@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from edit_policy import (  # noqa: E402
     apply_heat_phase_defaults,
+    apply_wardrobe_continuity,
     lint_heat_arc,
     lint_multi_heroine,
     lint_sex_vo_spice,
@@ -19,6 +20,7 @@ from edit_policy import (  # noqa: E402
     nar_has_spice,
     resolve_heroine_cast_mode,
     resolve_wardrobe_state,
+    wardrobe_undress_rank,
 )
 from film_spec import validate_film_spec  # noqa: E402
 
@@ -143,6 +145,93 @@ class HeatArcLintTests(unittest.TestCase):
         rep = lint_sex_wardrobe(shots, heat_scale="max")
         self.assertTrue(rep["ok"], rep)
         self.assertGreaterEqual(len(rep["undress_beats"]), 1)
+
+    def test_wardrobe_re_dress_fails(self) -> None:
+        """衣服回穿：undressed 之后又 full → HEAT_WARDROBE_RE_DRESS."""
+        shots = _spine(
+            ["setup", "foreplay", "act", "climax", "afterglow", "bridge", "bridge", "bridge"]
+        )
+        for sh in shots:
+            if sh["heat_phase"] == "afterglow":
+                sh["wardrobe_state"] = "full"
+                sh["dsl"]["wardrobe_state"] = "full"
+                sh["dsl"]["action"] = "stands fully clothed neat dress"
+                sh["dsl"]["subject"] = "adult woman full dress intact"
+        rep = lint_sex_wardrobe(shots, heat_scale="max")
+        self.assertIn("HEAT_WARDROBE_RE_DRESS", rep["codes"])
+        self.assertFalse(rep["ok"])
+
+    def test_wardrobe_continuity_inherits_forward(self) -> None:
+        shots = [
+            {
+                "id": "shot01",
+                "heat_phase": "foreplay",
+                "dramatic_function": "sensory",
+                "nar": "肩带一滑，卸甲。",
+                "wardrobe_state": "partial",
+                "dsl": {
+                    "subject": "x",
+                    "action": "removes armor strips",
+                    "motion": "m",
+                    "story_beat": "b",
+                    "visible_change": "armor falls",
+                    "wardrobe_state": "partial",
+                },
+            },
+            {
+                "id": "shot02",
+                "heat_phase": "act",
+                "dramatic_function": "action",
+                "nar": "沉腰吃进。",
+                # no wardrobe_state — must inherit partial (or bump undressed via max default)
+                "dsl": {
+                    "subject": "x",
+                    "action": "hips sink",
+                    "motion": "m",
+                    "story_beat": "b",
+                    "visible_change": "c",
+                },
+            },
+        ]
+        cont = apply_wardrobe_continuity(shots, heat_scale="max")
+        self.assertIn("shot02", cont["filled_ids"])
+        self.assertEqual(shots[1]["wardrobe_state"], "partial")
+        self.assertEqual(shots[1]["dsl"]["wardrobe_state"], "partial")
+        self.assertGreaterEqual(
+            wardrobe_undress_rank(shots[1]["wardrobe_state"]) or 0,
+            wardrobe_undress_rank("partial") or 0,
+        )
+
+    def test_write_spec_hard_on_re_dress(self) -> None:
+        shots = _spine(
+            ["setup", "foreplay", "act", "act", "climax", "afterglow", "bridge", "bridge"]
+        )
+        for sh in shots:
+            sh["dsl"]["camera"] = {"shot_size": "medium full", "angle": "eye level"}
+            sh["lipsync"] = False
+            if sh["heat_phase"] == "afterglow":
+                sh["wardrobe_state"] = "armored"
+                sh["dsl"]["wardrobe_state"] = "armored"
+                sh["dsl"]["action"] = "stands fully armored intact outfit"
+                sh["dsl"]["subject"] = "adult woman full armor intact"
+        spec = {
+            "title": "测回穿硬闸",
+            "vo_mode": "storyteller",
+            "tts_backend": "edge",
+            "heat_scale": "max",
+            "sex_wardrobe_strict": True,
+            "sex_floor_strict": False,
+            "sex_vo_strict": False,
+            "director_intent": {
+                "logline": "成人max卸装后回穿铠甲应 hard fail",
+                "tone": "成人",
+                "emotional_arc": ["起", "承", "转"],
+            },
+            "scenes": [{"shots": shots}],
+        }
+        with self.assertRaises(Exception) as ctx:
+            validate_film_spec(spec, assign_missing_ids=False)
+        self.assertIn("HEAT_WARDROBE_RE_DRESS", str(ctx.exception))
 
     def test_resolve_wardrobe_from_markers(self) -> None:
         shot = {

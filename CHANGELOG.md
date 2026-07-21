@@ -3,6 +3,15 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [1.4.2] — 2026-07-21
+
+### Changed
+
+- **卸装阶梯硬底强化**：`apply_wardrobe_continuity` 在 write-spec 继承前镜 `wardrobe_state`；rank 单调不降。
+- 新码 **`HEAT_WARDROBE_RE_DRESS`**：后镜穿回更「整齐」的衣服 → `sex_wardrobe_strict` hard fail。
+- Prompt 注入 `Costume continuity: NEVER re-dress` when state ≥ partial。
+- Docs: sex-undress-ladder · hard-defaults · schema · SKILL。
+
 ## [1.4.1] — 2026-07-21
 
 ### Changed

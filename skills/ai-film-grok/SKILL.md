@@ -118,7 +118,7 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 **弹性（跟 brief）**：`heat_scale` / 亲密核镜比 / 单·多女主——由 Prompt 与参考图推断。  
 **例外硬底**（`heat_scale=max` write-spec 默认 hard）：  
 1) 性爱片段 act+climax **时长 ≥20%**（`sex_floor_strict`）  
-2) **办事必须卸甲/脱衣**到 `wardrobe_state`=partial\|undressed\|bare，且有卸装动作拍（`sex_wardrobe_strict`）  
+2) **办事必须卸甲/脱衣**到 `wardrobe_state`=partial\|undressed\|bare，且有卸装动作拍（`sex_wardrobe_strict`）；**后镜延续前镜卸装、禁止回穿**（`HEAT_WARDROBE_RE_DRESS`）  
 3) **旁白全程荤梗**；act/climax 必须办事动词（`sex_vo_strict`）——实打实办事剧，禁纯文艺说书  
 见 [ecchi-story.md](references/ecchi-story.md) · [sex-duration-floor](references/lessons-2026-07-21-sex-duration-floor.md) · [sex-undress-ladder](references/lessons-2026-07-21-sex-undress-ladder.md) · [sex-vo-spice](references/lessons-2026-07-21-sex-vo-spice.md)。  
 

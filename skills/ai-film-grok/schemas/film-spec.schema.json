@@ -95,7 +95,7 @@
     },
     "sex_wardrobe_strict": {
       "type": "boolean",
-      "description": "Hard-fail when act/climax still full armor/dress or undress beat missing. Default true when heat_scale=max"
+      "description": "Hard-fail when act/climax still full armor/dress, undress beat missing, or wardrobe re-dresses mid-film (HEAT_WARDROBE_RE_DRESS). Default true when heat_scale=max. Continuity: wardrobe_state rank only rises; later shots inherit prior undress."
     },
     "sex_vo_strict": {
       "type": "boolean",
@@ -136,6 +136,39 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "Optional full cast id list"
+    },
+    "title_sequence": {
+      "type": "object",
+      "properties": {
+        "subtitle": { "type": "string" },
+        "tagline": { "type": "string" },
+        "show_motifs": { "type": "boolean", "default": true },
+        "style": {
+          "type": "string",
+          "enum": ["auto", "cinematic", "noir", "playful", "ecchi-rnb", "minimal"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "end_roll": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["auto", "full", "cast_only", "none"],
+          "default": "auto"
+        },
+        "cast_heading": { "type": "string", "default": "Cast" },
+        "crew_heading": { "type": "string", "default": "Crew" },
+        "show_shot_list": { "type": "boolean", "default": false },
+        "scroll_duration_sec": {
+          "type": "number",
+          "minimum": 2,
+          "maximum": 12,
+          "default": 5
+        }
+      },
+      "additionalProperties": true
     },
     "multi_heroine_strict": {
       "type": "boolean",
@@ -296,7 +329,7 @@
                 "wardrobe_state": {
                   "type": "string",
                   "enum": ["full", "armored", "partial", "undressed", "bare"],
-                  "description": "Costume ladder. act/climax must be partial|undressed|bare (not full/armored). See sex-undress-ladder lesson."
+                  "description": "Costume ladder (monotonic undress). act/climax must be partial|undressed|bare. Later shots must not re-dress below prior peak. Missing → inherit previous on write-spec. See sex-undress-ladder lesson."
                 },
                 "dsl": {
                   "type": "object",

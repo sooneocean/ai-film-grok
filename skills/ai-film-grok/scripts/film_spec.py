@@ -21,6 +21,7 @@ from edit_policy import (
     PolicyError,
     apply_coverage_defaults_to_shot,
     apply_heat_phase_defaults,
+    apply_wardrobe_continuity,
     lint_character_stance,
     lint_heat_arc,
     lint_multi_heroine,
@@ -600,9 +601,11 @@ def validate_film_spec(
     shots: list[dict[str, Any]] = []
     seen: set[str] = set()
     previous_axes: list[str] = []
+    previous_viewpoints: list[str] = []
     previous_focal: str | None = None
     previous_viewpoint: str | None = None
     previous_look: str | None = None
+    previous_end_pose: str | None = None
     # Cast ids for multi-stance (style-bible keys or director_intent.cast)
     cast_ids: list[str] = []
     di = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
@@ -697,16 +700,30 @@ def validate_film_spec(
                     shot_index=len(shots),
                     previous_axes=previous_axes,
                     previous_focal=previous_focal,
+                    previous_viewpoints=previous_viewpoints,
                     previous_viewpoint=previous_viewpoint,
                     previous_look=previous_look,
+                    previous_end_pose=previous_end_pose,
                     cast_ids=cast_ids,
                 )
                 ax = str((cov or {}).get("camera_axis") or "").strip()
                 if ax:
                     previous_axes.append(ax)
                 previous_focal = str((cov or {}).get("focal_character") or previous_focal or "")
-                previous_viewpoint = str((cov or {}).get("viewpoint") or previous_viewpoint or "")
+                
+                vp = str((cov or {}).get("viewpoint") or "")
+                if vp:
+                    previous_viewpoints.append(vp)
+                    previous_viewpoint = vp
+                else:
+                    previous_viewpoint = previous_viewpoint or ""
+                
                 previous_look = str((cov or {}).get("look_axis") or previous_look or "")
+                
+                ep = str(shot.get("dsl", {}).get("end_pose") or shot.get("end_pose") or "")
+                if ep:
+                    previous_end_pose = ep
+                    
             except PolicyError as exc:
                 raise FilmSpecError(str(exc)) from exc
             dsl = shot.get("dsl")
@@ -773,6 +790,18 @@ def validate_film_spec(
         )
     except AudioRecipeError as exc:
         raise FilmSpecError(str(exc)) from exc
+
+    # Voice-coupled editorial strategy (after vocal_color exists)
+    try:
+        from edit_strategy import EditStrategyError, apply_edit_strategy_to_spec
+
+        apply_edit_strategy_to_spec(spec)
+    except EditStrategyError as exc:
+        raise FilmSpecError(str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001 — soft: never block write-spec
+        notes = list(spec.get("_edit_strategy_errors") or [])
+        notes.append(str(exc))
+        spec["_edit_strategy_errors"] = notes
 
     spec["_vo_budget"] = {
         "max_nar_chars": MAX_NAR_CHARS,
@@ -1207,6 +1236,22 @@ def validate_film_spec(
         audience_profile = intent.get("audience_profile")
     elif isinstance(spec.get("audience_profile"), str):
         audience_profile = spec.get("audience_profile")
+    # 卸装阶梯延续：前镜状态继承；衣服不回穿（lint HEAT_WARDROBE_RE_DRESS）
+    wardrobe_cont = apply_wardrobe_continuity(shots, heat_scale=heat_scale)
+    if wardrobe_cont.get("filled_ids") or wardrobe_cont.get("bumped_ids"):
+        notes = list(spec.get("_heat_notes") or [])
+        bits = []
+        if wardrobe_cont.get("filled_ids"):
+            bits.append(
+                "wardrobe inherit: " + ",".join(wardrobe_cont["filled_ids"][:12])
+            )
+        if wardrobe_cont.get("bumped_ids"):
+            bits.append(
+                "wardrobe undress-bump: " + ",".join(wardrobe_cont["bumped_ids"][:12])
+            )
+        notes.append("; ".join(bits))
+        spec["_heat_notes"] = notes
+    spec["_wardrobe_continuity"] = wardrobe_cont
     heat_rep = lint_heat_arc(
         shots,
         heat_scale=heat_scale,
@@ -1222,11 +1267,31 @@ def validate_film_spec(
             "heat arc lint failed (heat_arc_strict): "
             + ",".join(heat_rep["codes"] or ["HEAT"])
         )
-    # Sex duration floor (act+climax ≥20% plate by default for heat_scale=max).
-    # Opt-out: sex_floor_strict: false. Opt-in higher: sex_min_duration_ratio / hardcore profile.
     sex_floor_strict = spec.get("sex_floor_strict")
     if sex_floor_strict is None:
         sex_floor_strict = heat_scale == "max"
+        
+    if "HEAT_SEX_DURATION_LOW" in (heat_rep.get("codes") or []):
+        # Proactive orchestration: Auto-extend act/climax shots to meet ratio
+        act_shots = [
+            sh for sh in shots if isinstance(sh, dict) 
+            and str(sh.get("heat_phase") or "").strip().lower() in {"act", "climax"}
+        ]
+        if act_shots:
+            for sh in act_shots:
+                sh["duration_sec"] = max(10.0, float(sh.get("duration_sec") or DEFAULT_DURATION_SEC))
+            # Re-lint after auto-extension
+            heat_rep = lint_heat_arc(
+                shots,
+                heat_scale=heat_scale,
+                intimacy_min_ratio=spec.get("intimacy_min_ratio"),
+                setup_max_ratio=spec.get("setup_max_ratio"),
+                sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
+                audience_profile=audience_profile,
+                advise=heat_advise,
+            )
+            spec["_heat_arc"] = heat_rep
+
     if sex_floor_strict is True and "HEAT_SEX_DURATION_LOW" in (heat_rep.get("codes") or []):
         ratio = heat_rep.get("sex_duration_ratio")
         floor = heat_rep.get("sex_duration_floor")
@@ -1236,7 +1301,7 @@ def validate_film_spec(
             "raise act+climax duration_sec share to ≥20% of total (or set "
             "sex_min_duration_ratio / sex_floor_strict:false). See ecchi-story.md"
         )
-    # Sex wardrobe: act/climax must undress (卸甲/脱衣→裸露); default hard on max.
+    # Sex wardrobe: act/climax must undress; continuity monotonic (衣服不回穿); hard on max.
     sex_wardrobe_strict = spec.get("sex_wardrobe_strict")
     if sex_wardrobe_strict is None:
         sex_wardrobe_strict = heat_scale == "max"
@@ -1248,6 +1313,7 @@ def validate_film_spec(
             "HEAT_SEX_WARDROBE_DRESSED",
             "HEAT_SEX_WARDROBE_WEAK",
             "HEAT_UNDRESS_BEAT_MISSING",
+            "HEAT_WARDROBE_RE_DRESS",
         }
     ]
     if sex_wardrobe_strict is True and wardrobe_fail_codes:
@@ -1255,8 +1321,8 @@ def validate_film_spec(
             "sex wardrobe ladder failed (sex_wardrobe_strict): "
             + ",".join(wardrobe_fail_codes)
             + " — act/climax must set wardrobe_state=partial|undressed|bare "
-            "(or dsl bare skin / armor off / 半裸 / 卸甲) and include an undress beat. "
-            "禁止全装铠甲办事。See lessons-2026-07-21-sex-undress-ladder.md"
+            "(or dsl bare skin / armor off / 半裸 / 卸甲); include undress beat; "
+            "后镜必须延续前镜卸装状态、禁止回穿。See lessons-2026-07-21-sex-undress-ladder.md"
         )
     # VO 荤梗：实打实办事剧，旁白全程要荤；act/climax 要办事动词
     sex_vo_strict = spec.get("sex_vo_strict")

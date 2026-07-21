@@ -186,6 +186,7 @@ def suggest_viewpoint(
     dramatic_function: str,
     *,
     focal: str | None = None,
+    previous_viewpoints: list[str] | None = None,
     previous_viewpoint: str | None = None,
     previous_focal: str | None = None,
     shot_index: int = 0,
@@ -193,9 +194,23 @@ def suggest_viewpoint(
     """Pick viewpoint grammar for multi-stance cinema (not always objective)."""
     fn = (dramatic_function or "bridge").strip().lower()
     foc = normalize_focal_character(focal)
-    prev_v = (previous_viewpoint or "").strip().lower()
+    
+    if previous_viewpoints and len(previous_viewpoints) > 0:
+        prev_v = previous_viewpoints[-1].strip().lower()
+    else:
+        prev_v = (previous_viewpoint or "").strip().lower()
+        
     prev_f = normalize_focal_character(previous_focal) if previous_focal else ""
     focal_shifted = bool(prev_f and foc and prev_f != foc)
+    
+    # Anti-flat optimization (Lookahead check)
+    if previous_viewpoints and len(previous_viewpoints) >= 2:
+        if previous_viewpoints[-1] == "objective" and previous_viewpoints[-2] == "objective":
+            # Force break out of objective soup
+            if fn in {"action", "approach"}:
+                return "ots"
+            return "reaction_to" if fn == "reaction" else "ots"
+
 
     if fn == "sensory":
         return "insert_object"
@@ -683,6 +698,16 @@ def suggest_edit_craft(
     nvp = (next_viewpoint or "").strip().lower()
     if flu not in {"auto", "silk", "punchy", "cinematic"}:
         flu = "auto"
+        
+    # --- Rhythmic Editing (Action/Climax Accents) ---
+    if next_b in {"action", "climax"}:
+        if cross_scene:
+            return "smash_cut"
+        if chain in {"continue", "match", "match_cut", "byte"} or cut_on in {"action", "mid-action", "mid_motion"}:
+            return "cut_on_action"
+        if flu == "punchy":
+            return "smash_cut"
+
     # Character stance: focal flip → reverse/contrast energy (still hard on continue)
     if focal_changed and nvp in {"reverse", "reaction_to", "ots"}:
         if chain in {"continue", "match", "match_cut", "byte"}:
@@ -817,7 +842,7 @@ def _punctuate_soft_run(crafts: list[str], *, fluency: str = "auto") -> list[str
     }
     run = 0
     out: list[str] = []
-    max_soft_run = 2 if fluency == "punchy" else 3
+    max_soft_run = 1 if fluency == "punchy" else 2
     for c in crafts:
         if c in softish:
             run += 1
@@ -1751,6 +1776,10 @@ def inject_micro_motion_cues(
             out = f"{out}, {suffix}, idle not speaking"
     if camera_axis and infer_camera_axis(out) is None:
         out = inject_camera_axis_phrase(out, camera_axis)
+        
+    if fn in {"hook", "approach", "action"}:
+        out = out.replace("soft lean", "lean hard").replace("gentle sway", "decisive motion").replace("soft breath", "sharp breath").replace("fingers slowly", "fingers snap").replace("hair drifts", "hair whips")
+        
     return out
 
 
@@ -1761,8 +1790,10 @@ def apply_coverage_defaults_to_shot(
     shot_index: int = 0,
     previous_axes: list[str] | None = None,
     previous_focal: str | None = None,
+    previous_viewpoints: list[str] | None = None,
     previous_viewpoint: str | None = None,
     previous_look: str | None = None,
+    previous_end_pose: str | None = None,
     cast_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Fill missing motion / camera / framing / camera_axis / stance from beat grammar.
@@ -1806,6 +1837,7 @@ def apply_coverage_defaults_to_shot(
             viewpoint = suggest_viewpoint(
                 dramatic_function,
                 focal=focal,
+                previous_viewpoints=previous_viewpoints,
                 previous_viewpoint=previous_viewpoint,
                 previous_focal=previous_focal,
                 shot_index=shot_index,
@@ -1816,6 +1848,7 @@ def apply_coverage_defaults_to_shot(
         viewpoint = suggest_viewpoint(
             dramatic_function,
             focal=focal,
+            previous_viewpoints=previous_viewpoints,
             previous_viewpoint=previous_viewpoint,
             previous_focal=previous_focal,
             shot_index=shot_index,
@@ -1915,6 +1948,16 @@ def apply_coverage_defaults_to_shot(
         dsl["framing"] = ", ".join(b for b in bits if b)
         camera.setdefault("framing", dsl["framing"])
         filled.append("dsl.framing")
+        
+    # --- Continuity Auto-Injection ---
+    chain_mode = (dsl.get("chain_mode") or shot.get("chain_mode") or "").strip().lower()
+    if chain_mode in {"continue", "match", "match_cut", "soft"} and previous_end_pose:
+        author_start_pose = dsl.get("start_pose") or shot.get("start_pose")
+        if not author_start_pose or not str(author_start_pose).strip():
+            dsl["start_pose"] = previous_end_pose.strip()
+            shot["start_pose"] = previous_end_pose.strip()
+            filled.append("dsl.start_pose (auto-injected from previous end_pose)")
+
     report = {
         "dramatic_function": defaults["dramatic_function"],
         "filled": filled,
@@ -1974,7 +2017,15 @@ DEFAULT_SHOT_DURATION_SEC = 6.0
 
 # Wardrobe ladder for sex (办事必须卸甲/脱衣 · 2026-07-21)
 # full/armored = 登场定妆；partial = 失序半脱；undressed/bare = 办事层裸露可读
+# Rank is undress progress only — must be monotonic non-decreasing (衣服不回穿)
 WARDROBE_STATES = frozenset({"full", "armored", "partial", "undressed", "bare"})
+WARDROBE_UNDRESS_RANK: dict[str, int] = {
+    "full": 0,
+    "armored": 1,
+    "partial": 2,
+    "undressed": 3,
+    "bare": 4,
+}
 SEX_WARDROBE_OK = frozenset({"partial", "undressed", "bare"})
 SEX_WARDROBE_STRONG = frozenset({"undressed", "bare"})  # hardcore prefers these
 _EXPOSED_WARDROBE_MARKERS: tuple[str, ...] = (
@@ -2421,6 +2472,86 @@ def shot_has_undress_action(shot: dict[str, Any]) -> bool:
     return any(m in blob for m in _UNDRESS_ACTION_MARKERS)
 
 
+def wardrobe_undress_rank(state: str | None) -> int | None:
+    """Higher = more undressed. None if unknown."""
+    if not state:
+        return None
+    return WARDROBE_UNDRESS_RANK.get(str(state).strip().lower())
+
+
+def _write_shot_wardrobe_state(shot: dict[str, Any], state: str) -> None:
+    """Persist wardrobe_state on shot + dsl (continuity carry / clamp write-back)."""
+    shot["wardrobe_state"] = state
+    dsl = shot.get("dsl")
+    if not isinstance(dsl, dict):
+        dsl = {}
+        shot["dsl"] = dsl
+    dsl["wardrobe_state"] = state
+
+
+def apply_wardrobe_continuity(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+) -> dict[str, Any]:
+    """Carry wardrobe_state forward; never re-dress; fill act/climax defaults on max/hot.
+
+    Product rule (2026-07-21+): 卸装阶梯必须 · 分镜延续前镜状态 · **衣服不回穿**.
+    - Missing state inherits previous known state
+    - Undress action on still-dressed shot bumps to at least ``partial``
+    - act/climax without state on max/hot defaults to ``undressed``
+    - Explicit regression is NOT auto-clamped here (lint raises HEAT_WARDROBE_RE_DRESS)
+    """
+    scale = (heat_scale or "").strip().lower() or None
+    prev_state: str | None = None
+    filled: list[str] = []
+    bumped: list[str] = []
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        sid = str(shot.get("id") or "?")
+        ph = infer_heat_phase(shot)
+        st = resolve_wardrobe_state(shot)
+        undress = shot_has_undress_action(shot)
+
+        if st is None and prev_state is not None:
+            _write_shot_wardrobe_state(shot, prev_state)
+            st = prev_state
+            filled.append(sid)
+
+        if undress:
+            r = wardrobe_undress_rank(st)
+            # Still full/armored while undressing → at least partial mid-strip
+            if r is None or r < WARDROBE_UNDRESS_RANK["partial"]:
+                _write_shot_wardrobe_state(shot, "partial")
+                st = "partial"
+                bumped.append(sid)
+
+        if st is None and scale in {"max", "hot"} and ph in SEX_PHASES:
+            # Sex beat with no evidence: default undressed (must not stay armored)
+            _write_shot_wardrobe_state(shot, "undressed")
+            st = "undressed"
+            filled.append(sid)
+
+        if st is not None:
+            # Advance running peak only when not regressing (regress handled by lint)
+            pr = wardrobe_undress_rank(prev_state)
+            sr = wardrobe_undress_rank(st)
+            if pr is None or (sr is not None and sr >= pr):
+                prev_state = st
+            # if regressing, keep prev_state peak for subsequent inherit
+        elif prev_state is not None:
+            # already inherited above when st was None
+            pass
+
+    return {
+        "filled_ids": filled,
+        "bumped_ids": bumped,
+        "final_peak": prev_state,
+        "note": "wardrobe continuity: inherit forward; undress bumps partial; no re-dress",
+    }
+
+
 def lint_sex_wardrobe(
     shots: list[dict[str, Any]],
     *,
@@ -2433,6 +2564,7 @@ def lint_sex_wardrobe(
     Product rule (2026-07-21): 办事 = 卸甲/脱衣 → 裸露可读。
     act/climax wardrobe_state must be partial|undressed|bare (hardcore prefers undressed|bare).
     At least one undress-action beat in foreplay or early act.
+    Continuity (2026-07-21+): wardrobe rank monotonic — **衣服不回穿** (HEAT_WARDROBE_RE_DRESS).
     """
     scale = (heat_scale or "").strip().lower() or None
     profile = (audience_profile or "").strip().lower() or None
@@ -2446,11 +2578,15 @@ def lint_sex_wardrobe(
     per_shot: list[dict[str, Any]] = []
     sex_shots: list[tuple[dict[str, Any], str]] = []
     undress_beats: list[str] = []
+    re_dress_ids: list[str] = []
 
     def _issue(code: str, severity: str, message: str) -> None:
         codes.append(code)
         issues.append({"code": code, "severity": severity, "message": message})
 
+    peak_rank = -1
+    peak_state: str | None = None
+    peak_sid: str | None = None
     for shot in shots:
         if not isinstance(shot, dict):
             continue
@@ -2458,19 +2594,64 @@ def lint_sex_wardrobe(
         ph = infer_heat_phase(shot)
         st = resolve_wardrobe_state(shot)
         undress = shot_has_undress_action(shot)
+        rank = wardrobe_undress_rank(st)
         row = {
             "id": sid,
             "heat_phase": ph,
             "wardrobe_state": st,
             "undress_action": undress,
+            "undress_rank": rank,
         }
+        # Monotonic: known state cannot drop below peak undress so far
+        if rank is not None and peak_rank >= 0 and rank < peak_rank:
+            re_dress_ids.append(
+                f"{sid}:{st}<{peak_state}(from {peak_sid or '?'})"
+            )
+            row["re_dress"] = True
+        if rank is not None and rank > peak_rank:
+            peak_rank = rank
+            peak_state = st
+            peak_sid = sid or None
+        elif rank is not None and peak_rank < 0:
+            peak_rank = rank
+            peak_state = st
+            peak_sid = sid or None
         per_shot.append(row)
         if undress and ph in {"foreplay", "act", "setup"}:
             undress_beats.append(sid or ph)
         if ph in SEX_PHASES:
             sex_shots.append((shot, ph))
 
-    if scale not in {"max", "hot"} or not sex_shots:
+    if scale not in {"max", "hot"}:
+        # Still report re-dress if any (soft product rule for all scales when states present)
+        if re_dress_ids:
+            _issue(
+                "HEAT_WARDROBE_RE_DRESS",
+                "warning",
+                "wardrobe re-dressed mid-film (衣服回穿) — "
+                f"{', '.join(re_dress_ids[:8])}"
+                + ("…" if len(re_dress_ids) > 8 else "")
+                + "。卸装状态只可前进 full→armored→partial→undressed→bare，"
+                "后镜必须延续前镜；禁止穿回。",
+            )
+        warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+        return {
+            "ok": warn_n == 0,
+            "codes": sorted(set(codes)),
+            "warning_count": warn_n,
+            "info_count": 0,
+            "issues": issues,
+            "heat_scale": scale,
+            "sex_shot_count": len(sex_shots),
+            "undress_beats": undress_beats,
+            "re_dress_shots": re_dress_ids,
+            "per_shot": per_shot,
+            "required_states": sorted(ok_states),
+            "peak_state": peak_state,
+            "note": "wardrobe continuity checked; sex ladder skipped (no max/hot)",
+        }
+
+    if not sex_shots and not re_dress_ids:
         return {
             "ok": True,
             "codes": [],
@@ -2478,10 +2659,12 @@ def lint_sex_wardrobe(
             "info_count": 0,
             "issues": [],
             "heat_scale": scale,
-            "sex_shot_count": len(sex_shots),
+            "sex_shot_count": 0,
             "undress_beats": undress_beats,
+            "re_dress_shots": [],
             "per_shot": per_shot,
             "required_states": sorted(ok_states),
+            "peak_state": peak_state,
             "note": "wardrobe sex lint skipped (no max/hot sex phases)",
         }
 
@@ -2521,7 +2704,7 @@ def lint_sex_wardrobe(
             "hardcore: act/climax wardrobe only partial — prefer undressed|bare "
             f"({', '.join(weak_ids[:8])})",
         )
-    if not undress_beats:
+    if not undress_beats and sex_shots:
         _issue(
             "HEAT_UNDRESS_BEAT_MISSING",
             "warning",
@@ -2529,6 +2712,16 @@ def lint_sex_wardrobe(
             "add a foreplay/act shot that visibly removes armor/clothes "
             "(dsl.action: removes armor / strips / 脱下 / 卸甲). "
             "Sex must not jump from full costume to climax without undress.",
+        )
+    if re_dress_ids:
+        _issue(
+            "HEAT_WARDROBE_RE_DRESS",
+            "warning",
+            "wardrobe re-dressed after undress (衣服回穿) — "
+            f"{', '.join(re_dress_ids[:8])}"
+            + ("…" if len(re_dress_ids) > 8 else "")
+            + "。分镜必须延续前镜卸装状态；rank 只可前进 "
+            "full→armored→partial→undressed→bare。禁止 afterglow/后续镜穿回全装。",
         )
 
     warn_n = sum(1 for i in issues if i.get("severity") == "warning")
@@ -2544,11 +2737,14 @@ def lint_sex_wardrobe(
         "undress_beats": undress_beats,
         "dressed_sex_shots": dressed_ids,
         "weak_sex_shots": weak_ids,
+        "re_dress_shots": re_dress_ids,
         "per_shot": per_shot,
         "required_states": sorted(ok_states),
+        "peak_state": peak_state,
         "note": (
             "Sex wardrobe ladder: full/armored → partial → undressed/bare. "
-            "act+climax must be exposed; undress beat required. "
+            "act+climax must be exposed; undress beat required; "
+            "continuity monotonic (衣服不回穿). "
             "See references/lessons-2026-07-21-sex-undress-ladder.md"
         ),
     }
@@ -2933,6 +3129,8 @@ def lint_heat_arc(
             "codes": wardrobe_rep.get("codes"),
             "undress_beats": wardrobe_rep.get("undress_beats"),
             "dressed_sex_shots": wardrobe_rep.get("dressed_sex_shots"),
+            "re_dress_shots": wardrobe_rep.get("re_dress_shots"),
+            "peak_state": wardrobe_rep.get("peak_state"),
             "per_shot": wardrobe_rep.get("per_shot"),
             "required_states": wardrobe_rep.get("required_states"),
         },
@@ -2945,9 +3143,9 @@ def lint_heat_arc(
             "per_shot": vo_rep.get("per_shot"),
         },
         "note": (
-            "Sex floor ≥20% duration; undress ladder; VO 荤梗 on every nar for max "
-            "(sex_vo_strict). See ecchi-story.md · sex-duration-floor · "
-            "sex-undress-ladder · sex-vo-spice lessons."
+            "Sex floor ≥20% duration; undress ladder + continuity (衣服不回穿); "
+            "VO 荤梗 on every nar for max (sex_vo_strict). "
+            "See ecchi-story.md · sex-duration-floor · sex-undress-ladder · sex-vo-spice."
         ),
     }
 

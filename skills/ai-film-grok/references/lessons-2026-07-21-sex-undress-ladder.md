@@ -35,7 +35,20 @@
 
 1. **act/climax** 不得为 `full` / `armored` / 未声明且无裸露词  
 2. 必须存在 **卸甲/脱衣动作拍**（`HEAT_UNDRESS_BEAT_MISSING`）  
-3. 码：`HEAT_SEX_WARDROBE_DRESSED` · `HEAT_UNDRESS_BEAT_MISSING` · hardcore 另有 `HEAT_SEX_WARDROBE_WEAK`
+3. **分镜延续 + 衣服不回穿**（2026-07-21 强化）：`wardrobe_state` rank 只可前进  
+   `full(0) → armored(1) → partial(2) → undressed(3) → bare(4)`  
+   后镜未写状态 → write-spec **继承前镜**；后镜写更「穿好」的状态 → **`HEAT_WARDROBE_RE_DRESS` hard fail**  
+4. 码：`HEAT_SEX_WARDROBE_DRESSED` · `HEAT_UNDRESS_BEAT_MISSING` · `HEAT_WARDROBE_RE_DRESS` · hardcore 另有 `HEAT_SEX_WARDROBE_WEAK`
+
+### 延续规则（agent / 作者）
+
+| 规则 | 做法 |
+|---|---|
+| 卸装只前进 | afterglow / 后续镜 **禁止** 回到 full/armored |
+| 未写状态 | `apply_wardrobe_continuity` 继承上一镜 |
+| 有卸装动作 | 仍 full/armored 时自动至少抬到 `partial` |
+| 静帧/I2V | prompt 注入 `Costume continuity: wardrobe_state=… NEVER re-dress` |
+| 跨镜 cast | 禁止对 undressed 镜再 `image_edit(full armor cast)` 当办事 |
 
 ### 写法（film-spec）
 

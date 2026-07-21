@@ -62,13 +62,13 @@ def run_preflight(root: Path) -> dict[str, Any]:
         hard.append(_issue("hard", "no_manifest", "missing manifest.json", fix="aifilm init …"))
     if not spec:
         hard.append(_issue("hard", "no_spec", "missing film-spec.json", fix="aifilm write-spec --root …"))
-    if not style.get("locked"):
+    if style.get("state") != "Approved" and not style.get("locked"):
         soft.append(
             _issue(
                 "soft",
-                "style_unlocked",
-                "style-bible not locked",
-                fix='aifilm lock-style --root … --canonical … --cast-master … --signature "…"',
+                "style_not_approved",
+                f"Visual Bible state is {style.get('state', 'Unknown')} (unlocked), expected Approved",
+                fix='aifilm bible lock --root …',
             )
         )
 
@@ -296,6 +296,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 "HEAT_SEX_WARDROBE_DRESSED",
                 "HEAT_SEX_WARDROBE_WEAK",
                 "HEAT_UNDRESS_BEAT_MISSING",
+                "HEAT_WARDROBE_RE_DRESS",
             ):
                 if wcode in heat_codes:
                     soft.append(
@@ -305,12 +306,15 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             (
                                 f"sex wardrobe ladder: {wcode} — "
                                 f"dressed={((heat_rep.get('wardrobe') or {}).get('dressed_sex_shots'))} "
-                                f"undress_beats={((heat_rep.get('wardrobe') or {}).get('undress_beats'))}"
+                                f"undress_beats={((heat_rep.get('wardrobe') or {}).get('undress_beats'))} "
+                                f"re_dress={((heat_rep.get('wardrobe') or {}).get('re_dress_shots'))} "
+                                f"peak={((heat_rep.get('wardrobe') or {}).get('peak_state'))}"
                             ),
                             fix=(
                                 "act/climax: wardrobe_state=partial|undressed|bare; "
                                 "add foreplay undress action (removes armor / 卸甲 / 脱下); "
-                                "still/I2V must show armor/clothes off, not full costume straddle. "
+                                "still/I2V must show armor/clothes off; "
+                                "后镜延续前镜卸装、禁止回穿 (rank only rises). "
                                 "See lessons-2026-07-21-sex-undress-ladder.md"
                             ),
                         )
