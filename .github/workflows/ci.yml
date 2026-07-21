@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  validate-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          # skill is mostly stdlib + local scripts; pytest for unit suite
+          pip install pytest
+
+      - name: Validate plugin.json shape
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("plugin.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          for key in ("name", "version", "description"):
+              assert key in data and str(data[key]).strip(), f"missing {key}"
+          assert data["name"] == "ai-film-grok"
+          skill = Path("skills/ai-film-grok/SKILL.md")
+          assert skill.is_file(), "skill body missing"
+          aifilm = Path("skills/ai-film-grok/scripts/aifilm")
+          assert aifilm.is_file(), "aifilm entry missing"
+          print("plugin.json + layout OK:", data["name"], data["version"])
+          PY
+
+      - name: Pytest (skill)
+        working-directory: skills/ai-film-grok
+        run: |
+          python -m pytest tests/ -q --tb=line
+        env:
+          # keep network-off friendly; tests should be local
+          AIFILM_CI: "1"

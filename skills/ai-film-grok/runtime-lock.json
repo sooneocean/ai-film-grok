@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "python": "3.11.15",
+  "commands": {
+    "ffmpeg": "ffmpeg version 8.1 Copyright (c) 2000-2026 the FFmpeg developers",
+    "ffprobe": "ffprobe version 8.1 Copyright (c) 2007-2026 the FFmpeg developers"
+  },
+  "packages": {
+    "numpy": "1.26.4",
+    "Pillow": "12.2.0",
+    "edge-tts": "7.2.8",
+    "jsonschema": "4.23.0"
+  },
+  "scripts": {
+    "scripts/aifilm": "e55bded972a538f531fe7452b7ab28439cf4ff316b466f773a664195897ffcfa",
+    "scripts/aifilm_grok.py": "57f22c828c06b98fb5ede0d3a18d886e6354ba8645402c01874755d793e36612",
+    "scripts/backend-lock": "60b86b253cb393b587af4ca6e63a2403daa42b515f7501fffe407e2b8e257f25",
+    "scripts/backend_lock.py": "3003312dc63fdd1909430e91e91f9f9edca9e36175998ebc884c14e513c5845e",
+    "scripts/edit_policy.py": "fb4844950ac5abaca8c154108ed2eecde3aa96a0f3f881aae46b97300c92acc9",
+    "scripts/film_spec.py": "6260fd7ad4f63d0f3d5b3cf16f90f4362b10905e3988b4c404921822880c7c08",
+    "scripts/lipsync_backend.py": "b9d0f1f87bef2948ee6514353b077b1f295758b6a2d179aa67640c1b69b32723",
+    "scripts/make_sfx_bed.py": "6c50c7905e4b94e919f2a250c629d4cbc49626f23182ba61e9ca348657189fe5",
+    "scripts/media_qa.py": "8b0f998d0fb0b03600b3824587d7ebd540af69b287fcee409b6fd55e8d7ab690",
+    "scripts/media-queue": "da195a2746cf766603bca02d970ff22679a4481d3f245bb0ce28538210bf2ae0",
+    "scripts/media_queue.py": "31cd8dfb46dd6ac9312cdcf0be23712e04a16172788eda1a3e7bef1707fc70ae",
+    "scripts/production_gates.py": "ee29b6d0a289d9ad13800ea8f2d67b2a650231497b06f8b0544566c21bc373e3",
+    "scripts/render_final.py": "63309f8551f6538ac5af047ccf38aa8aadb6a243eeda303f6d7a09eb862529b3",
+    "scripts/runtime_policy.py": "9572aebf493d22325b232dafe035d284c6bc58f17bd1c584b51ec6e005bf3a71",
+    "scripts/security_policy.py": "37cbbc9f5a73ef49c15a698a074eea5987b291ef4b871514213d86aae63dd21f",
+    "scripts/tts_backend.py": "2b65ae15c822910d499c14cdc80feea80b58a66f527ca16bbb3c15dda605e4ad",
+    "scripts/test-skill": "4b36a731a4f344763af04552f56d37acf023b5b39bb62eb9cc715c4c17d412c6",
+    "scripts/adapters/cosyvoice_infer.example.py": "d7f7f0caff898f566eedad2485e4027ba49aac736e8cfe9cca5cc97913e98462"
+  },
+  "requirements_sha256": "b0acb41843d88a97955a7f14a300c9f873957f3e7a6da00bc3343e178289728a"
+}

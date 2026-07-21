@@ -1,0 +1,5 @@
+# Exact Python runtime used to validate ai-film-grok on 2026-07-15.
+numpy==1.26.4
+Pillow==12.2.0
+edge-tts==7.2.8
+jsonschema==4.23.0

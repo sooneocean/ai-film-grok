@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+
+from dispatch import build_dispatch  # noqa: E402
+
+
+class DispatchTests(unittest.TestCase):
+    def test_dispatch_packet_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "brief.json").write_text('{"title":"t","theme":"x"}\n', encoding="utf-8")
+            (root / "film-spec.json").write_text(
+                json.dumps(
+                    {
+                        "title": "t",
+                        "tts_backend": "edge",
+                        "shots": [{"id": "shot01", "nar": "话说", "dramatic_function": "hook"}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            packet = build_dispatch(
+                root,
+                gates={},
+                include_capability=True,
+                write_receipt=True,
+            )
+            self.assertTrue(packet.get("ok"))
+            self.assertIn("craft_stage", packet)
+            self.assertIn("next_actions", packet)
+            self.assertIn("agent_do", packet)
+            self.assertIn("routing", packet)
+            self.assertTrue(Path(packet["receipt_path"]).is_file())
+            self.assertEqual(packet["routing"].get("tts_default"), "edge")
+            self.assertIn("off", packet["routing"].get("lipsync", ""))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,538 @@
+"""compose-render: register-final, remotion media copy, layout underlay."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+
+from compose_render import (  # noqa: E402
+    ComposeRenderError,
+    assert_underlay_not_double_burn,
+    compose_render,
+    copy_remotion_media,
+    ensure_audio_mux,
+    probe_designed_post_tooling,
+    probe_has_audio,
+    probe_remotion_readiness,
+    register_final_film,
+    remotion_actionable_next_steps,
+    remotion_npm_install,
+)
+from export_composition import export_composition  # noqa: E402
+from runtime_policy import sha256  # noqa: E402
+
+
+def _ffmpeg_available() -> bool:
+    return (
+        subprocess.call(
+            ["ffmpeg", "-version"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        == 0
+    )
+
+
+def _make_motion_clip(path: Path, *, seconds: float = 2.0, with_audio: bool = True) -> None:
+    """Synthetic clip with continuous motion (testsrc2) so media_qa motion_ok can pass."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    motion = path.with_suffix(".motion.mp4")
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"testsrc2=s=160x90:r=24:d={seconds}",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            str(motion),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    if with_audio:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(motion),
+                "-f",
+                "lavfi",
+                "-i",
+                f"sine=frequency=440:duration={seconds}",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-shortest",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        motion.unlink(missing_ok=True)
+    else:
+        motion.replace(path)
+
+
+def _seed_film(root: Path, *, n_shots: int = 1, with_final: bool = False) -> None:
+    for name in ("clips", "out", "receipts", "keyframes", "prompts", "audio", "canonical"):
+        (root / name).mkdir(parents=True, exist_ok=True)
+    shots = []
+    clips = {}
+    for i in range(1, n_shots + 1):
+        sid = f"shot{i:02d}"
+        shots.append(
+            {
+                "id": sid,
+                "dramatic_function": "hook" if i == 1 else "reaction",
+                "nar": f"话说第{i}镜。",
+                "duration_sec": 6,
+                "lipsync": False,
+                "dsl": {
+                    "subject": "woman",
+                    "action": "looks",
+                    "motion": "slow push-in, soft blink, breathing, idle not speaking",
+                },
+            }
+        )
+        clip = root / "clips" / f"{sid}.mp4"
+        # placeholder bytes enough for export path checks; motion tests use real ffmpeg files
+        clip.write_bytes(b"\x00fake")
+        clips[sid] = {
+            "shot_id": sid,
+            "path": str(clip),
+            "status": "approved",
+            "duration_sec": 6.0,
+            "source_endpoint": "image_to_video",
+            "identity_approved": True,
+            "motion_approved": True,
+            "sha256": "x",
+        }
+    spec = {
+        "title": "compose-render-test",
+        "vo_mode": "storyteller",
+        "transition_sec": 0.28,
+        "director_intent": {
+            "logline": "测试 compose-render 正式注册链路的完整句子。",
+            "tone": "测试",
+            "emotional_arc": ["a", "b", "c"],
+        },
+        "scenes": [{"shots": shots}],
+    }
+    (root / "film-spec.json").write_text(
+        json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    outputs: dict = {}
+    if with_final and _ffmpeg_available():
+        final = root / "out" / "film_final.mp4"
+        _make_motion_clip(final, seconds=1.2, with_audio=True)
+        outputs["final_film"] = {
+            "path": "film_final.mp4",
+            "sha256": sha256(final),
+            "duration_sec": 1.2,
+        }
+    (root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "title": "compose-render-test",
+                "width": 720,
+                "height": 1280,
+                "fps": 30,
+                "clips": clips,
+                "gates": {},
+                "outputs": outputs,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+@unittest.skipUnless(_ffmpeg_available(), "ffmpeg required")
+class RegisterFinalTests(unittest.TestCase):
+    def test_register_final_writes_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film(root)
+            src = root / "out" / "src.mp4"
+            _make_motion_clip(src, seconds=1.0, with_audio=True)
+            result = register_final_film(
+                root,
+                src,
+                out_name="film_final.mp4",
+                post_engine="hyperframes",
+                force=True,
+            )
+            self.assertTrue(result["ok"])
+            self.assertFalse(result["final_complete"])
+            man = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            ff = man["outputs"]["final_film"]
+            self.assertEqual(ff["path"], "film_final.mp4")
+            self.assertEqual(ff["post_engine"], "hyperframes")
+            self.assertEqual(ff["sha256"], result["output_sha256"])
+            self.assertTrue((root / "out" / "film_final.mp4").is_file())
+            self.assertTrue((root / "out" / "final-delivery.json").is_file())
+
+    def test_register_final_invalidates_old_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film(root)
+            src = root / "out" / "src.mp4"
+            _make_motion_clip(src, seconds=1.0, with_audio=True)
+            man = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            man["outputs"]["final_review"] = {
+                "approved": True,
+                "output_sha256": "old",
+                "reviewer": "x",
+                "notes": "y",
+            }
+            (root / "manifest.json").write_text(
+                json.dumps(man, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            register_final_film(
+                root, src, out_name="film_final.mp4", post_engine="external", force=True
+            )
+            man2 = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            self.assertNotIn("final_review", man2["outputs"])
+            self.assertIn("final_review_stale", man2["outputs"])
+
+
+@unittest.skipUnless(_ffmpeg_available(), "ffmpeg required")
+class AudioMuxTests(unittest.TestCase):
+    def test_mux_from_final_when_video_silent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            (root / "out").mkdir()
+            silent = root / "out" / "silent.mp4"
+            final = root / "out" / "film_final.mp4"
+            out = root / "out" / "mixed.mp4"
+            _make_motion_clip(silent, seconds=0.8, with_audio=False)
+            _make_motion_clip(final, seconds=0.8, with_audio=True)
+            self.assertFalse(probe_has_audio(silent))
+            self.assertTrue(probe_has_audio(final))
+            info = ensure_audio_mux(silent, root, out)
+            self.assertTrue(info["ok"])
+            self.assertEqual(info["action"], "mux_from_final")
+            self.assertTrue(probe_has_audio(out))
+
+
+class ToolingProbeTests(unittest.TestCase):
+    def test_probe_designed_post_tooling_shape(self) -> None:
+        info = probe_designed_post_tooling()
+        self.assertIn("npx", info)
+        self.assertIn("hyperframes_ok", info)
+        self.assertIn("error", info)
+        # When npx exists in this environment, version probe should not crash
+        if info.get("npx"):
+            self.assertTrue(isinstance(info.get("hyperframes_ok"), bool))
+
+
+class DoubleBurnGateTests(unittest.TestCase):
+    def test_underlay_blocks_when_burned_in(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            (root / "out").mkdir(parents=True)
+            (root / "out" / "film_final.mp4").write_bytes(b"\x00fake")
+            (root / "out" / "final-delivery.json").write_text(
+                json.dumps({"subtitles": {"burned_in": True}}),
+                encoding="utf-8",
+            )
+            with self.assertRaises(ComposeRenderError) as ctx:
+                assert_underlay_not_double_burn(root, layout="underlay")
+            self.assertIn("double-burn", str(ctx.exception).lower())
+
+    def test_allow_burned_underlay_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            (root / "out").mkdir(parents=True)
+            (root / "out" / "final-delivery.json").write_text(
+                json.dumps({"subtitles": {"burned_in": True}}),
+                encoding="utf-8",
+            )
+            info = assert_underlay_not_double_burn(
+                root, layout="underlay", allow_burned_underlay=True
+            )
+            self.assertTrue(info["ok"])
+
+    def test_subs_off_plate_allows_underlay(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            (root / "out").mkdir(parents=True)
+            (root / "out" / "final-delivery.json").write_text(
+                json.dumps({"subtitles": {"burned_in": False}}),
+                encoding="utf-8",
+            )
+            info = assert_underlay_not_double_burn(root, layout="underlay")
+            self.assertTrue(info["ok"])
+            self.assertIs(info.get("burned_in"), False)
+
+
+class RemotionCopyAndLayoutTests(unittest.TestCase):
+    def test_copy_remotion_media_and_underlay_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film(root, n_shots=2, with_final=_ffmpeg_available())
+            # export needs real files under clips for relative paths — already placeholders
+            result = export_composition(
+                root, engine="both", force=True, layout="auto"
+            )
+            self.assertTrue(result["ok"])
+            if _ffmpeg_available() and (root / "out" / "film_final.mp4").is_file():
+                self.assertEqual(result["layout"], "underlay")
+                html = (root / "compose" / "hyperframes" / "index.html").read_text(
+                    encoding="utf-8"
+                )
+                self.assertIn("final-underlay", html)
+            else:
+                self.assertEqual(result["layout"], "multiclip")
+
+            # real files for copy
+            for i in (1, 2):
+                sid = f"shot{i:02d}"
+                p = root / "clips" / f"{sid}.mp4"
+                p.write_bytes(b"clip-bytes-" + sid.encode())
+            copy = copy_remotion_media(root)
+            # multiclip: 2 shots; underlay layout also copies final film → 3
+            self.assertGreaterEqual(copy["count"], 2)
+            plan = json.loads(
+                (root / "compose" / "remotion" / "media-copy-plan.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(copy["count"], len(plan["items"]))
+            pub = root / "compose" / "remotion" / "public" / "clips"
+            self.assertTrue(any(pub.glob("shot*")))
+
+
+class RemotionComposeRenderBranchTests(unittest.TestCase):
+    def test_probe_remotion_not_ready_without_node_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film(root, n_shots=1)
+            export_composition(root, engine="remotion", force=True)
+            info = probe_remotion_readiness(root)
+            self.assertTrue(info["package_json"])
+            self.assertTrue(info["has_npm_deps_declared"])
+            self.assertTrue(info["root_tsx"])
+            self.assertTrue(info["film_tsx"])
+            self.assertFalse(info["ready"])
+            self.assertTrue(any("node_modules" in m for m in info["missing"]))
+
+    def test_remotion_next_steps_list_bootstrap_render_register(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            steps = remotion_actionable_next_steps(root)
+            blob = "\n".join(steps)
+            self.assertIn("npm install", blob)
+            self.assertIn("--npm-install", blob)
+            self.assertIn("remotion render", blob)
+            self.assertIn("register-final", blob)
+            self.assertIn("post-engine remotion", blob)
+            self.assertIn("hyperframes", blob)
+
+    def test_remotion_npm_install_success_with_fake_npm(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            rem = Path(tmp) / "remotion"
+            rem.mkdir()
+            (rem / "package.json").write_text(
+                json.dumps({"name": "t", "dependencies": {"remotion": "4.0.0"}}),
+                encoding="utf-8",
+            )
+            fake_npm = Path(tmp) / "fake-npm"
+            # Creates node_modules layout that probe_remotion_readiness accepts
+            fake_npm.write_text(
+                "#!/bin/sh\n"
+                "set -e\n"
+                'mkdir -p node_modules/.bin node_modules/remotion\n'
+                'printf "#!/bin/sh\\nexit 1\\n" > node_modules/.bin/remotion\n'
+                "chmod +x node_modules/.bin/remotion\n"
+                "echo installed\n",
+                encoding="utf-8",
+            )
+            fake_npm.chmod(0o755)
+            info = remotion_npm_install(rem, npm_bin=str(fake_npm), timeout=30)
+            self.assertTrue(info["ok"])
+            self.assertTrue((rem / "node_modules" / "remotion").is_dir())
+
+    def test_remotion_npm_install_missing_package_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            rem = Path(tmp) / "empty"
+            rem.mkdir()
+            with self.assertRaises(ComposeRenderError) as ctx:
+                remotion_npm_install(rem, npm_bin="/bin/true", timeout=5)
+            self.assertIn("package.json", str(ctx.exception))
+
+    def test_compose_render_npm_install_then_ready_attempts_render(self) -> None:
+        """--npm-install with fake npm reaches render path (render fails honestly)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film(root, n_shots=1)
+            (root / "clips" / "shot01.mp4").write_bytes(b"clip-shot01")
+            export_composition(root, engine="remotion", force=True)
+            rem = root / "compose" / "remotion"
+            fake_npm = Path(tmp) / "fake-npm"
+            fake_npm.write_text(
+                "#!/bin/sh\n"
+                "set -e\n"
+                'mkdir -p node_modules/.bin node_modules/remotion\n'
+                'printf "#!/bin/sh\\nexit 1\\n" > node_modules/.bin/remotion\n'
+                "chmod +x node_modules/.bin/remotion\n",
+                encoding="utf-8",
+            )
+            fake_npm.chmod(0o755)
+
+            # Inject fake npm by patching which via remotion_npm_install path:
+            # call compose_render after pre-running install with fake npm, then
+            # also test the compose_render branch by monkeypatching remotion_npm_install.
+            import compose_render as cr_mod
+
+            original = cr_mod.remotion_npm_install
+
+            def _fake_install(rem_dir, **kwargs):  # type: ignore[no-untyped-def]
+                return original(rem_dir, npm_bin=str(fake_npm), timeout=30)
+
+            cr_mod.remotion_npm_install = _fake_install  # type: ignore[assignment]
+            try:
+                with self.assertRaises(ComposeRenderError) as ctx:
+                    compose_render(
+                        root,
+                        engine="remotion",
+                        export_first=False,
+                        npm_install=True,
+                        register=False,
+                    )
+                self.assertIn("remotion render failed", str(ctx.exception).lower())
+                # install side-effect present
+                self.assertTrue((rem / "node_modules" / "remotion").is_dir())
+            finally:
+                cr_mod.remotion_npm_install = original  # type: ignore[assignment]
+
+    def test_compose_render_npm_install_failure_returns_actionable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film(root, n_shots=1)
+            (root / "clips" / "shot01.mp4").write_bytes(b"clip-shot01")
+            export_composition(root, engine="remotion", force=True)
+            fake_npm = Path(tmp) / "fail-npm"
+            fake_npm.write_text("#!/bin/sh\necho boom >&2\nexit 2\n", encoding="utf-8")
+            fake_npm.chmod(0o755)
+
+            import compose_render as cr_mod
+
+            original = cr_mod.remotion_npm_install
+
+            def _fail_install(rem_dir, **kwargs):  # type: ignore[no-untyped-def]
+                return original(rem_dir, npm_bin=str(fake_npm), timeout=10)
+
+            cr_mod.remotion_npm_install = _fail_install  # type: ignore[assignment]
+            try:
+                result = compose_render(
+                    root,
+                    engine="remotion",
+                    export_first=False,
+                    npm_install=True,
+                    register=False,
+                )
+                self.assertFalse(result["ok"])
+                self.assertFalse(result["rendered"])
+                self.assertIn("npm install failed", result.get("error", "").lower())
+                self.assertIn("next_steps", result)
+            finally:
+                cr_mod.remotion_npm_install = original  # type: ignore[assignment]
+
+    def test_compose_render_remotion_actionable_when_not_bootstrapped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film(root, n_shots=2)
+            for i in (1, 2):
+                sid = f"shot{i:02d}"
+                (root / "clips" / f"{sid}.mp4").write_bytes(b"clip-" + sid.encode())
+            result = compose_render(
+                root,
+                engine="remotion",
+                export_first=True,
+                force_export=True,
+                register=False,
+            )
+            self.assertFalse(result["ok"])
+            self.assertFalse(result["rendered"])
+            self.assertEqual(result["engine"], "remotion")
+            self.assertIn("next_steps", result)
+            steps = result["next_steps"]
+            self.assertTrue(isinstance(steps, list) and len(steps) >= 4)
+            joined = "\n".join(steps)
+            self.assertIn("npm install", joined)
+            self.assertIn("register-final", joined)
+            # media was still copied
+            copy = result["steps"].get("remotion_media_copy") or {}
+            self.assertTrue(copy.get("ok"))
+            self.assertEqual(copy.get("count"), 2)
+            self.assertTrue(
+                any((root / "compose" / "remotion" / "public" / "clips").glob("shot*"))
+            )
+
+    def test_compose_render_remotion_ready_path_calls_register_label(self) -> None:
+        """When readiness is forced ready, auto-render path is taken (render may fail honestly)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film(root, n_shots=1)
+            (root / "clips" / "shot01.mp4").write_bytes(b"clip-shot01")
+            export_composition(root, engine="remotion", force=True)
+            copy_remotion_media(root)
+            rem = root / "compose" / "remotion"
+            # Fake node_modules/remotion so readiness passes; remotion render will fail honestly
+            (rem / "node_modules" / "remotion").mkdir(parents=True)
+            (rem / "node_modules" / ".bin").mkdir(parents=True)
+            fake_bin = rem / "node_modules" / ".bin" / "remotion"
+            fake_bin.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            fake_bin.chmod(0o755)
+
+            info = probe_remotion_readiness(root)
+            # npx may or may not exist; if missing, not ready
+            if not info.get("npx"):
+                self.assertFalse(info["ready"])
+                return
+            self.assertTrue(info["ready"], msg=info)
+
+            with self.assertRaises(ComposeRenderError) as ctx:
+                compose_render(
+                    root,
+                    engine="remotion",
+                    export_first=False,
+                    register=False,
+                )
+            self.assertIn("remotion render failed", str(ctx.exception).lower())
+
+
+if __name__ == "__main__":
+    unittest.main()

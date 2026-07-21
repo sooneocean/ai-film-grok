@@ -1,0 +1,1020 @@
+#!/usr/bin/env python3
+"""Multi-backend TTS for ai-film-grok.
+
+Backends (human-likeness roughly ↑):
+  minimax   — MiniMax Speech 2.6/2.8 HD (strong CN + emotion tags; needs MINIMAX_API_KEY)
+  fish      — Fish Audio API (s2.1-pro / free tier)
+  grok      — Grok TTS via OAuth (api.x.ai /v1/tts; speech tags; opt-in, SuperGrok)
+  voicebox  — local open-source studio (https://github.com/jamiepine/voicebox) on :17493
+  edge      — Microsoft Edge Neural (free explicit backend; more synthetic) **film default**
+  external  — local CosyVoice / IndexTTS / 火山豆包 CLI via AIFILM_TTS_ARGV
+
+Env / config.env:
+  AIFILM_TTS_BACKEND=auto|minimax|fish|voicebox|edge|external|grok
+  AIFILM_GROK_TTS_VOICE=eve   # or ara, leo, carina, zagan, …
+  AIFILM_GROK_TTS_LANGUAGE=zh
+  FISH_API_KEY=...  FISH_VOICE_ID=...  FISH_MODEL=s2.1-pro-free
+  MINIMAX_API_KEY=...  MINIMAX_VOICE_ID=Chinese (Mandarin)_Lyrical_Voice
+  MINIMAX_MODEL=speech-2.6-hd
+  VOICEBOX_BASE_URL=http://127.0.0.1:17493
+  VOICEBOX_PROFILE=<profile name or id>
+  VOICEBOX_LANGUAGE=zh
+  AIFILM_TTS_ARGV='["python","/path/infer.py","--text-file","{text_file}","--out","{out}"]'
+
+Fallback (opt-in only; never silent cross-provider):
+  tts_allow_network_fallback / --allow-network-fallback in auto mode:
+    primary fail → voicebox (if ready) → edge
+  AIFILM_TTS_VOICEBOX_FALLBACK=1: even explicit edge/minimax/fish may try voicebox once.
+
+Note: auto never picks grok (keeps edge/local defaults for reproducible 中文说书).
+Use --tts-backend grok or AIFILM_TTS_BACKEND=grok explicitly.
+"""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+from security_policy import (
+    SecurityPolicyError,
+    atomic_write_bytes,
+    atomic_write_text,
+    expand_argv,
+    load_allowed_env,
+    minimal_subprocess_env,
+    parse_argv_json,
+)
+
+
+class TTSError(RuntimeError):
+    pass
+
+
+TTS_BACKENDS = frozenset({"auto", "minimax", "fish", "voicebox", "edge", "external", "grok"})
+DEFAULT_VOICEBOX_URL = "http://127.0.0.1:17493"
+# Built-in Grok voices (subset; full list via aifilm grok-oauth voices)
+GROK_BUILTIN_VOICES = frozenset(
+    {
+        "eve",
+        "ara",
+        "leo",
+        "rex",
+        "sal",
+        "carina",
+        "zagan",
+        "helix",
+        "orion",
+        "luna",
+        "altair",
+    }
+)
+
+
+def _load_config_env() -> None:
+    """Load skill config.env into os.environ if not already set."""
+    cfg = Path(__file__).resolve().parents[1] / "config.env"
+    load_allowed_env(
+        cfg,
+        allowed_keys={
+            "AIFILM_FISH_API_KEY",
+            "AIFILM_FISH_MODEL",
+            "AIFILM_FISH_VOICE_ID",
+            "AIFILM_MINIMAX_API_KEY",
+            "AIFILM_MINIMAX_MODEL",
+            "AIFILM_MINIMAX_VOICE_ID",
+            "AIFILM_TTS_ARGV",
+            "AIFILM_TTS_BACKEND",
+            "AIFILM_TTS_STRICT_VOICE",
+            "AIFILM_TTS_VOICEBOX_FALLBACK",
+            "AIFILM_GROK_TTS_VOICE",
+            "AIFILM_GROK_TTS_LANGUAGE",
+            "AIFILM_VOICEBOX_ENGINE",
+            "AIFILM_VOICEBOX_LANGUAGE",
+            "AIFILM_VOICEBOX_PROFILE",
+            "AIFILM_VOICEBOX_URL",
+            "FISH_API_KEY",
+            "FISH_AUDIO_API_KEY",
+            "FISH_MODEL",
+            "FISH_REFERENCE_ID",
+            "FISH_VOICE_ID",
+            "MINIMAX_API_KEY",
+            "MINIMAX_GROUP_ID",
+            "MINIMAX_MODEL",
+            "MINIMAX_VOICE_ID",
+            "VOICEBOX_BASE_URL",
+            "VOICEBOX_ENGINE",
+            "VOICEBOX_LANGUAGE",
+            "VOICEBOX_PROFILE",
+            "VOICEBOX_PROFILE_ID",
+        },
+    )
+
+
+def fish_api_key() -> str | None:
+    return (
+        os.environ.get("FISH_API_KEY")
+        or os.environ.get("FISH_AUDIO_API_KEY")
+        or os.environ.get("AIFILM_FISH_API_KEY")
+        or None
+    )
+
+
+def fish_voice_id() -> str | None:
+    return (
+        os.environ.get("FISH_VOICE_ID")
+        or os.environ.get("AIFILM_FISH_VOICE_ID")
+        or os.environ.get("FISH_REFERENCE_ID")
+        or None
+    )
+
+
+def fish_model() -> str:
+    return os.environ.get("FISH_MODEL") or os.environ.get("AIFILM_FISH_MODEL") or "s2.1-pro-free"
+
+
+def minimax_api_key() -> str | None:
+    return (
+        os.environ.get("MINIMAX_API_KEY")
+        or os.environ.get("AIFILM_MINIMAX_API_KEY")
+        or None
+    )
+
+
+def minimax_voice_id() -> str:
+    return (
+        os.environ.get("MINIMAX_VOICE_ID")
+        or os.environ.get("AIFILM_MINIMAX_VOICE_ID")
+        or "Chinese (Mandarin)_Lyrical_Voice"
+    )
+
+
+def minimax_model() -> str:
+    return (
+        os.environ.get("MINIMAX_MODEL")
+        or os.environ.get("AIFILM_MINIMAX_MODEL")
+        or "speech-2.6-hd"
+    )
+
+
+def minimax_group_id() -> str | None:
+    return os.environ.get("MINIMAX_GROUP_ID") or None
+
+
+def external_argv() -> list[str] | None:
+    raw = os.environ.get("AIFILM_TTS_ARGV")
+    if raw and raw.strip():
+        try:
+            return parse_argv_json(raw, variable="AIFILM_TTS_ARGV")
+        except SecurityPolicyError as exc:
+            raise TTSError(str(exc)) from exc
+    if os.environ.get("AIFILM_TTS_CMD"):
+        raise TTSError(
+            "AIFILM_TTS_CMD is disabled because shell templates are unsafe; use AIFILM_TTS_ARGV JSON"
+        )
+    return None
+
+
+def strict_voice_enabled() -> bool:
+    return (os.environ.get("AIFILM_TTS_STRICT_VOICE") or "1").lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+
+
+def voicebox_fallback_enabled() -> bool:
+    """Opt-in: on explicit backend failure, try local Voicebox once."""
+    return (os.environ.get("AIFILM_TTS_VOICEBOX_FALLBACK") or "0").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def voicebox_base_url() -> str:
+    return (
+        os.environ.get("VOICEBOX_BASE_URL")
+        or os.environ.get("AIFILM_VOICEBOX_URL")
+        or DEFAULT_VOICEBOX_URL
+    ).rstrip("/")
+
+
+def voicebox_profile() -> str | None:
+    raw = (
+        os.environ.get("VOICEBOX_PROFILE")
+        or os.environ.get("VOICEBOX_PROFILE_ID")
+        or os.environ.get("AIFILM_VOICEBOX_PROFILE")
+        or ""
+    ).strip()
+    return raw or None
+
+
+def voicebox_language() -> str:
+    return (
+        os.environ.get("VOICEBOX_LANGUAGE")
+        or os.environ.get("AIFILM_VOICEBOX_LANGUAGE")
+        or "zh"
+    ).strip() or "zh"
+
+
+def voicebox_engine() -> str | None:
+    eng = (
+        os.environ.get("VOICEBOX_ENGINE")
+        or os.environ.get("AIFILM_VOICEBOX_ENGINE")
+        or ""
+    ).strip()
+    return eng or None
+
+
+def _voicebox_http_json(
+    method: str,
+    path: str,
+    *,
+    body: dict[str, Any] | None = None,
+    timeout: float = 15,
+) -> Any:
+    url = f"{voicebox_base_url()}{path}"
+    data = None
+    headers = {"Accept": "application/json"}
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read()
+            if not raw:
+                return None
+            return json.loads(raw.decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        err = exc.read().decode("utf-8", errors="replace")[:600]
+        raise TTSError(f"Voicebox HTTP {exc.code} {path}: {err}") from exc
+    except Exception as exc:
+        raise TTSError(
+            f"Voicebox unreachable at {voicebox_base_url()}: {exc}. "
+            "Start the Voicebox app (API default http://127.0.0.1:17493)."
+        ) from exc
+
+
+def probe_voicebox() -> dict[str, Any]:
+    """Lightweight readiness: /health + at least one profile; resolve default if set."""
+    try:
+        _voicebox_http_json("GET", "/health", timeout=3)
+    except TTSError as exc:
+        return {"ok": False, "error": str(exc), "profile_id": None, "profile_name": None}
+    try:
+        profiles = _voicebox_http_json("GET", "/profiles", timeout=8)
+    except TTSError as exc:
+        return {"ok": False, "error": str(exc), "profile_id": None, "profile_name": None}
+    if not isinstance(profiles, list) or not profiles:
+        return {
+            "ok": False,
+            "error": "Voicebox has no profiles — create/clone one in the app",
+            "profile_id": None,
+            "profile_name": None,
+            "profile_count": 0,
+        }
+    wanted = voicebox_profile()
+    resolved_id = None
+    resolved_name = None
+    if wanted:
+        low = wanted.lower()
+        for p in profiles:
+            if str(p.get("id")) == wanted or str(p.get("name") or "").lower() == low:
+                resolved_id = str(p["id"])
+                resolved_name = str(p.get("name") or p["id"])
+                break
+        if not resolved_id:
+            return {
+                "ok": False,
+                "error": f"VOICEBOX_PROFILE={wanted!r} not found among {len(profiles)} profiles",
+                "profile_id": None,
+                "profile_name": None,
+                "profile_count": len(profiles),
+            }
+    else:
+        for p in profiles:
+            if str(p.get("voice_type") or "") != "import":
+                resolved_id = str(p["id"])
+                resolved_name = str(p.get("name") or p["id"])
+                break
+        if not resolved_id:
+            p0 = profiles[0]
+            resolved_id = str(p0["id"])
+            resolved_name = str(p0.get("name") or p0["id"])
+    return {
+        "ok": True,
+        "error": None,
+        "profile_id": resolved_id,
+        "profile_name": resolved_name,
+        "profile_count": len(profiles),
+        "base_url": voicebox_base_url(),
+        "language": voicebox_language(),
+        "engine": voicebox_engine(),
+    }
+
+
+def grok_tts_voice() -> str:
+    return (os.environ.get("AIFILM_GROK_TTS_VOICE") or "eve").strip() or "eve"
+
+
+def grok_tts_language() -> str:
+    return (os.environ.get("AIFILM_GROK_TTS_LANGUAGE") or "zh").strip() or "zh"
+
+
+def probe_grok_tts() -> dict[str, Any]:
+    """Cheap readiness: OAuth auth present + models ok (does not call /tts every probe)."""
+    try:
+        from grok_oauth import auth_path, probe as grok_probe
+
+        if not auth_path().is_file() and not (os.environ.get("XAI_API_KEY") or "").strip():
+            return {"ok": False, "error": "no grok auth.json and no XAI_API_KEY"}
+        # Avoid deep TTS list on every film probe — models list is enough
+        g = grok_probe(deep=False)
+        if not g.get("ok"):
+            return {"ok": False, "error": g.get("error") or "grok oauth not ok", "detail": g}
+        return {
+            "ok": True,
+            "source": g.get("source"),
+            "voice": grok_tts_voice(),
+            "language": grok_tts_language(),
+            "has_imagine_video": g.get("has_imagine_video"),
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200]}
+
+
+def probe() -> dict[str, Any]:
+    _load_config_env()
+    external_error = None
+    try:
+        ext = external_argv()
+    except TTSError as exc:
+        ext = None
+        external_error = str(exc)
+    vb = probe_voicebox()
+    grok = probe_grok_tts()
+    backends: dict[str, bool] = {
+        "edge": True,
+        "fish": bool(fish_api_key()),
+        "minimax": bool(minimax_api_key()),
+        "external": bool(ext),
+        "voicebox": bool(vb.get("ok")),
+        "grok": bool(grok.get("ok")),
+    }
+    try:
+        import edge_tts  # noqa: F401
+
+        backends["edge"] = True
+    except ImportError:
+        backends["edge"] = False
+
+    preferred = (os.environ.get("AIFILM_TTS_BACKEND") or "auto").lower()
+    strict_voice = strict_voice_enabled()
+    fish_ready = bool(backends["fish"] and (fish_voice_id() or not strict_voice))
+    if preferred == "auto":
+        # Prefer local execution, then expressive APIs with stable voice identity.
+        # Voicebox is local-first quality when the app is up + profile exists.
+        # Never auto-pick grok (opt-in only for SuperGrok OAuth path).
+        if backends["external"]:
+            choice = "external"
+        elif backends["voicebox"]:
+            choice = "voicebox"
+        elif backends["minimax"]:
+            choice = "minimax"
+        elif fish_ready:
+            choice = "fish"
+        else:
+            choice = "edge"
+    else:
+        choice = preferred
+
+    ready = {**backends, "fish": fish_ready}
+    return {
+        "ok": bool(ready.get(choice, False)),
+        "preferred": preferred,
+        # Keep an explicit configured backend active even when unready so synthesis fails closed.
+        "active": choice,
+        "backends": backends,
+        "ready": ready,
+        "fish_key_set": backends["fish"],
+        "fish_voice_id": fish_voice_id(),
+        "fish_model": fish_model(),
+        "minimax_key_set": backends["minimax"],
+        "minimax_voice_id": minimax_voice_id() if backends["minimax"] else None,
+        "minimax_model": minimax_model() if backends["minimax"] else None,
+        "grok_ok": backends["grok"],
+        "grok_voice": grok_tts_voice() if backends["grok"] else None,
+        "grok_language": grok_tts_language() if backends["grok"] else None,
+        "grok_error": grok.get("error"),
+        "voicebox_ok": backends["voicebox"],
+        "voicebox_base_url": voicebox_base_url(),
+        "voicebox_profile": vb.get("profile_name") or voicebox_profile(),
+        "voicebox_profile_id": vb.get("profile_id"),
+        "voicebox_error": vb.get("error"),
+        "voicebox_fallback": voicebox_fallback_enabled(),
+        "external_argv_set": backends["external"],
+        "external_config_error": external_error,
+        "strict_voice_lock": strict_voice,
+        "locked_speaker_policy": (
+            "fish without FISH_VOICE_ID fails closed when strict; "
+            "minimax uses fixed MINIMAX_VOICE_ID; voicebox locks VOICEBOX_PROFILE; "
+            "grok uses AIFILM_GROK_TTS_VOICE (default eve); "
+            "edge uses fixed vo_voice/cast_voices"
+        ),
+        "note": (
+            "一角一声: set FISH_VOICE_ID / MINIMAX_VOICE_ID / VOICEBOX_PROFILE / AIFILM_GROK_TTS_VOICE; "
+            "strict lock defaults ON. Local quality: voicebox (app :17493) or external. "
+            "Grok TTS is opt-in (never auto). Fallback: auto+tts_allow_network_fallback → voicebox then edge; "
+            "AIFILM_TTS_VOICEBOX_FALLBACK=1 also covers explicit edge/minimax/fish fails."
+        ),
+    }
+
+
+# cn sediment: edge occasional empty stream → retry before hard fail (min payload bytes).
+EDGE_MIN_AUDIO_BYTES = 500
+EDGE_EMPTY_RETRIES = 3
+EDGE_RETRY_BACKOFF_SEC = 0.35
+
+
+def tts_grok(
+    text: str,
+    out_mp3: Path,
+    *,
+    voice_id: str | None = None,
+    language: str | None = None,
+    speed: float | None = None,
+    with_timestamps: bool = False,
+) -> Path:
+    """Grok OAuth TTS (POST /v1/tts). Opt-in only — never film default."""
+    try:
+        from grok_oauth import GrokOAuthError, tts_speak
+    except ImportError as exc:
+        raise TTSError(f"grok_oauth import failed: {exc}") from exc
+    vid = (voice_id or "").strip()
+    if not vid or _is_edge_voice_name(vid):
+        vid = grok_tts_voice()
+    lang = (language or grok_tts_language()).strip() or "zh"
+    try:
+        result = tts_speak(
+            text,
+            out=out_mp3,
+            voice_id=vid,
+            language=lang,
+            speed=speed,
+            with_timestamps=with_timestamps,
+        )
+    except GrokOAuthError as exc:
+        raise TTSError(f"grok TTS failed: {exc}") from exc
+    if not result.get("ok"):
+        raise TTSError(f"grok TTS produced no audio: {result}")
+    return Path(result["path"])
+
+
+def tts_edge(
+    text: str,
+    out_mp3: Path,
+    voice: str = "zh-CN-XiaoxiaoNeural",
+    *,
+    rate: str = "+0%",
+    volume: str = "+0%",
+    pitch: str = "+0Hz",
+    min_bytes: int = EDGE_MIN_AUDIO_BYTES,
+    max_attempts: int = EDGE_EMPTY_RETRIES,
+) -> Path:
+    """Edge Neural TTS with empty/tiny stream retry (ai-film-cn empty-stream lesson)."""
+    import asyncio
+    import time
+
+    import edge_tts
+
+    async def _run() -> bytes:
+        communicate = edge_tts.Communicate(text, voice, rate=rate, volume=volume, pitch=pitch)
+        data = bytearray()
+        async for event in communicate.stream():
+            if event["type"] == "audio" and event.get("data") is not None:
+                data.extend(event["data"])
+        return bytes(data)
+
+    attempts = max(1, int(max_attempts))
+    floor = max(1, int(min_bytes))
+    last_size = 0
+    data = b""
+    for attempt in range(1, attempts + 1):
+        data = asyncio.run(_run())
+        last_size = len(data) if data else 0
+        if data and last_size >= floor:
+            break
+        if attempt < attempts:
+            time.sleep(EDGE_RETRY_BACKOFF_SEC * attempt)
+    if not data or last_size < floor:
+        raise TTSError(
+            f"edge-tts empty/tiny audio after {attempts} attempt(s) "
+            f"({last_size}B < {floor}B): {text[:40]}"
+        )
+    out_mp3.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_bytes(out_mp3, data)
+    return out_mp3
+
+
+def tts_fish(
+    text: str,
+    out_mp3: Path,
+    *,
+    voice_id: str | None = None,
+    model: str | None = None,
+    speed: float = 0.95,
+) -> Path:
+    """Fish Audio REST API — human-like Chinese/EN TTS.
+
+    Docs: https://docs.fish.audio/api-reference/endpoint/openapi-v1/text-to-speech
+    Free tier model header: s2.1-pro-free
+    """
+    key = fish_api_key()
+    if not key:
+        raise TTSError("FISH_API_KEY not set — get one at https://fish.audio/app/api-keys")
+
+    ref = voice_id or fish_voice_id()
+    mdl = model or fish_model()
+    # Without a fixed reference_id, Fish may pick different speakers per request
+    # (one film = many voices). Prefer locking temperature low when unlocked.
+    locked = bool(ref)
+    payload: dict[str, Any] = {
+        "text": text,
+        "format": "mp3",
+        "mp3_bitrate": 192,
+        "sample_rate": 44100,
+        "normalize": True,
+        "latency": "normal",
+        "prosody": {
+            "speed": float(speed),
+            "volume": 0,
+            "normalize_loudness": True,
+        },
+        # Lower temperature when we need 一角一声 consistency
+        "temperature": 0.45 if locked else 0.35,
+        "top_p": 0.65 if locked else 0.5,
+        "condition_on_previous_chunks": True,
+        "repetition_penalty": 1.2,
+    }
+    if ref:
+        payload["reference_id"] = ref
+
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.fish.audio/v1/tts",
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "model": mdl,
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = resp.read()
+    except urllib.error.HTTPError as exc:
+        err = exc.read().decode("utf-8", errors="replace")[:800]
+        raise TTSError(f"Fish TTS HTTP {exc.code}: {err}") from exc
+    except Exception as exc:
+        raise TTSError(f"Fish TTS request failed: {exc}") from exc
+
+    if not data or len(data) < 200:
+        raise TTSError(f"Fish TTS returned empty/tiny audio ({len(data) if data else 0} bytes)")
+
+    out_mp3.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_bytes(out_mp3, data)
+    return out_mp3
+
+
+def tts_minimax(
+    text: str,
+    out_mp3: Path,
+    *,
+    voice_id: str | None = None,
+    model: str | None = None,
+    speed: float = 0.95,
+    emotion: str | None = None,
+) -> Path:
+    """MiniMax T2A HTTP — Speech 2.6/2.8 HD.
+
+    Docs: https://platform.minimax.io/docs/api-reference/speech-t2a-http
+    Returns hex-encoded audio in JSON (non-streaming).
+    """
+    key = minimax_api_key()
+    if not key:
+        raise TTSError("MINIMAX_API_KEY not set — https://platform.minimax.io")
+
+    vid = voice_id or minimax_voice_id()
+    mdl = model or minimax_model()
+    payload: dict[str, Any] = {
+        "model": mdl,
+        "text": text,
+        "stream": False,
+        "output_format": "hex",
+        "language_boost": "Chinese",
+        "voice_setting": {
+            "voice_id": vid,
+            "speed": float(speed),
+            "vol": 1.0,
+            "pitch": 0,
+            "text_normalization": True,
+        },
+        "audio_setting": {
+            "sample_rate": 44100,
+            "bitrate": 128000,
+            "format": "mp3",
+            "channel": 1,
+        },
+    }
+    if emotion:
+        payload["voice_setting"]["emotion"] = emotion
+
+    url = "https://api.minimax.io/v1/t2a_v2"
+    gid = minimax_group_id()
+    if gid:
+        url = f"{url}?GroupId={gid}"
+
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as exc:
+        err = exc.read().decode("utf-8", errors="replace")[:800]
+        raise TTSError(f"MiniMax TTS HTTP {exc.code}: {err}") from exc
+    except Exception as exc:
+        raise TTSError(f"MiniMax TTS request failed: {exc}") from exc
+
+    try:
+        obj = json.loads(raw.decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise TTSError(f"MiniMax TTS non-JSON response: {raw[:200]!r}") from exc
+
+    base = obj.get("base_resp") or {}
+    if int(base.get("status_code", -1)) != 0:
+        raise TTSError(f"MiniMax TTS error: {base.get('status_msg') or obj}")
+
+    data_obj = obj.get("data") or {}
+    hex_audio = data_obj.get("audio")
+    if not hex_audio or not isinstance(hex_audio, str):
+        raise TTSError(f"MiniMax TTS missing audio hex: {str(obj)[:400]}")
+    try:
+        audio_bytes = bytes.fromhex(hex_audio)
+    except ValueError as exc:
+        raise TTSError("MiniMax TTS invalid hex audio") from exc
+    if len(audio_bytes) < 200:
+        raise TTSError(f"MiniMax TTS tiny audio ({len(audio_bytes)} bytes)")
+
+    out_mp3.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_bytes(out_mp3, audio_bytes)
+    return out_mp3
+
+
+def tts_external(text: str, out_mp3: Path, voice: str = "") -> Path:
+    cmd_tpl = external_argv()
+    if not cmd_tpl:
+        raise TTSError("AIFILM_TTS_ARGV not set")
+    out_mp3.parent.mkdir(parents=True, exist_ok=True)
+    text_file = out_mp3.with_suffix(".txt")
+    atomic_write_text(text_file, text)
+    try:
+        argv = expand_argv(
+            cmd_tpl,
+            {
+                "text": text,
+                "out": str(out_mp3),
+                "voice": voice or "",
+                "text_file": str(text_file),
+            },
+            variable="AIFILM_TTS_ARGV",
+        )
+    except SecurityPolicyError as exc:
+        raise TTSError(str(exc)) from exc
+    try:
+        proc = subprocess.run(
+            argv,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env=minimal_subprocess_env(),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise TTSError(f"external TTS could not run: {exc}") from exc
+    if proc.returncode != 0 or not out_mp3.is_file():
+        raise TTSError(
+            f"external TTS failed rc={proc.returncode}: {(proc.stderr or proc.stdout)[:800]}"
+        )
+    return out_mp3
+
+
+def tts_voicebox(
+    text: str,
+    out_mp3: Path,
+    *,
+    voice: str = "",
+    language: str | None = None,
+    engine: str | None = None,
+    instruct: str | None = None,
+    timeout: float = 600,
+) -> Path:
+    """Local Voicebox studio via loopback REST (stream preferred, poll fallback)."""
+    # Prefer in-process HTTP (same as adapter) so minimal_subprocess_env is not required.
+    adapters = Path(__file__).resolve().parent / "adapters"
+    if str(adapters) not in sys.path:
+        sys.path.insert(0, str(adapters))
+    try:
+        import voicebox_tts as vb  # type: ignore
+    except ImportError as exc:
+        raise TTSError(f"voicebox_tts adapter missing: {exc}") from exc
+
+    # Adapter raises SystemExit on hard errors — map to TTSError.
+    try:
+        meta = vb.synthesize(
+            text,
+            out_mp3,
+            voice=voice or (voicebox_profile() or ""),
+            language=language or voicebox_language(),
+            engine=engine if engine is not None else voicebox_engine(),
+            instruct=instruct,
+            prefer_stream=True,
+            timeout=timeout,
+        )
+    except SystemExit as exc:
+        raise TTSError(str(exc) or "voicebox synthesis failed") from exc
+    except Exception as exc:
+        raise TTSError(f"voicebox synthesis failed: {exc}") from exc
+    if not out_mp3.is_file() and not out_mp3.with_suffix(".wav").is_file():
+        raise TTSError(f"voicebox produced no file: {meta}")
+    # render_final expects the path it passed (often .mp3); adapter writes that path.
+    if not out_mp3.is_file():
+        wav = out_mp3.with_suffix(".wav")
+        if wav.is_file():
+            # ensure target exists for callers that only check out_mp3
+            if out_mp3.suffix.lower() == ".mp3":
+                try:
+                    subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            str(wav),
+                            "-ac",
+                            "1",
+                            "-ar",
+                            "44100",
+                            "-codec:a",
+                            "libmp3lame",
+                            "-q:a",
+                            "2",
+                            str(out_mp3),
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                        check=False,
+                    )
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+            if not out_mp3.is_file():
+                # last resort: copy wav bytes under the requested name (ffmpeg sniff works)
+                out_mp3.write_bytes(wav.read_bytes())
+    return out_mp3
+
+
+def _edge_voice_or_default(voice: str) -> str:
+    if voice and (voice.startswith("zh-") or "Neural" in voice):
+        return voice
+    return "zh-CN-XiaoxiaoNeural"
+
+
+def _is_edge_voice_name(voice: str) -> bool:
+    return bool(voice and (voice.startswith("zh-") or "Neural" in voice))
+
+
+def is_edge_neural_voice_id(voice: str | None) -> bool:
+    """Public: Edge Neural style ids (zh-CN-…Neural) must not go to ElevenLabs/external."""
+    return _is_edge_voice_name(str(voice or "").strip())
+
+
+def external_tts_argv_hints_provider(provider: str = "eleven") -> bool:
+    """True if AIFILM_TTS_ARGV JSON/string mentions a cloud provider (default: elevenlabs)."""
+    raw = (os.environ.get("AIFILM_TTS_ARGV") or "").strip()
+    if not raw:
+        return False
+    return provider.lower() in raw.lower()
+
+
+def assert_voice_backend_compatible(backend: str, voice: str | None) -> None:
+    """Hard-fail when Edge Neural ids are sent to external/cloud TTS (e.g. ElevenLabs)."""
+    choice = (backend or "edge").strip().lower()
+    if not is_edge_neural_voice_id(voice):
+        return
+    # Neural id only safe on explicit edge (fish/minimax/voicebox/grok strip Neural themselves)
+    if choice in {"edge", "fish", "minimax", "voicebox", "grok"}:
+        return
+    if choice == "external" or external_tts_argv_hints_provider("eleven"):
+        raise TTSError(
+            f"TTS voice {voice!r} looks like Microsoft Edge Neural — cannot use with "
+            "external/ElevenLabs (AIFILM_TTS_ARGV). "
+            "Fix: --tts-backend edge for Chinese storyteller, "
+            "or set vo_voice to a real provider voice id (not zh-CN-…Neural)."
+        )
+    if choice == "auto" and (os.environ.get("AIFILM_TTS_ARGV") or "").strip():
+        raise TTSError(
+            f"tts_backend=auto with AIFILM_TTS_ARGV set would send Edge Neural voice "
+            f"{voice!r} to external TTS. Use --tts-backend edge (recommended for 中文旁白) "
+            "or a provider-native voice id."
+        )
+
+
+def synthesize(
+    text: str,
+    out_mp3: Path,
+    *,
+    backend: str | None = None,
+    voice: str = "zh-CN-XiaoxiaoNeural",
+    rate: str = "+0%",
+    volume: str = "+0%",
+    pitch: str = "+0Hz",
+    speed: float | None = None,
+    allow_network_fallback: bool = False,
+) -> dict[str, Any]:
+    """Synthesize speech. Returns {backend, path, voice}."""
+    info = probe()
+    # Hard gate: Edge Neural ids never go to external/ElevenLabs
+    req = "auto" if backend is None else str(backend).lower()
+    assert_voice_backend_compatible(req, voice)
+    choice = req
+    if choice == "auto":
+        choice = str(info.get("active") or "edge").lower()
+    if choice not in TTS_BACKENDS - {"auto"}:
+        raise TTSError(f"Unknown TTS backend {choice!r}; choose one of {sorted(TTS_BACKENDS)}")
+    assert_voice_backend_compatible(choice, voice)
+
+    def _speed_from_rate() -> float:
+        if speed is not None:
+            return float(speed)
+        sp = 0.95
+        if rate and rate.endswith("%"):
+            try:
+                pct = float(rate.replace("%", "").replace("+", ""))
+                sp = max(0.5, min(2.0, 1.0 + pct / 100.0))
+            except ValueError:
+                sp = 0.95
+        return sp
+
+    used = choice
+    voice_used = voice
+    model_used = None
+    primary_error: TTSError | None = None
+    try:
+        if choice == "minimax":
+            sp = _speed_from_rate()
+            # If --voice looks like MiniMax id (not edge zh-CN-*), use it
+            vid = voice if voice and not voice.startswith("zh-") else None
+            tts_minimax(text, out_mp3, voice_id=vid, speed=sp)
+            voice_used = vid or minimax_voice_id()
+            model_used = minimax_model()
+        elif choice == "fish":
+            sp = _speed_from_rate()
+            # Fish reference_id if voice is not an edge Neural name
+            vid = voice if voice and not voice.startswith("zh-") and "Neural" not in voice else None
+            # 一角一声：无固定 voice_id 时 Fish 会每镜漂移，因此严格模式默认拒绝。
+            strict = strict_voice_enabled()
+            if strict and not (vid or fish_voice_id()):
+                raise TTSError(
+                    "Fish backend requires a fixed FISH_VOICE_ID in strict voice mode; "
+                    "explicit backends never cross providers"
+                )
+            tts_fish(text, out_mp3, voice_id=vid, speed=sp)
+            voice_used = vid or fish_voice_id() or "fish-default"
+            model_used = fish_model()
+        elif choice == "voicebox":
+            # Edge Neural names are not Voicebox profiles — strip them.
+            vb_voice = "" if _is_edge_voice_name(voice) else (voice or "")
+            if strict_voice_enabled() and not (vb_voice or voicebox_profile() or info.get("voicebox_profile_id")):
+                raise TTSError(
+                    "Voicebox backend requires VOICEBOX_PROFILE (or vo_voice = profile name) "
+                    "in strict voice mode"
+                )
+            tts_voicebox(text, out_mp3, voice=vb_voice)
+            voice_used = vb_voice or info.get("voicebox_profile") or voicebox_profile() or "voicebox-default"
+            model_used = voicebox_engine() or "voicebox"
+        elif choice == "grok":
+            # Edge Neural names are not Grok voice_ids — fall back to AIFILM_GROK_TTS_VOICE.
+            g_voice = "" if _is_edge_voice_name(voice) else (voice or "")
+            sp = _speed_from_rate()
+            # Map edge-like rate % into Grok speed range 0.7–1.5
+            sp = max(0.7, min(1.5, sp))
+            tts_grok(text, out_mp3, voice_id=g_voice or None, speed=sp)
+            voice_used = g_voice or grok_tts_voice()
+            model_used = "grok-tts"
+        elif choice == "external":
+            tts_external(text, out_mp3, voice=voice)
+        else:
+            used = "edge"
+            tts_edge(text, out_mp3, voice, rate=rate, volume=volume, pitch=pitch)
+            voice_used = voice
+    except TTSError as exc:
+        primary_error = exc
+        requested_auto = backend is None or str(backend).lower() == "auto"
+        recovered = False
+
+        # 1) Opt-in auto fallback chain: primary → voicebox → edge
+        if allow_network_fallback and requested_auto and choice not in {"edge"}:
+            if choice != "voicebox" and info["backends"].get("voicebox"):
+                try:
+                    vb_voice = "" if _is_edge_voice_name(voice) else (voice or "")
+                    tts_voicebox(text, out_mp3, voice=vb_voice)
+                    used = f"{choice}->voicebox_opt_in_fallback"
+                    voice_used = vb_voice or info.get("voicebox_profile") or "voicebox-fallback"
+                    model_used = voicebox_engine() or "voicebox"
+                    recovered = True
+                except TTSError:
+                    recovered = False
+            if not recovered and info["backends"].get("edge"):
+                edge_v = _edge_voice_or_default(voice)
+                tts_edge(text, out_mp3, edge_v, rate=rate, volume=volume, pitch=pitch)
+                used = f"{choice}->edge_opt_in_fallback"
+                voice_used = edge_v
+                recovered = True
+
+        # 2) Explicit backend + AIFILM_TTS_VOICEBOX_FALLBACK=1 → try local Voicebox once
+        if (
+            not recovered
+            and voicebox_fallback_enabled()
+            and choice in {"edge", "minimax", "fish", "external"}
+            and info["backends"].get("voicebox")
+        ):
+            try:
+                vb_voice = "" if _is_edge_voice_name(voice) else (voice or "")
+                tts_voicebox(text, out_mp3, voice=vb_voice)
+                used = f"{choice}->voicebox_opt_in_fallback"
+                voice_used = vb_voice or info.get("voicebox_profile") or "voicebox-fallback"
+                model_used = voicebox_engine() or "voicebox"
+                recovered = True
+            except TTSError:
+                recovered = False
+
+        if not recovered:
+            raise primary_error from None
+
+    return {
+        "backend": used,
+        "path": str(out_mp3),
+        "voice": voice_used,
+        "model": model_used,
+        "fish_model": fish_model() if "fish" in used else None,
+        "minimax_model": minimax_model() if "minimax" in used else None,
+        "voicebox_profile": info.get("voicebox_profile") if "voicebox" in used else None,
+    }
+
+
+def main() -> int:
+    import argparse
+
+    p = argparse.ArgumentParser(description="ai-film-grok TTS backend")
+    sub = p.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("doctor", help="Probe backends")
+    syn = sub.add_parser("synth", help="Synthesize one line")
+    syn.add_argument("--text", required=True)
+    syn.add_argument("--out", required=True)
+    syn.add_argument("--backend", default=None)
+    syn.add_argument("--voice", default="zh-CN-XiaoxiaoNeural")
+    syn.add_argument("--rate", default="-5%")
+    syn.add_argument("--allow-network-fallback", action="store_true")
+    args = p.parse_args()
+    if args.cmd == "doctor":
+        print(json.dumps(probe(), ensure_ascii=False, indent=2))
+        return 0
+    r = synthesize(
+        args.text,
+        Path(args.out),
+        backend=args.backend,
+        voice=args.voice,
+        rate=args.rate,
+        allow_network_fallback=args.allow_network_fallback,
+    )
+    print(json.dumps({"ok": True, **r}, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

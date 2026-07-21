@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""Deterministic media probes used by registration and final-delivery gates."""
+
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+from pathlib import Path
+from typing import Any
+
+from security_policy import minimal_subprocess_env
+
+
+# Grok Imagine + FRW video backends.
+# 2026-07-20 quality: bulk default is Seedance newvideo, NOT legacy img2video template.
+ALLOWED_VIDEO_ENDPOINTS = frozenset(
+    {
+        "image_to_video",  # Grok frame-1 I2V
+        "reference_to_video",  # Grok multi-ref
+        "frw_seedance_i2v",  # FRW newvideo seedance-*-i2v (DEFAULT bulk quality)
+        "frw_seedance_flf",  # FRW newvideo seedance-*-flf / pro-flf
+        "frw_ltx_i2v",  # FRW newvideo ltx-i2v (precise w×h; probe if 502)
+        "frw_ltx_t2v",  # FRW newvideo ltx-t2v (empty/env plates)
+        "frw_ltx_flf",  # FRW newvideo ltx-flf
+        "frw_ltx_lipsync",  # FRW ltx-音画同步 (probe: often 502)
+        "frw_wan_lipsync",  # FRW wan-音画同步
+        "frw_seedance_lipsync",  # FRW seedance-2-pro-lipsync (probe: often 403)
+        "frw_newvideo",  # other FRW NEW_VIDEO templates (byteplus/gimm/wan/…)
+        "frw_img2video",  # LEGACY template 348771… — discouraged (quality floor)
+        "frw_text2video",  # classic T2V
+        "frw_first_last_frame",  # legacy FLF template
+        "frw_video_continue",  # FRW video-continue
+        "external",  # generic offline/external clip (must reencode)
+    }
+)
+MOTION_SAMPLE_WIDTH = 64
+MOTION_SAMPLE_HEIGHT = 64
+MOTION_THRESHOLD = 1.0
+FRAME_MOTION_THRESHOLD = 0.25
+MOTION_CONTINUITY_THRESHOLD = 0.6
+
+
+class MediaQAError(RuntimeError):
+    pass
+
+
+def _run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[Any]:
+    return subprocess.run(command, env=minimal_subprocess_env(), **kwargs)
+
+
+def _failed_analysis(source: Path, error: str) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "path": str(source),
+        "decode_ok": False,
+        "motion_ok": False,
+        "has_audio": False,
+        "duration_sec": 0.0,
+        "decoded_frames": 0,
+        "motion_score": 0.0,
+        "motion_continuity": 0.0,
+        "active_motion_transitions": 0,
+        "errors": [error],
+    }
+
+
+def _rate(value: object) -> float:
+    if not isinstance(value, str) or not value or value == "0/0":
+        return 0.0
+    if "/" in value:
+        numerator, denominator = value.split("/", 1)
+        try:
+            return float(numerator) / float(denominator)
+        except (ValueError, ZeroDivisionError):
+            return 0.0
+    try:
+        return float(value)
+    except ValueError:
+        return 0.0
+
+
+def _motion_score(path: Path) -> tuple[float, int, float, int]:
+    frame_size = MOTION_SAMPLE_WIDTH * MOTION_SAMPLE_HEIGHT
+    proc = _run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-vf",
+            f"fps=4,scale={MOTION_SAMPLE_WIDTH}:{MOTION_SAMPLE_HEIGHT}:flags=area,format=gray",
+            "-pix_fmt",
+            "gray",
+            "-f",
+            "rawvideo",
+            "pipe:1",
+        ],
+        capture_output=True,
+        timeout=180,
+    )
+    if proc.returncode != 0:
+        raise MediaQAError(proc.stderr.decode("utf-8", errors="replace")[:1000])
+    frames = [
+        proc.stdout[offset : offset + frame_size]
+        for offset in range(0, len(proc.stdout), frame_size)
+        if len(proc.stdout[offset : offset + frame_size]) == frame_size
+    ]
+    if len(frames) < 2:
+        return 0.0, len(frames), 0.0, 0
+    differences: list[float] = []
+    for before, after in zip(frames, frames[1:]):
+        differences.append(sum(abs(a - b) for a, b in zip(before, after)) / frame_size)
+    active_transitions = sum(difference >= FRAME_MOTION_THRESHOLD for difference in differences)
+    continuity = active_transitions / len(differences)
+    return (
+        round(sum(differences) / len(differences), 4),
+        len(frames),
+        round(continuity, 4),
+        active_transitions,
+    )
+
+
+def analyze_media(
+    path: Path | str,
+    *,
+    require_audio: bool,
+    require_motion: bool,
+) -> dict[str, Any]:
+    source = Path(path).expanduser().resolve()
+    errors: list[str] = []
+    if not source.is_file() or source.stat().st_size == 0:
+        return _failed_analysis(source, "media file is missing or empty")
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        raise MediaQAError("ffmpeg and ffprobe are required for media QA")
+
+    try:
+        probe = _run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-count_frames",
+                "-show_entries",
+                "format=duration:stream=codec_type,codec_name,width,height,nb_read_frames,avg_frame_rate,duration",
+                "-of",
+                "json",
+                str(source),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        info = json.loads(probe.stdout)
+    except (subprocess.SubprocessError, json.JSONDecodeError) as exc:
+        return _failed_analysis(source, f"ffprobe failed: {exc}")
+
+    streams = info.get("streams") or []
+    video_stream = next((stream for stream in streams if stream.get("codec_type") == "video"), None)
+    has_audio = any(stream.get("codec_type") == "audio" for stream in streams)
+    try:
+        duration = float((info.get("format") or {}).get("duration") or 0.0)
+    except (TypeError, ValueError):
+        duration = 0.0
+    if not video_stream:
+        errors.append("video stream is missing")
+    if duration < 0.5:
+        errors.append("duration is shorter than 0.5 seconds")
+    if require_audio and not has_audio:
+        errors.append("audio stream is required")
+
+    decode_ok = False
+    if video_stream:
+        try:
+            decoded = _run(
+                ["ffmpeg", "-v", "error", "-xerror", "-i", str(source), "-f", "null", "-"],
+                capture_output=True,
+                timeout=180,
+            )
+            decode_ok = decoded.returncode == 0
+            if not decode_ok:
+                errors.append("full video decode failed")
+        except subprocess.SubprocessError as exc:
+            errors.append(f"full video decode failed: {exc}")
+
+    decoded_frames = 0
+    motion_score = 0.0
+    sampled_frames = 0
+    motion_continuity = 0.0
+    active_transitions = 0
+    if video_stream and decode_ok:
+        raw_frames = video_stream.get("nb_read_frames")
+        try:
+            decoded_frames = int(raw_frames)
+        except (TypeError, ValueError):
+            decoded_frames = int(round(duration * _rate(video_stream.get("avg_frame_rate"))))
+        try:
+            motion_score, sampled_frames, motion_continuity, active_transitions = _motion_score(source)
+        except (MediaQAError, subprocess.SubprocessError) as exc:
+            errors.append(f"motion probe failed: {exc}")
+    motion_ok = (
+        sampled_frames >= 3
+        and motion_score >= MOTION_THRESHOLD
+        and active_transitions >= 2
+        and motion_continuity >= MOTION_CONTINUITY_THRESHOLD
+    )
+    if require_motion and not motion_ok:
+        errors.append(
+            "motion gate failed: "
+            f"score={motion_score:.4f} (minimum {MOTION_THRESHOLD:.4f}), "
+            f"continuity={motion_continuity:.4f} (minimum {MOTION_CONTINUITY_THRESHOLD:.4f}), "
+            f"active_transitions={active_transitions} (minimum 2)"
+        )
+
+    return {
+        "ok": not errors,
+        "path": str(source),
+        "bytes": source.stat().st_size,
+        "decode_ok": decode_ok,
+        "duration_sec": round(duration, 4),
+        "decoded_frames": decoded_frames,
+        "sampled_frames": sampled_frames,
+        "motion_score": motion_score,
+        "motion_threshold": MOTION_THRESHOLD,
+        "motion_continuity": motion_continuity,
+        "motion_continuity_threshold": MOTION_CONTINUITY_THRESHOLD,
+        "active_motion_transitions": active_transitions,
+        "motion_ok": motion_ok,
+        "has_audio": has_audio,
+        "video_codec": video_stream.get("codec_name") if video_stream else None,
+        "width": video_stream.get("width") if video_stream else None,
+        "height": video_stream.get("height") if video_stream else None,
+        "errors": errors,
+    }
+
+
+def approved_clip_record(record: object) -> bool:
+    if not isinstance(record, dict):
+        return False
+    qa = record.get("qa")
+    return bool(
+        record.get("status") == "approved"
+        and record.get("source_endpoint") in ALLOWED_VIDEO_ENDPOINTS
+        and record.get("identity_approved") is True
+        and record.get("motion_approved") is True
+        and isinstance(record.get("review_note"), str)
+        and record["review_note"].strip()
+        and isinstance(qa, dict)
+        and qa.get("ok") is True
+        and qa.get("decode_ok") is True
+        and qa.get("motion_ok") is True
+    )

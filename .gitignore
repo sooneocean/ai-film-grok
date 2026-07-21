@@ -1,0 +1,49 @@
+# secrets & local runtime — never commit
+**/config.env
+**/.env
+**/.env.*
+!**/.env.example
+!**/config.env.example
+
+# OS / editor
+**/.DS_Store
+**/.idea/
+**/.vscode/
+**/*.swp
+**/*~
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.benchmarks/
+**/.coverage
+**/htmlcov/
+**/*.egg-info/
+**/.venv/
+**/venv/
+
+# Node (if any post tooling lands)
+**/node_modules/
+**/dist/
+
+# local skill noise
+**/backups/
+**/receipts/
+**/*.log
+**/last_suite.log
+
+# film project outputs accidentally copied in
+**/out/
+**/clips/
+**/keyframes/
+**/film-spec.json
+**/manifest.json
+**/timeline.json
+
+# local backup artifacts
+**/*.bak
+**/*.bak-*
+**/*~pre-*

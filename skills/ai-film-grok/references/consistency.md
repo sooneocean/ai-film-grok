@@ -1,0 +1,211 @@
+# Consistency（画风 / 身份 / 画质一致性）硬门禁
+
+> 2026-07-16 教训：Kei 片用 FRW 批量 img2image 且定妆仅为角色设定转面图裁切 →
+> 镜间画风漂、服装漂、质感不齐。**批量前必须有 cast master + pilot 审批。**
+
+与 `write-spec` / `register-*` / `review-final` 纪律对齐。Agent **不得**用「赶工期」跳过本节。
+
+## 0. 目标一句话
+
+整片看起来像**同一套动画工房**画的，不是 22 张各自抽卡。
+
+## 1. 资产层级（必须按序）
+
+| 顺序 | 资产 | 路径约定 | 用途 |
+|------|------|----------|------|
+| 1 | **Style master** | `canonical/style-v1.*` | 介质/色板/光感/线条语言（可无主角脸） |
+| 2 | **Cast master（每角一张）** | `canonical/cast/<id>-v1.*` | 脸、发型、瞳色、服装、身材比例 |
+| 3 | **Lookbook（3 张）** | `canonical/lookbook/` | 近景脸 / 半身 / 情绪极端各 1，先批再量产 |
+| 4 | **Shot stills** | `keyframes/shotXX.*` | **只**允许 `image_edit` / 同源 img2img，禁止纯文生角色 |
+
+角色转面设定图（turnaround）**只能当参考**，不能直接当 `style-v1` 锁定成片画风。
+
+### Cast master 验收清单（全勾才算过）
+
+- [ ] 脸型/瞳色/发型与用户参考一致  
+- [ ] **发色稳定**：与 ref/cast 同色名；禁霓虹光下漂成黑/棕/另一女主色（见 §1b）  
+- [ ] 服装主色与配件（如光环、领带色）稳定  
+- [ ] 介质正确（anime ≠ photoreal）  
+- [ ] 竖屏 9:16 或可安全裁切  
+- [ ] 明确 **18+ 成人**比例与脸  
+- [ ] 光线干净、可做后续 edit 锚点  
+
+### 1b. 发色硬锁（2026-07-21 · P1）
+
+> 片例：双女主丝绒舞台——Astra 深青发漂成纯黑 → 无法辨认同人。完整见 [lessons-2026-07-21-hair-color-lock.md](lessons-2026-07-21-hair-color-lock.md)。
+
+| 规则 | 要求 |
+|------|------|
+| **H1 可复述发色句** | 每角 `cast_locks.<id>` 写色名 + **NEVER** 禁色（例：`dark teal cyan-green; NEVER pure black`） |
+| **H2 hair_swatches** | style-bible 建议写 `{ "id": "色名 #hex" }`；prompt 可复述 |
+| **H3 多角多锚** | 镜内每位出场角色：**各自 cast master 都进 `image[]` 前列**（双人=两张 cast 在前） |
+| **H4 Hair lock 行** | 每镜 still/I2V prompt 在 identity 后加 `Hair lock: …` 逐角重复 |
+| **H5 pilot 发色** | 对照 cast 发色 fail = **identity fail**，禁 approve / bulk |
+| **H6 漂了只修** | 用 cast master `image_edit` 修 still；**禁止**从已漂 still 平行重抽再 I2V |
+
+**禁止**：只写 `dark hair` / `colored hair`；双人镜只喂一张 cast；靠 I2V「希望视频修回发色」。
+
+### 1c. 画面零工程字（2026-07-21 · P0 致命）
+
+> 片例：成片角落残留 `shot11` / `keyframe shot05`。用户定性**致命**。见 [lessons-2026-07-21-no-shot-watermark.md](lessons-2026-07-21-no-shot-watermark.md)。
+
+| 规则 | 要求 |
+|------|------|
+| **T1 零工程字** | 画面禁 `shot##` · `keyframe` · `cast master` · `v1/v2` · 文件名 · 调试 caption |
+| **T2 Prompt 不印 ID** | 镜号只在文件名/JSON；prompt **禁止**写 `shot11 keyframe` 等可被画成字的串 |
+| **T3 干净句** | 每镜 still 必含：`No text, no watermark, no caption, no labels, no shot numbers.` |
+| **T4 入组前检** | register-still 前目视/OCR 四角+底边；命中 → **禁 register / 禁 I2V** |
+| **T5 脏了先 scrub** | `image_edit` 去字 → 复检 → 再 I2V；禁止脏 keyframe bulk |
+
+**禁止**：带着角落 `shot11` 字样的 still 进成片；把工程 ID 写进 Imagine prompt 当画面描述。
+
+### 1d. 首帧结构门禁（2026-07-21 · P0 致命）
+
+> 片例：成片 ~33s `shot13`——**静帧手/身结构坏 → I2V 整段毒化**。用户：「首帧坏了导致整个片段都坏了」。  
+> 完整见 [lessons-2026-07-21-keyframe-first-frame-poison.md](lessons-2026-07-21-keyframe-first-frame-poison.md)。
+
+| 规则 | 要求 |
+|------|------|
+| **F1 首帧=交付帧** | keyframe 按成片冻帧审，不是草图 |
+| **F2 解剖学** | 手 **5 指**清晰；无多余肢；无躯干/腿融合；无破面「第三物体」 |
+| **F3 高风险构图** | 双人无头+多手交叠 insert → 简化为单手/单腿清晰 insert |
+| **F4 坏 still 禁 I2V** | F2 fail → 禁止 image_to_video，先修 still |
+| **F5 I2V 后抽首帧** | `t=0` 与 `t=0.5s` 结构仍坏 → 禁 register-clip approved |
+| **F6 final 抽镜起点** | 每镜起点 ±0.3s 抽帧；坏则换镜，禁只 re-final |
+
+**铁律**：`I2V 首帧 ≈ keyframe`；**结构坏会演满 6 秒**。`motion_ok` 不能替代 `structure_ok`。
+
+## 2. 生成纪律（Grok 主路径）
+
+1. **主角出现的每一镜**：`image_edit`，`image` 列表**出场角色的 cast master 全部靠前**；可选再加相邻已批 still / style。  
+2. Prompt **必须**以 `style-bible.signature_block` + `identity_lock` + **`Hair lock`** 开头（见 style-bible.md）。  
+3. 只改：pose / expression / environment / action / wetness / camera——**不改发色/瞳色/签名服色**。  
+4. **禁止**对主角反复 `image_gen` 从零抽卡。  
+5. 漂了：用 cast master 当 ref 修坏帧，不要整镜重抽换脸/**换发色**。
+
+### 量产前 Pilot（硬）
+
+在写满 10+ 镜之前：
+
+1. 只做 **3 镜 pilot**（建议 hook + reaction + action）。  
+2. **用户**对比 cast master：脸 / 发 / 服 / 介质（agent 不得自批）。  
+3. 写 `receipts/pilot-approval.json`：
+
+```json
+{
+  "approved": true,
+  "approved_by": "user",
+  "user_phrase": "pilot 过",
+  "shots": ["shot01", "shot04", "shot11"],
+  "compared_to_cast": "canonical/cast/kei-v1.png",
+  "notes": "face/hair/outfit/medium match"
+}
+```
+
+4. 缺 `approved_by: user`（或会话中用户原话批准）→ **禁止**批量。  
+5. 全片 still **同一 img2img 锚**（cast master）。禁止「机构戏用 cast、色气戏用 naked 用户图」两套锚。用户高色气图只作 **style 参考/lookbook**，定妆锚用着衣 cast。
+
+## 3. Provider 路由（Grok 身份 + FRW Seedance 优先）
+
+**无限 FRW 配额时**：bulk **2V 默认 Seedance `newvideo`**（质量优先，**前提 key 已开通模板**）；定妆 / still 仍 **Grok**。完整契约见 [frw-degrade-dispatch.md](frw-degrade-dispatch.md)、[lessons-2026-07-20-seedance-quality.md](lessons-2026-07-20-seedance-quality.md)、[lessons-2026-07-21-frw-key-capability.md](lessons-2026-07-21-frw-key-capability.md)。
+
+| 规则 | 要求 |
+|------|------|
+| **分层** | 创作/身份 → Grok still；**确定性 bulk 2V → FRW Seedance** `newvideo`（权限开时） |
+| **Key canary** | bulk 前 `balance` + Seedance 一枪 + `ltx-t2v`；**403**=未开通，**502**=平台挂 |
+| film-spec | `i2v_provider: frw` + **`frw_video_model: seedance-2-fast-i2v`**（默认）；`auto`→二者 |
+| Seedance 全 403 | L1→**Grok 720p**；L2→**`ltx-t2v`**→classic t2v；legacy I2V 仅显式救生艇 |
+| 锚点（若 FRW still） | 必须先 `upload` cast；每镜 **img2image**（禁止 text2image 出主角） |
+| 模型 | FRW 侧 **整片固定同一 `frw_video_model`**；禁止半 Seedance 半 legacy 冒充 |
+| 尺寸 | 固定同一画幅；9:16 **原生 720p**（`frw_resolution: 720p`）；**禁止** 576 生成再放大到 720 |
+| Prompt | 每镜前缀同一 `identity_lock` + `signature_block`；场景句放后半；Seedance 用 `@Image1 …` |
+| **分镜动态** | 默认 **`newvideo --model seedance-2-fast-i2v`**；有明确尾帧 **`seedance-2-pro-flf`** |
+| **禁止默认** | legacy `img2video` / 旧 FLF 模板（须显式 `legacy-img2video`） |
+| **入口** | `"$AIFILM" frw …` 或 `scripts/frw_dispatch.py`；stdout JSON `protocol_version=1.0` |
+| **入组** | 下载 → **`reencode-clips`（不升分辨率）** → `register-clip`（真实 endpoint） |
+| 禁止 | 半片 Grok still + 半片 FRW still 混剪同一角色 |
+| 禁止 | 长期半片 Grok I2V + 半片 FRW I2V（单镜兜底后尽快统一） |
+| 禁止 | 错 poll 的 `frw_batch_flf`；把 Grok I2V 说成 FLF；403 后仍写 model=seedance |
+| 质检 | 每 5 镜抽 1 镜对照 cast；失败整批 pause；pilot 3 镜 Seedance 人审 fail → 不 bulk |
+| 注册 | `--review-note` 写真实 `provider=` `model=` `fallback=` `res=` `identity_lock_ok` |
+
+```bash
+AIFILM="$HOME/.grok/skills/ai-film-grok/scripts/aifilm"
+
+# bulk 2V：上传已批 keyframe → Seedance newvideo（禁止默认 img2video）
+"$AIFILM" frw upload --file-path "<root>/keyframes/shot01.png" --category image
+"$AIFILM" frw newvideo \
+  --model seedance-2-fast-i2v \
+  --img-url "<url>" --prompt "@Image1 <sig+lock+motion>" \
+  --aspect-ratio 9:16 --resolution 720p --duration 5 --wait
+
+# 有首尾帧时锁构图
+"$AIFILM" frw newvideo \
+  --model seedance-2-pro-flf \
+  --img1 "<head-url>" --img2 "<tail-url>" \
+  --prompt "@Image1 @Image2 continuous mid-action, subject stays centered" \
+  --aspect-ratio 9:16 --resolution 1080p --duration 5 --wait
+
+# 回 Grok 控制台（reencode 只 clean codec，不放大）
+"$AIFILM" reencode-clips --root "<root>"
+"$AIFILM" register-clip --root "<root>" --shot-id shot01 \
+  --source "<clip.mp4>" --source-endpoint frw_seedance_i2v \
+  --identity-approved --motion-approved \
+  --review-note "provider=frw model=seedance-2-fast-i2v res=720p identity_lock_ok"
+```
+
+## 4. 注册门禁（人工）
+
+### Still
+
+注册前目视：
+
+- 与 cast master 同一人（脸/发/服）  
+- 与 style master 同一介质与色级  
+- 无乱入元素、无儿童化脸  
+
+`review-note` 建议模板：`id-ok face/hair/outfit; medium=anime; cast=kei-v1`。
+
+### Clip
+
+- 身份不漂于该镜 still  
+- 可见运动（非冻帧）  
+- 不因 I2V 糊成另一画风  
+
+身份/画风 fail → `director-notes` + reshoot，**禁止**靠 assemble 硬拼。
+
+## 5. 终审 scorecard
+
+`review-final` 除原维度外必须评 **style**（画风统一）：
+
+| 维度 | pass 条件 |
+|------|-----------|
+| identity | 主角可识别为 cast master |
+| **style** | 介质/线稿或渲染/色板全片一致，无明显「换模型」感 |
+| motion | 真实运动 |
+| escalation | 叙事情绪弧成立 |
+| audio / subs / dead_air | 同前 |
+
+`style=fail` → 不得 `final_complete`；优先重做 still 再 I2V，不要只靠调色掩盖。
+
+## 5b. 签名配件（光环 / 道具）硬锁
+
+若角色设定含 **唯一视觉签名**（如 Kei 的粉色霓虹双文件光环）：
+
+1. `identity_lock` 与 `signature_block` **必须**写清配件名称与位置（`MANDATORY … always visible`）。
+2. cast master 验收：配件可见才算过；无配件 = 定妆失败。
+3. 每镜 prompt 前缀重复配件；`negative_hints` 写 `no missing halo / do not remove …`。
+4. pilot 抽检明确勾「配件在」。
+
+教训 [2026-07-16 v2]：简化定妆漏掉光环 → 整片身份错误，须 v3 重做。
+
+## 6. 反模式（本次踩过）
+
+| 反模式 | 正确做法 |
+|--------|----------|
+| 转面图裁切当 style-v1 | 单独生成**成片介质**的 cinematic style + cast 立绘 |
+| 批量 22 镜无 pilot | 先 3 镜批准 |
+| Imagine 挂了就无锚点 text2image | FRW 也必须 img2image + 固定 model |
+| 01–04 Grok、05–22 FRW 混用 | 选一条 provider 做完或全量重生成 |
+| 只评 identity 不评 style | scorecard 含 style |
+| 赶工跳过 lookbook | 近景/半身/情绪三张未批禁止量产 |
