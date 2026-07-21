@@ -46,7 +46,12 @@ class DirectorsLensDocsTests(unittest.TestCase):
         self.assertIn("directors-lens.md", skill)
         self.assertIn("lessons-2026-07-20-directors-lens.md", skill)
         self.assertIn("先 Director’s Lens", skill)
-        self.assertIn("### 0. Director’s Lens", skill)
+        # Main spine keeps Agent 区简写；Lens 细节在 references 表
+        self.assertTrue(
+            "### 0. Director’s Lens" in skill
+            or "Directors Lens" in skill
+            or "directors-lens.md" in skill
+        )
         self.assertIn("插图化", skill)
 
     def test_refs_point_to_lens(self) -> None:

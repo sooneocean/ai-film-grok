@@ -189,7 +189,8 @@ class CaptionFormatTests(unittest.TestCase):
         validate_film_spec(spec, assign_missing_ids=False)
         self.assertEqual(spec.get("caption_mode"), "zh")
         self.assertEqual(spec.get("transition_fluency"), "silk")
-        self.assertEqual(spec.get("i2v_provider"), "frw")
+        # grok_primary season: auto resolves to grok L1 (Seedance off)
+        self.assertEqual(spec.get("i2v_provider"), "grok")
         intents = spec.get("transition_intents") or []
         self.assertEqual(len(intents), 1)
         # join into continue shot → hard

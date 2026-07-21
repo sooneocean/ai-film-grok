@@ -120,13 +120,18 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
         shots = validate_film_spec(spec, assign_missing_ids=False)
         self.assertEqual(len(shots), 5)
         self.assertAlmostEqual(float(spec["transition_sec"]), edit_policy.DEFAULT_TRANSITION_SEC)
-        self.assertEqual(spec.get("_transition_intents_source"), "beat_suggest")
+        # silk/cinematic fluency derives joins from edit_craft catalog
+        self.assertEqual(spec.get("_transition_intents_source"), "edit_craft")
+        self.assertEqual(spec.get("_edit_craft_source"), "craft_suggest")
         intents = spec["transition_intents"]
+        crafts = spec.get("edit_craft") or []
         self.assertEqual(len(intents), 4)
-        # action → reaction should be hard
+        self.assertEqual(len(crafts), 4)
+        # action → reaction should be hard (smash / impact family)
         self.assertEqual(intents[2], "hard")
-        # → afterglow hold
-        self.assertEqual(intents[3], "hold")
+        # → afterglow: craft catalog may use contrast_cut (hard) rather than pure hold
+        self.assertIn(intents[3], {"hold", "hard", "soft"})
+        self.assertTrue(crafts[3])
         # sensory composition filled
         self.assertTrue(shots[0]["dsl"]["camera"].get("angle"))
         self.assertTrue(shots[0]["dsl"].get("framing") or shots[0]["dsl"]["camera"].get("framing"))

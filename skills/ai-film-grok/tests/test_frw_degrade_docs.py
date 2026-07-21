@@ -48,19 +48,20 @@ class FrwSeedanceDocsTests(unittest.TestCase):
 
     def test_skill_yaml_and_body_seedance(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")
+        # Current season: grok_primary; Seedance kept as restore path + FRW degrade docs
+        self.assertIn("grok_primary", skill)
         self.assertIn("seedance-2-fast-i2v", skill)
         self.assertIn("frw_video_model", skill)
         self.assertIn("frw newvideo", skill)
         self.assertIn("frw-degrade-dispatch.md", skill)
         self.assertIn("lessons-2026-07-20-seedance-quality.md", skill)
         self.assertIn("不是 first-last-frame", skill)
-        # YAML description must say Seedance, not only generic FRW 2V
+        self.assertIn("seedance_first", skill)
         desc_line = next(
             (ln for ln in skill.splitlines() if ln.startswith("description:")),
             "",
         )
-        self.assertIn("Seedance", desc_line)
-        self.assertIn("seedance-2-fast-i2v", desc_line)
+        self.assertIn("grok_primary", desc_line)
         self.assertNotIn("默认 FRW 2V 优先", desc_line)
 
     def test_consistency_and_production_seedance(self) -> None:
@@ -164,17 +165,20 @@ class FrwSeedanceDocsTests(unittest.TestCase):
             DEFAULT_FRW_ENV_MODEL,
             DEFAULT_FRW_VIDEO_MODEL,
             DEFAULT_I2V_PROVIDER,
+            default_i2v_provider,
             validate_film_spec,
         )
 
-        self.assertEqual(DEFAULT_I2V_PROVIDER, "frw")
+        # Constants: provider is profile-resolved ("auto"); FRW model ids stay documented
+        self.assertEqual(DEFAULT_I2V_PROVIDER, "auto")
         self.assertEqual(DEFAULT_FRW_VIDEO_MODEL, "seedance-2-fast-i2v")
         self.assertEqual(DEFAULT_FRW_ENV_MODEL, "ltx-t2v")
+        self.assertEqual(default_i2v_provider(), "grok")  # grok_primary default season
         spec = {
-            "title": "seedance-default-probe",
+            "title": "grok-primary-default-probe",
             "vo_mode": "storyteller",
             "director_intent": {
-                "logline": "测试 Seedance 默认写入 film-spec 的行为。",
+                "logline": "测试 grok_primary 默认写入 film-spec 的行为。",
                 "tone": "neutral",
                 "emotional_arc": ["a", "b", "c"],
             },
@@ -208,7 +212,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
             ],
         }
         validate_film_spec(spec, assign_missing_ids=False)
-        self.assertEqual(spec.get("i2v_provider"), "frw")
+        self.assertEqual(spec.get("i2v_provider"), "grok")
         self.assertEqual(spec.get("frw_video_model"), "seedance-2-fast-i2v")
         self.assertEqual(spec.get("frw_env_model"), "ltx-t2v")
         self.assertEqual(spec.get("frw_resolution"), "720p")

@@ -254,13 +254,16 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 | **生成式电影工序**（Beat/Coverage/五锁） | [generative-film-craft.md](references/generative-film-craft.md) |
 | 工具四层 + 对照表 | [pipeline-methodology.md](references/pipeline-methodology.md) |
 | 弹性默认 | [hard-defaults.md](references/hard-defaults.md) |
-| 叙事上游执行 | [directors-lens.md](references/directors-lens.md) |
+| 叙事上游执行 | [directors-lens.md](references/directors-lens.md) · [lessons-2026-07-20-directors-lens.md](references/lessons-2026-07-20-directors-lens.md)（**先 Director’s Lens**，防插图化） |
 | 画风身份 | [consistency.md](references/consistency.md) · [style-bible.md](references/style-bible.md) |
-| 规格 | [film-spec.md](references/film-spec.md) · schema |
+| 规格 | [film-spec.md](references/film-spec.md) · schema · `caption_mode` / `transition_fluency` / `camera_axis` |
 | 接戏 | [continuity_chain.md](references/continuity_chain.md) |
-| 后期 | [postproduction.md](references/postproduction.md) · [post-compose.md](references/post-compose.md) |
+| 后期 | [postproduction.md](references/postproduction.md) · [post-compose.md](references/post-compose.md) · [hf-remotion-capability-matrix.md](references/hf-remotion-capability-matrix.md) |
 | 量产 | [production-discipline.md](references/production-discipline.md) |
 | 色气 / 剪辑 | [ecchi-story.md](references/ecchi-story.md) · [editor-cut-pass.md](references/editor-cut-pass.md) · [editorial-craft.md](references/editorial-craft.md) |
+| 剪辑丝滑 / 双语字 | [lessons-2026-07-20-cut-silk-bilingual.md](references/lessons-2026-07-20-cut-silk-bilingual.md) · [lessons-2026-07-20-transition-motion-v2.md](references/lessons-2026-07-20-transition-motion-v2.md) |
+| 标题双烧 | [lessons-2026-07-20-title-double-burn.md](references/lessons-2026-07-20-title-double-burn.md)（`plate-cards blank` + `subs off`） |
+| FRW 降级 / Seedance | [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md) · [lessons-2026-07-20-seedance-quality.md](references/lessons-2026-07-20-seedance-quality.md) · `frw_video_model` / `seedance-2-fast-i2v` · `frw newvideo`（恢复时 `seedance_first`，**不是 first-last-frame**） |
 | 踩坑 lessons | `references/lessons-2026-07-*.md`（新规则须标 P 码 + 层） |
 | **发色硬锁** | [lessons-2026-07-21-hair-color-lock.md](references/lessons-2026-07-21-hair-color-lock.md) · [consistency.md](references/consistency.md) §1b |
 | **禁 shot 水印** | [lessons-2026-07-21-no-shot-watermark.md](references/lessons-2026-07-21-no-shot-watermark.md) · [consistency.md](references/consistency.md) §1c · **致命** |
