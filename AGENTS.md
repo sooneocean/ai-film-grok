@@ -38,7 +38,7 @@ ai-film-grok/                    ← plugin root / git root
 | Media | I2V / queue / register / OAuth 出图 | media / continuity 相关 |
 | Audio | TTS / BGM / recipe / lipsync | `test_audio_recipe` `test_capability` |
 | Post | final / compose / review / export | `test_delivery_gates` compose 相关 |
-| Narrative | 色气 / 剪辑 / 景别 / lessons | 文档 + 相关 soft gate |
+| Narrative | 色气 / 性爱时长≥20% / 剪辑 / 景别 / lessons | `test_heat_arc_multi` + soft gate |
 | Gates | hard-defaults / security / runtime-lock | doctor + delivery gates |
 
 细则见 skill 内 `references/pipeline-methodology.md` · `references/hard-defaults.md`。

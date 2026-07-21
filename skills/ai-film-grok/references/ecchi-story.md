@@ -95,21 +95,32 @@
 | `afterglow` | 余韵钩子 | 未完邀请，禁说教 |
 | `bridge` | 转场垫 | 空镜/物件，不抢亲密核时长 |
 
-### 亲密核（intimacy core）
+### 亲密核（intimacy core）vs 性爱片段（sex core）
 
 ```text
-亲密核 = foreplay + act + climax
+亲密核 intimacy = foreplay + act + climax   （镜数占比 · 建议）
+性爱片段 sex    = act + climax only         （duration_sec 加权 · 产品底）
 ```
 
-| `heat_scale` | 亲密核**参考**占比 | setup 参考 | 说明 |
-|---|---|---|---|
-| max（用户点名成人/办事完成时） | **建议** ≥ 60% | **建议** ≤ 25% | 建议有 act + climax；非硬闸 |
-| **max + 重口男向**（用户写「重口/男向/尺度太小」） | **目标 ≥ 70%** | **setup ≤ 2 镜 / ≤20%** | act **≥4** + climax **≥2**（10 镜 60s）；见下 §重口男向 |
-| hot | 建议 ≥ 40% | — | 弹性 |
-| medium 及以下 / 未写 | 不要求 | — | 跟 brief |
+| `heat_scale` | 亲密核**参考**（镜比） | **性爱片段时长**（act+climax / 总 duration_sec） | setup 参考 | 说明 |
+|---|---|---|---|---|
+| max（成人/办事完成） | **建议** ≥ 60% | **硬底 ≥ 20%**（write-spec 默认 `sex_floor_strict`） | **建议** ≤ 25% | 尺度太小根因常是 setup/foreplay 占满、性爱时长不足 |
+| **max + 重口男向**（「重口/男向/尺度太小」） | **目标 ≥ 70%** | **目标 ≥ 40%**（`audience_profile: hardcore_male`） | **setup ≤ 2 镜 / ≤20%** | act **≥4** + climax **≥2**（10 镜 60s） |
+| hot | 建议 ≥ 40% | soft floor ≥ 15% | — | 弹性 |
+| medium 及以下 / 未写 | 不要求 | 不要求 | — | 跟 brief |
 
-**弹性原则**：用户 brief 要热 → 拉高亲密核；用户只要暧昧 → 勿强行办事完成。  
-**参考脊柱**（非强制）：2 setup + 2–3 foreplay + 3–4 act + 1–2 climax + 1 afterglow。
+**60s / 10×6s 速算**：性爱硬底 20% = **≥12s** act+climax（最少 2 镜满 6s，或 1×10s+余量）；大尺度建议 **≥3–4 镜 act + 1–2 climax**（≥35–40%）。
+
+**弹性原则**：用户 brief 要热 → 拉高性爱时长；用户只要暧昧 → `heat_scale` 别钉 max / 设 `sex_floor_strict:false`。  
+**参考脊柱**（max 60s）：1–2 setup + 2 foreplay + **3–4 act** + **1–2 climax** + 1 afterglow。
+
+| 字段 | 含义 |
+|---|---|
+| `sex_min_duration_ratio` | 覆盖性爱时长底（默认 max=0.20；hardcore=0.40） |
+| `sex_floor_strict` | `HEAT_SEX_DURATION_LOW` 是否 hard-fail write-spec（**max 默认 true**） |
+| `_heat_arc.sex_duration_ratio` | 指标：性爱秒数 / 总秒数 |
+
+详见 [lessons-2026-07-21-sex-duration-floor.md](lessons-2026-07-21-sex-duration-floor.md)。
 
 ### 重口男向（2026-07-21 · 用户嫌尺度小时强制）
 
@@ -132,7 +143,10 @@
   "heat_scale": "max",
   "heat_phase_auto": true,
   "heat_arc_advise": true,
-  "heat_arc_strict": false
+  "heat_arc_strict": false,
+  "sex_floor_strict": true,
+  "sex_min_duration_ratio": 0.20,
+  "director_intent": { "audience_profile": "hardcore_male" }
 }
 ```
 
@@ -141,9 +155,11 @@
 | （不写 heat_scale） | **不自动钉 max** |
 | `heat_phase_auto` | 从 dramatic_function 填 phase（不猜 climax） |
 | `heat_arc_advise` | `_heat_arc` 多打 info 建议 |
-| `heat_arc_strict` | 仅极端 warning 升 hard（默认关） |
+| `heat_arc_strict` | 全部 heat warning 升 hard（默认关） |
+| `sex_floor_strict` | **性爱时长** hard（max 默认 **开**） |
+| `sex_min_duration_ratio` | 性爱时长底；hardcore_male 未写时 lint 用 0.40 |
 
-`_heat_arc` 默认：指标 + **仅极端偏低** soft warn；不是硬编码比例闸。
+`_heat_arc`：`sex_duration_ratio` + phase 时长表；`HEAT_SEX_DURATION_LOW` 在 max 默认挡 write-spec。
 
 ### 12 镜 max 脊柱（多女主或满 70s）
 

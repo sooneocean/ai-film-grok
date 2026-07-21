@@ -1944,20 +1944,33 @@ def apply_coverage_defaults_to_shot(
     return report
 
 
-# --- Heat arc / multi-heroine (elastic · 2026-07-21) ---
-# Metrics + optional soft advice only. No forced ratios unless heat_arc_strict.
+# --- Heat arc / multi-heroine (elastic · 2026-07-21; sex-duration floor 2026-07-21) ---
+# Metrics + soft advice. Sex duration floor is a real floor for heat_scale=max
+# (write-spec hard by default via sex_floor_strict). Other ratios stay advisory
+# unless heat_arc_strict.
 
 HEAT_SCALES = frozenset({"soft", "medium", "hot", "max"})
 HEAT_PHASES = frozenset(
     {"setup", "foreplay", "act", "climax", "afterglow", "bridge"}
 )
 INTIMACY_PHASES = frozenset({"foreplay", "act", "climax"})
-# Advisory targets (docs / agent guidance only — not hard gates)
+# Sex / intercourse beats only (NOT foreplay) — user KPI: 「性爱片段」
+SEX_PHASES = frozenset({"act", "climax"})
+# Advisory targets (docs / agent guidance)
 ADVISORY_MAX_INTIMACY_RATIO = 0.60
 ADVISORY_MAX_SETUP_RATIO = 0.25
-# Extreme floor: only below this do we emit a soft warning on max (still not hard fail)
+ADVISORY_MAX_SEX_DURATION_RATIO = 0.35  # advise mode target for max
+# Extreme floor: intimacy shot-share soft warn on max
 EXTREME_INTIMACY_FLOOR = 0.30
 EXTREME_SETUP_CEILING = 0.75
+# Product floor: act+climax duration share of total plate (duration_sec weighted)
+# heat_scale=max → default hard at write-spec (sex_floor_strict default True)
+DEFAULT_SEX_DURATION_FLOOR = 0.20
+# hot soft floor (warning only)
+HOT_SEX_DURATION_FLOOR = 0.15
+# hardcore_male / 尺度太小 target (metrics + advise; not auto-hard unless set)
+HARDCORE_SEX_DURATION_TARGET = 0.40
+DEFAULT_SHOT_DURATION_SEC = 6.0
 
 # dramatic_function → default heat_phase when author omits heat_phase
 _DRAMATIC_TO_HEAT_PHASE: dict[str, str] = {
@@ -2017,40 +2030,78 @@ def apply_heat_phase_defaults(shots: list[dict[str, Any]]) -> list[str]:
     return filled
 
 
+def _shot_duration_sec(shot: dict[str, Any]) -> float:
+    """Plate seconds for duration-weighted heat ratios (defaults 6s)."""
+    try:
+        d = float(shot.get("duration_sec") or DEFAULT_SHOT_DURATION_SEC)
+    except (TypeError, ValueError):
+        d = DEFAULT_SHOT_DURATION_SEC
+    if d < 0:
+        return 0.0
+    return d
+
+
 def lint_heat_arc(
     shots: list[dict[str, Any]],
     *,
     heat_scale: str | None = None,
     intimacy_min_ratio: float | None = None,
     setup_max_ratio: float | None = None,
+    sex_min_duration_ratio: float | None = None,
+    audience_profile: str | None = None,
     advise: bool = False,
 ) -> dict[str, Any]:
-    """Elastic heat metrics. Soft issues only for extreme gaps or when advise=True.
+    """Heat metrics + sex-duration floor for adult films.
 
-    Does not invent heat_scale. Targets are advisory (docs), not product hard gates.
+    - intimacy_ratio / setup_ratio: **shot-count** share (legacy metrics)
+    - sex_duration_ratio / intimacy_duration_ratio: **duration_sec-weighted**
+      sex = act+climax only (性爱片段); intimacy = foreplay+act+climax
+    - heat_scale=max: sex_duration_ratio < floor (default 20%) → HEAT_SEX_DURATION_LOW
+      (write-spec hard by default via sex_floor_strict)
     """
     scale = (heat_scale or "").strip().lower() or None
+    profile = (audience_profile or "").strip().lower() or None
     issues: list[dict[str, Any]] = []
     codes: list[str] = []
     n = len(shots) or 0
     phases: dict[str, int] = {p: 0 for p in HEAT_PHASES}
-    phase_by_shot: list[dict[str, str]] = []
+    phase_dur: dict[str, float] = {p: 0.0 for p in HEAT_PHASES}
+    phase_by_shot: list[dict[str, Any]] = []
+    total_dur = 0.0
     for shot in shots:
         if not isinstance(shot, dict):
             continue
         ph = infer_heat_phase(shot)
+        dur = _shot_duration_sec(shot)
         phases[ph] = phases.get(ph, 0) + 1
-        phase_by_shot.append({"id": str(shot.get("id") or ""), "heat_phase": ph})
+        phase_dur[ph] = phase_dur.get(ph, 0.0) + dur
+        total_dur += dur
+        phase_by_shot.append(
+            {
+                "id": str(shot.get("id") or ""),
+                "heat_phase": ph,
+                "duration_sec": round(dur, 3),
+            }
+        )
 
     intimacy_n = sum(phases.get(p, 0) for p in INTIMACY_PHASES)
     setup_n = phases.get("setup", 0)
     climax_n = phases.get("climax", 0)
     act_n = phases.get("act", 0)
     foreplay_n = phases.get("foreplay", 0)
+    sex_n = act_n + climax_n
     intimacy_ratio = (intimacy_n / n) if n else 0.0
     setup_ratio = (setup_n / n) if n else 0.0
+    sex_shot_ratio = (sex_n / n) if n else 0.0
 
-    # Author override for advisory target (not a gate unless heat_arc_strict elsewhere)
+    intimacy_dur = sum(phase_dur.get(p, 0.0) for p in INTIMACY_PHASES)
+    setup_dur = phase_dur.get("setup", 0.0)
+    sex_dur = sum(phase_dur.get(p, 0.0) for p in SEX_PHASES)
+    intimacy_duration_ratio = (intimacy_dur / total_dur) if total_dur > 0 else 0.0
+    setup_duration_ratio = (setup_dur / total_dur) if total_dur > 0 else 0.0
+    sex_duration_ratio = (sex_dur / total_dur) if total_dur > 0 else 0.0
+
+    # Author override for advisory / floor targets
     guide_int = (
         float(intimacy_min_ratio)
         if intimacy_min_ratio is not None
@@ -2061,10 +2112,58 @@ def lint_heat_arc(
         if setup_max_ratio is not None
         else ADVISORY_MAX_SETUP_RATIO
     )
+    if sex_min_duration_ratio is not None:
+        sex_floor = float(sex_min_duration_ratio)
+    elif profile in {"hardcore_male", "hardcore", "重口男向"}:
+        sex_floor = HARDCORE_SEX_DURATION_TARGET
+    else:
+        sex_floor = DEFAULT_SEX_DURATION_FLOOR
+    guide_sex = (
+        HARDCORE_SEX_DURATION_TARGET
+        if profile in {"hardcore_male", "hardcore", "重口男向"}
+        else ADVISORY_MAX_SEX_DURATION_RATIO
+    )
 
     def _issue(code: str, severity: str, message: str) -> None:
         codes.append(code)
         issues.append({"code": code, "severity": severity, "message": message})
+
+    # Product floor: act+climax duration share (性爱片段) for max / hot
+    # Min sample: ≥4 shots or ≥24s plate so tiny tests do not false-trigger
+    sex_gate_eligible = n >= 4 or total_dur + 1e-9 >= 24.0
+    if scale == "max" and sex_gate_eligible:
+        if sex_dur <= 0:
+            _issue(
+                "HEAT_SEX_DURATION_LOW",
+                "warning",
+                "heat_scale=max but act+climax duration is 0s — "
+                f"性爱片段 must be ≥{sex_floor:.0%} of total plate duration "
+                f"(need ≥{sex_floor * total_dur:.1f}s act+climax). "
+                "Add heat_phase=act/climax shots or raise their duration_sec.",
+            )
+        elif sex_duration_ratio + 1e-9 < sex_floor:
+            need_sec = sex_floor * total_dur
+            _issue(
+                "HEAT_SEX_DURATION_LOW",
+                "warning",
+                f"性爱片段(act+climax) duration {sex_dur:.1f}s / {total_dur:.1f}s "
+                f"= {sex_duration_ratio:.0%} < floor {sex_floor:.0%} "
+                f"(need ≥{need_sec:.1f}s). Replan spine: more/longer act+climax plates. "
+                "Override: sex_min_duration_ratio or sex_floor_strict:false.",
+            )
+    elif scale == "hot" and sex_gate_eligible:
+        hot_floor = (
+            float(sex_min_duration_ratio)
+            if sex_min_duration_ratio is not None
+            else HOT_SEX_DURATION_FLOOR
+        )
+        if sex_duration_ratio + 1e-9 < hot_floor:
+            _issue(
+                "HEAT_SEX_DURATION_LOW",
+                "warning",
+                f"hot: sex duration {sex_duration_ratio:.0%} < soft floor {hot_floor:.0%} "
+                f"({sex_dur:.1f}s/{total_dur:.1f}s act+climax)",
+            )
 
     # Extreme soft warnings only when author chose max and spine is clearly empty of intimacy
     if scale == "max" and n >= 6:
@@ -2073,7 +2172,7 @@ def lint_heat_arc(
                 "HEAT_ACT_CLIMAX_EMPTY",
                 "warning",
                 "heat_scale=max but no act/climax phase inferred — "
-                "add 进行/高潮完成 beats if that matches the brief (elastic; not forced)",
+                "add 进行/高潮完成 beats if that matches the brief",
             )
         elif intimacy_ratio + 1e-9 < EXTREME_INTIMACY_FLOOR:
             _issue(
@@ -2097,7 +2196,7 @@ def lint_heat_arc(
                 "HEAT_ADVISORY_INTIMACY",
                 "info",
                 f"advisory: intimacy core {intimacy_ratio:.0%} < guide {guide_int:.0%} "
-                f"(not a gate; set heat_arc_strict only if you want hard fail)",
+                f"(shot-count; not a gate unless heat_arc_strict)",
             )
         if setup_ratio > guide_setup + 1e-9:
             _issue(
@@ -2111,6 +2210,13 @@ def lint_heat_arc(
                 "info",
                 "advisory: no climax phase — add completion beat if brief wants 办事完成",
             )
+        if sex_duration_ratio + 1e-9 < guide_sex:
+            _issue(
+                "HEAT_ADVISORY_SEX_DURATION",
+                "info",
+                f"advisory: sex duration {sex_duration_ratio:.0%} < guide {guide_sex:.0%} "
+                f"({sex_dur:.1f}s/{total_dur:.1f}s); hard floor is {sex_floor:.0%} for max",
+            )
 
     warn_n = sum(1 for i in issues if i.get("severity") == "warning")
     return {
@@ -2120,19 +2226,31 @@ def lint_heat_arc(
         "info_count": sum(1 for i in issues if i.get("severity") == "info"),
         "issues": issues,
         "heat_scale": scale,
+        "audience_profile": profile,
         "shot_count": n,
         "phase_counts": phases,
+        "phase_duration_sec": {k: round(v, 3) for k, v in phase_dur.items()},
+        "total_duration_sec": round(total_dur, 3),
         "intimacy_ratio": round(intimacy_ratio, 3),
         "setup_ratio": round(setup_ratio, 3),
+        "sex_shot_ratio": round(sex_shot_ratio, 3),
+        "intimacy_duration_ratio": round(intimacy_duration_ratio, 3),
+        "setup_duration_ratio": round(setup_duration_ratio, 3),
+        "sex_duration_ratio": round(sex_duration_ratio, 3),
+        "sex_duration_sec": round(sex_dur, 3),
+        "intimacy_duration_sec": round(intimacy_dur, 3),
+        "sex_duration_floor": sex_floor if scale in {"max", "hot"} else None,
         "act_n": act_n,
         "climax_n": climax_n,
         "foreplay_n": foreplay_n,
         "advisory_intimacy_ratio": guide_int if scale in {"max", "hot"} else None,
         "advisory_setup_ratio": guide_setup if scale in {"max", "hot"} else None,
+        "advisory_sex_duration_ratio": guide_sex if scale in {"max", "hot"} else None,
         "phase_by_shot": phase_by_shot,
         "note": (
-            "Elastic metrics only. Advisory targets are not hard gates. "
-            "Enable heat_arc_advise for info tips; heat_arc_strict for hard fail on warnings. "
+            "Sex floor = act+climax duration_sec / total (default ≥20% for heat_scale=max; "
+            "write-spec hard via sex_floor_strict default true). "
+            "Intimacy core remains foreplay+act+climax (shot-count advisory). "
             "See references/ecchi-story.md"
         ),
     }

@@ -57,15 +57,82 @@ class HeatArcLintTests(unittest.TestCase):
         rep = lint_heat_arc(shots, heat_scale="max")
         self.assertFalse(rep["ok"])
         self.assertIn("HEAT_ACT_CLIMAX_EMPTY", rep["codes"])
+        self.assertIn("HEAT_SEX_DURATION_LOW", rep["codes"])
+        self.assertEqual(rep["sex_duration_ratio"], 0.0)
 
     def test_max_mid_ratio_no_forced_warning(self) -> None:
-        # ~50% intimacy — below advisory 60% but above extreme floor → ok without advise
+        # 2/8 act+climax by duration = 25% ≥ 20% floor; intimacy mid
         shots = _spine(
             ["setup", "setup", "setup", "foreplay", "act", "climax", "afterglow", "bridge"]
         )
         rep = lint_heat_arc(shots, heat_scale="max", advise=False)
         self.assertTrue(rep["ok"], rep)
         self.assertNotIn("HEAT_ADVISORY_INTIMACY", rep["codes"])
+        self.assertNotIn("HEAT_SEX_DURATION_LOW", rep["codes"])
+        self.assertAlmostEqual(rep["sex_duration_ratio"], 0.25, places=2)
+
+    def test_max_sex_duration_below_20_warns(self) -> None:
+        # only 1×6s act of 8×6s = 12.5% < 20%
+        shots = _spine(
+            ["setup", "setup", "setup", "foreplay", "foreplay", "act", "afterglow", "bridge"]
+        )
+        rep = lint_heat_arc(shots, heat_scale="max", advise=False)
+        self.assertFalse(rep["ok"])
+        self.assertIn("HEAT_SEX_DURATION_LOW", rep["codes"])
+        self.assertAlmostEqual(rep["sex_duration_ratio"], 0.125, places=3)
+        self.assertEqual(rep["sex_duration_floor"], 0.20)
+
+    def test_sex_duration_weighted_not_shot_count(self) -> None:
+        # 1 long act (12s) + 3 setup (6s) = 12/30 = 40% sex even if shot-count is 1/4
+        shots = [
+            {
+                "id": "shot01",
+                "heat_phase": "setup",
+                "dramatic_function": "hook",
+                "duration_sec": 6,
+                "nar": "a",
+                "dsl": {"subject": "x", "action": "a", "motion": "m", "story_beat": "b", "visible_change": "c"},
+            },
+            {
+                "id": "shot02",
+                "heat_phase": "setup",
+                "dramatic_function": "hook",
+                "duration_sec": 6,
+                "nar": "a",
+                "dsl": {"subject": "x", "action": "a", "motion": "m", "story_beat": "b", "visible_change": "c"},
+            },
+            {
+                "id": "shot03",
+                "heat_phase": "setup",
+                "dramatic_function": "hook",
+                "duration_sec": 6,
+                "nar": "a",
+                "dsl": {"subject": "x", "action": "a", "motion": "m", "story_beat": "b", "visible_change": "c"},
+            },
+            {
+                "id": "shot04",
+                "heat_phase": "act",
+                "dramatic_function": "action",
+                "duration_sec": 12,
+                "nar": "a",
+                "dsl": {"subject": "x", "action": "a", "motion": "m", "story_beat": "b", "visible_change": "c"},
+            },
+        ]
+        rep = lint_heat_arc(shots, heat_scale="max")
+        self.assertAlmostEqual(rep["sex_duration_ratio"], 0.4, places=2)
+        self.assertAlmostEqual(rep["sex_shot_ratio"], 0.25, places=2)
+        self.assertNotIn("HEAT_SEX_DURATION_LOW", rep["codes"])
+
+    def test_hardcore_profile_raises_sex_floor(self) -> None:
+        # 25% sex fails hardcore 40% floor
+        shots = _spine(
+            ["setup", "setup", "setup", "foreplay", "act", "climax", "afterglow", "bridge"]
+        )
+        rep = lint_heat_arc(
+            shots, heat_scale="max", audience_profile="hardcore_male", advise=False
+        )
+        self.assertIn("HEAT_SEX_DURATION_LOW", rep["codes"])
+        self.assertEqual(rep["sex_duration_floor"], 0.40)
 
     def test_advise_adds_info_not_hard(self) -> None:
         shots = _spine(["setup"] * 5 + ["act", "climax", "afterglow"])
@@ -203,6 +270,51 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
         self.assertNotEqual(spec.get("heat_scale"), "max")
         self.assertIn("_heat_arc", spec)
         self.assertIn("_multi_heroine", spec)
+
+    def test_write_spec_max_sex_floor_hard_fail(self) -> None:
+        # 8 setup only — max defaults sex_floor_strict → hard fail
+        shots = _spine(["setup"] * 8)
+        for sh in shots:
+            sh["dsl"]["camera"] = {"shot_size": "medium full", "angle": "eye level"}
+            sh["lipsync"] = False
+        spec = {
+            "title": "测性爱时长硬闸",
+            "vo_mode": "storyteller",
+            "tts_backend": "edge",
+            "heat_scale": "max",
+            "director_intent": {
+                "logline": "成人max但无性爱段",
+                "tone": "成人",
+                "emotional_arc": ["起", "承", "转"],
+            },
+            "scenes": [{"shots": shots}],
+        }
+        with self.assertRaises(Exception) as ctx:
+            validate_film_spec(spec, assign_missing_ids=False)
+        self.assertIn("SEX_DURATION", str(ctx.exception).upper())
+
+    def test_write_spec_max_sex_floor_pass_with_enough_act(self) -> None:
+        shots = _spine(
+            ["setup", "foreplay", "act", "act", "act", "climax", "afterglow", "bridge"]
+        )
+        for sh in shots:
+            sh["dsl"]["camera"] = {"shot_size": "medium full", "angle": "eye level"}
+            sh["lipsync"] = False
+        spec = {
+            "title": "测性爱时长过关",
+            "vo_mode": "storyteller",
+            "tts_backend": "edge",
+            "heat_scale": "max",
+            "director_intent": {
+                "logline": "成人max性爱够秒",
+                "tone": "成人",
+                "emotional_arc": ["起", "承", "转"],
+            },
+            "scenes": [{"shots": shots}],
+        }
+        validate_film_spec(spec, assign_missing_ids=False)
+        self.assertGreaterEqual(spec["_heat_arc"]["sex_duration_ratio"], 0.20)
+        self.assertNotIn("HEAT_SEX_DURATION_LOW", spec["_heat_arc"]["codes"])
 
 
 if __name__ == "__main__":

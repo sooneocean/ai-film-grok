@@ -75,17 +75,27 @@
       "type": "number",
       "minimum": 0,
       "maximum": 1,
-      "description": "Max films: min share of shots in foreplay+act+climax (default 0.60)"
+      "description": "Max films: min share of shots in foreplay+act+climax (default 0.60 advisory)"
     },
     "setup_max_ratio": {
       "type": "number",
       "minimum": 0,
       "maximum": 1,
-      "description": "Max films: max share of setup-phase shots (default 0.25)"
+      "description": "Max films: max share of setup-phase shots (default 0.25 advisory)"
+    },
+    "sex_min_duration_ratio": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Min duration_sec share of act+climax (性爱片段). Default 0.20 for heat_scale=max; hardcore_male default 0.40"
+    },
+    "sex_floor_strict": {
+      "type": "boolean",
+      "description": "Hard-fail write-spec when HEAT_SEX_DURATION_LOW. Default true when heat_scale=max"
     },
     "heat_arc_strict": {
       "type": "boolean",
-      "description": "If true, heat arc lint failures hard-fail write-spec"
+      "description": "If true, all heat arc lint warnings hard-fail write-spec"
     },
     "cast_mode": {
       "enum": ["auto", "single", "multi"],

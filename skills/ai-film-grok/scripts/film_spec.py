@@ -1205,11 +1205,18 @@ def validate_film_spec(
             spec["_heat_notes"] = notes
 
     heat_advise = bool(spec.get("heat_arc_advise") is True)
+    audience_profile = None
+    if isinstance(intent.get("audience_profile"), str):
+        audience_profile = intent.get("audience_profile")
+    elif isinstance(spec.get("audience_profile"), str):
+        audience_profile = spec.get("audience_profile")
     heat_rep = lint_heat_arc(
         shots,
         heat_scale=heat_scale,
         intimacy_min_ratio=spec.get("intimacy_min_ratio"),
         setup_max_ratio=spec.get("setup_max_ratio"),
+        sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
+        audience_profile=audience_profile,
         advise=heat_advise,
     )
     spec["_heat_arc"] = heat_rep
@@ -1217,6 +1224,20 @@ def validate_film_spec(
         raise FilmSpecError(
             "heat arc lint failed (heat_arc_strict): "
             + ",".join(heat_rep["codes"] or ["HEAT"])
+        )
+    # Sex duration floor (act+climax ≥20% plate by default for heat_scale=max).
+    # Opt-out: sex_floor_strict: false. Opt-in higher: sex_min_duration_ratio / hardcore profile.
+    sex_floor_strict = spec.get("sex_floor_strict")
+    if sex_floor_strict is None:
+        sex_floor_strict = heat_scale == "max"
+    if sex_floor_strict is True and "HEAT_SEX_DURATION_LOW" in (heat_rep.get("codes") or []):
+        ratio = heat_rep.get("sex_duration_ratio")
+        floor = heat_rep.get("sex_duration_floor")
+        raise FilmSpecError(
+            "sex duration floor failed (sex_floor_strict): HEAT_SEX_DURATION_LOW "
+            f"sex_duration_ratio={ratio} floor={floor} — "
+            "raise act+climax duration_sec share to ≥20% of total (or set "
+            "sex_min_duration_ratio / sex_floor_strict:false). See ecchi-story.md"
         )
 
     # Heroine cast mode: single (default) vs multi — elastic from prompt/images/fields

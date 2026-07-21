@@ -61,7 +61,8 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 | 成片 | — | — | FFmpeg · HyperFrames · review |
 
 **I2V 运营模式**：`AIFILM_I2V_PROFILE=grok_primary`（默认）→ `i2v_provider=grok`。见 [i2v-grok-primary.md](references/i2v-grok-primary.md)。  
-**Grok OAuth Pack**：`aifilm grok-oauth doctor --deep` → chat/image/edit/video/tts。详 [grok-oauth.md](references/grok-oauth.md)。  
+**Grok OAuth Pack**：`aifilm grok-oauth doctor --deep` → chat/image/edit/video/tts。  
+**队列一键 I2V**：`aifilm queue-run-oauth --root … --max N`（claim→OAuth→complete）。详 [grok-oauth.md](references/grok-oauth.md)。  
 Seedance 恢复：`AIFILM_I2V_PROFILE=seedance_first` + canary 201。出图前加载 **`/imagine`**。
 ---
 
@@ -114,7 +115,8 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 7. **失败**：`media-queue fail/requeue`；禁手改 queue JSON  
 8. **同源**：禁半片 Grok + 半片 FRW still/2V  
 
-**弹性（跟 brief，不硬编码）**：`heat_scale` / 亲密核比例 / 单·多女主——由 Prompt 与参考图推断；指标在 `_heat_arc` / `_multi_heroine`，默认不挡 write-spec。见 [ecchi-story.md](references/ecchi-story.md)。  
+**弹性（跟 brief）**：`heat_scale` / 亲密核镜比 / 单·多女主——由 Prompt 与参考图推断。  
+**例外硬底**：`heat_scale=max` 时 **性爱片段（act+climax）`duration_sec` ≥ 总片板 20%**，write-spec 默认 hard（`sex_floor_strict`）。见 [ecchi-story.md](references/ecchi-story.md) · [lessons-2026-07-21-sex-duration-floor.md](references/lessons-2026-07-21-sex-duration-floor.md)。  
 
 ---
 
@@ -145,7 +147,8 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 
 **film-spec 要点**：`vo_mode` · `tts_backend` · `i2v_provider`/`frw_*` · `director_intent` · 每镜 `dramatic_function` + `nar` + `dsl`（action/motion/visible_change）。  
 成人/女主：**按用户 brief 填** `heat_scale` / `cast_mode`；不要关键词自动钉 max，不要无证据造第二女主。  
-**未过 write-spec → 禁止 media-queue。** 可选指标：`_heat_arc`（metrics）· `_multi_heroine.resolved`。
+max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0.20**（重口男向目标 **0.40**）。  
+**未过 write-spec → 禁止 media-queue。** 指标：`_heat_arc.sex_duration_ratio` · `_multi_heroine.resolved`。
 
 批准词：「可以」「ok」「好的」「行」；含「一路做完」→ `run_to_completion` 不得再停问。
 
@@ -271,4 +274,5 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 | **首帧毒化** | [lessons-2026-07-21-keyframe-first-frame-poison.md](references/lessons-2026-07-21-keyframe-first-frame-poison.md) · [consistency.md](references/consistency.md) §1d · **坏 still=整 clip 废** |
 | **景别情绪堆叠** | [lessons-2026-07-21-size-ladder-hardcore-stack.md](references/lessons-2026-07-21-size-ladder-hardcore-stack.md) · 全景→中→近→特写加压 + 成人六拍剧情 |
 | **性交冲击力标竿** | [lessons-2026-07-21-intercourse-impact-benchmark.md](references/lessons-2026-07-21-intercourse-impact-benchmark.md) · 性交六拍 + Mute Frame 测试 + 冲击七刀（成片「尺度小」根因课） |
+| **性爱时长硬底 ≥20%** | [lessons-2026-07-21-sex-duration-floor.md](references/lessons-2026-07-21-sex-duration-floor.md) · act+climax `duration_sec` 加权 · write-spec `sex_floor_strict` |
 | **FRW key 能力 / 403·502** | [lessons-2026-07-21-frw-key-capability.md](references/lessons-2026-07-21-frw-key-capability.md) · [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md) |

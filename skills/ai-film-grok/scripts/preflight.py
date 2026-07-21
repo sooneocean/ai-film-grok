@@ -7,13 +7,13 @@ Hard fails block production claims; soft warnings are advisory.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from util import read_json
 from production_gates import (
     load_pilot_approval,
     loop_risk_shots_from_spec,
@@ -34,15 +34,6 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
-
 
 def _issue(level: str, code: str, msg: str, *, fix: str = "") -> dict[str, str]:
     out = {"level": level, "code": code, "message": msg}
@@ -59,11 +50,11 @@ def run_preflight(root: Path) -> dict[str, Any]:
     if not root.is_dir():
         raise PreflightError(f"film root missing: {root}")
 
-    man = read_json(root / "manifest.json")
-    spec = read_json(root / "film-spec.json")
-    style = read_json(root / "style-bible.json")
+    man = read_json(root / "manifest.json") or {}
+    spec = read_json(root / "film-spec.json") or {}
+    style = read_json(root / "style-bible.json") or {}
     pilot = load_pilot_approval(root)
-    score = read_json(root / "receipts" / "pilot-scorecard.json")
+    score = read_json(root / "receipts" / "pilot-scorecard.json") or {}
 
     # --- structure ---
     if not man:
@@ -246,6 +237,79 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         ),
                     )
                 )
+        except Exception:
+            pass
+
+        # --- Sex duration floor (性爱片段 act+climax ≥20% plate · 2026-07-21) ---
+        try:
+            heat_rep = (
+                spec.get("_heat_arc")
+                if isinstance(spec.get("_heat_arc"), dict)
+                else None
+            )
+            if heat_rep is None:
+                from edit_policy import lint_heat_arc
+
+                heat_shots: list = []
+                for scene in spec.get("scenes") or []:
+                    if not isinstance(scene, dict):
+                        continue
+                    for sh in scene.get("shots") or []:
+                        if isinstance(sh, dict):
+                            heat_shots.append(sh)
+                intent = (
+                    spec.get("director_intent")
+                    if isinstance(spec.get("director_intent"), dict)
+                    else {}
+                )
+                heat_rep = lint_heat_arc(
+                    heat_shots,
+                    heat_scale=spec.get("heat_scale"),
+                    sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
+                    audience_profile=intent.get("audience_profile")
+                    or spec.get("audience_profile"),
+                )
+            heat_codes = list(heat_rep.get("codes") or [])
+            if "HEAT_SEX_DURATION_LOW" in heat_codes:
+                soft.append(
+                    _issue(
+                        "soft",
+                        "HEAT_SEX_DURATION_LOW",
+                        (
+                            f"性爱片段(act+climax) duration "
+                            f"{heat_rep.get('sex_duration_ratio')} "
+                            f"({heat_rep.get('sex_duration_sec')}s/"
+                            f"{heat_rep.get('total_duration_sec')}s) "
+                            f"< floor {heat_rep.get('sex_duration_floor')} "
+                            f"— heat_scale={heat_rep.get('heat_scale')}"
+                        ),
+                        fix=(
+                            "add/lengthen heat_phase=act|climax plates until ≥20% total "
+                            "duration_sec (hardcore_male target 40%); "
+                            "write-spec hard when heat_scale=max unless sex_floor_strict:false. "
+                            "See references/ecchi-story.md · lessons-2026-07-21-sex-duration-floor.md"
+                        ),
+                    )
+                )
+            elif str(spec.get("heat_scale") or "").lower() == "max":
+                # Surface metrics even when pass (agent can see ratio)
+                sdr = heat_rep.get("sex_duration_ratio")
+                if sdr is not None and float(sdr) + 1e-9 < 0.35:
+                    soft.append(
+                        _issue(
+                            "soft",
+                            "HEAT_SEX_DURATION_ADVISORY",
+                            (
+                                f"sex duration {sdr} is above floor but below advisory 0.35 "
+                                f"({heat_rep.get('sex_duration_sec')}s/"
+                                f"{heat_rep.get('total_duration_sec')}s act+climax)"
+                            ),
+                            fix=(
+                                "for 大尺度 adult max, aim act+climax ≥35% duration; "
+                                "hardcore_male ≥40%. See ecchi-story.md"
+                            ),
+                        )
+                    )
         except Exception:
             pass
 
@@ -817,6 +881,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
             "references/lessons-2026-07-16-kei.md",
             "references/lessons-2026-07-17-compose-pilot.md",
             "references/lessons-2026-07-20-sediment-cn-codex.md",
+            "references/lessons-2026-07-21-sex-duration-floor.md",
         ],
     }
 
