@@ -15,5 +15,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](
 
 ### Notes
 
+### CI
+
+- GitHub Actions: `validate-core` (must pass) + `test-full` (report-only while legacy doc tests catch up).
+- Pinned deps via `skills/ai-film-grok/requirements.lock`.
+
 - Local secrets stay in `skills/ai-film-grok/config.env` (gitignored).
 - User skill path is a symlink into this plugin skill directory.
