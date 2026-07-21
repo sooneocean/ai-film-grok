@@ -119,7 +119,8 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 **例外硬底**（`heat_scale=max` write-spec 默认 hard）：  
 1) 性爱片段 act+climax **时长 ≥20%**（`sex_floor_strict`）  
 2) **办事必须卸甲/脱衣**到 `wardrobe_state`=partial\|undressed\|bare，且有卸装动作拍（`sex_wardrobe_strict`）  
-见 [ecchi-story.md](references/ecchi-story.md) · [sex-duration-floor](references/lessons-2026-07-21-sex-duration-floor.md) · [sex-undress-ladder](references/lessons-2026-07-21-sex-undress-ladder.md)。  
+3) **旁白全程荤梗**；act/climax 必须办事动词（`sex_vo_strict`）——实打实办事剧，禁纯文艺说书  
+见 [ecchi-story.md](references/ecchi-story.md) · [sex-duration-floor](references/lessons-2026-07-21-sex-duration-floor.md) · [sex-undress-ladder](references/lessons-2026-07-21-sex-undress-ladder.md) · [sex-vo-spice](references/lessons-2026-07-21-sex-vo-spice.md)。  
 
 ---
 
@@ -279,4 +280,5 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 | **性交冲击力标竿** | [lessons-2026-07-21-intercourse-impact-benchmark.md](references/lessons-2026-07-21-intercourse-impact-benchmark.md) · 性交六拍 + Mute Frame 测试 + 冲击七刀（成片「尺度小」根因课） |
 | **性爱时长硬底 ≥20%** | [lessons-2026-07-21-sex-duration-floor.md](references/lessons-2026-07-21-sex-duration-floor.md) · act+climax `duration_sec` 加权 · write-spec `sex_floor_strict` |
 | **办事卸甲阶梯** | [lessons-2026-07-21-sex-undress-ladder.md](references/lessons-2026-07-21-sex-undress-ladder.md) · full→partial→undressed/bare · 禁铠甲完整跨坐 |
+| **旁白荤梗硬底** | [lessons-2026-07-21-sex-vo-spice.md](references/lessons-2026-07-21-sex-vo-spice.md) · 每镜 nar 荤梗 · act 办事动词 · `sex_vo_strict` |
 | **FRW key 能力 / 403·502** | [lessons-2026-07-21-frw-key-capability.md](references/lessons-2026-07-21-frw-key-capability.md) · [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md) |

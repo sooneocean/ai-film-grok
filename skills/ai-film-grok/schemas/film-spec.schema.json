@@ -97,6 +97,10 @@
       "type": "boolean",
       "description": "Hard-fail when act/climax still full armor/dress or undress beat missing. Default true when heat_scale=max"
     },
+    "sex_vo_strict": {
+      "type": "boolean",
+      "description": "Hard-fail when nar lacks 荤梗 or act/climax lack sex verbs. Default true when heat_scale=max"
+    },
     "heat_arc_strict": {
       "type": "boolean",
       "description": "If true, all heat arc lint warnings hard-fail write-spec"

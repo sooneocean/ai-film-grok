@@ -13,15 +13,18 @@ from edit_policy import (  # noqa: E402
     apply_heat_phase_defaults,
     lint_heat_arc,
     lint_multi_heroine,
+    lint_sex_vo_spice,
     lint_sex_wardrobe,
+    nar_has_sex_verb,
+    nar_has_spice,
     resolve_heroine_cast_mode,
     resolve_wardrobe_state,
 )
 from film_spec import validate_film_spec  # noqa: E402
 
 
-def _spine(phases: list[str], *, wardrobe_ok: bool = True) -> list[dict]:
-    """Build phase spine. wardrobe_ok fills undress ladder for max sex gates."""
+def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True) -> list[dict]:
+    """Build phase spine. wardrobe_ok + vo_spice fill max sex gates."""
     df_map = {
         "setup": "hook",
         "foreplay": "sensory",
@@ -29,6 +32,14 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True) -> list[dict]:
         "climax": "action",
         "afterglow": "afterglow",
         "bridge": "bridge",
+    }
+    nar_map = {
+        "setup": "展厅落锁。今晚只加演你一场。",
+        "foreplay": "肩带一滑，规矩失效。",
+        "act": "沉腰吃进。再沉，节奏是她给的。",
+        "climax": "她失声。背一弓——这一场办穿了。",
+        "afterglow": "贴耳低语：下一场——换你顶。",
+        "bridge": "门闩还热，故事未完。",
     }
     shots = []
     undress_assigned = False
@@ -61,11 +72,12 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True) -> list[dict]:
         }
         if wardrobe_state:
             dsl["wardrobe_state"] = wardrobe_state
+        nar = nar_map.get(ph, "短旁白测。") if vo_spice else "灯灭了。故事却刚好开始。"
         shot = {
             "id": f"shot{i:02d}",
             "dramatic_function": df_map.get(ph, "bridge"),
             "heat_phase": ph,
-            "nar": "短旁白测。",
+            "nar": nar,
             "lipsync": False,
             "duration_sec": 6,
             "dsl": dsl,
@@ -154,7 +166,7 @@ class HeatArcLintTests(unittest.TestCase):
                 "heat_phase": "setup",
                 "dramatic_function": "hook",
                 "duration_sec": 6,
-                "nar": "a",
+                "nar": "落锁。今晚只加演你。",
                 "wardrobe_state": "armored",
                 "dsl": {
                     "subject": "x",
@@ -170,7 +182,7 @@ class HeatArcLintTests(unittest.TestCase):
                 "heat_phase": "setup",
                 "dramatic_function": "hook",
                 "duration_sec": 6,
-                "nar": "a",
+                "nar": "铠甲卸下，肩带失序。",
                 "dsl": {
                     "subject": "x",
                     "action": "removes armor strips dress",
@@ -184,7 +196,7 @@ class HeatArcLintTests(unittest.TestCase):
                 "heat_phase": "setup",
                 "dramatic_function": "hook",
                 "duration_sec": 6,
-                "nar": "a",
+                "nar": "规矩失效，贴身半掌。",
                 "dsl": {"subject": "x", "action": "a", "motion": "m", "story_beat": "b", "visible_change": "c"},
             },
             {
@@ -192,7 +204,7 @@ class HeatArcLintTests(unittest.TestCase):
                 "heat_phase": "act",
                 "dramatic_function": "action",
                 "duration_sec": 12,
-                "nar": "a",
+                "nar": "沉腰吃进，再磨一遍。",
                 "wardrobe_state": "undressed",
                 "dsl": {
                     "subject": "x undressed bare skin",
@@ -406,6 +418,52 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
         self.assertGreaterEqual(spec["_heat_arc"]["sex_duration_ratio"], 0.20)
         self.assertNotIn("HEAT_SEX_DURATION_LOW", spec["_heat_arc"]["codes"])
         self.assertNotIn("HEAT_SEX_WARDROBE_DRESSED", spec["_heat_arc"]["codes"])
+
+    def test_vo_spice_markers(self) -> None:
+        self.assertTrue(nar_has_spice("沉腰吃进。"))
+        self.assertTrue(nar_has_sex_verb("这一场办穿了。"))
+        self.assertFalse(nar_has_spice("灯灭了。故事却刚好开始。"))
+
+    def test_literary_vo_fails_max(self) -> None:
+        shots = _spine(
+            ["setup", "foreplay", "act", "act", "climax", "afterglow", "bridge", "bridge"],
+            vo_spice=False,
+        )
+        rep = lint_sex_vo_spice(shots, heat_scale="max")
+        self.assertIn("HEAT_VO_SPICE_MISSING", rep["codes"])
+        self.assertIn("HEAT_VO_SEX_VERB_WEAK", rep["codes"])
+
+    def test_spicy_vo_passes(self) -> None:
+        shots = _spine(
+            ["setup", "foreplay", "act", "act", "climax", "afterglow", "bridge", "bridge"]
+        )
+        rep = lint_sex_vo_spice(shots, heat_scale="max")
+        self.assertTrue(rep["ok"], rep)
+        self.assertGreaterEqual(rep["spice_ratio"], 0.85)
+
+    def test_write_spec_bland_vo_hard_fail(self) -> None:
+        shots = _spine(
+            ["setup", "foreplay", "act", "act", "climax", "afterglow", "bridge", "bridge"],
+            vo_spice=False,
+        )
+        for sh in shots:
+            sh["dsl"]["camera"] = {"shot_size": "medium full", "angle": "eye level"}
+            sh["lipsync"] = False
+        spec = {
+            "title": "测文艺旁白硬闸",
+            "vo_mode": "storyteller",
+            "tts_backend": "edge",
+            "heat_scale": "max",
+            "director_intent": {
+                "logline": "成人max但旁白文艺",
+                "tone": "成人",
+                "emotional_arc": ["起", "承", "转"],
+            },
+            "scenes": [{"shots": shots}],
+        }
+        with self.assertRaises(Exception) as ctx:
+            validate_film_spec(spec, assign_missing_ids=False)
+        self.assertIn("VO", str(ctx.exception).upper())
 
     def test_write_spec_armored_act_hard_fail(self) -> None:
         shots = _spine(

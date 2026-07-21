@@ -164,6 +164,7 @@
   "heat_arc_strict": false,
   "sex_floor_strict": true,
   "sex_wardrobe_strict": true,
+  "sex_vo_strict": true,
   "sex_min_duration_ratio": 0.20,
   "director_intent": { "audience_profile": "hardcore_male" }
 }
@@ -177,9 +178,10 @@
 | `heat_arc_strict` | 全部 heat warning 升 hard（默认关） |
 | `sex_floor_strict` | **性爱时长** hard（max 默认 **开**） |
 | `sex_wardrobe_strict` | **卸甲/脱衣** hard（max 默认 **开**） |
+| `sex_vo_strict` | **旁白荤梗** hard（max 默认 **开**） |
 | `sex_min_duration_ratio` | 性爱时长底；hardcore_male 未写时 lint 用 0.40 |
 
-`_heat_arc`：`sex_duration_ratio` + `wardrobe`；`HEAT_SEX_DURATION_LOW` / `HEAT_SEX_WARDROBE_*` 在 max 默认挡 write-spec。
+`_heat_arc`：`sex_duration_ratio` + `wardrobe` + `vo_spice`；max 默认挡 write-spec。
 
 ### 12 镜 max 脊柱（多女主或满 70s）
 
@@ -298,12 +300,24 @@ I2V 默认 **6 秒**。口白过长 → 旧版会慢放/冻帧，观感差。
 
 说书人可以色，但**一句一事**：一镜只推进一个距离/感官点。
 
-## 说书人口吻模板
+## 说书人口吻模板（max 办事剧 = 全程荤梗）
 
-- 开场：「话说那天夜里…」
-- 中段：「她没有碰你，可呼吸已经贴上来了。」
-- 金句：「规矩写在嘴上，例外写在眼睛里。」
-- 收束：「灯灭了。故事却刚好开始。」
+> **硬底**：`heat_scale=max` 时 **每镜 `nar` 都要荤梗**；act/climax 必须办事动词。  
+> 码：`HEAT_VO_SPICE_MISSING` / `HEAT_VO_SEX_VERB_WEAK` · `sex_vo_strict` 默认 true。  
+> 见 [lessons-2026-07-21-sex-vo-spice.md](lessons-2026-07-21-sex-vo-spice.md)。
+
+| 段 | 弱（禁） | 强（要） |
+|---|---|---|
+| setup | 话说那天夜里… | 展厅**落锁**。今晚只**加演**你一场。 |
+| foreplay | 她回眸一笑。 | 肩带一滑，**规矩**失效；**贴身**半掌。 |
+| act | 夜色温柔。 | **沉腰吃进**。再沉，**节奏**是她给的。 |
+| climax | 心跳加速。 | 她**失声**。背一弓——这一场**办穿**了。 |
+| afterglow | 灯灭了。故事却刚好开始。 | 贴耳：**下一场——换你顶。** |
+
+- 开场：「落锁。今晚只办你 / 加演你。」  
+- 中段：「沉腰 / 顶 / 磨 / 吃进 / 锁腰」= 画面同动词  
+- 金句：双关可留，但**不能只有双关没有身体**  
+- 收束：**换你顶 / 未完 / 下一场**，禁说教晚安
 
 ## 与 `vo_mode` 的配合
 

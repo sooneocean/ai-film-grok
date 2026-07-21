@@ -116,7 +116,7 @@ I2V prompt 顺序：**狠主动词 → camera_axis → 微动**；禁口型说�
 | `heat_scale` | **必须 `max`**（禁止默默 medium） |
 | `audience` / `director_intent.audience` | 写明重口男向 |
 | `heat_arc_advise` | true |
-| VO | 身体动词可说满：结合、顶、吃进、腿软、办完（仍 18+ 同意虚构） |
+| VO | **全程荤梗硬底**（`sex_vo_strict`）：沉腰/办穿/吃进/锁腰/高潮/换你顶；禁文艺灯暗句。见 [sex-vo-spice](lessons-2026-07-21-sex-vo-spice.md) |
 
 ### H1 亲密核镜比（重口默认，可软 warn）
 

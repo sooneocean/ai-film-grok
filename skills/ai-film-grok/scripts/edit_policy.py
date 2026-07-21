@@ -2078,6 +2078,155 @@ _FULL_DRESS_MARKERS: tuple[str, ...] = (
     "一丝不苟",
 )
 
+# VO 荤梗 / 办事动词（实打实成人办事剧 · 2026-07-21）
+# heat_scale=max：每镜 nar 至少命中 1 个 荤梗；act/climax 必须命中办事动词
+_NAR_SPICE_MARKERS: tuple[str, ...] = (
+    # 身体 / 办事
+    "沉腰",
+    "顶弄",
+    "顶撞",
+    "再顶",
+    "磨",
+    "骑",
+    "跨坐",
+    "办穿",
+    "办完",
+    "办事",
+    "加办",
+    "吃进",
+    "吞",
+    "更深",
+    "腿软",
+    "锁腰",
+    "锁腿",
+    "攥",
+    "喘",
+    "湿",
+    "潮",
+    "硬",
+    "软了",
+    "腰线",
+    "胯",
+    "臀",
+    "胸",
+    "乳",
+    "穴",
+    "插",
+    "入",
+    "泄",
+    "射",
+    "高潮",
+    "失声",
+    "余颤",
+    "余韵",
+    "贴身",
+    "贴耳",
+    "耳语",
+    "压进",
+    "按进",
+    "拽进",
+    "咬",
+    "舔",
+    "吻",
+    "蹭",
+    "夹",
+    "绞",
+    "灌",
+    "弄",
+    "肏",
+    "操",
+    "干穿",
+    "干",
+    "上床",
+    "脱",
+    "卸甲",
+    "半裸",
+    "裸",
+    "失序",
+    "肩带",
+    "裙",
+    "扣",
+    # 荤梗 / 双关（可当 setup/afterglow 入口，act 仍要办事动词）
+    "加演",
+    "加练",
+    "补课",
+    "作业",
+    "练习",
+    "规矩",
+    "认输",
+    "落锁",
+    "门闩",
+    "换你顶",
+    "下一场",
+    "未完",
+    "诚实",
+    "入口",
+    "结合",
+    "节奏",
+    "hips",
+    "grind",
+    "thrust",
+    "mount",
+    "climax",
+    "moan",
+    "wet",
+    "bare",
+    "straddle",
+    "sink",
+)
+_NAR_SEX_VERB_MARKERS: tuple[str, ...] = (
+    "沉腰",
+    "顶弄",
+    "顶撞",
+    "再顶",
+    "磨",
+    "骑",
+    "跨坐",
+    "办穿",
+    "办完",
+    "办事",
+    "吃进",
+    "更深",
+    "腿软",
+    "锁腰",
+    "锁腿",
+    "高潮",
+    "失声",
+    "余颤",
+    "插",
+    "入",
+    "泄",
+    "射",
+    "肏",
+    "操",
+    "干穿",
+    "干",
+    "结合",
+    "节奏",
+    "换你顶",
+    "grind",
+    "thrust",
+    "mount",
+    "climax",
+    "straddle",
+    "hips",
+    "sink",
+)
+# 纯文艺 / 扫兴（单独出现且无荤梗时 fail）
+_NAR_LITERARY_ONLY_HINTS: tuple[str, ...] = (
+    "灯灭了",
+    "故事却",
+    "话说",
+    "月光",
+    "夜色温柔",
+    "沉默",
+    "心跳加速",
+    "脸红",
+    "不好意思",
+    "下课了",
+    "今天主题",
+)
+
 # dramatic_function → default heat_phase when author omits heat_phase
 _DRAMATIC_TO_HEAT_PHASE: dict[str, str] = {
     "hook": "setup",
@@ -2405,6 +2554,146 @@ def lint_sex_wardrobe(
     }
 
 
+def nar_has_spice(nar: object) -> bool:
+    text = str(nar or "").strip().lower()
+    if not text:
+        return False
+    return any(m.lower() in text for m in _NAR_SPICE_MARKERS)
+
+
+def nar_has_sex_verb(nar: object) -> bool:
+    text = str(nar or "").strip().lower()
+    if not text:
+        return False
+    return any(m.lower() in text for m in _NAR_SEX_VERB_MARKERS)
+
+
+def lint_sex_vo_spice(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+    audience_profile: str | None = None,
+) -> dict[str, Any]:
+    """Adult max films: every nar must carry 荤梗; act/climax need sex verbs.
+
+    Product rule (2026-07-21): 实打实办事剧 — 讲的内容都要荤梗，禁纯文艺说书。
+    """
+    scale = (heat_scale or "").strip().lower() or None
+    profile = (audience_profile or "").strip().lower() or None
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+    per_shot: list[dict[str, Any]] = []
+    bland: list[str] = []
+    weak_sex: list[str] = []
+    spice_n = 0
+    voiced_n = 0
+
+    def _issue(code: str, severity: str, message: str) -> None:
+        codes.append(code)
+        issues.append({"code": code, "severity": severity, "message": message})
+
+    if scale not in {"max", "hot"}:
+        return {
+            "ok": True,
+            "codes": [],
+            "warning_count": 0,
+            "info_count": 0,
+            "issues": [],
+            "heat_scale": scale,
+            "spice_ratio": None,
+            "bland_shots": [],
+            "weak_sex_vo_shots": [],
+            "per_shot": [],
+            "note": "VO spice lint skipped (not max/hot)",
+        }
+
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        sid = str(shot.get("id") or "")
+        ph = infer_heat_phase(shot)
+        nar = str(shot.get("nar") or "").strip()
+        if not nar:
+            continue
+        voiced_n += 1
+        spice = nar_has_spice(nar)
+        sex_v = nar_has_sex_verb(nar)
+        literary = any(h in nar for h in _NAR_LITERARY_ONLY_HINTS)
+        if spice:
+            spice_n += 1
+        row = {
+            "id": sid,
+            "heat_phase": ph,
+            "spice": spice,
+            "sex_verb": sex_v,
+            "literary_hint": literary,
+        }
+        per_shot.append(row)
+        if not spice:
+            bland.append(sid or "?")
+        if ph in SEX_PHASES and not sex_v:
+            weak_sex.append(sid or "?")
+
+    spice_ratio = (spice_n / voiced_n) if voiced_n else 1.0
+
+    if bland:
+        _issue(
+            "HEAT_VO_SPICE_MISSING",
+            "warning",
+            "旁白缺荤梗（实打实办事剧禁纯文艺）: "
+            f"{', '.join(bland[:10])}"
+            + ("…" if len(bland) > 10 else "")
+            + "。每镜 nar 须含身体/办事/双关词（沉腰/办穿/加演/换你顶/腿软/吃进…）。"
+            "See lessons-2026-07-21-sex-vo-spice.md",
+        )
+    if weak_sex:
+        _issue(
+            "HEAT_VO_SEX_VERB_WEAK",
+            "warning",
+            "act/climax 旁白缺办事动词: "
+            f"{', '.join(weak_sex[:10])}"
+            + ("…" if len(weak_sex) > 10 else "")
+            + "。要用沉腰/顶/磨/骑/办穿/办完/吃进/锁腰/高潮/换你顶 等同画面动词，"
+            "禁只写灯灭/回眸/故事开始。",
+        )
+    # max: require full coverage (every voiced shot spicy); hot: ≥70%
+    need = 1.0 if scale == "max" else 0.70
+    if voiced_n >= 3 and spice_ratio + 1e-9 < need and not bland:
+        # bland already covers missing; this is aggregate safety
+        pass
+    if scale == "max" and voiced_n >= 4 and spice_ratio + 1e-9 < 0.85:
+        _issue(
+            "HEAT_VO_SPICE_RATIO_LOW",
+            "warning",
+            f"荤梗覆盖 {spice_ratio:.0%} < 85%（max 办事剧目标全覆盖）—"
+            f"{spice_n}/{voiced_n} 镜。重写 bland 旁白。",
+        )
+    if profile in {"hardcore_male", "hardcore", "重口男向"} and weak_sex:
+        # already issued HEAT_VO_SEX_VERB_WEAK; keep
+        pass
+
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "codes": sorted(set(codes)),
+        "warning_count": warn_n,
+        "info_count": sum(1 for i in issues if i.get("severity") == "info"),
+        "issues": issues,
+        "heat_scale": scale,
+        "audience_profile": profile,
+        "spice_ratio": round(spice_ratio, 3),
+        "spice_n": spice_n,
+        "voiced_n": voiced_n,
+        "bland_shots": bland,
+        "weak_sex_vo_shots": weak_sex,
+        "per_shot": per_shot,
+        "note": (
+            "max adult coitus films: every nar needs 荤梗; act/climax need sex verbs. "
+            "sex_vo_strict defaults true on max. lessons-2026-07-21-sex-vo-spice.md"
+        ),
+    }
+
+
 def lint_heat_arc(
     shots: list[dict[str, Any]],
     *,
@@ -2596,6 +2885,20 @@ def lint_heat_arc(
             codes.append(c)
         issues.append(iss)
 
+    # VO 荤梗：实打实办事剧，旁白不能纯文艺
+    vo_rep = lint_sex_vo_spice(
+        shots,
+        heat_scale=scale,
+        audience_profile=profile,
+    )
+    for iss in vo_rep.get("issues") or []:
+        if not isinstance(iss, dict):
+            continue
+        c = str(iss.get("code") or "")
+        if c and c not in codes:
+            codes.append(c)
+        issues.append(iss)
+
     warn_n = sum(1 for i in issues if i.get("severity") == "warning")
     return {
         "ok": warn_n == 0,
@@ -2633,12 +2936,18 @@ def lint_heat_arc(
             "per_shot": wardrobe_rep.get("per_shot"),
             "required_states": wardrobe_rep.get("required_states"),
         },
+        "vo_spice": {
+            "ok": vo_rep.get("ok"),
+            "codes": vo_rep.get("codes"),
+            "spice_ratio": vo_rep.get("spice_ratio"),
+            "bland_shots": vo_rep.get("bland_shots"),
+            "weak_sex_vo_shots": vo_rep.get("weak_sex_vo_shots"),
+            "per_shot": vo_rep.get("per_shot"),
+        },
         "note": (
-            "Sex floor = act+climax duration_sec / total (default ≥20% for heat_scale=max; "
-            "write-spec hard via sex_floor_strict default true). "
-            "Wardrobe ladder: undress before/during sex; act+climax not full armor "
-            "(sex_wardrobe_strict default true on max). "
-            "See references/ecchi-story.md · lessons-2026-07-21-sex-undress-ladder.md"
+            "Sex floor ≥20% duration; undress ladder; VO 荤梗 on every nar for max "
+            "(sex_vo_strict). See ecchi-story.md · sex-duration-floor · "
+            "sex-undress-ladder · sex-vo-spice lessons."
         ),
     }
 

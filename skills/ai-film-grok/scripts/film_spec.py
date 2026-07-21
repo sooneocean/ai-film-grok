@@ -1258,6 +1258,27 @@ def validate_film_spec(
             "(or dsl bare skin / armor off / 半裸 / 卸甲) and include an undress beat. "
             "禁止全装铠甲办事。See lessons-2026-07-21-sex-undress-ladder.md"
         )
+    # VO 荤梗：实打实办事剧，旁白全程要荤；act/climax 要办事动词
+    sex_vo_strict = spec.get("sex_vo_strict")
+    if sex_vo_strict is None:
+        sex_vo_strict = heat_scale == "max"
+    vo_fail_codes = [
+        c
+        for c in (heat_rep.get("codes") or [])
+        if c
+        in {
+            "HEAT_VO_SPICE_MISSING",
+            "HEAT_VO_SEX_VERB_WEAK",
+            "HEAT_VO_SPICE_RATIO_LOW",
+        }
+    ]
+    if sex_vo_strict is True and vo_fail_codes:
+        raise FilmSpecError(
+            "sex VO spice failed (sex_vo_strict): "
+            + ",".join(vo_fail_codes)
+            + " — every nar needs 荤梗; act/climax need 沉腰/办穿/吃进/锁腰/高潮… "
+            "禁纯文艺灯暗句。See lessons-2026-07-21-sex-vo-spice.md"
+        )
 
     # Heroine cast mode: single (default) vs multi — elastic from prompt/images/fields
     cast_ids: list[str] = []

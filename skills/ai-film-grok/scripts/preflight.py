@@ -315,6 +315,28 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             ),
                         )
                     )
+            for vcode in (
+                "HEAT_VO_SPICE_MISSING",
+                "HEAT_VO_SEX_VERB_WEAK",
+                "HEAT_VO_SPICE_RATIO_LOW",
+            ):
+                if vcode in heat_codes:
+                    soft.append(
+                        _issue(
+                            "soft",
+                            vcode,
+                            (
+                                f"VO 荤梗: {vcode} — "
+                                f"bland={((heat_rep.get('vo_spice') or {}).get('bland_shots'))} "
+                                f"weak_sex={((heat_rep.get('vo_spice') or {}).get('weak_sex_vo_shots'))} "
+                                f"spice_ratio={((heat_rep.get('vo_spice') or {}).get('spice_ratio'))}"
+                            ),
+                            fix=(
+                                "rewrite every nar with 荤梗; act/climax use 沉腰/办穿/吃进/锁腰/高潮/换你顶; "
+                                "ban pure literary 灯灭/回眸. lessons-2026-07-21-sex-vo-spice.md"
+                            ),
+                        )
+                    )
             elif str(spec.get("heat_scale") or "").lower() == "max":
                 # Surface metrics even when pass (agent can see ratio)
                 sdr = heat_rep.get("sex_duration_ratio")
@@ -907,6 +929,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
             "references/lessons-2026-07-20-sediment-cn-codex.md",
             "references/lessons-2026-07-21-sex-duration-floor.md",
             "references/lessons-2026-07-21-sex-undress-ladder.md",
+            "references/lessons-2026-07-21-sex-vo-spice.md",
         ],
     }
 
