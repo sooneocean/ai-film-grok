@@ -17,16 +17,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install system tools (ffmpeg)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install test deps
+      - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
-          # skill is mostly stdlib + local scripts; pytest for unit suite
-          pip install pytest
+          pip install pytest numpy pillow
+          # edge-tts optional for some tests; install if lock mentions it
+          pip install edge-tts || true
 
       - name: Validate plugin.json shape
         run: |
@@ -50,5 +56,4 @@ jobs:
         run: |
           python -m pytest tests/ -q --tb=line
         env:
-          # keep network-off friendly; tests should be local
           AIFILM_CI: "1"
