@@ -17,6 +17,10 @@ Agent 开新片先扫本页 + [2026-07-20-session-index](2026-07-20-session-inde
 | **TTS 默认 vs 兜底** | [voices](../references/voices.md) | edge 默认；Voicebox 质量+opt-in FALLBACK；`tts-ab` |
 | **BGM 抗重复 / 纯乐器** | [bgm-generation](../references/bgm-generation.md) · [bgm-anti-repeat](2026-07-21-bgm-anti-repeat.md) | 池≥3 纯乐器听感兜底；程序 v3 硬兜底；HeartMuLa 不当 BGM |
 | **声轨自适应** | [audio-recipe](../references/audio-recipe.md) | audio_policy + 每镜 recipe；默认不自动唱 |
+| **成人办事三条硬底** | [sex-hard-floors](2026-07-21-sex-hard-floors.md) | 性爱时长≥20% · 卸甲脱衣 · 旁白荤梗 |
+| 性爱时长 | [sex-duration-floor](../references/lessons-2026-07-21-sex-duration-floor.md) | act+climax duration 加权；`sex_floor_strict` |
+| 办事卸甲 | [sex-undress-ladder](../references/lessons-2026-07-21-sex-undress-ladder.md) | full→undressed/bare；禁铠甲完整跨坐 |
+| 旁白荤梗 | [sex-vo-spice](../references/lessons-2026-07-21-sex-vo-spice.md) | 每镜 nar 荤梗；act 办事动词；`sex_vo_strict` |
 
 ## 开场（自动调配）
 
@@ -39,4 +43,5 @@ Audio:     audio_policy + audio_recipe（write-spec）
 Lipsync:   默认 off
 发色:      P1 hard
 runtime:   改 scripts 后 lock-runtime
+成人max:   性爱时长≥20% + 卸甲脱衣 + 旁白荤梗（三条 write-spec 默认 hard）
 ```
