@@ -55,9 +55,12 @@ class SuggestI2VTests(unittest.TestCase):
         self.assertTrue(any("Grok" in r or "grok" in r for r in (s["recommendations"] + s["rationale"])))
 
     def test_no_receipt(self) -> None:
+        # grok_primary (default season): no canary still suggests Grok L1 + LTX env
         s = suggest_i2v_from_canary(None)
         self.assertFalse(s["has_canary"])
-        self.assertEqual(s["patch"], {})
+        self.assertTrue(s["ok"])
+        self.assertEqual(s["patch"].get("i2v_provider"), "grok")
+        self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
         self.assertTrue(s["recommendations"])
 
     def test_summarize(self) -> None:
