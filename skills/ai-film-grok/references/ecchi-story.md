@@ -118,9 +118,27 @@
 |---|---|
 | `sex_min_duration_ratio` | 覆盖性爱时长底（默认 max=0.20；hardcore=0.40） |
 | `sex_floor_strict` | `HEAT_SEX_DURATION_LOW` 是否 hard-fail write-spec（**max 默认 true**） |
+| `sex_wardrobe_strict` | 全装/铠甲办事是否 hard-fail（**max 默认 true**） |
+| `wardrobe_state` | 每镜：`full`→`armored`→`partial`→`undressed`→`bare` |
 | `_heat_arc.sex_duration_ratio` | 指标：性爱秒数 / 总秒数 |
+| `_heat_arc.wardrobe` | 卸甲拍 + act 衣着状态 |
 
-详见 [lessons-2026-07-21-sex-duration-floor.md](lessons-2026-07-21-sex-duration-floor.md)。
+详见 [lessons-2026-07-21-sex-duration-floor.md](lessons-2026-07-21-sex-duration-floor.md) · [lessons-2026-07-21-sex-undress-ladder.md](lessons-2026-07-21-sex-undress-ladder.md)。
+
+### 办事卸甲阶梯（wardrobe ladder · 硬底）
+
+```text
+定妆 full/armored → 前戏 partial（失序/半脱/卸甲动作）→ act undressed/bare → climax bare
+```
+
+| 禁止（act/climax） | 必须 |
+|---|---|
+| 全装正装跨坐 | `wardrobe_state`: partial / undressed / bare |
+| 铠甲完整「办事」 | 至少 1 镜 **卸甲/脱衣动作**（foreplay 或 act 入口） |
+| 只写 heat_phase=act 仍穿完整 tech dress | still/I2V：**铠甲/裙落，裸露皮肤可读** |
+
+静帧 prompt 抓手：`armor discarded` · `dress off` · `bare skin` · `半裸` · `卸甲` · `skin-to-skin`。  
+审核软化：可用 **suggestive undressed**（非硬核生殖器特写），但**不得退回全装**。
 
 ### 重口男向（2026-07-21 · 用户嫌尺度小时强制）
 
@@ -145,6 +163,7 @@
   "heat_arc_advise": true,
   "heat_arc_strict": false,
   "sex_floor_strict": true,
+  "sex_wardrobe_strict": true,
   "sex_min_duration_ratio": 0.20,
   "director_intent": { "audience_profile": "hardcore_male" }
 }
@@ -157,9 +176,10 @@
 | `heat_arc_advise` | `_heat_arc` 多打 info 建议 |
 | `heat_arc_strict` | 全部 heat warning 升 hard（默认关） |
 | `sex_floor_strict` | **性爱时长** hard（max 默认 **开**） |
+| `sex_wardrobe_strict` | **卸甲/脱衣** hard（max 默认 **开**） |
 | `sex_min_duration_ratio` | 性爱时长底；hardcore_male 未写时 lint 用 0.40 |
 
-`_heat_arc`：`sex_duration_ratio` + phase 时长表；`HEAT_SEX_DURATION_LOW` 在 max 默认挡 write-spec。
+`_heat_arc`：`sex_duration_ratio` + `wardrobe`；`HEAT_SEX_DURATION_LOW` / `HEAT_SEX_WARDROBE_*` 在 max 默认挡 write-spec。
 
 ### 12 镜 max 脊柱（多女主或满 70s）
 

@@ -116,7 +116,10 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 8. **同源**：禁半片 Grok + 半片 FRW still/2V  
 
 **弹性（跟 brief）**：`heat_scale` / 亲密核镜比 / 单·多女主——由 Prompt 与参考图推断。  
-**例外硬底**：`heat_scale=max` 时 **性爱片段（act+climax）`duration_sec` ≥ 总片板 20%**，write-spec 默认 hard（`sex_floor_strict`）。见 [ecchi-story.md](references/ecchi-story.md) · [lessons-2026-07-21-sex-duration-floor.md](references/lessons-2026-07-21-sex-duration-floor.md)。  
+**例外硬底**（`heat_scale=max` write-spec 默认 hard）：  
+1) 性爱片段 act+climax **时长 ≥20%**（`sex_floor_strict`）  
+2) **办事必须卸甲/脱衣**到 `wardrobe_state`=partial\|undressed\|bare，且有卸装动作拍（`sex_wardrobe_strict`）  
+见 [ecchi-story.md](references/ecchi-story.md) · [sex-duration-floor](references/lessons-2026-07-21-sex-duration-floor.md) · [sex-undress-ladder](references/lessons-2026-07-21-sex-undress-ladder.md)。  
 
 ---
 
@@ -275,4 +278,5 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 | **景别情绪堆叠** | [lessons-2026-07-21-size-ladder-hardcore-stack.md](references/lessons-2026-07-21-size-ladder-hardcore-stack.md) · 全景→中→近→特写加压 + 成人六拍剧情 |
 | **性交冲击力标竿** | [lessons-2026-07-21-intercourse-impact-benchmark.md](references/lessons-2026-07-21-intercourse-impact-benchmark.md) · 性交六拍 + Mute Frame 测试 + 冲击七刀（成片「尺度小」根因课） |
 | **性爱时长硬底 ≥20%** | [lessons-2026-07-21-sex-duration-floor.md](references/lessons-2026-07-21-sex-duration-floor.md) · act+climax `duration_sec` 加权 · write-spec `sex_floor_strict` |
+| **办事卸甲阶梯** | [lessons-2026-07-21-sex-undress-ladder.md](references/lessons-2026-07-21-sex-undress-ladder.md) · full→partial→undressed/bare · 禁铠甲完整跨坐 |
 | **FRW key 能力 / 403·502** | [lessons-2026-07-21-frw-key-capability.md](references/lessons-2026-07-21-frw-key-capability.md) · [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md) |

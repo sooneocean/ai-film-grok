@@ -13,8 +13,6 @@ from continuity import (
     lint_vo_motion_link,
 )
 from continuity_chain import (
-    check_continuity_chain,
-    init_chain_doc,
     is_long_form,
 )
 from framing_lint import lint_framing_iron
@@ -38,7 +36,6 @@ from edit_policy import (
     suggest_edit_crafts,
     normalize_edit_craft,
     edit_crafts_to_intents,
-    edit_crafts_to_styles,
     _CRAFT_WHY,
     validate_motion,
 )
@@ -1238,6 +1235,28 @@ def validate_film_spec(
             f"sex_duration_ratio={ratio} floor={floor} — "
             "raise act+climax duration_sec share to ≥20% of total (or set "
             "sex_min_duration_ratio / sex_floor_strict:false). See ecchi-story.md"
+        )
+    # Sex wardrobe: act/climax must undress (卸甲/脱衣→裸露); default hard on max.
+    sex_wardrobe_strict = spec.get("sex_wardrobe_strict")
+    if sex_wardrobe_strict is None:
+        sex_wardrobe_strict = heat_scale == "max"
+    wardrobe_fail_codes = [
+        c
+        for c in (heat_rep.get("codes") or [])
+        if c
+        in {
+            "HEAT_SEX_WARDROBE_DRESSED",
+            "HEAT_SEX_WARDROBE_WEAK",
+            "HEAT_UNDRESS_BEAT_MISSING",
+        }
+    ]
+    if sex_wardrobe_strict is True and wardrobe_fail_codes:
+        raise FilmSpecError(
+            "sex wardrobe ladder failed (sex_wardrobe_strict): "
+            + ",".join(wardrobe_fail_codes)
+            + " — act/climax must set wardrobe_state=partial|undressed|bare "
+            "(or dsl bare skin / armor off / 半裸 / 卸甲) and include an undress beat. "
+            "禁止全装铠甲办事。See lessons-2026-07-21-sex-undress-ladder.md"
         )
 
     # Heroine cast mode: single (default) vs multi — elastic from prompt/images/fields

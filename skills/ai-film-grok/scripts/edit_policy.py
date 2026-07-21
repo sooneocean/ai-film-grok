@@ -1972,6 +1972,112 @@ HOT_SEX_DURATION_FLOOR = 0.15
 HARDCORE_SEX_DURATION_TARGET = 0.40
 DEFAULT_SHOT_DURATION_SEC = 6.0
 
+# Wardrobe ladder for sex (办事必须卸甲/脱衣 · 2026-07-21)
+# full/armored = 登场定妆；partial = 失序半脱；undressed/bare = 办事层裸露可读
+WARDROBE_STATES = frozenset({"full", "armored", "partial", "undressed", "bare"})
+SEX_WARDROBE_OK = frozenset({"partial", "undressed", "bare"})
+SEX_WARDROBE_STRONG = frozenset({"undressed", "bare"})  # hardcore prefers these
+_EXPOSED_WARDROBE_MARKERS: tuple[str, ...] = (
+    "undressed",
+    "unclothed",
+    "nude",
+    "naked",
+    "bare skin",
+    "bare chest",
+    "bare breasts",
+    "bare shoulders",
+    "bare thighs",
+    "bare midriff",
+    "stripped",
+    "lingerie only",
+    "only lingerie",
+    "armor off",
+    "armor removed",
+    "armor discarded",
+    "dress off",
+    "dress removed",
+    "dress discarded",
+    "clothes off",
+    "clothing removed",
+    "half-naked",
+    "half naked",
+    "topless",
+    "skin-to-skin",
+    "skin to skin",
+    "wardrobe disorder",
+    "hiked hem",
+    "skirt hiked",
+    "open bodice",
+    "open shirt",
+    "disheveled clothes",
+    "clothes in disorder",
+    "裸",
+    "半裸",
+    "全裸",
+    "裸露",
+    "脱衣",
+    "卸甲",
+    "铠甲卸",
+    "铠甲落",
+    "衣落",
+    "裙掀",
+    "掀裙",
+    "肩带崩",
+    "失序到办事",
+    "办事层",
+)
+_UNDRESS_ACTION_MARKERS: tuple[str, ...] = (
+    "undress",
+    "undresses",
+    "undressing",
+    "strips",
+    "stripping",
+    "strip off",
+    "removes armor",
+    "remove armor",
+    "armor falls",
+    "peels off",
+    "slides dress",
+    "dress slides",
+    "pulls dress",
+    "unbuckles",
+    "unhooks",
+    "unzips",
+    "unbuttons",
+    "shrugs off",
+    "takes off",
+    "taking off",
+    "脱下",
+    "脱掉",
+    "卸下",
+    "卸甲",
+    "解扣",
+    "解带",
+    "拉下拉链",
+    "褪去",
+    "扯开",
+    "扯落",
+    "滑落肩",
+    "肩带滑",
+)
+_FULL_DRESS_MARKERS: tuple[str, ...] = (
+    "full armor",
+    "complete armor",
+    "armor intact",
+    "fully armored",
+    "fully clothed",
+    "full dress intact",
+    "intact outfit",
+    "formal attire",
+    "neat dress",
+    "pristine outfit",
+    "全装",
+    "铠甲完整",
+    "正装完好",
+    "衣着整齐",
+    "一丝不苟",
+)
+
 # dramatic_function → default heat_phase when author omits heat_phase
 _DRAMATIC_TO_HEAT_PHASE: dict[str, str] = {
     "hook": "setup",
@@ -2039,6 +2145,264 @@ def _shot_duration_sec(shot: dict[str, Any]) -> float:
     if d < 0:
         return 0.0
     return d
+
+
+def _shot_visual_blob(shot: dict[str, Any]) -> str:
+    """Concatenate wardrobe-relevant text from shot + dsl for marker scan."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    parts: list[str] = []
+    for key in (
+        "wardrobe_state",
+        "wardrobe",
+        "nar",
+        "title",
+        "subject",
+        "action",
+        "start_pose",
+        "end_pose",
+        "motion",
+        "story_beat",
+        "visible_change",
+        "environment",
+    ):
+        if key in shot and shot.get(key) is not None:
+            parts.append(str(shot.get(key)))
+        if key in dsl and dsl.get(key) is not None:
+            parts.append(str(dsl.get(key)))
+    # nested wardrobe object
+    for container in (shot, dsl):
+        w = container.get("wardrobe") if isinstance(container, dict) else None
+        if isinstance(w, dict):
+            parts.extend(str(v) for v in w.values() if v is not None)
+        elif isinstance(w, str):
+            parts.append(w)
+    return " ".join(parts).lower()
+
+
+def normalize_wardrobe_state(value: object | None) -> str | None:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    s = str(value).strip().lower().replace("-", "_")
+    aliases = {
+        "full_dress": "full",
+        "clothed": "full",
+        "dressed": "full",
+        "armor": "armored",
+        "armour": "armored",
+        "half": "partial",
+        "disorder": "partial",
+        "disheveled": "partial",
+        "半脱": "partial",
+        "失序": "partial",
+        "nude": "bare",
+        "naked": "bare",
+        "exposed": "bare",
+        "裸": "bare",
+        "半裸": "undressed",
+        "脱衣": "undressed",
+        "卸甲": "undressed",
+    }
+    s = aliases.get(s, s)
+    if s not in WARDROBE_STATES:
+        raise PolicyError(
+            f"wardrobe_state must be one of {sorted(WARDROBE_STATES)}; got {value!r}"
+        )
+    return s
+
+
+def resolve_wardrobe_state(shot: dict[str, Any]) -> str | None:
+    """Explicit wardrobe_state / dsl.wardrobe_state, else infer from visual blob."""
+    if not isinstance(shot, dict):
+        return None
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    for raw in (
+        shot.get("wardrobe_state"),
+        dsl.get("wardrobe_state"),
+        (shot.get("wardrobe") or {}).get("state")
+        if isinstance(shot.get("wardrobe"), dict)
+        else None,
+        (dsl.get("wardrobe") or {}).get("state")
+        if isinstance(dsl.get("wardrobe"), dict)
+        else None,
+    ):
+        try:
+            st = normalize_wardrobe_state(raw)
+        except PolicyError:
+            st = None
+        if st:
+            return st
+    blob = _shot_visual_blob(shot)
+    if not blob.strip():
+        return None
+    # Strong exposed first
+    if any(m in blob for m in ("nude", "naked", "全裸", "bare breasts", "bare chest")):
+        return "bare"
+    if any(m in blob for m in _EXPOSED_WARDROBE_MARKERS):
+        if any(m in blob for m in ("armor", "铠甲", "dress", "裙", "strap")) and any(
+            m in blob for m in _UNDRESS_ACTION_MARKERS
+        ):
+            return "undressed"
+        if any(
+            m in blob
+            for m in (
+                "undressed",
+                "unclothed",
+                "stripped",
+                "armor off",
+                "dress off",
+                "clothes off",
+                "半裸",
+                "裸露",
+                "卸甲",
+            )
+        ):
+            return "undressed"
+        return "partial"
+    if any(m in blob for m in _FULL_DRESS_MARKERS):
+        if "armor" in blob or "铠甲" in blob:
+            return "armored"
+        return "full"
+    if "armor" in blob or "铠甲" in blob:
+        return "armored"
+    return None
+
+
+def shot_has_undress_action(shot: dict[str, Any]) -> bool:
+    blob = _shot_visual_blob(shot)
+    return any(m in blob for m in _UNDRESS_ACTION_MARKERS)
+
+
+def lint_sex_wardrobe(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+    audience_profile: str | None = None,
+    require_strong: bool | None = None,
+) -> dict[str, Any]:
+    """Sex shots must not stay fully armored/clothed; undress beat required on max.
+
+    Product rule (2026-07-21): 办事 = 卸甲/脱衣 → 裸露可读。
+    act/climax wardrobe_state must be partial|undressed|bare (hardcore prefers undressed|bare).
+    At least one undress-action beat in foreplay or early act.
+    """
+    scale = (heat_scale or "").strip().lower() or None
+    profile = (audience_profile or "").strip().lower() or None
+    hardcore = profile in {"hardcore_male", "hardcore", "重口男向"}
+    if require_strong is None:
+        require_strong = hardcore
+    ok_states = SEX_WARDROBE_STRONG if require_strong else SEX_WARDROBE_OK
+
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+    per_shot: list[dict[str, Any]] = []
+    sex_shots: list[tuple[dict[str, Any], str]] = []
+    undress_beats: list[str] = []
+
+    def _issue(code: str, severity: str, message: str) -> None:
+        codes.append(code)
+        issues.append({"code": code, "severity": severity, "message": message})
+
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        sid = str(shot.get("id") or "")
+        ph = infer_heat_phase(shot)
+        st = resolve_wardrobe_state(shot)
+        undress = shot_has_undress_action(shot)
+        row = {
+            "id": sid,
+            "heat_phase": ph,
+            "wardrobe_state": st,
+            "undress_action": undress,
+        }
+        per_shot.append(row)
+        if undress and ph in {"foreplay", "act", "setup"}:
+            undress_beats.append(sid or ph)
+        if ph in SEX_PHASES:
+            sex_shots.append((shot, ph))
+
+    if scale not in {"max", "hot"} or not sex_shots:
+        return {
+            "ok": True,
+            "codes": [],
+            "warning_count": 0,
+            "info_count": 0,
+            "issues": [],
+            "heat_scale": scale,
+            "sex_shot_count": len(sex_shots),
+            "undress_beats": undress_beats,
+            "per_shot": per_shot,
+            "required_states": sorted(ok_states),
+            "note": "wardrobe sex lint skipped (no max/hot sex phases)",
+        }
+
+    dressed_ids: list[str] = []
+    weak_ids: list[str] = []
+    for shot, ph in sex_shots:
+        sid = str(shot.get("id") or "?")
+        st = resolve_wardrobe_state(shot)
+        blob = _shot_visual_blob(shot)
+        exposed = any(m in blob for m in _EXPOSED_WARDROBE_MARKERS)
+        if st in {"full", "armored"} or (
+            st is None and not exposed and any(m in blob for m in _FULL_DRESS_MARKERS)
+        ):
+            dressed_ids.append(f"{sid}:{st or 'full?'}")
+        elif st is None and not exposed:
+            # act/climax with no wardrobe evidence → treat as still-clothed risk
+            dressed_ids.append(f"{sid}:unspecified")
+        elif st is not None and st not in ok_states:
+            weak_ids.append(f"{sid}:{st}")
+        elif require_strong and st == "partial":
+            weak_ids.append(f"{sid}:partial")
+
+    if dressed_ids:
+        _issue(
+            "HEAT_SEX_WARDROBE_DRESSED",
+            "warning",
+            "act/climax still fully clothed/armored or wardrobe unspecified — "
+            f"{', '.join(dressed_ids[:8])}"
+            + ("…" if len(dressed_ids) > 8 else "")
+            + "。办事镜必须卸甲/脱衣到 partial|undressed|bare（写 wardrobe_state 或 "
+            "dsl 写 bare skin / armor off / 半裸 / 卸甲）。禁止全装铠甲跨坐冒充办事。",
+        )
+    if weak_ids and require_strong:
+        _issue(
+            "HEAT_SEX_WARDROBE_WEAK",
+            "warning",
+            "hardcore: act/climax wardrobe only partial — prefer undressed|bare "
+            f"({', '.join(weak_ids[:8])})",
+        )
+    if not undress_beats:
+        _issue(
+            "HEAT_UNDRESS_BEAT_MISSING",
+            "warning",
+            "no undress/卸甲 action beat found before or during act — "
+            "add a foreplay/act shot that visibly removes armor/clothes "
+            "(dsl.action: removes armor / strips / 脱下 / 卸甲). "
+            "Sex must not jump from full costume to climax without undress.",
+        )
+
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "codes": sorted(set(codes)),
+        "warning_count": warn_n,
+        "info_count": sum(1 for i in issues if i.get("severity") == "info"),
+        "issues": issues,
+        "heat_scale": scale,
+        "audience_profile": profile,
+        "sex_shot_count": len(sex_shots),
+        "undress_beats": undress_beats,
+        "dressed_sex_shots": dressed_ids,
+        "weak_sex_shots": weak_ids,
+        "per_shot": per_shot,
+        "required_states": sorted(ok_states),
+        "note": (
+            "Sex wardrobe ladder: full/armored → partial → undressed/bare. "
+            "act+climax must be exposed; undress beat required. "
+            "See references/lessons-2026-07-21-sex-undress-ladder.md"
+        ),
+    }
 
 
 def lint_heat_arc(
@@ -2218,6 +2582,20 @@ def lint_heat_arc(
                 f"({sex_dur:.1f}s/{total_dur:.1f}s); hard floor is {sex_floor:.0%} for max",
             )
 
+    # Undress ladder: act/climax cannot stay full armor/dress
+    wardrobe_rep = lint_sex_wardrobe(
+        shots,
+        heat_scale=scale,
+        audience_profile=profile,
+    )
+    for iss in wardrobe_rep.get("issues") or []:
+        if not isinstance(iss, dict):
+            continue
+        c = str(iss.get("code") or "")
+        if c and c not in codes:
+            codes.append(c)
+        issues.append(iss)
+
     warn_n = sum(1 for i in issues if i.get("severity") == "warning")
     return {
         "ok": warn_n == 0,
@@ -2247,11 +2625,20 @@ def lint_heat_arc(
         "advisory_setup_ratio": guide_setup if scale in {"max", "hot"} else None,
         "advisory_sex_duration_ratio": guide_sex if scale in {"max", "hot"} else None,
         "phase_by_shot": phase_by_shot,
+        "wardrobe": {
+            "ok": wardrobe_rep.get("ok"),
+            "codes": wardrobe_rep.get("codes"),
+            "undress_beats": wardrobe_rep.get("undress_beats"),
+            "dressed_sex_shots": wardrobe_rep.get("dressed_sex_shots"),
+            "per_shot": wardrobe_rep.get("per_shot"),
+            "required_states": wardrobe_rep.get("required_states"),
+        },
         "note": (
             "Sex floor = act+climax duration_sec / total (default ≥20% for heat_scale=max; "
             "write-spec hard via sex_floor_strict default true). "
-            "Intimacy core remains foreplay+act+climax (shot-count advisory). "
-            "See references/ecchi-story.md"
+            "Wardrobe ladder: undress before/during sex; act+climax not full armor "
+            "(sex_wardrobe_strict default true on max). "
+            "See references/ecchi-story.md · lessons-2026-07-21-sex-undress-ladder.md"
         ),
     }
 

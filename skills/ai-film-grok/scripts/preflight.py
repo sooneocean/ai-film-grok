@@ -7,6 +7,7 @@ Hard fails block production claims; soft warnings are advisory.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 from datetime import datetime, timezone
@@ -291,6 +292,29 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         ),
                     )
                 )
+            for wcode in (
+                "HEAT_SEX_WARDROBE_DRESSED",
+                "HEAT_SEX_WARDROBE_WEAK",
+                "HEAT_UNDRESS_BEAT_MISSING",
+            ):
+                if wcode in heat_codes:
+                    soft.append(
+                        _issue(
+                            "soft",
+                            wcode,
+                            (
+                                f"sex wardrobe ladder: {wcode} — "
+                                f"dressed={((heat_rep.get('wardrobe') or {}).get('dressed_sex_shots'))} "
+                                f"undress_beats={((heat_rep.get('wardrobe') or {}).get('undress_beats'))}"
+                            ),
+                            fix=(
+                                "act/climax: wardrobe_state=partial|undressed|bare; "
+                                "add foreplay undress action (removes armor / 卸甲 / 脱下); "
+                                "still/I2V must show armor/clothes off, not full costume straddle. "
+                                "See lessons-2026-07-21-sex-undress-ladder.md"
+                            ),
+                        )
+                    )
             elif str(spec.get("heat_scale") or "").lower() == "max":
                 # Surface metrics even when pass (agent can see ratio)
                 sdr = heat_rep.get("sex_duration_ratio")
@@ -882,6 +906,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
             "references/lessons-2026-07-17-compose-pilot.md",
             "references/lessons-2026-07-20-sediment-cn-codex.md",
             "references/lessons-2026-07-21-sex-duration-floor.md",
+            "references/lessons-2026-07-21-sex-undress-ladder.md",
         ],
     }
 

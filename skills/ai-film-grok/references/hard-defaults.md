@@ -13,6 +13,7 @@
 | 成人尺度 | **用户要热才 `heat_scale:max`**；不自动钉 max |
 | 亲密核 | **建议**（max 时可参考 ≥60% 镜比）；`_heat_arc` 报指标；极端偏低 soft warn |
 | **性爱片段时长** | **产品硬底**（2026-07-21）：`heat_scale=max` 时 **act+climax 的 `duration_sec` 合计 ≥ 总片板 20%**；write-spec 默认 `sex_floor_strict`；重口男向目标 ≥40%；`sex_min_duration_ratio` 可覆盖 |
+| **办事卸甲/脱衣** | **产品硬底**（2026-07-21）：act/climax 禁止全装铠甲；`wardrobe_state`=partial\|undressed\|bare；须有卸甲/脱衣动作拍；默认 `sex_wardrobe_strict`；静帧/I2V 须画到裸露可读 |
 | heat_phase | 可选；`heat_phase_auto` 时从 dramatic_function 填，**不猜 climax** |
 | 女主 | **默认 single**；multi 仅证据（Prompt/多图/显式字段）；勿臆造 |
 | 定妆 | style-v1 + cast masters + lookbook → pilot 3 镜用户批准 → bulk |

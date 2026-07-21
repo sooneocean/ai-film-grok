@@ -61,6 +61,7 @@
   "heat_phase_auto": true,
   "heat_arc_advise": false,
   "sex_floor_strict": true,
+  "sex_wardrobe_strict": true,
   "sex_min_duration_ratio": 0.20,
   "director_intent": {
     "logline": "雨夜出租车后座，说书人陪你靠近一位湿透的女司机。",

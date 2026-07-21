@@ -93,6 +93,10 @@
       "type": "boolean",
       "description": "Hard-fail write-spec when HEAT_SEX_DURATION_LOW. Default true when heat_scale=max"
     },
+    "sex_wardrobe_strict": {
+      "type": "boolean",
+      "description": "Hard-fail when act/climax still full armor/dress or undress beat missing. Default true when heat_scale=max"
+    },
     "heat_arc_strict": {
       "type": "boolean",
       "description": "If true, all heat arc lint warnings hard-fail write-spec"
@@ -285,6 +289,11 @@
                   "enum": ["setup", "foreplay", "act", "climax", "afterglow", "bridge"],
                   "description": "Adult heat arc phase; intimacy core = foreplay+act+climax"
                 },
+                "wardrobe_state": {
+                  "type": "string",
+                  "enum": ["full", "armored", "partial", "undressed", "bare"],
+                  "description": "Costume ladder. act/climax must be partial|undressed|bare (not full/armored). See sex-undress-ladder lesson."
+                },
                 "dsl": {
                   "type": "object",
                   "description": "Visual DSL; write-spec fills motion/shot_size/camera_axis from beat defaults",
@@ -323,6 +332,11 @@
                       "type": "string",
                       "enum": ["left", "right", "center"],
                       "description": "Screen direction for 180-degree continuity; reverse flips"
+                    },
+                    "wardrobe_state": {
+                      "type": "string",
+                      "enum": ["full", "armored", "partial", "undressed", "bare"],
+                      "description": "Same as shot.wardrobe_state; act sex must not stay full/armored"
                     },
                     "chain_mode": {
                       "type": "string",
