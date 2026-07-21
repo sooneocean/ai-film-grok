@@ -1,80 +1,441 @@
-# ai-film-grok（Grok Plugin · 独立仓）
+# ai-film-grok
 
-把「灵感到可验收动态成片」收成一条可恢复流水线：**dispatch 八环** + Grok Imagine 静帧/I2V + edge TTS + HyperFrames/FFmpeg。
+**Grok Build 插件**：把「灵感到可验收的 AI 动态短片」收成一条**可恢复、可门禁、可插拔模型**的流水线。
 
-## 本机绝对路径（给 coding agent）
+- **不是**静图轮播 / Ken Burns / 只有关键帧  
+- **是** I2V 真动态 + 旁白混音 + 字幕 + 七维验收 → 可交付 MP4  
 
-```text
-/Users/dex/.grok/plugins/ai-film-grok
-```
+| | |
+|---|---|
+| **版本** | 见 [`plugin.json`](./plugin.json) |
+| **仓库** | https://github.com/sooneocean/ai-film-grok |
+| **斜杠命令** | `/ai-film-grok` · `/aifilm` |
+| **CLI** | `skills/ai-film-grok/scripts/aifilm` |
+| **Agent 入口** | [`AGENTS.md`](./AGENTS.md) · skill 主脊 [`skills/ai-film-grok/SKILL.md`](./skills/ai-film-grok/SKILL.md) |
 
-Agent 请先读 **[AGENTS.md](./AGENTS.md)**。  
-改完后：`make validate doctor test` → bump `plugin.json` version → `make update` → commit/push。
+---
 
 ## 目录
 
-```text
-ai-film-grok/                 # plugin root = git root
-├── plugin.json
-├── AGENTS.md                 # agent 迭代协议
-├── CHANGELOG.md
-├── Makefile
-├── commands/                 # /ai-film-grok · /aifilm
-└── skills/ai-film-grok/      # skill 本体
-    ├── SKILL.md
-    ├── scripts/aifilm
-    ├── references/
-    ├── tests/
-    └── config.env.example
-```
+1. [安装](#安装)
+2. [使用逻辑（先读这个）](#使用逻辑先读这个)
+3. [架构图](#架构图)
+4. [可插拔模型一览](#可插拔模型一览)
+5. [最小成片路径](#最小成片路径)
+6. [配置](#配置)
+7. [本机开发 / 发版](#本机开发--发版)
+8. [验证](#验证)
 
-## 安装 / 启用
+---
 
-### A · 本机开发（推荐，源码即运行）
+## 安装
 
-源码已在用户插件目录时，Grok 会发现；仍需 enable：
+### 前提
 
-```bash
-grok plugin validate /Users/dex/.grok/plugins/ai-film-grok
-grok plugin install /Users/dex/.grok/plugins/ai-film-grok --trust
-grok plugin enable ai-film-grok
-grok plugin update ai-film-grok   # 改完源码刷新 installed 副本
-```
+- [Grok Build](https://grok.x.ai)（或已安装 `grok` CLI 的本机环境）
+- Python **3.11+**、`ffmpeg` / `ffprobe`
+- 成片时建议：已 `grok login`（OAuth → `~/.grok/auth.json`），便于 Imagine / OAuth I2V / opt-in Grok TTS
 
-TUI：`/plugins` → `ai-film-grok` → `Space` 启用 · `r` 重载。
-
-### B · 从 GitHub 装到另一台机器
+### A · 从 GitHub 安装（另一台机器 / 干净环境）
 
 ```bash
-grok plugin install <owner>/ai-film-grok --trust
+grok plugin install sooneocean/ai-film-grok --trust
 grok plugin enable ai-film-grok
 # 之后拉更新：
 grok plugin update ai-film-grok
 ```
 
-`plugin.json` 的 `repository` / `homepage` 即 GitHub 地址。
+TUI：`/plugins` → 选 `ai-film-grok` → `Space` 启用 · `r` 重载。
 
-## 日常迭代
+### B · 本机开发（源码即运行）
 
-```bash
-cd /Users/dex/.grok/plugins/ai-film-grok
-# … edit …
-make validate doctor test
-# bump version in plugin.json if behavior changed
-make update
-git add -A && git commit -m "feat: …" && git push
+源码默认在用户插件目录（本仓绝对路径）：
+
+```text
+~/.grok/plugins/ai-film-grok
 ```
 
-GitHub Actions（`.github/workflows/ci.yml`）在 push/PR 上跑校验 + pytest。
+```bash
+grok plugin validate ~/.grok/plugins/ai-film-grok
+grok plugin install ~/.grok/plugins/ai-film-grok --trust
+grok plugin enable ai-film-grok
+# 改完源码后刷新 installed 副本：
+grok plugin update ai-film-grok
+```
+
+### C · 用户 skill 路径
+
+本机推荐：
+
+```text
+~/.grok/skills/ai-film-grok  →  symlink →  ~/.grok/plugins/ai-film-grok/skills/ai-film-grok
+```
+
+**不要**再开第二份可写副本；单一真相只在 plugin 源码树。
+
+### D · 密钥与本地配置
+
+```bash
+cp ~/.grok/plugins/ai-film-grok/skills/ai-film-grok/config.env.example \
+   ~/.grok/plugins/ai-film-grok/skills/ai-film-grok/config.env
+chmod 600 ~/.grok/plugins/ai-film-grok/skills/ai-film-grok/config.env
+# 按需填 FISH_ / MINIMAX_ / VOICEBOX_ / XAI_API_KEY 等；config.env 永不提交
+```
+
+---
+
+## 使用逻辑（先读这个）
+
+类比拍短片：**先定剧本与试镜，再批量开拍，再剪辑成片**——不能跳步 bulk。
+
+### 双轴主脊
+
+| 轴 | 解决什么 | 入口 |
+|---|---|---|
+| **电影工序八环** | 叙事模糊（想到哪拍到哪） | Idea → Story → Beats → Shots → Media → Selects → Rough → **Verified MP4** |
+| **工具四层** | 实现模糊（不知道用哪个模型） | Agent → 视觉 → 语音 → 设计(HF) → FFmpeg → 交付 |
+
+### 自动调配（每回合主入口）
+
+开任何片子、每完成一步后，**优先**：
+
+```bash
+SKILL_DIR="${HOME}/.grok/plugins/ai-film-grok/skills/ai-film-grok"
+[ -d "$SKILL_DIR" ] || SKILL_DIR="${HOME}/.grok/skills/ai-film-grok"
+AIFILM="$SKILL_DIR/scripts/aifilm"
+
+"$AIFILM" doctor
+"$AIFILM" dispatch --root "<film-root>"
+# 读 JSON：craft_stage · next_cmd · agent_instruction · routing · hard_gates
+# 本回合只做 next_cmd；做完再 dispatch。禁止跳环 bulk。
+```
+
+| 字段 | 含义 |
+|------|------|
+| `craft_stage` | 八环当前位置 |
+| `next_cmd` | **唯一**推荐命令 |
+| `agent_do` / `agent_instruction` | 本回合 checklist |
+| `routing` | TTS / BGM / I2V 兜底策略摘要 |
+| `hard_gates` | 不可跳过的门禁 |
+
+`dispatch` **不会**：自批 pilot、静默改 film-spec、默认开 lipsync。  
+用户说「可以 / 一路做完」才 unlock 批量。
+
+### 阶段 → 你该做什么
+
+| 阶段 | 工序区 | 你该做的 | 典型命令 |
+|------|--------|----------|----------|
+| `agent` | 企划 + 预生产 | Brief / Lens → lock-style → write-spec → **pilot** | `init` `lock-style` `write-spec` `pilot *` |
+| `visual` | 生产画面 | still → **I2V** → register · continue | `media-queue` `image_to_video` / OAuth `queue-run-oauth` `register-clip` |
+| `voice` | 声轨 | Radio 测旁白 | `tts-rehearse --backend edge` |
+| `design` | 后期设计 | Studio / 设计成片 | `compose-preview` · `final --post-engine hyperframes` |
+| `post` | 锁画 | 七维审批 | `review-final` |
+| `deliver` / `done` | Master | 导出 | `export-desktop` |
+
+### 硬门禁（工程 · 不可跳）
+
+1. **write-spec 过** → 才 `media-queue`  
+2. **pilot 用户批准** → 才 bulk（无批准 ≤3 shot）  
+3. **continue**：末帧 SHA = 下镜 keyframe；缝 **hard**  
+4. **VO 预算**：`nar`≤55 字；hook/action 不 loop  
+5. **双烧**：设计路径 `plate-cards blank` + `subs off`  
+6. **交付**：七维全 pass + 完整观看 → `final_complete`  
+7. **失败**：`media-queue fail/requeue`；禁手改 queue JSON  
+8. **同源**：禁半片 Grok + 半片 FRW still/2V  
+
+叙事/尺度/女主人数跟 brief 走（软）；`heat_scale=max` 时另有产品硬底（性爱时长 ≥20%、卸甲阶梯、旁白荤梗）——见 skill 内 `references/ecchi-story.md`。
+
+### Agent 在 Grok Build 里怎么用
+
+1. 会话加载 skill：`/ai-film-grok` 或 `/aifilm`  
+2. 给主题 / 参考图 / film root  
+3. Agent 跑 `dispatch`，只执行 `next_cmd`  
+4. 静帧 / I2V 优先会话内 Imagine 工具；量产可用 OAuth 队列  
+5. 你批准 pilot → bulk → `final` → 你完整看片签七维  
+
+---
+
+## 架构图
+
+### 总览（工具四层 + 八环）
+
+![ai-film-grok 架构：Prompt → Agent 八环 → 视觉/语音/设计/FFmpeg → 交付；侧栏可插拔模型](skills/ai-film-grok/docs/architecture.png)
+
+矢量源：[`skills/ai-film-grok/docs/architecture.svg`](./skills/ai-film-grok/docs/architecture.svg) · PNG：[`architecture.png`](./skills/ai-film-grok/docs/architecture.png)
+
+### Mermaid（GitHub 可渲染）
+
+```mermaid
+flowchart TB
+  subgraph IN["输入"]
+    P["用户 Prompt / 剧本 / 参考图"]
+  end
+
+  subgraph AGENT["规划层 · Agent + aifilm"]
+    D["dispatch 每回合"]
+    L["Director's Lens"]
+    S["film-spec + write-spec"]
+    STY["lock-style / cast master"]
+    PI["pilot 三镜 · 用户批准"]
+    D --> L --> S --> STY --> PI
+  end
+
+  subgraph VIS["1 · 视觉层 · 可插拔"]
+    STILL["静帧<br/>image_gen / image_edit / OAuth image"]
+    I2V["I2V bulk<br/>默认 grok_primary → Grok image_to_video"]
+    FRW["可选 FRW<br/>Seedance I2V · LTX T2V 环境床"]
+    Q["media-queue · register-clip · continue"]
+    STILL --> I2V --> Q
+    FRW -.-> Q
+  end
+
+  subgraph VOI["2 · 语音层 · 可插拔"]
+    TTS["TTS 默认 edge<br/>+ voicebox / grok / minimax / fish / external"]
+    BGM["BGM 默认 rnb 池<br/>+ music-seed 程序化兜底 / 用户文件"]
+    LIP["Lipsync 默认 off<br/>+ MuseTalk / Wav2Lip / FRW lipsync"]
+  end
+
+  subgraph POST["3–4 · 设计 + 后处理 · 可插拔"]
+    HF["HyperFrames 优先"]
+    REM["Remotion 备选"]
+    FF["FFmpeg plate · loudnorm · 封装"]
+    HF --> FF
+    REM --> FF
+  end
+
+  subgraph OUT["交付"]
+    RV["review-final 七维"]
+    EX["export-desktop · final MP4"]
+    RV --> EX
+  end
+
+  P --> AGENT
+  PI -->|批准后 bulk| VIS
+  VIS --> VOI
+  VOI --> POST
+  POST --> OUT
+
+  note1["一键 final --post-engine hyperframes<br/>= FFmpeg plate → HF → 封装"]
+  POST --- note1
+```
+
+### 数据落盘（film root）
+
+```text
+<film-root>/
+├── film-spec.json          # 镜表 · provider · VO · 门禁字段
+├── style-v1 / cast/        # 画风与角色锚
+├── keyframes/ · clips/     # 静帧与 I2V
+├── audio/                  # TTS · BGM · mix
+├── receipts/               # dispatch / pilot / queue / review
+└── out/                    # 成片与导出
+```
+
+### 工程一键交付顺序（勿与工序心智搞反）
+
+```text
+final --post-engine hyperframes
+  = [4] FFmpeg plate（subs off）→ [3] HyperFrames → [4] 封装
+```
+
+纯 FFmpeg 烧字：`--post-engine ffmpeg` · Remotion：`--post-engine remotion`。
+
+---
+
+## 可插拔模型一览
+
+所有「默认」可用环境变量或 `film-spec.json` 覆盖；**禁止静默换声 / 静默换 I2V provider**。  
+机位一页：`aifilm capability` · 深度鉴权：`aifilm grok-oauth doctor --deep`。
+
+### 1 · 静帧 / 图像
+
+| 插槽 | 默认 | 可切换 | 怎么换 |
+|------|------|--------|--------|
+| 会话出图 | Grok Imagine `image_gen` / `image_edit` | 同左（主路径） | 加载 `/imagine`；角色用 **edit(cast)** |
+| OAuth 批处理 | `aifilm grok-oauth image` / `image-edit` | 模型名 env | `AIFILM_GROK_IMAGE_MODEL`（默认 `grok-imagine-image`） |
+| 鉴权 | OAuth `~/.grok/auth.json` | API key 兜底 | `AIFILM_GROK_AUTH=auto\|oauth\|api_key` · `XAI_API_KEY` |
+
+### 2 · I2V / 视频（人物动）
+
+| 插槽 | 默认（当前季） | 可切换 | 怎么换 |
+|------|----------------|--------|--------|
+| **运营 profile** | `grok_primary` | `seedance_first` | `AIFILM_I2V_PROFILE=…` |
+| **L1 人物 I2V** | Grok `image_to_video`（720p 串行） | FRW Seedance I2V | film-spec `i2v_provider=grok\|frw`；恢复 Seedance：`seedance_first` + canary 201 |
+| OAuth 批 I2V | `queue-run-oauth` / `grok-oauth video --wait` | 视频模型 env | `AIFILM_GROK_VIDEO_MODEL`（默认 `grok-imagine-video`） |
+| L2 无脸环境床 | FRW **`ltx-t2v`**（`env-plate`） | — | `aifilm env-plate` · register `frw_ltx_t2v` |
+| 会话工具 | `image_to_video` | `reference_to_video`（少用） | 无原生 T2V |
+
+```bash
+# 当前默认（Seedance 暂关）
+AIFILM_I2V_PROFILE=grok_primary
+AIFILM_SEEDANCE_AVAILABLE=0
+
+# 恢复 FRW Seedance bulk（须 canary 201）
+# AIFILM_I2V_PROFILE=seedance_first
+# AIFILM_SEEDANCE_AVAILABLE=1
+```
+
+### 3 · TTS（旁白）
+
+| 后端 ID | 角色 | 默认？ | 配置要点 |
+|---------|------|--------|----------|
+| **`edge`** | 中文量产说书 | **是** | `zh-CN-*-Neural`；零依赖 |
+| `voicebox` | 本机克隆 / 多引擎 | 否 | `VOICEBOX_BASE_URL` + **固定** `VOICEBOX_PROFILE` |
+| `grok` | SuperGrok OAuth TTS | 否（永不 auto） | `AIFILM_TTS_BACKEND=grok` · `AIFILM_GROK_TTS_VOICE` |
+| `minimax` | 在线情感 | 否 | `MINIMAX_API_KEY` + 固定 `MINIMAX_VOICE_ID` |
+| `fish` | 在线克隆 | 否 | `FISH_API_KEY` + 固定 `FISH_VOICE_ID` |
+| `external` | CosyVoice 2 / ElevenLabs / 自研 | 否 | **仅** `AIFILM_TTS_ARGV` JSON argv（禁 shell 字符串） |
+| `auto` | 按就绪度排序 | 可选 | external → voicebox → minimax → fish → edge |
+
+```bash
+AIFILM_TTS_BACKEND=edge          # 推荐中文成片
+# AIFILM_TTS_VOICEBOX_FALLBACK=1 # opt-in：显式后端失败再试 Voicebox 一次
+# 试听对照：
+# aifilm tts-ab --root <film> --shot shot01 --backends edge,voicebox
+```
+
+**硬规则**：不要把 `zh-CN-*-Neural` 塞进 ElevenLabs；一角一声；显式后端失败不静默跨商换声。
+
+### 4 · BGM / 音乐
+
+| 插槽 | 默认 | 可切换 | 说明 |
+|------|------|--------|------|
+| 听感池 | `assets/bgm/rnb/*` 纯乐器 | `playful` / `warm` / `dark` | 色气默认 **rnb**；`dark` 仅恐怖 |
+| 工程兜底 | 程序化 multi-style v3 | `--music-seed` / `audio_policy.music_seed` | 永远有床轨 |
+| 用户文件 | — | `--music <path>` | 优先于生成 |
+| 外接生成 | off | `AIFILM_MUSIC_ARGV` | 失败回落池 / 程序化 |
+
+### 5 · Lipsync（口型）
+
+| 后端 | 默认 | 说明 |
+|------|------|------|
+| `off` | **是** | 说书强制 off |
+| MuseTalk / Wav2Lip | 否 | `backend-lock` 审权重后 lock |
+| FRW lipsync | 否 | `frw-lipsync probe`→201 再 run；403/502 跳过 |
+| `external` | 否 | `AIFILM_LIPSYNC_ARGV` JSON argv |
+
+```bash
+AIFILM_LIPSYNC_BACKEND=off
+# final 时：--lipsync off|auto|require
+```
+
+### 6 · 后期合成引擎
+
+| 引擎 | 默认 | 命令 |
+|------|------|------|
+| **HyperFrames** | **是** | `final --post-engine hyperframes` |
+| FFmpeg 纯烧 | 否 | `--post-engine ffmpeg` |
+| Remotion | 否 | `--post-engine remotion` |
+
+### 7 · 推理 / 规划（Grok 侧）
+
+| 能力 | 默认模型 / 入口 | 覆盖 |
+|------|-----------------|------|
+| 会话推理 | Grok Build 主模型 | 会话内 |
+| OAuth chat | `AIFILM_GROK_CHAT_MODEL`（默认 `grok-4.5`） | env |
+| 结构化规划 | film-spec + Director’s Lens | 本地 JSON |
+
+### 适配器目录（插拔实现）
+
+```text
+skills/ai-film-grok/scripts/adapters/
+├── grok_oauth_image.py / grok_oauth_image_edit.py / grok_oauth_video.py / grok_oauth_tts.py
+├── voicebox_tts.py
+├── cosyvoice_tts.py · cosyvoice_infer.example.py
+├── elevenlabs_tts.py
+├── music_external.py
+└── xai_openai_compat.example.py
+```
+
+---
+
+## 最小成片路径
+
+```bash
+SKILL_DIR="${HOME}/.grok/plugins/ai-film-grok/skills/ai-film-grok"
+AIFILM="$SKILL_DIR/scripts/aifilm"
+MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
+ROOT="/path/to/my-film"   # 绝对路径
+
+"$AIFILM" doctor
+"$AIFILM" init --theme "都市雨夜重逢" --title "雨停之前" --aspect 9:16 --root "$ROOT"
+# … 写 Director’s Lens / style / cast 后：
+"$AIFILM" lock-style --root "$ROOT" --canonical "<style-v1.png>" \
+  --cast-master "<cast/id-v1.png>" --signature "<signature_block>"
+"$AIFILM" write-spec --root "$ROOT"
+"$AIFILM" pilot pick --root "$ROOT" && "$AIFILM" pilot report --root "$ROOT"
+# 用户原话批准后：
+"$AIFILM" pilot approve --root "$ROOT" --user-phrase "可以" --shots shot01,shot02,shot03
+
+# 每步都可：
+"$AIFILM" dispatch --root "$ROOT"
+
+# 视觉 bulk（会话 image_to_video 或 OAuth 队列）后 register-clip …
+"$AIFILM" tts-rehearse --root "$ROOT" --backend edge
+"$AIFILM" final --root "$ROOT" --post-engine hyperframes \
+  --lipsync off --music-mood rnb --tts-backend edge --compose-preset auto
+"$AIFILM" review-final --root "$ROOT" --approve --reviewer "you" \
+  --notes "已完整观看" \
+  --score-identity pass --score-style pass --score-motion pass \
+  --score-escalation pass --score-audio pass --score-subs pass --score-dead-air pass
+"$AIFILM" export-desktop --root "$ROOT" --name "雨停之前"
+```
+
+细节命令与门禁全文：[`skills/ai-film-grok/SKILL.md`](./skills/ai-film-grok/SKILL.md)。
+
+---
 
 ## 配置
 
-1. 复制 `skills/ai-film-grok/config.env.example` → 同目录 `config.env`（**勿提交**）
-2. 中文 final TTS 默认 **edge**；色气 BGM 默认 **rnb**；I2V 默认 `grok_primary`
+| 变量 | 默认 | 含义 |
+|------|------|------|
+| `AIFILM_TTS_BACKEND` | `edge` | TTS 后端 |
+| `AIFILM_I2V_PROFILE` | `grok_primary` | I2V 运营季 |
+| `AIFILM_SEEDANCE_AVAILABLE` | `0` | Seedance 是否当 bulk |
+| `AIFILM_LIPSYNC_BACKEND` | `off` | 口型 |
+| `AIFILM_GROK_AUTH` | `auto` | OAuth / API key |
+| `AIFILM_GROK_CHAT_MODEL` | `grok-4.5` | OAuth chat |
+| `AIFILM_GROK_IMAGE_MODEL` | `grok-imagine-image` | OAuth 图 |
+| `AIFILM_GROK_VIDEO_MODEL` | `grok-imagine-video` | OAuth 视频 |
+| `AIFILM_TTS_ARGV` | — | 外部 TTS JSON argv |
+| `AIFILM_MUSIC_ARGV` | — | 外部音乐 JSON argv |
+| `AIFILM_LIPSYNC_ARGV` | — | 外部口型 JSON argv |
 
-## 与 `~/.grok/skills/ai-film-grok`
+完整模板：[`skills/ai-film-grok/config.env.example`](./skills/ai-film-grok/config.env.example)。
 
-本机为 **symlink → 本 plugin 的 skill 目录**。不要再开第二份可写副本。
+**成片硬默认（产品）**
+
+- 中文 final TTS → **edge**  
+- 色气 BGM → **rnb**（`dark` 仅恐怖）  
+- I2V → **`grok_primary`**（Seedance 暂关，除非显式恢复）  
+- pilot 须用户批准才 bulk  
+
+---
+
+## 本机开发 / 发版
+
+```bash
+cd ~/.grok/plugins/ai-film-grok
+# 1) 只改本树
+# 2) make validate doctor test
+# 3) 行为变更 → bump plugin.json semver
+# 4) make update
+# 5) git commit（message 英文）&& git push origin main
+```
+
+| 路径 | 用途 |
+|------|------|
+| `plugin.json` | 插件元数据 / 版本 |
+| `commands/` | `/ai-film-grok` · `/aifilm` |
+| `skills/ai-film-grok/SKILL.md` | Agent 主脊（短） |
+| `skills/ai-film-grok/scripts/` | `aifilm` CLI + 适配器 |
+| `skills/ai-film-grok/references/` | 稳定规则 |
+| `skills/ai-film-grok/tests/` | pytest |
+| `.github/workflows/ci.yml` | validate + 全量 pytest |
+
+Coding agent 协议：[`AGENTS.md`](./AGENTS.md)。变更日志：[`CHANGELOG.md`](./CHANGELOG.md)。
+
+---
 
 ## 验证
 
@@ -83,8 +444,14 @@ make validate
 make doctor
 test -x skills/ai-film-grok/scripts/aifilm
 grok plugin details ai-film-grok
+# 可选全量：
+# make test
 ```
+
+CI：push / PR 跑 `plugin validate` + 全量 pytest（见 `.github/workflows/ci.yml`）。
+
+---
 
 ## License
 
-MIT
+MIT © [dex](https://github.com/sooneocean)

@@ -337,7 +337,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             ),
                         )
                     )
-            elif str(spec.get("heat_scale") or "").lower() == "max":
+            if str(spec.get("heat_scale") or "").lower() == "max":
                 # Surface metrics even when pass (agent can see ratio)
                 sdr = heat_rep.get("sex_duration_ratio")
                 if sdr is not None and float(sdr) + 1e-9 < 0.35:

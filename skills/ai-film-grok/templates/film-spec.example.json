@@ -57,6 +57,7 @@
   "description": "说书人讲述：雨夜女司机与后座升温——色气靠距离与感官，不对口型",
   "aspect_ratio": "9:16",
   "heat_scale": "max",
+  "sex_vo_strict": false,
   "cast_mode": "auto",
   "heat_phase_auto": true,
   "heat_arc_advise": false,
@@ -109,8 +110,8 @@
           "dramatic_function": "hook",
           "lipsync": false,
           "duration_sec": 6,
-          "nar": "雨很急。她拉开车门，热气先扑出来。",
-          "nar_en": "The rain is fierce. She opens the door; heat spills out first.",
+          "nar": "雨很急。她湿透的雨衣半敞，拉开车门，热气先扑出来。",
+          "nar_en": "The rain is fierce. Her wet raincoat half open, she pulls the door; heat spills out first.",
           "dsl": {
             "subject": "adult anime woman taxi driver, wet raincoat half open, heavy blush",
             "action": "opens rear door under rain",
@@ -142,8 +143,8 @@
           "dramatic_function": "approach",
           "lipsync": false,
           "duration_sec": 6,
-          "nar": "后视镜里，锁骨上的水珠还没干。",
-          "nar_en": "In the rearview, water still beads on her collarbones.",
+          "nar": "后视镜里，锁骨上的水珠还没干，她轻轻喘了一下。",
+          "nar_en": "In the rearview, water still beads on her collarbones; she breathes soft.",
           "dsl": {
             "subject": "same driver in rearview mirror, wet collarbone, seductive eyes",
             "action": "glances into rearview mirror",
@@ -156,6 +157,12 @@
             "story_beat": "距离被后视镜拉近，感官压迫开始",
             "visible_change": "视线落入后视镜；水珠仍停在锁骨",
             "environment": "taxi cabin dashboard glow",
+            "emotion": {
+              "primary": "tension",
+              "intensity": 0.9,
+              "valence": 0.8,
+              "arousal": 0.9
+            },
             "camera": {
               "shot_size": "close-up",
               "angle": "eye level"

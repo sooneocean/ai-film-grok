@@ -1,36 +1,38 @@
-# ai-film-grok
+# ai-film-grok（skill 本体）
 
-**用一句话**：把「从灵感到可发布的 AI 动态短片」收成一条可恢复、可验收的**四层流水线**——Agent 规划 → **视觉**（Grok still + Seedance I2V）→ **语音**（Edge TTS）→ **设计层**（HyperFrames / Remotion）→ **FFmpeg 后处理** → 交付。
+> **安装 / 使用逻辑 / 架构图 / 可插拔模型** → 仓库根 [README.md](../../README.md)（对外主文档）。
 
-正式交付必须是**真实动态成片**（经 Seedance / 可选 Grok I2V 验收），不是静图轮播、Ken Burns 或只有关键帧。
+**一句话**：把「从灵感到可发布的 AI 动态短片」收成**可恢复、可验收**流水线——八环 dispatch + **视觉**（Grok still + 默认 `grok_primary` I2V）+ **语音**（Edge TTS）+ **设计**（HyperFrames / Remotion）+ **FFmpeg** → 交付。
+
+正式交付必须是**真实动态成片**（I2V 验收），不是静图轮播、Ken Burns 或只有关键帧。
 
 ### 四层方法论（主脊）
 
 ```text
-用戶 Prompt / 劇本
+用户 Prompt / 剧本
         ↓
-Grok Agent（規劃 + Prompt 優化 + 角色一致性）
+Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
         ↓
-1. 視覺生成     Grok Imagine 靜幀 + Seedance/Grok I2V
-2. 語音生成     Edge TTS（WAV/MP3 + SRT）
-3. 動態合成     HyperFrames（優先） / Remotion（備選）
-4. 最終後處理   FFmpeg（拼板 · 混音 · 導出）
+1. 视觉生成     Grok Imagine 静帧 + I2V（默认 grok_primary；可选 FRW Seedance）
+2. 语音生成     Edge TTS（可插拔 voicebox / grok / minimax / fish / external）
+3. 动态合成     HyperFrames（优先） / Remotion（备选）
+4. 最终后处理   FFmpeg（拼板 · 混音 · 导出）
         ↓
-最終 MP4 + 預覽 + 可下載資產
+最终 MP4 + 预览 + 可下载资产
 ```
 
 **Skill 入口**：[`SKILL.md`](SKILL.md) 主脊 + 阶段路由 + 命令  
-- **电影工序**（想法→成片）：[`references/generative-film-craft.md`](references/generative-film-craft.md)  
+- **电影工序**：[`references/generative-film-craft.md`](references/generative-film-craft.md)  
 - **工具四层**：[`references/pipeline-methodology.md`](references/pipeline-methodology.md)  
 - 弹性默认：[`references/hard-defaults.md`](references/hard-defaults.md)
 
-运行时：`aifilm status|next|preflight|stage` → **`pipeline_stage`**；`stage` / `next --print-stage-only` 写 sidecar 供 HUD。
+运行时：优先 `aifilm dispatch`；`status|next|preflight|stage` → **`pipeline_stage`**（HUD sidecar）。
 
 ### 架构总览
 
-![ai-film-grok 四层流水线：Prompt → Agent → 视觉 → 语音 → HyperFrames/Remotion → FFmpeg → 交付](docs/architecture.png)
+![ai-film-grok 四层流水线](docs/architecture.png)
 
-> 2026-07-21 重绘：紫色 Agent → 四层生产（视觉/语音/设计/后处理）→ 绿色交付；底部注明一键 hyperframes 工程顺序。源文件：[`docs/architecture.png`](docs/architecture.png)。
+> 当前季默认 **I2V = grok_primary**。完整插拔矩阵与安装步骤见仓库根 README。
 
 ---
 
