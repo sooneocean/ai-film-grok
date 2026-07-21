@@ -141,9 +141,11 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 
 ```bash
 "$AIFILM" init --theme "<theme>" --title "<title>" --aspect 9:16 --root "<abs-root>"
-"$AIFILM" lock-style --root "<root>" --canonical "<style-v1.png>" \
-  --cast-master "<cast/id-v1.png>" --signature "<signature_block>"
+"$AIFILM" bible init --root "<root>"
+# 編輯 style-bible.json，填寫角色、服裝、風格等...
+"$AIFILM" bible lock --root "<root>"
 "$AIFILM" write-spec --root "<root>"
+# write-spec 會自動根據 bible 生成 prompts/*.txt 並檢查衝突
 "$AIFILM" pilot pick --root "<root>" && "$AIFILM" pilot report --root "<root>"
 # 用户原话批准后：
 "$AIFILM" pilot approve --root "<root>" --user-phrase "可以" --shots shot01,shot03,shot04
@@ -175,8 +177,9 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 - 详：[ltx-env-plate.md](references/ltx-env-plate.md) · [i2v-grok-primary.md](references/i2v-grok-primary.md)
 
 ```bash
+# write-spec 已自動生成 prompt，直接使用
 "$MEDIA_QUEUE" --budget-units 12 add --root "<root>" --shot-id shot01 \
-  --operation image_to_video --prompt-file "<p.txt>" --input "<kf.png>"
+  --operation image_to_video --prompt-file "prompts/shot01.txt" --input "<kf.png>"
 "$MEDIA_QUEUE" claim --root "<root>"
 # Grok Build: image_to_video(image=kf, prompt=…, duration=6)  # 串行！
 "$AIFILM" register-clip --root "<root>" --shot-id shot01 --source "<clip.mp4>" \
@@ -198,7 +201,9 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 
 **BGM 抗重复（定稿）**：**听感兜底** = 纯乐器曲库池 `assets/bgm/rnb/*`（≥3 首 + seed 轮换）；**工程硬兜底** = 程序 v3 multi-style（`--music-seed` / `audio_policy.music_seed`）。ACE-Step/`[inst]` 等只**离线灌库**；HeartMuLa 不当默认 BGM。见 [bgm-generation.md](references/bgm-generation.md)。
 
-**场景自适应声轨**：`write-spec` 按 beat 写每镜 `audio_recipe`；片级 `audio_policy`（默认不自动唱）。见 [audio-recipe.md](references/audio-recipe.md) · `audio-plan`。
+**场景自适应声轨**：`write-spec` 按 beat 写每镜 `audio_recipe`；片级 `audio_policy`（默认不自动唱）。见 [audio-recipe.md](references/audio-recipe.md) · `audio-plan`。  
+**声线默认**：**旁白 `nar` + BGM** 主导；`vocal_color` 娇喘独立轨 **默认关闭**（鸡肋）。`tone_tags` 仍可进画面 prompt；`sound_cues` 仍可进 SFX。见 [voice-tracks.md](references/voice-tracks.md)。  
+**声线耦合剪辑**：`edit_strategy.mode=voice_coupled`（heat max 默认）→ craft + `join_transition_secs` + act `visual_fit=vo`。见 [edit-strategy-voice-coupled.md](references/edit-strategy-voice-coupled.md)。
 
 ### 3 · 设计 + 4 · 后处理
 
@@ -257,6 +262,8 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 | **自动调配** dispatch | [auto-dispatch.md](references/auto-dispatch.md) |
 | **工序八环主脊** Idea→Verified | [craft-spine.md](references/craft-spine.md) |
 | **音频三阶梯** TTS/BGM/Lipsync | [audio-fallback.md](references/audio-fallback.md) |
+| **多轨声线** 默认 nar+BGM；娇喘轨 opt-in | [voice-tracks.md](references/voice-tracks.md) |
+| **声线耦合剪辑** craft/可变转场/vo-fit | [edit-strategy-voice-coupled.md](references/edit-strategy-voice-coupled.md) |
 | **媒体队列 · Grok/FRW** | [grok-media-pipeline.md](references/grok-media-pipeline.md) |
 | **生成式电影工序**（Beat/Coverage/五锁） | [generative-film-craft.md](references/generative-film-craft.md) |
 | 工具四层 + 对照表 | [pipeline-methodology.md](references/pipeline-methodology.md) |

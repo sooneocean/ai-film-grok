@@ -47,6 +47,7 @@
 | VO 预算 | `nar` ≤55 字（快节奏 ≤28）；`est_vo_sec ≤ duration_sec+0.5` |
 | loop | hook/action 永不 stream_loop |
 | 一角一声 | 固定 `vo_voice`；显式 TTS 失败不静默跨商降级 |
+| **声线主导** | **旁白 `nar` + BGM**；`vocal_color` 娇喘独立轨 **默认关**（`voice_tracks.enabled=false` · gain=0）；`tone_tags` 只进画面；`sound_cues` 可进 SFX；见 [voice-tracks.md](voice-tracks.md) |
 
 ## 视觉与一致性
 

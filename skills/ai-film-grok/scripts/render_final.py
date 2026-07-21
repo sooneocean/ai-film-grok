@@ -77,17 +77,32 @@ except ImportError:  # pragma: no cover
     tts_synthesize = None  # type: ignore
     tts_probe = None  # type: ignore
 
+try:
+    from voice_tracks import (
+        compute_color_offset_sec,
+        resolve_shot_vocal_color,
+        resolve_voice_tracks,
+        sound_cues_to_sfx_kinds,
+    )
+except ImportError:  # pragma: no cover
+    compute_color_offset_sec = None  # type: ignore
+    resolve_shot_vocal_color = None  # type: ignore
+    resolve_voice_tracks = None  # type: ignore
+    sound_cues_to_sfx_kinds = None  # type: ignore
+
 # 中文女声优先：旁白是主叙事，必须压过 BGM
 # TTS 质量与稳定声线分开选择；跨服务商降级必须显式开启。
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"  # edge 显式后端默认女声
 STORYTELLER_VOICE = "zh-CN-XiaoxiaoNeural"
 # 混音：旁白永远是主角
-# Dual-track mix (两条音轨都要听得见):
+# Multi-track mix (旁白 / 娇喘语助 / 原生 clip 音 / BGM 独立增益):
 # - BGM 生成用固定健康 amp（不吃 music_volume，避免「生成压一次 + 混音再压一次」→ 音乐消失）
 # - music_volume 只在 amix 时用；sidechain 说话时让路，停顿时音乐回来
+# - vocal_color = 色气语助词/娇喘，独立 TTS 轨，不写进 nar（见 voice-tracks.md）
 DEFAULT_MUSIC_VOLUME = 0.48  # 略降 BGM，旁白更贴耳、节奏更干净
 DEFAULT_BGM_GEN_AMP = 0.22  # 程序化 BGM 生成响度（固定，勿再乘 music_volume）
 DEFAULT_VO_GAIN = 1.32  # 旁白增益：清晰压过环境音与 BGM（星声 lesson 略抬）
+DEFAULT_VOCAL_COLOR_GAIN = 0.0  # 2026-07-21: 语助轨默认关闭；成片以 nar+BGM 主导
 DEFAULT_VO_RATE = "+0%"  # 默认不拖腔；快节奏色气短片可用 +5%~+8%（禁 -3%+slot 叠拖）
 DEFAULT_VO_PITCH = "+0Hz"
 FONT_CANDIDATES = [
@@ -296,18 +311,18 @@ def _split_one_soft(u: str) -> tuple[str, str] | None:
     return a, b
 
 
-def _ensure_caption_density(units: list[str]) -> list[str]:
+def _ensure_caption_density(units: list[str], max_len: int = 14) -> list[str]:
     """Only split *long* phrase lines — never force a target cue count.
 
     Old logic required ceil(vo_dur/max_unit) cues and shredded good phrases
     into 「是罚你眼睛只 / 准看我。」. Timing rebalance already caps line duration.
     """
     units = list(units)
-    # Only split lines that are genuinely long for 9:16 (≥ 18 chars)
+    # Only split lines that are genuinely long for 9:16 (≥ max_len chars)
     guard = 0
     while guard < 8:
         guard += 1
-        long_idx = [i for i, u in enumerate(units) if len(u) >= 18]
+        long_idx = [i for i, u in enumerate(units) if len(u) >= max_len]
         if not long_idx:
             break
         i = max(long_idx, key=lambda k: len(units[k]))
@@ -526,13 +541,15 @@ def procedural_music_rnb(
     amp: float = 0.16,
     bpm: float = 76.0,
     seed: int | None = None,
+    shot_starts: list[float] | None = None,
+    events: list[dict] | None = None,
 ) -> np.ndarray:
     """Seductive late-night R&B bed (Rhodes + sub + soft kit). float mono."""
     # Prefer shared implementation from make_sfx_bed when available
     try:
         from make_sfx_bed import rnb_bgm  # type: ignore
 
-        return rnb_bgm(dur, amp=amp, bpm=bpm, seed=seed)
+        return rnb_bgm(dur, amp=amp, bpm=bpm, seed=seed, shot_starts=shot_starts, events=events)
     except Exception:
         pass
     n = int(SR * max(0.5, dur))
@@ -568,6 +585,8 @@ def procedural_music(
     amp: float = 0.14,
     mood: str = "playful",
     seed: int | None = None,
+    shot_starts: list[float] | None = None,
+    events: list[dict] | None = None,
 ) -> np.ndarray:
     """Royalty-free algorithmic BGM (numpy). License: original generative, no sample pack.
 
@@ -576,7 +595,7 @@ def procedural_music(
     mood = (mood or "playful").lower()
     # rnb/soul/sensual = late-night seductive bed (Kei lesson: never use dark for 色气)
     if mood in ("rnb", "r&b", "soul", "neo-soul", "neosoul", "sensual", "seductive", "ecchi", "sexy"):
-        sig = procedural_music_rnb(dur, amp=amp * 1.05, bpm=76.0, seed=seed)
+        sig = procedural_music_rnb(dur, amp=amp * 1.05, bpm=76.0, seed=seed, shot_starts=shot_starts, events=events)
         return (np.clip(sig, -1, 1) * 32767).astype(np.int16)
 
     n = int(SR * max(0.5, dur))
@@ -770,6 +789,140 @@ def build_native_track(
         transition_sec=t_sec,
         segment_durs=segment_durs,
         join_intents=join_intents,
+    )
+    return output
+
+
+def build_vocal_color_track(
+    shot_audio: list[dict[str, Any]],
+    *,
+    shot_start_map: dict[str, float],
+    total_duration: float,
+    work: Path,
+    audio_dir: Path,
+) -> Path | None:
+    """Overlay per-shot 娇喘/语助词 stems onto the film timeline (independent of nar).
+
+    Returns path to vocal_color_track.wav, or None when no color stems.
+    """
+    placements: list[tuple[Path, float, float]] = []  # wav, delay_sec, gain
+    for item in shot_audio:
+        c_wav = item.get("color_wav")
+        if not c_wav:
+            continue
+        try:
+            c_path = Path(c_wav)
+        except TypeError:
+            continue
+        if not c_path.is_file():
+            continue
+        sid = str(item.get("id") or "")
+        start = float(shot_start_map.get(sid, 0.0))
+        plate = float(item.get("target") or 0.0)
+        c_dur = float(item.get("color_dur") or 0.0)
+        off = item.get("color_offset_sec")
+        if compute_color_offset_sec is not None:
+            off_sec = compute_color_offset_sec(
+                offset_sec=float(off) if off is not None else -1.0,
+                plate_sec=plate,
+                color_dur=c_dur if c_dur > 0 else 0.4,
+                vo_dur=float(item.get("raw_vo_dur") or item.get("vo_dur") or 0.0),
+            )
+        else:
+            off_sec = max(0.0, float(off) if off is not None and float(off) >= 0 else plate * 0.55)
+        delay = start + off_sec
+        gain = float(item.get("color_gain") or DEFAULT_VOCAL_COLOR_GAIN)
+        if gain <= 0:
+            continue
+        placements.append((c_path, delay, gain))
+
+    try:
+        output = safe_output_path(
+            audio_dir, "vocal_color_track.wav", suffixes={".wav"}, field="vocal color track"
+        )
+    except SecurityPolicyError as exc:
+        raise RenderError(str(exc)) from exc
+
+    if not placements:
+        # Default path: no color stems → skip track (mix stays nar+BGM+native).
+        return None
+
+    # Silence base + delayed stems amixed
+    base = work / "color_base_silence.wav"
+    run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"anullsrc=r={SR}:cl=stereo",
+            "-t",
+            f"{max(0.05, float(total_duration)):.3f}",
+            "-c:a",
+            "pcm_s16le",
+            str(base),
+        ]
+    )
+    delayed_parts: list[Path] = [base]
+    for idx, (src, delay, gain) in enumerate(placements):
+        part = work / f"color_place_{idx:02d}.wav"
+        delay_ms = max(0, int(round(delay * 1000.0)))
+        # adelay + pad to full timeline length
+        run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(src),
+                "-af",
+                (
+                    f"aformat=sample_fmts=fltp:sample_rates={SR}:channel_layouts=stereo,"
+                    f"volume={gain:.3f},"
+                    f"adelay={delay_ms}|{delay_ms},"
+                    f"apad=whole_dur={max(0.05, float(total_duration)):.3f}"
+                ),
+                "-t",
+                f"{max(0.05, float(total_duration)):.3f}",
+                "-ar",
+                str(SR),
+                "-ac",
+                "2",
+                "-c:a",
+                "pcm_s16le",
+                str(part),
+            ]
+        )
+        delayed_parts.append(part)
+
+    # amix all
+    n_in = len(delayed_parts)
+    inputs: list[str] = []
+    for p in delayed_parts:
+        inputs.extend(["-i", str(p)])
+    fc = (
+        "".join(f"[{i}:a]" for i in range(n_in))
+        + f"amix=inputs={n_in}:duration=first:normalize=0,"
+        f"aformat=sample_fmts=fltp:sample_rates={SR}:channel_layouts=stereo,"
+        f"alimiter=limit=0.92[aout]"
+    )
+    run(
+        [
+            "ffmpeg",
+            "-y",
+            *inputs,
+            "-filter_complex",
+            fc,
+            "-map",
+            "[aout]",
+            "-ar",
+            str(SR),
+            "-ac",
+            "2",
+            "-c:a",
+            "pcm_s16le",
+            str(output),
+        ]
     )
     return output
 
@@ -1072,6 +1225,7 @@ def concat_videos(
     join_intents: list[str] | None = None,
     transition_style: str = "fade",
     join_styles: list[str] | None = None,
+    join_use_ts: list[float] | None = None,
 ) -> dict[str, Any]:
     """Concatenate clips with optional per-join hard/soft/hold transitions."""
     if not parts:
@@ -1090,6 +1244,7 @@ def concat_videos(
             transition=style,
             join_intents=join_intents,
             join_styles=join_styles,
+            join_use_ts=join_use_ts,
         )
     except PolicyError as exc:
         raise RenderError(str(exc)) from exc
@@ -1350,6 +1505,35 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     if raw_gain is None:
         raw_gain = spec.get("vo_gain")
     vo_gain = float(raw_gain if raw_gain is not None else DEFAULT_VO_GAIN)
+    # Multi-track voice policy (nar vs 娇喘语助 vs native)
+    voice_policy: dict[str, Any] = {}
+    if resolve_voice_tracks is not None:
+        try:
+            voice_policy = resolve_voice_tracks(spec)
+        except Exception:
+            voice_policy = {}
+    if voice_policy.get("nar_gain") is not None:
+        try:
+            vo_gain = float(voice_policy["nar_gain"])
+        except (TypeError, ValueError):
+            pass
+    if voice_policy.get("native_audio_volume") is not None:
+        try:
+            native_audio_volume = float(voice_policy["native_audio_volume"])
+        except (TypeError, ValueError):
+            pass
+    raw_color_gain = getattr(args, "vocal_color_gain", None)
+    if raw_color_gain is None:
+        raw_color_gain = voice_policy.get("vocal_color_gain")
+    if raw_color_gain is None:
+        raw_color_gain = spec.get("vocal_color_gain")
+    try:
+        film_vocal_color_gain = float(
+            raw_color_gain if raw_color_gain is not None else DEFAULT_VOCAL_COLOR_GAIN
+        )
+    except (TypeError, ValueError):
+        film_vocal_color_gain = DEFAULT_VOCAL_COLOR_GAIN
+    film_vocal_color_gain = max(0.0, min(1.5, film_vocal_color_gain))
     # 色气 / storyteller → seductive R&B by default；音乐必须远低于旁白
     mood = args.music_mood or ("rnb" if vo_mode in ("storyteller", "hybrid") else "playful")
     lipsync_mode = (getattr(args, "lipsync", None) or "off").lower()
@@ -1447,6 +1631,50 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             f"  tts backend={tts_meta.get('backend')} voice={tts_meta.get('voice') or shot_voice} "
             f"dur={dur:.2f}s"
         )
+        # Independent 娇喘/语助词 stem (not mixed into nar text)
+        color_wav: Path | None = None
+        color_dur = 0.0
+        color_meta: dict[str, Any] | None = None
+        color_payload: dict[str, Any] = {}
+        if resolve_shot_vocal_color is not None and voice_policy.get("enabled", False):
+            try:
+                color_payload = resolve_shot_vocal_color(
+                    shot, policy=voice_policy, seed=i * 17
+                )
+            except Exception:
+                color_payload = {}
+        color_text = str(color_payload.get("text") or "").strip()
+        color_gain = float(color_payload.get("gain") or film_vocal_color_gain or 0.0)
+        if color_text and color_gain > 0 and film_vocal_color_gain > 0:
+            try:
+                c_mp3 = safe_output_path(
+                    audio_dir,
+                    f"{sid}_color.mp3",
+                    suffixes={".mp3"},
+                    field=f"vocal color output for {sid}",
+                )
+                safe_output_path(
+                    audio_dir,
+                    f"{sid}_color.wav",
+                    suffixes={".wav"},
+                    field=f"vocal color wav for {sid}",
+                )
+                log(f"  vocal_color TTS {sid}: {color_text[:24]}...")
+                color_wav, color_dur, color_meta = tts_to_wav(
+                    color_text,
+                    c_mp3,
+                    shot_voice,
+                    rate=str(color_payload.get("rate") or "+0%"),
+                    volume=vo_tts_vol,
+                    pitch=str(color_payload.get("pitch") or "+2Hz"),
+                    backend=None if tts_backend == "auto" else str(tts_backend),
+                    allow_network_fallback=tts_allow_network_fallback,
+                )
+                log(f"  vocal_color dur={color_dur:.2f}s gain={color_gain:.2f}")
+            except Exception as exc:  # noqa: BLE001 — color is soft layer
+                log(f"  vocal_color skip {sid}: {exc}")
+                color_wav = None
+                color_dur = 0.0
         # shorter tail — snappier cut to next shot
         pad = float(getattr(args, "vo_pad", 0.12) or 0.12)
         target = dur + pad
@@ -1540,6 +1768,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 "vo_atempo_plan": vo_atempo_plan,
                 "out_point_sec": out_point,
                 "in_point_sec": in_point,
+                "color_wav": color_wav,
+                "color_dur": color_dur,
+                "color_text": color_text,
+                "color_gain": color_gain if color_wav else 0.0,
+                "color_offset_sec": color_payload.get("offset_sec", -1.0),
+                "color_tts": color_meta,
+                "color_source": color_payload.get("source"),
             }
         )
 
@@ -1714,6 +1949,29 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
     except PolicyError as exc:
         raise RenderError(str(exc)) from exc
+    # Per-join transition duration from edit_strategy (voice-coupled rhythm)
+    full_join_use_ts: list[float] | None = None
+    raw_join_secs = spec.get("join_transition_secs")
+    if isinstance(raw_join_secs, list) and len(raw_join_secs) == len(shot_audio) - 1:
+        try:
+            story_secs = [max(0.0, min(0.8, float(x))) for x in raw_join_secs]
+            edge = float(transition_sec) if transition_sec > 0 else 0.05
+            # title→s0, s0→s1…, sN→end  (len = n_shots + 1 when both pads present)
+            n_parts = len(parts)
+            n_joins = max(0, n_parts - 1)
+            if n_joins == len(shot_audio) + 1:
+                full_join_use_ts = [edge] + story_secs + [edge]
+            elif n_joins == len(shot_audio):
+                # missing one pad
+                full_join_use_ts = [edge] + story_secs
+            elif n_joins == len(shot_audio) - 1:
+                full_join_use_ts = story_secs
+            else:
+                full_join_use_ts = None
+            if full_join_use_ts is not None and len(full_join_use_ts) != n_joins:
+                full_join_use_ts = None
+        except (TypeError, ValueError):
+            full_join_use_ts = None
     xfade_plan = concat_videos(
         parts,
         silent,
@@ -1722,10 +1980,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         join_intents=full_join_intents,
         transition_style=transition_style,
         join_styles=full_join_styles,
+        join_use_ts=full_join_use_ts,
     )
     log(
         f"video concat method={xfade_plan.get('method')} transition_sec={transition_sec} "
         f"style={transition_style} styles={xfade_plan.get('join_styles')} "
+        f"join_use_ts={full_join_use_ts} "
         f"enabled={xfade_plan.get('enabled')} joins={full_join_intents}"
     )
 
@@ -1803,6 +2063,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "total_duration": float(total_dur),
         "event_count": 0,
         "bed_applied": True,
+        "voice_tracks": {
+            "nar_gain": vo_gain,
+            "vocal_color_gain": film_vocal_color_gain,
+            "native_audio_volume": native_audio_volume,
+            "policy": voice_policy,
+        },
     }
     # Spotting map shared by procedural + user music (mute/duck/sfx on bed)
     spot_tl = film_segment_timeline(
@@ -1828,6 +2094,57 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         flat.get(str(item["id"]), {"id": item["id"]}) for item in shot_audio
     ]
     sound_plan = inject_auto_sfx_if_empty(sound_plan, shot_dicts)
+    # sound_cues on shots → extra sfx_accent events (声景轨，不进旁白)
+    if sound_cues_to_sfx_kinds is not None and isinstance(sound_plan, dict):
+        cue_events: list[dict[str, Any]] = list(sound_plan.get("events") or [])
+        added = 0
+        for sh in shot_dicts:
+            if not isinstance(sh, dict):
+                continue
+            kinds = sh.get("_sfx_kinds_from_cues") or sound_cues_to_sfx_kinds(
+                sh.get("sound_cues") or []
+            )
+            for kind in list(kinds)[:2]:
+                cue_events.append(
+                    {
+                        "type": "sfx_accent",
+                        "shot_id": sh.get("id"),
+                        "kind": kind,
+                        "source": "sound_cues",
+                    }
+                )
+                added += 1
+        if added:
+            sound_plan = {**sound_plan, "events": cue_events}
+            notes = list(sound_plan.get("_notes") or [])
+            notes.append(f"sound_cues: injected {added} sfx_accent(s)")
+            sound_plan["_notes"] = notes
+
+    # vocal_color timeline stem (after shot_starts known); default off → None
+    color_track = build_vocal_color_track(
+        shot_audio,
+        shot_start_map=shot_start_map,
+        total_duration=float(total_dur),
+        work=work,
+        audio_dir=audio_dir,
+    )
+    if color_track is not None:
+        mix_spotting["vocal_color_track"] = str(color_track)
+        mix_spotting["vocal_color_shots"] = [
+            {
+                "id": it.get("id"),
+                "text": it.get("color_text"),
+                "gain": it.get("color_gain"),
+                "source": it.get("color_source"),
+            }
+            for it in shot_audio
+            if it.get("color_wav")
+        ]
+        log(f"vocal_color track: {len(mix_spotting['vocal_color_shots'])} stem(s)")
+    else:
+        mix_spotting["vocal_color_track"] = None
+        mix_spotting["vocal_color_shots"] = []
+        log("vocal_color track: off (nar+BGM dominate; opt-in via voice_tracks.enabled)")
 
     def _apply_spotting_to_float_mono(float_mono: np.ndarray) -> tuple[np.ndarray, dict[str, Any]]:
         """mute/duck + sfx_accent overlay on float mono bed."""
@@ -1946,7 +2263,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         with wave.open(str(mono_tmp), "rb") as handle:
             frames = handle.readframes(handle.getnframes())
             user_i16 = np.frombuffer(frames, dtype=np.int16).astype(np.float64) / 32767.0
-        user_f, mix_spotting = _apply_spotting_to_float_mono(user_i16)
+        user_f, spotting_only = _apply_spotting_to_float_mono(user_i16)
+        # keep multi-track voice metadata (not wiped by bed spotting)
+        mix_spotting = {**mix_spotting, **spotting_only}
         mix_spotting["mood"] = (sound_plan or {}).get("mood", mood) if sound_plan else mood
         mix_spotting["bed_source"] = str(music_resolved.get("source") or "user_music_file")
         mix_spotting["music_seed"] = music_seed
@@ -1984,14 +2303,27 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 or (spec.get("_audio_routing") or {}).get("mean_bed_gain")
                 or 1.0
             )
-            gen_amp = max(0.06, min(0.35, gen_amp * bg_hint))
         except (TypeError, ValueError):
             bg_hint = 1.0
+        s_starts = []
+        acc = title_dur
+        for item in shot_audio:
+            s_starts.append(acc)
+            acc += float(item.get("target") or 6.0)
+
         samples = procedural_music(
-            total_dur, emo=1.1, curve="swell", amp=gen_amp, mood=mood, seed=music_seed
+            total_dur, 
+            emo=1.1, 
+            curve="swell", 
+            amp=gen_amp, 
+            mood=mood, 
+            seed=music_seed,
+            shot_starts=s_starts,
+            events=(sound_plan or {}).get("events")
         )
         float_bed = samples.astype(np.float64) / 32767.0
-        float_bed, mix_spotting = _apply_spotting_to_float_mono(float_bed)
+        float_bed, spotting_only = _apply_spotting_to_float_mono(float_bed)
+        mix_spotting = {**mix_spotting, **spotting_only}
         mix_spotting["bed_source"] = "procedural"
         mix_spotting["music_seed"] = music_seed
         mix_spotting["bed_gain_hint"] = bg_hint
@@ -2069,7 +2401,36 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     mix_spotting["sidechain"] = sidechain
     sc_frag = sidechain_filter_fragment(sidechain)
     filters_help = run(["ffmpeg", "-filters"], check=False).stdout
-    if "sidechaincompress" in filters_help:
+    # Default 3-input: 0=nar 1=bgm 2=native. Color (娇喘) only when stems exist.
+    use_color = color_track is not None and Path(str(color_track)).is_file()
+    color_in_gain = 1.0  # per-stem gain already applied in build_vocal_color_track
+    if use_color and "sidechaincompress" in filters_help:
+        fc = (
+            f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];"
+            f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[mus];"
+            f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[native];"
+            f"[3:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[color];"
+            f"[mus][native]amix=inputs=2:duration=first:normalize=0[bed];"
+            f"[bed][narr]{sc_frag}[ducked];"
+            f"[narr][ducked][color]amix=inputs=3:duration=first:normalize=0,"
+            f"aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
+            f"alimiter=limit=0.95[aout]"
+        )
+        mix_spotting["sidechain_applied"] = True
+        mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "vocal_color"]
+    elif use_color:
+        fc = (
+            f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];"
+            f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[mus];"
+            f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[native];"
+            f"[3:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[color];"
+            f"[narr][mus][native][color]amix=inputs=4:duration=first:normalize=0,"
+            f"aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
+            f"alimiter=limit=0.95[aout]"
+        )
+        mix_spotting["sidechain_applied"] = False
+        mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "vocal_color"]
+    elif "sidechaincompress" in filters_help:
         fc = (
             f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];"
             f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[mus];"
@@ -2081,6 +2442,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             f"alimiter=limit=0.95[aout]"
         )
         mix_spotting["sidechain_applied"] = True
+        mix_spotting["mix_inputs"] = ["narration", "bgm", "native"]
     else:
         fc = (
             f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];"
@@ -2091,6 +2453,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             f"alimiter=limit=0.95[aout]"
         )
         mix_spotting["sidechain_applied"] = False
+        mix_spotting["mix_inputs"] = ["narration", "bgm", "native"]
 
     try:
         mix_report_path = safe_output_path(
@@ -2104,16 +2467,20 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     except SecurityPolicyError as exc:
         raise RenderError(str(exc)) from exc
 
-    run(
+    mix_cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(voice_cat),
+        "-i",
+        str(music_path),
+        "-i",
+        str(native_track),
+    ]
+    if use_color:
+        mix_cmd.extend(["-i", str(color_track)])
+    mix_cmd.extend(
         [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(voice_cat),
-            "-i",
-            str(music_path),
-            "-i",
-            str(native_track),
             "-filter_complex",
             fc,
             "-map",
@@ -2127,6 +2494,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             str(mixed),
         ]
     )
+    run(mix_cmd)
 
     # Phase F/G: loudness probe + optional/auto loudnorm toward shortform target
     try:
@@ -2446,6 +2814,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--vo-rate", default=None, help='TTS rate e.g. "-5%%" (edge) / maps to Fish speed')
     p.add_argument("--vo-pitch", default=None, help='TTS pitch e.g. "-1Hz" (edge only)')
     p.add_argument("--vo-gain", type=float, default=None, help="Narration mix gain (default 1.15)")
+    p.add_argument(
+        "--vocal-color-gain",
+        type=float,
+        default=None,
+        help="Independent 娇喘/语助词 track mix gain (0..1.5; default 0 / off; opt-in with voice_tracks.enabled)",
+    )
     p.add_argument("--title")
     p.add_argument("--end-title")
     p.add_argument("--title-dur", type=float, default=1.5)
@@ -2485,7 +2859,7 @@ def main(argv: list[str] | None = None) -> int:
         "--music-template",
         default=None,
         choices=["off", "auto", "on"],
-        help="Local BGM: auto=use audio/bgm.wav or audio/templates/{mood}.* if present (default); on=require; off=procedural only",
+        help="Local BGM: auto=use audio/bgm.wav or audio/templates/{mood}.* if present; on=require; off=procedural",
     )
     p.add_argument(
         "--music-volume",
@@ -2514,14 +2888,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--sidechain-threshold",
         type=float,
-        default=None,
-        help="VO→BGM sidechain threshold (default: rnb 0.07 / other 0.08)",
+        help="VO→BGM sidechain threshold (default: rnb 0.065 / other 0.08)",
     )
     p.add_argument(
         "--sidechain-ratio",
         type=float,
-        default=None,
-        help="VO→BGM sidechain ratio (default: rnb 3.2 / other 3.5)",
+        help="VO→BGM sidechain ratio (default: rnb 3.8 / other 3.5)",
     )
     p.add_argument(
         "--sidechain-attack",
@@ -2532,8 +2904,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--sidechain-release",
         type=float,
-        default=None,
-        help="Sidechain release ms — higher = BGM returns slower in VO pauses (rnb default 720)",
+        help="Sidechain release ms — higher = BGM returns slower in VO pauses (rnb default 880)",
     )
     p.add_argument(
         "--loudnorm",

@@ -693,6 +693,142 @@ def _stage_hf_media(
     return f"media/{dest_name}"
 
 
+def build_title_sequence_html(
+    package: dict[str, Any],
+    title_sequence: dict[str, Any],
+    preset: str,
+    styles: dict[str, str],
+) -> str | None:
+    if not title_sequence:
+        return None
+    mode = str(title_sequence.get("mode") or "none").strip().lower()
+    if mode == "none":
+        return None
+    title = str(package.get("title") or "")
+    safe_title = html.escape(title)
+    subtitle = html.escape(str(title_sequence.get("subtitle") or ""))
+    tagline = html.escape(str(title_sequence.get("tagline") or ""))
+    show_motifs = bool(title_sequence.get("show_motifs", True))
+    di = package.get("director_intent") if isinstance(package.get("director_intent"), dict) else {}
+    motifs_raw = di.get("visual_motifs") or []
+    motifs: list[str] = []
+    if isinstance(motifs_raw, list) and show_motifs:
+        for m in motifs_raw:
+            s = str(m).strip()
+            if s:
+                motifs.append(s)
+
+    motif_tags = ""
+    if motifs:
+        tags = "".join(
+            f'<span class="motif-tag">{html.escape(t)}</span>' for t in motifs[:8]
+        )
+        motif_tags = f'<div class="motif-cloud">{tags}</div>'
+
+    subtitle_block = ""
+    if subtitle:
+        subtitle_block = f'<p class="ts-subtitle">{subtitle}</p>'
+    if tagline:
+        subtitle_block += f'<p class="ts-tagline">{tagline}</p>'
+
+    inner = f"""<h1 class="ts-title">{safe_title}</h1>{subtitle_block}{motif_tags}"""
+    return f"""    <section id="title-sequence" class="clip overlay title-sequence" data-start="0" data-duration="3" data-track-index="2" data-preset="{html.escape(preset)}">
+      <div class="ts-backdrop">
+        <div class="ts-content">{inner}</div>
+      </div>
+    </section>"""
+
+
+def build_end_roll_html(
+    package: dict[str, Any],
+    end_roll: dict[str, Any],
+    preset: str,
+    styles: dict[str, str],
+    credits: dict[str, Any],
+) -> str | None:
+    if not end_roll:
+        return None
+    mode = str(end_roll.get("mode") or "none").strip().lower()
+    if mode == "none":
+        return None
+    if mode == "cast_only":
+        sections = [("Cast", credits.get("cast") or [])]
+    elif mode == "full":
+        sections = [
+            (str(end_roll.get("cast_heading") or "Cast"), credits.get("cast") or []),
+            (str(end_roll.get("crew_heading") or "Crew"), credits.get("crew") or []),
+        ]
+        if end_roll.get("show_shot_list") and credits.get("shots"):
+            shot_lines = "".join(
+                f'<div class="er-shot"><span class="er-shot-id">{html.escape(str(s.get("id") or ""))}</span>'
+                f'<span class="er-shot-title">{html.escape(str(s.get("title") or ""))}</span></div>'
+                for s in credits.get("shots") or []
+            )
+            sections.append(("Shots", [{"name": shot_lines, "role": ""}]))
+    else:
+        sections = [
+            (str(end_roll.get("cast_heading") or "Cast"), credits.get("cast") or []),
+            (str(end_roll.get("crew_heading") or "Crew"), credits.get("crew") or []),
+        ]
+        if end_roll.get("show_shot_list") and credits.get("shots"):
+            shot_lines = "".join(
+                f'<div class="er-shot"><span class="er-shot-id">{html.escape(str(s.get("id") or ""))}</span>'
+                f'<span class="er-shot-title">{html.escape(str(s.get("title") or ""))}</span></div>'
+                for s in credits.get("shots") or []
+            )
+            sections.append(("Shots", [{"name": shot_lines, "role": ""}]))
+
+    scroll_dur = float(end_roll.get("scroll_duration_sec") or 5)
+    scroll_dur = max(2.0, min(12.0, scroll_dur))
+
+    section_blocks = []
+    for heading, items in sections:
+        if not items:
+            continue
+        lines = "".join(
+            f'<div class="er-line"><span class="er-name">{html.escape(str(i.get("name") or ""))}</span>'
+            f'<span class="er-role">{html.escape(str(i.get("role") or ""))}</span></div>'
+            for i in items
+        )
+        section_blocks.append(f'<div class="er-section"><h3>{html.escape(heading)}</h3>{lines}</div>')
+
+    inner = "".join(section_blocks)
+    return f"""    <section id="end-roll" class="clip overlay end-roll" data-start="{max(0.0, float(package['film_timeline'].get('output_duration') or 0) - scroll_dur):.3f}" data-duration="{scroll_dur:.3f}" data-track-index="6">
+      <div class="er-track"><div class="er-inner">{inner}</div></div>
+    </section>"""
+
+
+def build_title_sequence_tsx(
+    package: dict[str, Any], title_sequence: dict[str, Any], preset: str
+) -> str | None:
+    """Remotion title sequence component source.
+
+    Returns None for mode=none / empty (Film.tsx uses its own title card).
+    Fancy TSX title sequences deferred — HyperFrames HTML path is primary.
+    """
+    if not title_sequence:
+        return None
+    mode = str(title_sequence.get("mode") or "none").strip().lower()
+    if mode == "none":
+        return None
+    # Opt-in fancy title: fall back to Film.tsx simple card until brace-safe generator lands
+    return None
+
+
+def build_end_roll_tsx(end_roll: dict[str, Any], credits: dict[str, Any]) -> str | None:
+    """Remotion end-roll component source. See build_title_sequence_tsx."""
+    if not end_roll:
+        return None
+    mode = str(end_roll.get("mode") or "none").strip().lower()
+    if mode == "none":
+        return None
+    return None
+
+
+def escape(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
 def write_hyperframes(
     compose_root: Path,
     package: dict[str, Any],
@@ -802,19 +938,32 @@ def write_hyperframes(
     safe_title = html.escape(title)
     title_show = min(title_dur, max(0.4, total * 0.25))
     end_show = min(end_dur, max(0.4, total * 0.2))
-    overlay_parts.append(
-        f'    <section id="title-card" class="clip overlay" data-start="0" '
-        f'data-duration="{title_show:.3f}" data-track-index="2" '
-        f'data-preset="{html.escape(resolved_preset)}">'
-        f'<div class="card"><h1 id="title-text">{safe_title}</h1></div></section>'
-    )
-    end_start = max(0.0, total - end_show)
-    end_label = html.escape(styles["end_label"])
-    overlay_parts.append(
-        f'    <section id="end-card" class="clip overlay" data-start="{end_start:.3f}" '
-        f'data-duration="{end_show:.3f}" data-track-index="6">'
-        f'<div class="card"><p id="end-text">{end_label}</p></div></section>'
-    )
+    credits = package.get("credits") or {}
+    title_sequence = package.get("title_sequence") or {}
+    end_roll = package.get("end_roll") or {}
+
+    title_seq_html = build_title_sequence_html(package, title_sequence, resolved_preset, styles)
+    end_roll_html = build_end_roll_html(package, end_roll, resolved_preset, styles, credits)
+
+    if title_seq_html:
+        overlay_parts.append(title_seq_html)
+    else:
+        overlay_parts.append(
+            f'    <section id="title-card" class="clip overlay" data-start="0" '
+            f'data-duration="{title_show:.3f}" data-track-index="2" '
+            f'data-preset="{html.escape(resolved_preset)}">'
+            f'<div class="card"><h1 id="title-text">{safe_title}</h1></div></section>'
+        )
+    if end_roll_html:
+        overlay_parts.append(end_roll_html)
+    else:
+        end_start = max(0.0, total - end_show)
+        end_label = html.escape(styles["end_label"])
+        overlay_parts.append(
+            f'    <section id="end-card" class="clip overlay" data-start="{end_start:.3f}" '
+            f'data-duration="{end_show:.3f}" data-track-index="6">'
+            f'<div class="card"><p id="end-text">{end_label}</p></div></section>'
+        )
 
     # Captions: own track each; underlay keeps absolute times (offset 0)
     # Dual zh_en → two-line caption stack (zh primary, en secondary)
@@ -958,6 +1107,118 @@ def write_hyperframes(
         opacity: 0.88;
         letter-spacing: 0.02em;
       }}
+      .title-sequence {{
+        background: transparent;
+      }}
+      .ts-backdrop {{
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: {styles["overlay_bg"]};
+        pointer-events: none;
+      }}
+      .ts-content {{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding: 24px;
+        text-align: center;
+      }}
+      .ts-title {{
+        margin: 0;
+        font-weight: 700;
+        letter-spacing: {styles["title_letter"]};
+        text-shadow: {styles["title_shadow"]};
+        font-size: {styles["title_size"]}px;
+        max-width: 92%;
+        white-space: nowrap;
+        line-height: 1.15;
+      }}
+      .ts-subtitle {{
+        margin: 0;
+        font-size: {max(22, int(width) // 22)}px;
+        opacity: 0.92;
+        text-shadow: 0 1px 10px rgba(0,0,0,0.55);
+      }}
+      .ts-tagline {{
+        margin: 0;
+        font-size: {max(16, int(width) // 30)}px;
+        opacity: 0.72;
+        text-shadow: 0 1px 8px rgba(0,0,0,0.50);
+      }}
+      .motif-cloud {{
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 6px;
+      }}
+      .motif-tag {{
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.10);
+        color: rgba(255,255,255,0.88);
+        font-size: {max(12, int(width) // 32)}px;
+        letter-spacing: 0.03em;
+      }}
+      .end-roll {{
+        background: transparent;
+      }}
+      .er-track {{
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }}
+      .er-inner {{
+        padding: 10% 7%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }}
+      .er-section h3 {{
+        margin: 0 0 8px;
+        font-size: {max(18, int(width) // 24)}px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.80);
+      }}
+      .er-line {{
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 5px 0;
+        width: 100%;
+        max-width: 92%;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+      }}
+      .er-name {{
+        color: rgba(255,255,255,0.92);
+        font-size: {max(16, int(width) // 28)}px;
+      }}
+      .er-role {{
+        color: rgba(255,255,255,0.56);
+        font-size: {max(14, int(width) // 30)}px;
+      }}
+      .er-shot {{
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 3px 0;
+        width: 100%;
+        max-width: 92%;
+      }}
+      .er-shot-id {{
+        color: rgba(255,255,255,0.60);
+        font-size: {max(12, int(width) // 32)}px;
+      }}
+      .er-shot-title {{
+        color: rgba(255,255,255,0.80);
+        font-size: {max(13, int(width) // 30)}px;
+      }}
     </style>
   </head>
   <body>
@@ -981,7 +1242,14 @@ def write_hyperframes(
       window.__timelines = window.__timelines || {{}};
       const tl = gsap.timeline({{ paused: true }});
       tl.from("#title-text", {{ y: {styles["title_y"]}, opacity: 0, duration: {styles["title_dur_anim"]}, ease: "power3.out" }}, 0.12);
+      tl.from(".ts-title", {{ y: 36, opacity: 0, duration: 0.70, ease: "power3.out" }}, 0.10);
+      tl.from(".ts-subtitle", {{ y: 20, opacity: 0, duration: 0.55, ease: "power2.out" }}, 0.35);
+      tl.from(".ts-tagline", {{ y: 14, opacity: 0, duration: 0.45, ease: "power2.out" }}, 0.55);
+      tl.from(".motif-tag", {{ scale: 0.6, opacity: 0, duration: 0.38, stagger: 0.06, ease: "back.out(1.4)" }}, 0.70);
       tl.from("#end-text", {{ y: 24, opacity: 0, duration: 0.45, ease: "power2.out" }}, {end_start + 0.1:.3f});
+      tl.from(".er-section", {{ y: 30, opacity: 0, duration: 0.50, stagger: 0.12, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.05:.3f});
+      tl.from(".er-line", {{ x: -12, opacity: 0, duration: 0.35, stagger: 0.04, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.20:.3f});
+      tl.from(".er-shot", {{ x: 10, opacity: 0, duration: 0.30, stagger: 0.03, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.28:.3f});
 {gsap_cap_block}
       window.__timelines["main"] = tl;
     </script>
@@ -1011,6 +1279,8 @@ def write_hyperframes(
             "compose_preset": resolved_preset,
             "caption_clock_offset": caption_clock_offset,
             "captions_placed": placed_captions,
+            "title_sequence": title_seq_html is not None,
+            "end_roll": end_roll_html is not None,
         },
     )
     write_text(
@@ -1275,95 +1545,114 @@ Config.setOverwriteOutput(true);
     )
 
     title_js = json.dumps(title)
+    title_sequence = package.get("title_sequence") or {}
+    end_roll = package.get("end_roll") or {}
+    credits = package.get("credits") or {}
+    has_title_seq = bool(title_sequence and any(k in title_sequence for k in ("subtitle", "tagline", "show_motifs", "style")))
+    has_end_roll = bool(end_roll and end_roll.get("mode") not in (None, "none"))
     composition_tsx = f"""/**
- * ai-film-grok → Remotion designed-post composition
- * Footage = approved Grok I2V (copied into public/ via media-copy-plan).
- * This file only adds title/end cards + captions — not a motion source.
- */
-import React from "react";
-import {{ AbsoluteFill, OffthreadVideo, Sequence, staticFile, useVideoConfig }} from "remotion";
-import type {{ Caption }} from "@remotion/captions";
-import compositionData from "../public/composition-data.json";
-import captions from "../public/captions.json";
+  * ai-film-grok → Remotion designed-post composition
+  * Footage = approved Grok I2V (copied into public/ via media-copy-plan).
+  * This file only adds title/end cards + captions — not a motion source.
+  */
+ import React from "react";
+ import {{ AbsoluteFill, OffthreadVideo, Sequence, staticFile, useVideoConfig }} from "remotion";
+ import type {{ Caption }} from "@remotion/captions";
+ import compositionData from "../public/composition-data.json";
+ import captions from "../public/captions.json";
+ {"import TitleSequence from './TitleSequence';" if has_title_seq else ""}
+ {"import EndRoll from './EndRoll';" if has_end_roll else ""}
 
-type Shot = {{
-  id: string;
-  fromFrame: number;
-  durationInFrames: number;
-  src: string;
-  nar: string;
-}};
+ type Shot = {{
+   id: string;
+   fromFrame: number;
+   durationInFrames: number;
+   src: string;
+   nar: string;
+ }};
 
-type RemotionMeta = {{
-  shots: Shot[];
-  underlaySrc?: string | null;
-  layout?: string;
-}};
+ type RemotionMeta = {{
+   shots: Shot[];
+   underlaySrc?: string | null;
+   layout?: string;
+ }};
 
-const rem = (compositionData as {{ remotion: RemotionMeta }}).remotion;
-const shots = rem.shots;
-const underlaySrc = rem.underlaySrc || null;
-const captionList = captions as Caption[];
-const captionBg = {json.dumps(cap_bg)};
-const captionBorder = {json.dumps(cap_border)};
-const overlayBg = {json.dumps(overlay_bg)};
+ const rem = (compositionData as {{ remotion: RemotionMeta }}).remotion;
+ const shots = rem.shots;
+ const underlaySrc = rem.underlaySrc || null;
+ const captionList = captions as Caption[];
+ const captionBg = {json.dumps(cap_bg)};
+ const captionBorder = {json.dumps(cap_border)};
+ const overlayBg = {json.dumps(overlay_bg)};
 
-export const Film: React.FC = () => {{
-  const {{ fps, width, height }} = useVideoConfig();
-  const titleFrames = Math.max(1, Math.round({title_dur} * fps));
-  const endFrames = Math.max(1, Math.round({end_dur} * fps));
-  const total = {duration_in_frames};
+ export const Film: React.FC = () => {{
+   const {{ fps, width, height }} = useVideoConfig();
+   const titleFrames = Math.max(1, Math.round({title_dur} * fps));
+   const endFrames = Math.max(1, Math.round({end_dur} * fps));
+   const total = {duration_in_frames};
 
-  return (
-    <AbsoluteFill style={{{{ backgroundColor: "#000", fontFamily: "system-ui, sans-serif" }}}}>
-      {{underlaySrc ? (
-        <AbsoluteFill>
-          <OffthreadVideo
-            src={{staticFile(underlaySrc)}}
-            style={{{{ width, height, objectFit: "cover" }}}}
-          />
-        </AbsoluteFill>
-      ) : (
-        shots.map((shot) => (
-          <Sequence key={{shot.id}} from={{shot.fromFrame}} durationInFrames={{shot.durationInFrames}}>
-            <AbsoluteFill>
-              <OffthreadVideo
-                src={{staticFile(shot.src)}}
-                style={{{{ width, height, objectFit: "cover" }}}}
-              />
-            </AbsoluteFill>
-          </Sequence>
-        ))
-      )}}
+   return (
+     <AbsoluteFill style={{{{ backgroundColor: "#000", fontFamily: "system-ui, sans-serif" }}}}>
+       {{underlaySrc ? (
+         <AbsoluteFill>
+           <OffthreadVideo
+             src={{staticFile(underlaySrc)}}
+             style={{{{ width, height, objectFit: "cover" }}}}
+           />
+         </AbsoluteFill>
+       ) : (
+         shots.map((shot) => (
+           <Sequence key={{shot.id}} from={{shot.fromFrame}} durationInFrames={{shot.durationInFrames}}>
+             <AbsoluteFill>
+               <OffthreadVideo
+                 src={{staticFile(shot.src)}}
+                 style={{{{ width, height, objectFit: "cover" }}}}
+               />
+             </AbsoluteFill>
+           </Sequence>
+         ))
+       )}}
 
-      <Sequence from={{0}} durationInFrames={{titleFrames}}>
-        <AbsoluteFill
-          style={{{{
-            justifyContent: "center",
-            alignItems: "center",
-            background: overlayBg,
-          }}}}
-        >
-          <h1
-            style={{{{
-              color: "white",
-              fontSize: Math.max(36, width / 14),
-              textAlign: "center",
-              padding: 24,
-            }}}}
-          >
-            {{{title_js}}}
-          </h1>
-        </AbsoluteFill>
-      </Sequence>
+       {{{str(has_title_seq).lower()} ? (
+         <Sequence from={{0}} durationInFrames={{titleFrames}}>
+           <TitleSequence />
+         </Sequence>
+       ) : (
+         <Sequence from={{0}} durationInFrames={{titleFrames}}>
+           <AbsoluteFill
+             style={{{{
+               justifyContent: "center",
+               alignItems: "center",
+               background: overlayBg,
+             }}}}
+           >
+             <h1
+               style={{{{
+                 color: "white",
+                 fontSize: Math.max(36, width / 14),
+                 textAlign: "center",
+                 padding: 24,
+               }}}}
+             >
+               {{{title_js}}}
+             </h1>
+           </AbsoluteFill>
+         </Sequence>
+       )}}
 
-      <Sequence from={{Math.max(0, total - endFrames)}} durationInFrames={{endFrames}}>
-        <AbsoluteFill style={{{{ justifyContent: "center", alignItems: "center" }}}}>
-          <p style={{{{ color: "white", fontSize: Math.max(28, width / 18) }}}}>完</p>
-        </AbsoluteFill>
-      </Sequence>
+       {{{str(has_end_roll).lower()} ? (
+         <Sequence from={{Math.max(0, total - endFrames)}} durationInFrames={{endFrames}}>
+           <EndRoll />
+         </Sequence>
+       ) : (
+         <Sequence from={{Math.max(0, total - endFrames)}} durationInFrames={{endFrames}}>
+           <AbsoluteFill style={{{{ justifyContent: "center", alignItems: "center" }}}}>
+             <p style={{{{ color: "white", fontSize: Math.max(28, width / 18) }}}}>完</p>
+           </AbsoluteFill>
+         </Sequence>
+       )}}
 
-      {{captionList.map((c, i) => {{
+       {{captionList.map((c, i) => {{
         // startMs already clock-shifted at export (caption_clock_offset applied)
         const from = Math.round((c.startMs / 1000) * fps);
         const dur = Math.max(1, Math.round(((c.endMs - c.startMs) / 1000) * fps));
@@ -1411,6 +1700,16 @@ export const filmMeta = {{
 }};
 """
     write_text(src_dir / "Film.tsx", composition_tsx)
+
+    if has_title_seq:
+        tsx_title = build_title_sequence_tsx(package, title_sequence, resolved_preset)
+        if tsx_title:
+            write_text(src_dir / "TitleSequence.tsx", tsx_title)
+
+    if has_end_roll:
+        tsx_end = build_end_roll_tsx(end_roll, credits)
+        if tsx_end:
+            write_text(src_dir / "EndRoll.tsx", tsx_end)
 
     write_text(
         src_dir / "Root.tsx",
@@ -1529,6 +1828,8 @@ def export_composition(
     force: bool = False,
     layout: str = "auto",
     compose_preset: str = "auto",
+    title_sequence: str | dict[str, Any] | None = None,
+    end_roll: str | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     engine = (engine or "both").strip().lower()
     if engine not in ENGINES:
@@ -1548,6 +1849,33 @@ def export_composition(
         title_dur=title_dur,
         caption_source=str(package.get("caption_source") or ""),
     )
+
+    if isinstance(title_sequence, str) and title_sequence.strip():
+        ts = (title_sequence or "auto").strip().lower()
+        if ts == "none":
+            package["title_sequence"] = {"mode": "none"}
+        elif ts == "auto":
+            package.pop("title_sequence", None)
+        else:
+            package["title_sequence"] = {"mode": ts}
+    elif isinstance(title_sequence, dict):
+        package["title_sequence"] = title_sequence
+
+    if isinstance(end_roll, str) and end_roll.strip():
+        er = (end_roll or "auto").strip().lower()
+        if er == "none":
+            package["end_roll"] = {"mode": "none"}
+        elif er == "auto":
+            package.pop("end_roll", None)
+        else:
+            package["end_roll"] = {"mode": er}
+    elif isinstance(end_roll, dict):
+        package["end_roll"] = end_roll
+
+    if package.get("title_sequence") or package.get("end_roll"):
+        spec_for_credits = read_json(root / "film-spec.json") if (root / "film-spec.json").is_file() else {}
+        manifest_for_credits = read_json(root / "manifest.json") if (root / "manifest.json").is_file() else {}
+        package["credits"] = derive_credits_from_spec(spec_for_credits, manifest_for_credits)
 
     try:
         compose_root = safe_workspace_directory(root, "compose", field="compose directory")
@@ -1588,6 +1916,9 @@ def export_composition(
         "caption_source": package["caption_source"],
         "layout": resolved_layout,
         "compose_preset": resolved_preset,
+        "title_sequence": package.get("title_sequence"),
+        "end_roll": package.get("end_roll"),
+        "credits": package.get("credits"),
         "post_policy": {
             "default_final": "ffmpeg render_final.py via aifilm final",
             "designed_final": "compose-render (HyperFrames check+render+audio+register)",
@@ -1658,10 +1989,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--compose-preset",
         default="auto",
         choices=list(COMPOSE_PRESETS),
-        help="Visual preset for titles/captions: auto|ecchi-rnb|minimal",
+        help="Visual preset for titles/captions: auto|cinematic|noir|playful|ecchi-rnb|minimal",
     )
     p.add_argument("--title-dur", type=float, default=1.5)
     p.add_argument("--end-dur", type=float, default=1.5)
+    p.add_argument(
+        "--title-sequence",
+        default=None,
+        choices=["auto", "none"],
+        help="Override film-spec title_sequence mode (auto=spec/default, none=suppress)",
+    )
+    p.add_argument(
+        "--end-roll",
+        default=None,
+        choices=["auto", "none", "cast_only", "full"],
+        help="Override film-spec end_roll mode (auto=spec/default, none=suppress)",
+    )
     p.add_argument("--force", action="store_true")
     return p
 
