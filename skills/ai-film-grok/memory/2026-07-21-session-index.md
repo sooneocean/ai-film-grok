@@ -20,7 +20,9 @@ Agent 开新片先扫本页 + [2026-07-20-session-index](2026-07-20-session-inde
 | **成人办事三条硬底** | [sex-hard-floors](2026-07-21-sex-hard-floors.md) | 性爱时长≥20% · 卸甲脱衣 · 旁白荤梗 |
 | 性爱时长 | [sex-duration-floor](../references/lessons-2026-07-21-sex-duration-floor.md) | act+climax duration 加权；`sex_floor_strict` |
 | 办事卸甲 | [sex-undress-ladder](../references/lessons-2026-07-21-sex-undress-ladder.md) | full→undressed/bare；禁铠甲完整跨坐 |
+| **卸装延续·不回穿** | 同上 · v1.4.2 | rank 单调；`apply_wardrobe_continuity`；`HEAT_WARDROBE_RE_DRESS` hard |
 | 旁白荤梗 | [sex-vo-spice](../references/lessons-2026-07-21-sex-vo-spice.md) | 每镜 nar 荤梗；act 办事动词；`sex_vo_strict` |
+| **声线默认 nar+BGM** | [voice-tracks](../references/voice-tracks.md) · v1.4.1 | `vocal_color` 娇喘轨默认关；成片旁白主导 |
 
 ## 开场（自动调配）
 
@@ -43,5 +45,14 @@ Audio:     audio_policy + audio_recipe（write-spec）
 Lipsync:   默认 off
 发色:      P1 hard
 runtime:   改 scripts 后 lock-runtime
-成人max:   性爱时长≥20% + 卸甲脱衣 + 旁白荤梗（三条 write-spec 默认 hard）
+成人max:   性爱时长≥20% + 卸甲脱衣(延续不回穿) + 旁白荤梗（三条 write-spec 默认 hard）
+声线:      nar + BGM 主导；vocal_color 默认关（opt-in）
+plugin:    ≥1.4.2（1.4.1 声线 / 1.4.2 卸装延续）
 ```
+- [2026-07-21-continuity-strategy.md] 首尾幀與連貫性優化策略 (Intra-scene continue, Inter-scene cut)
+- [2026-07-21-extreme-spice-strategy.md] 極限葷梗與大尺度敘事策略 (Hyper-sexualized premises, explicit VO, explicit action)
+
+## 本会话交付（van / Astra）
+
+- 成片桌面：`后座夜_旁白BGM.mp4`（~49.7s，无娇喘轨）
+- film root：`~/AI FILM SPACE/0721/astra-van-nighthaul`
