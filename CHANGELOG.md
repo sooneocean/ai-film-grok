@@ -17,7 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](
 
 ### CI
 
-- GitHub Actions: `validate-core` (must pass) + `test-full` (report-only while legacy doc tests catch up).
+- GitHub Actions: `validate-core` + `test-full` both required (full suite green on main).
 - Pinned deps via `skills/ai-film-grok/requirements.lock`.
 
 - Local secrets stay in `skills/ai-film-grok/config.env` (gitignored).

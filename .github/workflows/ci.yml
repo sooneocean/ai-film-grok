@@ -60,11 +60,10 @@ jobs:
             tests/test_next_actions.py \
             tests/test_production_gates.py
 
-  # Full suite: report debt; does not block packaging gate while legacy tests catch up
+  # Full suite: hard gate once green on main
   test-full:
     runs-on: ubuntu-latest
     needs: validate-core
-    continue-on-error: true
     defaults:
       run:
         shell: bash
