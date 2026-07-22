@@ -322,3 +322,14 @@ Private skill for team use unless otherwise stated.
 - **Grok Imagine Video 1.5** — 关键帧驱动的真实镜头运动（image-to-video）  
 
 本地侧负责导演规格、一致性门禁、队列编排、音画合成与验收——让你把算力花在「拍片」，而不是重复踩坑。
+
+<!-- BEGIN GENERATED: project-status -->
+### 当前项目状态（自动同步）
+
+- 插件版本：`1.6.0`
+- Skill Registry：`21/24` 项标记为 `implemented`
+- CLI 脚本：`60` 个
+- pytest 文件：`68` 个
+- 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
+- Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
+<!-- END GENERATED: project-status -->

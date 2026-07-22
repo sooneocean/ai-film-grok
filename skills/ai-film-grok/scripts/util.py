@@ -1,6 +1,8 @@
 """Shared I/O and general-purpose utilities for the ai-film-grok pipeline."""
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -26,10 +28,13 @@ def write_json(path: Path, data: Any) -> None:
     so Unicode characters are written verbatim.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", delete=False
+    ) as handle:
+        handle.write(payload)
+        temporary = Path(handle.name)
+    os.replace(temporary, path)
 
 
 def ensure_dir(path: Path) -> Path:

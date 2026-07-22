@@ -258,7 +258,7 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 
 中文 **edge 默认**（零依赖、可复现）。**质量档**（不改默认）：SuperGrok → **`grok`**（OAuth TTS + speech tags，`--tts-backend grok`）；本机克隆 → `voicebox`；中文最高自然度本地 → **CosyVoice 2** `external`；情感精修 → MiniMax。场景表见 [voices.md](references/voices.md) · [grok-oauth.md](references/grok-oauth.md)。**失败 opt-in 兜底**：`AIFILM_TTS_VOICEBOX_FALLBACK=1`（不静默换声）。有回执则 vo_pacing **优先 measured**。混音在 final plate（sidechain / loudnorm / auto_sfx）。
 
-**BGM 抗重复（定稿）**：**听感兜底** = 纯乐器曲库池 `assets/bgm/rnb/*`（≥3 首 + seed 轮换）；**工程硬兜底** = 程序 v3 multi-style（`--music-seed` / `audio_policy.music_seed`）。ACE-Step/`[inst]` 等只**离线灌库**；HeartMuLa 不当默认 BGM。见 [bgm-generation.md](references/bgm-generation.md)。
+**BGM 抗重复（定稿）**：当前仓库**不附带**版权曲；已验证授权的纯乐器曲才可放 `assets/bgm/rnb/*`（每首须 `.license.txt`，≥3 首才轮换）。在曲库为空时，**工程默认** = 程序 v3 multi-style（`--music-seed` / `audio_policy.music_seed`）。ACE-Step/`[inst]` 等只**离线灌库**；HeartMuLa 不当默认 BGM。见 [bgm-generation.md](references/bgm-generation.md)。
 
 **场景自适应声轨**：`write-spec` 按 beat 写每镜 `audio_recipe`；片级 `audio_policy`（默认不自动唱）。见 [audio-recipe.md](references/audio-recipe.md) · `audio-plan`。  
 **声线默认**：**旁白 `nar` + BGM** 主导；`vocal_color` 娇喘独立轨 **默认关闭**（鸡肋）。`tone_tags` 仍可进画面 prompt；`sound_cues` 仍可进 SFX。见 [voice-tracks.md](references/voice-tracks.md)。  
@@ -288,6 +288,8 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 ```
 
 `final` 技术成功 ≠ `final_complete`。fail → `director-notes`。
+
+**v1.6 审片证据**：新项目在 `register-clip --status approved` 前须先跑 `review-shot`；它会抽首/中/末帧、生成联系表并要求五维 1–5 分与时间点。`review-final` 另须七维 `--screening-evidence`。失败重拍单只能显式 resolve，之后的全片 pass 不会自动抹除。
 
 **完整环**：Define/Structure（Lens）→ Visualize（lock）→ Generate → Select（register）→ Edit（Editor’s Cut · [editor-cut-pass.md](references/editor-cut-pass.md)）→ final(hyperframes) → review → export。
 

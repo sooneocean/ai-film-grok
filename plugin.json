@@ -1,6 +1,6 @@
 {
   "name": "ai-film-grok",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Grok Build AI 短片/漫剧成片管线：Idea→Verified 八环 dispatch + Drama Graph + Skill Registry + Asset/State 一致性 + Imagine I2V + edge TTS + HyperFrames/FFmpeg。触发：AI 电影、漫剧、Grok Imagine、dispatch、成片、/ai-film-grok、/aifilm。",
   "author": {
     "name": "dex",

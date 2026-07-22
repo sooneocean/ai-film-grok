@@ -18,6 +18,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import aifilm_grok  # noqa: E402
 from media_qa import analyze_media  # noqa: E402
+from shot_review import create_shot_review  # noqa: E402
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg required")
@@ -122,7 +123,36 @@ class DeliveryGateTests(unittest.TestCase):
             "review_note": "Identity, wardrobe, motion, and first frame checked.",
         }
         values.update(overrides)
+        source = Path(str(values["source"]))
+        review = create_shot_review(
+            self.root,
+            shot_id="shot01",
+            source=source,
+            reviewer="director",
+            notes="完整观看，身份、状态、构图、运动和叙事功能均已核对。",
+            scores={"identity": 4, "continuity": 4, "composition": 4, "motion": 4, "narrative": 4},
+            evidence_values=[
+                "identity@0.0:face matches cast",
+                "continuity@0.3:wardrobe remains stable",
+                "composition@0.6:subject stays readable",
+                "motion@1.0:movement continues",
+                "narrative@1.5:reaction completes the beat",
+            ],
+            approve=True,
+        )
+        values["review_receipt"] = review["path"]
         return argparse.Namespace(**values)
+
+    def screening_args(self) -> list[str]:
+        return [
+            "--screening-evidence", "identity@0.0:cast remains consistent",
+            "--screening-evidence", "style@0.1:style holds",
+            "--screening-evidence", "motion@0.3:motion remains active",
+            "--screening-evidence", "escalation@0.5:turn lands",
+            "--screening-evidence", "audio@0.7:VO and BGM clear",
+            "--screening-evidence", "subs@0.9:subtitles readable",
+            "--screening-evidence", "dead_air@1.1:no dead air",
+        ]
 
     def test_approved_registration_refuses_missing_manual_review_evidence(self) -> None:
         for key, value in (
@@ -202,6 +232,7 @@ class DeliveryGateTests(unittest.TestCase):
                     "pass",
                     "--score-dead-air",
                     "pass",
+                    *self.screening_args(),
                 ]
             )
         self.assertEqual(rc, 0, output.getvalue())
@@ -272,6 +303,7 @@ class DeliveryGateTests(unittest.TestCase):
                     "fail",
                     "--reshoot-shots",
                     "shot01",
+                    *self.screening_args(),
                 ]
             )
         self.assertEqual(rc2, 2)

@@ -2,15 +2,6 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-
-if [ -n "${AIFILM_PYTHON:-}" ] && [ -x "${AIFILM_PYTHON}" ]; then
-  PYTHON=${AIFILM_PYTHON}
-elif command -v pyenv >/dev/null 2>&1; then
-  PYTHON=$(pyenv which python3)
-elif [ -x "${HOME}/.pyenv/versions/3.11.15/bin/python3" ]; then
-  PYTHON=${HOME}/.pyenv/versions/3.11.15/bin/python3
-else
-  PYTHON=$(command -v python3)
-fi
+PYTHON=$("$SCRIPT_DIR/runtime-python")
 
 exec "$PYTHON" "$SCRIPT_DIR/aifilm_grok.py" "$@"

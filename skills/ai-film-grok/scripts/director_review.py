@@ -64,6 +64,28 @@ def normalize_score_value(value: object, *, field: str) -> bool:
     )
 
 
+def parse_timestamp_evidence(values: list[str], *, required: tuple[str, ...], duration_sec: float) -> dict[str, dict[str, Any]]:
+    """Parse repeatable ``dimension@seconds:note`` evidence without accepting claims alone."""
+    out: dict[str, dict[str, Any]] = {}
+    for raw in values:
+        try:
+            dim_part, rest = str(raw).split("@", 1)
+            time_part, note = rest.split(":", 1)
+            dim = dim_part.strip().lower()
+            timestamp = float(time_part.strip())
+        except (TypeError, ValueError):
+            raise DirectorReviewError("screening evidence must use dimension@seconds:note") from None
+        if dim not in required:
+            raise DirectorReviewError(f"unknown screening evidence dimension: {dim}")
+        if timestamp < 0 or timestamp > duration_sec or not note.strip() or dim in out:
+            raise DirectorReviewError(f"invalid screening evidence for {dim}")
+        out[dim] = {"timestamp_sec": round(timestamp, 3), "note": note.strip()}
+    missing = [dim for dim in required if dim not in out]
+    if missing:
+        raise DirectorReviewError("screening evidence missing dimensions: " + ", ".join(missing))
+    return out
+
+
 def build_scorecard_from_mapping(raw: dict[str, Any]) -> dict[str, bool]:
     """Build scorecard from a dict of dimension → pass/fail."""
     if not isinstance(raw, dict):

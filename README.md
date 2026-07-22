@@ -191,7 +191,7 @@ flowchart TB
 
   subgraph VOI["2 · 语音层 · 可插拔"]
     TTS["TTS 默认 edge<br/>+ voicebox / grok / minimax / fish / external"]
-    BGM["BGM 默认 rnb 池<br/>+ music-seed 程序化兜底 / 用户文件"]
+    BGM["BGM 默认程序化 rnb<br/>+ 用户提供的已授权曲库"]
     LIP["Lipsync 默认 off<br/>+ MuseTalk / Wav2Lip / FRW lipsync"]
   end
 
@@ -300,8 +300,8 @@ AIFILM_TTS_BACKEND=edge          # 推荐中文成片
 
 | 插槽 | 默认 | 可切换 | 说明 |
 |------|------|--------|------|
-| 听感池 | `assets/bgm/rnb/*` 纯乐器 | `playful` / `warm` / `dark` | 色气默认 **rnb**；`dark` 仅恐怖 |
-| 工程兜底 | 程序化 multi-style v3 | `--music-seed` / `audio_policy.music_seed` | 永远有床轨 |
+| 听感池 | 用户提供的 `assets/bgm/<mood>/*` 纯乐器 | `playful` / `warm` / `dark` | 当前仓库未附带曲目；每首须有 `.license.txt` |
+| 工程默认 | 程序化 multi-style v3 | `--music-seed` / `audio_policy.music_seed` | 当前无已授权本地曲目时的唯一默认床轨 |
 | 用户文件 | — | `--music <path>` | 优先于生成 |
 | 外接生成 | off | `AIFILM_MUSIC_ARGV` | 失败回落池 / 程序化 |
 
@@ -367,6 +367,14 @@ ROOT="/path/to/my-film"   # 绝对路径
 # 用户原话批准后：
 "$AIFILM" pilot approve --root "$ROOT" --user-phrase "可以" --shots shot01,shot02,shot03
 
+# 批量前：完整看片并建立带抽帧、时间点与评分的镜头审片回执
+"$AIFILM" review-shot --root "$ROOT" --shot-id shot01 --source "<clip.mp4>" \
+  --approve --reviewer "you" --notes "完整观看" \
+  --score-identity 4 --score-continuity 4 --score-composition 4 --score-motion 4 --score-narrative 4 \
+  --evidence "identity@0.0:角色匹配" --evidence "continuity@1.0:状态连续" \
+  --evidence "composition@2.0:构图清晰" --evidence "motion@3.0:动作连续" \
+  --evidence "narrative@4.0:信息落点"
+
 # 每步都可：
 "$AIFILM" dispatch --root "$ROOT"
 
@@ -380,6 +388,8 @@ ROOT="/path/to/my-film"   # 绝对路径
   --score-escalation pass --score-audio pass --score-subs pass --score-dead-air pass
 "$AIFILM" export-desktop --root "$ROOT" --name "雨停之前"
 ```
+
+v1.6 新项目还需为 final 的七个维度各提供 `--screening-evidence "维度@秒数:观察"`；旧项目先用 `aifilm review-contract migrate` 显式升级，历史布尔审批不会被伪造成新审片。
 
 细节命令与门禁全文：[`skills/ai-film-grok/SKILL.md`](./skills/ai-film-grok/SKILL.md)。
 
@@ -417,7 +427,7 @@ ROOT="/path/to/my-film"   # 绝对路径
 ```bash
 cd ~/.grok/plugins/ai-film-grok
 # 1) 只改本树
-# 2) make validate doctor test
+# 2) make release-check（统一使用 Python 3.11+；含 doctor、plugin validate、全量 pytest）
 # 3) 行为变更 → bump plugin.json semver
 # 4) make update
 # 5) git commit（message 英文）&& git push origin main
@@ -442,10 +452,11 @@ Coding agent 协议：[`AGENTS.md`](./AGENTS.md)。变更日志：[`CHANGELOG.md
 ```bash
 make validate
 make doctor
+make release-check
 test -x skills/ai-film-grok/scripts/aifilm
 grok plugin details ai-film-grok
-# 可选全量：
-# make test
+# 快速核心回归：make test-fast
+# 全量：make test
 ```
 
 CI：push / PR 跑 `plugin validate` + 全量 pytest（见 `.github/workflows/ci.yml`）。
@@ -455,3 +466,34 @@ CI：push / PR 跑 `plugin validate` + 全量 pytest（见 `.github/workflows/ci
 ## License
 
 MIT © [dex](https://github.com/sooneocean)
+
+<!-- BEGIN GENERATED: project-status -->
+### 当前项目状态（自动同步）
+
+- 插件版本：`1.6.0`
+- Skill Registry：`21/24` 项标记为 `implemented`
+- CLI 脚本：`60` 个
+- pytest 文件：`68` 个
+- 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
+- Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
+<!-- END GENERATED: project-status -->
+
+<!-- BEGIN GENERATED: maintainer-install -->
+### 文档与远端同步（维护者）
+
+代码或插件结构变更后，在仓库根目录执行：
+
+```bash
+make sync-docs   # 生成 Graph、状态摘要与安装说明
+make release-check
+make sync        # 验证通过后提交、push，并核对 origin SHA
+```
+
+首次启用本地 push 门禁：
+
+```bash
+make install-hooks
+```
+
+同步器不会提交 `.env`、`config.env`、`.codegraph`、`.omo`、`.kilo` 或备份目录。
+<!-- END GENERATED: maintainer-install -->

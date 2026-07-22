@@ -24,6 +24,15 @@ GRAPH_NAME = "drama-graph.json"
 PROJECTION_KEY = "_projection"
 CONTROL_STATES = frozenset({"draft", "review", "locked", "stale"})
 LOCK_SCOPES = ("story", "beats", "shots", "panels")
+DIRECTOR_BOARD_FIELDS = (
+    "emotional_turn",
+    "audience_question",
+    "image_priority",
+    "sound_priority",
+    "coverage_strategy",
+    "cut_intent",
+)
+DIRECTOR_BOARD_APPROVAL_STATES = frozenset({"draft", "review", "approved"})
 STABLE_SHOT_RE = re.compile(r"^ep\d+_sc\d+_bt\d+_sh\d+$")
 PLACEHOLDER_RE = re.compile(
     r"^(?:todo|tbd|needs_authoring|待补|待定|待填写|冲突顶点|余韵与续集钩子|advance story)$",
@@ -182,6 +191,26 @@ def _issue(code: str, message: str, *, node_ref: str | None = None, severity: st
     return {"code": code, "message": message, "node_ref": node_ref, "severity": severity}
 
 
+def draft_director_board() -> dict[str, str]:
+    """Return an explicit authoring checklist; placeholders never pass a lock."""
+    return {**{field: "needs_authoring" for field in DIRECTOR_BOARD_FIELDS}, "approval_state": "draft"}
+
+
+def validate_director_board(board: object, *, node_ref: str, require_approval: bool = False) -> list[dict[str, Any]]:
+    if not isinstance(board, dict):
+        return [_issue("DIRECTOR_BOARD_MISSING", "beat.director_board is required", node_ref=node_ref)]
+    issues: list[dict[str, Any]] = []
+    for field in DIRECTOR_BOARD_FIELDS:
+        if not _nonempty(board.get(field)):
+            issues.append(_issue("DIRECTOR_BOARD_FIELD_MISSING", f"director_board.{field} is required", node_ref=node_ref))
+    approval = str(board.get("approval_state") or "draft").strip().lower()
+    if approval not in DIRECTOR_BOARD_APPROVAL_STATES:
+        issues.append(_issue("DIRECTOR_BOARD_APPROVAL_INVALID", "director_board.approval_state must be draft|review|approved", node_ref=node_ref))
+    elif require_approval and approval != "approved":
+        issues.append(_issue("DIRECTOR_BOARD_NOT_APPROVED", "director_board must be approved before beat lock", node_ref=node_ref))
+    return issues
+
+
 def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> dict[str, Any]:
     """Validate narrative meaning in addition to graph shape."""
     issues: list[dict[str, Any]] = []
@@ -231,6 +260,7 @@ def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> 
             ):
                 if not _nonempty(node.get(field)):
                     issues.append(_issue(code, f"beat.{field} is required", node_ref=ref))
+            issues.extend(validate_director_board(node.get("director_board"), node_ref=ref, require_approval=strict))
         elif canonical and node_type == "scene":
             for field in ("purpose", "entry_state", "exit_state", "conflict"):
                 if not _nonempty(node.get(field)):
@@ -338,7 +368,7 @@ def lock_scope(graph: dict[str, Any], scope: str, *, user_phrase: str) -> dict[s
     validation = validate_narrative_graph(graph, strict=True)
     scope_prefixes = {
         "story": ("STORY_",),
-        "beats": ("BEAT_", "SCENE_"),
+        "beats": ("BEAT_", "SCENE_", "DIRECTOR_BOARD_"),
         "shots": ("SHOT_", "UNSTABLE_NODE_ID", "DUPLICATE_SHOT_ID"),
         "panels": (),
     }

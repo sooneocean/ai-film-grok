@@ -82,7 +82,7 @@ User / Agent
 SKILL.md（路由+硬门禁，~300 行主脊 + 60+ references）
     │
     ▼
-aifilm CLI（aifilm_grok.py ~4622 行单体 + 模块）
+aifilm CLI（aifilm_grok.py ~5147 行单体 + 模块）
     │
     ├─ dispatch / craft / next     → 工序状态机（八环）
     ├─ write-spec / film_spec      → 规格门禁

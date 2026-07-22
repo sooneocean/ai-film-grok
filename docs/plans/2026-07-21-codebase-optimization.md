@@ -10,7 +10,7 @@ origin: docs/brainstorms/2026-07-21-plugin-analysis-requirements.md
 
 ## Summary
 
-A phased optimization of the ai-film-grok plugin codebase targeting the inflection point identified in research: the codebase is functional (395 tests passing, 8-ring dispatch working, OAuth integration landed) but has accumulated technical debt from rapid feature development. Key issues: one 4,246-line CLI monolith, duplicated I/O helpers across 10+ modules, CI running only 4 of 58 tests, zero linting/type-checking in CI, and hardening gaps in the I2V pipeline (timeouts, retries, serial bottleneck).
+A historical refactor proposal. As of v1.6 the verified baseline is 462 passing tests plus 47 subtests; CI already has a full-suite job, while the CLI monolith has grown to 5,147 lines. Treat its old counts and CI diagnosis as superseded by the v1.6 release checks and director-review contract.
 
 The plan proposes 5 waves over 3-5 working sessions, each independently shippable, prioritized by impact-to-effort ratio. No architectural rewrites — every wave respects the existing 4-layer architecture and 8-ring dispatch protocol.
 
@@ -20,7 +20,7 @@ The plan proposes 5 waves over 3-5 working sessions, each independently shippabl
 
 The ai-film-grok plugin processes a user's text concept through a 4-layer pipeline (Agent → Visual → Voice → Design/Post) into a finished short film. Recent velocity (OAuth integration, CI setup, 75 commits) has left structural debt:
 
-- **Monolith risk**: `aifilm_grok.py` at 4,246 lines handles argument parsing AND all 10+ cmd group implementations. A single typo or import cycle in this file blocks the entire CLI.
+- **Monolith risk**: `aifilm_grok.py` at roughly 5,147 lines handles argument parsing AND all command group implementations. A single typo or import cycle in this file blocks the entire CLI.
 - **I/O duplication**: `_read_json` / `_write_json` are copy-pasted across 10+ modules with minor variations. Changing JSON behavior (e.g., adding encoding validation) requires 10+ edits.
 - **CI blind spot**: Only 4 of 58 test files run in CI (`test_doctor`, `test_dispatch`, `test_capability`, `test_delivery_gates`). The remaining `test_*` files — including all adapter tests (10 adapters, zero coverage) and edge-case tests — are not exercised on push.
 - **No static analysis**: No ruff, isort, mypy, or pyright in CI. Style drift and type errors are discovered at runtime.

@@ -18,6 +18,7 @@ from narrative_control import (
     GRAPH_SCHEMA_VERSION,
     bump_graph_revision,
     ensure_graph_controls,
+    draft_director_board,
     graph_content_sha256,
     validate_narrative_graph,
 )
@@ -691,6 +692,7 @@ def build_planned_graph(
                 "emotionalShift": bt.get("emotionalShift") or {"from": "", "to": ""},
                 "importance": bt["importance"],
                 "targetDuration": bt["targetDuration"],
+                "director_board": draft_director_board(),
                 "shots": shots,
             }
             beats_out.append(bt_out)

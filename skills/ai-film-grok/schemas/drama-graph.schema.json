@@ -155,6 +155,18 @@
         "tactic": { "type": "string" },
         "turn": { "type": "string" },
         "state_delta": { "type": "string" },
+        "director_board": {
+          "type": "object",
+          "properties": {
+            "emotional_turn": { "type": "string" },
+            "audience_question": { "type": "string" },
+            "image_priority": { "type": "string" },
+            "sound_priority": { "type": "string" },
+            "coverage_strategy": { "type": "string" },
+            "cut_intent": { "type": "string" },
+            "approval_state": { "enum": ["draft", "review", "approved"] }
+          }
+        },
         "emotionalShift": {
           "type": "object",
           "properties": {

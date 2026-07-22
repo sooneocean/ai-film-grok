@@ -56,6 +56,15 @@ def _fill_graph(graph: dict) -> dict:
                         "turn": "新線索改變局面",
                         "outcome": "關係向前一步",
                         "state_delta": "秘密更接近曝光",
+                        "director_board": {
+                            "emotional_turn": "防卫转为坦白",
+                            "audience_question": "她会不会说出真相",
+                            "image_priority": "后视镜里的眼神",
+                            "sound_priority": "雨声压住沉默",
+                            "coverage_strategy": "反应后给线索特写",
+                            "cut_intent": "在呼吸停顿处切",
+                            "approval_state": "approved",
+                        },
                     }
                 )
                 for shot in beat.get("shots") or []:
@@ -194,6 +203,24 @@ class NarrativeControlTests(unittest.TestCase):
             self.assertTrue(projection_status(root, graph)["ok"])
             graph["story"]["theme"] = "被编辑后的主题"
             self.assertTrue(projection_status(root, graph)["stale"])
+
+    def test_beat_lock_requires_an_approved_director_board(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_plan(root, "雨夜出租車，兩人的距離越來越近。", apply_film_spec=False)
+            graph = _fill_graph(json.loads((root / "drama-graph.json").read_text(encoding="utf-8")))
+            for ep in graph["episodes"]:
+                for scene in ep["scenes"]:
+                    for beat in scene["beats"]:
+                        beat["director_board"]["approval_state"] = "review"
+            with self.assertRaises(NarrativeControlError) as ctx:
+                lock_scope(graph, "beats", user_phrase="先锁节拍")
+            self.assertEqual(ctx.exception.code, "NARRATIVE_NOT_VALID")
+            for ep in graph["episodes"]:
+                for scene in ep["scenes"]:
+                    for beat in scene["beats"]:
+                        beat["director_board"]["approval_state"] = "approved"
+            lock_scope(graph, "beats", user_phrase="导演确认节拍")
 
 
 if __name__ == "__main__":

@@ -12,8 +12,8 @@
     "jsonschema": "4.23.0"
   },
   "scripts": {
-    "scripts/aifilm": "e55bded972a538f531fe7452b7ab28439cf4ff316b466f773a664195897ffcfa",
-    "scripts/aifilm_grok.py": "bae5c007d5567870cb308915be5232562466d3059e76f3a51966491f18dcde9f",
+    "scripts/aifilm": "97f131b75cd6954e6aed0c8a7a05387bd45499e110226dd13df8cb6af4f996e9",
+    "scripts/aifilm_grok.py": "4d1dd2ab0cd41fa117044a8388370412ab423e0a8381698014985f2b23cd5490",
     "scripts/backend-lock": "60b86b253cb393b587af4ca6e63a2403daa42b515f7501fffe407e2b8e257f25",
     "scripts/backend_lock.py": "3003312dc63fdd1909430e91e91f9f9edca9e36175998ebc884c14e513c5845e",
     "scripts/edit_policy.py": "06fec57bc3413ab8430cf8bf75df5cf4a149704b25a02aa51a83d7471b3d231d",

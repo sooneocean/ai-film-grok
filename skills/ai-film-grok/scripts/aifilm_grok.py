@@ -585,7 +585,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     write_json(root / "style-bible.json", style)
     write_json(root / "film-spec.json", film_spec)
     write_json(root / "timeline.json", timeline)
-    save_manifest(root, empty_manifest(title=title, theme=theme, aspect=aspect))
+    manifest = empty_manifest(title=title, theme=theme, aspect=aspect)
+    manifest["review_contract_version"] = 2
+    save_manifest(root, manifest)
     (root / "README.md").write_text(
         f"# {title}\n\nTheme: {theme}\n\nProvider: Grok Imagine\nRoot: `{root}`\n",
         encoding="utf-8",
@@ -614,10 +616,12 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         and record.get("status") == "approved"
         and record_file_matches(dirs["keyframes"], record, field=f"still path for {sid}")
     ]
+    review_contract = int(manifest.get("review_contract_version") or 1)
     approved_clips = [
         sid
         for sid, record in clips.items()
         if approved_clip_record(record)
+        and (review_contract < 2 or isinstance(record.get("shot_review"), dict))
         and record_file_matches(dirs["clips"], record, field=f"clip path for {sid}")
     ]
     canonical = [path for path in dirs["canonical"].glob("*") if path.is_file() and not path.is_symlink()]
@@ -643,6 +647,11 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         and final_qa.get("has_audio") is True
     )
     review = outputs.get("final_review")
+    screening_evidence = review.get("screening_evidence") if isinstance(review, dict) else {}
+    screening_evidence_ok = review_contract < 2 or (
+        isinstance(screening_evidence, dict)
+        and set(screening_evidence) == set(SCORECARD_DIMENSIONS)
+    )
     review_ok = bool(
         isinstance(review, dict)
         and review.get("approved") is True
@@ -655,6 +664,7 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         and isinstance(review.get("technical_qa"), dict)
         and review["technical_qa"].get("ok") is True
         and scorecard_is_complete_and_passing(review)
+        and screening_evidence_ok
     )
     dnotes = load_director_notes(root)
     open_items = open_reshoot_items(dnotes)
@@ -668,7 +678,7 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         "clips_complete": clips_complete,
         "assembled": assembled,
         "reshoots_clear": reshoots_clear(dnotes),
-        "final_complete": bool(clips_complete and final_technical_ok and review_ok),
+        "final_complete": bool(clips_complete and final_technical_ok and review_ok and reshoots_clear(dnotes)),
         "desktop_exported": bool(outputs.get("desktop_dir") and Path(outputs["desktop_dir"]).is_dir()),
     }
     manifest["gates"] = gates
@@ -1827,6 +1837,20 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             raise FilmError("Approved clips require --motion-approved after watching the complete clip")
         if not review_note:
             raise FilmError("Approved clips require --review-note with the visual review result")
+    manifest = load_manifest(root)
+    shot_review = None
+    if args.status == "approved" and int(manifest.get("review_contract_version") or 1) >= 2:
+        try:
+            from shot_review import approved_review_for_clip
+
+            shot_review = approved_review_for_clip(
+                root,
+                shot_id=str(args.shot_id),
+                clip=source,
+                receipt=Path(args.review_receipt).expanduser().resolve() if getattr(args, "review_receipt", None) else None,
+            )
+        except Exception as exc:
+            raise FilmError(f"v1.6 approved clips require matching shot-review evidence: {exc}") from exc
     try:
         qa = analyze_media(source, require_audio=False, require_motion=True)
     except MediaQAError as exc:
@@ -1853,6 +1877,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             "motion_approved": motion_approved,
             "review_note": review_note,
             "qa": qa,
+            "shot_review": shot_review,
         }
     )
     if qa.get("has_audio"):
@@ -1895,7 +1920,6 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             }
         except (SecurityPolicyError, subprocess.CalledProcessError, OSError, ValueError) as exc:
             raise FilmError(f"Could not preserve generated native audio: {exc}") from exc
-    manifest = load_manifest(root)
     manifest.setdefault("clips", {})[record["shot_id"]] = record
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
@@ -2615,6 +2639,19 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         card = build_scorecard_from_cli(args)
     except DirectorReviewError as exc:
         raise FilmError(str(exc)) from exc
+    manifest_contract = int(manifest.get("review_contract_version") or 1)
+    screening_evidence: dict[str, Any] = {}
+    if manifest_contract >= 2:
+        try:
+            from director_review import parse_timestamp_evidence
+
+            screening_evidence = parse_timestamp_evidence(
+                list(getattr(args, "screening_evidence", None) or []),
+                required=SCORECARD_DIMENSIONS,
+                duration_sec=float(technical_qa.get("duration_sec") or 0.0),
+            )
+        except DirectorReviewError as exc:
+            raise FilmError(str(exc)) from exc
 
     # Scorecard fail → write director_notes reshoot list, do not approve
     if not scorecard_all_pass(card):
@@ -2638,6 +2675,7 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             "output_sha256": final_record["sha256"],
             "technical_qa": technical_qa,
             "scorecard": scorecard_payload(card),
+            "screening_evidence": screening_evidence,
             "director_notes_path": str(notes_path),
             "open_reshoot_ids": [it.get("id") for it in open_items],
         }
@@ -2662,27 +2700,55 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         "output_sha256": final_record["sha256"],
         "technical_qa": technical_qa,
         "scorecard": scorecard,
+        "screening": {"path": str(final_path), "sha256": final_record["sha256"], "duration_sec": technical_qa.get("duration_sec")},
+        "screening_evidence": screening_evidence,
     }
     review_path = out_dir / "final-review.json"
     write_json(review_path, review)
     review["path"] = str(review_path)
     manifest.setdefault("outputs", {})["final_review"] = review
-    # Approving all-pass closes any leftover open reshoot items (history retained)
-    dnotes = load_director_notes(root)
-    if open_reshoot_items(dnotes):
-        for it in list(open_reshoot_items(dnotes)):
-            try:
-                resolve_reshoot_item(
-                    dnotes,
-                    item_id=str(it.get("id")),
-                    resolve_note="auto-closed on successful review-final --approve",
-                )
-            except DirectorReviewError:
-                pass
-        save_director_notes(root, dnotes)
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
     emit({"ok": True, "final_complete": manifest["gates"]["final_complete"], "review": review})
+    return 0
+
+
+def cmd_review_shot(args: argparse.Namespace) -> int:
+    root = Path(args.root).expanduser().resolve()
+    ensure_tree(root)
+    try:
+        from shot_review import REVIEW_DIMENSIONS, ShotReviewError, create_shot_review
+
+        scores = {dim: getattr(args, f"score_{dim}") for dim in REVIEW_DIMENSIONS}
+        report = create_shot_review(
+            root,
+            shot_id=str(args.shot_id),
+            source=Path(args.source),
+            reviewer=str(args.reviewer),
+            notes=str(args.notes),
+            scores=scores,
+            evidence_values=list(args.evidence or []),
+            references=[Path(item) for item in (args.reference or [])],
+            approve=bool(args.approve),
+        )
+    except (ShotReviewError, MediaQAError, ValueError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit({"ok": True, "approved": report["approved"], "review": report})
+    return 0
+
+
+def cmd_review_contract(args: argparse.Namespace) -> int:
+    root = Path(args.root).expanduser().resolve()
+    manifest = load_manifest(root)
+    if args.review_contract_action != "migrate":
+        raise FilmError(f"unknown review-contract action: {args.review_contract_action}")
+    legacy = [sid for sid, record in (manifest.get("clips") or {}).items() if isinstance(record, dict) and record.get("status") == "approved" and not isinstance(record.get("shot_review"), dict)]
+    manifest["review_contract_version"] = 2
+    manifest["review_contract_migrated_at"] = utc_now()
+    manifest["review_contract_pending_shots"] = legacy
+    recompute_gates(root, manifest)
+    save_manifest(root, manifest)
+    emit({"ok": True, "review_contract_version": 2, "pending_shot_reviews": legacy, "note": "existing approvals remain historical records; review each listed clip before it can satisfy v1.6 delivery gates"})
     return 0
 
 
@@ -3428,6 +3494,7 @@ def cmd_graph(args: argparse.Namespace) -> int:
         graph_content_sha256,
         graph_locked_for_projection,
         projection_status,
+        draft_director_board,
     )
     action = str(getattr(args, "graph_action", "") or "")
     if action == "derive":
@@ -3477,10 +3544,33 @@ def cmd_graph(args: argparse.Namespace) -> int:
             "constraints": list(di.get("taboos") or []),
             "status": "needs_authoring",
         }
+        for ep in graph.get("episodes") or []:
+            for scene in ep.get("scenes") or []:
+                for beat in scene.get("beats") or []:
+                    if not isinstance(beat, dict):
+                        continue
+                    beat.setdefault("objective", "needs_authoring")
+                    beat.setdefault("obstacle", "needs_authoring")
+                    beat.setdefault("tactic", "needs_authoring")
+                    beat.setdefault("turn", "needs_authoring")
+                    beat.setdefault("outcome", "needs_authoring")
+                    beat.setdefault("state_delta", "needs_authoring")
+                    beat.setdefault("director_board", draft_director_board())
         from narrative_control import ensure_graph_controls
         ensure_graph_controls(graph)
         write_json(graph_path(root), graph)
-        emit({"ok": True, "action": "import", "path": str(graph_path(root)), "state": graph.get("state"), "content_sha256": graph_content_sha256(graph)})
+        migration = {
+            "schema_version": 1,
+            "kind": "drama-graph-migration",
+            "at": utc_now(),
+            "source": "film-spec.json",
+            "target": "drama-graph.json",
+            "target_schema_version": GRAPH_SCHEMA_VERSION,
+            "content_sha256": graph_content_sha256(graph),
+            "note": "legacy import is draft-only; complete director_board and lock scopes before projection",
+        }
+        write_json(root / "receipts" / "graph-migration.json", migration)
+        emit({"ok": True, "action": "import", "path": str(graph_path(root)), "receipt": str(root / "receipts" / "graph-migration.json"), "state": graph.get("state"), "content_sha256": graph_content_sha256(graph)})
         return 0
     if action == "project":
         graph = json.loads(graph_path(root).read_text(encoding="utf-8")) if graph_path(root).is_file() else {}
@@ -4243,6 +4333,24 @@ def build_parser() -> argparse.ArgumentParser:
     rc.add_argument("--identity-approved", action="store_true")
     rc.add_argument("--motion-approved", action="store_true")
     rc.add_argument("--review-note")
+    rc.add_argument("--review-receipt", help="v1.6 approved review receipt (defaults to receipts/reviews/<shot>.json)")
+
+    shot_review = sub.add_parser("review-shot", help="Create evidence-backed first/middle/last-frame director review for one clip")
+    shot_review.add_argument("--root", required=True)
+    shot_review.add_argument("--shot-id", required=True)
+    shot_review.add_argument("--source", required=True)
+    shot_review.add_argument("--approve", action="store_true", help="Approve only if QA, 1–5 scores, and timestamp evidence all pass")
+    shot_review.add_argument("--reviewer", required=True)
+    shot_review.add_argument("--notes", required=True)
+    for dim in ("identity", "continuity", "composition", "motion", "narrative"):
+        shot_review.add_argument(f"--score-{dim}", type=int, choices=range(1, 6), required=True, dest=f"score_{dim}")
+    shot_review.add_argument("--evidence", action="append", default=[], help="Repeat dimension@seconds:note for every review dimension")
+    shot_review.add_argument("--reference", action="append", default=[], help="Optional reference asset path; repeatable")
+
+    review_contract = sub.add_parser("review-contract", help="Explicitly migrate a legacy film root to v1.6 review evidence gates")
+    review_contract_sub = review_contract.add_subparsers(dest="review_contract_action", required=True)
+    review_contract_migrate = review_contract_sub.add_parser("migrate", help="Require real shot reviews for historical approved clips")
+    review_contract_migrate.add_argument("--root", required=True)
 
     asb = sub.add_parser("assemble", help="Assemble silent film from timeline + clips")
     asb.add_argument("--root", required=True)
@@ -4553,6 +4661,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Comma-separated shot ids to attach to identity/style/motion/escalation fails (writes director_notes)",
     )
+    review.add_argument("--screening-evidence", action="append", default=[], help="v1.6: repeat dimension@seconds:note for each final scorecard dimension")
 
     dn = sub.add_parser(
         "director-notes",
@@ -5032,6 +5141,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_doctor(args)
         if args.cmd == "lock-runtime":
             return cmd_lock_runtime(args)
+        if args.cmd == "review-shot":
+            return cmd_review_shot(args)
+        if args.cmd == "review-contract":
+            return cmd_review_contract(args)
         if args.cmd == "frw-lipsync":
             return cmd_frw_lipsync(args)
         if args.cmd == "env-plate":
