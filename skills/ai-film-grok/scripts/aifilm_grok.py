@@ -2717,20 +2717,11 @@ def cmd_review_shot(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     ensure_tree(root)
     try:
-        from shot_review import REVIEW_DIMENSIONS, ShotReviewError, create_shot_review
+        from cli.review import create_shot_review_report
+        from shot_review import ShotReviewError
 
-        scores = {dim: getattr(args, f"score_{dim}") for dim in REVIEW_DIMENSIONS}
-        report = create_shot_review(
-            root,
-            shot_id=str(args.shot_id),
-            source=Path(args.source),
-            reviewer=str(args.reviewer),
-            notes=str(args.notes),
-            scores=scores,
-            evidence_values=list(args.evidence or []),
-            references=[Path(item) for item in (args.reference or [])],
-            approve=bool(args.approve),
-        )
+        report = create_shot_review_report(args)
+        report["path"] = str(Path(report["path"]).resolve())
     except (ShotReviewError, MediaQAError, ValueError) as exc:
         raise FilmError(str(exc)) from exc
     emit({"ok": True, "approved": report["approved"], "review": report})
@@ -2742,10 +2733,9 @@ def cmd_review_contract(args: argparse.Namespace) -> int:
     manifest = load_manifest(root)
     if args.review_contract_action != "migrate":
         raise FilmError(f"unknown review-contract action: {args.review_contract_action}")
-    legacy = [sid for sid, record in (manifest.get("clips") or {}).items() if isinstance(record, dict) and record.get("status") == "approved" and not isinstance(record.get("shot_review"), dict)]
-    manifest["review_contract_version"] = 2
-    manifest["review_contract_migrated_at"] = utc_now()
-    manifest["review_contract_pending_shots"] = legacy
+    from cli.review import migrate_review_contract
+
+    legacy, _migrated_at = migrate_review_contract(manifest)
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
     emit({"ok": True, "review_contract_version": 2, "pending_shot_reviews": legacy, "note": "existing approvals remain historical records; review each listed clip before it can satisfy v1.6 delivery gates"})
