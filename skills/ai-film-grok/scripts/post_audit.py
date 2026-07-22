@@ -1,0 +1,588 @@
+"""Unified, read-only post-production audit and evidence receipt."""
+
+from __future__ import annotations
+
+import hashlib
+import re
+import subprocess
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from director_review import open_reshoot_items
+from media_qa import analyze_media
+from util import read_json, write_json
+
+_SRT_TIME = re.compile(r"(\d{2}):(\d{2}):(\d{2})[,\.](\d{3})")
+
+
+def _srt_end_times(path: Path) -> tuple[list[float], list[str]]:
+    ends: list[float] = []
+    errors: list[str] = []
+    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if "-->" not in line:
+            continue
+        parts = _SRT_TIME.findall(line)
+        if len(parts) != 2:
+            errors.append(f"invalid timecode line {line_no}")
+            continue
+        h, m, s, ms = (int(x) for x in parts[1])
+        ends.append(h * 3600 + m * 60 + s + ms / 1000)
+    return ends, errors
+
+
+def _hash(path: Path | None) -> str | None:
+    if path is None or not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _probe(path: Path) -> dict[str, Any]:
+    try:
+        proc = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=nw=1:nk=1",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        return {
+            "ok": proc.returncode == 0 and bool(proc.stdout.strip()),
+            "duration_sec": float(proc.stdout.strip()) if proc.stdout.strip() else None,
+            "error": proc.stderr.strip() or None,
+        }
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+        return {"ok": False, "duration_sec": None, "error": str(exc)}
+
+
+def _first_file(root: Path, *relative: str) -> Path | None:
+    return next((root / item for item in relative if (root / item).is_file()), None)
+
+
+def audit_freshness(root: Path, receipt: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Compare a stored audit's bound hashes with the current film files."""
+    stored = receipt or read_json(root / "receipts" / "post-audit.json") or {}
+    ev = (stored.get("evidence") or {}) if isinstance(stored, dict) else {}
+    # Prefer registered film_final / hyperframes over stale out/final.mp4 alias
+    final = _first_file(
+        root,
+        "out/film_final.mp4",
+        "out/film_hyperframes.mp4",
+        "out/final.mp4",
+        "final.mp4",
+        "deliverables/final.mp4",
+    )
+    subtitle = _first_file(root, "out/final.srt", "final.srt")
+    audio = _first_file(root, "audio/mix_report.json")
+    timeline = _first_file(root, "timeline.json")
+    review = _first_file(root, "out/final-review.json", "receipts/final-review.json")
+    current = {
+        "final": _hash(final),
+        "subtitles": _hash(subtitle),
+        "audio": _hash(audio),
+        "timeline": _hash(timeline),
+        "review": _hash(review),
+    }
+    bound = {
+        "final": ((ev.get("final") or {}).get("sha256")),
+        "subtitles": ((ev.get("subtitles") or {}).get("sha256")),
+        "audio": ((ev.get("audio") or {}).get("sha256")),
+        "timeline": ((ev.get("timeline") or {}).get("sha256")),
+        "review": ((ev.get("review") or {}).get("sha256")),
+    }
+    mismatches = [
+        key
+        for key in current
+        if bound.get(key) != current.get(key) and (bound.get(key) or current.get(key))
+    ]
+    return {"current": current, "bound": bound, "stale": bool(mismatches), "mismatches": mismatches}
+
+
+def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
+    root = Path(root).expanduser().resolve()
+    manifest = read_json(root / "manifest.json") or {}
+    record = (
+        ((manifest.get("outputs") or {}).get("final_film") or {})
+        if isinstance(manifest, dict)
+        else {}
+    )
+    # Prefer registered final_film path (often out/film_final.mp4 or film_final.mp4
+    # relative to root/out). Do NOT prefer stale out/final.mp4 over the registered file.
+    candidates: list[Path] = []
+    raw_path = str(record.get("path") or "").strip()
+    if raw_path:
+        p = Path(raw_path)
+        if p.is_absolute():
+            candidates.append(p)
+        else:
+            candidates.append(root / p)
+            candidates.append(root / "out" / p)
+            # bare "film_final.mp4" → out/film_final.mp4
+            if p.name == p.as_posix():
+                candidates.append(root / "out" / p.name)
+    candidates.extend(
+        [
+            root / "out" / "film_final.mp4",
+            root / "out" / "film_hyperframes.mp4",
+            root / "out" / "final.mp4",
+            root / "final.mp4",
+            root / "deliverables" / "final.mp4",
+        ]
+    )
+    seen: set[str] = set()
+    final_path = None
+    for p in candidates:
+        key = str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        if p.is_file():
+            final_path = p
+            break
+    hard: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+    if not final_path:
+        hard.append({"code": "FINAL_MP4_MISSING", "message": "final MP4 is missing"})
+    media = {"ok": False, "path": str(final_path) if final_path else None}
+    if final_path:
+        media = analyze_media(final_path, require_audio=True, require_motion=True)
+        if not media.get("ok"):
+            hard.append(
+                {
+                    "code": "MEDIA_QA_FAILED",
+                    "message": "; ".join(media.get("errors") or ["media QA failed"]),
+                }
+            )
+    final_hash = _hash(final_path) if final_path else None
+    if final_hash and record.get("sha256") and final_hash != record.get("sha256"):
+        hard.append(
+            {
+                "code": "FINAL_HASH_STALE",
+                "message": "manifest final_film hash does not match current MP4",
+            }
+        )
+    review = (
+        read_json(root / "out" / "final-review.json")
+        or read_json(root / "receipts" / "final-review.json")
+        or {}
+    )
+    if not review.get("approved"):
+        hard.append(
+            {
+                "code": "FINAL_REVIEW_MISSING",
+                "message": "approved full-film review receipt is missing",
+            }
+        )
+    from director_review import SCORECARD_DIMENSIONS
+
+    scorecard_raw = review.get("scorecard") if isinstance(review.get("scorecard"), dict) else {}
+    # review-final writes nested {dimensions:{…}}; older receipts may be flat
+    if isinstance(scorecard_raw.get("dimensions"), dict):
+        scorecard = scorecard_raw["dimensions"]
+    else:
+        scorecard = scorecard_raw
+    screening = (
+        review.get("screening_evidence")
+        if isinstance(review.get("screening_evidence"), dict)
+        else {}
+    )
+    missing_dimensions = [dim for dim in SCORECARD_DIMENSIONS if scorecard.get(dim) is not True]
+    if review.get("approved") and missing_dimensions:
+        hard.append(
+            {
+                "code": "FINAL_SCORECARD_INCOMPLETE",
+                "message": "approved review is missing passing dimensions: "
+                + ", ".join(missing_dimensions),
+            }
+        )
+    missing_screening = [dim for dim in SCORECARD_DIMENSIONS if dim not in screening]
+    if review.get("approved") and missing_screening:
+        hard.append(
+            {
+                "code": "SCREENING_EVIDENCE_INCOMPLETE",
+                "message": "full-film screening evidence is missing: "
+                + ", ".join(missing_screening),
+            }
+        )
+    final_duration = float(media.get("duration_sec") or 0) if isinstance(media, dict) else 0
+    if final_duration:
+        for dim, item in screening.items():
+            if not isinstance(item, dict):
+                hard.append(
+                    {
+                        "code": "SCREENING_TIMESTAMP_OUT_OF_RANGE",
+                        "message": f"screening evidence {dim} is outside final duration",
+                    }
+                )
+                continue
+            # director_review stores timestamp_sec; accept legacy "timestamp"
+            raw_ts = item.get("timestamp_sec", item.get("timestamp"))
+            if raw_ts is None or float(raw_ts) < 0 or float(raw_ts) > final_duration:
+                hard.append(
+                    {
+                        "code": "SCREENING_TIMESTAMP_OUT_OF_RANGE",
+                        "message": f"screening evidence {dim} is outside final duration",
+                    }
+                )
+    if review.get("output_sha256") and final_hash and review.get("output_sha256") != final_hash:
+        hard.append(
+            {
+                "code": "FINAL_REVIEW_HASH_STALE",
+                "message": "final review was approved against a different MP4 hash",
+            }
+        )
+    performance_timeline = (
+        review.get("performance_timeline")
+        if isinstance(review, dict) and isinstance(review.get("performance_timeline"), dict)
+        else {}
+    )
+    if performance_timeline.get("required") and not performance_timeline.get("ok"):
+        hard.append(
+            {
+                "code": "PERFORMANCE_TIMELINE_INCOMPLETE",
+                "message": "approved final review contains an incomplete performance timeline",
+            }
+        )
+    speech_timing = (
+        review.get("speech_performance_timing")
+        if isinstance(review, dict) and isinstance(review.get("speech_performance_timing"), dict)
+        else {}
+    )
+    if speech_timing.get("required") and not speech_timing.get("ok"):
+        hard.append(
+            {
+                "code": "SPEECH_PERFORMANCE_TIMING_INCOMPLETE",
+                "message": "approved final review contains incomplete dialogue-performance timing",
+            }
+        )
+    audio_provenance = (
+        review.get("audio_provenance")
+        if isinstance(review, dict) and isinstance(review.get("audio_provenance"), dict)
+        else {}
+    )
+    director_ledger = (
+        review.get("director_ledger") if isinstance(review.get("director_ledger"), dict) else {}
+    )
+    if director_ledger.get("required"):
+        from director_ledger import ledger_is_current
+
+        if not ledger_is_current(root, director_ledger):
+            hard.append(
+                {
+                    "code": "DIRECTOR_LEDGER_STALE",
+                    "message": "human exception ledger is stale after spec, graph, or final change",
+                }
+            )
+    if audio_provenance.get("required"):
+        from audio_provenance import build_audio_provenance
+
+        current_audio_provenance = build_audio_provenance(root, write=False)
+        stored_bindings = {
+            "tts": (audio_provenance.get("tts_rehearsal") or {}).get("sha256"),
+            "carrier": (audio_provenance.get("voice_carrier") or {}).get("sha256"),
+            "final": (audio_provenance.get("final_delivery") or {}).get("sha256"),
+            "dialogue": [
+                (item.get("shot_id"), item.get("audio_sha256"))
+                for item in audio_provenance.get("dialogue_sources") or []
+                if isinstance(item, dict)
+            ],
+        }
+        current_bindings = {
+            "tts": (current_audio_provenance.get("tts_rehearsal") or {}).get("sha256"),
+            "carrier": (current_audio_provenance.get("voice_carrier") or {}).get("sha256"),
+            "final": (current_audio_provenance.get("final_delivery") or {}).get("sha256"),
+            "dialogue": [
+                (item.get("shot_id"), item.get("audio_sha256"))
+                for item in current_audio_provenance.get("dialogue_sources") or []
+                if isinstance(item, dict)
+            ],
+        }
+        if not current_audio_provenance.get("ok") or (stored_bindings != current_bindings):
+            hard.append(
+                {
+                    "code": "AUDIO_PROVENANCE_STALE",
+                    "message": "dialogue audio provenance no longer matches the approved final review",
+                }
+            )
+    notes = read_json(root / "receipts" / "director-notes.json") or {}
+    open_items = open_reshoot_items(notes)
+    if open_items:
+        hard.append(
+            {
+                "code": "OPEN_RESHOOTS",
+                "message": f"{len(open_items)} open director reshoot item(s) remain",
+            }
+        )
+    subtitle = next(
+        (p for p in (root / "out" / "final.srt", root / "final.srt") if p.is_file()), None
+    )
+    if not subtitle:
+        warnings.append(
+            {"code": "SUBTITLE_MISSING", "message": "final subtitle sidecar is missing"}
+        )
+    subtitle_check = {"ok": True, "cue_count": 0, "max_end_sec": None, "errors": []}
+    if subtitle:
+        ends, subtitle_errors = _srt_end_times(subtitle)
+        subtitle_check = {
+            "ok": not subtitle_errors,
+            "cue_count": len(ends),
+            "max_end_sec": max(ends) if ends else None,
+            "errors": subtitle_errors,
+        }
+        duration = float(media.get("duration_sec") or 0) if isinstance(media, dict) else 0
+        if subtitle_errors:
+            hard.append({"code": "SUBTITLE_PARSE_FAILED", "message": "; ".join(subtitle_errors)})
+        if duration and ends and max(ends) > duration + 0.05:
+            hard.append(
+                {
+                    "code": "SUBTITLE_OUT_OF_RANGE",
+                    "message": f"subtitle ends at {max(ends):.3f}s beyond video duration {duration:.3f}s",
+                }
+            )
+    mix = read_json(root / "audio" / "mix_report.json") or {}
+    loudness = mix.get("loudness") or mix.get("loudness_after") or {}
+    if mix and not loudness:
+        warnings.append(
+            {
+                "code": "LOUDNESS_EVIDENCE_MISSING",
+                "message": "mix_report exists but contains no loudness measurement",
+            }
+        )
+    spec = read_json(root / "film-spec.json") or {}
+    shots = [
+        shot
+        for scene in (spec.get("scenes") or [])
+        if isinstance(scene, dict)
+        for shot in (scene.get("shots") or [])
+        if isinstance(shot, dict)
+    ]
+    safe_area = {"ok": True, "warning_count": 0, "issues": []}
+    if shots:
+        from framing_lint import lint_vertical_safe_area
+
+        safe_area = lint_vertical_safe_area(shots)
+        if safe_area.get("warning_count"):
+            target = hard if spec.get("vertical_safe_area_strict") is True else warnings
+            target.append(
+                {
+                    "code": "VERTICAL_SAFE_AREA",
+                    "message": f"{safe_area.get('warning_count')} vertical safe-area issue(s)",
+                }
+            )
+    delivery = next(
+        (
+            p
+            for p in (root / "out" / "final-delivery.json", root / "final-delivery.json")
+            if p.is_file()
+        ),
+        None,
+    )
+    if not delivery:
+        hard.append(
+            {"code": "DELIVERY_SIDECAR_MISSING", "message": "final-delivery.json is missing"}
+        )
+    delivery_meta = read_json(delivery) if delivery else {}
+    delivery_version = int(delivery_meta.get("schema_version") or 1)
+    subtitles_meta = (
+        delivery_meta.get("subtitles") if isinstance(delivery_meta.get("subtitles"), dict) else {}
+    )
+    compose_caption_artifact = (
+        root / "compose" / "remotion" / "public" / "captions.json"
+    ).is_file()
+    if subtitles_meta.get("burned_in") is True and compose_caption_artifact:
+        hard.append(
+            {
+                "code": "SUBTITLE_DOUBLE_BURN_RISK",
+                "message": "final delivery reports burned subtitles and compose captions artifact also exists",
+            }
+        )
+    caption_frame_audit = None
+    if subtitles_meta.get("burned_in") is True:
+        from caption_frame_audit import caption_readability_evidence_status
+
+        caption_frame_audit = caption_readability_evidence_status(root)
+        if not caption_frame_audit["ok"]:
+            issue = {
+                "code": "BURNED_SUBTITLE_HUMAN_REVIEW_MISSING",
+                "message": "burned subtitles need current sampled frames and human readability approval",
+            }
+            (hard if delivery_version >= 2 else warnings).append(issue)
+    title_spec = spec.get("title_sequence") if isinstance(spec, dict) else {}
+    if (
+        isinstance(title_spec, dict)
+        and title_spec.get("mode") not in {None, "none"}
+        and delivery_meta.get("plate_cards") == "text"
+    ):
+        hard.append(
+            {
+                "code": "TITLE_DOUBLE_BURN_RISK",
+                "message": "title sequence is enabled while final delivery reports text plate cards",
+            }
+        )
+    evidence = {
+        "final": {
+            "path": str(final_path) if final_path else None,
+            "sha256": final_hash,
+            "probe": _probe(final_path) if final_path else None,
+            "media_qa": media,
+        },
+        "review": {
+            "approved": bool(review.get("approved")),
+            "path": str(root / "out" / "final-review.json") if review else None,
+            "sha256": _hash(root / "out" / "final-review.json")
+            if (root / "out" / "final-review.json").is_file()
+            else _hash(root / "receipts" / "final-review.json"),
+        },
+        "subtitles": {
+            "path": str(subtitle) if subtitle else None,
+            "sha256": _hash(subtitle) if subtitle else None,
+            "check": subtitle_check,
+            "burned_in": subtitles_meta.get("burned_in"),
+        },
+        "audio": {
+            "path": str(_first_file(root, "audio/mix_report.json"))
+            if _first_file(root, "audio/mix_report.json")
+            else None,
+            "sha256": _hash(_first_file(root, "audio/mix_report.json"))
+            if _first_file(root, "audio/mix_report.json")
+            else None,
+            "loudness": loudness,
+        },
+        "timeline": {
+            "path": str(_first_file(root, "timeline.json"))
+            if _first_file(root, "timeline.json")
+            else None,
+            "sha256": _hash(_first_file(root, "timeline.json"))
+            if _first_file(root, "timeline.json")
+            else None,
+        },
+        "safe_area": safe_area,
+        "delivery": {
+            "path": str(delivery) if delivery else None,
+            "sha256": _hash(delivery) if delivery else None,
+            "schema_version": delivery_version if delivery else None,
+        },
+        "caption_frame_audit": caption_frame_audit,
+        "open_reshoot_count": len(open_items),
+        "performance_timeline": {
+            "required": bool(performance_timeline.get("required")),
+            "ok": performance_timeline.get("ok"),
+            "path": performance_timeline.get("path"),
+            "sha256": performance_timeline.get("sha256"),
+        },
+        "speech_performance_timing": {
+            "required": bool(speech_timing.get("required")),
+            "ok": speech_timing.get("ok"),
+            "path": speech_timing.get("path"),
+            "sha256": speech_timing.get("sha256"),
+        },
+        "audio_provenance": {
+            "required": bool(audio_provenance.get("required")),
+            "ok": audio_provenance.get("ok"),
+            "path": audio_provenance.get("path"),
+            "sha256": audio_provenance.get("sha256"),
+        },
+    }
+    sidecar_expectations = {
+        "final": (delivery_meta.get("output_sha256") or delivery_meta.get("final_sha256")),
+        "subtitles": (subtitles_meta.get("srt_sha256")),
+        "audio": (
+            (delivery_meta.get("audio") or {}).get("sha256")
+            if isinstance(delivery_meta.get("audio"), dict)
+            else None
+        ),
+        "timeline": (
+            (delivery_meta.get("timeline") or {}).get("sha256")
+            if isinstance(delivery_meta.get("timeline"), dict)
+            else None
+        ),
+    }
+    for key, expected in sidecar_expectations.items():
+        actual = (evidence.get(key) or {}).get("sha256")
+        if expected and actual and expected != actual:
+            hard.append(
+                {
+                    "code": f"SIDECAR_{key.upper()}_HASH_MISMATCH",
+                    "message": f"final-delivery metadata hash for {key} does not match current file",
+                }
+            )
+    if delivery and delivery_version < 2:
+        warnings.append(
+            {
+                "code": "DELIVERY_PROVENANCE_LEGACY",
+                "message": "final-delivery schema v1 lacks complete post provenance; re-render to v2 when practical",
+            }
+        )
+    if delivery_version >= 2:
+        required_provenance = {
+            "final": delivery_meta.get("output_sha256") or delivery_meta.get("final_sha256"),
+            "subtitles": subtitles_meta.get("srt_sha256") if subtitle else True,
+            "audio_mix_report": (delivery_meta.get("audio_provenance") or {}).get(
+                "mix_report_sha256"
+            )
+            if _first_file(root, "audio/mix_report.json")
+            else True,
+            "timeline": (delivery_meta.get("timeline") or {}).get("sha256")
+            if _first_file(root, "timeline.json")
+            else True,
+        }
+        missing_provenance = [key for key, value in required_provenance.items() if not value]
+        if missing_provenance:
+            hard.append(
+                {
+                    "code": "DELIVERY_PROVENANCE_INCOMPLETE",
+                    "message": "final-delivery v2 is missing bound hashes: "
+                    + ", ".join(missing_provenance),
+                }
+            )
+    freshness = audit_freshness(root, {"evidence": evidence})
+    if freshness["stale"]:
+        hard.append(
+            {
+                "code": "POST_AUDIT_STALE",
+                "message": "post-audit evidence hashes do not match current production files",
+            }
+        )
+    report = {
+        "ok": True,
+        "kind": "post-audit",
+        "at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        "root": str(root),
+        "delivery_ready": not hard,
+        "hard_failures": hard,
+        "warnings": warnings,
+        "human_review_required": [] if review.get("approved") else ["full-film director review"],
+        "freshness": freshness,
+        "evidence": evidence,
+    }
+    if write:
+        write_json(root / "receipts" / "post-audit.json", report)
+        lines = (
+            [
+                "# Post Audit",
+                "",
+                f"- Delivery ready: `{report['delivery_ready']}`",
+                f"- Hard failures: `{len(hard)}`",
+                f"- Warnings: `{len(warnings)}`",
+                "",
+                "## Hard failures",
+            ]
+            + [f"- `{item['code']}`: {item['message']}" for item in hard]
+            + ["", "## Warnings"]
+            + [f"- `{item['code']}`: {item['message']}" for item in warnings]
+        )
+        (root / "receipts" / "post-audit.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return report

@@ -6,10 +6,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 CHECKLIST_KEYS = (
     "pose",
@@ -75,9 +74,7 @@ def wardrobe_state_of(shot: dict[str, Any] | None) -> str:
     if not isinstance(shot, dict):
         return ""
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
-    return str(
-        shot.get("wardrobe_state") or dsl.get("wardrobe_state") or ""
-    ).strip().lower()
+    return str(shot.get("wardrobe_state") or dsl.get("wardrobe_state") or "").strip().lower()
 
 
 # Undress ranks used to decide story-serial promote (keep in sync with edit_policy)
@@ -147,9 +144,7 @@ def is_long_form(spec: dict[str, Any], shots: list[dict[str, Any]] | None = None
         shots = flatten_shots(spec)
     if len(shots) >= 6:
         return True
-    if planned_duration_sec(shots) >= 36.0:
-        return True
-    return False
+    return planned_duration_sec(shots) >= 36.0
 
 
 def chain_doc_path(root: Path) -> Path:
@@ -178,7 +173,7 @@ def load_frame_chain_receipt(root: Path) -> dict[str, Any]:
 def save_frame_chain_receipt(root: Path, data: dict[str, Any]) -> Path:
     p = frame_chain_receipt_path(root)
     p.parent.mkdir(parents=True, exist_ok=True)
-    data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    data["updated_at"] = datetime.now(UTC).isoformat()
     data["schema_version"] = 1
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return p
@@ -197,9 +192,11 @@ def upsert_join(
     checklist: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     data = load_frame_chain_receipt(root)
-    joins = [j for j in data["joins"] if not (
-        isinstance(j, dict) and j.get("from") == from_id and j.get("to") == to_id
-    )]
+    joins = [
+        j
+        for j in data["joins"]
+        if not (isinstance(j, dict) and j.get("from") == from_id and j.get("to") == to_id)
+    ]
     rec = {
         "from": from_id,
         "to": to_id,
@@ -224,9 +221,9 @@ def render_chain_skeleton(
     shots: list[dict[str, Any]],
     spine: str = "（填写一句话动作脊柱）",
 ) -> str:
-    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date = datetime.now(UTC).strftime("%Y-%m-%d")
     n = len(shots)
-    ids = [str(s.get("id") or f"shot{i+1}") for i, s in enumerate(shots)]
+    ids = [str(s.get("id") or f"shot{i + 1}") for i, s in enumerate(shots)]
     lines = [
         f"# Continuity Chain — {title}",
         "",
@@ -234,7 +231,7 @@ def render_chain_skeleton(
         "",
         f"- **film root**: `{root}`",
         f"- **updated**: {date}",
-        f"- **long_form**: true",
+        "- **long_form**: true",
         f"- **shot_count**: {n}",
         "",
         "## 动作脊柱（一句话）",
@@ -411,7 +408,9 @@ def check_continuity_chain(
         cl = j.get("checklist") if isinstance(j.get("checklist"), dict) else {}
         if not cl and pair in md_checklists:
             cl = md_checklists[pair]
-        missing = [k for k in CHECKLIST_KEYS if str(cl.get(k, "")).lower() not in {"pass", "ok", "yes"}]
+        missing = [
+            k for k in CHECKLIST_KEYS if str(cl.get(k, "")).lower() not in {"pass", "ok", "yes"}
+        ]
         fails = [k for k in CHECKLIST_KEYS if str(cl.get(k, "")).lower() in {"fail", "no"}]
         if fails:
             issues.append(

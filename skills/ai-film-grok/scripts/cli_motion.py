@@ -1,0 +1,50 @@
+"""Media-generation CLI routes with no dependency on the main control plane."""
+
+from __future__ import annotations
+
+from argparse import Namespace
+from pathlib import Path
+from typing import Any
+
+from env_plate import EnvPlateError, run_env_plate
+from motion_plan import MotionPlanError, build_motion_plan
+
+
+class MotionRouteError(RuntimeError):
+    """Normalized route error suitable for the top-level CLI."""
+
+
+def env_plate(args: Namespace) -> dict[str, Any]:
+    prompt = str(getattr(args, "prompt", None) or "").strip()
+    prompt_file = getattr(args, "prompt_file", None)
+    if prompt_file:
+        try:
+            prompt = Path(prompt_file).expanduser().resolve().read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise MotionRouteError(f"cannot read env prompt file: {prompt_file}: {exc}") from exc
+    if not prompt:
+        raise MotionRouteError("env-plate requires --prompt or --prompt-file")
+    try:
+        return run_env_plate(
+            prompt=prompt,
+            root=Path(args.root).expanduser().resolve() if getattr(args, "root", None) else None,
+            shot_id=getattr(args, "shot_id", None),
+            wait=not bool(getattr(args, "no_wait", False)),
+            width=str(getattr(args, "width", None) or "720"),
+            height=str(getattr(args, "height", None) or "1280"),
+            duration=str(getattr(args, "duration", None) or "5"),
+            fps=str(getattr(args, "fps", None) or "24"),
+            register=not bool(getattr(args, "no_register", False)),
+            extract_keyframe=not bool(getattr(args, "no_keyframe", False)),
+            out_dir=Path(args.out_dir) if getattr(args, "out_dir", None) else None,
+            poll_timeout=float(getattr(args, "poll_timeout", None) or 240),
+        )
+    except EnvPlateError as exc:
+        raise MotionRouteError(str(exc)) from exc
+
+
+def motion_plan(args: Namespace) -> dict[str, Any]:
+    try:
+        return build_motion_plan(Path(args.root), str(args.shot_id))
+    except MotionPlanError as exc:
+        raise MotionRouteError(str(exc)) from exc

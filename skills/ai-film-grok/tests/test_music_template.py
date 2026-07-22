@@ -10,15 +10,17 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from sound_plan import SoundPlanError, resolve_music_template  # noqa: E402
+from sound_plan import resolve_music_template  # noqa: E402
 
 
 class MusicTemplateTests(unittest.TestCase):
-    def test_auto_none_when_empty(self) -> None:
+    def test_auto_uses_packaged_rnb_when_film_has_no_bed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "audio").mkdir()
-            self.assertIsNone(resolve_music_template(root, mood="rnb", mode="auto"))
+            hit = resolve_music_template(root, mood="rnb", mode="auto")
+            assert hit is not None
+            self.assertEqual(hit["source"], "skill_library")
 
     def test_auto_picks_bgm_wav(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -43,12 +45,13 @@ class MusicTemplateTests(unittest.TestCase):
             assert hit is not None
             self.assertIn("rnb.wav", hit["path"])
 
-    def test_on_fails_without_file(self) -> None:
+    def test_on_uses_packaged_rnb_without_film_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "audio").mkdir()
-            with self.assertRaises(SoundPlanError):
-                resolve_music_template(root, mood="rnb", mode="on")
+            hit = resolve_music_template(root, mood="rnb", mode="on")
+            assert hit is not None
+            self.assertEqual(hit["source"], "skill_library")
 
     def test_cli_music_wins(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

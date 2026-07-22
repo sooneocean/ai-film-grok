@@ -6,8 +6,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -21,14 +23,17 @@ from media_queue import (  # noqa: E402
 
 
 def iso(seconds: int = 0) -> str:
-    return (datetime.now(timezone.utc) + timedelta(seconds=seconds)).replace(microsecond=0).isoformat()
+    return (datetime.now(UTC) + timedelta(seconds=seconds)).replace(microsecond=0).isoformat()
 
 
+@pytest.mark.slow
 class FailReasonNormalizeTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_enum_passthrough(self) -> None:
         for r in FAIL_REASONS:
             self.assertEqual(normalize_fail_reason(r), r)
 
+    @pytest.mark.slow
     def test_aliases(self) -> None:
         self.assertEqual(normalize_fail_reason("content-moderated"), "moderation")
         self.assertEqual(normalize_fail_reason("motion gate failed"), "motion")
@@ -62,9 +67,7 @@ class QueueRequeueTests(unittest.TestCase):
                 capture_output=True,
             )
         except (subprocess.CalledProcessError, FileNotFoundError):
-            self.frame.write_bytes(
-                b"\xff\xd8\xff\xd9"
-            )  # minimal JPEG markers if ffmpeg missing
+            self.frame.write_bytes(b"\xff\xd8\xff\xd9")  # minimal JPEG markers if ffmpeg missing
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
@@ -77,11 +80,13 @@ class QueueRequeueTests(unittest.TestCase):
             prompt_file=self.prompt,
             inputs=[self.frame],
             max_attempts=3,
-            allow_without_pilot=True)
+            allow_without_pilot=True,
+        )
         claimed = q.claim(now=iso())
         self.assertEqual(claimed["id"], job["id"])
         return q, claimed
 
+    @pytest.mark.slow
     def test_fail_moderation_marks_failed_not_auto_pending(self) -> None:
         q, claimed = self._add_claim()
         failed = q.fail(
@@ -95,6 +100,7 @@ class QueueRequeueTests(unittest.TestCase):
         self.assertEqual(failed["status"], "failed")
         self.assertEqual(failed["fail_reason"], "moderation")
 
+    @pytest.mark.slow
     def test_requeue_returns_pending_immediately(self) -> None:
         q, claimed = self._add_claim()
         q.fail(
@@ -113,6 +119,7 @@ class QueueRequeueTests(unittest.TestCase):
         claimed2 = q.claim(now=iso())
         self.assertEqual(claimed2["id"], claimed["id"])
 
+    @pytest.mark.slow
     def test_fail_motion_can_auto_retry_pending(self) -> None:
         q, claimed = self._add_claim()
         failed = q.fail(
@@ -126,6 +133,7 @@ class QueueRequeueTests(unittest.TestCase):
         self.assertEqual(failed["status"], "pending")
         self.assertEqual(failed["fail_reason"], "motion")
 
+    @pytest.mark.slow
     def test_requeue_rejects_succeeded(self) -> None:
         q, claimed = self._add_claim()
         # Force succeeded without real media by writing state is hard; use fail terminal then requeue ok

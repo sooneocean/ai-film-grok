@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -43,9 +45,7 @@ def _minimal_spec() -> dict:
                             "subject": "a",
                             "action": "blinks",
                             "motion": "soft blink, breath, idle not speaking",
-                            "framing": (
-                                "medium, full head, headroom, safe framing no cropping"
-                            ),
+                            "framing": ("medium, full head, headroom, safe framing no cropping"),
                         },
                     },
                     {
@@ -68,7 +68,9 @@ def _minimal_spec() -> dict:
     }
 
 
+@pytest.mark.slow
 class TTSRehearsalTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_register_measured_durations_writes_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -106,6 +108,7 @@ class TTSRehearsalTests(unittest.TestCase):
             self.assertAlmostEqual(measured["shot01"], 2.4)
             self.assertAlmostEqual(measured["shot02"], 3.1)
 
+    @pytest.mark.slow
     def test_register_rejects_missing_duration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -115,6 +118,7 @@ class TTSRehearsalTests(unittest.TestCase):
                     [{"shot_id": "shot01"}],  # no path, no duration
                 )
 
+    @pytest.mark.slow
     def test_run_rehearsal_register_map_with_real_audio(self) -> None:
         if not __import__("shutil").which("ffmpeg"):
             self.skipTest("ffmpeg not available")
@@ -179,10 +183,7 @@ class TTSRehearsalTests(unittest.TestCase):
         reg = root / "reg.json"
         reg.write_text(
             json.dumps(
-                [
-                    {"shot_id": sid, "path": str(p)}
-                    for sid, p in paths.items()
-                ],
+                [{"shot_id": sid, "path": str(p)} for sid, p in paths.items()],
                 ensure_ascii=False,
                 indent=2,
             )
@@ -207,8 +208,7 @@ class TTSRehearsalTimingGateTests(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "style-bible.json").write_text(
-            json.dumps({"locked": True, "identity_lock": "ok"}, ensure_ascii=False)
-            + "\n",
+            json.dumps({"locked": True, "identity_lock": "ok"}, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
         # ~6 chars → est_vo ≈ 1.5s — passes estimate vo_pacing for 6s plate
@@ -247,6 +247,7 @@ class TTSRehearsalTimingGateTests(unittest.TestCase):
             json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
 
+    @pytest.mark.slow
     def test_estimate_only_preflight_ok_without_receipt(self) -> None:
         from preflight import run_preflight
 
@@ -259,6 +260,7 @@ class TTSRehearsalTimingGateTests(unittest.TestCase):
             # short nar should not trip loop_risk either
             self.assertNotIn("loop_risk", codes)
 
+    @pytest.mark.slow
     def test_over_plate_measured_fails_preflight(self) -> None:
         """Real preflight path: short nar (estimate ok) + measured 8s > 6s plate → hard."""
         from preflight import run_preflight
@@ -292,6 +294,7 @@ class TTSRehearsalTimingGateTests(unittest.TestCase):
             self.assertEqual(per["shot01"]["source"], "measured")
             self.assertGreaterEqual(per["shot01"]["vo_sec"], 7.9)
 
+    @pytest.mark.slow
     def test_over_plate_measured_fails_assert_no_loop_risk(self) -> None:
         """production_gates final path: measured over-plate hard even if estimate short."""
         from production_gates import ProductionGateError, assert_no_loop_risk
@@ -322,6 +325,7 @@ class TTSRehearsalTimingGateTests(unittest.TestCase):
                 assert_no_loop_risk(root, force=True)
             self.assertIn("measured", str(ctx2.exception).lower())
 
+    @pytest.mark.slow
     def test_strict_missing_receipt_fails_assert(self) -> None:
         from production_gates import ProductionGateError, assert_tts_rehearsal_timing
 
@@ -332,6 +336,7 @@ class TTSRehearsalTimingGateTests(unittest.TestCase):
                 assert_tts_rehearsal_timing(root, strict=True)
             self.assertIn("missing", str(ctx.exception).lower())
 
+    @pytest.mark.slow
     def test_loop_risk_prefers_measured_over_estimate(self) -> None:
         """loop_risk_shots_from_spec uses measured when map provided."""
         from production_gates import loop_risk_shots_from_spec
@@ -343,9 +348,7 @@ class TTSRehearsalTimingGateTests(unittest.TestCase):
             # estimate path: short nar → no risk
             self.assertEqual(loop_risk_shots_from_spec(spec), [])
             # measured path: 7s on 6s plate → risk
-            risk = loop_risk_shots_from_spec(
-                spec, measured_by_shot={"shot01": 7.0}
-            )
+            risk = loop_risk_shots_from_spec(spec, measured_by_shot={"shot01": 7.0})
             self.assertIn("shot01", risk)
 
 

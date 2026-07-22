@@ -170,14 +170,36 @@ def resolve_voice_tracks(
     *,
     heat_scale: str | None = None,
 ) -> dict[str, Any]:
-    """Merge film voice_tracks with defaults; disable auto color on soft heat."""
+    """Merge film voice_tracks with defaults; adult hardcore may opt-in color.
+
+    Non-adult: color stays off (legacy default).
+    hardcore_male / spice_level=extreme: suggest enabled+auto color unless author
+    explicitly set enabled=false.
+    """
     base = dict(DEFAULT_VOICE_TRACKS)
     author = (spec or {}).get("voice_tracks") if isinstance(spec, dict) else None
+    author_keys = set(author.keys()) if isinstance(author, dict) else set()
     if isinstance(author, dict):
         for key in DEFAULT_VOICE_TRACKS:
             if key in author and author[key] is not None:
                 base[key] = author[key]
     heat = str(heat_scale or (spec or {}).get("heat_scale") or "").strip().lower()
+    intent = (spec or {}).get("director_intent") if isinstance(spec, dict) else {}
+    profile = ""
+    if isinstance(intent, dict):
+        profile = str(intent.get("audience_profile") or "").strip().lower()
+    if not profile and isinstance(spec, dict):
+        profile = str(spec.get("audience_profile") or "").strip().lower()
+    spice = str((spec or {}).get("spice_level") or "").strip().lower()
+    hardcore = profile in {"hardcore_male", "hardcore", "重口男向"} or spice == "extreme"
+    # Adult hardcore: enable color track unless author explicitly disabled
+    if hardcore and heat in {"max", "hot"} and "enabled" not in author_keys:
+        base["enabled"] = True
+        base["auto_vocal_color"] = (
+            True if "auto_vocal_color" not in author_keys else base["auto_vocal_color"]
+        )
+        if "vocal_color_gain" not in author_keys or float(base.get("vocal_color_gain") or 0) <= 0:
+            base["vocal_color_gain"] = 0.52
     # clamp gains
     for gkey in ("vocal_color_gain", "sfx_bed_gain"):
         try:
@@ -191,6 +213,11 @@ def resolve_voice_tracks(
         base["enabled"] = False
         base["auto_vocal_color"] = False
         base["vocal_color_gain"] = 0.0
+    base["auto_sex_sfx"] = True
+    if isinstance(author, dict) and "auto_sex_sfx" in author:
+        base["auto_sex_sfx"] = bool(author.get("auto_sex_sfx"))
+    if isinstance(spec, dict) and spec.get("auto_sex_sfx") is False:
+        base["auto_sex_sfx"] = False
     return base
 
 
@@ -266,6 +293,9 @@ def apply_voice_tracks_to_spec(spec: dict[str, Any], *, seed: int = 0) -> dict[s
         return {"voice_tracks": policy, "shots_with_color": 0}
 
     n_color = 0
+    n_sfx = 0
+    auto_sfx = bool(policy.get("auto_sex_sfx", True))
+    heat = str(spec.get("heat_scale") or "").strip().lower()
     for scene in scenes:
         if not isinstance(scene, dict):
             continue
@@ -275,25 +305,40 @@ def apply_voice_tracks_to_spec(spec: dict[str, Any], *, seed: int = 0) -> dict[s
             tags = normalize_tone_tags(shot.get("tone_tags"))
             if tags:
                 shot["tone_tags"] = tags
+            # Auto flesh SFX on act/climax for adult max
             cues = normalize_sound_cues(shot.get("sound_cues"))
-            if cues:
+            ph = _heat_phase(shot)
+            if auto_sfx and heat in {"max", "hot"} and ph in {"act", "climax"} and not cues:
+                cues = ["impact", "breath", "leather"]
                 shot["sound_cues"] = cues
-                # map to sfx for sound_plan consumers
+                shot["_sound_cues_auto"] = True
+                n_sfx += 1
+            elif cues:
+                shot["sound_cues"] = cues
+            if cues:
                 kinds = sound_cues_to_sfx_kinds(cues)
                 if kinds:
                     shot["_sfx_kinds_from_cues"] = kinds
+            # Performance tone for act faces
+            if heat in {"max", "hot"} and ph in {"act", "climax", "foreplay"} and not tags:
+                shot["tone_tags"] = (
+                    ["breathy", "moan"] if ph != "foreplay" else ["teasing", "breathy"]
+                )
             color = resolve_shot_vocal_color(shot, policy=policy, seed=seed)
             shot["_vocal_color"] = color
             if color.get("text") and color.get("gain", 0) > 0:
                 n_color += 1
-                # keep author field mirrored when auto
                 if color.get("source") == "auto" and not str(shot.get("vocal_color") or "").strip():
                     shot["vocal_color"] = color["text"]
 
     summary = {
         "voice_tracks": policy,
         "shots_with_color": n_color,
-        "note": "nar=story; vocal_color=娇喘语助 independent gain; tone_tags=prompt manner; sound_cues=SFX",
+        "shots_with_auto_sex_sfx": n_sfx,
+        "note": (
+            "nar=story; vocal_color=娇喘轨 (hardcore/extreme opt-in); "
+            "tone_tags=prompt; sound_cues=SFX (act auto impact/breath)"
+        ),
     }
     spec["_voice_tracks_routing"] = summary
     return summary
@@ -313,9 +358,6 @@ def compute_color_offset_sec(
         off = float(offset_sec)
     else:
         # prefer late-mid of VO if known, else 55% plate
-        if vo_dur and vo_dur > 0.3:
-            off = float(vo_dur) * 0.55
-        else:
-            off = plate * 0.55
+        off = float(vo_dur) * 0.55 if vo_dur and vo_dur > 0.3 else plate * 0.55
     max_off = max(0.0, plate - cdur - 0.05)
     return max(0.0, min(off, max_off))

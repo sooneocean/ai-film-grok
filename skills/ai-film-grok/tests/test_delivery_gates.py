@@ -12,6 +12,7 @@ from io import StringIO
 from pathlib import Path
 from unittest import mock
 
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -51,7 +52,11 @@ class DeliveryGateTests(unittest.TestCase):
                             "title": "shot",
                             "dramatic_function": "hook",
                             "nar": "这是完整测试旁白。",
-                            "dsl": {"subject": "adult person", "action": "walks", "motion": "walk, camera pan, idle"},
+                            "dsl": {
+                                "subject": "adult person",
+                                "action": "walks",
+                                "motion": "walk, camera pan, idle",
+                            },
                         }
                     ],
                 }
@@ -145,15 +150,23 @@ class DeliveryGateTests(unittest.TestCase):
 
     def screening_args(self) -> list[str]:
         return [
-            "--screening-evidence", "identity@0.0:cast remains consistent",
-            "--screening-evidence", "style@0.1:style holds",
-            "--screening-evidence", "motion@0.3:motion remains active",
-            "--screening-evidence", "escalation@0.5:turn lands",
-            "--screening-evidence", "audio@0.7:VO and BGM clear",
-            "--screening-evidence", "subs@0.9:subtitles readable",
-            "--screening-evidence", "dead_air@1.1:no dead air",
+            "--screening-evidence",
+            "identity@0.0:cast remains consistent",
+            "--screening-evidence",
+            "style@0.1:style holds",
+            "--screening-evidence",
+            "motion@0.3:motion remains active",
+            "--screening-evidence",
+            "escalation@0.5:turn lands",
+            "--screening-evidence",
+            "audio@0.7:VO and BGM clear",
+            "--screening-evidence",
+            "subs@0.9:subtitles readable",
+            "--screening-evidence",
+            "dead_air@1.1:no dead air",
         ]
 
+    @pytest.mark.slow
     def test_approved_registration_refuses_missing_manual_review_evidence(self) -> None:
         for key, value in (
             ("source_endpoint", None),
@@ -161,10 +174,10 @@ class DeliveryGateTests(unittest.TestCase):
             ("motion_approved", False),
             ("review_note", ""),
         ):
-            with self.subTest(key=key):
-                with self.assertRaises(aifilm_grok.FilmError):
-                    aifilm_grok.cmd_register_clip(self.register_args(**{key: value}))
+            with self.subTest(key=key), self.assertRaises(aifilm_grok.FilmError):
+                aifilm_grok.cmd_register_clip(self.register_args(**{key: value}))
 
+    @pytest.mark.slow
     def test_approved_registration_records_endpoint_identity_motion_and_decode_qa(self) -> None:
         with contextlib.redirect_stdout(StringIO()):
             self.assertEqual(aifilm_grok.cmd_register_clip(self.register_args()), 0)
@@ -175,6 +188,7 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertTrue(record["motion_approved"])
         self.assertTrue(record["qa"]["ok"], record["qa"])
 
+    @pytest.mark.slow
     def test_v16_project_refuses_boolean_only_clip_approval_without_review_receipt(self) -> None:
         args = self.register_args()
         Path(str(args.review_receipt)).unlink()
@@ -182,12 +196,11 @@ class DeliveryGateTests(unittest.TestCase):
         with self.assertRaisesRegex(aifilm_grok.FilmError, "shot-review evidence"):
             aifilm_grok.cmd_register_clip(args)
 
+    @pytest.mark.slow
     def test_registration_preserves_generated_native_audio_as_a_stem(self) -> None:
         with contextlib.redirect_stdout(StringIO()):
             self.assertEqual(
-                aifilm_grok.cmd_register_clip(
-                    self.register_args(source=str(self.final_source))
-                ),
+                aifilm_grok.cmd_register_clip(self.register_args(source=str(self.final_source))),
                 0,
             )
         manifest = aifilm_grok.load_manifest(self.root)
@@ -197,6 +210,7 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertEqual(native["sha256"], aifilm_grok.sha256(stem))
         self.assertGreater(native["duration_sec"], 1.5)
 
+    @pytest.mark.slow
     def test_final_is_incomplete_until_explicit_full_film_review(self) -> None:
         with contextlib.redirect_stdout(StringIO()):
             aifilm_grok.cmd_register_clip(self.register_args())
@@ -217,9 +231,28 @@ class DeliveryGateTests(unittest.TestCase):
         with contextlib.redirect_stdout(missing_evidence):
             missing_evidence_rc = aifilm_grok.main(
                 [
-                    "review-final", "--root", str(self.root), "--approve", "--reviewer", "agent", "--notes", "full score but no evidence",
-                    "--score-identity", "pass", "--score-style", "pass", "--score-motion", "pass", "--score-escalation", "pass",
-                    "--score-audio", "pass", "--score-subs", "pass", "--score-dead-air", "pass",
+                    "review-final",
+                    "--root",
+                    str(self.root),
+                    "--approve",
+                    "--reviewer",
+                    "agent",
+                    "--notes",
+                    "full score but no evidence",
+                    "--score-identity",
+                    "pass",
+                    "--score-style",
+                    "pass",
+                    "--score-motion",
+                    "pass",
+                    "--score-escalation",
+                    "pass",
+                    "--score-audio",
+                    "pass",
+                    "--score-subs",
+                    "pass",
+                    "--score-dead-air",
+                    "pass",
                 ]
             )
         self.assertEqual(missing_evidence_rc, 2)
@@ -261,6 +294,7 @@ class DeliveryGateTests(unittest.TestCase):
         review = after_manifest["outputs"]["final_review"]
         self.assertTrue(review["scorecard"]["all_pass"])
 
+    @pytest.mark.slow
     def test_review_final_rejects_incomplete_or_failing_scorecard(self) -> None:
         with contextlib.redirect_stdout(StringIO()):
             aifilm_grok.cmd_register_clip(self.register_args())
@@ -358,6 +392,7 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertTrue(listed.get("reshoots_clear"))
         self.assertEqual(listed.get("open_reshoot_count"), 0)
 
+    @pytest.mark.slow
     def test_desktop_export_refuses_incomplete_formal_delivery(self) -> None:
         home = self.base / "home"
         (home / "Desktop").mkdir(parents=True)

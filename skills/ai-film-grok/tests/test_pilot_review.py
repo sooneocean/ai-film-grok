@@ -19,7 +19,6 @@ from pilot_review import (  # noqa: E402
     pilot_report,
     pilot_scorecard_ready,
     user_phrase_is_approval,
-    write_pilot_approval,
     write_pilot_scorecard,
 )
 from production_gates import pilot_is_user_approved  # noqa: E402
@@ -161,18 +160,12 @@ class PilotApproveTests(unittest.TestCase):
         self.assertTrue(user_phrase_is_approval("pilot 过"))
         self.assertTrue(user_phrase_is_approval("可以量产"))
         self.assertTrue(user_phrase_is_approval("可以"))
-        self.assertTrue(
-            user_phrase_is_approval("可以 以后这个动作 直接进行到生成完成")
-        )
+        self.assertTrue(user_phrase_is_approval("可以 以后这个动作 直接进行到生成完成"))
         self.assertTrue(user_phrase_is_approval("ok"))
         self.assertFalse(user_phrase_is_approval("继续生成"))
         self.assertFalse(user_phrase_is_approval("可以改一下"))
         self.assertFalse(user_phrase_is_approval("不行重做"))
-        self.assertTrue(
-            user_phrase_wants_run_to_completion(
-                "可以 以后这个动作 直接进行到生成完成"
-            )
-        )
+        self.assertTrue(user_phrase_wants_run_to_completion("可以 以后这个动作 直接进行到生成完成"))
         self.assertFalse(user_phrase_wants_run_to_completion("pilot 过"))
 
 

@@ -78,9 +78,7 @@ def _has_color(shot: dict[str, Any]) -> bool:
     if str(shot.get("vocal_color") or "").strip():
         return True
     vc = shot.get("_vocal_color")
-    if isinstance(vc, dict) and str(vc.get("text") or "").strip():
-        return True
-    return False
+    return bool(isinstance(vc, dict) and str(vc.get("text") or "").strip())
 
 
 def _has_cues(shot: dict[str, Any], *keys: str) -> bool:
@@ -371,7 +369,7 @@ def apply_edit_strategy_to_spec(spec: dict[str, Any]) -> dict[str, Any]:
     spec["join_transition_secs"] = join_secs
     spec["_edit_craft_source"] = craft_source
     # film-level transition_sec = median soft (legacy single default)
-    softs = [s for c, s in zip(crafts, join_secs) if c not in _HARD_FAMILY]
+    softs = [s for c, s in zip(crafts, join_secs, strict=False) if c not in _HARD_FAMILY]
     if softs:
         spec["transition_sec"] = round(sorted(softs)[len(softs) // 2], 3)
     elif mode == "punchy":

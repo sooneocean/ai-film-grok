@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -14,7 +15,9 @@ sys.path.insert(0, str(SCRIPTS))
 import render_final  # noqa: E402
 
 
+@pytest.mark.slow
 class SafeSidecarTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_json_writer_replaces_symlink_without_touching_external_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside:
             root = Path(tmp)
@@ -27,6 +30,7 @@ class SafeSidecarTests(unittest.TestCase):
             self.assertFalse(sidecar.is_symlink())
             self.assertEqual(json.loads(sidecar.read_text(encoding="utf-8")), {"ok": True})
 
+    @pytest.mark.slow
     def test_srt_writer_replaces_symlink_without_touching_external_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside:
             root = Path(tmp)
@@ -39,6 +43,7 @@ class SafeSidecarTests(unittest.TestCase):
             self.assertFalse(sidecar.is_symlink())
             self.assertIn("安全", sidecar.read_text(encoding="utf-8"))
 
+    @pytest.mark.slow
     def test_renderer_explicit_backend_failure_does_not_retry_edge(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             synth = mock.Mock(side_effect=RuntimeError("external failed"))

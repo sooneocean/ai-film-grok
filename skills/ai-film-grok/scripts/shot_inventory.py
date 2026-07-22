@@ -7,8 +7,9 @@ Prevents indexing past missing segments into a silent partial final.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 class InventoryError(RuntimeError):
@@ -117,9 +118,7 @@ def check_shot_inventory(
             issues.append(
                 {
                     "code": "VO_INVENTORY_MISMATCH",
-                    "message": (
-                        f"shot set ≠ VO stems: missing={missing_vo} extra={extra_vo}"
-                    ),
+                    "message": (f"shot set ≠ VO stems: missing={missing_vo} extra={extra_vo}"),
                     "missing_vo": missing_vo,
                     "extra_vo": extra_vo,
                 }
@@ -169,7 +168,6 @@ def discover_vo_stem_ids(root: Path) -> list[str]:
         for p in d.iterdir():
             if not p.is_file():
                 continue
-            name = p.name
             # shot01.wav / shot01.mp3 / shot01_vo.wav
             stem = p.stem
             if stem.endswith("_vo"):
@@ -199,10 +197,6 @@ def assert_inventory_for_final(
             + ",".join(report.get("codes") or ["INVENTORY"])
             + f" missing_clips={report.get('missing_clips')} "
             + f"extra_clips={report.get('extra_clips')}"
-            + (
-                f" missing_vo={report.get('missing_vo')}"
-                if require_vo
-                else ""
-            )
+            + (f" missing_vo={report.get('missing_vo')}" if require_vo else "")
         )
     return report

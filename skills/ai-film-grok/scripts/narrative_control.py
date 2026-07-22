@@ -8,16 +8,15 @@ binds a canonical graph to its executable film-spec projection.
 
 from __future__ import annotations
 
-import copy
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from util import read_json, write_json
-
 
 GRAPH_SCHEMA_VERSION = 2
 GRAPH_NAME = "drama-graph.json"
@@ -49,11 +48,13 @@ class NarrativeControlError(ValueError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _nonempty(value: Any) -> bool:
-    return isinstance(value, str) and bool(value.strip()) and not PLACEHOLDER_RE.match(value.strip())
+    return (
+        isinstance(value, str) and bool(value.strip()) and not PLACEHOLDER_RE.match(value.strip())
+    )
 
 
 def _canonical_content(value: Any) -> Any:
@@ -146,7 +147,9 @@ def node_index(graph: dict[str, Any]) -> dict[str, tuple[str, str, dict[str, Any
     return out
 
 
-def descendants(graph: dict[str, Any], node_ref: str) -> list[tuple[str, str, dict[str, Any], str | None]]:
+def descendants(
+    graph: dict[str, Any], node_ref: str
+) -> list[tuple[str, str, dict[str, Any], str | None]]:
     idx = node_index(graph)
     row = idx.get(node_ref)
     if not row:
@@ -187,27 +190,54 @@ def bump_graph_revision(graph: dict[str, Any], *, reason: str = "edit") -> dict[
     return graph
 
 
-def _issue(code: str, message: str, *, node_ref: str | None = None, severity: str = "hard") -> dict[str, Any]:
+def _issue(
+    code: str, message: str, *, node_ref: str | None = None, severity: str = "hard"
+) -> dict[str, Any]:
     return {"code": code, "message": message, "node_ref": node_ref, "severity": severity}
 
 
 def draft_director_board() -> dict[str, str]:
     """Return an explicit authoring checklist; placeholders never pass a lock."""
-    return {**{field: "needs_authoring" for field in DIRECTOR_BOARD_FIELDS}, "approval_state": "draft"}
+    return {
+        **{field: "needs_authoring" for field in DIRECTOR_BOARD_FIELDS},
+        "approval_state": "draft",
+    }
 
 
-def validate_director_board(board: object, *, node_ref: str, require_approval: bool = False) -> list[dict[str, Any]]:
+def validate_director_board(
+    board: object, *, node_ref: str, require_approval: bool = False
+) -> list[dict[str, Any]]:
     if not isinstance(board, dict):
-        return [_issue("DIRECTOR_BOARD_MISSING", "beat.director_board is required", node_ref=node_ref)]
+        return [
+            _issue("DIRECTOR_BOARD_MISSING", "beat.director_board is required", node_ref=node_ref)
+        ]
     issues: list[dict[str, Any]] = []
     for field in DIRECTOR_BOARD_FIELDS:
         if not _nonempty(board.get(field)):
-            issues.append(_issue("DIRECTOR_BOARD_FIELD_MISSING", f"director_board.{field} is required", node_ref=node_ref))
+            issues.append(
+                _issue(
+                    "DIRECTOR_BOARD_FIELD_MISSING",
+                    f"director_board.{field} is required",
+                    node_ref=node_ref,
+                )
+            )
     approval = str(board.get("approval_state") or "draft").strip().lower()
     if approval not in DIRECTOR_BOARD_APPROVAL_STATES:
-        issues.append(_issue("DIRECTOR_BOARD_APPROVAL_INVALID", "director_board.approval_state must be draft|review|approved", node_ref=node_ref))
+        issues.append(
+            _issue(
+                "DIRECTOR_BOARD_APPROVAL_INVALID",
+                "director_board.approval_state must be draft|review|approved",
+                node_ref=node_ref,
+            )
+        )
     elif require_approval and approval != "approved":
-        issues.append(_issue("DIRECTOR_BOARD_NOT_APPROVED", "director_board must be approved before beat lock", node_ref=node_ref))
+        issues.append(
+            _issue(
+                "DIRECTOR_BOARD_NOT_APPROVED",
+                "director_board must be approved before beat lock",
+                node_ref=node_ref,
+            )
+        )
     return issues
 
 
@@ -229,25 +259,82 @@ def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> 
         )
         for field in required_story:
             if not _nonempty(story.get(field)):
-                issues.append(_issue("STORY_GOAL_MISSING" if field == "protagonist_goal" else "STORY_STAKES_MISSING" if field == "stakes" else "STORY_FIELD_MISSING", f"story.{field} is required", node_ref="story"))
-        if not isinstance(story.get("emotional_arc"), list) or len(story.get("emotional_arc") or []) < 3:
-            issues.append(_issue("STORY_ARC_MISSING", "story.emotional_arc requires at least 3 beats", node_ref="story"))
+                issues.append(
+                    _issue(
+                        "STORY_GOAL_MISSING"
+                        if field == "protagonist_goal"
+                        else "STORY_STAKES_MISSING"
+                        if field == "stakes"
+                        else "STORY_FIELD_MISSING",
+                        f"story.{field} is required",
+                        node_ref="story",
+                    )
+                )
+        if (
+            not isinstance(story.get("emotional_arc"), list)
+            or len(story.get("emotional_arc") or []) < 3
+        ):
+            issues.append(
+                _issue(
+                    "STORY_ARC_MISSING",
+                    "story.emotional_arc requires at least 3 beats",
+                    node_ref="story",
+                )
+            )
 
     seen_shots: set[str] = set()
     for ref, node_type, node, _ in iter_nodes(graph):
         if node_type == "shot":
             sid = str(node.get("id") or ref)
             if sid in seen_shots:
-                issues.append(_issue("DUPLICATE_SHOT_ID", f"duplicate shot id: {sid}", node_ref=ref))
+                issues.append(
+                    _issue("DUPLICATE_SHOT_ID", f"duplicate shot id: {sid}", node_ref=ref)
+                )
             seen_shots.add(sid)
             if canonical and not STABLE_SHOT_RE.match(sid):
-                issues.append(_issue("UNSTABLE_NODE_ID", f"shot id must be stable hierarchy id: {sid}", node_ref=ref))
+                issues.append(
+                    _issue(
+                        "UNSTABLE_NODE_ID",
+                        f"shot id must be stable hierarchy id: {sid}",
+                        node_ref=ref,
+                    )
+                )
             if canonical:
                 if not _nonempty(node.get("beat_id") or node.get("beatId")):
-                    issues.append(_issue("SHOT_ORPHAN_BEAT", "shot must reference beat_id", node_ref=ref))
-                for field in ("coverage_role", "must_show", "visible_change", "start_state", "end_state"):
+                    issues.append(
+                        _issue("SHOT_ORPHAN_BEAT", "shot must reference beat_id", node_ref=ref)
+                    )
+                for field in (
+                    "coverage_role",
+                    "must_show",
+                    "visible_change",
+                    "start_state",
+                    "end_state",
+                    "playable_action",
+                    "expectation",
+                    "subtext",
+                    "gaze_target",
+                    "reaction_trigger",
+                    "body_state",
+                ):
                     if not _nonempty(node.get(field)):
-                        code = "SHOT_MUST_SHOW_MISSING" if field == "must_show" else "SHOT_VISIBLE_CHANGE_MISSING" if field == "visible_change" else "SHOT_FIELD_MISSING"
+                        code = (
+                            "SHOT_MUST_SHOW_MISSING"
+                            if field == "must_show"
+                            else "SHOT_VISIBLE_CHANGE_MISSING"
+                            if field == "visible_change"
+                            else "SHOT_PERFORMANCE_MISSING"
+                            if field
+                            in {
+                                "playable_action",
+                                "expectation",
+                                "subtext",
+                                "gaze_target",
+                                "reaction_trigger",
+                                "body_state",
+                            }
+                            else "SHOT_FIELD_MISSING"
+                        )
                         issues.append(_issue(code, f"shot.{field} is required", node_ref=ref))
         elif canonical and node_type == "beat":
             for field, code in (
@@ -257,14 +344,22 @@ def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> 
                 ("turn", "BEAT_NO_TURN"),
                 ("outcome", "BEAT_OUTCOME_MISSING"),
                 ("state_delta", "BEAT_STATE_DELTA_MISSING"),
+                ("audience_question", "BEAT_AUDIENCE_QUESTION_MISSING"),
+                ("emotional_turn", "BEAT_EMOTIONAL_TURN_MISSING"),
             ):
                 if not _nonempty(node.get(field)):
                     issues.append(_issue(code, f"beat.{field} is required", node_ref=ref))
-            issues.extend(validate_director_board(node.get("director_board"), node_ref=ref, require_approval=strict))
+            issues.extend(
+                validate_director_board(
+                    node.get("director_board"), node_ref=ref, require_approval=strict
+                )
+            )
         elif canonical and node_type == "scene":
             for field in ("purpose", "entry_state", "exit_state", "conflict"):
                 if not _nonempty(node.get(field)):
-                    issues.append(_issue("SCENE_FIELD_MISSING", f"scene.{field} is required", node_ref=ref))
+                    issues.append(
+                        _issue("SCENE_FIELD_MISSING", f"scene.{field} is required", node_ref=ref)
+                    )
 
     for _, _, scene, _ in iter_nodes(graph):
         if not isinstance(scene, dict) or not scene.get("beats"):
@@ -275,10 +370,29 @@ def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> 
             shots = [s for s in beat.get("shots") or [] if isinstance(s, dict)]
             previous: str | None = None
             for shot in shots:
-                action = str(shot.get("must_show") or shot.get("visible_change") or shot.get("action") or "").strip().lower()
+                action = (
+                    str(
+                        shot.get("must_show")
+                        or shot.get("visible_change")
+                        or shot.get("action")
+                        or ""
+                    )
+                    .strip()
+                    .lower()
+                )
                 role = str(shot.get("coverage_role") or "")
-                if action and previous == re.sub(r"\s+", " ", action) and role not in {"reaction", "hold"}:
-                    issues.append(_issue("SHOT_DUPLICATE_ACTION", "adjacent shots repeat the same visual evidence", node_ref=str(shot.get("id"))))
+                if (
+                    action
+                    and previous == re.sub(r"\s+", " ", action)
+                    and role not in {"reaction", "hold"}
+                ):
+                    issues.append(
+                        _issue(
+                            "SHOT_DUPLICATE_ACTION",
+                            "adjacent shots repeat the same visual evidence",
+                            node_ref=str(shot.get("id")),
+                        )
+                    )
                 if action:
                     previous = re.sub(r"\s+", " ", action)
 
@@ -319,12 +433,23 @@ def control_status(root: Path) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
     graph = read_json(root / GRAPH_NAME) or {}
     if not graph:
-        return {"ok": True, "exists": False, "canonical": False, "locked_scopes": [], "semantic": {"ok": True, "issues": []}, "projection": {"ok": True, "stale": False}}
+        return {
+            "ok": True,
+            "exists": False,
+            "canonical": False,
+            "locked_scopes": [],
+            "semantic": {"ok": True, "issues": []},
+            "projection": {"ok": True, "stale": False},
+        }
     ensure_graph_controls(graph)
     semantic = validate_narrative_graph(graph)
     locked = list(graph.get("lock_scopes") or [])
     projection = projection_status(root, graph)
-    ready = bool(semantic.get("ok")) and all(scope in locked for scope in LOCK_SCOPES) and bool(projection.get("ok"))
+    ready = (
+        bool(semantic.get("ok"))
+        and all(scope in locked for scope in LOCK_SCOPES)
+        and bool(projection.get("ok"))
+    )
     return {
         "ok": ready,
         "exists": True,
@@ -347,15 +472,25 @@ def assert_projection_ready(root: Path, *, require_locked: bool = True) -> dict[
         projection = status.get("projection") or {}
         semantic = status.get("semantic") or {}
         if projection.get("stale"):
-            raise NarrativeControlError("film-spec projection is stale; run aifilm graph project after locking", code="GRAPH_PROJECTION_STALE")
+            raise NarrativeControlError(
+                "film-spec projection is stale; run aifilm graph project after locking",
+                code="GRAPH_PROJECTION_STALE",
+            )
         if semantic.get("errors"):
-            raise NarrativeControlError("narrative graph has semantic errors; run aifilm plan validate --strict", code="NARRATIVE_NOT_VALID")
+            raise NarrativeControlError(
+                "narrative graph has semantic errors; run aifilm plan validate --strict",
+                code="NARRATIVE_NOT_VALID",
+            )
         missing = [s for s in LOCK_SCOPES if s not in (status.get("locked_scopes") or [])]
-        raise NarrativeControlError(f"narrative scopes not locked: {', '.join(missing)}", code="NARRATIVE_NOT_LOCKED")
+        raise NarrativeControlError(
+            f"narrative scopes not locked: {', '.join(missing)}", code="NARRATIVE_NOT_LOCKED"
+        )
     return status
 
 
-def _scope_nodes(graph: dict[str, Any], scope: str) -> list[tuple[str, str, dict[str, Any], str | None]]:
+def _scope_nodes(
+    graph: dict[str, Any], scope: str
+) -> list[tuple[str, str, dict[str, Any], str | None]]:
     if scope not in LOCK_SCOPES:
         raise NarrativeControlError(f"unknown lock scope: {scope}", code="UNKNOWN_LOCK_SCOPE")
     wanted = {"story": {"story"}, "beats": {"beat"}, "shots": {"shot"}, "panels": {"panel"}}[scope]
@@ -364,7 +499,9 @@ def _scope_nodes(graph: dict[str, Any], scope: str) -> list[tuple[str, str, dict
 
 def lock_scope(graph: dict[str, Any], scope: str, *, user_phrase: str) -> dict[str, Any]:
     if not str(user_phrase or "").strip():
-        raise NarrativeControlError("lock requires a non-empty user phrase", code="USER_APPROVAL_REQUIRED")
+        raise NarrativeControlError(
+            "lock requires a non-empty user phrase", code="USER_APPROVAL_REQUIRED"
+        )
     validation = validate_narrative_graph(graph, strict=True)
     scope_prefixes = {
         "story": ("STORY_",),
@@ -373,11 +510,14 @@ def lock_scope(graph: dict[str, Any], scope: str, *, user_phrase: str) -> dict[s
         "panels": (),
     }
     scope_errors = [
-        item for item in validation.get("errors") or []
+        item
+        for item in validation.get("errors") or []
         if any(str(item.get("code") or "").startswith(prefix) for prefix in scope_prefixes[scope])
     ]
     if scope_errors:
-        raise NarrativeControlError("cannot lock graph with semantic errors", code="NARRATIVE_NOT_VALID")
+        raise NarrativeControlError(
+            "cannot lock graph with semantic errors", code="NARRATIVE_NOT_VALID"
+        )
     ensure_graph_controls(graph)
     for _, _, node, _ in _scope_nodes(graph, scope):
         c = _control(node)
@@ -424,7 +564,9 @@ def _set_path(target: dict[str, Any], path: str, value: Any) -> None:
     cursor[parts[-1]] = value
 
 
-def edit_node(graph: dict[str, Any], node_ref: str, changes: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+def edit_node(
+    graph: dict[str, Any], node_ref: str, changes: dict[str, Any]
+) -> tuple[dict[str, Any], list[str]]:
     row = node_index(graph).get(node_ref)
     if not row:
         raise NarrativeControlError(f"unknown narrative node: {node_ref}", code="NODE_NOT_FOUND")
@@ -434,14 +576,16 @@ def edit_node(graph: dict[str, Any], node_ref: str, changes: dict[str, Any]) -> 
     for field in changes:
         root_field = str(field).split(".", 1)[0]
         if c.get("state") == "locked" and (field in locked or root_field in locked):
-            raise NarrativeControlError(f"node {ref} field {field} is locked", code="LOCKED_NODE_MUTATION")
+            raise NarrativeControlError(
+                f"node {ref} field {field} is locked", code="LOCKED_NODE_MUTATION"
+            )
         if field in {"id", "control"} or field.startswith("_"):
             raise NarrativeControlError(f"field cannot be edited: {field}", code="INVALID_FIELD")
     for field, value in changes.items():
         _set_path(node, field, value)
     _set_control(node, state="review", revision=int(c.get("revision") or 1) + 1)
     affected = [r[0] for r in descendants(graph, ref)]
-    for child_ref, _, child, _ in descendants(graph, ref):
+    for _child_ref, _, child, _ in descendants(graph, ref):
         _set_control(child, state="stale")
     graph["state"] = "review"
     bump_graph_revision(graph, reason=f"edit:{ref}")
@@ -455,7 +599,9 @@ def mark_replan(graph: dict[str, Any], node_ref: str) -> list[str]:
         raise NarrativeControlError(f"unknown narrative node: {node_ref}", code="NODE_NOT_FOUND")
     affected_rows = [row] + descendants(graph, row[0])
     if any(_control(r[2]).get("state") == "locked" for r in affected_rows):
-        raise NarrativeControlError("cannot replan locked node/subtree; unlock the scope first", code="LOCKED_NODE_MUTATION")
+        raise NarrativeControlError(
+            "cannot replan locked node/subtree; unlock the scope first", code="LOCKED_NODE_MUTATION"
+        )
     affected = [r[0] for r in affected_rows]
     for _, _, node, _ in affected_rows:
         _set_control(node, state="stale")
@@ -475,17 +621,28 @@ def graph_locked_for_projection(graph: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def write_revision_receipt(root: Path, graph: dict[str, Any], *, action: str, node_ref: str | None = None, affected: list[str] | None = None, reason: str | None = None) -> Path:
+def write_revision_receipt(
+    root: Path,
+    graph: dict[str, Any],
+    *,
+    action: str,
+    node_ref: str | None = None,
+    affected: list[str] | None = None,
+    reason: str | None = None,
+) -> Path:
     root = Path(root).expanduser().resolve()
     path = root / "receipts" / "narrative" / f"revision-{int(graph.get('revision') or 1):04d}.json"
-    write_json(path, {
-        "ok": True,
-        "action": action,
-        "node_ref": node_ref,
-        "affected_nodes": affected or [],
-        "reason": reason,
-        "revision": graph.get("revision"),
-        "content_sha256": graph.get("content_sha256"),
-        "at": utc_now(),
-    })
+    write_json(
+        path,
+        {
+            "ok": True,
+            "action": action,
+            "node_ref": node_ref,
+            "affected_nodes": affected or [],
+            "reason": reason,
+            "revision": graph.get("revision"),
+            "content_sha256": graph.get("content_sha256"),
+            "at": utc_now(),
+        },
+    )
     return path

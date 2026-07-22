@@ -25,11 +25,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -48,7 +47,7 @@ TEMPLATES = {
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(UTC).astimezone().isoformat(timespec="seconds")
 
 
 def _load_dotenv(path: Path) -> dict[str, str]:
@@ -74,7 +73,9 @@ def resolve_api_key() -> tuple[str, str]:
 
     home = Path.home()
     candidates = [
-        Path(os.environ.get("FRWCLAW_ROOT", "")).expanduser() if os.environ.get("FRWCLAW_ROOT") else None,
+        Path(os.environ.get("FRWCLAW_ROOT", "")).expanduser()
+        if os.environ.get("FRWCLAW_ROOT")
+        else None,
         home / ".hermes" / "skills" / "frwclaw-pro" / ".env",
         home / ".agents" / "skills" / "frwclaw-pro" / ".env",
     ]
@@ -181,7 +182,9 @@ def _status_label(http: int, body: Any) -> str:
     return f"{http}:{str(body)[:120]}"
 
 
-def _poll_task(host: str, api_key: str, task_id: str, *, timeout_s: float = 180.0) -> dict[str, Any]:
+def _poll_task(
+    host: str, api_key: str, task_id: str, *, timeout_s: float = 180.0
+) -> dict[str, Any]:
     deadline = time.time() + timeout_s
     last: dict[str, Any] = {}
     while time.time() < deadline:
@@ -230,10 +233,7 @@ def _classify(probes: dict[str, Any]) -> dict[str, str]:
     else:
         l1 = "grok"
 
-    if ltx_t2v_ok:
-        l2 = "ltx-t2v"
-    else:
-        l2 = "legacy-text2video"
+    l2 = "ltx-t2v" if ltx_t2v_ok else "legacy-text2video"
 
     notes: list[str] = []
     if "403" in seedance:
@@ -248,9 +248,13 @@ def _classify(probes: dict[str, Any]) -> dict[str, str]:
     return {
         "recommended_l1": l1,
         "recommended_l2": l2,
-        "seedance_permission": "open" if seedance_ok else ("blocked" if "403" in seedance else "unknown"),
+        "seedance_permission": "open"
+        if seedance_ok
+        else ("blocked" if "403" in seedance else "unknown"),
         "notes": ",".join(notes) if notes else "ok",
-        "classic_img2video_usable": "yes" if classic_i2v_ok else ("untested" if not classic_i2v else "no"),
+        "classic_img2video_usable": "yes"
+        if classic_i2v_ok
+        else ("untested" if not classic_i2v else "no"),
     }
 
 
@@ -267,7 +271,9 @@ def run_canary(
         "probed_at": _now_iso(),
         "host": host.rstrip("/"),
         "key_source": key_source or "missing",
-        "key_fingerprint": (api_key[:8] + "…" + api_key[-4:]) if len(api_key) >= 12 else "(missing)",
+        "key_fingerprint": (api_key[:8] + "…" + api_key[-4:])
+        if len(api_key) >= 12
+        else "(missing)",
         "credits_total": None,
         "credits_remaining": None,
         "call_limit": None,
@@ -432,7 +438,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--root", default=None, help="Film root; write receipts/frw-key-capability.json")
     p.add_argument("--host", default=DEFAULT_HOST, help=f"FRW API host (default {DEFAULT_HOST})")
     p.add_argument("--img-url", default=DEFAULT_IMG, help="Public HTTPS image for i2v probes")
-    p.add_argument("--wait", action="store_true", help="Poll ltx-t2v to completed (uses credits if 201)")
+    p.add_argument(
+        "--wait", action="store_true", help="Poll ltx-t2v to completed (uses credits if 201)"
+    )
     p.add_argument("--full", action="store_true", help="Also probe classic T2I/I2V + ltx-i2v")
     p.add_argument("--poll-timeout", type=float, default=180.0, help="Seconds for --wait poll")
     p.add_argument(

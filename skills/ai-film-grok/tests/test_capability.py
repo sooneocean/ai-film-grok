@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -20,7 +22,9 @@ from capability_report import (  # noqa: E402
 )
 
 
+@pytest.mark.slow
 class SuggestI2VTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_seedance_201_suggests_frw(self) -> None:
         receipt = {
             "ok": True,
@@ -36,6 +40,7 @@ class SuggestI2VTests(unittest.TestCase):
         self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
         self.assertTrue(s["rationale"])
 
+    @pytest.mark.slow
     def test_seedance_403_suggests_grok(self) -> None:
         receipt = {
             "ok": True,
@@ -52,8 +57,11 @@ class SuggestI2VTests(unittest.TestCase):
         self.assertEqual(s["patch"].get("i2v_provider"), "grok")
         self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
         self.assertIn("i2v_provider", s["changes"])
-        self.assertTrue(any("Grok" in r or "grok" in r for r in (s["recommendations"] + s["rationale"])))
+        self.assertTrue(
+            any("Grok" in r or "grok" in r for r in (s["recommendations"] + s["rationale"]))
+        )
 
+    @pytest.mark.slow
     def test_no_receipt(self) -> None:
         # grok_primary (default season): no canary still suggests Grok L1 + LTX env
         s = suggest_i2v_from_canary(None)
@@ -63,6 +71,7 @@ class SuggestI2VTests(unittest.TestCase):
         self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
         self.assertTrue(s["recommendations"])
 
+    @pytest.mark.slow
     def test_summarize(self) -> None:
         sm = summarize_frw_receipt(
             {"ok": True, "seedance_i2v": "403", "recommended_l1": "grok", "probed_at": "t"}
@@ -72,7 +81,9 @@ class SuggestI2VTests(unittest.TestCase):
         self.assertEqual(sm["recommended_l1"], "grok")
 
 
+@pytest.mark.slow
 class ApplyPatchTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_apply_only_i2v_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -102,6 +113,7 @@ class ApplyPatchTests(unittest.TestCase):
             self.assertEqual(loaded["extra_should_stay"], 1)
             self.assertIn("_capability_apply", loaded)
 
+    @pytest.mark.slow
     def test_apply_dry_run_no_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -114,7 +126,9 @@ class ApplyPatchTests(unittest.TestCase):
             self.assertEqual(loaded["i2v_provider"], "frw")
 
 
+@pytest.mark.slow
 class BuildReportSmoke(unittest.TestCase):
+    @pytest.mark.slow
     def test_global_report_shape(self) -> None:
         report = build_capability_report(root=None)
         self.assertIn("tts", report)
@@ -126,6 +140,7 @@ class BuildReportSmoke(unittest.TestCase):
         self.assertIn("voicebox", report["tts"])
         self.assertIn("fallback_enabled", report["tts"])
 
+    @pytest.mark.slow
     def test_root_with_fake_canary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

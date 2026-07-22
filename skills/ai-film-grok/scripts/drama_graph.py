@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
-"""Vertical Drama Graph v0 — derive / validate / status from film-spec.
+"""Vertical Drama Graph v2 — derive / validate / status from film-spec.
 
-Phase 1: film-spec remains the executable source of truth.
-drama-graph.json is a read-only structural projection for Agent planning.
+The canonical narrative graph is v2. Legacy film-spec roots are imported into
+an explicit draft graph and remain blocked until their story semantics are
+authored and locked.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from util import read_json, write_json
 
 GRAPH_NAME = "drama-graph.json"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 KIND = "vertical-drama-graph"
 
 # dramatic_function → beat bucket (v0 grouping)
@@ -28,7 +31,87 @@ _BEAT_BUCKETS: list[tuple[str, frozenset[str], str]] = [
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
+
+
+def _stable_hash(value: Any) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _finalize_execution_jobs(
+    jobs: list[dict[str, Any]],
+    *,
+    graph: dict[str, Any],
+    projection_stale: bool = False,
+) -> list[dict[str, Any]]:
+    """Apply dependency order and lifecycle states to the job summary.
+
+    ``ready`` means every dependency is actually complete. A missing or stale
+    upstream never becomes executable merely because its own asset is present.
+    """
+    by_id = {str(job.get("id")): job for job in jobs}
+    stale_nodes = {
+        str(ref)
+        for ref, _kind, node, _parent in _iter_graph_nodes(graph)
+        if isinstance(node, dict)
+        and isinstance(node.get("control"), dict)
+        and node["control"].get("state") == "stale"
+    }
+    for job in jobs:
+        node_ref = str(job.get("nodeRef") or "")
+        job["inputHash"] = _stable_hash(
+            {
+                "nodeRef": node_ref,
+                "skillId": job.get("skillId"),
+                "graph": graph.get("content_sha256"),
+            }
+        )
+        job["lifecycle"] = "blocked"
+        if projection_stale or node_ref.split(":", 1)[-1] in stale_nodes:
+            job["status"] = "stale"
+            job["lifecycle"] = "stale"
+            job["executable"] = False
+            continue
+        deps = [by_id.get(str(dep)) for dep in (job.get("dependsOn") or [])]
+        dependencies_complete = all(dep is not None and dep.get("status") == "done" for dep in deps)
+        job["executable"] = dependencies_complete
+        if job.get("skillId") == "image.animate" and not dependencies_complete:
+            job["status"] = "blocked"
+        if job.get("status") == "done":
+            job["lifecycle"] = "succeeded"
+        elif job.get("status") == "ready":
+            # Keep authoring readiness visible; ``executable`` is the hard
+            # runtime gate when upstream jobs have not completed.
+            job["lifecycle"] = "ready"
+        else:
+            job["lifecycle"] = "blocked"
+    return jobs
+
+
+def _iter_graph_nodes(graph: dict[str, Any]):
+    """Small local iterator to avoid coupling execution status to authoring code."""
+    story = graph.get("story")
+    if isinstance(story, dict):
+        yield "story", "story", story, None
+    for ep in graph.get("episodes") or []:
+        if not isinstance(ep, dict):
+            continue
+        ep_ref = str(ep.get("id") or "episode")
+        yield ep_ref, "episode", ep, "story"
+        for sc in ep.get("scenes") or []:
+            if not isinstance(sc, dict):
+                continue
+            sc_ref = str(sc.get("id") or "scene")
+            yield sc_ref, "scene", sc, ep_ref
+            for bt in sc.get("beats") or []:
+                if not isinstance(bt, dict):
+                    continue
+                bt_ref = str(bt.get("id") or "beat")
+                yield bt_ref, "beat", bt, sc_ref
+                for sh in bt.get("shots") or []:
+                    if isinstance(sh, dict):
+                        yield str(sh.get("id") or "shot"), "shot", sh, bt_ref
 
 
 def graph_path(root: Path) -> Path:
@@ -62,7 +145,9 @@ def _iter_scenes(spec: dict[str, Any]) -> list[dict[str, Any]]:
     # flat shots legacy
     shots = spec.get("shots")
     if isinstance(shots, list) and shots:
-        return [{"title": "main", "summary": "", "shots": [s for s in shots if isinstance(s, dict)]}]
+        return [
+            {"title": "main", "summary": "", "shots": [s for s in shots if isinstance(s, dict)]}
+        ]
     return []
 
 
@@ -197,7 +282,9 @@ def _locations_from_bible(bible: dict[str, Any]) -> list[dict[str, Any]]:
                     "structure": str(v.get("structure") or ""),
                     "timeOfDay": str(v.get("timeOfDay") or v.get("time_of_day") or ""),
                     "lighting": str(v.get("lighting") or ""),
-                    "immutableRules": list(v.get("immutableRules") or v.get("immutable_rules") or []),
+                    "immutableRules": list(
+                        v.get("immutableRules") or v.get("immutable_rules") or []
+                    ),
                 }
             )
         else:
@@ -290,7 +377,10 @@ def derive_graph(root: Path, *, write: bool = True) -> dict[str, Any]:
                         "beat_id": str(sh.get("beat_id") or sh.get("beatId") or ""),
                         "source_refs": list(sh.get("source_refs") or []),
                         "narrativePurpose": str(
-                            sh.get("title") or dsl.get("story_beat") or sh.get("dramatic_function") or ""
+                            sh.get("title")
+                            or dsl.get("story_beat")
+                            or sh.get("dramatic_function")
+                            or ""
                         ),
                         "dramaticFunction": str(sh.get("dramatic_function") or ""),
                         "shotSize": str(cam.get("shot_size") or dsl.get("shot_size") or ""),
@@ -414,7 +504,9 @@ def derive_graph(root: Path, *, write: bool = True) -> dict[str, Any]:
         "kind": KIND,
         "derived_from": {
             "film_spec": str(root / "film-spec.json"),
-            "style_bible": str(root / "style-bible.json") if (root / "style-bible.json").is_file() else None,
+            "style_bible": str(root / "style-bible.json")
+            if (root / "style-bible.json").is_file()
+            else None,
             "at": utc_now(),
             "mode": "derive",
         },
@@ -426,6 +518,19 @@ def derive_graph(root: Path, *, write: bool = True) -> dict[str, Any]:
             "targetFps": fps,
             "root": str(root),
         },
+        "story": {
+            "premise": str(di.get("premise") or di.get("logline") or ""),
+            "logline": str(di.get("logline") or ""),
+            "theme": str(di.get("theme") or ""),
+            "protagonist_ids": list(di.get("cast") or []),
+            "protagonist_goal": str(di.get("protagonist_goal") or "needs_authoring"),
+            "opposition": str(di.get("opposition") or "needs_authoring"),
+            "stakes": str(di.get("stakes") or "needs_authoring"),
+            "climax_choice": str(di.get("climax_choice") or "needs_authoring"),
+            "ending_hook": str(di.get("ending_hook") or ending or "needs_authoring"),
+            "emotional_arc": emotional,
+            "status": "needs_authoring",
+        },
         "episodes": [episode],
         "characters": _characters_from_bible(bible),
         "locations": _locations_from_bible(bible),
@@ -433,6 +538,9 @@ def derive_graph(root: Path, *, write: bool = True) -> dict[str, Any]:
         "warnings": warnings,
     }
 
+    from narrative_control import ensure_graph_controls
+
+    ensure_graph_controls(graph)
     if write:
         write_json(graph_path(root), graph)
         # receipt
@@ -470,8 +578,8 @@ def validate_graph(graph: dict[str, Any] | None = None, root: Path | None = None
     if not isinstance(graph, dict):
         return {"ok": False, "errors": ["graph is not an object"], "warnings": []}
 
-    if graph.get("schema_version") not in {SCHEMA_VERSION, 2}:
-        errors.append(f"schema_version must be {SCHEMA_VERSION} or 2")
+    if graph.get("schema_version") != SCHEMA_VERSION:
+        errors.append(f"schema_version must be {SCHEMA_VERSION}; migrate legacy v1 explicitly")
     if graph.get("kind") not in (None, KIND):
         warnings.append(f"unexpected kind={graph.get('kind')}")
 
@@ -526,7 +634,9 @@ def validate_graph(graph: dict[str, Any] | None = None, root: Path | None = None
                                 if isinstance(p, dict) and not p.get("id"):
                                     errors.append(f"shot {sid} panel missing id")
                                 # panel must not be only free text — require subject or action
-                                if isinstance(p, dict) and not (p.get("subject") or p.get("action")):
+                                if isinstance(p, dict) and not (
+                                    p.get("subject") or p.get("action")
+                                ):
                                     warnings.append(f"shot {sid} panel has empty subject/action")
 
         if not shot_ids:
@@ -653,7 +763,7 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
         depends_on: list[str] | None = None,
         cli: str | None = None,
         why: str = "",
-        ) -> None:
+    ) -> None:
         jobs.append(
             {
                 "id": jid,
@@ -685,7 +795,9 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
             "story",
             "done" if semantic_ok else "ready",
             cli=None if semantic_ok else f'aifilm plan validate --root "{root}" --strict',
-            why="story/beat/shot semantic contract" if semantic_ok else "missing story or shot semantics",
+            why="story/beat/shot semantic contract"
+            if semantic_ok
+            else "missing story or shot semantics",
         )
         narrative_gate_ids.append("job_story_validate")
         add(
@@ -694,7 +806,9 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
             "episode:ep01",
             "done" if semantic_ok else "blocked",
             depends_on=["job_story_validate"],
-            why="beat outcomes and state deltas" if semantic_ok else "blocked by narrative validation",
+            why="beat outcomes and state deltas"
+            if semantic_ok
+            else "blocked by narrative validation",
         )
         narrative_gate_ids.append("job_beat_validate")
         add(
@@ -703,7 +817,9 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
             "episode:ep01",
             "done" if semantic_ok else "blocked",
             depends_on=["job_beat_validate"],
-            why="stable shot ids and distinct coverage" if semantic_ok else "blocked by beat validation",
+            why="stable shot ids and distinct coverage"
+            if semantic_ok
+            else "blocked by beat validation",
         )
         narrative_gate_ids.append("job_shot_plan")
         add(
@@ -717,15 +833,25 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
         narrative_gate_ids.append("job_panel_layout")
         projection_ok = bool(projection.get("ok"))
         all_locked = all(scope in locked for scope in ("story", "beats", "shots", "panels"))
-        project_status = "done" if semantic_ok and all_locked and projection_ok else "ready" if semantic_ok and all_locked else "blocked"
+        project_status = (
+            "done"
+            if semantic_ok and all_locked and projection_ok
+            else "ready"
+            if semantic_ok and all_locked
+            else "blocked"
+        )
         add(
             "job_graph_project",
             "graph.project",
             "project",
             project_status,
             depends_on=["job_panel_layout"],
-            cli=None if project_status == "done" else f'aifilm graph project --root "{root}" --force',
-            why="graph → film-spec projection" if project_status != "done" else "projection current",
+            cli=None
+            if project_status == "done"
+            else f'aifilm graph project --root "{root}" --force',
+            why="graph → film-spec projection"
+            if project_status != "done"
+            else "projection current",
         )
         narrative_gate_ids.append("job_graph_project")
         add(
@@ -734,7 +860,9 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
             "project",
             "done" if projection_ok else "blocked",
             depends_on=["job_graph_project"],
-            why="source revision/hash binding" if projection_ok else "film-spec projection missing or stale",
+            why="source revision/hash binding"
+            if projection_ok
+            else "film-spec projection missing or stale",
         )
         narrative_gate_ids.append("job_projection_verify")
 
@@ -773,7 +901,11 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
             why="missing film-spec",
         )
     else:
-        status = "blocked" if narrative and narrative.get("canonical") and not narrative.get("ready_for_media") else "done"
+        status = (
+            "blocked"
+            if narrative and narrative.get("canonical") and not narrative.get("ready_for_media")
+            else "done"
+        )
         add(
             "job_write_spec",
             "shot.plan",
@@ -794,6 +926,7 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
         why="Vertical Drama Graph projection",
     )
 
+    motion_job_ids: list[str] = []
     for sh in iter_shots(graph):
         sid = str(sh.get("id"))
         hints = sh.get("assetHints") or {}
@@ -817,44 +950,61 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
             depends_on=[f"job_panel_{sid}"],
             cli=None
             if hints.get("hasKeyframe")
-            else f'# image_edit/gen → keyframes/{sid}.png → register-still',
+            else f"# image_edit/gen → keyframes/{sid}.png → register-still",
             why="need keyframe" if kf_status == "ready" else "keyframe present",
         )
+        # Real VO duration locks the playable timing before motion credits are spent.
+        voice_job_id: str | None = None
+        if sh.get("nar"):
+            voice_job_id = f"job_vo_{sid}"
+            tts_ok = (root / "receipts" / "tts-rehearsal.json").is_file()
+            add(
+                voice_job_id,
+                "voice.synthesize",
+                f"shot:{sid}",
+                "done" if tts_ok else "ready",
+                depends_on=["job_write_spec"],
+                cli=None if tts_ok else f'aifilm tts-rehearse --root "{root}" --backend edge',
+                why="lock real VO duration before motion",
+            )
+
         # motion
         if mode == "panel-animation":
             skill = "camera.motion.plan"
+            motion_cli = f'aifilm motion-plan --root "{root}" --shot-id {sid}'
+            route = "panel_animation"
         elif mode == "text-to-video":
             skill = "image.animate"
+            motion_cli = f'aifilm env-plate --root "{root}" --shot-id {sid} --prompt-file prompts/{sid}.txt --wait'
+            route = "environment_t2v"
+        elif mode in {"single-keyframe-i2v", "first-last-frame-i2v"}:
+            skill = "image.animate"
+            motion_cli = f"aifilm media-queue / image_to_video → register-clip --shot-id {sid}"
+            route = "hero_i2v"
         else:
             skill = "image.animate"
+            motion_cli = f"aifilm media-queue / image_to_video → register-clip --shot-id {sid}"
+            route = "explicit_review_required"
         clip_status = "done" if hints.get("hasClip") else "ready"
+        motion_deps = [f"job_kf_{sid}"]
+        if voice_job_id:
+            motion_deps.append(voice_job_id)
         add(
             f"job_motion_{sid}",
             skill,
             f"shot:{sid}",
             clip_status,
-            depends_on=[f"job_kf_{sid}"],
-            cli=None
-            if hints.get("hasClip")
-            else f'aifilm media-queue / image_to_video → register-clip --shot-id {sid}',
-            why=f"productionMode={mode}",
+            depends_on=motion_deps,
+            cli=None if hints.get("hasClip") else motion_cli,
+            why=f"productionMode={mode}; route={route}",
         )
-        # voice if nar
-        if sh.get("nar"):
-            # VO often at final; mark ready until tts rehearsal exists
-            tts_ok = (root / "receipts" / "tts-rehearsal.json").is_file()
-            add(
-                f"job_vo_{sid}",
-                "voice.synthesize",
-                f"shot:{sid}",
-                "done" if tts_ok else "ready",
-                depends_on=[f"job_motion_{sid}"],
-                cli=None if tts_ok else f'aifilm tts-rehearse --root "{root}" --backend edge',
-                why="nar present",
-            )
+        jobs[-1]["route"] = route
+        motion_job_ids.append(f"job_motion_{sid}")
 
     # assemble / render
-    final_mp4 = list(root.glob("**/final*.mp4")) + list((root / "exports").glob("*.mp4") if (root / "exports").is_dir() else [])
+    final_mp4 = list(root.glob("**/final*.mp4")) + list(
+        (root / "exports").glob("*.mp4") if (root / "exports").is_dir() else []
+    )
     # also common path
     for cand in [root / "final.mp4", root / "deliverables" / "final.mp4"]:
         if cand.is_file():
@@ -864,8 +1014,12 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
         "job_render",
         "video.render",
         "episode:ep01",
-        "done" if has_final else "blocked" if craft_stage in {"idea", "story", "beats"} else "ready",
-        depends_on=["job_write_spec"],
+        "done"
+        if has_final
+        else "blocked"
+        if craft_stage in {"idea", "story", "beats"}
+        else "ready",
+        depends_on=["job_write_spec"] + motion_job_ids,
         cli=f'aifilm final --root "{root}" --post-engine hyperframes',
         why="final mp4" if has_final else "await media then final",
     )
@@ -879,16 +1033,25 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
         why="seven-dimension scorecard",
     )
 
+    projection = (narrative or {}).get("projection") or {}
+    projection_is_bound = bool(projection.get("source_revision") or projection.get("actual_sha256"))
+    _finalize_execution_jobs(
+        jobs,
+        graph=graph,
+        # Legacy film-spec imports have no canonical projection binding yet;
+        # preserve their asset visibility while keeping bound graphs fail closed.
+        projection_stale=bool(projection.get("stale")) and projection_is_bound,
+    )
     by_status: dict[str, int] = {}
     for j in jobs:
         stt = str(j.get("status") or "unknown")
         by_status[stt] = by_status.get(stt, 0) + 1
 
-    ready = [j for j in jobs if j.get("status") == "ready"]
+    ready = [j for j in jobs if j.get("lifecycle") == "ready" and j.get("executable", True)]
     primary = ready[0] if ready else None
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "kind": "execution-jobs-summary",
         "at": utc_now(),
         "root": str(root),

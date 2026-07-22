@@ -8,8 +8,11 @@ Pipeline stages (product spine — see references/pipeline-methodology.md):
 
 from __future__ import annotations
 
+from datetime import UTC
 from pathlib import Path
 from typing import Any
+
+from util import read_json
 
 # Product methodology stages (Grok Agent + layers 1–4 + delivery).
 PIPELINE_STAGES: tuple[str, ...] = (
@@ -57,25 +60,13 @@ _STAGE_LABELS_ZH: dict[str, str] = {
 }
 
 
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        import json
-
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
-
-
 def _preview_ok(root: Path) -> bool:
     try:
         from compose_preview import has_valid_preview_receipt
 
         return has_valid_preview_receipt(root)
     except Exception:
-        rec = _read_json(root / "receipts" / "compose-preview.json")
+        rec = read_json(root / "receipts" / "compose-preview.json") or {}
         return bool(
             isinstance(rec, dict)
             and isinstance(rec.get("url"), str)
@@ -85,7 +76,7 @@ def _preview_ok(root: Path) -> bool:
 
 
 def _tts_rehearse_ok(root: Path) -> bool:
-    rehearse = _read_json(root / "receipts" / "tts-rehearsal.json")
+    rehearse = read_json(root / "receipts" / "tts-rehearsal.json") or {}
     return bool(
         isinstance(rehearse, dict)
         and rehearse.get("ok") is True
@@ -94,14 +85,14 @@ def _tts_rehearse_ok(root: Path) -> bool:
 
 
 def _final_record(root: Path) -> dict[str, Any] | None:
-    man = _read_json(root / "manifest.json")
+    man = read_json(root / "manifest.json") or {}
     outputs = man.get("outputs") if isinstance(man.get("outputs"), dict) else {}
     rec = outputs.get("final_film")
     return rec if isinstance(rec, dict) and rec else None
 
 
 def _pilot_user_ok(root: Path) -> bool:
-    pilot_approval = _read_json(root / "receipts" / "pilot-approval.json")
+    pilot_approval = read_json(root / "receipts" / "pilot-approval.json") or {}
     try:
         from production_gates import pilot_is_user_approved
 
@@ -182,8 +173,7 @@ def detect_pipeline_stage(
         "design": bool(
             final_ok
             or (
-                final_rec
-                and str(final_rec.get("post_engine") or "") in {"hyperframes", "remotion"}
+                final_rec and str(final_rec.get("post_engine") or "") in {"hyperframes", "remotion"}
             )
             or preview_ok
         ),
@@ -263,7 +253,11 @@ def build_next_actions(
     r = str(root)
 
     if not (root / "brief.json").is_file() and not gates.get("brief"):
-        add("init", f'aifilm init --theme "…" --title "…" --root "{r}" --aspect 9:16', "项目未初始化")
+        add(
+            "init",
+            f'aifilm init --theme "…" --title "…" --root "{r}" --aspect 9:16',
+            "项目未初始化",
+        )
         return actions
 
     if not gates.get("style_locked"):
@@ -277,7 +271,7 @@ def build_next_actions(
         add("write-spec", f'aifilm write-spec --root "{r}"', "film-spec 未通过校验")
 
     # Framing crop risk after write-spec (soft routing)
-    spec = _read_json(root / "film-spec.json")
+    spec = read_json(root / "film-spec.json") or {}
     framing = spec.get("_framing_lint") if isinstance(spec.get("_framing_lint"), dict) else {}
     if framing and framing.get("ok") is False:
         codes = ",".join(str(c) for c in (framing.get("codes") or [])[:4])
@@ -288,8 +282,8 @@ def build_next_actions(
         )
 
     # Pilot path (before bulk clips)
-    pilot_approval = _read_json(root / "receipts" / "pilot-approval.json")
-    pilot_score = _read_json(root / "receipts" / "pilot-scorecard.json")
+    pilot_approval = read_json(root / "receipts" / "pilot-approval.json") or {}
+    pilot_score = read_json(root / "receipts" / "pilot-scorecard.json") or {}
     try:
         from production_gates import pilot_is_user_approved
 
@@ -384,16 +378,16 @@ def build_next_actions(
                 add(
                     "final-designed",
                     f'aifilm final --root "{r}" --post-engine hyperframes '
-                    f'--lipsync off --music-mood rnb --tts-backend edge --compose-preset auto '
-                    f'--title-sequence auto --end-roll auto',
+                    f"--lipsync off --music-mood rnb --tts-backend edge --compose-preset auto "
+                    f"--title-sequence auto --end-roll auto",
                     "[层3·设计] 跳过预览一键设计成片（排版风险更高；可用 --require-preview 强制先预览）",
                 )
             else:
                 add(
                     "final-designed",
                     f'aifilm final --root "{r}" --post-engine hyperframes '
-                    f'--lipsync off --music-mood rnb --tts-backend edge --compose-preset auto '
-                    f'--title-sequence auto --end-roll auto',
+                    f"--lipsync off --music-mood rnb --tts-backend edge --compose-preset auto "
+                    f"--title-sequence auto --end-roll auto",
                     "[层3·设计] 已 compose-preview → 推荐 HyperFrames 设计字幕成片",
                 )
                 rem_pkg = root / "compose" / "remotion" / "package.json"
@@ -401,7 +395,7 @@ def build_next_actions(
                     add(
                         "compose-render-remotion",
                         f'aifilm compose-render --root "{r}" --engine remotion --npm-install '
-                        f'--title-sequence auto --end-roll auto',
+                        f"--title-sequence auto --end-roll auto",
                         "[层3·设计] Remotion 包已导出 → compose-render（首次 --npm-install）",
                     )
                 add(
@@ -511,14 +505,14 @@ def persist_pipeline_stage(
     """
     import json
     import os
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     root = Path(root).expanduser().resolve()
     receipts = root / "receipts"
     receipts.mkdir(parents=True, exist_ok=True)
     payload = {
         **pipeline,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "root": str(root),
         "next_cmd": next_cmd,
         "next_id": next_id,
@@ -539,7 +533,9 @@ def persist_pipeline_stage(
         hud.mkdir(parents=True, exist_ok=True)
         hud_json = hud / "aifilm-stage.json"
         hud_txt = hud / "aifilm-stage.txt"
-        hud_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        hud_json.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         line = payload["line"]
         if next_id:
             line = f"{line} → {next_id}"

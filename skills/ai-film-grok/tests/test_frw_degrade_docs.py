@@ -5,6 +5,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 REF = ROOT / "references" / "frw-degrade-dispatch.md"
 LESSON_FRW = ROOT / "references" / "lessons-2026-07-20-frw-2v-first.md"
@@ -21,7 +23,9 @@ EXAMPLE = ROOT / "templates" / "film-spec.example.json"
 SCHEMA = ROOT / "schemas" / "film-spec.schema.json"
 
 
+@pytest.mark.slow
 class FrwSeedanceDocsTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_frw_degrade_reference_seedance_first(self) -> None:
         self.assertTrue(REF.is_file(), f"missing {REF}")
         text = REF.read_text(encoding="utf-8")
@@ -46,6 +50,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         low = text.lower()
         self.assertIn("image_to_video", low)
 
+    @pytest.mark.slow
     def test_skill_yaml_and_body_seedance(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")
         # Current season: grok_primary; Seedance kept as restore path + FRW degrade docs
@@ -64,6 +69,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         self.assertIn("grok_primary", desc_line)
         self.assertNotIn("默认 FRW 2V 优先", desc_line)
 
+    @pytest.mark.slow
     def test_consistency_and_production_seedance(self) -> None:
         cons = CONSISTENCY.read_text(encoding="utf-8")
         prod = PRODUCTION.read_text(encoding="utf-8")
@@ -75,6 +81,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         self.assertIn("Seedance", cons)
         self.assertNotIn("推荐 576×1024", cons)
 
+    @pytest.mark.slow
     def test_sediment_opt5_seedance(self) -> None:
         if not SEDIMENT.is_file():
             self.skipTest("sediment crosswalk missing")
@@ -89,6 +96,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         self.assertIn("403", text)
         self.assertIn("Grok", text)
 
+    @pytest.mark.slow
     def test_lessons_exist(self) -> None:
         self.assertTrue(LESSON_FRW.is_file(), f"missing {LESSON_FRW}")
         self.assertTrue(LESSON_SEED.is_file(), f"missing {LESSON_SEED}")
@@ -111,6 +119,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         self.assertIn("502", ltx)
         self.assertIn("image_url", ltx)
 
+    @pytest.mark.slow
     def test_ltx_in_dispatch_and_film_spec_models(self) -> None:
         ref = REF.read_text(encoding="utf-8")
         self.assertIn("ltx-i2v", ref)
@@ -125,6 +134,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         qa = MEDIA_QA.read_text(encoding="utf-8")
         self.assertIn("frw_ltx_i2v", qa)
 
+    @pytest.mark.slow
     def test_media_qa_and_film_spec_code(self) -> None:
         self.assertTrue(FRW_LAUNCHER.is_file(), f"missing {FRW_LAUNCHER}")
         qa = MEDIA_QA.read_text(encoding="utf-8")
@@ -147,6 +157,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         self.assertIn("Seedance-first", launcher)
         self.assertIn("seedance-2-fast-i2v", launcher)
 
+    @pytest.mark.slow
     def test_example_and_schema_fields(self) -> None:
         ex = EXAMPLE.read_text(encoding="utf-8")
         self.assertIn("seedance-2-fast-i2v", ex)
@@ -157,6 +168,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         self.assertIn("seedance-2-fast-i2v", schema)
         self.assertIn("i2v_provider", schema)
 
+    @pytest.mark.slow
     def test_film_spec_defaults_runtime(self) -> None:
         import sys
 
@@ -220,9 +232,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         self.assertEqual(spec["scenes"][0]["shots"][0].get("shot_role"), "hero")
         self.assertEqual(spec["scenes"][0]["shots"][1].get("shot_role"), "env")
         self.assertIn("hero_motion_primary", (spec.get("_layer_routing") or {}))
-        self.assertEqual(
-            (spec.get("_layer_routing") or {}).get("env_synth_primary"), "ltx-t2v"
-        )
+        self.assertEqual((spec.get("_layer_routing") or {}).get("env_synth_primary"), "ltx-t2v")
 
 
 if __name__ == "__main__":

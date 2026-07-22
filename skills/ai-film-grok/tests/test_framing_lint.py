@@ -20,8 +20,7 @@ def _minimal(*, framing: str | None = None, motion: str | None = None) -> dict:
     dsl: dict = {
         "subject": "woman",
         "action": "turns latch",
-        "motion": motion
-        or "hand turns latch shut, body angles in, idle not speaking",
+        "motion": motion or "hand turns latch shut, body angles in, idle not speaking",
     }
     if framing is not None:
         dsl["framing"] = framing
@@ -50,9 +49,7 @@ def _minimal(*, framing: str | None = None, motion: str | None = None) -> dict:
 
 class FramingLintTests(unittest.TestCase):
     def test_crop_prone_text_detected(self) -> None:
-        hits = framing_crop_risk_in_text(
-            "extreme close-up, face fills the frame, push-in on face"
-        )
+        hits = framing_crop_risk_in_text("extreme close-up, face fills the frame, push-in on face")
         self.assertTrue(hits)
         self.assertTrue(any("extreme" in h.lower() or "fill" in h.lower() for h in hits))
 

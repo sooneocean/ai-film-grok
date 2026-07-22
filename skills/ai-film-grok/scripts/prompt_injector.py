@@ -1,17 +1,43 @@
-import json
 import hashlib
+import json
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
+from typing import Any
+
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
+
 
 def _sha256(content: str) -> str:
-    return hashlib.sha256(content.encode('utf-8')).hexdigest()
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _dedupe_csv(value: str) -> str:
+    """Keep ordered negative constraints while dropping exact repeated tokens."""
+    seen: set[str] = set()
+    kept: list[str] = []
+    for item in value.split(","):
+        normalized = item.strip()
+        key = normalized.casefold()
+        if normalized and key not in seen:
+            seen.add(key)
+            kept.append(normalized)
+    return ", ".join(kept)
+
+
+def _prompt_metrics(prompt: str) -> dict[str, int]:
+    """Expose a conservative local estimate; providers remain the billing authority."""
+    characters = len(prompt)
+    return {
+        "characters": characters,
+        "estimated_input_tokens": (characters + 3) // 4,
+    }
+
 
 class PromptConflictError(Exception):
     pass
+
 
 class PromptInjector:
     def __init__(self, bible: dict[str, Any], template_version: str = "T2I"):
@@ -27,13 +53,31 @@ class PromptInjector:
         shot_lower = shot_text.lower()
 
         conflict_groups = {
-            "hair color": ["white hair", "blonde hair", "black hair", "brown hair", "red hair", "blue hair", "pink hair", "silver hair", "purple hair", "green hair"],
-            "eye color": ["blue eyes", "red eyes", "green eyes", "brown eyes", "black eyes", "purple eyes"],
+            "hair color": [
+                "white hair",
+                "blonde hair",
+                "black hair",
+                "brown hair",
+                "red hair",
+                "blue hair",
+                "pink hair",
+                "silver hair",
+                "purple hair",
+                "green hair",
+            ],
+            "eye color": [
+                "blue eyes",
+                "red eyes",
+                "green eyes",
+                "brown eyes",
+                "black eyes",
+                "purple eyes",
+            ],
             "time of day": ["daytime", "night", "morning", "evening", "sunset"],
-            "environment": ["indoors", "outdoors", "outside", "inside"]
+            "environment": ["indoors", "outdoors", "outside", "inside"],
         }
 
-        for group_name, traits in conflict_groups.items():
+        for _group_name, traits in conflict_groups.items():
             for trait in traits:
                 if trait in lock_lower and any(t in shot_lower for t in traits if t != trait):
                     return True
@@ -41,11 +85,11 @@ class PromptInjector:
 
     @staticmethod
     def _wardrobe_state_of(shot: dict[str, Any]) -> str:
-        return str(
-            shot.get("wardrobe_state")
-            or (shot.get("dsl") or {}).get("wardrobe_state")
-            or ""
-        ).strip().lower()
+        return (
+            str(shot.get("wardrobe_state") or (shot.get("dsl") or {}).get("wardrobe_state") or "")
+            .strip()
+            .lower()
+        )
 
     @staticmethod
     def _costume_continuity_line(w_lock: str) -> str:
@@ -137,11 +181,7 @@ class PromptInjector:
                 identity = self.bible.get("identity_lock", "")
             identity = self._identity_for_wardrobe(identity, wardrobe_state)
 
-            wardrobe = (
-                self.bible.get("wardrobe_variants", {})
-                .get(hid, {})
-                .get(wardrobe_state, "")
-            )
+            wardrobe = self.bible.get("wardrobe_variants", {}).get(hid, {}).get(wardrobe_state, "")
             # Never fall back to default_wardrobe when undressed — that re-dresses
             if not wardrobe and wardrobe_state in {"full", "armored", "default"}:
                 wardrobe = char_info.get("default_wardrobe", "")
@@ -160,9 +200,7 @@ class PromptInjector:
                 )
 
             if resolve_state_photo is not None:
-                sp = resolve_state_photo(
-                    self.bible, str(hid), wardrobe_state, root=root
-                )
+                sp = resolve_state_photo(self.bible, str(hid), wardrobe_state, root=root)
                 if sp:
                     state_photo_paths.append(sp)
 
@@ -170,30 +208,61 @@ class PromptInjector:
             parts.append(" | ".join(char_locks))
 
         # Keyframe-first state index: tell agent which pixel ref to use
-        state_photo_line = ""
+        reference_instruction = ""
         if state_photo_paths:
             primary = state_photo_paths[0]
-            state_photo_line = (
+            reference_instruction = (
                 f"State photo ref: {primary} — image_edit MUST use this state photo "
                 f"(or undress-anchor / prior undressed still) as PRIMARY ref for wardrobe_state={wardrobe_state}; "
                 f"do NOT restart from full cast master unless state=full"
             )
-            parts.append(state_photo_line)
 
         costume_line = ""
         if wardrobe_state in {"partial", "undressed", "bare"}:
             costume_line = self._costume_continuity_line(wardrobe_state)
             parts.append(costume_line)
 
+        # 3b. Coitus / heat pose lock (act/climax — Mute Frame readable)
+        heat_phase = (
+            str(shot.get("heat_phase") or (shot.get("dsl") or {}).get("heat_phase") or "")
+            .strip()
+            .lower()
+        )
+        coitus_beat = (
+            str(shot.get("coitus_beat") or (shot.get("dsl") or {}).get("coitus_beat") or "")
+            .strip()
+            .lower()
+        )
+        coitus_line = ""
+        if heat_phase in {"act", "climax"} or coitus_beat in {
+            "entry",
+            "union",
+            "rhythm",
+            "lock",
+            "finish",
+        }:
+            coitus_line = (
+                "Coitus readability HARD: pelvis contact / hips-sink / straddle-seat "
+                "or grind must be visible in frame; NOT soft hug or eye-contact only; "
+                f"coitus_beat={coitus_beat or heat_phase}; weight down, thighs readable; "
+                "do NOT put clothes back on"
+            )
+            parts.append(coitus_line)
+
         # 4. Cinematography DSL
         dsl = shot.get("dsl", {})
         camera = dsl.get("camera", {})
         cine_parts = []
-        if camera.get("shot_size"): cine_parts.append(camera["shot_size"])
-        if camera.get("angle"): cine_parts.append(camera["angle"])
-        if dsl.get("viewpoint"): cine_parts.append(f"viewpoint: {dsl['viewpoint']}")
-        if dsl.get("look_axis"): cine_parts.append(f"looking {dsl['look_axis']}")
-        if dsl.get("focal_character"): cine_parts.append(f"focus on {dsl['focal_character']}")
+        if camera.get("shot_size"):
+            cine_parts.append(camera["shot_size"])
+        if camera.get("angle"):
+            cine_parts.append(camera["angle"])
+        if dsl.get("viewpoint"):
+            cine_parts.append(f"viewpoint: {dsl['viewpoint']}")
+        if dsl.get("look_axis"):
+            cine_parts.append(f"looking {dsl['look_axis']}")
+        if dsl.get("focal_character"):
+            cine_parts.append(f"focus on {dsl['focal_character']}")
 
         cine_block = ""
         if cine_parts:
@@ -202,13 +271,21 @@ class PromptInjector:
         # 5. Continuity State
         states = self.bible.get("continuity_states", {})
         active_states = []
-        for st_name, st_desc in states.items():
+        for _st_name, st_desc in states.items():
             active_states.append(st_desc)
         # start_pose continuity into prompt
         start_pose = str(dsl.get("start_pose") or "").strip()
 
-        # 6. Shot-Specific Action
-        shot_action = dsl.get("action", "") or shot.get("nar", "")
+        # 6. Shot-Specific Action.  VO/dialogue never becomes a visual action:
+        # only observable body/prop action and an in-scene reaction may enter.
+        try:
+            from content_channels import resolve_content_channels, visual_prompt_action
+
+            content = resolve_content_channels(shot)
+            shot_action = visual_prompt_action(shot)
+        except Exception:
+            content = {}
+            shot_action = str(dsl.get("action") or "").strip()
 
         # 6b. Tone tags = performance manner (still/I2V face/body acting)
         #     Sound cues = ambient/SFX description (must NOT be spoken as nar)
@@ -234,7 +311,9 @@ class PromptInjector:
         global_locks = f"{sig} {lighting} {', '.join(active_states)}"
         for lock in char_locks + [global_locks]:
             if self.detect_conflict(lock, shot_action):
-                raise PromptConflictError(f"Shot prompt '{shot_action}' conflicts with locked trait '{lock}'")
+                raise PromptConflictError(
+                    f"Shot prompt '{shot_action}' conflicts with locked trait '{lock}'"
+                )
 
         # Template Branching: T2I vs I2V — ALWAYS re-attach costume continuity
         if self.template_version == "I2V":
@@ -242,11 +321,8 @@ class PromptInjector:
             parts = []
             if costume_line:
                 parts.append(costume_line)
-            if state_photo_line:
-                parts.append(
-                    "I2V input MUST be keyframe built from state photo / undress-anchor; "
-                    "Keep first-frame clothing — never re-dress"
-                )
+            if coitus_line:
+                parts.append(coitus_line)
             if cine_block:
                 parts.append(cine_block)
             if active_states:
@@ -255,6 +331,19 @@ class PromptInjector:
                 parts.append(f"Start already: {start_pose}")
             if shot_action:
                 parts.append(f"Motion/Action: {shot_action}")
+            voice = content.get("voice") if isinstance(content, dict) else {}
+            if (
+                isinstance(voice, dict)
+                and voice.get("kind") == "narration"
+                and not voice.get("lipsync")
+            ):
+                parts.append("Narration is audio-only: no invented speech or mouth movement")
+            elif (
+                isinstance(voice, dict) and voice.get("kind") == "dialogue" and voice.get("lipsync")
+            ):
+                parts.append(
+                    "Use supplied dialogue audio for lipsync; do not invent additional words"
+                )
             if tone_line:
                 parts.append(tone_line)
         else:
@@ -266,10 +355,10 @@ class PromptInjector:
                 parts.append(f"Lighting: {lighting}")
             if char_locks:
                 parts.append(" | ".join(char_locks))
-            if state_photo_line:
-                parts.append(state_photo_line)
             if costume_line:
                 parts.append(costume_line)
+            if coitus_line:
+                parts.append(coitus_line)
             if active_states:
                 parts.append(f"Continuity: {', '.join(active_states)}")
             if start_pose:
@@ -290,10 +379,8 @@ class PromptInjector:
             "full armor during sex, intact outfit after strip, 回穿, 脱完又穿上"
         )
         if wardrobe_state in {"partial", "undressed", "bare"}:
-            if negatives:
-                negatives = f"{negatives}, {re_dress_no}"
-            else:
-                negatives = re_dress_no
+            negatives = f"{negatives}, {re_dress_no}" if negatives else re_dress_no
+        negatives = _dedupe_csv(negatives)
 
         final_prompt = "\n".join(parts)
         if negatives:
@@ -308,8 +395,10 @@ class PromptInjector:
             "wardrobe_state": wardrobe_state,
             "state_photo_paths": state_photo_paths,
             "state_photo_primary": state_photo_paths[0] if state_photo_paths else None,
+            "reference_instruction": reference_instruction or None,
             "prompt_text": final_prompt,
             "prompt_hash": _sha256(final_prompt),
+            "prompt_metrics": _prompt_metrics(final_prompt),
             "generated_at": utc_now(),
             "keyframe_first_note": (
                 "Build keyframe from state_photo_primary (or undress-anchor); "

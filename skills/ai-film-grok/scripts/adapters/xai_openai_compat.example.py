@@ -17,7 +17,11 @@ from pathlib import Path
 
 
 def _load_config_env() -> None:
-    cfg = (Path(__file__).resolve().parents[2] / "config.env" if (Path(__file__).resolve().parents[2] / "config.env").is_file() else Path.home() / ".grok/skills/ai-film-grok/config.env")
+    cfg = (
+        Path(__file__).resolve().parents[2] / "config.env"
+        if (Path(__file__).resolve().parents[2] / "config.env").is_file()
+        else Path.home() / ".grok/skills/ai-film-grok/config.env"
+    )
     if not cfg.is_file():
         return
     for line in cfg.read_text(encoding="utf-8").splitlines():
@@ -49,9 +53,7 @@ def main() -> int:
         return 2
 
     base = (
-        os.environ.get("XAI_BASE_URL")
-        or os.environ.get("OPENAI_BASE_URL")
-        or "https://api.x.ai/v1"
+        os.environ.get("XAI_BASE_URL") or os.environ.get("OPENAI_BASE_URL") or "https://api.x.ai/v1"
     ).rstrip("/")
     client = OpenAI(api_key=key, base_url=base)
     # Chat smoke — models/params change; check docs.x.ai

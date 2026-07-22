@@ -1,5 +1,7 @@
 """Shared I/O and general-purpose utilities for the ai-film-grok pipeline."""
 
+from __future__ import annotations
+
 import json
 import os
 import tempfile

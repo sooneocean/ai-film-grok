@@ -8,12 +8,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from export_composition import (  # noqa: E402
-    build_end_roll_html,
-    build_title_sequence_html,
     derive_credits_from_spec,
     export_composition,
 )
@@ -104,7 +104,9 @@ def _seed_film_root(root: Path, *, n_shots: int = 2, with_title_end: bool = Fals
     )
 
 
+@pytest.mark.slow
 class DeriveCreditsTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_cast_from_director_intent(self) -> None:
         spec = {
             "title": "T",
@@ -125,6 +127,7 @@ class DeriveCreditsTests(unittest.TestCase):
         self.assertEqual(credits["cast"][1]["name"], "Bob")
         self.assertEqual(credits["crew"][0]["name"], "AI Film Grok")
 
+    @pytest.mark.slow
     def test_fallback_cast_from_title(self) -> None:
         spec = {
             "title": "MyFilm",
@@ -140,6 +143,7 @@ class DeriveCreditsTests(unittest.TestCase):
         self.assertEqual(credits["cast"][0]["name"], "MyFilm")
         self.assertEqual(credits["cast"][0]["role"], "Director")
 
+    @pytest.mark.slow
     def test_shots_extracted(self) -> None:
         spec = {
             "title": "T",
@@ -158,7 +162,9 @@ class DeriveCreditsTests(unittest.TestCase):
         self.assertEqual(credits["shots"][1]["title"], "Second")
 
 
+@pytest.mark.slow
 class TitleEndRollExportTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_spec_title_sequence_generates_html(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -170,14 +176,13 @@ class TitleEndRollExportTests(unittest.TestCase):
                 force=True,
             )
             self.assertTrue(result["ok"])
-            html = (root / "compose" / "hyperframes" / "index.html").read_text(
-                encoding="utf-8"
-            )
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
             self.assertIn('id="title-sequence"', html)
             self.assertIn('id="end-roll"', html)
             self.assertIn("A Test Film", html)
             self.assertIn("Alice", html)
 
+    @pytest.mark.slow
     def test_title_sequence_none_suppresses_even_with_spec(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -191,14 +196,13 @@ class TitleEndRollExportTests(unittest.TestCase):
                 end_roll="none",
             )
             self.assertTrue(result["ok"])
-            html = (root / "compose" / "hyperframes" / "index.html").read_text(
-                encoding="utf-8"
-            )
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
             self.assertNotIn('id="title-sequence"', html)
             self.assertNotIn('id="end-roll"', html)
             self.assertIn('id="title-card"', html)
             self.assertIn('id="end-card"', html)
 
+    @pytest.mark.slow
     def test_end_roll_cast_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -212,13 +216,12 @@ class TitleEndRollExportTests(unittest.TestCase):
                 end_roll="cast_only",
             )
             self.assertTrue(result["ok"])
-            html = (root / "compose" / "hyperframes" / "index.html").read_text(
-                encoding="utf-8"
-            )
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
             self.assertIn('id="end-roll"', html)
             self.assertIn("Alice", html)
             self.assertNotIn('id="title-sequence"', html)
 
+    @pytest.mark.slow
     def test_remotion_title_end_components(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -236,6 +239,7 @@ class TitleEndRollExportTests(unittest.TestCase):
             self.assertIn("TitleSequence", film_tsx)
             self.assertIn("EndRoll", film_tsx)
 
+    @pytest.mark.slow
     def test_manifest_records_title_and_end_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -246,13 +250,12 @@ class TitleEndRollExportTests(unittest.TestCase):
                 engine="hyperframes",
                 force=True,
             )
-            pkg = json.loads(
-                (root / "compose" / "package.json").read_text(encoding="utf-8")
-            )
+            pkg = json.loads((root / "compose" / "package.json").read_text(encoding="utf-8"))
             self.assertTrue(pkg.get("title_sequence"))
             self.assertTrue(pkg.get("end_roll"))
             self.assertIn("credits", pkg)
 
+    @pytest.mark.slow
     def test_backward_compat_old_spec_uses_minimal_cards(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -264,9 +267,7 @@ class TitleEndRollExportTests(unittest.TestCase):
                 force=True,
             )
             self.assertTrue(result["ok"])
-            html = (root / "compose" / "hyperframes" / "index.html").read_text(
-                encoding="utf-8"
-            )
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
             self.assertIn('id="title-card"', html)
             self.assertIn('id="end-card"', html)
             self.assertNotIn('id="title-sequence"', html)

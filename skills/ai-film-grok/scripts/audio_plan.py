@@ -3,20 +3,11 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from typing import Any  # noqa: F401 — used in shots_dry
 
-
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
+from util import read_json
 
 
 def skill_dir() -> Path:
@@ -29,7 +20,7 @@ def build_audio_plan(root: Path) -> dict[str, Any]:
     if str(scripts) not in sys.path:
         sys.path.insert(0, str(scripts))
 
-    spec = _read_json(root / "film-spec.json")
+    spec = read_json(root / "film-spec.json") or {}
     tts_backend = str(spec.get("tts_backend") or "edge").lower()
     vo_voice = spec.get("vo_voice")
     mood = "rnb"
@@ -122,16 +113,15 @@ def build_audio_plan(root: Path) -> dict[str, Any]:
                 music_library=bool(caps.get("music_library")),
                 sung_provider_ready=bool(caps.get("sung_provider_ready")),
             )
-            policy = spec.get("audio_policy") if isinstance(spec.get("audio_policy"), dict) else policy
+            policy = (
+                spec.get("audio_policy") if isinstance(spec.get("audio_policy"), dict) else policy
+            )
         except Exception as exc:  # noqa: BLE001
             routing = {"ok": False, "error": str(exc)[:200]}
 
     if isinstance(routing, dict) and routing.get("counts"):
         c = routing["counts"]
-        recommendations.append(
-            "audio_recipe: "
-            + ", ".join(f"{k}={v}" for k, v in c.items() if v)
-        )
+        recommendations.append("audio_recipe: " + ", ".join(f"{k}={v}" for k, v in c.items() if v))
     if isinstance(policy, dict) and policy.get("mode") == "musical_hybrid":
         if not policy.get("allow_sung"):
             recommendations.append("musical_hybrid but allow_sung=false — no sung_beat")
@@ -161,9 +151,7 @@ def build_audio_plan(root: Path) -> dict[str, Any]:
             "resolved": music_resolved,
             "error": music_error,
             "will_use": (
-                "user_or_template"
-                if music_resolved
-                else ("error" if music_error else "procedural")
+                "user_or_template" if music_resolved else ("error" if music_error else "procedural")
             ),
             "bed_source_policy": (policy or {}).get("bed_source") if policy else "auto",
             "mean_bed_gain": (routing or {}).get("mean_bed_gain") if routing else None,

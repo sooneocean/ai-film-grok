@@ -1,18 +1,18 @@
 # 多轨声线（Voice Tracks）
 
 > 2026-07-21 · 分层语义：旁白 / 画面语气 / 声景。  
-> **同日修订**：`vocal_color`（娇喘语助独立 TTS）**默认关闭**——成片以 **旁白 + BGM** 主导；需要时再显式 opt-in。
+> **2026-07-22 v1.10**：非成人仍默认关娇喘轨；**hardcore / spice=extreme** 建议开 + act 自动肉体 SFX。
 
 ## 默认成片声线
 
-| 轨 | 默认 |
-|---|---|
-| **旁白 `nar`** | ✅ 主叙事 |
-| **BGM** | ✅ rnb / sidechain |
-| native clip 环境音 | 低增益可选 |
-| **vocal_color 娇喘轨** | ❌ **关**（`enabled=false`, gain=0） |
-| tone_tags | 只进画面 prompt，不进混音 |
-| sound_cues | 可进 SFX accent |
+| 轨 | 非成人默认 | 重口 hardcore / extreme |
+|---|---|---|
+| **旁白 `nar`** | ✅ 主叙事 | ✅ 更直白办事动词 |
+| **BGM** | ✅ rnb / sidechain | ✅ rnb |
+| native clip 环境音 | 低增益可选 | 同左 |
+| **vocal_color 娇喘轨** | ❌ 关（鸡肋） | ✅ **建议开** auto + gain≈0.52 |
+| tone_tags | 只进画面 prompt | act 自动 breathy/moan |
+| sound_cues | 可进 SFX | act/climax **自动** impact/breath/leather |
 
 ## 为什么还留字段
 

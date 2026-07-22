@@ -1,23 +1,29 @@
+from __future__ import annotations
+
 import json
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
-from datetime import datetime, timezone
+from typing import Any
+
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
+
 
 def read_json(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError:
         return None
 
+
 def write_json(path: Path, data: dict[str, Any]) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
 
 def migrate_to_v2(bible: dict[str, Any]) -> dict[str, Any]:
     v2_bible = bible.copy()
@@ -80,7 +86,9 @@ def resolve_state_photo(
     """
     state = (wardrobe_state or "full").strip().lower() or "full"
     hid = (heroine_id or "hero").strip() or "hero"
-    csm = bible.get("cast_state_masters") if isinstance(bible.get("cast_state_masters"), dict) else {}
+    csm = (
+        bible.get("cast_state_masters") if isinstance(bible.get("cast_state_masters"), dict) else {}
+    )
     for key in (hid, "hero", "xide", "fufu", "astra"):
         block = csm.get(key)
         if isinstance(block, dict):
@@ -102,15 +110,18 @@ def resolve_state_photo(
                 return str(cm[key])
     return None
 
+
 def load_bible(root: Path) -> dict[str, Any]:
     path = root / "style-bible.json"
     bible = read_json(path) or {"schema_version": 2, "state": "Draft", "locked": False}
     return migrate_to_v2(bible)
 
+
 def save_bible(root: Path, bible: dict[str, Any]) -> None:
     path = root / "style-bible.json"
     bible["updated_at"] = utc_now()
     write_json(path, bible)
+
 
 def update_bible_state(root: Path, state: str) -> None:
     bible = load_bible(root)

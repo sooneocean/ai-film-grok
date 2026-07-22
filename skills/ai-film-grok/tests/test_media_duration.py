@@ -8,18 +8,23 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from media_duration import MediaDurationError, probe_duration_sec  # noqa: E402
 
 
+@pytest.mark.slow
 class MediaDurationTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_missing_path_raises(self) -> None:
         with self.assertRaises(MediaDurationError) as ctx:
             probe_duration_sec("/nonexistent/path/nope.mp4", label="unit")
         self.assertIn("missing", str(ctx.exception).lower())
 
+    @pytest.mark.slow
     def test_empty_file_raises(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "empty.mp4"
@@ -29,6 +34,7 @@ class MediaDurationTests(unittest.TestCase):
             msg = str(ctx.exception).lower()
             self.assertTrue("empty" in msg or "0 bytes" in msg)
 
+    @pytest.mark.slow
     def test_garbage_file_raises_not_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "garbage.mp4"
@@ -36,6 +42,7 @@ class MediaDurationTests(unittest.TestCase):
             with self.assertRaises(MediaDurationError):
                 probe_duration_sec(p, label="unit")
 
+    @pytest.mark.slow
     def test_real_wav_has_positive_duration(self) -> None:
         """Drive real ffprobe on a tiny generated wav — proves shipped helper works."""
         if not __import__("shutil").which("ffmpeg"):
@@ -61,6 +68,7 @@ class MediaDurationTests(unittest.TestCase):
             self.assertGreater(dur, 0.2)
             self.assertLess(dur, 1.0)
 
+    @pytest.mark.slow
     def test_render_final_pdur_missing_raises(self) -> None:
         """Shipped render_final.pdur must not return a silent numeric default."""
         import render_final as rf

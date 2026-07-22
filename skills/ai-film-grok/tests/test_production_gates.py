@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 import tempfile
 import unittest
@@ -25,9 +24,7 @@ from production_gates import (  # noqa: E402
 class PilotGateTests(unittest.TestCase):
     def test_agent_self_approve_rejected(self) -> None:
         self.assertFalse(
-            pilot_is_user_approved(
-                {"approved": True, "approved_by": "agent", "notes": "self"}
-            )
+            pilot_is_user_approved({"approved": True, "approved_by": "agent", "notes": "self"})
         )
 
     def test_user_approve_ok(self) -> None:
@@ -53,9 +50,7 @@ class PilotGateTests(unittest.TestCase):
             known: set[str] = set()
             for i in range(1, 4):
                 sid = f"shot0{i}"
-                assert_pilot_allows_add(
-                    root, shot_id=sid, existing_shot_ids=known, env_skip=False
-                )
+                assert_pilot_allows_add(root, shot_id=sid, existing_shot_ids=known, env_skip=False)
                 known.add(sid)
             with self.assertRaisesRegex(ProductionGateError, "pilot"):
                 assert_pilot_allows_add(
@@ -118,8 +113,7 @@ class LoopRiskGateTests(unittest.TestCase):
         self.assertLessEqual(len("夜深，她推门进来。"), RECOMMENDED_NAR_CHARS + 5)
 
     def test_assert_blocks(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+        with tempfile.TemporaryDirectory():
             # minimal invalid for validate — use force path with prebuilt risk via direct assert
             with self.assertRaises(ProductionGateError):
                 assert_no_loop_risk(

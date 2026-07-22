@@ -8,12 +8,12 @@ import json
 import platform
 import shutil
 import subprocess
+from collections.abc import Iterable
 from importlib import metadata
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from security_policy import minimal_subprocess_env
-
 
 LOCKED_PACKAGES = ("numpy", "Pillow", "edge-tts", "jsonschema")
 DEFAULT_SCRIPTS = (
@@ -103,7 +103,9 @@ def _package_versions(names: Iterable[str]) -> dict[str, str | None]:
     return versions
 
 
-def build_runtime_lock(skill_dir: Path, *, script_paths: list[Path] | None = None) -> dict[str, Any]:
+def build_runtime_lock(
+    skill_dir: Path, *, script_paths: list[Path] | None = None
+) -> dict[str, Any]:
     root = skill_dir.expanduser().resolve()
     if script_paths is None:
         script_paths = [root / "scripts" / name for name in DEFAULT_SCRIPTS]
@@ -139,7 +141,9 @@ def verify_runtime_lock(skill_dir: Path, lock_path: Path) -> dict[str, Any]:
         return {"ok": False, "errors": [f"runtime lock unreadable: {exc}"]}
     errors: list[str] = []
     if expected.get("python") != platform.python_version():
-        errors.append(f"python version drift: expected {expected.get('python')}, found {platform.python_version()}")
+        errors.append(
+            f"python version drift: expected {expected.get('python')}, found {platform.python_version()}"
+        )
     for command, wanted in (expected.get("commands") or {}).items():
         actual = _command_version(command)
         if actual != wanted:

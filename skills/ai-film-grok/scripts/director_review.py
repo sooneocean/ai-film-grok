@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 # All dimensions must be explicitly scored on --approve.
@@ -18,9 +18,7 @@ SCORECARD_DIMENSIONS: tuple[str, ...] = (
 )
 
 # CLI flag stem: --score-identity, --score-dead-air, ...
-SCORECARD_CLI_FLAGS: dict[str, str] = {
-    dim: f"score_{dim}" for dim in SCORECARD_DIMENSIONS
-}
+SCORECARD_CLI_FLAGS: dict[str, str] = {dim: f"score_{dim}" for dim in SCORECARD_DIMENSIONS}
 
 RESHOOT_ACTIONS = frozenset({"keep", "reshoot", "recut"})
 ITEM_STATUSES = frozenset({"open", "resolved"})
@@ -43,7 +41,7 @@ class DirectorReviewError(ValueError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def empty_scorecard() -> dict[str, bool | None]:
@@ -59,12 +57,12 @@ def normalize_score_value(value: object, *, field: str) -> bool:
             return True
         if token in {"fail", "false", "no", "0"}:
             return False
-    raise DirectorReviewError(
-        f"{field} must be pass|fail (or true|false); got {value!r}"
-    )
+    raise DirectorReviewError(f"{field} must be pass|fail (or true|false); got {value!r}")
 
 
-def parse_timestamp_evidence(values: list[str], *, required: tuple[str, ...], duration_sec: float) -> dict[str, dict[str, Any]]:
+def parse_timestamp_evidence(
+    values: list[str], *, required: tuple[str, ...], duration_sec: float
+) -> dict[str, dict[str, Any]]:
     """Parse repeatable ``dimension@seconds:note`` evidence without accepting claims alone."""
     out: dict[str, dict[str, Any]] = {}
     for raw in values:
@@ -74,7 +72,9 @@ def parse_timestamp_evidence(values: list[str], *, required: tuple[str, ...], du
             dim = dim_part.strip().lower()
             timestamp = float(time_part.strip())
         except (TypeError, ValueError):
-            raise DirectorReviewError("screening evidence must use dimension@seconds:note") from None
+            raise DirectorReviewError(
+                "screening evidence must use dimension@seconds:note"
+            ) from None
         if dim not in required:
             raise DirectorReviewError(f"unknown screening evidence dimension: {dim}")
         if timestamp < 0 or timestamp > duration_sec or not note.strip() or dim in out:
@@ -119,9 +119,7 @@ def build_scorecard_from_cli(args: Any) -> dict[str, bool]:
             raw[dim] = value
     if missing:
         flags = ", ".join(f"--score-{d.replace('_', '-')}" for d in missing)
-        raise DirectorReviewError(
-            f"review-final requires full scorecard; missing: {flags}"
-        )
+        raise DirectorReviewError(f"review-final requires full scorecard; missing: {flags}")
     return build_scorecard_from_mapping(raw)
 
 

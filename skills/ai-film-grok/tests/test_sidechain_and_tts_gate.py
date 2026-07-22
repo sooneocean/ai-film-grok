@@ -75,13 +75,15 @@ class TtsNeuralGateTests(unittest.TestCase):
         assert_voice_backend_compatible("edge", "zh-CN-XiaoxiaoNeural")
 
     def test_auto_with_tts_argv_rejects_neural(self) -> None:
-        with mock.patch.dict(
-            os.environ,
-            {"AIFILM_TTS_ARGV": '["python","elevenlabs_tts.py"]'},
-            clear=False,
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"AIFILM_TTS_ARGV": '["python","elevenlabs_tts.py"]'},
+                clear=False,
+            ),
+            self.assertRaises(TTSError),
         ):
-            with self.assertRaises(TTSError):
-                assert_voice_backend_compatible("auto", "zh-CN-YunxiNeural")
+            assert_voice_backend_compatible("auto", "zh-CN-YunxiNeural")
 
     def test_preflight_hard_on_neural_external(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -95,9 +97,7 @@ class TtsNeuralGateTests(unittest.TestCase):
                 "clips": {},
                 "outputs": {},
             }
-            (root / "manifest.json").write_text(
-                json.dumps(man), encoding="utf-8"
-            )
+            (root / "manifest.json").write_text(json.dumps(man), encoding="utf-8")
             (root / "style-bible.json").write_text(
                 json.dumps({"locked": True, "identity_lock": "x" * 20}),
                 encoding="utf-8",

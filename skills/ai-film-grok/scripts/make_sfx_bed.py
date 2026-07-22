@@ -436,23 +436,25 @@ def rnb_bgm(
         dj_sections = []
         dj_env = np.ones(n, dtype=np.float64)
         starts = sorted(shot_starts) + [dur]
-        accent_times = [float(e.get("time_sec", 0)) for e in (events or []) if e.get("type") == "sfx_accent"]
+        accent_times = [
+            float(e.get("time_sec", 0)) for e in (events or []) if e.get("type") == "sfx_accent"
+        ]
 
         for i in range(len(starts) - 1):
             s_st = starts[i]
-            s_ed = starts[i+1]
+            s_ed = starts[i + 1]
             s_dur = s_ed - s_st
 
             # Check for peak action / sfx accents
             has_accent = any((s_st - 0.5) <= at < (s_ed + 0.5) for at in accent_times)
-            progress = i / max(1, len(starts)-1)
+            progress = i / max(1, len(starts) - 1)
 
             if i == 0:
                 sq = (0.7, 0.4, 0.0, 0.2, False)  # Intro
             elif has_accent or (progress > 0.7 and s_dur < 3.0):
                 sq = (0.9, 0.8, 1.2, 1.0, False)  # Drop / Climax
             elif s_dur >= 5.0 or (i % 3 == 2):
-                sq = (0.6, 0.7, 0.0, 0.0, True)   # Break (remove drums)
+                sq = (0.6, 0.7, 0.0, 0.0, True)  # Break (remove drums)
             else:
                 sq = (0.8, 0.7, 0.8, 0.8, False)  # Groove
 
@@ -462,21 +464,22 @@ def rnb_bgm(
             i0, i1 = int(s_st * SR), min(n, int(s_ed * SR))
             if i0 < i1:
                 is_break = sq[4]
-                env_start = dj_env[max(0, i0-1)]
+                env_start = dj_env[max(0, i0 - 1)]
                 if is_break:
                     # Muffle out (Filter closing)
-                    dj_env[i0:i1] = np.linspace(env_start, 0.15, i1-i0)
+                    dj_env[i0:i1] = np.linspace(env_start, 0.15, i1 - i0)
                 else:
                     # Blast back in (Filter opens)
                     # if returning from a break on an accent, open instantly, else smoothly
                     if has_accent:
                         dj_env[i0:i1] = 1.0
                     else:
-                        dj_env[i0:i1] = np.linspace(min(1.0, env_start + 0.5), 1.0, i1-i0)
+                        dj_env[i0:i1] = np.linspace(min(1.0, env_start + 0.5), 1.0, i1 - i0)
 
         def _section_at(sec: float) -> tuple[float, float, float, float, bool]:
             for st, ed, sq in dj_sections:
-                if st <= sec < ed: return sq
+                if st <= sec < ed:
+                    return sq
             return dj_sections[-1][2] if dj_sections else (0.8, 0.7, 0.8, 0.8, False)
 
     else:
@@ -739,7 +742,12 @@ def build_bed(
     # per-shot SFX — keep light so R&B groove stays sexy, not busy
     sfx_scale = 0.65 * sfx_level
     for i, t0 in enumerate(shot_starts):
-        place(bed, whoosh(0.24, 0.10 * sfx_scale), max(0.0, t0 - 0.10), pan=(-0.25 if i % 2 == 0 else 0.25))
+        place(
+            bed,
+            whoosh(0.24, 0.10 * sfx_scale),
+            max(0.0, t0 - 0.10),
+            pan=(-0.25 if i % 2 == 0 else 0.25),
+        )
         place(bed, soft_hit(0.09 * sfx_scale), t0 + 0.02)
         if i in (0, 5):
             place(bed, sparkle(0.09 * sfx_scale), t0 + 0.4)
@@ -763,7 +771,9 @@ def main() -> int:
     ap.add_argument("--mood", default="rnb", help="rnb|sensual|dark|playful — 色气片默认 rnb")
     ap.add_argument("--sfx-level", type=float, default=0.9)
     ap.add_argument("--bpm", type=float, default=76.0, help="R&B tempo, ~72-80 seductive")
-    ap.add_argument("--seed", type=int, default=None, help="BGM RNG seed (anti-fatigue variety / style)")
+    ap.add_argument(
+        "--seed", type=int, default=None, help="BGM RNG seed (anti-fatigue variety / style)"
+    )
     args = ap.parse_args()
     starts = [float(x) for x in args.shot_starts.split(",") if x.strip()]
     bed = build_bed(

@@ -108,7 +108,7 @@ class DramaGraphTests(unittest.TestCase):
 
             graph = derive_graph(root, write=True)
             self.assertTrue(graph_path(root).is_file())
-            self.assertEqual(graph.get("schema_version"), 1)
+            self.assertEqual(graph.get("schema_version"), 2)
             self.assertEqual(len(graph.get("episodes") or []), 1)
             ep = graph["episodes"][0]
             self.assertGreaterEqual(len(ep.get("scenes") or []), 1)

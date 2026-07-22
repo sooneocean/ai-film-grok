@@ -12,6 +12,8 @@ from unittest import mock
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+import contextlib
+
 import aifilm_grok  # noqa: E402
 import tts_backend  # noqa: E402
 from media_queue import MediaQueue, QueueError  # noqa: E402
@@ -61,29 +63,23 @@ class EdgeEmptyRetryTests(unittest.TestCase):
 
         def fake_asyncio_run(coro):  # noqa: ANN001
             attempts["n"] += 1
-            try:
+            with contextlib.suppress(Exception):
                 coro.close()
-            except Exception:
-                pass
             return results.pop(0) if results else b"x" * 600
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "vo.mp3"
             with mock.patch("time.sleep", return_value=None):
                 with mock.patch("asyncio.run", side_effect=fake_asyncio_run):
-                    path = tts_backend.tts_edge(
-                        "你好世界", out, max_attempts=3, min_bytes=500
-                    )
+                    path = tts_backend.tts_edge("你好世界", out, max_attempts=3, min_bytes=500)
             self.assertTrue(path.is_file())
             self.assertGreaterEqual(path.stat().st_size, 500)
             self.assertEqual(attempts["n"], 2)  # empty then ok
 
     def test_all_empty_raises(self) -> None:
         def fake_asyncio_run(coro):  # noqa: ANN001
-            try:
+            with contextlib.suppress(Exception):
                 coro.close()
-            except Exception:
-                pass
             return b"\x00" * 10  # tiny
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -156,9 +152,7 @@ class PreflightFramingTests(unittest.TestCase):
             )
             (root / "film-spec.json").write_text(
                 json.dumps(
-                    _spec_one(
-                        framing="extreme close-up, face fills the frame, push-in on face"
-                    ),
+                    _spec_one(framing="extreme close-up, face fills the frame, push-in on face"),
                     ensure_ascii=False,
                 ),
                 encoding="utf-8",
@@ -181,9 +175,7 @@ class PreflightFramingTests(unittest.TestCase):
                 json.dumps({"locked": True, "identity_lock": "ok"}),
                 encoding="utf-8",
             )
-            spec = _spec_one(
-                framing="extreme close-up, fills the frame"
-            )
+            spec = _spec_one(framing="extreme close-up, fills the frame")
             spec["framing_strict"] = True
             (root / "film-spec.json").write_text(
                 json.dumps(spec, ensure_ascii=False), encoding="utf-8"

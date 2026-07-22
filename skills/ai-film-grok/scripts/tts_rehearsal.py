@@ -12,14 +12,16 @@ Supports:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
-import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from content_channels import resolve_content_channels
 from film_spec import estimate_nar_vo_sec, validate_film_spec
 from media_duration import MediaDurationError, probe_duration_sec
+from util import write_json
 
 SCHEMA_VERSION = 1
 KIND = "ai-film-tts-rehearsal"
@@ -31,8 +33,16 @@ class TTSRehearsalError(RuntimeError):
     pass
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def rehearsal_receipt_path(root: Path) -> Path:
@@ -69,11 +79,6 @@ def measured_vo_by_shot(root: Path) -> dict[str, float]:
         if dur > 0:
             out[sid] = dur
     return out
-
-
-def _write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _load_spec(root: Path, spec_path: Path | None) -> dict[str, Any]:
@@ -115,6 +120,7 @@ def register_measured_durations(
         path_raw = item.get("path")
         dur: float | None = None
         path_str: str | None = None
+        audio_sha256: str | None = None
         if path_raw:
             p = Path(str(path_raw)).expanduser()
             if not p.is_file():
@@ -124,17 +130,14 @@ def register_measured_durations(
             except MediaDurationError as exc:
                 raise TTSRehearsalError(str(exc)) from exc
             path_str = str(p.resolve())
+            audio_sha256 = _sha256(p)
         if dur is None and item.get("measured_duration_sec") is not None:
             try:
                 dur = float(item["measured_duration_sec"])
             except (TypeError, ValueError) as exc:
-                raise TTSRehearsalError(
-                    f"{sid}: measured_duration_sec must be a number"
-                ) from exc
+                raise TTSRehearsalError(f"{sid}: measured_duration_sec must be a number") from exc
         if dur is None or dur <= 0:
-            raise TTSRehearsalError(
-                f"{sid}: need path (ffprobe) or positive measured_duration_sec"
-            )
+            raise TTSRehearsalError(f"{sid}: need path (ffprobe) or positive measured_duration_sec")
         est = item.get("est_vo_sec")
         try:
             est_f = float(est) if est is not None else None
@@ -156,7 +159,10 @@ def register_measured_durations(
                 "duration_sec": plate_f,
                 "over_plate": over,
                 "path": path_str,
+                "audio_sha256": audio_sha256,
                 "nar": item.get("nar"),
+                "text_kind": item.get("text_kind"),
+                "text": item.get("text"),
             }
         )
 
@@ -180,7 +186,7 @@ def register_measured_durations(
         ),
     }
     out_path = rehearsal_receipt_path(root)
-    _write_json(out_path, receipt)
+    write_json(out_path, receipt)
     receipt["receipt_path"] = str(out_path)
     return receipt
 
@@ -216,7 +222,9 @@ def run_rehearsal(
 
     for shot in shots:
         sid = str(shot["id"])
-        nar = str(shot.get("nar") or "").strip()
+        voice_channel = resolve_content_channels(shot)["voice"]
+        text_kind = str(voice_channel["kind"])
+        nar = str(voice_channel["text"] or "").strip()
         plate = float(shot.get("duration_sec") or 6.0)
         est = float(shot.get("est_vo_sec") or estimate_nar_vo_sec(nar))
         reg_path = (register_map or {}).get(sid)
@@ -229,13 +237,13 @@ def run_rehearsal(
                     "est_vo_sec": est,
                     "duration_sec": plate,
                     "nar": nar,
+                    "text_kind": text_kind,
+                    "text": nar,
                 }
             )
             continue
         if not synthesize:
-            raise TTSRehearsalError(
-                f"{sid}: no register audio and synthesize=False"
-            )
+            raise TTSRehearsalError(f"{sid}: no register audio and synthesize=False")
         if not nar:
             raise TTSRehearsalError(f"{sid}: empty nar — cannot rehearse TTS")
         try:
@@ -260,6 +268,8 @@ def run_rehearsal(
                 "est_vo_sec": est,
                 "duration_sec": plate,
                 "nar": nar,
+                "text_kind": text_kind,
+                "text": nar,
             }
         )
 
@@ -369,9 +379,7 @@ def bind_receipt_to_spec_timing(
             ),
         }
         if strict and raise_on_fail:
-            raise TTSRehearsalError(
-                f"strict TTS rehearsal: missing or invalid {RECEIPT_REL}"
-            )
+            raise TTSRehearsalError(f"strict TTS rehearsal: missing or invalid {RECEIPT_REL}")
         return result
 
     measured = measured_vo_by_shot(root)
@@ -394,8 +402,10 @@ def bind_receipt_to_spec_timing(
         except (OSError, json.JSONDecodeError):
             pass
 
-    over = recompute_over_plate_shots(shots, measured) if shots else list(
-        rec.get("over_plate_shots") or []
+    over = (
+        recompute_over_plate_shots(shots, measured)
+        if shots
+        else list(rec.get("over_plate_shots") or [])
     )
     # Also honor receipt-stored over list (union)
     for sid in rec.get("over_plate_shots") or []:
@@ -415,9 +425,7 @@ def bind_receipt_to_spec_timing(
         except (TypeError, ValueError):
             plate = float(DEFAULT_DURATION_SEC)
         est = float(shot.get("est_vo_sec") or estimate_nar_vo_sec(nar))
-        vo, source = effective_vo_sec(
-            sid, nar, est_vo_sec=est, measured_by_shot=measured
-        )
+        vo, source = effective_vo_sec(sid, nar, est_vo_sec=est, measured_by_shot=measured)
         if vo > LOOP_RISK_VO_SEC and plate <= 6.5:
             loop_risk.append(sid)
         per_shot.append(
@@ -468,7 +476,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--register-json",
         default=None,
-        help='JSON list of {shot_id, path|measured_duration_sec} (no network)',
+        help="JSON list of {shot_id, path|measured_duration_sec} (no network)",
     )
     p.add_argument(
         "--no-synthesize",
@@ -493,9 +501,7 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("register-json must be a list or {shots: [...]}")
         # Prefer path-based map when paths present; else pure duration register
         if all(isinstance(x, dict) and x.get("path") for x in items):
-            register_map = {
-                str(x["shot_id"]): Path(str(x["path"])) for x in items
-            }
+            register_map = {str(x["shot_id"]): Path(str(x["path"])) for x in items}
             receipt = run_rehearsal(
                 root,
                 spec_path=Path(args.spec) if args.spec else None,

@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -28,7 +30,9 @@ from production_gates import (  # noqa: E402
 )
 
 
+@pytest.mark.slow
 class NextActionsTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_suggests_write_spec_when_no_spec(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -38,6 +42,7 @@ class NextActionsTests(unittest.TestCase):
             self.assertIn("write-spec", ids)
             self.assertIn("pilot-report", ids)
 
+    @pytest.mark.slow
     def test_suggests_review_when_final_present(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -65,6 +70,7 @@ class NextActionsTests(unittest.TestCase):
             ids = [a["id"] for a in actions]
             self.assertIn("review-final", ids)
 
+    @pytest.mark.slow
     def test_clips_complete_prefers_preview_before_final(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -99,6 +105,7 @@ class NextActionsTests(unittest.TestCase):
             self.assertLess(ids.index("tts-rehearse"), ids.index("final"))
             self.assertLess(ids.index("compose-preview"), ids.index("final"))
 
+    @pytest.mark.slow
     def test_after_preview_receipt_prefers_designed_final(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -148,6 +155,7 @@ class NextActionsTests(unittest.TestCase):
 class PipelineStageTests(unittest.TestCase):
     """Product spine: agent → visual → voice → design → post → deliver → done."""
 
+    @pytest.mark.slow
     def test_agent_when_spec_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -159,6 +167,7 @@ class PipelineStageTests(unittest.TestCase):
             self.assertIn("write-spec", stage["detail"])
             self.assertEqual(stage["stage_total"], 7)
 
+    @pytest.mark.slow
     def test_voice_when_clips_complete_no_rehearse(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -190,6 +199,7 @@ class PipelineStageTests(unittest.TestCase):
             self.assertTrue(stage["checklist"]["visual"])
             self.assertFalse(stage["checklist"]["voice"])
 
+    @pytest.mark.slow
     def test_design_after_rehearse_and_preview_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -223,6 +233,7 @@ class PipelineStageTests(unittest.TestCase):
             self.assertEqual(stage["stage"], "design")
             self.assertEqual(stage["detail"], "compose-preview")
 
+    @pytest.mark.slow
     def test_post_when_final_film_awaits_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -254,6 +265,7 @@ class PipelineStageTests(unittest.TestCase):
             self.assertEqual(stage["stage"], "post")
             self.assertEqual(stage["detail"], "review-final")
 
+    @pytest.mark.slow
     def test_actions_carry_stage_field(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -266,6 +278,7 @@ class PipelineStageTests(unittest.TestCase):
             write = next(a for a in actions if a["id"] == "write-spec")
             self.assertEqual(write["stage"], "agent")
 
+    @pytest.mark.slow
     def test_persist_and_format_stage_line(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -289,7 +302,9 @@ class PipelineStageTests(unittest.TestCase):
             self.assertIn("write-spec", body.get("next_id") or "")
 
 
+@pytest.mark.slow
 class NextActionsSedimentOpt2Tests(unittest.TestCase):
+    @pytest.mark.slow
     def test_tts_rehearse_when_clips_complete_without_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -319,6 +334,7 @@ class NextActionsSedimentOpt2Tests(unittest.TestCase):
             self.assertIn("tts-rehearse", ids)
             self.assertTrue(any("tts-rehearse" in a["cmd"] for a in actions))
 
+    @pytest.mark.slow
     def test_fix_framing_when_lint_failed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -342,7 +358,9 @@ class NextActionsSedimentOpt2Tests(unittest.TestCase):
             self.assertIn("fix-framing", ids)
 
 
+@pytest.mark.slow
 class PilotFailNotesTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_fail_writes_director_notes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -362,7 +380,9 @@ class PilotFailNotesTests(unittest.TestCase):
             self.assertTrue(all(i.get("reason_code") == "style" for i in open_items))
 
 
+@pytest.mark.slow
 class PilotGateMessageTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_gate_message_mentions_pilot_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

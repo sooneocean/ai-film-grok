@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -47,9 +48,9 @@ def _base_spec(n_shots: int = 3) -> dict:
     for i in range(n_shots):
         shots.append(
             {
-                "id": f"shot{i+1:02d}",
+                "id": f"shot{i + 1:02d}",
                 "dramatic_function": ["hook", "approach", "afterglow"][min(i, 2)],
-                "nar": f"旁白{i+1}。",
+                "nar": f"旁白{i + 1}。",
                 "dsl": {
                     "subject": "woman",
                     "cast": ["heroine"],
@@ -72,10 +73,14 @@ def _base_spec(n_shots: int = 3) -> dict:
     }
 
 
+@pytest.mark.slow
 class PerJoinTransitionTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_mixed_hard_soft_intents_resolve_different_use_ts(self) -> None:
         durs = [1.0, 2.0, 2.0, 2.0, 1.0]
-        soft = edit_policy.segment_timeline(durs, 0.25, join_intents=["soft", "soft", "soft", "soft"])
+        soft = edit_policy.segment_timeline(
+            durs, 0.25, join_intents=["soft", "soft", "soft", "soft"]
+        )
         mixed = edit_policy.segment_timeline(
             durs, 0.25, join_intents=["soft", "hard", "soft", "hold"]
         )
@@ -86,6 +91,7 @@ class PerJoinTransitionTests(unittest.TestCase):
         # hard join does not shorten that step vs soft-only
         self.assertGreater(mixed["output_duration"], soft["output_duration"] - 0.01)
 
+    @pytest.mark.slow
     def test_concat_videos_mixed_hard_soft_shortens_only_soft_joins(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -113,6 +119,7 @@ class PerJoinTransitionTests(unittest.TestCase):
             # still shorter than pure hard sum 3.0
             self.assertLess(d_mixed, 2.95)
 
+    @pytest.mark.slow
     def test_film_spec_rejects_wrong_intent_length(self) -> None:
         spec = _base_spec(3)
         spec["transition_intents"] = ["soft"]  # need 2
@@ -123,7 +130,9 @@ class PerJoinTransitionTests(unittest.TestCase):
         self.assertEqual(len(shots), 3)
 
 
+@pytest.mark.slow
 class SoundSpottingTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_expand_and_apply_mute(self) -> None:
         import numpy as np
 
@@ -155,6 +164,7 @@ class SoundSpottingTests(unittest.TestCase):
         self.assertTrue(np.allclose(out[a:b], 0.0))
         self.assertGreater(float(out[0]), 0.5)
 
+    @pytest.mark.slow
     def test_invalid_event_type_rejected_in_film_spec(self) -> None:
         spec = _base_spec(2)
         spec["sound_plan"] = {"mood": "rnb", "events": [{"type": "explode"}]}
@@ -162,7 +172,9 @@ class SoundSpottingTests(unittest.TestCase):
             validate_film_spec(spec, assign_missing_ids=False)
 
 
+@pytest.mark.slow
 class ContinuityLintTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_cast_flip_and_clean_pair(self) -> None:
         bad = [
             {
@@ -204,6 +216,7 @@ class ContinuityLintTests(unittest.TestCase):
         self.assertTrue(ok["ok"])
         self.assertNotIn(continuity.CODE_CAST_FLIP, ok["codes"])
 
+    @pytest.mark.slow
     def test_screen_direction_flip_code(self) -> None:
         shots = [
             {
@@ -221,6 +234,7 @@ class ContinuityLintTests(unittest.TestCase):
         self.assertIn(continuity.CODE_SCREEN_DIRECTION_FLIP, report["codes"])
         self.assertFalse(report["ok"])
 
+    @pytest.mark.slow
     def test_strict_continuity_on_film_spec(self) -> None:
         spec = _base_spec(2)
         spec["continuity_strict"] = True

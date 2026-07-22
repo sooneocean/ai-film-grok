@@ -17,7 +17,15 @@ from continuity import (  # noqa: E402
 )
 
 
-def _shot(sid: str, beat: str, *, motion: str, action: str = "", size: str = "close-up", angle: str = "eye level"):
+def _shot(
+    sid: str,
+    beat: str,
+    *,
+    motion: str,
+    action: str = "",
+    size: str = "close-up",
+    angle: str = "eye level",
+):
     return {
         "id": sid,
         "dramatic_function": beat,
@@ -31,7 +39,11 @@ def _shot(sid: str, beat: str, *, motion: str, action: str = "", size: str = "cl
 
 def test_primary_motion_weak_on_action_blink_only():
     shots = [
-        _shot("shot01", "action", motion="soft blink, breath, slow push-in, hair drift, idle not speaking"),
+        _shot(
+            "shot01",
+            "action",
+            motion="soft blink, breath, slow push-in, hair drift, idle not speaking",
+        ),
     ]
     r = lint_vo_motion_link(shots)
     assert CODE_PRIMARY_MOTION_WEAK in r["codes"]

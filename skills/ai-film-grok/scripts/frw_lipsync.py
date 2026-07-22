@@ -25,7 +25,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -119,6 +119,7 @@ def _upload_via_frw(file_path: Path, category: str) -> str:
             category,
         ],
         capture_output=True,
+        timeout=120,
         text=True,
     )
     out = (proc.stdout or "").strip()
@@ -230,7 +231,9 @@ def probe_lipsync_models(*, host: str = DEFAULT_HOST) -> dict[str, Any]:
     }
 
 
-def poll_task(task_id: str, *, api_key: str, host: str = DEFAULT_HOST, timeout_s: float = 300) -> dict[str, Any]:
+def poll_task(
+    task_id: str, *, api_key: str, host: str = DEFAULT_HOST, timeout_s: float = 300
+) -> dict[str, Any]:
     deadline = time.time() + timeout_s
     last: dict[str, Any] = {}
     while time.time() < deadline:
@@ -321,7 +324,7 @@ def run_frw_lipsync(
     report: dict[str, Any] = {
         "ok": False,
         "kind": "ai-film-frw-lipsync",
-        "at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "model": model,
         "template_id": meta["template_id"],
         "register_endpoint": meta["register_endpoint"],
@@ -382,7 +385,7 @@ def run_frw_lipsync(
             "--review-note",
             f"provider=frw model={model} lipsync face+audio",
         ]
-        proc = subprocess.run(reg, capture_output=True, text=True)
+        proc = subprocess.run(reg, capture_output=True, text=True, timeout=120)
         report["register_rc"] = proc.returncode
         try:
             report["register"] = json.loads((proc.stdout or "").strip().splitlines()[-1])

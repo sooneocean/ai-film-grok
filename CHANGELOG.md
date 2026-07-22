@@ -3,6 +3,435 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [1.14.4] — 2026-07-22
+
+### Added
+
+- Post-production P1b: `caption-frame-attest` binds explicit human readability approval to current sampled caption frames. Post-audit now fail-closes missing or stale caption-review evidence for v2 burned-subtitle deliveries.
+
+## [1.14.3] — 2026-07-22
+
+### Added
+
+- Post-production P1a: `caption-frame-audit` extracts hash-bound final-MP4 frames during subtitle cues for human readability review. Post-audit now warns when burned-caption visual evidence is missing or stale.
+
+## [1.14.2] — 2026-07-22
+
+### Added
+
+- Post-production P0: `final-delivery` v2 binds final output, subtitle, mix-report, and timeline provenance. Post-audit fail-closes incomplete v2 provenance while retaining a migration warning for legacy v1 sidecars.
+
+## [1.14.1] — 2026-07-22
+
+### Added
+
+- `prompt-compression-attest` binds hash-matched candidate keyframes, clips, frame QA, an all-pass Pilot scorecard, and an existing human Pilot approval to a compression candidate. Evidence completion never promotes or rewrites a production rule.
+
+## [1.14.0] — 2026-07-22
+
+### Added
+
+- `prompt-compression-pilot` writes an ai-film-grok hash-bound candidate ledger. It rejects removal of protected locks and requires same-condition candidate media, QA, scorecard, and human Pilot approval before any compression could be promoted.
+
+## [1.13.9] — 2026-07-22
+
+### Added
+
+- Prompt-budget now supports a review-only token threshold and separates protected repeated locks from compression candidates. Candidates state their estimated saving but cannot be applied automatically; a director-approved Pilot equivalence check remains required.
+
+## [1.13.8] — 2026-07-22
+
+### Added
+
+- `prompt-budget --root <film>` reads prompt-assembly receipts to estimate per-shot and episode input tokens, identify repeated provider-bound lines, and distinguish continuity locks from lines worth reviewing. It is read-only unless `--write` is explicit.
+
+## [1.13.7] — 2026-07-22
+
+### Changed
+
+- Prompt assembly keeps local state-photo instructions in the traceability receipt instead of sending filesystem paths and executor guidance to image/video providers. It also de-duplicates negative constraints and records a local prompt-token estimate per shot.
+
+## [1.13.6] — 2026-07-22
+
+### Added
+
+- Planning-answer dry-runs now return a canonical answer SHA-256 and transaction ID. A formal submission may require that exact ID with `--expected-transaction-id`, and records the binding in planning history.
+
+## [1.13.5] — 2026-07-22
+
+### Changed
+
+- Planning-answer batches are now atomic: a formal write occurs only after the complete in-memory batch passes narrative validation; rejected batches leave graph and history untouched.
+
+## [1.13.4] — 2026-07-22
+
+### Added
+
+- Planning history now packages diagnosis-specific answer templates as copyable planning-answer dry-run commands.
+
+## [1.13.3] — 2026-07-22
+
+### Added
+
+- Planning history emits diagnosis-specific answer templates; unresolved core causality produces only the five-question story card.
+
+## [1.13.2] — 2026-07-22
+
+### Added
+
+- Planning history now classifies stalled progress as no formal answers, unresolved core causality, or answers that did not reduce open fields.
+
+## [1.13.1] — 2026-07-22
+
+### Added
+
+- `planning-history` provides local readiness progression, stalled-round count, and current high-priority authoring blockers.
+
+## [1.13.0] — 2026-07-22
+
+### Added
+
+- Formal planning-answer writes append-only local planning-history entries with changed fields, graph revision, and readiness delta; dry-run remains non-mutating.
+
+## [1.12.9] — 2026-07-22
+
+### Added
+
+- `planning-answer --dry-run` now reports readiness before/after, delta, and the remaining highest-priority authoring batch.
+
+## [1.12.8] — 2026-07-22
+
+### Added
+
+- Planning autopilot now emits a minimal structured answer template and dry-run command for the next authoring batch.
+
+## [1.12.7] — 2026-07-22
+
+### Added
+
+- Planning autopilot now reports a transparent weighted draft-readiness score and lock-review eligibility from unresolved authoring fields.
+
+## [1.12.6] — 2026-07-22
+
+### Added
+
+- Planning autopilot now provides a minimal high-impact authoring batch before deferring lower-risk detail questions.
+
+## [1.12.3] — 2026-07-22
+
+### Added
+
+- Planning autopilot now emits a priority-sorted director questionnaire from canonical `needs_authoring` fields, prioritizing story causality before tactic and coverage detail.
+
+## [1.12.2] — 2026-07-22
+
+### Added
+
+- `planning-autopilot` exposes safe draft-automation steps separately from mandatory human story, lock, Pilot, and final-review checkpoints.
+
+## [1.12.1] — 2026-07-22
+
+### Added
+
+- Director exception ledger now requires approver, approval time, and reviewed clip; historical approvals are visible as pending re-approval rather than silently trusted.
+
+## [1.12.0] — 2026-07-22
+
+### Added
+
+- `director-ledger` centralizes human-approved subtitle carry-over exceptions and binds them to film-spec, drama graph, and final MP4 hashes; post-audit invalidates stale authorization.
+
+## [1.11.9] — 2026-07-22
+
+### Added
+
+- Hard/Continue subtitle carry-over is permitted only by an exact, reasoned, range-bounded, human-approved `subtitle_carryovers` declaration.
+
+## [1.11.8] — 2026-07-22
+
+### Added
+
+- `subtitle-cut-boundaries` blocks subtitle cues that cross authored hard cuts or strict Continue boundaries.
+
+## [1.11.7] — 2026-07-22
+
+### Added
+
+- `subtitle-dialogue-alignment` blocks lipsync dialogue without a cue covering its human-observed delivery end, or without declared subtitle and subject safe areas.
+
+## [1.11.6] — 2026-07-22
+
+### Added
+
+- `audio-provenance` binds canonical lipsync dialogue, local rehearsal-audio bytes, the rendered voice carrier, and the registered final MP4 with checksums.
+- Final review and post-audit now reject a stale or missing dialogue-audio source chain, while explicitly distinguishing byte provenance from human sound and lip-sync judgment.
+
+## [1.11.5] — 2026-07-22
+
+### Added
+
+- `speech-performance-timing` binds a measured dialogue rehearsal, its canonical text, the human-observed end-of-line delivery, and at least 0.2s of post-line reaction space.
+- `review-final` now blocks lipsync dialogue that has no dialogue-kind TTS evidence, mismatched text, an impossible delivery end, or an immediate cut that removes the reaction beat.
+
+## [1.11.4] — 2026-07-22
+
+### Added
+
+- `performance-timeline` compiles checksum-bound per-shot triggers, actions, reactions, delivery, and mouth-still observations into an ordered film timeline.
+- Final approval now fails for content-channel projects when required performance receipts or their timestamp frames are absent, stale, or semantically out of order.
+
+## [1.11.3] — 2026-07-22
+
+### Added
+
+- Performance-fact shot review: content-channel shots now bind human-observation timestamps for playable actions, visible triggers/reactions, dialogue delivery, and on-camera narration without mouth movement to the exact reviewed clip hash.
+- Reactions cannot be approved before their declared trigger; the receipt explicitly records that this is human observation rather than automatic mouth, face, or acting recognition.
+
+## [1.11.2] — 2026-07-22
+
+### Changed
+
+- Cleared the repository's ruff backlog with safe and reviewed mechanical fixes; CI now retains hard correctness checks while documenting intentional dynamic-import, compatibility, process-lifetime, and test-scope exceptions.
+- Fixed real static defects in re-encode reporting and normalized formatting/imports across scripts and tests.
+
+## [1.11.1] — 2026-07-22
+
+### Added
+
+- Content-channel contract: narration, dialogue, playable performance and motion now have separate fields and receipts.
+- `content_channels_strict` rejects narration copied into visual action, on-camera dialogue with lipsync disabled, lipsync without dialogue, and reactions triggered by text rather than an in-scene event.
+
+### Changed
+
+- Prompt construction never falls back from `nar` to a motion/action instruction; narration is audio-only unless authored as a separate visible action.
+- User-source fidelity runs only when `source_excerpt` exists, so stock/generated plans are no longer falsely judged as overwriting user text.
+
+## [1.11.0] — 2026-07-22
+
+### Added
+
+- **CI hardening**: `validate-core` job now installs `ruff` and runs `ruff check` + `ruff format --check` on all scripts; `test-full` runs the complete test suite (including slow tests) as a hard gate.
+- **`pyproject.toml`** for the skill: ruff configuration (line-length 100, target Python 3.11), pytest config with `slow` marker, and `tool.ruff.lint` rules (E, F, I, W, B, UP, SIM).
+- **BGM cache**: 5 CC0-licensed R&B loops (`assets/bgm/rnb/`) with `index.json` and per-track license files, providing a safe default for `--music-mood rnb` without external dependencies.
+- **Adapter smoke tests** (`tests/test_adapter_smoke.py`): parametrized tests verifying all I2V/TTS/BGM adapter modules import and expose their expected provider classes and methods.
+- **I2V retry logic**: `grok_oauth_video.py` adapter now retries `video_generate` with exponential backoff (2s, 4s) on 429 rate-limit errors.
+
+### Changed
+
+- **`util.py` adoption**: 11 script files now use the shared `read_json`/`write_json` helpers instead of inline JSON I/O, reducing duplication and ensuring consistent error handling.
+- **Subprocess timeouts**: all 16 script files with `subprocess.run`/`call`/`Popen` now specify `timeout=` (30s–300s depending on operation type), preventing indefinite hangs in CI and production.
+- **Slow test markers**: 33 test files containing subprocess/FFmpeg/network calls are now marked `@pytest.mark.slow`, enabling fast CI (`pytest -m "not slow"`) and full CI (`pytest` without filter).
+- **Version bump** to 1.11.0 (semver: minor — new features + hardening).
+
+## [1.10.6] — 2026-07-22
+
+### Changed
+
+- Post-audit now requires complete passing final-review scorecard and seven-dimension screening evidence.
+- Final review approval is invalidated when its bound MP4 hash differs from the current final.
+
+## [1.10.5] — 2026-07-22
+
+### Added
+
+- Final-delivery sidecar hash consistency checks for final, subtitles, audio, and timeline.
+- `export-desktop` now writes `项目状态/delivery-manifest.json` with exported file hashes and sizes.
+
+## [1.10.4] — 2026-07-22
+
+### Added
+
+- Post-audit hard checks for subtitle double-burn risk and title plate duplication risk.
+- Final delivery subtitle burn metadata and compose caption artifacts are now cross-checked.
+
+## [1.10.3] — 2026-07-22
+
+### Added
+
+- Post-audit subtitle timecode/range validation.
+- Audio mix loudness evidence reporting.
+- Vertical safe-area audit with strict-vs-warning behavior.
+
+## [1.10.2] — 2026-07-22
+
+### Changed
+
+- `export-desktop` now requires a current post-audit receipt with no hard failures or stale evidence.
+- Internal preview/render paths remain available before formal delivery export.
+
+## [1.10.1] — 2026-07-22
+
+### Added
+
+- Post-audit freshness binding for final, subtitle, audio mix, timeline, and final-review hashes.
+
+### Changed
+
+- Dispatch now treats stale post-audit receipts as delivery blockers.
+
+## [1.9.1] — 2026-07-22
+
+### Changed
+
+- Connected `post-audit` freshness and hard-failure status to dispatch for post and verified stages.
+- Dispatch now reports post-audit receipt presence, delivery readiness, hard failures, and warnings.
+
+## [1.10.2] — 2026-07-22
+
+### Added
+
+- write-spec injects act/climax flesh `sound_plan` sfx accents from heat/sound_cues.
+- Adult `pilot pick` prefers undress → union → rhythm.
+- Dual-climax spine (`双高潮`/`两轮` or hardcore ≥90s); `templates/premises-adult.md`.
+
+## [1.10.0] — 2026-07-22
+
+### Added
+
+- `spice_level` (suggestive/explicit/extreme) with `HEAT_VO_SPICE_TOO_MILD` for dual-entendre-only act VO.
+- VO–motion alignment lint; sex_pose variety (`SEX_POSE_STALE`); montage craft lint + hardcore craft spine inject.
+- Act auto flesh SFX (`impact/breath/leather`); hardcore/extreme vocal_color opt-in defaults.
+- `aifilm heat vo-suggest` / `heat soften-log`; coitus review dimension; pose pack docs.
+- Max sex duration floor raised to **30%** (hardcore still 40%).
+
+### Changed
+
+- Adult plan seeds denser nar + multi `sex_pose`; heat check reports spice/pose/sfx/montage.
+
+## [1.9.0] — 2026-07-22
+
+### Added
+
+- Adult max planning spine (`ADULT_MAX` / `HARDCORE_MALE`) from brief heat signals — no silent pin without evidence.
+- Coitus six-beat grammar lint + size-ladder lint in `_heat_arc` (`coitus_strict` / `size_ladder_strict` for hardcore).
+- Sex I2V motion templates (`rhythm_hips`, `union_settle`, `finish_arch`, …) and heat-aware coverage.
+- Prompt coitus readability HARD line for act/climax; `aifilm heat check`; adult-max film-spec template + playbook.
+
+### Changed
+
+- `plan run` projects `heat_phase` / `coitus_beat` / spicy `nar` seeds and `coitus_grammar.beats` when adult brief detected.
+- Plugin minor **1.9.0** — adult production capability pack.
+
+## [1.8.11] — 2026-07-22
+
+### Added
+
+- Unified `aifilm post-audit --root` post-production audit with JSON and Markdown receipts.
+- Hard checks for final media presence/QA, final hash freshness, approved full-film review, open reshoots, and delivery sidecar.
+- Evidence capture for final, review, subtitles, delivery, and open director notes.
+
+## [1.8.10] — 2026-07-22
+
+### Changed
+
+- Connected the production evidence ledger to dispatch for media, rough, and verified stages.
+- Dispatch now surfaces a hard production-evidence gate before bulk motion when canonical graph, current projection, or user-approved pilot evidence is missing.
+
+## [1.8.9] — 2026-07-22
+
+### Added
+
+- Read-only `aifilm production-evidence --root` ledger for story, pilot, motion, audio, subtitle, and delivery evidence.
+- Bulk readiness remains false until canonical story semantics, current projection, and user-approved pilot evidence exist.
+
+### Changed
+
+- Production QA evidence is now surfaced as one machine-readable report instead of scattered receipt inspection.
+
+## [1.8.8] — 2026-07-22
+
+### Changed
+
+- Extracted the story idea → draft Drama Graph `plan run` route.
+- Preserved authoring questions, draft state, optional film-spec seed, and force behavior.
+
+### Added
+
+- Regression coverage for missing sources and authoring-only one-liner plans.
+
+## [1.8.7] — 2026-07-22
+
+### Changed
+
+- Extracted canonical `plan project` projection into a dedicated CLI route.
+- Kept overwrite confirmation, graph readiness checks, validation summary, and output contract unchanged.
+
+### Added
+
+- Regression coverage for missing graph and overwrite protection.
+
+## [1.8.6] — 2026-07-22
+
+### Changed
+
+- Extracted planning mutations into a dedicated transactional CLI route.
+- Preserved revision receipts and explicit fail-closed confirmation for subtree replan operations.
+
+### Added
+
+- Regression coverage for missing graph and unconfirmed replan mutations.
+
+## [1.8.5] — 2026-07-22
+
+### Changed
+
+- Extracted read-only Story Planning validation and status routes into a dedicated CLI module.
+- Kept planning write operations in the main entry until their mutation receipts receive isolated route coverage.
+
+## [1.8.4] — 2026-07-22
+
+### Changed
+
+- Extracted read-only Drama Graph validation and status routes into a dedicated CLI module.
+- Kept legacy derive/import and canonical project flows in the main entry until their write contracts are separately covered.
+
+## [1.8.3] — 2026-07-22
+
+### Changed
+
+- Extracted environment T2V and panel motion-plan routing into a dedicated media CLI module.
+- Preserved existing provider arguments, prompt-file handling, error normalization, and JSON output.
+
+## [1.8.2] — 2026-07-22
+
+### Changed
+
+- Extracted the Skill Registry CLI route into a dedicated module while preserving command names, arguments, and JSON output.
+- Added subprocess-bounded CLI smoke coverage for help and registry listing.
+
+## [1.8.1] — 2026-07-22
+
+### Added
+
+- CI smoke gates for the CLI launcher, shipped schemas, registry, and new production modules.
+- Regression coverage proving stale execution nodes cannot be dispatched.
+
+## [1.8.0] — 2026-07-22
+
+### Added
+
+- Execution job lifecycle metadata with input hashes, executable dependency gates, and production-mode routing.
+- Deterministic `motion-plan` compiler for panel-animation shots.
+- `aifilm skill validate` for runtime input/output envelope checks.
+
+### Changed
+
+- Environment plates can load prompts from files, avoiding shell-length and quoting failures.
+
+## [1.7.0] — 2026-07-22
+
+### Added
+
+- Director-grade story planning fields for obstacle, tactic, turn, outcome, state delta, audience question, emotional turn, and actionable authoring questions.
+- Hard narrative validation for observable shot state transitions and performance direction: playable action, expectation, subtext, gaze target, reaction trigger, and body state.
+- Canonical Drama Graph v2 for derived roots, with explicit draft semantics and stale projection protection.
+- Executable Skill Registry metadata, rhythm/coverage lint, and 9:16 platform safe-area lint.
+
+### Changed
+
+- VO rehearsal is now a dependency before motion generation in the execution graph.
+- `plan run` remains an honest draft operation and no longer implies that a generated graph is production-ready.
+
 ## [1.6.0] — 2026-07-22
 
 ### Added

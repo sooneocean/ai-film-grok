@@ -51,6 +51,10 @@
         "stakes": { "type": "string" },
         "climax_choice": { "type": "string" },
         "ending_hook": { "type": "string" },
+        "authoring_questions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "emotional_arc": { "type": "array", "items": { "type": "string" } },
         "pace_chart": { "type": "array", "items": { "type": "string" } },
         "constraints": { "type": "array", "items": { "type": "string" } },
@@ -155,6 +159,12 @@
         "tactic": { "type": "string" },
         "turn": { "type": "string" },
         "state_delta": { "type": "string" },
+        "audience_question": { "type": "string" },
+        "emotional_turn": { "type": "string" },
+        "authoring_questions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "director_board": {
           "type": "object",
           "properties": {
@@ -228,6 +238,12 @@
         "visible_change": { "type": "string" },
         "start_state": { "type": "string" },
         "end_state": { "type": "string" },
+        "playable_action": { "type": "string" },
+        "expectation": { "type": "string" },
+        "subtext": { "type": "string" },
+        "gaze_target": { "type": "string" },
+        "reaction_trigger": { "type": "string" },
+        "body_state": { "type": "string" },
         "source_refs": { "type": "array", "items": { "type": "string" } },
         "nar": { "type": "string" },
         "panelIds": { "type": "array", "items": { "type": "string" } },
@@ -279,6 +295,8 @@
         },
         "sourcePromptPath": { "type": ["string", "null"] },
         "must_include": { "type": "array", "items": { "type": "string" } },
+        "playable_action": { "type": "string" },
+        "gaze_target": { "type": "string" },
         "control": { "$ref": "#/$defs/Control" }
       }
     },

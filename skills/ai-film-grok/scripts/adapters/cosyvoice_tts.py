@@ -32,7 +32,6 @@ import base64
 import json
 import os
 import subprocess
-import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -45,7 +44,11 @@ MIN_AUDIO_BYTES = 500
 
 
 def _load_config_env() -> None:
-    cfg = (Path(__file__).resolve().parents[2] / "config.env" if (Path(__file__).resolve().parents[2] / "config.env").is_file() else Path.home() / ".grok/skills/ai-film-grok/config.env")
+    cfg = (
+        Path(__file__).resolve().parents[2] / "config.env"
+        if (Path(__file__).resolve().parents[2] / "config.env").is_file()
+        else Path.home() / ".grok/skills/ai-film-grok/config.env"
+    )
     if not cfg.is_file():
         return
     for line in cfg.read_text(encoding="utf-8").splitlines():
@@ -79,9 +82,7 @@ def _style() -> str:
 
 def _ref_wav() -> Path | None:
     raw = (
-        os.environ.get("COSYVOICE_REF_WAV")
-        or os.environ.get("AIFILM_COSYVOICE_REF")
-        or ""
+        os.environ.get("COSYVOICE_REF_WAV") or os.environ.get("AIFILM_COSYVOICE_REF") or ""
     ).strip()
     if not raw:
         return None
@@ -90,11 +91,7 @@ def _ref_wav() -> Path | None:
 
 
 def _speaker(voice: str) -> str:
-    return (
-        (voice or "").strip()
-        or (os.environ.get("COSYVOICE_SPEAKER") or "").strip()
-        or "default"
-    )
+    return (voice or "").strip() or (os.environ.get("COSYVOICE_SPEAKER") or "").strip() or "default"
 
 
 def _build_payload(text: str, speaker: str, ref: Path | None) -> dict:
@@ -115,9 +112,7 @@ def _build_payload(text: str, speaker: str, ref: Path | None) -> dict:
         }
         if ref is not None:
             body["prompt_wav"] = str(ref)
-            body["prompt_text"] = (
-                os.environ.get("COSYVOICE_PROMPT_TEXT") or ""
-            ).strip()
+            body["prompt_text"] = (os.environ.get("COSYVOICE_PROMPT_TEXT") or "").strip()
         return body
     # shengwang blog / simple API
     body = {"text": text, "speaker": speaker, "language": lang}
@@ -267,10 +262,7 @@ def main() -> int:
     if args.ref:
         os.environ["COSYVOICE_REF_WAV"] = args.ref
 
-    if args.text_file:
-        text = Path(args.text_file).read_text(encoding="utf-8")
-    else:
-        text = args.text
+    text = Path(args.text_file).read_text(encoding="utf-8") if args.text_file else args.text
     if not args.out:
         raise SystemExit("usage: cosyvoice_tts.py doctor | --text … --out …")
     synthesize(text, Path(args.out), args.voice)

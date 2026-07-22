@@ -9,9 +9,8 @@ import re
 import string
 import tempfile
 import unicodedata
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping, Sequence
-
 
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 MAX_COMPONENT_LENGTH = 128
@@ -61,7 +60,9 @@ def validate_identifier(value: str, *, field: str = "identifier") -> str:
 
 def validate_component(value: str, *, field: str = "name") -> str:
     if not isinstance(value, str) or not value or value != value.strip():
-        raise SecurityPolicyError(f"Invalid {field}: value must be non-empty without outer whitespace")
+        raise SecurityPolicyError(
+            f"Invalid {field}: value must be non-empty without outer whitespace"
+        )
     if len(value) > MAX_COMPONENT_LENGTH:
         raise SecurityPolicyError(f"Invalid {field}: maximum length is {MAX_COMPONENT_LENGTH}")
     if value in {".", ".."} or os.path.isabs(value) or "/" in value or "\\" in value:
@@ -167,7 +168,9 @@ def parse_argv_json(raw: str, *, variable: str) -> list[str]:
     if not isinstance(value, list) or not value or len(value) > MAX_ARG_COUNT:
         raise SecurityPolicyError(f"{variable} must contain 1-{MAX_ARG_COUNT} arguments")
     if any(not isinstance(arg, str) or not arg or len(arg) > MAX_ARG_LENGTH for arg in value):
-        raise SecurityPolicyError(f"{variable} arguments must be non-empty strings under {MAX_ARG_LENGTH} characters")
+        raise SecurityPolicyError(
+            f"{variable} arguments must be non-empty strings under {MAX_ARG_LENGTH} characters"
+        )
     if not value[0].strip() or any("\0" in arg for arg in value):
         raise SecurityPolicyError(f"{variable} contains an invalid executable or NUL byte")
     return value

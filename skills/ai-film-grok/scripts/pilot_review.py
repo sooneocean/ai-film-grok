@@ -11,7 +11,7 @@ import argparse
 import json
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +26,17 @@ from security_policy import SecurityPolicyError, safe_workspace_directory
 
 # Pilot scorecard is the pre-batch gate — three dimensions, not full final seven.
 PILOT_SCORE_DIMS: tuple[str, ...] = ("identity", "style", "motion")
-PREFERRED_BEATS: tuple[str, ...] = ("hook", "reaction", "action", "sensory", "approach", "afterglow", "bridge")
+PREFERRED_BEATS: tuple[str, ...] = (
+    "hook",
+    "reaction",
+    "action",
+    "sensory",
+    "approach",
+    "afterglow",
+    "bridge",
+)
+# Adult max pilot: undress + union + rhythm prove wardrobe ladder + mute-frame + motion
+ADULT_PILOT_COITUS: tuple[str, ...] = ("undress", "union", "rhythm", "entry", "finish", "lock")
 
 
 class PilotReviewError(RuntimeError):
@@ -34,12 +44,14 @@ class PilotReviewError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as handle:
         json.dump(value, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
         temp = Path(handle.name)
@@ -67,16 +79,37 @@ def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def pick_pilot_shots(spec: dict[str, Any], *, n: int = PILOT_MAX_SHOTS_WITHOUT_APPROVAL) -> list[str]:
-    """Prefer hook + reaction + action; fill remaining by preferred beat order then id order."""
+def pick_pilot_shots(
+    spec: dict[str, Any], *, n: int = PILOT_MAX_SHOTS_WITHOUT_APPROVAL
+) -> list[str]:
+    """Prefer hook + reaction + action; heat=max prefers undress/union/rhythm first."""
     shots = flatten_shots(spec)
     if not shots:
         raise PilotReviewError("film-spec has no shots — write-spec first")
+    heat = str(spec.get("heat_scale") or "").strip().lower()
+    picked: list[str] = []
+
+    # Adult canary: wardrobe undress + coitus-readable union + rhythm hips
+    if heat in {"max", "hot"}:
+        by_coitus: dict[str, list[str]] = {}
+        for shot in shots:
+            dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+            cb = str(shot.get("coitus_beat") or dsl.get("coitus_beat") or "").strip().lower()
+            if cb:
+                by_coitus.setdefault(cb, []).append(str(shot["id"]))
+        for cb in ADULT_PILOT_COITUS:
+            # one shot per coitus beat — diversify undress / union / rhythm
+            for sid in by_coitus.get(cb) or []:
+                if sid not in picked:
+                    picked.append(sid)
+                    break
+            if len(picked) >= n:
+                return picked
+
     by_beat: dict[str, list[str]] = {}
     for shot in shots:
         beat = str(shot.get("dramatic_function") or "bridge")
         by_beat.setdefault(beat, []).append(str(shot["id"]))
-    picked: list[str] = []
     for beat in PREFERRED_BEATS:
         for sid in by_beat.get(beat) or []:
             if sid not in picked:
@@ -187,10 +220,7 @@ def build_pilot_scorecard(
             "motion": "真实动态可见；静戏有 blink/breath/push-in",
         },
         "next": (
-            [
-                'aifilm pilot-approve --root … --user-phrase "pilot 过" --shots '
-                + ",".join(shots)
-            ]
+            ['aifilm pilot-approve --root … --user-phrase "pilot 过" --shots ' + ",".join(shots)]
             if all_pass
             else [
                 "修 still/I2V 后重跑 pilot-score",
@@ -331,9 +361,7 @@ def user_phrase_is_approval(phrase: str) -> bool:
     if any(m in p or m in low for m in markers):
         return True
     # Exact short affirmations only (avoid matching random long text)
-    if low in {"ok", "okay", "yes", "y", "好", "好的", "行", "过", "通过"}:
-        return True
-    return False
+    return low in {"ok", "okay", "yes", "y", "好", "好的", "行", "过", "通过"}
 
 
 def user_phrase_wants_run_to_completion(phrase: str) -> bool:
@@ -475,7 +503,7 @@ def _next_actions(
         ]
     if not score_ok:
         return [
-            f'aifilm pilot-score --root … --shots {shot_csv} '
+            f"aifilm pilot-score --root … --shots {shot_csv} "
             "--score-identity pass --score-style pass --score-motion pass "
             '--reviewer <you> --notes "…"',
         ]

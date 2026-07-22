@@ -8,23 +8,15 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from util import read_json
 
 
 class LipsyncCanaryError(RuntimeError):
     pass
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
 
 
 def run_lipsync_canary(
@@ -51,7 +43,7 @@ def run_lipsync_canary(
     report: dict[str, Any] = {
         "ok": False,
         "kind": "ai-film-lipsync-canary",
-        "at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "root": str(root),
         "shot_id": shot_id,
         "probe": {
@@ -78,7 +70,7 @@ def run_lipsync_canary(
         report["receipt_path"] = str(outp)
         return report
 
-    man = _read_json(root / "manifest.json")
+    man = read_json(root / "manifest.json") or {}
     clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
     rec = clips.get(shot_id) if isinstance(clips.get(shot_id), dict) else {}
 
@@ -108,9 +100,7 @@ def run_lipsync_canary(
                 aud = p
                 break
     if aud is None or not aud.is_file():
-        raise LipsyncCanaryError(
-            f"no audio for shot {shot_id!r}; run tts-rehearse or pass --audio"
-        )
+        raise LipsyncCanaryError(f"no audio for shot {shot_id!r}; run tts-rehearse or pass --audio")
 
     be = resolve_backend(backend)
     if be == "off":

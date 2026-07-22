@@ -87,7 +87,7 @@ class TransitionFluencyTests(unittest.TestCase):
         self.assertNotEqual(c, b)
 
     def test_inject_camera_axis_phrase(self) -> None:
-        from edit_policy import inject_camera_axis_phrase, infer_camera_axis
+        from edit_policy import infer_camera_axis, inject_camera_axis_phrase
 
         m = inject_camera_axis_phrase("hand raises tray, idle not speaking", "locked")
         self.assertIn("locked-off", m.lower())

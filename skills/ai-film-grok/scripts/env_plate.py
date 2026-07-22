@@ -15,7 +15,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -91,7 +91,12 @@ def submit_ltx_t2v(
     api_key, key_src = _load_frw_key()
     # force no-face language
     low = prompt.lower()
-    if "no people" not in low and "no faces" not in low and "无人" not in prompt and "无脸" not in prompt:
+    if (
+        "no people" not in low
+        and "no faces" not in low
+        and "无人" not in prompt
+        and "无脸" not in prompt
+    ):
         prompt = prompt.rstrip() + ", no people, no faces, empty unoccupied scene"
 
     st, body = _http_json(
@@ -178,7 +183,7 @@ def _download(url: str, dest: Path) -> Path:
 def _extract_first_frame(video: Path, out_png: Path) -> Path:
     out_png.parent.mkdir(parents=True, exist_ok=True)
     cmd = ["ffmpeg", "-y", "-i", str(video), "-vframes", "1", "-q:v", "2", str(out_png)]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
     if proc.returncode != 0 or not out_png.is_file():
         raise EnvPlateError(f"ffmpeg first frame failed: {(proc.stderr or '')[:300]}")
     return out_png
@@ -212,7 +217,7 @@ def run_env_plate(
     report: dict[str, Any] = {
         "ok": False,
         "kind": "ai-film-env-plate",
-        "at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "model": LTX_T2V_MODEL,
         "template_id": LTX_T2V_TEMPLATE_ID,
         "template_name": "ltx-文生视频",
@@ -289,7 +294,7 @@ def run_env_plate(
             "--review-note",
             "provider=frw model=ltx-t2v role=env no-face unlimited FRW",
         ]
-        proc = subprocess.run(reg, capture_output=True, text=True)
+        proc = subprocess.run(reg, capture_output=True, text=True, timeout=120)
         report["register_rc"] = proc.returncode
         try:
             report["register"] = json.loads((proc.stdout or "").strip().splitlines()[-1])

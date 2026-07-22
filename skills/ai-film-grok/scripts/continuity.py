@@ -213,12 +213,7 @@ def _has_primary_action(shot: dict[str, Any]) -> bool:
     if not blob:
         return False
     # Normalize hyphens so "push-in" splits into micro tokens push + in
-    cleaned = (
-        blob.replace(",", " ")
-        .replace(";", " ")
-        .replace("/", " ")
-        .replace("-", " ")
-    )
+    cleaned = blob.replace(",", " ").replace(";", " ").replace("/", " ").replace("-", " ")
     tokens = [t for t in cleaned.split() if t and t not in _MICRO_ONLY_TOKENS]
     if not tokens:
         return False
@@ -281,7 +276,7 @@ def lint_vo_motion_link(
 
     need_primary = frozenset({"hook", "approach", "action"})
     for i, shot in enumerate(shots):
-        sid = str(shot.get("id") or f"shot{i+1}")
+        sid = str(shot.get("id") or f"shot{i + 1}")
         fn = _norm_token(shot.get("dramatic_function"))
         if fn in need_primary and not _has_primary_action(shot):
             issues.append(
@@ -299,7 +294,7 @@ def lint_vo_motion_link(
     # 3-shot monotony / size flat
     for i in range(0, len(shots) - 2):
         window = shots[i : i + 3]
-        ids = [str(s.get("id") or f"shot{i+j+1}") for j, s in enumerate(window)]
+        ids = [str(s.get("id") or f"shot{i + j + 1}") for j, s in enumerate(window)]
         primaries = [_has_primary_action(s) for s in window]
         if not any(primaries):
             issues.append(
@@ -348,8 +343,7 @@ def lint_vo_motion_link(
         if diversify < 2 and len(window) == 3:
             # only add if not already monotony/size_flat for same window
             already = any(
-                iss.get("shot_ids") == ids
-                and iss["code"] in {CODE_MOTION_MONOTONY, CODE_SIZE_FLAT}
+                iss.get("shot_ids") == ids and iss["code"] in {CODE_MOTION_MONOTONY, CODE_SIZE_FLAT}
                 for iss in issues
             )
             if not already and diversify <= 1:
@@ -398,7 +392,7 @@ def lint_vo_motion_link(
     # Camera axis flat: 3 consecutive same camera_axis (or all push-in language)
     for i in range(0, len(shots) - 2):
         window = shots[i : i + 3]
-        ids = [str(s.get("id") or f"shot{i+j+1}") for j, s in enumerate(window)]
+        ids = [str(s.get("id") or f"shot{i + j + 1}") for j, s in enumerate(window)]
         axes: list[str] = []
         for s in window:
             dsl = s.get("dsl") if isinstance(s.get("dsl"), dict) else {}
@@ -653,19 +647,10 @@ def lint_meaningful_motion(shots: list[dict[str, Any]]) -> dict[str, Any]:
         fn = _norm_token(shot.get("dramatic_function"))
         dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
         blob = _motion_action_blob(shot)
-        visible = _norm_token(
-            dsl.get("visible_change") or shot.get("visible_change") or ""
-        )
-        story_beat = _norm_token(
-            dsl.get("story_beat") or shot.get("story_beat") or ""
-        )
+        visible = _norm_token(dsl.get("visible_change") or shot.get("visible_change") or "")
+        story_beat = _norm_token(dsl.get("story_beat") or shot.get("story_beat") or "")
         # 1) Aesthetic-only motion (camera micro fillers without story body)
-        cleaned = (
-            blob.replace(",", " ")
-            .replace(";", " ")
-            .replace("/", " ")
-            .replace("-", " ")
-        )
+        cleaned = blob.replace(",", " ").replace(";", " ").replace("/", " ").replace("-", " ")
         tokens = [t for t in cleaned.split() if t]
         content = [t for t in tokens if t not in _AESTHETIC_ONLY and len(t) > 2]
         need_body = frozenset({"hook", "approach", "action"})
@@ -840,7 +825,7 @@ def lint_continuity(
     for i in range(1, len(shots)):
         prev, cur = shots[i - 1], shots[i]
         pid = str(prev.get("id") or f"shot{i}")
-        cid = str(cur.get("id") or f"shot{i+1}")
+        cid = str(cur.get("id") or f"shot{i + 1}")
         pair = [pid, cid]
         prev_fn = _norm_token(prev.get("dramatic_function"))
         cur_fn = _norm_token(cur.get("dramatic_function"))
@@ -879,7 +864,13 @@ def lint_continuity(
         d0, d1 = _screen_direction(prev), _screen_direction(cur)
         if d0 and d1 and d0 != d1:
             axis_ok = any(
-                x in (prev_fn, cur_fn, _norm_token(cur.get("axis_break")), _norm_token(prev.get("axis_break")))
+                x
+                in (
+                    prev_fn,
+                    cur_fn,
+                    _norm_token(cur.get("axis_break")),
+                    _norm_token(prev.get("axis_break")),
+                )
                 for x in ("bridge", "axis_break", "true", "yes")
             ) or bool(cur.get("axis_break") or prev.get("axis_break"))
             if not axis_ok:
@@ -894,7 +885,12 @@ def lint_continuity(
 
         # Prop drop: prev had props, cur empty after approach/action
         pp, cp = _props_set(prev), _props_set(cur)
-        if pp and not cp and prev_fn in {"approach", "action", "sensory"} and cur_fn not in {"bridge", "afterglow"}:
+        if (
+            pp
+            and not cp
+            and prev_fn in {"approach", "action", "sensory"}
+            and cur_fn not in {"bridge", "afterglow"}
+        ):
             issues.append(
                 {
                     "code": CODE_PROP_DROP,

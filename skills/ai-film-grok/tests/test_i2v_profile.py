@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import json
 import os
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -12,19 +10,21 @@ from unittest import mock
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from capability_report import suggest_i2v_from_canary  # noqa: E402
 from film_spec import (  # noqa: E402
     default_i2v_provider,
     resolve_i2v_profile,
     validate_film_spec,
 )
-from capability_report import suggest_i2v_from_canary  # noqa: E402
 
 
 class I2VProfileTests(unittest.TestCase):
     def test_grok_primary_default(self) -> None:
-        env = {k: v for k, v in os.environ.items() if k not in {
-            "AIFILM_I2V_PROFILE", "AIFILM_SEEDANCE_AVAILABLE"
-        }}
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in {"AIFILM_I2V_PROFILE", "AIFILM_SEEDANCE_AVAILABLE"}
+        }
         with mock.patch.dict(os.environ, env, clear=True):
             # clear those keys
             os.environ.pop("AIFILM_I2V_PROFILE", None)

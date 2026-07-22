@@ -120,6 +120,35 @@
       "cli": { "run": "aifilm assets sync --root", "validate": "aifilm assets status --root" }
     },
     {
+      "id": "heat.lint",
+      "version": "1.0.0",
+      "summary": "Adult heat gates: sex duration, wardrobe, VO spice, coitus, size, pose, montage",
+      "status": "implemented",
+      "produces": ["HeatReport"],
+      "dependsOnAssets": ["Shot"],
+      "capabilities": ["structure", "qa"],
+      "providers": ["local"],
+      "tags": ["adult", "heat", "qa"],
+      "phases": ["3", "5"],
+      "cli": {
+        "run": "aifilm heat check --root",
+        "validate": "aifilm heat check --root"
+      }
+    },
+    {
+      "id": "heat.vo-suggest",
+      "version": "1.0.0",
+      "summary": "Suggest denser adult narration lines by heat_phase/coitus_beat",
+      "status": "implemented",
+      "produces": ["VoSuggestions"],
+      "dependsOnAssets": ["Shot"],
+      "capabilities": ["structure"],
+      "providers": ["local"],
+      "tags": ["adult", "heat", "vo"],
+      "phases": ["3"],
+      "cli": { "run": "aifilm heat vo-suggest --root [--shot]" }
+    },
+    {
       "id": "shot.plan",
       "version": "1.1.0",
       "summary": "Plan vertical shots from beats + project film-spec; write-spec validates",
@@ -195,14 +224,16 @@
       "id": "camera.motion.plan",
       "version": "0.1.0",
       "summary": "Static panel motion plan (push-in/parallax) without full I2V",
-      "status": "stub",
+      "status": "implemented",
       "produces": ["MotionPlan"],
       "dependsOnAssets": ["Panel", "Keyframe"],
       "capabilities": ["motion_json"],
       "providers": ["local"],
       "tags": ["motion"],
       "phases": ["6"],
-      "cli": { "run": "# Phase 6: motion JSON → FFmpeg/HF", "validate": null }
+      "cli": { "run": "aifilm motion-plan --root --shot-id", "validate": "aifilm status --root" },
+      "inputContract": "registry/contracts/skill-envelope.in.json",
+      "outputContract": "registry/contracts/skill-envelope.out.json"
     },
     {
       "id": "voice.synthesize",
@@ -319,7 +350,7 @@
       "providers": ["local"],
       "tags": ["deliver"],
       "phases": ["0", "9"],
-      "cli": { "run": "aifilm export-desktop --root", "validate": null }
+      "cli": { "run": "aifilm export-desktop --root", "validate": "aifilm status --root" }
     },
     {
       "id": "dispatch.orchestrate",
@@ -332,7 +363,7 @@
       "providers": ["local"],
       "tags": ["agent"],
       "phases": ["0", "2"],
-      "cli": { "run": "aifilm dispatch --root", "validate": null }
+      "cli": { "run": "aifilm dispatch --root", "validate": "aifilm next --root" }
     }
   ]
 }

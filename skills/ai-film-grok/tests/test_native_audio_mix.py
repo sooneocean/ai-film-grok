@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -15,7 +16,9 @@ import render_final  # noqa: E402
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg required")
+@pytest.mark.slow
 class NativeAudioMixTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_native_track_aligns_stems_and_silence_to_full_timeline(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

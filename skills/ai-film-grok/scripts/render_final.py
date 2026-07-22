@@ -11,6 +11,7 @@ so mouth matches 口白 — see references/lipsync.md.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -19,10 +20,11 @@ import shutil
 import subprocess
 import sys
 import wave
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from edit_policy import (
     DEFAULT_TRANSITION_SEC,
     PolicyError,
@@ -36,6 +38,7 @@ from edit_policy import (
 )
 from film_spec import FilmSpecError, validate_film_spec
 from media_qa import MediaQAError, analyze_media, approved_clip_record
+from PIL import Image, ImageDraw, ImageFont
 from runtime_policy import sha256
 from security_policy import (
     SecurityPolicyError,
@@ -59,20 +62,19 @@ from sound_plan import (
     sidechain_filter_fragment,
 )
 
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-
 # local sibling import
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
-    from lipsync_backend import lipsync_one, should_lipsync_shot, probe as lipsync_probe
+    from lipsync_backend import lipsync_one, should_lipsync_shot
+    from lipsync_backend import probe as lipsync_probe
 except ImportError:  # pragma: no cover
     lipsync_one = None  # type: ignore
     should_lipsync_shot = None  # type: ignore
     lipsync_probe = None  # type: ignore
 
 try:
-    from tts_backend import synthesize as tts_synthesize, probe as tts_probe
+    from tts_backend import probe as tts_probe
+    from tts_backend import synthesize as tts_synthesize
 except ImportError:  # pragma: no cover
     tts_synthesize = None  # type: ignore
     tts_probe = None  # type: ignore
@@ -113,14 +115,16 @@ FONT_CANDIDATES = [
 # Re-export policy constants for tests/back-compat
 # Transitions: DEFAULT_TRANSITION_SEC from edit_policy (silk soft dissolve)
 SR = 44100
-DEFAULT_SUB_MAX_CHARS = 14  # shorter subtitle chunks, less face cover
+# 9:16 竖屏：一句一卡；过长句按逗号拆开，阅读更轻松
+DEFAULT_SUB_MAX_CHARS = 12  # phrase-sized cue; long nar always splits at ，/。
+
 
 class RenderError(RuntimeError):
     pass
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def write_json(path: Path, value: dict[str, Any]) -> None:
@@ -138,6 +142,7 @@ def log(msg: str) -> None:
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         cmd,
+        timeout=60,
         check=check,
         capture_output=True,
         text=True,
@@ -183,27 +188,40 @@ def resolve_font() -> str:
     raise RenderError("No Chinese-capable system font found")
 
 
-def split_units(text: str, max_len: int = 16) -> list[str]:
-    """Chinese subtitle units: prefer punctuation phrases, avoid mid-phrase shreds.
+def split_units(text: str, max_len: int = 12) -> list[str]:
+    """Chinese subtitle units: **one short phrase per cue** for 9:16 HF captions.
 
-    Goals: readable 9:16 captions, no 「话说放学后的 / 天台门」style bad wraps.
+    Prefer natural clause boundaries (。！？ and ，、) so long storyteller nars
+    become readable one-liners — never dump a full 20–30 char shot nar in one card.
+
+    Hard cap: no unit longer than max_len (trailing ，。… may make it max_len+1).
     """
     text = (text or "").strip()
     if not text:
         return []
     text = text.replace("……", "…").replace("...", "…")
-    # First cut on strong punctuation
-    segs = re.split(r"(?<=[。！？!?；;])", text)
+    # Normalize multi-dash so we split once after the whole dash run
+    text = re.sub(r"[—–-]{2,}", "——", text)
+    # Phrase-first: strong end + comma/顿号; keep —— as a single end marker
+    # (user: 一句話一個字幕；太長字串要拆開)
+    segs = re.split(r"(?<=[。！？!?；;…，,、])|(?<=——)", text)
     units: list[str] = []
+    soft_particles = "的了着过吗呢吧啊哦喔与和是在把被给让"
 
     def flush(buf: str) -> None:
-        buf = buf.strip("，,、 \t")
+        buf = buf.strip(" \t")
+        # keep trailing ，。 for natural reading; strip only spaces
+        buf = buf.strip()
         if buf:
             units.append(buf)
 
     def hard_wrap(part: str) -> None:
-        """Wrap long phrase at soft boundaries (顿号/逗号/连接词后), not mid-word."""
+        """Wrap long phrase at soft boundaries; never keep a >max_len blob."""
         if len(part) <= max_len:
+            flush(part)
+            return
+        # If only over by a single trailing punct, keep as one card
+        if len(part) == max_len + 1 and part[-1] in "，。！？…、,.;!?—":
             flush(part)
             return
         i = 0
@@ -212,30 +230,34 @@ def split_units(text: str, max_len: int = 16) -> list[str]:
             if len(remain) <= max_len:
                 flush(remain)
                 break
-            window = remain[: max_len + 1]
-            # Prefer break after punctuation inside window
+            if len(remain) == max_len + 1 and remain[-1] in "，。！？…、,.;!?—":
+                flush(remain)
+                break
+            # Search soft cut only inside first max_len chars (not past the hard cap)
+            window = remain[:max_len]
             cut = None
             for j, ch in enumerate(window):
-                if j < 4:
+                if j < 3:
                     continue
                 if ch in "，,、；;…—：:":
                     cut = j + 1
-            # Prefer break after particles (keep them with left half)
             if cut is None:
-                for j in range(min(max_len, len(window)) - 1, 3, -1):
-                    if window[j] in "的了着过吗呢吧啊哦喔与和是在把被给让":
+                for j in range(len(window) - 1, 2, -1):
+                    if window[j] in soft_particles:
                         cut = j + 1
                         break
-            if cut is None or cut < 4:
+            if cut is None or cut < 3:
                 cut = max_len
+            # Avoid 1–2 char tails: leave ≥3 chars for the rest when possible
+            rest_len = len(remain) - cut
+            if 0 < rest_len < 3 and len(remain) > max_len:
+                cut = max(3, min(max_len, len(remain) - 3))
             chunk = remain[:cut]
-            rest = remain[cut:]
-            # Fold tiny orphan tail
-            if rest and len(rest) <= 2:
-                flush(remain)
-                break
+            # Never emit oversize chunk
+            if len(chunk) > max_len:
+                chunk = remain[:max_len]
             flush(chunk)
-            i += cut
+            i += len(chunk)
 
     for seg in segs:
         seg = seg.strip()
@@ -244,38 +266,47 @@ def split_units(text: str, max_len: int = 16) -> list[str]:
         if len(seg) <= max_len:
             flush(seg)
             continue
-        # Second cut on commas / dashes / colon
-        parts = re.split(r"(?<=[，,、——…：:])", seg)
-        cur = ""
+        # Long clause: split on colon / full-width dash run, then hard wrap
+        parts = re.split(r"(?<=[：:])|(?<=——)", seg)
         for part in parts:
             part = part.strip()
             if not part:
                 continue
-            if len(cur) + len(part) <= max_len:
-                cur += part
-                continue
-            if cur:
-                flush(cur)
-                cur = ""
             if len(part) <= max_len:
-                cur = part
+                flush(part)
             else:
                 hard_wrap(part)
-                cur = ""
-        if cur:
-            flush(cur)
 
-    # Merge accidental 1–2 char units; also merge "X。" style short tails
+    # Only merge accidental 1–2 char orphans — never re-glue past max_len
     merged: list[str] = []
     for u in units:
-        if merged and len(u) <= 2 and len(merged[-1]) + len(u) <= max_len + 2:
+        if merged and len(u) <= 2 and len(merged[-1]) + len(u) <= max_len:
             merged[-1] = merged[-1] + u
-        elif merged and len(merged[-1]) <= 4 and len(merged[-1]) + len(u) <= max_len:
-            # glue very short left fragment into next if previous was too short
+        elif merged and len(merged[-1]) <= 2 and len(merged[-1]) + len(u) <= max_len:
             merged[-1] = merged[-1] + u
         else:
             merged.append(u)
-    return merged or [text[:max_len]]
+    # Drop punctuation-only noise (comma / dash crumbs)
+    cleaned = [
+        u.strip(" \t")
+        for u in merged
+        if u.strip(" \t，,、—–-…")
+    ]
+    # Safety net: re-hard-wrap any unit still over max_len (should be rare)
+    final: list[str] = []
+    for u in cleaned:
+        if len(u) <= max_len:
+            final.append(u)
+        else:
+            # allow single trailing punct beyond max_len
+            if len(u) == max_len + 1 and u[-1] in "，。！？…、,.;!?——":
+                final.append(u)
+            else:
+                k = 0
+                while k < len(u):
+                    final.append(u[k : k + max_len])
+                    k += max_len
+    return final or [text[:max_len]]
 
 
 def _split_one_soft(u: str) -> tuple[str, str] | None:
@@ -294,7 +325,16 @@ def _split_one_soft(u: str) -> tuple[str, str] | None:
         elif ch in "的了着过吗呢吧啊哦喔么":
             score -= 4
         # Avoid splitting compounds like 只准 / 还可以 / 十分
-        if i + 1 < len(u) and u[i : i + 2] in ("只准", "还可", "十分", "几乎", "已经", "没有", "不在", "一点"):
+        if i + 1 < len(u) and u[i : i + 2] in (
+            "只准",
+            "还可",
+            "十分",
+            "几乎",
+            "已经",
+            "没有",
+            "不在",
+            "一点",
+        ):
             score += 20
         # Prefer even-ish length halves
         left, right = i + 1, len(u) - (i + 1)
@@ -379,7 +419,7 @@ def unit_timings(
 
     segs: list[tuple[str, float, float]] = []
     t = 0.0
-    for i, (u, dur) in enumerate(zip(units, durs)):
+    for i, (u, dur) in enumerate(zip(units, durs, strict=False)):
         start = t
         end = t + dur
         segs.append((u, start, min(vo_dur, end)))
@@ -442,11 +482,21 @@ def tts_edge(
     volume: str = "+0%",
     pitch: str = "+0Hz",
 ) -> tuple[Path, float]:
-    wav, dur, _ = tts_to_wav(text, out_mp3, voice, rate=rate, volume=volume, pitch=pitch, backend="edge")
+    wav, dur, _ = tts_to_wav(
+        text, out_mp3, voice, rate=rate, volume=volume, pitch=pitch, backend="edge"
+    )
     return wav, dur
 
 
-def make_tone(f0: float, a: float, n_seg: int, sr: int = SR, vib: float = 4.5, atk: float = 0.05, rel: float = 0.4) -> np.ndarray:
+def make_tone(
+    f0: float,
+    a: float,
+    n_seg: int,
+    sr: int = SR,
+    vib: float = 4.5,
+    atk: float = 0.05,
+    rel: float = 0.4,
+) -> np.ndarray:
     tt = np.linspace(0, n_seg / sr, n_seg, endpoint=False)
     env = np.ones(n_seg)
     atk_n = max(1, int(sr * atk))
@@ -567,7 +617,9 @@ def procedural_music_rnb(
     while i < n:
         k = min(kick_len, n - i)
         env = np.linspace(1, 0, k) ** 2
-        sig[i : i + k] += 0.22 * env * np.sin(2 * np.pi * 55 * np.linspace(0, 0.08, k, endpoint=False))
+        sig[i : i + k] += (
+            0.22 * env * np.sin(2 * np.pi * 55 * np.linspace(0, 0.08, k, endpoint=False))
+        )
         i += int(beat * 2 * SR)
     sig = np.tanh(sig * amp * 2.2)
     fade = int(SR * 1.0)
@@ -594,8 +646,20 @@ def procedural_music(
     """
     mood = (mood or "playful").lower()
     # rnb/soul/sensual = late-night seductive bed (Kei lesson: never use dark for 色气)
-    if mood in ("rnb", "r&b", "soul", "neo-soul", "neosoul", "sensual", "seductive", "ecchi", "sexy"):
-        sig = procedural_music_rnb(dur, amp=amp * 1.05, bpm=76.0, seed=seed, shot_starts=shot_starts, events=events)
+    if mood in (
+        "rnb",
+        "r&b",
+        "soul",
+        "neo-soul",
+        "neosoul",
+        "sensual",
+        "seductive",
+        "ecchi",
+        "sexy",
+    ):
+        sig = procedural_music_rnb(
+            dur, amp=amp * 1.05, bpm=76.0, seed=seed, shot_starts=shot_starts, events=events
+        )
         return (np.clip(sig, -1, 1) * 32767).astype(np.int16)
 
     n = int(SR * max(0.5, dur))
@@ -901,8 +965,7 @@ def build_vocal_color_track(
     for p in delayed_parts:
         inputs.extend(["-i", str(p)])
     fc = (
-        "".join(f"[{i}:a]" for i in range(n_in))
-        + f"amix=inputs={n_in}:duration=first:normalize=0,"
+        "".join(f"[{i}:a]" for i in range(n_in)) + f"amix=inputs={n_in}:duration=first:normalize=0,"
         f"aformat=sample_fmts=fltp:sample_rates={SR}:channel_layouts=stereo,"
         f"alimiter=limit=0.92[aout]"
     )
@@ -940,7 +1003,9 @@ def _wrap_title_lines(text: str, max_chars: int) -> list[str]:
     return lines
 
 
-def sub_png(text: str, path: Path, *, width: int, height: int, font_path: str, title: bool = False) -> None:
+def sub_png(
+    text: str, path: Path, *, width: int, height: int, font_path: str, title: bool = False
+) -> None:
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     if title:
@@ -986,7 +1051,9 @@ def sub_png(text: str, path: Path, *, width: int, height: int, font_path: str, t
     img.save(path)
 
 
-def mkcard_video(text: str, out: Path, *, width: int, height: int, duration: float, fps: int, font_path: str) -> None:
+def mkcard_video(
+    text: str, out: Path, *, width: int, height: int, duration: float, fps: int, font_path: str
+) -> None:
     """Title/end card: dark wine gradient + soft highlight (色气 short-film feel).
 
     Empty ``text`` → **blank pad** (same gradient, no glyphs). Used when designed
@@ -1051,13 +1118,9 @@ def mkcard_video(text: str, out: Path, *, width: int, height: int, duration: flo
     )
 
 
-def flatten_shots(
-    spec: dict[str, Any], film_root: Path | None = None
-) -> list[dict[str, Any]]:
+def flatten_shots(spec: dict[str, Any], film_root: Path | None = None) -> list[dict[str, Any]]:
     try:
-        return validate_film_spec(
-            spec, assign_missing_ids=False, film_root=film_root
-        )
+        return validate_film_spec(spec, assign_missing_ids=False, film_root=film_root)
     except FilmSpecError as exc:
         raise RenderError(str(exc)) from exc
 
@@ -1095,7 +1158,9 @@ def voice_for_shot(
     if isinstance(speaker, str) and speaker.strip() and speaker.strip() in cast_voices:
         return cast_voices[speaker.strip()]
     # map first cast tag if present (character mode)
-    casts = shot.get("dsl", {}).get("cast") if isinstance(shot.get("dsl"), dict) else shot.get("cast")
+    casts = (
+        shot.get("dsl", {}).get("cast") if isinstance(shot.get("dsl"), dict) else shot.get("cast")
+    )
     if isinstance(casts, list) and casts:
         c0 = str(casts[0]).strip()
         if c0 in cast_voices:
@@ -1398,25 +1463,37 @@ def build_subtitle_cues_for_shots(
     shot_starts = list(film_tl["shot_starts"])
     for i, item in enumerate(shot_audio):
         t0 = float(shot_starts[i])
-        vo_dur = float(item.get("vo_dur") or item["target"])
+        # CRITICAL: use raw speech length, NOT padded plate vo_dur.
+        # After pad_natural, item["vo_dur"] == plate (silence tail); spreading
+        # phrases over that makes late cards appear with no VO (user: 字幕對不上口白).
+        speech_dur = float(
+            item.get("raw_vo_dur") or item.get("vo_dur") or item["target"] or 0.0
+        )
+        plate = float(item.get("target") or speech_dur or 0.0)
+        # never schedule captions into the pad tail (keep ≥0.15s headroom if pad)
+        if plate > speech_dur + 0.2:
+            speech_dur = min(speech_dur, plate - 0.05)
+        speech_dur = max(0.4, speech_dur)
         units = list(item.get("units") or [])
         segs = unit_timings(
             units,
-            vo_dur,
+            speech_dur,
             min_unit=sub_min,
             max_unit=sub_max,
             gap=0.03,
         )
-        shot_end = t0 + float(item["target"]) - 0.02
+        speech_end = t0 + speech_dur
+        shot_end = t0 + plate - 0.02
+        hard_end = min(speech_end, shot_end)
         for u, bs, be in segs:
             sb = max(0.0, t0 + bs - sub_lead)
             eb = t0 + be
             if eb - sb < sub_min:
                 eb = sb + sub_min
-            if eb > shot_end:
-                eb = shot_end
+            if eb > hard_end:
+                eb = hard_end
             if eb <= sb:
-                eb = min(shot_end, sb + 0.4)
+                eb = min(hard_end, sb + 0.4)
             cues.append({"start": sb, "end": eb, "text": u, "shot_index": i})
     return cues, film_tl
 
@@ -1471,8 +1548,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     # Film-spec may override VO strategy
     vo_mode = str(spec.get("vo_mode") or "storyteller").lower()
     # 默认中文女声（晓晓 edge 兜底）；Fish 时 voice 可填 FISH voice id
-    voice = args.voice or spec.get("vo_voice") or (
-        STORYTELLER_VOICE if vo_mode in ("storyteller", "hybrid") else DEFAULT_VOICE
+    voice = (
+        args.voice
+        or spec.get("vo_voice")
+        or (STORYTELLER_VOICE if vo_mode in ("storyteller", "hybrid") else DEFAULT_VOICE)
     )
     # 一角一声：film-spec.cast_voices = {"storyteller": "zh-CN-XiaoxiaoNeural", "heroine": "..."}
     cast_voices_raw = spec.get("cast_voices") or {}
@@ -1481,12 +1560,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         for k, v in cast_voices_raw.items():
             if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
                 cast_voices[k.strip()] = v.strip()
-    vo_rate = str(
-        getattr(args, "vo_rate", None) or spec.get("vo_rate") or DEFAULT_VO_RATE
-    )
-    vo_pitch = str(
-        getattr(args, "vo_pitch", None) or spec.get("vo_pitch") or DEFAULT_VO_PITCH
-    )
+    vo_rate = str(getattr(args, "vo_rate", None) or spec.get("vo_rate") or DEFAULT_VO_RATE)
+    vo_pitch = str(getattr(args, "vo_pitch", None) or spec.get("vo_pitch") or DEFAULT_VO_PITCH)
     vo_tts_vol = str(getattr(args, "vo_tts_volume", None) or spec.get("vo_tts_volume") or "+0%")
     tts_backend = (
         getattr(args, "tts_backend", None)
@@ -1513,15 +1588,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         except Exception:
             voice_policy = {}
     if voice_policy.get("nar_gain") is not None:
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             vo_gain = float(voice_policy["nar_gain"])
-        except (TypeError, ValueError):
-            pass
     if voice_policy.get("native_audio_volume") is not None:
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             native_audio_volume = float(voice_policy["native_audio_volume"])
-        except (TypeError, ValueError):
-            pass
     raw_color_gain = getattr(args, "vocal_color_gain", None)
     if raw_color_gain is None:
         raw_color_gain = voice_policy.get("vocal_color_gain")
@@ -1538,7 +1609,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     mood = args.music_mood or ("rnb" if vo_mode in ("storyteller", "hybrid") else "playful")
     lipsync_mode = (getattr(args, "lipsync", None) or "off").lower()
     # Storyteller: never lipsync unless user forced --lipsync require
-    if vo_mode == "storyteller" and lipsync_mode not in ("require", "musetalk", "wav2lip", "external"):
+    if vo_mode == "storyteller" and lipsync_mode not in (
+        "require",
+        "musetalk",
+        "wav2lip",
+        "external",
+    ):
         if lipsync_mode != "off":
             log("storyteller mode → force lipsync off")
         lipsync_mode = "off"
@@ -1551,12 +1627,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     font_path = resolve_font()
 
     shots = flatten_shots(spec, film_root=root)
-    clips_map = (manifest.get("clips") or {})
+    clips_map = manifest.get("clips") or {}
     try:
         clips_dir = safe_workspace_directory(root, "clips", field="film clips directory")
         audio_dir = safe_workspace_directory(root, "audio", field="film audio directory")
         native_dir = safe_workspace_directory(audio_dir, "native", field="native audio directory")
-        keyframes_dir = safe_workspace_directory(root, "keyframes", field="film keyframes directory")
+        keyframes_dir = safe_workspace_directory(
+            root, "keyframes", field="film keyframes directory"
+        )
         work = safe_workspace_directory(out_dir, "_final_work", field="final work directory")
         for directory, field in (
             (out_dir, "film output directory"),
@@ -1602,7 +1680,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         text = narration_for_shot(shot)
         if not text:
             raise RenderError(f"Shot {sid} has no nar/narration/dialogue text for VO")
-        max_chars = int(getattr(args, "sub_max_chars", DEFAULT_SUB_MAX_CHARS) or DEFAULT_SUB_MAX_CHARS)
+        max_chars = int(
+            getattr(args, "sub_max_chars", DEFAULT_SUB_MAX_CHARS) or DEFAULT_SUB_MAX_CHARS
+        )
         units = split_units(text, max_len=max_chars)
         try:
             mp3 = safe_output_path(
@@ -1638,9 +1718,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         color_payload: dict[str, Any] = {}
         if resolve_shot_vocal_color is not None and voice_policy.get("enabled", False):
             try:
-                color_payload = resolve_shot_vocal_color(
-                    shot, policy=voice_policy, seed=i * 17
-                )
+                color_payload = resolve_shot_vocal_color(shot, policy=voice_policy, seed=i * 17)
             except Exception:
                 color_payload = {}
         color_text = str(color_payload.get("text") or "").strip()
@@ -1702,7 +1780,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         vo_atempo_plan: dict[str, Any] | None = None
         raw_vo_dur = float(dur)
         # vo_fit: atempo (default for slot) | legacy (pad/trim only, stretch video to VO)
-        vo_fit = str(spec.get("vo_fit") or getattr(args, "vo_fit", None) or "atempo").strip().lower()
+        vo_fit = (
+            str(spec.get("vo_fit") or getattr(args, "vo_fit", None) or "atempo").strip().lower()
+        )
         if vo_fit not in {"atempo", "legacy"}:
             vo_fit = "atempo"
 
@@ -1743,7 +1823,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             target = slot
         # Optional edit handle: only play [in_point, out_point) of source plate
         try:
-            out_point = float(shot["out_point_sec"]) if shot.get("out_point_sec") is not None else None
+            out_point = (
+                float(shot["out_point_sec"]) if shot.get("out_point_sec") is not None else None
+            )
         except (TypeError, ValueError):
             out_point = None
         try:
@@ -1865,7 +1947,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                         }
                     )
                     if lipsync_mode == "require":
-                        raise RenderError(f"lipsync required but skipped for {item['id']}: {result}")
+                        raise RenderError(
+                            f"lipsync required but skipped for {item['id']}: {result}"
+                        )
             except Exception as exc:
                 lipsync_report.append({"id": item["id"], "ok": False, "error": str(exc)})
                 if lipsync_mode == "require":
@@ -1998,7 +2082,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     # convert each to same format and pad to exact segment durations
     voice_parts: list[Path] = []
     segs_durs = [title_dur] + [item["target"] for item in shot_audio] + [end_dur]
-    for i, (src, dur) in enumerate(zip(voice_inputs, segs_durs)):
+    for i, (src, dur) in enumerate(zip(voice_inputs, segs_durs, strict=False)):
         part = work / f"vo_part_{i:02d}.wav"
         # pad/trim to exact duration
         run(
@@ -2026,8 +2110,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     except SecurityPolicyError as exc:
         raise RenderError(str(exc)) from exc
     active_transition = transition_sec if xfade_plan.get("enabled") else 0.0
-    audio_join_intents = full_join_intents if xfade_plan.get("enabled") else ["hard"] * max(
-        0, len(segs_durs) - 1
+    audio_join_intents = (
+        full_join_intents if xfade_plan.get("enabled") else ["hard"] * max(0, len(segs_durs) - 1)
     )
     # Placeholder to keep following code structure: voice_cat filled by acrossfade
     afade_plan = concat_audio_segments(
@@ -2080,20 +2164,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         default_intent=default_intent if active_transition > 0 else "hard",
     )
     shot_start_map = {
-        str(item["id"]): float(spot_tl["shot_starts"][i])
-        for i, item in enumerate(shot_audio)
+        str(item["id"]): float(spot_tl["shot_starts"][i]) for i, item in enumerate(shot_audio)
     }
     sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
     # Auto light SFX accents from dramatic_function when author left events empty
-    flat = {
-        str(s["id"]): s
-        for s in flatten_shots(spec)
-        if isinstance(s, dict) and s.get("id")
-    }
-    shot_dicts = [
-        flat.get(str(item["id"]), {"id": item["id"]}) for item in shot_audio
-    ]
-    sound_plan = inject_auto_sfx_if_empty(sound_plan, shot_dicts)
+    flat = {str(s["id"]): s for s in flatten_shots(spec) if isinstance(s, dict) and s.get("id")}
+    shot_dicts = [flat.get(str(item["id"]), {"id": item["id"]}) for item in shot_audio]
+    heat_scale = str(spec.get("heat_scale") or "").strip().lower() or None
+    sound_plan = inject_auto_sfx_if_empty(sound_plan, shot_dicts, heat_scale=heat_scale)
     # sound_cues on shots → extra sfx_accent events (声景轨，不进旁白)
     if sound_cues_to_sfx_kinds is not None and isinstance(sound_plan, dict):
         cue_events: list[dict[str, Any]] = list(sound_plan.get("events") or [])
@@ -2269,7 +2347,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         mix_spotting["mood"] = (sound_plan or {}).get("mood", mood) if sound_plan else mood
         mix_spotting["bed_source"] = str(music_resolved.get("source") or "user_music_file")
         mix_spotting["music_seed"] = music_seed
-        mix_spotting["note"] = "user/external music — mute/duck/sfx_accent on bed before VO sidechain"
+        mix_spotting["note"] = (
+            "user/external music — mute/duck/sfx_accent on bed before VO sidechain"
+        )
         if sound_plan and sound_plan.get("bed") is False:
             user_f = np.zeros_like(user_f)
             mix_spotting["bed_applied"] = False
@@ -2312,14 +2392,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             acc += float(item.get("target") or 6.0)
 
         samples = procedural_music(
-            total_dur, 
-            emo=1.1, 
-            curve="swell", 
-            amp=gen_amp, 
-            mood=mood, 
+            total_dur,
+            emo=1.1,
+            curve="swell",
+            amp=gen_amp,
+            mood=mood,
             seed=music_seed,
             shot_starts=s_starts,
-            events=(sound_plan or {}).get("events")
+            events=(sound_plan or {}).get("events"),
         )
         float_bed = samples.astype(np.float64) / 32767.0
         float_bed, spotting_only = _apply_spotting_to_float_mono(float_bed)
@@ -2548,8 +2628,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             else:
                 mix_spotting["loudnorm_applied"] = False
                 mix_spotting["loudnorm_error"] = (
-                    (ln_proc.stderr or ln_proc.stdout or "loudnorm failed")[-400:]
-                )
+                    ln_proc.stderr or ln_proc.stdout or "loudnorm failed"
+                )[-400:]
         else:
             mix_spotting["loudnorm_applied"] = False
         if mix_spotting.get("report_path"):
@@ -2560,13 +2640,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     except Exception as exc:  # pragma: no cover — probe must never fail final
         mix_spotting["loudness_error"] = str(exc)[:200]
         if mix_spotting.get("report_path"):
-            try:
+            with contextlib.suppress(Exception):
                 atomic_write_text(
                     Path(str(mix_spotting["report_path"])),
                     json.dumps(mix_spotting, ensure_ascii=False, indent=2) + "\n",
                 )
-            except Exception:
-                pass
 
     # 8) Subtitle cues — char-weighted, early; same xfade clock as picture/VO/native
     sub_lead = float(getattr(args, "sub_lead", 0.08) or 0.0)  # show slightly before speech
@@ -2678,8 +2756,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     if not has_v or not has_a:
         raise RenderError("Final MP4 missing video or audio stream")
 
+    timeline_path = root / "timeline.json"
+    mix_report_path = root / "audio" / "mix_report.json"
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "created_at": utc_now(),
         "title": title_text,
         "output": str(final_path),
@@ -2726,6 +2806,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "sha256": sha256(native_track),
             "volume": native_audio_volume,
             "preserved_shots": [item["id"] for item in shot_audio if item.get("native_audio")],
+        },
+        "audio_provenance": {
+            "mix_report": str(mix_report_path) if mix_report_path.is_file() else None,
+            "mix_report_sha256": sha256(mix_report_path) if mix_report_path.is_file() else None,
+        },
+        "timeline": {
+            "path": str(timeline_path) if timeline_path.is_file() else None,
+            "sha256": sha256(timeline_path) if timeline_path.is_file() else None,
         },
         "subtitles": {
             "srt": str(srt_path),
@@ -2811,7 +2899,9 @@ def main(argv: list[str] | None = None) -> int:
         choices=["auto", "minimax", "fish", "edge", "external"],
         help="TTS: auto prefers external > MiniMax > pinned Fish > edge",
     )
-    p.add_argument("--vo-rate", default=None, help='TTS rate e.g. "-5%%" (edge) / maps to Fish speed')
+    p.add_argument(
+        "--vo-rate", default=None, help='TTS rate e.g. "-5%%" (edge) / maps to Fish speed'
+    )
     p.add_argument("--vo-pitch", default=None, help='TTS pitch e.g. "-1Hz" (edge only)')
     p.add_argument("--vo-gain", type=float, default=None, help="Narration mix gain (default 1.15)")
     p.add_argument(
@@ -2830,7 +2920,9 @@ def main(argv: list[str] | None = None) -> int:
         default="text",
         help="text=FFmpeg burns title/end glyphs; blank=pad only (for HyperFrames/Remotion designed cards)",
     )
-    p.add_argument("--sub-lead", type=float, default=0.08, help="Show subtitles this many seconds early")
+    p.add_argument(
+        "--sub-lead", type=float, default=0.08, help="Show subtitles this many seconds early"
+    )
     p.add_argument("--sub-min-unit", type=float, default=0.48)
     p.add_argument("--sub-max-unit", type=float, default=1.75)
     p.add_argument("--sub-max-chars", type=int, default=DEFAULT_SUB_MAX_CHARS)

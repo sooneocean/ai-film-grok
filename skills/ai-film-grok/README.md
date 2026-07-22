@@ -326,10 +326,10 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`1.6.0`
-- Skill Registry：`21/24` 项标记为 `implemented`
-- CLI 脚本：`60` 个
-- pytest 文件：`68` 个
+- 插件版本：`1.14.4`
+- Skill Registry：`24/26` 项标记为 `implemented`
+- CLI 脚本：`84` 个
+- pytest 文件：`91` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

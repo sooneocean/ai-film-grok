@@ -20,7 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -43,12 +43,14 @@ class ComposeRenderError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as handle:
         json.dump(value, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
         temp = Path(handle.name)
@@ -115,7 +117,9 @@ def probe_designed_post_tooling() -> dict[str, Any]:
         # e.g. "hyperframes v0.7.60" or just "0.7.60"
         ver = None
         for token in out.replace("\n", " ").split():
-            if token[0].isdigit() or (token.startswith("v") and len(token) > 1 and token[1].isdigit()):
+            if token[0].isdigit() or (
+                token.startswith("v") and len(token) > 1 and token[1].isdigit()
+            ):
                 ver = token.lstrip("v")
                 break
         info["hyperframes_version"] = ver or (out[:80] if out else None)
@@ -160,9 +164,7 @@ def probe_remotion_readiness(root: Path) -> dict[str, Any]:
                 deps.update(data["dependencies"])
             if isinstance(data.get("devDependencies"), dict):
                 deps.update(data["devDependencies"])
-            info["has_npm_deps_declared"] = bool(
-                "remotion" in deps or "@remotion/cli" in deps
-            )
+            info["has_npm_deps_declared"] = bool("remotion" in deps or "@remotion/cli" in deps)
         except ComposeRenderError:
             info["has_npm_deps_declared"] = False
 
@@ -511,8 +513,7 @@ def copy_remotion_media(root: Path) -> dict[str, Any]:
     )
     if errors or len(copied) != len(items):
         raise ComposeRenderError(
-            f"remotion media-copy incomplete: {len(copied)}/{len(items)} ok; "
-            f"errors={errors[:5]}"
+            f"remotion media-copy incomplete: {len(copied)}/{len(items)} ok; errors={errors[:5]}"
         )
     return {"ok": True, "count": len(copied), "items": copied, "planned": len(items)}
 
@@ -597,6 +598,22 @@ def _ffmpeg_mux_video_with_audio(video: Path, audio_src: Path, out: Path) -> Non
     )
 
 
+def _audio_video_clock_ok(
+    video: Path,
+    audio_src: Path,
+    *,
+    max_skew_sec: float = 0.75,
+) -> tuple[bool, float, float, float]:
+    """Return (ok, video_dur, audio_dur, skew). Reject hard clock skew that desyncs VO/subs."""
+    try:
+        v = float(pdur(video))
+        a = float(pdur(audio_src))
+    except Exception:
+        return False, 0.0, 0.0, 999.0
+    skew = abs(v - a)
+    return skew <= max_skew_sec, v, a, skew
+
+
 def ensure_audio_mux(
     video: Path,
     root: Path,
@@ -604,7 +621,10 @@ def ensure_audio_mux(
 ) -> dict[str, Any]:
     """Attach production VO/BGM mix to designed-post video.
 
-    Prefer audio/mixed.wav (final pipeline) over quiet native I2V hum.
+    Prefer audio/mixed.wav (final pipeline) over quiet native I2V hum **only when
+    durations match the picture clock**. Muxing a 69s plate mix onto a 62s underlay
+    (or the reverse) silently desyncs VO vs burned/designed captions.
+
     Passthrough only when no mix stems exist and video already has usable loudness.
     """
     preferred = _preferred_mix_audio_sources(root)
@@ -614,6 +634,14 @@ def ensure_audio_mux(
         if audio_src.suffix.lower() in {".wav", ".mp3", ".m4a", ".aac"} or probe_has_audio(
             audio_src
         ):
+            ok_clock, v_dur, a_dur, skew = _audio_video_clock_ok(video, audio_src)
+            if not ok_clock:
+                log(
+                    f"skip mux {audio_src.name}: duration skew {skew:.2f}s "
+                    f"(video={v_dur:.2f}s audio={a_dur:.2f}s) — would desync VO/subs; "
+                    f"re-run final so plate+mix share one clock"
+                )
+                continue
             try:
                 _ffmpeg_mux_video_with_audio(video, audio_src, out)
             except (ComposeRenderError, subprocess.CalledProcessError, OSError) as exc:
@@ -622,10 +650,15 @@ def ensure_audio_mux(
             if out.is_file() and out.stat().st_size > 1000 and probe_has_audio(out):
                 return {
                     "ok": True,
-                    "action": "mux_from_mix" if "mixed" in audio_src.name or "narration" in audio_src.name else "mux_from_final",
+                    "action": "mux_from_mix"
+                    if "mixed" in audio_src.name or "narration" in audio_src.name
+                    else "mux_from_final",
                     "audio_source": str(audio_src),
                     "has_audio": True,
                     "mean_volume_db": probe_mean_volume_db(out),
+                    "video_duration_sec": v_dur,
+                    "audio_duration_sec": a_dur,
+                    "duration_skew_sec": skew,
                 }
 
     # No production mix — keep video audio if it is actually audible
@@ -640,10 +673,7 @@ def ensure_audio_mux(
                 "has_audio": True,
                 "mean_volume_db": mean,
             }
-        log(
-            f"video audio too quiet (mean_volume={mean} dB) and no mixed.wav — "
-            "trying stem rebuild"
-        )
+        log(f"video audio too quiet (mean_volume={mean} dB) and no mixed.wav — trying stem rebuild")
 
     candidates: list[Path] = []
     for rel in (
@@ -797,15 +827,11 @@ def register_final_film(
         shutil.copy2(source, final_path)
 
     try:
-        technical_qa = analyze_media(
-            final_path, require_audio=True, require_motion=require_motion
-        )
+        technical_qa = analyze_media(final_path, require_audio=True, require_motion=require_motion)
     except MediaQAError as exc:
         raise ComposeRenderError(str(exc)) from exc
     if not technical_qa.get("ok"):
-        raise ComposeRenderError(
-            f"Final MP4 failed technical QA: {technical_qa.get('errors')}"
-        )
+        raise ComposeRenderError(f"Final MP4 failed technical QA: {technical_qa.get('errors')}")
 
     digest = sha256(final_path)
     duration = float(technical_qa.get("duration_sec") or pdur(final_path))
@@ -1165,9 +1191,7 @@ def compose_render(
                     "next": next_steps,
                 }
             try:
-                steps["npm_install"] = remotion_npm_install(
-                    rem, timeout=int(npm_install_timeout)
-                )
+                steps["npm_install"] = remotion_npm_install(rem, timeout=int(npm_install_timeout))
             except ComposeRenderError as exc:
                 # Honest failure with next steps (no fake MP4)
                 return {
@@ -1185,9 +1209,7 @@ def compose_render(
             steps["remotion_readiness_after_install"] = readiness
 
         if not readiness.get("ready"):
-            hint = (
-                'pass --npm-install once (network), or: cd compose/remotion && npm install'
-            )
+            hint = "pass --npm-install once (network), or: cd compose/remotion && npm install"
             # Not silent success: ok=False + rendered=false + exact next steps
             return {
                 "ok": False,

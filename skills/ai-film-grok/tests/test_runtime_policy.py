@@ -6,12 +6,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from backend_lock import create_lock_entry, verify_backend_lock  # noqa: E402
 from aifilm_grok import grok_permission_mode  # noqa: E402
+from backend_lock import create_lock_entry, verify_backend_lock  # noqa: E402
 from runtime_policy import verify_requirements_lock, verify_runtime_lock  # noqa: E402
 
 
@@ -66,7 +65,9 @@ class RuntimeLockTests(unittest.TestCase):
             lock_path = root / "runtime-lock.json"
             from runtime_policy import build_runtime_lock
 
-            lock_path.write_text(json.dumps(build_runtime_lock(root, script_paths=[script])), encoding="utf-8")
+            lock_path.write_text(
+                json.dumps(build_runtime_lock(root, script_paths=[script])), encoding="utf-8"
+            )
             self.assertTrue(verify_runtime_lock(root, lock_path)["ok"])
             script.write_text("print('v2')\n", encoding="utf-8")
             self.assertFalse(verify_runtime_lock(root, lock_path)["ok"])

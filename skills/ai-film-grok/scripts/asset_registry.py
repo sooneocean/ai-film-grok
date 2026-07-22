@@ -8,7 +8,7 @@ Does not invent pixels — only registry slots, variants, and consistency report
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +38,7 @@ DEFAULT_VARIANT_BLURBS = {
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def registry_path(root: Path) -> Path:
@@ -65,8 +65,12 @@ def _loc_object(lid: str, value: Any) -> dict[str, Any]:
             "timeOfDay": str(value.get("timeOfDay") or value.get("time_of_day") or ""),
             "lighting": str(value.get("lighting") or ""),
             "palette": str(value.get("palette") or ""),
-            "immutableRules": list(value.get("immutableRules") or value.get("immutable_rules") or []),
-            "recurringObjects": list(value.get("recurringObjects") or value.get("recurring_objects") or []),
+            "immutableRules": list(
+                value.get("immutableRules") or value.get("immutable_rules") or []
+            ),
+            "recurringObjects": list(
+                value.get("recurringObjects") or value.get("recurring_objects") or []
+            ),
             "primaryAngles": list(value.get("primaryAngles") or value.get("primary_angles") or []),
         }
         return out
@@ -400,7 +404,9 @@ def _align_with_state_index(root: Path, registry: dict[str, Any]) -> dict[str, A
         if isinstance(t, dict) and t.get("reDressRisk")
     ]
     for t in re_dress:
-        issues.append(f"re_dress_risk:{t.get('characterId')}:{t.get('shotId')}:{t.get('wardrobeState')}")
+        issues.append(
+            f"re_dress_risk:{t.get('characterId')}:{t.get('shotId')}:{t.get('wardrobeState')}"
+        )
 
     gen_plan = si.get("generate_plan") or []
     return {
@@ -425,7 +431,7 @@ def sync_assets(
 ) -> dict[str, Any]:
     """character.bible / location.bible / prop.track / character.state.update shell."""
     root = Path(root).expanduser().resolve()
-    from visual_bible import load_bible, save_bible, migrate_to_v2
+    from visual_bible import load_bible, migrate_to_v2, save_bible
 
     bible = migrate_to_v2(load_bible(root))
     locked = bool(bible.get("locked")) or str(bible.get("state") or "").lower() == "approved"
@@ -438,7 +444,7 @@ def sync_assets(
 
     # character ids from bible + shots
     chars_map = bible.get("characters") if isinstance(bible.get("characters"), dict) else {}
-    char_ids: list[str] = [str(k) for k in chars_map.keys()]
+    char_ids: list[str] = [str(k) for k in chars_map]
     for sh in shots:
         for hid in _hero_ids(sh, fallback=[]):
             if hid not in char_ids:
@@ -466,23 +472,30 @@ def sync_assets(
 
     characters_out: list[dict[str, Any]] = []
     for cid in char_ids:
-        body = chars_map.get(cid) if isinstance(chars_map.get(cid), dict) else {"identity": str(chars_map.get(cid) or cid)}
+        body = (
+            chars_map.get(cid)
+            if isinstance(chars_map.get(cid), dict)
+            else {"identity": str(chars_map.get(cid) or cid)}
+        )
         used = used_by_char.get(cid) or {"full"}
         variants = _ensure_wardrobe_variants(bible, cid, used, force=False)
         slots = _ensure_cast_state_slots(root, bible, cid, used)
         # forbid drift defaults
-        forbid = body.get("forbid_drift") or body.get("forbidDrift") or [
-            "face identity",
-            "hair color",
-            "age band",
-        ]
+        forbid = (
+            body.get("forbid_drift")
+            or body.get("forbidDrift")
+            or [
+                "face identity",
+                "hair color",
+                "age band",
+            ]
+        )
         characters_out.append(
             {
                 "id": cid,
                 "identity": str(body.get("identity") or cid),
                 "defaultWardrobe": str(body.get("default_wardrobe") or variants.get("full") or ""),
-                "castMaster": body.get("cast_master")
-                or (bible.get("cast_masters") or {}).get(cid),
+                "castMaster": body.get("cast_master") or (bible.get("cast_masters") or {}).get(cid),
                 "states": slots,
                 "wardrobeVariants": variants,
                 "forbidDrift": list(forbid) if isinstance(forbid, list) else [str(forbid)],
@@ -619,7 +632,9 @@ def _sync_graph_assets(root: Path, registry: dict[str, Any]) -> None:
                     events = by_shot.get(sid) or []
                     if events:
                         # primary hero first event
-                        sh["wardrobeState"] = events[0].get("wardrobeState") or sh.get("wardrobeState")
+                        sh["wardrobeState"] = events[0].get("wardrobeState") or sh.get(
+                            "wardrobeState"
+                        )
                         sh["characterStateRefs"] = [
                             f"{e.get('characterId')}:{e.get('wardrobeState')}" for e in events
                         ]

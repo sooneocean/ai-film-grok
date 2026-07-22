@@ -46,6 +46,11 @@ SAFE_FRAMING_HINT = (
 # Beats where subject head/body readability is critical (not pure detail insert).
 SUBJECT_BEATS = frozenset({"hook", "approach", "action", "reaction", "afterglow", "bridge"})
 
+VERTICAL_SAFE_AREA_HINT = (
+    "declare top_ui_clear, subtitle_clear, subject_clear and prop_readable "
+    "for 9:16 platform framing"
+)
+
 
 def _shot_framing_blob(shot: dict[str, Any]) -> str:
     parts: list[str] = []
@@ -155,3 +160,37 @@ def lint_framing_iron(shots: list[dict[str, Any]]) -> dict[str, Any]:
 def framing_crop_risk_in_text(text: str) -> list[str]:
     """Public helper for unit tests / still-prompt gates."""
     return _match_any(text or "", CROP_PRONE_PATTERNS)
+
+
+def lint_vertical_safe_area(shots: list[dict[str, Any]]) -> dict[str, Any]:
+    """Check that platform UI/subtitle/subject zones are declared for 9:16."""
+    issues: list[dict[str, Any]] = []
+    required = ("top_ui_clear", "subtitle_clear", "subject_clear", "prop_readable")
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+        area = shot.get("safe_area") or dsl.get("safe_area")
+        if not isinstance(area, dict):
+            issues.append(
+                {
+                    "shot_id": str(shot.get("id") or "?"),
+                    "code": "VERTICAL_SAFE_AREA_UNDECLARED",
+                    "level": "warning",
+                    "message": VERTICAL_SAFE_AREA_HINT,
+                }
+            )
+            continue
+        missing = [key for key in required if area.get(key) is not True]
+        if missing:
+            issues.append(
+                {
+                    "shot_id": str(shot.get("id") or "?"),
+                    "code": "VERTICAL_SAFE_AREA_INCOMPLETE",
+                    "level": "warning",
+                    "missing": missing,
+                    "message": f"missing safe-area declarations: {', '.join(missing)}",
+                }
+            )
+    codes = sorted({str(i["code"]) for i in issues})
+    return {"ok": not issues, "codes": codes, "warning_count": len(issues), "issues": issues}

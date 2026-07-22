@@ -13,7 +13,7 @@ import json
 import os
 import re
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +29,6 @@ from security_policy import (
     SecurityPolicyError,
     reject_symlinks,
     safe_existing_file,
-    safe_output_path,
     safe_workspace_directory,
 )
 
@@ -45,12 +44,14 @@ class ComposeExportError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as handle:
         json.dump(value, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
         temp = Path(handle.name)
@@ -59,7 +60,9 @@ def write_json(path: Path, value: Any) -> None:
 
 def write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as handle:
         handle.write(text)
         if not text.endswith("\n"):
             handle.write("\n")
@@ -127,6 +130,118 @@ def format_caption_lines(
             "html_kind": "dual",
         }
     return {"text": zh_s, "zh": zh_s, "en": en_s, "mode": "zh", "html_kind": "single"}
+
+
+# HF designed captions: one short phrase per card (matches render_final.split_units)
+HF_CAPTION_MAX_CHARS = 12
+
+
+def expand_cues_phrase_split(
+    cues: list[dict[str, Any]],
+    *,
+    max_chars: int = HF_CAPTION_MAX_CHARS,
+    min_cue_sec: float = 0.55,
+) -> list[dict[str, Any]]:
+    """Re-split long SRT/nar cues into one-phrase cards for HyperFrames readability.
+
+    Timing: char-weighted within each original cue window. Does not change
+    total coverage of the parent cue's [start, end].
+    """
+    try:
+        from render_final import split_units
+    except Exception:  # pragma: no cover
+        split_units = None  # type: ignore
+
+    if not cues:
+        return []
+    out: list[dict[str, Any]] = []
+    for cue in cues:
+        start = float(cue.get("start") or 0.0)
+        end = float(cue.get("end") or start)
+        span = max(0.05, end - start)
+        zh = str(cue.get("zh") or cue.get("text") or "").strip()
+        en = str(cue.get("en") or "").strip()
+        mode = str(cue.get("mode") or "zh")
+        # Prefer zh for split; keep en only on first sub-cue when dual
+        text_for_split = zh or str(cue.get("text") or "")
+        if split_units is None:
+            units = [text_for_split] if text_for_split else []
+        else:
+            units = split_units(text_for_split, max_len=max_chars)
+        if not units:
+            continue
+        # One phrase fits the card: keep original window (no retime)
+        # Allow +1 only for a trailing punct so 12+， still counts as one card
+        _one = units[0]
+        _one_ok = len(units) == 1 and (
+            len(_one) <= max_chars
+            or (len(_one) == max_chars + 1 and _one[-1] in "，。！？…、,.;!?——")
+        )
+        if _one_ok:
+            lines = format_caption_lines(_one, en if mode == "zh_en" else "", mode=mode)
+            out.append(
+                {
+                    **{k: v for k, v in cue.items() if k not in {"text", "zh", "en", "html_kind"}},
+                    "start": start,
+                    "end": end,
+                    "text": lines["text"],
+                    "zh": lines["zh"],
+                    "en": lines["en"],
+                    "mode": lines["mode"],
+                    "html_kind": lines["html_kind"],
+                }
+            )
+            continue
+        # Drop units that would be shorter than min if we pack too many into short span
+        weights = [max(1.0, float(len(u))) for u in units]
+        total_w = sum(weights) or 1.0
+        # If span too short for n cues, merge adjacent short units first
+        # Never re-glue past max_chars (user: 一句一卡，長串拆開)
+        n = len(units)
+        if span < min_cue_sec * n and n > 1:
+            merged: list[str] = []
+            cur = ""
+            for u in units:
+                if not cur:
+                    cur = u
+                elif len(cur) + len(u) <= max_chars:
+                    cur = cur + u
+                else:
+                    merged.append(cur)
+                    cur = u
+            if cur:
+                merged.append(cur)
+            units = merged or units
+            weights = [max(1.0, float(len(u))) for u in units]
+            total_w = sum(weights) or 1.0
+        t = start
+        gap = 0.04
+        usable = max(0.2, span - gap * max(0, len(units) - 1))
+        for i, (u, w) in enumerate(zip(units, weights, strict=False)):
+            dur = usable * (w / total_w)
+            dur = max(min_cue_sec * 0.7, dur)
+            t1 = t + dur
+            if i == len(units) - 1:
+                t1 = end
+            # en only on first phrase of dual block (avoid repeating EN n times)
+            en_i = en if (i == 0 and mode == "zh_en") else ""
+            lines = format_caption_lines(u, en_i, mode=mode if en_i else "zh")
+            out.append(
+                {
+                    "start": round(t, 3),
+                    "end": round(min(end, t1), 3),
+                    "text": lines["text"],
+                    "zh": lines["zh"],
+                    "en": lines["en"],
+                    "mode": lines["mode"],
+                    "html_kind": lines["html_kind"],
+                    "shot_id": cue.get("shot_id"),
+                }
+            )
+            t = min(end, t1 + gap)
+            if t >= end - 0.02:
+                break
+    return out
 
 
 def parse_srt(path: Path) -> list[dict[str, Any]]:
@@ -236,7 +351,9 @@ def build_timeline_package(
     title = str(spec.get("title") or manifest.get("title") or "Untitled")
 
     try:
-        transition_sec = normalize_transition_sec(spec.get("transition_sec", DEFAULT_TRANSITION_SEC))
+        transition_sec = normalize_transition_sec(
+            spec.get("transition_sec", DEFAULT_TRANSITION_SEC)
+        )
     except PolicyError as exc:
         raise ComposeExportError(str(exc)) from exc
 
@@ -246,9 +363,7 @@ def build_timeline_package(
         story_intents = [str(x) for x in raw_intents]
     else:
         beats = [str(s.get("dramatic_function") or "bridge") for s in shots]
-        story_intents = [
-            suggest_join_intent(beats[i], beats[i + 1]) for i in range(len(beats) - 1)
-        ]
+        story_intents = [suggest_join_intent(beats[i], beats[i + 1]) for i in range(len(beats) - 1)]
 
     packaged_shots: list[dict[str, Any]] = []
     shot_targets: list[float] = []
@@ -343,42 +458,49 @@ def build_timeline_package(
                 continue
             t0 = float(starts[i]) if i < len(starts) else sum(shot_targets[:i])
             t1 = t0 + float(item["duration_sec"]) * 0.92
-            lines = format_caption_lines(zh, en, mode=caption_mode)
-            cues.append(
-                {
-                    "start": t0,
-                    "end": t1,
-                    "text": lines["text"],
-                    "shot_id": item["id"],
-                    "zh": lines["zh"],
-                    "en": lines["en"],
-                    "mode": lines["mode"],
-                    "html_kind": lines["html_kind"],
-                }
-            )
+            # one-phrase cards even when SRT missing (use nar window)
+            base = {
+                "start": t0,
+                "end": t1,
+                "text": zh,
+                "shot_id": item["id"],
+                "zh": zh,
+                "en": en,
+                "mode": caption_mode,
+            }
+            cues.extend(expand_cues_phrase_split([base], max_chars=HF_CAPTION_MAX_CHARS))
     else:
         enriched: list[dict[str, Any]] = []
         for i, cue in enumerate(cues):
             zh = str(cue.get("text") or "").strip()
             en = ""
             sid = None
-            if i < len(packaged_shots):
+            # Map cue → shot by time overlap when cue count ≠ shot count
+            mid = (float(cue["start"]) + float(cue["end"])) / 2.0
+            for j, item in enumerate(packaged_shots):
+                t0 = float(starts[j]) if j < len(starts) else sum(shot_targets[:j])
+                t1 = t0 + float(item["duration_sec"])
+                if t0 - 0.05 <= mid <= t1 + 0.05:
+                    sid = item["id"]
+                    en = str(item.get("nar_en") or "")
+                    break
+            if sid is None and i < len(packaged_shots):
                 sid = packaged_shots[i]["id"]
                 en = str(packaged_shots[i].get("nar_en") or "")
-            lines = format_caption_lines(zh, en, mode=caption_mode)
             enriched.append(
                 {
                     "start": float(cue["start"]),
                     "end": float(cue["end"]),
-                    "text": lines["text"],
+                    "text": zh,
                     "shot_id": sid,
-                    "zh": lines["zh"],
-                    "en": lines["en"],
-                    "mode": lines["mode"],
-                    "html_kind": lines["html_kind"],
+                    "zh": zh,
+                    "en": en,
+                    "mode": caption_mode,
                 }
             )
-        cues = enriched
+        # Always phrase-split for HF: long SRT lines become 一句一卡
+        cues = expand_cues_phrase_split(enriched, max_chars=HF_CAPTION_MAX_CHARS)
+        caption_source = f"{caption_source}+phrase_split"
 
     # Optional pre-mixed audio / final film as underlay references
     final_film = None
@@ -439,7 +561,9 @@ def build_timeline_package(
         "director_intent": spec.get("director_intent"),
         "sound_plan": spec.get("sound_plan"),
         "vo_mode": spec.get("vo_mode"),
-        "title_sequence": spec.get("title_sequence") if isinstance(spec.get("title_sequence"), dict) else None,
+        "title_sequence": spec.get("title_sequence")
+        if isinstance(spec.get("title_sequence"), dict)
+        else None,
         "end_roll": spec.get("end_roll") if isinstance(spec.get("end_roll"), dict) else None,
         "notes": {
             "role": "designed-post bridge",
@@ -472,9 +596,7 @@ def _fluency_export_meta(
     visual_fit = str(spec.get("visual_fit") or "slot").strip().lower()
     long_form = bool(spec.get("long_form") or spec.get("require_continuity_chain"))
     # Heuristic: mostly-hard joins + vo fit → continue-chain style plate
-    continue_chain = long_form or (
-        visual_fit == "vo" and hard_n >= max(1, soft_n)
-    )
+    continue_chain = long_form or (visual_fit == "vo" and hard_n >= max(1, soft_n))
     video_join = "hard_match_cut" if hard_n >= soft_n else "mixed_soft"
     return {
         "visual_fit": visual_fit,
@@ -568,9 +690,7 @@ def resolve_compose_preset(package: dict[str, Any], preset: str = "auto") -> str
     if raw in COMPOSE_PRESET_RESOLVED:
         return raw
     if raw not in {"auto", ""}:
-        raise ComposeExportError(
-            f"compose_preset must be auto|ecchi-rnb|minimal; got {preset!r}"
-        )
+        raise ComposeExportError(f"compose_preset must be auto|ecchi-rnb|minimal; got {preset!r}")
 
     mood = ""
     sp = package.get("sound_plan")
@@ -627,9 +747,7 @@ def preset_hf_styles(preset: str, *, width: int) -> dict[str, str]:
     if preset == "ecchi-rnb":
         return {
             "body_bg": "#0a0608",
-            "overlay_bg": (
-                "linear-gradient(180deg, rgba(40,12,24,0.38), rgba(12,6,10,0.52))"
-            ),
+            "overlay_bg": ("linear-gradient(180deg, rgba(40,12,24,0.38), rgba(12,6,10,0.52))"),
             "title_size": str(title_px),
             "end_size": str(end_px),
             "caption_size": str(max(cap_px, 24)),
@@ -763,9 +881,7 @@ def build_title_sequence_html(
                 motifs.append(val)
         if not motifs:
             motifs = ["film"]
-        motif_tags = "".join(
-            f'<span class="motif-tag">{html.escape(m)}</span>' for m in motifs[:6]
-        )
+        motif_tags = "".join(f'<span class="motif-tag">{html.escape(m)}</span>' for m in motifs[:6])
     parts = [f'<h1 class="ts-title">{title}</h1>']
     if subtitle:
         parts.append(f'<p class="ts-subtitle">{subtitle}</p>')
@@ -793,9 +909,7 @@ def build_title_sequence_html(
 
     motif_tags = ""
     if motifs:
-        tags = "".join(
-            f'<span class="motif-tag">{html.escape(t)}</span>' for t in motifs[:8]
-        )
+        tags = "".join(f'<span class="motif-tag">{html.escape(t)}</span>' for t in motifs[:8])
         motif_tags = f'<div class="motif-cloud">{tags}</div>'
 
     subtitle_block = ""
@@ -863,10 +977,12 @@ def build_end_roll_html(
             f'<span class="er-role">{html.escape(str(i.get("role") or ""))}</span></div>'
             for i in items
         )
-        section_blocks.append(f'<div class="er-section"><h3>{html.escape(heading)}</h3>{lines}</div>')
+        section_blocks.append(
+            f'<div class="er-section"><h3>{html.escape(heading)}</h3>{lines}</div>'
+        )
 
     inner = "".join(section_blocks)
-    return f"""    <section id="end-roll" class="clip overlay end-roll" data-start="{max(0.0, float(package['film_timeline'].get('output_duration') or 0) - scroll_dur):.3f}" data-duration="{scroll_dur:.3f}" data-track-index="6">
+    return f"""    <section id="end-roll" class="clip overlay end-roll" data-start="{max(0.0, float(package["film_timeline"].get("output_duration") or 0) - scroll_dur):.3f}" data-duration="{scroll_dur:.3f}" data-track-index="6">
       <div class="er-track"><div class="er-inner">{inner}</div></div>
     </section>"""
 
@@ -937,7 +1053,11 @@ def write_hyperframes(
         title_dur=title_dur,
         caption_source=caption_source,
     )
-    if resolved_layout == "underlay" and package.get("final_film") and package["final_film"].get("path"):
+    if (
+        resolved_layout == "underlay"
+        and package.get("final_film")
+        and package["final_film"].get("path")
+    ):
         fpath = str(package["final_film"]["path"])
         dest_name = f"underlay{Path(fpath).suffix or '.mp4'}"
         fsrc = _stage_hf_media(hf_dir, film_root, fpath, dest_name)
@@ -1015,7 +1135,9 @@ def write_hyperframes(
     title_sequence = package.get("title_sequence") or {}
     end_roll = package.get("end_roll") or {}
 
-    title_seq_html = build_title_sequence_html(package, title_sequence, resolved_preset, styles, title_dur=title_dur)
+    title_seq_html = build_title_sequence_html(
+        package, title_sequence, resolved_preset, styles, title_dur=title_dur
+    )
     end_roll_html = build_end_roll_html(package, end_roll, resolved_preset, styles, credits)
 
     if title_seq_html:
@@ -1621,7 +1743,10 @@ Config.setOverwriteOutput(true);
     title_sequence = package.get("title_sequence") or {}
     end_roll = package.get("end_roll") or {}
     credits = package.get("credits") or {}
-    has_title_seq = bool(title_sequence and any(k in title_sequence for k in ("subtitle", "tagline", "show_motifs", "style")))
+    has_title_seq = bool(
+        title_sequence
+        and any(k in title_sequence for k in ("subtitle", "tagline", "show_motifs", "style"))
+    )
     has_end_roll = bool(end_roll and end_roll.get("mode") not in (None, "none"))
     composition_tsx = f"""/**
   * ai-film-grok → Remotion designed-post composition
@@ -1946,8 +2071,12 @@ def export_composition(
         package["end_roll"] = end_roll
 
     if package.get("title_sequence") or package.get("end_roll"):
-        spec_for_credits = read_json(root / "film-spec.json") if (root / "film-spec.json").is_file() else {}
-        manifest_for_credits = read_json(root / "manifest.json") if (root / "manifest.json").is_file() else {}
+        spec_for_credits = (
+            read_json(root / "film-spec.json") if (root / "film-spec.json").is_file() else {}
+        )
+        manifest_for_credits = (
+            read_json(root / "manifest.json") if (root / "manifest.json").is_file() else {}
+        )
         package["credits"] = derive_credits_from_spec(spec_for_credits, manifest_for_credits)
 
     try:
@@ -2049,7 +2178,9 @@ def export_composition(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Export film root to HyperFrames/Remotion compose packages")
+    p = argparse.ArgumentParser(
+        description="Export film root to HyperFrames/Remotion compose packages"
+    )
     p.add_argument("--root", required=True)
     p.add_argument("--engine", default="both", choices=list(ENGINES))
     p.add_argument(

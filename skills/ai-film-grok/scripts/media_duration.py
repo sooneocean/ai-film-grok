@@ -54,9 +54,7 @@ def probe_duration_sec(
             timeout=60,
         )
     except FileNotFoundError as exc:
-        raise MediaDurationError(
-            f"{label}: ffprobe not found on PATH — install ffmpeg"
-        ) from exc
+        raise MediaDurationError(f"{label}: ffprobe not found on PATH — install ffmpeg") from exc
     except subprocess.TimeoutExpired as exc:
         raise MediaDurationError(f"{label}: ffprobe timed out on {p}") from exc
     except OSError as exc:
@@ -70,21 +68,15 @@ def probe_duration_sec(
 
     raw = (proc.stdout or "").strip()
     if not raw or raw.lower() in {"n/a", "nan", "inf", "-inf"}:
-        raise MediaDurationError(
-            f"{label}: unreadable duration from ffprobe on {p}: {raw!r}"
-        )
+        raise MediaDurationError(f"{label}: unreadable duration from ffprobe on {p}: {raw!r}")
     try:
         dur = float(raw)
     except ValueError as exc:
-        raise MediaDurationError(
-            f"{label}: non-numeric duration {raw!r} for {p}"
-        ) from exc
+        raise MediaDurationError(f"{label}: non-numeric duration {raw!r} for {p}") from exc
     if dur != dur or dur <= 0:  # NaN or non-positive
         raise MediaDurationError(f"{label}: invalid duration {dur} for {p}")
     if dur < min_sec:
-        raise MediaDurationError(
-            f"{label}: duration {dur}s below min {min_sec}s for {p}"
-        )
+        raise MediaDurationError(f"{label}: duration {dur}s below min {min_sec}s for {p}")
     return float(dur)
 
 

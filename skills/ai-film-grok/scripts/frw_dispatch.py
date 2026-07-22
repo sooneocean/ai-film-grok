@@ -42,7 +42,7 @@ def run_canary(argv: list[str]) -> int:
         )
         return 1
     # Prefer frwclaw venv only if present; canary is stdlib-only so system py is fine
-    return int(subprocess.call([sys.executable, str(canary), *argv]))
+    return int(subprocess.call([sys.executable, str(canary), *argv]), timeout=120)
 
 
 def resolve_frw_root() -> Path:
@@ -115,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
 
     cmd = [py, str(dispatch), *argv]
     try:
-        proc = subprocess.run(cmd, env=env, cwd=str(root))
+        proc = subprocess.run(cmd, env=env, cwd=str(root), timeout=60)
     except OSError as exc:
         print(
             f"frw_dispatch: failed to exec {py}: {exc}",

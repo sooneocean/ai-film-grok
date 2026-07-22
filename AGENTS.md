@@ -57,17 +57,20 @@ AIFILM="$SKILL/scripts/aifilm"
 # 2) 校验包装
 grok plugin validate "$ROOT"
 
-# 3) 机位 / 门禁
+# 3) Ruff lint + format check
+ruff check "$SKILL/scripts/" && ruff format --check "$SKILL/scripts/"
+
+# 4) 机位 / 门禁
 "$AIFILM" doctor
 
-# 4) 相关测试（全量可选）
-cd "$SKILL" && python3 -m pytest tests/ -q --tb=line
+# 5) 相关测试（fast path: 排除 slow）
+cd "$SKILL" && python3 -m pytest tests/ -q --tb=line -m "not slow"
 
-# 5) 功能变更 → bump plugin.json version（semver）
-# 6) 刷新本机 installed 副本
+# 6) 功能变更 → bump plugin.json version（semver）
+# 7) 刷新本机 installed 副本
 grok plugin update ai-film-grok
 
-# 7) commit（message 英文）+ push origin main
+# 8) commit（message 英文）+ push origin main
 ```
 
 ## 硬规则

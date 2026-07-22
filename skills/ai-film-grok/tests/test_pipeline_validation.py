@@ -10,6 +10,7 @@ from io import StringIO
 from pathlib import Path
 from unittest import mock
 
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -36,7 +37,11 @@ def valid_spec() -> dict[str, object]:
                         "title": "开场",
                         "dramatic_function": "hook",
                         "nar": "夜里，车门缓缓打开。",
-                        "dsl": {"subject": "an adult woman", "action": "opens a door", "motion": "door open, blink, idle not speaking"},
+                        "dsl": {
+                            "subject": "an adult woman",
+                            "action": "opens a door",
+                            "motion": "door open, blink, idle not speaking",
+                        },
                     }
                 ],
             }
@@ -60,6 +65,7 @@ class PipelineValidationTests(unittest.TestCase):
             rc = aifilm_grok.main(["write-spec", "--root", str(root), "--spec", str(source)])
         return rc, json.loads(output.getvalue())
 
+    @pytest.mark.slow
     def test_write_spec_requires_vo_mode_narration_and_unique_safe_ids(self) -> None:
         mutations = []
 
@@ -107,6 +113,7 @@ class PipelineValidationTests(unittest.TestCase):
                 self.assertEqual(rc, 2)
                 self.assertFalse(result["ok"])
 
+    @pytest.mark.slow
     def test_write_spec_assigns_safe_ids_and_writes_valid_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -118,6 +125,7 @@ class PipelineValidationTests(unittest.TestCase):
             saved = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
             self.assertEqual(saved["scenes"][0]["shots"][0]["id"], "shot01")
 
+    @pytest.mark.slow
     def test_register_media_rejects_unsafe_shot_id_without_writing_outside_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -142,6 +150,7 @@ class PipelineValidationTests(unittest.TestCase):
             self.assertFalse((root / "escape.jpg").exists())
             self.assertFalse((base / "escape.jpg").exists())
 
+    @pytest.mark.slow
     def test_assemble_and_final_reject_escaping_output_name_before_work(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -156,6 +165,7 @@ class PipelineValidationTests(unittest.TestCase):
                     self.assertEqual(rc, 2)
                     self.assertFalse((root.parent / "escape.mp4").exists())
 
+    @pytest.mark.slow
     def test_assemble_rejects_symlinked_output_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as outside:
             root = Path(tmp) / "film"
@@ -169,12 +179,13 @@ class PipelineValidationTests(unittest.TestCase):
             result = json.loads(output.getvalue())
             self.assertIn("symbolic-link", result["error"])
 
-
+    @pytest.mark.slow
     def test_render_final_rejects_escaping_output_name_before_reading_root(self) -> None:
         args = argparse.Namespace(root="/definitely/missing", out_name="../escape.mp4")
         with self.assertRaisesRegex(render_final.RenderError, "single relative path component"):
             render_final.render_final(args)
 
+    @pytest.mark.slow
     def test_desktop_export_requires_force_when_destination_exists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp) / "home"

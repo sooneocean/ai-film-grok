@@ -86,19 +86,28 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
                             "id": "shot01",
                             "dramatic_function": "hook",
                             "nar": "登场。",
-                            "dsl": {"subject": "a", "motion": "slow push-in, soft blink, idle not speaking"},
+                            "dsl": {
+                                "subject": "a",
+                                "motion": "slow push-in, soft blink, idle not speaking",
+                            },
                         },
                         {
                             "id": "shot02",
                             "dramatic_function": "approach",
                             "nar": "靠近。",
-                            "dsl": {"subject": "a", "motion": "dolly-in, breath, idle not speaking"},
+                            "dsl": {
+                                "subject": "a",
+                                "motion": "dolly-in, breath, idle not speaking",
+                            },
                         },
                         {
                             "id": "shot03",
                             "dramatic_function": "action",
                             "nar": "行动。",
-                            "dsl": {"subject": "a", "motion": "body lean, track, idle not speaking"},
+                            "dsl": {
+                                "subject": "a",
+                                "motion": "body lean, track, idle not speaking",
+                            },
                         },
                         {
                             "id": "shot04",
@@ -110,7 +119,10 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
                             "id": "shot05",
                             "dramatic_function": "afterglow",
                             "nar": "余韵。",
-                            "dsl": {"subject": "a", "motion": "hold look, breath, idle not speaking"},
+                            "dsl": {
+                                "subject": "a",
+                                "motion": "hold look, breath, idle not speaking",
+                            },
                         },
                     ]
                 }

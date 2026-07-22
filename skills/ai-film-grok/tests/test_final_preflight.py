@@ -8,7 +8,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
+
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -63,7 +64,9 @@ def _seed_ecchi_dark(root: Path) -> None:
     )
 
 
+@pytest.mark.slow
 class FinalPreflightGateTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_final_blocked_by_ecchi_dark_bgm(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -104,6 +107,7 @@ class FinalPreflightGateTests(unittest.TestCase):
             self.assertIn("preflight hard", msg)
             self.assertIn("ecchi_dark_bgm", msg)
 
+    @pytest.mark.slow
     def test_skip_preflight_reaches_loop_gate_or_render(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -6,13 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from runtime_policy import sha256
 from security_policy import atomic_write_text, minimal_subprocess_env
-
 
 BACKEND_FILES = {
     "wav2lip": {
@@ -21,13 +20,18 @@ BACKEND_FILES = {
     },
     "musetalk": {
         "entrypoints": ("aifilm_infer.py", "scripts/aifilm_infer.py", "scripts/inference.py"),
-        "weights": ("models/**/*.pth", "models/**/*.bin", "models/**/*.safetensors", "models/**/*.onnx"),
+        "weights": (
+            "models/**/*.pth",
+            "models/**/*.bin",
+            "models/**/*.safetensors",
+            "models/**/*.onnx",
+        ),
     },
 }
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _git(root: Path, *args: str) -> str | None:
@@ -107,11 +111,15 @@ def verify_backend_lock(kind: str, root: Path, lock_path: Path) -> dict[str, Any
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Inspect or explicitly trust a local lip-sync backend")
+    parser = argparse.ArgumentParser(
+        description="Inspect or explicitly trust a local lip-sync backend"
+    )
     parser.add_argument("command", choices=["inspect", "lock"])
     parser.add_argument("--backend", required=True, choices=sorted(BACKEND_FILES))
     parser.add_argument("--root", required=True)
-    parser.add_argument("--lock", default=str(Path(__file__).resolve().parents[1] / "backend-lock.json"))
+    parser.add_argument(
+        "--lock", default=str(Path(__file__).resolve().parents[1] / "backend-lock.json")
+    )
     parser.add_argument("--acknowledge-trusted-weights", action="store_true")
     args = parser.parse_args(argv)
     root = Path(args.root)
@@ -125,7 +133,11 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("refusing to trust a dirty backend repository")
     lock_path = Path(args.lock).expanduser().resolve()
     try:
-        lock = json.loads(lock_path.read_text(encoding="utf-8")) if lock_path.is_file() else {"schema_version": 1}
+        lock = (
+            json.loads(lock_path.read_text(encoding="utf-8"))
+            if lock_path.is_file()
+            else {"schema_version": 1}
+        )
     except json.JSONDecodeError as exc:
         parser.error(f"invalid existing lock: {exc}")
     lock.setdefault("backends", {})[args.backend] = entry

@@ -64,12 +64,7 @@ def _shot_size(shot: dict[str, Any]) -> str:
     cam = shot.get("camera") if isinstance(shot.get("camera"), dict) else {}
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
     framing = dsl.get("framing") if isinstance(dsl.get("framing"), dict) else {}
-    raw = (
-        cam.get("shot_size")
-        or framing.get("shot_size")
-        or shot.get("shot_size")
-        or ""
-    )
+    raw = cam.get("shot_size") or framing.get("shot_size") or shot.get("shot_size") or ""
     return str(raw).strip().lower().replace(" ", "_")
 
 
@@ -111,7 +106,9 @@ def default_audio_policy(
         allow_sung = False
     allow_lipsync = bool(author.get("allow_lipsync", False))
     try:
-        max_sung = max(0, int(author.get("max_sung_shots") if author.get("max_sung_shots") is not None else 1))
+        max_sung = max(
+            0, int(author.get("max_sung_shots") if author.get("max_sung_shots") is not None else 1)
+        )
     except (TypeError, ValueError) as exc:
         raise AudioRecipeError("audio_policy.max_sung_shots must be int") from exc
     out: dict[str, Any] = {
@@ -355,12 +352,14 @@ def resolve_shot_audio_recipe(
         caps=caps,
         reasons=reasons,
     )
-    payload = _recipe_payload(
-        recipe, reasons=reasons, source=source, degraded_from=degraded_from
-    )
+    payload = _recipe_payload(recipe, reasons=reasons, source=source, degraded_from=degraded_from)
     # Author lipsync true on dialogue/sung recipes sticks when near
     if payload["recipe"] in {"dialogue_lipsync", "sung_beat"} and is_near_shot(shot):
-        if shot.get("lipsync") is True or policy.get("allow_lipsync") or payload["recipe"] == "sung_beat":
+        if (
+            shot.get("lipsync") is True
+            or policy.get("allow_lipsync")
+            or payload["recipe"] == "sung_beat"
+        ):
             payload["lipsync"] = True
     # storyteller: force lipsync false on recipe unless character mode and allow
     if vo_mode == "storyteller" and payload["recipe"] not in {"sung_beat"}:
@@ -428,7 +427,11 @@ def apply_audio_recipes_to_spec(
         )
 
     # Film-level mean bed gain for mix hints
-    gains = [float(s["audio_recipe"]["bed_gain"]) for s in shots if isinstance(s.get("audio_recipe"), dict)]
+    gains = [
+        float(s["audio_recipe"]["bed_gain"])
+        for s in shots
+        if isinstance(s.get("audio_recipe"), dict)
+    ]
     mean_gain = sum(gains) / len(gains) if gains else 1.0
 
     # Annotate sound_plan with routing hint (non-breaking)
@@ -438,9 +441,7 @@ def apply_audio_recipes_to_spec(
         sp["bed_gain_hint"] = round(mean_gain, 3)
         sp["bed_source_policy"] = policy.get("bed_source")
         notes = list(sp.get("_notes") or [])
-        notes.append(
-            f"audio_recipe: {', '.join(f'{k}={v}' for k, v in counts.items() if v)}"
-        )
+        notes.append(f"audio_recipe: {', '.join(f'{k}={v}' for k, v in counts.items() if v)}")
         sp["_notes"] = notes
         spec["sound_plan"] = sp
 
@@ -478,7 +479,9 @@ def apply_audio_recipes_to_spec(
                 seed = int((spec.get("voice_tracks") or {}).get("seed") or 0)
             except (TypeError, ValueError):
                 seed = 0
-        vt = apply_voice_tracks_to_spec(spec, seed=seed or abs(hash(str(spec.get("title") or "film"))) % 997)
+        vt = apply_voice_tracks_to_spec(
+            spec, seed=seed or abs(hash(str(spec.get("title") or "film"))) % 997
+        )
         summary["voice_tracks"] = vt
     except Exception as exc:  # noqa: BLE001 — never block write-spec on color layer
         summary["voice_tracks_error"] = str(exc)
@@ -499,6 +502,7 @@ def probe_caps_for_root(root: Any | None = None) -> dict[str, bool]:
         pass
     try:
         from pathlib import Path
+
         from sound_plan import resolve_music_template  # type: ignore
 
         if root is not None:

@@ -13,7 +13,7 @@ Also hooked from preflight / dispatch.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,14 +32,15 @@ UNDRESS_STATES = frozenset({"partial", "undressed", "bare"})
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _shots_from_spec(spec: dict[str, Any]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     try:
-        from film_spec import validate_film_spec
         import copy
+
+        from film_spec import validate_film_spec
 
         out = list(validate_film_spec(copy.deepcopy(spec), assign_missing_ids=False))
     except Exception:
@@ -149,13 +150,15 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
 
     # --- resolve state photos ---
     try:
-        from visual_bible import resolve_state_photo, migrate_to_v2
+        from visual_bible import migrate_to_v2, resolve_state_photo
 
         bible = migrate_to_v2(bible)
     except Exception:
         resolve_state_photo = None  # type: ignore
 
-    csm = bible.get("cast_state_masters") if isinstance(bible.get("cast_state_masters"), dict) else {}
+    csm = (
+        bible.get("cast_state_masters") if isinstance(bible.get("cast_state_masters"), dict) else {}
+    )
     missing_states: list[str] = []
     state_index: dict[str, Any] = {}
 
@@ -322,7 +325,12 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
 
     # frame-chain receipt
     fc = read_json(root / "receipts" / "frame-chain.json") or {}
-    if heat_maxish and len(shot_rows) >= 3 and not fc and any(r.get("clip_approved") for r in shot_rows):
+    if (
+        heat_maxish
+        and len(shot_rows) >= 3
+        and not fc
+        and any(r.get("clip_approved") for r in shot_rows)
+    ):
         soft.append(
             {
                 "level": "soft",
@@ -381,11 +389,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
         "hard": hard_only,
         "soft": soft,
         "generate_plan": uniq_plan,
-        "next_if_gap": (
-            f'aifilm state-index plan --root "{root}"'
-            if uniq_plan
-            else None
-        ),
+        "next_if_gap": (f'aifilm state-index plan --root "{root}"' if uniq_plan else None),
         "agent_do": _agent_do(uniq_plan, ok),
         "ref": "references/keyframe-first-state-index.md · lessons-2026-07-21-wardrobe-no-redress-still.md",
     }

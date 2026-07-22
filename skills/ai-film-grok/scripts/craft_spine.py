@@ -6,9 +6,10 @@ Orthogonal to tool-layer pipeline stages (agent/visual/voice/…).
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
+
+from util import read_json
 
 CRAFT_STAGES: tuple[str, ...] = (
     "idea",
@@ -44,27 +45,17 @@ CRAFT_QUESTIONS: dict[str, str] = {
 }
 
 
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
-
-
 def _present(path: Path) -> bool:
     return path.is_file() and path.stat().st_size > 2
 
 
 def _pilot_user_ok(root: Path) -> bool:
     try:
-        from production_gates import pilot_is_user_approved, load_pilot_approval
+        from production_gates import load_pilot_approval, pilot_is_user_approved
 
         return pilot_is_user_approved(load_pilot_approval(root))
     except Exception:
-        pilot = _read_json(root / "receipts" / "pilot-approval.json")
+        pilot = read_json(root / "receipts" / "pilot-approval.json") or {}
         return bool(
             str(pilot.get("approved_by") or "").lower() == "user"
             and str(pilot.get("user_phrase") or "").strip()
@@ -101,7 +92,7 @@ def _spec_valid_flag(root: Path, gates: dict[str, Any] | None) -> bool:
     if gates and gates.get("spec"):
         return True
     # soft: film-spec exists and has shots
-    spec = _read_json(root / "film-spec.json")
+    spec = read_json(root / "film-spec.json") or {}
     shots = spec.get("shots") if isinstance(spec.get("shots"), list) else []
     return bool(shots)
 
@@ -115,15 +106,18 @@ def detect_craft_stage(
     root = Path(root).expanduser().resolve()
     gates = gates or {}
     receipts = root / "receipts"
-    spec = _read_json(root / "film-spec.json")
-    man = _read_json(root / "manifest.json")
+    spec = read_json(root / "film-spec.json") or {}
+    man = read_json(root / "manifest.json") or {}
     outputs = man.get("outputs") if isinstance(man.get("outputs"), dict) else {}
     final_rec = outputs.get("final_film") if isinstance(outputs.get("final_film"), dict) else {}
     silent_rec = outputs.get("silent_film") if isinstance(outputs.get("silent_film"), dict) else {}
 
     has_brief = _present(root / "brief.json") or _present(receipts / "creative-brief.md")
-    has_init = has_brief or bool(gates.get("brief")) or root.is_dir() and (
-        (root / "film-spec.json").is_file() or (root / "README.md").is_file()
+    has_init = (
+        has_brief
+        or bool(gates.get("brief"))
+        or root.is_dir()
+        and ((root / "film-spec.json").is_file() or (root / "README.md").is_file())
     )
     story_ok = _director_intent_ok(spec) if spec else False
     if not story_ok and _present(receipts / "directors-lens.md"):
@@ -133,7 +127,7 @@ def detect_craft_stage(
         beats_ok = True
     style_ok = bool(gates.get("style_locked"))
     if not style_ok:
-        style = _read_json(root / "style-bible.json")
+        style = read_json(root / "style-bible.json") or {}
         style_ok = bool(style.get("locked"))
     spec_ok = _spec_valid_flag(root, gates)
     pilot_ok = _pilot_user_ok(root)
@@ -163,7 +157,9 @@ def detect_craft_stage(
         pass
     final_complete = bool(gates.get("final_complete"))
     export_ok = bool(gates.get("desktop_exported"))
-    final_review = outputs.get("final_review") if isinstance(outputs.get("final_review"), dict) else {}
+    final_review = (
+        outputs.get("final_review") if isinstance(outputs.get("final_review"), dict) else {}
+    )
     human_verified = bool(final_review.get("approved") is True) and final_complete
 
     flags = {
@@ -239,7 +235,7 @@ def detect_craft_stage(
     elif final_rec and not final_complete:
         stage, detail = "verified", "review-final"
         blockers.append("final_not_approved")
-    elif clips_ok and (rough_ok or True):
+    elif clips_ok and (True):
         # clips complete → rough then voice/design then verified
         if not final_rec:
             stage, detail = "rough", "final-or-preview"
@@ -302,7 +298,7 @@ def craft_status_report(
     craft = detect_craft_stage(root, gates=gates)
     root = Path(root).expanduser().resolve()
     next_hint = {
-        "idea": '写 receipts/creative-brief.md 或确认 brief；aifilm init',
+        "idea": "写 receipts/creative-brief.md 或确认 brief；aifilm init",
         "story": "Director’s Lens → director_intent.logline/theme",
         "beats": "补 dramatic_function / visible_change；可选 beat-sheet.md",
         "shots": "aifilm write-spec · pilot pick/score/approve",

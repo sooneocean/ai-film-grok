@@ -29,8 +29,10 @@ Fallback (opt-in only; never silent cross-provider):
 Note: auto never picks grok (keeps edge/local defaults for reproducible 中文说书).
 Use --tts-backend grok or AIFILM_TTS_BACKEND=grok explicitly.
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import subprocess
@@ -138,11 +140,7 @@ def fish_model() -> str:
 
 
 def minimax_api_key() -> str | None:
-    return (
-        os.environ.get("MINIMAX_API_KEY")
-        or os.environ.get("AIFILM_MINIMAX_API_KEY")
-        or None
-    )
+    return os.environ.get("MINIMAX_API_KEY") or os.environ.get("AIFILM_MINIMAX_API_KEY") or None
 
 
 def minimax_voice_id() -> str:
@@ -155,9 +153,7 @@ def minimax_voice_id() -> str:
 
 def minimax_model() -> str:
     return (
-        os.environ.get("MINIMAX_MODEL")
-        or os.environ.get("AIFILM_MINIMAX_MODEL")
-        or "speech-2.6-hd"
+        os.environ.get("MINIMAX_MODEL") or os.environ.get("AIFILM_MINIMAX_MODEL") or "speech-2.6-hd"
     )
 
 
@@ -218,17 +214,13 @@ def voicebox_profile() -> str | None:
 
 def voicebox_language() -> str:
     return (
-        os.environ.get("VOICEBOX_LANGUAGE")
-        or os.environ.get("AIFILM_VOICEBOX_LANGUAGE")
-        or "zh"
+        os.environ.get("VOICEBOX_LANGUAGE") or os.environ.get("AIFILM_VOICEBOX_LANGUAGE") or "zh"
     ).strip() or "zh"
 
 
 def voicebox_engine() -> str | None:
     eng = (
-        os.environ.get("VOICEBOX_ENGINE")
-        or os.environ.get("AIFILM_VOICEBOX_ENGINE")
-        or ""
+        os.environ.get("VOICEBOX_ENGINE") or os.environ.get("AIFILM_VOICEBOX_ENGINE") or ""
     ).strip()
     return eng or None
 
@@ -332,7 +324,8 @@ def grok_tts_language() -> str:
 def probe_grok_tts() -> dict[str, Any]:
     """Cheap readiness: OAuth auth present + models ok (does not call /tts every probe)."""
     try:
-        from grok_oauth import auth_path, probe as grok_probe
+        from grok_oauth import auth_path
+        from grok_oauth import probe as grok_probe
 
         if not auth_path().is_file() and not (os.environ.get("XAI_API_KEY") or "").strip():
             return {"ok": False, "error": "no grok auth.json and no XAI_API_KEY"}
@@ -768,7 +761,7 @@ def tts_voicebox(
         if wav.is_file():
             # ensure target exists for callers that only check out_mp3
             if out_mp3.suffix.lower() == ".mp3":
-                try:
+                with contextlib.suppress(OSError, subprocess.TimeoutExpired):
                     subprocess.run(
                         [
                             "ffmpeg",
@@ -790,8 +783,6 @@ def tts_voicebox(
                         timeout=120,
                         check=False,
                     )
-                except (OSError, subprocess.TimeoutExpired):
-                    pass
             if not out_mp3.is_file():
                 # last resort: copy wav bytes under the requested name (ffmpeg sniff works)
                 out_mp3.write_bytes(wav.read_bytes())
@@ -909,13 +900,17 @@ def synthesize(
         elif choice == "voicebox":
             # Edge Neural names are not Voicebox profiles — strip them.
             vb_voice = "" if _is_edge_voice_name(voice) else (voice or "")
-            if strict_voice_enabled() and not (vb_voice or voicebox_profile() or info.get("voicebox_profile_id")):
+            if strict_voice_enabled() and not (
+                vb_voice or voicebox_profile() or info.get("voicebox_profile_id")
+            ):
                 raise TTSError(
                     "Voicebox backend requires VOICEBOX_PROFILE (or vo_voice = profile name) "
                     "in strict voice mode"
                 )
             tts_voicebox(text, out_mp3, voice=vb_voice)
-            voice_used = vb_voice or info.get("voicebox_profile") or voicebox_profile() or "voicebox-default"
+            voice_used = (
+                vb_voice or info.get("voicebox_profile") or voicebox_profile() or "voicebox-default"
+            )
             model_used = voicebox_engine() or "voicebox"
         elif choice == "grok":
             # Edge Neural names are not Grok voice_ids — fall back to AIFILM_GROK_TTS_VOICE.

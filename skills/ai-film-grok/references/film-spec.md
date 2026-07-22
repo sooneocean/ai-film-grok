@@ -70,6 +70,45 @@ CLI 配方与入组纪律：[frw-degrade-dispatch.md](frw-degrade-dispatch.md)�
 
 LTX 参数必须 **string** 宽高；竖屏 `720`×`1280`。[frw-ltx-probe.md](lessons-2026-07-20-frw-ltx-probe.md)。
 
+## 内容通道与场内触发（v1.11.1）
+
+`nar` 是旁白/音频文本，**不是**动作 prompt。`dialogue` 是角色台词；只有 `voice.on_camera=true` 且 `lipsync=true` 时才允许驱动嘴型。人物表演与动态必须来自可见动作，并由场内事件触发。
+
+```json
+"content_channels": {
+  "voice": {"kind": "narration", "on_camera": false},
+  "performance": {
+    "playable_action": "她的手停在门锁上",
+    "reaction_trigger": "门把自己转动",
+    "body_state": "肩膀绷紧，视线钉住门缝"
+  },
+  "motion": {
+    "action": "她后退半步，手仍悬在锁前",
+    "scene_trigger": "门把自己转动"
+  }
+}
+```
+
+开 `content_channels_strict: true` 后，以下会阻断 write-spec：把 `nar` 原样复制为 `dsl.action`、镜内台词却关 lipsync、开 lipsync 却没有 dialogue、或以“旁白/台词”作为反应触发器。空镜/建立镜可只用旁白与镜头运动，不强造角色表演。
+
+## 表演事实审片（v1.11.3）
+
+`review-shot --approve` 会把当前 clip 的 hash、首/中/末联系表和人类观察时间点绑在一起。只要该镜使用 `content_channels`（或全片开了 `content_channels_strict`），审片人还要提供与编导意图相符的 `--performance-evidence kind@seconds:note`：声明的 `scene_trigger` 对应 `trigger_visible`；`playable_action` 对应其后的 `action_visible`；`reaction_trigger` 对应其后的 `reaction_visible`；镜内 lipsync 台词对应 `dialogue_delivery`；镜内人物配画外旁白且关闭 lipsync 时，对应 `mouth_still`。
+
+每条表演证据还会抽出该秒的独立 frame，并与 clip hash 一并收据化。它是导演的人工事实记录，不是自动嘴型、脸部或演技识别；它能证明谁在何秒看到了什么，并防止旁白或“她很惊讶”被误当成已发生的动态表演。是否真正成立仍需完整观看 clip。
+
+`aifilm performance-timeline --root <film>` 会把所有已批准镜头的这些证据转换为全片绝对时间轴。`review-final` 对启用 content channels 的项目自动调用它：缺少镜头收据、证据 frame 损坏、或动作/反应早于其场内触发，都会阻止最终批准。
+
+## 台词、嘴型与反应留白（v1.11.5）
+
+镜内 lipsync 台词必须先有同一 `dialogue` 文本的实测 TTS rehearsal，再以 `dialogue_delivery@秒数:note` 记录**最后一个可听见音节结束**的人工观察。`aifilm speech-performance-timing --root <film>` 会拒绝：旁白音频冒充台词、rehearsal 文本与 canonical dialogue 不同、交付时间早于实测音频结束，或交付后不足 0.2 秒就切镜。旁白不驱动此门禁，也不允许借此要求嘴型。
+
+`aifilm audio-provenance --root <film>` 进一步记录台词 rehearsal 音频、voice carrier 与最终 MP4 的 hash。它阻止审过后换音频或换交付文件；但 hash 只能证明文件未被替换，最终听感、台词含义和嘴型仍须人类完整审片。
+
+## 字幕跨镜例外（v1.11.9）
+
+硬切与 Continue 默认不允许字幕跨镜。电话声、悬念句等确实需要 L-cut 时，顶层 `subtitle_carryovers` 必须逐项声明 `from_shot_id`、`to_shot_id`、实际 cue 起止秒数、具体原因，并设 `human_approved: true`；范围以外或未批准的字幕仍会阻断 final。
+
 ## 转场 / 运镜（顶层 + 每镜 · v2）
 
 | 字段 | 默认 / 位置 | 说明 |

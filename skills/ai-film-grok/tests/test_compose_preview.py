@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -21,7 +23,9 @@ from compose_preview import (  # noqa: E402
 from compose_render import ComposeRenderError, assert_preview_receipt  # noqa: E402
 
 
+@pytest.mark.slow
 class UrlParseTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_extract_and_prefer_localhost(self) -> None:
         text = """
   Project   demo
@@ -32,12 +36,15 @@ class UrlParseTests(unittest.TestCase):
         self.assertIn("http://localhost:3002", urls)
         self.assertEqual(prefer_studio_url(urls), "http://localhost:3002")
 
+    @pytest.mark.slow
     def test_empty(self) -> None:
         self.assertEqual(extract_urls(""), [])
         self.assertIsNone(prefer_studio_url([]))
 
 
+@pytest.mark.slow
 class PreviewReceiptTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_write_and_validate_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -60,15 +67,14 @@ class PreviewReceiptTests(unittest.TestCase):
             self.assertEqual(meta["url"], "http://localhost:3002")
             self.assertEqual(meta["receipt"], "receipts/compose-preview.json")
 
+    @pytest.mark.slow
     def test_assert_preview_receipt_gate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with self.assertRaises(ComposeRenderError) as ctx:
                 assert_preview_receipt(root)
             self.assertIn("require-preview", str(ctx.exception))
-            write_preview_receipt(
-                root, url="http://127.0.0.1:3002", hf_dir=str(root / "hf")
-            )
+            write_preview_receipt(root, url="http://127.0.0.1:3002", hf_dir=str(root / "hf"))
             info = assert_preview_receipt(root)
             self.assertTrue(info["ok"])
             self.assertIn("127.0.0.1", str(info["url"]))

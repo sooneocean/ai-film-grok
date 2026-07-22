@@ -7,13 +7,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from dispatch import build_dispatch  # noqa: E402
 
 
+@pytest.mark.slow
 class DispatchTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_dispatch_packet_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

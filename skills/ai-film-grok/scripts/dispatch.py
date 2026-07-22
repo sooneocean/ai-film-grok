@@ -12,24 +12,11 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
-
-
-def _write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+from util import read_json, write_json
 
 
 def skill_scripts() -> Path:
@@ -51,8 +38,9 @@ def build_dispatch(
         sys.path.insert(0, str(scripts))
 
     from craft_spine import craft_status_report, detect_craft_stage
-    from next_actions import build_next_actions, detect_pipeline_stage
     from narrative_control import control_status
+    from next_actions import build_next_actions, detect_pipeline_stage
+    from production_evidence import build_evidence
 
     gates = gates or {}
     craft_report = craft_status_report(root, gates=gates)
@@ -93,7 +81,7 @@ def build_dispatch(
             if craft_stage in {"shots", "media"}:
                 pre(
                     "grok-i2v-bulk",
-                    f'# Media: i2v_provider=grok · image_edit(cast) still → media-queue image_to_video 720p → register-clip --source-endpoint image_to_video  (profile={i2v_profile}; Seedance off)',
+                    f"# Media: i2v_provider=grok · image_edit(cast) still → media-queue image_to_video 720p → register-clip --source-endpoint image_to_video  (profile={i2v_profile}; Seedance off)",
                     "Seedance 暂不可用：人物动走 Grok Imagine Video，勿提交 seedance bulk",
                     "visual",
                 )
@@ -107,7 +95,7 @@ def build_dispatch(
                 )
                 pre(
                     "frw-lipsync-probe",
-                    f'aifilm frw-lipsync probe  # then: frw-lipsync run --face kf.png --audio vo.wav --shot-id …',
+                    "aifilm frw-lipsync probe  # then: frw-lipsync run --face kf.png --audio vo.wav --shot-id …",
                     "对白近景可选 FRW 口型（probe 201 才 run）；说书默认 off；403/502 则跳过",
                     "visual",
                 )
@@ -130,14 +118,14 @@ def build_dispatch(
     if craft_stage == "idea" and not (root / "receipts" / "creative-brief.md").is_file():
         pre(
             "creative-brief",
-            f'# write {r}/receipts/creative-brief.md from templates/creative-brief.example.md',
+            f"# write {r}/receipts/creative-brief.md from templates/creative-brief.example.md",
             "Idea 环：先落 creative-brief（受众/时长/情绪）再 Lens",
             "agent",
         )
     if craft_stage == "story":
         pre(
             "directors-lens",
-            f'# Director’s Lens → director_intent.logline/theme in film-spec; optional receipts/directors-lens.md',
+            "# Director’s Lens → director_intent.logline/theme in film-spec; optional receipts/directors-lens.md",
             "Story 环：锁 logline/theme，禁止原文插图化",
             "agent",
         )
@@ -173,6 +161,27 @@ def build_dispatch(
 
     # Merge: prepend craft items not already covered by same id
     narrative = control_status(root)
+    evidence = build_evidence(root)
+    evidence_gate = bool(evidence.get("ready_for_bulk"))
+    if craft_stage in {"media", "rough", "verified"} and not evidence_gate:
+        pre(
+            "production-evidence-gate",
+            f'aifilm production-evidence --root "{r}"',
+            "production evidence incomplete; bulk motion remains blocked until canonical graph, current projection, and user-approved pilot are present",
+            "agent",
+        )
+    post_audit = read_json(root / "receipts" / "post-audit.json") or {}
+    from post_audit import audit_freshness
+
+    freshness = audit_freshness(root, post_audit)
+    post_audit_gate = bool(post_audit.get("delivery_ready")) and not freshness.get("stale")
+    if craft_stage in {"post", "verified"} and not post_audit_gate:
+        pre(
+            "post-audit-gate",
+            f'aifilm post-audit --root "{r}"',
+            "final delivery requires a current post-audit receipt with no hard failures",
+            "post",
+        )
     narrative_action_id: str | None = None
     if narrative.get("canonical") and not narrative.get("ready_for_media"):
         semantic = narrative.get("semantic") or {}
@@ -194,7 +203,11 @@ def build_dispatch(
                 "agent",
             )
         else:
-            missing = [s for s in ("story", "beats", "shots", "panels") if s not in (narrative.get("locked_scopes") or [])]
+            missing = [
+                s
+                for s in ("story", "beats", "shots", "panels")
+                if s not in (narrative.get("locked_scopes") or [])
+            ]
             scope = missing[0] if missing else "story"
             narrative_action_id = "narrative-lock"
             pre(
@@ -402,7 +415,7 @@ def build_dispatch(
         "ok": True,
         "kind": "ai-film-dispatch",
         "schema_version": 2,
-        "at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "root": str(root),
         "auto": True,
         "craft_stage": craft_stage,
@@ -461,6 +474,14 @@ def build_dispatch(
             "issue_codes": (narrative.get("semantic") or {}).get("issue_codes") or [],
             "projection": narrative.get("projection"),
         },
+        "production_evidence": evidence,
+        "post_audit": {
+            "receipt_present": bool(post_audit),
+            "delivery_ready": post_audit_gate,
+            "hard_failure_count": len(post_audit.get("hard_failures") or []),
+            "warning_count": len(post_audit.get("warnings") or []),
+            "freshness": freshness,
+        },
         "hard_gates": [
             "write-spec before media-queue",
             "pilot user approve before bulk (>3 shots)",
@@ -468,6 +489,7 @@ def build_dispatch(
             "final ≠ final_complete without review-final",
             "state-index check before bulk when undress/continue (fluency)",
             "canonical narrative graph validated + all scopes locked + projection hash current",
+            "production evidence ready before bulk motion",
         ],
         "ref": (
             "references/craft-spine.md · references/keyframe-first-state-index.md · "
@@ -484,7 +506,7 @@ def build_dispatch(
 
     if write_receipt:
         path = root / "receipts" / "dispatch.json"
-        _write_json(path, packet)
+        write_json(path, packet)
         packet["receipt_path"] = str(path)
         # also HUD-friendly slim
         try:

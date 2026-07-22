@@ -6,9 +6,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -17,7 +18,7 @@ from media_queue import MediaQueue, QueueError  # noqa: E402
 
 
 def iso(seconds: int = 0) -> str:
-    return (datetime.now(timezone.utc) + timedelta(seconds=seconds)).replace(microsecond=0).isoformat()
+    return (datetime.now(UTC) + timedelta(seconds=seconds)).replace(microsecond=0).isoformat()
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg required")
@@ -29,7 +30,17 @@ class MediaQueueTests(unittest.TestCase):
         self.prompt.write_text("camera slowly pushes in", encoding="utf-8")
         self.frame = Path(self.tmp.name) / "frame.jpg"
         subprocess.run(
-            ["ffmpeg", "-y", "-f", "lavfi", "-i", "color=red:s=160x90", "-frames:v", "1", str(self.frame)],
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=red:s=160x90",
+                "-frames:v",
+                "1",
+                str(self.frame),
+            ],
             check=True,
             capture_output=True,
         )
@@ -69,6 +80,7 @@ class MediaQueueTests(unittest.TestCase):
         params.update(kwargs)
         return self.queue().add_job(**params)
 
+    @pytest.mark.slow
     def test_add_is_deduplicated_by_prompt_and_input_hashes(self) -> None:
         first = self.add()
         second = self.add()
@@ -76,6 +88,7 @@ class MediaQueueTests(unittest.TestCase):
         self.assertEqual(len(self.queue().state()["jobs"]), 1)
         self.assertIn("prompt_sha256", first)
 
+    @pytest.mark.slow
     def test_generation_unit_budget_blocks_unbounded_queue_growth(self) -> None:
         queue = MediaQueue(self.root, budget_units=1)
         queue.add_job(
@@ -94,6 +107,7 @@ class MediaQueueTests(unittest.TestCase):
                 allow_without_pilot=True,
             )
 
+    @pytest.mark.slow
     def test_generation_unit_budget_can_be_explicitly_raised(self) -> None:
         queue = MediaQueue(self.root, budget_units=1)
         queue.add_job(
@@ -114,6 +128,7 @@ class MediaQueueTests(unittest.TestCase):
         self.assertEqual(queue.metrics()["budget_units"], 2)
         self.assertEqual(queue.metrics()["budget_remaining"], 0)
 
+    @pytest.mark.slow
     def test_only_one_job_can_be_running_and_failure_uses_backoff(self) -> None:
         job = self.add()
         claimed = self.queue().claim(now=iso())
@@ -130,6 +145,7 @@ class MediaQueueTests(unittest.TestCase):
         )
         self.assertIn(failed["status"], {"pending", "failed"})
 
+    @pytest.mark.slow
     def test_pilot_window_allows_three_then_blocks_fourth(self) -> None:
         queue = MediaQueue(self.root, budget_units=20)
         for i in range(1, 4):
@@ -147,6 +163,7 @@ class MediaQueueTests(unittest.TestCase):
                 inputs=[self.frame],
             )
 
+    @pytest.mark.slow
     def test_pilot_user_approval_unlocks_bulk(self) -> None:
         queue = MediaQueue(self.root, budget_units=20)
         for i in range(1, 4):
@@ -165,6 +182,7 @@ class MediaQueueTests(unittest.TestCase):
         )
         self.assertEqual(job["shot_id"], "shot04")
 
+    @pytest.mark.slow
     def test_agent_self_approve_does_not_unlock(self) -> None:
         receipts = self.root / "receipts"
         receipts.mkdir(parents=True, exist_ok=True)

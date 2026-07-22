@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -166,7 +168,9 @@ def _seed_film(root: Path, *, n_shots: int = 1, with_final: bool = False) -> Non
 
 
 @unittest.skipUnless(_ffmpeg_available(), "ffmpeg required")
+@pytest.mark.slow
 class RegisterFinalTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_register_final_writes_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -191,6 +195,7 @@ class RegisterFinalTests(unittest.TestCase):
             self.assertTrue((root / "out" / "film_final.mp4").is_file())
             self.assertTrue((root / "out" / "final-delivery.json").is_file())
 
+    @pytest.mark.slow
     def test_register_final_invalidates_old_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -217,7 +222,9 @@ class RegisterFinalTests(unittest.TestCase):
 
 
 @unittest.skipUnless(_ffmpeg_available(), "ffmpeg required")
+@pytest.mark.slow
 class AudioMuxTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_mux_from_final_when_video_silent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -236,7 +243,9 @@ class AudioMuxTests(unittest.TestCase):
             self.assertTrue(probe_has_audio(out))
 
 
+@pytest.mark.slow
 class ToolingProbeTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_probe_designed_post_tooling_shape(self) -> None:
         info = probe_designed_post_tooling()
         self.assertIn("npx", info)
@@ -247,7 +256,9 @@ class ToolingProbeTests(unittest.TestCase):
             self.assertTrue(isinstance(info.get("hyperframes_ok"), bool))
 
 
+@pytest.mark.slow
 class DoubleBurnGateTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_underlay_blocks_when_burned_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -262,6 +273,7 @@ class DoubleBurnGateTests(unittest.TestCase):
                 assert_underlay_not_double_burn(root, layout="underlay")
             self.assertIn("double-burn", str(ctx.exception).lower())
 
+    @pytest.mark.slow
     def test_allow_burned_underlay_override(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -276,6 +288,7 @@ class DoubleBurnGateTests(unittest.TestCase):
             )
             self.assertTrue(info["ok"])
 
+    @pytest.mark.slow
     def test_subs_off_plate_allows_underlay(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -290,22 +303,20 @@ class DoubleBurnGateTests(unittest.TestCase):
             self.assertIs(info.get("burned_in"), False)
 
 
+@pytest.mark.slow
 class RemotionCopyAndLayoutTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_copy_remotion_media_and_underlay_layout(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
             root.mkdir()
             _seed_film(root, n_shots=2, with_final=_ffmpeg_available())
             # export needs real files under clips for relative paths — already placeholders
-            result = export_composition(
-                root, engine="both", force=True, layout="auto"
-            )
+            result = export_composition(root, engine="both", force=True, layout="auto")
             self.assertTrue(result["ok"])
             if _ffmpeg_available() and (root / "out" / "film_final.mp4").is_file():
                 self.assertEqual(result["layout"], "underlay")
-                html = (root / "compose" / "hyperframes" / "index.html").read_text(
-                    encoding="utf-8"
-                )
+                html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
                 self.assertIn("final-underlay", html)
             else:
                 self.assertEqual(result["layout"], "multiclip")
@@ -319,16 +330,16 @@ class RemotionCopyAndLayoutTests(unittest.TestCase):
             # multiclip: 2 shots; underlay layout also copies final film → 3
             self.assertGreaterEqual(copy["count"], 2)
             plan = json.loads(
-                (root / "compose" / "remotion" / "media-copy-plan.json").read_text(
-                    encoding="utf-8"
-                )
+                (root / "compose" / "remotion" / "media-copy-plan.json").read_text(encoding="utf-8")
             )
             self.assertEqual(copy["count"], len(plan["items"]))
             pub = root / "compose" / "remotion" / "public" / "clips"
             self.assertTrue(any(pub.glob("shot*")))
 
 
+@pytest.mark.slow
 class RemotionComposeRenderBranchTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_probe_remotion_not_ready_without_node_modules(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -343,6 +354,7 @@ class RemotionComposeRenderBranchTests(unittest.TestCase):
             self.assertFalse(info["ready"])
             self.assertTrue(any("node_modules" in m for m in info["missing"]))
 
+    @pytest.mark.slow
     def test_remotion_next_steps_list_bootstrap_render_register(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -356,6 +368,7 @@ class RemotionComposeRenderBranchTests(unittest.TestCase):
             self.assertIn("post-engine remotion", blob)
             self.assertIn("hyperframes", blob)
 
+    @pytest.mark.slow
     def test_remotion_npm_install_success_with_fake_npm(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             rem = Path(tmp) / "remotion"
@@ -369,7 +382,7 @@ class RemotionComposeRenderBranchTests(unittest.TestCase):
             fake_npm.write_text(
                 "#!/bin/sh\n"
                 "set -e\n"
-                'mkdir -p node_modules/.bin node_modules/remotion\n'
+                "mkdir -p node_modules/.bin node_modules/remotion\n"
                 'printf "#!/bin/sh\\nexit 1\\n" > node_modules/.bin/remotion\n'
                 "chmod +x node_modules/.bin/remotion\n"
                 "echo installed\n",
@@ -380,6 +393,7 @@ class RemotionComposeRenderBranchTests(unittest.TestCase):
             self.assertTrue(info["ok"])
             self.assertTrue((rem / "node_modules" / "remotion").is_dir())
 
+    @pytest.mark.slow
     def test_remotion_npm_install_missing_package_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             rem = Path(tmp) / "empty"
@@ -388,6 +402,7 @@ class RemotionComposeRenderBranchTests(unittest.TestCase):
                 remotion_npm_install(rem, npm_bin="/bin/true", timeout=5)
             self.assertIn("package.json", str(ctx.exception))
 
+    @pytest.mark.slow
     def test_compose_render_npm_install_then_ready_attempts_render(self) -> None:
         """--npm-install with fake npm reaches render path (render fails honestly)."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -401,7 +416,7 @@ class RemotionComposeRenderBranchTests(unittest.TestCase):
             fake_npm.write_text(
                 "#!/bin/sh\n"
                 "set -e\n"
-                'mkdir -p node_modules/.bin node_modules/remotion\n'
+                "mkdir -p node_modules/.bin node_modules/remotion\n"
                 'printf "#!/bin/sh\\nexit 1\\n" > node_modules/.bin/remotion\n'
                 "chmod +x node_modules/.bin/remotion\n",
                 encoding="utf-8",
@@ -434,6 +449,7 @@ class RemotionComposeRenderBranchTests(unittest.TestCase):
             finally:
                 cr_mod.remotion_npm_install = original  # type: ignore[assignment]
 
+    @pytest.mark.slow
     def test_compose_render_npm_install_failure_returns_actionable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -468,6 +484,7 @@ class RemotionComposeRenderBranchTests(unittest.TestCase):
             finally:
                 cr_mod.remotion_npm_install = original  # type: ignore[assignment]
 
+    @pytest.mark.slow
     def test_compose_render_remotion_actionable_when_not_bootstrapped(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -496,10 +513,9 @@ class RemotionComposeRenderBranchTests(unittest.TestCase):
             copy = result["steps"].get("remotion_media_copy") or {}
             self.assertTrue(copy.get("ok"))
             self.assertEqual(copy.get("count"), 2)
-            self.assertTrue(
-                any((root / "compose" / "remotion" / "public" / "clips").glob("shot*"))
-            )
+            self.assertTrue(any((root / "compose" / "remotion" / "public" / "clips").glob("shot*")))
 
+    @pytest.mark.slow
     def test_compose_render_remotion_ready_path_calls_register_label(self) -> None:
         """When readiness is forced ready, auto-render path is taken (render may fail honestly)."""
         with tempfile.TemporaryDirectory() as tmp:

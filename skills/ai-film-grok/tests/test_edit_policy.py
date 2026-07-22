@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -45,13 +46,16 @@ def _make_moving_clip(path: Path, *, duration: float = 2.0, fps: int = 30) -> No
     )
 
 
+@pytest.mark.slow
 class EditPolicyUnitTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_plan_stretch_long_target_is_loop_not_freeze(self) -> None:
         plan = edit_policy.plan_stretch(6.0, 14.0)
         self.assertEqual(plan["mode"], "loop")
         self.assertEqual(plan["freeze_sec"], 0.0)
         self.assertGreaterEqual(plan["loops"], 1)
 
+    @pytest.mark.slow
     def test_plan_stretch_upgrades_heavy_pad_to_loop(self) -> None:
         # Mild ratio but would freeze most of extension if pad unlimited
         plan = edit_policy.plan_stretch(2.0, 2.0 * 1.20)
@@ -60,6 +64,7 @@ class EditPolicyUnitTests(unittest.TestCase):
         if plan["mode"] == "loop":
             self.assertEqual(plan["freeze_sec"], 0.0)
 
+    @pytest.mark.slow
     def test_plan_stretch_hook_forbids_loop(self) -> None:
         # hook/action must not stream_loop even when target >> src
         plan = edit_policy.plan_stretch(6.0, 7.0, dramatic_function="hook")
@@ -67,11 +72,13 @@ class EditPolicyUnitTests(unittest.TestCase):
         self.assertNotEqual(plan["mode"], "loop")
         self.assertTrue(plan.get("forbid_loop"))
 
+    @pytest.mark.slow
     def test_plan_stretch_action_forbids_loop_fails_if_too_long(self) -> None:
         # 6s plate cannot cover 14s VO without loop → PolicyError
         with self.assertRaises(edit_policy.PolicyError):
             edit_policy.plan_stretch(6.0, 14.0, dramatic_function="action")
 
+    @pytest.mark.slow
     def test_xfade_filter_graph_enabled_for_multi_clip(self) -> None:
         graph = edit_policy.build_xfade_filter_graph([2.0, 2.0, 2.0], transition_sec=0.25)
         self.assertTrue(graph["enabled"])
@@ -81,16 +88,19 @@ class EditPolicyUnitTests(unittest.TestCase):
         self.assertAlmostEqual(graph["output_duration"], expected, places=2)
         self.assertLess(graph["output_duration"], 6.0)
 
+    @pytest.mark.slow
     def test_xfade_disabled_when_zero(self) -> None:
         graph = edit_policy.build_xfade_filter_graph([2.0, 2.0], transition_sec=0.0)
         self.assertFalse(graph["enabled"])
         self.assertEqual(graph["filter_complex"], "")
 
+    @pytest.mark.slow
     def test_acrossfade_graph(self) -> None:
         g = edit_policy.build_acrossfade_filter_graph(3, transition_sec=0.22)
         self.assertTrue(g["enabled"])
         self.assertIn("acrossfade=", g["filter_complex"])
 
+    @pytest.mark.slow
     def test_validate_motion_requires_cues_and_rejects_mouth_primary(self) -> None:
         ok = edit_policy.validate_motion("slow push-in, soft blink, breath, idle not speaking")
         self.assertIn("push", ok.lower())
@@ -105,6 +115,7 @@ class EditPolicyUnitTests(unittest.TestCase):
 class TimelineSyncTests(unittest.TestCase):
     """Subtitle/native starts must track xfade offsets, not hard-cut cumulative targets."""
 
+    @pytest.mark.slow
     def test_segment_timeline_matches_xfade_offsets(self) -> None:
         durs = [1.0, 6.0, 6.0, 6.0, 6.0, 1.0]  # title + 4 shots + end
         t = 0.22
@@ -115,13 +126,14 @@ class TimelineSyncTests(unittest.TestCase):
         self.assertAlmostEqual(tl["output_duration"], graph["output_duration"], places=4)
         # lag vs hard-cut: by shot 5 (index 4 story = segment 5), hard is ahead by ~4*0.22
         hard = 0.0
-        for i, d in enumerate(durs):
+        for i, _d in enumerate(durs):
             if i == 0:
                 continue
             hard += durs[i - 1]
             if i >= 2:  # after first join into story
                 self.assertLess(tl["starts"][i], hard - 0.05)
 
+    @pytest.mark.slow
     def test_subtitle_cues_align_to_xfade_shot_starts(self) -> None:
         title_dur = 1.0
         end_dur = 1.0
@@ -158,6 +170,7 @@ class TimelineSyncTests(unittest.TestCase):
                 self.assertLess(first, hard_t0 - 0.1)
             hard_t0 += shot["target"]
 
+    @pytest.mark.slow
     def test_native_track_shortens_with_acrossfade_like_video(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -190,10 +203,7 @@ class TimelineSyncTests(unittest.TestCase):
             targets = [2.0, 2.0, 2.0]
             transition = 0.25
             track = render_final.build_native_track(
-                [
-                    {"id": f"s{i}", "target": t, "native_audio": stem}
-                    for i, t in enumerate(targets)
-                ],
+                [{"id": f"s{i}", "target": t, "native_audio": stem} for i, t in enumerate(targets)],
                 title_duration=title_dur,
                 end_duration=end_dur,
                 work=work,
@@ -201,15 +211,17 @@ class TimelineSyncTests(unittest.TestCase):
                 transition_sec=transition,
             )
             hard_sum = title_dur + sum(targets) + end_dur
-            expected = edit_policy.segment_timeline(
-                [title_dur] + targets + [end_dur], transition
-            )["output_duration"]
+            expected = edit_policy.segment_timeline([title_dur] + targets + [end_dur], transition)[
+                "output_duration"
+            ]
             dout = render_final.pdur(track)
             self.assertLess(dout, hard_sum - 0.2)
             self.assertAlmostEqual(dout, expected, delta=0.25)
 
 
+@pytest.mark.slow
 class StretchAndTransitionIntegrationTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_stretch_clip_long_target_preserves_motion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -225,6 +237,7 @@ class StretchAndTransitionIntegrationTests(unittest.TestCase):
             self.assertTrue(qa.get("motion_ok"), qa)
             self.assertGreaterEqual(qa.get("duration_sec", 0), 5.5)
 
+    @pytest.mark.slow
     def test_concat_videos_inserts_xfade_shortening_duration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -245,6 +258,7 @@ class StretchAndTransitionIntegrationTests(unittest.TestCase):
             self.assertLess(dout, da + db - 0.05)
             self.assertGreater(dout, da + db - 0.25 * 2)  # not over-shortened
 
+    @pytest.mark.slow
     def test_concat_videos_hard_cut_when_transition_zero(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -260,16 +274,21 @@ class StretchAndTransitionIntegrationTests(unittest.TestCase):
             self.assertAlmostEqual(dout, 2.0, delta=0.15)
 
 
+@pytest.mark.slow
 class TTSVoiceLockTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_fish_without_voice_id_fails_closed_unless_fallback_is_opted_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out1 = Path(tmp) / "a.mp3"
             import os
 
-            with mock.patch.object(tts_backend, "_load_config_env"), mock.patch.dict(
-                os.environ,
-                {"AIFILM_TTS_STRICT_VOICE": "1", "FISH_API_KEY": "test-key"},
-                clear=True,
+            with (
+                mock.patch.object(tts_backend, "_load_config_env"),
+                mock.patch.dict(
+                    os.environ,
+                    {"AIFILM_TTS_STRICT_VOICE": "1", "FISH_API_KEY": "test-key"},
+                    clear=True,
+                ),
             ):
                 with self.assertRaisesRegex(tts_backend.TTSError, "fixed FISH_VOICE_ID"):
                     tts_backend.synthesize(
@@ -288,27 +307,33 @@ class TTSVoiceLockTests(unittest.TestCase):
                     )
             self.assertFalse(out1.exists())
 
+    @pytest.mark.slow
     def test_explicit_configured_fish_without_voice_is_reported_unready(self) -> None:
         import os
 
-        with mock.patch.object(tts_backend, "_load_config_env"), mock.patch.dict(
-            os.environ,
-            {
-                "AIFILM_TTS_BACKEND": "fish",
-                "AIFILM_TTS_STRICT_VOICE": "1",
-                "FISH_API_KEY": "test-key",
-            },
-            clear=True,
+        with (
+            mock.patch.object(tts_backend, "_load_config_env"),
+            mock.patch.dict(
+                os.environ,
+                {
+                    "AIFILM_TTS_BACKEND": "fish",
+                    "AIFILM_TTS_STRICT_VOICE": "1",
+                    "FISH_API_KEY": "test-key",
+                },
+                clear=True,
+            ),
         ):
             info = tts_backend.probe()
             self.assertFalse(info["ok"])
             self.assertEqual(info["active"], "fish")
             self.assertFalse(info["ready"]["fish"])
 
+    @pytest.mark.slow
     def test_edge_locked_speaker_same_identity_twice(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out1 = Path(tmp) / "a.mp3"
             out2 = Path(tmp) / "b.mp3"
+
             def fake_edge(_: str, out: Path, __: str, **___: object) -> Path:
                 out.write_bytes(b"ID3" + b"offline-test-audio" * 40)
                 return out
@@ -333,6 +358,7 @@ class TTSVoiceLockTests(unittest.TestCase):
             self.assertTrue(out1.is_file() and out1.stat().st_size > 500)
             self.assertTrue(out2.is_file() and out2.stat().st_size > 500)
 
+    @pytest.mark.slow
     def test_probe_reports_strict_voice_lock_policy(self) -> None:
         info = tts_backend.probe()
         self.assertIn("strict_voice_lock", info)
@@ -364,6 +390,7 @@ class FilmSpecMotionTests(unittest.TestCase):
             ],
         }
 
+    @pytest.mark.slow
     def test_missing_motion_filled_from_beat_defaults(self) -> None:
         from film_spec import validate_film_spec
 
@@ -376,6 +403,7 @@ class FilmSpecMotionTests(unittest.TestCase):
         self.assertEqual(shots[0]["dsl"]["camera"]["shot_size"], "medium full")
         self.assertIn("dsl.motion", shots[0].get("coverage_defaults_applied", {}).get("filled", []))
 
+    @pytest.mark.slow
     def test_explicit_mouth_speaking_rejected(self) -> None:
         from film_spec import FilmSpecError, validate_film_spec
 
@@ -384,6 +412,7 @@ class FilmSpecMotionTests(unittest.TestCase):
         with self.assertRaises(FilmSpecError):
             validate_film_spec(bad, assign_missing_ids=False)
 
+    @pytest.mark.slow
     def test_author_motion_wins_over_defaults(self) -> None:
         from film_spec import validate_film_spec
 
@@ -404,26 +433,24 @@ if __name__ == "__main__":
     unittest.main()
 
 
+@pytest.mark.slow
 class EditorialCraftTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_continue_is_match_or_action_cut(self) -> None:
         c = edit_policy.suggest_edit_craft(
             "hook", "approach", next_chain_mode="continue", next_cut_on="mid_motion"
         )
         self.assertEqual(c, "cut_on_action")
-        c2 = edit_policy.suggest_edit_craft(
-            "hook", "approach", next_chain_mode="continue"
-        )
+        c2 = edit_policy.suggest_edit_craft("hook", "approach", next_chain_mode="continue")
         self.assertEqual(c2, "match_cut")
         self.assertEqual(edit_policy.craft_to_intent_style(c)[0], "hard")
 
+    @pytest.mark.slow
     def test_smash_and_insert(self) -> None:
-        self.assertEqual(
-            edit_policy.suggest_edit_craft("action", "reaction"), "smash_cut"
-        )
-        self.assertEqual(
-            edit_policy.suggest_edit_craft("approach", "sensory"), "insert_cut"
-        )
+        self.assertEqual(edit_policy.suggest_edit_craft("action", "reaction"), "smash_cut")
+        self.assertEqual(edit_policy.suggest_edit_craft("approach", "sensory"), "insert_cut")
 
+    @pytest.mark.slow
     def test_soft_run_punctuated(self) -> None:
         crafts = ["soft_glue"] * 6
         out = edit_policy._punctuate_soft_run(crafts, fluency="silk")
@@ -437,6 +464,7 @@ class EditorialCraftTests(unittest.TestCase):
         }
         self.assertTrue(any(c in hardish for c in out))
 
+    @pytest.mark.slow
     def test_crafts_drive_intents_styles_length(self) -> None:
         beats = [
             "hook",
@@ -447,9 +475,7 @@ class EditorialCraftTests(unittest.TestCase):
             "afterglow",
         ]
         chains = ["", "continue", "continue", "cut", "continue", "cut"]
-        crafts = edit_policy.suggest_edit_crafts(
-            beats, chain_modes=chains, fluency="cinematic"
-        )
+        crafts = edit_policy.suggest_edit_crafts(beats, chain_modes=chains, fluency="cinematic")
         self.assertEqual(len(crafts), 5)
         intents = edit_policy.edit_crafts_to_intents(crafts)
         styles = edit_policy.edit_crafts_to_styles(crafts)
@@ -460,7 +486,9 @@ class EditorialCraftTests(unittest.TestCase):
         self.assertEqual(intents[1], "hard")
 
 
+@pytest.mark.slow
 class CharacterStanceTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_viewpoint_and_focal_suggest(self) -> None:
         foc = edit_policy.suggest_focal_character("reaction", previous_focal="hero")
         self.assertTrue(foc)
@@ -477,14 +505,12 @@ class CharacterStanceTests(unittest.TestCase):
         )
         self.assertEqual(rev, "reverse")
 
+    @pytest.mark.slow
     def test_look_axis_flips_on_reverse(self) -> None:
-        self.assertEqual(
-            edit_policy.suggest_look_axis("reverse", previous_look="left"), "right"
-        )
-        self.assertEqual(
-            edit_policy.suggest_look_axis("reverse", previous_look="right"), "left"
-        )
+        self.assertEqual(edit_policy.suggest_look_axis("reverse", previous_look="left"), "right")
+        self.assertEqual(edit_policy.suggest_look_axis("reverse", previous_look="right"), "left")
 
+    @pytest.mark.slow
     def test_focal_change_drives_craft(self) -> None:
         c = edit_policy.suggest_edit_craft(
             "action",
@@ -494,6 +520,7 @@ class CharacterStanceTests(unittest.TestCase):
         )
         self.assertIn(c, {"contrast_cut", "smash_cut"})
 
+    @pytest.mark.slow
     def test_coverage_injects_stance(self) -> None:
         shot = {
             "dramatic_function": "reaction",
@@ -514,6 +541,7 @@ class CharacterStanceTests(unittest.TestCase):
         self.assertIn(dsl.get("look_axis"), edit_policy.LOOK_AXES)
         self.assertIn(rep.get("viewpoint_source"), {"suggest", "author", "suggest_fallback"})
 
+    @pytest.mark.slow
     def test_lint_viewpoint_flat(self) -> None:
         shots = [
             {

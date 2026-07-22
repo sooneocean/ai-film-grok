@@ -12,7 +12,7 @@ import stat
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,9 +24,16 @@ for _p in (_SKILL_DIR, _SCRIPTS_DIR):
     if _s not in sys.path:
         sys.path.insert(0, _s)
 
-from scripts.prompt_injector import PromptInjector, PromptConflictError
-from scripts.visual_bible import load_bible, update_bible_state
+import contextlib
 
+from continuity import lint_continuity, lint_frame_chain
+from continuity_chain import (
+    check_continuity_chain,
+    init_chain_doc,
+    is_long_form,
+    sha256_file,
+    upsert_join,
+)
 from director_review import (
     SCORECARD_DIMENSIONS,
     DirectorReviewError,
@@ -36,20 +43,12 @@ from director_review import (
     empty_director_notes,
     open_reshoot_items,
     parse_shot_id_list,
-    resolve_reshoot_item,
     reshoots_clear,
+    resolve_reshoot_item,
     scorecard_all_pass,
     scorecard_is_complete_and_passing,
     scorecard_payload,
     validate_scorecard_for_approve,
-)
-from continuity import lint_continuity, lint_frame_chain
-from continuity_chain import (
-    check_continuity_chain,
-    init_chain_doc,
-    is_long_form,
-    sha256_file,
-    upsert_join,
 )
 from film_spec import FilmSpecError, validate_film_spec
 from media_qa import ALLOWED_VIDEO_ENDPOINTS, MediaQAError, analyze_media, approved_clip_record
@@ -65,6 +64,8 @@ from security_policy import (
     validate_identifier,
 )
 
+from scripts.prompt_injector import PromptConflictError, PromptInjector
+from scripts.visual_bible import load_bible
 
 SCHEMA_VERSION = 1
 MANIFEST_NAME = "manifest.json"
@@ -97,12 +98,14 @@ class FilmError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def write_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as handle:
         json.dump(value, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
         temp = Path(handle.name)
@@ -136,9 +139,16 @@ def aspect_dims(aspect: str) -> tuple[int, int]:
     return table[aspect]
 
 
-def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+def run(
+    cmd: list[str],
+    *,
+    check: bool = True,
+    timeout: int | float | None = 60,
+) -> subprocess.CompletedProcess[str]:
+    """Subprocess helper. Default 60s; pass timeout=None or large value for long renders (final)."""
     return subprocess.run(
         cmd,
+        timeout=timeout,
         check=check,
         capture_output=True,
         text=True,
@@ -359,7 +369,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     log_mode = stat.S_IMODE(grok_log.stat().st_mode) if grok_log.is_file() else None
     warnings: list[str] = []
     if permission_mode == "always-approve":
-        warnings.append("Global Grok permission_mode is always-approve; change requires explicit user approval")
+        warnings.append(
+            "Global Grok permission_mode is always-approve; change requires explicit user approval"
+        )
     if log_mode is not None and log_mode & 0o077:
         warnings.append(f"Grok unified log is readable beyond the owner (mode {oct(log_mode)})")
     if config_env_mode is not None and config_env_mode & 0o077:
@@ -428,7 +440,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         sys.path.insert(0, str(skill_dir / "scripts"))
         from compose_render import probe_designed_post_tooling, probe_remotion_readiness
 
-        designed = {**probe_designed_post_tooling(), "required_for": "final --post-engine hyperframes"}
+        designed = {
+            **probe_designed_post_tooling(),
+            "required_for": "final --post-engine hyperframes",
+        }
         designed["ok"] = bool(designed.get("npx") and designed.get("hyperframes_ok"))
         # Soft remotion readiness when a package was exported under CWD film roots — probe empty ok
         designed["remotion"] = {
@@ -466,14 +481,18 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "hint": grok_oauth.get("hint") or "grok login",
     }
     if not grok_oauth.get("ok"):
-        warnings.append("Grok OAuth not ready (optional for API batch; in-session Imagine tools still work if logged in)")
+        warnings.append(
+            "Grok OAuth not ready (optional for API batch; in-session Imagine tools still work if logged in)"
+        )
 
     if not report["ffmpeg"] or not report["ffprobe"]:
         report["ok"] = False
         report["error"] = "ffmpeg/ffprobe not found on PATH"
     elif not edge_ok or not numpy_ok or not pil_ok:
         report["ok"] = False
-        report["error"] = "Formal final requires edge-tts + numpy + pillow (pip install --user edge-tts numpy pillow)"
+        report["error"] = (
+            "Formal final requires edge-tts + numpy + pillow (pip install --user edge-tts numpy pillow)"
+        )
     elif (
         not tts_info.get("ok")
         or not requirements["ok"]
@@ -482,7 +501,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         or not lipsync_required_ok
     ):
         report["ok"] = False
-        report["error"] = "Runtime/schema/backend verification failed; inspect nested doctor reports"
+        report["error"] = (
+            "Runtime/schema/backend verification failed; inspect nested doctor reports"
+        )
     report["strict_ok"] = bool(report["ok"] and not warnings)
     emit(report)
     return 0 if (report["strict_ok"] if getattr(args, "strict", False) else report["ok"]) else 1
@@ -592,7 +613,16 @@ def cmd_init(args: argparse.Namespace) -> int:
         f"# {title}\n\nTheme: {theme}\n\nProvider: Grok Imagine\nRoot: `{root}`\n",
         encoding="utf-8",
     )
-    emit({"ok": True, "root": str(root), "title": title, "aspect_ratio": aspect, "width": w, "height": h})
+    emit(
+        {
+            "ok": True,
+            "root": str(root),
+            "title": title,
+            "aspect_ratio": aspect,
+            "width": w,
+            "height": h,
+        }
+    )
     return 0
 
 
@@ -624,8 +654,12 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         and (review_contract < 2 or isinstance(record.get("shot_review"), dict))
         and record_file_matches(dirs["clips"], record, field=f"clip path for {sid}")
     ]
-    canonical = [path for path in dirs["canonical"].glob("*") if path.is_file() and not path.is_symlink()]
-    out_mp4 = [path for path in dirs["out"].glob("*.mp4") if path.is_file() and not path.is_symlink()]
+    canonical = [
+        path for path in dirs["canonical"].glob("*") if path.is_file() and not path.is_symlink()
+    ]
+    out_mp4 = [
+        path for path in dirs["out"].glob("*.mp4") if path.is_file() and not path.is_symlink()
+    ]
     outputs = manifest.get("outputs") or {}
     silent_record = outputs.get("silent_film")
     silent_qa = silent_record.get("technical_qa") if isinstance(silent_record, dict) else None
@@ -678,8 +712,12 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         "clips_complete": clips_complete,
         "assembled": assembled,
         "reshoots_clear": reshoots_clear(dnotes),
-        "final_complete": bool(clips_complete and final_technical_ok and review_ok and reshoots_clear(dnotes)),
-        "desktop_exported": bool(outputs.get("desktop_dir") and Path(outputs["desktop_dir"]).is_dir()),
+        "final_complete": bool(
+            clips_complete and final_technical_ok and review_ok and reshoots_clear(dnotes)
+        ),
+        "desktop_exported": bool(
+            outputs.get("desktop_dir") and Path(outputs["desktop_dir"]).is_dir()
+        ),
     }
     manifest["gates"] = gates
     manifest["style_locked"] = gates["style_locked"]
@@ -720,15 +758,13 @@ def _pipeline_bundle(
     next_cmd = actions[0]["cmd"] if actions else None
     next_id = actions[0].get("id") if actions else None
     if persist:
-        try:
+        with contextlib.suppress(OSError):
             persist_pipeline_stage(
                 root,
                 pipeline,
                 next_cmd=next_cmd,
                 next_id=next_id,
             )
-        except OSError:
-            pass
     return actions, pipeline, next_cmd, next_id
 
 
@@ -736,7 +772,9 @@ def cmd_next(args: argparse.Namespace) -> int:
     """Print the single next recommended production command (lesson routing)."""
     root = Path(args.root).expanduser().resolve()
     manifest = load_manifest(root) if (root / MANIFEST_NAME).is_file() else {}
-    summary = recompute_gates(root, manifest) if manifest else {"gates": {}, "open_reshoot_count": 0}
+    summary = (
+        recompute_gates(root, manifest) if manifest else {"gates": {}, "open_reshoot_count": 0}
+    )
     if manifest:
         save_manifest(root, manifest)
     gates = summary.get("gates") or {}
@@ -823,7 +861,9 @@ def cmd_stage(args: argparse.Namespace) -> int:
     """Print / refresh current pipeline stage (product spine layer)."""
     root = Path(args.root).expanduser().resolve()
     manifest = load_manifest(root) if (root / MANIFEST_NAME).is_file() else {}
-    summary = recompute_gates(root, manifest) if manifest else {"gates": {}, "open_reshoot_count": 0}
+    summary = (
+        recompute_gates(root, manifest) if manifest else {"gates": {}, "open_reshoot_count": 0}
+    )
     if manifest:
         save_manifest(root, manifest)
     gates = summary.get("gates") or {}
@@ -859,6 +899,54 @@ def cmd_stage(args: argparse.Namespace) -> int:
         return 0
     print(line)
     return 0
+
+
+def cmd_heat(args: argparse.Namespace) -> int:
+    """Adult heat gates: check | vo-suggest | soften-log."""
+    root = Path(str(args.root)).expanduser().resolve()
+    action = str(getattr(args, "heat_action", None) or "check")
+    try:
+        from heat_check import heat_check, heat_vo_suggest
+        from util import write_json
+    except Exception as exc:  # noqa: BLE001
+        raise FilmError(f"Cannot import heat_check: {exc}") from exc
+    if action in {"check", ""}:
+        report = heat_check(root)
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "vo-suggest":
+        report = heat_vo_suggest(root, shot_id=getattr(args, "shot", None))
+        emit(report)
+        return 0
+    if action == "soften-log":
+        # Dual-track moderation compensation receipt (never lower heat_scale)
+        note = str(getattr(args, "note", "") or "moderation softed still/I2V")
+        payload = {
+            "ok": True,
+            "at": __import__("datetime")
+            .datetime.now(__import__("datetime").timezone.utc)
+            .replace(microsecond=0)
+            .isoformat(),
+            "note": note,
+            "heat_scale_must_stay": True,
+            "compensation": {
+                "vo_spice_up": True,
+                "insert_l4": True,
+                "sfx_flesh": True,
+                "checklist": [
+                    "Rewrite act nar with denser sex verbs",
+                    "Add insert_cut craft or L4 body/fabric still",
+                    "Ensure sound_cues impact/breath on act",
+                    "Do NOT set heat_scale to medium/soft",
+                ],
+            },
+        }
+        path = root / "receipts" / "moderation_soften.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, payload)
+        emit({"ok": True, "path": str(path), "receipt": payload})
+        return 0
+    raise FilmError(f"unknown heat action: {action}")
 
 
 def cmd_preflight(args: argparse.Namespace) -> int:
@@ -946,6 +1034,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     pilot_data = read_json(pilot_path) if pilot_path.is_file() else {}
     try:
         from production_gates import pilot_is_user_approved as _pilot_ok
+
         pilot_ok = _pilot_ok(pilot_data) if pilot_data else False
     except Exception:
         pilot_ok = False
@@ -967,7 +1056,9 @@ def cmd_status(args: argparse.Namespace) -> int:
             "provider_default": manifest.get("provider_default"),
             "pipeline_stage": pipeline_stage,
             "stage": pipeline_stage.get("stage") if isinstance(pipeline_stage, dict) else None,
-            "stage_label": pipeline_stage.get("label_zh") if isinstance(pipeline_stage, dict) else None,
+            "stage_label": pipeline_stage.get("label_zh")
+            if isinstance(pipeline_stage, dict)
+            else None,
             "next_gate": next_gate,
             "next_actions": next_actions,
             "next_cmd": next_cmd or (next_actions[0]["cmd"] if next_actions else None),
@@ -993,7 +1084,9 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "hyperframes_index": compose_hf.is_file(),
                 "remotion_package": (root / "compose" / "remotion" / "package.json").is_file(),
                 "remotion": _status_remotion_probe(root),
-                "preview_meta": str(compose_preview_meta) if compose_preview_meta.is_file() else None,
+                "preview_meta": str(compose_preview_meta)
+                if compose_preview_meta.is_file()
+                else None,
                 "preview_receipt": str(root / "receipts" / "compose-preview.json")
                 if (root / "receipts" / "compose-preview.json").is_file()
                 else None,
@@ -1003,6 +1096,15 @@ def cmd_status(args: argparse.Namespace) -> int:
             "manifest": str(root / MANIFEST_NAME),
         }
     )
+    return 0
+
+
+def cmd_production_evidence(args: argparse.Namespace) -> int:
+    """Read-only evidence ledger for production gates."""
+    from production_evidence import build_evidence
+
+    report = build_evidence(Path(args.root).expanduser().resolve())
+    emit(report)
     return 0
 
 
@@ -1117,16 +1219,13 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     ensure_tree(root)
     try:
-        from narrative_control import assert_projection_ready, NarrativeControlError
+        from narrative_control import NarrativeControlError, assert_projection_ready
 
         assert_projection_ready(root, require_locked=True)
     except NarrativeControlError as exc:
         raise FilmError(f"{exc.code}: {exc}") from exc
     default_spec = root / "film-spec.json"
-    if args.spec:
-        spec_path = Path(args.spec).expanduser().resolve()
-    else:
-        spec_path = default_spec
+    spec_path = Path(args.spec).expanduser().resolve() if args.spec else default_spec
     spec = read_json(spec_path)
     try:
         shots = validate_film_spec(spec, assign_missing_ids=True, film_root=root)
@@ -1151,9 +1250,7 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
     wardrobe_variants = bible.get("wardrobe_variants", {})
     wardrobe_errors = []
     for shot in shots:
-        w_state = shot.get("wardrobe_state") or (shot.get("dsl") or {}).get(
-            "wardrobe_state"
-        )
+        w_state = shot.get("wardrobe_state") or (shot.get("dsl") or {}).get("wardrobe_state")
         if w_state and w_state != "default":
             heroines = shot.get("heroine_ids", ["hero"])
             # also honor dsl.cast when heroine_ids default
@@ -1245,7 +1342,9 @@ def cmd_lint_continuity(args: argparse.Namespace) -> int:
     except FilmSpecError as exc:
         raise FilmError(str(exc)) from exc
     report = lint_continuity(shots)
-    intents = spec.get("transition_intents") if isinstance(spec.get("transition_intents"), list) else None
+    intents = (
+        spec.get("transition_intents") if isinstance(spec.get("transition_intents"), list) else None
+    )
     frame_chain = lint_frame_chain(shots, transition_intents=intents)
     report["frame_chain"] = frame_chain
     # Merge soft frame-chain codes into top-level codes for visibility
@@ -1260,9 +1359,7 @@ def cmd_lint_continuity(args: argparse.Namespace) -> int:
     )
     if args.strict and not report["ok"]:
         write_json(root / "continuity_lint.json", report)
-        raise FilmError(
-            "continuity lint failed: " + ",".join(report.get("codes") or [])
-        )
+        raise FilmError("continuity lint failed: " + ",".join(report.get("codes") or []))
     out = root / "continuity_lint.json"
     write_json(out, report)
     emit(
@@ -1286,9 +1383,7 @@ def cmd_extract_frame(args: argparse.Namespace) -> int:
     if args.source:
         source = Path(args.source).expanduser().resolve()
     elif args.shot_id and root:
-        manifest = (
-            read_json(root / "manifest.json") if (root / "manifest.json").is_file() else {}
-        )
+        manifest = read_json(root / "manifest.json") if (root / "manifest.json").is_file() else {}
         assets = manifest.get("assets") if isinstance(manifest, dict) else None
         if isinstance(assets, list):
             for a in assets:
@@ -1331,6 +1426,7 @@ def cmd_extract_frame(args: argparse.Namespace) -> int:
             capture_output=True,
             text=True,
             check=True,
+            timeout=300,
         )
         duration = float((probe.stdout or "0").strip() or "0")
     except (subprocess.CalledProcessError, ValueError) as exc:
@@ -1373,7 +1469,7 @@ def cmd_extract_frame(args: argparse.Namespace) -> int:
         str(out),
     ]
     try:
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=60)
     except subprocess.CalledProcessError as exc:
         raise FilmError(
             f"ffmpeg extract failed: {(exc.stderr or exc.stdout or '')[-500:]}"
@@ -1474,9 +1570,7 @@ def cmd_continuity_chain(args: argparse.Namespace) -> int:
     write_json(out, report)
     emit({"ok": report["ok"], "path": str(out), "continuity_chain": report})
     if not report["ok"] and getattr(args, "strict", False):
-        raise FilmError(
-            "continuity-chain check failed: " + ",".join(report.get("codes") or [])
-        )
+        raise FilmError("continuity-chain check failed: " + ",".join(report.get("codes") or []))
     return 0 if report["ok"] else 2
 
 
@@ -1538,8 +1632,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
     palette = str(style.get("palette") or "").strip().lower()
     if not palette or "to be filled" in palette:
         raise FilmError(
-            "lock-style requires a concrete palette in style-bible.json "
-            "(not 'to be filled…')"
+            "lock-style requires a concrete palette in style-bible.json (not 'to be filled…')"
         )
     identity = str(style.get("identity_lock") or "").strip().lower()
     if identity and "to be filled" in identity:
@@ -1553,6 +1646,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
     style["locked"] = True
     style["state"] = "Approved"
     from scripts.visual_bible import save_bible
+
     save_bible(root, style)
     manifest = load_manifest(root)
     recompute_gates(root, manifest)
@@ -1680,6 +1774,8 @@ def _auto_promote_last_to_next(
             next_shot_after,
             should_auto_promote_next,
             upsert_join,
+        )
+        from continuity_chain import (
             sha256_file as chain_sha,
         )
     except Exception:
@@ -1721,6 +1817,7 @@ def _auto_promote_last_to_next(
             capture_output=True,
             text=True,
             check=True,
+            timeout=300,
         )
         duration = float((probe.stdout or "0").strip() or "0")
     except (subprocess.CalledProcessError, ValueError) as exc:
@@ -1748,6 +1845,7 @@ def _auto_promote_last_to_next(
             capture_output=True,
             text=True,
             check=True,
+            timeout=300,
         )
     except subprocess.CalledProcessError as exc:
         return {
@@ -1832,9 +1930,13 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                 f"Approved clips require --source-endpoint in {sorted(ALLOWED_VIDEO_ENDPOINTS)}"
             )
         if not identity_approved:
-            raise FilmError("Approved clips require --identity-approved after canonical identity review")
+            raise FilmError(
+                "Approved clips require --identity-approved after canonical identity review"
+            )
         if not motion_approved:
-            raise FilmError("Approved clips require --motion-approved after watching the complete clip")
+            raise FilmError(
+                "Approved clips require --motion-approved after watching the complete clip"
+            )
         if not review_note:
             raise FilmError("Approved clips require --review-note with the visual review result")
     manifest = load_manifest(root)
@@ -1847,10 +1949,14 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                 root,
                 shot_id=str(args.shot_id),
                 clip=source,
-                receipt=Path(args.review_receipt).expanduser().resolve() if getattr(args, "review_receipt", None) else None,
+                receipt=Path(args.review_receipt).expanduser().resolve()
+                if getattr(args, "review_receipt", None)
+                else None,
             )
         except Exception as exc:
-            raise FilmError(f"v1.6 approved clips require matching shot-review evidence: {exc}") from exc
+            raise FilmError(
+                f"v1.6 approved clips require matching shot-review evidence: {exc}"
+            ) from exc
     try:
         qa = analyze_media(source, require_audio=False, require_motion=True)
     except MediaQAError as exc:
@@ -1883,7 +1989,9 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     if qa.get("has_audio"):
         try:
             audio_dir = film_dirs(root)["audio"]
-            native_dir = safe_workspace_directory(audio_dir, "native", field="native audio directory")
+            native_dir = safe_workspace_directory(
+                audio_dir, "native", field="native audio directory"
+            )
             native_dir.mkdir(exist_ok=True)
             native_path = safe_output_path(
                 native_dir,
@@ -1946,7 +2054,9 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     return 0
 
 
-def normalize_clip(src: Path, dest: Path, *, width: int, height: int, fps: int, duration: float | None) -> None:
+def normalize_clip(
+    src: Path, dest: Path, *, width: int, height: int, fps: int, duration: float | None
+) -> None:
     """Re-encode to a common profile for safe concat."""
     vf = (
         f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
@@ -2079,7 +2189,9 @@ def cmd_assemble(args: argparse.Namespace) -> int:
     except MediaQAError as exc:
         raise FilmError(str(exc)) from exc
     if not technical_qa.get("ok"):
-        raise FilmError(f"Assembled film failed decode/duration/motion QA: {technical_qa.get('errors')}")
+        raise FilmError(
+            f"Assembled film failed decode/duration/motion QA: {technical_qa.get('errors')}"
+        )
     manifest["outputs"]["silent_film"] = {
         "path": str(out_path),
         "sha256": sha256(out_path),
@@ -2260,8 +2372,8 @@ def cmd_reencode_clips(args: argparse.Namespace) -> int:
             "ok": len(failed) == 0,
             "reencoded": done,
             "failed": failed,
-            "width": width,
-            "height": height,
+            "width": target_w,
+            "height": target_h,
             "fps": fps,
             "duration_cap": duration_cap,
             "count_ok": len(done),
@@ -2317,10 +2429,7 @@ def cmd_final(args: argparse.Namespace) -> int:
                 f"final blocked by preflight --preflight-strict soft gates [{codes}]. "
                 f'Run aifilm preflight --root "{root}" or drop --preflight-strict.'
             )
-        log(
-            f"preflight ok (hard=0 soft={len(soft)}) "
-            f"→ post_engine={post_engine}"
-        )
+        log(f"preflight ok (hard=0 soft={len(soft)}) → post_engine={post_engine}")
 
     # Fail early before TTS if loop-risk VO would force boring stream_loop.
     # When receipts/tts-rehearsal.json present, measured_duration_sec preferred over estimate.
@@ -2434,7 +2543,8 @@ def cmd_final(args: argparse.Namespace) -> int:
         f"running render_final.py (post_engine={post_engine}, "
         f"subs={subs_mode}, plate_cards={plate_cards}) ..."
     )
-    proc = run(cmd, check=False)
+    # P0 · 少婦案：render_final 常 >2min；默认 run(timeout=60) 会 TimeoutExpired
+    proc = run(cmd, check=False, timeout=600)
     sys.stderr.write(proc.stderr or "")
     ffmpeg_result: dict[str, Any] | None = None
     if proc.stdout:
@@ -2597,9 +2707,7 @@ def cmd_final(args: argparse.Namespace) -> int:
             "hard_ok": preflight_report.get("hard_ok"),
             "soft_count": len(preflight_report.get("soft") or []),
             "soft_codes": [
-                i.get("code")
-                for i in (preflight_report.get("soft") or [])
-                if isinstance(i, dict)
+                i.get("code") for i in (preflight_report.get("soft") or []) if isinstance(i, dict)
             ],
         }
     emit(out_obj)
@@ -2617,11 +2725,15 @@ def cmd_review_final(args: argparse.Namespace) -> int:
     manifest = load_manifest(root)
     summary = recompute_gates(root, manifest)
     if not summary["gates"]["clips_complete"]:
-        raise FilmError("Cannot approve final: not every planned clip has endpoint, identity, motion, and decode QA")
+        raise FilmError(
+            "Cannot approve final: not every planned clip has endpoint, identity, motion, and decode QA"
+        )
     final_record = (manifest.get("outputs") or {}).get("final_film")
     out_dir = film_dirs(root)["out"]
     if not record_file_matches(out_dir, final_record, field="final film path"):
-        raise FilmError("Cannot approve final: final film is missing or its SHA-256 no longer matches")
+        raise FilmError(
+            "Cannot approve final: final film is missing or its SHA-256 no longer matches"
+        )
     final_path = safe_existing_file(out_dir, final_record["path"], field="final film path")
     try:
         technical_qa = analyze_media(final_path, require_audio=True, require_motion=True)
@@ -2632,7 +2744,9 @@ def cmd_review_final(args: argparse.Namespace) -> int:
     reviewer = str(args.reviewer or "").strip()
     notes = str(args.notes or "").strip()
     if not args.approve:
-        raise FilmError("Full-film review requires explicit --approve after watching the entire film")
+        raise FilmError(
+            "Full-film review requires explicit --approve after watching the entire film"
+        )
     if not reviewer or not notes:
         raise FilmError("Full-film review requires non-empty --reviewer and --notes")
     try:
@@ -2652,6 +2766,42 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             )
         except DirectorReviewError as exc:
             raise FilmError(str(exc)) from exc
+    from performance_timeline import build_performance_timeline
+
+    performance_timeline = build_performance_timeline(root)
+    if performance_timeline["required"] and not performance_timeline["ok"]:
+        codes = ", ".join(sorted({item["code"] for item in performance_timeline["errors"]}))
+        raise FilmError(f"Cannot approve final: performance timeline is incomplete: {codes}")
+    from speech_performance_timing import build_speech_performance_timing
+
+    speech_performance_timing = build_speech_performance_timing(root)
+    if speech_performance_timing["required"] and not speech_performance_timing["ok"]:
+        codes = ", ".join(sorted({item["code"] for item in speech_performance_timing["errors"]}))
+        raise FilmError(f"Cannot approve final: speech/performance timing is incomplete: {codes}")
+    from audio_provenance import build_audio_provenance
+
+    audio_provenance = build_audio_provenance(root)
+    if audio_provenance["required"] and not audio_provenance["ok"]:
+        codes = ", ".join(sorted({item["code"] for item in audio_provenance["errors"]}))
+        raise FilmError(f"Cannot approve final: audio provenance is incomplete: {codes}")
+    from subtitle_dialogue_alignment import build_subtitle_dialogue_alignment
+
+    subtitle_dialogue_alignment = build_subtitle_dialogue_alignment(root)
+    if subtitle_dialogue_alignment["required"] and not subtitle_dialogue_alignment["ok"]:
+        codes = ", ".join(sorted({item["code"] for item in subtitle_dialogue_alignment["errors"]}))
+        raise FilmError(f"Cannot approve final: subtitle/dialogue alignment is incomplete: {codes}")
+    from subtitle_cut_boundaries import build_subtitle_cut_boundaries
+
+    subtitle_cut_boundaries = build_subtitle_cut_boundaries(root)
+    if subtitle_cut_boundaries["required"] and not subtitle_cut_boundaries["ok"]:
+        raise FilmError("Cannot approve final: subtitle crosses a hard or continue cut boundary")
+    from director_ledger import build_director_ledger
+
+    director_ledger = build_director_ledger(root)
+    if director_ledger["required"] and not director_ledger["ok"]:
+        raise FilmError(
+            "Cannot approve final: director exception ledger has pending re-approval items"
+        )
 
     # Scorecard fail → write director_notes reshoot list, do not approve
     if not scorecard_all_pass(card):
@@ -2676,6 +2826,9 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             "technical_qa": technical_qa,
             "scorecard": scorecard_payload(card),
             "screening_evidence": screening_evidence,
+            "performance_timeline": performance_timeline,
+            "speech_performance_timing": speech_performance_timing,
+            "audio_provenance": audio_provenance,
             "director_notes_path": str(notes_path),
             "open_reshoot_ids": [it.get("id") for it in open_items],
         }
@@ -2700,8 +2853,18 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         "output_sha256": final_record["sha256"],
         "technical_qa": technical_qa,
         "scorecard": scorecard,
-        "screening": {"path": str(final_path), "sha256": final_record["sha256"], "duration_sec": technical_qa.get("duration_sec")},
+        "screening": {
+            "path": str(final_path),
+            "sha256": final_record["sha256"],
+            "duration_sec": technical_qa.get("duration_sec"),
+        },
         "screening_evidence": screening_evidence,
+        "performance_timeline": performance_timeline,
+        "speech_performance_timing": speech_performance_timing,
+        "audio_provenance": audio_provenance,
+        "subtitle_dialogue_alignment": subtitle_dialogue_alignment,
+        "subtitle_cut_boundaries": subtitle_cut_boundaries,
+        "director_ledger": director_ledger,
     }
     review_path = out_dir / "final-review.json"
     write_json(review_path, review)
@@ -2738,7 +2901,14 @@ def cmd_review_contract(args: argparse.Namespace) -> int:
     legacy, _migrated_at = migrate_review_contract(manifest)
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
-    emit({"ok": True, "review_contract_version": 2, "pending_shot_reviews": legacy, "note": "existing approvals remain historical records; review each listed clip before it can satisfy v1.6 delivery gates"})
+    emit(
+        {
+            "ok": True,
+            "review_contract_version": 2,
+            "pending_shot_reviews": legacy,
+            "note": "existing approvals remain historical records; review each listed clip before it can satisfy v1.6 delivery gates",
+        }
+    )
     return 0
 
 
@@ -2887,7 +3057,9 @@ def cmd_pilot(args: argparse.Namespace) -> int:
             return 0
         if action == "approve":
             scorecard = load_pilot_scorecard(root)
-            shots = [s.strip() for s in str(getattr(args, "shots", "") or "").split(",") if s.strip()]
+            shots = [
+                s.strip() for s in str(getattr(args, "shots", "") or "").split(",") if s.strip()
+            ]
             if not shots and isinstance(scorecard.get("shots"), list):
                 shots = [str(x) for x in scorecard["shots"]]
             if not shots:
@@ -3006,8 +3178,7 @@ def cmd_export_compose(args: argparse.Namespace) -> int:
     summary = recompute_gates(root, manifest)
     if not summary["gates"].get("clips_complete"):
         raise FilmError(
-            "export-compose requires clips_complete "
-            "(every planned shot has approved register-clip)"
+            "export-compose requires clips_complete (every planned shot has approved register-clip)"
         )
     try:
         result = export_composition(
@@ -3123,7 +3294,7 @@ def cmd_frw(args: argparse.Namespace) -> int:
     if not argv:
         argv = ["help"]
     # Do not capture stdout — FRW protocol is one-line JSON for the agent.
-    return int(subprocess.call([sys.executable, str(launcher), *argv]))
+    return int(subprocess.call([sys.executable, str(launcher), *argv]), timeout=120)
 
 
 def cmd_export_desktop(args: argparse.Namespace) -> int:
@@ -3141,7 +3312,24 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
     manifest = load_manifest(root)
     recompute_gates(root, manifest)
     if not manifest["gates"]["final_complete"]:
-        raise FilmError("Desktop export requires completed technical QA and explicit full-film final review")
+        raise FilmError(
+            "Desktop export requires completed technical QA and explicit full-film final review"
+        )
+    post_receipt = read_json(root / "receipts" / "post-audit.json") or {}
+    from post_audit import audit_freshness
+
+    freshness = audit_freshness(root, post_receipt)
+    if not post_receipt:
+        raise FilmError(
+            "Desktop export requires a current post-audit receipt; run aifilm post-audit --root first"
+        )
+    if freshness.get("stale"):
+        raise FilmError(
+            "Desktop export requires a fresh post-audit; evidence changed: "
+            + ", ".join(freshness.get("mismatches") or [])
+        )
+    if not post_receipt.get("delivery_ready"):
+        raise FilmError("Desktop export blocked by post-audit hard failures")
     dirs = film_dirs(root)
     try:
         reject_symlinks(dest, field="Desktop export destination")
@@ -3149,7 +3337,9 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
             reject_symlinks(dirs[key], field=f"film {key} export source")
         for meta in EXPORT_METADATA_FILES:
             if (root / meta).is_symlink():
-                raise SecurityPolicyError(f"Invalid export source: symbolic links are not allowed: {root / meta}")
+                raise SecurityPolicyError(
+                    f"Invalid export source: symbolic links are not allowed: {root / meta}"
+                )
     except SecurityPolicyError as exc:
         raise FilmError(str(exc)) from exc
     for sub in ("成片", "关键帧", "镜头片段", "定妆与场景", "简报", "项目状态"):
@@ -3183,10 +3373,8 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
         if stale.name not in ("film_final.mp4", "film_silent.mp4") and (
             "pre_" in stale.name or stale.name.endswith("_dual.mp4") or "里番" in stale.name
         ):
-            try:
+            with contextlib.suppress(OSError):
                 stale.unlink()
-            except OSError:
-                pass
     # audio stems
     try:
         audio_export = safe_workspace_directory(dest, "音频", field="Desktop audio directory")
@@ -3222,6 +3410,19 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
     if compose_preview.is_file():
         shutil.copy2(compose_preview, dest / "项目状态" / "compose-preview.json")
     shutil.copy2(root / MANIFEST_NAME, dest / "项目状态" / MANIFEST_NAME)
+    delivery_manifest = {
+        "kind": "desktop-delivery-manifest",
+        "created_at": utc_now(),
+        "source_root": str(root),
+        "files": {},
+    }
+    for exported in sorted((dest / "成片").iterdir()):
+        if exported.is_file():
+            delivery_manifest["files"][f"成片/{exported.name}"] = {
+                "sha256": sha256(exported),
+                "size": exported.stat().st_size,
+            }
+    write_json(dest / "项目状态" / "delivery-manifest.json", delivery_manifest)
 
     readme = dest / "README.txt"
     silent = (manifest.get("outputs") or {}).get("silent_film") or {}
@@ -3292,27 +3493,26 @@ def cmd_frw_lipsync(args: argparse.Namespace) -> int:
 
 def cmd_env_plate(args: argparse.Namespace) -> int:
     """FRW LTX T2V env/no-face plate (+ first frame keyframe)."""
-    from env_plate import EnvPlateError, run_env_plate
+    from cli_motion import MotionRouteError, env_plate
 
     try:
-        rep = run_env_plate(
-            prompt=str(args.prompt),
-            root=Path(args.root).expanduser().resolve() if getattr(args, "root", None) else None,
-            shot_id=getattr(args, "shot_id", None),
-            wait=not bool(getattr(args, "no_wait", False)),
-            width=str(getattr(args, "width", None) or "720"),
-            height=str(getattr(args, "height", None) or "1280"),
-            duration=str(getattr(args, "duration", None) or "5"),
-            fps=str(getattr(args, "fps", None) or "24"),
-            register=not bool(getattr(args, "no_register", False)),
-            extract_keyframe=not bool(getattr(args, "no_keyframe", False)),
-            out_dir=Path(args.out_dir) if getattr(args, "out_dir", None) else None,
-            poll_timeout=float(getattr(args, "poll_timeout", None) or 240),
-        )
-    except EnvPlateError as exc:
+        rep = env_plate(args)
+    except MotionRouteError as exc:
         raise FilmError(str(exc)) from exc
     emit(rep)
     return 0 if rep.get("ok") else 1
+
+
+def cmd_motion_plan(args: argparse.Namespace) -> int:
+    """Compile a panel-animation shot into a deterministic motion plan."""
+    from cli_motion import MotionRouteError, motion_plan
+
+    try:
+        rep = motion_plan(args)
+    except MotionRouteError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(rep)
+    return 0
 
 
 def cmd_grok_oauth(args: argparse.Namespace) -> int:
@@ -3477,20 +3677,33 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
 def cmd_graph(args: argparse.Namespace) -> int:
     """Vertical Drama Graph: legacy derive/import + canonical project/validate/status."""
     root = Path(args.root).expanduser().resolve()
-    from drama_graph import derive_graph, graph_path, graph_status, validate_graph
+    if str(getattr(args, "graph_action", "") or "") in {"validate", "status"}:
+        from cli_graph import status as status_graph_cli
+        from cli_graph import validate as validate_graph_cli
+
+        runner = validate_graph_cli if args.graph_action == "validate" else status_graph_cli
+        report, code = runner(args, root)
+        emit(report)
+        return code
+    from drama_graph import derive_graph, graph_path, validate_graph
     from narrative_control import (
         GRAPH_SCHEMA_VERSION,
-        control_status,
+        draft_director_board,
         graph_content_sha256,
         graph_locked_for_projection,
-        projection_status,
-        draft_director_board,
     )
+
     action = str(getattr(args, "graph_action", "") or "")
     if action == "derive":
-        existing = json.loads(graph_path(root).read_text(encoding="utf-8")) if graph_path(root).is_file() else {}
+        existing = (
+            json.loads(graph_path(root).read_text(encoding="utf-8"))
+            if graph_path(root).is_file()
+            else {}
+        )
         if int(existing.get("schema_version") or 0) >= GRAPH_SCHEMA_VERSION:
-            raise FilmError("canonical drama-graph exists; use aifilm graph project or plan edit, not graph derive")
+            raise FilmError(
+                "canonical drama-graph exists; use aifilm graph project or plan edit, not graph derive"
+            )
         graph = derive_graph(root, write=not bool(getattr(args, "no_write", False)))
         v = validate_graph(graph)
         emit(
@@ -3513,12 +3726,22 @@ def cmd_graph(args: argparse.Namespace) -> int:
             else {}
         )
         if int(existing.get("schema_version") or 0) >= GRAPH_SCHEMA_VERSION:
-            raise FilmError("canonical drama-graph already exists; refusing legacy import overwrite")
+            raise FilmError(
+                "canonical drama-graph already exists; refusing legacy import overwrite"
+            )
         graph = derive_graph(root, write=False)
-        spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8")) if (root / "film-spec.json").is_file() else {}
+        spec = (
+            json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+            if (root / "film-spec.json").is_file()
+            else {}
+        )
         di = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
         graph["schema_version"] = GRAPH_SCHEMA_VERSION
-        graph["derived_from"] = {**(graph.get("derived_from") or {}), "mode": "legacy-import", "imported_at": utc_now()}
+        graph["derived_from"] = {
+            **(graph.get("derived_from") or {}),
+            "mode": "legacy-import",
+            "imported_at": utc_now(),
+        }
         graph["story"] = {
             "premise": str(spec.get("description") or di.get("logline") or ""),
             "logline": str(di.get("logline") or spec.get("description") or ""),
@@ -3547,6 +3770,7 @@ def cmd_graph(args: argparse.Namespace) -> int:
                     beat.setdefault("state_delta", "needs_authoring")
                     beat.setdefault("director_board", draft_director_board())
         from narrative_control import ensure_graph_controls
+
         ensure_graph_controls(graph)
         write_json(graph_path(root), graph)
         migration = {
@@ -3560,70 +3784,75 @@ def cmd_graph(args: argparse.Namespace) -> int:
             "note": "legacy import is draft-only; complete director_board and lock scopes before projection",
         }
         write_json(root / "receipts" / "graph-migration.json", migration)
-        emit({"ok": True, "action": "import", "path": str(graph_path(root)), "receipt": str(root / "receipts" / "graph-migration.json"), "state": graph.get("state"), "content_sha256": graph_content_sha256(graph)})
+        emit(
+            {
+                "ok": True,
+                "action": "import",
+                "path": str(graph_path(root)),
+                "receipt": str(root / "receipts" / "graph-migration.json"),
+                "state": graph.get("state"),
+                "content_sha256": graph_content_sha256(graph),
+            }
+        )
         return 0
     if action == "project":
-        graph = json.loads(graph_path(root).read_text(encoding="utf-8")) if graph_path(root).is_file() else {}
+        graph = (
+            json.loads(graph_path(root).read_text(encoding="utf-8"))
+            if graph_path(root).is_file()
+            else {}
+        )
         if int(graph.get("schema_version") or 0) < GRAPH_SCHEMA_VERSION:
-            raise FilmError("graph project requires canonical graph v2; run aifilm graph import first")
+            raise FilmError(
+                "graph project requires canonical graph v2; run aifilm graph import first"
+            )
         ready = graph_locked_for_projection(graph)
         if not ready.get("ok"):
-            raise FilmError("graph is not ready for projection: " + ", ".join(ready.get("missing_scopes") or [i.get("code", "NARRATIVE") for i in (ready.get("semantic") or {}).get("errors", [])]))
+            raise FilmError(
+                "graph is not ready for projection: "
+                + ", ".join(
+                    ready.get("missing_scopes")
+                    or [
+                        i.get("code", "NARRATIVE")
+                        for i in (ready.get("semantic") or {}).get("errors", [])
+                    ]
+                )
+            )
         from story_plan import project_graph_to_film_spec
-        existing = json.loads((root / "film-spec.json").read_text(encoding="utf-8")) if (root / "film-spec.json").is_file() else {}
-        has_shots = any(isinstance(sc, dict) and sc.get("shots") for sc in (existing.get("scenes") or []))
+
+        existing = (
+            json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+            if (root / "film-spec.json").is_file()
+            else {}
+        )
+        has_shots = any(
+            isinstance(sc, dict) and sc.get("shots") for sc in (existing.get("scenes") or [])
+        )
         if has_shots and not bool(getattr(args, "force", False)):
             raise FilmError("film-spec already has shots; pass --force to overwrite projection")
         norm_path = root / "receipts" / "story-normalize.json"
         norm = json.loads(norm_path.read_text(encoding="utf-8")) if norm_path.is_file() else None
         spec = project_graph_to_film_spec(graph, base_spec=existing, normalized=norm)
         write_json(root / "film-spec.json", spec)
-        emit({"ok": True, "action": "project", "path": str(root / "film-spec.json"), "source_revision": graph.get("revision"), "source_sha256": graph_content_sha256(graph)})
-        return 0
-    if action == "validate":
-        if bool(getattr(args, "derive_if_missing", False)) and not graph_path(root).is_file():
-            derive_graph(root, write=True)
-        report = validate_graph(root=root)
-        report["narrative"] = control_status(root)
-        report["action"] = "validate"
-        report["path"] = str(graph_path(root))
-        emit(report)
-        return 0 if report.get("ok") else 1
-    if action == "status":
-        auto = bool(getattr(args, "derive_if_missing", True)) and not bool(
-            getattr(args, "no_derive", False)
+        emit(
+            {
+                "ok": True,
+                "action": "project",
+                "path": str(root / "film-spec.json"),
+                "source_revision": graph.get("revision"),
+                "source_sha256": graph_content_sha256(graph),
+            }
         )
-        st = graph_status(root, auto_derive=auto)
-        if bool(getattr(args, "with_jobs", False)):
-            from drama_graph import build_jobs_summary
-
-            st["jobs_summary"] = build_jobs_summary(root)
-        st["control"] = control_status(root)
-        st["projection"] = projection_status(root)
-        emit(st)
-        return 0 if st.get("ok") else 1
+        return 0
     raise FilmError(f"unknown graph action {action!r}")
 
 
 def cmd_skill(args: argparse.Namespace) -> int:
-    """Skill Registry: list | show (Phase 2 shell)."""
-    from skill_registry import list_skills, show_skill
+    """Skill Registry route delegated to the registry CLI module."""
+    from cli_skill import run
 
-    action = str(getattr(args, "skill_action", "") or "")
-    if action == "list":
-        tag = getattr(args, "tag", None)
-        phase = getattr(args, "phase", None)
-        report = list_skills(tag=tag, phase=str(phase) if phase is not None else None)
-        emit(report)
-        return 0 if report.get("ok") else 1
-    if action == "show":
-        sid = getattr(args, "id", None) or getattr(args, "skill_id", None)
-        if not sid:
-            raise FilmError("skill show requires --id")
-        report = show_skill(str(sid))
-        emit(report)
-        return 0 if report.get("ok") else 1
-    raise FilmError(f"unknown skill action {action!r}")
+    report, code = run(args)
+    emit(report)
+    return code
 
 
 def cmd_assets(args: argparse.Namespace) -> int:
@@ -3661,27 +3890,68 @@ def cmd_assets(args: argparse.Namespace) -> int:
 
 def cmd_plan(args: argparse.Namespace) -> int:
     """Phase 3: story.normalize → beat/shot plan → drama-graph (+ film-spec seed)."""
-    from story_plan import (
-        normalize_story,
-        plan_status,
-        project_graph_to_film_spec,
-        run_plan,
-    )
-    from drama_graph import GRAPH_NAME, validate_graph
+    action = str(getattr(args, "plan_action", "") or "")
+    if action in {"edit", "lock", "unlock", "replan"}:
+        from cli_plan_mutation import PlanMutationError, run
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError(f"plan {action} requires --root")
+        try:
+            report, code = run(args, Path(root_s).expanduser().resolve())
+        except PlanMutationError as exc:
+            raise FilmError(f"{exc.code}: {exc}") from exc
+        emit(report)
+        return code
+    if action == "run":
+        from cli_plan_run import PlanRunError, run
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan run requires --root")
+        try:
+            report, code = run(args, Path(root_s).expanduser().resolve())
+        except PlanRunError as exc:
+            raise FilmError(str(exc)) from exc
+        emit(report)
+        return code
+    if action == "project":
+        from cli_plan_project import run
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan project requires --root")
+        report, code = run(args, Path(root_s).expanduser().resolve())
+        emit(report)
+        return code
+    if action in {"validate", "status"}:
+        from cli_plan import status as status_plan_cli
+        from cli_plan import validate as validate_plan_cli
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError(f"plan {action} requires --root")
+        runner = validate_plan_cli if action == "validate" else status_plan_cli
+        report, code = (
+            runner(args, Path(root_s).expanduser().resolve())
+            if action == "validate"
+            else runner(Path(root_s).expanduser().resolve())
+        )
+        emit(report)
+        return code
+    from drama_graph import GRAPH_NAME
     from narrative_control import (
         NarrativeControlError,
-        control_status,
         edit_node,
-        graph_locked_for_projection,
+        lock_scope,
         mark_replan,
         unlock_scope,
-        lock_scope,
         write_revision_receipt,
-        validate_narrative_graph,
+    )
+    from story_plan import (
+        normalize_story,
     )
     from util import read_json, write_json
-
-    action = str(getattr(args, "plan_action", "") or "")
 
     def _load_text() -> str:
         text = getattr(args, "text", None)
@@ -3714,44 +3984,6 @@ def cmd_plan(args: argparse.Namespace) -> int:
             emit({"ok": True, "action": "normalize", "story": norm})
         return 0
 
-    if action == "run":
-        root_s = getattr(args, "root", None)
-        if not root_s:
-            raise FilmError("plan run requires --root")
-        root = Path(root_s).expanduser().resolve()
-        raw = _load_text()
-        report = run_plan(
-            root,
-            raw,
-            title=getattr(args, "title", None),
-            target_duration=float(getattr(args, "target_duration", 45) or 45),
-            apply_film_spec=bool(getattr(args, "apply_film_spec", False)) and not bool(getattr(args, "no_film_spec", False)),
-            force=bool(getattr(args, "force", False)),
-            source_path=str(getattr(args, "file", None) or ""),
-            seed_bible=not bool(getattr(args, "no_bible", False)),
-        )
-        emit(report)
-        return 0 if report.get("ok") else 1
-
-    if action == "validate":
-        root_s = getattr(args, "root", None)
-        if not root_s:
-            raise FilmError("plan validate requires --root")
-        root = Path(root_s).expanduser().resolve()
-        status = control_status(root)
-        # Copy the semantic summary before attaching the full control status;
-        # otherwise report['control']['semantic'] points back into report and
-        # json.dumps() fails with a circular-reference error.
-        strict_requested = bool(getattr(args, "strict", False))
-        if strict_requested and (root / GRAPH_NAME).is_file():
-            report = validate_narrative_graph(read_json(root / GRAPH_NAME), strict=True)
-        else:
-            report = dict(status.get("semantic") or {"ok": False, "issues": [{"code": "GRAPH_MISSING"}]})
-        report["strict_requested"] = strict_requested
-        report.update({"action": "validate", "root": str(root), "control": status})
-        emit(report)
-        return 0 if report.get("ok") else 1
-
     if action in {"edit", "lock", "unlock", "replan"}:
         root_s = getattr(args, "root", None)
         if not root_s:
@@ -3766,7 +3998,9 @@ def cmd_plan(args: argparse.Namespace) -> int:
                 changes: dict[str, Any] = {}
                 for item in list(getattr(args, "set", None) or []):
                     if "=" not in item:
-                        raise NarrativeControlError(f"--set requires field=value: {item}", code="INVALID_FIELD")
+                        raise NarrativeControlError(
+                            f"--set requires field=value: {item}", code="INVALID_FIELD"
+                        )
                     field, raw_value = item.split("=", 1)
                     try:
                         value: Any = json.loads(raw_value)
@@ -3777,80 +4011,73 @@ def cmd_plan(args: argparse.Namespace) -> int:
                     changes[field] = value
                 graph, affected = edit_node(graph, str(args.node), changes)
                 write_json(graph_path, graph)
-                receipt = write_revision_receipt(root, graph, action="edit", node_ref=str(args.node), affected=affected)
-                emit({"ok": True, "action": action, "revision": graph.get("revision"), "affected_nodes": affected, "receipt_path": str(receipt)})
+                receipt = write_revision_receipt(
+                    root, graph, action="edit", node_ref=str(args.node), affected=affected
+                )
+                emit(
+                    {
+                        "ok": True,
+                        "action": action,
+                        "revision": graph.get("revision"),
+                        "affected_nodes": affected,
+                        "receipt_path": str(receipt),
+                    }
+                )
                 return 0
             if action == "lock":
                 graph = lock_scope(graph, str(args.scope), user_phrase=str(args.user_phrase))
                 write_json(graph_path, graph)
-                receipt = write_revision_receipt(root, graph, action="lock", reason=str(args.user_phrase))
-                emit({"ok": True, "action": action, "scope": args.scope, "revision": graph.get("revision"), "receipt_path": str(receipt)})
+                receipt = write_revision_receipt(
+                    root, graph, action="lock", reason=str(args.user_phrase)
+                )
+                emit(
+                    {
+                        "ok": True,
+                        "action": action,
+                        "scope": args.scope,
+                        "revision": graph.get("revision"),
+                        "receipt_path": str(receipt),
+                    }
+                )
                 return 0
             if action == "unlock":
                 graph = unlock_scope(graph, str(args.scope), reason=str(args.reason))
                 write_json(graph_path, graph)
-                receipt = write_revision_receipt(root, graph, action="unlock", reason=str(args.reason))
-                emit({"ok": True, "action": action, "scope": args.scope, "revision": graph.get("revision"), "receipt_path": str(receipt)})
+                receipt = write_revision_receipt(
+                    root, graph, action="unlock", reason=str(args.reason)
+                )
+                emit(
+                    {
+                        "ok": True,
+                        "action": action,
+                        "scope": args.scope,
+                        "revision": graph.get("revision"),
+                        "receipt_path": str(receipt),
+                    }
+                )
                 return 0
             if not bool(getattr(args, "descendants", False)):
-                raise NarrativeControlError("replan requires --descendants to confirm subtree invalidation", code="DESCENDANTS_CONFIRM_REQUIRED")
+                raise NarrativeControlError(
+                    "replan requires --descendants to confirm subtree invalidation",
+                    code="DESCENDANTS_CONFIRM_REQUIRED",
+                )
             affected = mark_replan(graph, str(args.node))
             write_json(graph_path, graph)
-            receipt = write_revision_receipt(root, graph, action="replan", node_ref=str(args.node), affected=affected)
-            emit({"ok": True, "action": action, "revision": graph.get("revision"), "affected_nodes": affected, "receipt_path": str(receipt)})
+            receipt = write_revision_receipt(
+                root, graph, action="replan", node_ref=str(args.node), affected=affected
+            )
+            emit(
+                {
+                    "ok": True,
+                    "action": action,
+                    "revision": graph.get("revision"),
+                    "affected_nodes": affected,
+                    "receipt_path": str(receipt),
+                }
+            )
             return 0
         except NarrativeControlError as exc:
             raise FilmError(f"{exc.code}: {exc}") from exc
-
-    if action == "project":
-        root_s = getattr(args, "root", None)
-        if not root_s:
-            raise FilmError("plan project requires --root")
-        root = Path(root_s).expanduser().resolve()
-        gpath = root / GRAPH_NAME
-        graph = read_json(gpath)
-        if not graph:
-            raise FilmError(f"missing {gpath} — run: aifilm plan run --root …")
-        force = bool(getattr(args, "force", False))
-        existing = read_json(root / "film-spec.json") or {}
-        has_shots = any(
-            isinstance(sc, dict) and sc.get("shots")
-            for sc in (existing.get("scenes") or [])
-        )
-        if has_shots and not force:
-            emit(
-                {
-                    "ok": False,
-                    "error": "film-spec already has shots; pass --force to overwrite",
-                }
-            )
-            return 1
-        norm = read_json(root / "receipts" / "story-normalize.json")
-        ready = graph_locked_for_projection(graph)
-        if not ready.get("ok"):
-            emit({"ok": False, "action": "project", "error": "graph is not ready for projection", "missing_scopes": ready.get("missing_scopes"), "semantic": ready.get("semantic")})
-            return 1
-        spec = project_graph_to_film_spec(graph, base_spec=existing, normalized=norm)
-        write_json(root / "film-spec.json", spec)
-        v = validate_graph(graph)
-        emit(
-            {
-                "ok": True,
-                "action": "project",
-                "path": str(root / "film-spec.json"),
-                "graph_ok": bool(v.get("ok")),
-                "shot_count": v.get("shot_count"),
-                "next": f'aifilm write-spec --root "{root}"',
-            }
-        )
-        return 0
-
-    if action == "status":
-        root_s = getattr(args, "root", None)
-        if not root_s:
-            raise FilmError("plan status requires --root")
-        emit(plan_status(Path(root_s)))
-        return 0
 
     raise FilmError(f"unknown plan action {action!r}")
 
@@ -3986,7 +4213,9 @@ def cmd_tts_ab(args: argparse.Namespace) -> int:
     """A/B TTS for one shot → receipts/tts-ab/ (does not change film-spec)."""
     from tts_ab import TTSAbError, run_tts_ab
 
-    backends = [b.strip() for b in str(getattr(args, "backends", "edge,voicebox")).split(",") if b.strip()]
+    backends = [
+        b.strip() for b in str(getattr(args, "backends", "edge,voicebox")).split(",") if b.strip()
+    ]
     try:
         man = run_tts_ab(
             Path(args.root).expanduser().resolve(),
@@ -3994,7 +4223,9 @@ def cmd_tts_ab(args: argparse.Namespace) -> int:
             backends=backends,
             voice=getattr(args, "voice", None),
             text=getattr(args, "text", None),
-            spec_path=Path(args.spec).expanduser().resolve() if getattr(args, "spec", None) else None,
+            spec_path=Path(args.spec).expanduser().resolve()
+            if getattr(args, "spec", None)
+            else None,
         )
     except TTSAbError as exc:
         raise FilmError(str(exc)) from exc
@@ -4068,9 +4299,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="aifilm_grok", description="ai-film-grok local control plane")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    doctor = sub.add_parser("doctor", help="Check tooling, locks, schema, backends, and security posture")
-    doctor.add_argument("--strict", action="store_true", help="Also fail on global security warnings")
-    sub.add_parser("lock-runtime", help="Fingerprint the current verified Python/FFmpeg/script runtime")
+    doctor = sub.add_parser(
+        "doctor", help="Check tooling, locks, schema, backends, and security posture"
+    )
+    doctor.add_argument(
+        "--strict", action="store_true", help="Also fail on global security warnings"
+    )
+    sub.add_parser(
+        "lock-runtime", help="Fingerprint the current verified Python/FFmpeg/script runtime"
+    )
 
     fls = sub.add_parser(
         "frw-lipsync",
@@ -4102,7 +4339,10 @@ def build_parser() -> argparse.ArgumentParser:
         "env-plate",
         help="FRW LTX T2V env/no-face plate (unlimited FRW) → clip + first keyframe",
     )
-    envp.add_argument("--prompt", required=True)
+    envp.add_argument("--prompt", required=False, default=None)
+    envp.add_argument(
+        "--prompt-file", default=None, help="Read environment prompt from a UTF-8 file"
+    )
     envp.add_argument("--root", default=None, help="Film root (optional register/receipts)")
     envp.add_argument("--shot-id", default=None)
     envp.add_argument("--no-wait", action="store_true")
@@ -4114,6 +4354,13 @@ def build_parser() -> argparse.ArgumentParser:
     envp.add_argument("--no-keyframe", action="store_true")
     envp.add_argument("--out-dir", default=None)
     envp.add_argument("--poll-timeout", type=float, default=240)
+
+    mp = sub.add_parser(
+        "motion-plan",
+        help="Compile one panel-animation shot into a deterministic motion plan",
+    )
+    mp.add_argument("--root", required=True)
+    mp.add_argument("--shot-id", required=True)
 
     goauth = sub.add_parser(
         "grok-oauth",
@@ -4217,14 +4464,18 @@ def build_parser() -> argparse.ArgumentParser:
         "capability",
         help="One-page readiness (TTS/BGM/lipsync/tools + optional FRW canary / i2v suggest)",
     )
-    cap.add_argument("--root", default=None, help="Film root (reads frw canary receipt + film-spec)")
+    cap.add_argument(
+        "--root", default=None, help="Film root (reads frw canary receipt + film-spec)"
+    )
     cap.add_argument(
         "--run-canary",
         action="store_true",
         help="Hit FRW API canary and write receipts/frw-key-capability.json (costs credits)",
     )
     cap.add_argument("--canary-wait", action="store_true", help="With --run-canary: poll ltx-t2v")
-    cap.add_argument("--canary-full", action="store_true", help="With --run-canary: full template probes")
+    cap.add_argument(
+        "--canary-full", action="store_true", help="With --run-canary: full template probes"
+    )
     cap.add_argument(
         "--suggest-i2v",
         action="store_true",
@@ -4260,6 +4511,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("status", help="Gate status")
     st.add_argument("--root", required=True)
+
+    pe = sub.add_parser("production-evidence", help="Read-only production evidence ledger")
+    pe.add_argument("--root", required=True)
+    pa = sub.add_parser("post-audit", help="Unified post-production audit")
+    pa.add_argument("--root", required=True)
+    caption_audit = sub.add_parser(
+        "caption-frame-audit",
+        help="Extract final-MP4 frames during subtitle cues for human readability review",
+    )
+    caption_audit.add_argument("--root", required=True)
+    caption_audit.add_argument("--max-frames", type=int, default=5)
+    caption_attest = sub.add_parser(
+        "caption-frame-attest",
+        help="Record human readability approval for current caption review frames",
+    )
+    caption_attest.add_argument("--root", required=True)
+    caption_attest.add_argument("--user-phrase", required=True)
 
     lintc = sub.add_parser(
         "lint-continuity",
@@ -4323,23 +4591,64 @@ def build_parser() -> argparse.ArgumentParser:
     rc.add_argument("--identity-approved", action="store_true")
     rc.add_argument("--motion-approved", action="store_true")
     rc.add_argument("--review-note")
-    rc.add_argument("--review-receipt", help="v1.6 approved review receipt (defaults to receipts/reviews/<shot>.json)")
+    rc.add_argument(
+        "--review-receipt",
+        help="v1.6 approved review receipt (defaults to receipts/reviews/<shot>.json)",
+    )
 
-    shot_review = sub.add_parser("review-shot", help="Create evidence-backed first/middle/last-frame director review for one clip")
+    shot_review = sub.add_parser(
+        "review-shot",
+        help="Create evidence-backed first/middle/last-frame director review for one clip",
+    )
     shot_review.add_argument("--root", required=True)
     shot_review.add_argument("--shot-id", required=True)
     shot_review.add_argument("--source", required=True)
-    shot_review.add_argument("--approve", action="store_true", help="Approve only if QA, 1–5 scores, and timestamp evidence all pass")
+    shot_review.add_argument(
+        "--approve",
+        action="store_true",
+        help="Approve only if QA, 1–5 scores, and timestamp evidence all pass",
+    )
     shot_review.add_argument("--reviewer", required=True)
     shot_review.add_argument("--notes", required=True)
     for dim in ("identity", "continuity", "composition", "motion", "narrative"):
-        shot_review.add_argument(f"--score-{dim}", type=int, choices=range(1, 6), required=True, dest=f"score_{dim}")
-    shot_review.add_argument("--evidence", action="append", default=[], help="Repeat dimension@seconds:note for every review dimension")
-    shot_review.add_argument("--reference", action="append", default=[], help="Optional reference asset path; repeatable")
+        shot_review.add_argument(
+            f"--score-{dim}", type=int, choices=range(1, 6), required=True, dest=f"score_{dim}"
+        )
+    shot_review.add_argument(
+        "--score-coitus",
+        type=int,
+        choices=range(1, 6),
+        required=False,
+        default=None,
+        dest="score_coitus",
+        help="Optional mute-frame intercourse readability 1-5 (adult max)",
+    )
+    shot_review.add_argument(
+        "--evidence",
+        action="append",
+        default=[],
+        help="Repeat dimension@seconds:note for every review dimension",
+    )
+    shot_review.add_argument(
+        "--performance-evidence",
+        action="append",
+        default=[],
+        help="Repeat kind@seconds:note (action_visible, trigger_visible, reaction_visible, dialogue_delivery, mouth_still)",
+    )
+    shot_review.add_argument(
+        "--reference", action="append", default=[], help="Optional reference asset path; repeatable"
+    )
 
-    review_contract = sub.add_parser("review-contract", help="Explicitly migrate a legacy film root to v1.6 review evidence gates")
-    review_contract_sub = review_contract.add_subparsers(dest="review_contract_action", required=True)
-    review_contract_migrate = review_contract_sub.add_parser("migrate", help="Require real shot reviews for historical approved clips")
+    review_contract = sub.add_parser(
+        "review-contract",
+        help="Explicitly migrate a legacy film root to v1.6 review evidence gates",
+    )
+    review_contract_sub = review_contract.add_subparsers(
+        dest="review_contract_action", required=True
+    )
+    review_contract_migrate = review_contract_sub.add_parser(
+        "migrate", help="Require real shot reviews for historical approved clips"
+    )
     review_contract_migrate.add_argument("--root", required=True)
 
     asb = sub.add_parser("assemble", help="Assemble silent film from timeline + clips")
@@ -4413,7 +4722,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     reenc.add_argument("--review-note", default=None)
 
-    fin = sub.add_parser("final", help="Render formal final: edge-tts VO + BGM + burned Chinese subs")
+    fin = sub.add_parser(
+        "final", help="Render formal final: edge-tts VO + BGM + burned Chinese subs"
+    )
     fin.add_argument("--root", required=True)
     fin.add_argument("--out-name", default="film_final.mp4")
     fin.add_argument("--transition-sec", type=float, default=None, help="Inter-shot xfade seconds")
@@ -4433,7 +4744,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["atempo", "legacy"],
         help="slot mode: atempo=VO speed to plate (default three-axis); legacy=old pad/stretch",
     )
-    fin.add_argument("--voice", default=None, help="edge voice or provider voice id; default comes from film-spec")
+    fin.add_argument(
+        "--voice",
+        default=None,
+        help="edge voice or provider voice id; default comes from film-spec",
+    )
     fin.add_argument(
         "--tts-backend",
         default=None,
@@ -4528,7 +4843,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Lip-sync OFF by default (Wav2Lip often warps faces). Use auto only when quality is acceptable.",
     )
     fin.add_argument("--sub-lead", type=float, default=0.08, help="Show subtitles early (seconds)")
-    fin.add_argument("--sub-max-unit", type=float, default=1.75, help="Max seconds per subtitle line")
+    fin.add_argument(
+        "--sub-max-unit", type=float, default=1.75, help="Max seconds per subtitle line"
+    )
     fin.add_argument("--sub-max-chars", type=int, default=14, help="Max Chinese chars per line")
     fin.add_argument(
         "--title-dur",
@@ -4651,7 +4968,96 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Comma-separated shot ids to attach to identity/style/motion/escalation fails (writes director_notes)",
     )
-    review.add_argument("--screening-evidence", action="append", default=[], help="v1.6: repeat dimension@seconds:note for each final scorecard dimension")
+    review.add_argument(
+        "--screening-evidence",
+        action="append",
+        default=[],
+        help="v1.6: repeat dimension@seconds:note for each final scorecard dimension",
+    )
+
+    performance_timeline = sub.add_parser(
+        "performance-timeline",
+        help="Compile checksum-bound per-shot performance evidence into a director timeline",
+    )
+    performance_timeline.add_argument("--root", required=True)
+
+    speech_performance_timing = sub.add_parser(
+        "speech-performance-timing",
+        help="Check measured dialogue duration against delivery evidence and reaction space",
+    )
+    speech_performance_timing.add_argument("--root", required=True)
+
+    audio_provenance = sub.add_parser(
+        "audio-provenance",
+        help="Bind dialogue rehearsal audio hashes to voice carrier and registered final MP4",
+    )
+    audio_provenance.add_argument("--root", required=True)
+    subtitle_alignment = sub.add_parser(
+        "subtitle-dialogue-alignment",
+        help="Check subtitle coverage and safe area for lipsync dialogue",
+    )
+    subtitle_alignment.add_argument("--root", required=True)
+    subtitle_boundaries = sub.add_parser(
+        "subtitle-cut-boundaries", help="Check subtitle cues against hard and Continue cuts"
+    )
+    subtitle_boundaries.add_argument("--root", required=True)
+    ledger = sub.add_parser(
+        "director-ledger", help="Build checksum-bound ledger of human-approved exceptions"
+    )
+    ledger.add_argument("--root", required=True)
+    autopilot = sub.add_parser(
+        "planning-autopilot", help="Show safe automatic planning steps and human lock points"
+    )
+    autopilot.add_argument("--root", required=True)
+    answer = sub.add_parser(
+        "planning-answer", help="Apply structured answers to open graph authoring fields only"
+    )
+    answer.add_argument("--root", required=True)
+    answer.add_argument(
+        "--answers-json",
+        required=True,
+        help='JSON list: [{"node_ref":"…","field":"…","value":"…"}]',
+    )
+    answer.add_argument("--dry-run", action="store_true")
+    answer.add_argument(
+        "--expected-transaction-id",
+        default=None,
+        help="Require the exact transaction_id returned by a prior dry-run",
+    )
+    history = sub.add_parser(
+        "planning-history", help="Show planning readiness progression and current blockers"
+    )
+    history.add_argument("--root", required=True)
+    prompt_budget = sub.add_parser(
+        "prompt-budget", help="Audit prompt-token estimates and repeated provider-bound lines"
+    )
+    prompt_budget.add_argument("--root", required=True)
+    prompt_budget.add_argument(
+        "--write", action="store_true", help="Write receipts/prompt-budget.json"
+    )
+    prompt_budget.add_argument(
+        "--max-estimated-tokens",
+        type=int,
+        default=None,
+        help="Set a review threshold; never rewrites prompts or approves compression",
+    )
+    compression_pilot = sub.add_parser(
+        "prompt-compression-pilot",
+        help="Write a hash-bound, evidence-required prompt-compression Pilot ledger",
+    )
+    compression_pilot.add_argument("--root", required=True)
+    compression_pilot.add_argument(
+        "--candidate-json",
+        required=True,
+        help="Root-contained JSON: source_line plus candidate prompt text for each Pilot shot",
+    )
+    compression_attest = sub.add_parser(
+        "prompt-compression-attest",
+        help="Bind candidate media/QA and existing human Pilot approval to a compression ledger",
+    )
+    compression_attest.add_argument("--root", required=True)
+    compression_attest.add_argument("--evidence-json", required=True)
+    compression_attest.add_argument("--user-phrase", required=True)
 
     dn = sub.add_parser(
         "director-notes",
@@ -4735,6 +5141,29 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--root", required=True)
     pf.add_argument("--strict", action="store_true", help="Also fail on soft warnings")
 
+    heat_p = sub.add_parser(
+        "heat",
+        help="Adult heat: check | vo-suggest | soften-log",
+    )
+    heat_sub = heat_p.add_subparsers(dest="heat_action", required=True)
+    heat_ck = heat_sub.add_parser(
+        "check",
+        help="One-page heat report (duration/wardrobe/VO/coitus/size/pose/montage)",
+    )
+    heat_ck.add_argument("--root", required=True)
+    heat_vo = heat_sub.add_parser(
+        "vo-suggest",
+        help="Suggest denser adult nar lines by heat_phase/coitus_beat",
+    )
+    heat_vo.add_argument("--root", required=True)
+    heat_vo.add_argument("--shot", default=None, help="Optional shot id")
+    heat_sf = heat_sub.add_parser(
+        "soften-log",
+        help="Write receipts/moderation_soften.json dual-track compensation (never lower heat)",
+    )
+    heat_sf.add_argument("--root", required=True)
+    heat_sf.add_argument("--note", default="", help="What was soft-moderated")
+
     si = sub.add_parser(
         "state-index",
         help="Checkpoint: state photos + keyframes + promote plan (fluid camera/joins)",
@@ -4768,7 +5197,9 @@ def build_parser() -> argparse.ArgumentParser:
     pr = pilot_sub.add_parser("report", help="Media + scorecard + approval status for pilot shots")
     pr.add_argument("--root", required=True)
     pr.add_argument("--shots", default="", help="Comma shot ids (default auto-pick)")
-    ps = pilot_sub.add_parser("score", help="Write receipts/pilot-scorecard.json (identity/style/motion)")
+    ps = pilot_sub.add_parser(
+        "score", help="Write receipts/pilot-scorecard.json (identity/style/motion)"
+    )
     ps.add_argument("--root", required=True)
     ps.add_argument("--shots", required=True)
     ps.add_argument("--reviewer", required=True)
@@ -4811,7 +5242,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Studio port (default 3002 HF / 3003 Remotion)",
     )
     cpv.add_argument("--no-open", action="store_true", help="Print URL only; do not open browser")
-    cpv.add_argument("--no-export", action="store_true", help="Do not auto export-compose if missing")
+    cpv.add_argument(
+        "--no-export", action="store_true", help="Do not auto export-compose if missing"
+    )
     cpv.add_argument("--foreground", action="store_true", help="Block instead of background server")
     cpv.add_argument("--force-new", action="store_true")
     cpv.add_argument("--stop", action="store_true", help="Stop background Studio (HF only)")
@@ -5002,9 +5435,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     g_der.add_argument("--root", required=True, help="Film root")
     g_der.add_argument("--no-write", action="store_true", help="Do not write drama-graph.json")
-    g_imp = graph_sub.add_parser("import", help="Explicitly import legacy film-spec into canonical drama-graph v2")
+    g_imp = graph_sub.add_parser(
+        "import", help="Explicitly import legacy film-spec into canonical drama-graph v2"
+    )
     g_imp.add_argument("--root", required=True, help="Film root")
-    g_proj = graph_sub.add_parser("project", help="Project locked canonical drama-graph into film-spec")
+    g_proj = graph_sub.add_parser(
+        "project", help="Project locked canonical drama-graph into film-spec"
+    )
     g_proj.add_argument("--root", required=True, help="Film root")
     g_proj.add_argument("--force", action="store_true", help="Overwrite existing film-spec shots")
     g_val = graph_sub.add_parser("validate", help="Validate drama-graph.json structure")
@@ -5031,6 +5468,10 @@ def build_parser() -> argparse.ArgumentParser:
     sk_list.add_argument("--phase", default=None, help="Filter by phase id (e.g. 1, 2)")
     sk_show = skill_sub.add_parser("show", help="Show one skill + contracts")
     sk_show.add_argument("--id", dest="id", required=True, help="skill_id e.g. image.animate")
+    sk_validate = skill_sub.add_parser("validate", help="Validate runtime input/output envelope")
+    sk_validate.add_argument("--skill-id", required=True)
+    sk_validate.add_argument("--payload-file", required=True)
+    sk_validate.add_argument("--direction", choices=("input", "output"), default="input")
 
     # Phase 3: story → beat/shot planning
     plan_p = sub.add_parser(
@@ -5038,7 +5479,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Story plan: normalize|run|validate|edit|lock|unlock|replan|project|status",
     )
     plan_sub = plan_p.add_subparsers(dest="plan_action", required=True)
-    p_norm = plan_sub.add_parser("normalize", help="story.normalize → receipts/story-normalize.json")
+    p_norm = plan_sub.add_parser(
+        "normalize", help="story.normalize → receipts/story-normalize.json"
+    )
     p_norm.add_argument("--root", default=None, help="Optional film root to write receipt")
     p_norm.add_argument("--text", default=None, help="Raw story / brief text")
     p_norm.add_argument("--file", default=None, help="Path to .txt/.md story")
@@ -5062,8 +5505,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Overwrite existing film-spec shots / locked bible seed",
     )
-    p_run.add_argument("--apply-film-spec", action="store_true", help="Also write a draft film-spec projection")
-    p_run.add_argument("--no-film-spec", action="store_true", help="Do not write film-spec (compatibility alias)")
+    p_run.add_argument(
+        "--apply-film-spec", action="store_true", help="Also write a draft film-spec projection"
+    )
+    p_run.add_argument(
+        "--no-film-spec", action="store_true", help="Do not write film-spec (compatibility alias)"
+    )
     p_run.add_argument(
         "--no-bible",
         action="store_true",
@@ -5074,7 +5521,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_proj.add_argument("--root", required=True)
     p_proj.add_argument("--force", action="store_true", help="Overwrite existing shots")
-    p_val = plan_sub.add_parser("validate", help="Validate story/beat/shot semantics and projection state")
+    p_val = plan_sub.add_parser(
+        "validate", help="Validate story/beat/shot semantics and projection state"
+    )
     p_val.add_argument("--root", required=True)
     p_val.add_argument("--strict", action="store_true")
     p_edit = plan_sub.add_parser("edit", help="Edit one unlocked narrative node")
@@ -5089,10 +5538,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_unlock.add_argument("--root", required=True)
     p_unlock.add_argument("--scope", choices=("story", "beats", "shots", "panels"), required=True)
     p_unlock.add_argument("--reason", required=True)
-    p_replan = plan_sub.add_parser("replan", help="Mark a node and descendants stale without deleting media")
+    p_replan = plan_sub.add_parser(
+        "replan", help="Mark a node and descendants stale without deleting media"
+    )
     p_replan.add_argument("--root", required=True)
     p_replan.add_argument("--node", required=True)
-    p_replan.add_argument("--descendants", action="store_true", help="Required explicit confirmation flag")
+    p_replan.add_argument(
+        "--descendants", action="store_true", help="Required explicit confirmation flag"
+    )
     p_st = plan_sub.add_parser("status", help="Plan + graph status for film root")
     p_st.add_argument("--root", required=True)
 
@@ -5139,6 +5592,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_frw_lipsync(args)
         if args.cmd == "env-plate":
             return cmd_env_plate(args)
+        if args.cmd == "motion-plan":
+            return cmd_motion_plan(args)
         if args.cmd == "grok-oauth":
             return cmd_grok_oauth(args)
         if args.cmd == "dispatch":
@@ -5159,6 +5614,24 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_init(args)
         if args.cmd == "status":
             return cmd_status(args)
+        if args.cmd == "production-evidence":
+            return cmd_production_evidence(args)
+        if args.cmd == "post-audit":
+            from post_audit import audit
+
+            report = audit(Path(args.root).expanduser().resolve())
+            emit(report)
+            return 0 if report.get("delivery_ready") else 1
+        if args.cmd == "caption-frame-audit":
+            from caption_frame_audit import build_caption_frame_audit
+
+            emit(build_caption_frame_audit(Path(args.root), max_frames=args.max_frames))
+            return 0
+        if args.cmd == "caption-frame-attest":
+            from caption_frame_audit import attest_caption_readability
+
+            emit(attest_caption_readability(Path(args.root), user_phrase=args.user_phrase))
+            return 0
         if args.cmd == "stage":
             return cmd_stage(args)
         if args.cmd == "write-spec":
@@ -5175,15 +5648,18 @@ def main(argv: list[str] | None = None) -> int:
             root = Path(args.root).expanduser().resolve()
             if args.bible_cmd == "init":
                 from scripts.visual_bible import load_bible, save_bible
+
                 bible = load_bible(root)
                 save_bible(root, bible)
                 emit({"ok": True, "msg": "Visual Bible initialized/migrated to v2"})
             elif args.bible_cmd == "lock":
                 from scripts.visual_bible import update_bible_state
+
                 update_bible_state(root, "Approved")
                 emit({"ok": True, "msg": "Visual Bible locked (Approved)"})
             elif args.bible_cmd == "state":
                 from scripts.visual_bible import update_bible_state
+
                 update_bible_state(root, args.set)
                 emit({"ok": True, "msg": f"Visual Bible state updated to {args.set}"})
             return 0
@@ -5201,12 +5677,114 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_final(args)
         if args.cmd == "review-final":
             return cmd_review_final(args)
+        if args.cmd == "performance-timeline":
+            from performance_timeline import build_performance_timeline
+
+            report = build_performance_timeline(Path(args.root))
+            emit(report)
+            return 0 if report["ok"] else 2
+        if args.cmd == "speech-performance-timing":
+            from speech_performance_timing import build_speech_performance_timing
+
+            report = build_speech_performance_timing(Path(args.root))
+            emit(report)
+            return 0 if report["ok"] else 2
+        if args.cmd == "audio-provenance":
+            from audio_provenance import build_audio_provenance
+
+            report = build_audio_provenance(Path(args.root))
+            emit(report)
+            return 0 if report["ok"] else 2
+        if args.cmd == "subtitle-dialogue-alignment":
+            from subtitle_dialogue_alignment import build_subtitle_dialogue_alignment
+
+            report = build_subtitle_dialogue_alignment(Path(args.root))
+            emit(report)
+            return 0 if report["ok"] else 2
+        if args.cmd == "subtitle-cut-boundaries":
+            from subtitle_cut_boundaries import build_subtitle_cut_boundaries
+
+            report = build_subtitle_cut_boundaries(Path(args.root))
+            emit(report)
+            return 0 if report["ok"] else 2
+        if args.cmd == "director-ledger":
+            from director_ledger import build_director_ledger
+
+            emit(build_director_ledger(Path(args.root)))
+            return 0
+        if args.cmd == "planning-autopilot":
+            from planning_autopilot import build_planning_autopilot
+
+            emit(build_planning_autopilot(Path(args.root)))
+            return 0
+        if args.cmd == "planning-answer":
+            from planning_autopilot import apply_authoring_answers
+
+            try:
+                answers = json.loads(args.answers_json)
+            except json.JSONDecodeError as exc:
+                raise FilmError(f"--answers-json must be valid JSON: {exc}") from exc
+            if not isinstance(answers, list):
+                raise FilmError("--answers-json must be a JSON list")
+            emit(
+                apply_authoring_answers(
+                    Path(args.root),
+                    answers,
+                    dry_run=bool(args.dry_run),
+                    expected_transaction_id=args.expected_transaction_id,
+                )
+            )
+            return 0
+        if args.cmd == "planning-history":
+            from planning_autopilot import planning_history_summary
+
+            emit(planning_history_summary(Path(args.root)))
+            return 0
+        if args.cmd == "prompt-budget":
+            from prompt_budget import prompt_budget_report
+
+            emit(
+                prompt_budget_report(
+                    Path(args.root),
+                    write=bool(args.write),
+                    max_estimated_tokens=args.max_estimated_tokens,
+                )
+            )
+            return 0
+        if args.cmd == "prompt-compression-pilot":
+            from prompt_compression_pilot import build_prompt_compression_pilot
+
+            candidate_path = safe_existing_file(
+                Path(args.root), args.candidate_json, field="prompt-compression candidate JSON"
+            )
+            candidate = read_json(candidate_path)
+            if not isinstance(candidate, dict):
+                raise FilmError("--candidate-json must be a JSON object")
+            emit(build_prompt_compression_pilot(Path(args.root), candidate))
+            return 0
+        if args.cmd == "prompt-compression-attest":
+            from prompt_compression_pilot import attest_prompt_compression_pilot
+
+            evidence_path = safe_existing_file(
+                Path(args.root), args.evidence_json, field="prompt-compression evidence JSON"
+            )
+            evidence = read_json(evidence_path)
+            if not isinstance(evidence, dict):
+                raise FilmError("--evidence-json must be a JSON object")
+            emit(
+                attest_prompt_compression_pilot(
+                    Path(args.root), evidence, user_phrase=args.user_phrase
+                )
+            )
+            return 0
         if args.cmd == "director-notes":
             return cmd_director_notes(args)
         if args.cmd == "next":
             return cmd_next(args)
         if args.cmd == "preflight":
             return cmd_preflight(args)
+        if args.cmd == "heat":
+            return cmd_heat(args)
         if args.cmd == "state-index":
             return cmd_state_index(args)
         if args.cmd == "pilot":

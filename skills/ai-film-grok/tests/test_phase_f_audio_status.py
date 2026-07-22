@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -47,18 +49,22 @@ def _minimal_spec(*, tts: str = "auto", tone: str = "色气·诱惑") -> dict:
     }
 
 
+@pytest.mark.slow
 class WriteSpecPinTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_storyteller_auto_becomes_edge(self) -> None:
         spec = _minimal_spec(tts="auto")
         validate_film_spec(spec, assign_missing_ids=False)
         self.assertEqual(spec["tts_backend"], "edge")
         self.assertTrue(any("edge" in n for n in (spec.get("_tts_notes") or [])))
 
+    @pytest.mark.slow
     def test_explicit_minimax_kept(self) -> None:
         spec = _minimal_spec(tts="minimax")
         validate_film_spec(spec, assign_missing_ids=False)
         self.assertEqual(spec["tts_backend"], "minimax")
 
+    @pytest.mark.slow
     def test_rnb_sidechain_injected(self) -> None:
         spec = _minimal_spec(tts="edge")
         validate_film_spec(spec, assign_missing_ids=False)
@@ -68,7 +74,9 @@ class WriteSpecPinTests(unittest.TestCase):
         self.assertGreaterEqual(float(sp["sidechain"]["release_ms"]), 700)
 
 
+@pytest.mark.slow
 class StatusAudioTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_status_audio_summary_from_spec_and_mix(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -111,7 +119,9 @@ class StatusAudioTests(unittest.TestCase):
             self.assertEqual(summary["loudness"]["integrated_lufs"], -16.0)
 
 
+@pytest.mark.slow
 class PreflightStorytellerSoftTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_soft_when_storyteller_minimax(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -134,7 +144,9 @@ class PreflightStorytellerSoftTests(unittest.TestCase):
             self.assertIn("tts_storyteller_not_edge", soft)
 
 
+@pytest.mark.slow
 class LoudnessProbeShapeTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_probe_missing_file_returns_none(self) -> None:
         self.assertIsNone(probe_mixed_loudness(Path("/no/such/mixed.wav")))
 

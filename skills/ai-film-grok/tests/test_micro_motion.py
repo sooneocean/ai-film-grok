@@ -52,7 +52,10 @@ class MicroMotionTests(unittest.TestCase):
             },
         }
         report = apply_coverage_defaults_to_shot(shot, dramatic_function="reaction")
-        self.assertTrue(report.get("micro_motion_injected") or "dsl.motion_micro_inject" in report.get("filled", []))
+        self.assertTrue(
+            report.get("micro_motion_injected")
+            or "dsl.motion_micro_inject" in report.get("filled", [])
+        )
         self.assertIn("blink", shot["dsl"]["motion"].lower())
 
     def test_write_spec_path_injects_via_validate_film_spec(self) -> None:

@@ -86,9 +86,7 @@ class VoiceTracksTest(unittest.TestCase):
         self.assertIn("breath", shot.get("_sfx_kinds_from_cues") or [])
 
     def test_offset_clamp(self) -> None:
-        off = compute_color_offset_sec(
-            offset_sec=-1, plate_sec=6.0, color_dur=1.0, vo_dur=4.0
-        )
+        off = compute_color_offset_sec(offset_sec=-1, plate_sec=6.0, color_dur=1.0, vo_dur=4.0)
         self.assertGreaterEqual(off, 0.0)
         self.assertLessEqual(off, 5.0)
 

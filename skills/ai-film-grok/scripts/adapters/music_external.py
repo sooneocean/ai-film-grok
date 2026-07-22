@@ -19,10 +19,10 @@ Place many royalty-free beds in assets/bgm/rnb/*.wav for pool rotation without A
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import subprocess
-import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -31,7 +31,11 @@ MIN_BYTES = 500
 
 
 def _load_config_env() -> None:
-    cfg = (Path(__file__).resolve().parents[2] / "config.env" if (Path(__file__).resolve().parents[2] / "config.env").is_file() else Path.home() / ".grok/skills/ai-film-grok/config.env")
+    cfg = (
+        Path(__file__).resolve().parents[2] / "config.env"
+        if (Path(__file__).resolve().parents[2] / "config.env").is_file()
+        else Path.home() / ".grok/skills/ai-film-grok/config.env"
+    )
     if not cfg.is_file():
         return
     for line in cfg.read_text(encoding="utf-8").splitlines():
@@ -95,19 +99,22 @@ def _http_generate(prompt: str, duration: float, mood: str, seed: int, out: Path
     # allow extra JSON merge from env
     extra = (os.environ.get("MUSIC_GEN_EXTRA_JSON") or "").strip()
     if extra:
-        try:
+        with contextlib.suppress(json.JSONDecodeError):
             payload.update(json.loads(extra))
-        except json.JSONDecodeError:
-            pass
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,
         method="POST",
-        headers={"Content-Type": "application/json", "Accept": "audio/wav, audio/mpeg, application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "audio/wav, audio/mpeg, application/json",
+        },
     )
     try:
-        with urllib.request.urlopen(req, timeout=float(os.environ.get("AIFILM_MUSIC_TIMEOUT") or 300)) as resp:
+        with urllib.request.urlopen(
+            req, timeout=float(os.environ.get("AIFILM_MUSIC_TIMEOUT") or 300)
+        ) as resp:
             ctype = (resp.headers.get("Content-Type") or "").lower()
             raw = resp.read()
     except urllib.error.HTTPError as exc:

@@ -31,7 +31,6 @@ import argparse
 import json
 import os
 import subprocess
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -48,7 +47,11 @@ POLL_MAX_SEC = 600
 
 
 def _load_config_env() -> None:
-    cfg = (Path(__file__).resolve().parents[2] / "config.env" if (Path(__file__).resolve().parents[2] / "config.env").is_file() else Path.home() / ".grok/skills/ai-film-grok/config.env")
+    cfg = (
+        Path(__file__).resolve().parents[2] / "config.env"
+        if (Path(__file__).resolve().parents[2] / "config.env").is_file()
+        else Path.home() / ".grok/skills/ai-film-grok/config.env"
+    )
     if not cfg.is_file():
         return
     for line in cfg.read_text(encoding="utf-8").splitlines():
@@ -63,9 +66,7 @@ def _load_config_env() -> None:
 
 def base_url() -> str:
     return (
-        os.environ.get("VOICEBOX_BASE_URL")
-        or os.environ.get("AIFILM_VOICEBOX_URL")
-        or DEFAULT_BASE
+        os.environ.get("VOICEBOX_BASE_URL") or os.environ.get("AIFILM_VOICEBOX_URL") or DEFAULT_BASE
     ).rstrip("/")
 
 
@@ -88,9 +89,7 @@ def default_language() -> str:
 
 def default_engine() -> str | None:
     eng = (
-        os.environ.get("VOICEBOX_ENGINE")
-        or os.environ.get("AIFILM_VOICEBOX_ENGINE")
-        or ""
+        os.environ.get("VOICEBOX_ENGINE") or os.environ.get("AIFILM_VOICEBOX_ENGINE") or ""
     ).strip()
     return eng or None
 
@@ -175,9 +174,7 @@ def resolve_profile_id(voice: str) -> tuple[str, str]:
     needle = (voice or default_profile()).strip()
     profiles = list_profiles()
     if not profiles:
-        raise SystemExit(
-            "voicebox has no voice profiles — open the app, create/clone one first"
-        )
+        raise SystemExit("voicebox has no voice profiles — open the app, create/clone one first")
     if not needle:
         # Prefer non-import default: first non-import profile
         for p in profiles:
@@ -201,9 +198,7 @@ def resolve_profile_id(voice: str) -> tuple[str, str]:
         p = hits[0]
         return str(p["id"]), str(p.get("name") or p["id"])
     names = ", ".join(f"{p.get('name')}({p.get('id')})" for p in profiles[:12])
-    raise SystemExit(
-        f"voicebox profile {needle!r} not found. Available: {names}"
-    )
+    raise SystemExit(f"voicebox profile {needle!r} not found. Available: {names}")
 
 
 def _looks_like_wav(data: bytes) -> bool:

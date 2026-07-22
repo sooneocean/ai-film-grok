@@ -1,0 +1,195 @@
+{
+  "title": "落锁加演",
+  "description": "成人办事剧脚手架：性爱时长≥20%、卸装不回穿、旁白荤梗、性交六拍、景别加压",
+  "aspect_ratio": "9:16",
+  "vo_mode": "storyteller",
+  "tts_backend": "edge",
+  "i2v_provider": "grok",
+  "heat_scale": "max",
+  "heat_phase_auto": true,
+  "sex_floor_strict": true,
+  "sex_wardrobe_strict": true,
+  "sex_vo_strict": true,
+  "sex_min_duration_ratio": 0.20,
+  "coitus_strict": false,
+  "size_ladder_strict": false,
+  "coitus_grammar": {
+    "enabled": true,
+    "mute_frame_test": true,
+    "beats": {
+      "entry": ["shot01"],
+      "undress": ["shot02"],
+      "union": ["shot03"],
+      "rhythm": ["shot04", "shot05"],
+      "lock": ["shot06"],
+      "finish": ["shot07"],
+      "hook": ["shot08"]
+    }
+  },
+  "director_intent": {
+    "logline": "展厅落锁后，她卸甲跨坐，把规矩办穿，只留下一句换你顶。",
+    "tone": "成人色气·办事完成·荤梗拉满",
+    "audience": "成人短片观众",
+    "emotional_arc": ["落锁", "卸甲", "结合节奏", "办完钩子"],
+    "theme": "边界失效后的诚实欲望",
+    "cast": ["heroine", "partner"],
+    "taboos": ["全装跨坐当办事", "纯文艺灯暗句", "脱完回穿"]
+  },
+  "scenes": [
+    {
+      "title": "加演",
+      "summary": "从落锁到办穿的一条压迫链",
+      "shots": [
+        {
+          "id": "shot01",
+          "dramatic_function": "hook",
+          "heat_phase": "setup",
+          "coitus_beat": "entry",
+          "wardrobe_state": "full",
+          "duration_sec": 5,
+          "nar": "展厅落锁。今晚只加演你一场。",
+          "dsl": {
+            "subject": "adult heroine full stage costume",
+            "action": "pin partner to door latch close entry",
+            "motion": "hand on latch door close weight step-in",
+            "camera": { "shot_size": "medium full", "angle": "eye level" },
+            "visible_change": "door locks space narrows",
+            "wardrobe_state": "full",
+            "coitus_beat": "entry"
+          }
+        },
+        {
+          "id": "shot02",
+          "dramatic_function": "sensory",
+          "heat_phase": "foreplay",
+          "coitus_beat": "undress",
+          "wardrobe_state": "partial",
+          "duration_sec": 6,
+          "nar": "肩带一滑。卸甲半裸，规矩失效。",
+          "dsl": {
+            "subject": "adult heroine partial undress bare shoulders",
+            "action": "removes armor dress slides off shoulders undress",
+            "motion": "straps slide dress peels bare skin expands",
+            "camera": { "shot_size": "medium", "angle": "eye level" },
+            "visible_change": "armor discarded bare skin",
+            "wardrobe_state": "partial",
+            "start_pose": "shoulder straps already slipping",
+            "coitus_beat": "undress"
+          }
+        },
+        {
+          "id": "shot03",
+          "dramatic_function": "action",
+          "heat_phase": "act",
+          "coitus_beat": "union",
+          "wardrobe_state": "undressed",
+          "duration_sec": 8,
+          "nar": "跨坐落稳。整根吃进，锁住。",
+          "dsl": {
+            "subject": "adult heroine undressed bare skin",
+            "action": "straddle-seat hips settle pelvis-lock skin-to-skin",
+            "motion": "straddle-seat hips settle pelvis-lock weight down",
+            "camera": { "shot_size": "medium", "angle": "slight low" },
+            "visible_change": "hips lock contact readable",
+            "wardrobe_state": "undressed",
+            "start_pose": "already undressed bare from prior",
+            "coitus_beat": "union"
+          }
+        },
+        {
+          "id": "shot04",
+          "dramatic_function": "action",
+          "heat_phase": "act",
+          "coitus_beat": "rhythm",
+          "wardrobe_state": "undressed",
+          "duration_sec": 8,
+          "nar": "沉腰吃进。再顶，磨到发软。",
+          "dsl": {
+            "subject": "adult heroine undressed bare skin",
+            "action": "hips-sink grind-forward thrust-rhythm twice",
+            "motion": "hips-sink twice grind-forward thrust-rhythm locked camera",
+            "camera": { "shot_size": "medium", "angle": "slight low" },
+            "visible_change": "two visible hip sinks",
+            "wardrobe_state": "undressed",
+            "start_pose": "already undressed straddle locked",
+            "coitus_beat": "rhythm"
+          }
+        },
+        {
+          "id": "shot05",
+          "dramatic_function": "action",
+          "heat_phase": "act",
+          "coitus_beat": "rhythm",
+          "wardrobe_state": "bare",
+          "duration_sec": 8,
+          "nar": "再沉腰。节奏是她给的，办穿前奏。",
+          "dsl": {
+            "subject": "adult heroine bare skin",
+            "action": "hips-sink grind deeper thrust-rhythm clutch fabric",
+            "motion": "hips-sink grind-forward clutch fabric",
+            "camera": { "shot_size": "close-up", "angle": "slight low" },
+            "visible_change": "deeper rhythm face and hip",
+            "wardrobe_state": "bare",
+            "start_pose": "already bare from prior peak undress",
+            "coitus_beat": "rhythm"
+          }
+        },
+        {
+          "id": "shot06",
+          "dramatic_function": "sensory",
+          "heat_phase": "act",
+          "coitus_beat": "lock",
+          "wardrobe_state": "bare",
+          "duration_sec": 6,
+          "nar": "腿锁腰。攥床单，再夹紧。",
+          "dsl": {
+            "subject": "adult limbs bare",
+            "action": "leg-wrap-waist clutch sheets micro-tremor",
+            "motion": "leg-wrap-waist clutch sheets micro-tremor",
+            "camera": { "shot_size": "close-up insert hands fabric", "angle": "eye level" },
+            "visible_change": "fingers white on fabric",
+            "wardrobe_state": "bare",
+            "coitus_beat": "lock"
+          }
+        },
+        {
+          "id": "shot07",
+          "dramatic_function": "action",
+          "heat_phase": "climax",
+          "coitus_beat": "finish",
+          "wardrobe_state": "bare",
+          "duration_sec": 8,
+          "nar": "失声办穿。背一弓，腿软。",
+          "dsl": {
+            "subject": "adult heroine bare finish face",
+            "action": "arch-finish residual-tremor wet eyes",
+            "motion": "arch-finish residual-tremor static hold",
+            "camera": { "shot_size": "close-up", "angle": "eye level" },
+            "visible_change": "spine arch then softens",
+            "wardrobe_state": "bare",
+            "coitus_beat": "finish"
+          }
+        },
+        {
+          "id": "shot08",
+          "dramatic_function": "afterglow",
+          "heat_phase": "afterglow",
+          "coitus_beat": "hook",
+          "wardrobe_state": "bare",
+          "duration_sec": 5,
+          "nar": "贴耳：下一场——换你顶。",
+          "dsl": {
+            "subject": "adult pair bare residual",
+            "action": "ear whisper residual hold next round",
+            "motion": "lean to ear residual pull-back hold",
+            "camera": { "shot_size": "medium", "angle": "eye level" },
+            "visible_change": "unfinished invitation",
+            "wardrobe_state": "bare",
+            "start_pose": "already bare after climax",
+            "coitus_beat": "hook"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -12,7 +12,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import director_review  # noqa: E402
 import edit_policy  # noqa: E402
-from film_spec import FilmSpecError, validate_film_spec  # noqa: E402
+from film_spec import validate_film_spec  # noqa: E402
 
 
 class BeatCoverageDefaultsTests(unittest.TestCase):
@@ -85,9 +85,7 @@ class DirectorScorecardTests(unittest.TestCase):
 
     def test_legacy_review_without_scorecard_fails_gate_check(self) -> None:
         self.assertFalse(
-            director_review.scorecard_is_complete_and_passing(
-                {"approved": True, "notes": "lgtm"}
-            )
+            director_review.scorecard_is_complete_and_passing({"approved": True, "notes": "lgtm"})
         )
         self.assertTrue(
             director_review.scorecard_is_complete_and_passing(

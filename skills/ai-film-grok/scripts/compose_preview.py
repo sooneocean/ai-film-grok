@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +33,7 @@ class ComposePreviewError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def log(msg: str) -> None:
@@ -407,7 +407,9 @@ def compose_preview_remotion(
         "background": background,
         "started_at": utc_now(),
         "receipt": str(receipt),
-        "stop_hint": f"kill the remotion studio process (pid={pid})" if pid else "stop studio from terminal",
+        "stop_hint": f"kill the remotion studio process (pid={pid})"
+        if pid
+        else "stop studio from terminal",
         "log_tail": log_tail,
         "message": (
             None
@@ -424,9 +426,7 @@ def ensure_hyperframes_dir(root: Path, *, export_if_missing: bool) -> Path:
     if index.is_file():
         return hf
     if not export_if_missing:
-        raise ComposePreviewError(
-            f"missing {index} — run export-compose or pass --export"
-        )
+        raise ComposePreviewError(f"missing {index} — run export-compose or pass --export")
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from export_composition import ComposeExportError, export_composition
 
@@ -440,7 +440,9 @@ def ensure_hyperframes_dir(root: Path, *, export_if_missing: bool) -> Path:
 
 
 def preview_status(hf_dir: Path) -> dict[str, Any]:
-    cmd = hyperframes_preview_cmd(hf_dir, port=None, background=False, open_browser=False, status=True)
+    cmd = hyperframes_preview_cmd(
+        hf_dir, port=None, background=False, open_browser=False, status=True
+    )
     proc = run_preview_command(cmd, timeout=60)
     text = (proc.stdout or "") + (proc.stderr or "")
     url = prefer_studio_url(extract_urls(text))
@@ -454,7 +456,9 @@ def preview_status(hf_dir: Path) -> dict[str, Any]:
 
 
 def preview_stop(hf_dir: Path) -> dict[str, Any]:
-    cmd = hyperframes_preview_cmd(hf_dir, port=None, background=False, open_browser=False, stop=True)
+    cmd = hyperframes_preview_cmd(
+        hf_dir, port=None, background=False, open_browser=False, stop=True
+    )
     proc = run_preview_command(cmd, timeout=60)
     text = (proc.stdout or "") + (proc.stderr or "")
     return {"ok": proc.returncode == 0, "returncode": proc.returncode, "raw_tail": text[-800:]}
@@ -496,7 +500,9 @@ def compose_preview(
     # Already running?
     st = preview_status(hf_dir)
     if st.get("running") and st.get("url") and not force_new:
-        opened = open_system_browser(str(st["url"])) if open_browser else {"ok": False, "skipped": True}
+        opened = (
+            open_system_browser(str(st["url"])) if open_browser else {"ok": False, "skipped": True}
+        )
         receipt = write_preview_receipt(
             root,
             url=str(st["url"]),
@@ -677,7 +683,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False, indent=2))
         return 2
     except subprocess.TimeoutExpired:
-        print(json.dumps({"ok": False, "error": "preview command timed out"}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {"ok": False, "error": "preview command timed out"}, ensure_ascii=False, indent=2
+            )
+        )
         return 2
 
 

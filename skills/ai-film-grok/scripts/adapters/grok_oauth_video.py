@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 _SCRIPTS = Path(__file__).resolve().parents[1]
@@ -24,6 +25,34 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 from grok_oauth import GrokOAuthError, video_generate  # noqa: E402
+
+
+def _retry_video_generate(prompt, **kwargs):
+    """Retry video_generate with exponential backoff on 429 rate limits."""
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return video_generate(prompt, **kwargs)
+        except GrokOAuthError as exc:
+            msg = str(exc).lower()
+            if "429" in msg or "rate limit" in msg or "too many requests" in msg:
+                if attempt < max_attempts:
+                    wait = 2**attempt  # 2s, 4s
+                    print(
+                        json.dumps(
+                            {
+                                "ok": False,
+                                "error": str(exc),
+                                "retry_after": wait,
+                                "attempt": attempt,
+                            },
+                            ensure_ascii=False,
+                        )
+                    )
+                    time.sleep(wait)
+                    continue
+            raise
+    raise GrokOAuthError("video_generate: max retries exhausted")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -46,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         prompt = "subtle natural motion, cinematic, keep identity"
 
     try:
-        result = video_generate(
+        result = _retry_video_generate(
             prompt,
             image=args.image,
             out=Path(args.out),

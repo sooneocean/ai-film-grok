@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -113,12 +114,14 @@ class MediaQATests(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls.tmp.cleanup()
 
+    @pytest.mark.slow
     def test_static_video_decodes_but_fails_motion_gate(self) -> None:
         qa = analyze_media(self.static, require_audio=False, require_motion=True)
         self.assertTrue(qa["decode_ok"])
         self.assertFalse(qa["motion_ok"])
         self.assertFalse(qa["ok"])
 
+    @pytest.mark.slow
     def test_real_motion_video_passes_decode_duration_and_motion(self) -> None:
         qa = analyze_media(self.motion, require_audio=False, require_motion=True)
         self.assertTrue(qa["ok"], json.dumps(qa, indent=2))
@@ -126,6 +129,7 @@ class MediaQATests(unittest.TestCase):
         self.assertGreater(qa["decoded_frames"], 20)
         self.assertGreater(qa["motion_score"], 1.0)
 
+    @pytest.mark.slow
     def test_static_slideshow_cannot_pass_on_a_single_large_cut(self) -> None:
         qa = analyze_media(self.slideshow, require_audio=False, require_motion=True)
         self.assertGreater(qa["motion_score"], 1.0)
@@ -133,6 +137,7 @@ class MediaQATests(unittest.TestCase):
         self.assertFalse(qa["motion_ok"])
         self.assertFalse(qa["ok"])
 
+    @pytest.mark.slow
     def test_formal_final_requires_audio(self) -> None:
         without_audio = analyze_media(self.motion, require_audio=True, require_motion=True)
         with_audio = analyze_media(self.final, require_audio=True, require_motion=True)
@@ -140,6 +145,7 @@ class MediaQATests(unittest.TestCase):
         self.assertIn("audio stream", " ".join(without_audio["errors"]))
         self.assertTrue(with_audio["ok"], json.dumps(with_audio, indent=2))
 
+    @pytest.mark.slow
     def test_clip_approval_requires_endpoint_manual_identity_and_technical_motion(self) -> None:
         qa = analyze_media(self.motion, require_audio=False, require_motion=True)
         valid = {

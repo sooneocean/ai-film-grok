@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import json
 import mimetypes
 import os
@@ -37,10 +38,9 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 DEFAULT_AUTH_PATH = Path.home() / ".grok" / "auth.json"
 DEFAULT_API_BASE = "https://api.x.ai/v1"
@@ -66,15 +66,15 @@ class GrokOAuthError(RuntimeError):
 
 
 def auth_path() -> Path:
-    raw = (os.environ.get("AIFILM_GROK_AUTH_PATH") or os.environ.get("GROK_AUTH_JSON") or "").strip()
+    raw = (
+        os.environ.get("AIFILM_GROK_AUTH_PATH") or os.environ.get("GROK_AUTH_JSON") or ""
+    ).strip()
     return Path(raw).expanduser() if raw else DEFAULT_AUTH_PATH
 
 
 def api_base() -> str:
     return (
-        os.environ.get("AIFILM_GROK_API_BASE")
-        or os.environ.get("XAI_BASE_URL")
-        or DEFAULT_API_BASE
+        os.environ.get("AIFILM_GROK_API_BASE") or os.environ.get("XAI_BASE_URL") or DEFAULT_API_BASE
     ).rstrip("/")
 
 
@@ -168,10 +168,8 @@ def _save_auth_entry(storage_key: str, entry: dict[str, Any], path: Path | None 
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.chmod(tmp, 0o600)
     os.replace(tmp, p)
-    try:
+    with contextlib.suppress(OSError):
         os.chmod(p, 0o600)
-    except OSError:
-        pass
 
 
 def refresh_access_token(entry: dict[str, Any]) -> dict[str, Any]:
@@ -184,7 +182,9 @@ def refresh_access_token(entry: dict[str, Any]) -> dict[str, Any]:
     # discover token endpoint
     token_url = f"{issuer}/oauth2/token"
     try:
-        with urllib.request.urlopen(f"{issuer}/.well-known/openid-configuration", timeout=15) as resp:
+        with urllib.request.urlopen(
+            f"{issuer}/.well-known/openid-configuration", timeout=15
+        ) as resp:
             conf = json.loads(resp.read().decode())
             if conf.get("token_endpoint"):
                 token_url = str(conf["token_endpoint"])
@@ -222,8 +222,8 @@ def refresh_access_token(entry: dict[str, Any]) -> dict[str, Any]:
     if expires_in:
         try:
             exp_ts = time.time() + float(expires_in)
-            entry["expires_at"] = datetime.fromtimestamp(exp_ts, tz=timezone.utc).isoformat().replace(
-                "+00:00", "Z"
+            entry["expires_at"] = (
+                datetime.fromtimestamp(exp_ts, tz=UTC).isoformat().replace("+00:00", "Z")
             )
         except (TypeError, ValueError):
             pass
@@ -874,16 +874,8 @@ def tts_speak(
     if not (text or "").strip():
         raise GrokOAuthError("tts text is empty")
     tok = get_access_token()
-    voice_id = (
-        voice_id
-        or os.environ.get("AIFILM_GROK_TTS_VOICE")
-        or DEFAULT_TTS_VOICE
-    )
-    language = (
-        language
-        or os.environ.get("AIFILM_GROK_TTS_LANGUAGE")
-        or DEFAULT_TTS_LANGUAGE
-    )
+    voice_id = voice_id or os.environ.get("AIFILM_GROK_TTS_VOICE") or DEFAULT_TTS_VOICE
+    language = language or os.environ.get("AIFILM_GROK_TTS_LANGUAGE") or DEFAULT_TTS_LANGUAGE
     body: dict[str, Any] = {
         "text": text,
         "voice_id": voice_id,
@@ -976,7 +968,9 @@ def main(argv: list[str] | None = None) -> int:
     ch.add_argument("--prompt", required=True)
     ch.add_argument("--model", default=None)
     ch.add_argument("--system", default=None)
-    ch.add_argument("--json", action="store_true", dest="json_mode", help="response_format=json_object")
+    ch.add_argument(
+        "--json", action="store_true", dest="json_mode", help="response_format=json_object"
+    )
 
     im = sub.add_parser("image", help="Text-to-image (prefer in-session image_gen)")
     im.add_argument("--prompt", required=True)

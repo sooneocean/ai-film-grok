@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""One-page adult heat gate report: duration / wardrobe / VO / coitus / size ladder."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from edit_policy import lint_heat_arc
+from util import read_json
+
+
+def _flat_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    shots: list[dict[str, Any]] = []
+    for sc in spec.get("scenes") or []:
+        if not isinstance(sc, dict):
+            continue
+        for sh in sc.get("shots") or []:
+            if isinstance(sh, dict):
+                shots.append(sh)
+    return shots
+
+
+def heat_check(root: Path) -> dict[str, Any]:
+    root = Path(root).expanduser().resolve()
+    spec = read_json(root / "film-spec.json") or {}
+    if not spec:
+        return {"ok": False, "error": "missing film-spec.json", "root": str(root)}
+    shots = _flat_shots(spec)
+    intent = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+    audience = intent.get("audience_profile") or spec.get("audience_profile")
+    heat_scale = spec.get("heat_scale")
+    cg = spec.get("coitus_grammar") if isinstance(spec.get("coitus_grammar"), dict) else None
+    craft = spec.get("edit_craft")
+    craft_list = craft if isinstance(craft, list) else ([craft] if craft else None)
+    rep = lint_heat_arc(
+        shots,
+        heat_scale=str(heat_scale) if heat_scale else None,
+        intimacy_min_ratio=spec.get("intimacy_min_ratio"),
+        setup_max_ratio=spec.get("setup_max_ratio"),
+        sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
+        audience_profile=str(audience) if audience else None,
+        advise=True,
+        coitus_grammar=cg,
+        spice_level=spec.get("spice_level"),
+        edit_craft=craft_list,
+    )
+    sfx_n = sum(
+        1
+        for sh in shots
+        if isinstance(sh, dict) and (sh.get("sound_cues") or sh.get("_sfx_kinds_from_cues"))
+    )
+    sp = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else {}
+    plan_sfx = sum(
+        1 for e in (sp.get("events") or []) if isinstance(e, dict) and e.get("type") == "sfx_accent"
+    )
+    sex_sfx = sum(1 for e in (sp.get("events") or []) if isinstance(e, dict) and e.get("sex_sfx"))
+    gates = {
+        "sex_duration": {
+            "ratio": rep.get("sex_duration_ratio"),
+            "floor": rep.get("sex_duration_floor"),
+            "ok": "HEAT_SEX_DURATION_LOW" not in (rep.get("codes") or []),
+        },
+        "wardrobe": {
+            "ok": (rep.get("wardrobe") or {}).get("ok"),
+            "codes": (rep.get("wardrobe") or {}).get("codes"),
+        },
+        "vo_spice": {
+            "ok": (rep.get("vo_spice") or {}).get("ok"),
+            "spice_ratio": (rep.get("vo_spice") or {}).get("spice_ratio"),
+            "spice_level": rep.get("spice_level"),
+            "too_mild": (rep.get("vo_spice") or {}).get("too_mild_shots"),
+        },
+        "vo_motion": rep.get("vo_motion") or {},
+        "poses": rep.get("poses") or {},
+        "montage": rep.get("montage") or {},
+        "coitus": rep.get("coitus") or {},
+        "size_ladder": rep.get("size_ladder") or {},
+        "sfx_shots": sfx_n,
+        "sound_plan_accents": plan_sfx,
+        "sex_sfx_accents": sex_sfx,
+    }
+    hard_codes = [
+        c
+        for c in (rep.get("codes") or [])
+        if c.startswith("HEAT_") or c.startswith("COITUS_") or c.startswith("SIZE_")
+    ]
+    return {
+        "ok": bool(rep.get("ok")),
+        "root": str(root),
+        "heat_scale": heat_scale,
+        "audience_profile": audience,
+        "shot_count": len(shots),
+        "sex_duration_ratio": rep.get("sex_duration_ratio"),
+        "codes": rep.get("codes"),
+        "warning_count": rep.get("warning_count"),
+        "gates": gates,
+        "hard_relevant_codes": hard_codes,
+        "strict_flags": {
+            "sex_floor_strict": spec.get("sex_floor_strict"),
+            "sex_wardrobe_strict": spec.get("sex_wardrobe_strict"),
+            "sex_vo_strict": spec.get("sex_vo_strict"),
+            "coitus_strict": spec.get("coitus_strict"),
+            "size_ladder_strict": spec.get("size_ladder_strict"),
+        },
+        "spice_level": rep.get("spice_level") or spec.get("spice_level"),
+        "line": (
+            f"heat={heat_scale} spice={rep.get('spice_level') or spec.get('spice_level')} "
+            f"sex={rep.get('sex_duration_ratio')} "
+            f"wardrobe_ok={(rep.get('wardrobe') or {}).get('ok')} "
+            f"vo_ok={(rep.get('vo_spice') or {}).get('ok')} "
+            f"coitus_ok={(rep.get('coitus') or {}).get('ok')} "
+            f"size_ok={(rep.get('size_ladder') or {}).get('ok')} "
+            f"pose_u={(rep.get('poses') or {}).get('unique')} "
+            f"sfx={sfx_n}/{plan_sfx}sex={sex_sfx} "
+            f"codes={','.join((rep.get('codes') or [])[:6]) or 'none'}"
+        ),
+    }
+
+
+def heat_vo_suggest(
+    root: Path,
+    *,
+    shot_id: str | None = None,
+) -> dict[str, Any]:
+    """Suggest stronger adult nar lines for a shot or all act shots."""
+    from edit_policy import infer_heat_phase, resolve_coitus_beat, suggest_vo_lines
+
+    root = Path(root).expanduser().resolve()
+    spec = read_json(root / "film-spec.json") or {}
+    shots = _flat_shots(spec)
+    spice = str(spec.get("spice_level") or "explicit")
+    out: list[dict[str, Any]] = []
+    for sh in shots:
+        sid = str(sh.get("id") or "")
+        if shot_id and sid != shot_id:
+            continue
+        ph = infer_heat_phase(sh)
+        cb = resolve_coitus_beat(sh)
+        if shot_id or ph in {"act", "climax", "foreplay", "setup", "afterglow"}:
+            lines = suggest_vo_lines(heat_phase=ph, coitus_beat=cb, spice_level=spice)
+            out.append(
+                {
+                    "id": sid,
+                    "heat_phase": ph,
+                    "coitus_beat": cb,
+                    "current_nar": sh.get("nar"),
+                    "suggestions": lines,
+                }
+            )
+    return {
+        "ok": True,
+        "root": str(root),
+        "spice_level": spice,
+        "shots": out,
+        "note": "Copy a suggestion into film-spec nar; re-run write-spec / heat check",
+    }

@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -18,7 +20,9 @@ def _write(root: Path, name: str, obj: dict) -> None:
     (root / name).write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+@pytest.mark.slow
 class PreflightTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_hard_on_loop_risk_and_ecchi_dark(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -73,6 +77,7 @@ class PreflightTests(unittest.TestCase):
             self.assertIn("ecchi_dark_bgm", codes)
             self.assertFalse(report["hard_ok"])
 
+    @pytest.mark.slow
     def test_soft_compose_preview_when_clips_complete(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -128,11 +133,16 @@ class PreflightTests(unittest.TestCase):
             soft_codes = {i["code"] for i in report["soft"]}
             self.assertIn("compose_preview_recommended", soft_codes)
 
+    @pytest.mark.slow
     def test_soft_pilot_and_tts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "receipts").mkdir()
-            _write(root, "manifest.json", {"schema_version": 1, "gates": {}, "clips": {}, "outputs": {}})
+            _write(
+                root,
+                "manifest.json",
+                {"schema_version": 1, "gates": {}, "clips": {}, "outputs": {}},
+            )
             _write(root, "style-bible.json", {"locked": True, "identity_lock": "halo"})
             _write(
                 root,

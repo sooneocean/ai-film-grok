@@ -7,19 +7,10 @@ or empty stub cannot impersonate delivery.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
-
-def _read_json(path: Path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return raw if isinstance(raw, dict) else None
+from util import read_json
 
 
 def _present(path: Path) -> bool:
@@ -44,20 +35,20 @@ def classify_evidence(root: Path) -> dict[str, Any]:
         "timeline": _present(root / "timeline.json"),
         "continuity_chain_doc": _present(root / "continuity_chain.md"),
     }
-    spec = _read_json(root / "film-spec.json") or {}
+    spec = read_json(root / "film-spec.json") or {}
     if isinstance(spec.get("sound_plan"), dict) and spec["sound_plan"]:
         intent["sound_plan"] = True
     if isinstance(spec.get("transition_intents"), list) and spec["transition_intents"]:
         intent["transition_intents"] = True
-    style = _read_json(root / "style-bible.json") or {}
+    style = read_json(root / "style-bible.json") or {}
     intent["style_locked"] = bool(style.get("locked"))
 
     # --- executed (machine produced artifacts with substance) ---
-    mix = _read_json(receipts / "mix_report.json") if receipts.is_dir() else None
-    tts_reh = _read_json(receipts / "tts-rehearsal.json") if receipts.is_dir() else None
-    preview = _read_json(receipts / "compose-preview.json") if receipts.is_dir() else None
-    queue = _read_json(receipts / "media-queue.json") if receipts.is_dir() else None
-    man = _read_json(root / "manifest.json") or {}
+    mix = read_json(receipts / "mix_report.json") if receipts.is_dir() else None
+    tts_reh = read_json(receipts / "tts-rehearsal.json") if receipts.is_dir() else None
+    preview = read_json(receipts / "compose-preview.json") if receipts.is_dir() else None
+    queue = read_json(receipts / "media-queue.json") if receipts.is_dir() else None
+    man = read_json(root / "manifest.json") or {}
     outputs = man.get("outputs") if isinstance(man.get("outputs"), dict) else {}
     final_rec = outputs.get("final_film") if isinstance(outputs.get("final_film"), dict) else {}
     silent_rec = outputs.get("silent_film") if isinstance(outputs.get("silent_film"), dict) else {}
@@ -72,9 +63,7 @@ def classify_evidence(root: Path) -> dict[str, Any]:
         if rec.get("sha256") and rec.get("duration_sec"):
             return True
         qa = rec.get("technical_qa")
-        if isinstance(qa, dict) and qa.get("ok") is True:
-            return True
-        return False
+        return bool(isinstance(qa, dict) and qa.get("ok") is True)
 
     executed: dict[str, Any] = {
         "class": "executed",
@@ -103,9 +92,11 @@ def classify_evidence(root: Path) -> dict[str, Any]:
     }
 
     # --- human review (must not be agent self-approval alone) ---
-    pilot = _read_json(receipts / "pilot-approval.json") if receipts.is_dir() else None
-    pilot_score = _read_json(receipts / "pilot-scorecard.json") if receipts.is_dir() else None
-    final_review = outputs.get("final_review") if isinstance(outputs.get("final_review"), dict) else None
+    pilot = read_json(receipts / "pilot-approval.json") if receipts.is_dir() else None
+    pilot_score = read_json(receipts / "pilot-scorecard.json") if receipts.is_dir() else None
+    final_review = (
+        outputs.get("final_review") if isinstance(outputs.get("final_review"), dict) else None
+    )
     try:
         from production_gates import pilot_is_user_approved
 
@@ -185,7 +176,9 @@ def classify_evidence(root: Path) -> dict[str, Any]:
         "shots": intent.get("film_spec") and intent.get("style_locked"),
         "media": executed.get("media_queue") or executed.get("approved_clip_count", 0) > 0,
         "selects": craft_receipts["selects_report"] or executed.get("approved_clip_count", 0) > 0,
-        "rough": craft_receipts["rough_cut"] or executed.get("silent_film") or executed.get("final_film"),
+        "rough": craft_receipts["rough_cut"]
+        or executed.get("silent_film")
+        or executed.get("final_film"),
         "verified": human.get("final_review_approved") and executed.get("final_film"),
     }
 

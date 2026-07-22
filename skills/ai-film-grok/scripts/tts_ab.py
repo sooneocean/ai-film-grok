@@ -11,9 +11,11 @@ from __future__ import annotations
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from util import read_json
 
 AUDIO_DIR_REL = "receipts/tts-ab"
 MANIFEST_NAME = "manifest.json"
@@ -24,17 +26,7 @@ class TTSAbError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise TTSAbError(f"cannot read {path}: {exc}") from exc
-    if not isinstance(raw, dict):
-        raise TTSAbError(f"{path} must be a JSON object")
-    return raw
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _shot_nar(spec: dict[str, Any], shot_id: str) -> tuple[str, str]:
@@ -76,7 +68,7 @@ def run_tts_ab(
     if str(scripts) not in sys.path:
         sys.path.insert(0, str(scripts))
 
-    from tts_backend import probe, synthesize, TTSError  # type: ignore
+    from tts_backend import TTSError, probe, synthesize  # type: ignore
 
     sp = Path(spec_path).expanduser().resolve() if spec_path else (root / "film-spec.json")
     nar = (text or "").strip()
@@ -84,7 +76,7 @@ def run_tts_ab(
     if not nar:
         if not sp.is_file():
             raise TTSAbError(f"film-spec missing: {sp} (or pass --text)")
-        spec = _read_json(sp)
+        spec = read_json(sp) or {}
         nar, default_voice = _shot_nar(spec, shot_id)
         if not use_voice:
             use_voice = default_voice
@@ -109,8 +101,10 @@ def run_tts_ab(
         }
         ready_map = info.get("ready") or info.get("backends") or {}
         # edge always "ready" if import ok
-        is_ready = bool(ready_map.get(be_l)) if be_l != "edge" else bool(
-            (info.get("backends") or {}).get("edge", True)
+        is_ready = (
+            bool(ready_map.get(be_l))
+            if be_l != "edge"
+            else bool((info.get("backends") or {}).get("edge", True))
         )
         if be_l == "voicebox":
             is_ready = bool(info.get("voicebox_ok") or (info.get("backends") or {}).get("voicebox"))
@@ -121,9 +115,8 @@ def run_tts_ab(
             continue
         if not is_ready:
             entry["status"] = "skip"
-            entry["error"] = (
-                f"backend {be_l!r} not ready"
-                + (f": {info.get('voicebox_error')}" if be_l == "voicebox" else "")
+            entry["error"] = f"backend {be_l!r} not ready" + (
+                f": {info.get('voicebox_error')}" if be_l == "voicebox" else ""
             )
             results.append(entry)
             continue

@@ -4,25 +4,17 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
+from util import read_json
 
 
 def build_selects_report(root: Path, *, write_receipt: bool = True) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
-    spec = _read_json(root / "film-spec.json")
-    man = _read_json(root / "manifest.json")
+    spec = read_json(root / "film-spec.json") or {}
+    man = read_json(root / "manifest.json") or {}
     clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
     stills = man.get("stills") if isinstance(man.get("stills"), dict) else {}
     shots = spec.get("shots") if isinstance(spec.get("shots"), list) else []
@@ -68,7 +60,7 @@ def build_selects_report(root: Path, *, write_receipt: bool = True) -> dict[str,
         "ok": planned == 0 or (approved >= planned and missing == 0),
         "kind": "ai-film-selects-report",
         "schema_version": 1,
-        "at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "root": str(root),
         "planned": planned,
         "approved": approved,

@@ -146,7 +146,9 @@ def probe() -> dict[str, Any]:
         "musetalk": bool(
             mt
             and mt_trust.get("ok")
-            and ((mt / "aifilm_infer.py").is_file() or (mt / "scripts" / "aifilm_infer.py").is_file())
+            and (
+                (mt / "aifilm_infer.py").is_file() or (mt / "scripts" / "aifilm_infer.py").is_file()
+            )
         ),
         "wav2lip": bool(
             w2
@@ -195,7 +197,9 @@ def resolve_backend(requested: str) -> str:
         return ready[0] if ready else "off"
     if req == "require":
         if not ready:
-            raise LipSyncError("lipsync required but no backend ready (see lipsync_backend.py doctor)")
+            raise LipSyncError(
+                "lipsync required but no backend ready (see lipsync_backend.py doctor)"
+            )
         return ready[0]
     if req not in ("external", "musetalk", "wav2lip"):
         raise LipSyncError(f"Unknown backend {req}")
@@ -282,6 +286,7 @@ def run_wav2lip(video: Path, audio: Path, out: Path, root: Path) -> None:
     log(f"lipsync wav2lip: {' '.join(cmd)}")
     proc = subprocess.run(
         cmd,
+        timeout=60,
         cwd=str(root),
         capture_output=True,
         text=True,
@@ -318,13 +323,16 @@ def run_musetalk(video: Path, audio: Path, out: Path, root: Path) -> None:
             log(f"lipsync musetalk wrapper: {' '.join(cmd)}")
             proc = subprocess.run(
                 cmd,
+                timeout=60,
                 cwd=str(root),
                 capture_output=True,
                 text=True,
                 env=minimal_subprocess_env(),
             )
             if proc.returncode != 0:
-                raise LipSyncError(f"musetalk wrapper failed: {(proc.stderr or proc.stdout)[:2000]}")
+                raise LipSyncError(
+                    f"musetalk wrapper failed: {(proc.stderr or proc.stdout)[:2000]}"
+                )
             if not out.is_file():
                 raise LipSyncError("musetalk wrapper produced no output")
             return
@@ -404,9 +412,7 @@ def should_lipsync_shot(shot: dict[str, Any]) -> bool:
         return True
     # title keywords
     title = str(shot.get("title") or "").lower()
-    if any(k in title for k in ("joke", "punch", "talk", "讲", "口", "对镜")):
-        return True
-    return False
+    return bool(any(k in title for k in ("joke", "punch", "talk", "讲", "口", "对镜")))
 
 
 def main(argv: list[str] | None = None) -> int:

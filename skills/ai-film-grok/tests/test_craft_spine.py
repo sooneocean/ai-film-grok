@@ -21,9 +21,10 @@ class CraftSpineTests(unittest.TestCase):
             root = Path(tmp)
             (root / "brief.json").write_text('{"title":"t"}\n', encoding="utf-8")
             craft = detect_craft_stage(root)
-            self.assertIn(craft["craft_stage"], {
-                "idea", "story", "beats", "shots", "media", "selects", "rough", "verified"
-            })
+            self.assertIn(
+                craft["craft_stage"],
+                {"idea", "story", "beats", "shots", "media", "selects", "rough", "verified"},
+            )
             self.assertEqual(craft["stage_total"], 8)
             rep = craft_status_report(root)
             self.assertTrue(rep["ok"])

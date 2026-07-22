@@ -63,9 +63,7 @@ class SfxAccentTests(unittest.TestCase):
             "bed": True,
             "events": [{"type": "sfx_accent", "shot_id": "shot01", "kind": "chime"}],
         }
-        out = inject_auto_sfx_if_empty(
-            plan, [{"id": "shot01", "dramatic_function": "hook"}]
-        )
+        out = inject_auto_sfx_if_empty(plan, [{"id": "shot01", "dramatic_function": "hook"}])
         assert out is not None
         self.assertEqual(len(out["events"]), 1)
         self.assertEqual(out["events"][0]["kind"], "chime")
@@ -81,9 +79,7 @@ class SfxAccentTests(unittest.TestCase):
         )
         assert out is not None
         self.assertGreaterEqual(len(out["events"]), 2)
-        expanded = expand_sound_events(
-            out, shot_starts={"s1": 1.5, "s2": 7.5}, total_duration=20.0
-        )
+        expanded = expand_sound_events(out, shot_starts={"s1": 1.5, "s2": 7.5}, total_duration=20.0)
         accents = [e for e in expanded["applied_events"] if e["type"] == "sfx_accent"]
         self.assertEqual(len(accents), 2)
         # whoosh at shot start; reaction chime has offset
@@ -92,9 +88,7 @@ class SfxAccentTests(unittest.TestCase):
 
     def test_auto_sfx_false_skips(self) -> None:
         plan = {"mood": "rnb", "bed": True, "events": [], "auto_sfx": False}
-        out = inject_auto_sfx_if_empty(
-            plan, [{"id": "s1", "dramatic_function": "hook"}]
-        )
+        out = inject_auto_sfx_if_empty(plan, [{"id": "s1", "dramatic_function": "hook"}])
         assert out is not None
         self.assertEqual(out["events"], [])
 

@@ -1,0 +1,32 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "E402",  # CLI/test modules deliberately amend sys.path before local imports
+    "B008",  # do not perform function calls in argument defaults
+    "B007",  # readable loop indices are retained where iteration context matters
+    "B904",  # legacy exception messages intentionally preserve original context
+    "SIM102",  # use a single if statement instead of nested if
+    "SIM103",  # explicit boolean branches can carry director-policy commentary
+    "SIM112",  # compatibility examples may read legacy lowercase environment names
+    "SIM115",  # detached preview process owns and closes its log handle
+    "SIM117",  # nested test contexts retain assertion and patch scope readability
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B017", "S101"]
+"scripts/adapters/*.py" = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+testpaths = ["tests"]

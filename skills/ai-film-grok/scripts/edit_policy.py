@@ -211,7 +211,6 @@ def suggest_viewpoint(
                 return "ots"
             return "reaction_to" if fn == "reaction" else "ots"
 
-
     if fn == "sensory":
         return "insert_object"
     if fn == "reaction":
@@ -287,9 +286,7 @@ def lint_character_stance(
             continue
         dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
         vp = str(dsl.get("viewpoint") or sh.get("viewpoint") or "").strip().lower()
-        foc = normalize_focal_character(
-            dsl.get("focal_character") or sh.get("focal_character")
-        )
+        foc = normalize_focal_character(dsl.get("focal_character") or sh.get("focal_character"))
         viewpoints.append(vp or "objective")
         focals.append(foc)
 
@@ -308,8 +305,7 @@ def lint_character_stance(
         reaction_idx = [
             i
             for i, sh in enumerate(shots)
-            if isinstance(sh, dict)
-            and str(sh.get("dramatic_function") or "").lower() == "reaction"
+            if isinstance(sh, dict) and str(sh.get("dramatic_function") or "").lower() == "reaction"
         ]
         if reaction_idx and all(focals[i] == focals[0] for i in reaction_idx):
             codes.append("FOCAL_STANCE_FLAT")
@@ -343,6 +339,7 @@ def lint_character_stance(
         "viewpoint_set": sorted(set(viewpoints)),
         "focal_set": sorted(unique_focal),
     }
+
 
 # Motion validation
 FORBIDDEN_MOTION_PATTERNS = (
@@ -478,9 +475,7 @@ def plan_stretch(
     max_freeze = MAX_FREEZE_PAD_NO_LOOP_SEC if forbid_loop else MAX_FREEZE_PAD_SEC
 
     if forbid_loop:
-        return _setpts_pad_plan(
-            src_dur, target, ratio, max_freeze=max_freeze, forbid_loop=True
-        )
+        return _setpts_pad_plan(src_dur, target, ratio, max_freeze=max_freeze, forbid_loop=True)
 
     if ratio > LOOP_STRETCH_RATIO:
         return _loop_plan(src_dur, target, ratio)
@@ -521,9 +516,7 @@ def normalize_transition_sec(value: object | None) -> float:
     except (TypeError, ValueError) as exc:
         raise PolicyError("transition_sec must be a number") from exc
     if sec < MIN_TRANSITION_SEC or sec > MAX_TRANSITION_SEC:
-        raise PolicyError(
-            f"transition_sec must be in [{MIN_TRANSITION_SEC}, {MAX_TRANSITION_SEC}]"
-        )
+        raise PolicyError(f"transition_sec must be in [{MIN_TRANSITION_SEC}, {MAX_TRANSITION_SEC}]")
     return sec
 
 
@@ -703,7 +696,11 @@ def suggest_edit_craft(
     if next_b in {"action", "climax"}:
         if cross_scene:
             return "smash_cut"
-        if chain in {"continue", "match", "match_cut", "byte"} or cut_on in {"action", "mid-action", "mid_motion"}:
+        if chain in {"continue", "match", "match_cut", "byte"} or cut_on in {
+            "action",
+            "mid-action",
+            "mid_motion",
+        }:
             return "cut_on_action"
         if flu == "punchy":
             return "smash_cut"
@@ -719,7 +716,9 @@ def suggest_edit_craft(
     # smash/insert/montage still map to intent=hard — no dissolve on byte seams.
     if chain in {"continue", "match", "match_cut", "byte"}:
         if next_b == "afterglow":
-            return "cut_on_action" if cut_on in {"mid_motion", "mid-action", "action"} else "match_cut"
+            return (
+                "cut_on_action" if cut_on in {"mid_motion", "mid-action", "action"} else "match_cut"
+            )
         if prev_b == "action" and next_b == "reaction":
             return "smash_cut"
         if prev_b == "action" and next_b == "action":
@@ -870,9 +869,7 @@ def edit_crafts_to_styles(crafts: list[str], *, soft_i_start: int = 0) -> list[s
             styles.append("fade")
             continue
         if craft == "whip_soft":
-            styles.append(
-                ("hblur", "smoothleft", "smoothright", "smoothup")[soft_i % 4]
-            )
+            styles.append(("hblur", "smoothleft", "smoothright", "smoothup")[soft_i % 4])
             soft_i += 1
         elif craft == "mood_hold":
             styles.append(_STYLE_HOLD_ROTATION[i % len(_STYLE_HOLD_ROTATION)])
@@ -1195,15 +1192,15 @@ def resolve_join_use_ts(
             raise PolicyError(
                 f"join_intents length must be {n - 1} for {n} segments; got {len(join_intents)}"
             )
-        intents = [normalize_transition_intent(x, field=f"join_intents[{i}]") for i, x in enumerate(join_intents)]
+        intents = [
+            normalize_transition_intent(x, field=f"join_intents[{i}]")
+            for i, x in enumerate(join_intents)
+        ]
     use_ts: list[float] = []
     cursor = durs[0]
     for i in range(1, n):
         base = intent_to_base_sec(intents[i - 1], default_sec)
-        if base <= 0:
-            use_t = 0.0
-        else:
-            use_t = _join_use_t(base, cursor, durs[i])
+        use_t = 0.0 if base <= 0 else _join_use_t(base, cursor, durs[i])
         use_ts.append(use_t)
         cursor = cursor + durs[i] - use_t
     return use_ts, intents
@@ -1287,9 +1284,7 @@ def segment_timeline(
         use_ts = []
         intents = []
     else:
-        use_ts, intents = resolve_join_use_ts(
-            durs, default_sec=t, join_intents=join_intents
-        )
+        use_ts, intents = resolve_join_use_ts(durs, default_sec=t, join_intents=join_intents)
 
     starts = [0.0]
     cursor = durs[0]
@@ -1357,9 +1352,7 @@ def xfade_output_duration(
     if not segment_durs:
         return 0.0
     return float(
-        segment_timeline(segment_durs, transition_sec, join_intents=join_intents)[
-            "output_duration"
-        ]
+        segment_timeline(segment_durs, transition_sec, join_intents=join_intents)["output_duration"]
     )
 
 
@@ -1453,9 +1446,9 @@ def build_xfade_filter_graph(
         "n_inputs": n,
         "transition": default_style,
         "transition_sec": float(transition_sec),
-        "method": "mixed" if "hard" in methods and "soft" in methods else (
-            "xfade" if "soft" in methods else "hard_concat"
-        ),
+        "method": "mixed"
+        if "hard" in methods and "soft" in methods
+        else ("xfade" if "soft" in methods else "hard_concat"),
     }
 
 
@@ -1517,7 +1510,9 @@ def build_acrossfade_filter_graph(
 
     parts: list[str] = []
     for i in range(n_inputs):
-        parts.append(f"[{i}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a{i}]")
+        parts.append(
+            f"[{i}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a{i}]"
+        )
     prev = "a0"
     for i in range(1, n_inputs):
         out = f"ax{i}"
@@ -1572,6 +1567,7 @@ def i2v_motion_templates() -> dict[str, str]:
 
     Primary body/prop verb first for hook/approach/action; micro fillers last.
     Avoid multi-action thrash that warps faces. See lessons-2026-07-17-vo-motion-link.
+    Adult coitus keys (union/rhythm/…) are for heat_phase=act|climax — not soft defaults.
     """
     return {
         "idle_closeup": (
@@ -1592,7 +1588,7 @@ def i2v_motion_templates() -> dict[str, str]:
         ),
         "afterglow": (
             "hold then micro push-in, soft smile micro-move, rim light flicker, "
-            "hair wind, breath, idle not speaking"
+            "hair wind, residual-tremor breath, idle not speaking"
         ),
         "hook": (
             "one establishing body or prop action (hand on latch / door close / turn), "
@@ -1604,8 +1600,7 @@ def i2v_motion_templates() -> dict[str, str]:
             "shallow focus drift, idle not speaking"
         ),
         "reaction": (
-            "slow push-in on eyes, subtle flinch, blush micro-move, breath hitch, "
-            "idle not speaking"
+            "slow push-in on eyes, subtle flinch, blush micro-move, breath hitch, idle not speaking"
         ),
         "action": (
             "single readable body action first (unhook, belt pull, lean-in, hand extend), "
@@ -1615,7 +1610,101 @@ def i2v_motion_templates() -> dict[str, str]:
             "gentle continuous pan, light flicker, transitional look, soft handheld, "
             "idle not speaking"
         ),
+        # --- Adult coitus grammar motion (heat act/climax · 2026-07-22) ---
+        "undress_slide": (
+            "primary: straps slide off shoulders, dress/armor peels down torso once, "
+            "bare skin expands, Keep first-frame clothing direction only more undressed, "
+            "smooth track with hands, breath hitch, idle not speaking"
+        ),
+        "entry_pin": (
+            "primary: pin partner to seat/bed, weight drop, pelvis aim, mount-settle start, "
+            "low-angle lean-stop, fabric clutch, breath, idle not speaking"
+        ),
+        "union_settle": (
+            "primary: straddle-seat hips settle into pelvis-lock, weight fully down once, "
+            "thighs clamp, camera locked slight low, breath hitch, idle not speaking"
+        ),
+        "rhythm_hips": (
+            "primary: hips-sink twice with grind-forward thrust-rhythm, pelvis readable, "
+            "locked camera or micro rock with body, clutch fabric, breath, idle not speaking"
+        ),
+        "lock_clutch": (
+            "primary: leg-wrap-waist lock, fingers clutch sheets/flesh, micro-tremor squeeze, "
+            "ecu_hold on hands or hip line, idle not speaking"
+        ),
+        "finish_arch": (
+            "primary: arch-finish spine curve, residual-tremor, wet eyes, body softens after peak, "
+            "static hold then micro breath, idle not speaking"
+        ),
+        "hook_whisper": (
+            "primary: lean to ear, residual afterglow hold, soft pull-back, "
+            "whisper posture not speaking lips sealed, idle not speaking"
+        ),
     }
+
+
+# Coitus beat → preferred motion template key
+COITUS_BEAT_MOTION_KEY: dict[str, str] = {
+    "entry": "entry_pin",
+    "union": "union_settle",
+    "rhythm": "rhythm_hips",
+    "lock": "lock_clutch",
+    "finish": "finish_arch",
+    "hook": "hook_whisper",
+    "undress": "undress_slide",
+}
+
+# Act-phase pose verbs that pass Mute Frame / coitus readability (X4)
+_COITUS_READABLE_MARKERS: tuple[str, ...] = (
+    "straddle",
+    "straddle-seat",
+    "hips-sink",
+    "hips sink",
+    "grind",
+    "grind-forward",
+    "mount",
+    "mount-settle",
+    "pelvis",
+    "pelvis-lock",
+    "thrust",
+    "thrust-rhythm",
+    "leg-wrap",
+    "leg wrap",
+    "clutch",
+    "arch-finish",
+    "arch finish",
+    "residual-tremor",
+    "skin-to-skin",
+    "skin to skin",
+    "沉腰",
+    "跨坐",
+    "骑",
+    "顶",
+    "磨",
+    "锁腰",
+    "锁腿",
+    "办穿",
+    "吃进",
+    "结合",
+    "骨盆",
+    "咬合",
+)
+# Soft poses that must NOT be the only act language
+_COITUS_PSEUDO_ONLY: tuple[str, ...] = (
+    "soft lean",
+    "gentle hug",
+    "eye contact only",
+    "shoulder touch",
+    "sit beside",
+    "牵手",
+    "对视",
+    "拥抱",
+    "轻靠",
+)
+
+COITUS_BEATS = frozenset({"entry", "union", "rhythm", "lock", "finish", "hook", "undress"})
+# Six-beat coverage required for hardcore / coitus_strict (undress optional extra)
+COITUS_REQUIRED_BEATS = ("entry", "union", "rhythm", "lock", "finish", "hook")
 
 
 # dramatic_function → default coverage (shot_size + motion + composition)
@@ -1690,9 +1779,7 @@ def coverage_defaults_for_beat(dramatic_function: str) -> dict[str, str]:
     """Map beat role to default shot_size, angle, framing + motion (storyteller-safe)."""
     fn = (dramatic_function or "").strip().lower()
     if fn not in BEAT_COVERAGE_DEFAULTS:
-        raise PolicyError(
-            f"unknown dramatic_function for coverage defaults: {dramatic_function!r}"
-        )
+        raise PolicyError(f"unknown dramatic_function for coverage defaults: {dramatic_function!r}")
     templates = i2v_motion_templates()
     row = BEAT_COVERAGE_DEFAULTS[fn]
     key = row["motion_key"]
@@ -1705,6 +1792,56 @@ def coverage_defaults_for_beat(dramatic_function: str) -> dict[str, str]:
         "motion_key": key,
         "motion": motion,
     }
+
+
+def coverage_defaults_for_heat(
+    dramatic_function: str,
+    *,
+    heat_phase: str | None = None,
+    coitus_beat: str | None = None,
+) -> dict[str, str]:
+    """Coverage defaults with adult heat override for act/climax coitus beats."""
+    base = coverage_defaults_for_beat(dramatic_function)
+    ph = (heat_phase or "").strip().lower() or None
+    cb = (coitus_beat or "").strip().lower() or None
+    templates = i2v_motion_templates()
+    if cb in COITUS_BEAT_MOTION_KEY:
+        key = COITUS_BEAT_MOTION_KEY[cb]
+        base["motion_key"] = key
+        base["motion"] = templates.get(key) or base["motion"]
+        if cb in {"union", "rhythm", "entry"}:
+            base["shot_size"] = "medium"
+            base["angle"] = "slight low"
+            base["framing"] = (
+                "vertical 9:16 pelvis and thighs readable, hips contact, "
+                "full head + headroom, safe framing no cropping, weight down"
+            )
+        elif cb in {"lock", "finish"}:
+            base["shot_size"] = "close-up"
+            base["angle"] = "eye level"
+        elif cb == "undress":
+            base["shot_size"] = "medium full"
+            base["angle"] = "eye level"
+        base["heat_phase"] = ph or ""
+        base["coitus_beat"] = cb
+        return base
+    if ph in {"act", "climax"}:
+        key = "rhythm_hips" if ph == "act" else "finish_arch"
+        base["motion_key"] = key
+        base["motion"] = templates.get(key) or base["motion"]
+        base["shot_size"] = "medium" if ph == "act" else "close-up"
+        base["angle"] = "slight low" if ph == "act" else "eye level"
+        base["framing"] = (
+            "vertical 9:16 coitus-readable body, pelvis or finish reaction, "
+            "full head + headroom, safe framing no cropping"
+        )
+        base["heat_phase"] = ph
+    elif ph == "foreplay":
+        key = "undress_slide"
+        base["motion_key"] = key
+        base["motion"] = templates.get(key) or base["motion"]
+        base["heat_phase"] = ph
+    return base
 
 
 # Beats that often produce low motion_score on quiet close-ups — force micro cues.
@@ -1778,7 +1915,13 @@ def inject_micro_motion_cues(
         out = inject_camera_axis_phrase(out, camera_axis)
 
     if fn in {"hook", "approach", "action"}:
-        out = out.replace("soft lean", "lean hard").replace("gentle sway", "decisive motion").replace("soft breath", "sharp breath").replace("fingers slowly", "fingers snap").replace("hair drifts", "hair whips")
+        out = (
+            out.replace("soft lean", "lean hard")
+            .replace("gentle sway", "decisive motion")
+            .replace("soft breath", "sharp breath")
+            .replace("fingers slowly", "fingers snap")
+            .replace("hair drifts", "hair whips")
+        )
 
     return out
 
@@ -1801,15 +1944,37 @@ def apply_coverage_defaults_to_shot(
     Explicit author values always win for shot_size/angle/framing/viewpoint/focal.
     Motion may receive micro-cue + rotating camera_axis injection.
     Character stance (focal/viewpoint/look_axis) elevates multi-POV cinema.
+    When heat_phase/coitus_beat set, prefer adult coitus motion templates.
     Returns a report of what was filled / injected.
     """
-    defaults = coverage_defaults_for_beat(dramatic_function)
+    heat_phase = (
+        str(shot.get("heat_phase") or (shot.get("dsl") or {}).get("heat_phase") or "")
+        .strip()
+        .lower()
+        or None
+    )
+    coitus_beat = (
+        str(shot.get("coitus_beat") or (shot.get("dsl") or {}).get("coitus_beat") or "")
+        .strip()
+        .lower()
+        or None
+    )
+    defaults = coverage_defaults_for_heat(
+        dramatic_function,
+        heat_phase=heat_phase,
+        coitus_beat=coitus_beat,
+    )
     filled: list[str] = []
     injected = False
     dsl = shot.get("dsl")
     if not isinstance(dsl, dict):
         dsl = {}
         shot["dsl"] = dsl
+    if heat_phase and not dsl.get("heat_phase"):
+        dsl["heat_phase"] = heat_phase
+    if coitus_beat and not dsl.get("coitus_beat"):
+        dsl["coitus_beat"] = coitus_beat
+        shot["coitus_beat"] = coitus_beat
 
     # --- Character stance (focal / viewpoint / look_axis) ---
     author_focal = dsl.get("focal_character") or shot.get("focal_character")
@@ -1903,9 +2068,7 @@ def apply_coverage_defaults_to_shot(
         if _is_mouth_primary_only(motion):
             pass
         else:
-            new_motion = inject_micro_motion_cues(
-                motion, dramatic_function, camera_axis=axis
-            )
+            new_motion = inject_micro_motion_cues(motion, dramatic_function, camera_axis=axis)
             if new_motion != motion.strip():
                 dsl["motion"] = new_motion
                 injected = True
@@ -1993,9 +2156,7 @@ def apply_coverage_defaults_to_shot(
 # unless heat_arc_strict.
 
 HEAT_SCALES = frozenset({"soft", "medium", "hot", "max"})
-HEAT_PHASES = frozenset(
-    {"setup", "foreplay", "act", "climax", "afterglow", "bridge"}
-)
+HEAT_PHASES = frozenset({"setup", "foreplay", "act", "climax", "afterglow", "bridge"})
 INTIMACY_PHASES = frozenset({"foreplay", "act", "climax"})
 # Sex / intercourse beats only (NOT foreplay) — user KPI: 「性爱片段」
 SEX_PHASES = frozenset({"act", "climax"})
@@ -2008,12 +2169,112 @@ EXTREME_INTIMACY_FLOOR = 0.30
 EXTREME_SETUP_CEILING = 0.75
 # Product floor: act+climax duration share of total plate (duration_sec weighted)
 # heat_scale=max → default hard at write-spec (sex_floor_strict default True)
-DEFAULT_SEX_DURATION_FLOOR = 0.20
+# max adult product floor (v1.10 · raised from 0.20 so act+climax dominate)
+DEFAULT_SEX_DURATION_FLOOR = 0.30
 # hot soft floor (warning only)
 HOT_SEX_DURATION_FLOOR = 0.15
 # hardcore_male / 尺度太小 target (metrics + advise; not auto-hard unless set)
 HARDCORE_SEX_DURATION_TARGET = 0.40
 DEFAULT_SHOT_DURATION_SEC = 6.0
+
+# spice_level: how dirty VO must be (v1.10)
+SPICE_LEVELS = frozenset({"suggestive", "explicit", "extreme"})
+# extreme requires denser sex verbs / body nouns — dual-entendre alone is too mild
+_NAR_EXTREME_MARKERS: tuple[str, ...] = (
+    "沉腰",
+    "顶弄",
+    "顶撞",
+    "再顶",
+    "吃进",
+    "办穿",
+    "办完",
+    "跨坐",
+    "骑",
+    "插",
+    "入",
+    "泄",
+    "射",
+    "高潮",
+    "穴",
+    "肏",
+    "操",
+    "干穿",
+    "吞",
+    "更深",
+    "锁腰",
+    "腿软",
+    "失声",
+    "磨",
+    "thrust",
+    "grind",
+    "mount",
+    "straddle",
+    "climax",
+    "hips-sink",
+    "整根",
+    "内射",
+    "中出",
+    "灌满",
+    "喷",
+)
+# dual-entendre only — counts as spice but TOO_MILD under extreme
+_NAR_MILD_ONLY_MARKERS: tuple[str, ...] = (
+    "加演",
+    "加练",
+    "补课",
+    "作业",
+    "练习",
+    "规矩",
+    "认输",
+    "落锁",
+    "门闩",
+    "下一场",
+    "未完",
+    "诚实",
+    "夜色",
+    "灯",
+)
+
+# sex_pose catalog (suggestive names · multi-pose variety)
+SEX_POSES = frozenset(
+    {
+        "straddle",
+        "cowgirl",
+        "reverse_cowgirl",
+        "missionary_pin",
+        "from_behind",
+        "standing_lift",
+        "lotus",
+        "edge_oral",
+        "lap_grind",
+        "wall_pin",
+        "prone_bone",
+        "side_entry",
+    }
+)
+COITUS_BEAT_DEFAULT_POSE: dict[str, str] = {
+    "entry": "wall_pin",
+    "undress": "lap_grind",
+    "union": "straddle",
+    "rhythm": "cowgirl",
+    "lock": "lotus",
+    "finish": "missionary_pin",
+    "hook": "side_entry",
+}
+
+# hardcore montage craft spine (n-1 joins)
+HARDCORE_CRAFT_SPINE: tuple[str, ...] = (
+    "whip_soft",
+    "insert_cut",
+    "cut_on_action",
+    "smash_cut",
+    "montage_jump",
+    "montage_jump",
+    "insert_cut",
+    "cut_on_action",
+    "smash_cut",
+    "mood_hold",
+)
 
 # Wardrobe ladder for sex (办事必须卸甲/脱衣 · 2026-07-21)
 # full/armored = 登场定妆；partial = 失序半脱；undressed/bare = 办事层裸露可读
@@ -2404,9 +2665,7 @@ def normalize_wardrobe_state(value: object | None) -> str | None:
     }
     s = aliases.get(s, s)
     if s not in WARDROBE_STATES:
-        raise PolicyError(
-            f"wardrobe_state must be one of {sorted(WARDROBE_STATES)}; got {value!r}"
-        )
+        raise PolicyError(f"wardrobe_state must be one of {sorted(WARDROBE_STATES)}; got {value!r}")
     return s
 
 
@@ -2421,9 +2680,7 @@ def resolve_wardrobe_state(shot: dict[str, Any]) -> str | None:
         (shot.get("wardrobe") or {}).get("state")
         if isinstance(shot.get("wardrobe"), dict)
         else None,
-        (dsl.get("wardrobe") or {}).get("state")
-        if isinstance(dsl.get("wardrobe"), dict)
-        else None,
+        (dsl.get("wardrobe") or {}).get("state") if isinstance(dsl.get("wardrobe"), dict) else None,
     ):
         try:
             st = normalize_wardrobe_state(raw)
@@ -2575,9 +2832,7 @@ def apply_wardrobe_continuity(
                 prev_state = st
             # peak always advances to most undressed so far
             pkr = wardrobe_undress_rank(peak_state)
-            if pkr is None or (sr is not None and sr > pkr):
-                peak_state = st
-            elif peak_state is None:
+            if pkr is None or (sr is not None and sr > pkr) or peak_state is None:
                 peak_state = st
         elif prev_state is not None:
             pass
@@ -2596,9 +2851,7 @@ def apply_wardrobe_continuity(
             # end_pose should declare feeds-next for frame-chain lint
             end = str(dsl.get("end_pose") or "").strip()
             if not end:
-                dsl["end_pose"] = (
-                    f"holds undress state={st} mid-motion — feeds next first frame"
-                )
+                dsl["end_pose"] = f"holds undress state={st} mid-motion — feeds next first frame"
             elif "feed" not in end.lower():
                 dsl["end_pose"] = f"{end} — feeds next first frame"
 
@@ -2737,15 +2990,9 @@ def lint_sex_wardrobe(
         }
         # Monotonic: known state cannot drop below peak undress so far
         if rank is not None and peak_rank >= 0 and rank < peak_rank:
-            re_dress_ids.append(
-                f"{sid}:{st}<{peak_state}(from {peak_sid or '?'})"
-            )
+            re_dress_ids.append(f"{sid}:{st}<{peak_state}(from {peak_sid or '?'})")
             row["re_dress"] = True
-        if rank is not None and rank > peak_rank:
-            peak_rank = rank
-            peak_state = st
-            peak_sid = sid or None
-        elif rank is not None and peak_rank < 0:
+        if rank is not None and rank > peak_rank or rank is not None and peak_rank < 0:
             peak_rank = rank
             peak_state = st
             peak_sid = sid or None
@@ -2754,8 +3001,7 @@ def lint_sex_wardrobe(
         if st in {"partial", "undressed", "bare"}:
             blob = _shot_visual_blob(shot)
             if shot.get("_wardrobe_subject_conflict") or any(
-                m in blob
-                for m in _FULL_DRESS_MARKERS
+                m in blob for m in _FULL_DRESS_MARKERS
             ):
                 # only flag if full-dress markers present without undress override words
                 if any(m in blob for m in _FULL_DRESS_MARKERS) and not any(
@@ -2927,6 +3173,142 @@ def lint_sex_wardrobe(
     }
 
 
+# Adult-max template pollution (金瓶梅案 · 2026-07-22)
+# When ≥40% of voiced nars are these stock lines, user script was overwritten.
+_TEMPLATE_NAR_POLLUTION_MARKERS: tuple[str, ...] = (
+    "展厅落锁",
+    "今晚只加演你",
+    "今晚只办事加演",
+    "肩带一滑，规矩失效",
+    "肩带一滑。卸甲半裸",
+    "贴耳：下一场",
+    "咬耳：下一场",
+    "门落锁。今晚只办事",
+    "跨坐落稳。整根吃进",
+    "门闩还热，故事未完",
+    "扣子崩开。半裸卸甲",
+)
+
+
+def is_template_nar_pollution(nar: object) -> bool:
+    text = str(nar or "").strip()
+    if not text:
+        return False
+    return any(m in text for m in _TEMPLATE_NAR_POLLUTION_MARKERS)
+
+
+def lint_user_source_fidelity(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+    source_excerpt: str | None = None,
+) -> dict[str, Any]:
+    """Fail when plan/spice templates wiped user story language.
+
+    Product rule (2026-07-22): user input is the spine; spice templates are
+    fallback seeds only. Independent multi-section scripts must not become
+    3×「展厅落锁」clones.
+    """
+    scale = (heat_scale or "").strip().lower() or None
+    excerpt = (source_excerpt or "").strip()
+    # This lint protects supplied source language; a generated/stock plan has
+    # no user source to preserve. Do not mistake its own VO for overwritten text.
+    if not excerpt:
+        return {
+            "ok": True,
+            "applicable": False,
+            "codes": [],
+            "warning_count": 0,
+            "issues": [],
+            "polluted_shots": [],
+            "pollution_ratio": 0.0,
+            "voiced": 0,
+            "note": "user source fidelity skipped: source_excerpt is absent",
+        }
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+    polluted: list[str] = []
+    voiced = 0
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        nar = str(shot.get("nar") or "").strip()
+        if not nar:
+            continue
+        voiced += 1
+        if is_template_nar_pollution(nar):
+            polluted.append(str(shot.get("id") or "?"))
+
+    ratio = (len(polluted) / voiced) if voiced else 0.0
+    # Only flag when we have enough voiced shots and high template density
+    if voiced >= 4 and ratio + 1e-9 >= 0.40:
+        codes.append("USER_SOURCE_NAR_POLLUTED")
+        issues.append(
+            {
+                "code": "USER_SOURCE_NAR_POLLUTED",
+                "severity": "warning",
+                "message": (
+                    f"旁白模板污染 {ratio:.0%}（{len(polluted)}/{voiced}）含「展厅落锁/加演」等库存句 — "
+                    "用户原文被 adult-max 模板覆盖。须保留用户诗白/对白/专有名词，"
+                    "荤梗只能补后缀不能整句替换。See lessons-2026-07-22-user-source-fidelity.md"
+                ),
+            }
+        )
+    # If source excerpt has unique story tokens missing from all nars → soft warn
+    if excerpt and voiced >= 3 and scale in {"max", "hot"}:
+        # sample distinctive CJK 2-grams from source that should appear somewhere
+        tokens = re.findall(r"[\u4e00-\u9fff]{2,4}", excerpt)
+        skip = {
+            "成人",
+            "办事",
+            "竖屏",
+            "短剧",
+            "旁白",
+            "镜头",
+            "特写",
+            "时长",
+            "开场",
+            "转场",
+            "集尾",
+        }
+        distinctive = []
+        for t in tokens:
+            if t in skip or t in _TEMPLATE_NAR_POLLUTION_MARKERS:
+                continue
+            if t not in distinctive:
+                distinctive.append(t)
+            if len(distinctive) >= 12:
+                break
+        all_nar = " ".join(str(s.get("nar") or "") for s in shots if isinstance(s, dict))
+        missing = [t for t in distinctive[:8] if t not in all_nar]
+        if len(missing) >= 4 and ratio >= 0.25:
+            codes.append("USER_SOURCE_TOKENS_MISSING")
+            issues.append(
+                {
+                    "code": "USER_SOURCE_TOKENS_MISSING",
+                    "severity": "warning",
+                    "message": (
+                        "用户剧本专名/情节点未进入旁白: "
+                        + "、".join(missing[:6])
+                        + "。plan 后须对照 source 回填 nar，禁止只用库存荤梗。"
+                    ),
+                }
+            )
+
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "applicable": True,
+        "codes": sorted(set(codes)),
+        "warning_count": warn_n,
+        "issues": issues,
+        "polluted_shots": polluted,
+        "pollution_ratio": round(ratio, 3),
+        "voiced": voiced,
+        "note": "user source fidelity: lessons-2026-07-22-user-source-fidelity.md",
+    }
+
+
 def nar_has_spice(nar: object) -> bool:
     text = str(nar or "").strip().lower()
     if not text:
@@ -2941,24 +3323,74 @@ def nar_has_sex_verb(nar: object) -> bool:
     return any(m.lower() in text for m in _NAR_SEX_VERB_MARKERS)
 
 
+def nar_has_extreme_spice(nar: object) -> bool:
+    """True if nar hits denser body/sex markers (not dual-entendre alone)."""
+    text = str(nar or "").strip().lower()
+    if not text:
+        return False
+    return any(m.lower() in text for m in _NAR_EXTREME_MARKERS)
+
+
+def normalize_spice_level(
+    value: object | None,
+    *,
+    heat_scale: str | None = None,
+    audience_profile: str | None = None,
+) -> str | None:
+    raw = str(value or "").strip().lower() or None
+    if raw in SPICE_LEVELS:
+        return raw
+    if raw:
+        return None  # invalid left to caller
+    scale = (heat_scale or "").strip().lower() or None
+    profile = (audience_profile or "").strip().lower() or None
+    if profile in {"hardcore_male", "hardcore", "重口男向"}:
+        return "extreme"
+    if scale == "max":
+        return "explicit"
+    if scale == "hot":
+        return "suggestive"
+    return None
+
+
+def resolve_sex_pose(shot: dict[str, Any]) -> str | None:
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    raw = str(shot.get("sex_pose") or dsl.get("sex_pose") or "").strip().lower()
+    if raw in SEX_POSES:
+        return raw
+    # infer from coitus beat / action
+    cb = resolve_coitus_beat(shot)
+    if cb and cb in COITUS_BEAT_DEFAULT_POSE:
+        blob = _shot_visual_pose_blob(shot)
+        # keep inferred pose only when coitus-ish
+        if any(m in blob for m in _COITUS_READABLE_MARKERS) or cb in COITUS_BEATS:
+            return COITUS_BEAT_DEFAULT_POSE[cb]
+    return None
+
+
 def lint_sex_vo_spice(
     shots: list[dict[str, Any]],
     *,
     heat_scale: str | None = None,
     audience_profile: str | None = None,
+    spice_level: str | None = None,
 ) -> dict[str, Any]:
     """Adult max films: every nar must carry 荤梗; act/climax need sex verbs.
 
     Product rule (2026-07-21): 实打实办事剧 — 讲的内容都要荤梗，禁纯文艺说书。
+    v1.10: spice_level=extreme → dual-entendre alone is HEAT_VO_SPICE_TOO_MILD.
     """
     scale = (heat_scale or "").strip().lower() or None
     profile = (audience_profile or "").strip().lower() or None
+    level = normalize_spice_level(spice_level, heat_scale=scale, audience_profile=profile)
     issues: list[dict[str, Any]] = []
     codes: list[str] = []
     per_shot: list[dict[str, Any]] = []
     bland: list[str] = []
     weak_sex: list[str] = []
+    too_mild: list[str] = []
     spice_n = 0
+    extreme_n = 0
     voiced_n = 0
 
     def _issue(code: str, severity: str, message: str) -> None:
@@ -2973,9 +3405,11 @@ def lint_sex_vo_spice(
             "info_count": 0,
             "issues": [],
             "heat_scale": scale,
+            "spice_level": level,
             "spice_ratio": None,
             "bland_shots": [],
             "weak_sex_vo_shots": [],
+            "too_mild_shots": [],
             "per_shot": [],
             "note": "VO spice lint skipped (not max/hot)",
         }
@@ -2991,14 +3425,18 @@ def lint_sex_vo_spice(
         voiced_n += 1
         spice = nar_has_spice(nar)
         sex_v = nar_has_sex_verb(nar)
+        extreme = nar_has_extreme_spice(nar)
         literary = any(h in nar for h in _NAR_LITERARY_ONLY_HINTS)
         if spice:
             spice_n += 1
+        if extreme:
+            extreme_n += 1
         row = {
             "id": sid,
             "heat_phase": ph,
             "spice": spice,
             "sex_verb": sex_v,
+            "extreme": extreme,
             "literary_hint": literary,
         }
         per_shot.append(row)
@@ -3006,8 +3444,13 @@ def lint_sex_vo_spice(
             bland.append(sid or "?")
         if ph in SEX_PHASES and not sex_v:
             weak_sex.append(sid or "?")
+        # extreme: act/climax with only mild dual-entendre fail
+        # setup/foreplay/afterglow may stay dual-entendre + light body words
+        if level == "extreme" and ph in SEX_PHASES and spice and not extreme:
+            too_mild.append(sid or "?")
 
     spice_ratio = (spice_n / voiced_n) if voiced_n else 1.0
+    extreme_ratio = (extreme_n / voiced_n) if voiced_n else 1.0
 
     if bland:
         _issue(
@@ -3044,6 +3487,15 @@ def lint_sex_vo_spice(
     if profile in {"hardcore_male", "hardcore", "重口男向"} and weak_sex:
         # already issued HEAT_VO_SEX_VERB_WEAK; keep
         pass
+    if too_mild:
+        _issue(
+            "HEAT_VO_SPICE_TOO_MILD",
+            "warning",
+            "spice_level=extreme 但旁白仍偏双关/不够脏: "
+            f"{', '.join(too_mild[:10])}"
+            + ("…" if len(too_mild) > 10 else "")
+            + "。act/climax 须直白办事动词（沉腰/吃进/办穿/顶/插…），禁只写加演/规矩/夜色。",
+        )
 
     warn_n = sum(1 for i in issues if i.get("severity") == "warning")
     return {
@@ -3054,17 +3506,581 @@ def lint_sex_vo_spice(
         "issues": issues,
         "heat_scale": scale,
         "audience_profile": profile,
+        "spice_level": level,
         "spice_ratio": round(spice_ratio, 3),
+        "extreme_ratio": round(extreme_ratio, 3),
         "spice_n": spice_n,
         "voiced_n": voiced_n,
         "bland_shots": bland,
         "weak_sex_vo_shots": weak_sex,
+        "too_mild_shots": too_mild,
         "per_shot": per_shot,
         "note": (
-            "max adult coitus films: every nar needs 荤梗; act/climax need sex verbs. "
-            "sex_vo_strict defaults true on max. lessons-2026-07-21-sex-vo-spice.md"
+            "max adult: 荤梗 + sex verbs; extreme rejects dual-entendre-only act VO. "
+            "sex_vo_strict on max. lessons-2026-07-21-sex-vo-spice.md"
         ),
     }
+
+
+def _shot_visual_pose_blob(shot: dict[str, Any]) -> str:
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    bits = [
+        str(shot.get("sex_pose") or ""),
+        str(shot.get("coitus_beat") or dsl.get("coitus_beat") or ""),
+        str(dsl.get("action") or ""),
+        str(dsl.get("motion") or ""),
+        str(dsl.get("visible_change") or ""),
+        str(dsl.get("subject") or ""),
+        str(shot.get("must_show") or ""),
+        str(shot.get("nar") or ""),
+    ]
+    return " ".join(bits).lower()
+
+
+def shot_coitus_readable(shot: dict[str, Any]) -> bool:
+    """Mute-frame proxy: action language includes coitus-readable pose verbs."""
+    blob = _shot_visual_pose_blob(shot)
+    if not blob.strip():
+        return False
+    has_real = any(m in blob for m in _COITUS_READABLE_MARKERS)
+    if not has_real:
+        return False
+    # pure pseudo without real markers already failed; if only soft words dominate, still ok if real present
+    return True
+
+
+def shot_coitus_pseudo_only(shot: dict[str, Any]) -> bool:
+    blob = _shot_visual_pose_blob(shot)
+    if any(m in blob for m in _COITUS_READABLE_MARKERS):
+        return False
+    return any(m in blob for m in _COITUS_PSEUDO_ONLY) or bool(blob.strip())
+
+
+def resolve_coitus_beat(shot: dict[str, Any]) -> str | None:
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    raw = shot.get("coitus_beat") or dsl.get("coitus_beat") or shot.get("sex_beat")
+    if raw and str(raw).strip().lower() in COITUS_BEATS:
+        return str(raw).strip().lower()
+    # Infer from pose blob
+    blob = _shot_visual_pose_blob(shot)
+    if any(
+        x in blob for x in ("arch-finish", "arch finish", "办穿", "失声", "residual-tremor", "高潮")
+    ):
+        return "finish"
+    if any(x in blob for x in ("leg-wrap", "clutch", "锁腰", "锁腿", "攥")):
+        return "lock"
+    if any(x in blob for x in ("hips-sink", "grind", "thrust", "沉腰", "顶", "rhythm")):
+        return "rhythm"
+    if any(x in blob for x in ("straddle", "mount", "pelvis-lock", "跨坐", "结合", "union")):
+        return "union"
+    if any(x in blob for x in ("pin", "entry", "拽", "压进", "按进")):
+        return "entry"
+    if any(x in blob for x in ("undress", "strip", "卸甲", "脱", "肩带")):
+        return "undress"
+    if any(x in blob for x in ("换你顶", "下一场", "未完", "whisper", "hook")):
+        return "hook"
+    return None
+
+
+def lint_coitus_grammar(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+    audience_profile: str | None = None,
+    coitus_grammar: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Intercourse six-beat coverage + mute-frame pose readability (docs → code)."""
+    scale = (heat_scale or "").strip().lower() or None
+    profile = (audience_profile or "").strip().lower() or None
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+    cg = coitus_grammar if isinstance(coitus_grammar, dict) else {}
+    enabled = cg.get("enabled")
+    if enabled is None:
+        enabled = scale == "max" or profile in {"hardcore_male", "hardcore", "重口男向"}
+    enabled = bool(enabled)
+
+    def _issue(code: str, severity: str, message: str) -> None:
+        codes.append(code)
+        issues.append({"code": code, "severity": severity, "message": message})
+
+    if not enabled or scale not in {"max", "hot"}:
+        return {
+            "ok": True,
+            "enabled": False,
+            "codes": [],
+            "issues": [],
+            "beats_covered": {},
+            "readable_act_ratio": None,
+            "note": "coitus grammar skipped (not max/hot or disabled)",
+        }
+
+    hardcore = profile in {"hardcore_male", "hardcore", "重口男向"}
+    sev = "warning"  # film_spec may promote via coitus_strict
+
+    # Map beats → shot ids from explicit grammar or per-shot fields
+    beats_map: dict[str, list[str]] = {b: [] for b in COITUS_REQUIRED_BEATS}
+    beats_map["undress"] = []
+    explicit = cg.get("beats") if isinstance(cg.get("beats"), dict) else {}
+    for b, ids in explicit.items():
+        bk = str(b).strip().lower()
+        if bk not in beats_map:
+            continue
+        if isinstance(ids, list):
+            beats_map[bk] = [str(x) for x in ids if str(x).strip()]
+        elif ids:
+            beats_map[bk] = [str(ids)]
+
+    act_shots: list[dict[str, Any]] = []
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        ph = infer_heat_phase(shot)
+        sid = str(shot.get("id") or "")
+        cb = resolve_coitus_beat(shot)
+        if cb and sid and sid not in beats_map.get(cb, []):
+            beats_map.setdefault(cb, []).append(sid)
+        if ph in SEX_PHASES:
+            act_shots.append(shot)
+
+    missing = [b for b in COITUS_REQUIRED_BEATS if not beats_map.get(b)]
+    # Six-beat hard require only when hardcore or coitus_grammar.enabled
+    if missing and (hardcore or bool(cg.get("enabled"))):
+        _issue(
+            "COITUS_BEAT_MISSING",
+            sev,
+            f"coitus six-beat missing: {','.join(missing)} — "
+            "assign coitus_beat or coitus_grammar.beats "
+            "(entry/union/rhythm/lock/finish/hook). See intercourse-impact-benchmark.",
+        )
+
+    unreadable: list[str] = []
+    pseudo: list[str] = []
+    for shot in act_shots:
+        sid = str(shot.get("id") or "?")
+        if shot_coitus_readable(shot):
+            continue
+        if shot_coitus_pseudo_only(shot):
+            pseudo.append(sid)
+        unreadable.append(sid)
+
+    readable_n = len(act_shots) - len(unreadable)
+    ratio = (readable_n / len(act_shots)) if act_shots else 1.0
+    # Unreadable pose: hardcore always; plain max only if majority unreadable
+    if act_shots and hardcore and ratio + 1e-9 < 0.50:
+        _issue(
+            "COITUS_UNREADABLE_POSE",
+            sev,
+            f"act/climax coitus-readable ratio {ratio:.0%} "
+            f"(unreadable={unreadable[:8]}) — use straddle/hips-sink/grind/pelvis-lock; "
+            "forbid hug-only soft lean as act main. Mute Frame Test.",
+        )
+    elif act_shots and not hardcore and ratio + 1e-9 < 0.50 and unreadable:
+        _issue(
+            "COITUS_UNREADABLE_POSE",
+            "info" if not bool(cg.get("enabled")) else sev,
+            f"advisory: act coitus-readable {ratio:.0%} — strengthen pose verbs for impact",
+        )
+    if pseudo and hardcore:
+        _issue(
+            "COITUS_PSEUDO_SEX",
+            sev,
+            f"pseudo-sex pose language only: {pseudo[:6]} — embrace/牵手 is not coitus",
+        )
+
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "enabled": True,
+        "codes": sorted(set(codes)),
+        "issues": issues,
+        "beats_covered": {k: v for k, v in beats_map.items() if v},
+        "missing_beats": missing,
+        "act_shot_count": len(act_shots),
+        "readable_act_ratio": round(ratio, 3),
+        "unreadable_shots": unreadable,
+        "pseudo_shots": pseudo,
+        "note": "coitus grammar: six-beat + mute-frame pose verbs. lessons-2026-07-21-intercourse-impact-benchmark.md",
+    }
+
+
+def _shot_size_rank(shot: dict[str, Any]) -> int | None:
+    """Map shot_size text → L0–L4 rank (higher = tighter)."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    cam = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
+    raw = (
+        str(
+            cam.get("shot_size")
+            or dsl.get("shot_size")
+            or shot.get("shot_size")
+            or shot.get("shotSize")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
+    if not raw:
+        return None
+    if any(x in raw for x in ("ecu", "extreme close", "insert", "detail", "物件", "局部")):
+        return 4
+    if any(x in raw for x in ("close-up", "close up", "closeup", "cu", "近景", "特写")):
+        return 3
+    if any(x in raw for x in ("medium full", "medium-full", "中全", "knee", "3/4")):
+        return 1
+    if any(x in raw for x in ("wide", "long shot", "establishing", "全景", "大全")):
+        return 0
+    if any(x in raw for x in ("medium", "中景", "waist")):
+        return 2
+    return 2  # default medium
+
+
+def lint_size_ladder(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+    audience_profile: str | None = None,
+) -> dict[str, Any]:
+    """Size ladder escalation for adult shorts (WS→MS→CU→ECU pressure)."""
+    scale = (heat_scale or "").strip().lower() or None
+    profile = (audience_profile or "").strip().lower() or None
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+
+    def _issue(code: str, severity: str, message: str) -> None:
+        codes.append(code)
+        issues.append({"code": code, "severity": severity, "message": message})
+
+    if scale not in {"max", "hot"}:
+        return {
+            "ok": True,
+            "codes": [],
+            "issues": [],
+            "note": "size ladder skipped (not max/hot)",
+        }
+
+    hardcore = profile in {"hardcore_male", "hardcore", "重口男向"}
+    sev = "warning"
+    n = len([s for s in shots if isinstance(s, dict)])
+    ranks: list[tuple[str, int | None, str]] = []
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        sid = str(shot.get("id") or "")
+        r = _shot_size_rank(shot)
+        ph = infer_heat_phase(shot)
+        ranks.append((sid, r, ph))
+
+    # Size ladder pressure only for hardcore by default (max stays advisory via info)
+    ladder_sev = sev if hardcore else "info"
+
+    # Flat triple: 3 consecutive same explicit rank
+    for i in range(len(ranks) - 2):
+        a, b, c = ranks[i][1], ranks[i + 1][1], ranks[i + 2][1]
+        if a is not None and a == b == c and n >= 6:
+            _issue(
+                "SIZE_STACK_FLAT",
+                ladder_sev,
+                f"three consecutive same shot_size rank L{a} "
+                f"({ranks[i][0]},{ranks[i + 1][0]},{ranks[i + 2][0]}) — "
+                "vary size ladder (WS→MS→CU→insert).",
+            )
+            break
+
+    # Quotas for adult 8–12 spine (hardcore warnings; max info)
+    if n >= 6:
+        present = [r for _, r, _ in ranks if r is not None]
+        if present:
+            has_wide = any(r <= 1 for r in present)
+            has_med = sum(1 for r in present if r == 2)
+            has_cu = sum(1 for r in present if r == 3)
+            has_l4 = sum(1 for r in present if r >= 4)
+            if not has_wide:
+                _issue(
+                    "SIZE_LADDER_NO_WIDE",
+                    ladder_sev,
+                    "adult size ladder needs ≥1 wide/medium-full (L0/L1) establishing shot",
+                )
+            if has_med < 1 and hardcore:
+                _issue(
+                    "SIZE_LADDER_NO_MEDIUM",
+                    ladder_sev,
+                    "hardcore: need medium (L2) body-relation shots",
+                )
+            if has_cu < 1:
+                _issue(
+                    "SIZE_LADDER_NO_CU",
+                    ladder_sev,
+                    "adult size ladder needs ≥1 close-up (L3) reaction/pressure",
+                )
+            if hardcore and has_l4 < 1:
+                _issue(
+                    "SIZE_LADDER_NO_INSERT",
+                    ladder_sev,
+                    "hardcore: need ≥1 L4 insert (hand/hip/fabric detail)",
+                )
+
+    # act→climax: peak tightness should not suddenly open to wide
+    act_ranks = [r for _, r, ph in ranks if ph in SEX_PHASES and r is not None]
+    if len(act_ranks) >= 2:
+        for i in range(1, len(act_ranks)):
+            if act_ranks[i] <= act_ranks[i - 1] - 2:
+                _issue(
+                    "SIZE_LADDER_ACT_REOPEN",
+                    ladder_sev,
+                    "act→climax size suddenly reopens wider — keep pressure (no jump back to wide during sex)",
+                )
+                break
+
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "codes": sorted(set(codes)),
+        "issues": issues,
+        "ranks": [{"id": sid, "rank": r, "heat_phase": ph} for sid, r, ph in ranks],
+        "note": "size ladder: lessons-2026-07-21-size-ladder-hardcore-stack.md",
+    }
+
+
+def lint_vo_motion_align(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+    audience_profile: str | None = None,
+) -> dict[str, Any]:
+    """nar sex verbs should echo dsl.action/motion (声画同动词)."""
+    scale = (heat_scale or "").strip().lower() or None
+    profile = (audience_profile or "").strip().lower() or None
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+    mismatch: list[str] = []
+
+    def _issue(code: str, severity: str, message: str) -> None:
+        codes.append(code)
+        issues.append({"code": code, "severity": severity, "message": message})
+
+    if scale not in {"max", "hot"}:
+        return {
+            "ok": True,
+            "codes": [],
+            "issues": [],
+            "mismatch_shots": [],
+            "note": "vo-motion align skipped",
+        }
+
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        ph = infer_heat_phase(shot)
+        if ph not in SEX_PHASES:
+            continue
+        nar = str(shot.get("nar") or "")
+        if not nar_has_sex_verb(nar):
+            continue
+        blob = _shot_visual_pose_blob(shot)
+        # at least one sex verb marker from nar should appear in visual blob
+        nar_l = nar.lower()
+        hits = [m for m in _NAR_SEX_VERB_MARKERS if m.lower() in nar_l]
+        if not hits:
+            continue
+        if not any(h.lower() in blob for h in hits):
+            # also accept coitus English markers in visual when Chinese in nar
+            if shot_coitus_readable(shot) and nar_has_extreme_spice(nar):
+                continue
+            mismatch.append(str(shot.get("id") or "?"))
+
+    if mismatch:
+        sev = "warning" if profile in {"hardcore_male", "hardcore", "重口男向"} else "info"
+        _issue(
+            "HEAT_VO_MOTION_MISMATCH",
+            sev,
+            f"act/climax VO sex verbs not mirrored in dsl.action/motion: "
+            f"{', '.join(mismatch[:8])} — 声画同动词（沉腰= hips-sink）。",
+        )
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "codes": sorted(set(codes)),
+        "issues": issues,
+        "mismatch_shots": mismatch,
+        "note": "vo-motion alignment for coitus beats",
+    }
+
+
+def lint_sex_pose_variety(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+    audience_profile: str | None = None,
+) -> dict[str, Any]:
+    """≥3 act shots should not share identical pose language (防姿势日历)."""
+    scale = (heat_scale or "").strip().lower() or None
+    profile = (audience_profile or "").strip().lower() or None
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+
+    def _issue(code: str, severity: str, message: str) -> None:
+        codes.append(code)
+        issues.append({"code": code, "severity": severity, "message": message})
+
+    if scale not in {"max", "hot"}:
+        return {"ok": True, "codes": [], "issues": [], "poses": [], "unique": 0}
+
+    act_poses: list[str] = []
+    act_ids: list[str] = []
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        if infer_heat_phase(shot) not in SEX_PHASES:
+            continue
+        pose = resolve_sex_pose(shot) or ""
+        if not pose:
+            # fingerprint action
+            dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+            pose = str(dsl.get("action") or "")[:40].lower()
+        act_poses.append(pose)
+        act_ids.append(str(shot.get("id") or ""))
+
+    unique = len(set(p for p in act_poses if p))
+    if len(act_poses) >= 3 and unique < 2:
+        sev = "warning" if profile in {"hardcore_male", "hardcore", "重口男向"} else "info"
+        _issue(
+            "SEX_POSE_STALE",
+            sev,
+            f"act/climax poses stale ({unique} unique / {len(act_poses)} shots) — "
+            "rotate sex_pose (straddle/cowgirl/from_behind/missionary_pin…).",
+        )
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "codes": sorted(set(codes)),
+        "issues": issues,
+        "poses": act_poses,
+        "unique": unique,
+        "act_count": len(act_poses),
+        "note": "multi-pose variety for act stack",
+    }
+
+
+def lint_montage_craft(
+    crafts: list[str] | None,
+    *,
+    heat_scale: str | None = None,
+    audience_profile: str | None = None,
+    shot_count: int = 0,
+) -> dict[str, Any]:
+    """Hardcore adult cuts need craft variety (insert/smash/montage)."""
+    scale = (heat_scale or "").strip().lower() or None
+    profile = (audience_profile or "").strip().lower() or None
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+    craft_list = [str(c).strip().lower() for c in (crafts or []) if str(c).strip()]
+    unique = sorted(set(craft_list))
+
+    def _issue(code: str, severity: str, message: str) -> None:
+        codes.append(code)
+        issues.append({"code": code, "severity": severity, "message": message})
+
+    if scale not in {"max", "hot"} or shot_count < 6:
+        return {
+            "ok": True,
+            "codes": [],
+            "issues": [],
+            "unique_crafts": unique,
+            "note": "montage lint skipped",
+        }
+
+    hardcore = profile in {"hardcore_male", "hardcore", "重口男向"}
+    sev = "warning" if hardcore else "info"
+    need_kinds = 4 if hardcore else 3
+    if craft_list and len(unique) < need_kinds:
+        _issue(
+            "MONTAGE_FLAT",
+            sev,
+            f"edit_craft only {len(unique)} kinds {unique[:6]} — need ≥{need_kinds} "
+            "(insert_cut/smash_cut/montage_jump…). See montage-hardcore-male.",
+        )
+    has_insert = any("insert" in c for c in craft_list)
+    has_smash = any("smash" in c for c in craft_list)
+    if hardcore and craft_list and not has_insert:
+        _issue(
+            "MONTAGE_NO_INSERT",
+            sev,
+            "hardcore: need ≥1 insert_cut in edit_craft spine",
+        )
+    if hardcore and craft_list and not has_smash:
+        _issue(
+            "MONTAGE_NO_SMASH",
+            sev,
+            "hardcore: need ≥1 smash_cut in edit_craft spine",
+        )
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "codes": sorted(set(codes)),
+        "issues": issues,
+        "unique_crafts": unique,
+        "craft_count": len(craft_list),
+        "has_insert": has_insert,
+        "has_smash": has_smash,
+        "note": "montage craft variety for adult cuts",
+    }
+
+
+def suggest_vo_lines(
+    *,
+    heat_phase: str | None = None,
+    coitus_beat: str | None = None,
+    spice_level: str | None = "explicit",
+) -> list[str]:
+    """Strong adult nar seeds by phase/beat (agent / heat vo-suggest)."""
+    ph = (heat_phase or "act").strip().lower()
+    cb = (coitus_beat or "").strip().lower()
+    extreme = (spice_level or "").strip().lower() == "extreme"
+    bank: dict[str, list[str]] = {
+        "setup": [
+            "展厅落锁。今晚只加演你一场。",
+            "门一闩。规矩作废，只办你。",
+        ],
+        "foreplay": [
+            "肩带一滑。卸甲半裸，规矩失效。",
+            "扣子崩开。她把你按进失序。",
+        ],
+        "act": [
+            "沉腰吃进。再顶，磨到发软。",
+            "跨坐落稳。整根吞满，锁住。",
+            "再沉腰。节奏是她给的，办穿前奏。",
+        ],
+        "climax": [
+            "失声办穿。背一弓，腿软。",
+            "她高潮失声。余颤还在夹。",
+        ],
+        "afterglow": [
+            "贴耳：下一场——换你顶。",
+            "未完。她咬耳：换你来办。",
+        ],
+    }
+    if extreme:
+        bank["act"] = [
+            "沉腰吃进整根。再顶深，磨到发软。",
+            "跨坐吞满。肏穿前的节奏是她给的。",
+            "再插深。锁腰夹紧，不许退。",
+        ]
+        bank["climax"] = [
+            "失声办穿。灌满前背一弓，腿软。",
+            "高潮绞紧。余颤喷在你身上。",
+        ]
+    by_cb = {
+        "entry": bank["setup"],
+        "undress": bank["foreplay"],
+        "union": ["跨坐落稳。整根吃进，锁住。", "髋贴髋。结合瞬间，不许退。"],
+        "rhythm": bank["act"],
+        "lock": ["腿锁腰。攥床单，再夹紧。", "锁死。指节攥白，不许拔。"],
+        "finish": bank["climax"],
+        "hook": bank["afterglow"],
+    }
+    if cb in by_cb:
+        return list(by_cb[cb])
+    return list(bank.get(ph, bank["act"]))
 
 
 def lint_heat_arc(
@@ -3076,6 +4092,10 @@ def lint_heat_arc(
     sex_min_duration_ratio: float | None = None,
     audience_profile: str | None = None,
     advise: bool = False,
+    coitus_grammar: dict[str, Any] | None = None,
+    spice_level: str | None = None,
+    edit_craft: list[str] | None = None,
+    source_excerpt: str | None = None,
 ) -> dict[str, Any]:
     """Heat metrics + sex-duration floor for adult films.
 
@@ -3084,6 +4104,7 @@ def lint_heat_arc(
       sex = act+climax only (性爱片段); intimacy = foreplay+act+climax
     - heat_scale=max: sex_duration_ratio < floor (default 20%) → HEAT_SEX_DURATION_LOW
       (write-spec hard by default via sex_floor_strict)
+    - coitus grammar + size ladder soft metrics (strict via film_spec flags)
     """
     scale = (heat_scale or "").strip().lower() or None
     profile = (audience_profile or "").strip().lower() or None
@@ -3107,6 +4128,7 @@ def lint_heat_arc(
                 "id": str(shot.get("id") or ""),
                 "heat_phase": ph,
                 "duration_sec": round(dur, 3),
+                "coitus_beat": resolve_coitus_beat(shot),
             }
         )
 
@@ -3129,14 +4151,10 @@ def lint_heat_arc(
 
     # Author override for advisory / floor targets
     guide_int = (
-        float(intimacy_min_ratio)
-        if intimacy_min_ratio is not None
-        else ADVISORY_MAX_INTIMACY_RATIO
+        float(intimacy_min_ratio) if intimacy_min_ratio is not None else ADVISORY_MAX_INTIMACY_RATIO
     )
     guide_setup = (
-        float(setup_max_ratio)
-        if setup_max_ratio is not None
-        else ADVISORY_MAX_SETUP_RATIO
+        float(setup_max_ratio) if setup_max_ratio is not None else ADVISORY_MAX_SETUP_RATIO
     )
     if sex_min_duration_ratio is not None:
         sex_floor = float(sex_min_duration_ratio)
@@ -3259,12 +4277,88 @@ def lint_heat_arc(
         issues.append(iss)
 
     # VO 荤梗：实打实办事剧，旁白不能纯文艺
+    level = normalize_spice_level(spice_level, heat_scale=scale, audience_profile=profile)
     vo_rep = lint_sex_vo_spice(
         shots,
         heat_scale=scale,
         audience_profile=profile,
+        spice_level=level,
     )
     for iss in vo_rep.get("issues") or []:
+        if not isinstance(iss, dict):
+            continue
+        c = str(iss.get("code") or "")
+        if c and c not in codes:
+            codes.append(c)
+        issues.append(iss)
+
+    # User source fidelity: ban wholesale 展厅-template overwrite of user script
+    fidelity_rep = lint_user_source_fidelity(
+        shots,
+        heat_scale=scale,
+        source_excerpt=source_excerpt,
+    )
+    for iss in fidelity_rep.get("issues") or []:
+        if not isinstance(iss, dict):
+            continue
+        c = str(iss.get("code") or "")
+        if c and c not in codes:
+            codes.append(c)
+        issues.append(iss)
+
+    # Coitus grammar + size ladder (impact / pressure)
+    coitus_rep = lint_coitus_grammar(
+        shots,
+        heat_scale=scale,
+        audience_profile=profile,
+        coitus_grammar=coitus_grammar,
+    )
+    for iss in coitus_rep.get("issues") or []:
+        if not isinstance(iss, dict):
+            continue
+        c = str(iss.get("code") or "")
+        if c and c not in codes:
+            codes.append(c)
+        issues.append(iss)
+
+    size_rep = lint_size_ladder(
+        shots,
+        heat_scale=scale,
+        audience_profile=profile,
+    )
+    for iss in size_rep.get("issues") or []:
+        if not isinstance(iss, dict):
+            continue
+        c = str(iss.get("code") or "")
+        if c and c not in codes:
+            codes.append(c)
+        issues.append(iss)
+
+    vo_motion_rep = lint_vo_motion_align(shots, heat_scale=scale, audience_profile=profile)
+    for iss in vo_motion_rep.get("issues") or []:
+        if not isinstance(iss, dict):
+            continue
+        c = str(iss.get("code") or "")
+        if c and c not in codes:
+            codes.append(c)
+        issues.append(iss)
+
+    pose_rep = lint_sex_pose_variety(shots, heat_scale=scale, audience_profile=profile)
+    for iss in pose_rep.get("issues") or []:
+        if not isinstance(iss, dict):
+            continue
+        c = str(iss.get("code") or "")
+        if c and c not in codes:
+            codes.append(c)
+        issues.append(iss)
+
+    montage_rep = lint_montage_craft(
+        edit_craft,
+        heat_scale=scale,
+        audience_profile=profile,
+        shot_count=n,
+    )
+    for iss in montage_rep.get("issues") or []:
         if not isinstance(iss, dict):
             continue
         c = str(iss.get("code") or "")
@@ -3312,18 +4406,58 @@ def lint_heat_arc(
             "per_shot": wardrobe_rep.get("per_shot"),
             "required_states": wardrobe_rep.get("required_states"),
         },
+        "spice_level": level,
         "vo_spice": {
             "ok": vo_rep.get("ok"),
             "codes": vo_rep.get("codes"),
             "spice_ratio": vo_rep.get("spice_ratio"),
+            "extreme_ratio": vo_rep.get("extreme_ratio"),
             "bland_shots": vo_rep.get("bland_shots"),
             "weak_sex_vo_shots": vo_rep.get("weak_sex_vo_shots"),
+            "too_mild_shots": vo_rep.get("too_mild_shots"),
             "per_shot": vo_rep.get("per_shot"),
         },
+        "user_source_fidelity": {
+            "ok": fidelity_rep.get("ok"),
+            "codes": fidelity_rep.get("codes"),
+            "pollution_ratio": fidelity_rep.get("pollution_ratio"),
+            "polluted_shots": fidelity_rep.get("polluted_shots"),
+        },
+        "vo_motion": {
+            "ok": vo_motion_rep.get("ok"),
+            "codes": vo_motion_rep.get("codes"),
+            "mismatch_shots": vo_motion_rep.get("mismatch_shots"),
+        },
+        "poses": {
+            "ok": pose_rep.get("ok"),
+            "codes": pose_rep.get("codes"),
+            "unique": pose_rep.get("unique"),
+            "act_count": pose_rep.get("act_count"),
+        },
+        "montage": {
+            "ok": montage_rep.get("ok"),
+            "codes": montage_rep.get("codes"),
+            "unique_crafts": montage_rep.get("unique_crafts"),
+            "has_insert": montage_rep.get("has_insert"),
+            "has_smash": montage_rep.get("has_smash"),
+        },
+        "coitus": {
+            "ok": coitus_rep.get("ok"),
+            "enabled": coitus_rep.get("enabled"),
+            "codes": coitus_rep.get("codes"),
+            "beats_covered": coitus_rep.get("beats_covered"),
+            "missing_beats": coitus_rep.get("missing_beats"),
+            "readable_act_ratio": coitus_rep.get("readable_act_ratio"),
+            "unreadable_shots": coitus_rep.get("unreadable_shots"),
+        },
+        "size_ladder": {
+            "ok": size_rep.get("ok"),
+            "codes": size_rep.get("codes"),
+            "ranks": size_rep.get("ranks"),
+        },
         "note": (
-            "Sex floor ≥20% duration; undress ladder + continuity (衣服不回穿 / clamp / "
-            "start_pose); VO 荤梗 on every nar for max (sex_vo_strict). "
-            "See ecchi-story.md · sex-duration-floor · sex-undress-ladder · sex-vo-spice."
+            "Sex floor ≥30% duration (max); undress; VO spice/extreme; coitus six-beat; "
+            "size ladder; pose variety; montage craft. See adult-max-playbook.md"
         ),
     }
 
@@ -3393,7 +4527,7 @@ def resolve_heroine_cast_mode(
     heroines = [str(x).strip() for x in (heroine_ids or []) if str(x).strip()]
     cast = [str(x).strip() for x in (cast_ids or []) if str(x).strip()]
     masters = cast_masters if isinstance(cast_masters, dict) else {}
-    master_ids = [str(k).strip() for k in masters.keys() if str(k).strip()]
+    master_ids = [str(k).strip() for k in masters if str(k).strip()]
     # Female master candidates = masters not clearly male-coded
     female_masters = [
         m for m in master_ids if m.lower() not in _MALE_CAST_IDS and "male" not in m.lower()
@@ -3487,9 +4621,7 @@ def resolve_heroine_cast_mode(
             reasons.append("prompt_multi+cast_ids")
 
     if reasons and (
-        len(heroines) >= 2
-        or len(female_masters) >= 2
-        or (prompt_multi and ref_n >= 2)
+        len(heroines) >= 2 or len(female_masters) >= 2 or (prompt_multi and ref_n >= 2)
     ):
         if len(heroines) < 2 and len(female_masters) >= 2:
             heroines = list(female_masters)

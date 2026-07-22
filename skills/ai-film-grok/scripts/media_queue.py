@@ -8,10 +8,11 @@ import fcntl
 import hashlib
 import json
 import secrets
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any
 
 from media_qa import ALLOWED_VIDEO_ENDPOINTS, MediaQAError, analyze_media
 from production_gates import ProductionGateError, assert_pilot_allows_add
@@ -23,7 +24,6 @@ from security_policy import (
     safe_workspace_directory,
     validate_identifier,
 )
-
 
 OPERATIONS = frozenset({"image_gen", "image_edit", "image_to_video", "reference_to_video"})
 STATUS_PENDING = "pending"
@@ -67,7 +67,7 @@ def normalize_fail_reason(value: object) -> str:
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _parse_time(value: str) -> datetime:
@@ -150,16 +150,25 @@ class MediaQueue:
             attempts += int(job.get("attempts") or 0)
             if job.get("claimed_at") and job.get("completed_at"):
                 durations.append(
-                    max(0.0, (_parse_time(job["completed_at"]) - _parse_time(job["claimed_at"])).total_seconds())
+                    max(
+                        0.0,
+                        (
+                            _parse_time(job["completed_at"]) - _parse_time(job["claimed_at"])
+                        ).total_seconds(),
+                    )
                 )
         terminal = sum(counts.get(status, 0) for status in TERMINAL_STATUSES)
         return {
             "counts": counts,
             "jobs": len(state["jobs"]),
             "attempts": attempts,
-            "success_rate": round(counts.get(STATUS_SUCCEEDED, 0) / terminal, 4) if terminal else None,
+            "success_rate": round(counts.get(STATUS_SUCCEEDED, 0) / terminal, 4)
+            if terminal
+            else None,
             "mean_run_seconds": round(sum(durations) / len(durations), 3) if durations else None,
-            "budget_units": int((state.get("policy") or {}).get("budget_units") or self.budget_units),
+            "budget_units": int(
+                (state.get("policy") or {}).get("budget_units") or self.budget_units
+            ),
             "budget_remaining": max(
                 0,
                 int((state.get("policy") or {}).get("budget_units") or self.budget_units)
@@ -176,7 +185,7 @@ class MediaQueue:
         inputs: list[Path],
         max_attempts: int = 3,
         allow_without_pilot: bool = False,
-        assembly_receipt: Optional[Path] = None,
+        assembly_receipt: Path | None = None,
     ) -> dict[str, Any]:
         try:
             shot_id = validate_identifier(shot_id, field="shot id")
@@ -196,7 +205,7 @@ class MediaQueue:
         spec_path = self.root / "film-spec.json"
         if spec_path.is_file():
             try:
-                from narrative_control import assert_projection_ready, NarrativeControlError
+                from narrative_control import NarrativeControlError, assert_projection_ready
 
                 assert_projection_ready(self.root, require_locked=True)
             except NarrativeControlError as exc:
@@ -229,7 +238,12 @@ class MediaQueue:
         prompt_hash = sha256(prompt)
         input_records = [{"path": str(path), "sha256": sha256(path)} for path in resolved_inputs]
         identity = json.dumps(
-            {"shot_id": shot_id, "operation": operation, "prompt": prompt_hash, "inputs": input_records},
+            {
+                "shot_id": shot_id,
+                "operation": operation,
+                "prompt": prompt_hash,
+                "inputs": input_records,
+            },
             sort_keys=True,
         ).encode("utf-8")
         job_id = f"{shot_id}-{hashlib.sha256(identity).hexdigest()[:16]}"
@@ -239,9 +253,7 @@ class MediaQueue:
             if existing:
                 return existing
             existing_shot_ids = {
-                str(job.get("shot_id"))
-                for job in state["jobs"]
-                if job.get("shot_id")
+                str(job.get("shot_id")) for job in state["jobs"] if job.get("shot_id")
             }
             try:
                 assert_pilot_allows_add(
@@ -338,9 +350,9 @@ class MediaQueue:
                 else:
                     delay = min(max(base, 5 * (2 ** (attempts - 1))), 1800)
                 job["status"] = STATUS_PENDING
-                job["next_attempt_at"] = (current + timedelta(seconds=delay)).replace(
-                    microsecond=0
-                ).isoformat()
+                job["next_attempt_at"] = (
+                    (current + timedelta(seconds=delay)).replace(microsecond=0).isoformat()
+                )
             else:
                 job["status"] = STATUS_FAILED
             job.pop("claim_token", None)
@@ -395,7 +407,9 @@ class MediaQueue:
     ) -> dict[str, Any]:
         media = output.expanduser().resolve()
         if endpoint not in ALLOWED_VIDEO_ENDPOINTS:
-            raise QueueError(f"completion endpoint must be one of {sorted(ALLOWED_VIDEO_ENDPOINTS)}")
+            raise QueueError(
+                f"completion endpoint must be one of {sorted(ALLOWED_VIDEO_ENDPOINTS)}"
+            )
         qa = analyze_media(media, require_audio=False, require_motion=True)
         if not qa.get("ok"):
             raise QueueError(f"media output failed decode/duration/motion QA: {qa.get('errors')}")
@@ -403,7 +417,9 @@ class MediaQueue:
             state = self._read()
             job = self._running_job(state, job_id, claim_token)
             if job.get("operation") != endpoint:
-                raise QueueError(f"job operation {job.get('operation')} does not match endpoint {endpoint}")
+                raise QueueError(
+                    f"job operation {job.get('operation')} does not match endpoint {endpoint}"
+                )
             job["status"] = STATUS_SUCCEEDED
             job["completed_at"] = utc_now()
             job["receipt"] = {
@@ -425,7 +441,9 @@ class MediaQueue:
             for job in state["jobs"]:
                 if job.get("status") != STATUS_RUNNING or not job.get("claimed_at"):
                     continue
-                if current - _parse_time(job["claimed_at"]) > timedelta(seconds=stale_after_seconds):
+                if current - _parse_time(job["claimed_at"]) > timedelta(
+                    seconds=stale_after_seconds
+                ):
                     job["status"] = STATUS_PENDING
                     job["next_attempt_at"] = current.replace(microsecond=0).isoformat()
                     job.pop("claim_token", None)
@@ -451,7 +469,11 @@ def record_capability(root: Path | str, *, endpoint: str, media: Path) -> dict[s
         "media_sha256": sha256(media),
         "qa": qa,
     }
-    state = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"schema_version": 1, "checks": []}
+    state = (
+        json.loads(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else {"schema_version": 1, "checks": []}
+    )
     state.setdefault("checks", []).append(result)
     state["latest"] = result
     atomic_write_text(path, json.dumps(state, ensure_ascii=False, indent=2) + "\n")
@@ -476,7 +498,9 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip pilot user-approval gate (emergency / unit tests only)",
     )
-    add.add_argument("--assembly-receipt", help="Path to prompt_assembly_shot.json receipt for traceability")
+    add.add_argument(
+        "--assembly-receipt", help="Path to prompt_assembly_shot.json receipt for traceability"
+    )
     claim = sub.add_parser("claim")
     claim.add_argument("--root", required=True)
     status = sub.add_parser("status")
@@ -503,7 +527,9 @@ def main(argv: list[str] | None = None) -> int:
         help="typed fail reason: moderation|motion|rate_limit|decode|other",
     )
     fail.add_argument("--terminal", action="store_true")
-    requeue = sub.add_parser("requeue", help="Return failed/pending job to pending (no hand-edit JSON)")
+    requeue = sub.add_parser(
+        "requeue", help="Return failed/pending job to pending (no hand-edit JSON)"
+    )
     requeue.add_argument("--root", required=True)
     requeue.add_argument("--job-id", required=True)
     requeue.add_argument(

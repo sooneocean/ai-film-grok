@@ -6,6 +6,8 @@ import sys
 import unittest
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -18,17 +20,21 @@ from audio_recipe import (  # noqa: E402
 )
 
 
+@pytest.mark.slow
 class AudioRecipeTests(unittest.TestCase):
+    @pytest.mark.slow
     def test_policy_auto_never_sung(self) -> None:
         p = default_audio_policy(vo_mode="storyteller")
         self.assertEqual(p["mode"], "auto")
         self.assertFalse(p["allow_sung"])
 
+    @pytest.mark.slow
     def test_policy_musical_hybrid_allows_sung(self) -> None:
         p = validate_audio_policy({"mode": "musical_hybrid"}, vo_mode="hybrid")
         self.assertTrue(p["allow_sung"])
         self.assertEqual(p["max_sung_shots"], 1)
 
+    @pytest.mark.slow
     def test_sensory_short_nar_bed_focus(self) -> None:
         shot = {
             "id": "s1",
@@ -43,6 +49,7 @@ class AudioRecipeTests(unittest.TestCase):
         self.assertEqual(r, "bed_focus")
         self.assertTrue(any("sensory" in x or "bed_focus" in x for x in reasons))
 
+    @pytest.mark.slow
     def test_hook_is_narrate_bed(self) -> None:
         shot = {
             "id": "s1",
@@ -55,6 +62,7 @@ class AudioRecipeTests(unittest.TestCase):
         )
         self.assertEqual(r, "narrate_bed")
 
+    @pytest.mark.slow
     def test_sung_degrades_without_provider(self) -> None:
         shot = {
             "id": "s5",
@@ -80,6 +88,7 @@ class AudioRecipeTests(unittest.TestCase):
         self.assertEqual(rec["recipe"], "narrate_bed")
         self.assertEqual(rec["degraded_from"], "sung_beat")
 
+    @pytest.mark.slow
     def test_apply_fills_shots(self) -> None:
         shots = [
             {

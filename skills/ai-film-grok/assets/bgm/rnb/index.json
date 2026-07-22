@@ -1,0 +1,42 @@
+{
+  "kind": "bgm-library",
+  "license": "CC0",
+  "tracks": [
+    {
+      "file": "rnb_loop_01.wav",
+      "tempo": 85,
+      "duration_sec": 30,
+      "mood": "rnb",
+      "license_file": "rnb_loop_01.wav.license.txt"
+    },
+    {
+      "file": "rnb_loop_02.wav",
+      "tempo": 90,
+      "duration_sec": 30,
+      "mood": "rnb",
+      "license_file": "rnb_loop_02.wav.license.txt"
+    },
+    {
+      "file": "rnb_loop_03.wav",
+      "tempo": 80,
+      "duration_sec": 30,
+      "mood": "rnb",
+      "license_file": "rnb_loop_03.wav.license.txt"
+    },
+    {
+      "file": "rnb_loop_04.wav",
+      "tempo": 95,
+      "duration_sec": 30,
+      "mood": "rnb",
+      "license_file": "rnb_loop_04.wav.license.txt"
+    },
+    {
+      "file": "rnb_loop_05.wav",
+      "tempo": 88,
+      "duration_sec": 30,
+      "mood": "rnb",
+      "license_file": "rnb_loop_05.wav.license.txt"
+    }
+  ],
+  "note": "Procedurally generated CC0 R&B loops. Replace with licensed tracks for production."
+}

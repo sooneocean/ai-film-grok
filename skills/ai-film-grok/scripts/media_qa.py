@@ -11,7 +11,6 @@ from typing import Any
 
 from security_policy import minimal_subprocess_env
 
-
 # Grok Imagine + FRW video backends.
 # 2026-07-20 quality: bulk default is Seedance newvideo, NOT legacy img2video template.
 ALLOWED_VIDEO_ENDPOINTS = frozenset(
@@ -58,6 +57,7 @@ class MediaQAError(RuntimeError):
 
 
 def _run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[Any]:
+    kwargs.setdefault("timeout", 60)
     return subprocess.run(command, env=minimal_subprocess_env(), **kwargs)
 
 
@@ -122,8 +122,10 @@ def _motion_score(path: Path) -> tuple[float, int, float, int]:
     if len(frames) < 2:
         return 0.0, len(frames), 0.0, 0
     differences: list[float] = []
-    for before, after in zip(frames, frames[1:]):
-        differences.append(sum(abs(a - b) for a, b in zip(before, after)) / frame_size)
+    for before, after in zip(frames, frames[1:], strict=False):
+        differences.append(
+            sum(abs(a - b) for a, b in zip(before, after, strict=False)) / frame_size
+        )
     active_transitions = sum(difference >= FRAME_MOTION_THRESHOLD for difference in differences)
     continuity = active_transitions / len(differences)
     return (
@@ -209,7 +211,9 @@ def analyze_media(
         except (TypeError, ValueError):
             decoded_frames = int(round(duration * _rate(video_stream.get("avg_frame_rate"))))
         try:
-            motion_score, sampled_frames, motion_continuity, active_transitions = _motion_score(source)
+            motion_score, sampled_frames, motion_continuity, active_transitions = _motion_score(
+                source
+            )
         except (MediaQAError, subprocess.SubprocessError) as exc:
             errors.append(f"motion probe failed: {exc}")
     motion_ok = (
@@ -383,9 +387,7 @@ def analyze_still_geometry(
         # landscape delivery
         if aspect < 1.4 or aspect > 2.0:
             codes.append("KEYFRAME_ASPECT")
-            errors.append(
-                f"keyframe aspect {aspect:.3f} not 16:9 landscape (got {w}x{h})"
-            )
+            errors.append(f"keyframe aspect {aspect:.3f} not 16:9 landscape (got {w}x{h})")
 
     if nbytes < STILL_BYTES_SOFT_MIN and not codes:
         soft.append("KEYFRAME_BYTES_LOW")

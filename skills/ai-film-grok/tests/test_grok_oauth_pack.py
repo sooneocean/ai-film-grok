@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import json
 import sys
 from pathlib import Path
 from unittest import mock
@@ -16,6 +15,7 @@ sys.path.insert(0, str(SCRIPTS))
 import grok_oauth as go  # noqa: E402
 
 
+@pytest.mark.slow
 def test_file_to_data_url_png(tmp_path: Path) -> None:
     p = tmp_path / "t.png"
     # minimal valid-ish bytes
@@ -26,6 +26,7 @@ def test_file_to_data_url_png(tmp_path: Path) -> None:
     assert base64.b64decode(payload)[:4] == b"\x89PNG"
 
 
+@pytest.mark.slow
 def test_image_input_object_url_passthrough() -> None:
     assert go._image_input_object("https://example.com/a.png") == {
         "url": "https://example.com/a.png"
@@ -35,6 +36,7 @@ def test_image_input_object_url_passthrough() -> None:
     }
 
 
+@pytest.mark.slow
 def test_probe_pack_flags_without_auth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AIFILM_GROK_AUTH_PATH", str(tmp_path / "missing-auth.json"))
     monkeypatch.delenv("XAI_API_KEY", raising=False)
@@ -47,6 +49,7 @@ def test_probe_pack_flags_without_auth(tmp_path: Path, monkeypatch: pytest.Monke
     assert rep["pack"]["native_lipsync"] is False
 
 
+@pytest.mark.slow
 def test_chat_completion_json_mode_body(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict = {}
 
@@ -67,6 +70,7 @@ def test_chat_completion_json_mode_body(monkeypatch: pytest.MonkeyPatch) -> None
     assert captured["body"]["response_format"] == {"type": "json_object"}
 
 
+@pytest.mark.slow
 def test_video_submit_requires_image_for_15(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         go,
@@ -77,6 +81,7 @@ def test_video_submit_requires_image_for_15(monkeypatch: pytest.MonkeyPatch) -> 
         go.video_submit("leaf falls", model="grok-imagine-video-1.5")
 
 
+@pytest.mark.slow
 def test_video_submit_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         go,
@@ -94,6 +99,7 @@ def test_video_submit_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["ok"] is True
 
 
+@pytest.mark.slow
 def test_tts_speak_raw_mp3(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         go,
@@ -112,6 +118,7 @@ def test_tts_speak_raw_mp3(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     assert out.read_bytes() == audio
 
 
+@pytest.mark.slow
 def test_tts_backend_includes_grok() -> None:
     import tts_backend as tb
 
@@ -120,6 +127,7 @@ def test_tts_backend_includes_grok() -> None:
     tb.assert_voice_backend_compatible("grok", "zh-CN-XiaoxiaoNeural")
 
 
+@pytest.mark.slow
 def test_cli_help_lists_video_tts() -> None:
     # argparse smoke: main(["doctor"]) needs network — just ensure parser builds
     with mock.patch.object(sys, "argv", ["grok_oauth", "doctor"]):

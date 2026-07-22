@@ -16,9 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import struct
 import subprocess
-import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -29,7 +27,11 @@ API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 
 
 def _load_config_env() -> None:
-    cfg = (Path(__file__).resolve().parents[2] / "config.env" if (Path(__file__).resolve().parents[2] / "config.env").is_file() else Path.home() / ".grok/skills/ai-film-grok/config.env")
+    cfg = (
+        Path(__file__).resolve().parents[2] / "config.env"
+        if (Path(__file__).resolve().parents[2] / "config.env").is_file()
+        else Path.home() / ".grok/skills/ai-film-grok/config.env"
+    )
     if not cfg.is_file():
         return
     for line in cfg.read_text(encoding="utf-8").splitlines():
@@ -128,7 +130,11 @@ def main() -> int:
         if out.suffix.lower() == ".mp3":
             wav = out.with_suffix(".wav")
             _mp3_to_wav(out, wav)
-    print(json.dumps({"ok": True, "voice": voice, "model": model, "out": str(out), "chars": len(text)}))
+    print(
+        json.dumps(
+            {"ok": True, "voice": voice, "model": model, "out": str(out), "chars": len(text)}
+        )
+    )
     return 0
 
 

@@ -8,7 +8,6 @@ Without approval, at most PILOT_MAX_SHOTS_WITHOUT_APPROVAL distinct shot_ids may
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
@@ -17,10 +16,11 @@ from film_spec import (
     DEFAULT_DURATION_SEC,
     LOOP_RISK_VO_SEC,
     VO_PACING_SLACK_SEC,
+    FilmSpecError,
     estimate_nar_vo_sec,
     validate_film_spec,
-    FilmSpecError,
 )
+from util import read_json
 
 PILOT_MAX_SHOTS_WITHOUT_APPROVAL = 3
 PILOT_APPROVAL_NAME = "pilot-approval.json"
@@ -30,22 +30,12 @@ class ProductionGateError(RuntimeError):
     """Raised when a production gate blocks the operation."""
 
 
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
-
-
 def pilot_approval_path(root: Path) -> Path:
     return Path(root).expanduser().resolve() / "receipts" / PILOT_APPROVAL_NAME
 
 
 def load_pilot_approval(root: Path) -> dict[str, Any]:
-    return _read_json(pilot_approval_path(root))
+    return read_json(pilot_approval_path(root) or {})
 
 
 def pilot_is_user_approved(data: dict[str, Any] | None) -> bool:
@@ -61,9 +51,7 @@ def pilot_is_user_approved(data: dict[str, Any] | None) -> bool:
     notes = str(data.get("notes") or "")
     if "pilot 过" in notes or "pilot过" in notes:
         return True
-    if "user approved pilot" in notes.lower() or "pilot passed by user" in notes.lower():
-        return True
-    return False
+    return bool("user approved pilot" in notes.lower() or "pilot passed by user" in notes.lower())
 
 
 def assert_pilot_user_approved(
@@ -260,7 +248,7 @@ def assert_tts_rehearsal_timing(
     if force:
         return {"skipped": True, "reason": "force"}
     root = Path(root).expanduser().resolve()
-    spec = _read_json(root / "film-spec.json")
+    spec = read_json(root / "film-spec.json") or {}
     env_strict = os.environ.get("AIFILM_STRICT_TTS_REHEARSAL", "").strip().lower() in {
         "1",
         "true",
@@ -318,7 +306,7 @@ def assert_no_loop_risk(
     data = spec
     if data is None and root is not None:
         path = Path(root).expanduser().resolve() / "film-spec.json"
-        data = _read_json(path)
+        data = read_json(path) or {}
         if not data:
             if force:
                 return []

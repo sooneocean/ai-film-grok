@@ -10,16 +10,16 @@ import argparse
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from util import read_json
 from production_gates import (
     load_pilot_approval,
     loop_risk_shots_from_spec,
     pilot_is_user_approved,
 )
+from util import read_json
 
 ECCHI_TONE = re.compile(
     r"色气|里番|同人|诱惑|后宫|sensual|ecchi|seductive|rnb|soul",
@@ -32,8 +32,7 @@ class PreflightError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _issue(level: str, code: str, msg: str, *, fix: str = "") -> dict[str, str]:
@@ -61,14 +60,16 @@ def run_preflight(root: Path) -> dict[str, Any]:
     if not man:
         hard.append(_issue("hard", "no_manifest", "missing manifest.json", fix="aifilm init …"))
     if not spec:
-        hard.append(_issue("hard", "no_spec", "missing film-spec.json", fix="aifilm write-spec --root …"))
+        hard.append(
+            _issue("hard", "no_spec", "missing film-spec.json", fix="aifilm write-spec --root …")
+        )
     if style.get("state") != "Approved" and not style.get("locked"):
         soft.append(
             _issue(
                 "soft",
                 "style_not_approved",
                 f"Visual Bible state is {style.get('state', 'Unknown')} (unlocked), expected Approved",
-                fix='aifilm bible lock --root …',
+                fix="aifilm bible lock --root …",
             )
         )
 
@@ -78,14 +79,12 @@ def run_preflight(root: Path) -> dict[str, Any]:
         try:
             import copy
 
-            from framing_lint import lint_framing_iron
             from film_spec import validate_film_spec
+            from framing_lint import lint_framing_iron
 
             shots_for_frame: list = []
             try:
-                shots_for_frame = validate_film_spec(
-                    copy.deepcopy(spec), assign_missing_ids=False
-                )
+                shots_for_frame = validate_film_spec(copy.deepcopy(spec), assign_missing_ids=False)
             except Exception:
                 for scene in spec.get("scenes") or []:
                     if not isinstance(scene, dict):
@@ -131,9 +130,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 os.environ.get("AIFILM_STRICT_TTS_REHEARSAL", "").strip().lower()
                 in {"1", "true", "yes"}
             )
-            tts_timing = bind_receipt_to_spec_timing(
-                root, strict=strict_reh, raise_on_fail=False
-            )
+            tts_timing = bind_receipt_to_spec_timing(root, strict=strict_reh, raise_on_fail=False)
             if strict_reh and not tts_timing.get("present"):
                 hard.append(
                     _issue(
@@ -167,9 +164,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
             )
 
         try:
-            risk = loop_risk_shots_from_spec(
-                spec, measured_by_shot=measured_map or None, root=root
-            )
+            risk = loop_risk_shots_from_spec(spec, measured_by_shot=measured_map or None, root=root)
         except Exception:
             risk = []
         if risk:
@@ -243,11 +238,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
 
         # --- Sex duration floor (性爱片段 act+climax ≥20% plate · 2026-07-21) ---
         try:
-            heat_rep = (
-                spec.get("_heat_arc")
-                if isinstance(spec.get("_heat_arc"), dict)
-                else None
-            )
+            heat_rep = spec.get("_heat_arc") if isinstance(spec.get("_heat_arc"), dict) else None
             if heat_rep is None:
                 from edit_policy import lint_heat_arc
 
@@ -267,8 +258,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     heat_shots,
                     heat_scale=spec.get("heat_scale"),
                     sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
-                    audience_profile=intent.get("audience_profile")
-                    or spec.get("audience_profile"),
+                    audience_profile=intent.get("audience_profile") or spec.get("audience_profile"),
                 )
             heat_codes = list(heat_rep.get("codes") or [])
             if "HEAT_SEX_DURATION_LOW" in heat_codes:
@@ -378,7 +368,11 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     if isinstance(sh, dict):
                         stance_shots.append(sh)
             # Prefer write-spec report if present
-            report = spec.get("_character_stance") if isinstance(spec.get("_character_stance"), dict) else None
+            report = (
+                spec.get("_character_stance")
+                if isinstance(spec.get("_character_stance"), dict)
+                else None
+            )
             if report and report.get("codes"):
                 codes = list(report.get("codes") or [])
             else:
@@ -409,7 +403,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             "soft",
                             "STANCE_FIELDS_SPARSE",
                             f"{missing_vp}/{len(stance_shots)} shots missing dsl.viewpoint",
-                            fix='run write-spec to inject stance, or set viewpoint/focal_character by hand',
+                            fix="run write-spec to inject stance, or set viewpoint/focal_character by hand",
                         )
                     )
         except Exception:
@@ -430,7 +424,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         "hard",
                         "tts_neural_on_external",
                         str(tts_exc)[:280],
-                        fix='final --tts-backend edge（中文旁白）；或把 vo_voice 改成 provider voice id',
+                        fix="final --tts-backend edge（中文旁白）；或把 vo_voice 改成 provider voice id",
                     )
                 )
         except ImportError:
@@ -441,7 +435,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "soft",
                     "tts_external_risk",
                     f"tts_backend={tts!r} or AIFILM_TTS_ARGV set — 中文 Neural ID 勿塞 ElevenLabs",
-                    fix='final 时显式 --tts-backend edge（中文说书默认）；本机克隆用 voicebox',
+                    fix="final 时显式 --tts-backend edge（中文说书默认）；本机克隆用 voicebox",
                 )
             )
         # Phase F: 说书人 + 非 edge → soft 提示（minimax/fish 可做但中文短片默认 edge）
@@ -452,7 +446,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "soft",
                     "tts_storyteller_not_edge",
                     f"vo_mode={vo_mode} 但 tts_backend={tts!r} — 中文说书默认 edge 更稳",
-                    fix='write-spec 会把 auto 钉 edge；或 final --tts-backend edge',
+                    fix="write-spec 会把 auto 钉 edge；或 final --tts-backend edge",
                 )
             )
         if tts == "voicebox":
@@ -474,7 +468,9 @@ def run_preflight(root: Path) -> dict[str, Any]:
 
         # BGM mood
         tone = ""
-        intent = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+        intent = (
+            spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+        )
         tone = str(intent.get("tone") or "") + " " + str(spec.get("title") or "")
         sp = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else {}
         mood = str(sp.get("mood") or "").lower()
@@ -487,7 +483,11 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     fix="改 sound_plan.mood 为 rnb/soul/sensual；horror 才用 dark",
                 )
             )
-        elif ECCHI_TONE.search(tone) and mood and mood not in {"rnb", "soul", "sensual", "seductive", "warm", "playful", ""}:
+        elif (
+            ECCHI_TONE.search(tone)
+            and mood
+            and mood not in {"rnb", "soul", "sensual", "seductive", "warm", "playful", ""}
+        ):
             soft.append(
                 _issue(
                     "soft",
@@ -582,7 +582,11 @@ def run_preflight(root: Path) -> dict[str, Any]:
             )
 
         # Meaningful motion (story-bearing dynamics)
-        mm = spec.get("_meaningful_motion") if isinstance(spec.get("_meaningful_motion"), dict) else {}
+        mm = (
+            spec.get("_meaningful_motion")
+            if isinstance(spec.get("_meaningful_motion"), dict)
+            else {}
+        )
         mm_codes = list(mm.get("codes") or [])
         if not mm_codes:
             shots_mm: list = []
@@ -741,8 +745,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
             from film_spec import validate_film_spec
 
             shot_ids_for_inv = [
-                str(s["id"])
-                for s in validate_film_spec(spec, assign_missing_ids=False)
+                str(s["id"]) for s in validate_film_spec(spec, assign_missing_ids=False)
             ]
         except Exception:
             # fall back to raw ids without full validation
@@ -870,7 +873,11 @@ def run_preflight(root: Path) -> dict[str, Any]:
 
             outputs = man.get("outputs") if isinstance(man.get("outputs"), dict) else {}
             has_final = isinstance(outputs.get("final_film"), dict)
-            if gates.get("clips_complete") and not has_final and not has_valid_preview_receipt(root):
+            if (
+                gates.get("clips_complete")
+                and not has_final
+                and not has_valid_preview_receipt(root)
+            ):
                 soft.append(
                     _issue(
                         "soft",
@@ -883,7 +890,9 @@ def run_preflight(root: Path) -> dict[str, Any]:
             pass
     except Exception as exc:
         soft.append(
-            _issue("soft", "hyperframes_probe_error", str(exc)[:200], fix="检查 compose_render 导入")
+            _issue(
+                "soft", "hyperframes_probe_error", str(exc)[:200], fix="检查 compose_render 导入"
+            )
         )
 
     # concurrent final warning file
@@ -903,7 +912,9 @@ def run_preflight(root: Path) -> dict[str, Any]:
     try:
         from media_qa import analyze_still_geometry, pick_best_keyframe
 
-        aspect = str((spec or {}).get("aspect_ratio") or "9:16") if isinstance(spec, dict) else "9:16"
+        aspect = (
+            str((spec or {}).get("aspect_ratio") or "9:16") if isinstance(spec, dict) else "9:16"
+        )
         shot_list: list[Any] = []
         if isinstance(spec, dict):
             for sc in spec.get("scenes") or []:
@@ -951,7 +962,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         f"{b['shot_id']}={b.get('width')}x{b.get('height')} {b.get('codes')}"
                         for b in sample
                     )
-                    + (f" …(+{len(bad_geo)-5})" if len(bad_geo) > 5 else ""),
+                    + (f" …(+{len(bad_geo) - 5})" if len(bad_geo) > 5 else ""),
                     fix=(
                         "re-export still ≥720×1280 9:16 full-res; use pick_best_keyframe (prefer png); "
                         "never I2V from thumbnail. lessons-2026-07-22-keyframe-no-compress.md"

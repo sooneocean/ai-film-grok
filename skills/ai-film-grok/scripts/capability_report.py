@@ -18,9 +18,11 @@ from __future__ import annotations
 import json
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from util import read_json, write_json
 
 FRW_RECEIPT_REL = "receipts/frw-key-capability.json"
 SPEC_REL = "film-spec.json"
@@ -38,22 +40,7 @@ class CapabilityError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-
-def _read_json(path: Path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return raw if isinstance(raw, dict) else None
-
-
-def _write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def skill_dir() -> Path:
@@ -61,7 +48,7 @@ def skill_dir() -> Path:
 
 
 def load_frw_receipt(root: Path) -> dict[str, Any] | None:
-    return _read_json(Path(root).expanduser().resolve() / FRW_RECEIPT_REL)
+    return read_json(Path(root).expanduser().resolve() / FRW_RECEIPT_REL)
 
 
 def summarize_frw_receipt(receipt: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -129,9 +116,7 @@ def suggest_i2v_from_canary(
             "when Seedance returns: AIFILM_I2V_PROFILE=seedance_first + canary 201",
         ]
         out["changes"] = {
-            k: {"from": cur.get(k), "to": v}
-            for k, v in out["patch"].items()
-            if cur.get(k) != v
+            k: {"from": cur.get(k), "to": v} for k, v in out["patch"].items() if cur.get(k) != v
         }
         out["current"] = {
             "i2v_provider": cur.get("i2v_provider"),
@@ -185,9 +170,11 @@ def suggest_i2v_from_canary(
         warnings.append(f"unclear L1 from canary (recommended_l1={l1!r} seedance={seedance!r})")
         recs.append("re-run canary with --full or check FRW_API_KEY")
 
-    if l2 == "ltx-t2v" or str(receipt.get("ltx_t2v") or "").startswith("201") or receipt.get(
-        "ltx_t2v"
-    ) == "completed":
+    if (
+        l2 == "ltx-t2v"
+        or str(receipt.get("ltx_t2v") or "").startswith("201")
+        or receipt.get("ltx_t2v") == "completed"
+    ):
         patch["frw_env_model"] = "ltx-t2v"
         rationale.append("ltx-t2v usable → L2 env beds ltx-t2v")
     elif l2:
@@ -223,7 +210,7 @@ def apply_i2v_patch(root: Path, patch: dict[str, Any], *, dry_run: bool = False)
     spec_path = root / SPEC_REL
     if not spec_path.is_file():
         raise CapabilityError(f"film-spec missing: {spec_path}")
-    spec = _read_json(spec_path)
+    spec = read_json(spec_path)
     if not spec:
         raise CapabilityError(f"cannot read film-spec: {spec_path}")
 
@@ -244,7 +231,7 @@ def apply_i2v_patch(root: Path, patch: dict[str, Any], *, dry_run: bool = False)
         meta["at"] = utc_now()
         meta["patch"] = {k: v["to"] for k, v in applied.items()}
         spec["_capability_apply"] = meta
-        _write_json(spec_path, spec)
+        write_json(spec_path, spec)
 
     return {
         "ok": True,
@@ -384,9 +371,7 @@ def build_capability_report(
                 f'backend-lock inspect/lock --backend wav2lip --root "{w2}"'
             )
         else:
-            recommendations.append(
-                "lipsync: no backend (default off is OK for storyteller)"
-            )
+            recommendations.append("lipsync: no backend (default off is OK for storyteller)")
 
     # Grok OAuth (grok login → ~/.grok/auth.json)
     grok_oauth: dict[str, Any] = {"ok": False}
@@ -399,9 +384,7 @@ def build_capability_report(
                 "Grok OAuth ready — chat/image API via auth.json; in-session still prefer image_gen/edit tools"
             )
         else:
-            recommendations.append(
-                "Grok OAuth not ready — run: grok login  (or set XAI_API_KEY)"
-            )
+            recommendations.append("Grok OAuth not ready — run: grok login  (or set XAI_API_KEY)")
     except Exception as exc:  # noqa: BLE001
         grok_oauth = {"ok": False, "error": str(exc)[:200]}
 
@@ -427,7 +410,8 @@ def build_capability_report(
             raise CapabilityError(f"root not a directory: {root_resolved}")
 
         if run_canary:
-            from frw_canary import run_canary as _run, write_receipt  # type: ignore
+            from frw_canary import run_canary as _run  # type: ignore
+            from frw_canary import write_receipt
 
             report = _run(wait=canary_wait, full=canary_full)
             path = write_receipt(root_resolved, report)
@@ -456,7 +440,7 @@ def build_capability_report(
                     "frw canary receipt not ok — re-run canary or switch L1 to Grok per degrade doc"
                 )
 
-        spec = _read_json(root_resolved / SPEC_REL)
+        spec = read_json(root_resolved / SPEC_REL)
         if spec:
             film_block = {
                 "present": True,
@@ -560,7 +544,8 @@ def build_capability_report(
         },
         "runtime_lock": {
             "ok": bool(runtime.get("ok")),
-            "errors": runtime.get("errors") or ([runtime.get("error")] if runtime.get("error") else []),
+            "errors": runtime.get("errors")
+            or ([runtime.get("error")] if runtime.get("error") else []),
         },
         "tools": tools,
         "designed_post": {
@@ -593,11 +578,15 @@ def build_capability_report(
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
-    p = argparse.ArgumentParser(prog="capability_report", description="ai-film-grok capability one-pager")
+    p = argparse.ArgumentParser(
+        prog="capability_report", description="ai-film-grok capability one-pager"
+    )
     p.add_argument("--root", default=None)
     p.add_argument("--run-canary", action="store_true")
     p.add_argument("--suggest-i2v", action="store_true")
-    p.add_argument("--apply", action="store_true", help="Write suggested i2v fields into film-spec (opt-in)")
+    p.add_argument(
+        "--apply", action="store_true", help="Write suggested i2v fields into film-spec (opt-in)"
+    )
     p.add_argument("--canary-wait", action="store_true")
     p.add_argument("--canary-full", action="store_true")
     args = p.parse_args(argv)
@@ -606,7 +595,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"ok": False, "error": "--apply requires --root"}, ensure_ascii=False))
         return 2
     if args.run_canary and not args.root:
-        print(json.dumps({"ok": False, "error": "--run-canary requires --root"}, ensure_ascii=False))
+        print(
+            json.dumps({"ok": False, "error": "--run-canary requires --root"}, ensure_ascii=False)
+        )
         return 2
 
     try:
