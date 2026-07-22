@@ -244,6 +244,28 @@
       },
       "additionalProperties": true
     },
+    "content_channels_strict": {
+      "type": "boolean",
+      "default": false,
+      "description": "Require explicit separation of voice, performance, motion, and in-scene triggers."
+    },
+    "subtitle_carryovers": {
+      "type": "array",
+      "description": "Explicit human-approved subtitle carry-over across a hard/Continue cut.",
+      "items": {
+        "type": "object",
+        "required": ["from_shot_id", "to_shot_id", "cue_start_sec", "cue_end_sec", "reason", "human_approved"],
+        "properties": {
+          "from_shot_id": {"type": "string", "minLength": 1},
+          "to_shot_id": {"type": "string", "minLength": 1},
+          "cue_start_sec": {"type": "number", "minimum": 0},
+          "cue_end_sec": {"type": "number", "exclusiveMinimum": 0},
+          "reason": {"type": "string", "minLength": 3},
+          "human_approved": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      }
+    },
     "sound_plan": {
       "type": "object",
       "properties": {
@@ -306,6 +328,36 @@
         "properties": {
           "title": { "type": "string" },
           "summary": { "type": "string" },
+          "director_board": {
+            "type": "object",
+            "description": "Director decision board per scene — the questions a director answers at a production meeting. Mirrors drama-graph beat.director_board; write-spec lints authored (non-placeholder) on scene_strict.",
+            "properties": {
+              "emotional_turn": {
+                "type": "string",
+                "description": "Where the audience's feeling pivots in this scene. e.g. 'curiosity → voyeuristic pull'"
+              },
+              "audience_question": {
+                "type": "string",
+                "description": "The question the scene makes the audience hold. e.g. 'will she close the distance?'"
+              },
+              "coverage_strategy": {
+                "type": "string",
+                "description": "What coverage serves the scene's turn — insert on object, OTS reverse, wide hold?"
+              },
+              "cut_intent": {
+                "type": "string",
+                "description": "How this scene should cut — smash on the turn, hold on the afterglow, montage on the act?"
+              },
+              "image_priority": { "type": "string" },
+              "sound_priority": { "type": "string" },
+              "approval_state": {
+                "type": "string",
+                "enum": ["draft", "review", "approved"],
+                "description": "approved required before bulk generate when scene_strict=true"
+              }
+            },
+            "additionalProperties": true
+          },
           "shots": {
             "type": "array",
             "items": {
@@ -332,6 +384,17 @@
                 },
                 "duration_sec": { "type": "number", "exclusiveMinimum": 0, "maximum": 60 },
                 "lipsync": { "type": "boolean" },
+                "dialogue": { "type": "string" },
+                "speaker_on_camera": { "type": "boolean" },
+                "scene_trigger": { "type": "string" },
+                "content_channels": {
+                  "type": "object",
+                  "properties": {
+                    "voice": { "type": "object" },
+                    "performance": { "type": "object" },
+                    "motion": { "type": "object" }
+                  }
+                },
                 "heat_phase": {
                   "type": "string",
                   "enum": ["setup", "foreplay", "act", "climax", "afterglow", "bridge"],
@@ -400,6 +463,18 @@
                     "start_pose": { "type": "string" },
                     "end_pose": { "type": "string" },
                     "nar_en": { "type": "string" },
+                    "subtext": {
+                      "type": "string",
+                      "description": "Character interiority — the unspoken thought driving this beat. Fights 'motion without performance': I2V can move bodies, subtext makes them act. See principles.md P0/P4"
+                    },
+                    "playable_action": {
+                      "type": "string",
+                      "description": "Actable verb the performer executes (distinguish from motion=camera move). e.g. 'reaches for lock' not 'push-in'. Performance intent for I2V prompt."
+                    },
+                    "body_state": {
+                      "type": "string",
+                      "description": "Micro-expression / physiological texture: held breath, trembling lips, flushed skin. The granularity a director gives actors between marks."
+                    },
                     "camera": {
                       "type": "object",
                       "properties": {

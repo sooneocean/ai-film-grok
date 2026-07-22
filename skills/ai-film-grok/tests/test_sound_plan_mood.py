@@ -1,4 +1,5 @@
 """BGM mood defaults: 色气 → rnb, never horror dark by accident."""
+
 from __future__ import annotations
 
 import sys
@@ -77,6 +78,29 @@ class SoundPlanMoodTests(unittest.TestCase):
         spec = _spec("暗黑同人里番", sound_plan={"mood": "dark", "bed": True})
         validate_film_spec(spec, assign_missing_ids=False)
         self.assertEqual(spec["sound_plan"]["mood"], "rnb")
+
+    def test_horror_tone_gets_dark_not_rnb(self) -> None:
+        """Genre migration test (2026-07-22): horror storyteller film must
+        get 'dark', not the storyteller-default 'rnb'."""
+        d = default_sound_plan_for_film(tone="恐怖·惊悚", vo_mode="storyteller")
+        self.assertEqual(d["mood"], "dark")
+
+    def test_horror_in_title_gets_dark(self) -> None:
+        d = default_sound_plan_for_film(
+            tone="悬疑", title="走廊尽头的病房", vo_mode="storyteller"
+        )
+        self.assertEqual(d["mood"], "dark")
+
+    def test_horror_dark_not_rewritten_by_ecchi_check(self) -> None:
+        """A horror tone explicitly asking for dark should keep it
+        (tone_implies_ecchi is False for horror, so no rewrite)."""
+        plan = validate_sound_plan(
+            {"mood": "dark", "bed": True},
+            tone="恐怖",
+            title="走廊尽头的病房",
+        )
+        assert plan is not None
+        self.assertEqual(plan["mood"], "dark")
 
 
 if __name__ == "__main__":

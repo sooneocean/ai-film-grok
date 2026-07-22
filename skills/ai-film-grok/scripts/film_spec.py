@@ -5,6 +5,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from audio_recipe import (
+    AudioRecipeError,
+    apply_audio_recipes_to_spec,
+    probe_caps_for_root,
+)
+from content_channels import lint_content_channels
 from continuity import (
     lint_continuity,
     lint_frame_chain,
@@ -15,44 +21,41 @@ from continuity import (
 from continuity_chain import (
     is_long_form,
 )
-from framing_lint import lint_framing_iron
 from edit_policy import (
+    _CRAFT_WHY,
     DEFAULT_TRANSITION_SEC,
     PolicyError,
     apply_coverage_defaults_to_shot,
     apply_heat_phase_defaults,
     apply_wardrobe_continuity,
+    edit_crafts_to_intents,
+    enforce_continue_hard_joins,
     lint_character_stance,
     lint_heat_arc,
     lint_multi_heroine,
-    resolve_heroine_cast_mode,
-    enforce_continue_hard_joins,
+    normalize_edit_craft,
     normalize_heat_scale,
     normalize_transition_intent,
     normalize_transition_sec,
     normalize_transition_styles,
     normalize_xfade_style,
+    resolve_heroine_cast_mode,
+    suggest_edit_crafts,
     suggest_transition_intents,
     suggest_transition_styles,
-    suggest_edit_crafts,
-    normalize_edit_craft,
-    edit_crafts_to_intents,
-    _CRAFT_WHY,
     validate_motion,
 )
+from framing_lint import lint_framing_iron, lint_vertical_safe_area
+from rhythm import lint_rhythm
 from security_policy import SecurityPolicyError, validate_identifier
-from audio_recipe import (
-    AudioRecipeError,
-    apply_audio_recipes_to_spec,
-    probe_caps_for_root,
-)
 from sound_plan import (
     SoundPlanError,
     default_sound_plan_for_film,
+    inject_auto_sfx_if_empty,
+    inject_sex_sfx_from_shots,
     resolve_sidechain,
     validate_sound_plan,
 )
-
 
 VO_MODES = frozenset({"storyteller", "character", "hybrid"})
 TTS_BACKENDS = frozenset({"auto", "minimax", "fish", "voicebox", "edge", "external", "grok"})
@@ -101,7 +104,11 @@ def _load_i2v_profile_env() -> None:
     import os
     from pathlib import Path
 
-    cfg = (Path(__file__).resolve().parents[1] / "config.env" if (Path(__file__).resolve().parents[1] / "config.env").is_file() else Path.home() / ".grok/skills/ai-film-grok/config.env")
+    cfg = (
+        Path(__file__).resolve().parents[1] / "config.env"
+        if (Path(__file__).resolve().parents[1] / "config.env").is_file()
+        else Path.home() / ".grok/skills/ai-film-grok/config.env"
+    )
     if not cfg.is_file():
         return
     for line in cfg.read_text(encoding="utf-8").splitlines():
@@ -300,10 +307,157 @@ def validate_dramatic_function(value: object, *, field: str) -> str:
         )
     fn = value.strip().lower()
     if fn not in DRAMATIC_FUNCTIONS:
-        raise FilmSpecError(
-            f"{field} must be one of {sorted(DRAMATIC_FUNCTIONS)}; got {value!r}"
-        )
+        raise FilmSpecError(f"{field} must be one of {sorted(DRAMATIC_FUNCTIONS)}; got {value!r}")
     return fn
+
+
+# Placeholder strings that never count as authored director intent (mirrors
+# narrative_control.PLACEHOLDER_RE so film-spec and drama-graph agree on
+# "needs_authoring" semantics).
+_PERFORMANCE_PLACEHOLDERS = frozenset(
+    {
+        "",
+        "todo",
+        "tbd",
+        "needs_authoring",
+        "待补",
+        "待定",
+        "待填写",
+    }
+)
+
+# Fields that carry character interiority — the "why" behind the motion.
+# Absent or placeholder → SHOT_PERFORMANCE_MISSING (warning by default;
+# performance_strict=true raises). Aligns film-spec with drama-graph's
+# shot-level validation (see narrative_control.validate_narrative_graph).
+PERFORMANCE_FIELDS = ("subtext", "playable_action", "body_state")
+
+
+def _is_unauthored(value: object) -> bool:
+    return not isinstance(value, str) or value.strip().lower() in _PERFORMANCE_PLACEHOLDERS
+
+
+def lint_performance(shots: list[dict[str, Any]]) -> dict[str, Any]:
+    """Surface shots that have motion but no performance intent.
+
+    I2V can move bodies; subtext is what makes them *act*. This lint is the
+    film-spec echo of drama-graph's SHOT_PERFORMANCE_MISSING — it asks, for
+    every shot: "we know the camera moves, but what is the character's
+    interior change A→B?" Missing on hook/approach/action is a stronger
+    signal than on bridge/insert (env beds have no performer).
+    """
+    issues: list[dict[str, Any]] = []
+    for shot in shots:
+        sid = str(shot.get("id") or "")
+        dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+        fn = str(shot.get("dramatic_function") or "").strip().lower()
+        role = str(shot.get("shot_role") or "hero").strip().lower()
+        # Env/insert beds have no performer to direct — skip performance lint.
+        if role in {"env", "insert"} and fn == "bridge":
+            continue
+        missing = [f for f in PERFORMANCE_FIELDS if _is_unauthored(dsl.get(f))]
+        if not missing:
+            continue
+        # hook/approach/action carry the story spine — stronger severity.
+        spine = fn in {"hook", "approach", "action"}
+        issues.append(
+            {
+                "code": "SHOT_PERFORMANCE_MISSING",
+                "severity": "warning",
+                "shot_id": sid,
+                "fields": missing,
+                "dramatic_function": fn,
+                "message": (
+                    f"{sid} ({fn}) has motion but no performance intent: "
+                    f"missing {missing}. I2V moves the body; subtext makes it act. "
+                    "Fill dsl.subtext (interiority) / playable_action (actable verb) "
+                    "/ body_state (micro-expression)."
+                ),
+                "spine": spine,
+            }
+        )
+    return {
+        "ok": len(issues) == 0,
+        "codes": sorted({i["code"] for i in issues}),
+        "warning_count": len(issues),
+        "issues": issues,
+    }
+
+
+# Director board fields mirrored from narrative_control.DIRECTOR_BOARD_FIELDS
+# so the production contract and the canonical graph stay in sync.
+DIRECTOR_BOARD_FIELDS = (
+    "emotional_turn",
+    "audience_question",
+    "coverage_strategy",
+    "cut_intent",
+)
+
+
+def lint_director_board(scenes: list[dict[str, Any]]) -> dict[str, Any]:
+    """Check each scene's director_board is authored, not placeholder.
+
+    The director board is the production-meeting checklist: what turns, what
+    question does the audience hold, how do we cover and cut it. A scene
+    with a board full of "needs_authoring" has had its shots pre-decided
+    without a director's pass — the classic AI-film failure of beautiful
+    frames with no governing intent.
+    """
+    issues: list[dict[str, Any]] = []
+    for idx, scene in enumerate(scenes, start=1):
+        if not isinstance(scene, dict):
+            continue
+        board = scene.get("director_board")
+        label = f"scene{idx}"
+        if not isinstance(board, dict):
+            # No board at all is soft by default (existing films don't have it);
+            # scene_strict=true will require it. We report, don't fail.
+            issues.append(
+                {
+                    "code": "DIRECTOR_BOARD_MISSING",
+                    "severity": "warning",
+                    "scene": label,
+                    "message": (
+                        f"{label} has no director_board — emotional_turn / "
+                        "audience_question / coverage_strategy / cut_intent "
+                        "should be authored before bulk."
+                    ),
+                }
+            )
+            continue
+        for field in DIRECTOR_BOARD_FIELDS:
+            if _is_unauthored(board.get(field)):
+                issues.append(
+                    {
+                        "code": "DIRECTOR_BOARD_FIELD_MISSING",
+                        "severity": "warning",
+                        "scene": label,
+                        "field": field,
+                        "message": (
+                            f"{label}.director_board.{field} is missing or placeholder — "
+                            "author it before approving this scene for bulk."
+                        ),
+                    }
+                )
+        approval = str(board.get("approval_state") or "draft").strip().lower()
+        if approval not in {"draft", "review", "approved"}:
+            issues.append(
+                {
+                    "code": "DIRECTOR_BOARD_APPROVAL_INVALID",
+                    "severity": "warning",
+                    "scene": label,
+                    "message": (
+                        f"{label}.director_board.approval_state must be "
+                        "draft|review|approved; got {approval!r}"
+                    ),
+                }
+            )
+    return {
+        "ok": len(issues) == 0,
+        "codes": sorted({i["code"] for i in issues}),
+        "warning_count": len(issues),
+        "issues": issues,
+    }
 
 
 def validate_film_spec(
@@ -347,9 +501,7 @@ def validate_film_spec(
                 "bulk image_to_video 720p; still=image_edit cast; register image_to_video)"
             )
         else:
-            i2v_notes.append(
-                "auto→frw for bulk 2V (Seedance newvideo; Grok still for identity)"
-            )
+            i2v_notes.append("auto→frw for bulk 2V (Seedance newvideo; Grok still for identity)")
         spec["_i2v_notes"] = i2v_notes
     # Soft warn if profile is grok_primary but user left i2v_provider=frw + seedance model
     if i2v_profile == "grok_primary" and i2v_provider == "frw":
@@ -363,9 +515,7 @@ def validate_film_spec(
     # FRW video model (Seedance/LTX path). auto → seedance id kept as aspirational label
     raw_fvm = spec.get("frw_video_model", default_frw_video_model())
     if not isinstance(raw_fvm, str) or raw_fvm.lower() not in FRW_VIDEO_MODELS:
-        raise FilmSpecError(
-            f"film-spec frw_video_model must be one of {sorted(FRW_VIDEO_MODELS)}"
-        )
+        raise FilmSpecError(f"film-spec frw_video_model must be one of {sorted(FRW_VIDEO_MODELS)}")
     fvm = raw_fvm.lower()
     if fvm == "auto":
         fvm = default_frw_video_model()
@@ -396,8 +546,10 @@ def validate_film_spec(
     # Seedance defaults for agent CLI (aspect/resolution/duration)
     if "frw_aspect_ratio" not in spec or not spec.get("frw_aspect_ratio"):
         ar = str(spec.get("aspect_ratio") or DEFAULT_FRW_ASPECT)
-        spec["frw_aspect_ratio"] = "9:16" if ar in {"9:16", "9x16"} else (
-            "16:9" if ar in {"16:9", "16x9"} else DEFAULT_FRW_ASPECT
+        spec["frw_aspect_ratio"] = (
+            "9:16"
+            if ar in {"9:16", "9x16"}
+            else ("16:9" if ar in {"16:9", "16x9"} else DEFAULT_FRW_ASPECT)
         )
     if "frw_resolution" not in spec or not spec.get("frw_resolution"):
         # fast-i2v template defaults 720p; do not invent 576
@@ -432,9 +584,7 @@ def validate_film_spec(
     # Env / synth layer model (LTX T2V beds — no face import)
     raw_env = spec.get("frw_env_model", DEFAULT_FRW_ENV_MODEL)
     if not isinstance(raw_env, str) or raw_env.lower() not in FRW_ENV_MODELS:
-        raise FilmSpecError(
-            f"film-spec frw_env_model must be one of {sorted(FRW_ENV_MODELS)}"
-        )
+        raise FilmSpecError(f"film-spec frw_env_model must be one of {sorted(FRW_ENV_MODELS)}")
     env_m = raw_env.lower()
     if env_m == "auto":
         env_m = DEFAULT_FRW_ENV_MODEL
@@ -449,11 +599,7 @@ def validate_film_spec(
     if "_frw_t2v_fallback_chain" not in spec:
         spec["_frw_t2v_fallback_chain"] = list(FRW_T2V_FALLBACK_CHAIN)
     # Layer routing summary for agents (P1 hero vs P5 synth)
-    hero_primary = (
-        "grok_image_to_video_720p"
-        if i2v_provider == "grok"
-        else f"frw:{fvm}"
-    )
+    hero_primary = "grok_image_to_video_720p" if i2v_provider == "grok" else f"frw:{fvm}"
     spec["_layer_routing"] = {
         "i2v_profile": i2v_profile,
         "hero_still": "grok_image_edit_cast",
@@ -470,7 +616,9 @@ def validate_film_spec(
             "balance + seedance-2-fast-i2v smoke + ltx-t2v; 403≠502"
         ),
         "register_endpoint_hero": (
-            "image_to_video" if i2v_provider == "grok" else "frw_seedance_i2v|frw_ltx_*|frw_img2video"
+            "image_to_video"
+            if i2v_provider == "grok"
+            else "frw_seedance_i2v|frw_ltx_*|frw_img2video"
         ),
         "designed_post": "hyperframes|remotion",
         "note": (
@@ -556,7 +704,9 @@ def validate_film_spec(
         raise FilmSpecError(str(exc)) from exc
 
     # BGM: 色气/storyteller default rnb (R&B/Soul seductive). dark only for horror.
-    intent_for_sound = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+    intent_for_sound = (
+        spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+    )
     tone_txt = str((intent_for_sound or {}).get("tone") or "")
     try:
         if spec.get("sound_plan") is None:
@@ -619,11 +769,11 @@ def validate_film_spec(
     if isinstance(raw_cast, list):
         cast_ids = [str(x).strip() for x in raw_cast if str(x).strip()]
     elif isinstance(raw_cast, dict):
-        cast_ids = [str(k).strip() for k in raw_cast.keys() if str(k).strip()]
+        cast_ids = [str(k).strip() for k in raw_cast if str(k).strip()]
     # style-bible may not be in film-spec; optional cast_masters on spec
     cm = spec.get("cast_masters")
     if isinstance(cm, dict):
-        for k in cm.keys():
+        for k in cm:
             if str(k).strip() and str(k) not in cast_ids:
                 cast_ids.append(str(k).strip())
     if not cast_ids:
@@ -677,9 +827,7 @@ def validate_film_spec(
                     role = DEFAULT_SHOT_ROLE
             else:
                 if not isinstance(raw_role, str) or raw_role.lower() not in SHOT_ROLES:
-                    raise FilmSpecError(
-                        f"{shot_id}.shot_role must be one of {sorted(SHOT_ROLES)}"
-                    )
+                    raise FilmSpecError(f"{shot_id}.shot_role must be one of {sorted(SHOT_ROLES)}")
                 role = raw_role.lower()
             shot["shot_role"] = role
             # Recommend engine per layer (agent CLI; not auto-dispatched)
@@ -768,9 +916,7 @@ def validate_film_spec(
     # Aggregate VO budget report (non-blocking summary for agents / status)
     total_est = sum(float(s.get("est_vo_sec") or 0) for s in shots)
     long_recommended = [
-        s["id"]
-        for s in shots
-        if len(str(s.get("nar") or "")) > RECOMMENDED_NAR_CHARS
+        s["id"] for s in shots if len(str(s.get("nar") or "")) > RECOMMENDED_NAR_CHARS
     ]
     # Soft advisory: still surface shots that sit near the 6s plate edge.
     loop_risk = [
@@ -796,6 +942,32 @@ def validate_film_spec(
         )
     except AudioRecipeError as exc:
         raise FilmSpecError(str(exc)) from exc
+
+    # Adult flesh SFX → sound_plan events (after voice_tracks auto sound_cues)
+    try:
+        heat_for_sfx = str(spec.get("heat_scale") or "").strip().lower() or None
+        sp = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
+        if sp is None and heat_for_sfx in {"max", "hot"}:
+            sp = default_sound_plan_for_film(
+                vo_mode=str(spec.get("vo_mode") or "storyteller"),
+                tone=str((spec.get("director_intent") or {}).get("tone") or ""),
+                title=str(spec.get("title") or ""),
+                description=str(spec.get("description") or ""),
+            )
+        if isinstance(sp, dict):
+            sp = inject_auto_sfx_if_empty(sp, shots, heat_scale=heat_for_sfx)
+            sp = inject_sex_sfx_from_shots(sp, shots, heat_scale=heat_for_sfx)
+            spec["sound_plan"] = sp
+            if sp.get("_notes"):
+                notes = list(spec.get("_sound_plan_notes") or [])
+                for n in sp.get("_notes") or []:
+                    if n not in notes:
+                        notes.append(n)
+                spec["_sound_plan_notes"] = notes
+    except Exception as exc:  # noqa: BLE001 — soft
+        notes = list(spec.get("_sound_plan_notes") or [])
+        notes.append(f"sex_sfx inject soft-fail: {exc}")
+        spec["_sound_plan_notes"] = notes
 
     # Voice-coupled editorial strategy (after vocal_color exists)
     try:
@@ -867,7 +1039,11 @@ def validate_film_spec(
     crafts: list[str] = []
     focals_for_craft = [
         str(
-            ((s.get("dsl") or {}).get("focal_character") if isinstance(s.get("dsl"), dict) else None)
+            (
+                (s.get("dsl") or {}).get("focal_character")
+                if isinstance(s.get("dsl"), dict)
+                else None
+            )
             or s.get("focal_character")
             or "hero"
         )
@@ -889,8 +1065,7 @@ def validate_film_spec(
             )
         try:
             crafts = [
-                normalize_edit_craft(x, field=f"edit_craft[{i}]")
-                for i, x in enumerate(raw_crafts)
+                normalize_edit_craft(x, field=f"edit_craft[{i}]") for i, x in enumerate(raw_crafts)
             ]
         except PolicyError as exc:
             raise FilmSpecError(str(exc)) from exc
@@ -983,11 +1158,7 @@ def validate_film_spec(
     # Dual caption soft report (not hard fail — agent can fill nar_en later)
     cap_mode = str(spec.get("caption_mode") or "zh")
     if cap_mode == "zh_en":
-        missing_en = [
-            str(s.get("id"))
-            for s in shots
-            if not str(s.get("nar_en") or "").strip()
-        ]
+        missing_en = [str(s.get("id")) for s in shots if not str(s.get("nar_en") or "").strip()]
         spec["_caption_mode_report"] = {
             "mode": "zh_en",
             "missing_nar_en": missing_en,
@@ -1024,9 +1195,7 @@ def validate_film_spec(
                 )
             except PolicyError as exc:
                 raise FilmSpecError(str(exc)) from exc
-            spec["_transition_styles_source"] = (
-                "edit_craft" if crafts else "beat_suggest"
-            )
+            spec["_transition_styles_source"] = "edit_craft" if crafts else "beat_suggest"
 
     # Layer identity soft report: T2V/env beds must not claim hero face lock
     layer_issues: list[dict[str, Any]] = []
@@ -1053,8 +1222,7 @@ def validate_film_spec(
         elif role in {"env", "insert", "bridge"}:
             # warn if author writes face-fill language on env bed
             blob = " ".join(
-                str(dsl.get(k) or "")
-                for k in ("subject", "action", "motion", "story_beat")
+                str(dsl.get(k) or "") for k in ("subject", "action", "motion", "story_beat")
             ).lower()
             if any(
                 k in blob
@@ -1119,8 +1287,49 @@ def validate_film_spec(
     }
     if spec.get("stance_strict") is True and not stance.get("ok"):
         raise FilmSpecError(
-            "character stance lint failed (stance_strict): "
-            + ",".join(stance.get("codes") or [])
+            "character stance lint failed (stance_strict): " + ",".join(stance.get("codes") or [])
+        )
+
+    # Performance / subtext (soft; performance_strict raises) — the director's
+    # answer to "the camera moves, but what is the character's interior A→B?"
+    # Mirrors drama-graph SHOT_PERFORMANCE_MISSING so the production contract
+    # and canonical graph share one standard.
+    perf = lint_performance(shots)
+    spec["_performance_lint"] = {
+        "ok": perf["ok"],
+        "codes": perf["codes"],
+        "warning_count": perf["warning_count"],
+        "issues": perf["issues"],
+        "note": (
+            "Soft: hero shots should carry subtext / playable_action / body_state. "
+            "I2V moves bodies; performance intent makes them act. "
+            "Set performance_strict=true to hard-fail. See principles.md P0/P4"
+        ),
+    }
+    if spec.get("performance_strict") is True and not perf["ok"]:
+        raise FilmSpecError(
+            "performance lint failed (performance_strict): " + ",".join(perf["codes"])
+        )
+
+    # Director decision board per scene (soft; scene_strict raises) — mirrors
+    # drama-graph beat.director_board. A scene without authored emotional_turn /
+    # audience_question / coverage_strategy / cut_intent has been pre-shot
+    # without a director's pass.
+    board = lint_director_board(scenes)
+    spec["_director_board_lint"] = {
+        "ok": board["ok"],
+        "codes": board["codes"],
+        "warning_count": board["warning_count"],
+        "issues": board["issues"],
+        "note": (
+            "Soft: each scene should author director_board (emotional_turn / "
+            "audience_question / coverage_strategy / cut_intent). "
+            "Set scene_strict=true to require approval_state=approved before bulk."
+        ),
+    }
+    if spec.get("scene_strict") is True and not board["ok"]:
+        raise FilmSpecError(
+            "director board lint failed (scene_strict): " + ",".join(board["codes"])
         )
 
     # VO–motion link / anti-fatigue (soft; lessons-2026-07-17-vo-motion-link)
@@ -1138,9 +1347,7 @@ def validate_film_spec(
             vml = {
                 **vml,
                 "issues": list(vml.get("issues") or []) + list(stl.get("issues") or []),
-                "codes": sorted(
-                    set(vml.get("codes") or []) | set(stl.get("codes") or [])
-                ),
+                "codes": sorted(set(vml.get("codes") or []) | set(stl.get("codes") or [])),
                 "warning_count": int(vml.get("warning_count") or 0)
                 + int(stl.get("warning_count") or 0),
                 "ok": bool(vml.get("ok")) and bool(stl.get("ok")),
@@ -1173,6 +1380,30 @@ def validate_film_spec(
         raise FilmSpecError(
             "meaningful motion lint failed (meaningful_motion_strict): "
             + ",".join(mm["codes"] or ["MOTION"])
+        )
+
+    # Content channels: keep spoken text, visible performance and motion apart.
+    channel_report = lint_content_channels(shots)
+    spec["_content_channels"] = channel_report
+    if spec.get("content_channels_strict") is True and not channel_report["ok"]:
+        raise FilmSpecError(
+            "content channel lint failed (content_channels_strict): "
+            + ",".join(channel_report["codes"] or ["CONTENT_CHANNEL"])
+        )
+
+    # Director rhythm: hook timing, coverage repetition, size pressure, button.
+    target_duration = spec.get("target_duration")
+    rhythm = lint_rhythm(shots, target_duration=float(target_duration) if target_duration else None)
+    spec["_rhythm"] = {
+        "ok": rhythm["ok"],
+        "codes": rhythm["codes"],
+        "warning_count": rhythm["warning_count"],
+        "issues": rhythm["issues"],
+        "note": "Advisory by default; set rhythm_strict=true after director grammar is authored.",
+    }
+    if spec.get("rhythm_strict") is True and rhythm["warning_count"] > 0:
+        raise FilmSpecError(
+            "rhythm lint failed (rhythm_strict): " + ",".join(rhythm["codes"] or ["RHYTHM"])
         )
     # Frame chain (soft; lessons-2026-07-20-frame-chain) — soft/hold joins need end→start poses
     fch = lint_frame_chain(shots, transition_intents=intents)
@@ -1210,12 +1441,23 @@ def validate_film_spec(
         "issues": frm["issues"],
         "note": frm.get("note"),
     }
-    if spec.get("framing_strict") is True and (
-        frm["warning_count"] > 0 or frm["error_count"] > 0
-    ):
+    if spec.get("framing_strict") is True and (frm["warning_count"] > 0 or frm["error_count"] > 0):
         raise FilmSpecError(
-            "framing iron lint failed (framing_strict): "
-            + ",".join(frm["codes"] or ["FRAMING"])
+            "framing iron lint failed (framing_strict): " + ",".join(frm["codes"] or ["FRAMING"])
+        )
+
+    safe_area = lint_vertical_safe_area(shots)
+    spec["_vertical_safe_area"] = {
+        "ok": safe_area["ok"],
+        "codes": safe_area["codes"],
+        "warning_count": safe_area["warning_count"],
+        "issues": safe_area["issues"],
+        "note": "Declare platform UI, subtitle, subject and prop-safe zones for 9:16 shots.",
+    }
+    if spec.get("vertical_safe_area_strict") is True and safe_area["warning_count"] > 0:
+        raise FilmSpecError(
+            "vertical safe-area lint failed (vertical_safe_area_strict): "
+            + ",".join(safe_area["codes"] or ["VERTICAL_SAFE_AREA"])
         )
 
     # Heat + cast: elastic (no auto-pin heat_scale; metrics optional)
@@ -1229,9 +1471,7 @@ def validate_film_spec(
         spec["heat_scale"] = heat_scale
     # heat_phase fill only when asked (or when heat_scale already set and heat_phase_auto≠false)
     heat_phase_auto = spec.get("heat_phase_auto")
-    if heat_phase_auto is True or (
-        heat_scale is not None and heat_phase_auto is not False
-    ):
+    if heat_phase_auto is True or (heat_scale is not None and heat_phase_auto is not False):
         filled_hp = apply_heat_phase_defaults(shots)
         if filled_hp:
             notes = list(spec.get("_heat_notes") or [])
@@ -1244,6 +1484,9 @@ def validate_film_spec(
         audience_profile = intent.get("audience_profile")
     elif isinstance(spec.get("audience_profile"), str):
         audience_profile = spec.get("audience_profile")
+    coitus_grammar = (
+        spec.get("coitus_grammar") if isinstance(spec.get("coitus_grammar"), dict) else None
+    )
     # 卸装阶梯延续：前镜状态继承；衣服不回穿（lint HEAT_WARDROBE_RE_DRESS）
     wardrobe_cont = apply_wardrobe_continuity(shots, heat_scale=heat_scale)
     if (
@@ -1255,26 +1498,89 @@ def validate_film_spec(
         notes = list(spec.get("_heat_notes") or [])
         bits = []
         if wardrobe_cont.get("filled_ids"):
-            bits.append(
-                "wardrobe inherit: " + ",".join(wardrobe_cont["filled_ids"][:12])
-            )
+            bits.append("wardrobe inherit: " + ",".join(wardrobe_cont["filled_ids"][:12]))
         if wardrobe_cont.get("bumped_ids"):
-            bits.append(
-                "wardrobe undress-bump: " + ",".join(wardrobe_cont["bumped_ids"][:12])
-            )
+            bits.append("wardrobe undress-bump: " + ",".join(wardrobe_cont["bumped_ids"][:12]))
         if wardrobe_cont.get("clamped_ids"):
-            bits.append(
-                "wardrobe re-dress CLAMPED: "
-                + ",".join(wardrobe_cont["clamped_ids"][:12])
-            )
+            bits.append("wardrobe re-dress CLAMPED: " + ",".join(wardrobe_cont["clamped_ids"][:12]))
         if wardrobe_cont.get("start_pose_ids"):
             bits.append(
-                "start_pose undress-lock: "
-                + ",".join(wardrobe_cont["start_pose_ids"][:12])
+                "start_pose undress-lock: " + ",".join(wardrobe_cont["start_pose_ids"][:12])
             )
         notes.append("; ".join(bits))
         spec["_heat_notes"] = notes
     spec["_wardrobe_continuity"] = wardrobe_cont
+    # spice_level default from heat/audience
+    try:
+        from edit_policy import HARDCORE_CRAFT_SPINE, normalize_spice_level
+    except Exception:  # pragma: no cover
+        normalize_spice_level = None  # type: ignore
+        HARDCORE_CRAFT_SPINE = ()  # type: ignore
+    spice_level = spec.get("spice_level")
+    if normalize_spice_level is not None:
+        resolved_spice = normalize_spice_level(
+            spice_level, heat_scale=heat_scale, audience_profile=audience_profile
+        )
+        if resolved_spice and not spice_level:
+            spec["spice_level"] = resolved_spice
+            spice_level = resolved_spice
+        elif spice_level:
+            spice_level = str(spice_level).strip().lower()
+
+    # Hardcore flat craft → inject montage spine (unless lock_craft)
+    craft_raw = spec.get("edit_craft")
+    craft_list: list[str] = []
+    if isinstance(craft_raw, list):
+        craft_list = [str(c) for c in craft_raw if str(c).strip()]
+    elif isinstance(craft_raw, str) and craft_raw.strip():
+        craft_list = [craft_raw.strip()]
+    ap_l = str(audience_profile or "").strip().lower()
+    hardcore_aud = ap_l in {"hardcore_male", "hardcore", "重口男向"}
+    lock_craft = False
+    es = spec.get("edit_strategy") if isinstance(spec.get("edit_strategy"), dict) else {}
+    lock_craft = bool(es.get("lock_craft"))
+    if (
+        hardcore_aud
+        and heat_scale == "max"
+        and not lock_craft
+        and (len(set(c.lower() for c in craft_list)) < 4 or not craft_list)
+    ):
+        n_join = max(1, len(shots) - 1)
+        spine = list(HARDCORE_CRAFT_SPINE)
+        while len(spine) < n_join:
+            spine.extend(HARDCORE_CRAFT_SPINE)
+        craft_list = spine[:n_join]
+        spec["edit_craft"] = craft_list
+        notes = list(spec.get("_heat_notes") or [])
+        notes.append("hardcore edit_craft spine injected (montage/insert/smash)")
+        spec["_heat_notes"] = notes
+
+    # Prefer story-normalize raw for fidelity check when present on disk
+    source_excerpt = (
+        str(
+            spec.get("source_script")
+            or spec.get("source_excerpt")
+            or (spec.get("_plan") or {}).get("raw_excerpt")
+            or ""
+        ).strip()
+        or None
+    )
+    if film_root is not None and not source_excerpt:
+        try:
+            from pathlib import Path as _P
+
+            norm_path = _P(film_root) / "receipts" / "story-normalize.json"
+            if norm_path.is_file():
+                import json as _json
+
+                norm = _json.loads(norm_path.read_text(encoding="utf-8"))
+                if isinstance(norm, dict):
+                    source_excerpt = (
+                        str(norm.get("raw_excerpt") or norm.get("logline") or "").strip() or None
+                    )
+        except Exception:
+            source_excerpt = source_excerpt
+
     heat_rep = lint_heat_arc(
         shots,
         heat_scale=heat_scale,
@@ -1283,12 +1589,31 @@ def validate_film_spec(
         sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
         audience_profile=audience_profile,
         advise=heat_advise,
+        coitus_grammar=coitus_grammar,
+        spice_level=str(spice_level) if spice_level else None,
+        edit_craft=craft_list or None,
+        source_excerpt=source_excerpt,
     )
     spec["_heat_arc"] = heat_rep
     if spec.get("heat_arc_strict") is True and heat_rep["warning_count"] > 0:
         raise FilmSpecError(
-            "heat arc lint failed (heat_arc_strict): "
-            + ",".join(heat_rep["codes"] or ["HEAT"])
+            "heat arc lint failed (heat_arc_strict): " + ",".join(heat_rep["codes"] or ["HEAT"])
+        )
+    # P0 user-source fidelity only protects actual user source, never stock plans.
+    fidelity_strict = spec.get("user_source_fidelity_strict")
+    if fidelity_strict is None:
+        fidelity_strict = heat_scale == "max" and bool(source_excerpt)
+    if fidelity_strict is True and not source_excerpt:
+        raise FilmSpecError(
+            "user source fidelity requires source_excerpt when user_source_fidelity_strict=true"
+        )
+    fid_codes = [c for c in (heat_rep.get("codes") or []) if str(c).startswith("USER_SOURCE_")]
+    if fidelity_strict is True and fid_codes:
+        raise FilmSpecError(
+            "user source fidelity failed (user_source_fidelity_strict): "
+            + ",".join(fid_codes)
+            + " — 用户原文被 adult-max 库存旁白覆盖。保留用户诗白/对白/专名；"
+            "荤梗只可补后缀。See lessons-2026-07-22-user-source-fidelity.md"
         )
     sex_floor_strict = spec.get("sex_floor_strict")
     if sex_floor_strict is None:
@@ -1297,12 +1622,16 @@ def validate_film_spec(
     if "HEAT_SEX_DURATION_LOW" in (heat_rep.get("codes") or []):
         # Proactive orchestration: Auto-extend act/climax shots to meet ratio
         act_shots = [
-            sh for sh in shots if isinstance(sh, dict)
+            sh
+            for sh in shots
+            if isinstance(sh, dict)
             and str(sh.get("heat_phase") or "").strip().lower() in {"act", "climax"}
         ]
         if act_shots:
             for sh in act_shots:
-                sh["duration_sec"] = max(10.0, float(sh.get("duration_sec") or DEFAULT_DURATION_SEC))
+                sh["duration_sec"] = max(
+                    10.0, float(sh.get("duration_sec") or DEFAULT_DURATION_SEC)
+                )
             # Re-lint after auto-extension
             heat_rep = lint_heat_arc(
                 shots,
@@ -1312,6 +1641,9 @@ def validate_film_spec(
                 sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
                 audience_profile=audience_profile,
                 advise=heat_advise,
+                coitus_grammar=coitus_grammar,
+                spice_level=str(spice_level) if spice_level else None,
+                edit_craft=craft_list or None,
             )
             spec["_heat_arc"] = heat_rep
 
@@ -1321,7 +1653,7 @@ def validate_film_spec(
         raise FilmSpecError(
             "sex duration floor failed (sex_floor_strict): HEAT_SEX_DURATION_LOW "
             f"sex_duration_ratio={ratio} floor={floor} — "
-            "raise act+climax duration_sec share to ≥20% of total (or set "
+            "raise act+climax duration_sec share to ≥30% of total (or set "
             "sex_min_duration_ratio / sex_floor_strict:false). See ecchi-story.md"
         )
     # Sex wardrobe: act/climax must undress; continuity monotonic (衣服不回穿); hard on max.
@@ -1362,6 +1694,7 @@ def validate_film_spec(
             "HEAT_VO_SPICE_MISSING",
             "HEAT_VO_SEX_VERB_WEAK",
             "HEAT_VO_SPICE_RATIO_LOW",
+            "HEAT_VO_SPICE_TOO_MILD",
         }
     ]
     if sex_vo_strict is True and vo_fail_codes:
@@ -1369,7 +1702,74 @@ def validate_film_spec(
             "sex VO spice failed (sex_vo_strict): "
             + ",".join(vo_fail_codes)
             + " — every nar needs 荤梗; act/climax need 沉腰/办穿/吃进/锁腰/高潮… "
-            "禁纯文艺灯暗句。See lessons-2026-07-21-sex-vo-spice.md"
+            "extreme 档禁纯双关。See lessons-2026-07-21-sex-vo-spice.md"
+        )
+
+    # Coitus six-beat + mute-frame pose (hard on hardcore / enabled grammar / max)
+    _hardcore_profiles = {"hardcore_male", "hardcore", "重口男向"}
+    coitus_strict = spec.get("coitus_strict")
+    if coitus_strict is None:
+        ap = str(audience_profile or "").strip().lower()
+        coitus_strict = ap in _hardcore_profiles or bool(
+            (coitus_grammar or {}).get("enabled") is True
+        )
+    coitus_fail_codes = [
+        c
+        for c in (heat_rep.get("codes") or [])
+        if c
+        in {
+            "COITUS_BEAT_MISSING",
+            "COITUS_UNREADABLE_POSE",
+            "COITUS_PSEUDO_SEX",
+        }
+    ]
+    if coitus_strict is True and coitus_fail_codes:
+        raise FilmSpecError(
+            "coitus grammar failed (coitus_strict): "
+            + ",".join(coitus_fail_codes)
+            + " — assign coitus_beat entry→hook; act stills must be coitus-readable "
+            "(straddle/hips-sink/grind), not hug-only. See intercourse-impact-benchmark."
+        )
+
+    size_ladder_strict = spec.get("size_ladder_strict")
+    if size_ladder_strict is None:
+        size_ladder_strict = str(audience_profile or "").strip().lower() in _hardcore_profiles
+    size_fail_codes = [c for c in (heat_rep.get("codes") or []) if str(c).startswith("SIZE_")]
+    if size_ladder_strict is True and size_fail_codes:
+        raise FilmSpecError(
+            "size ladder failed (size_ladder_strict): "
+            + ",".join(size_fail_codes)
+            + " — vary WS→MS→CU→insert; do not reopen wide mid-act. "
+            "See size-ladder-hardcore-stack."
+        )
+
+    montage_strict = spec.get("montage_strict")
+    if montage_strict is None:
+        montage_strict = str(audience_profile or "").strip().lower() in _hardcore_profiles
+    montage_fail = [c for c in (heat_rep.get("codes") or []) if str(c).startswith("MONTAGE_")]
+    if montage_strict is True and montage_fail:
+        raise FilmSpecError(
+            "montage craft failed (montage_strict): "
+            + ",".join(montage_fail)
+            + " — need insert/smash/montage variety. See montage-hardcore-male."
+        )
+
+    pose_strict = spec.get("pose_strict")
+    if pose_strict is None:
+        pose_strict = str(audience_profile or "").strip().lower() in _hardcore_profiles
+    if pose_strict is True and "SEX_POSE_STALE" in (heat_rep.get("codes") or []):
+        raise FilmSpecError(
+            "sex pose variety failed (pose_strict): SEX_POSE_STALE — "
+            "rotate sex_pose across act shots (straddle/cowgirl/from_behind…)."
+        )
+
+    vo_motion_strict = spec.get("sex_vo_motion_strict")
+    if vo_motion_strict is None:
+        vo_motion_strict = str(audience_profile or "").strip().lower() in _hardcore_profiles
+    if vo_motion_strict is True and "HEAT_VO_MOTION_MISMATCH" in (heat_rep.get("codes") or []):
+        raise FilmSpecError(
+            "vo-motion align failed (sex_vo_motion_strict): HEAT_VO_MOTION_MISMATCH — "
+            "mirror nar sex verbs in dsl.action/motion."
         )
 
     # Heroine cast mode: single (default) vs multi — elastic from prompt/images/fields
@@ -1447,9 +1847,7 @@ def validate_film_spec(
     }
     spec["_multi_heroine"] = mh
     notes = list(spec.get("_cast_mode_notes") or [])
-    notes.append(
-        f"cast_mode={resolved.get('mode')} reasons={resolved.get('reasons')}"
-    )
+    notes.append(f"cast_mode={resolved.get('mode')} reasons={resolved.get('reasons')}")
     spec["_cast_mode_notes"] = notes
     if spec.get("multi_heroine_strict") is True and mh["warning_count"] > 0:
         raise FilmSpecError(

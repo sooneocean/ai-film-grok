@@ -43,6 +43,22 @@ ECCHI_TONE_HINTS = (
     "r-18",
 )
 
+# Horror/thriller tone keywords — detected BEFORE ecchi so a horror storyteller
+# film gets "dark" not "rnb". Found by genre migration test (2026-07-22):
+# default_sound_plan_for_film gave horror films rnb because vo_mode=storyteller
+# overrode the tone signal.
+HORROR_TONE_HINTS = (
+    "恐怖",
+    "惊悚",
+    "horror",
+    "thriller",
+    "scary",
+    "creepy",
+    "诡异",
+    "悬疑",  # suspense-thriller adjacent
+    "suspense",
+)
+
 
 class SoundPlanError(ValueError):
     pass
@@ -105,7 +121,9 @@ def resolve_sidechain(
                 try:
                     base[key] = float(overrides[key])
                 except (TypeError, ValueError) as exc:
-                    raise SoundPlanError(f"sidechain override {key} invalid: {overrides[key]!r}") from exc
+                    raise SoundPlanError(
+                        f"sidechain override {key} invalid: {overrides[key]!r}"
+                    ) from exc
 
     # clamp sane ranges
     base["threshold"] = max(0.001, min(1.0, base["threshold"]))
@@ -154,9 +172,7 @@ def resolve_loudnorm(
     if mode_s in {"false", "no", "0", "never"}:
         mode_s = "off"
     if mode_s not in LOUDNORM_MODES:
-        raise SoundPlanError(
-            f"loudnorm mode must be off|auto|on; got {raw_mode!r}"
-        )
+        raise SoundPlanError(f"loudnorm mode must be off|auto|on; got {raw_mode!r}")
     tgt = target_lufs
     if tgt is None and plan.get("target_lufs") is not None:
         try:
@@ -303,9 +319,7 @@ def resolve_music_template(
     if mode_s in {"false", "no", "0", "never"}:
         mode_s = "off"
     if mode_s not in MUSIC_TEMPLATE_MODES:
-        raise SoundPlanError(
-            f"music_template mode must be off|auto|on; got {raw_mode!r}"
-        )
+        raise SoundPlanError(f"music_template mode must be off|auto|on; got {raw_mode!r}")
 
     # Explicit --music always wins
     if music_arg:
@@ -316,8 +330,10 @@ def resolve_music_template(
             p = alt if alt.is_file() else p
         if not p.is_file():
             raise SoundPlanError(f"--music file not found: {music_arg}")
-        lic = (music_license or "").strip() or _license_sidecar_for(p) or (
-            "user-supplied file (set --music-license for commercial claims)"
+        lic = (
+            (music_license or "").strip()
+            or _license_sidecar_for(p)
+            or ("user-supplied file (set --music-license for commercial claims)")
         )
         return {
             "path": str(p.resolve()),
@@ -409,9 +425,13 @@ def resolve_music_template(
     except ValueError:
         pool_index = 0
 
-    lic = (music_license or "").strip() or _license_sidecar_for(found) or (
-        f"{source} path={found.name}; "
-        "not a commercial license grant — add *.license.txt or --music-license"
+    lic = (
+        (music_license or "").strip()
+        or _license_sidecar_for(found)
+        or (
+            f"{source} path={found.name}; "
+            "not a commercial license grant — add *.license.txt or --music-license"
+        )
     )
     rel: str | None
     try:
@@ -454,9 +474,24 @@ def normalize_sound_mood(value: object) -> str:
     )
 
 
-def tone_implies_ecchi(tone: str | None, title: str | None = None, description: str | None = None) -> bool:
+def tone_implies_ecchi(
+    tone: str | None, title: str | None = None, description: str | None = None
+) -> bool:
     blob = " ".join(x for x in (tone or "", title or "", description or "") if x).lower()
     return any(h.lower() in blob for h in ECCHI_TONE_HINTS)
+
+
+def tone_implies_horror(
+    tone: str | None, title: str | None = None, description: str | None = None
+) -> bool:
+    """Detect horror/thriller before ecchi — a horror storyteller film
+    needs 'dark', not the storyteller-default 'rnb'.
+
+    Found by genre migration test (2026-07-22): default_sound_plan_for_film
+    gave horror films rnb because vo_mode=storyteller overrode the tone signal.
+    """
+    blob = " ".join(x for x in (tone or "", title or "", description or "") if x).lower()
+    return any(h.lower() in blob for h in HORROR_TONE_HINTS)
 
 
 def default_sound_plan_for_film(
@@ -466,8 +501,15 @@ def default_sound_plan_for_film(
     title: str | None = None,
     description: str | None = None,
 ) -> dict[str, Any]:
-    """Default bed for new films: 色气/storyteller → rnb; never dark unless horror tone."""
-    if tone_implies_ecchi(tone, title, description) or vo_mode in ("storyteller", "hybrid"):
+    """Default bed for new films.
+
+    Priority: horror tone → dark (before storyteller→rnb); ecchi → rnb;
+    else storyteller → rnb, character → warm. Genre migration test
+    (2026-07-22) proved storyteller default must not mask horror tone.
+    """
+    if tone_implies_horror(tone, title, description):
+        mood = "dark"
+    elif tone_implies_ecchi(tone, title, description) or vo_mode in ("storyteller", "hybrid"):
         mood = "rnb"
     else:
         mood = "warm"
@@ -609,21 +651,70 @@ _BEAT_SFX_KIND = {
     "bridge": "generic",
 }
 
+# heat_phase → adult flesh accent (v1.10.2)
+_HEAT_SFX_KIND = {
+    "setup": "whoosh",
+    "foreplay": "breath",
+    "act": "impact",
+    "climax": "impact",
+    "afterglow": "breath",
+    "bridge": "generic",
+}
+
+
+def _shot_heat_phase(shot: dict[str, Any]) -> str:
+    hp = str(shot.get("heat_phase") or "").strip().lower()
+    if hp:
+        return hp
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    hp = str(dsl.get("heat_phase") or "").strip().lower()
+    return hp
+
+
+def _kind_from_shot_cues(shot: dict[str, Any]) -> str | None:
+    """Map shot sound_cues / _sfx_kinds_from_cues to primary accent kind."""
+    kinds = shot.get("_sfx_kinds_from_cues")
+    if isinstance(kinds, list) and kinds:
+        k = str(kinds[0]).strip().lower()
+        if k in SFX_KINDS:
+            return k
+    cues = shot.get("sound_cues")
+    if isinstance(cues, list):
+        for c in cues:
+            cl = str(c).strip().lower()
+            if cl in {"impact", "thud", "颠"}:
+                return "impact"
+            if cl in {"breath", "喘", "娇喘", "moan"}:
+                return "breath"
+            if cl in {"heartbeat", "心跳"}:
+                return "heartbeat"
+            if cl in {"whoosh"}:
+                return "whoosh"
+            if cl in {"leather", "wet"}:
+                return "generic"
+    return None
+
 
 def suggest_auto_sfx_events(
     shots: list[dict[str, Any]],
     *,
     max_events: int = 12,
+    heat_scale: str | None = None,
 ) -> list[dict[str, Any]]:
-    """When author left events empty, place one light accent per shot from beat type."""
+    """When author left events empty, place one accent per shot from beat/heat."""
+    heat = (heat_scale or "").strip().lower()
+    adult = heat in {"max", "hot"}
     events: list[dict[str, Any]] = []
     for shot in shots:
         if not isinstance(shot, dict) or not shot.get("id"):
             continue
         beat = str(shot.get("dramatic_function") or "bridge").strip().lower()
-        kind = _BEAT_SFX_KIND.get(beat, "generic")
-        # whoosh sits on cut; others sit slightly into the shot so they don't click with hard cut
-        # at_sec left to expand_sound_events via shot_id (+ optional offset stored as at_offset)
+        ph = _shot_heat_phase(shot)
+        kind = _kind_from_shot_cues(shot)
+        if not kind and adult and ph in _HEAT_SFX_KIND:
+            kind = _HEAT_SFX_KIND[ph]
+        if not kind:
+            kind = _BEAT_SFX_KIND.get(beat, "generic")
         item: dict[str, Any] = {
             "type": "sfx_accent",
             "shot_id": str(shot["id"]),
@@ -631,31 +722,92 @@ def suggest_auto_sfx_events(
             "auto": True,
         }
         if kind != "whoosh":
-            item["at_offset_sec"] = 0.18
+            # act/climax flesh hits later in plate (rhythm peak)
+            item["at_offset_sec"] = 0.35 if ph in {"act", "climax"} else 0.18
+        if adult and ph in {"act", "climax"}:
+            item["sex_sfx"] = True
         events.append(item)
         if len(events) >= max_events:
             break
     return events
 
 
+def inject_sex_sfx_from_shots(
+    plan: dict[str, Any] | None,
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+) -> dict[str, Any] | None:
+    """Ensure act/climax shots have flesh sfx_accent (merge, do not wipe author events).
+
+    Uses shot.sound_cues / heat_phase. Skip when auto_sfx is false.
+    """
+    if not plan or not isinstance(plan, dict):
+        return plan
+    if plan.get("auto_sfx") is False or plan.get("auto_sex_sfx") is False:
+        return plan
+    heat = (heat_scale or "").strip().lower()
+    if heat not in {"max", "hot"}:
+        return plan
+    events = list(plan.get("events") or [])
+    covered = {
+        str(e.get("shot_id"))
+        for e in events
+        if isinstance(e, dict) and e.get("type") == "sfx_accent" and e.get("shot_id")
+    }
+    added = 0
+    for shot in shots:
+        if not isinstance(shot, dict) or not shot.get("id"):
+            continue
+        sid = str(shot["id"])
+        ph = _shot_heat_phase(shot)
+        if ph not in {"act", "climax", "foreplay"}:
+            continue
+        if sid in covered:
+            continue
+        kind = _kind_from_shot_cues(shot) or _HEAT_SFX_KIND.get(ph, "impact")
+        events.append(
+            {
+                "type": "sfx_accent",
+                "shot_id": sid,
+                "kind": kind,
+                "auto": True,
+                "sex_sfx": True,
+                "at_offset_sec": 0.35 if ph in {"act", "climax"} else 0.2,
+            }
+        )
+        covered.add(sid)
+        added += 1
+    if not added:
+        return plan
+    plan = {**plan, "events": events}
+    notes = list(plan.get("_notes") or [])
+    notes.append(f"sex_sfx: injected {added} flesh accent(s) for act/climax/foreplay")
+    plan["_notes"] = notes
+    return plan
+
+
 def inject_auto_sfx_if_empty(
     plan: dict[str, Any] | None,
     shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
 ) -> dict[str, Any] | None:
-    """If plan has no sfx_accent and auto_sfx is not false, inject beat-based accents."""
+    """If plan has no sfx_accent and auto_sfx is not false, inject beat/heat accents."""
     if not plan or not isinstance(plan, dict):
         return plan
     if plan.get("auto_sfx") is False:
         return plan
     events = list(plan.get("events") or [])
     if any(isinstance(e, dict) and e.get("type") == "sfx_accent" for e in events):
-        return plan
-    auto = suggest_auto_sfx_events(shots)
+        # still merge sex accents onto act shots missing coverage
+        return inject_sex_sfx_from_shots(plan, shots, heat_scale=heat_scale)
+    auto = suggest_auto_sfx_events(shots, heat_scale=heat_scale)
     if not auto:
         return plan
     plan = {**plan, "events": events + auto}
     notes = list(plan.get("_notes") or [])
-    notes.append(f"auto_sfx: injected {len(auto)} accent(s) from dramatic_function")
+    notes.append(f"auto_sfx: injected {len(auto)} accent(s) from beat/heat")
     plan["_notes"] = notes
     return plan
 

@@ -102,6 +102,15 @@
     {
       "title": "Ride",
       "summary": "上车 → 靠近 → 感官 → 余韵",
+      "director_board": {
+        "emotional_turn": "好奇 → 感官偷窥 → 身体失控",
+        "audience_question": "谁先越过这条看不见的线？",
+        "coverage_strategy": "后视镜 OTS + 锁骨特写 insert，近景加压",
+        "cut_intent": "hook 后 soft_glue 升温，sensory 转 smash 压感官",
+        "image_priority": "水珠与门闩的物件特写锚定每次距离变化",
+        "sound_priority": "心跳 BGM duck，旁白第三人称保距离感",
+        "approval_state": "approved"
+      },
       "shots": [
         {
           "id": "shot01",
@@ -125,6 +134,9 @@
             "look_axis": "left",
             "story_beat": "她拉开车门，把乘客关进同一私密空间",
             "visible_change": "车门从关到开；身体半入座舱",
+            "subtext": "她在决定要不要把乘客也淋进这摊热里——手比脑子快",
+            "playable_action": "grips door handle, hesitates, pulls open wider than needed",
+            "body_state": "wet skin flushed, breath held then released, fingers tremble on handle",
             "environment": "rainy night street neon puddles",
             "camera": {
               "shot_size": "medium full",
