@@ -175,6 +175,13 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertTrue(record["motion_approved"])
         self.assertTrue(record["qa"]["ok"], record["qa"])
 
+    def test_v16_project_refuses_boolean_only_clip_approval_without_review_receipt(self) -> None:
+        args = self.register_args()
+        Path(str(args.review_receipt)).unlink()
+        args.review_receipt = None
+        with self.assertRaisesRegex(aifilm_grok.FilmError, "shot-review evidence"):
+            aifilm_grok.cmd_register_clip(args)
+
     def test_registration_preserves_generated_native_audio_as_a_stem(self) -> None:
         with contextlib.redirect_stdout(StringIO()):
             self.assertEqual(
@@ -205,6 +212,18 @@ class DeliveryGateTests(unittest.TestCase):
         aifilm_grok.save_manifest(self.root, manifest)
         before = aifilm_grok.recompute_gates(self.root, manifest)
         self.assertFalse(before["gates"]["final_complete"])
+
+        missing_evidence = StringIO()
+        with contextlib.redirect_stdout(missing_evidence):
+            missing_evidence_rc = aifilm_grok.main(
+                [
+                    "review-final", "--root", str(self.root), "--approve", "--reviewer", "agent", "--notes", "full score but no evidence",
+                    "--score-identity", "pass", "--score-style", "pass", "--score-motion", "pass", "--score-escalation", "pass",
+                    "--score-audio", "pass", "--score-subs", "pass", "--score-dead-air", "pass",
+                ]
+            )
+        self.assertEqual(missing_evidence_rc, 2)
+        self.assertIn("screening evidence", missing_evidence.getvalue())
 
         output = StringIO()
         with contextlib.redirect_stdout(output):
