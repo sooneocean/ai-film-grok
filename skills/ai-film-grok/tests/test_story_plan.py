@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+
+from drama_graph import validate_graph  # noqa: E402
+from story_plan import (  # noqa: E402
+    normalize_story,
+    project_graph_to_film_spec,
+    run_plan,
+)
+
+
+class StoryPlanTests(unittest.TestCase):
+    def test_one_liner_plan_meets_dod(self) -> None:
+        """DoD: one-line idea → valid graph with ≥3 beats + film-spec seed."""
+        idea = "雨夜出租车，女司机与乘客的距离越来越近，后视镜里呼吸先越线。"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = run_plan(
+                root,
+                idea,
+                title="雨夜后座",
+                target_duration=40,
+                apply_film_spec=True,
+                force=True,
+            )
+            self.assertTrue(report.get("ok"), report)
+            counts = report.get("counts") or {}
+            self.assertGreaterEqual(counts.get("beats") or 0, 3)
+            self.assertGreaterEqual(counts.get("shots") or 0, 3)
+            self.assertGreaterEqual(counts.get("episodes") or 0, 1)
+            self.assertTrue((root / "drama-graph.json").is_file())
+            self.assertTrue((root / "film-spec.json").is_file())
+            self.assertTrue((root / "receipts" / "story-normalize.json").is_file())
+
+            graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
+            self.assertEqual((graph.get("derived_from") or {}).get("mode"), "planned")
+            v = validate_graph(graph)
+            self.assertTrue(v.get("ok"), v)
+
+            # every shot has beatId + panel
+            shots = []
+            for ep in graph["episodes"]:
+                for sc in ep["scenes"]:
+                    for bt in sc["beats"]:
+                        for sh in bt["shots"]:
+                            shots.append(sh)
+                            self.assertTrue(sh.get("beatId"))
+                            self.assertTrue(sh.get("panels"))
+                            self.assertEqual(sh.get("verticalComposition") is not None, True)
+
+            spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+            self.assertEqual(spec.get("aspect_ratio"), "9:16")
+            self.assertIn("director_intent", spec)
+            self.assertGreaterEqual(len(spec["director_intent"].get("logline") or ""), 8)
+            flat = []
+            for sc in spec.get("scenes") or []:
+                flat.extend(sc.get("shots") or [])
+            self.assertGreaterEqual(len(flat), 3)
+            for sh in flat:
+                self.assertTrue(sh.get("id"))
+                self.assertTrue(sh.get("nar"))
+                self.assertTrue(sh.get("dramatic_function"))
+                self.assertTrue(sh.get("dsl"))
+                self.assertTrue(sh.get("beat_id"))
+
+    def test_multi_scene_headers(self) -> None:
+        raw = """# 旧电梯
+
+## 场景：一楼大厅
+她按下上行键，灯灭了一秒。
+
+## 场景：电梯轿厢
+门合上。他站在角落，呼吸很近。
+"""
+        norm = normalize_story(raw, title_hint="旧电梯")
+        self.assertEqual(norm["title"], "旧电梯")
+        self.assertGreaterEqual(len(norm.get("scene_chunks") or []), 2)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = run_plan(root, raw, target_duration=50, force=True)
+            self.assertTrue(report.get("ok"), report)
+            self.assertGreaterEqual((report.get("counts") or {}).get("scenes") or 0, 2)
+
+    def test_force_required_when_shots_exist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_plan(root, "第一次规划一句话故事足够长。", force=True)
+            report2 = run_plan(root, "第二次覆盖。", force=False)
+            self.assertTrue(report2.get("ok"))  # graph still ok
+            fs = report2.get("film_spec") or {}
+            self.assertTrue(fs.get("skipped"))
+
+    def test_project_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_plan(root, "地铁末班车，两个人沉默对视后突然开口。", force=True)
+            graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
+            spec = project_graph_to_film_spec(graph)
+            self.assertTrue(spec["scenes"][0]["shots"])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/style-bible.schema.json",
+  "title": "ai-film-grok style-bible v2",
+  "type": "object",
+  "properties": {
+    "schema_version": { "type": "integer", "enum": [1, 2] },
+    "state": { "enum": ["Draft", "Candidate", "Approved"] },
+    "locked": { "type": "boolean" },
+    "title": { "type": "string" },
+    "medium": { "type": "string" },
+    "palette": { "type": "string" },
+    "lighting": { "type": "string" },
+    "lens": { "type": "string" },
+    "rendering": { "type": "string" },
+    "signature_block": { "type": "string" },
+    "negative_hints": { "type": "string" },
+    "identity_lock": { "type": "string", "description": "Legacy identity lock block (v1 fallback)" },
+    "characters": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "identity": { "type": "string", "description": "Physical traits like hair, eyes, body type" },
+          "default_wardrobe": { "type": "string" },
+          "cast_master": { "type": "string" },
+          "forbid_drift": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Identity locks that must not drift across shots"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "wardrobe_variants": {
+      "type": "object",
+      "description": "Map of character_id -> { variant_name: 'description' } (full|partial|undressed|bare…)",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
+    },
+    "cast_state_masters": {
+      "type": "object",
+      "description": "character_id -> wardrobe_state -> path to state photo",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
+    },
+    "locations": {
+      "type": "object",
+      "description": "location_id -> string description OR structured Location object (Phase 4)",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "structure": { "type": "string" },
+              "timeOfDay": { "type": "string" },
+              "lighting": { "type": "string" },
+              "palette": { "type": "string" },
+              "immutableRules": { "type": "array", "items": { "type": "string" } },
+              "recurringObjects": { "type": "array", "items": { "type": "string" } },
+              "primaryAngles": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
+    "props": {
+      "type": "object",
+      "description": "prop_id -> string OR structured Prop (Phase 4)",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "ownerId": { "type": ["string", "null"] },
+              "locationId": { "type": ["string", "null"] },
+              "condition": { "type": "string" },
+              "storyFunction": { "type": "string" },
+              "firstShotId": { "type": ["string", "null"] },
+              "lastShotId": { "type": ["string", "null"] }
+            },
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
+    "continuity_states": {
+      "type": "object",
+      "description": "Global or per-character state transitions (e.g. 'hero_dirty', 'night_time')",
+      "additionalProperties": { "type": "string" }
+    },
+    "approved_keyframes": {
+      "type": "object",
+      "description": "Validated reference images",
+      "additionalProperties": { "type": "string" }
+    },
+    "updated_at": { "type": ["string", "null"] },
+    "canonical_style_path": { "type": ["string", "null"] },
+    "previous_versions": {
+      "type": "array",
+      "items": { "type": "object" }
+    }
+  },
+  "required": ["schema_version"]
+}

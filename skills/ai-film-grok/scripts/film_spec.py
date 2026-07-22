@@ -519,8 +519,14 @@ def validate_film_spec(
         raise FilmSpecError("film-spec native_audio_volume must be a number between 0 and 1")
     if float(native_volume) < 0 or float(native_volume) > 1:
         raise FilmSpecError("film-spec native_audio_volume must be between 0 and 1")
-    # Default silk dissolve when author omits transition_sec
-    if "transition_sec" not in spec or spec.get("transition_sec") is None:
+    # Default silk dissolve when author omits transition_sec.  Keep this fact so
+    # the voice-coupled strategy cannot turn an implicit global default into an
+    # authored 0.40s hold just because one join is a mood_hold.
+    transition_sec_authored = "transition_sec" in spec and spec.get("transition_sec") is not None
+    edit_craft_authored = isinstance(spec.get("edit_craft"), list) or isinstance(
+        spec.get("edit_crafts"), list
+    )
+    if not transition_sec_authored:
         spec["transition_sec"] = DEFAULT_TRANSITION_SEC
     try:
         spec["transition_sec"] = normalize_transition_sec(spec.get("transition_sec"))
@@ -710,20 +716,20 @@ def validate_film_spec(
                 if ax:
                     previous_axes.append(ax)
                 previous_focal = str((cov or {}).get("focal_character") or previous_focal or "")
-                
+
                 vp = str((cov or {}).get("viewpoint") or "")
                 if vp:
                     previous_viewpoints.append(vp)
                     previous_viewpoint = vp
                 else:
                     previous_viewpoint = previous_viewpoint or ""
-                
+
                 previous_look = str((cov or {}).get("look_axis") or previous_look or "")
-                
+
                 ep = str(shot.get("dsl", {}).get("end_pose") or shot.get("end_pose") or "")
                 if ep:
                     previous_end_pose = ep
-                    
+
             except PolicyError as exc:
                 raise FilmSpecError(str(exc)) from exc
             dsl = shot.get("dsl")
@@ -796,6 +802,8 @@ def validate_film_spec(
         from edit_strategy import EditStrategyError, apply_edit_strategy_to_spec
 
         apply_edit_strategy_to_spec(spec)
+        if not transition_sec_authored:
+            spec["transition_sec"] = DEFAULT_TRANSITION_SEC
     except EditStrategyError as exc:
         raise FilmSpecError(str(exc)) from exc
     except Exception as exc:  # noqa: BLE001 — soft: never block write-spec
@@ -886,7 +894,7 @@ def validate_film_spec(
             ]
         except PolicyError as exc:
             raise FilmSpecError(str(exc)) from exc
-        spec["_edit_craft_source"] = "author"
+        spec["_edit_craft_source"] = "author" if edit_craft_authored else "craft_suggest"
     elif expected > 0:
         try:
             crafts = suggest_edit_crafts(
@@ -1238,7 +1246,12 @@ def validate_film_spec(
         audience_profile = spec.get("audience_profile")
     # 卸装阶梯延续：前镜状态继承；衣服不回穿（lint HEAT_WARDROBE_RE_DRESS）
     wardrobe_cont = apply_wardrobe_continuity(shots, heat_scale=heat_scale)
-    if wardrobe_cont.get("filled_ids") or wardrobe_cont.get("bumped_ids"):
+    if (
+        wardrobe_cont.get("filled_ids")
+        or wardrobe_cont.get("bumped_ids")
+        or wardrobe_cont.get("clamped_ids")
+        or wardrobe_cont.get("start_pose_ids")
+    ):
         notes = list(spec.get("_heat_notes") or [])
         bits = []
         if wardrobe_cont.get("filled_ids"):
@@ -1248,6 +1261,16 @@ def validate_film_spec(
         if wardrobe_cont.get("bumped_ids"):
             bits.append(
                 "wardrobe undress-bump: " + ",".join(wardrobe_cont["bumped_ids"][:12])
+            )
+        if wardrobe_cont.get("clamped_ids"):
+            bits.append(
+                "wardrobe re-dress CLAMPED: "
+                + ",".join(wardrobe_cont["clamped_ids"][:12])
+            )
+        if wardrobe_cont.get("start_pose_ids"):
+            bits.append(
+                "start_pose undress-lock: "
+                + ",".join(wardrobe_cont["start_pose_ids"][:12])
             )
         notes.append("; ".join(bits))
         spec["_heat_notes"] = notes
@@ -1270,11 +1293,11 @@ def validate_film_spec(
     sex_floor_strict = spec.get("sex_floor_strict")
     if sex_floor_strict is None:
         sex_floor_strict = heat_scale == "max"
-        
+
     if "HEAT_SEX_DURATION_LOW" in (heat_rep.get("codes") or []):
         # Proactive orchestration: Auto-extend act/climax shots to meet ratio
         act_shots = [
-            sh for sh in shots if isinstance(sh, dict) 
+            sh for sh in shots if isinstance(sh, dict)
             and str(sh.get("heat_phase") or "").strip().lower() in {"act", "climax"}
         ]
         if act_shots:
@@ -1314,6 +1337,7 @@ def validate_film_spec(
             "HEAT_SEX_WARDROBE_WEAK",
             "HEAT_UNDRESS_BEAT_MISSING",
             "HEAT_WARDROBE_RE_DRESS",
+            "HEAT_WARDROBE_TEXT_CONFLICT",
         }
     ]
     if sex_wardrobe_strict is True and wardrobe_fail_codes:
@@ -1322,7 +1346,9 @@ def validate_film_spec(
             + ",".join(wardrobe_fail_codes)
             + " — act/climax must set wardrobe_state=partial|undressed|bare "
             "(or dsl bare skin / armor off / 半裸 / 卸甲); include undress beat; "
-            "后镜必须延续前镜卸装状态、禁止回穿。See lessons-2026-07-21-sex-undress-ladder.md"
+            "后镜必须延续前镜卸装状态、禁止回穿；"
+            "下一镜 start_pose/subject 从已脱状态开场，禁 full wardrobe。"
+            " See lessons-2026-07-21-sex-undress-ladder.md"
         )
     # VO 荤梗：实打实办事剧，旁白全程要荤；act/climax 要办事动词
     sex_vo_strict = spec.get("sex_vo_strict")

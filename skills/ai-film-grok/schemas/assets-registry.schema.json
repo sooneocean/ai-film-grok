@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/assets-registry.schema.json",
+  "title": "ai-film-grok Asset Registry Phase 4",
+  "type": "object",
+  "required": ["schema_version", "kind", "characters"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "kind": { "type": "string", "const": "asset-registry" },
+    "at": { "type": "string" },
+    "root": { "type": "string" },
+    "characters": { "type": "array" },
+    "locations": { "type": "array" },
+    "props": { "type": "array" },
+    "characterStatesTimeline": { "type": "array" },
+    "counts": { "type": "object" },
+    "consistency": { "type": "object" }
+  },
+  "additionalProperties": true
+}

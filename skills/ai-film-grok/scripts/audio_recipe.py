@@ -454,11 +454,34 @@ def apply_audio_recipes_to_spec(
         "note": (
             "Per-shot audio_recipe set by write-spec. "
             "sung/lipsync never auto without audio_policy flags. "
-            "See references/audio-recipe.md"
+            "See references/audio-recipe.md · voice-tracks.md (nar vs vocal_color)"
         ),
     }
     spec["audio_policy"] = policy
     spec["_audio_routing"] = summary
+    # Multi-track voice: 娇喘语助 / tone_tags / sound_cues (independent gains at final)
+    try:
+        from voice_tracks import apply_voice_tracks_to_spec
+
+        seed = 0
+        try:
+            seed = int((policy.get("music_seed") if isinstance(policy, dict) else None) or 0)
+        except (TypeError, ValueError):
+            seed = 0
+        if not seed:
+            try:
+                seed = int((spec.get("audio_policy") or {}).get("music_seed") or 0)
+            except (TypeError, ValueError):
+                seed = 0
+        if not seed:
+            try:
+                seed = int((spec.get("voice_tracks") or {}).get("seed") or 0)
+            except (TypeError, ValueError):
+                seed = 0
+        vt = apply_voice_tracks_to_spec(spec, seed=seed or abs(hash(str(spec.get("title") or "film"))) % 997)
+        summary["voice_tracks"] = vt
+    except Exception as exc:  # noqa: BLE001 — never block write-spec on color layer
+        summary["voice_tracks_error"] = str(exc)
     return summary
 
 

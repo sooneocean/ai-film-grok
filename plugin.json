@@ -1,7 +1,7 @@
 {
   "name": "ai-film-grok",
-  "version": "1.4.2",
-  "description": "Grok Build AI 短片/漫剧成片管线：Idea→Verified 八环 dispatch + Imagine 静帧/I2V（grok_primary）+ edge TTS + HyperFrames/FFmpeg。触发：AI 电影、漫剧、Grok Imagine、dispatch、成片、/ai-film-grok、/aifilm。",
+  "version": "1.5.0",
+  "description": "Grok Build AI 短片/漫剧成片管线：Idea→Verified 八环 dispatch + Drama Graph + Skill Registry + Asset/State 一致性 + Imagine I2V + edge TTS + HyperFrames/FFmpeg。触发：AI 电影、漫剧、Grok Imagine、dispatch、成片、/ai-film-grok、/aifilm。",
   "author": {
     "name": "dex",
     "url": "https://github.com/sooneocean"

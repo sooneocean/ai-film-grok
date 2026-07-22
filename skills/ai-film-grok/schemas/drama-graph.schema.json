@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/drama-graph.schema.json",
+  "title": "ai-film-grok Canonical Vertical Drama Graph v2",
+  "description": "Canonical, revisioned narrative graph projected into executable film-spec.",
+  "type": "object",
+  "required": ["schema_version", "project", "episodes"],
+  "properties": {
+    "schema_version": { "type": "integer", "enum": [1, 2] },
+    "revision": { "type": "integer", "minimum": 1 },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "state": { "enum": ["draft", "review", "locked", "stale"] },
+    "lock_scopes": {
+      "type": "array",
+      "items": { "enum": ["story", "beats", "shots", "panels"] }
+    },
+    "kind": { "type": "string", "const": "vertical-drama-graph" },
+    "derived_from": {
+      "type": "object",
+      "properties": {
+        "film_spec": { "type": "string" },
+        "style_bible": { "type": ["string", "null"] },
+        "at": { "type": "string" },
+        "mode": { "enum": ["derive", "manual", "planned", "legacy-import"] }
+      }
+    },
+    "project": {
+      "type": "object",
+      "required": ["id", "title", "aspectRatio"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "aspectRatio": { "enum": ["9:16", "16:9", "1:1", "3:4", "4:3"] },
+        "targetResolution": {
+          "type": "string",
+          "description": "Export target e.g. 1080x1920"
+        },
+        "targetFps": { "type": "integer" },
+        "root": { "type": "string" }
+      }
+    },
+    "story": {
+      "type": "object",
+      "properties": {
+        "premise": { "type": "string" },
+        "logline": { "type": "string" },
+        "theme": { "type": "string" },
+        "protagonist_ids": { "type": "array", "items": { "type": "string" } },
+        "protagonist_goal": { "type": "string" },
+        "opposition": { "type": "string" },
+        "stakes": { "type": "string" },
+        "climax_choice": { "type": "string" },
+        "ending_hook": { "type": "string" },
+        "emotional_arc": { "type": "array", "items": { "type": "string" } },
+        "pace_chart": { "type": "array", "items": { "type": "string" } },
+        "constraints": { "type": "array", "items": { "type": "string" } },
+        "status": { "enum": ["needs_authoring", "review", "locked"] }
+      }
+    },
+    "episodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Episode" }
+    },
+    "characters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Character" }
+    },
+    "locations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Location" }
+    },
+    "props": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Prop" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "Episode": {
+      "type": "object",
+      "required": ["id", "episodeNumber", "title", "scenes"],
+      "properties": {
+        "id": { "type": "string" },
+        "episodeNumber": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "targetDuration": { "type": "number" },
+        "openingHook": { "type": "string" },
+        "centralConflict": { "type": "string" },
+        "climax": { "type": "string" },
+        "endingHook": { "type": "string" },
+        "aspectRatio": { "enum": ["9:16"] },
+        "status": {
+          "enum": [
+            "planning",
+            "asset-production",
+            "editing",
+            "review",
+            "approved",
+            "rendered"
+          ]
+        },
+        "scenes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Scene" }
+        }
+      }
+    },
+    "Scene": {
+      "type": "object",
+      "required": ["id", "order", "beats"],
+      "properties": {
+        "id": { "type": "string" },
+        "order": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "synopsis": { "type": "string" },
+        "purpose": { "type": "string" },
+        "conflict": { "type": "string" },
+        "entry_state": { "type": "string" },
+        "exit_state": { "type": "string" },
+        "locationId": { "type": ["string", "null"] },
+        "characterIds": { "type": "array", "items": { "type": "string" } },
+        "targetDuration": { "type": "number" },
+        "productionMode": {
+          "enum": [
+            "static-motion-comic",
+            "image-to-video",
+            "video-generation",
+            "hybrid",
+            "unknown"
+          ]
+        },
+        "status": {
+          "enum": ["parsed", "planned", "generated", "assembled", "approved"]
+        },
+        "beats": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Beat" }
+        }
+      }
+    },
+    "Beat": {
+      "type": "object",
+      "required": ["id", "order", "objective", "shots"],
+      "properties": {
+        "id": { "type": "string" },
+        "order": { "type": "integer", "minimum": 1 },
+        "objective": { "type": "string" },
+        "action": { "type": "string" },
+        "outcome": { "type": "string" },
+        "obstacle": { "type": "string" },
+        "tactic": { "type": "string" },
+        "turn": { "type": "string" },
+        "state_delta": { "type": "string" },
+        "emotionalShift": {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" }
+          }
+        },
+        "importance": {
+          "enum": ["supporting", "important", "climax"]
+        },
+        "targetDuration": { "type": "number" },
+        "shots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Shot" }
+        }
+      }
+    },
+    "Shot": {
+      "type": "object",
+      "required": ["id", "order"],
+      "properties": {
+        "id": { "type": "string" },
+        "order": { "type": "integer", "minimum": 1 },
+        "filmSpecShotId": { "type": "string" },
+        "narrativePurpose": { "type": "string" },
+        "dramaticFunction": { "type": "string" },
+        "shotSize": { "type": "string" },
+        "verticalComposition": {
+          "enum": [
+            "top-subject",
+            "center-subject",
+            "bottom-subject",
+            "foreground-background",
+            "two-character-stack",
+            "three-layer-depth",
+            "unknown"
+          ]
+        },
+        "cameraMovement": { "type": "string" },
+        "productionMode": {
+          "enum": [
+            "panel-animation",
+            "single-keyframe-i2v",
+            "first-last-frame-i2v",
+            "text-to-video",
+            "composite",
+            "unknown"
+          ]
+        },
+        "targetDuration": { "type": "number" },
+        "characterIds": { "type": "array", "items": { "type": "string" } },
+        "locationId": { "type": ["string", "null"] },
+        "wardrobeState": { "type": "string" },
+        "heatPhase": { "type": "string" },
+        "chainMode": { "type": "string" },
+        "beat_id": { "type": "string" },
+        "coverage_role": { "type": "string" },
+        "must_show": { "type": "string" },
+        "visible_change": { "type": "string" },
+        "start_state": { "type": "string" },
+        "end_state": { "type": "string" },
+        "source_refs": { "type": "array", "items": { "type": "string" } },
+        "nar": { "type": "string" },
+        "panelIds": { "type": "array", "items": { "type": "string" } },
+        "keyframeIds": { "type": "array", "items": { "type": "string" } },
+        "motionClipIds": { "type": "array", "items": { "type": "string" } },
+        "dialogueLineIds": { "type": "array", "items": { "type": "string" } },
+        "panels": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Panel" }
+        },
+        "assetHints": {
+          "type": "object",
+          "properties": {
+            "keyframePath": { "type": ["string", "null"] },
+            "clipPath": { "type": ["string", "null"] },
+            "promptPath": { "type": ["string", "null"] },
+            "hasKeyframe": { "type": "boolean" },
+            "hasClip": { "type": "boolean" },
+            "hasPrompt": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "Panel": {
+      "type": "object",
+      "required": ["id", "order"],
+      "properties": {
+        "id": { "type": "string" },
+        "order": { "type": "integer" },
+        "subject": { "type": "string" },
+        "action": { "type": "string" },
+        "expression": { "type": "string" },
+        "location": { "type": "string" },
+        "verticalComposition": { "type": "string" },
+        "cameraAngle": { "type": "string" },
+        "lighting": { "type": "string" },
+        "style": { "type": "string" },
+        "continuityConstraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "negativeConstraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "referenceAssetIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sourcePromptPath": { "type": ["string", "null"] },
+        "must_include": { "type": "array", "items": { "type": "string" } },
+        "control": { "$ref": "#/$defs/Control" }
+      }
+    },
+    "Control": {
+      "type": "object",
+      "properties": {
+        "state": { "enum": ["draft", "review", "locked", "stale"] },
+        "revision": { "type": "integer", "minimum": 1 },
+        "locked_fields": { "type": "array", "items": { "type": "string" } },
+        "locked_at": { "type": ["string", "null"] },
+        "lock_reason": { "type": ["string", "null"] }
+      }
+    },
+    "Character": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "identity": { "type": "string" },
+        "defaultWardrobe": { "type": "string" },
+        "castMaster": { "type": ["string", "null"] }
+      }
+    },
+    "Location": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "Prop": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}

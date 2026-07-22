@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/skill-envelope.in.json",
+  "title": "SkillRequest envelope",
+  "type": "object",
+  "required": ["skillId", "projectRoot"],
+  "properties": {
+    "skillId": { "type": "string", "minLength": 1 },
+    "projectRoot": { "type": "string", "minLength": 1 },
+    "nodeRef": { "type": "string", "description": "e.g. shot:shot03 or project" },
+    "input": { "type": "object" },
+    "dryRun": { "type": "boolean", "default": false },
+    "force": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": true
+}

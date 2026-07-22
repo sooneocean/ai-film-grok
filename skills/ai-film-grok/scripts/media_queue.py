@@ -11,7 +11,7 @@ import secrets
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
 
 from media_qa import ALLOWED_VIDEO_ENDPOINTS, MediaQAError, analyze_media
 from production_gates import ProductionGateError, assert_pilot_allows_add
@@ -176,6 +176,7 @@ class MediaQueue:
         inputs: list[Path],
         max_attempts: int = 3,
         allow_without_pilot: bool = False,
+        assembly_receipt: Optional[Path] = None,
     ) -> dict[str, Any]:
         try:
             shot_id = validate_identifier(shot_id, field="shot id")
@@ -194,6 +195,12 @@ class MediaQueue:
         # Shot must exist in film-spec when present (no ghost queue after write-spec)
         spec_path = self.root / "film-spec.json"
         if spec_path.is_file():
+            try:
+                from narrative_control import assert_projection_ready, NarrativeControlError
+
+                assert_projection_ready(self.root, require_locked=True)
+            except NarrativeControlError as exc:
+                raise QueueError(f"{exc.code}: {exc}") from exc
             try:
                 import json as _json
 
@@ -266,6 +273,8 @@ class MediaQueue:
                 "next_attempt_at": utc_now(),
                 "created_at": utc_now(),
             }
+            if assembly_receipt:
+                job["assembly_receipt"] = str(assembly_receipt.expanduser().resolve())
             state["jobs"].append(job)
             self._write(state)
             return job
@@ -467,6 +476,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip pilot user-approval gate (emergency / unit tests only)",
     )
+    add.add_argument("--assembly-receipt", help="Path to prompt_assembly_shot.json receipt for traceability")
     claim = sub.add_parser("claim")
     claim.add_argument("--root", required=True)
     status = sub.add_parser("status")
@@ -525,6 +535,7 @@ def main(argv: list[str] | None = None) -> int:
                 inputs=[Path(value) for value in args.input],
                 max_attempts=args.max_attempts,
                 allow_without_pilot=bool(getattr(args, "allow_without_pilot", False)),
+                assembly_receipt=Path(args.assembly_receipt) if args.assembly_receipt else None,
             )
         elif args.command == "claim":
             result = queue.claim()

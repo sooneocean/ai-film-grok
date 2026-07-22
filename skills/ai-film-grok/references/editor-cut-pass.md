@@ -84,9 +84,11 @@ Director’s Lens → write-spec → pilot → bulk still/I2V
 ### 3. 声音（Sound）
 
 - [ ] VO：hook/高潮/收束金句是否够狠；**重口男向**身体动词说满；拖腔禁 atempo≪1  
+- [ ] **多轨**：`nar` 与 `vocal_color` 拆开；语助不塞进旁白；见 [voice-tracks.md](voice-tracks.md)  
 - [ ] BGM：色气默认 rnb；高潮段是否 duck 更深 / seed 可换 take  
-- [ ] SFX：落锁 whoosh/click、解扣 metal、床垫 soft thump、心跳 sensory——写进 `sound_plan.events` 或靠 auto_sfx 后人工加  
+- [ ] SFX：落锁 whoosh/click、解扣 metal、床垫 soft thump、心跳 sensory——写进 `sound_cues` / `sound_plan.events`  
 - [ ] mixed.wav 优先；禁 I2V 静音轨当终声  
+- [ ] **剪辑策略**：`edit_strategy.mode=voice_coupled`；act `visual_fit=vo`；`join_transition_secs` 非全等；见 [edit-strategy-voice-coupled.md](edit-strategy-voice-coupled.md)  
 
 ### 4. 剧情（Story / Escalation）
 

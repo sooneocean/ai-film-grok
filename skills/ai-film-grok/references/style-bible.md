@@ -17,7 +17,17 @@
 | `hair_swatches` | `{ "id": "色名 #hex 或可复述色名" }` | **强烈建议**；防霓虹光改写发色（2026-07-21） |
 | `negative_hints` | 禁换脸、禁换发色、禁换介质、禁未成年… | 必填；须含「do not recolor hair」 |
 | `canonical_style_path` | style-v1 路径 | lock-style 写入 |
-| `cast_masters` | `{ "kei": "canonical/cast/kei-v1.png" }` | 至少一名主角；**一角一路径** |
+| `cast_masters` | `{ "kei": "canonical/cast/kei-v1.png" }` | 至少一名主角；**一角一路径**（默认 full 定妆） |
+| `cast_state_masters` | `{ "kei": { "full": "…", "partial": "…", "undressed": "…", "bare": "…" } }` | **状态照索引**（2026-07-21）；keyframe 按 `wardrobe_state` 查此表；见 [keyframe-first-state-index.md](keyframe-first-state-index.md) |
+| `wardrobe_variants` | 每角每 state **文字**衣着描述 | 与状态照像素配套；undressed **勿**写回 full 句 |
+
+## 状态照（State photos）· 必做心智
+
+1. cast-v1 = L1 全装证件照。  
+2. 串行 `image_edit` 产出 L2：`canonical/cast-states/<id>/{full,partial,undressed,bare}.*`  
+3. 写入 `cast_state_masters`；heat max 至少 full+partial+undressed。  
+4. 每镜 keyframe **主 ref** = `cast_state_masters[id][wardrobe_state]`（缺则 undress-anchor；**禁止** silent 回 full cast）。  
+5. I2V **只**吃 keyframe；坏了回头改 keyframe/状态照。
 
 ## 从主题推断 medium（init / 人工）
 
@@ -29,31 +39,32 @@
 
 ## Lock 流程
 
-1. 写满 bible 字段（含 `identity_lock`）。  
-2. 生成 **style-v1**（介质样张）+ **cast/\<id\>-v1**（主角定妆）。  
-3. 生成 lookbook 3 张并人工批。  
-4. 执行：
+1. 初始化 v2 結構: `aifilm bible init --root <root>`
+2. 編輯 `style-bible.json`，寫滿 bible 字段（含 `characters`, `wardrobe_variants`, `continuity_states` 等）。  
+3. 生成 **style-v1**（介质样张）+ **cast/\<id\>-v1**（主角定妆）。  
+4. 生成 lookbook 3 张并人工批。  
+5. 鎖定並過渡到 Approved 狀態:
 
 ```bash
-"$AIFILM" lock-style --root <root> \
-  --canonical <style-v1.png> \
-  --cast-master <cast/kei-v1.png> \
-  --signature "<signature_block 最终版>"
+"$AIFILM" bible lock --root <root>
+# 或者手動更新
+"$AIFILM" bible state --root <root> --set Approved
 ```
 
-5. 中途不得随意 unlock；大改画风 → 新 film root 或 `style-v2` 新片。
+6. 中途不得随意 unlock；大改画风 → rollback 或建立新 film root。
 
-## Prompt 前缀模板（每镜强制）
+## Prompt 前缀模板（由 Prompt Injector 自動注入）
 
-```text
-{signature_block}
-Identity lock: {identity_lock}
-Hair lock: {per-character hair from cast_locks / hair_swatches; include NEVER… bans}
-Stance: focal={focal_character}; viewpoint={viewpoint}; look_axis={look_axis}
-[shot-specific pose / env / camera only after this line]
-All characters 18+ adults. Keep exact face, EXACT hair color, wardrobe and medium.
-Do not recolor hair under neon or red club light.
-```
+執行 `aifilm write-spec` 時，內建的 Prompt Injector 會自動讀取 `style-bible.json` 並按以下優先級將 prompt 寫入 `receipts/prompt_assembly_[shot].json` 與 `prompts/[shot].txt`：
+
+1. Signature / Visual Style
+2. Location / Lighting
+3. Character Lock & Wardrobe Lock
+4. Continuity State
+5. Shot-Specific Action
+6. Negative Constraints
+
+**無需在 agent 階段手動組裝長字串，Injector 具備防衝突檢測（例如角色鎖定與分鏡動作矛盾時報錯）。**
 
 - `focal_character` / `viewpoint` / `look_axis` 来自 film-spec `dsl`（write-spec 可注入）；见 [character-stance.md](character-stance.md)。  
 - 缺省可写 `focal=hero; viewpoint=objective; look_axis=center`，但 **≥4 镜片应轮换 viewpoint**。  

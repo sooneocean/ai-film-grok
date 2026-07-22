@@ -2,6 +2,20 @@
 
 与 `write-spec`、`media-queue` **代码门禁**对齐。Agent 不得只读本文而绕过 CLI。
 
+## 先验后生 · 算力刀口（2026-07-22 · P0）
+
+**验证完再生成**——图与视频同一逻辑；重复生成成本过高。
+
+| 顺序 | 动作 | 禁 |
+|---|---|---|
+| 1 | still / image 落盘 | 未读图就当 keyframe |
+| 2 | 几何+身份+结构过闸 | 缩水/横图/坏脸进库 |
+| 3 | 才 I2V 或 bulk edit | 未验 30 still 开 30 I2V |
+| 4 | 坏了只修上游再烧 | 对糊图盲重试 video |
+
+权威课：[lessons-2026-07-22-verify-before-generate.md](lessons-2026-07-22-verify-before-generate.md) · 几何：[keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md)。  
+用户说「一路做完」= 不反复停问，**仍须每镜先验**。
+
 ## 叙事上游（Director’s Lens · 2026-07-20）
 
 用户给文本/brief 时：**先** [directors-lens.md](directors-lens.md) 重构故事与 storyboard，**再** `film-spec` / `write-spec`。  
@@ -105,6 +119,8 @@ Agent 写 still/I2V prompt 时：**motion 字符串以主动作为首**，微动
 |------|------|
 | 默认 | `i2v_provider: frw` + **`frw_video_model: seedance-2-fast-i2v`**（`auto` 钉此） |
 | Still | **Grok** `image_edit(cast)` 同源；禁止 FRW text2image 批量主角 |
+| Still 卸装后 | peak 后 **只** `image_edit(undress-anchor/已脱 still)`；**禁**全装 cast 重起（回穿 P0） |
+| 状态照索引 | `cast_state_masters` + keyframe-first；I2V 只吃 keyframe；坏了改 keyframe |
 | bulk 2V | **`"$AIFILM" frw newvideo --model seedance-2-fast-i2v`**（9:16 **720p 原生**） |
 | 有尾帧 | **`seedance-2-pro-flf`** |
 | 入组 | `reencode-clips`（**不放大**）→ `register-clip --source-endpoint frw_seedance_i2v\|frw_seedance_flf` |

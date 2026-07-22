@@ -14,7 +14,11 @@
 | 亲密核 | **建议**（max 时可参考 ≥60% 镜比）；`_heat_arc` 报指标；极端偏低 soft warn |
 | **性爱片段时长** | **产品硬底**（2026-07-21）：`heat_scale=max` 时 **act+climax 的 `duration_sec` 合计 ≥ 总片板 20%**；write-spec 默认 `sex_floor_strict`；重口男向目标 ≥40%；`sex_min_duration_ratio` 可覆盖 |
 | **办事卸甲/脱衣** | **产品硬底**（2026-07-21）：act/climax 禁止全装铠甲；`wardrobe_state`=partial\|undressed\|bare；须有卸甲/脱衣动作拍；默认 `sex_wardrobe_strict`；静帧/I2V 须画到裸露可读 |
-| **卸装延续·不回穿** | **产品硬底**（2026-07-21）：分镜 `wardrobe_state` rank 单调不降；后镜继承前镜；**禁止衣服回穿**（`HEAT_WARDROBE_RE_DRESS`）；`apply_wardrobe_continuity` 写回 film-spec |
+| **卸装延续·不回穿** | **产品硬底**（2026-07-21+）：rank 单调不降；后镜继承；**回穿自动 clamp**（max/hot）；`start_pose` 从已脱开场；prompt 注入 `Costume continuity HARD` + 禁 default 全装回退；码 `HEAT_WARDROBE_RE_DRESS` / `HEAT_WARDROBE_TEXT_CONFLICT` |
+| **卸装后 still 源** | **P0 像素硬底**（2026-07-21 席德案）：peak 后 **禁止** `image_edit(全装 cast master)`；必须 `canonical/wardrobe/undress-anchor` 或上一已脱 still；I2V 锁 first-frame 衣着；见 [wardrobe-no-redress-still](lessons-2026-07-21-wardrobe-no-redress-still.md) |
+| **I2V 末帧不回穿 + promote 门** | **P0**（2026-07-22 astra 红外套案）：register 前验 last frame 肩/胸未整穿已脱衣物；毒末帧禁止 promote；identity 只锁脸发；见 [i2v-endframe-no-redress](lessons-2026-07-22-i2v-endframe-no-redress.md) |
+| **Keyframe-first · 状态照** | **产品硬底**（2026-07-21）：先状态照索引 `cast_state_masters` → 再 keyframe → 再 I2V；视频坏先改 keyframe/状态照；prompt 注入 `State photo ref`；见 [keyframe-first-state-index](keyframe-first-state-index.md) |
+| **生成 first/last** | **产品硬底**（2026-07-21）：`register-clip` 后自动 last→next first（continue/卸装/max）；下镜 I2V 禁 cast 重起；按真实末帧衣着/姿势写 prompt；**末帧须先过 W8 不回穿门**；见 first-last-gen · i2v-endframe-no-redress |
 | **旁白荤梗** | **产品硬底**（2026-07-21）：max 办事剧 **每镜 nar 须含荤梗**；act/climax 须办事动词（沉腰/办穿/吃进…）；禁纯文艺灯暗句；默认 `sex_vo_strict` |
 | heat_phase | 可选；`heat_phase_auto` 时从 dramatic_function 填，**不猜 climax** |
 | 女主 | **默认 single**；multi 仅证据（Prompt/多图/显式字段）；勿臆造 |
@@ -62,6 +66,8 @@
 | env 无脸 | `shot_role=env\|bridge\|insert` → `aifilm env-plate` · register `frw_ltx_t2v`；禁 T2V 锁脸 |
 | 口型 | 默认 off（说书）；对白近景 opt-in `frw-lipsync probe`→run；403/502 跳过勿硬上 |
 | 静帧 | 主角 Grok **`image_edit(cast)`**；禁反复纯 `image_gen`；加载 `/imagine` |
+| **静帧几何·禁压缩** | **P0**（2026-07-22）：I2V 前 keyframe **≥720×1280 且 9:16 竖比**；禁横图/缩略图/缩水 jpg；`register-still`+`preflight` 硬闸；同 stem 优先全分辨率 png。见 [keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md) |
+| **先验后生·算力刀口** | **P0**（2026-07-22）：**验证通过才烧下一级**（still 先验→I2V；ref 先验→image_edit bulk）。禁止未验批量 I2V/出图；坏了只修上游。见 [verify-before-generate](lessons-2026-07-22-verify-before-generate.md) |
 | Grok Build | 推理+Imagine 优先；无原生 T2V；bulk 动默认 FRW；会话外 xai-sdk 可选非默认 |
 | 构图 | 禁 ECU/fill frame/push-in on face 裁头；full head + headroom |
 | 库存 | film-spec 镜数 = approved clips |

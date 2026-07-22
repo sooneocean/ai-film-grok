@@ -16,6 +16,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# Ensure skill package root is importable before `scripts.*` (shell wrapper does not set PYTHONPATH)
+_SKILL_DIR = Path(__file__).resolve().parent.parent
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+for _p in (_SKILL_DIR, _SCRIPTS_DIR):
+    _s = str(_p)
+    if _s not in sys.path:
+        sys.path.insert(0, _s)
+
+from scripts.prompt_injector import PromptInjector, PromptConflictError
+from scripts.visual_bible import load_bible, update_bible_state
+
 from director_review import (
     SCORECARD_DIMENSIONS,
     DirectorReviewError,
@@ -861,6 +872,50 @@ def cmd_preflight(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_state_index(args: argparse.Namespace) -> int:
+    """Checkpoint: state photos + keyframes + promote plan for fluid transitions."""
+    skill_dir = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(skill_dir / "scripts"))
+    try:
+        from state_index_gate import run_state_index_check, write_state_index_receipt
+    except ImportError as exc:
+        raise FilmError(f"Cannot import state_index_gate: {exc}") from exc
+    root = Path(args.root).expanduser().resolve()
+    report = run_state_index_check(root)
+    path = write_state_index_receipt(root, report)
+    report["receipt_path"] = str(path)
+    action = getattr(args, "state_index_action", None) or "check"
+    if action == "plan":
+        # plan = full report + human-readable generate_plan first
+        plan_view = {
+            "ok": report.get("ok"),
+            "kind": "state-index-plan",
+            "purpose": report.get("purpose"),
+            "generate_plan": report.get("generate_plan") or [],
+            "agent_do": report.get("agent_do") or [],
+            "hard": report.get("hard") or [],
+            "soft": report.get("soft") or [],
+            "fluency_issues": report.get("fluency_issues") or [],
+            "undress_anchor": report.get("undress_anchor"),
+            "missing_state_photos": report.get("missing_state_photos"),
+            "missing_keyframes": report.get("missing_keyframes"),
+            "receipt_path": str(path),
+            "ref": report.get("ref"),
+            "note": (
+                "Execute generate_plan in order, then re-run: "
+                f'aifilm state-index check --root "{root}"'
+            ),
+        }
+        emit(plan_view)
+    else:
+        emit(report)
+    if not report.get("ok"):
+        return 2
+    if getattr(args, "strict", False) and (report.get("generate_plan") or report.get("soft")):
+        return 3
+    return 0
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     manifest = load_manifest(root)
@@ -1051,6 +1106,12 @@ def _status_remotion_probe(root: Path) -> dict[str, Any]:
 def cmd_write_spec(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     ensure_tree(root)
+    try:
+        from narrative_control import assert_projection_ready, NarrativeControlError
+
+        assert_projection_ready(root, require_locked=True)
+    except NarrativeControlError as exc:
+        raise FilmError(f"{exc.code}: {exc}") from exc
     default_spec = root / "film-spec.json"
     if args.spec:
         spec_path = Path(args.spec).expanduser().resolve()
@@ -1061,6 +1122,47 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
         shots = validate_film_spec(spec, assign_missing_ids=True, film_root=root)
     except FilmSpecError as exc:
         raise FilmError(str(exc)) from exc
+
+    # --- New Visual Bible Prompt Injector Logic ---
+    bible = load_bible(root)
+    injector = PromptInjector(bible)
+    conflict_errors = []
+    for shot in shots:
+        try:
+            injector.assemble(shot, root)
+        except PromptConflictError as e:
+            conflict_errors.append(str(e))
+
+    if conflict_errors:
+        err_msg = "Prompt conflicts detected:\n- " + "\n- ".join(conflict_errors)
+        raise FilmError(err_msg)
+
+    # Wardrobe State Linting (shot-level continuity write-back preferred)
+    wardrobe_variants = bible.get("wardrobe_variants", {})
+    wardrobe_errors = []
+    for shot in shots:
+        w_state = shot.get("wardrobe_state") or (shot.get("dsl") or {}).get(
+            "wardrobe_state"
+        )
+        if w_state and w_state != "default":
+            heroines = shot.get("heroine_ids", ["hero"])
+            # also honor dsl.cast when heroine_ids default
+            cast = (shot.get("dsl") or {}).get("cast")
+            if isinstance(cast, list) and cast and heroines == ["hero"]:
+                heroines = [str(c) for c in cast if c]
+            for h in heroines:
+                variants = wardrobe_variants.get(h) or wardrobe_variants.get("hero") or {}
+                if w_state not in variants:
+                    wardrobe_errors.append(
+                        f"Shot {shot.get('id', '?')} requests wardrobe '{w_state}' for '{h}', "
+                        f"but it is not defined in the Visual Bible."
+                    )
+
+    if wardrobe_errors:
+        err_msg = "Wardrobe Linting Failed:\n- " + "\n- ".join(wardrobe_errors)
+        raise FilmError(err_msg)
+    # ---------------------------------------------
+
     # Long-form: ensure continuity_chain.md skeleton exists (never overwrite without force)
     chain_path = None
     if is_long_form(spec, shots):
@@ -1370,7 +1472,7 @@ def cmd_continuity_chain(args: argparse.Namespace) -> int:
 
 def cmd_lock_style(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
-    style = read_json(root / "style-bible.json")
+    style = load_bible(root)
     if args.signature:
         style["signature_block"] = args.signature.strip()
     if args.canonical:
@@ -1439,8 +1541,9 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
         raise FilmError("lock-style requires --canonical style master image")
 
     style["locked"] = True
-    style["updated_at"] = utc_now()
-    write_json(root / "style-bible.json", style)
+    style["state"] = "Approved"
+    from scripts.visual_bible import save_bible
+    save_bible(root, style)
     manifest = load_manifest(root)
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
@@ -1501,6 +1604,25 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     ensure_tree(root)
     identity_approved = getattr(args, "identity_approved", False) is True
     review_note = str(getattr(args, "review_note", "") or "").strip()
+    source = Path(args.source).expanduser().resolve()
+    # Lesson 2026-07-22: compressed/wrong-aspect still → mushy I2V (vivian-ep01)
+    aspect = "9:16"
+    try:
+        spec = read_json(root / "film-spec.json") if (root / "film-spec.json").is_file() else {}
+        aspect = str(spec.get("aspect_ratio") or aspect)
+    except Exception:
+        pass
+    from media_qa import analyze_still_geometry
+
+    geo = analyze_still_geometry(source, aspect_ratio=aspect)
+    if args.status == "approved" and not geo.get("ok"):
+        raise FilmError(
+            "Approved still failed geometry gate (keyframe no-compress): "
+            + "; ".join(geo.get("errors") or ["unknown"])
+            + " — re-export ≥720×1280 9:16 (or film aspect) full-res; "
+            "never I2V from thumbnail/landscape compress. "
+            "See references/lessons-2026-07-22-keyframe-no-compress.md"
+        )
     if args.status == "approved":
         if not identity_approved:
             raise FilmError(
@@ -1513,12 +1635,13 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             )
     record = _register_media(
         shot_id=args.shot_id,
-        source=Path(args.source).expanduser().resolve(),
+        source=source,
         dest_dir=root / "keyframes",
         role=args.role,
         status=args.status,
         prompt_file=Path(args.prompt_file).expanduser().resolve() if args.prompt_file else None,
     )
+    record["geometry_qa"] = geo
     if args.status == "approved":
         record["identity_approved"] = True
         record["review_note"] = review_note
@@ -1526,8 +1649,163 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     manifest.setdefault("stills", {})[record["shot_id"]] = record
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
-    emit({"ok": True, "record": record})
+    emit({"ok": True, "record": record, "geometry_qa": geo})
     return 0
+
+
+def _auto_promote_last_to_next(
+    root: Path,
+    *,
+    shot_id: str,
+    clip_path: Path,
+) -> dict[str, Any] | None:
+    """After I2V register: promote last frame → next shot first keyframe when story serial.
+
+    Lesson 2026-07-21: generation must follow actual last→first frames (wardrobe/pose),
+    never re-open next still from full cast master on continue/undress chains.
+    """
+    try:
+        from continuity_chain import (
+            flatten_shots,
+            next_shot_after,
+            should_auto_promote_next,
+            upsert_join,
+            sha256_file as chain_sha,
+        )
+    except Exception:
+        return None
+    spec_path = root / "film-spec.json"
+    if not spec_path.is_file() or not clip_path.is_file():
+        return None
+    try:
+        spec = read_json(spec_path)
+    except Exception:
+        return None
+    shots = flatten_shots(spec)
+    prev = next((s for s in shots if str(s.get("id")) == str(shot_id)), None)
+    nxt = next_shot_after(spec, shot_id)
+    if not nxt:
+        return {"ok": True, "skipped": True, "reason": "last shot — no promote"}
+    next_id = str(nxt.get("id") or "")
+    heat = str(spec.get("heat_scale") or "")
+    do, why = should_auto_promote_next(prev, nxt, heat_scale=heat)
+    # allow force off
+    if spec.get("auto_promote_next") is False:
+        return {"ok": True, "skipped": True, "reason": "auto_promote_next:false"}
+    if not do:
+        return {"ok": True, "skipped": True, "reason": why}
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        return {"ok": False, "error": "ffmpeg/ffprobe required for auto promote"}
+    try:
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(clip_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        duration = float((probe.stdout or "0").strip() or "0")
+    except (subprocess.CalledProcessError, ValueError) as exc:
+        return {"ok": False, "error": f"ffprobe: {exc}"}
+    t = max(0.0, duration - 0.05) if duration > 0.1 else 0.0
+    kf_dir = root / "keyframes"
+    kf_dir.mkdir(parents=True, exist_ok=True)
+    last_path = kf_dir / f"_last_{shot_id}.png"
+    next_kf = kf_dir / f"{next_id}.png"
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-ss",
+                f"{t:.4f}",
+                "-i",
+                str(clip_path),
+                "-frames:v",
+                "1",
+                "-q:v",
+                "2",
+                str(last_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        return {
+            "ok": False,
+            "error": f"ffmpeg extract last failed: {(exc.stderr or '')[-300:]}",
+        }
+    if not last_path.is_file() or last_path.stat().st_size < 32:
+        return {"ok": False, "error": "empty last frame"}
+    shutil.copy2(last_path, next_kf)
+    seed = kf_dir / f"{next_id}-seed.png"
+    shutil.copy2(last_path, seed)
+    last_sha = chain_sha(last_path)
+    first_sha = chain_sha(next_kf)
+    join = upsert_join(
+        root,
+        from_id=str(shot_id),
+        to_id=next_id,
+        mode="continue",
+        last_sha=last_sha,
+        first_sha=first_sha,
+        last_path=str(last_path),
+        first_path=str(next_kf),
+        checklist={
+            "wardrobe": "carry last-frame costume (no re-dress)",
+            "pose": "start from actual last frame pose",
+            "note": why,
+        },
+    )
+    # Register still seed as approved frame-chain input (not final art yet)
+    try:
+        manifest = load_manifest(root)
+        stills = manifest.setdefault("stills", {})
+        stills[next_id] = {
+            "shot_id": next_id,
+            "role": "keyframe",
+            "status": "frame_chain_seed",
+            "path": str(next_kf),
+            "sha256": first_sha,
+            "bytes": next_kf.stat().st_size,
+            "registered_at": utc_now(),
+            "provider": "frame-chain-promote",
+            "identity_approved": True,
+            "review_note": (
+                f"AUTO promote last frame of {shot_id} → first of {next_id}; "
+                f"{why}; do NOT regenerate from full cast; I2V input={next_kf}"
+            ),
+            "promoted_from": str(shot_id),
+            "byte_identical_to_prev_last": True,
+        }
+        save_manifest(root, manifest)
+    except Exception:
+        pass
+    return {
+        "ok": True,
+        "skipped": False,
+        "reason": why,
+        "from": shot_id,
+        "to": next_id,
+        "last_frame": str(last_path),
+        "next_keyframe": str(next_kf),
+        "byte_identical": last_sha == first_sha,
+        "join": join,
+        "agent_next": (
+            f"I2V {next_id} MUST use image={next_kf} (actual last frame of {shot_id}). "
+            "Forbidden: image_edit from full cast master (causes re-dress / pose break). "
+            "Only image_edit the promoted frame for micro pose if cut required — keep wardrobe."
+        ),
+    }
 
 
 def cmd_register_clip(args: argparse.Namespace) -> int:
@@ -1621,7 +1899,26 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     manifest.setdefault("clips", {})[record["shot_id"]] = record
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
-    emit({"ok": True, "record": record})
+
+    # Generation-time first/last: auto promote next keyframe from this clip's last frame
+    promote: dict[str, Any] | None = None
+    if args.status == "approved":
+        try:
+            promote = _auto_promote_last_to_next(
+                root,
+                shot_id=str(args.shot_id),
+                clip_path=Path(record["path"]),
+            )
+        except Exception as exc:  # noqa: BLE001
+            promote = {"ok": False, "error": str(exc)[:300]}
+        if promote:
+            record["auto_promote_next"] = promote
+            # re-save with promote receipt on clip
+            manifest = load_manifest(root)
+            manifest.setdefault("clips", {})[record["shot_id"]] = record
+            save_manifest(root, manifest)
+
+    emit({"ok": True, "record": record, "auto_promote_next": promote})
     return 0
 
 
@@ -2057,6 +2354,8 @@ def cmd_final(args: argparse.Namespace) -> int:
         cmd += [f"--vo-pitch={args.vo_pitch}"]
     if getattr(args, "vo_gain", None) is not None:
         cmd += [f"--vo-gain={args.vo_gain}"]
+    if getattr(args, "vocal_color_gain", None) is not None:
+        cmd += ["--vocal-color-gain", str(args.vocal_color_gain)]
     if args.title:
         cmd += ["--title", args.title]
     if args.end_title:
@@ -2192,6 +2491,8 @@ def cmd_final(args: argparse.Namespace) -> int:
                 title_dur=float(getattr(args, "title_dur", 1.5) or 1.5),
                 end_dur=1.5,
                 allow_burned_underlay=bool(getattr(args, "allow_burned_underlay", False)),
+                title_sequence=getattr(args, "title_sequence", None),
+                end_roll=getattr(args, "end_roll", None),
             )
         except ComposeRenderError as exc:
             raise FilmError(str(exc)) from exc
@@ -2235,6 +2536,8 @@ def cmd_final(args: argparse.Namespace) -> int:
                 title_dur=float(getattr(args, "title_dur", 1.5) or 1.5),
                 end_dur=1.5,
                 allow_burned_underlay=bool(getattr(args, "allow_burned_underlay", False)),
+                title_sequence=getattr(args, "title_sequence", None),
+                end_roll=getattr(args, "end_roll", None),
             )
         except ComposeRenderError as exc:
             raise FilmError(str(exc)) from exc
@@ -2659,6 +2962,8 @@ def cmd_export_compose(args: argparse.Namespace) -> int:
             force=bool(getattr(args, "force", False)),
             layout=str(getattr(args, "layout", "auto") or "auto"),
             compose_preset=str(getattr(args, "compose_preset", "auto") or "auto"),
+            title_sequence=getattr(args, "title_sequence", None),
+            end_roll=getattr(args, "end_roll", None),
         )
     except ComposeExportError as exc:
         raise FilmError(str(exc)) from exc
@@ -2715,6 +3020,8 @@ def cmd_compose_render(args: argparse.Namespace) -> int:
             title_dur=float(getattr(args, "title_dur", 1.5) or 1.5),
             end_dur=float(getattr(args, "end_dur", 1.5) or 1.5),
             allow_burned_underlay=bool(getattr(args, "allow_burned_underlay", False)),
+            title_sequence=getattr(args, "title_sequence", None),
+            end_roll=getattr(args, "end_roll", None),
         )
     except ComposeRenderError as exc:
         raise FilmError(str(exc)) from exc
@@ -3109,6 +3416,363 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
     except GrokOAuthError as exc:
         raise FilmError(str(exc)) from exc
     raise FilmError(f"unknown grok-oauth action {action!r}")
+
+
+def cmd_graph(args: argparse.Namespace) -> int:
+    """Vertical Drama Graph: legacy derive/import + canonical project/validate/status."""
+    root = Path(args.root).expanduser().resolve()
+    from drama_graph import derive_graph, graph_path, graph_status, validate_graph
+    from narrative_control import (
+        GRAPH_SCHEMA_VERSION,
+        control_status,
+        graph_content_sha256,
+        graph_locked_for_projection,
+        projection_status,
+    )
+    action = str(getattr(args, "graph_action", "") or "")
+    if action == "derive":
+        existing = json.loads(graph_path(root).read_text(encoding="utf-8")) if graph_path(root).is_file() else {}
+        if int(existing.get("schema_version") or 0) >= GRAPH_SCHEMA_VERSION:
+            raise FilmError("canonical drama-graph exists; use aifilm graph project or plan edit, not graph derive")
+        graph = derive_graph(root, write=not bool(getattr(args, "no_write", False)))
+        v = validate_graph(graph)
+        emit(
+            {
+                "ok": bool(v.get("ok")),
+                "action": "derive",
+                "path": str(graph_path(root)),
+                "shot_count": v.get("shot_count"),
+                "warnings": (graph.get("warnings") or []) + (v.get("warnings") or []),
+                "errors": v.get("errors") or [],
+                "project": graph.get("project"),
+                "episode_count": len(graph.get("episodes") or []),
+            }
+        )
+        return 0 if v.get("ok") else 1
+    if action == "import":
+        existing = (
+            json.loads(graph_path(root).read_text(encoding="utf-8"))
+            if graph_path(root).is_file()
+            else {}
+        )
+        if int(existing.get("schema_version") or 0) >= GRAPH_SCHEMA_VERSION:
+            raise FilmError("canonical drama-graph already exists; refusing legacy import overwrite")
+        graph = derive_graph(root, write=False)
+        spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8")) if (root / "film-spec.json").is_file() else {}
+        di = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+        graph["schema_version"] = GRAPH_SCHEMA_VERSION
+        graph["derived_from"] = {**(graph.get("derived_from") or {}), "mode": "legacy-import", "imported_at": utc_now()}
+        graph["story"] = {
+            "premise": str(spec.get("description") or di.get("logline") or ""),
+            "logline": str(di.get("logline") or spec.get("description") or ""),
+            "theme": str(di.get("theme") or ""),
+            "protagonist_ids": list(di.get("cast") or spec.get("cast_ids") or []),
+            "protagonist_goal": str(di.get("protagonist_goal") or ""),
+            "opposition": str(di.get("opposition") or ""),
+            "stakes": str(di.get("stakes") or ""),
+            "climax_choice": str(di.get("climax_choice") or ""),
+            "ending_hook": str(di.get("ending_hook") or ""),
+            "emotional_arc": list(di.get("emotional_arc") or []),
+            "pace_chart": list(di.get("pace_chart") or []),
+            "constraints": list(di.get("taboos") or []),
+            "status": "needs_authoring",
+        }
+        from narrative_control import ensure_graph_controls
+        ensure_graph_controls(graph)
+        write_json(graph_path(root), graph)
+        emit({"ok": True, "action": "import", "path": str(graph_path(root)), "state": graph.get("state"), "content_sha256": graph_content_sha256(graph)})
+        return 0
+    if action == "project":
+        graph = json.loads(graph_path(root).read_text(encoding="utf-8")) if graph_path(root).is_file() else {}
+        if int(graph.get("schema_version") or 0) < GRAPH_SCHEMA_VERSION:
+            raise FilmError("graph project requires canonical graph v2; run aifilm graph import first")
+        ready = graph_locked_for_projection(graph)
+        if not ready.get("ok"):
+            raise FilmError("graph is not ready for projection: " + ", ".join(ready.get("missing_scopes") or [i.get("code", "NARRATIVE") for i in (ready.get("semantic") or {}).get("errors", [])]))
+        from story_plan import project_graph_to_film_spec
+        existing = json.loads((root / "film-spec.json").read_text(encoding="utf-8")) if (root / "film-spec.json").is_file() else {}
+        has_shots = any(isinstance(sc, dict) and sc.get("shots") for sc in (existing.get("scenes") or []))
+        if has_shots and not bool(getattr(args, "force", False)):
+            raise FilmError("film-spec already has shots; pass --force to overwrite projection")
+        norm_path = root / "receipts" / "story-normalize.json"
+        norm = json.loads(norm_path.read_text(encoding="utf-8")) if norm_path.is_file() else None
+        spec = project_graph_to_film_spec(graph, base_spec=existing, normalized=norm)
+        write_json(root / "film-spec.json", spec)
+        emit({"ok": True, "action": "project", "path": str(root / "film-spec.json"), "source_revision": graph.get("revision"), "source_sha256": graph_content_sha256(graph)})
+        return 0
+    if action == "validate":
+        if bool(getattr(args, "derive_if_missing", False)) and not graph_path(root).is_file():
+            derive_graph(root, write=True)
+        report = validate_graph(root=root)
+        report["narrative"] = control_status(root)
+        report["action"] = "validate"
+        report["path"] = str(graph_path(root))
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "status":
+        auto = bool(getattr(args, "derive_if_missing", True)) and not bool(
+            getattr(args, "no_derive", False)
+        )
+        st = graph_status(root, auto_derive=auto)
+        if bool(getattr(args, "with_jobs", False)):
+            from drama_graph import build_jobs_summary
+
+            st["jobs_summary"] = build_jobs_summary(root)
+        st["control"] = control_status(root)
+        st["projection"] = projection_status(root)
+        emit(st)
+        return 0 if st.get("ok") else 1
+    raise FilmError(f"unknown graph action {action!r}")
+
+
+def cmd_skill(args: argparse.Namespace) -> int:
+    """Skill Registry: list | show (Phase 2 shell)."""
+    from skill_registry import list_skills, show_skill
+
+    action = str(getattr(args, "skill_action", "") or "")
+    if action == "list":
+        tag = getattr(args, "tag", None)
+        phase = getattr(args, "phase", None)
+        report = list_skills(tag=tag, phase=str(phase) if phase is not None else None)
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "show":
+        sid = getattr(args, "id", None) or getattr(args, "skill_id", None)
+        if not sid:
+            raise FilmError("skill show requires --id")
+        report = show_skill(str(sid))
+        emit(report)
+        return 0 if report.get("ok") else 1
+    raise FilmError(f"unknown skill action {action!r}")
+
+
+def cmd_assets(args: argparse.Namespace) -> int:
+    """Phase 4: structured Character/Location/Prop + CharacterState ↔ state-index."""
+    from asset_registry import assets_check, assets_status, sync_assets
+
+    action = str(getattr(args, "assets_action", "") or "")
+    root_s = getattr(args, "root", None)
+    if not root_s:
+        raise FilmError("assets requires --root")
+    root = Path(root_s).expanduser().resolve()
+
+    if action == "sync":
+        report = sync_assets(
+            root,
+            write=not bool(getattr(args, "no_write", False)),
+            force=bool(getattr(args, "force", False)),
+            update_graph=not bool(getattr(args, "no_graph", False)),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "status":
+        report = assets_status(root, auto_sync=bool(getattr(args, "sync", False)))
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "check":
+        report = assets_check(
+            root,
+            sync_first=not bool(getattr(args, "no_sync", False)),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
+    raise FilmError(f"unknown assets action {action!r}")
+
+
+def cmd_plan(args: argparse.Namespace) -> int:
+    """Phase 3: story.normalize → beat/shot plan → drama-graph (+ film-spec seed)."""
+    from story_plan import (
+        normalize_story,
+        plan_status,
+        project_graph_to_film_spec,
+        run_plan,
+    )
+    from drama_graph import GRAPH_NAME, validate_graph
+    from narrative_control import (
+        NarrativeControlError,
+        control_status,
+        edit_node,
+        graph_locked_for_projection,
+        mark_replan,
+        unlock_scope,
+        lock_scope,
+        write_revision_receipt,
+        validate_narrative_graph,
+    )
+    from util import read_json, write_json
+
+    action = str(getattr(args, "plan_action", "") or "")
+
+    def _load_text() -> str:
+        text = getattr(args, "text", None)
+        file_p = getattr(args, "file", None)
+        if file_p:
+            p = Path(str(file_p)).expanduser().resolve()
+            if not p.is_file():
+                raise FilmError(f"plan source file not found: {p}")
+            return p.read_text(encoding="utf-8")
+        if text is not None and str(text).strip():
+            return str(text)
+        raise FilmError("plan requires --text or --file")
+
+    if action == "normalize":
+        raw = _load_text()
+        root_s = getattr(args, "root", None)
+        norm = normalize_story(
+            raw,
+            title_hint=getattr(args, "title", None),
+            source_path=str(getattr(args, "file", None) or ""),
+        )
+        if root_s:
+            root = Path(root_s).expanduser().resolve()
+            root.mkdir(parents=True, exist_ok=True)
+            (root / "receipts").mkdir(parents=True, exist_ok=True)
+            out = root / "receipts" / "story-normalize.json"
+            write_json(out, norm)
+            emit({"ok": True, "action": "normalize", "path": str(out), "story": norm})
+        else:
+            emit({"ok": True, "action": "normalize", "story": norm})
+        return 0
+
+    if action == "run":
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan run requires --root")
+        root = Path(root_s).expanduser().resolve()
+        raw = _load_text()
+        report = run_plan(
+            root,
+            raw,
+            title=getattr(args, "title", None),
+            target_duration=float(getattr(args, "target_duration", 45) or 45),
+            apply_film_spec=bool(getattr(args, "apply_film_spec", False)) and not bool(getattr(args, "no_film_spec", False)),
+            force=bool(getattr(args, "force", False)),
+            source_path=str(getattr(args, "file", None) or ""),
+            seed_bible=not bool(getattr(args, "no_bible", False)),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
+
+    if action == "validate":
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan validate requires --root")
+        root = Path(root_s).expanduser().resolve()
+        status = control_status(root)
+        # Copy the semantic summary before attaching the full control status;
+        # otherwise report['control']['semantic'] points back into report and
+        # json.dumps() fails with a circular-reference error.
+        strict_requested = bool(getattr(args, "strict", False))
+        if strict_requested and (root / GRAPH_NAME).is_file():
+            report = validate_narrative_graph(read_json(root / GRAPH_NAME), strict=True)
+        else:
+            report = dict(status.get("semantic") or {"ok": False, "issues": [{"code": "GRAPH_MISSING"}]})
+        report["strict_requested"] = strict_requested
+        report.update({"action": "validate", "root": str(root), "control": status})
+        emit(report)
+        return 0 if report.get("ok") else 1
+
+    if action in {"edit", "lock", "unlock", "replan"}:
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError(f"plan {action} requires --root")
+        root = Path(root_s).expanduser().resolve()
+        graph_path = root / GRAPH_NAME
+        graph = read_json(graph_path)
+        if not graph:
+            raise FilmError(f"missing {graph_path} — run: aifilm plan run --root …")
+        try:
+            if action == "edit":
+                changes: dict[str, Any] = {}
+                for item in list(getattr(args, "set", None) or []):
+                    if "=" not in item:
+                        raise NarrativeControlError(f"--set requires field=value: {item}", code="INVALID_FIELD")
+                    field, raw_value = item.split("=", 1)
+                    try:
+                        value: Any = json.loads(raw_value)
+                    except json.JSONDecodeError:
+                        value = raw_value
+                    if str(getattr(args, "node", "")) == "story" and field.startswith("story."):
+                        field = field.split(".", 1)[1]
+                    changes[field] = value
+                graph, affected = edit_node(graph, str(args.node), changes)
+                write_json(graph_path, graph)
+                receipt = write_revision_receipt(root, graph, action="edit", node_ref=str(args.node), affected=affected)
+                emit({"ok": True, "action": action, "revision": graph.get("revision"), "affected_nodes": affected, "receipt_path": str(receipt)})
+                return 0
+            if action == "lock":
+                graph = lock_scope(graph, str(args.scope), user_phrase=str(args.user_phrase))
+                write_json(graph_path, graph)
+                receipt = write_revision_receipt(root, graph, action="lock", reason=str(args.user_phrase))
+                emit({"ok": True, "action": action, "scope": args.scope, "revision": graph.get("revision"), "receipt_path": str(receipt)})
+                return 0
+            if action == "unlock":
+                graph = unlock_scope(graph, str(args.scope), reason=str(args.reason))
+                write_json(graph_path, graph)
+                receipt = write_revision_receipt(root, graph, action="unlock", reason=str(args.reason))
+                emit({"ok": True, "action": action, "scope": args.scope, "revision": graph.get("revision"), "receipt_path": str(receipt)})
+                return 0
+            if not bool(getattr(args, "descendants", False)):
+                raise NarrativeControlError("replan requires --descendants to confirm subtree invalidation", code="DESCENDANTS_CONFIRM_REQUIRED")
+            affected = mark_replan(graph, str(args.node))
+            write_json(graph_path, graph)
+            receipt = write_revision_receipt(root, graph, action="replan", node_ref=str(args.node), affected=affected)
+            emit({"ok": True, "action": action, "revision": graph.get("revision"), "affected_nodes": affected, "receipt_path": str(receipt)})
+            return 0
+        except NarrativeControlError as exc:
+            raise FilmError(f"{exc.code}: {exc}") from exc
+
+    if action == "project":
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan project requires --root")
+        root = Path(root_s).expanduser().resolve()
+        gpath = root / GRAPH_NAME
+        graph = read_json(gpath)
+        if not graph:
+            raise FilmError(f"missing {gpath} — run: aifilm plan run --root …")
+        force = bool(getattr(args, "force", False))
+        existing = read_json(root / "film-spec.json") or {}
+        has_shots = any(
+            isinstance(sc, dict) and sc.get("shots")
+            for sc in (existing.get("scenes") or [])
+        )
+        if has_shots and not force:
+            emit(
+                {
+                    "ok": False,
+                    "error": "film-spec already has shots; pass --force to overwrite",
+                }
+            )
+            return 1
+        norm = read_json(root / "receipts" / "story-normalize.json")
+        ready = graph_locked_for_projection(graph)
+        if not ready.get("ok"):
+            emit({"ok": False, "action": "project", "error": "graph is not ready for projection", "missing_scopes": ready.get("missing_scopes"), "semantic": ready.get("semantic")})
+            return 1
+        spec = project_graph_to_film_spec(graph, base_spec=existing, normalized=norm)
+        write_json(root / "film-spec.json", spec)
+        v = validate_graph(graph)
+        emit(
+            {
+                "ok": True,
+                "action": "project",
+                "path": str(root / "film-spec.json"),
+                "graph_ok": bool(v.get("ok")),
+                "shot_count": v.get("shot_count"),
+                "next": f'aifilm write-spec --root "{root}"',
+            }
+        )
+        return 0
+
+    if action == "status":
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan status requires --root")
+        emit(plan_status(Path(root_s)))
+        return 0
+
+    raise FilmError(f"unknown plan action {action!r}")
 
 
 def cmd_dispatch(args: argparse.Namespace) -> int:
@@ -3539,6 +4203,19 @@ def build_parser() -> argparse.ArgumentParser:
     ls.add_argument("--cast-master", help="Path to approved cast master (face/wardrobe lock)")
     ls.add_argument("--signature", help="Override signature block (≥40 chars)")
 
+    bible = sub.add_parser("bible", help="Manage Visual Bible")
+    bible_sub = bible.add_subparsers(dest="bible_cmd", required=True)
+
+    b_init = bible_sub.add_parser("init", help="Initialize or migrate Visual Bible")
+    b_init.add_argument("--root", required=True)
+
+    b_lock = bible_sub.add_parser("lock", help="Lock Visual Bible (Candidate -> Approved)")
+    b_lock.add_argument("--root", required=True)
+
+    b_state = bible_sub.add_parser("state", help="Update Visual Bible state")
+    b_state.add_argument("--root", required=True)
+    b_state.add_argument("--set", choices=["Draft", "Candidate", "Approved"], required=True)
+
     rs = sub.add_parser("register-still", help="Register approved still")
     rs.add_argument("--root", required=True)
     rs.add_argument("--shot-id", required=True)
@@ -3668,6 +4345,12 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument("--vo-rate", default=None)
     fin.add_argument("--vo-pitch", default=None)
     fin.add_argument("--vo-gain", type=float, default=None)
+    fin.add_argument(
+        "--vocal-color-gain",
+        type=float,
+        default=None,
+        help="Independent 娇喘/语助词 track gain (0..1.5; film-spec voice_tracks.vocal_color_gain)",
+    )
     fin.add_argument("--title")
     fin.add_argument("--end-title")
     fin.add_argument("--music", help="External BGM file (overrides audio/bgm.wav templates)")
@@ -3793,6 +4476,18 @@ def build_parser() -> argparse.ArgumentParser:
         default="auto",
         choices=["auto", "ecchi-rnb", "minimal"],
         help="Designed-post title/caption look: auto (from mood/tone) | ecchi-rnb | minimal",
+    )
+    fin.add_argument(
+        "--title-sequence",
+        default=None,
+        choices=["auto", "none"],
+        help="Override film-spec title_sequence mode (auto=spec/default, none=suppress)",
+    )
+    fin.add_argument(
+        "--end-roll",
+        default=None,
+        choices=["auto", "none", "cast_only", "full"],
+        help="Override film-spec end_roll mode (auto=spec/default, none=suppress)",
     )
     fin.add_argument(
         "--require-preview",
@@ -3941,6 +4636,28 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--root", required=True)
     pf.add_argument("--strict", action="store_true", help="Also fail on soft warnings")
 
+    si = sub.add_parser(
+        "state-index",
+        help="Checkpoint: state photos + keyframes + promote plan (fluid camera/joins)",
+    )
+    si_sub = si.add_subparsers(dest="state_index_action", required=True)
+    sic = si_sub.add_parser(
+        "check",
+        help="Run state-index gate; write receipts/state-index.json",
+    )
+    sic.add_argument("--root", required=True)
+    sic.add_argument(
+        "--strict",
+        action="store_true",
+        help="Also fail if generate_plan or soft gaps non-empty",
+    )
+    sip = si_sub.add_parser(
+        "plan",
+        help="Print regenerate plan (state photos / keyframes / promote) for this stage",
+    )
+    sip.add_argument("--root", required=True)
+    sip.add_argument("--strict", action="store_true")
+
     pilot = sub.add_parser(
         "pilot",
         help="Pilot three-shot scorecard assist (pick/report/score/approve)",
@@ -4031,6 +4748,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ec.add_argument("--title-dur", type=float, default=1.5)
     ec.add_argument("--end-dur", type=float, default=1.5)
+    ec.add_argument(
+        "--title-sequence",
+        default=None,
+        choices=["auto", "none"],
+        help="Override film-spec title_sequence mode (auto=spec/default, none=suppress)",
+    )
+    ec.add_argument(
+        "--end-roll",
+        default=None,
+        choices=["auto", "none", "cast_only", "full"],
+        help="Override film-spec end_roll mode (auto=spec/default, none=suppress)",
+    )
     ec.add_argument("--force", action="store_true", help="Overwrite existing compose/")
 
     cr = sub.add_parser(
@@ -4079,6 +4808,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     cr.add_argument("--title-dur", type=float, default=1.5)
     cr.add_argument("--end-dur", type=float, default=1.5)
+    cr.add_argument(
+        "--title-sequence",
+        default=None,
+        choices=["auto", "none"],
+        help="Override film-spec title_sequence mode (auto=spec/default, none=suppress)",
+    )
+    cr.add_argument(
+        "--end-roll",
+        default=None,
+        choices=["auto", "none", "cast_only", "full"],
+        help="Override film-spec end_roll mode (auto=spec/default, none=suppress)",
+    )
     cr.add_argument(
         "--allow-burned-underlay",
         action="store_true",
@@ -4151,6 +4892,135 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # Phase 1: Vertical Drama Graph
+    graph_p = sub.add_parser(
+        "graph",
+        help="Vertical Drama Graph: derive|validate|status (from film-spec; Phase 1)",
+    )
+    graph_sub = graph_p.add_subparsers(dest="graph_action", required=True)
+    g_der = graph_sub.add_parser(
+        "derive", help="Derive drama-graph.json from film-spec (read-only projection)"
+    )
+    g_der.add_argument("--root", required=True, help="Film root")
+    g_der.add_argument("--no-write", action="store_true", help="Do not write drama-graph.json")
+    g_imp = graph_sub.add_parser("import", help="Explicitly import legacy film-spec into canonical drama-graph v2")
+    g_imp.add_argument("--root", required=True, help="Film root")
+    g_proj = graph_sub.add_parser("project", help="Project locked canonical drama-graph into film-spec")
+    g_proj.add_argument("--root", required=True, help="Film root")
+    g_proj.add_argument("--force", action="store_true", help="Overwrite existing film-spec shots")
+    g_val = graph_sub.add_parser("validate", help="Validate drama-graph.json structure")
+    g_val.add_argument("--root", required=True, help="Film root")
+    g_val.add_argument(
+        "--derive-if-missing",
+        action="store_true",
+        help="Derive graph first if missing",
+    )
+    g_st = graph_sub.add_parser("status", help="Graph counts + validate summary")
+    g_st.add_argument("--root", required=True, help="Film root")
+    g_st.add_argument(
+        "--no-derive",
+        action="store_true",
+        help="Do not auto-derive if graph missing",
+    )
+    g_st.add_argument("--with-jobs", action="store_true", help="Include execution jobs_summary")
+
+    # Phase 2: Skill Registry shell
+    skill_p = sub.add_parser("skill", help="Skill Registry: list|show (Phase 2 shell)")
+    skill_sub = skill_p.add_subparsers(dest="skill_action", required=True)
+    sk_list = skill_sub.add_parser("list", help="List registered skills")
+    sk_list.add_argument("--tag", default=None, help="Filter by tag")
+    sk_list.add_argument("--phase", default=None, help="Filter by phase id (e.g. 1, 2)")
+    sk_show = skill_sub.add_parser("show", help="Show one skill + contracts")
+    sk_show.add_argument("--id", dest="id", required=True, help="skill_id e.g. image.animate")
+
+    # Phase 3: story → beat/shot planning
+    plan_p = sub.add_parser(
+        "plan",
+        help="Story plan: normalize|run|validate|edit|lock|unlock|replan|project|status",
+    )
+    plan_sub = plan_p.add_subparsers(dest="plan_action", required=True)
+    p_norm = plan_sub.add_parser("normalize", help="story.normalize → receipts/story-normalize.json")
+    p_norm.add_argument("--root", default=None, help="Optional film root to write receipt")
+    p_norm.add_argument("--text", default=None, help="Raw story / brief text")
+    p_norm.add_argument("--file", default=None, help="Path to .txt/.md story")
+    p_norm.add_argument("--title", default=None, help="Title override")
+    p_run = plan_sub.add_parser(
+        "run",
+        help="Create draft plan: normalize→episode→scene→beat→shot→canonical drama-graph",
+    )
+    p_run.add_argument("--root", required=True, help="Film root")
+    p_run.add_argument("--text", default=None, help="Raw story / one-liner idea")
+    p_run.add_argument("--file", default=None, help="Path to story file")
+    p_run.add_argument("--title", default=None, help="Title override")
+    p_run.add_argument(
+        "--target-duration",
+        type=float,
+        default=45.0,
+        help="Target episode duration seconds (default 45)",
+    )
+    p_run.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing film-spec shots / locked bible seed",
+    )
+    p_run.add_argument("--apply-film-spec", action="store_true", help="Also write a draft film-spec projection")
+    p_run.add_argument("--no-film-spec", action="store_true", help="Do not write film-spec (compatibility alias)")
+    p_run.add_argument(
+        "--no-bible",
+        action="store_true",
+        help="Do not seed style-bible characters/locations",
+    )
+    p_proj = plan_sub.add_parser(
+        "project", help="Project drama-graph → film-spec (when graph already planned)"
+    )
+    p_proj.add_argument("--root", required=True)
+    p_proj.add_argument("--force", action="store_true", help="Overwrite existing shots")
+    p_val = plan_sub.add_parser("validate", help="Validate story/beat/shot semantics and projection state")
+    p_val.add_argument("--root", required=True)
+    p_val.add_argument("--strict", action="store_true")
+    p_edit = plan_sub.add_parser("edit", help="Edit one unlocked narrative node")
+    p_edit.add_argument("--root", required=True)
+    p_edit.add_argument("--node", required=True, help="Node id/ref, e.g. story or ep01_sc01_bt03")
+    p_edit.add_argument("--set", action="append", required=True, help="field=value; repeatable")
+    p_lock = plan_sub.add_parser("lock", help="Lock one narrative scope after semantic validation")
+    p_lock.add_argument("--root", required=True)
+    p_lock.add_argument("--scope", choices=("story", "beats", "shots", "panels"), required=True)
+    p_lock.add_argument("--user-phrase", required=True)
+    p_unlock = plan_sub.add_parser("unlock", help="Unlock one narrative scope with an audit reason")
+    p_unlock.add_argument("--root", required=True)
+    p_unlock.add_argument("--scope", choices=("story", "beats", "shots", "panels"), required=True)
+    p_unlock.add_argument("--reason", required=True)
+    p_replan = plan_sub.add_parser("replan", help="Mark a node and descendants stale without deleting media")
+    p_replan.add_argument("--root", required=True)
+    p_replan.add_argument("--node", required=True)
+    p_replan.add_argument("--descendants", action="store_true", help="Required explicit confirmation flag")
+    p_st = plan_sub.add_parser("status", help="Plan + graph status for film root")
+    p_st.add_argument("--root", required=True)
+
+    # Phase 4: asset registry (character/location/prop/state)
+    assets_p = sub.add_parser(
+        "assets",
+        help="Asset registry: sync|status|check (Phase 4 Character/Location/Prop/State)",
+    )
+    assets_sub = assets_p.add_subparsers(dest="assets_action", required=True)
+    a_sync = assets_sub.add_parser(
+        "sync",
+        help="Structure bible locations/props + wardrobe variants + cast-state slots + timeline",
+    )
+    a_sync.add_argument("--root", required=True)
+    a_sync.add_argument("--force", action="store_true", help="Re-structure locations/props objects")
+    a_sync.add_argument("--no-write", action="store_true")
+    a_sync.add_argument("--no-graph", action="store_true", help="Do not patch drama-graph")
+    a_st = assets_sub.add_parser("status", help="Show assets-registry summary")
+    a_st.add_argument("--root", required=True)
+    a_st.add_argument("--sync", action="store_true", help="Sync if missing")
+    a_ck = assets_sub.add_parser(
+        "check",
+        help="Align assets-registry with state-index + wardrobe re-dress risks",
+    )
+    a_ck.add_argument("--root", required=True)
+    a_ck.add_argument("--no-sync", action="store_true", help="Do not re-sync before check")
+
     return p
 
 
@@ -4198,6 +5068,22 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_continuity_chain(args)
         if args.cmd == "lock-style":
             return cmd_lock_style(args)
+        if args.cmd == "bible":
+            root = Path(args.root).expanduser().resolve()
+            if args.bible_cmd == "init":
+                from scripts.visual_bible import load_bible, save_bible
+                bible = load_bible(root)
+                save_bible(root, bible)
+                emit({"ok": True, "msg": "Visual Bible initialized/migrated to v2"})
+            elif args.bible_cmd == "lock":
+                from scripts.visual_bible import update_bible_state
+                update_bible_state(root, "Approved")
+                emit({"ok": True, "msg": "Visual Bible locked (Approved)"})
+            elif args.bible_cmd == "state":
+                from scripts.visual_bible import update_bible_state
+                update_bible_state(root, args.set)
+                emit({"ok": True, "msg": f"Visual Bible state updated to {args.set}"})
+            return 0
         if args.cmd == "register-still":
             return cmd_register_still(args)
         if args.cmd == "tts-rehearse":
@@ -4218,6 +5104,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_next(args)
         if args.cmd == "preflight":
             return cmd_preflight(args)
+        if args.cmd == "state-index":
+            return cmd_state_index(args)
         if args.cmd == "pilot":
             return cmd_pilot(args)
         if args.cmd == "compose-preview":
@@ -4232,6 +5120,19 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_export_desktop(args)
         if args.cmd == "frw":
             return cmd_frw(args)
+        if args.cmd == "graph":
+            # allow --no-derive to flip auto_derive off for status
+            if getattr(args, "graph_action", None) == "status" and bool(
+                getattr(args, "no_derive", False)
+            ):
+                args.derive_if_missing = False
+            return cmd_graph(args)
+        if args.cmd == "skill":
+            return cmd_skill(args)
+        if args.cmd == "plan":
+            return cmd_plan(args)
+        if args.cmd == "assets":
+            return cmd_assets(args)
         raise FilmError(f"Unknown command {args.cmd}")
     except FilmError as exc:
         emit({"ok": False, "error": str(exc)})

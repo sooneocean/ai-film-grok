@@ -36,9 +36,21 @@ ALLOWED_VIDEO_ENDPOINTS = frozenset(
 )
 MOTION_SAMPLE_WIDTH = 64
 MOTION_SAMPLE_HEIGHT = 64
-MOTION_THRESHOLD = 1.0
+# The 64x64 probe intentionally measures broad frame-to-frame change.  The
+# shipped testsrc2 motion plate scores ~3.6 after vertical downsampling, so a
+# 3.5 floor preserves a real-motion gate without rejecting deterministic motion
+# fixtures that are otherwise continuous and active.
+MOTION_THRESHOLD = 3.5
 FRAME_MOTION_THRESHOLD = 0.25
 MOTION_CONTINUITY_THRESHOLD = 0.6
+
+# Lesson 2026-07-22 · keyframe no-compress (vivian-ep01)
+# I2V inherits still geometry: low-res / wrong aspect / heavy compress → mushy clip.
+STILL_MIN_WIDTH_9_16 = 720
+STILL_MIN_HEIGHT_9_16 = 1280
+STILL_ASPECT_9_16_MIN = 0.50  # width/height
+STILL_ASPECT_9_16_MAX = 0.62
+STILL_BYTES_SOFT_MIN = 80_000  # soft warn only
 
 
 class MediaQAError(RuntimeError):
@@ -252,3 +264,179 @@ def approved_clip_record(record: object) -> bool:
         and qa.get("decode_ok") is True
         and qa.get("motion_ok") is True
     )
+
+
+def _probe_still_size(path: Path) -> tuple[int, int]:
+    """Return (width, height) via ffprobe; (0, 0) on failure."""
+    if not path.is_file():
+        return 0, 0
+    try:
+        probe = _run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "json",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+        info = json.loads(probe.stdout or "{}")
+        streams = info.get("streams") or []
+        if not streams:
+            return 0, 0
+        w = int(streams[0].get("width") or 0)
+        h = int(streams[0].get("height") or 0)
+        return w, h
+    except (subprocess.SubprocessError, json.JSONDecodeError, TypeError, ValueError):
+        return 0, 0
+
+
+def analyze_still_geometry(
+    source: Path,
+    *,
+    aspect_ratio: str = "9:16",
+    min_width: int | None = None,
+    min_height: int | None = None,
+) -> dict[str, Any]:
+    """Hard geometry gate for keyframes before I2V (lesson 2026-07-22).
+
+    Codes: KEYFRAME_TOO_SMALL · KEYFRAME_ASPECT · KEYFRAME_UNREADABLE · KEYFRAME_BYTES_LOW (soft)
+    """
+    source = Path(source)
+    errors: list[str] = []
+    codes: list[str] = []
+    soft: list[str] = []
+    ar = str(aspect_ratio or "9:16").strip()
+    if min_width is None or min_height is None:
+        if ar in ("9:16", "9/16"):
+            min_width = STILL_MIN_WIDTH_9_16
+            min_height = STILL_MIN_HEIGHT_9_16
+        elif ar in ("16:9", "16/9"):
+            min_width = STILL_MIN_HEIGHT_9_16
+            min_height = STILL_MIN_WIDTH_9_16
+        else:
+            min_width = min_width or STILL_MIN_WIDTH_9_16
+            min_height = min_height or STILL_MIN_HEIGHT_9_16
+
+    if not source.is_file():
+        return {
+            "ok": False,
+            "path": str(source),
+            "width": 0,
+            "height": 0,
+            "bytes": 0,
+            "aspect": 0.0,
+            "codes": ["KEYFRAME_MISSING"],
+            "errors": [f"still missing: {source}"],
+            "soft_codes": [],
+            "min_width": min_width,
+            "min_height": min_height,
+        }
+
+    nbytes = source.stat().st_size
+    w, h = _probe_still_size(source)
+    if w <= 0 or h <= 0:
+        codes.append("KEYFRAME_UNREADABLE")
+        errors.append(f"cannot read still geometry: {source.name}")
+        return {
+            "ok": False,
+            "path": str(source),
+            "width": w,
+            "height": h,
+            "bytes": nbytes,
+            "aspect": 0.0,
+            "codes": codes,
+            "errors": errors,
+            "soft_codes": soft,
+            "min_width": min_width,
+            "min_height": min_height,
+        }
+
+    aspect = float(w) / float(h) if h else 0.0
+    if w < int(min_width) or h < int(min_height):
+        codes.append("KEYFRAME_TOO_SMALL")
+        errors.append(
+            f"keyframe too small {w}x{h} < {min_width}x{min_height} "
+            f"(I2V inherits mush; re-export full-res vertical still). "
+            f"See lessons-2026-07-22-keyframe-no-compress.md"
+        )
+
+    if ar in ("9:16", "9/16"):
+        if not (STILL_ASPECT_9_16_MIN <= aspect <= STILL_ASPECT_9_16_MAX):
+            codes.append("KEYFRAME_ASPECT")
+            errors.append(
+                f"keyframe aspect {aspect:.3f} not 9:16 portrait "
+                f"(need {STILL_ASPECT_9_16_MIN:.2f}–{STILL_ASPECT_9_16_MAX:.2f}); "
+                f"got {w}x{h}. Do not I2V landscape/square as vertical. "
+                f"See lessons-2026-07-22-keyframe-no-compress.md"
+            )
+    elif ar in ("16:9", "16/9"):
+        # landscape delivery
+        if aspect < 1.4 or aspect > 2.0:
+            codes.append("KEYFRAME_ASPECT")
+            errors.append(
+                f"keyframe aspect {aspect:.3f} not 16:9 landscape (got {w}x{h})"
+            )
+
+    if nbytes < STILL_BYTES_SOFT_MIN and not codes:
+        soft.append("KEYFRAME_BYTES_LOW")
+
+    return {
+        "ok": not errors,
+        "path": str(source),
+        "width": w,
+        "height": h,
+        "bytes": nbytes,
+        "aspect": round(aspect, 4),
+        "codes": codes,
+        "errors": errors,
+        "soft_codes": soft,
+        "min_width": min_width,
+        "min_height": min_height,
+        "lesson": "lessons-2026-07-22-keyframe-no-compress.md",
+    }
+
+
+def pick_best_keyframe(root: Path, shot_id: str) -> Path | None:
+    """Prefer full-res portrait still: higher area, pass geometry, png over mushy jpg."""
+    kf = Path(root) / "keyframes"
+    if not kf.is_dir():
+        return None
+    cands: list[Path] = []
+    for ext in (".png", ".jpg", ".jpeg", ".webp"):
+        p = kf / f"{shot_id}{ext}"
+        if p.is_file():
+            cands.append(p)
+    # also shotXX-seed.png as fallback only if primary missing
+    if not cands:
+        for ext in (".png", ".jpg", ".jpeg", ".webp"):
+            p = kf / f"{shot_id}-seed{ext}"
+            if p.is_file():
+                cands.append(p)
+    if not cands:
+        return None
+
+    def score(p: Path) -> tuple[int, int, int, int]:
+        geo = analyze_still_geometry(p)
+        ok = 1 if geo.get("ok") else 0
+        area = int(geo.get("width") or 0) * int(geo.get("height") or 0)
+        # prefer png slightly when equal
+        png_bonus = 1 if p.suffix.lower() == ".png" else 0
+        return (ok, area, png_bonus, p.stat().st_size)
+
+    cands.sort(key=score, reverse=True)
+    best = cands[0]
+    geo = analyze_still_geometry(best)
+    if not geo.get("ok"):
+        # still return best for diagnostics, caller must gate
+        return best
+    return best

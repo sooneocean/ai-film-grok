@@ -14,11 +14,16 @@
 | 顺序 | 资产 | 路径约定 | 用途 |
 |------|------|----------|------|
 | 1 | **Style master** | `canonical/style-v1.*` | 介质/色板/光感/线条语言（可无主角脸） |
-| 2 | **Cast master（每角一张）** | `canonical/cast/<id>-v1.*` | 脸、发型、瞳色、服装、身材比例 |
+| 2 | **Cast master（每角一张）** | `canonical/cast/<id>-v1.*` | 脸、发型、瞳色、**默认全装**、身材比例 |
 | 3 | **Lookbook（3 张）** | `canonical/lookbook/` | 近景脸 / 半身 / 情绪极端各 1，先批再量产 |
-| 4 | **Shot stills** | `keyframes/shotXX.*` | **只**允许 `image_edit` / 同源 img2img，禁止纯文生角色 |
+| 3b | **状态照 State photos** | `canonical/cast-states/<id>/{full,partial,undressed,bare}.*` | **衣着状态索引**；keyframe 主 ref（见 [keyframe-first-state-index](keyframe-first-state-index.md)） |
+| 3c | **undress-anchor** | `canonical/wardrobe/undress-anchor.*` | 本片卸装峰值；≥partial 后可用 |
+| 4 | **Shot keyframes** | `keyframes/shotXX.*` | 本镜 t=0；**只** `image_edit(状态照/已脱 still)`，禁止纯文生角色；**≥720×1280 9:16 全分辨率**（禁压缩缩略图，见 §1e） |
+| 5 | **I2V clips** | `clips/shotXX.mp4` | **只**以 keyframe 为 frame-1 |
 
 角色转面设定图（turnaround）**只能当参考**，不能直接当 `style-v1` 锁定成片画风。
+
+**Keyframe-first**：视频坏了 → **回头改 keyframe / 状态照**，不是从 full cast 平行重抽。详 [keyframe-first-state-index.md](keyframe-first-state-index.md)。
 
 ### Cast master 验收清单（全勾才算过）
 
@@ -29,6 +34,33 @@
 - [ ] 竖屏 9:16 或可安全裁切  
 - [ ] 明确 **18+ 成人**比例与脸  
 - [ ] 光线干净、可做后续 edit 锚点  
+
+### 1e. 静帧禁压缩 / 错幅（2026-07-22 · P0）
+
+> 片例：薇薇安 EP01——`shot30.jpg` 为 **1152×864 横图**却被 I2V，成片呈「压缩糊」。用户：「图片被压缩导致影片也是压缩状态」。完整见 [lessons-2026-07-22-keyframe-no-compress.md](lessons-2026-07-22-keyframe-no-compress.md)。
+
+| 规则 | 要求 |
+|------|------|
+| **C0 交付分辨率** | 9:16 默认 keyframe **宽≥720 且 高≥1280** |
+| **C1 画幅** | `w/h` ∈ 0.50–0.62；横图/方图 **禁 I2V** |
+| **C3 择优** | 同 stem `.png`/`.jpg` 并存 → **优先更高分辨率且过 C0/C1**（`pick_best_keyframe`） |
+| **C4/C5 硬闸** | `register-still approved` + `preflight` 跑 `analyze_still_geometry`；fail 禁 bulk I2V |
+| **C6 promote** | 末帧 promote **png 全像素**，勿再压低质 jpg |
+
+**铁律**：I2V 不能「放大」糊 still；坏几何 = 整 clip 废。
+
+### 1f. 先验后生 · 算力刀口（2026-07-22 · P0）
+
+> 用户：「验证完再生成视频；图片也是一样逻辑；算力放在刀口上；重复生成成本过高」。  
+> 完整：[lessons-2026-07-22-verify-before-generate.md](lessons-2026-07-22-verify-before-generate.md)
+
+| 规则 | 要求 |
+|------|------|
+| **V0 先验后生** | 上游过闸 → 才烧下游（still→I2V；ref→edit bulk） |
+| **V1 出图即验** | image 落盘后先验几何+身份+结构，再 register / 当 ref |
+| **V2 I2V 前再验** | 只吃 `pick_best_keyframe` 且 geometry ok 的路径 |
+| **V3 坏了修上游** | 禁止对坏 still 盲重试 I2V；禁止未验 30 镜就 bulk 视频 |
+| **V5 成本** | 修 1 张 still ≫ 盲烧 10 段 I2V |
 
 ### 1b. 发色硬锁（2026-07-21 · P1）
 
@@ -75,9 +107,44 @@
 
 **铁律**：`I2V 首帧 ≈ keyframe`；**结构坏会演满 6 秒**。`motion_ok` 不能替代 `structure_ok`。
 
+### 1e. 卸装后禁止回穿 · Still 源链（2026-07-21 · P0 致命）
+
+> 片例：`xide-hardcore-thrust`——film-spec 已 `bare`，shot05–10 仍从**全装 cast master** 重画 → 丝袜/甲「穿回去」。用户定性**严重 bug**。  
+> 完整见 [lessons-2026-07-21-wardrobe-no-redress-still.md](lessons-2026-07-21-wardrobe-no-redress-still.md) · [sex-undress-ladder](lessons-2026-07-21-sex-undress-ladder.md)。
+
+| 规则 | 要求 |
+|------|------|
+| **W1 脱下=永久** | 本片内 `wardrobe_state` rank **只前进**；afterglow 也禁回 full/armored |
+| **W2 undress-anchor** | 卸装峰值 still 批准后立刻：`canonical/wardrobe/undress-anchor.png` |
+| **W2b 状态照索引** | heat max 建议 `cast_state_masters` 齐 full/partial/undressed（±bare）；路径见 style-bible |
+| **W3 peak 后源** | `partial\|undressed\|bare` 镜：**只** `image_edit(state photo \| undress-anchor \| 上一已脱 still)` |
+| **W4 禁 cast 全装源** | peak 后 **禁止** 以全装 cast master 当 still 主 ref（脸可辅 ref，衣着必须以状态照为准） |
+| **W5 I2V 锁衣** | motion 必写 `Keep first-frame clothing — never re-dress`；禁「重新穿好」 |
+| **W6 抽检** | 从 peak 起每镜 t≈1s：半脱标记仍在；整齐全装 = **identity/escalation fail**，禁 final 装傻 |
+| **W7 keyframe-first** | I2V 只吃本镜 keyframe；坏了先改 keyframe/状态照再 I2V（[keyframe-first-state-index](keyframe-first-state-index.md)） |
+
+**铁律**：`wardrobe_state` 文字过闸 ≠ 像素过闸；**ref 全装 = 成片回穿**。  
+**禁止**：审核失败后用全装 cast 重起 act 十镜；并行 bulk `image_edit(cast)` 覆盖已脱镜。
+
+### 1f. I2V 末帧禁止回穿 + promote 门（2026-07-22 · P0 致命）
+
+> 片例：`astra-encore-120`——shot04 首帧 partial 正确，I2V 末帧红外套穿回肩/胸；promote 把毒末帧写成 shot05 → 全线回穿。  
+> 完整见 [lessons-2026-07-22-i2v-endframe-no-redress.md](lessons-2026-07-22-i2v-endframe-no-redress.md)。
+
+| 规则 | 要求 |
+|------|------|
+| **W8 末帧门** | `register-clip` 前/后抽 last frame：肩/胸不得整穿**本片已脱**主外套/盔甲 |
+| **W9 promote 条件** | 仅 W8 通过的末帧才可 promote → 下镜 keyframe；失败则 fail clip、重 I2V |
+| **W10 I2V 硬词** | `Keep first-frame clothing — do NOT put [discarded] back on / never re-dress` |
+| **W11 文字不污染** | `identity_lock` 只锁脸发；`ceremonial jacket ON` 等 full 词禁止进入 undressed/bare 的 Character/subject |
+| **W12 motion 不换衣** | motion 分不够 → 加大转体/甩发/走步；**禁止**用回穿换 `motion_score` |
+
+**铁律**：静帧对 + 末帧回穿 = 仍算回穿事故。**末帧才是衣着真相。**
+
 ## 2. 生成纪律（Grok 主路径）
 
-1. **主角出现的每一镜**：`image_edit`，`image` 列表**出场角色的 cast master 全部靠前**；可选再加相邻已批 still / style。  
+1. **主角出现的每一镜**：`image_edit`，按 **wardrobe_state 选状态照为主 ref**；full 时用 cast master。  
+   - **W3**：已过卸装峰值 / non-full state → **主图 ref = state photo / undress-anchor / 已脱 still**；cast 仅可作脸辅，不得当衣着真相源。  
 2. Prompt **必须**以 `style-bible.signature_block` + `identity_lock` + **`Hair lock`** 开头（见 style-bible.md）。  
 3. 只改：pose / expression / environment / action / wetness / camera——**不改发色/瞳色/签名服色**。  
 4. **禁止**对主角反复 `image_gen` 从零抽卡。  

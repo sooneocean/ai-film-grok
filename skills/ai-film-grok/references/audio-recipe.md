@@ -85,9 +85,11 @@ write-spec 后：
 - 读 `bed_gain_hint` / `mean_bed_gain` → 调节程序床 gen amp 与 music_volume  
 - mix_report 记 `audio_routing_counts`、`audio_policy`  
 - **sung 仍不自动生成**（需后续 HeartMuLa 适配器 + provider）；路由会先降级  
+- **四轨混音**：旁白 × `nar_gain` · BGM · native clip · **`vocal_color` 娇喘语助**（独立增益）— 见 [voice-tracks.md](voice-tracks.md)
 
 ## 与其它文档
 
+- **多轨声线 / 娇喘语助 / tone_tags**：[voice-tracks.md](voice-tracks.md)  
 - BGM 抗疲劳：[bgm-generation.md](bgm-generation.md)  
 - TTS 兜底：[audio-fallback.md](audio-fallback.md) · [voices.md](voices.md)  
 - 口型：[lipsync.md](lipsync.md)  

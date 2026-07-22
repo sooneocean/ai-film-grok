@@ -123,7 +123,7 @@
 | `_heat_arc.sex_duration_ratio` | 指标：性爱秒数 / 总秒数 |
 | `_heat_arc.wardrobe` | 卸甲拍 + act 衣着状态 |
 
-详见 [lessons-2026-07-21-sex-duration-floor.md](lessons-2026-07-21-sex-duration-floor.md) · [lessons-2026-07-21-sex-undress-ladder.md](lessons-2026-07-21-sex-undress-ladder.md)。
+详见 [lessons-2026-07-21-sex-duration-floor.md](lessons-2026-07-21-sex-duration-floor.md) · [lessons-2026-07-21-sex-undress-ladder.md](lessons-2026-07-21-sex-undress-ladder.md) · [lessons-2026-07-21-wardrobe-no-redress-still.md](lessons-2026-07-21-wardrobe-no-redress-still.md)（**脱下禁止穿回 · undress-anchor**）。
 
 ### 办事卸甲阶梯（wardrobe ladder · 硬底）
 

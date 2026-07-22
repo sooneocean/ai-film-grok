@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/skill-envelope.out.json",
+  "title": "SkillResult envelope",
+  "type": "object",
+  "required": ["ok", "skillId"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "skillId": { "type": "string" },
+    "nodeRef": { "type": "string" },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "id": { "type": "string" },
+          "path": { "type": "string" }
+        }
+      }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" },
+        "provider": { "type": "string" },
+        "promptHash": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "finishedAt": { "type": "string" }
+      }
+    },
+    "nextSuggested": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

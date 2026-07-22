@@ -56,7 +56,7 @@ class SidechainTests(unittest.TestCase):
     def test_filter_fragment(self) -> None:
         frag = sidechain_filter_fragment(SIDECHAIN_RNB)
         self.assertIn("sidechaincompress=", frag)
-        self.assertIn("release=720", frag)
+        self.assertIn("release=880", frag)
 
 
 class TtsNeuralGateTests(unittest.TestCase):

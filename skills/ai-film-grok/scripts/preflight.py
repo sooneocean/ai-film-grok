@@ -297,6 +297,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 "HEAT_SEX_WARDROBE_WEAK",
                 "HEAT_UNDRESS_BEAT_MISSING",
                 "HEAT_WARDROBE_RE_DRESS",
+                "HEAT_WARDROBE_TEXT_CONFLICT",
             ):
                 if wcode in heat_codes:
                     soft.append(
@@ -308,13 +309,15 @@ def run_preflight(root: Path) -> dict[str, Any]:
                                 f"dressed={((heat_rep.get('wardrobe') or {}).get('dressed_sex_shots'))} "
                                 f"undress_beats={((heat_rep.get('wardrobe') or {}).get('undress_beats'))} "
                                 f"re_dress={((heat_rep.get('wardrobe') or {}).get('re_dress_shots'))} "
+                                f"text_conflict={((heat_rep.get('wardrobe') or {}).get('text_conflict_shots'))} "
                                 f"peak={((heat_rep.get('wardrobe') or {}).get('peak_state'))}"
                             ),
                             fix=(
                                 "act/climax: wardrobe_state=partial|undressed|bare; "
                                 "add foreplay undress action (removes armor / 卸甲 / 脱下); "
                                 "still/I2V must show armor/clothes off; "
-                                "后镜延续前镜卸装、禁止回穿 (rank only rises). "
+                                "后镜延续前镜卸装、禁止回穿 (rank only rises); "
+                                "下一镜 start_pose/subject 从已脱状态开场，禁 full wardrobe。 "
                                 "See lessons-2026-07-21-sex-undress-ladder.md"
                             ),
                         )
@@ -895,6 +898,135 @@ def run_preflight(root: Path) -> dict[str, Any]:
             )
         )
 
+    # --- keyframe geometry / no-compress (lesson 2026-07-22 · vivian-ep01) ---
+    keyframe_geo_report: dict[str, Any] | None = None
+    try:
+        from media_qa import analyze_still_geometry, pick_best_keyframe
+
+        aspect = str((spec or {}).get("aspect_ratio") or "9:16") if isinstance(spec, dict) else "9:16"
+        shot_list: list[Any] = []
+        if isinstance(spec, dict):
+            for sc in spec.get("scenes") or []:
+                if isinstance(sc, dict):
+                    shot_list.extend(sc.get("shots") or [])
+        bad_geo: list[dict[str, Any]] = []
+        soft_geo: list[str] = []
+        for sh in shot_list:
+            if not isinstance(sh, dict):
+                continue
+            sid = str(sh.get("id") or "")
+            if not sid:
+                continue
+            kf = pick_best_keyframe(root, sid)
+            if kf is None:
+                continue  # missing handled elsewhere
+            geo = analyze_still_geometry(kf, aspect_ratio=aspect)
+            if not geo.get("ok"):
+                bad_geo.append(
+                    {
+                        "shot_id": sid,
+                        "path": str(kf),
+                        "width": geo.get("width"),
+                        "height": geo.get("height"),
+                        "codes": geo.get("codes"),
+                        "errors": geo.get("errors"),
+                    }
+                )
+            for scode in geo.get("soft_codes") or []:
+                soft_geo.append(f"{sid}:{scode}")
+        keyframe_geo_report = {
+            "ok": len(bad_geo) == 0,
+            "bad": bad_geo,
+            "soft": soft_geo,
+            "checked": len(shot_list),
+        }
+        if bad_geo:
+            sample = bad_geo[:5]
+            hard.append(
+                _issue(
+                    "hard",
+                    "KEYFRAME_COMPRESS_OR_ASPECT",
+                    "keyframe 分辨率/画幅不合格（压缩或横图会传染整段 I2V）: "
+                    + "; ".join(
+                        f"{b['shot_id']}={b.get('width')}x{b.get('height')} {b.get('codes')}"
+                        for b in sample
+                    )
+                    + (f" …(+{len(bad_geo)-5})" if len(bad_geo) > 5 else ""),
+                    fix=(
+                        "re-export still ≥720×1280 9:16 full-res; use pick_best_keyframe (prefer png); "
+                        "never I2V from thumbnail. lessons-2026-07-22-keyframe-no-compress.md"
+                    ),
+                )
+            )
+        if soft_geo:
+            soft.append(
+                _issue(
+                    "soft",
+                    "KEYFRAME_BYTES_LOW",
+                    f"keyframe file very small (possible heavy JPEG): {soft_geo[:8]}",
+                    fix="prefer png / high-quality jpg; eye-check for blocky mush",
+                )
+            )
+    except Exception as exc:
+        soft.append(
+            _issue(
+                "soft",
+                "keyframe_geometry_probe_error",
+                f"keyframe geometry probe failed: {exc}"[:200],
+                fix="check media_qa.analyze_still_geometry",
+            )
+        )
+
+    # --- state-index checkpoint (keyframe-first + fluent joins) ---
+    state_index_report: dict[str, Any] | None = None
+    try:
+        from state_index_gate import run_state_index_check, write_state_index_receipt
+
+        state_index_report = run_state_index_check(root)
+        write_state_index_receipt(root, state_index_report)
+        for iss in state_index_report.get("hard") or []:
+            if not isinstance(iss, dict):
+                continue
+            hard.append(
+                _issue(
+                    "hard",
+                    str(iss.get("code") or "state_index"),
+                    str(iss.get("message") or "state-index hard"),
+                    fix=str(iss.get("fix") or "aifilm state-index plan --root …"),
+                )
+            )
+        for iss in state_index_report.get("soft") or []:
+            if not isinstance(iss, dict):
+                continue
+            soft.append(
+                _issue(
+                    "soft",
+                    str(iss.get("code") or "state_index"),
+                    str(iss.get("message") or "state-index soft"),
+                    fix=str(iss.get("fix") or "aifilm state-index plan --root …"),
+                )
+            )
+        # If generate_plan non-empty and production mid-flight, surface as soft checkpoint
+        plan = state_index_report.get("generate_plan") or []
+        if plan and not state_index_report.get("ok"):
+            soft.append(
+                _issue(
+                    "soft",
+                    "state_index_regen_needed",
+                    f"state-index: {len(plan)} regenerate item(s) for fluid transitions",
+                    fix=f'aifilm state-index plan --root "{root}"',
+                )
+            )
+    except Exception as exc:
+        soft.append(
+            _issue(
+                "soft",
+                "state_index_probe_error",
+                f"state-index gate failed: {exc}"[:200],
+                fix="check state_index_gate.py",
+            )
+        )
+
     hard_ok = len(hard) == 0
     try:
         from next_actions import build_next_actions, detect_pipeline_stage
@@ -904,6 +1036,23 @@ def run_preflight(root: Path) -> dict[str, Any]:
     except Exception:
         next_actions = []
         pipeline_stage = {"stage": "unknown", "label_zh": "未知"}
+
+    # Prefer state-index fix when plan non-empty and still in visual/agent
+    if state_index_report and (state_index_report.get("generate_plan") or []):
+        si_cmd = f'aifilm state-index plan --root "{root}"'
+        if not next_actions or not str((next_actions[0] or {}).get("cmd") or "").startswith(
+            "aifilm state-index"
+        ):
+            next_actions = [
+                {
+                    "id": "state-index-plan",
+                    "cmd": si_cmd,
+                    "why": "状态照/keyframe/promote 检查有缺口 — 先补再 bulk，保障运镜转场流畅",
+                    "stage": "visual",
+                    "stage_label": "1·视觉",
+                    "source": "state_index_gate",
+                }
+            ] + list(next_actions or [])
 
     return {
         "ok": hard_ok,
@@ -917,6 +1066,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
         "inventory": inventory_report,
         "evidence": evidence,
         "tts_timing": tts_timing,
+        "state_index": state_index_report,
         "pilot": {
             "user_approved": pilot_ok,
             "scorecard_all_pass": score_ok,
@@ -926,14 +1076,19 @@ def run_preflight(root: Path) -> dict[str, Any]:
         "stage_label": pipeline_stage.get("label_zh") if isinstance(pipeline_stage, dict) else None,
         "next_actions": next_actions,
         "next_cmd": next_actions[0]["cmd"] if next_actions else None,
+        "keyframe_geometry": keyframe_geo_report,
         "lessons": [
             "references/pipeline-methodology.md",
+            "references/keyframe-first-state-index.md",
             "references/lessons-2026-07-16-kei.md",
             "references/lessons-2026-07-17-compose-pilot.md",
             "references/lessons-2026-07-20-sediment-cn-codex.md",
             "references/lessons-2026-07-21-sex-duration-floor.md",
             "references/lessons-2026-07-21-sex-undress-ladder.md",
             "references/lessons-2026-07-21-sex-vo-spice.md",
+            "references/lessons-2026-07-21-wardrobe-no-redress-still.md",
+            "references/lessons-2026-07-22-keyframe-no-compress.md",
+            "references/lessons-2026-07-22-verify-before-generate.md",
         ],
     }
 

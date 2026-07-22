@@ -51,16 +51,16 @@ class SoundPlanError(ValueError):
 # VO sidechain-compress defaults (FFmpeg sidechaincompress on BGM bed)
 # rnb: slightly longer release so groove returns in narration pauses (色气「呼吸感」)
 SIDECHAIN_DEFAULT: dict[str, float] = {
-    "threshold": 0.08,
-    "ratio": 3.5,
+    "threshold": 0.05,
+    "ratio": 4.0,
     "attack_ms": 20.0,
     "release_ms": 550.0,
 }
 SIDECHAIN_RNB: dict[str, float] = {
-    "threshold": 0.07,
-    "ratio": 3.2,
+    "threshold": 0.045,
+    "ratio": 4.5,
     "attack_ms": 15.0,
-    "release_ms": 720.0,
+    "release_ms": 880.0,
 }
 
 

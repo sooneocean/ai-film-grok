@@ -439,6 +439,8 @@ def build_timeline_package(
         "director_intent": spec.get("director_intent"),
         "sound_plan": spec.get("sound_plan"),
         "vo_mode": spec.get("vo_mode"),
+        "title_sequence": spec.get("title_sequence") if isinstance(spec.get("title_sequence"), dict) else None,
+        "end_roll": spec.get("end_roll") if isinstance(spec.get("end_roll"), dict) else None,
         "notes": {
             "role": "designed-post bridge",
             "does_not_replace": [
@@ -693,17 +695,88 @@ def _stage_hf_media(
     return f"media/{dest_name}"
 
 
+def derive_credits_from_spec(
+    spec: dict[str, Any],
+    manifest: dict[str, Any],
+) -> dict[str, Any]:
+    """Procedural credits from film-spec director_intent + scenes + manifest clips."""
+    di = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+    cast_raw = di.get("cast") if isinstance(di.get("cast"), list) else []
+    cast = []
+    for c in cast_raw:
+        if isinstance(c, dict):
+            cast.append(
+                {
+                    "name": str(c.get("name") or c.get("id") or "Cast"),
+                    "role": str(c.get("role") or ""),
+                }
+            )
+        elif isinstance(c, str):
+            cast.append({"name": c, "role": ""})
+    if not cast:
+        title = str(spec.get("title") or "")
+        cast.append({"name": title, "role": "Director"})
+
+    crew = [
+        {"name": "AI Film Grok", "role": "Pipeline"},
+        {"name": str(di.get("tone") or ""), "role": "Tone"},
+    ]
+
+    shots = []
+    for scene in spec.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        for shot in scene.get("shots") or []:
+            if isinstance(shot, dict) and shot.get("id"):
+                shots.append(
+                    {
+                        "id": str(shot["id"]),
+                        "title": str(shot.get("title") or shot.get("id")),
+                    }
+                )
+
+    return {"cast": cast, "crew": crew, "shots": shots}
+
+
 def build_title_sequence_html(
     package: dict[str, Any],
     title_sequence: dict[str, Any],
     preset: str,
     styles: dict[str, str],
+    title_dur: float = 1.5,
 ) -> str | None:
     if not title_sequence:
         return None
-    mode = str(title_sequence.get("mode") or "none").strip().lower()
+    mode = str(title_sequence.get("mode") or "auto").strip().lower()
     if mode == "none":
         return None
+    title = html.escape(str(package.get("title") or ""))
+    subtitle = html.escape(str(title_sequence.get("subtitle") or ""))
+    tagline = html.escape(str(title_sequence.get("tagline") or ""))
+    show_motifs = bool(title_sequence.get("show_motifs", True))
+    motif_tags = ""
+    if show_motifs:
+        motifs = []
+        for key in (" motifs", "style", "tone"):
+            val = str(key).strip()
+            if val:
+                motifs.append(val)
+        if not motifs:
+            motifs = ["film"]
+        motif_tags = "".join(
+            f'<span class="motif-tag">{html.escape(m)}</span>' for m in motifs[:6]
+        )
+    parts = [f'<h1 class="ts-title">{title}</h1>']
+    if subtitle:
+        parts.append(f'<p class="ts-subtitle">{subtitle}</p>')
+    if tagline:
+        parts.append(f'<p class="ts-tagline">{tagline}</p>')
+    if motif_tags:
+        parts.append(f'<div class="motif-cloud">{motif_tags}</div>')
+    content = "".join(parts)
+    return f"""    <section id="title-sequence" class="clip overlay title-sequence" data-start="0" data-duration="{float(title_dur):.3f}" data-track-index="3">
+      <div class="ts-backdrop"><div class="ts-content">{content}</div></div>
+    </section>"""
     title = str(package.get("title") or "")
     safe_title = html.escape(title)
     subtitle = html.escape(str(title_sequence.get("subtitle") or ""))
@@ -748,7 +821,7 @@ def build_end_roll_html(
 ) -> str | None:
     if not end_roll:
         return None
-    mode = str(end_roll.get("mode") or "none").strip().lower()
+    mode = str(end_roll.get("mode") or "auto").strip().lower()
     if mode == "none":
         return None
     if mode == "cast_only":
@@ -942,7 +1015,7 @@ def write_hyperframes(
     title_sequence = package.get("title_sequence") or {}
     end_roll = package.get("end_roll") or {}
 
-    title_seq_html = build_title_sequence_html(package, title_sequence, resolved_preset, styles)
+    title_seq_html = build_title_sequence_html(package, title_sequence, resolved_preset, styles, title_dur=title_dur)
     end_roll_html = build_end_roll_html(package, end_roll, resolved_preset, styles, credits)
 
     if title_seq_html:
@@ -954,10 +1027,10 @@ def write_hyperframes(
             f'data-preset="{html.escape(resolved_preset)}">'
             f'<div class="card"><h1 id="title-text">{safe_title}</h1></div></section>'
         )
+    end_start = max(0.0, total - end_show)
     if end_roll_html:
         overlay_parts.append(end_roll_html)
     else:
-        end_start = max(0.0, total - end_show)
         end_label = html.escape(styles["end_label"])
         overlay_parts.append(
             f'    <section id="end-card" class="clip overlay" data-start="{end_start:.3f}" '
@@ -1855,7 +1928,7 @@ def export_composition(
         if ts == "none":
             package["title_sequence"] = {"mode": "none"}
         elif ts == "auto":
-            package.pop("title_sequence", None)
+            pass
         else:
             package["title_sequence"] = {"mode": ts}
     elif isinstance(title_sequence, dict):
@@ -1866,7 +1939,7 @@ def export_composition(
         if er == "none":
             package["end_roll"] = {"mode": "none"}
         elif er == "auto":
-            package.pop("end_roll", None)
+            pass
         else:
             package["end_roll"] = {"mode": er}
     elif isinstance(end_roll, dict):
@@ -2020,6 +2093,8 @@ def main(argv: list[str] | None = None) -> int:
             force=args.force,
             layout=args.layout,
             compose_preset=str(getattr(args, "compose_preset", "auto") or "auto"),
+            title_sequence=getattr(args, "title_sequence", None),
+            end_roll=getattr(args, "end_roll", None),
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0

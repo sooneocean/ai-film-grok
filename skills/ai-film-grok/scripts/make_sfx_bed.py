@@ -399,6 +399,8 @@ def rnb_bgm(
     *,
     seed: int | None = None,
     style: str | None = None,
+    shot_starts: list[float] | None = None,
+    events: list[dict] | None = None,
 ) -> np.ndarray:
     """Seductive late-night R&B with anti-fatigue arrangement (v3 multi-style).
 
@@ -406,6 +408,7 @@ def rnb_bgm(
       2026-07-20: fixed Am loop → multi progression + sections + seed
       2026-07-21: seed alone still same timbre → **style family** from seed
         (velvet|pulse|ambient|lofi|glitter) so takes sound different, not just reordered
+      2026-07-21 (Phase III): DJ Dynamic Mix — aligns drops, breaks, and filter sweeps to shots/events.
     """
     seed_i = None if seed is None else int(seed) & 0x7FFFFFFF
     rng = np.random.default_rng(seed_i)
@@ -427,12 +430,63 @@ def rnb_bgm(
     order = list(range(len(progs)))
     rng.shuffle(order)
 
-    sections: list[tuple[float, float, float, float, bool]] = list(sp["sections"])  # type: ignore[arg-type]
-    sec_len = max(bar * 4, dur / max(len(sections), 1))
+    # DJ Dynamic Logic
+    dj_env = None
+    if shot_starts and len(shot_starts) > 0:
+        dj_sections = []
+        dj_env = np.ones(n, dtype=np.float64)
+        starts = sorted(shot_starts) + [dur]
+        accent_times = [float(e.get("time_sec", 0)) for e in (events or []) if e.get("type") == "sfx_accent"]
 
-    def _section_at(sec: float) -> tuple[float, float, float, float, bool]:
-        idx = min(len(sections) - 1, int(sec / sec_len))
-        return sections[idx]
+        for i in range(len(starts) - 1):
+            s_st = starts[i]
+            s_ed = starts[i+1]
+            s_dur = s_ed - s_st
+
+            # Check for peak action / sfx accents
+            has_accent = any((s_st - 0.5) <= at < (s_ed + 0.5) for at in accent_times)
+            progress = i / max(1, len(starts)-1)
+
+            if i == 0:
+                sq = (0.7, 0.4, 0.0, 0.2, False)  # Intro
+            elif has_accent or (progress > 0.7 and s_dur < 3.0):
+                sq = (0.9, 0.8, 1.2, 1.0, False)  # Drop / Climax
+            elif s_dur >= 5.0 or (i % 3 == 2):
+                sq = (0.6, 0.7, 0.0, 0.0, True)   # Break (remove drums)
+            else:
+                sq = (0.8, 0.7, 0.8, 0.8, False)  # Groove
+
+            dj_sections.append((s_st, s_ed, sq))
+
+            # Build DJ Filter Sweep Envelope
+            i0, i1 = int(s_st * SR), min(n, int(s_ed * SR))
+            if i0 < i1:
+                is_break = sq[4]
+                env_start = dj_env[max(0, i0-1)]
+                if is_break:
+                    # Muffle out (Filter closing)
+                    dj_env[i0:i1] = np.linspace(env_start, 0.15, i1-i0)
+                else:
+                    # Blast back in (Filter opens)
+                    # if returning from a break on an accent, open instantly, else smoothly
+                    if has_accent:
+                        dj_env[i0:i1] = 1.0
+                    else:
+                        dj_env[i0:i1] = np.linspace(min(1.0, env_start + 0.5), 1.0, i1-i0)
+
+        def _section_at(sec: float) -> tuple[float, float, float, float, bool]:
+            for st, ed, sq in dj_sections:
+                if st <= sec < ed: return sq
+            return dj_sections[-1][2] if dj_sections else (0.8, 0.7, 0.8, 0.8, False)
+
+    else:
+        # Fallback to uniform structural sections
+        sections: list[tuple[float, float, float, float, bool]] = list(sp["sections"])  # type: ignore[arg-type]
+        sec_len = max(bar * 4, dur / max(len(sections), 1))
+
+        def _section_at(sec: float) -> tuple[float, float, float, float, bool]:
+            idx = min(len(sections) - 1, int(sec / sec_len))
+            return sections[idx]
 
     pad_mix = float(sp["pad_mix"])
     rhodes_mix = float(sp["rhodes_mix"])
@@ -602,6 +656,11 @@ def rnb_bgm(
         mono = _one_pole_lowpass(mono, cutoff_hz=float(rng.uniform(2800, 4200)))
         # light wow (slow pitch-ish amplitude)
         mono *= 0.92 + 0.08 * np.sin(2 * np.pi * 0.35 * t + rng.uniform(0, 3))
+
+    if dj_env is not None:
+        # Dynamic DJ Filter Sweep
+        muffled = _one_pole_lowpass(mono, cutoff_hz=400.0)
+        mono = muffled * (1.0 - dj_env) + mono * dj_env
 
     out = np.tanh(mono * 1.12)
     if bright < 0:

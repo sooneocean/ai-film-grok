@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+
+from asset_registry import assets_check, registry_path, sync_assets  # noqa: E402
+from story_plan import run_plan  # noqa: E402
+
+
+class AssetRegistryTests(unittest.TestCase):
+    def test_plan_then_assets_aligned(self) -> None:
+        idea = "雨夜出租车里，女司机与乘客靠近，雨衣半敞。"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = run_plan(root, idea, title="雨夜", target_duration=36, force=True)
+            self.assertTrue(plan.get("ok"), plan)
+            self.assertTrue((plan.get("assets") or {}).get("ok") is not False)
+
+            rep = sync_assets(root, write=True)
+            self.assertTrue(rep.get("ok"), rep)
+            self.assertTrue(registry_path(root).is_file())
+            self.assertGreaterEqual(rep["counts"]["characters"], 1)
+            self.assertGreaterEqual(rep["counts"]["locations"], 1)
+
+            bible = json.loads((root / "style-bible.json").read_text(encoding="utf-8"))
+            # locations structured as objects
+            locs = bible.get("locations") or {}
+            self.assertTrue(locs)
+            for _lid, val in locs.items():
+                self.assertIsInstance(val, dict)
+                self.assertIn("description", val)
+
+            # wardrobe variants include full
+            wv = bible.get("wardrobe_variants") or {}
+            self.assertTrue(wv)
+            for _cid, block in wv.items():
+                self.assertIn("full", block)
+
+            # cast_state_masters slots
+            csm = bible.get("cast_state_masters") or {}
+            self.assertTrue(csm)
+
+            # graph got characterStates
+            graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
+            self.assertIn("characterStates", graph)
+            self.assertTrue(graph.get("assetRegistry"))
+
+            # dirs created
+            for cid in rep.get("characters") or []:
+                self.assertTrue((root / "canonical" / "cast-states" / cid).is_dir())
+
+            chk = assets_check(root, sync_first=True)
+            # no re-dress on monotonic full plan
+            self.assertEqual(chk.get("re_dress_risks"), 0)
+            # full-only wardrobe: no used undress → should be aligned
+            self.assertTrue(chk.get("ok"), chk)
+
+    def test_re_dress_detected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_plan(root, "一间卧室里的短戏足够长。", title="test", force=True)
+            spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+            shots = []
+            for sc in spec.get("scenes") or []:
+                shots.extend(sc.get("shots") or [])
+            self.assertGreaterEqual(len(shots), 2)
+            shots[0]["wardrobe_state"] = "undressed"
+            shots[1]["wardrobe_state"] = "full"  # re-dress
+            if isinstance(shots[0].get("dsl"), dict):
+                shots[0]["dsl"]["wardrobe_state"] = "undressed"
+            if isinstance(shots[1].get("dsl"), dict):
+                shots[1]["dsl"]["wardrobe_state"] = "full"
+            # write back
+            si = 0
+            for sc in spec["scenes"]:
+                n = len(sc.get("shots") or [])
+                sc["shots"] = shots[si : si + n]
+                si += n
+            (root / "film-spec.json").write_text(
+                json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            rep = sync_assets(root, write=True)
+            self.assertGreaterEqual(rep["counts"]["re_dress_risks"], 1)
+            chk = assets_check(root, sync_first=False)
+            self.assertFalse(chk.get("ok"))
+            self.assertTrue(any("re_dress" in x for x in (chk.get("issues") or [])))
+
+    def test_prop_harvest_from_dsl(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_plan(root, "咖啡馆里的相遇，杯子很重要。", force=True)
+            spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+            for sc in spec.get("scenes") or []:
+                for sh in sc.get("shots") or []:
+                    dsl = sh.setdefault("dsl", {})
+                    dsl["props"] = ["coffee cup", "umbrella"]
+                    break
+            (root / "film-spec.json").write_text(
+                json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            rep = sync_assets(root, write=True)
+            self.assertGreaterEqual(rep["counts"]["props"], 1)
+            bible = json.loads((root / "style-bible.json").read_text(encoding="utf-8"))
+            props = bible.get("props") or {}
+            self.assertTrue(any(isinstance(v, dict) for v in props.values()))
+
+
+if __name__ == "__main__":
+    unittest.main()

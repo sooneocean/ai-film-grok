@@ -52,6 +52,7 @@ def build_dispatch(
 
     from craft_spine import craft_status_report, detect_craft_stage
     from next_actions import build_next_actions, detect_pipeline_stage
+    from narrative_control import control_status
 
     gates = gates or {}
     craft_report = craft_status_report(root, gates=gates)
@@ -158,16 +159,57 @@ def build_dispatch(
         pre(
             "audio-plan",
             f'aifilm audio-plan --root "{r}"',
-            "音轨 dry-run：确认 TTS/BGM/lipsync 路径再 final",
+            "音轨 dry-run：確認 TTS/BGM/lipsync 路徑再 final",
             "voice",
         )
 
+    if craft_stage == "post":
+        pre(
+            "design-title-sequence",
+            f'aifilm final --root "{r}" --post-engine hyperframes --compose-preset auto',
+            "片頭片尾：final 會自動讀取 film-spec 的 title_sequence / end_roll（預設 minimal + 完）",
+            "post",
+        )
+
     # Merge: prepend craft items not already covered by same id
+    narrative = control_status(root)
+    narrative_action_id: str | None = None
+    if narrative.get("canonical") and not narrative.get("ready_for_media"):
+        semantic = narrative.get("semantic") or {}
+        projection = narrative.get("projection") or {}
+        if semantic.get("errors"):
+            narrative_action_id = "narrative-validate"
+            pre(
+                "narrative-validate",
+                f'aifilm plan validate --root "{r}" --strict',
+                "劇情／Beat／分鏡語義尚未完成，先修正 draft，不得進入 write-spec 或 media",
+                "agent",
+            )
+        elif projection.get("stale"):
+            narrative_action_id = "narrative-project"
+            pre(
+                "narrative-project",
+                f'aifilm graph project --root "{r}" --force',
+                "film-spec projection hash 已過期，重新投影後才能繼續",
+                "agent",
+            )
+        else:
+            missing = [s for s in ("story", "beats", "shots", "panels") if s not in (narrative.get("locked_scopes") or [])]
+            scope = missing[0] if missing else "story"
+            narrative_action_id = "narrative-lock"
+            pre(
+                "narrative-lock",
+                f'aifilm plan lock --root "{r}" --scope {scope} --user-phrase "<USER_APPROVAL>"',
+                f"等待使用者審閱並鎖定 {scope} scope；Agent 不得自批",
+                "agent",
+            )
     existing_ids = {a.get("id") for a in actions}
     merged: list[dict[str, str]] = []
     for p in prepend:
         if p["id"] not in existing_ids:
             merged.append(p)
+    if narrative_action_id:
+        merged.sort(key=lambda item: 0 if item.get("id") == narrative_action_id else 1)
     merged.extend(actions)
     # de-dupe by id keep first
     seen: set[str] = set()
@@ -226,6 +268,44 @@ def build_dispatch(
             "Grok Build：静帧 image_edit(cast)/image_gen；动 bulk FRW 或 image_to_video；加载 /imagine"
         )
         agent_do.append("推理产出 structured film-spec 字段；事实先 web_search；记忆写 film-root")
+        agent_do.append(
+            "生成串行 first/last（必触发）：register-clip 后自动 promote 末帧→下镜首帧；"
+            "下镜 I2V 只用 keyframes/<next>.png，禁 cast 全装重起（防回穿/姿势断）"
+        )
+        agent_do.append(
+            "剧情接戏：按实际 last frame 衣着/姿势优化下一镜 prompt；"
+            "卸装后只 image_edit 已 promote 帧，不写 full wardrobe"
+        )
+        agent_do.append(
+            "状态照/keyframe 检查门：aifilm state-index check|plan — "
+            "有缺口可在本阶段补生成状态照/keyframe/promote，保障运镜转场流畅"
+        )
+        # Inject state-index plan as next when gaps
+        try:
+            from state_index_gate import run_state_index_check
+
+            si = run_state_index_check(root)
+            if si.get("generate_plan"):
+                actions.insert(
+                    0,
+                    {
+                        "id": "state-index-plan",
+                        "cmd": f'aifilm state-index plan --root "{r}"',
+                        "why": (
+                            f"state-index 有 {len(si.get('generate_plan') or [])} 项待补 "
+                            "（状态照/keyframe/promote）— 先补再 bulk，转场才顺"
+                        ),
+                        "stage": "visual",
+                        "stage_label": "1·视觉",
+                        "source": "state_index_gate",
+                    },
+                )
+                agent_do.insert(
+                    2,
+                    f"优先：aifilm state-index plan（{len(si.get('generate_plan') or [])} 项）",
+                )
+        except Exception:
+            pass
     agent_do.append("禁止：自批 pilot、静默改 i2v_provider、Ken Burns 当戏、说书默认 lipsync")
     agent_do.append("用户说「可以/ok/一路做完」才 pilot approve / run_to_completion")
 
@@ -284,10 +364,44 @@ def build_dispatch(
         if cap.get("suggested_film_spec_patch"):
             routing["i2v_patch_available"] = cap.get("suggested_film_spec_patch")
 
+    # Phase 1+2: Vertical Drama Graph + Execution jobs summary (non-breaking)
+    graph_digest: dict[str, Any] | None = None
+    jobs_summary: dict[str, Any] | None = None
+    try:
+        from drama_graph import build_jobs_summary, graph_status
+
+        graph_digest = graph_status(root, auto_derive=bool((root / "film-spec.json").is_file()))
+        jobs_summary = build_jobs_summary(root, craft_stage=craft_stage)
+    except Exception as exc:  # noqa: BLE001
+        graph_digest = {"ok": False, "error": str(exc)[:200]}
+        jobs_summary = {"ok": False, "error": str(exc)[:200]}
+
+    execution_plan_digest: dict[str, Any] | None = None
+    if isinstance(jobs_summary, dict) and jobs_summary.get("jobs") is not None:
+        primary_job = jobs_summary.get("primary_job")
+        execution_plan_digest = {
+            "total": jobs_summary.get("total"),
+            "ready_count": jobs_summary.get("ready_count"),
+            "done_count": jobs_summary.get("done_count"),
+            "blocked_count": jobs_summary.get("blocked_count"),
+            "counts_by_status": jobs_summary.get("counts_by_status"),
+            "primary_job_id": (primary_job or {}).get("id"),
+            "primary_skill_id": (primary_job or {}).get("skillId"),
+            "graph_line": jobs_summary.get("graph_line") or (graph_digest or {}).get("line"),
+        }
+        agent_do.append(
+            f"ExecutionGraph: ready={execution_plan_digest.get('ready_count')} "
+            f"done={execution_plan_digest.get('done_count')} "
+            f"blocked={execution_plan_digest.get('blocked_count')} "
+            f"/ total={execution_plan_digest.get('total')}"
+        )
+        if execution_plan_digest.get("graph_line"):
+            agent_do.append(f"DramaGraph: {execution_plan_digest.get('graph_line')}")
+
     packet = {
         "ok": True,
         "kind": "ai-film-dispatch",
-        "schema_version": 1,
+        "schema_version": 2,
         "at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "root": str(root),
         "auto": True,
@@ -316,17 +430,55 @@ def build_dispatch(
         }
         if cap
         else None,
+        "graph": {
+            "ok": (graph_digest or {}).get("ok"),
+            "line": (graph_digest or {}).get("line"),
+            "counts": (graph_digest or {}).get("counts"),
+            "path": (graph_digest or {}).get("path"),
+            "exists": (graph_digest or {}).get("exists"),
+        }
+        if graph_digest
+        else None,
+        "jobs_summary": {
+            "total": (jobs_summary or {}).get("total"),
+            "ready_count": (jobs_summary or {}).get("ready_count"),
+            "done_count": (jobs_summary or {}).get("done_count"),
+            "blocked_count": (jobs_summary or {}).get("blocked_count"),
+            "counts_by_status": (jobs_summary or {}).get("counts_by_status"),
+            "primary_job": (jobs_summary or {}).get("primary_job"),
+            "jobs_preview": (jobs_summary or {}).get("jobs_preview"),
+            "error": (jobs_summary or {}).get("error"),
+        }
+        if jobs_summary
+        else None,
+        "execution_plan_digest": execution_plan_digest,
+        "narrative_control": {
+            "canonical": narrative.get("canonical"),
+            "state": narrative.get("state"),
+            "revision": narrative.get("revision"),
+            "locked_scopes": narrative.get("locked_scopes") or [],
+            "ready_for_media": narrative.get("ready_for_media"),
+            "issue_codes": (narrative.get("semantic") or {}).get("issue_codes") or [],
+            "projection": narrative.get("projection"),
+        },
         "hard_gates": [
             "write-spec before media-queue",
             "pilot user approve before bulk (>3 shots)",
             "no silent provider switch",
             "final ≠ final_complete without review-final",
+            "state-index check before bulk when undress/continue (fluency)",
+            "canonical narrative graph validated + all scopes locked + projection hash current",
         ],
-        "ref": "references/craft-spine.md · references/audio-fallback.md",
+        "ref": (
+            "references/craft-spine.md · references/keyframe-first-state-index.md · "
+            "references/audio-fallback.md · docs/plans/2026-07-21-vertical-drama-upgrade.md"
+        ),
         "usage": {
             "dispatch": "aifilm dispatch --root <film>",
             "print_cmd": "aifilm dispatch --root <film> --print-cmd-only",
             "loop": "每完成一步再跑 dispatch，直到 craft=verified 且 export",
+            "graph": "aifilm graph derive|validate|status --root <film>",
+            "skill": "aifilm skill list|show --id <skill_id>",
         },
     }
 
@@ -345,6 +497,9 @@ def build_dispatch(
                 "next_why": next_why,
                 "line": f"{craft_report.get('line') or craft_stage} | next={next_id}",
                 "at": packet["at"],
+                "jobs_ready": (execution_plan_digest or {}).get("ready_count"),
+                "jobs_done": (execution_plan_digest or {}).get("done_count"),
+                "graph_line": (execution_plan_digest or {}).get("graph_line"),
             }
             (hud / "aifilm-dispatch.json").write_text(
                 json.dumps(slim, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

@@ -57,6 +57,10 @@
 "$AIFILM" extract-frame --root "<root>" --shot-id shot01 --which last \
   --promote-keyframe shot02
 # → 写出 keyframes/shot02.png，SHA 与末帧相同，并记入 receipts/frame-chain.json
+
+# 2026-07-21：register-clip --status approved 后 **自动** promote（continue / 卸装 / heat max）
+# emit.auto_promote_next.next_keyframe = 下镜 I2V 唯一合法 first frame
+# 见 references/lessons-2026-07-21-first-last-gen.md
 ```
 
 **语义澄清**：

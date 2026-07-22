@@ -35,6 +35,9 @@ ai-film-grok/                    ← plugin root / git root
 | AREA | 范围 | 优先测 |
 |------|------|--------|
 | Spine | dispatch / craft / next / SKILL 主脊 | `test_dispatch` `test_craft_spine` |
+| Graph+Registry | drama-graph derive / skill list | `test_drama_graph` `test_skill_registry` |
+| Plan | story.normalize → shot plan | `test_story_plan` |
+| Assets | character/location/prop/state | `test_asset_registry` |
 | Media | I2V / queue / register / OAuth 出图 | media / continuity 相关 |
 | Audio | TTS / BGM / recipe / lipsync | `test_audio_recipe` `test_capability` |
 | Post | final / compose / review / export | `test_delivery_gates` compose 相关 |

@@ -16,6 +16,7 @@
 
 ## 生成原则
 
+- **Keyframe-first**：I2V 输入 = 本镜 `keyframes/shotXX`；keyframe 主 ref = **状态照** `cast_state_masters[id][wardrobe_state]` 或 undress-anchor（非 full cast）。视频不对 → 改 keyframe/状态照再 I2V。见 [keyframe-first-state-index.md](keyframe-first-state-index.md)。
 - 沿用 film `aspect_ratio`；默认 480p，用户要求或重点镜头才用 720p。
 - prompt 顺序：主体 → 动作 → 场景 → 风格签名 → 镜头 → 光线。
 - 一镜一动作；写清相机与身体/环境运动。禁止空 motion 或 mouth-speaking-primary。

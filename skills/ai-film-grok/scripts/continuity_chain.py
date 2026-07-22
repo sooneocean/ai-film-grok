@@ -49,6 +49,86 @@ def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
     return shots
 
 
+def ordered_shot_ids(spec: dict[str, Any]) -> list[str]:
+    return [str(s.get("id") or "") for s in flatten_shots(spec) if s.get("id")]
+
+
+def next_shot_after(spec: dict[str, Any], shot_id: str) -> dict[str, Any] | None:
+    """Return the next shot dict in story order, or None if last."""
+    shots = flatten_shots(spec)
+    for i, s in enumerate(shots):
+        if str(s.get("id") or "") == str(shot_id):
+            if i + 1 < len(shots):
+                return shots[i + 1]
+            return None
+    return None
+
+
+def shot_chain_mode(shot: dict[str, Any] | None) -> str:
+    if not isinstance(shot, dict):
+        return ""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    return str(dsl.get("chain_mode") or shot.get("chain_mode") or "").strip().lower()
+
+
+def wardrobe_state_of(shot: dict[str, Any] | None) -> str:
+    if not isinstance(shot, dict):
+        return ""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    return str(
+        shot.get("wardrobe_state") or dsl.get("wardrobe_state") or ""
+    ).strip().lower()
+
+
+# Undress ranks used to decide story-serial promote (keep in sync with edit_policy)
+_WARDROBE_RANK = {
+    "full": 0,
+    "armored": 1,
+    "partial": 2,
+    "undressed": 3,
+    "bare": 4,
+}
+
+
+def should_auto_promote_next(
+    prev: dict[str, Any] | None,
+    nxt: dict[str, Any] | None,
+    *,
+    heat_scale: str | None = None,
+) -> tuple[bool, str]:
+    """Whether register-clip should promote prev last frame → next first frame.
+
+    Product (2026-07-21 教训): 生成时必须按剧情实际 first/last 接戏，
+    禁止每镜从 cast 全装重起（回穿 / 姿势断）。
+    """
+    if not prev or not nxt:
+        return False, "no next shot"
+    mode = shot_chain_mode(prev) or shot_chain_mode(nxt)
+    if mode in {"cut", "bridge", "hard_cut"}:
+        return False, f"chain_mode={mode} (no byte promote)"
+    if mode in {"continue", "hold", "soft"}:
+        return True, f"chain_mode={mode}"
+    # Default story serial: undress ladder or max heat sequential
+    pw = wardrobe_state_of(prev)
+    nw = wardrobe_state_of(nxt)
+    pr = _WARDROBE_RANK.get(pw)
+    nr = _WARDROBE_RANK.get(nw)
+    if pr is not None and pr >= 2:  # partial+
+        return True, f"undress continuity prev={pw} (story serial promote)"
+    if nr is not None and nr >= 2:
+        return True, f"undress continuity next={nw}"
+    scale = (heat_scale or "").strip().lower()
+    if scale in {"max", "hot"}:
+        # Adult short: default continue between consecutive plates unless cut
+        return True, f"heat_scale={scale} default serial first/last"
+    # Explicit continue via end_pose feeds start
+    dsl_p = prev.get("dsl") if isinstance(prev.get("dsl"), dict) else {}
+    end = str(dsl_p.get("end_pose") or "").lower()
+    if "feed" in end or "→" in end or "feeds" in end:
+        return True, "end_pose feeds next"
+    return False, "no auto-promote rule matched"
+
+
 def planned_duration_sec(shots: list[dict[str, Any]]) -> float:
     total = 0.0
     for s in shots:

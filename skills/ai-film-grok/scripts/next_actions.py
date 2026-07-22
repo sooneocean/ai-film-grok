@@ -384,21 +384,24 @@ def build_next_actions(
                 add(
                     "final-designed",
                     f'aifilm final --root "{r}" --post-engine hyperframes '
-                    f'--lipsync off --music-mood rnb --tts-backend edge',
+                    f'--lipsync off --music-mood rnb --tts-backend edge --compose-preset auto '
+                    f'--title-sequence auto --end-roll auto',
                     "[层3·设计] 跳过预览一键设计成片（排版风险更高；可用 --require-preview 强制先预览）",
                 )
             else:
                 add(
                     "final-designed",
                     f'aifilm final --root "{r}" --post-engine hyperframes '
-                    f'--lipsync off --music-mood rnb --tts-backend edge --compose-preset auto',
+                    f'--lipsync off --music-mood rnb --tts-backend edge --compose-preset auto '
+                    f'--title-sequence auto --end-roll auto',
                     "[层3·设计] 已 compose-preview → 推荐 HyperFrames 设计字幕成片",
                 )
                 rem_pkg = root / "compose" / "remotion" / "package.json"
                 if rem_pkg.is_file():
                     add(
                         "compose-render-remotion",
-                        f'aifilm compose-render --root "{r}" --engine remotion --npm-install',
+                        f'aifilm compose-render --root "{r}" --engine remotion --npm-install '
+                        f'--title-sequence auto --end-roll auto',
                         "[层3·设计] Remotion 包已导出 → compose-render（首次 --npm-install）",
                     )
                 add(

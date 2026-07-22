@@ -1021,6 +1021,8 @@ def compose_render(
     title_dur: float = 1.5,
     end_dur: float = 1.5,
     allow_burned_underlay: bool = False,
+    title_sequence: str | None = None,
+    end_roll: str | None = None,
 ) -> dict[str, Any]:
     """End-to-end designed-post render.
 
@@ -1111,6 +1113,8 @@ def compose_render(
                 force=force_export,
                 layout=layout_l if layout_l in {"multiclip", "underlay"} else layout,
                 compose_preset=compose_preset,
+                title_sequence=title_sequence,
+                end_roll=end_roll,
             )
             exp = steps["export"]
             if isinstance(exp, dict) and isinstance(exp.get("layout"), str):
@@ -1372,6 +1376,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--title-dur", type=float, default=1.5)
     p.add_argument("--end-dur", type=float, default=1.5)
     p.add_argument(
+        "--title-sequence",
+        default=None,
+        choices=["auto", "none"],
+        help="Override film-spec title_sequence mode (auto=spec/default, none=suppress)",
+    )
+    p.add_argument(
+        "--end-roll",
+        default=None,
+        choices=["auto", "none", "cast_only", "full"],
+        help="Override film-spec end_roll mode (auto=spec/default, none=suppress)",
+    )
+    p.add_argument(
         "--allow-burned-underlay",
         action="store_true",
         help="Allow underlay when plate already has burned-in captions (double-burn risk)",
@@ -1415,6 +1431,8 @@ def main(argv: list[str] | None = None) -> int:
                 title_dur=args.title_dur,
                 end_dur=args.end_dur,
                 allow_burned_underlay=bool(getattr(args, "allow_burned_underlay", False)),
+                title_sequence=getattr(args, "title_sequence", None),
+                end_roll=getattr(args, "end_roll", None),
             )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         # remotion not-ready returns structured ok=False without raising

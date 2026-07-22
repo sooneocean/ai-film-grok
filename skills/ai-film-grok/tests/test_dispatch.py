@@ -43,6 +43,13 @@ class DispatchTests(unittest.TestCase):
             self.assertTrue(Path(packet["receipt_path"]).is_file())
             self.assertEqual(packet["routing"].get("tts_default"), "edge")
             self.assertIn("off", packet["routing"].get("lipsync", ""))
+            # Phase 1+2 additive fields
+            self.assertGreaterEqual(int(packet.get("schema_version") or 0), 2)
+            self.assertIn("jobs_summary", packet)
+            self.assertIn("execution_plan_digest", packet)
+            self.assertIn("graph", packet)
+            self.assertIsNotNone(packet.get("jobs_summary"))
+            self.assertIn("total", packet["jobs_summary"] or {})
 
 
 if __name__ == "__main__":

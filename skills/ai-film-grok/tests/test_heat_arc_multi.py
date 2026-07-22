@@ -161,6 +161,53 @@ class HeatArcLintTests(unittest.TestCase):
         self.assertIn("HEAT_WARDROBE_RE_DRESS", rep["codes"])
         self.assertFalse(rep["ok"])
 
+    def test_wardrobe_re_dress_clamped_on_max(self) -> None:
+        """max: 回穿被 clamp 到 peak，后镜保持 undressed/bare."""
+        shots = _spine(
+            ["setup", "foreplay", "act", "climax", "afterglow", "bridge", "bridge", "bridge"]
+        )
+        # peak should be bare/undressed from spine; force afterglow full then clamp
+        for sh in shots:
+            if sh["heat_phase"] == "afterglow":
+                sh["wardrobe_state"] = "full"
+                sh["dsl"]["wardrobe_state"] = "full"
+                sh["dsl"]["subject"] = "adult woman full dress intact neat dress"
+                sh["dsl"]["action"] = "stands fully clothed"
+        cont = apply_wardrobe_continuity(shots, heat_scale="max")
+        self.assertTrue(cont.get("clamped_ids"), cont)
+        for sh in shots:
+            if sh["heat_phase"] == "afterglow":
+                rank = wardrobe_undress_rank(sh["wardrobe_state"])
+                self.assertIsNotNone(rank)
+                self.assertGreaterEqual(rank, wardrobe_undress_rank("undressed") or 0)
+                # start_pose must acknowledge already undressed
+                sp = str(sh["dsl"].get("start_pose") or "").lower()
+                self.assertTrue(
+                    any(k in sp for k in ("already", "prior", "bare", "undress", "half")),
+                    sp,
+                )
+
+    def test_wardrobe_text_conflict_detected(self) -> None:
+        shots = [
+            {
+                "id": "shot01",
+                "heat_phase": "act",
+                "dramatic_function": "action",
+                "nar": "沉腰办穿。",
+                "wardrobe_state": "bare",
+                "dsl": {
+                    "subject": "adult woman full wardrobe full dress intact neat dress",
+                    "action": "hips sink",
+                    "motion": "m",
+                    "story_beat": "b",
+                    "visible_change": "c",
+                    "wardrobe_state": "bare",
+                },
+            }
+        ]
+        rep = lint_sex_wardrobe(shots, heat_scale="max")
+        self.assertIn("HEAT_WARDROBE_TEXT_CONFLICT", rep["codes"])
+
     def test_wardrobe_continuity_inherits_forward(self) -> None:
         shots = [
             {
@@ -202,7 +249,8 @@ class HeatArcLintTests(unittest.TestCase):
             wardrobe_undress_rank("partial") or 0,
         )
 
-    def test_write_spec_hard_on_re_dress(self) -> None:
+    def test_write_spec_clamps_re_dress(self) -> None:
+        """Product: re-dress is clamped (must trigger), not only hard-failed."""
         shots = _spine(
             ["setup", "foreplay", "act", "act", "climax", "afterglow", "bridge", "bridge"]
         )
@@ -215,7 +263,7 @@ class HeatArcLintTests(unittest.TestCase):
                 sh["dsl"]["action"] = "stands fully armored intact outfit"
                 sh["dsl"]["subject"] = "adult woman full armor intact"
         spec = {
-            "title": "测回穿硬闸",
+            "title": "测回穿自动钳制",
             "vo_mode": "storyteller",
             "tts_backend": "edge",
             "heat_scale": "max",
@@ -223,15 +271,28 @@ class HeatArcLintTests(unittest.TestCase):
             "sex_floor_strict": False,
             "sex_vo_strict": False,
             "director_intent": {
-                "logline": "成人max卸装后回穿铠甲应 hard fail",
+                "logline": "成人max卸装后回穿应被 clamp 到 peak",
                 "tone": "成人",
                 "emotional_arc": ["起", "承", "转"],
             },
             "scenes": [{"shots": shots}],
         }
-        with self.assertRaises(Exception) as ctx:
-            validate_film_spec(spec, assign_missing_ids=False)
-        self.assertIn("HEAT_WARDROBE_RE_DRESS", str(ctx.exception))
+        # validate mutates spec in place; returns shot list
+        validate_film_spec(spec, assign_missing_ids=False)
+        cont = spec.get("_wardrobe_continuity") or {}
+        self.assertTrue(cont.get("clamped_ids"), cont)
+        # afterglow no longer armored
+        for sc in spec.get("scenes") or []:
+            for sh in sc.get("shots") or []:
+                if sh.get("heat_phase") == "afterglow":
+                    self.assertNotEqual(sh.get("wardrobe_state"), "armored")
+                    self.assertGreaterEqual(
+                        wardrobe_undress_rank(sh.get("wardrobe_state")) or 0,
+                        wardrobe_undress_rank("undressed") or 0,
+                    )
+        # residual re-dress codes should be cleared by clamp
+        heat = spec.get("_heat_arc") or {}
+        self.assertNotIn("HEAT_WARDROBE_RE_DRESS", heat.get("codes") or [])
 
     def test_resolve_wardrobe_from_markers(self) -> None:
         shot = {
