@@ -81,6 +81,7 @@ flowchart TD
 - `test_department_contracts.py`
 - `test_department_quality_reports.py`
 - `test_dialogue_contract.py`
+- `test_dialogue_ledger.py`
 - `test_director_coverage_and_review.py`
 - `test_director_intent.py`
 - `test_director_ledger.py`
@@ -150,6 +151,7 @@ flowchart TD
 - `test_production_book.py`
 - `test_production_evidence.py`
 - `test_production_gates.py`
+- `test_professional_director_e2e.py`
 - `test_professional_golden.py`
 - `test_prompt_budget.py`
 - `test_prompt_compression_pilot.py`
