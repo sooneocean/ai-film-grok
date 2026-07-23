@@ -287,6 +287,8 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 
 ## 按需加载（细节不进主脊）
 
+> 完整分类导航见 [references/INDEX.md](references/INDEX.md)（91 个文件按功能 + 日期分组）。
+
 | 主题 | 文件 |
 |---|---|
 | **Grok Build / SDK 能力总表** | [grok-build-sdk.md](references/grok-build-sdk.md) |

@@ -1,0 +1,174 @@
+# References 索引
+
+> 91 个 reference 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
+> 踩坑 lessons（47 个）见末节,按日期归档;新规则须标 P 码 + 层。
+
+---
+
+## 工序与主脊（Craft Spine）
+
+| 文件 | 主题 |
+|---|---|
+| [craft-spine.md](craft-spine.md) | 八环工序主脊 Idea→Verified |
+| [generative-film-craft.md](generative-film-craft.md) | 生成式电影工序（Beat/Coverage/五锁） |
+| [directors-lens.md](directors-lens.md) | Director's Lens 文本→故事→Storyboard→film-spec |
+| [beat-spines.md](beat-spines.md) | 多类型节拍骨架总纲 |
+| [pipeline-methodology.md](pipeline-methodology.md) | 工具层 + 工序层方法论 |
+| [principles.md](principles.md) | 底层泛化能力 P0–P5 |
+| [hard-defaults.md](hard-defaults.md) | 默认与跨层决策（硬门禁完整表） |
+| [production-discipline.md](production-discipline.md) | 量产纪律 season-scale |
+| [director-self-scorecard.md](director-self-scorecard.md) | 导演自评卡 |
+| [genre-migration-test.md](genre-migration-test.md) | 题材迁移测试 |
+
+## 专业导演系统（v1.15+）
+
+| 文件 | 主题 |
+|---|---|
+| [professional-director-system.md](professional-director-system.md) | Production Book / 部门合同 / 审批 ledger / stale 传播 |
+
+## 规格与契约
+
+| 文件 | 主题 |
+|---|---|
+| [film-spec.md](film-spec.md) | Film Spec 契约 |
+| [style-bible.md](style-bible.md) | Style Bible 全片视觉语法 |
+| [config-schema.md](config-schema.md) | config_loader.py 配置 schema |
+
+## 工具栈 · Grok Build
+
+| 文件 | 主题 |
+|---|---|
+| [grok-build-sdk.md](grok-build-sdk.md) | SDK 能力矩阵 |
+| [grok-oauth.md](grok-oauth.md) | OAuth Pack chat/image/edit/video/tts |
+| [grok-media-pipeline.md](grok-media-pipeline.md) | Grok 媒体管线 + FRW 2V 优先 |
+| [auto-dispatch.md](auto-dispatch.md) | aifilm dispatch 自动调配 |
+
+## 工具栈 · I2V / FRW
+
+| 文件 | 主题 |
+|---|---|
+| [i2v-grok-primary.md](i2v-grok-primary.md) | I2V grok_primary 运营模式 |
+| [frw-degrade-dispatch.md](frw-degrade-dispatch.md) | FRW Seedance/LTX/经典 dispatch |
+| [ltx-env-plate.md](ltx-env-plate.md) | FRW LTX T2V 无角色环境床 |
+| [frw-lipsync.md](frw-lipsync.md) | FRW 口型音画同步 |
+| [seedance-camera-vocab.md](seedance-camera-vocab.md) | Seedance 运镜/视觉词库 |
+
+## 工具栈 · 音频
+
+| 文件 | 主题 |
+|---|---|
+| [audio-fallback.md](audio-fallback.md) | 音频三阶梯 TTS/BGM/Lipsync |
+| [audio-recipe.md](audio-recipe.md) | 场景自适应声轨配方 |
+| [bgm-generation.md](bgm-generation.md) | BGM 生成与抗疲劳 |
+| [voice-tracks.md](voice-tracks.md) | 多轨声线（娇喘轨 opt-in） |
+| [voices.md](voices.md) | 旁白与声线一致性 |
+| [vo-modes.md](vo-modes.md) | VO Modes 口白策略 |
+| [opensource-tts.md](opensource-tts.md) | 开源 TTS 与一角一声 |
+| [lipsync.md](lipsync.md) | Lip-sync 后端政策 |
+
+## 工具栈 · 后期
+
+| 文件 | 主题 |
+|---|---|
+| [post-compose.md](post-compose.md) | 设计后期桥 HF/Remotion |
+| [postproduction.md](postproduction.md) | 正式后期与交付 |
+| [hf-remotion-capability-matrix.md](hf-remotion-capability-matrix.md) | HF/Remotion 能力盘点 |
+| [hf-transition-policy.md](hf-transition-policy.md) | HF 转场受控启用策略 |
+
+## 一致性与接戏
+
+| 文件 | 主题 |
+|---|---|
+| [consistency.md](consistency.md) | 画风/身份/画质一致性硬门禁 |
+| [continuity_chain.md](continuity_chain.md) | 长片动作串接 |
+| [keyframe-first-state-index.md](keyframe-first-state-index.md) | Keyframe-First 状态照索引 |
+| [shot-motion.md](shot-motion.md) | 运镜/动态/过场/构图 |
+| [character-stance.md](character-stance.md) | 角色立场/多 POV 剪辑 |
+
+## 剪辑工艺
+
+| 文件 | 主题 |
+|---|---|
+| [editor-cut-pass.md](editor-cut-pass.md) | Editor's Cut Pass |
+| [editorial-craft.md](editorial-craft.md) | 资深剪辑语法 |
+| [edit-strategy-voice-coupled.md](edit-strategy-voice-coupled.md) | Voice-Coupled Editorial |
+
+## 色气 / 成人
+
+| 文件 | 主题 |
+|---|---|
+| [ecchi-story.md](ecchi-story.md) | 色气叙事规范 |
+| [adult-max-playbook.md](adult-max-playbook.md) | 办事剧单入口 sex≥30% |
+
+---
+
+## 踩坑 Lessons（按日期）
+
+> 新规则须标 P 码 + 层。验证稳定后可晋升到上方稳定 references。
+
+### 2026-07-22
+
+| 文件 | 主题 |
+|---|---|
+| [i2v-endframe-no-redress](lessons-2026-07-22-i2v-endframe-no-redress.md) | I2V 末帧不回穿 + promote 门 |
+| [keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md) | 静帧禁压缩/错幅 |
+| [shaofu-cast-subs-bgm-final](lessons-2026-07-22-shaofu-cast-subs-bgm-final.md) | 少婦案 脸锁/字幕/BGM/final |
+| [user-source-fidelity](lessons-2026-07-22-user-source-fidelity.md) | 用户原文保真 |
+| [verify-before-generate](lessons-2026-07-22-verify-before-generate.md) | 先验后生·算力刀口 |
+
+### 2026-07-21
+
+| 文件 | 主题 |
+|---|---|
+| [audio-recipe-routing](lessons-2026-07-21-audio-recipe-routing.md) | 音频配方路由 |
+| [bgm-instrumental-fallback](lessons-2026-07-21-bgm-instrumental-fallback.md) | BGM 纯乐器兜底 |
+| [bgm-multi-style](lessons-2026-07-21-bgm-multi-style.md) | BGM multi-style |
+| [ecchi-climax-ratio-multi](lessons-2026-07-21-ecchi-climax-ratio-multi.md) | 色气高潮比例 |
+| [first-last-gen](lessons-2026-07-21-first-last-gen.md) | 生成 first/last 接戏 |
+| [frw-key-capability](lessons-2026-07-21-frw-key-capability.md) | FRW key 能力 / 403·502 |
+| [hair-color-lock](lessons-2026-07-21-hair-color-lock.md) | 发色硬锁 |
+| [intercourse-impact-benchmark](lessons-2026-07-21-intercourse-impact-benchmark.md) | 性交冲击力标竿 |
+| [keyframe-first-frame-poison](lessons-2026-07-21-keyframe-first-frame-poison.md) | 首帧毒化 |
+| [montage-hardcore-male](lessons-2026-07-21-montage-hardcore-male.md) | 蒙太奇+重口男向 |
+| [no-shot-watermark](lessons-2026-07-21-no-shot-watermark.md) | 禁 shot 水印 |
+| [sex-duration-floor](lessons-2026-07-21-sex-duration-floor.md) | 性爱时长硬底 ≥20% |
+| [sex-undress-ladder](lessons-2026-07-21-sex-undress-ladder.md) | 办事卸甲阶梯·不回穿 |
+| [sex-vo-spice](lessons-2026-07-21-sex-vo-spice.md) | 旁白荤梗硬底 |
+| [size-ladder-hardcore-stack](lessons-2026-07-21-size-ladder-hardcore-stack.md) | 景别情绪堆叠 |
+| [tts-shengwang-eval](lessons-2026-07-21-tts-shengwang-eval.md) | TTS 声网评测 |
+| [wardrobe-no-redress-still](lessons-2026-07-21-wardrobe-no-redress-still.md) | 卸装后 still 源链 |
+
+### 2026-07-20
+
+| 文件 | 主题 |
+|---|---|
+| [action-fluency](lessons-2026-07-20-action-fluency.md) | 动作流畅 |
+| [audio-compose](lessons-2026-07-20-audio-compose.md) | 音频混音 |
+| [bgm-anti-fatigue](lessons-2026-07-20-bgm-anti-fatigue.md) | BGM 抗疲劳 |
+| [character-stance](lessons-2026-07-20-character-stance.md) | 角色立场 |
+| [cut-silk-bilingual](lessons-2026-07-20-cut-silk-bilingual.md) | 剪辑丝滑/双语字 |
+| [designed-post-fluency](lessons-2026-07-20-designed-post-fluency.md) | 设计后期流畅 |
+| [directors-lens](lessons-2026-07-20-directors-lens.md) | Director's Lens 上游 |
+| [editor-cut-ecchi-scale](lessons-2026-07-20-editor-cut-ecchi-scale.md) | 剪辑色气尺度 |
+| [editorial-craft](lessons-2026-07-20-editorial-craft.md) | 剪辑工艺 |
+| [frame-chain](lessons-2026-07-20-frame-chain.md) | 帧链 |
+| [frw-2v-first](lessons-2026-07-20-frw-2v-first.md) | FRW 2V 优先 |
+| [frw-ltx-probe](lessons-2026-07-20-frw-ltx-probe.md) | FRW LTX 探测 |
+| [layer-routing](lessons-2026-07-20-layer-routing.md) | 分层路由 |
+| [meaningful-motion](lessons-2026-07-20-meaningful-motion.md) | 有意义运动 |
+| [motion-transition](lessons-2026-07-20-motion-transition.md) | 运动转场 |
+| [sediment-cn-codex](lessons-2026-07-20-sediment-cn-codex.md) | 沉淀 |
+| [seedance-quality](lessons-2026-07-20-seedance-quality.md) | Seedance 质量 |
+| [title-double-burn](lessons-2026-07-20-title-double-burn.md) | 标题双烧 |
+| [transition-motion-v2](lessons-2026-07-20-transition-motion-v2.md) | 转场运动 v2 |
+| [vo-atempo-three-axis](lessons-2026-07-20-vo-atempo-three-axis.md) | VO atempo 三轴 |
+| [vo-drag-motion-snap](lessons-2026-07-20-vo-drag-motion-snap.md) | VO 拖拽运动 snap |
+
+### 2026-07-16 ~ 17
+
+| 文件 | 主题 |
+|---|---|
+| [kei](lessons-2026-07-16-kei.md) | kei 案 |
+| [compose-pilot](lessons-2026-07-17-compose-pilot.md) | compose pilot |
+| [run-to-completion](lessons-2026-07-17-run-to-completion.md) | 一路做完 |
+| [vo-motion-link](lessons-2026-07-17-vo-motion-link.md) | VO 运动链接 |
