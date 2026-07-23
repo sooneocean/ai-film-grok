@@ -16,21 +16,50 @@ class InventoryError(RuntimeError):
     pass
 
 
-def _as_id_list(values: Iterable[Any] | None) -> list[str]:
-    out: list[str] = []
+def flatten_shot_inventory(value: Any) -> list[str]:
+    """Return canonical shot ids from an iterable, film-spec, or drama graph."""
+    found: list[str] = []
     seen: set[str] = set()
-    for v in values or []:
-        sid = str(v).strip()
-        if not sid or sid in seen:
-            continue
-        seen.add(sid)
-        out.append(sid)
-    return out
+
+    def walk(item: Any, *, in_shots: bool = False) -> None:
+        if isinstance(item, dict):
+            if in_shots and item.get("id") is not None:
+                sid = str(item["id"]).strip()
+                if sid and sid not in seen:
+                    seen.add(sid)
+                    found.append(sid)
+            for key, child in item.items():
+                walk(child, in_shots=key == "shots")
+        elif isinstance(item, (list, tuple, set, frozenset)):
+            for child in item:
+                walk(child, in_shots=in_shots)
+        elif in_shots:
+            sid = str(item).strip()
+            if sid and sid not in seen:
+                seen.add(sid)
+                found.append(sid)
+
+    if isinstance(value, dict):
+        walk(value)
+    else:
+        for item in value or []:
+            if isinstance(item, dict):
+                walk(item, in_shots=True)
+            else:
+                sid = str(item).strip()
+                if sid and sid not in seen:
+                    seen.add(sid)
+                    found.append(sid)
+    return found
+
+
+def _as_id_list(values: Iterable[Any] | None) -> list[str]:
+    return flatten_shot_inventory(values)
 
 
 def check_shot_inventory(
-    shot_ids: Iterable[Any],
-    approved_clip_ids: Iterable[Any],
+    shot_ids: Any,
+    approved_clip_ids: Any,
     *,
     vo_stem_ids: Iterable[Any] | None = None,
     require_vo: bool = False,

@@ -5,6 +5,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    from .department_contracts import migrate_style_bible
+except ImportError:  # direct script imports used by the CLI
+    from department_contracts import migrate_style_bible
+
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat()
@@ -67,6 +72,15 @@ def migrate_to_v2(bible: dict[str, Any]) -> dict[str, Any]:
         v2_bible["cast_state_masters"] = {}
 
     return v2_bible
+
+
+def migrate_to_v3(
+    bible: dict[str, Any] | str | None,
+    *,
+    valid_approval_refs: set[str] | None = None,
+) -> dict[str, Any]:
+    """Wrap legacy visual data in independently revisioned v3 nodes."""
+    return migrate_style_bible(bible, valid_approval_refs=valid_approval_refs)
 
 
 def resolve_state_photo(

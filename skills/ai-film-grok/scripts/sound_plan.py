@@ -611,9 +611,6 @@ def apply_mute_windows_to_samples(
     import numpy as np
 
     out = np.array(samples, dtype=np.float64, copy=True)
-    if out.ndim > 1:
-        # process first channel only if stereo slipped in; caller should pass mono
-        out = out.reshape(-1) if out.ndim == 1 else out[:, 0].copy()
     n = len(out)
     for ev in events:
         if ev.get("type") != "mute":
@@ -721,12 +718,37 @@ def suggest_auto_sfx_events(
             "kind": kind,
             "auto": True,
         }
+
+        try:
+            from acoustic_policy import resolve_spatial_pan
+
+            framing = shot.get("dsl", {}).get("framing") or shot.get("framing") or ""
+            pan = resolve_spatial_pan(framing)
+            item["pan"] = pan
+        except ImportError:
+            pass
+
         if kind != "whoosh":
             # act/climax flesh hits later in plate (rhythm peak)
             item["at_offset_sec"] = 0.35 if ph in {"act", "climax"} else 0.18
         if adult and ph in {"act", "climax"}:
             item["sex_sfx"] = True
+
         events.append(item)
+
+        # Phase 3: Continuous Foley Injection for High Heat/Motion
+        if adult and ph in {"act", "climax", "foreplay"}:
+            events.append(
+                {
+                    "type": "sfx_accent",
+                    "shot_id": str(shot["id"]),
+                    "kind": "foley_cloth",
+                    "auto": True,
+                    "at_offset_sec": 0.05,
+                    "pan": item.get("pan", 0.0),
+                }
+            )
+
         if len(events) >= max_events:
             break
     return events
@@ -766,6 +788,14 @@ def inject_sex_sfx_from_shots(
         if sid in covered:
             continue
         kind = _kind_from_shot_cues(shot) or _HEAT_SFX_KIND.get(ph, "impact")
+        try:
+            from acoustic_policy import resolve_spatial_pan
+
+            framing = shot.get("dsl", {}).get("framing") or shot.get("framing") or ""
+            pan = resolve_spatial_pan(framing)
+        except ImportError:
+            pan = 0.0
+
         events.append(
             {
                 "type": "sfx_accent",
@@ -774,6 +804,18 @@ def inject_sex_sfx_from_shots(
                 "auto": True,
                 "sex_sfx": True,
                 "at_offset_sec": 0.35 if ph in {"act", "climax"} else 0.2,
+                "pan": pan,
+            }
+        )
+        # Add continuous foley
+        events.append(
+            {
+                "type": "sfx_accent",
+                "shot_id": sid,
+                "kind": "foley_cloth",
+                "auto": True,
+                "at_offset_sec": 0.05,
+                "pan": pan,
             }
         )
         covered.add(sid)
@@ -851,6 +893,13 @@ def sfx_clip_for_kind(kind: str, *, amp: float = 0.2) -> Any:
         out[: len(a)] += a
         out[: len(b)] += b
         return out
+    if kind == "foley_cloth":
+        # Simulate continuous cloth rustle with low-passed noise
+        n = int(sr * 1.5)
+        t = np.linspace(0, 1.5, n, endpoint=False)
+        noise = np.random.uniform(-1, 1, n)
+        env = np.sin(np.pi * t / 1.5) ** 2
+        return (amp * 0.4 * noise * env).astype(np.float64)
     # generic
     return sparkle(amp=amp * 0.7)
 
@@ -862,12 +911,11 @@ def apply_sfx_accents_to_samples(
     events: list[dict[str, Any]],
     level: float = 0.55,
 ) -> Any:
-    """Overlay sfx_accent clips onto mono float bed. Returns float mono."""
+    """Overlay sfx_accent clips onto mono or stereo float bed. Returns float array of same shape."""
     import numpy as np
 
     out = np.array(samples, dtype=np.float64, copy=True)
-    if out.ndim > 1:
-        out = out[:, 0].copy() if out.shape[1] else out.reshape(-1)
+    is_stereo = out.ndim > 1 and out.shape[1] == 2
     n = len(out)
     placed = 0
     for ev in events:
@@ -877,18 +925,31 @@ def apply_sfx_accents_to_samples(
         clip = np.asarray(sfx_clip_for_kind(kind, amp=0.22 * float(level)), dtype=np.float64)
         if clip.ndim > 1:
             clip = clip[:, 0]
+
         at = float(ev.get("at_sec") or 0.0)
-        # honor optional offset used by auto inject (already baked into at_sec by expand if set)
+        pan = float(ev.get("pan") or 0.0)
+
         i0 = int(at * sr)
         if i0 >= n or i0 < 0:
             continue
         i1 = min(n, i0 + len(clip))
         seg = clip[: i1 - i0]
-        out[i0:i1] += seg
+
+        if is_stereo:
+            # Simple constant power pan
+            angle = (pan + 1.0) * np.pi / 4.0
+            left_gain = np.cos(angle)
+            right_gain = np.sin(angle)
+            out[i0:i1, 0] += seg * left_gain
+            out[i0:i1, 1] += seg * right_gain
+        else:
+            out[i0:i1] += seg
+
         placed += 1
         if ev is not None:
             ev["overlay_applied"] = True
             ev["overlay_samples"] = int(len(seg))
+
     # soft peak protect
     peak = float(np.max(np.abs(out))) + 1e-9
     if peak > 0.98:
@@ -946,6 +1007,10 @@ def expand_sound_events(
             item["depth"] = float(ev.get("depth", 0.35))
             item["duration_sec"] = float(ev.get("duration_sec", 2.0))
             item["effect"] = "bed_sidechain_duck"
+
+        if "pan" in ev:
+            item["pan"] = float(ev["pan"])
+
         applied.append(item)
     return {
         "mood": plan.get("mood"),
@@ -955,3 +1020,62 @@ def expand_sound_events(
         "event_count": len(applied),
         "auto_sfx_notes": list(plan.get("_notes") or []),
     }
+
+
+def build_mood_timeline(
+    shots: list[dict[str, Any]],
+    *,
+    shot_starts: dict[str, float],
+    shot_ends: dict[str, float],
+    default_mood: str = "rnb",
+) -> list[dict[str, Any]]:
+    """Build a time-based mood map by analyzing the dramatic curve of shots."""
+    if not shots:
+        return [{"start_sec": 0.0, "end_sec": 0.0, "mood": default_mood}]
+
+    timeline = []
+    for shot in shots:
+        sid = str(shot.get("id"))
+        if sid not in shot_starts or sid not in shot_ends:
+            continue
+
+        st = float(shot_starts[sid])
+        ed = float(shot_ends[sid])
+        if ed <= st:
+            continue
+
+        # Determine mood from dramatic function and heat phase
+        func = str(shot.get("dramatic_function") or "").strip().lower()
+        hp = _shot_heat_phase(shot)
+
+        mood = default_mood
+        if hp in {"act", "climax", "foreplay"}:
+            mood = "rnb" if default_mood != "dark" else default_mood
+        elif func in {"climax", "crisis", "rising_action"}:
+            mood = "dark" if default_mood == "dark" else "rnb"
+        elif func in {"intro", "establishing"}:
+            mood = "ambient" if default_mood != "dark" else "ambient"
+        elif func in {"resolution", "falling_action"}:
+            mood = "warm"
+        else:
+            mood = default_mood
+
+        timeline.append({"start_sec": st, "end_sec": ed, "mood": mood})
+
+    # Merge adjacent identical moods
+    if not timeline:
+        return [{"start_sec": 0.0, "end_sec": 0.0, "mood": default_mood}]
+
+    merged = []
+    timeline.sort(key=lambda x: x["start_sec"])
+    curr = timeline[0].copy()
+
+    for item in timeline[1:]:
+        if item["mood"] == curr["mood"] and item["start_sec"] <= curr["end_sec"] + 0.1:
+            curr["end_sec"] = max(curr["end_sec"], item["end_sec"])
+        else:
+            merged.append(curr)
+            curr = item.copy()
+    merged.append(curr)
+
+    return merged

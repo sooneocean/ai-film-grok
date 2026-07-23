@@ -81,10 +81,34 @@
       "resolution": "未完成邀请，钩子悬着"
     },
     "pace_chart": [
-      "慢燃登场",
-      "加速靠近",
-      "感官高潮",
-      "余韵释放"
+      {
+        "label": "慢燃登场",
+        "start_ratio": 0.0,
+        "end_ratio": 0.25,
+        "intensity": 3,
+        "cut_freq": "slow"
+      },
+      {
+        "label": "加速靠近",
+        "start_ratio": 0.25,
+        "end_ratio": 0.60,
+        "intensity": 6,
+        "cut_freq": "medium"
+      },
+      {
+        "label": "感官高潮",
+        "start_ratio": 0.60,
+        "end_ratio": 0.85,
+        "intensity": 9,
+        "cut_freq": "fast"
+      },
+      {
+        "label": "余韵释放",
+        "start_ratio": 0.85,
+        "end_ratio": 1.0,
+        "intensity": 4,
+        "cut_freq": "slow"
+      }
     ],
     "visual_motifs": [
       "雨=冷静外壳",

@@ -44,6 +44,24 @@ def _voice_carrier(root: Path) -> Path | None:
     )
 
 
+def _artifact(path: Path | None) -> dict[str, str | None]:
+    return {"path": str(path) if path else None, "sha256": _hash(path)}
+
+
+def _reported_artifact(root: Path, value: Any) -> dict[str, str | None]:
+    if isinstance(value, dict):
+        raw_path = value.get("path")
+        expected = value.get("sha256")
+    else:
+        raw_path, expected = value, None
+    if not raw_path:
+        return {"path": None, "sha256": expected}
+    path = Path(str(raw_path)).expanduser()
+    if not path.is_absolute():
+        path = root / path
+    return {"path": str(path), "sha256": _hash(path) or expected}
+
+
 def build_audio_provenance(root: Path, *, write: bool = True) -> dict[str, Any]:
     """Create a no-spend evidence receipt; it does not identify audio by listening."""
     root = Path(root).expanduser().resolve()
@@ -103,6 +121,42 @@ def build_audio_provenance(root: Path, *, write: bool = True) -> dict[str, Any]:
     carrier = _voice_carrier(root)
     manifest = read_json(root / "manifest.json") or {}
     final = (manifest.get("outputs") or {}).get("final_film") or {}
+    delivery = (
+        read_json(root / "receipts" / "final-delivery.json")
+        or read_json(root / "out" / "final-delivery.json")
+        or {}
+    )
+    mix = read_json(root / "audio" / "mix_report.json") or {}
+    srt = next((p for p in (root / "out" / "final.srt", root / "final.srt") if p.is_file()), None)
+    channels = {
+        "dialogue": {"events": dialogue, "stems": []},
+        "vo": {"events": [], "stems": [_artifact(carrier)] if carrier else []},
+        "native": {
+            "events": [],
+            "stems": [_reported_artifact(root, delivery.get("native_audio"))]
+            if delivery.get("native_audio")
+            else [],
+        },
+        "ambience": {
+            "events": list(mix.get("ambience_events") or []),
+            "stems": list(mix.get("ambience_stems") or []),
+        },
+        "foley": {
+            "events": list(mix.get("foley_events") or []),
+            "stems": list(mix.get("foley_stems") or []),
+        },
+        "sfx": {
+            "events": list(mix.get("sfx_events") or []),
+            "stems": list(mix.get("sfx_stems") or []),
+        },
+        "bgm": {
+            "events": list(mix.get("music_cues") or []),
+            "stems": [_reported_artifact(root, delivery.get("music"))]
+            if delivery.get("music")
+            else [],
+        },
+        "captions": {**_artifact(srt), "events": [], "stems": []},
+    }
     required = bool(dialogue or errors)
     if required and not carrier:
         errors.append(
@@ -127,6 +181,7 @@ def build_audio_provenance(root: Path, *, write: bool = True) -> dict[str, Any]:
         "ok": not errors,
         "tts_rehearsal": {"path": str(rehearsal_path), "sha256": _hash(rehearsal_path)},
         "dialogue_sources": dialogue,
+        "channels": channels,
         "voice_carrier": {"path": str(carrier) if carrier else None, "sha256": _hash(carrier)},
         "final_delivery": {"sha256": final.get("sha256"), "path": final.get("path")},
         "errors": errors,

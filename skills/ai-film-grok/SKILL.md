@@ -17,12 +17,18 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 **原则**：工程门禁硬；**叙事/尺度/女主/工序深度软**——跟 Prompt 与参考图走。前一层未确认不 bulk 生成。
 **算力纪律（P0 · 2026-07-22）**：**先验后生**——图/视频都先验证再烧下一级算力；坏输入上生成 = 双倍成本。见 [verify-before-generate](references/lessons-2026-07-22-verify-before-generate.md)。
 **用户原文保真（P0 · 2026-07-22）**：用户剧本/诗白是脊柱；禁止 adult-max「展厅落锁」模板整句覆盖；多段输入各自独立，不克隆测试骨架；口白动词=画面动作。见 [user-source-fidelity](references/lessons-2026-07-22-user-source-fidelity.md)。
+**用户定妆脸锁（P0 · 2026-07-22 少婦案）**：用户主角图/角色表 → 裁 FRONT+脸 → cast master；有角色 still **只** `image_edit(cast|face|已过审 still)`；审核 moderated **禁止**纯 `image_gen` 绕脸；整页 sheet 禁止直接当 9:16 脸锁。见 [shaofu-cast-subs-bgm-final](references/lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)。
+**字幕空窗（P0 · 同案）**：`post-engine hyperframes` 默认 plate `subs=off`；HF 未成功烧字时 **必须** `render_final --subs burn` 补；**禁止**为过 review 清空 `final.srt`。
+**色气 BGM（P0 · 同案）**：色气/heat 亲密默认 **rnb 曲库** `assets/bgm/rnb/*`（显式 `--music`）；勿用 dark；procedural 仅曲库缺失时。
+**final 超时（P0 · 同案）**：`aifilm final` 调 render_final 须 ≥600s；短超时会假失败。
+
+**专业导演系统（v1.15）**：创作判断不再只存在 Prompt。`production-book.json` 总控 Graph、Visual/Audio/Post Bible、版本锁、审批 ledger、精准 stale 传播、Dailies/Selects、Picture Lock 与 Master Gate；模型评分永远只作 advisory。见 [professional-director-system.md](references/professional-director-system.md)。
 
 ```text
 【工序八环】Idea → Story → Beats → Shots → Media → Selects → Rough → Verified MP4
 【工具】Agent → 1视觉 → 2语音 → 3设计(HF) → 4FFmpeg → 交付
 【六动词】Define → Structure → Visualize → Generate → Select → Edit
-【自动调配】每回合优先 aifilm dispatch --root <film> → 只执行 next_cmd
+【自动调配】每回合优先 aifilm dispatch --root <film> → 执行 next_action（兼容 next_cmd）
 ```
 
 主脊详解：[craft-spine.md](references/craft-spine.md) · 音频三阶梯：[audio-fallback.md](references/audio-fallback.md) · 调度：[auto-dispatch.md](references/auto-dispatch.md)
@@ -33,7 +39,7 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 
 ```bash
 "$AIFILM" dispatch --root "<root>"
-# 读 JSON：craft_stage · next_cmd · agent_instruction · routing
+# 读 JSON：craft_stage · next_action · next_cmd · context_digest · routing
 #        + graph · jobs_summary · execution_plan_digest（v1.4.6+）
 # 本回合只做 next_cmd；做完再 dispatch。禁止跳环 bulk。
 ```
@@ -42,6 +48,8 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 |------|------|
 | `craft_stage` | 八环当前位置 |
 | `next_cmd` | **唯一**推荐命令 |
+| `next_action` | 可直接执行、带输入 hash／transaction／审批等级的结构化动作 |
+| `context_digest` | rigor、部门锁、stale、素材版本、导演意见与批准／预算范围 |
 | `agent_do` / `agent_instruction` | 本回合 checklist |
 | `routing` | TTS/BGM/I2V 自动兜底策略摘要 |
 | `hard_gates` | 不可跳过的门禁 |
@@ -64,6 +72,13 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 # Phase 2：能力表
 "$AIFILM" skill list
 "$AIFILM" skill show --id story.normalize
+"$AIFILM" skill run --skill-id dispatch.orchestrate --payload-file action.json --dry-run
+
+# 专业导演总控与部门合同（新项目默认 professional；旧项目默认 legacy）
+"$AIFILM" director init --root "<root>" --rigor professional
+"$AIFILM" director status --root "<root>"
+"$AIFILM" department list --root "<root>"
+"$AIFILM" department edit --root "<root>" --id visual --payload-file patch.json --expected-revision 1 --dry-run
 
 # Phase 4：角色/场景/道具 + 状态照槽位（与 state-index 对齐）
 "$AIFILM" assets sync --root "<root>"
@@ -150,6 +165,10 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 11. **静帧禁压缩/错幅（P0）**：keyframe **≥720×1280 且 9:16**；禁横图/缩略图/缩水 jpg 进 I2V；`register-still`+`preflight` 硬闸；同 stem 用 `pick_best_keyframe`（见 [keyframe-no-compress](references/lessons-2026-07-22-keyframe-no-compress.md)）
 12. **先验后生 · 算力刀口（P0）**：**验证完再** `image_to_video` / bulk `image_edit`；图与视频同一逻辑；禁止未验 30 still 就开 30 I2V；坏了只修上游不盲重烧（见 [verify-before-generate](references/lessons-2026-07-22-verify-before-generate.md)）
 13. **用户原文保真（P0）**：`plan`/`write-spec` 不得用 adult-max 库存旁白整句覆盖用户诗白/对白；多段输入独立场景，禁止 dual-climax 自动克隆；`USER_SOURCE_NAR_POLLUTED` hard fail（见 [user-source-fidelity](references/lessons-2026-07-22-user-source-fidelity.md)）
+
+14. **用户定妆脸锁（P0）**：角色 still 禁纯 t2i；cast FRONT+face；moderated 不绕（[shaofu-cast-subs-bgm-final](references/lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)）
+15. **字幕交付**：HF 路径失败必须 burn；禁空 SRT
+16. **色气 BGM**：优先 `assets/bgm/rnb/*` + `--music-mood rnb`
 
 **弹性（跟 brief）**：`heat_scale` / 亲密核镜比 / 单·多女主——由 Prompt 与参考图推断。
 **例外硬底**（`heat_scale=max` write-spec 默认 hard）：
@@ -260,7 +279,7 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 
 中文 **edge 默认**（零依赖、可复现）。**质量档**（不改默认）：SuperGrok → **`grok`**（OAuth TTS + speech tags，`--tts-backend grok`）；本机克隆 → `voicebox`；中文最高自然度本地 → **CosyVoice 2** `external`；情感精修 → MiniMax。场景表见 [voices.md](references/voices.md) · [grok-oauth.md](references/grok-oauth.md)。**失败 opt-in 兜底**：`AIFILM_TTS_VOICEBOX_FALLBACK=1`（不静默换声）。有回执则 vo_pacing **优先 measured**。混音在 final plate（sidechain / loudnorm / auto_sfx）。
 
-**BGM 抗重复（定稿）**：当前仓库**不附带**版权曲；已验证授权的纯乐器曲才可放 `assets/bgm/rnb/*`（每首须 `.license.txt`，≥3 首才轮换）。在曲库为空时，**工程默认** = 程序 v3 multi-style（`--music-seed` / `audio_policy.music_seed`）。ACE-Step/`[inst]` 等只**离线灌库**；HeartMuLa 不当默认 BGM。见 [bgm-generation.md](references/bgm-generation.md)。
+**BGM 抗重复 + 色气默认（定稿 · 2026-07-22）**：色气/里番/heat 亲密 → **优先** `assets/bgm/rnb/*`（CC0 曲库，显式 `--music` + `--music-volume 0.55–0.58`）；`--music-mood rnb|sensual|soul`，**禁止**对色气用 `dark`。曲库为空时才程序 v3 multi-style（`--music-seed`）。HF 未完成时勿假设有字——plate 须 `--subs burn`。见 [bgm-generation.md](references/bgm-generation.md) · [shaofu-cast-subs-bgm-final](references/lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)。
 
 **场景自适应声轨**：`write-spec` 按 beat 写每镜 `audio_recipe`；片级 `audio_policy`（默认不自动唱）。见 [audio-recipe.md](references/audio-recipe.md) · `audio-plan`。
 **声线默认**：**旁白 `nar` + BGM** 主导；`vocal_color` 娇喘独立轨 **默认关闭**（鸡肋）。`tone_tags` 仍可进画面 prompt；`sound_cues` 仍可进 SFX。见 [voice-tracks.md](references/voice-tracks.md)。
@@ -360,5 +379,6 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 | **生成 first/last 接戏** | [lessons-2026-07-21-first-last-gen.md](references/lessons-2026-07-21-first-last-gen.md) · register 自动 promote 末帧→下镜首帧 · 按实况优化 prompt |
 | **旁白荤梗硬底** | [lessons-2026-07-21-sex-vo-spice.md](references/lessons-2026-07-21-sex-vo-spice.md) · 每镜 nar 荤梗 · act 办事动词 · `sex_vo_strict` |
 | **用户原文保真（禁模板污染）** | [lessons-2026-07-22-user-source-fidelity.md](references/lessons-2026-07-22-user-source-fidelity.md) · `preserve_user_nar` · `USER_SOURCE_NAR_POLLUTED` · 多段独立 |
+| **少婦案·脸锁/字幕/BGM/final** | [lessons-2026-07-22-shaofu-cast-subs-bgm-final.md](references/lessons-2026-07-22-shaofu-cast-subs-bgm-final.md) · cast edit-only · HF 空字必 burn · rnb 曲库 · final≥600s |
 | **成人办事剧单入口（v1.10）** | [adult-max-playbook.md](references/adult-max-playbook.md) · sex≥30% · extreme VO · 肉体 SFX · 蒙太奇 · 多体位 · `heat check|vo-suggest|soften-log` · [pose-packs](references/pose-packs/coitus-beats.md) |
 | **FRW key 能力 / 403·502** | [lessons-2026-07-21-frw-key-capability.md](references/lessons-2026-07-21-frw-key-capability.md) · [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md) |

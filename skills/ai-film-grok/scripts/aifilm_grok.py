@@ -309,6 +309,32 @@ def save_manifest(root: Path, manifest: dict[str, Any]) -> None:
     write_json(root / MANIFEST_NAME, manifest)
 
 
+def _classify_doctor_readiness(
+    *,
+    core_checks: dict[str, bool],
+    optional_capabilities: dict[str, Any],
+    environment_warnings: list[str],
+) -> dict[str, Any]:
+    """Separate production requirements from optional tools and host advisories."""
+    failed_checks = [name for name, ready in core_checks.items() if not ready]
+    core_readiness = {
+        "ok": not failed_checks,
+        "checks": core_checks,
+        "failed_checks": failed_checks,
+    }
+    environment_advisories = {
+        "ok": not environment_warnings,
+        "warnings": list(environment_warnings),
+    }
+    return {
+        "core_readiness": core_readiness,
+        "optional_capabilities": optional_capabilities,
+        "environment_advisories": environment_advisories,
+        "ok": core_readiness["ok"],
+        "strict_ok": bool(core_readiness["ok"] and environment_advisories["ok"]),
+    }
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     skill_dir = Path(__file__).resolve().parents[1]
     edge_ok = False
@@ -367,19 +393,27 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     permission_mode = grok_permission_mode(grok_config)
     grok_log = Path.home() / ".grok" / "logs" / "unified.jsonl"
     log_mode = stat.S_IMODE(grok_log.stat().st_mode) if grok_log.is_file() else None
-    warnings: list[str] = []
+    environment_warnings: list[str] = []
     if permission_mode == "always-approve":
-        warnings.append(
+        environment_warnings.append(
             "Global Grok permission_mode is always-approve; change requires explicit user approval"
         )
     if log_mode is not None and log_mode & 0o077:
-        warnings.append(f"Grok unified log is readable beyond the owner (mode {oct(log_mode)})")
+        environment_warnings.append(
+            f"Grok unified log is readable beyond the owner (mode {oct(log_mode)})"
+        )
     if config_env_mode is not None and config_env_mode & 0o077:
-        warnings.append(f"skill config.env must be owner-only (mode {oct(config_env_mode)})")
+        environment_warnings.append(
+            f"skill config.env must be owner-only (mode {oct(config_env_mode)})"
+        )
     requested_lipsync = str(lipsync_info.get("env_backend") or "auto")
-    lipsync_required_ok = requested_lipsync in {"off", "auto"} or bool(
-        (lipsync_info.get("backends") or {}).get(requested_lipsync)
-    )
+    ready_lipsync_backends = list(lipsync_info.get("ready") or [])
+    if requested_lipsync == "require":
+        lipsync_required_ok = bool(ready_lipsync_backends)
+    else:
+        lipsync_required_ok = requested_lipsync in {"off", "auto"} or bool(
+            (lipsync_info.get("backends") or {}).get(requested_lipsync)
+        )
     report = {
         "ok": True,
         "skill_dir": str(skill_dir),
@@ -400,7 +434,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "config_env_mode": oct(config_env_mode) if config_env_mode is not None else None,
             "global_permission_mode": permission_mode,
             "grok_log_mode": oct(log_mode) if log_mode is not None else None,
-            "warnings": warnings,
+            "warnings": environment_warnings,
         },
         "render_final": (skill_dir / "scripts" / "render_final.py").is_file(),
         "export_composition": (skill_dir / "scripts" / "export_composition.py").is_file(),
@@ -480,8 +514,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "error": grok_oauth.get("error"),
         "hint": grok_oauth.get("hint") or "grok login",
     }
+    optional_warnings: list[str] = []
     if not grok_oauth.get("ok"):
-        warnings.append(
+        optional_warnings.append(
             "Grok OAuth not ready (optional for API batch; in-session Imagine tools still work if logged in)"
         )
 
@@ -504,7 +539,45 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         report["error"] = (
             "Runtime/schema/backend verification failed; inspect nested doctor reports"
         )
-    report["strict_ok"] = bool(report["ok"] and not warnings)
+    core_checks = {
+        "skill_spine": bool(report["skill_md"]),
+        "ffmpeg": bool(report["ffmpeg"]),
+        "ffprobe": bool(report["ffprobe"]),
+        "edge_tts": edge_ok,
+        "numpy": numpy_ok,
+        "pillow": pil_ok,
+        "tts_backend": bool(tts_info.get("ok")),
+        "requirements_lock": bool(requirements.get("ok")),
+        "runtime_lock": bool(runtime.get("ok")),
+        "film_spec_schema": schema_ok,
+        "requested_lipsync_backend": lipsync_required_ok,
+    }
+    optional_capabilities = {
+        "lipsync": {
+            "enabled": requested_lipsync not in {"off", "auto"},
+            "requested_backend": requested_lipsync,
+            "ready": bool(ready_lipsync_backends),
+            "ready_backends": ready_lipsync_backends,
+            "required_request_satisfied": lipsync_required_ok,
+        },
+        "designed_post": {
+            "ready": bool(designed.get("ok")),
+            "required_for": designed.get("required_for"),
+        },
+        "grok_oauth": {
+            "ready": bool(grok_oauth.get("ok")),
+            "required_for": "API batch generation",
+        },
+        "warnings": optional_warnings,
+    }
+    readiness = _classify_doctor_readiness(
+        core_checks=core_checks,
+        optional_capabilities=optional_capabilities,
+        environment_warnings=environment_warnings,
+    )
+    report.update(readiness)
+    if not report["ok"] and "error" not in report:
+        report["error"] = "Core readiness failed; inspect core_readiness.failed_checks"
     emit(report)
     return 0 if (report["strict_ok"] if getattr(args, "strict", False) else report["ok"]) else 1
 
@@ -3855,6 +3928,106 @@ def cmd_skill(args: argparse.Namespace) -> int:
     return code
 
 
+def cmd_director(args: argparse.Namespace) -> int:
+    from director_cli import (
+        check,
+        director_init,
+        impact,
+        migrate,
+        migrate_audit,
+        rebuild,
+        status,
+    )
+
+    root = Path(args.root).expanduser().resolve()
+    action = args.director_action
+    try:
+        if action == "init":
+            report = director_init(
+                root,
+                title=args.title,
+                rigor=args.rigor,
+                format_pack=args.format_pack,
+                genre_pack=args.genre_pack,
+            )
+        elif action == "migrate-audit":
+            report = migrate_audit(root)
+        elif action == "migrate":
+            report = migrate(root, title=args.title)
+        elif action == "status":
+            report = status(root)
+        elif action == "check":
+            report = check(root)
+        elif action == "impact":
+            report = impact(root, changed_refs=args.changed_ref, reason=args.reason)
+        elif action == "rebuild":
+            report = rebuild(
+                root,
+                changed_refs=args.changed_ref,
+                reason=args.reason,
+                expected_revision=args.expected_revision,
+                transaction_id=args.transaction_id,
+            )
+        else:
+            raise FilmError(f"unknown director action {action!r}")
+    except (OSError, ValueError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok") else 1
+
+
+def cmd_department(args: argparse.Namespace) -> int:
+    from department_cli import (
+        diff_department,
+        edit_department,
+        list_departments,
+        lock_department,
+        show_department,
+        unlock_department,
+        validate_department,
+    )
+
+    root = Path(args.root).expanduser().resolve()
+    action = args.department_action
+    try:
+        if action == "list":
+            report = list_departments(root)
+        elif action in {"show", "status"}:
+            report = show_department(root, args.department_id)
+        elif action == "edit":
+            report = edit_department(
+                root,
+                args.department_id,
+                payload_file=args.payload_file,
+                expected_revision=args.expected_revision,
+                dry_run=args.dry_run,
+            )
+        elif action == "diff":
+            report = diff_department(root, args.department_id, payload_file=args.payload_file)
+        elif action == "validate":
+            report = validate_department(root, args.department_id)
+        elif action == "lock":
+            report = lock_department(
+                root,
+                args.department_id,
+                approval_ref=args.approval_ref,
+                expected_revision=args.expected_revision,
+            )
+        elif action == "unlock":
+            report = unlock_department(
+                root,
+                args.department_id,
+                reason=args.reason,
+                expected_revision=args.expected_revision,
+            )
+        else:
+            raise FilmError(f"unknown department action {action!r}")
+    except (OSError, ValueError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok") else 1
+
+
 def cmd_assets(args: argparse.Namespace) -> int:
     """Phase 4: structured Character/Location/Prop + CharacterState ↔ state-index."""
     from asset_registry import assets_check, assets_status, sync_assets
@@ -5460,8 +5633,70 @@ def build_parser() -> argparse.ArgumentParser:
     )
     g_st.add_argument("--with-jobs", action="store_true", help="Include execution jobs_summary")
 
+    director_p = sub.add_parser(
+        "director",
+        help="Production book: init|migrate-audit|migrate|status|check|impact|rebuild",
+    )
+    director_sub = director_p.add_subparsers(dest="director_action", required=True)
+    d_init = director_sub.add_parser("init")
+    d_init.add_argument("--root", required=True)
+    d_init.add_argument("--title", default="Untitled")
+    d_init.add_argument(
+        "--rigor", choices=("legacy", "guided", "professional"), default="professional"
+    )
+    d_init.add_argument("--format-pack", default="vertical-short")
+    d_init.add_argument("--genre-pack", default="drama")
+    d_migrate_audit = director_sub.add_parser("migrate-audit")
+    d_migrate_audit.add_argument("--root", required=True)
+    d_migrate = director_sub.add_parser("migrate")
+    d_migrate.add_argument("--root", required=True)
+    d_migrate.add_argument("--title", default="Untitled")
+    for director_action in ("status", "check"):
+        action_parser = director_sub.add_parser(director_action)
+        action_parser.add_argument("--root", required=True)
+    for director_action in ("impact", "rebuild"):
+        action_parser = director_sub.add_parser(director_action)
+        action_parser.add_argument("--root", required=True)
+        action_parser.add_argument("--changed-ref", action="append", required=True)
+        action_parser.add_argument("--reason", required=True)
+        if director_action == "rebuild":
+            action_parser.add_argument("--expected-revision", type=int, required=True)
+            action_parser.add_argument("--transaction-id", default=None)
+
+    department_p = sub.add_parser(
+        "department",
+        help="Department bibles: list|show|edit|diff|validate|lock|unlock|status",
+    )
+    department_sub = department_p.add_subparsers(dest="department_action", required=True)
+    dept_list = department_sub.add_parser("list")
+    dept_list.add_argument("--root", required=True)
+    for department_action in ("show", "validate", "status"):
+        action_parser = department_sub.add_parser(department_action)
+        action_parser.add_argument("--root", required=True)
+        action_parser.add_argument("--id", dest="department_id", required=True)
+    dept_edit = department_sub.add_parser("edit")
+    dept_edit.add_argument("--root", required=True)
+    dept_edit.add_argument("--id", dest="department_id", required=True)
+    dept_edit.add_argument("--payload-file", required=True)
+    dept_edit.add_argument("--expected-revision", type=int, required=True)
+    dept_edit.add_argument("--dry-run", action="store_true")
+    dept_diff = department_sub.add_parser("diff")
+    dept_diff.add_argument("--root", required=True)
+    dept_diff.add_argument("--id", dest="department_id", required=True)
+    dept_diff.add_argument("--payload-file", required=True)
+    dept_lock = department_sub.add_parser("lock")
+    dept_lock.add_argument("--root", required=True)
+    dept_lock.add_argument("--id", dest="department_id", required=True)
+    dept_lock.add_argument("--approval-ref", required=True)
+    dept_lock.add_argument("--expected-revision", type=int, default=None)
+    dept_unlock = department_sub.add_parser("unlock")
+    dept_unlock.add_argument("--root", required=True)
+    dept_unlock.add_argument("--id", dest="department_id", required=True)
+    dept_unlock.add_argument("--reason", required=True)
+    dept_unlock.add_argument("--expected-revision", type=int, default=None)
+
     # Phase 2: Skill Registry shell
-    skill_p = sub.add_parser("skill", help="Skill Registry: list|show (Phase 2 shell)")
+    skill_p = sub.add_parser("skill", help="Skill Registry: list|show|validate|run")
     skill_sub = skill_p.add_subparsers(dest="skill_action", required=True)
     sk_list = skill_sub.add_parser("list", help="List registered skills")
     sk_list.add_argument("--tag", default=None, help="Filter by tag")
@@ -5472,6 +5707,10 @@ def build_parser() -> argparse.ArgumentParser:
     sk_validate.add_argument("--skill-id", required=True)
     sk_validate.add_argument("--payload-file", required=True)
     sk_validate.add_argument("--direction", choices=("input", "output"), default="input")
+    sk_run = skill_sub.add_parser("run", help="Run one fixed registry skill transaction")
+    sk_run.add_argument("--skill-id", required=True)
+    sk_run.add_argument("--payload-file", required=True)
+    sk_run.add_argument("--dry-run", action="store_true")
 
     # Phase 3: story → beat/shot planning
     plan_p = sub.add_parser(
@@ -5808,7 +6047,17 @@ def main(argv: list[str] | None = None) -> int:
             ):
                 args.derive_if_missing = False
             return cmd_graph(args)
+        if args.cmd == "director":
+            return cmd_director(args)
+        if args.cmd == "department":
+            return cmd_department(args)
         if args.cmd == "skill":
+            if args.skill_action == "run":
+                from skill_runner import run_skill
+
+                report = run_skill(args.skill_id, args.payload_file, dry_run=bool(args.dry_run))
+                emit(report)
+                return 0 if report.get("ok") else 2
             return cmd_skill(args)
         if args.cmd == "plan":
             return cmd_plan(args)

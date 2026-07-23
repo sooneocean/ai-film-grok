@@ -46,15 +46,22 @@ def build_subtitle_dialogue_alignment(root: Path, *, write: bool = True) -> dict
             review = read_json(root / "receipts" / "reviews" / f"{sid}.json") or {}
             evidence = (review.get("performance_contract") or {}).get("evidence") or {}
             delivery = evidence.get("dialogue_delivery") if isinstance(evidence, dict) else None
+            start = cursor + float((delivery or {}).get("start_sec") or 0)
             end = cursor + float((delivery or {}).get("timestamp_sec") or 0)
-            overlapping = [cue for cue in cues if cue[0] <= end and cue[1] >= cursor]
+            shot_end = cursor + duration
+            overlapping = [cue for cue in cues if cue[0] <= end and cue[1] >= start]
             area = (
                 (shot.get("safe_area") or (shot.get("dsl") or {}).get("safe_area") or {})
                 if isinstance(shot, dict)
                 else {}
             )
             rows.append(
-                {"shot_id": sid, "speech_end_sec": round(end, 3), "cue_count": len(overlapping)}
+                {
+                    "shot_id": sid,
+                    "speech_start_sec": round(start, 3),
+                    "speech_end_sec": round(end, 3),
+                    "cue_count": len(overlapping),
+                }
             )
             if not srt or not overlapping:
                 errors.append(
@@ -72,6 +79,23 @@ def build_subtitle_dialogue_alignment(root: Path, *, write: bool = True) -> dict
                         "message": "subtitle disappears before delivered dialogue ends",
                     }
                 )
+            for cue_start, cue_end in overlapping:
+                if cue_start < cursor or cue_end > shot_end:
+                    errors.append(
+                        {
+                            "code": "SUBTITLE_OUTSIDE_SHOT_WINDOW",
+                            "shot_id": sid,
+                            "message": "subtitle cue must be contained by its shot window",
+                        }
+                    )
+                if cue_start < start or cue_end > end:
+                    errors.append(
+                        {
+                            "code": "SUBTITLE_OUTSIDE_DIALOGUE_WINDOW",
+                            "shot_id": sid,
+                            "message": "dialogue subtitle cue must be contained by its dialogue window",
+                        }
+                    )
             if (
                 not isinstance(area, dict)
                 or area.get("subtitle_clear") is not True

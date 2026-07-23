@@ -140,25 +140,27 @@ lint 码：`CAMERA_AXIS_FLAT` · `SOFT_SOUP` · `STYLE_SOUP` · `MOTION_MONOTONY
 | `audience` | 可选 |
 | `taboos` | 可选字符串数组（禁止卖点/收尾方式） |
 | `theme` | 可选；主题句（Lens 提炼） |
-| `act_structure` | 可选；`{setup, confrontation, resolution}` 或五幕扩展 |
-| `pace_chart` | 可选；节奏标签数组（慢燃→爆发→释放） |
+| `act_structure` | 三幕结构对象：`{setup, confrontation, resolution}` + 可选比例 `setup_ratio`/`confrontation_ratio`/`resolution_ratio`（经典 0.20/0.50/0.30，须和≈1.0） |
+| `pace_chart` | 节奏曲线数组，每段：`{label, start_ratio, end_ratio, cut_freq, intensity}`（≥3 段） |
 | `visual_motifs` | 可选；视觉象征字符串数组 |
 
-`theme` / `act_structure` / `pace_chart` / `visual_motifs` **不**被 write-spec 硬校验，但写了可帮 agent 与用户对齐；schema 允许 `additionalProperties`。
+`act_structure_strict: true` / `pace_chart_strict: true` → write-spec 硬校验 act_structure + pace_chart 非空且结构合法。
+否则**可选**但写了会被校验结构。`theme` / `visual_motifs` 仍不被硬校验。
 
 ## 每镜戏剧功能（`dramatic_function` · 必填）
 
-镜头在剧情脊柱里的角色，不是「好看帧」标签：
+镜头在剧情脊柱里的角色，不是「好看帧」标签。七值枚举按 `genre` 切换骨架
+（详见 [beat-spines.md](beat-spines.md)），语义随类型变化：
 
-| 值 | 含义（对照 ecchi-story 六镜骨架） |
-|---|---|
-| `hook` | 登场/压迫感 |
-| `approach` | 靠近、空间变窄 |
-| `sensory` | 感官特写 |
-| `reaction` | 对方/代入反应 |
-| `action` | 身体行动推进 |
-| `afterglow` | 余韵/钩子 |
-| `bridge` | 过渡/连接 |
+| 值 | 通用语义 | 成人映射（genre=adult） |
+|---|---|---|
+| `hook` | 开场钩子：异常/欲望/冲突入口 | 登场/压迫感 |
+| `approach` | 靠近：空间收窄、信息逼近 | 靠近、空间变窄 |
+| `sensory` | 感官细节：触感/线索/质感特写 | 感官特写 |
+| `reaction` | 反应：情绪/代入回馈 | 对方/代入反应 |
+| `action` | 行动：局势改变的推进 | 身体行动推进 |
+| `afterglow` | 余韵：结果沉淀/钩子/未完成 | 余韵/钩子 |
+| `bridge` | 过渡：时空跳转/纯连接 | 过渡/连接 |
 
 ## 强制规则
 

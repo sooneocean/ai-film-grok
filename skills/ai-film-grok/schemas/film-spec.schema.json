@@ -19,6 +19,11 @@
       }
     },
     "aspect_ratio": { "enum": ["9:16", "16:9", "1:1", "3:4", "4:3"] },
+    "genre": {
+      "type": "string",
+      "enum": ["adult", "drama", "mystery", "arthouse", "documentary"],
+      "description": "Beat spine selector. Determines which beat template drives dramatic_function assignment. See references/beat-spines.md. Default: adult (backward compat)."
+    },
     "vo_mode": { "enum": ["storyteller", "character", "hybrid"] },
     "tts_backend": { "enum": ["auto", "minimax", "fish", "voicebox", "edge", "external"] },
     "i2v_provider": {
@@ -310,6 +315,34 @@
           "type": "array",
           "minItems": 3,
           "items": { "type": "string", "minLength": 1 }
+        },
+        "act_structure": {
+          "type": "object",
+          "description": "Three-act structure with ratio and beat anchors. See references/directors-lens.md. pace_chart_strict: true → write-spec enforces non-empty.",
+          "properties": {
+            "setup": { "type": "string", "minLength": 1, "description": "Act 1: setup — world, character, inciting incident" },
+            "confrontation": { "type": "string", "minLength": 1, "description": "Act 2: confrontation — obstacles, rising action, midpoint turn" },
+            "resolution": { "type": "string", "minLength": 1, "description": "Act 3: resolution — climax, denouement, new normal" },
+            "setup_ratio": { "type": "number", "minimum": 0.05, "maximum": 0.50, "description": "Act 1 proportion (default 0.20, classic 1:2:1)" },
+            "confrontation_ratio": { "type": "number", "minimum": 0.20, "maximum": 0.70, "description": "Act 2 proportion (default 0.50)" },
+            "resolution_ratio": { "type": "number", "minimum": 0.05, "maximum": 0.50, "description": "Act 3 proportion (default 0.30)" }
+          }
+        },
+        "pace_chart": {
+          "type": "array",
+          "description": "Structured rhythm curve: each entry has start_tc, end_tc, cut_freq, emotion_intensity. pace_chart_strict: true → write-spec enforces non-empty + ratios match act_structure.",
+          "items": {
+            "type": "object",
+            "required": ["label", "start_ratio", "end_ratio", "intensity"],
+            "properties": {
+              "label": { "type": "string", "minLength": 1, "description": "e.g. 慢燃/加速/高潮/释放" },
+              "start_ratio": { "type": "number", "minimum": 0, "maximum": 1, "description": "Start position as ratio of total duration (0-1)" },
+              "end_ratio": { "type": "number", "minimum": 0, "maximum": 1, "description": "End position as ratio of total duration (0-1)" },
+              "cut_freq": { "type": "string", "enum": ["slow", "medium", "fast", "rapid"], "description": "Target cut frequency for this segment" },
+              "intensity": { "type": "number", "minimum": 0, "maximum": 10, "description": "Emotional intensity 0-10 for this segment" }
+            }
+          },
+          "minItems": 3
         },
         "audience": { "type": "string", "minLength": 1 },
         "taboos": {

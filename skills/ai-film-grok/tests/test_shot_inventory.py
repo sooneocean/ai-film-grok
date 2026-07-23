@@ -16,6 +16,7 @@ from shot_inventory import (  # noqa: E402
     InventoryError,
     assert_inventory_for_final,
     check_shot_inventory,
+    flatten_shot_inventory,
 )
 
 
@@ -74,6 +75,18 @@ def _spec_two_shots() -> dict:
 
 
 class ShotInventoryTests(unittest.TestCase):
+    def test_flatten_inventory_and_compare_exact_ids_not_just_count(self) -> None:
+        planned = {"scenes": [{"shots": [{"id": "shot01"}, {"id": "shot02"}]}]}
+        current = {
+            "episodes": [{"scenes": [{"beats": [{"shots": [{"id": "shot01"}, {"id": "shot03"}]}]}]}]
+        }
+        self.assertEqual(flatten_shot_inventory(planned), ["shot01", "shot02"])
+        report = check_shot_inventory(planned, current)
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["shot_count"], report["approved_clip_count"])
+        self.assertEqual(report["missing_clips"], ["shot02"])
+        self.assertEqual(report["extra_clips"], ["shot03"])
+
     def test_complete_inventory_ok(self) -> None:
         report = check_shot_inventory(
             ["shot01", "shot02"],

@@ -139,3 +139,13 @@ MUSIC_GEN_BASE_URL=http://127.0.0.1:7860
 2. 池 ≥3 首 → 不同 seed 可能不同文件（pool_index）  
 3. 无曲库时仍有程序床（非静音）  
 4. 旁白清晰；床无人声抢麦  
+
+---
+
+## 色气成片 BGM（2026-07-22 · 少婦案）
+
+- **色气 / heat 亲密**：优先 `assets/bgm/rnb/rnb_loop_0{1-5}.wav`（各有 `.license.txt`，CC0）。
+- 推荐 80bpm 偏闷骚：`rnb_loop_03`；loop 至片长后 `--music` 显式传入。
+- `render_final --music-mood rnb --music-volume 0.55–0.58`；**禁止**色气用 `dark`。
+- 报告字段 `music.mood` 偶发显示 warm——以 `license_or_source` 含 `rnb`/`CC0` 为准。
+- 详：[lessons-2026-07-22-shaofu-cast-subs-bgm-final.md](lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)

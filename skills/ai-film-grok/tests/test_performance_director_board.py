@@ -5,6 +5,7 @@ These cover the "motion without performance" failure mode: I2V can move
 bodies, but subtext / playable_action / body_state are what make a shot
 *act*. Also covers the scene-level director decision board.
 """
+
 from __future__ import annotations
 
 import sys

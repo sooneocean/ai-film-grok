@@ -97,16 +97,25 @@
   "emotional_arc": ["建立", "升温", "爆发", "余韵"],
   "theme": "可选·主题句",
   "act_structure": {
-    "setup": "…",
-    "confrontation": "…",
-    "resolution": "…"
+    "setup": "第一幕：世界/人物/激励事件",
+    "confrontation": "第二幕：阻碍/升级/中点转折",
+    "resolution": "第三幕：高潮/结尾/新常态",
+    "setup_ratio": 0.20,
+    "confrontation_ratio": 0.50,
+    "resolution_ratio": 0.30
   },
-  "pace_chart": ["慢燃", "加速", "高潮", "释放"],
+  "pace_chart": [
+    {"label": "慢燃", "start_ratio": 0.0, "end_ratio": 0.25, "cut_freq": "slow", "intensity": 3},
+    {"label": "加速", "start_ratio": 0.25, "end_ratio": 0.55, "cut_freq": "medium", "intensity": 6},
+    {"label": "高潮", "start_ratio": 0.55, "end_ratio": 0.80, "cut_freq": "rapid", "intensity": 9},
+    {"label": "释放", "start_ratio": 0.80, "end_ratio": 1.0, "cut_freq": "slow", "intensity": 4}
+  ],
   "visual_motifs": ["雨=冷静外表", "锁=私密边界"]
 }
 ```
 
-`theme` / `act_structure` / `pace_chart` / `visual_motifs` 为**可选**；`write-spec` 只硬校验 logline / tone / emotional_arc。
+`act_structure_strict: true` / `pace_chart_strict: true` → write-spec 硬校验 act_structure + pace_chart 非空且结构合法。
+否则为可选；`theme` / `visual_motifs` 仍不被硬校验。
 
 ## Phase B — 场景分解（Scene Breakdown）
 
@@ -157,7 +166,14 @@ Scene 1 · 雨夜出租车 · 压迫→靠近→感官→余韵
 | 余韵、钩子、未完成 | `afterglow` |
 | 时空跳转、纯过渡 | `bridge` |
 
-色气默认六镜脊柱：`hook → approach → sensory → reaction → action → afterglow`（可加镜，不减功能）。
+节拍骨架按 `genre` 切换（详见 [beat-spines.md](beat-spines.md)）：
+- `adult`（默认）：`hook → approach → sensory → reaction → action → afterglow`
+- `drama`：`hook → approach → action → reaction → action → afterglow`（三幕弧）
+- `mystery`：`hook → approach → sensory → reaction → action → afterglow`（信息驱动）
+- `arthouse`：`hook → sensory → approach → reaction → action → afterglow`（氛围驱动）
+- `documentary`：`hook → approach → sensory → reaction → action → afterglow`（事实驱动）
+
+七值枚举不变，但语义随 genre 上下文变化（去 type-bias）。
 
 ### 剪辑语法（Phase C 后半 · 反呆板线性）
 

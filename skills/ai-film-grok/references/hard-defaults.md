@@ -124,3 +124,14 @@
 - [continuity_chain.md](continuity_chain.md) · [post-compose.md](post-compose.md) · [production-discipline.md](production-discipline.md)  
 - [editor-cut-pass.md](editor-cut-pass.md) · [ecchi-story.md](ecchi-story.md) · [voices.md](voices.md)  
 - [frw-degrade-dispatch.md](frw-degrade-dispatch.md) · [lessons-2026-07-21-frw-key-capability.md](lessons-2026-07-21-frw-key-capability.md)
+
+---
+
+## 2026-07-22 · 少婦案补记（脸锁 / 字幕 / BGM / final）
+
+见 [lessons-2026-07-22-shaofu-cast-subs-bgm-final.md](lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)。
+
+- 角色 still：只 `image_edit(cast)`；禁审核失败后 t2i 绕脸
+- HF `subs=off` 仅当 HF 真完成；否则 plate **burn**
+- 色气 BGM：`assets/bgm/rnb/*` 优先
+- `aifilm final` → render_final **timeout≥600s**

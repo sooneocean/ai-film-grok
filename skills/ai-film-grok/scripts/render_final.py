@@ -53,6 +53,7 @@ from sound_plan import (
     SoundPlanError,
     apply_mute_windows_to_samples,
     apply_sfx_accents_to_samples,
+    build_mood_timeline,
     expand_sound_events,
     inject_auto_sfx_if_empty,
     resolve_loudnorm,
@@ -280,18 +281,19 @@ def split_units(text: str, max_len: int = 12) -> list[str]:
     # Only merge accidental 1–2 char orphans — never re-glue past max_len
     merged: list[str] = []
     for u in units:
-        if merged and len(u) <= 2 and len(merged[-1]) + len(u) <= max_len:
-            merged[-1] = merged[-1] + u
-        elif merged and len(merged[-1]) <= 2 and len(merged[-1]) + len(u) <= max_len:
+        if (
+            merged
+            and len(u) <= 2
+            and len(merged[-1]) + len(u) <= max_len
+            or merged
+            and len(merged[-1]) <= 2
+            and len(merged[-1]) + len(u) <= max_len
+        ):
             merged[-1] = merged[-1] + u
         else:
             merged.append(u)
     # Drop punctuation-only noise (comma / dash crumbs)
-    cleaned = [
-        u.strip(" \t")
-        for u in merged
-        if u.strip(" \t，,、—–-…")
-    ]
+    cleaned = [u.strip(" \t") for u in merged if u.strip(" \t，,、—–-…")]
     # Safety net: re-hard-wrap any unit still over max_len (should be rare)
     final: list[str] = []
     for u in cleaned:
@@ -639,79 +641,132 @@ def procedural_music(
     seed: int | None = None,
     shot_starts: list[float] | None = None,
     events: list[dict] | None = None,
+    mood_timeline: list[dict] | None = None,
 ) -> np.ndarray:
     """Royalty-free algorithmic BGM (numpy). License: original generative, no sample pack.
 
-    Returns int16 mono. Moods: playful | dark | warm | rnb (seductive R&B, default for 色气).
+    Returns int16 mono. Moods: playful | dark | warm | rnb.
+    Phase 4: Plot-Adaptive Multi-Stem. Supports timeline of moods stitched with crossfades.
     """
-    mood = (mood or "playful").lower()
-    # rnb/soul/sensual = late-night seductive bed (Kei lesson: never use dark for 色气)
-    if mood in (
-        "rnb",
-        "r&b",
-        "soul",
-        "neo-soul",
-        "neosoul",
-        "sensual",
-        "seductive",
-        "ecchi",
-        "sexy",
-    ):
-        sig = procedural_music_rnb(
-            dur, amp=amp * 1.05, bpm=76.0, seed=seed, shot_starts=shot_starts, events=events
-        )
-        return (np.clip(sig, -1, 1) * 32767).astype(np.int16)
 
-    n = int(SR * max(0.5, dur))
-    seg_n = max(1, n // 4)
-    n = seg_n * 4
-    sig = np.zeros(n)
-    tt = np.linspace(0, 1, n, endpoint=False)
-    if curve == "rise":
-        dyn = 0.45 + 0.55 * tt
-    elif curve == "fall":
-        dyn = 1.0 - 0.45 * tt
-    elif curve == "swell":
-        dyn = 0.4 + 0.6 * np.sin(np.pi * tt)
-    else:
-        dyn = np.ones(n)
+    def _generate_single(g_dur: float, g_mood: str, g_seed: int | None) -> np.ndarray:
+        g_mood = (g_mood or "playful").lower()
+        if g_mood in (
+            "rnb",
+            "r&b",
+            "soul",
+            "neo-soul",
+            "neosoul",
+            "sensual",
+            "seductive",
+            "ecchi",
+            "sexy",
+        ):
+            return procedural_music_rnb(
+                g_dur, amp=amp * 1.05, bpm=76.0, seed=g_seed, shot_starts=shot_starts, events=events
+            )
 
-    if mood == "playful":
-        notes = [261.6, 329.6, 392.0, 523.3]  # C major bounce
-        bass = 130.8
-        pad = [261.6, 329.6, 392.0]
-        counter = [523.3, 493.9, 440.0, 392.0]
-    elif mood == "dark":
-        notes = [220.0, 261.6, 329.6, 440.0]
-        bass = 110.0
-        pad = [220.0, 261.6, 329.6]
-        counter = [440.0, 392.0, 329.6, 293.7]
-    else:  # warm
-        notes = [246.9, 293.7, 370.0, 493.9]
-        bass = 123.5
-        pad = [246.9, 293.7, 370.0]
-        counter = [493.9, 440.0, 370.0, 329.6]
+        n = int(SR * max(0.5, g_dur))
+        seg_n = max(1, n // 4)
+        n = seg_n * 4
+        sig = np.zeros(n)
+        tt = np.linspace(0, 1, n, endpoint=False)
+        if curve == "rise":
+            dyn = 0.45 + 0.55 * tt
+        elif curve == "fall":
+            dyn = 1.0 - 0.45 * tt
+        elif curve == "swell":
+            dyn = 0.4 + 0.6 * np.sin(np.pi * tt)
+        else:
+            dyn = np.ones(n)
 
-    for i, f in enumerate(notes):
-        s0, s1 = i * seg_n, (i + 1) * seg_n
-        tone = make_tone(f, 0.15, seg_n)
-        sig[s0:s1] += tone[: s1 - s0]
-    for f in pad:
-        sig += make_tone(f, 0.04, n, rel=n / SR)
-    sig += make_tone(bass, 0.09, n, rel=n / SR)
-    for i, f in enumerate(counter):
-        s0, s1 = i * seg_n, (i + 1) * seg_n
-        tone = make_tone(f, 0.035, seg_n, rel=0.2)
-        sig[s0:s1] += tone[: s1 - s0]
-    sig *= amp * (1 + emo * 0.45) * dyn
-    sig = np.tanh(sig)
-    return (sig * 32767).astype(np.int16)
+        if g_mood == "playful":
+            notes = [261.6, 329.6, 392.0, 523.3]
+            bass = 130.8
+            pad = [261.6, 329.6, 392.0]
+            counter = [523.3, 493.9, 440.0, 392.0]
+        elif g_mood == "dark":
+            notes = [220.0, 261.6, 329.6, 440.0]
+            bass = 110.0
+            pad = [220.0, 261.6, 329.6]
+            counter = [440.0, 392.0, 329.6, 293.7]
+        else:  # warm
+            notes = [246.9, 293.7, 370.0, 493.9]
+            bass = 123.5
+            pad = [246.9, 293.7, 370.0]
+            counter = [493.9, 440.0, 370.0, 329.6]
+
+        for i, f in enumerate(notes):
+            s0, s1 = i * seg_n, (i + 1) * seg_n
+            tone = make_tone(f, 0.15, seg_n)
+            sig[s0:s1] += tone[: s1 - s0]
+        for f in pad:
+            sig += make_tone(f, 0.04, n, rel=n / SR)
+        sig += make_tone(bass, 0.09, n, rel=n / SR)
+        for i, f in enumerate(counter):
+            s0, s1 = i * seg_n, (i + 1) * seg_n
+            tone = make_tone(f, 0.035, seg_n, rel=0.2)
+            sig[s0:s1] += tone[: s1 - s0]
+        sig *= amp * (1 + emo * 0.45) * dyn
+        return np.tanh(sig)
+
+    if not mood_timeline:
+        final_float = _generate_single(dur, mood, seed)
+        return (np.clip(final_float, -1, 1) * 32767).astype(np.int16)
+
+    # Plot-Adaptive Dynamic Timeline
+    final_bed = np.zeros(int(SR * dur))
+    base_seed = seed or 42
+    crossfade_sec = 2.0
+
+    for i, chapter in enumerate(mood_timeline):
+        st = float(chapter.get("start_sec", 0.0))
+        ed = float(chapter.get("end_sec", dur))
+        if ed > dur:
+            ed = dur
+        ch_dur = ed - st
+        if ch_dur <= 0:
+            continue
+
+        gen_dur = ch_dur
+        if i < len(mood_timeline) - 1:
+            gen_dur += crossfade_sec
+
+        chapter_seed = base_seed + i
+        chapter_sig = _generate_single(gen_dur, str(chapter.get("mood", mood)), chapter_seed)
+
+        i0 = int(st * SR)
+        i1 = i0 + len(chapter_sig)
+        if i1 > len(final_bed):
+            i1 = len(final_bed)
+            chapter_sig = chapter_sig[: i1 - i0]
+
+        if i > 0 and len(chapter_sig) > 0:
+            xfade_samples = min(int(crossfade_sec * SR), len(chapter_sig))
+            chapter_sig[:xfade_samples] *= np.linspace(0, 1, xfade_samples)
+
+        if i < len(mood_timeline) - 1 and len(chapter_sig) > 0:
+            xfade_samples = min(int(crossfade_sec * SR), len(chapter_sig))
+            chapter_sig[-xfade_samples:] *= np.linspace(1, 0, xfade_samples)
+
+        final_bed[i0:i1] += chapter_sig
+
+    return (np.clip(final_bed, -1, 1) * 32767).astype(np.int16)
 
 
 def write_wav_mono(path: Path, samples: np.ndarray, sr: int = SR) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(path), "wb") as handle:
         handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(sr)
+        handle.writeframes(samples.tobytes())
+
+
+def write_wav_stereo(path: Path, samples: np.ndarray, sr: int = SR) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as handle:
+        handle.setnchannels(2)
         handle.setsampwidth(2)
         handle.setframerate(sr)
         handle.writeframes(samples.tobytes())
@@ -1466,9 +1521,7 @@ def build_subtitle_cues_for_shots(
         # CRITICAL: use raw speech length, NOT padded plate vo_dur.
         # After pad_natural, item["vo_dur"] == plate (silence tail); spreading
         # phrases over that makes late cards appear with no VO (user: 字幕對不上口白).
-        speech_dur = float(
-            item.get("raw_vo_dur") or item.get("vo_dur") or item["target"] or 0.0
-        )
+        speech_dur = float(item.get("raw_vo_dur") or item.get("vo_dur") or item["target"] or 0.0)
         plate = float(item.get("target") or speech_dur or 0.0)
         # never schedule captions into the pad tail (keep ≥0.15s headroom if pad)
         if plate > speech_dur + 0.2:
@@ -2166,7 +2219,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     shot_start_map = {
         str(item["id"]): float(spot_tl["shot_starts"][i]) for i, item in enumerate(shot_audio)
     }
+    shot_end_map = {
+        str(item["id"]): float(spot_tl["shot_starts"][i] + spot_tl["shot_targets"][i])
+        for i, item in enumerate(shot_audio)
+    }
     sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
+    if sound_plan is None:
+        sound_plan = {}
     # Auto light SFX accents from dramatic_function when author left events empty
     flat = {str(s["id"]): s for s in flatten_shots(spec) if isinstance(s, dict) and s.get("id")}
     shot_dicts = [flat.get(str(item["id"]), {"id": item["id"]}) for item in shot_audio]
@@ -2224,8 +2283,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         mix_spotting["vocal_color_shots"] = []
         log("vocal_color track: off (nar+BGM dominate; opt-in via voice_tracks.enabled)")
 
-    def _apply_spotting_to_float_mono(float_mono: np.ndarray) -> tuple[np.ndarray, dict[str, Any]]:
-        """mute/duck + sfx_accent overlay on float mono bed."""
+    def _apply_spotting_and_convert_to_stereo(
+        float_bed: np.ndarray,
+    ) -> tuple[np.ndarray, dict[str, Any]]:
+        """mute/duck + sfx_accent overlay on float bed (upmixes mono to stereo)."""
         spotting: dict[str, Any]
         try:
             spotting = expand_sound_events(
@@ -2236,7 +2297,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         except SoundPlanError as exc:
             raise RenderError(str(exc)) from exc
         events = spotting.get("applied_events") or []
-        out = float_mono
+
+        if float_bed.ndim == 1:
+            out = np.column_stack((float_bed, float_bed))
+        elif float_bed.ndim == 2 and float_bed.shape[1] == 1:
+            out = np.column_stack((float_bed[:, 0], float_bed[:, 0]))
+        else:
+            out = float_bed.copy()
+
         if events:
             out = apply_mute_windows_to_samples(out, sr=SR, events=events)
             out = apply_sfx_accents_to_samples(out, sr=SR, events=events, level=0.55)
@@ -2273,6 +2341,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         count_key = ",".join(f"{k}{counts.get(k, 0)}" for k in sorted(counts))
         raw_seed = f"{title_s}|{mood}|{total_dur:.2f}|v3-multi-style|{count_key}"
         music_seed = int(hashlib.sha256(raw_seed.encode("utf-8")).hexdigest()[:8], 16)
+
+    # Phase 4: Plot-Adaptive Mood Timeline
+    if isinstance(sound_plan, dict):
+        sound_plan["mood_timeline"] = build_mood_timeline(
+            shot_dicts, shot_starts=shot_start_map, shot_ends=shot_end_map, default_mood=mood
+        )
 
     # Phase H: local template pool (audio/bgm.wav or assets/bgm/{mood}/*)
     try:
@@ -2341,7 +2415,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         with wave.open(str(mono_tmp), "rb") as handle:
             frames = handle.readframes(handle.getnframes())
             user_i16 = np.frombuffer(frames, dtype=np.int16).astype(np.float64) / 32767.0
-        user_f, spotting_only = _apply_spotting_to_float_mono(user_i16)
+        user_f, spotting_only = _apply_spotting_and_convert_to_stereo(user_i16)
         # keep multi-track voice metadata (not wiped by bed spotting)
         mix_spotting = {**mix_spotting, **spotting_only}
         mix_spotting["mood"] = (sound_plan or {}).get("mood", mood) if sound_plan else mood
@@ -2355,21 +2429,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             mix_spotting["bed_applied"] = False
         else:
             mix_spotting["bed_applied"] = True
-        write_wav_mono(music_path, (np.clip(user_f, -1, 1) * 32767.0).astype(np.int16))
         stereo = work / "bgm_stereo.wav"
-        run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(music_path),
-                "-ac",
-                "2",
-                "-c:a",
-                "pcm_s16le",
-                str(stereo),
-            ]
-        )
+        write_wav_stereo(stereo, (np.clip(user_f, -1.0, 1.0) * 32767.0).astype(np.int16))
         music_path = stereo
     else:
         license_note = "original generative numpy score (ai-film-grok procedural v3 multi-style, no third-party samples)"
@@ -2400,9 +2461,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             seed=music_seed,
             shot_starts=s_starts,
             events=(sound_plan or {}).get("events"),
+            mood_timeline=(sound_plan or {}).get("mood_timeline"),
         )
         float_bed = samples.astype(np.float64) / 32767.0
-        float_bed, spotting_only = _apply_spotting_to_float_mono(float_bed)
+        float_bed, spotting_only = _apply_spotting_and_convert_to_stereo(float_bed)
         mix_spotting = {**mix_spotting, **spotting_only}
         mix_spotting["bed_source"] = "procedural"
         mix_spotting["music_seed"] = music_seed
@@ -2422,22 +2484,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             mix_spotting["bed_applied"] = False
         else:
             mix_spotting["bed_applied"] = True
-        write_wav_mono(music_path, (np.clip(float_bed, -1.0, 1.0) * 32767.0).astype(np.int16))
-        # convert to stereo for mix
         stereo = work / "bgm_stereo.wav"
-        run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(music_path),
-                "-ac",
-                "2",
-                "-c:a",
-                "pcm_s16le",
-                str(stereo),
-            ]
-        )
+        write_wav_stereo(stereo, (np.clip(float_bed, -1.0, 1.0) * 32767.0).astype(np.int16))
         music_path = stereo
 
     # 7) Dual-track mix: VO primary + BGM always audible (两条音轨)

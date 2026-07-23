@@ -42,6 +42,11 @@
     "story": {
       "type": "object",
       "properties": {
+        "genre": {
+          "type": "string",
+          "enum": ["adult", "drama", "mystery", "arthouse", "documentary"],
+          "description": "Beat spine selector. Determines which beat template drives dramatic_function assignment. See references/beat-spines.md. Default: adult (backward compat)."
+        },
         "premise": { "type": "string" },
         "logline": { "type": "string" },
         "theme": { "type": "string" },
@@ -56,7 +61,32 @@
           "items": { "type": "string" }
         },
         "emotional_arc": { "type": "array", "items": { "type": "string" } },
-        "pace_chart": { "type": "array", "items": { "type": "string" } },
+        "act_structure": {
+          "type": "object",
+          "description": "Three-act structure with ratio and beat anchors. See references/directors-lens.md.",
+          "properties": {
+            "setup": { "type": "string" },
+            "confrontation": { "type": "string" },
+            "resolution": { "type": "string" },
+            "setup_ratio": { "type": "number", "minimum": 0.05, "maximum": 0.50 },
+            "confrontation_ratio": { "type": "number", "minimum": 0.20, "maximum": 0.70 },
+            "resolution_ratio": { "type": "number", "minimum": 0.05, "maximum": 0.50 }
+          }
+        },
+        "pace_chart": {
+          "type": "array",
+          "description": "Structured rhythm curve segments. Each entry: label/start_ratio/end_ratio/cut_freq/intensity.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "start_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+              "end_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+              "cut_freq": { "type": "string" },
+              "intensity": { "type": "number", "minimum": 0, "maximum": 10 }
+            }
+          }
+        },
         "constraints": { "type": "array", "items": { "type": "string" } },
         "status": { "enum": ["needs_authoring", "review", "locked"] }
       }

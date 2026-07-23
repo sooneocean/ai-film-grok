@@ -1042,6 +1042,9 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
         # preserve their asset visibility while keeping bound graphs fail closed.
         projection_stale=bool(projection.get("stale")) and projection_is_bound,
     )
+    from skill_registry import validate_execution_graph
+
+    execution_validation = validate_execution_graph(jobs)
     by_status: dict[str, int] = {}
     for j in jobs:
         stt = str(j.get("status") or "unknown")
@@ -1063,6 +1066,7 @@ def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[st
         "blocked_count": by_status.get("blocked", 0),
         "total": len(jobs),
         "primary_job": primary,
+        "validation": execution_validation,
         "jobs": jobs,
         "jobs_preview": jobs[:24],
     }

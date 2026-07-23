@@ -33,10 +33,7 @@ def build_subtitle_cut_boundaries(root: Path, *, write: bool = True) -> dict[str
         else []
     )
     title_dur = float(
-        film_tl.get("title_duration")
-        or spec.get("title_duration")
-        or spec.get("title_dur")
-        or 0.0
+        film_tl.get("title_duration") or spec.get("title_duration") or spec.get("title_dur") or 0.0
     )
     spec_shots = {
         str(shot.get("id")): shot
@@ -58,12 +55,10 @@ def build_subtitle_cut_boundaries(root: Path, *, write: bool = True) -> dict[str
             next_id = (
                 str(shots[index + 1].get("id") or "")
                 if index + 1 < len(shots)
-                else f"shot{index+2:02d}"
+                else f"shot{index + 2:02d}"
             )
             from_id = (
-                str(shots[index].get("id") or "")
-                if index < len(shots)
-                else f"shot{index+1:02d}"
+                str(shots[index].get("id") or "") if index < len(shots) else f"shot{index + 1:02d}"
             )
             next_shot = spec_shots.get(next_id, {})
             next_dsl = next_shot.get("dsl") if isinstance(next_shot.get("dsl"), dict) else {}

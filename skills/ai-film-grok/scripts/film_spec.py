@@ -295,6 +295,104 @@ def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
         intent["taboos"] = [
             _required_text(t, field=f"director_intent.taboos[{i}]") for i, t in enumerate(taboos)
         ]
+
+    # P0-2: act_structure + pace_chart validation (strict mode)
+    act_raw = raw.get("act_structure")
+    pace_raw = raw.get("pace_chart")
+    strict = bool(spec.get("pace_chart_strict") or spec.get("act_structure_strict"))
+
+    # act_structure: if present, validate shape + ratio sum
+    if isinstance(act_raw, dict):
+        act_cleaned: dict[str, Any] = {}
+        for act_key in ("setup", "confrontation", "resolution"):
+            val = act_raw.get(act_key)
+            if val is not None:
+                act_cleaned[act_key] = _required_text(val, field=f"act_structure.{act_key}")
+        ratios = {}
+        for rkey in ("setup_ratio", "confrontation_ratio", "resolution_ratio"):
+            rval = act_raw.get(rkey)
+            if rval is not None:
+                if not isinstance(rval, (int, float)) or rval < 0.05 or rval > 0.70:
+                    raise FilmSpecError(f"act_structure.{rkey}={rval} out of range [0.05, 0.70]")
+                ratios[rkey] = float(rval)
+        # If all three ratios present, they should sum to ~1.0
+        if len(ratios) == 3:
+            total = sum(ratios.values())
+            if abs(total - 1.0) > 0.05:
+                raise FilmSpecError(
+                    f"act_structure ratios sum={total:.3f}, expected ~1.0 "
+                    f"(setup+confrontation+resolution)"
+                )
+            act_cleaned.update(ratios)
+        elif ratios:
+            act_cleaned.update(ratios)
+        if strict and not act_cleaned.get("setup"):
+            raise FilmSpecError(
+                "act_structure_strict: setup/confrontation/resolution required when strict"
+            )
+        if act_cleaned:
+            intent["act_structure"] = act_cleaned
+    elif strict:
+        raise FilmSpecError(
+            "act_structure_strict: act_structure object required when strict mode is enabled"
+        )
+
+    # pace_chart: if present, validate structured entries (new format)
+    # Also accept legacy string-array format (backward compat)
+    if isinstance(pace_raw, list):
+        if len(pace_raw) == 0:
+            if strict:
+                raise FilmSpecError("pace_chart_strict: pace_chart must be non-empty when strict")
+        else:
+            pace_cleaned: list[Any] = []
+            for i, entry in enumerate(pace_raw):
+                if isinstance(entry, str):
+                    # Legacy string format — accept as-is
+                    pace_cleaned.append(entry.strip())
+                elif isinstance(entry, dict):
+                    label = _required_text(entry.get("label"), field=f"pace_chart[{i}].label")
+                    sr = entry.get("start_ratio")
+                    er = entry.get("end_ratio")
+                    if not isinstance(sr, (int, float)) or not (0 <= sr <= 1):
+                        raise FilmSpecError(
+                            f"pace_chart[{i}].start_ratio={sr} must be number in [0,1]"
+                        )
+                    if not isinstance(er, (int, float)) or not (0 <= er <= 1):
+                        raise FilmSpecError(
+                            f"pace_chart[{i}].end_ratio={er} must be number in [0,1]"
+                        )
+                    if er <= sr:
+                        raise FilmSpecError(f"pace_chart[{i}].end_ratio must be > start_ratio")
+                    intensity = entry.get("intensity")
+                    if intensity is not None and (
+                        not isinstance(intensity, (int, float)) or not (0 <= intensity <= 10)
+                    ):
+                        raise FilmSpecError(
+                            f"pace_chart[{i}].intensity={intensity} must be in [0,10]"
+                        )
+                    entry_clean: dict[str, Any] = {
+                        "label": label,
+                        "start_ratio": float(sr),
+                        "end_ratio": float(er),
+                    }
+                    if entry.get("cut_freq"):
+                        entry_clean["cut_freq"] = str(entry["cut_freq"])
+                    if intensity is not None:
+                        entry_clean["intensity"] = float(intensity)
+                    pace_cleaned.append(entry_clean)
+                else:
+                    raise FilmSpecError(
+                        f"pace_chart[{i}] must be string or object, got {type(entry).__name__}"
+                    )
+            if strict and len(pace_cleaned) < 3:
+                raise FilmSpecError(f"pace_chart_strict: need ≥3 segments, got {len(pace_cleaned)}")
+            if pace_cleaned:
+                intent["pace_chart"] = pace_cleaned
+    elif strict:
+        raise FilmSpecError(
+            "pace_chart_strict: pace_chart array required when strict mode is enabled"
+        )
+
     spec["director_intent"] = intent
     return intent
 

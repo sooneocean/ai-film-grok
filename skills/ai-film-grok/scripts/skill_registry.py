@@ -46,24 +46,34 @@ def load_registry() -> dict[str, Any]:
             continue
         cli = skill.get("cli") if isinstance(skill.get("cli"), dict) else {}
         validator = cli.get("validate")
-        skill.setdefault(
-            "executionContract",
-            {
-                "input": skill.get("inputContract") or "registry/contracts/skill-envelope.in.json",
-                "output": skill.get("outputContract")
-                or "registry/contracts/skill-envelope.out.json",
-                "validator": validator,
-                "sideEffects": "external_media_or_filesystem"
-                if str(skill.get("id") or "").split(".", 1)[0]
-                in {"image", "keyframe", "voice", "sound", "music", "timeline", "video", "export"}
-                else "filesystem_or_receipt",
-                "humanApprovalRequired": skill.get("status") == "human_required"
-                or str(skill.get("id") or "")
-                in {"keyframe.generate", "image.animate", "quality.inspect", "export.package"},
-                "retryPolicy": "explicit_requeue_only"
-                if str(skill.get("id") or "") in {"image.animate", "voice.synthesize"}
-                else "none",
-            },
+        contract = skill.setdefault("executionContract", {})
+        contract.setdefault(
+            "input", skill.get("inputContract") or "registry/contracts/skill-envelope.in.json"
+        )
+        contract.setdefault(
+            "output",
+            skill.get("outputContract") or "registry/contracts/skill-envelope.out.json",
+        )
+        contract.setdefault("validator", validator)
+        contract.setdefault("runner", cli.get("run"))
+        contract.setdefault(
+            "sideEffects",
+            "external_media_or_filesystem"
+            if str(skill.get("id") or "").split(".", 1)[0]
+            in {"image", "keyframe", "voice", "sound", "music", "timeline", "video", "export"}
+            else "filesystem_or_receipt",
+        )
+        contract.setdefault(
+            "humanApprovalRequired",
+            skill.get("status") == "human_required"
+            or str(skill.get("id") or "")
+            in {"keyframe.generate", "image.animate", "quality.inspect", "export.package"},
+        )
+        contract.setdefault(
+            "retryPolicy",
+            "explicit_requeue_only"
+            if str(skill.get("id") or "") in {"image.animate", "voice.synthesize"}
+            else "none",
         )
     data["validation"] = validate_registry(data)
     data["ok"] = True
@@ -136,6 +146,39 @@ def validate_registry(registry: dict[str, Any]) -> dict[str, Any]:
         "warnings": warnings,
         "skill_count": len(seen),
         "implemented_without_validator": incomplete,
+    }
+
+
+def validate_execution_graph(jobs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Resolve every execution job to a runnable, schema-bound registry skill."""
+    skills = {
+        str(skill.get("id")): skill
+        for skill in load_registry().get("skills") or []
+        if isinstance(skill, dict) and skill.get("id")
+    }
+    errors: list[str] = []
+    for job in jobs:
+        job_id = str(job.get("id") or "<unknown>")
+        skill_id = str(job.get("skillId") or "")
+        skill = skills.get(skill_id)
+        if skill is None:
+            errors.append(f"{job_id}: unresolved skillId={skill_id!r}")
+            continue
+        contract = skill.get("executionContract") or {}
+        missing = [
+            key for key in ("input", "output", "validator", "runner") if not contract.get(key)
+        ]
+        if missing:
+            errors.append(f"{job_id}: {skill_id} missing {','.join(missing)}")
+            continue
+        job["executionContract"] = {
+            key: contract[key] for key in ("input", "output", "validator", "runner")
+        }
+    return {
+        "ok": not errors,
+        "errors": errors,
+        "job_count": len(jobs),
+        "resolved_count": len(jobs) - len(errors),
     }
 
 

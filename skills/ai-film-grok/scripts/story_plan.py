@@ -485,18 +485,81 @@ def detect_heat_signals(text: str) -> dict[str, Any]:
     }
 
 
+def detect_genre(
+    text: str,
+    *,
+    heat: dict[str, Any] | None = None,
+    explicit_genre: str | None = None,
+) -> dict[str, Any]:
+    """Detect genre from brief text signals (parallel to detect_heat_signals).
+
+    Priority: explicit_genre > adult heat signals > genre markers > default adult.
+    Returns dict with 'genre', 'evidence', 'warnings'.
+    """
+    raw = (text or "").strip()
+    low = raw.lower()
+
+    # Explicit genre field wins
+    if explicit_genre and explicit_genre in GENRES:
+        return {
+            "genre": explicit_genre,
+            "evidence": "explicit_field",
+            "warnings": [],
+        }
+
+    # Adult heat signals take priority over other genre markers
+    h = heat or {}
+    if h.get("evidence_max") or h.get("heat_scale") == "max" or h.get("hardcore"):
+        return {
+            "genre": "adult",
+            "evidence": "heat_signals",
+            "warnings": [],
+        }
+
+    # Match genre markers in order
+    matched: list[str] = []
+    for genre_key, markers in _GENRE_MARKERS.items():
+        if any(m.lower() in low or m in raw for m in markers):
+            matched.append(genre_key)
+
+    if matched:
+        genre = matched[0]
+        warnings: list[str] = []
+        if len(matched) > 1:
+            warnings.append(
+                f"multiple genre signals detected ({', '.join(matched)}); "
+                f"using first: {genre} — set genre explicitly to override"
+            )
+        return {
+            "genre": genre,
+            "evidence": "text_markers",
+            "warnings": warnings,
+        }
+
+    # Default: adult (backward compat)
+    return {
+        "genre": "adult",
+        "evidence": "default",
+        "warnings": [],
+    }
+
+
 def select_beat_spine(
     heat: dict[str, Any] | None = None,
     *,
+    genre: str | None = None,
     target_duration: float | None = None,
     multi_scene: bool = False,
 ) -> list[dict[str, Any]]:
-    """Pick beat spine. Dual-climax is opt-in only (markers / explicit spine).
+    """Pick beat spine. Genre takes priority; adult spine falls back to heat logic.
 
-    P0 · 2026-07-22: do NOT auto dual-climax on long hardcore plates — that
-    stacked 3× identical adult templates on multi-section scripts (金瓶梅案).
-    Multi-scene scripts use compact single-pass adult spine per scene.
+    P0-1 · 2026-07-23: multi-genre support. Non-adult genres use GENRE_SPINES.
+    Adult genre (default) preserves backward-compat heat-signal logic.
     """
+    # Non-adult genre: use genre spine directly
+    if genre and genre != "adult" and genre in GENRE_SPINES:
+        return [dict(b) for b in GENRE_SPINES[genre]]
+
     h = heat or {}
     # Explicit dual only — never infer solely from duration
     if h.get("spine") == "dual_climax" or h.get("dual_climax"):
@@ -534,6 +597,307 @@ _BEAT_AUTHORING_PROMPTS: dict[str, tuple[str, ...]] = {
         "选择造成了什么可见后果？",
         "下一集或下一段必须留下什么问题？",
     ),
+}
+
+# ---------------------------------------------------------------------------
+# P0-1 · 2026-07-23: Multi-genre beat spines (de-type-bias)
+#
+# dramatic_function 七值枚举不变（向后兼容 write-spec 门禁），
+# 但 beat spine 按 genre 切换。成人仍是默认但不再是唯一骨架。
+# 详见 references/beat-spines.md
+# ---------------------------------------------------------------------------
+
+GENRES = ("adult", "drama", "mystery", "arthouse", "documentary")
+
+# Genre signal markers for detect_genre() — parallel to _HEAT_MAX_MARKERS.
+_GENRE_MARKERS: dict[str, tuple[str, ...]] = {
+    "drama": (
+        "剧情",
+        "家庭",
+        "社会",
+        "现实",
+        "伦理",
+        "成长",
+        "亲情",
+        "关系",
+        "生活",
+        "都市情感",
+    ),
+    "mystery": (
+        "悬疑",
+        "惊悚",
+        "推理",
+        "谜",
+        "案件",
+        "调查",
+        "真相",
+        "凶杀",
+        "侦探",
+        "犯罪",
+    ),
+    "arthouse": (
+        "文艺",
+        "实验",
+        "意象",
+        "诗意",
+        "留白",
+        "氛围",
+        "艺术",
+        "散文诗",
+        "意识流",
+    ),
+    "documentary": (
+        "纪录",
+        "纪实",
+        "真实",
+        "访谈",
+        "历史",
+        "科普",
+        "传记",
+        "档案",
+        "纪实报道",
+    ),
+}
+
+# Genre-specific beat spines. All dramatic_function values must be in DRAMATIC_FUNCS.
+# Each beat: key / dramatic_function / importance / objective / weight / shots_n
+GENRE_SPINES: dict[str, list[dict[str, Any]]] = {
+    "drama": [
+        {
+            "key": "hook",
+            "dramatic_function": "hook",
+            "importance": "climax",
+            "objective": "建立人物处境与核心张力",
+            "weight": 0.12,
+            "shots_n": 1,
+        },
+        {
+            "key": "setup",
+            "dramatic_function": "approach",
+            "importance": "supporting",
+            "objective": "人物关系与空间建立",
+            "weight": 0.18,
+            "shots_n": 1,
+        },
+        {
+            "key": "rising",
+            "dramatic_function": "action",
+            "importance": "important",
+            "objective": "冲突升级，主角行动推进",
+            "weight": 0.22,
+            "shots_n": 2,
+        },
+        {
+            "key": "turn",
+            "dramatic_function": "reaction",
+            "importance": "important",
+            "objective": "转折点：反应/抉择/觉醒",
+            "weight": 0.20,
+            "shots_n": 1,
+        },
+        {
+            "key": "climax",
+            "dramatic_function": "action",
+            "importance": "climax",
+            "objective": "高潮：决定性对抗或选择",
+            "weight": 0.18,
+            "shots_n": 1,
+        },
+        {
+            "key": "resolution",
+            "dramatic_function": "afterglow",
+            "importance": "supporting",
+            "objective": "结果沉淀与新常态",
+            "weight": 0.10,
+            "shots_n": 1,
+        },
+    ],
+    "mystery": [
+        {
+            "key": "hook",
+            "dramatic_function": "hook",
+            "importance": "climax",
+            "objective": "谜面/异常事件抛出",
+            "weight": 0.14,
+            "shots_n": 1,
+        },
+        {
+            "key": "investigate",
+            "dramatic_function": "approach",
+            "importance": "important",
+            "objective": "调查深入，信息逼近",
+            "weight": 0.20,
+            "shots_n": 2,
+        },
+        {
+            "key": "clue",
+            "dramatic_function": "sensory",
+            "importance": "important",
+            "objective": "关键线索/物证特写",
+            "weight": 0.16,
+            "shots_n": 1,
+        },
+        {
+            "key": "red_herring",
+            "dramatic_function": "reaction",
+            "importance": "supporting",
+            "objective": "误导/假线索反应",
+            "weight": 0.14,
+            "shots_n": 1,
+        },
+        {
+            "key": "reveal",
+            "dramatic_function": "action",
+            "importance": "climax",
+            "objective": "真相揭露/行动推进",
+            "weight": 0.24,
+            "shots_n": 2,
+        },
+        {
+            "key": "aftermath",
+            "dramatic_function": "afterglow",
+            "importance": "supporting",
+            "objective": "余波与新疑问",
+            "weight": 0.12,
+            "shots_n": 1,
+        },
+    ],
+    "arthouse": [
+        {
+            "key": "mood_open",
+            "dramatic_function": "hook",
+            "importance": "important",
+            "objective": "建立氛围与情绪基调",
+            "weight": 0.16,
+            "shots_n": 1,
+        },
+        {
+            "key": "observe",
+            "dramatic_function": "sensory",
+            "importance": "climax",
+            "objective": "静观：人物/环境的感官凝视",
+            "weight": 0.22,
+            "shots_n": 2,
+        },
+        {
+            "key": "gesture",
+            "dramatic_function": "approach",
+            "importance": "important",
+            "objective": "微妙接近/关系微变",
+            "weight": 0.18,
+            "shots_n": 1,
+        },
+        {
+            "key": "silence",
+            "dramatic_function": "reaction",
+            "importance": "important",
+            "objective": "留白/沉默中的情绪涌动",
+            "weight": 0.18,
+            "shots_n": 1,
+        },
+        {
+            "key": "shift",
+            "dramatic_function": "action",
+            "importance": "supporting",
+            "objective": "情绪转折（非情节转折）",
+            "weight": 0.14,
+            "shots_n": 1,
+        },
+        {
+            "key": "echo",
+            "dramatic_function": "afterglow",
+            "importance": "supporting",
+            "objective": "回响/未决的余韵",
+            "weight": 0.12,
+            "shots_n": 1,
+        },
+    ],
+    "documentary": [
+        {
+            "key": "premise",
+            "dramatic_function": "hook",
+            "importance": "important",
+            "objective": "主题/问题引入",
+            "weight": 0.14,
+            "shots_n": 1,
+        },
+        {
+            "key": "context",
+            "dramatic_function": "approach",
+            "importance": "supporting",
+            "objective": "背景/语境建立",
+            "weight": 0.18,
+            "shots_n": 1,
+        },
+        {
+            "key": "evidence",
+            "dramatic_function": "sensory",
+            "importance": "climax",
+            "objective": "事实/数据/物证呈现",
+            "weight": 0.22,
+            "shots_n": 2,
+        },
+        {
+            "key": "perspective",
+            "dramatic_function": "reaction",
+            "importance": "important",
+            "objective": "观点/访谈/立场",
+            "weight": 0.20,
+            "shots_n": 1,
+        },
+        {
+            "key": "conclusion",
+            "dramatic_function": "action",
+            "importance": "important",
+            "objective": "结论/推论推进",
+            "weight": 0.16,
+            "shots_n": 1,
+        },
+        {
+            "key": "coda",
+            "dramatic_function": "afterglow",
+            "importance": "supporting",
+            "objective": "余思/开放问题",
+            "weight": 0.10,
+            "shots_n": 1,
+        },
+    ],
+}
+
+# Authoring prompts for non-adult genre beat keys (parallel to _BEAT_AUTHORING_PROMPTS)
+_GENRE_BEAT_PROMPTS: dict[str, dict[str, tuple[str, ...]]] = {
+    "drama": {
+        "hook": ("主角此刻的处境是什么？", "观众第一秒看到的张力是什么？"),
+        "setup": ("谁与主角有关系？", "空间如何映射关系？"),
+        "rising": ("什么行动升级了冲突？", "主角的代价是什么？"),
+        "turn": ("什么让主角改变了立场？", "观众在这一拍多懂了什么？"),
+        "climax": ("不可撤回的决定是什么？", "谁因此获得或失去？"),
+        "resolution": ("新常态长什么样？", "留下了什么未决？"),
+    },
+    "mystery": {
+        "hook": ("谜面是什么？", "观众第一秒看到什么异常？"),
+        "investigate": ("谁在调查？", "调查逼近了什么？"),
+        "clue": ("哪个物证最关键？", "观众看到了什么角色没看到的东西？"),
+        "red_herring": ("什么误导了调查方向？", "假线索的后果是什么？"),
+        "reveal": ("真相如何揭露？", "揭露改变了谁的命运？"),
+        "aftermath": ("余波中谁受影响？", "什么新疑问被打开？"),
+    },
+    "arthouse": {
+        "mood_open": ("氛围基调是什么？", "观众感受到什么而不是看到什么？"),
+        "observe": ("凝视什么？", "细节如何暗示内心？"),
+        "gesture": ("什么微妙变化发生了？", "关系微变如何外化？"),
+        "silence": ("沉默里涌动什么？", "留白如何说话？"),
+        "shift": ("情绪如何转向？", "不是情节转折而是什么转折？"),
+        "echo": ("余响指向什么？", "什么未决？"),
+    },
+    "documentary": {
+        "premise": ("主题/问题是什么？", "为什么观众要关心？"),
+        "context": ("背景如何建立？", "语境提供什么坐标？"),
+        "evidence": ("什么事实/数据支撑主题？", "物证如何呈现？"),
+        "perspective": ("谁的立场被表达？", "观点如何补充或冲突？"),
+        "conclusion": ("结论指向什么？", "推论如何成立？"),
+        "coda": ("余思留下什么？", "什么开放问题？"),
+    },
 }
 
 _SCENE_HDR = re.compile(
@@ -768,10 +1132,14 @@ def normalize_story(
         warnings.append("no dialogue lines detected — default storyteller VO")
 
     heat = detect_heat_signals(raw)
+    genre_info = detect_genre(raw, heat=heat)
     if heat.get("evidence_max"):
         warnings.append(
             f"adult heat signals → spine={heat.get('spine')} heat_scale={heat.get('heat_scale')}"
         )
+    for gw in genre_info.get("warnings", []):
+        warnings.append(gw)
+    genre = genre_info["genre"]
 
     return {
         "schema_version": 1,
@@ -779,6 +1147,7 @@ def normalize_story(
         "at": utc_now(),
         "title": title,
         "logline": logline,
+        "genre": genre,
         "raw_excerpt": raw[:2000],
         "source_path": source_path,
         "source_chars": len(raw),
@@ -788,6 +1157,7 @@ def normalize_story(
         "scene_chunks": chunks,
         "vo_mode_suggest": "character" if dialogues else "storyteller",
         "heat_signals": heat,
+        "genre_evidence": genre_info["evidence"],
         "warnings": warnings,
         "source_map": {
             "method": "deterministic_v1",
@@ -799,7 +1169,9 @@ def normalize_story(
 def _draft_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:
     """Create an honest story contract; unknown intent stays blank/draft."""
     logline = str(normalized.get("logline") or "")
+    genre = str(normalized.get("genre") or "adult")
     return {
+        "genre": genre,
         "premise": logline,
         "logline": logline,
         "theme": "",
@@ -814,6 +1186,14 @@ def _draft_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:
         "climax_choice": "",
         "ending_hook": "",
         "emotional_arc": [],
+        "act_structure": {
+            "setup": "",
+            "confrontation": "",
+            "resolution": "",
+            "setup_ratio": 0.20,
+            "confrontation_ratio": 0.50,
+            "resolution_ratio": 0.30,
+        },
         "pace_chart": [],
         "constraints": [],
         "status": "needs_authoring",
@@ -1003,27 +1383,38 @@ def extract_beats(
     is_only_scene: bool,
     heat: dict[str, Any] | None = None,
     target_duration: float | None = None,
+    genre: str | None = None,
 ) -> list[dict[str, Any]]:
-    """beat.extract — map scene body onto vertical beat spine (adult spine when heat max)."""
+    """beat.extract — map scene body onto vertical beat spine (genre-aware).
+
+    P0-1 · 2026-07-23: non-adult genres use GENRE_SPINES via select_beat_spine.
+    Adult genre preserves backward-compat heat-signal logic.
+    """
     body = str(scene.get("body") or scene.get("synopsis") or "")
     sents = _sentences(body)
     heat = heat or {}
-    adult = bool(heat.get("heat_scale") == "max" or heat.get("hardcore"))
+    adult = (genre or "adult") == "adult" and (
+        bool(heat.get("heat_scale") == "max" or heat.get("hardcore"))
+    )
     # Multi-scene user scripts: compact per-scene arc (prevents 3× full adult template)
     if adult and not is_only_scene:
         spine = _compact_adult_spine_for_scene(body)
     else:
         spine = select_beat_spine(
             heat,
+            genre=genre,
             target_duration=target_duration or scene_budget_sec,
             multi_scene=not is_only_scene,
         )
-    # short scene: fewer beats (only for default drama spine)
+    # short scene: fewer beats (only for non-adult genre spines + default drama)
+    is_genre_spine = genre and genre != "adult" and genre in GENRE_SPINES
     if not adult:
         if not is_only_scene and len(sents) <= 2:
-            spine = [spine[0], spine[2], spine[3], spine[4]]
+            # Drop the 2nd beat (setup/context) for short multi-scene
+            if len(spine) >= 5:
+                spine = [spine[0], spine[2], spine[3], spine[4]]
         elif len(sents) == 1 and is_only_scene:
-            spine = list(DEFAULT_BEAT_SPINE)
+            spine = list(DEFAULT_BEAT_SPINE) if not is_genre_spine else spine
 
     # distribute sentences across beats
     if not sents:
@@ -1064,7 +1455,11 @@ def extract_beats(
             "state_delta": AUTHORING_PLACEHOLDER,
             "audience_question": AUTHORING_PLACEHOLDER,
             "emotional_turn": AUTHORING_PLACEHOLDER,
-            "authoring_questions": list(_BEAT_AUTHORING_PROMPTS.get(sp["key"], ())),
+            "authoring_questions": list(
+                (_GENRE_BEAT_PROMPTS.get(genre or "", {}) or _BEAT_AUTHORING_PROMPTS).get(
+                    sp["key"], ()
+                )
+            ),
         }
         if sp.get("heat_phase"):
             beat_obj["heat_phase"] = sp["heat_phase"]
@@ -1431,6 +1826,7 @@ def build_planned_graph(
             is_only_scene=len(scenes) == 1,
             heat=heat,
             target_duration=total,
+            genre=normalized.get("genre"),
         )
         if heat.get("hardcore") or heat.get("dual_climax"):
             for bt in beats:
@@ -1751,6 +2147,7 @@ def project_graph_to_film_spec(
         "title": title,
         "description": logline,
         "aspect_ratio": "9:16",
+        "genre": story.get("genre") or (normalized or {}).get("genre") or "adult",
         "vo_mode": vo_mode,
         "tts_backend": base.get("tts_backend") or "edge",
         "i2v_provider": base.get("i2v_provider") or "grok",
@@ -1764,6 +2161,7 @@ def project_graph_to_film_spec(
             "target_duration": ep.get("targetDuration"),
             "graph_mode": (graph.get("derived_from") or {}).get("mode"),
             "heat_spine": heat.get("spine") or "default",
+            "genre": story.get("genre") or (normalized or {}).get("genre") or "adult",
         },
         "_projection": {
             "source": "drama-graph.json",

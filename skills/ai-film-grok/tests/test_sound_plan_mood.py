@@ -86,9 +86,7 @@ class SoundPlanMoodTests(unittest.TestCase):
         self.assertEqual(d["mood"], "dark")
 
     def test_horror_in_title_gets_dark(self) -> None:
-        d = default_sound_plan_for_film(
-            tone="悬疑", title="走廊尽头的病房", vo_mode="storyteller"
-        )
+        d = default_sound_plan_for_film(tone="悬疑", title="走廊尽头的病房", vo_mode="storyteller")
         self.assertEqual(d["mood"], "dark")
 
     def test_horror_dark_not_rewritten_by_ecchi_check(self) -> None:

@@ -177,10 +177,12 @@ class SexSfxAndPilotTests(unittest.TestCase):
         out = inject_sex_sfx_from_shots(plan, shots, heat_scale="max")
         assert out is not None
         accents = [e for e in out["events"] if e.get("type") == "sfx_accent"]
-        self.assertEqual(len(accents), 1)
-        self.assertEqual(accents[0]["shot_id"], "s1")
-        self.assertEqual(accents[0]["kind"], "impact")
-        self.assertTrue(accents[0].get("sex_sfx"))
+        self.assertEqual(len(accents), 2)
+        sex_accents = [a for a in accents if a.get("sex_sfx")]
+        self.assertEqual(len(sex_accents), 1)
+        self.assertEqual(sex_accents[0]["shot_id"], "s1")
+        self.assertEqual(sex_accents[0]["kind"], "impact")
+        self.assertTrue(sex_accents[0].get("sex_sfx"))
 
     def test_pilot_prefers_adult_coitus(self) -> None:
         from pilot_review import pick_pilot_shots

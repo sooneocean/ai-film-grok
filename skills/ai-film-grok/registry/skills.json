@@ -364,6 +364,58 @@
       "tags": ["agent"],
       "phases": ["0", "2"],
       "cli": { "run": "aifilm dispatch --root", "validate": "aifilm next --root" }
+    },
+    {
+      "id": "story.validate",
+      "version": "1.0.0",
+      "summary": "Validate canonical story semantics before projection",
+      "status": "implemented",
+      "produces": ["StoryValidation"],
+      "dependsOnAssets": ["NormalizedStory"],
+      "capabilities": ["validate"],
+      "providers": ["local"],
+      "tags": ["narrative", "qa"],
+      "phases": ["3"],
+      "cli": { "run": "aifilm plan validate --root --strict", "validate": "aifilm plan validate --root --strict" }
+    },
+    {
+      "id": "beat.validate",
+      "version": "1.0.0",
+      "summary": "Validate beat outcomes and state deltas",
+      "status": "implemented",
+      "produces": ["BeatValidation"],
+      "dependsOnAssets": ["Beat"],
+      "capabilities": ["validate"],
+      "providers": ["local"],
+      "tags": ["narrative", "qa"],
+      "phases": ["3"],
+      "cli": { "run": "aifilm plan validate --root --strict", "validate": "aifilm plan validate --root --strict" }
+    },
+    {
+      "id": "graph.project",
+      "version": "1.0.0",
+      "summary": "Project locked narrative graph into film-spec",
+      "status": "implemented",
+      "produces": ["FilmSpec"],
+      "dependsOnAssets": ["Shot", "Panel"],
+      "capabilities": ["project"],
+      "providers": ["local"],
+      "tags": ["narrative", "planning"],
+      "phases": ["3"],
+      "cli": { "run": "aifilm graph project --root", "validate": "aifilm plan validate --root --strict" }
+    },
+    {
+      "id": "projection.verify",
+      "version": "1.0.0",
+      "summary": "Verify projection source revision and exact hash binding",
+      "status": "implemented",
+      "produces": ["ProjectionValidation"],
+      "dependsOnAssets": ["FilmSpec"],
+      "capabilities": ["validate"],
+      "providers": ["local"],
+      "tags": ["narrative", "qa"],
+      "phases": ["3"],
+      "cli": { "run": "aifilm plan validate --root --strict", "validate": "aifilm plan validate --root --strict" }
     }
   ]
 }

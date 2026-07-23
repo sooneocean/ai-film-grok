@@ -1,11 +1,34 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.dex/ai-film-grok/style-bible.schema.json",
-  "title": "ai-film-grok style-bible v2",
+  "title": "ai-film-grok visual style bible v3",
   "type": "object",
+  "required": ["schema_version", "kind", "revision", "state", "hash", "approval_ref", "stale_reasons", "nodes"],
   "properties": {
-    "schema_version": { "type": "integer", "enum": [1, 2] },
-    "state": { "enum": ["Draft", "Candidate", "Approved"] },
+    "schema_version": { "type": "integer", "const": 3 },
+    "kind": { "type": "string", "const": "visual-bible" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "state": { "enum": ["draft", "review", "locked", "stale"] },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "approval_ref": { "type": ["string", "null"] },
+    "stale_reasons": { "type": "array", "items": { "type": "object" } },
+    "nodes": {
+      "type": "object",
+      "required": ["face", "geometry", "body", "hair", "makeup", "wardrobe", "art", "location", "prop", "cinematography"],
+      "properties": {
+        "face": { "$ref": "#/$defs/parameterNode" },
+        "geometry": { "$ref": "#/$defs/parameterNode" },
+        "body": { "$ref": "#/$defs/parameterNode" },
+        "hair": { "$ref": "#/$defs/parameterNode" },
+        "makeup": { "$ref": "#/$defs/parameterNode" },
+        "wardrobe": { "$ref": "#/$defs/parameterNode" },
+        "art": { "$ref": "#/$defs/parameterNode" },
+        "location": { "$ref": "#/$defs/parameterNode" },
+        "prop": { "$ref": "#/$defs/parameterNode" },
+        "cinematography": { "$ref": "#/$defs/parameterNode" }
+      },
+      "additionalProperties": true
+    },
     "locked": { "type": "boolean" },
     "title": { "type": "string" },
     "medium": { "type": "string" },
@@ -15,101 +38,35 @@
     "rendering": { "type": "string" },
     "signature_block": { "type": "string" },
     "negative_hints": { "type": "string" },
-    "identity_lock": { "type": "string", "description": "Legacy identity lock block (v1 fallback)" },
-    "characters": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "identity": { "type": "string", "description": "Physical traits like hair, eyes, body type" },
-          "default_wardrobe": { "type": "string" },
-          "cast_master": { "type": "string" },
-          "forbid_drift": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Identity locks that must not drift across shots"
-          }
-        },
-        "additionalProperties": true
-      }
-    },
-    "wardrobe_variants": {
-      "type": "object",
-      "description": "Map of character_id -> { variant_name: 'description' } (full|partial|undressed|bare…)",
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": { "type": "string" }
-      }
-    },
-    "cast_state_masters": {
-      "type": "object",
-      "description": "character_id -> wardrobe_state -> path to state photo",
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": { "type": "string" }
-      }
-    },
-    "locations": {
-      "type": "object",
-      "description": "location_id -> string description OR structured Location object (Phase 4)",
-      "additionalProperties": {
-        "oneOf": [
-          { "type": "string" },
-          {
-            "type": "object",
-            "properties": {
-              "description": { "type": "string" },
-              "structure": { "type": "string" },
-              "timeOfDay": { "type": "string" },
-              "lighting": { "type": "string" },
-              "palette": { "type": "string" },
-              "immutableRules": { "type": "array", "items": { "type": "string" } },
-              "recurringObjects": { "type": "array", "items": { "type": "string" } },
-              "primaryAngles": { "type": "array", "items": { "type": "string" } }
-            },
-            "additionalProperties": true
-          }
-        ]
-      }
-    },
-    "props": {
-      "type": "object",
-      "description": "prop_id -> string OR structured Prop (Phase 4)",
-      "additionalProperties": {
-        "oneOf": [
-          { "type": "string" },
-          {
-            "type": "object",
-            "properties": {
-              "description": { "type": "string" },
-              "ownerId": { "type": ["string", "null"] },
-              "locationId": { "type": ["string", "null"] },
-              "condition": { "type": "string" },
-              "storyFunction": { "type": "string" },
-              "firstShotId": { "type": ["string", "null"] },
-              "lastShotId": { "type": ["string", "null"] }
-            },
-            "additionalProperties": true
-          }
-        ]
-      }
-    },
-    "continuity_states": {
-      "type": "object",
-      "description": "Global or per-character state transitions (e.g. 'hero_dirty', 'night_time')",
-      "additionalProperties": { "type": "string" }
-    },
-    "approved_keyframes": {
-      "type": "object",
-      "description": "Validated reference images",
-      "additionalProperties": { "type": "string" }
-    },
+    "identity_lock": { "type": "string" },
+    "characters": { "type": "object" },
+    "wardrobe_variants": { "type": "object" },
+    "cast_state_masters": { "type": "object" },
+    "locations": { "type": "object" },
+    "props": { "type": "object" },
+    "continuity_states": { "type": "object" },
+    "approved_keyframes": { "type": "object" },
     "updated_at": { "type": ["string", "null"] },
     "canonical_style_path": { "type": ["string", "null"] },
-    "previous_versions": {
-      "type": "array",
-      "items": { "type": "object" }
+    "previous_versions": { "type": "array", "items": { "type": "object" } }
+  },
+  "$defs": {
+    "parameterNode": {
+      "type": "object",
+      "required": ["id", "revision", "hash", "source_refs", "dependency_refs", "state", "approval_ref", "stale_reasons", "data"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^visual\\.[a-z0-9_-]+\\.primary$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "source_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
+        "dependency_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "state": { "enum": ["draft", "review", "locked", "stale"] },
+        "approval_ref": { "type": ["string", "null"] },
+        "stale_reasons": { "type": "array", "items": { "type": "object" } },
+        "data": {}
+      },
+      "additionalProperties": true
     }
   },
-  "required": ["schema_version"]
+  "additionalProperties": true
 }

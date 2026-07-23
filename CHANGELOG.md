@@ -3,6 +3,28 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [1.15.0] — 2026-07-23
+
+### Added — Director methodology injection (P0-1: de-type-bias)
+
+- **Multi-genre beat spines**: `dramatic_function` seven-value enum is now decoupled from the adult six-shot spine. New `genre` field (drama-graph + film-spec schemas) selects the beat spine template. Five genres supported: `adult` (default, backward-compat), `drama`, `mystery`, `arthouse`, `documentary` — each with its own beat spine (key/objective/weight/shots_n).
+- `detect_genre()`: parallel to `detect_heat_signals()`, infers genre from brief text markers. Priority: explicit genre field > adult heat signals > genre text markers > default adult.
+- `select_beat_spine()` accepts `genre` parameter; non-adult genres return `GENRE_SPINES[genre]` directly (ignores heat signals). Adult genre preserves existing heat-signal logic unchanged.
+- `normalize_story()` now returns `genre` + `genre_evidence` fields.
+- `project_graph_to_film_spec()` projects `genre` into film-spec top-level + `_plan` metadata.
+- `extract_beats()` passes genre to `select_beat_spine()` + uses genre-specific authoring prompts.
+- New `references/beat-spines.md` — 40-year director methodology: multi-genre spine definitions, selection logic, backward-compat guarantees, extensibility.
+- Updated `directors-lens.md` + `film-spec.md`: `dramatic_function` table now shows generic semantics (de-ecchi-bound) per genre context.
+- **Backward compatibility**: `dramatic_function` enum unchanged (write-spec gate unaffected). `genre` defaults to `adult`. Existing projects behave identically.
+
+### Added — Professional director control plane
+
+- Production Book, unified hash-bound human approvals, three rigor modes, precise stale propagation, and no-delete impact previews.
+- Style Bible v3 plus Audio/Post Bible department nodes for cast, face, hair, makeup, wardrobe, art, camera, voice, dialogue, sound, music, edit, captions, mix, and Master.
+- Agent-native `director`, `department`, and `skill run` CLI primitives with optimistic revisions, dry-run, atomic writes, structured receipts, and idempotent transaction recovery.
+- Read-only Shot Packages, strict Style→Cast→State Photo→Keyframe→Clip→Promoted Tail provenance, exact shot-set comparison, Dailies/Selects, Picture Lock, and eleven professional stage gates.
+- No-spend golden suite with genre isolation and continuity/audio/approval failure injection; Master delivery now requires real motion evidence, audio, visible captions, `ffprobe` read-back, and current full-film human approval.
+
 ## [1.14.4] — 2026-07-22
 
 ### Added

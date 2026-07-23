@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from shot_review import REVIEW_DIMENSIONS, create_shot_review
+from shot_review import create_shot_review
 
 
 def create_shot_review_report(args: Any) -> dict[str, Any]:

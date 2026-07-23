@@ -10,13 +10,70 @@ orchestration packet. Never skips pilot/user gates or silent-mutates film-spec.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import shlex
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from util import read_json, write_json
+
+_ACTION_SKILLS = {
+    "narrative-validate": "story.validate",
+    "narrative-project": "graph.project",
+    "narrative-lock": "story.validate",
+    "grok-i2v-bulk": "image.animate",
+    "state-index-plan": "character.state.update",
+    "audio-plan": "sound.design",
+    "selects-report": "quality.inspect",
+    "post-audit-gate": "quality.inspect",
+    "production-evidence-gate": "projection.verify",
+}
+
+
+def structured_next_action(
+    root: Path,
+    action: dict[str, Any] | None,
+    *,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Turn the legacy next command into a fixed, directly executable action."""
+    if not action:
+        return None
+    context = context or {}
+    raw_cmd = str(action.get("cmd") or "")
+    try:
+        tokens = shlex.split(raw_cmd)
+    except ValueError:
+        tokens = []
+    argv = tokens[1:] if tokens[:1] == ["aifilm"] else []
+    operation = argv[0] if argv else str(action.get("id") or "status")
+    action_id = str(action.get("id") or "")
+    skill_id = _ACTION_SKILLS.get(action_id, "dispatch.orchestrate")
+    paid_or_external = any(
+        word in action_id.lower() for word in ("bulk", "grok", "frw", "export")
+    ) or skill_id in {"image.animate", "keyframe.generate", "video.render", "export.package"}
+    spend_class = "paid" if paid_or_external else "local"
+    approval_class = "human_required" if paid_or_external else "none"
+    payload = {
+        "skill_id": skill_id,
+        "operation": operation,
+        "argv": argv,
+        "node_refs": list(context.get("node_refs") or []),
+        "input_hashes": dict(context.get("input_hashes") or {}),
+        "dependencies": list(context.get("dependencies") or []),
+        "spend_class": spend_class,
+        "approval_class": approval_class,
+        "expected_outputs": list(context.get("expected_outputs") or []),
+        "verification": list(context.get("verification") or []),
+    }
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    payload["transaction_id"] = f"tx-{digest[:24]}"
+    return payload
 
 
 def skill_scripts() -> Path:
@@ -411,6 +468,49 @@ def build_dispatch(
         if execution_plan_digest.get("graph_line"):
             agent_do.append(f"DramaGraph: {execution_plan_digest.get('graph_line')}")
 
+    context_digest: dict[str, Any] = {
+        "rigor": None,
+        "department_locks": {},
+        "department_stale_reasons": {},
+        "asset_versions": [],
+        "unresolved_notes": [],
+        "approval_scope": [],
+        "budget_scope": {},
+    }
+    try:
+        from production_book import read_production_book
+
+        book = read_production_book(root)
+        context_digest.update(
+            {
+                "rigor": book.get("rigor"),
+                "department_locks": {
+                    key: value.get("state") == "locked"
+                    for key, value in (book.get("departments") or {}).items()
+                },
+                "department_stale_reasons": {
+                    key: value.get("stale_reasons") or []
+                    for key, value in (book.get("departments") or {}).items()
+                    if value.get("stale_reasons")
+                },
+                "asset_versions": [
+                    {
+                        "id": item.get("id"),
+                        "version": item.get("version"),
+                        "hash": item.get("hash"),
+                    }
+                    for item in book.get("assets") or []
+                    if isinstance(item, dict)
+                ],
+                "unresolved_notes": book.get("unresolved_notes") or [],
+                "approval_scope": book.get("approval_scope") or [],
+                "budget_scope": book.get("budget_scope") or {},
+            }
+        )
+    except (FileNotFoundError, ValueError):
+        pass
+    next_action = structured_next_action(root, primary)
+
     packet = {
         "ok": True,
         "kind": "ai-film-dispatch",
@@ -429,6 +529,7 @@ def build_dispatch(
         },
         "next_id": next_id,
         "next_cmd": next_cmd,
+        "next_action": next_action,
         "next_why": next_why,
         "next_actions": actions,
         "agent_do": agent_do,
@@ -465,6 +566,7 @@ def build_dispatch(
         if jobs_summary
         else None,
         "execution_plan_digest": execution_plan_digest,
+        "context_digest": context_digest,
         "narrative_control": {
             "canonical": narrative.get("canonical"),
             "state": narrative.get("state"),

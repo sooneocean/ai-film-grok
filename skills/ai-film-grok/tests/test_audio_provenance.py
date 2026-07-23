@@ -93,3 +93,25 @@ class AudioProvenanceTests(unittest.TestCase):
         report = build_audio_provenance(self.root)
         self.assertFalse(report["ok"])
         self.assertIn("DIALOGUE_AUDIO_HASH_STALE", {item["code"] for item in report["errors"]})
+
+    def test_reports_separate_event_and_stem_provenance_channels(self) -> None:
+        self._write_rehearsal(hashlib.sha256(self.rehearsal_audio.read_bytes()).hexdigest())
+        (self.root / "out").mkdir()
+        (self.root / "out" / "final.srt").write_text(
+            "1\n00:00:00,000 --> 00:00:01,000\n别走\n", encoding="utf-8"
+        )
+
+        report = build_audio_provenance(self.root)
+
+        assert set(report["channels"]) == {
+            "dialogue",
+            "vo",
+            "native",
+            "ambience",
+            "foley",
+            "sfx",
+            "bgm",
+            "captions",
+        }
+        assert report["channels"]["dialogue"]["events"]
+        assert report["channels"]["captions"]["sha256"]

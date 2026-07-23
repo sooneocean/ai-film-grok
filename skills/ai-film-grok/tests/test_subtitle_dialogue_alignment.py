@@ -51,7 +51,7 @@ class SubtitleDialogueAlignmentTests(unittest.TestCase):
     @pytest.mark.slow
     def test_requires_cue_through_dialogue_end(self) -> None:
         (self.root / "out" / "final.srt").write_text(
-            "1\n00:00:00,000 --> 00:00:01,300\n别走\n", encoding="utf-8"
+            "1\n00:00:00,000 --> 00:00:01,200\n别走\n", encoding="utf-8"
         )
         self.assertTrue(build_subtitle_dialogue_alignment(self.root)["ok"])
         (self.root / "out" / "final.srt").write_text(
@@ -59,3 +59,31 @@ class SubtitleDialogueAlignmentTests(unittest.TestCase):
         )
         report = build_subtitle_dialogue_alignment(self.root)
         self.assertIn("SUBTITLE_ENDS_BEFORE_DIALOGUE", {e["code"] for e in report["errors"]})
+
+    def test_rejects_caption_outside_shot_or_dialogue_window(self) -> None:
+        review_path = self.root / "receipts" / "reviews" / "shot01.json"
+        review_path.write_text(
+            json.dumps(
+                {
+                    "performance_contract": {
+                        "evidence": {
+                            "dialogue_delivery": {
+                                "start_sec": 0.2,
+                                "timestamp_sec": 1.2,
+                            }
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        (self.root / "out" / "final.srt").write_text(
+            "1\n00:00:00,100 --> 00:00:01,300\n别走\n", encoding="utf-8"
+        )
+
+        report = build_subtitle_dialogue_alignment(self.root)
+
+        self.assertIn(
+            "SUBTITLE_OUTSIDE_DIALOGUE_WINDOW",
+            {error["code"] for error in report["errors"]},
+        )
