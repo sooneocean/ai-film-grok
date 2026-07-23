@@ -253,7 +253,9 @@ def loop_risk_shots_from_spec(
         beat = str(shot.get("dramatic_function") or shot.get("beat") or shot.get("function") or "")
         # P0 · 2026-07-23: only flag when plan_stretch still uses stream_loop.
         # Shortform clamp forbids loop on ≤7.5s plates — VO slightly >5.5s is OK.
-        if _shot_would_stream_loop(plate_sec=dur, vo_sec=vo, dramatic_function=beat or None):
+        if _shot_would_stream_loop(plate_sec=dur, vo_sec=vo, dramatic_function=beat or None) or (
+            vo > LOOP_RISK_VO_SEC and dur <= 6.5
+        ):
             risk.append(sid)
     # Do not trust stale _vo_budget.loop_risk_shots (pre shortform clamp policy)
     return risk
