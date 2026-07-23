@@ -1028,6 +1028,42 @@ def assert_preview_receipt(root: Path) -> dict[str, Any]:
         ) from exc
 
 
+# HyperFrames is strongest at 30–90s, hard ceiling ~3min (per hyperframes/SKILL.md).
+# Beyond 90s we emit a non-fatal segmentation advisory so agents route long pieces
+# through per-segment HF render + FFmpeg concat instead of one monolithic render.
+HF_STRONG_MAX_SEC = 90.0
+HF_HARD_CEILING_SEC = 180.0
+
+
+def duration_advisory(total_duration_sec: float | None) -> dict[str, Any]:
+    """Return a non-fatal advisory for HyperFrames duration limits.
+
+    Returns ``{"advisory": bool, "action": str|None, "segment_count": int}``.
+    """
+    if not total_duration_sec or total_duration_sec <= 0:
+        return {"advisory": False, "action": None, "segment_count": 1}
+    if total_duration_sec <= HF_STRONG_MAX_SEC:
+        return {"advisory": False, "action": None, "segment_count": 1}
+    action = None
+    seg_count = 1
+    if total_duration_sec <= HF_HARD_CEILING_SEC:
+        # Segment into ≤90s chunks for HF render, then FFmpeg concat
+        seg_count = max(2, int(-(-total_duration_sec // HF_STRONG_MAX_SEC)))
+        action = (
+            f"duration {total_duration_sec:.1f}s > 90s (HF sweet spot) — "
+            f"segment into {seg_count} ≤90s HF renders, then FFmpeg concat "
+            f"(per hyperframes/SKILL.md: 30–90s strongest, ~3min ceiling)"
+        )
+    else:
+        seg_count = max(3, int(-(-total_duration_sec // HF_STRONG_MAX_SEC)))
+        action = (
+            f"duration {total_duration_sec:.1f}s > {HF_HARD_CEILING_SEC}s HF ceiling — "
+            f"route to /general-video style per-segment render + concat "
+            f"(split into {seg_count} segments); HF is not the right tool for >3min"
+        )
+    return {"advisory": True, "action": action, "segment_count": seg_count}
+
+
 def compose_render(
     root: Path,
     *,

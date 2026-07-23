@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from media_probe import MediaProbeError, probe_media, verify_full_decode
 from security_policy import minimal_subprocess_env
 
 # Grok Imagine + FRW video backends.
@@ -191,25 +192,8 @@ def analyze_media(
         raise MediaQAError("ffmpeg and ffprobe are required for media QA")
 
     try:
-        probe = _run(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-count_frames",
-                "-show_entries",
-                "format=duration:stream=codec_type,codec_name,width,height,nb_read_frames,avg_frame_rate,duration",
-                "-of",
-                "json",
-                str(source),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        info = json.loads(probe.stdout)
-    except (subprocess.SubprocessError, json.JSONDecodeError) as exc:
+        info = probe_media(source, count_frames=True)
+    except MediaProbeError as exc:
         return _failed_analysis(source, f"ffprobe failed: {exc}")
 
     streams = info.get("streams") or []
@@ -229,15 +213,9 @@ def analyze_media(
     decode_ok = False
     if video_stream:
         try:
-            decoded = _run(
-                ["ffmpeg", "-v", "error", "-xerror", "-i", str(source), "-f", "null", "-"],
-                capture_output=True,
-                timeout=180,
-            )
-            decode_ok = decoded.returncode == 0
-            if not decode_ok:
-                errors.append("full video decode failed")
-        except subprocess.SubprocessError as exc:
+            verify_full_decode(source)
+            decode_ok = True
+        except (MediaProbeError, subprocess.SubprocessError) as exc:
             errors.append(f"full video decode failed: {exc}")
 
     decoded_frames = 0

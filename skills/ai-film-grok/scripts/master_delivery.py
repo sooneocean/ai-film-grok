@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from approval_ledger import approval_is_current, read_approval_ledger
+from media_probe import MediaProbeError, probe_media, verify_full_decode
 from util import sha256_file as _sha256_file
 
 REQUIRED_ASSETS = (
@@ -39,37 +40,18 @@ def parse_ffprobe(value: dict[str, Any] | str) -> dict[str, Any]:
 
 
 def _run_ffprobe(path: Path) -> dict[str, Any]:
-    process = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_streams",
-            "-show_format",
-            "-of",
-            "json",
-            str(path),
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    if process.returncode != 0:
-        raise ValueError("ffprobe could not read the current final MP4")
-    return parse_ffprobe(process.stdout)
+    try:
+        report = probe_media(path, timeout=120)
+    except MediaProbeError as exc:
+        raise ValueError(f"ffprobe could not read the current final MP4: {exc}") from exc
+    return parse_ffprobe(report)
 
 
 def _full_decode(path: Path) -> None:
-    process = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", str(path), "-f", "null", "-"],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=900,
-    )
-    if process.returncode != 0:
-        raise ValueError("full final MP4 decode failed")
+    try:
+        verify_full_decode(path, timeout=900)
+    except MediaProbeError as exc:
+        raise ValueError(f"full final MP4 decode failed: {exc}") from exc
 
 
 def _issue(code: str, message: str, *, ref: str | None = None) -> dict[str, Any]:

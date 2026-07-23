@@ -1031,6 +1031,23 @@ def lint_continuity(
                 }
             )
 
+    # P1-5: scene location missing check (each shot should have a locationId)
+    for sh in shots:
+        sid = str(sh.get("id") or "unknown")
+        dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+        loc = str(
+            sh.get("locationId") or sh.get("location_id") or dsl.get("location") or ""
+        ).strip()
+        if not loc:
+            issues.append(
+                {
+                    "code": CODE_SCENE_LOCATION_MISSING,
+                    "severity": "warning",
+                    "message": f"shot {sid} has no locationId — scene continuity cannot be verified",
+                    "shot_ids": [sid],
+                }
+            )
+
     codes = sorted({iss["code"] for iss in issues})
     # ok false only if any issue code is in fail_on
     blocking = [iss for iss in issues if iss["code"] in fail_on]
