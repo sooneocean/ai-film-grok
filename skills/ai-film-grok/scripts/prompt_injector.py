@@ -211,13 +211,65 @@ class PromptInjector:
                 identity = self.bible.get("identity_lock", "")
             identity = self._identity_for_wardrobe(identity, wardrobe_state, shot=shot)
 
-            wardrobe = self.bible.get("wardrobe_variants", {}).get(hid, {}).get(wardrobe_state, "")
+            # P1-1: prefer structured cast_locks over free-text identity
+            cast_lock = self.bible.get("cast_locks", {})
+            cl = cast_lock.get(hid, {}) if isinstance(cast_lock, dict) else {}
+            if cl.get("identity_lock_tokens"):
+                # Structured lock takes precedence — includes face/hair/eyes
+                identity = cl["identity_lock_tokens"]
+
+            wardrobe_raw = (
+                self.bible.get("wardrobe_variants", {}).get(hid, {}).get(wardrobe_state, "")
+            )
+            # P1-4: support structured wardrobe object (garment/accessories/material/color)
+            if isinstance(wardrobe_raw, dict):
+                w_parts = []
+                if wardrobe_raw.get("garment"):
+                    w_parts.append(str(wardrobe_raw["garment"]))
+                accs = wardrobe_raw.get("accessories")
+                if isinstance(accs, list) and accs:
+                    w_parts.append("accessories: " + ", ".join(str(a) for a in accs))
+                if wardrobe_raw.get("material"):
+                    w_parts.append(f"material: {wardrobe_raw['material']}")
+                if wardrobe_raw.get("color"):
+                    w_parts.append(f"color: {wardrobe_raw['color']}")
+                wardrobe = "; ".join(w_parts) if w_parts else ""
+            else:
+                wardrobe = str(wardrobe_raw) if wardrobe_raw else ""
             # Never fall back to default_wardrobe when undressed — that re-dresses
             if not wardrobe and wardrobe_state in {"full", "armored", "default"}:
                 wardrobe = char_info.get("default_wardrobe", "")
 
             if identity:
                 char_locks.append(f"Character {hid}: {identity}")
+
+            # P1-1: Hair lock line (consistency.md H4 — was missing in prompt_injector)
+            hair_lock = cl.get("hair_lock") or ""
+            if not hair_lock:
+                # Fallback: build from hair_swatches
+                sw = self.bible.get("hair_swatches", {})
+                sw_entry = sw.get(hid, {}) if isinstance(sw, dict) else {}
+                if sw_entry.get("color_name"):
+                    hair_lock = f"{sw_entry['color_name']}"
+                    if sw_entry.get("description"):
+                        hair_lock += f"; {sw_entry['description']}"
+            if hair_lock:
+                never = cl.get("never_tokens", "")
+                hair_line = f"Hair lock {hid}: {hair_lock}"
+                if never:
+                    hair_line += f" ({never})"
+                char_locks.append(hair_line)
+
+            # P1-3: Makeup lock line
+            makeup_lock = cl.get("makeup_lock") or ""
+            if not makeup_lock:
+                mu = self.bible.get("makeup", {})
+                mu_entry = mu.get(hid, {}) if isinstance(mu, dict) else {}
+                if mu_entry.get("lock_tokens"):
+                    makeup_lock = mu_entry["lock_tokens"]
+            if makeup_lock:
+                char_locks.append(f"Makeup {hid}: {makeup_lock}")
+
             if wardrobe:
                 if wardrobe_state == "default":
                     char_locks.append(f"Wardrobe {hid}: {wardrobe}")

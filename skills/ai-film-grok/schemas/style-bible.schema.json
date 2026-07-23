@@ -39,8 +39,64 @@
     "signature_block": { "type": "string" },
     "negative_hints": { "type": "string" },
     "identity_lock": { "type": "string" },
+    "cast_locks": {
+      "type": "object",
+      "description": "Per-character structured identity lock. Keyed by character id. Replaces free-text identity_lock for multi-character. P1-1 face-lock.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "face_ref_path": { "type": "string", "description": "Path to canonical face reference image (cast master)" },
+          "identity_lock_tokens": { "type": "string", "description": "Face/hair/eyes description tokens for prompt injection" },
+          "never_tokens": { "type": "string", "description": "NEVER list — colors/features that must not drift (e.g. 'NEVER pure black hair')" },
+          "hair_lock": { "type": "string", "description": "Hair-specific lock line (color name + style) injected as 'Hair lock' in prompt" },
+          "makeup_lock": { "type": "string", "description": "Makeup-specific lock line for prompt injection" }
+        }
+      }
+    },
+    "hair_swatches": {
+      "type": "object",
+      "description": "Hair color swatches per character. Keyed by character id → {color_name, hex, description}. P1-2 hairstyle.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "color_name": { "type": "string", "description": "Human-readable color name (e.g. 'dark teal cyan-green')" },
+          "hex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "description": "Hex color code for swatch reference" },
+          "description": { "type": "string", "description": "Full hair description including style and length" }
+        }
+      }
+    },
+    "makeup": {
+      "type": "object",
+      "description": "Per-character makeup design. Keyed by character id → {name, ref_path, lock_tokens, cross_scene_consistency}. P1-3 makeup.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Makeup look name (e.g. 'natural dewy', 'smoky evening')" },
+          "ref_path": { "type": "string", "description": "Path to makeup reference image" },
+          "lock_tokens": { "type": "string", "description": "Makeup description tokens for prompt injection" },
+          "cross_scene_consistency": { "type": "boolean", "description": "If true, this makeup must be consistent across all scenes" }
+        }
+      }
+    },
     "characters": { "type": "object" },
-    "wardrobe_variants": { "type": "object" },
+    "wardrobe_variants": {
+      "type": "object",
+      "description": "Per-character wardrobe design sheet. Keyed by character id → {state_key: {garment, accessories, material, color, state}}. P1-4: upgraded from bare text to structured wardrobe sheet. Legacy string values still accepted (backward compat).",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": ["object", "string"],
+          "description": "Wardrobe entry per state (full/partial/undressed/bare/scene-specific). Object: {garment, accessories, material, color, state}. String: legacy text description.",
+          "properties": {
+            "garment": { "type": "string", "description": "Main garment description" },
+            "accessories": { "type": "array", "items": { "type": "string" }, "description": "Accessories list (jewelry, bags, etc.)" },
+            "material": { "type": "string", "description": "Fabric/material (silk, leather, cotton)" },
+            "color": { "type": "string", "description": "Primary color(s)" },
+            "state": { "type": "string", "description": "Wardrobe state label (full/partial/undressed/bare)" }
+          }
+        }
+      }
+    },
     "cast_state_masters": { "type": "object" },
     "locations": { "type": "object" },
     "props": { "type": "object" },

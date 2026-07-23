@@ -13,8 +13,9 @@
 | `rendering` | 皮肤/布料/粒子/线稿密度 | anime 要写 clear line / cel-shade 等 |
 | `signature_block` | **英文**短段，贴进**每一** still/I2V prompt 前缀 | ≥48 字符，描述介质+色+身份稳定 |
 | `identity_lock` | **英文**角色锁句（脸/发/瞳/服） | 主角必填；多主角用 `cast_locks` 对象 |
-| `cast_locks` | 每角独立锁句（**必含发色 + NEVER 禁色**） | multi 必填；single 可只填 hero |
-| `hair_swatches` | `{ "id": "色名 #hex 或可复述色名" }` | **强烈建议**；防霓虹光改写发色（2026-07-21） |
+| `cast_locks` | 每角**结构化**锁对象（P1-1）：`{face_ref_path, identity_lock_tokens, never_tokens, hair_lock, makeup_lock}` | multi 必填；prompt_injector 优先使用此结构，注入 Hair lock 行与 Makeup 行 |
+| `hair_swatches` | `{ "<char_id>": {color_name, hex, description} }` | P1-2 发型参数化；独立字段脱离 identity_lock 自由文本；prompt_injector 自动构建 Hair lock |
+| `makeup` | `{ "<char_id>": {name, ref_path, lock_tokens, cross_scene_consistency} }` | P1-3 妆造参数化；prompt_injector 注入 Makeup 行；cross_scene_consistency=true 时全片妆造锁定 |
 | `negative_hints` | 禁换脸、禁换发色、禁换介质、禁未成年… | 必填；须含「do not recolor hair」 |
 | `canonical_style_path` | style-v1 路径 | lock-style 写入 |
 | `cast_masters` | `{ "kei": "canonical/cast/kei-v1.png" }` | 至少一名主角；**一角一路径**（默认 full 定妆） |
