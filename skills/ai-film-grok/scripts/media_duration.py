@@ -7,11 +7,10 @@ Used by final/compose paths so subtitle/VO/video clocks cannot drift unnoticed.
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import Any
 
-from security_policy import minimal_subprocess_env
+from media_probe import MediaProbeError, probe_media
 
 
 class MediaDurationError(RuntimeError):
@@ -36,37 +35,10 @@ def probe_duration_sec(
         raise MediaDurationError(f"{label}: empty file (0 bytes): {p}")
 
     try:
-        proc = subprocess.run(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=nokey=1:noprint_wrappers=1",
-                str(p),
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            env=minimal_subprocess_env(),
-            timeout=60,
-        )
-    except FileNotFoundError as exc:
-        raise MediaDurationError(f"{label}: ffprobe not found on PATH — install ffmpeg") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise MediaDurationError(f"{label}: ffprobe timed out on {p}") from exc
-    except OSError as exc:
-        raise MediaDurationError(f"{label}: ffprobe failed to start for {p}: {exc}") from exc
-
-    if proc.returncode != 0:
-        err = (proc.stderr or proc.stdout or "").strip()[:400]
-        raise MediaDurationError(
-            f"{label}: ffprobe failed (rc={proc.returncode}) on {p}: {err or 'no output'}"
-        )
-
-    raw = (proc.stdout or "").strip()
+        report = probe_media(p)
+    except MediaProbeError as exc:
+        raise MediaDurationError(f"{label}: {exc}") from exc
+    raw = str((report.get("format") or {}).get("duration") or "").strip()
     if not raw or raw.lower() in {"n/a", "nan", "inf", "-inf"}:
         raise MediaDurationError(f"{label}: unreadable duration from ffprobe on {p}: {raw!r}")
     try:

@@ -6,6 +6,7 @@ Verifies:
 - SCENE_LOCATION_MISSING lint fires on shots without locationId
 - style-bible art_direction layer (color_script/visual_motifs/texture_continuity)
 """
+
 from __future__ import annotations
 
 import sys
@@ -30,8 +31,18 @@ class TestSceneLocationMissing:
 
     def test_shot_with_locationId_no_warning(self):
         shots = [
-            {"id": "s1", "dramatic_function": "hook", "dsl": {"cast": ["hero"]}, "locationId": "loc1"},
-            {"id": "s2", "dramatic_function": "action", "dsl": {"cast": ["hero"]}, "locationId": "loc1"},
+            {
+                "id": "s1",
+                "dramatic_function": "hook",
+                "dsl": {"cast": ["hero"]},
+                "locationId": "loc1",
+            },
+            {
+                "id": "s2",
+                "dramatic_function": "action",
+                "dsl": {"cast": ["hero"]},
+                "locationId": "loc1",
+            },
         ]
         result = lint_continuity(shots)
         codes = result.get("codes", [])
@@ -39,7 +50,11 @@ class TestSceneLocationMissing:
 
     def test_shot_with_dsl_location_no_warning(self):
         shots = [
-            {"id": "s1", "dramatic_function": "hook", "dsl": {"cast": ["hero"], "location": "taxi"}},
+            {
+                "id": "s1",
+                "dramatic_function": "hook",
+                "dsl": {"cast": ["hero"], "location": "taxi"},
+            },
         ]
         result = lint_continuity(shots)
         codes = result.get("codes", [])
@@ -56,11 +71,23 @@ class TestSceneLocationMissing:
 class TestDeriveGraphLocationId:
     """derive_graph fills locationId (was hardcoded None)."""
 
-    def test_derive_graph_fills_scene_locationId(self):
+    def _make_film_root(self, tmp_path, spec):
+        import json
+
+        (tmp_path / "film-spec.json").write_text(json.dumps(spec, ensure_ascii=False))
+        return tmp_path
+
+    def test_derive_graph_fills_scene_locationId(self, tmp_path):
         from drama_graph import derive_graph
 
         spec = {
             "title": "Test",
+            "vo_mode": "storyteller",
+            "director_intent": {
+                "logline": "test logline long enough",
+                "tone": "dark",
+                "emotional_arc": ["a", "b", "c"],
+            },
             "scenes": [
                 {
                     "title": "Scene 1",
@@ -76,16 +103,23 @@ class TestDeriveGraphLocationId:
                 }
             ],
         }
-        graph = derive_graph(spec)
+        root = self._make_film_root(tmp_path, spec)
+        graph = derive_graph(root, write=False)
         scenes = graph.get("episodes", [{}])[0].get("scenes", [])
         assert len(scenes) >= 1
         assert scenes[0].get("locationId") == "loc_rainy_street"
 
-    def test_derive_graph_fills_shot_locationId_from_scene(self):
+    def test_derive_graph_fills_shot_locationId_from_scene(self, tmp_path):
         from drama_graph import derive_graph
 
         spec = {
             "title": "Test",
+            "vo_mode": "storyteller",
+            "director_intent": {
+                "logline": "test logline long enough",
+                "tone": "dark",
+                "emotional_arc": ["a", "b", "c"],
+            },
             "scenes": [
                 {
                     "title": "Scene 1",
@@ -101,7 +135,8 @@ class TestDeriveGraphLocationId:
                 }
             ],
         }
-        graph = derive_graph(spec)
+        root = self._make_film_root(tmp_path, spec)
+        graph = derive_graph(root, write=False)
         shots = []
         for ep in graph.get("episodes", []):
             for sc in ep.get("scenes", []):
@@ -110,12 +145,18 @@ class TestDeriveGraphLocationId:
         assert len(shots) >= 1
         assert shots[0].get("locationId") == "loc_bar"
 
-    def test_derive_graph_infers_location_from_dsl(self):
+    def test_derive_graph_infers_location_from_dsl(self, tmp_path):
         """When scene has no locationId, infer from shot dsl.location."""
         from drama_graph import derive_graph
 
         spec = {
             "title": "Test",
+            "vo_mode": "storyteller",
+            "director_intent": {
+                "logline": "test logline long enough",
+                "tone": "dark",
+                "emotional_arc": ["a", "b", "c"],
+            },
             "scenes": [
                 {
                     "title": "Scene 1",
@@ -124,13 +165,18 @@ class TestDeriveGraphLocationId:
                             "id": "s1",
                             "nar": "test",
                             "dramatic_function": "hook",
-                            "dsl": {"motion": "dolly_in", "action": "standing", "location": "taxi_interior"},
+                            "dsl": {
+                                "motion": "dolly_in",
+                                "action": "standing",
+                                "location": "taxi_interior",
+                            },
                         }
                     ],
                 }
             ],
         }
-        graph = derive_graph(spec)
+        root = self._make_film_root(tmp_path, spec)
+        graph = derive_graph(root, write=False)
         scenes = graph.get("episodes", [{}])[0].get("scenes", [])
         assert scenes[0].get("locationId") == "taxi_interior"
 

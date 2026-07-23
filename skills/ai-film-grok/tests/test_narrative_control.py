@@ -97,6 +97,16 @@ def _fill_graph(graph: dict) -> dict:
                 "confidence": 1.0,
             }
         )
+    for ep in graph.get("episodes") or []:
+        for hook_name in ("opening_hook", "ending_hook"):
+            hook = ep.get(hook_name)
+            if isinstance(hook, dict):
+                hook.update(
+                    {
+                        "source_refs": ["test:authored-source"],
+                        "visible_evidence": "照片背面出现地址",
+                    }
+                )
     return graph
 
 

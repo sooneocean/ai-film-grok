@@ -1164,7 +1164,10 @@ def _extract_plot_point_candidates(
                 "source_index": index,
             }
         )
-    return candidates[:12]
+    # Keep the authoring surface bounded: a paragraph may contain many
+    # keywords, but only the first three source-grounded promises enter the
+    # automatic episode plan. The remaining ambiguity stays out of the lock.
+    return candidates[:3]
 
 
 def _scene_chunks(raw: str) -> list[dict[str, str]]:
@@ -2021,7 +2024,9 @@ def build_planned_graph(
                 "plot_point_candidates": _extract_plot_point_candidates(
                     str(ep_chunk.get("body") or ""),
                     genre=str(normalized.get("genre") or "adult"),
-                    source_refs=list(ep_chunk.get("source_refs") or normalized.get("source_evidence_refs") or []),
+                    source_refs=list(
+                        ep_chunk.get("source_refs") or normalized.get("source_evidence_refs") or []
+                    ),
                     episode_hint=episode_number,
                 ),
             }
@@ -2197,11 +2202,7 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
         first_shot = shots[0]
         last_beat = beats[-1]
         last_shot = shots[-1]
-        candidates = [
-            c
-            for c in (ep.get("plot_point_candidates") or [])
-            if isinstance(c, dict)
-        ]
+        candidates = [c for c in (ep.get("plot_point_candidates") or []) if isinstance(c, dict)]
         confirmed = [c for c in candidates if c.get("authoring_status") == "confirmed"][:3]
         authoring_queue.extend(c for c in candidates if c not in confirmed)
         if not confirmed:
@@ -2222,11 +2223,15 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
         point_ids: list[str] = []
         for point_index, candidate in enumerate(confirmed[:3], start=1):
             beat = beats[min(point_index, len(beats) - 1)]
-            beat_shots = [sh for sh in beat.get("shots") or [] if isinstance(sh, dict)] or [first_shot]
+            beat_shots = [sh for sh in beat.get("shots") or [] if isinstance(sh, dict)] or [
+                first_shot
+            ]
             point_id = f"{ep_id}_point_{point_index:02d}"
             point_ids.append(point_id)
             payoff_episode = (
-                int(str(next_ep).removeprefix("ep")) if next_ep else int(str(ep_id).removeprefix("ep"))
+                int(str(next_ep).removeprefix("ep"))
+                if next_ep
+                else int(str(ep_id).removeprefix("ep"))
             )
             point = {
                 "point_id": point_id,
@@ -2236,10 +2241,14 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
                 "introduced_episode": ep_id,
                 "introduced_beat_id": str(beat.get("id") or ""),
                 "introduced_shot_ids": [str(sh.get("id")) for sh in beat_shots if sh.get("id")],
-                "visible_evidence": candidate.get("visible_evidence") or str(beat.get("action") or ""),
-                "audience_question": candidate.get("audience_question") or "这个线索接下来会带来什么变化？",
+                "visible_evidence": candidate.get("visible_evidence")
+                or str(beat.get("action") or ""),
+                "audience_question": candidate.get("audience_question")
+                or "这个线索接下来会带来什么变化？",
                 "planned_payoff_episode": payoff_episode,
-                "payoff_condition": "下一集必须回应该线索并改变人物或局势" if next_ep else "本季结束时明确回收或声明下一季承诺",
+                "payoff_condition": "下一集必须回应该线索并改变人物或局势"
+                if next_ep
+                else "本季结束时明确回收或声明下一季承诺",
                 "status": "planted" if next_ep else "season_hook",
                 "confidence": float(candidate.get("confidence") or 0.0),
                 "authoring_status": candidate.get("authoring_status") or "confirmed",
@@ -2286,7 +2295,11 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
                         "episode": ep_id,
                         "beat_id": str(first_beat.get("id") or ""),
                         "shot_ids": [str(first_shot.get("id") or "")],
-                        "visible_change": str(first_shot.get("visible_change") or first_shot.get("must_show") or "回应上一集钩子"),
+                        "visible_change": str(
+                            first_shot.get("visible_change")
+                            or first_shot.get("must_show")
+                            or "回应上一集钩子"
+                        ),
                     }
 
     graph["plot_points"] = points

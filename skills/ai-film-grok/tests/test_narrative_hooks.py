@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
 import sys
+from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -28,7 +27,14 @@ def _authored(graph: dict) -> dict:
     )
     for ep in graph["episodes"]:
         for scene in ep["scenes"]:
-            scene.update({"purpose": "逼近门后真相", "entry_state": "未知", "exit_state": "更接近门后", "conflict": "门与未知者阻挡"})
+            scene.update(
+                {
+                    "purpose": "逼近门后真相",
+                    "entry_state": "未知",
+                    "exit_state": "更接近门后",
+                    "conflict": "门与未知者阻挡",
+                }
+            )
             for beat in scene["beats"]:
                 beat.update(
                     {
@@ -70,10 +76,23 @@ def test_explicit_episode_headers_seed_cross_episode_contract() -> None:
     raw = "# 第1集\n她发现一把钥匙。\n\n# 第2集\n她用钥匙打开旧门。"
     graph = build_planned_graph(normalize_story(raw), target_duration=30)
     assert [ep["id"] for ep in graph["episodes"]] == ["ep01", "ep02"]
-    assert graph["episodes"][0]["ending_hook"]["point_id"] in graph["episodes"][1]["carry_in_points"]
+    assert (
+        graph["episodes"][0]["ending_hook"]["point_id"] in graph["episodes"][1]["carry_in_points"]
+    )
     assert graph["episodes"][0]["ending_hook"]["point_id"] in graph["episodes"][1]["payoff_points"]
-    assert all(ep.get("opening_hook") and ep.get("mid_episode_points") and ep.get("ending_hook") for ep in graph["episodes"])
-    assert all(any(str(sh["id"]).startswith(f"ep{i:02d}_") for sc in ep["scenes"] for bt in sc["beats"] for sh in bt["shots"]) for i, ep in enumerate(graph["episodes"], 1))
+    assert all(
+        ep.get("opening_hook") and ep.get("mid_episode_points") and ep.get("ending_hook")
+        for ep in graph["episodes"]
+    )
+    assert all(
+        any(
+            str(sh["id"]).startswith(f"ep{i:02d}_")
+            for sc in ep["scenes"]
+            for bt in sc["beats"]
+            for sh in bt["shots"]
+        )
+        for i, ep in enumerate(graph["episodes"], 1)
+    )
 
 
 def test_semantic_candidates_are_source_bound_and_not_generic_custom() -> None:
@@ -94,16 +113,63 @@ def test_low_confidence_candidate_is_not_lockable() -> None:
     assert "PLOT_POINT_NOT_CONFIRMED" in report["issue_codes"]
 
 
+def test_candidate_extraction_is_bounded_to_three_per_episode() -> None:
+    raw = (
+        "。".join(
+            [
+                "她隐瞒了自己的身份",
+                "她拿着一把钥匙",
+                "门外传来追杀警告",
+                "他答应保护她",
+                "组织有一条禁令",
+            ]
+        )
+        + "。"
+    )
+    graph = build_planned_graph(normalize_story(raw), target_duration=30)
+    assert len(graph["episodes"][0]["plot_point_candidates"]) <= 3
+
+
 def test_strict_validation_rejects_missing_midpoint_point() -> None:
-    graph = _authored(build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30))
+    graph = _authored(
+        build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30)
+    )
     graph["episodes"][0]["mid_episode_points"] = []
     report = validate_narrative_graph(graph, strict=True)
     assert "EPISODE_MIDPOINT_POINT_MISSING" in report["issue_codes"]
 
 
+def test_strict_validation_rejects_generic_hook_and_mismatched_shot() -> None:
+    graph = _authored(
+        build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30)
+    )
+    episode = graph["episodes"][0]
+    episode["ending_hook"]["question"] = "敬请期待"
+    episode["ending_hook"]["beat_id"] = episode["scenes"][0]["beats"][0]["id"]
+    report = validate_narrative_graph(graph, strict=True)
+    assert "HOOK_QUESTION_GENERIC" in report["issue_codes"]
+    assert "PLOT_POINT_NO_EVIDENCE" in report["issue_codes"]
+
+
+def test_strict_validation_rejects_unknown_payoff_reference() -> None:
+    graph = _authored(
+        build_planned_graph(
+            normalize_story("# 第1集\n她发现一把钥匙。\n\n# 第2集\n她打开旧门。"),
+            target_duration=30,
+        )
+    )
+    graph["episodes"][1]["payoff_points"].append("ghost_point")
+    report = validate_narrative_graph(graph, strict=True)
+    assert "PLOT_POINT_ORPHAN" in report["issue_codes"]
+
+
 def test_narrative_evidence_requires_executed_and_human_readback(tmp_path: Path) -> None:
-    graph = _authored(build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30))
-    (tmp_path / "drama-graph.json").write_text(json.dumps(graph, ensure_ascii=False), encoding="utf-8")
+    graph = _authored(
+        build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30)
+    )
+    (tmp_path / "drama-graph.json").write_text(
+        json.dumps(graph, ensure_ascii=False), encoding="utf-8"
+    )
     build_narrative_evidence(tmp_path)
     missing = validate_narrative_evidence(tmp_path)
     assert not missing["ok"]
@@ -112,5 +178,32 @@ def test_narrative_evidence_requires_executed_and_human_readback(tmp_path: Path)
         item["evidence_status"] = "verified"
         item["executed"] = {"shot_ids": item["shot_ids"], "time_range": [0.0, 1.0]}
         item["human_review"] = {"approved": True, "reviewer": "user"}
-    (tmp_path / "narrative-evidence.json").write_text(json.dumps(evidence, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "narrative-evidence.json").write_text(
+        json.dumps(evidence, ensure_ascii=False), encoding="utf-8"
+    )
     assert validate_narrative_evidence(tmp_path)["ok"]
+
+
+def test_v2_evidence_cannot_be_faked_with_partial_review_fields(tmp_path: Path) -> None:
+    graph = _authored(
+        build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30)
+    )
+    (tmp_path / "drama-graph.json").write_text(
+        json.dumps(graph, ensure_ascii=False), encoding="utf-8"
+    )
+    build_narrative_evidence(tmp_path)
+    evidence = json.loads((tmp_path / "narrative-evidence.json").read_text(encoding="utf-8"))
+    item = evidence["items"][0]
+    item["evidence_status"] = "verified"
+    item["executed"] = {
+        "shot_ids": item["shot_ids"],
+        "time_range": {"start_sec": 0.1, "end_sec": 0.8},
+    }
+    item["human_review"] = {"approved": True, "reviewer": "dex"}
+    (tmp_path / "narrative-evidence.json").write_text(
+        json.dumps(evidence, ensure_ascii=False), encoding="utf-8"
+    )
+    report = validate_narrative_evidence(tmp_path)
+    codes = {issue["code"] for issue in report["issues"]}
+    assert "HUMAN_REVIEW_MISSING" in codes
+    assert "NARRATIVE_EXECUTED_EVIDENCE_MISSING" in codes

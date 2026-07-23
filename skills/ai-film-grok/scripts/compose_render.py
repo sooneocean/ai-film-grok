@@ -24,6 +24,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from media_probe import run_media_to_output
 from media_qa import MediaQAError, analyze_media
 from runtime_policy import sha256
 from security_policy import (
@@ -82,13 +83,17 @@ def run(
     # Allow npx network cache under user home
     if "HOME" in env:
         env.setdefault("npm_config_cache", str(Path(env["HOME"]) / ".npm"))
+    argv = list(cmd)
+    if argv and Path(argv[0]).name == "ffmpeg" and "-nostdin" not in argv:
+        argv.insert(1, "-nostdin")
     return subprocess.run(
-        cmd,
+        argv,
         cwd=str(cwd) if cwd else None,
         check=check,
         capture_output=True,
         text=True,
         env=env,
+        stdin=subprocess.DEVNULL,
         timeout=timeout,
     )
 
@@ -570,7 +575,7 @@ def _preferred_mix_audio_sources(root: Path) -> list[Path]:
 
 
 def _ffmpeg_mux_video_with_audio(video: Path, audio_src: Path, out: Path) -> None:
-    run(
+    run_media_to_output(
         [
             "ffmpeg",
             "-y",
@@ -594,7 +599,10 @@ def _ffmpeg_mux_video_with_audio(video: Path, audio_src: Path, out: Path) -> Non
             "2",
             "-shortest",
             str(out),
-        ]
+        ],
+        out,
+        timeout=600,
+        min_bytes=1000,
     )
 
 
@@ -729,7 +737,7 @@ def ensure_audio_mux(
         work.mkdir(parents=True, exist_ok=True)
         mixed = work / "mixed.m4a"
         if bgm is not None:
-            run(
+            run_media_to_output(
                 [
                     "ffmpeg",
                     "-y",
@@ -746,10 +754,13 @@ def ensure_audio_mux(
                     "-b:a",
                     "192k",
                     str(mixed),
-                ]
+                ],
+                mixed,
+                timeout=600,
+                min_bytes=100,
             )
         else:
-            run(
+            run_media_to_output(
                 [
                     "ffmpeg",
                     "-y",
@@ -760,9 +771,12 @@ def ensure_audio_mux(
                     "-b:a",
                     "192k",
                     str(mixed),
-                ]
+                ],
+                mixed,
+                timeout=600,
+                min_bytes=100,
             )
-        run(
+        run_media_to_output(
             [
                 "ffmpeg",
                 "-y",
@@ -782,7 +796,10 @@ def ensure_audio_mux(
                 "192k",
                 "-shortest",
                 str(out),
-            ]
+            ],
+            out,
+            timeout=600,
+            min_bytes=1000,
         )
         return {
             "ok": True,
@@ -1318,6 +1335,12 @@ def compose_render(
                     "可 aifilm register-final --source … --post-engine remotion 手动接入。"
                 )
                 raise ComposeRenderError(f"{exc} | hint={result['hint']}") from exc
+        # Remotion duration advisory — non-fatal
+        _rem_out = Path(result["output"]) if result.get("output") else None
+        result["duration_advisory"] = duration_advisory(
+            result.get("duration_sec")
+            or (pdur(_rem_out) if _rem_out and _rem_out.is_file() else None)
+        )
         return result
 
     # HyperFrames path (also engine=both after remotion media copy)
@@ -1385,6 +1408,9 @@ def compose_render(
             )
             raise ComposeRenderError(f"{exc} | hint={result['hint']}") from exc
 
+    # HF duration advisory (>90s sweet spot, ~3min ceiling) — non-fatal
+    _dur = result.get("duration_sec") or (pdur(mixed_out) if mixed_out.is_file() else None)
+    result["duration_advisory"] = duration_advisory(_dur)
     return result
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -100,6 +101,8 @@ def _media_probe(path: Path) -> dict[str, Any]:
             text=True,
         )
         duration = float(json.loads(raw)["format"]["duration"])
+        if not math.isfinite(duration) or duration <= 0:
+            raise ValueError("media duration must be finite and positive")
     except (OSError, subprocess.CalledProcessError, KeyError, TypeError, ValueError) as exc:
         raise NarrativeEvidenceError(
             f"cannot probe media duration: {path}", code="MEDIA_UNREADABLE"
@@ -191,7 +194,14 @@ def record_narrative_evidence(
             raise NarrativeEvidenceError(
                 "shot is not planned for this evidence", code="EVIDENCE_SHOT_UNPLANNED"
             )
-        if start_sec is None or end_sec is None or end_sec <= start_sec or start_sec < 0:
+        if (
+            start_sec is None
+            or end_sec is None
+            or not math.isfinite(float(start_sec))
+            or not math.isfinite(float(end_sec))
+            or end_sec <= start_sec
+            or start_sec < 0
+        ):
             raise NarrativeEvidenceError(
                 "invalid evidence time range", code="EVIDENCE_TIME_INVALID"
             )
@@ -304,6 +314,36 @@ def validate_narrative_evidence(root: Path, *, require_verified: bool = True) ->
             # structured time_range plus media hash and are checked below.
             if isinstance(executed.get("time_range"), list) and not executed.get("media_path"):
                 continue
+            if (
+                not executed.get("shot_ids")
+                or not executed.get("media_path")
+                or not executed.get("media_sha256")
+            ):
+                issues.append(
+                    {
+                        "code": "NARRATIVE_EXECUTED_EVIDENCE_MISSING",
+                        "message": f"executed evidence fields are incomplete: {planned['evidence_id']}",
+                    }
+                )
+            if not isinstance(executed.get("time_range"), dict):
+                issues.append(
+                    {
+                        "code": "EVIDENCE_TIME_INVALID",
+                        "message": f"structured time range required: {planned['evidence_id']}",
+                    }
+                )
+            if (
+                human.get("approved") is not True
+                or not human.get("reviewer")
+                or not human.get("user_phrase")
+                or not human.get("reviewed_at")
+            ):
+                issues.append(
+                    {
+                        "code": "HUMAN_REVIEW_MISSING",
+                        "message": f"reviewer, time and explicit phrase required: {planned['evidence_id']}",
+                    }
+                )
             for sid in executed.get("shot_ids") or []:
                 if str(sid) not in {str(x) for x in planned.get("shot_ids") or []}:
                     issues.append(
@@ -313,7 +353,17 @@ def validate_narrative_evidence(root: Path, *, require_verified: bool = True) ->
                         }
                     )
             try:
-                media = root / str(executed.get("media_path") or "")
+                media = (root / str(executed.get("media_path") or "")).resolve()
+                media.relative_to(root)
+            except ValueError:
+                issues.append(
+                    {
+                        "code": "MEDIA_PATH_OUTSIDE_ROOT",
+                        "message": f"evidence media escapes film root: {planned['evidence_id']}",
+                    }
+                )
+                continue
+            try:
                 probe = _media_probe(media)
                 if probe["sha256"] != executed.get("media_sha256"):
                     issues.append(
@@ -334,7 +384,14 @@ def validate_narrative_evidence(root: Path, *, require_verified: bool = True) ->
                             "message": f"evidence time is outside media: {planned['evidence_id']}",
                         }
                     )
-            except (NarrativeEvidenceError, TypeError, ValueError):
+            except NarrativeEvidenceError as exc:
+                issues.append(
+                    {
+                        "code": exc.code,
+                        "message": f"invalid evidence media: {planned['evidence_id']}",
+                    }
+                )
+            except (TypeError, ValueError):
                 issues.append(
                     {
                         "code": "MEDIA_MISSING",

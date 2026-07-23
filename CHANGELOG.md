@@ -3,6 +3,30 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [1.21.0] — 2026-07-23
+
+### Improved — FFmpeg render safety
+
+- FFmpeg execution is now non-interactive across final and designed-post rendering.
+- Designed-post mux and stem outputs render to sibling temporary files, then publish atomically only after size and ffprobe validation.
+- Failed or undersized encodes no longer overwrite an existing final output; media command failures retain actionable diagnostics.
+
+## [1.20.0] — 2026-07-23
+
+### Added — Director methodology injection (P1-5/P1-6: scene design + art direction)
+
+- **Location schema expanded** (P1-5): `drama-graph.schema.json` Location upgraded from 2 fields (id/description) to full scene design sheet: `structure`, `timeOfDay`, `lighting`, `palette`, `immutableRules`, `recurringObjects`, `primaryAngles`, `atmosphere`, `color_temperature`, `set_dressing`, `lighting_plot`.
+- **locationId filling** (P1-5): `derive_graph()` now populates `locationId` from scene or inferred from shot dsl.location (was hardcoded `None` at both scene + shot level).
+- **SCENE_LOCATION_MISSING lint** (P1-5): new continuity lint code fires warning when shot has no locationId — scene continuity cannot be verified without location binding.
+- **`art_direction` layer** (P1-6): style-bible.schema now defines structured `art_direction` object with `color_script` (per-scene color temperature + emotional motivation), `visual_motifs` (recurring symbols with narrative meaning), `texture_continuity` (texture elements that must be consistent). Replaces single-string palette/lighting for art direction.
+- 9 new tests covering location filling, lint, and schema structure.
+
+### Improved — FFmpeg/ffprobe reliability
+
+- Added shared non-interactive FFmpeg/ffprobe execution and structured media probing.
+- Unified timeout, missing-tool, invalid-output, and full-decode errors across media QA, duration checks, and master delivery.
+- Kept encoding and filter behavior unchanged to avoid visual-quality regressions.
+
 ## [1.19.0] — 2026-07-23
 
 ### Added — Department evidence and take integrity

@@ -174,15 +174,15 @@
     },
     "Hook": {
       "type": "object",
-      "required": ["hook_id", "point_id", "beat_id", "shot_ids", "question"],
+      "required": ["hook_id", "point_id", "beat_id", "shot_ids", "question", "source_refs", "visible_evidence"],
       "properties": {
         "hook_id": { "type": "string" },
         "point_id": { "type": "string" },
         "beat_id": { "type": "string" },
         "shot_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-        "question": { "type": "string", "minLength": 1 }
-        ,"source_refs": { "type": "array", "items": { "type": "string" } }
-        ,"visible_evidence": { "type": "string" }
+        "question": { "type": "string", "minLength": 1 },
+        "source_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "visible_evidence": { "type": "string", "minLength": 1 }
       }
     },
     "PlotPointCandidate": {
@@ -416,7 +416,20 @@
         "must_include": { "type": "array", "items": { "type": "string" } },
         "playable_action": { "type": "string" },
         "gaze_target": { "type": "string" },
-        "control": { "$ref": "#/$defs/Control" }
+        "control": { "$ref": "#/$defs/Control" },
+        "shot_number": { "type": "string", "description": "P1-7: Storyboard shot number (e.g. 'S01_A')" },
+        "duration_sec": { "type": "number", "description": "P1-7: Planned shot duration" },
+        "shot_size_progression": { "type": "string", "enum": ["wide_to_close", "close_to_wide", "intercut", "static", "unspecified"], "description": "P1-7: Shot size progression within scene context" },
+        "composition_rule": {
+          "type": "string",
+          "enum": ["rule_of_thirds", "leading_lines", "symmetry", "golden_ratio", "center_frame", "negative_space", "unspecified"],
+          "description": "P1-7: Composition rule: 三分法/引导线/对称/黄金分割/居中/负空间"
+        },
+        "camera_height": { "type": "string", "description": "P1-7: Camera height (eye_level/low_angle/high_angle/birds_eye/worms_eye)" },
+        "lens_mm": { "type": "number", "description": "P1-7: Focal length in mm (35mm equivalent)" },
+        "eyeline_target": { "type": "string", "description": "P1-7: Where subject looks — for eyeline match continuity" },
+        "axis_side": { "type": "string", "enum": ["left", "right", "center"], "description": "P1-7: Which side of 180° axis camera is on" },
+        "transition_to_next": { "type": "string", "description": "P1-7: Planned transition to next panel" }
       }
     },
     "Control": {

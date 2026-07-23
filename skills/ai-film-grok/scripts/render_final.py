@@ -158,12 +158,17 @@ def log(msg: str) -> None:
 
 
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    argv = list(cmd)
+    executable = Path(argv[0]).name if argv else ""
+    if executable == "ffmpeg" and "-nostdin" not in argv:
+        argv.insert(1, "-nostdin")
     return subprocess.run(
-        cmd,
-        timeout=60,
+        argv,
+        timeout=600 if executable == "ffmpeg" else 60,
         check=check,
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
         env=minimal_subprocess_env(),
     )
 

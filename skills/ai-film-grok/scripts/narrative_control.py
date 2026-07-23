@@ -41,6 +41,9 @@ PLACEHOLDER_RE = re.compile(
     r"^(?:todo|tbd|needs_authoring|待补|待定|待填写|冲突顶点|余韵与续集钩子|advance story)$",
     re.IGNORECASE,
 )
+GENERIC_HOOK_RE = re.compile(
+    r"^(?:敬请期待|事情还没有结束|未完待续|to be continued|stay tuned)[。！! ]*$", re.I
+)
 
 
 class NarrativeControlError(ValueError):
@@ -253,14 +256,15 @@ def _episode_tree(graph: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-def _episode_refs(graph: dict[str, Any]) -> dict[str, dict[str, set[str]]]:
+def _episode_refs(graph: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Index episode-local beat and shot ids for hook/point evidence checks."""
-    out: dict[str, dict[str, set[str]]] = {}
+    out: dict[str, dict[str, Any]] = {}
     for ep in graph.get("episodes") or []:
         if not isinstance(ep, dict) or not ep.get("id"):
             continue
         beats: set[str] = set()
         shots: set[str] = set()
+        shot_to_beat: dict[str, str] = {}
         for scene in ep.get("scenes") or []:
             if not isinstance(scene, dict):
                 continue
@@ -271,8 +275,10 @@ def _episode_refs(graph: dict[str, Any]) -> dict[str, dict[str, set[str]]]:
                     beats.add(str(beat["id"]))
                 for shot in beat.get("shots") or []:
                     if isinstance(shot, dict) and shot.get("id"):
-                        shots.add(str(shot["id"]))
-        out[str(ep["id"])] = {"beats": beats, "shots": shots}
+                        shot_id = str(shot["id"])
+                        shots.add(shot_id)
+                        shot_to_beat[shot_id] = str(beat["id"])
+        out[str(ep["id"])] = {"beats": beats, "shots": shots, "shot_to_beat": shot_to_beat}
     return out
 
 
@@ -281,7 +287,7 @@ def _hook_issues(
     *,
     code: str,
     episode_id: str,
-    refs: dict[str, set[str]],
+    refs: dict[str, Any],
     points: dict[str, dict[str, Any]],
     require_unresolved: bool = False,
 ) -> list[dict[str, Any]]:
@@ -293,10 +299,26 @@ def _hook_issues(
                 node_ref=episode_id,
             )
         ]
+    issues: list[dict[str, Any]] = []
+    if GENERIC_HOOK_RE.match(str(hook.get("question") or "").strip()):
+        issues = [
+            _issue(
+                "HOOK_QUESTION_GENERIC",
+                f"hook question must name a concrete unresolved question: {episode_id}",
+                node_ref=episode_id,
+            )
+        ]
+    if not hook.get("source_refs") or not _nonempty(hook.get("visible_evidence")):
+        issues.append(
+            _issue(
+                "PLOT_POINT_NO_EVIDENCE",
+                f"hook requires source_refs and visible_evidence: {episode_id}",
+                node_ref=episode_id,
+            )
+        )
     point_id = str(hook.get("point_id") or "")
     beat_id = str(hook.get("beat_id") or "")
     shot_ids = {str(x) for x in hook.get("shot_ids") or [] if str(x).strip()}
-    issues: list[dict[str, Any]] = []
     if not point_id or point_id not in points:
         issues.append(
             _issue(
@@ -305,11 +327,28 @@ def _hook_issues(
                 node_ref=episode_id,
             )
         )
-    if beat_id not in refs["beats"] or not shot_ids.intersection(refs["shots"]):
+    local_shots = shot_ids.intersection(refs["shots"])
+    if beat_id not in refs["beats"] or not local_shots:
         issues.append(
             _issue(
                 "PLOT_POINT_NO_EVIDENCE",
                 f"hook has no local beat/shot evidence: {episode_id}",
+                node_ref=episode_id,
+            )
+        )
+    elif not any(refs.get("shot_to_beat", {}).get(shot_id) == beat_id for shot_id in local_shots):
+        issues.append(
+            _issue(
+                "PLOT_POINT_NO_EVIDENCE",
+                f"hook shot evidence is not bound to hook beat: {episode_id}",
+                node_ref=episode_id,
+            )
+        )
+    if point_id in points and str(points[point_id].get("introduced_episode") or "") != episode_id:
+        issues.append(
+            _issue(
+                "PLOT_POINT_ORPHAN",
+                f"hook point is not introduced in episode: {point_id}",
                 node_ref=episode_id,
             )
         )
@@ -365,6 +404,10 @@ def validate_narrative_contract(
             intro_ep not in episodes
             or intro_beat not in refs["beats"]
             or not intro_shots.intersection(refs["shots"])
+            or not any(
+                refs.get("shot_to_beat", {}).get(shot_id) == intro_beat
+                for shot_id in intro_shots.intersection(refs["shots"])
+            )
         ):
             issues.append(
                 _issue(
@@ -549,6 +592,24 @@ def validate_narrative_contract(
                     node_ref=episode_id,
                 )
             )
+        elif GENERIC_HOOK_RE.match(str(contract.get("new_audience_question") or "").strip()):
+            issues.append(
+                _issue(
+                    "HOOK_QUESTION_GENERIC",
+                    f"episode question must be concrete: {episode_id}",
+                    node_ref=episode_id,
+                )
+            )
+        for relation_name in ("carry_in_points", "payoff_points"):
+            for point_id in contract.get(relation_name) or []:
+                if str(point_id) not in points:
+                    issues.append(
+                        _issue(
+                            "PLOT_POINT_ORPHAN",
+                            f"{relation_name} references unknown point: {point_id}",
+                            node_ref=episode_id,
+                        )
+                    )
         if index > 0:
             previous_id = list(episodes)[index - 1]
             previous = episodes[previous_id]
@@ -574,7 +635,16 @@ def validate_narrative_contract(
                 )
         for point_id in contract.get("payoff_points") or []:
             point = points.get(str(point_id))
-            if point and point.get("status") not in {"paid_off", "season_hook"}:
+            if not point:
+                issues.append(
+                    _issue(
+                        "PLOT_POINT_ORPHAN",
+                        f"payoff references unknown point: {point_id}",
+                        node_ref=episode_id,
+                    )
+                )
+                continue
+            if point.get("status") not in {"paid_off", "season_hook"}:
                 issues.append(
                     _issue(
                         "PAYOFF_STATUS_INVALID",
@@ -584,14 +654,30 @@ def validate_narrative_contract(
                 )
             payoff_evidence = (
                 point.get("payoff_evidence")
-                if point and isinstance(point.get("payoff_evidence"), dict)
+                if isinstance(point.get("payoff_evidence"), dict)
                 else {}
             )
-            if point and str(payoff_evidence.get("episode") or "") != episode_id:
+            if str(payoff_evidence.get("episode") or "") != episode_id:
                 issues.append(
                     _issue(
                         "PAYOFF_EVIDENCE_MISMATCH",
                         f"payoff evidence does not match episode: {point_id}",
+                        node_ref=episode_id,
+                    )
+                )
+            payoff_refs = refs_by_ep.get(
+                episode_id, {"beats": set(), "shots": set(), "shot_to_beat": {}}
+            )
+            payoff_shots = {str(x) for x in payoff_evidence.get("shot_ids") or []}
+            if str(payoff_evidence.get("beat_id") or "") not in payoff_refs["beats"] or not any(
+                payoff_refs.get("shot_to_beat", {}).get(shot_id)
+                == str(payoff_evidence.get("beat_id"))
+                for shot_id in payoff_shots
+            ):
+                issues.append(
+                    _issue(
+                        "PAYOFF_EVIDENCE_ORPHAN",
+                        f"payoff evidence is not bound to its beat: {point_id}",
                         node_ref=episode_id,
                     )
                 )
