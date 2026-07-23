@@ -1223,6 +1223,14 @@ def cmd_provider_canary(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") else 2
 
 
+def cmd_delivery_package(args: argparse.Namespace) -> int:
+    from delivery_package import build_delivery_package
+
+    report = build_delivery_package(Path(args.root), allow_missing=bool(args.allow_missing))
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
 def cmd_state_index(args: argparse.Namespace) -> int:
     """Checkpoint: state photos + keyframes + promote plan for fluid transitions."""
     skill_dir = Path(__file__).resolve().parents[1]
@@ -5926,7 +5934,9 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_p.add_argument("--suite", choices=("premium-vertical",), default="premium-vertical")
     benchmark_p.add_argument("--mode", choices=("contract", "live"), default="contract")
 
-    creative = sub.add_parser("creative-pipeline", help="Radio cut, animatic and premium pre-production gates")
+    creative = sub.add_parser(
+        "creative-pipeline", help="Radio cut, animatic and premium pre-production gates"
+    )
     creative_sub = creative.add_subparsers(dest="pipeline_action", required=True)
     cr = creative_sub.add_parser("readiness")
     cr.add_argument("--root", required=True)
@@ -5943,7 +5953,9 @@ def build_parser() -> argparse.ArgumentParser:
     anim.add_argument("--pace-ok", action="store_true")
     anim.add_argument("--performance-ok", action="store_true")
 
-    dailies = sub.add_parser("dailies", help="Record and audit Select/Alternate/Reject/Reshoot candidates")
+    dailies = sub.add_parser(
+        "dailies", help="Record and audit Select/Alternate/Reject/Reshoot candidates"
+    )
     dailies_sub = dailies.add_subparsers(dest="dailies_action", required=True)
     ds = dailies_sub.add_parser("status")
     ds.add_argument("--root", required=True)
@@ -5962,7 +5974,9 @@ def build_parser() -> argparse.ArgumentParser:
     vr.add_argument("--root", required=True)
     vr.add_argument("--shot-id", required=True)
     vr.add_argument("--plate", required=True)
-    vr.add_argument("--status", choices=("pending", "wip", "review", "approved", "rejected"), required=True)
+    vr.add_argument(
+        "--status", choices=("pending", "wip", "review", "approved", "rejected"), required=True
+    )
     vr.add_argument("--reviewer", required=True)
     vr.add_argument("--notes", default="")
     for name in ("vfx-check", "audio-check"):
@@ -5984,6 +5998,12 @@ def build_parser() -> argparse.ArgumentParser:
     cc.add_argument("--identity-ok", action="store_true")
     cc.add_argument("--motion-ok", action="store_true")
     cc.add_argument("--notes", default="")
+
+    package = sub.add_parser(
+        "delivery-package", help="Validate dual-master premium delivery assets"
+    )
+    package.add_argument("--root", required=True)
+    package.add_argument("--allow-missing", action="store_true")
 
     # v1.23: reference video audit — reverse-engineer shot grammar
     refaudit = sub.add_parser(
@@ -6870,6 +6890,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_post_quality(args)
         if args.cmd == "provider-canary":
             return cmd_provider_canary(args)
+        if args.cmd == "delivery-package":
+            return cmd_delivery_package(args)
         if args.cmd == "analyze-reference":
             from reference_audit import ReferenceAuditError, run_reference_audit
 

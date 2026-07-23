@@ -44,6 +44,7 @@ DEFAULT_SCRIPTS = (
     "dailies.py",
     "post_quality.py",
     "provider_canary.py",
+    "delivery_package.py",
     "benchmark.py",
     "render_final.py",
     "runtime_policy.py",
