@@ -29,13 +29,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+from config_loader import get_config
+
+_CFG = get_config()
 
 DEFAULT_BASE = "http://127.0.0.1:17493"
 DEFAULT_LANGUAGE = "zh"
@@ -46,51 +49,20 @@ POLL_INTERVAL = 0.6
 POLL_MAX_SEC = 600
 
 
-def _load_config_env() -> None:
-    cfg = (
-        Path(__file__).resolve().parents[2] / "config.env"
-        if (Path(__file__).resolve().parents[2] / "config.env").is_file()
-        else Path.home() / ".grok/skills/ai-film-grok/config.env"
-    )
-    if not cfg.is_file():
-        return
-    for line in cfg.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
-
-
 def base_url() -> str:
-    return (
-        os.environ.get("VOICEBOX_BASE_URL") or os.environ.get("AIFILM_VOICEBOX_URL") or DEFAULT_BASE
-    ).rstrip("/")
+    return _CFG.voicebox_base_url.rstrip("/")
 
 
 def default_profile() -> str:
-    return (
-        os.environ.get("VOICEBOX_PROFILE")
-        or os.environ.get("VOICEBOX_PROFILE_ID")
-        or os.environ.get("AIFILM_VOICEBOX_PROFILE")
-        or ""
-    ).strip()
+    return (_CFG.voicebox_profile or "").strip()
 
 
 def default_language() -> str:
-    return (
-        os.environ.get("VOICEBOX_LANGUAGE")
-        or os.environ.get("AIFILM_VOICEBOX_LANGUAGE")
-        or DEFAULT_LANGUAGE
-    ).strip() or DEFAULT_LANGUAGE
+    return (_CFG.voicebox_language or DEFAULT_LANGUAGE).strip() or DEFAULT_LANGUAGE
 
 
 def default_engine() -> str | None:
-    eng = (
-        os.environ.get("VOICEBOX_ENGINE") or os.environ.get("AIFILM_VOICEBOX_ENGINE") or ""
-    ).strip()
+    eng = (_CFG.voicebox_engine or "").strip()
     return eng or None
 
 
@@ -411,7 +383,6 @@ def doctor() -> dict[str, Any]:
 
 
 def main() -> int:
-    _load_config_env()
     ap = argparse.ArgumentParser(description="Voicebox local TTS for ai-film-grok")
     ap.add_argument("cmd", nargs="?", default="synth", choices=["synth", "doctor", "profiles"])
     ap.add_argument("--text-file", default="")

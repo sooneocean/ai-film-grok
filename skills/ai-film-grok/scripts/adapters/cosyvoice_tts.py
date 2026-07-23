@@ -36,6 +36,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from config_loader import get_config
+
+_CFG = get_config()
+
 DEFAULT_BASE = "http://127.0.0.1:9880"
 DEFAULT_ENDPOINT = "/tts"
 # payload styles: shengwang | funaudio | openaiish
@@ -43,47 +47,23 @@ DEFAULT_STYLE = "shengwang"
 MIN_AUDIO_BYTES = 500
 
 
-def _load_config_env() -> None:
-    cfg = (
-        Path(__file__).resolve().parents[2] / "config.env"
-        if (Path(__file__).resolve().parents[2] / "config.env").is_file()
-        else Path.home() / ".grok/skills/ai-film-grok/config.env"
-    )
-    if not cfg.is_file():
-        return
-    for line in cfg.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
-
-
 def _base_url() -> str:
-    return (
-        os.environ.get("COSYVOICE_BASE_URL")
-        or os.environ.get("AIFILM_COSYVOICE_URL")
-        or DEFAULT_BASE
-    ).rstrip("/")
+    return _CFG.cosyvoice_base_url.rstrip("/")
 
 
 def _endpoint() -> str:
-    ep = (os.environ.get("COSYVOICE_ENDPOINT") or DEFAULT_ENDPOINT).strip()
+    ep = _CFG.cosyvoice_endpoint.strip()
     if not ep.startswith("/"):
         ep = "/" + ep
     return ep
 
 
 def _style() -> str:
-    return (os.environ.get("COSYVOICE_PAYLOAD_STYLE") or DEFAULT_STYLE).strip().lower()
+    return _CFG.cosyvoice_payload_style.strip().lower()
 
 
 def _ref_wav() -> Path | None:
-    raw = (
-        os.environ.get("COSYVOICE_REF_WAV") or os.environ.get("AIFILM_COSYVOICE_REF") or ""
-    ).strip()
+    raw = _CFG.cosyvoice_ref_wav.strip()
     if not raw:
         return None
     p = Path(raw).expanduser()
@@ -91,12 +71,12 @@ def _ref_wav() -> Path | None:
 
 
 def _speaker(voice: str) -> str:
-    return (voice or "").strip() or (os.environ.get("COSYVOICE_SPEAKER") or "").strip() or "default"
+    return (voice or "").strip() or (_CFG.cosyvoice_speaker or "").strip() or "default"
 
 
 def _build_payload(text: str, speaker: str, ref: Path | None) -> dict:
     style = _style()
-    lang = (os.environ.get("COSYVOICE_LANGUAGE") or "zh").strip()
+    lang = _CFG.cosyvoice_language
     if style == "openaiish":
         body: dict = {"input": text, "voice": speaker, "model": "cosyvoice"}
         if ref is not None:
@@ -112,14 +92,14 @@ def _build_payload(text: str, speaker: str, ref: Path | None) -> dict:
         }
         if ref is not None:
             body["prompt_wav"] = str(ref)
-            body["prompt_text"] = (os.environ.get("COSYVOICE_PROMPT_TEXT") or "").strip()
+            body["prompt_text"] = _CFG.cosyvoice_prompt_text
         return body
     # shengwang blog / simple API
     body = {"text": text, "speaker": speaker, "language": lang}
     if ref is not None:
         body["ref_wav"] = str(ref)
         # some servers want base64 inline
-        if os.environ.get("COSYVOICE_REF_AS_B64") == "1":
+        if _CFG.cosyvoice_ref_as_b64:
             body["ref_audio_b64"] = base64.b64encode(ref.read_bytes()).decode("ascii")
     return body
 
@@ -198,7 +178,6 @@ def _to_wav(raw: bytes, out: Path) -> None:
 
 
 def doctor() -> int:
-    _load_config_env()
     base = _base_url()
     ref = _ref_wav()
     print(f"COSYVOICE_BASE_URL={base}")
@@ -227,7 +206,6 @@ def doctor() -> int:
 
 
 def synthesize(text: str, out: Path, voice: str) -> None:
-    _load_config_env()
     text = text.strip()
     if not text:
         raise SystemExit("empty text")
@@ -258,7 +236,6 @@ def main() -> int:
     if args.command == "doctor":
         return doctor()
 
-    _load_config_env()
     if args.ref:
         os.environ["COSYVOICE_REF_WAV"] = args.ref
 

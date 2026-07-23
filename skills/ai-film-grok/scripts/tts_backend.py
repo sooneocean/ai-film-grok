@@ -42,12 +42,12 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from config_loader import get_config
 from security_policy import (
     SecurityPolicyError,
     atomic_write_bytes,
     atomic_write_text,
     expand_argv,
-    load_allowed_env,
     minimal_subprocess_env,
     parse_argv_json,
 )
@@ -78,91 +78,40 @@ GROK_BUILTIN_VOICES = frozenset(
 
 
 def _load_config_env() -> None:
-    """Load skill config.env into os.environ if not already set."""
-    cfg = Path(__file__).resolve().parents[1] / "config.env"
-    load_allowed_env(
-        cfg,
-        allowed_keys={
-            "AIFILM_FISH_API_KEY",
-            "AIFILM_FISH_MODEL",
-            "AIFILM_FISH_VOICE_ID",
-            "AIFILM_MINIMAX_API_KEY",
-            "AIFILM_MINIMAX_MODEL",
-            "AIFILM_MINIMAX_VOICE_ID",
-            "AIFILM_TTS_ARGV",
-            "AIFILM_TTS_BACKEND",
-            "AIFILM_TTS_STRICT_VOICE",
-            "AIFILM_TTS_VOICEBOX_FALLBACK",
-            "AIFILM_GROK_TTS_VOICE",
-            "AIFILM_GROK_TTS_LANGUAGE",
-            "AIFILM_VOICEBOX_ENGINE",
-            "AIFILM_VOICEBOX_LANGUAGE",
-            "AIFILM_VOICEBOX_PROFILE",
-            "AIFILM_VOICEBOX_URL",
-            "FISH_API_KEY",
-            "FISH_AUDIO_API_KEY",
-            "FISH_MODEL",
-            "FISH_REFERENCE_ID",
-            "FISH_VOICE_ID",
-            "MINIMAX_API_KEY",
-            "MINIMAX_GROUP_ID",
-            "MINIMAX_MODEL",
-            "MINIMAX_VOICE_ID",
-            "VOICEBOX_BASE_URL",
-            "VOICEBOX_ENGINE",
-            "VOICEBOX_LANGUAGE",
-            "VOICEBOX_PROFILE",
-            "VOICEBOX_PROFILE_ID",
-        },
-    )
+    """Compatibility hook for older callers; config loading is centralized now."""
+    get_config()
 
 
 def fish_api_key() -> str | None:
-    return (
-        os.environ.get("FISH_API_KEY")
-        or os.environ.get("FISH_AUDIO_API_KEY")
-        or os.environ.get("AIFILM_FISH_API_KEY")
-        or None
-    )
+    return get_config().fish_api_key or None
 
 
 def fish_voice_id() -> str | None:
-    return (
-        os.environ.get("FISH_VOICE_ID")
-        or os.environ.get("AIFILM_FISH_VOICE_ID")
-        or os.environ.get("FISH_REFERENCE_ID")
-        or None
-    )
+    return get_config().fish_voice_id or None
 
 
 def fish_model() -> str:
-    return os.environ.get("FISH_MODEL") or os.environ.get("AIFILM_FISH_MODEL") or "s2.1-pro-free"
+    return get_config().fish_model or "s2.1-pro-free"
 
 
 def minimax_api_key() -> str | None:
-    return os.environ.get("MINIMAX_API_KEY") or os.environ.get("AIFILM_MINIMAX_API_KEY") or None
+    return get_config().minimax_api_key or None
 
 
 def minimax_voice_id() -> str:
-    return (
-        os.environ.get("MINIMAX_VOICE_ID")
-        or os.environ.get("AIFILM_MINIMAX_VOICE_ID")
-        or "Chinese (Mandarin)_Lyrical_Voice"
-    )
+    return get_config().minimax_voice_id or "Chinese (Mandarin)_Lyrical_Voice"
 
 
 def minimax_model() -> str:
-    return (
-        os.environ.get("MINIMAX_MODEL") or os.environ.get("AIFILM_MINIMAX_MODEL") or "speech-2.6-hd"
-    )
+    return get_config().minimax_model or "speech-2.6-hd"
 
 
 def minimax_group_id() -> str | None:
-    return os.environ.get("MINIMAX_GROUP_ID") or None
+    return get_config().minimax_group_id or None
 
 
 def external_argv() -> list[str] | None:
-    raw = os.environ.get("AIFILM_TTS_ARGV")
+    raw = get_config().tts_argv
     if raw and raw.strip():
         try:
             return parse_argv_json(raw, variable="AIFILM_TTS_ARGV")
@@ -176,52 +125,29 @@ def external_argv() -> list[str] | None:
 
 
 def strict_voice_enabled() -> bool:
-    return (os.environ.get("AIFILM_TTS_STRICT_VOICE") or "1").lower() not in {
-        "0",
-        "false",
-        "no",
-        "off",
-    }
+    return get_config().tts_strict_voice
 
 
 def voicebox_fallback_enabled() -> bool:
     """Opt-in: on explicit backend failure, try local Voicebox once."""
-    return (os.environ.get("AIFILM_TTS_VOICEBOX_FALLBACK") or "0").lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    return get_config().tts_voicebox_fallback
 
 
 def voicebox_base_url() -> str:
-    return (
-        os.environ.get("VOICEBOX_BASE_URL")
-        or os.environ.get("AIFILM_VOICEBOX_URL")
-        or DEFAULT_VOICEBOX_URL
-    ).rstrip("/")
+    return (get_config().voicebox_base_url or DEFAULT_VOICEBOX_URL).rstrip("/")
 
 
 def voicebox_profile() -> str | None:
-    raw = (
-        os.environ.get("VOICEBOX_PROFILE")
-        or os.environ.get("VOICEBOX_PROFILE_ID")
-        or os.environ.get("AIFILM_VOICEBOX_PROFILE")
-        or ""
-    ).strip()
+    raw = (get_config().voicebox_profile or "").strip()
     return raw or None
 
 
 def voicebox_language() -> str:
-    return (
-        os.environ.get("VOICEBOX_LANGUAGE") or os.environ.get("AIFILM_VOICEBOX_LANGUAGE") or "zh"
-    ).strip() or "zh"
+    return (get_config().voicebox_language or "zh").strip() or "zh"
 
 
 def voicebox_engine() -> str | None:
-    eng = (
-        os.environ.get("VOICEBOX_ENGINE") or os.environ.get("AIFILM_VOICEBOX_ENGINE") or ""
-    ).strip()
+    eng = (get_config().voicebox_engine or "").strip()
     return eng or None
 
 
@@ -314,11 +240,11 @@ def probe_voicebox() -> dict[str, Any]:
 
 
 def grok_tts_voice() -> str:
-    return (os.environ.get("AIFILM_GROK_TTS_VOICE") or "eve").strip() or "eve"
+    return (get_config().grok_tts_voice or "eve").strip() or "eve"
 
 
 def grok_tts_language() -> str:
-    return (os.environ.get("AIFILM_GROK_TTS_LANGUAGE") or "zh").strip() or "zh"
+    return (get_config().grok_tts_language or "zh").strip() or "zh"
 
 
 def probe_grok_tts() -> dict[str, Any]:
@@ -327,7 +253,7 @@ def probe_grok_tts() -> dict[str, Any]:
         from grok_oauth import auth_path
         from grok_oauth import probe as grok_probe
 
-        if not auth_path().is_file() and not (os.environ.get("XAI_API_KEY") or "").strip():
+        if not auth_path().is_file() and not get_config().xai_api_key.strip():
             return {"ok": False, "error": "no grok auth.json and no XAI_API_KEY"}
         # Avoid deep TTS list on every film probe — models list is enough
         g = grok_probe(deep=False)
@@ -345,7 +271,6 @@ def probe_grok_tts() -> dict[str, Any]:
 
 
 def probe() -> dict[str, Any]:
-    _load_config_env()
     external_error = None
     try:
         ext = external_argv()
@@ -369,7 +294,7 @@ def probe() -> dict[str, Any]:
     except ImportError:
         backends["edge"] = False
 
-    preferred = (os.environ.get("AIFILM_TTS_BACKEND") or "auto").lower()
+    preferred = (get_config().tts_backend or "auto").lower()
     strict_voice = strict_voice_enabled()
     fish_ready = bool(backends["fish"] and (fish_voice_id() or not strict_voice))
     if preferred == "auto":
@@ -806,7 +731,7 @@ def is_edge_neural_voice_id(voice: str | None) -> bool:
 
 def external_tts_argv_hints_provider(provider: str = "eleven") -> bool:
     """True if AIFILM_TTS_ARGV JSON/string mentions a cloud provider (default: elevenlabs)."""
-    raw = (os.environ.get("AIFILM_TTS_ARGV") or "").strip()
+    raw = get_config().tts_argv.strip()
     if not raw:
         return False
     return provider.lower() in raw.lower()
@@ -827,7 +752,7 @@ def assert_voice_backend_compatible(backend: str, voice: str | None) -> None:
             "Fix: --tts-backend edge for Chinese storyteller, "
             "or set vo_voice to a real provider voice id (not zh-CN-…Neural)."
         )
-    if choice == "auto" and (os.environ.get("AIFILM_TTS_ARGV") or "").strip():
+    if choice == "auto" and get_config().tts_argv.strip():
         raise TTSError(
             f"tts_backend=auto with AIFILM_TTS_ARGV set would send Edge Neural voice "
             f"{voice!r} to external TTS. Use --tts-backend edge (recommended for 中文旁白) "

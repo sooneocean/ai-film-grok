@@ -21,48 +21,28 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
-import os
 import subprocess
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+from config_loader import get_config
+
+_CFG = get_config()
+
 MIN_BYTES = 500
 
 
-def _load_config_env() -> None:
-    cfg = (
-        Path(__file__).resolve().parents[2] / "config.env"
-        if (Path(__file__).resolve().parents[2] / "config.env").is_file()
-        else Path.home() / ".grok/skills/ai-film-grok/config.env"
-    )
-    if not cfg.is_file():
-        return
-    for line in cfg.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
-
-
 def _base() -> str:
-    return (
-        os.environ.get("MUSIC_GEN_BASE_URL")
-        or os.environ.get("ACESTEP_BASE_URL")
-        or "http://127.0.0.1:7860"
-    ).rstrip("/")
+    return _CFG.music_gen_base_url.rstrip("/")
 
 
 def _endpoint() -> str:
-    ep = (os.environ.get("MUSIC_GEN_ENDPOINT") or "/generate").strip()
+    ep = _CFG.music_gen_endpoint.strip()
     return ep if ep.startswith("/") else f"/{ep}"
 
 
 def doctor() -> int:
-    _load_config_env()
     base = _base()
     print(f"MUSIC_GEN_BASE_URL={base}")
     print(f"MUSIC_GEN_ENDPOINT={_endpoint()}")
@@ -96,8 +76,7 @@ def _http_generate(prompt: str, duration: float, mood: str, seed: int, out: Path
         "instrumental": True,
         "lyrics": "",
     }
-    # allow extra JSON merge from env
-    extra = (os.environ.get("MUSIC_GEN_EXTRA_JSON") or "").strip()
+    extra = _CFG.music_gen_extra_json.strip()
     if extra:
         with contextlib.suppress(json.JSONDecodeError):
             payload.update(json.loads(extra))
@@ -112,9 +91,7 @@ def _http_generate(prompt: str, duration: float, mood: str, seed: int, out: Path
         },
     )
     try:
-        with urllib.request.urlopen(
-            req, timeout=float(os.environ.get("AIFILM_MUSIC_TIMEOUT") or 300)
-        ) as resp:
+        with urllib.request.urlopen(req, timeout=float(_CFG.music_timeout)) as resp:
             ctype = (resp.headers.get("Content-Type") or "").lower()
             raw = resp.read()
     except urllib.error.HTTPError as exc:
@@ -181,7 +158,6 @@ def main() -> int:
     if args.command == "doctor":
         return doctor()
 
-    _load_config_env()
     if not args.out:
         raise SystemExit("usage: music_external.py doctor | --out … --duration …")
     prompt = (args.prompt or "").strip() or (

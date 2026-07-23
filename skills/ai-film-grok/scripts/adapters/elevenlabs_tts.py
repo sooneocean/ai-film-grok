@@ -15,37 +15,22 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+from config_loader import get_config
+
+_CFG = get_config()
 
 DEFAULT_VOICE = "cgSgspJ2msm6clMCkdW9"  # Jessica — young, cute, playful
 DEFAULT_MODEL = "eleven_multilingual_v2"
 API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 
 
-def _load_config_env() -> None:
-    cfg = (
-        Path(__file__).resolve().parents[2] / "config.env"
-        if (Path(__file__).resolve().parents[2] / "config.env").is_file()
-        else Path.home() / ".grok/skills/ai-film-grok/config.env"
-    )
-    if not cfg.is_file():
-        return
-    for line in cfg.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
-
-
 def _api_key() -> str:
-    key = (os.environ.get("ELEVENLABS_API_KEY") or "").strip()
+    key = _CFG.elevenlabs_api_key
     if not key:
         raise SystemExit("ELEVENLABS_API_KEY not set (put in config.env chmod 600)")
     return key
@@ -103,7 +88,7 @@ def _mp3_to_wav(mp3: Path, wav: Path) -> None:
 
 
 def main() -> int:
-    _load_config_env()
+    cfg = get_config()
     ap = argparse.ArgumentParser(description="ElevenLabs TTS for ai-film-grok")
     ap.add_argument("--text-file", required=True)
     ap.add_argument("--out", required=True, help="Output .wav or .mp3 path")
@@ -116,8 +101,8 @@ def main() -> int:
         raise SystemExit("empty text")
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    voice = (args.voice or os.environ.get("ELEVENLABS_VOICE_ID") or DEFAULT_VOICE).strip()
-    model = (args.model or os.environ.get("ELEVENLABS_MODEL") or DEFAULT_MODEL).strip()
+    voice = (args.voice or cfg.elevenlabs_voice_id or DEFAULT_VOICE).strip()
+    model = (args.model or cfg.elevenlabs_model or DEFAULT_MODEL).strip()
 
     audio = _synthesize(text, voice, model)
     # Always land a wav for render_final (it converts mp3→wav already, but wav is safest)

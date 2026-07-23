@@ -42,6 +42,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from config_loader import get_config
+
 DEFAULT_AUTH_PATH = Path.home() / ".grok" / "auth.json"
 DEFAULT_API_BASE = "https://api.x.ai/v1"
 DEFAULT_OIDC_ISSUER = "https://auth.x.ai"
@@ -66,34 +68,12 @@ class GrokOAuthError(RuntimeError):
 
 
 def auth_path() -> Path:
-    raw = (
-        os.environ.get("AIFILM_GROK_AUTH_PATH") or os.environ.get("GROK_AUTH_JSON") or ""
-    ).strip()
+    raw = get_config().grok_auth_path.strip()
     return Path(raw).expanduser() if raw else DEFAULT_AUTH_PATH
 
 
 def api_base() -> str:
-    return (
-        os.environ.get("AIFILM_GROK_API_BASE") or os.environ.get("XAI_BASE_URL") or DEFAULT_API_BASE
-    ).rstrip("/")
-
-
-def _load_config_env() -> None:
-    cfg = (
-        Path(__file__).resolve().parents[1] / "config.env"
-        if (Path(__file__).resolve().parents[1] / "config.env").is_file()
-        else Path.home() / ".grok/skills/ai-film-grok/config.env"
-    )
-    if not cfg.is_file():
-        return
-    for line in cfg.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
+    return get_config().grok_api_base.rstrip("/")
 
 
 def _jwt_payload(token: str) -> dict[str, Any]:
@@ -232,10 +212,9 @@ def refresh_access_token(entry: dict[str, Any]) -> dict[str, Any]:
 
 def get_access_token(*, force_refresh: bool = False, persist: bool = True) -> dict[str, Any]:
     """Return {token, source, expires_at, auth_mode, email, scopes, refreshed} — no raw dump helpers."""
-    _load_config_env()
-    # Explicit API key overrides (CI)
-    mode = (os.environ.get("AIFILM_GROK_AUTH") or "auto").strip().lower()
-    api_key = (os.environ.get("XAI_API_KEY") or "").strip()
+    cfg = get_config()
+    mode = cfg.grok_auth.strip().lower()
+    api_key = cfg.xai_api_key.strip()
     if mode == "api_key" or (mode == "auto" and api_key and not auth_path().is_file()):
         if not api_key:
             raise GrokOAuthError("AIFILM_GROK_AUTH=api_key but XAI_API_KEY empty")
@@ -387,13 +366,12 @@ def _image_input_object(image: str | Path) -> dict[str, str]:
 
 def probe(*, deep: bool = False) -> dict[str, Any]:
     """Safe readiness report (no secrets). deep=True lightly probes TTS voices list."""
-    _load_config_env()
     out: dict[str, Any] = {
         "ok": False,
         "auth_path": str(auth_path()),
         "auth_present": auth_path().is_file(),
         "api_base": api_base(),
-        "mode": (os.environ.get("AIFILM_GROK_AUTH") or "auto"),
+        "mode": get_config().grok_auth or "auto",
         "pack": {
             "chat": True,
             "image_gen": True,
@@ -445,7 +423,7 @@ def probe(*, deep: bool = False) -> dict[str, Any]:
         return out
 
     # TTS probe (list voices — cheap)
-    if deep or os.environ.get("AIFILM_GROK_PROBE_TTS", "").strip() in {"1", "true", "yes"}:
+    if deep or get_config().grok_probe_tts:
         try:
             voices = tts_list_voices()
             out["has_tts"] = bool(voices.get("ok"))
@@ -460,11 +438,11 @@ def probe(*, deep: bool = False) -> dict[str, Any]:
         out["tts_probe"] = "skipped (set deep=1 or AIFILM_GROK_PROBE_TTS=1)"
 
     out["recommended"] = {
-        "chat_model": os.environ.get("AIFILM_GROK_CHAT_MODEL") or DEFAULT_CHAT_MODEL,
-        "image_model": os.environ.get("AIFILM_GROK_IMAGE_MODEL") or DEFAULT_IMAGE_MODEL,
-        "video_model": os.environ.get("AIFILM_GROK_VIDEO_MODEL") or DEFAULT_VIDEO_MODEL,
-        "tts_voice": os.environ.get("AIFILM_GROK_TTS_VOICE") or DEFAULT_TTS_VOICE,
-        "tts_language": os.environ.get("AIFILM_GROK_TTS_LANGUAGE") or DEFAULT_TTS_LANGUAGE,
+        "chat_model": get_config().grok_chat_model or DEFAULT_CHAT_MODEL,
+        "image_model": get_config().grok_image_model or DEFAULT_IMAGE_MODEL,
+        "video_model": get_config().grok_video_model or DEFAULT_VIDEO_MODEL,
+        "tts_voice": get_config().grok_tts_voice or DEFAULT_TTS_VOICE,
+        "tts_language": get_config().grok_tts_language or DEFAULT_TTS_LANGUAGE,
         "i2v_note": "batch: aifilm grok-oauth video --image kf.png --wait; session: image_to_video",
         "tts_note": "film default remains edge; grok TTS is opt-in (tts_backend=grok / --backend grok)",
     }
@@ -485,7 +463,7 @@ def chat_completion(
     tools: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     tok = get_access_token()
-    model = model or os.environ.get("AIFILM_GROK_CHAT_MODEL") or DEFAULT_CHAT_MODEL
+    model = model or get_config().grok_chat_model or DEFAULT_CHAT_MODEL
     messages: list[dict[str, Any]] = []
     if system:
         messages.append({"role": "system", "content": system})
@@ -541,7 +519,7 @@ def images_generate(
 ) -> dict[str, Any]:
     """Text-to-image via api.x.ai (OAuth). Prefer Grok Build image_gen in-session."""
     tok = get_access_token()
-    model = model or os.environ.get("AIFILM_GROK_IMAGE_MODEL") or DEFAULT_IMAGE_MODEL
+    model = model or get_config().grok_image_model or DEFAULT_IMAGE_MODEL
     body: dict[str, Any] = {
         "model": model,
         "prompt": prompt,
@@ -608,7 +586,7 @@ def images_edit(
 ) -> dict[str, Any]:
     """Image edit / multi-ref edit via POST /v1/images/edits (JSON + data URL)."""
     tok = get_access_token()
-    model = model or os.environ.get("AIFILM_GROK_IMAGE_MODEL") or DEFAULT_IMAGE_MODEL
+    model = model or get_config().grok_image_model or DEFAULT_IMAGE_MODEL
     body: dict[str, Any] = {
         "model": model,
         "prompt": prompt,
@@ -685,7 +663,7 @@ def video_submit(
 ) -> dict[str, Any]:
     """Submit async video job. Returns {request_id, …}. Does not wait."""
     tok = get_access_token()
-    model = model or os.environ.get("AIFILM_GROK_VIDEO_MODEL") or DEFAULT_VIDEO_MODEL
+    model = model or get_config().grok_video_model or DEFAULT_VIDEO_MODEL
     body: dict[str, Any] = {
         "model": model,
         "duration": int(duration),
@@ -874,8 +852,8 @@ def tts_speak(
     if not (text or "").strip():
         raise GrokOAuthError("tts text is empty")
     tok = get_access_token()
-    voice_id = voice_id or os.environ.get("AIFILM_GROK_TTS_VOICE") or DEFAULT_TTS_VOICE
-    language = language or os.environ.get("AIFILM_GROK_TTS_LANGUAGE") or DEFAULT_TTS_LANGUAGE
+    voice_id = voice_id or get_config().grok_tts_voice or DEFAULT_TTS_VOICE
+    language = language or get_config().grok_tts_language or DEFAULT_TTS_LANGUAGE
     body: dict[str, Any] = {
         "text": text,
         "voice_id": voice_id,

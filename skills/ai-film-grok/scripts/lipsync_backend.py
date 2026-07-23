@@ -17,10 +17,11 @@ from pathlib import Path
 from typing import Any
 
 from backend_lock import verify_backend_lock
+from config_loader import get_config
+from logger import log
 from security_policy import (
     SecurityPolicyError,
     expand_argv,
-    load_allowed_env,
     minimal_subprocess_env,
     parse_argv_json,
 )
@@ -33,33 +34,11 @@ class LipSyncError(RuntimeError):
 BACKEND_PRIORITY = ("musetalk", "wav2lip", "external")
 
 
-def _load_skill_config_env() -> None:
-    """Load skill-local config.env if present (does not override existing env)."""
-    cfg = Path(__file__).resolve().parents[1] / "config.env"
-    load_allowed_env(
-        cfg,
-        allowed_keys={
-            "AIFILM_LIPSYNC_BACKEND",
-            "AIFILM_LIPSYNC_ARGV",
-            "AIFILM_MUSETALK_ROOT",
-            "AIFILM_WAV2LIP_ROOT",
-        },
-    )
-
-
-_load_skill_config_env()
-
-
 def emit(obj: dict[str, Any]) -> None:
     print(json.dumps(obj, ensure_ascii=False, indent=2))
 
-
-def log(msg: str) -> None:
-    print(msg, file=sys.stderr, flush=True)
-
-
 def env_backend() -> str:
-    return (os.environ.get("AIFILM_LIPSYNC_BACKEND") or "auto").strip().lower()
+    return (get_config().lipsync_backend or "auto").strip().lower()
 
 
 def backend_lock_path() -> Path:
@@ -73,7 +52,7 @@ def backend_trust(kind: str, root: Path | None) -> dict[str, Any]:
 
 
 def musetalk_root() -> Path | None:
-    raw = os.environ.get("AIFILM_MUSETALK_ROOT")
+    raw = get_config().musetalk_root
     candidates: list[Path] = []
     if raw:
         candidates.append(Path(raw).expanduser())
@@ -96,7 +75,7 @@ def musetalk_root() -> Path | None:
 
 
 def wav2lip_root() -> Path | None:
-    raw = os.environ.get("AIFILM_WAV2LIP_ROOT")
+    raw = get_config().wav2lip_root
     candidates: list[Path] = []
     if raw:
         candidates.append(Path(raw).expanduser())
@@ -117,7 +96,7 @@ def wav2lip_root() -> Path | None:
 
 
 def external_argv_template() -> list[str] | None:
-    raw = os.environ.get("AIFILM_LIPSYNC_ARGV")
+    raw = get_config().lipsync_argv
     if raw and raw.strip():
         try:
             return parse_argv_json(raw, variable="AIFILM_LIPSYNC_ARGV")
