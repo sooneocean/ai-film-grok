@@ -246,6 +246,26 @@ def apply_i2v_patch(root: Path, patch: dict[str, Any], *, dry_run: bool = False)
     }
 
 
+def _i2v_registry_summary(root: Path | None) -> dict[str, Any]:
+    """Probe the I2V provider registry (i2v_provider.py) for one-page readiness.
+
+    Non-fatal: returns an error block if the registry module is unavailable so the
+    capability report never fails because of the new abstraction layer.
+    """
+    try:
+        from i2v_provider import preferred, registry_report
+
+        active = preferred(root=root)
+        report = registry_report(root=root)
+        return {
+            "ok": True,
+            "active": active.name,
+            "providers": report["providers"],
+        }
+    except Exception as exc:  # noqa: BLE001 — registry is additive, never fatal
+        return {"ok": False, "error": str(exc)[:200]}
+
+
 def build_capability_report(
     *,
     root: Path | None = None,
@@ -558,6 +578,7 @@ def build_capability_report(
         "suggested_film_spec_patch": (suggest_block or {}).get("patch") if suggest_block else None,
         "i2v_suggest": suggest_block,
         "apply": apply_block,
+        "i2v_providers": _i2v_registry_summary(root_resolved),
         "recommendations": recommendations,
         "usage": {
             "doctor": "aifilm doctor",
