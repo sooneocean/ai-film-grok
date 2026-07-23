@@ -16,7 +16,7 @@
     "scripts/aifilm_grok.py": "b68536f7c3e4611c8a2a6c3144cc20ef5058e8a792be8da4ef3408caeb6c50e8",
     "scripts/backend-lock": "60b86b253cb393b587af4ca6e63a2403daa42b515f7501fffe407e2b8e257f25",
     "scripts/backend_lock.py": "ce829087a062bba9a217a5a90cec3573dbdf1417e72c5f7a669df45a57dab730",
-    "scripts/edit_policy.py": "1df4da37127776b74a1a98e813741b08d81b323e5ee4048657e87e979558dece",
+    "scripts/edit_policy.py": "67754ee29d6afba212faa82d30f532bb359bf9bcac266fd6e9fcac60d1475579",
     "scripts/film_spec.py": "633531ab6326339707567b4a536b112d5391bc7481a3b4378f4bcc09c9e4a119",
     "scripts/lipsync_backend.py": "afccdbd52c3720b46533ec8243d3e3aab727eb286505d9260ca024a1b2632a63",
     "scripts/make_sfx_bed.py": "a007a92f091b2e53ff74035ee002dcfdc5a00df19ca2fe24356cafb8815a295e",
