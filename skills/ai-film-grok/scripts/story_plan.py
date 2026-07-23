@@ -380,6 +380,10 @@ _TIME_OR_BRACKET_SECTION = re.compile(
     r")\s*",
     re.MULTILINE,
 )
+_EPISODE_HEADER = re.compile(
+    r"(?m)^\s*(?:#{1,4}\s*)?(第[一二三四五六七八九十百\d]+[集章]|Episode\s*\d+|EP\s*\d+)\s*[:：\-—]?\s*(.*)$",
+    re.IGNORECASE,
+)
 
 
 def is_template_nar(nar: object) -> bool:
@@ -1105,11 +1109,32 @@ def _scene_chunks(raw: str) -> list[dict[str, str]]:
     return chunks[:6]
 
 
+def _episode_chunks(raw: str, *, source_refs: list[str] | None = None) -> list[dict[str, Any]]:
+    """Prefer explicit episode/chapter headers; otherwise keep one episode."""
+    text = (raw or "").strip()
+    matches = list(_EPISODE_HEADER.finditer(text))
+    if len(matches) < 2:
+        return [{"title": "Episode 1", "body": text, "source_refs": list(source_refs or [])}]
+    chunks: list[dict[str, Any]] = []
+    refs = list(source_refs or [])
+    for i, match in enumerate(matches):
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        title_suffix = match.group(1).strip()
+        body = text[start:end].strip()
+        if not body:
+            continue
+        ref = refs[min(i, len(refs) - 1)] if refs else f"source:episode_{i + 1:02d}"
+        chunks.append({"title": title_suffix or f"Episode {i + 1}", "body": body, "source_refs": [ref]})
+    return chunks or [{"title": "Episode 1", "body": text, "source_refs": list(source_refs or [])}]
+
+
 def normalize_story(
     raw: str,
     *,
     title_hint: str | None = None,
     source_path: str | None = None,
+    source_evidence_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     """story.normalize — structured story package (no LLM)."""
     raw = (raw or "").strip()
@@ -1118,6 +1143,7 @@ def normalize_story(
     locs = _location_candidates(raw)
     dialogues = _dialogue_blocks(raw)
     chunks = _scene_chunks(raw)
+    episode_chunks = _episode_chunks(raw, source_refs=source_evidence_refs)
     logline = _clip_nar(raw.replace("\n", " "), 80)
     if len(raw) > 80:
         # prefer first sentence
@@ -1155,6 +1181,8 @@ def normalize_story(
         "location_candidates": locs,
         "dialogue_blocks": dialogues,
         "scene_chunks": chunks,
+        "episode_chunks": episode_chunks,
+        "source_evidence_refs": list(source_evidence_refs or []),
         "vo_mode_suggest": "character" if dialogues else "storyteller",
         "heat_signals": heat,
         "genre_evidence": genre_info["evidence"],
@@ -1518,6 +1546,7 @@ def plan_shots(
     character_ids: list[str],
     location_id: str | None,
     chain_continue: bool = True,
+    episode_number: int = 1,
 ) -> list[dict[str, Any]]:
     """shot.plan — expand beat into 1–N vertical shots."""
     n = max(1, min(3, int(beat.get("shots_n") or 1)))
@@ -1543,7 +1572,7 @@ def plan_shots(
         idx = shot_counter_start + i
         scene_order = int(scene.get("order") or 1)
         beat_order = int(beat.get("order") or 1)
-        sid = f"ep01_sc{scene_order:02d}_bt{beat_order:02d}_sh{i + 1:02d}"
+        sid = f"ep{episode_number:02d}_sc{scene_order:02d}_bt{beat_order:02d}_sh{i + 1:02d}"
         piece = sents[i] if i < len(sents) else sents[-1]
         # second shot in beat: reaction / insert flavor
         local_df = df
@@ -1845,85 +1874,95 @@ def build_planned_graph(
         target_duration = 60.0
     elif heat.get("heat_scale") == "max" and target_duration < 50:
         target_duration = 55.0
-    episode = structure_episode(normalized, target_duration=target_duration)
-    scenes = segment_scenes(normalized, episode)
-    total = float(episode["targetDuration"])
-    # weight scenes equally (or by body length)
-    weights = []
-    for sc in scenes:
-        w = max(1, len(str(sc.get("body") or "")))
-        weights.append(w)
-    wsum = sum(weights) or 1
     char_ids = [c["id"] for c in (normalized.get("character_candidates") or []) if c.get("id")]
     if not char_ids:
         char_ids = ["hero"]
 
     shot_i = 1
-    scenes_out: list[dict[str, Any]] = []
-    for si, sc in enumerate(scenes):
-        budget = total * (weights[si] / wsum)
-        sc["targetDuration"] = round(budget, 1)
-        beats = extract_beats(
-            sc,
-            scene_budget_sec=budget,
-            is_only_scene=len(scenes) == 1,
-            heat=heat,
-            target_duration=total,
-            genre=normalized.get("genre"),
-        )
-        if heat.get("hardcore") or heat.get("dual_climax"):
-            for bt in beats:
-                bt["_extreme_seed"] = True
-        beats_out: list[dict[str, Any]] = []
-        for bt in beats:
-            shots = plan_shots(
-                bt,
-                scene=sc,
-                shot_counter_start=shot_i,
-                character_ids=char_ids,
-                location_id=sc.get("locationId"),
-                chain_continue=True,
-            )
-            shot_i += len(shots)
-            bt_out = {
-                "id": bt["id"],
-                "order": bt["order"],
-                "objective": bt["objective"],
-                "action": bt["action"],
-                "outcome": bt.get("outcome") or "",
-                "obstacle": bt.get("obstacle") or AUTHORING_PLACEHOLDER,
-                "tactic": bt.get("tactic") or AUTHORING_PLACEHOLDER,
-                "turn": bt.get("turn") or AUTHORING_PLACEHOLDER,
-                "state_delta": bt.get("state_delta") or AUTHORING_PLACEHOLDER,
-                "audience_question": bt.get("audience_question") or AUTHORING_PLACEHOLDER,
-                "emotional_turn": bt.get("emotional_turn") or AUTHORING_PLACEHOLDER,
-                "authoring_questions": list(bt.get("authoring_questions") or []),
-                "emotionalShift": bt.get("emotionalShift") or {"from": "", "to": ""},
-                "importance": bt["importance"],
-                "targetDuration": bt["targetDuration"],
-                "director_board": draft_director_board(),
-                "shots": shots,
+    episode_outs: list[dict[str, Any]] = []
+    episode_chunks = normalized.get("episode_chunks") or [
+        {"title": "Episode 1", "body": normalized.get("raw_excerpt") or "", "source_refs": []}
+    ]
+    for episode_number, ep_chunk in enumerate(episode_chunks, start=1):
+        if not isinstance(ep_chunk, dict):
+            continue
+        ep_norm = dict(normalized)
+        ep_norm.update(
+            {
+                "title": str(ep_chunk.get("title") or f"Episode {episode_number}"),
+                "logline": _clip_nar(str(ep_chunk.get("body") or normalized.get("logline") or ""), 80),
+                "raw_excerpt": str(ep_chunk.get("body") or normalized.get("raw_excerpt") or "")[:2000],
+                "scene_chunks": _scene_chunks(str(ep_chunk.get("body") or "")),
             }
-            beats_out.append(bt_out)
-        sc_out = {
-            "id": sc["id"],
-            "order": sc["order"],
-            "title": sc["title"],
-            "synopsis": sc.get("synopsis") or "",
-            "locationId": sc.get("locationId"),
-            "characterIds": sc.get("characterIds") or char_ids,
-            "targetDuration": sc.get("targetDuration"),
-            "productionMode": sc.get("productionMode") or "hybrid",
-            "status": "planned",
-            "beats": beats_out,
-        }
-        scenes_out.append(sc_out)
-
-    episode_out = {
-        **episode,
-        "scenes": scenes_out,
-        "status": "planning",
-    }
+        )
+        episode = structure_episode(ep_norm, target_duration=target_duration, episode_number=episode_number)
+        scenes = segment_scenes(ep_norm, episode)
+        total = float(episode["targetDuration"])
+        weights = [max(1, len(str(sc.get("body") or ""))) for sc in scenes]
+        wsum = sum(weights) or 1
+        scenes_out: list[dict[str, Any]] = []
+        for si, sc in enumerate(scenes):
+            budget = total * (weights[si] / wsum)
+            sc["targetDuration"] = round(budget, 1)
+            beats = extract_beats(
+                sc,
+                scene_budget_sec=budget,
+                is_only_scene=len(scenes) == 1,
+                heat=heat,
+                target_duration=total,
+                genre=normalized.get("genre"),
+            )
+            if heat.get("hardcore") or heat.get("dual_climax"):
+                for bt in beats:
+                    bt["_extreme_seed"] = True
+            beats_out: list[dict[str, Any]] = []
+            for bt in beats:
+                shots = plan_shots(
+                    bt,
+                    scene=sc,
+                    shot_counter_start=shot_i,
+                    character_ids=char_ids,
+                    location_id=sc.get("locationId"),
+                    chain_continue=True,
+                    episode_number=episode_number,
+                )
+                shot_i += len(shots)
+                beats_out.append(
+                    {
+                        "id": bt["id"],
+                        "order": bt["order"],
+                        "objective": bt["objective"],
+                        "action": bt["action"],
+                        "outcome": bt.get("outcome") or "",
+                        "obstacle": bt.get("obstacle") or AUTHORING_PLACEHOLDER,
+                        "tactic": bt.get("tactic") or AUTHORING_PLACEHOLDER,
+                        "turn": bt.get("turn") or AUTHORING_PLACEHOLDER,
+                        "state_delta": bt.get("state_delta") or AUTHORING_PLACEHOLDER,
+                        "audience_question": bt.get("audience_question") or AUTHORING_PLACEHOLDER,
+                        "emotional_turn": bt.get("emotional_turn") or AUTHORING_PLACEHOLDER,
+                        "authoring_questions": list(bt.get("authoring_questions") or []),
+                        "emotionalShift": bt.get("emotionalShift") or {"from": "", "to": ""},
+                        "importance": bt["importance"],
+                        "targetDuration": bt["targetDuration"],
+                        "director_board": draft_director_board(),
+                        "shots": shots,
+                    }
+                )
+            scenes_out.append(
+                {
+                    "id": sc["id"],
+                    "order": sc["order"],
+                    "title": sc["title"],
+                    "synopsis": sc.get("synopsis") or "",
+                    "locationId": sc.get("locationId"),
+                    "characterIds": sc.get("characterIds") or char_ids,
+                    "targetDuration": sc.get("targetDuration"),
+                    "productionMode": sc.get("productionMode") or "hybrid",
+                    "status": "planned",
+                    "beats": beats_out,
+                }
+            )
+        episode_outs.append({**episode, "scenes": scenes_out, "status": "planning"})
 
     characters = []
     for c in normalized.get("character_candidates") or []:
@@ -1976,16 +2015,111 @@ def build_planned_graph(
             "targetFps": 30,
             "root": root_s,
         },
-        "episodes": [episode_out],
+        "episodes": episode_outs or [structure_episode(normalized, target_duration=target_duration)],
         "story": _draft_story_contract(normalized),
         "characters": characters,
         "locations": locations,
         "props": [],
         "warnings": list(normalized.get("warnings") or []),
     }
+    _seed_narrative_contract(graph, normalized)
     ensure_graph_controls(graph)
     graph["content_sha256"] = graph_content_sha256(graph)
     return graph
+
+
+def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) -> None:
+    """Seed honest, shot-bound promises so every planned episode has a hook arc."""
+    episodes = [ep for ep in graph.get("episodes") or [] if isinstance(ep, dict)]
+    points: list[dict[str, Any]] = []
+    source_refs = list(normalized.get("source_evidence_refs") or [])
+    if not source_refs:
+        source_refs = [str(normalized.get("source_path") or "planner:story-source")]
+
+    def flatten(ep: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        beats: list[dict[str, Any]] = []
+        shots: list[dict[str, Any]] = []
+        for scene in ep.get("scenes") or []:
+            for beat in scene.get("beats") or []:
+                if isinstance(beat, dict):
+                    beats.append(beat)
+                    shots.extend(sh for sh in beat.get("shots") or [] if isinstance(sh, dict))
+        return beats, shots
+
+    for index, ep in enumerate(episodes):
+        ep_id = str(ep.get("id") or f"ep{index + 1:02d}")
+        beats, shots = flatten(ep)
+        if not beats or not shots:
+            continue
+        first_beat = beats[0]
+        first_shot = shots[0]
+        mid_beat = beats[min(max(1, len(beats) // 2), len(beats) - 1)]
+        mid_shots = [sh for sh in mid_beat.get("shots") or [] if isinstance(sh, dict)] or [first_shot]
+        last_beat = beats[-1]
+        last_shot = shots[-1]
+        point_id = f"{ep_id}_point_01"
+        next_ep = episodes[index + 1].get("id") if index + 1 < len(episodes) else None
+        status = "planted" if next_ep else "season_hook"
+        point = {
+            "point_id": point_id,
+            "point_type": "custom",
+            "introduced_episode": ep_id,
+            "introduced_beat_id": str(mid_beat.get("id") or ""),
+            "introduced_shot_ids": [str(sh.get("id")) for sh in mid_shots if sh.get("id")],
+            "visible_evidence": str(mid_shots[0].get("must_show") or mid_beat.get("objective") or "新线索进入画面"),
+            "audience_question": f"{str(mid_beat.get('audience_question') or '').strip() or '这个变化接下来会带来什么后果？'}",
+            "planned_payoff_episode": int(str(next_ep).removeprefix("ep")) if next_ep else int(str(ep_id).removeprefix("ep")),
+            "payoff_condition": "下一集必须回应该线索并改变人物或局势" if next_ep else "本季结束时明确回收或声明下一季承诺",
+            "status": status,
+            "source_refs": [source_refs[min(index, len(source_refs) - 1)]],
+        }
+        points.append(point)
+        ep["opening_hook"] = {
+            "hook_id": f"{ep_id}_opening",
+            "point_id": point_id,
+            "beat_id": str(first_beat.get("id") or ""),
+            "shot_ids": [str(first_shot.get("id") or "")],
+            "question": str(ep.get("openingHook") or first_beat.get("objective") or "观众必须立刻知道发生了什么"),
+        }
+        ep["mid_episode_points"] = [point_id]
+        ep["ending_hook"] = {
+            "hook_id": f"{ep_id}_ending",
+            "point_id": point_id,
+            "beat_id": str(last_beat.get("id") or ""),
+            "shot_ids": [str(last_shot.get("id") or "")],
+            "question": "这个线索的真正后果是什么？",
+        }
+        ep["carry_in_points"] = []
+        ep["payoff_points"] = []
+        ep["new_audience_question"] = "这个线索的真正后果是什么？"
+        ep["endingHook"] = ep["ending_hook"]["question"]
+        for shot in mid_shots:
+            shot.setdefault("narrative_point_ids", []).append(point_id)
+        if index > 0:
+            previous_ep = episodes[index - 1]
+            previous_hook = previous_ep.get("ending_hook") or {}
+            previous_point_id = str(previous_hook.get("point_id") or "")
+            if previous_point_id:
+                ep["carry_in_points"].append(previous_point_id)
+                ep["payoff_points"].append(previous_point_id)
+                for previous_point in points:
+                    if previous_point.get("point_id") == previous_point_id:
+                        previous_point["status"] = "paid_off"
+                        previous_point["payoff_evidence"] = {
+                            "episode": ep_id,
+                            "shot_ids": [str(first_shot.get("id") or "")],
+                            "visible_change": str(first_shot.get("visible_change") or first_shot.get("must_show") or "回应上一集钩子"),
+                        }
+                        break
+
+    graph["plot_points"] = points
+    graph["narrative_policy"] = {
+        "midpoint_min": 1,
+        "payoff_window_episodes": 3,
+        "require_plan_evidence": True,
+        "require_executed_evidence": True,
+        "season_end_mode": "season_hook" if episodes and any(p.get("status") == "season_hook" for p in points) else "closed",
+    }
 
 
 def stabilize_shot_ids(
@@ -2218,6 +2352,24 @@ def project_graph_to_film_spec(
         "caption_mode": base.get("caption_mode") or "zh",
         "director_intent": di,
         "scenes": scenes_fs,
+        "episodes": [
+            {
+                "id": ep.get("id"),
+                "episodeNumber": ep.get("episodeNumber"),
+                "title": ep.get("title"),
+                "opening_hook": ep.get("opening_hook"),
+                "mid_episode_points": ep.get("mid_episode_points") or [],
+                "ending_hook": ep.get("ending_hook"),
+                "carry_in_points": ep.get("carry_in_points") or [],
+                "payoff_points": ep.get("payoff_points") or [],
+                "new_audience_question": ep.get("new_audience_question") or "",
+            }
+            for ep in graph.get("episodes") or []
+            if isinstance(ep, dict)
+        ],
+        "plot_points": [
+            dict(point) for point in graph.get("plot_points") or [] if isinstance(point, dict)
+        ],
         "_plan": {
             "source": "story_plan.v1",
             "at": utc_now(),
@@ -2265,6 +2417,7 @@ def project_graph_to_film_spec(
                 "mute_frame_test": True,
                 "beats": coitus_beats,
             }
+    spec["narrative_policy"] = dict(graph.get("narrative_policy") or {})
     return spec
 
 
@@ -2371,12 +2524,26 @@ def run_plan(
     force: bool = False,
     source_path: str | None = None,
     seed_bible: bool = True,
+    character_id_overrides: dict[str, str] | None = None,
+    source_evidence_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     """End-to-end Phase 3 planner for a film root."""
     root = Path(root).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
 
-    normalized = normalize_story(raw, title_hint=title, source_path=source_path)
+    normalized = normalize_story(
+        raw,
+        title_hint=title,
+        source_path=source_path,
+        source_evidence_refs=source_evidence_refs,
+    )
+    if character_id_overrides:
+        for candidate in normalized.get("character_candidates") or []:
+            name = str(candidate.get("name") or "")
+            override = character_id_overrides.get(name)
+            if override:
+                candidate["id"] = override
+                candidate["source"] = "intake"
     _ensure_film_root_skeleton(
         root,
         title=str(normalized.get("title") or "untitled"),

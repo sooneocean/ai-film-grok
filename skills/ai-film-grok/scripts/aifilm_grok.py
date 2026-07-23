@@ -187,7 +187,17 @@ def media_duration(path: Path) -> float:
 
 
 def emit(obj: dict[str, Any]) -> None:
-    print(json.dumps(obj, ensure_ascii=False, indent=2))
+    # Agent/pipe consumers do not benefit from whitespace; keep TTY output
+    # readable while reducing captured CLI context substantially.
+    if sys.stdout.isatty() or os.environ.get("AIFILM_PRETTY_JSON", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        print(json.dumps(obj, ensure_ascii=False, indent=2))
+    else:
+        print(json.dumps(obj, ensure_ascii=False, separators=(",", ":")))
 
 
 def grok_permission_mode(config_path: Path) -> str | None:
@@ -1790,6 +1800,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     except Exception:
         pass
     from media_qa import analyze_still_geometry
+    from quality_gates import evaluate_keyframe, require_quality, write_quality_receipt
 
     geo = analyze_still_geometry(source, aspect_ratio=aspect)
     if args.status == "approved" and not geo.get("ok"):
@@ -1810,6 +1821,17 @@ def cmd_register_still(args: argparse.Namespace) -> int:
                 "Approved stills require --review-note "
                 "(e.g. 'id-ok face/hair/outfit; medium matches style-v1')"
             )
+    quality = evaluate_keyframe(
+        root,
+        shot_id=str(args.shot_id),
+        source=source,
+        aspect_ratio=aspect,
+        prompt_file=Path(args.prompt_file).expanduser().resolve() if args.prompt_file else None,
+        identity_approved=identity_approved,
+        review_note=review_note,
+    )
+    if args.status == "approved":
+        require_quality(quality, kind="keyframe")
     record = _register_media(
         shot_id=args.shot_id,
         source=source,
@@ -1819,6 +1841,8 @@ def cmd_register_still(args: argparse.Namespace) -> int:
         prompt_file=Path(args.prompt_file).expanduser().resolve() if args.prompt_file else None,
     )
     record["geometry_qa"] = geo
+    record["quality_gate"] = quality
+    record["quality_receipt"] = str(write_quality_receipt(root, record["shot_id"], quality))
     if args.status == "approved":
         record["identity_approved"] = True
         record["review_note"] = review_note
@@ -2036,6 +2060,19 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
     if args.status == "approved" and not qa.get("ok"):
         raise FilmError(f"Clip failed decode/duration/motion QA: {qa.get('errors')}")
+    from quality_gates import evaluate_clip, require_quality, write_quality_receipt
+
+    quality = evaluate_clip(
+        root,
+        shot_id=str(args.shot_id),
+        qa=qa,
+        endpoint=endpoint,
+        identity_approved=identity_approved,
+        motion_approved=motion_approved,
+        review=shot_review,
+    )
+    if args.status == "approved":
+        require_quality(quality, kind="clip")
     record = _register_media(
         shot_id=args.shot_id,
         source=source,
@@ -2057,8 +2094,10 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             "review_note": review_note,
             "qa": qa,
             "shot_review": shot_review,
+            "quality_gate": quality,
         }
     )
+    record["quality_receipt"] = str(write_quality_receipt(root, record["shot_id"], quality))
     if qa.get("has_audio"):
         try:
             audio_dir = film_dirs(root)["audio"]
@@ -2876,6 +2915,18 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             "Cannot approve final: director exception ledger has pending re-approval items"
         )
 
+    from narrative_evidence import validate_narrative_evidence
+
+    narrative_evidence = validate_narrative_evidence(root, require_verified=True)
+    if narrative_evidence.get("required") and not narrative_evidence.get("ok"):
+        codes = ", ".join(
+            sorted({str(item.get("code")) for item in narrative_evidence.get("issues") or []})
+        )
+        raise FilmError(
+            f"Cannot approve final: narrative hook/plot-point evidence is incomplete [{codes}]. "
+            "Write narrative-evidence.json with executed and human_review evidence first."
+        )
+
     # Scorecard fail → write director_notes reshoot list, do not approve
     if not scorecard_all_pass(card):
         shot_ids = parse_shot_id_list(getattr(args, "reshoot_shots", None))
@@ -2938,6 +2989,7 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         "subtitle_dialogue_alignment": subtitle_dialogue_alignment,
         "subtitle_cut_boundaries": subtitle_cut_boundaries,
         "director_ledger": director_ledger,
+        "narrative_evidence": narrative_evidence,
     }
     review_path = out_dir / "final-review.json"
     write_json(review_path, review)
@@ -3146,6 +3198,12 @@ def cmd_pilot(args: argparse.Namespace) -> int:
                 scorecard=scorecard or None,
                 require_scorecard=not bool(getattr(args, "no_require_scorecard", False)),
             )
+            routing = read_json(root / "receipts" / "i2v-routing.json")
+            if routing:
+                approval["i2v_routing"] = {
+                    "selected_provider": routing.get("selected_provider"),
+                    "requested_profile": routing.get("requested_profile"),
+                }
             path = write_pilot_approval(root, approval)
             emit(
                 {
