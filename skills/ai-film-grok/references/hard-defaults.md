@@ -92,7 +92,7 @@
 
 1. `write-spec` 过 → 才 `media-queue add`  
 2. pilot 用户批准 → 才 bulk（无批准最多 3 shot_id）  
-3. bulk 默认 Seedance；一次 claim 一件  
+3. hero bulk 默认使用已通过当前 canary/pilot 的 provider；当前可复现默认为 `grok_primary`，Seedance 只有 canary+pilot 全过才升级
 4. continue 串行 + 字节 promote；禁 cast 重起  
 5. 失败只用 fail/requeue；禁手改 queue JSON  
 6. moderation：换 soft still，荤点留给 VO  

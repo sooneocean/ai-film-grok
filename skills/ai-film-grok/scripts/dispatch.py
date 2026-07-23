@@ -33,6 +33,39 @@ _ACTION_SKILLS = {
 }
 
 
+def _quality_summary(root: Path) -> dict[str, Any]:
+    """Summarize persisted per-shot quality evidence without rescanning media."""
+    directory = root / "receipts" / "quality"
+    reports: list[dict[str, Any]] = []
+    if directory.is_dir():
+        for path in sorted(directory.glob("*.json")):
+            report = read_json(path)
+            if isinstance(report, dict):
+                reports.append(report)
+    failed = [
+        {
+            "shot_id": report.get("shot_id"),
+            "kind": report.get("kind"),
+            "codes": report.get("codes") or [],
+            "blockers": report.get("hard") or [],
+        }
+        for report in reports
+        if report.get("ok") is not True
+    ]
+    return {
+        "schema_version": 1,
+        "receipt_count": len(reports),
+        "passed_count": sum(report.get("ok") is True for report in reports),
+        "failed_count": len(failed),
+        "failed_shots": failed[:20],
+        "next_action": (
+            f"repair quality gate for shot {failed[0]['shot_id']} before regeneration"
+            if failed
+            else None
+        ),
+    }
+
+
 def structured_next_action(
     action: dict[str, Any] | None,
     *,
@@ -248,6 +281,15 @@ def build_dispatch(
             "final delivery requires a current post-audit receipt with no hard failures",
             "post",
         )
+    quality = _quality_summary(root)
+    if quality["failed_count"]:
+        pre(
+            "quality-gate-repair",
+            f'aifilm preflight --root "{r}"',
+            quality["next_action"]
+            or "quality gate failed; inspect receipts/quality before regeneration",
+            "visual",
+        )
     narrative_action_id: str | None = None
     if narrative.get("canonical") and not narrative.get("ready_for_media"):
         semantic = narrative.get("semantic") or {}
@@ -388,6 +430,10 @@ def build_dispatch(
                 )
         except Exception:
             pass
+    if quality["failed_count"]:
+        agent_do.append(
+            "质量硬拦：先修复 quality receipt 中的 hero/keyframe 阻塞，再允许该镜头重新 I2V"
+        )
     agent_do.append("禁止：自批 pilot、静默改 i2v_provider、Ken Burns 当戏、说书默认 lipsync")
     agent_do.append("用户说「可以/ok/一路做完」才 pilot approve / run_to_completion")
 
@@ -607,6 +653,7 @@ def build_dispatch(
             "projection": narrative.get("projection"),
         },
         "production_evidence": evidence,
+        "quality": quality,
         "post_audit": {
             "receipt_present": bool(post_audit),
             "delivery_ready": post_audit_gate,
@@ -622,6 +669,8 @@ def build_dispatch(
             "state-index check before bulk when undress/continue (fluency)",
             "canonical narrative graph validated + all scopes locked + projection hash current",
             "production evidence ready before bulk motion",
+            "hero quality receipt pass before clip promote",
+            "provider fallback writes routing receipt and requires hero re-pilot",
         ],
         "ref": (
             "references/craft-spine.md · references/keyframe-first-state-index.md · "

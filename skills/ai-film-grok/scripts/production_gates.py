@@ -54,6 +54,25 @@ def pilot_is_user_approved(data: dict[str, Any] | None) -> bool:
     return bool("user approved pilot" in notes.lower() or "pilot passed by user" in notes.lower())
 
 
+def assert_provider_pilot_current(root: Path) -> dict[str, Any]:
+    """Prevent a provider fallback from silently reusing an old hero pilot."""
+    routing = read_json(Path(root).expanduser().resolve() / "receipts" / "i2v-routing.json") or {}
+    if routing.get("requires_hero_repilot") is not True:
+        return {"ok": True, "checked": False}
+    approval = load_pilot_approval(root)
+    pilot_route = approval.get("i2v_routing") if isinstance(approval, dict) else None
+    selected = str(routing.get("selected_provider") or "")
+    if (
+        not isinstance(pilot_route, dict)
+        or str(pilot_route.get("selected_provider") or "") != selected
+    ):
+        raise ProductionGateError(
+            "provider fallback changed the hero route; obtain a new user-approved pilot "
+            f"for provider={selected!r} before bulk media"
+        )
+    return {"ok": True, "checked": True, "provider": selected}
+
+
 def assert_pilot_user_approved(
     root: Path,
     *,
@@ -104,6 +123,7 @@ def assert_pilot_allows_add(
         return {"skipped": True, "reason": "env"}
     pilot = load_pilot_approval(root)
     if pilot_is_user_approved(pilot):
+        assert_provider_pilot_current(root)
         return {"ok": True, "pilot": pilot}
     known = set(existing_shot_ids) | {shot_id}
     if len(known) <= PILOT_MAX_SHOTS_WITHOUT_APPROVAL:

@@ -12,7 +12,8 @@ from typing import Any
 from security_policy import minimal_subprocess_env
 
 # Grok Imagine + FRW video backends.
-# 2026-07-20 quality: bulk default is Seedance newvideo, NOT legacy img2video template.
+# 2026-07-23 quality-first: hero provider is evidence-selected; never infer quality
+# from a configured model name, and never silently promote a fallback.
 ALLOWED_VIDEO_ENDPOINTS = frozenset(
     {
         "image_to_video",  # Grok frame-1 I2V
@@ -296,6 +297,9 @@ def approved_clip_record(record: object) -> bool:
     if not isinstance(record, dict):
         return False
     qa = record.get("qa")
+    quality = record.get("quality_gate")
+    if isinstance(quality, dict) and quality.get("ok") is not True:
+        return False
     return bool(
         record.get("status") == "approved"
         and record.get("source_endpoint") in ALLOWED_VIDEO_ENDPOINTS
