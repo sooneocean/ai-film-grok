@@ -122,6 +122,11 @@
       "type": "array",
       "items": { "$ref": "#/$defs/Character" }
     },
+    "dialogue_ledger": {
+      "type": "array",
+      "description": "P1-8: Independent dialogue ledger — decoupled from shot.dialogue. Each entry is a line with speaker/emotion/subtext/beat_ref.",
+      "items": { "$ref": "#/$defs/DialogueLine" }
+    },
     "locations": {
       "type": "array",
       "items": { "$ref": "#/$defs/Location" }
@@ -511,6 +516,22 @@
       "properties": {
         "id": { "type": "string" },
         "description": { "type": "string" }
+      }
+    },
+    "DialogueLine": {
+      "type": "object",
+      "required": ["line_id", "speaker", "text"],
+      "properties": {
+        "line_id": { "type": "string", "description": "Unique line id (e.g. 'dlg_001')" },
+        "speaker": { "type": "string", "description": "Character id who speaks this line" },
+        "text": { "type": "string", "minLength": 1, "description": "The actual dialogue text" },
+        "emotion": { "type": "string", "description": "Speaker's emotional state when delivering this line" },
+        "subtext": { "type": "string", "description": "What the speaker really means (under the surface)" },
+        "beat_ref": { "type": "string", "description": "Beat id this line belongs to" },
+        "shot_ref": { "type": "string", "description": "Shot id where this line appears (for lipsync anchoring)" },
+        "delivery_note": { "type": "string", "description": "Director's delivery instruction (pace/tone/emphasis)" },
+        "lipsync_anchor": { "type": "boolean", "description": "If true, this line is a key lipsync anchor shot" },
+        "is_key_line": { "type": "boolean", "description": "If true, this is a memorable/key line that must be delivered well" }
       }
     }
   }

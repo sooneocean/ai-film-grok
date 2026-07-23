@@ -507,6 +507,46 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         )
     report["designed_post"] = designed
 
+    # video-use skill readiness (real-footage editing ring, 2026-07-23) — soft probe
+    video_use: dict[str, Any] = {"ok": False, "required_for": "ingest-footage / auto-cut"}
+    try:
+        sys.path.insert(0, str(skill_dir / "scripts"))
+        from real_footage import video_use_dir
+
+        vu = video_use_dir()
+        video_use = {
+            "ok": True,
+            "path": str(vu),
+            "has_transcribe": (vu / "helpers" / "transcribe.py").is_file(),
+            "has_pack": (vu / "helpers" / "pack_transcripts.py").is_file(),
+            "has_render": (vu / "helpers" / "render.py").is_file(),
+            "has_grade": (vu / "helpers" / "grade.py").is_file(),
+            "required_for": "ingest-footage / auto-cut",
+        }
+    except Exception as exc:  # noqa: BLE001 — soft probe
+        video_use["error"] = str(exc)[:200]
+        video_use["soft_warning"] = (
+            "video-use not installed — install/ symlink the skill for real-footage editing"
+        )
+    report["video_use"] = video_use
+
+    # I2V provider registry summary (grok + seedance) — soft probe
+    i2v_providers: dict[str, Any] = {"ok": False}
+    try:
+        sys.path.insert(0, str(skill_dir / "scripts"))
+        from i2v_provider import preferred, registry_report
+
+        active = preferred()
+        reg = registry_report()
+        i2v_providers = {
+            "ok": True,
+            "active": active.name,
+            "providers": reg["providers"],
+        }
+    except Exception as exc:  # noqa: BLE001 — soft probe
+        i2v_providers = {"ok": False, "error": str(exc)[:200]}
+    report["i2v_providers"] = i2v_providers
+
     # Grok OAuth (session token from grok login) — soft probe, does not fail doctor by default
     grok_oauth: dict[str, Any] = {"ok": False}
     try:

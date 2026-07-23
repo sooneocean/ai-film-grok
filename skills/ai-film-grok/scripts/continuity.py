@@ -27,6 +27,8 @@ CODE_BEAT_SEMANTICS_MISS = "BEAT_SEMANTICS_MISS"
 CODE_VISIBLE_CHANGE_MISSING = "VISIBLE_CHANGE_MISSING"
 # P1-5: scene must have locationId (was hardcoded None in derive_graph)
 CODE_SCENE_LOCATION_MISSING = "SCENE_LOCATION_MISSING"
+# P1-8: key dialogue lines must have ledger entry
+CODE_DIALOGUE_LEDGER_MISSING = "DIALOGUE_LEDGER_MISSING"
 CODE_CHARACTER_STATE_REGRESSION = "CHARACTER_STATE_REGRESSION"
 CODE_POSE_MONOTONY = "POSE_MONOTONY"
 CODE_SIZE_MONOTONY = "SIZE_MONOTONY"
@@ -1047,6 +1049,26 @@ def lint_continuity(
                     "shot_ids": [sid],
                 }
             )
+
+    # P1-8: dialogue ledger check — shots with dialogue should have ledger entry
+    for sh in shots:
+        sid = str(sh.get("id") or "unknown")
+        has_dialogue = bool(
+            str(sh.get("dialogue") or "").strip()
+            or str((sh.get("dsl") or {}).get("dialogue") or "").strip()
+        )
+        has_lipsync = bool(sh.get("lipsync"))
+        if has_dialogue or has_lipsync:
+            line_refs = sh.get("dialogueLineIds") or sh.get("dialogue_line_ids") or []
+            if not line_refs:
+                issues.append(
+                    {
+                        "code": CODE_DIALOGUE_LEDGER_MISSING,
+                        "severity": "warning",
+                        "message": f"shot {sid} has dialogue/lipsync but no dialogue ledger line_id anchor",
+                        "shot_ids": [sid],
+                    }
+                )
 
     codes = sorted({iss["code"] for iss in issues})
     # ok false only if any issue code is in fail_on
