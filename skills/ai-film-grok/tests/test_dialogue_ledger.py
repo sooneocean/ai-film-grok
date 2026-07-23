@@ -6,6 +6,7 @@ Verifies:
 - No warning when shot has dialogue + dialogueLineIds
 - No warning when shot has no dialogue
 """
+
 from __future__ import annotations
 
 import json
@@ -57,7 +58,12 @@ class TestDialogueLedgerMissing:
 
     def test_shot_with_dialogue_and_line_id_no_warning(self):
         shots = [
-            {"id": "s1", "dramatic_function": "action", "dialogue": "hello world", "dialogueLineIds": ["dlg_001"]},
+            {
+                "id": "s1",
+                "dramatic_function": "action",
+                "dialogue": "hello world",
+                "dialogueLineIds": ["dlg_001"],
+            },
         ]
         result = lint_continuity(shots)
         assert CODE_DIALOGUE_LEDGER_MISSING not in result["codes"]
