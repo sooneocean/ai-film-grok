@@ -25,6 +25,7 @@ def test_new_init_defaults_to_professional_and_writes_canonical_book(tmp_path: P
     )
 
     assert book["rigor"] == "professional"
+    assert book["quality_target"] == "standard"
     assert book["state"] == "draft"
     assert book["phase"] == "development"
     assert book["stage"] == "idea"
@@ -32,6 +33,16 @@ def test_new_init_defaults_to_professional_and_writes_canonical_book(tmp_path: P
     assert set(book["departments"]) >= {"story", "visual", "sound", "post", "delivery"}
     assert book["content_sha256"] == stable_content_hash(book)
     assert json.loads((tmp_path / "production-book.json").read_text())["title"] == "雨夜"
+
+
+def test_premium_vertical_quality_target_is_persisted(tmp_path: Path) -> None:
+    book = init_production_book(tmp_path, quality_target="premium_vertical")
+    assert book["quality_target"] == "premium_vertical"
+
+
+def test_unknown_quality_target_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ProductionBookError, match="quality_target"):
+        init_production_book(tmp_path, quality_target="award_movie")
 
 
 def test_legacy_book_without_rigor_reads_as_legacy(tmp_path: Path) -> None:

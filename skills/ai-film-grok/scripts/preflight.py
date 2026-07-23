@@ -56,6 +56,26 @@ def run_preflight(root: Path) -> dict[str, Any]:
     pilot = load_pilot_approval(root)
     score = read_json(root / "receipts" / "pilot-scorecard.json") or {}
 
+    # Premium vertical is an authored creative contract, not a styling hint.
+    # Keep standard/legacy roots compatible while failing closed before paid work.
+    book = read_json(root / "production-book.json") or {}
+    if isinstance(book, dict) and book.get("quality_target", "standard") == "premium_vertical":
+        try:
+            from creative_quality import validate_premium_vertical
+
+            creative = validate_premium_vertical(root)
+            for issue in creative.get("errors") or []:
+                hard.append(
+                    _issue(
+                        "hard",
+                        str(issue.get("code") or "CREATIVE_QUALITY_MISSING"),
+                        str(issue.get("message") or "premium creative contract failed"),
+                        fix="aifilm plan edit/graph project/write-spec 后重新运行 preflight",
+                    )
+                )
+        except Exception as exc:  # noqa: BLE001
+            hard.append(_issue("hard", "CREATIVE_QUALITY_VALIDATION_FAILED", str(exc)[:200]))
+
     # --- structure ---
     if not man:
         hard.append(_issue("hard", "no_manifest", "missing manifest.json", fix="aifilm init …"))

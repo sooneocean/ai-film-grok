@@ -115,6 +115,10 @@ def _set_control(node: dict[str, Any], **updates: Any) -> None:
 
 def iter_nodes(graph: dict[str, Any]) -> Iterable[tuple[str, str, dict[str, Any], str | None]]:
     """Yield (node_ref, node_type, node, parent_ref) in stable tree order."""
+    # Local import avoids the story_plan ↔ narrative_control module cycle.
+    from story_plan import normalize_story_graph
+
+    graph = normalize_story_graph(graph)
     story = graph.get("story")
     if isinstance(story, dict):
         yield "story", "story", story, None

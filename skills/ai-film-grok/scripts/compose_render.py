@@ -246,7 +246,10 @@ def assert_underlay_not_double_burn(
 ) -> dict[str, Any]:
     """Hard gate: underlay + FFmpeg burned captions = double-burn disaster.
 
-    final --post-engine hyperframes|remotion already uses --subs off.
+    Staged contract (final_stages.py · 2026-07-23):
+      stage_plate  → always --subs off for designed-post (no assume captions)
+      stage_hf     → HyperFrames owns designed captions
+      stage_caption→ verify pixels; pil_recovery is explicit, never assumed
     Hand path final (burn) → export underlay → compose still double-burns.
     """
     layout_l = (layout or "auto").strip().lower()

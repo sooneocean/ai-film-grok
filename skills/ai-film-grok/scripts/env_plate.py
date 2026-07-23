@@ -19,9 +19,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from frw_canary import DEFAULT_HOST  # single source of truth for FRW API host
+
 LTX_T2V_TEMPLATE_ID = "3507313183813537792"
 LTX_T2V_MODEL = "ltx-t2v"
-DEFAULT_HOST = "https://frw-dreamaiai-api2.aiaiartist.com"
 
 
 class EnvPlateError(RuntimeError):

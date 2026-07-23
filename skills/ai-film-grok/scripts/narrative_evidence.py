@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from narrative_control import validate_narrative_graph
+from story_plan import normalize_story_graph
 from util import canonical_json_sha256, read_json, sha256_file, write_json
 
 EVIDENCE_NAME = "narrative-evidence.json"
@@ -34,6 +35,7 @@ def _graph_fingerprint(root: Path, graph: dict[str, Any]) -> str:
 
 
 def _planned(graph: dict[str, Any]) -> list[dict[str, Any]]:
+    graph = normalize_story_graph(graph)
     rows: list[dict[str, Any]] = []
     points = {
         str(p.get("point_id")): p for p in graph.get("plot_points") or [] if isinstance(p, dict)

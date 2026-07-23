@@ -124,7 +124,7 @@ FFmpeg 服务后处理层，也会先做设计 underlay；**交付默认仍是 H
 | Spec Lock | write-spec 通过 · pilot 用户批准 |
 | Production | approved clips + motion |
 | Voice | tts-rehearsal 或 mix_report |
-| Master | final_film + 七维 review-final + export |
+| Master | final_film + 十一维 review-final + export |
 
 intent ≠ executed ≠ human_review。
 

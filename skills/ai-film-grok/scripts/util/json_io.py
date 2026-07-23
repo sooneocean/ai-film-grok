@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from util.errors import FilmError
+
 
 def write_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -22,8 +24,6 @@ def write_json(path: Path, data: dict[str, Any]) -> None:
 
 def read_json(path: Path) -> dict[str, Any]:
     if not path.is_file():
-        from aifilm_grok import FilmError
-
         raise FilmError(f"Missing JSON: {path}")
     return json.loads(path.read_text(encoding="utf-8"))
 

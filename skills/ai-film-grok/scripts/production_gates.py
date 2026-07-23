@@ -150,14 +150,24 @@ def assert_pilot_allows_add(
 def _flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     scenes = spec.get("scenes") or []
-    if not isinstance(scenes, list):
-        return out
-    for scene in scenes:
-        if not isinstance(scene, dict):
-            continue
-        for shot in scene.get("shots") or []:
-            if isinstance(shot, dict):
-                out.append(shot)
+    if isinstance(scenes, list):
+        for scene in scenes:
+            if not isinstance(scene, dict):
+                continue
+            for shot in scene.get("shots") or []:
+                if isinstance(shot, dict):
+                    out.append(shot)
+    # Top-level shots (short-form film-spec may only use this list)
+    top = spec.get("shots") or []
+    if isinstance(top, list) and top:
+        seen = {str(s.get("id") or "") for s in out}
+        for shot in top:
+            if not isinstance(shot, dict):
+                continue
+            sid = str(shot.get("id") or "")
+            if sid and sid in seen:
+                continue
+            out.append(shot)
     return out
 
 
@@ -172,13 +182,41 @@ def _measured_map_for_root(root: Path | None) -> dict[str, float]:
         return {}
 
 
+def _shot_would_stream_loop(
+    *,
+    plate_sec: float,
+    vo_sec: float,
+    dramatic_function: str | None,
+) -> bool:
+    """True only if edit_policy.plan_stretch would still use stream_loop.
+
+    P0 · 2026-07-23: short I2V plates clamp/forbid_loop instead of replaying —
+    VO slightly over 5.5s is no longer a hard gate when loops=0.
+    """
+    try:
+        from edit_policy import plan_stretch
+
+        # Target ≈ VO + tiny pad (render_final adds vo_pad); plate is I2V source.
+        target = max(float(vo_sec), 0.05)
+        src = max(float(plate_sec), 0.05)
+        plan = plan_stretch(
+            src,
+            target,
+            dramatic_function=dramatic_function,
+        )
+        return int(plan.get("loops") or 0) > 0
+    except Exception:
+        # Fall back to legacy threshold if policy import fails
+        return float(vo_sec) > LOOP_RISK_VO_SEC and float(plate_sec) <= 6.5
+
+
 def loop_risk_shots_from_spec(
     spec: dict[str, Any],
     *,
     measured_by_shot: dict[str, float] | None = None,
     root: Path | None = None,
 ) -> list[str]:
-    """Return shot ids whose VO would force stream_loop on a ≤6.5s plate.
+    """Return shot ids whose VO would still force stream_loop after edit policy.
 
     When measured_by_shot (or root rehearsal receipt) is present, prefer measured
     seconds over estimate_nar_vo_sec / cached _vo_budget.
@@ -187,11 +225,11 @@ def loop_risk_shots_from_spec(
     if not measured and root is not None:
         measured = _measured_map_for_root(root)
 
-    if measured:
-        risk: list[str] = []
-        for shot in _flatten_shots(spec):
-            sid = str(shot.get("id") or "?")
-            nar = str(shot.get("nar") or shot.get("narration") or "")
+    risk: list[str] = []
+    for shot in _flatten_shots(spec):
+        sid = str(shot.get("id") or "?")
+        nar = str(shot.get("nar") or shot.get("narration") or "")
+        if measured:
             try:
                 from tts_rehearsal import effective_vo_sec
 
@@ -203,28 +241,23 @@ def loop_risk_shots_from_spec(
                 )
             except Exception:
                 vo = float(shot.get("est_vo_sec") or estimate_nar_vo_sec(nar))
+        else:
             try:
-                dur = float(shot.get("duration_sec") or DEFAULT_DURATION_SEC)
+                vo = float(shot.get("est_vo_sec") or estimate_nar_vo_sec(nar))
             except (TypeError, ValueError):
-                dur = float(DEFAULT_DURATION_SEC)
-            if vo > LOOP_RISK_VO_SEC and dur <= 6.5:
-                risk.append(sid)
-        return risk
-
-    budget = spec.get("_vo_budget")
-    if isinstance(budget, dict) and isinstance(budget.get("loop_risk_shots"), list):
-        return [str(x) for x in budget["loop_risk_shots"]]
-    risk = []
-    for shot in _flatten_shots(spec):
-        sid = str(shot.get("id") or "?")
-        nar = str(shot.get("nar") or shot.get("narration") or "")
-        est = estimate_nar_vo_sec(nar)
+                vo = estimate_nar_vo_sec(nar)
         try:
-            dur = float(shot.get("duration_sec") or 6)
+            dur = float(shot.get("duration_sec") or DEFAULT_DURATION_SEC)
         except (TypeError, ValueError):
-            dur = 6.0
-        if est > LOOP_RISK_VO_SEC and dur <= 6.5:
+            dur = float(DEFAULT_DURATION_SEC)
+        beat = str(shot.get("dramatic_function") or shot.get("beat") or shot.get("function") or "")
+        if _shot_would_stream_loop(plate_sec=dur, vo_sec=vo, dramatic_function=beat or None) or (
+            # Keep the documented hard-default contract conservative even when
+            # the current renderer can clamp a loop in a later stage.
+            vo > LOOP_RISK_VO_SEC and dur <= 6.5
+        ):
             risk.append(sid)
+    # Do not trust stale _vo_budget.loop_risk_shots (pre shortform clamp policy)
     return risk
 
 

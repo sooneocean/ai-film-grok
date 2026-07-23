@@ -45,7 +45,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 | 角色/画风定妆 | 反复改 prompt，脸服每镜飘 | **双 master**（style-v1 + cast-v1）+ lookbook，全片同一锚 |
 | 分镜与旁白节奏 | 旁白过长 → 画面 loop 重播、成片无聊 | **Director’s Lens**（文本→故事→storyboard）+ **film-spec + VO 预算门禁** |
 | 批量出图出片 | 记不住哪镜过了、重跑撞墙 | **media-queue** 串行 claim、失败 typed requeue、断点可续 |
-| 一致性验收 | 成片才发现换脸/换服/换模 | **pilot 三镜门禁** + still/clip 注册 + 七维 scorecard |
+| 一致性验收 | 成片才发现换脸/换服/换模 | **pilot 三镜门禁** + still/clip 注册 + 十一维 scorecard |
 | 配音混音字幕 | 手搓 TTS、BGM 抢戏、无字幕 | **一键 `final`**：Edge/外部 TTS、R&B 床轨、旁白 duck、PIL 烧字幕 |
 | 60 秒时长对齐 | 短旁白把成片压成 40 秒 | **`duration_sec` 槽位下限**（静音 pad + 画面 hold 满槽） |
 | 色气片踩坑 | BGM 变恐怖、中文声线乱、审核连撞 | 默认 **rnb**、中文 **edge**、moderation 换 soft still 纪律 |
@@ -67,7 +67,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 1. 给参考角色 / 定妆审美；  
 2. 批准 pilot 三镜（说「可以」等）；  
-3. 完整看完成片，七维 scorecard 签字。
+3. 完整看完成片，十一维 scorecard 签字。
 
 ---
 
@@ -89,6 +89,16 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 - Python **不内嵌 key**：Grok 工具由 agent 调；FRW 经 `frw_dispatch` + frwclaw `.env`；本仓库负责 **规格、队列、QA、成片门禁**。  
 - **单 provider 原则**：同一角色禁止半片 Grok still + 半片 FRW still；2V 禁止半 Seedance 半 legacy。
 ### 本地控制台与成片
+
+高质量竖屏项目可显式启用 authored creative gates：
+
+```bash
+aifilm director init --root <film-root> --quality-target premium_vertical
+aifilm director status --root <film-root>
+aifilm preflight --root <film-root>
+```
+
+旧项目默认 `standard`，不会被静默升级。
 
 | 组件 | 用途 |
 |------|------|
@@ -154,7 +164,7 @@ film-root/
    aifilm final（edge TTS + rnb BGM + 字幕 + duration_sec 槽位）
         │
         ▼
-   review-final 七维 → export-desktop
+   review-final 十一维 → export-desktop
 ```
 
 ### 1）一致性：双 master，而不是「每镜重新发明角色」
@@ -193,7 +203,7 @@ film-root/
 - 转场：soft xfade / hard / hold（可按 beat 自动）。  
 - 可选 `--post-engine hyperframes` 做设计字幕（仍不替代 I2V）。
 
-### 6）七维 scorecard（`review-final`）
+### 6）十一维 scorecard（`review-final`）
 
 `identity | style | motion | escalation | audio | subs | dead-air`  
 全 pass 才 `final_complete`，才允许正式 `export-desktop`。

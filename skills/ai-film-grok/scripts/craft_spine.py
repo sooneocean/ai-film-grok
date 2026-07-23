@@ -305,7 +305,7 @@ def craft_status_report(
         "media": "aifilm capability --root … · media-queue · register-clip",
         "selects": "aifilm selects report · 补 register approved",
         "rough": "assemble / compose-preview / Editor’s Cut；写 rough-cut 可选",
-        "verified": "final · review-final 七维 · export-desktop",
+        "verified": "final · review-final 十一维 · export-desktop",
     }
     stage = craft.get("craft_stage") or "idea"
     return {

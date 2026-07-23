@@ -93,8 +93,7 @@ EXPORT_METADATA_FILES = (
 )
 
 
-class FilmError(RuntimeError):
-    """User-facing workflow error."""
+from util.errors import FilmError  # noqa: E402 — re-exported for backward compat
 
 
 def utc_now() -> str:
@@ -1108,6 +1107,102 @@ def cmd_quality(args: argparse.Namespace) -> int:
     return 0 if report["ok"] else 2
 
 
+def cmd_benchmark(args: argparse.Namespace) -> int:
+    from benchmark import run_benchmark
+
+    report = run_benchmark(getattr(args, "root", None), suite=str(args.suite), mode=str(args.mode))
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
+def cmd_creative_pipeline(args: argparse.Namespace) -> int:
+    from creative_pipeline import (
+        build_animatic_gate,
+        build_radio_cut,
+        preproduction_readiness,
+        write_authoring_receipt,
+    )
+
+    root = Path(args.root).expanduser().resolve()
+    action = str(args.pipeline_action)
+    if action == "readiness":
+        report = preproduction_readiness(root)
+    elif action == "radio-cut":
+        if args.write:
+            write_authoring_receipt(root, "radio-cut", {
+                "timing_ok": bool(args.timing_ok),
+                "emotion_turns_ok": bool(args.emotion_turns_ok),
+                "shot_count": int(args.shot_count),
+            })
+        report = build_radio_cut(root)
+    elif action == "animatic":
+        if args.write:
+            write_authoring_receipt(root, "animatic", {
+                "coverage_ok": bool(args.coverage_ok),
+                "pace_ok": bool(args.pace_ok),
+                "performance_ok": bool(args.performance_ok),
+            })
+        report = build_animatic_gate(root)
+    else:
+        raise FilmError(f"Unknown creative pipeline action: {action}")
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
+def cmd_dailies(args: argparse.Namespace) -> int:
+    from dailies import dailies_status, update_dailies
+
+    root = Path(args.root).expanduser().resolve()
+    if args.dailies_action == "status":
+        report = dailies_status(root)
+    else:
+        report = update_dailies(
+            root,
+            shot_id=args.shot_id,
+            candidate=args.candidate,
+            status=args.status,
+            reviewer=args.reviewer,
+            notes=args.notes,
+            approved_budget=args.approved_budget,
+        )
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
+def cmd_post_quality(args: argparse.Namespace) -> int:
+    from post_quality import audio_delivery_gate, premium_master_qc, register_vfx_shot, vfx_gate
+
+    root = Path(args.root).expanduser().resolve()
+    action = str(args.post_action)
+    if action == "vfx-register":
+        report = register_vfx_shot(root, shot_id=args.shot_id, plate=args.plate, status=args.status, reviewer=args.reviewer, notes=args.notes)
+    elif action == "vfx-check":
+        report = vfx_gate(root)
+    elif action == "audio-check":
+        report = audio_delivery_gate(root)
+    elif action == "master-qc":
+        report = premium_master_qc(root, final=args.final)
+    else:
+        raise FilmError(f"Unknown post quality action: {action}")
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
+def cmd_provider_canary(args: argparse.Namespace) -> int:
+    from provider_canary import canary_status, record_canary
+
+    root = Path(args.root).expanduser().resolve()
+    if args.canary_action == "status":
+        report = canary_status(root)
+    else:
+        report = record_canary(
+            root, provider=args.provider, output=args.output, reviewer=args.reviewer,
+            identity_ok=args.identity_ok, motion_ok=args.motion_ok, notes=args.notes,
+        )
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
 def cmd_state_index(args: argparse.Namespace) -> int:
     """Checkpoint: state photos + keyframes + promote plan for fluid transitions."""
     skill_dir = Path(__file__).resolve().parents[1]
@@ -1529,9 +1624,216 @@ def cmd_continuity_chain(args: argparse.Namespace) -> int:
     return 0 if report["ok"] else 2
 
 
+def cmd_face_identity(args: argparse.Namespace) -> int:
+    """Pixel face fingerprints: enroll / verify / audit / status."""
+    from scripts import face_identity as fi
+
+    action = str(getattr(args, "face_identity_cmd", "") or "").strip()
+    root = Path(args.root).expanduser().resolve() if getattr(args, "root", None) else None
+    if action != "help" and root is None and action not in ():
+        if action:
+            pass
+
+    if action == "enroll":
+        if root is None:
+            raise FilmError("face-identity enroll requires --root")
+        source = getattr(args, "source", None)
+        char_id = str(getattr(args, "char_id", None) or "hero")
+        if not source:
+            raise FilmError("face-identity enroll requires --source")
+        out = fi.enroll(
+            root, char_id, Path(source), label=str(getattr(args, "label", None) or char_id)
+        )
+        emit(out)
+        return 0
+
+    if action == "enroll-bible":
+        if root is None:
+            raise FilmError("face-identity enroll-bible requires --root")
+        out = fi.enroll_from_bible(root)
+        emit({"ok": out.get("ok"), "action": "enroll-bible", **out})
+        return 0 if out.get("ok") else 2
+
+    if action == "verify":
+        if root is None:
+            raise FilmError("face-identity verify requires --root")
+        image = getattr(args, "image", None)
+        char_id = str(getattr(args, "char_id", None) or "hero")
+        if not image:
+            raise FilmError("face-identity verify requires --image")
+        out = fi.verify_image(
+            root,
+            Path(image),
+            char_id,
+            ahash_max=int(getattr(args, "ahash_max", None) or fi.DEFAULT_AHASH_MAX),
+            dhash_max=int(getattr(args, "dhash_max", None) or fi.DEFAULT_DHASH_MAX),
+            hist_max=float(getattr(args, "hist_max", None) or fi.DEFAULT_HIST_MAX),
+        )
+        emit(out)
+        return 0 if out.get("ok") else 2
+
+    if action == "audit":
+        if root is None:
+            raise FilmError("face-identity audit requires --root")
+        out = fi.audit_keyframes(
+            root,
+            char_id=getattr(args, "char_id", None),
+            strict=bool(getattr(args, "strict", False)),
+            ahash_max=int(getattr(args, "ahash_max", None) or fi.DEFAULT_AHASH_MAX),
+            dhash_max=int(getattr(args, "dhash_max", None) or fi.DEFAULT_DHASH_MAX),
+            hist_max=float(getattr(args, "hist_max", None) or fi.DEFAULT_HIST_MAX),
+        )
+        emit({"action": "audit", **out})
+        if bool(getattr(args, "strict", False)) and not out.get("verified"):
+            return 2
+        return 0
+
+    if action == "status":
+        if root is None:
+            raise FilmError("face-identity status requires --root")
+        receipt = fi.load_receipt(root)
+        st = fi.post_audit_face_status(root)
+        emit(
+            {
+                "ok": True,
+                "action": "status",
+                "verified": receipt.get("verified"),
+                "enrolled": list((receipt.get("enrolled") or {}).keys()),
+                "audit": receipt.get("audit"),
+                "post_audit": st,
+                "receipt": str(root / "receipts" / fi.RECEIPT_NAME),
+            }
+        )
+        return 0
+
+    raise FilmError(f"unknown face-identity action: {action}")
+
+
+def cmd_style_lock(args: argparse.Namespace) -> int:
+    """Input-ref → medium fingerprint → cast_locks plan/apply/check/prompt."""
+    from scripts import style_lock as sl
+
+    action = str(getattr(args, "style_lock_cmd", "") or "").strip()
+    root = Path(args.root).expanduser().resolve() if getattr(args, "root", None) else None
+
+    if action == "recommend":
+        emit({"ok": True, **sl.recommend_medium_for_user_goal(getattr(args, "goal", "") or "")})
+        return 0
+
+    if root is None:
+        raise FilmError("style-lock requires --root")
+
+    if action == "plan":
+        ref = getattr(args, "ref", None)
+        if not ref:
+            raise FilmError("style-lock plan requires --ref")
+        medium_arg = getattr(args, "medium", None)
+        if medium_arg in (None, "auto", ""):
+            medium_arg = None
+        plan = sl.plan_from_ref(
+            root=root,
+            ref_path=Path(ref),
+            char_id=str(getattr(args, "char_id", None) or "hero"),
+            display_name=str(getattr(args, "name", None) or ""),
+            medium=medium_arg,
+            theme=str(getattr(args, "theme", None) or ""),
+            title=str(getattr(args, "title", None) or root.name),
+            user_hint=str(getattr(args, "hint", None) or ""),
+            face_notes=str(getattr(args, "face_notes", None) or ""),
+            hair_lock=str(getattr(args, "hair", None) or ""),
+            never_tokens=str(getattr(args, "never", None) or ""),
+            default_wardrobe=str(getattr(args, "wardrobe", None) or ""),
+            palette=str(getattr(args, "palette", None) or ""),
+            lighting=str(getattr(args, "lighting", None) or ""),
+            crop_faces=not bool(getattr(args, "no_crop", False)),
+        )
+        path = sl.write_plan(root, plan)
+        emit({"ok": True, "action": "plan", "path": str(path), "plan": plan})
+        return 0
+
+    if action == "apply":
+        plan_path = getattr(args, "plan_file", None)
+        if plan_path:
+            plan = json.loads(Path(plan_path).expanduser().resolve().read_text(encoding="utf-8"))
+        else:
+            plan = sl.read_plan(root)
+        if not plan:
+            raise FilmError("no style-lock plan; run: aifilm style-lock plan --root … --ref …")
+        style = load_bible(root)
+        style = sl.apply_plan_to_bible(style, plan)
+        from scripts.visual_bible import save_bible
+
+        save_bible(root, style)
+        # also keep plan path
+        sl.write_plan(root, plan)
+        check = sl.validate_style_lock_bible(style)
+        emit(
+            {
+                "ok": True,
+                "action": "apply",
+                "medium_key": plan.get("medium_key"),
+                "stability": plan.get("stability"),
+                "cast_locks": list((style.get("cast_locks") or {}).keys()),
+                "check": check,
+                "next": [
+                    f'aifilm lock-style --root "{root}" --canonical <style-v1> '
+                    f"--cast-master <cast master 9:16> --char-id {plan.get('cast_id') or 'hero'} "
+                    f"--signature (from plan or omit if bible already filled)"
+                ],
+                "agent_still_prompt_prefix": style.get("agent_still_prompt_prefix"),
+            }
+        )
+        return 0
+
+    if action == "check":
+        style = load_bible(root)
+        check = sl.validate_style_lock_bible(style)
+        emit({"ok": bool(check.get("ok")), "action": "check", **check})
+        return 0 if check.get("ok") else 2
+
+    if action == "prompt":
+        style = load_bible(root)
+        fp = (
+            style.get("style_fingerprint")
+            if isinstance(style.get("style_fingerprint"), dict)
+            else {}
+        )
+        locks = style.get("cast_locks") if isinstance(style.get("cast_locks"), dict) else {}
+        cast_ids = None
+        if getattr(args, "cast", None):
+            cast_ids = [c.strip() for c in str(args.cast).split(",") if c.strip()]
+        if not fp:
+            raise FilmError("no style_fingerprint; run style-lock plan+apply first")
+        still = style.get("agent_still_prompt_prefix") or sl.build_agent_still_prompt_prefix(
+            fp, locks, cast_ids=cast_ids
+        )
+        i2v = style.get("agent_i2v_prompt_prefix") or sl.build_agent_i2v_prompt_prefix(
+            fp, motion=str(getattr(args, "motion", None) or "")
+        )
+        emit(
+            {
+                "ok": True,
+                "action": "prompt",
+                "still_prefix": still,
+                "i2v_prefix": i2v,
+                "medium_key": fp.get("medium_key"),
+            }
+        )
+        return 0
+
+    raise FilmError(f"unknown style-lock action: {action}")
+
+
 def cmd_lock_style(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     style = load_bible(root)
+    # Optional: auto-apply pending style-lock plan before locking
+    if bool(getattr(args, "from_plan", False)):
+        from scripts import style_lock as sl
+
+        plan = sl.read_plan(root)
+        if plan:
+            style = sl.apply_plan_to_bible(style, plan)
     if args.signature:
         style["signature_block"] = args.signature.strip()
     if args.canonical:
@@ -1554,6 +1856,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
         style["canonical_style_path"] = str(dest)
         style["canonical_style_sha256"] = sha256(dest)
     cast_master = getattr(args, "cast_master", None)
+    char_id = str(getattr(args, "char_id", None) or "hero").strip() or "hero"
     if cast_master:
         csrc = Path(cast_master).expanduser().resolve()
         if not csrc.is_file():
@@ -1563,7 +1866,9 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
         try:
             cdest = safe_output_path(
                 cast_dir,
-                f"hero-v1{csrc.suffix.lower() or '.png'}",
+                f"{char_id}-master{csrc.suffix.lower() or '.png'}"
+                if char_id != "hero"
+                else f"hero-v1{csrc.suffix.lower() or '.png'}",
                 suffixes={".jpg", ".jpeg", ".png", ".webp"},
                 field="cast master filename",
             )
@@ -1574,15 +1879,48 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
         style.setdefault("cast_masters", {})
         if not isinstance(style["cast_masters"], dict):
             style["cast_masters"] = {}
-        style["cast_masters"]["hero"] = str(cdest)
+        style["cast_masters"][char_id] = str(cdest)
+        # keep hero alias for legacy paths
+        if char_id != "hero":
+            style["cast_masters"].setdefault("hero", str(cdest))
         style["cast_master_sha256"] = sha256(cdest)
+        # Pixel face-identity enroll (best-effort)
+        try:
+            from scripts import face_identity as fi
+
+            fi.enroll(root, char_id, cdest, label=char_id)
+            if char_id != "hero":
+                fi.enroll(root, "hero", cdest, label=char_id)
+        except Exception:
+            pass
+
+    # Medium flag → fingerprint if missing
+    medium_flag = getattr(args, "medium", None)
+    if medium_flag:
+        from scripts import style_lock as sl
+
+        mk = sl.infer_medium(explicit=str(medium_flag))
+        fp = sl.build_style_fingerprint(
+            mk,
+            palette=str(style.get("palette") or ""),
+            lighting=str(style.get("lighting") or ""),
+        )
+        style["style_fingerprint"] = fp
+        style["medium"] = fp["medium"]
+        style["rendering"] = fp["rendering"]
+        if not style.get("signature_block") or len(str(style.get("signature_block") or "")) < 40:
+            style["signature_block"] = sl.build_signature_block(
+                str(style.get("title") or root.name), fp
+            )
+        if not style.get("palette") or "to be filled" in str(style.get("palette") or "").lower():
+            style["palette"] = f"locked-{mk}: coherent grade; match style master"
 
     # Consistency gates before lock (prevent empty/placeholder bibles)
     sig = str(style.get("signature_block") or "").strip()
     if len(sig) < 40:
         raise FilmError(
             "lock-style requires signature_block ≥40 chars "
-            "(pass --signature or edit style-bible.json first)"
+            "(pass --signature, --medium, or aifilm style-lock plan first)"
         )
     palette = str(style.get("palette") or "").strip().lower()
     if not palette or "to be filled" in palette:
@@ -1593,16 +1931,37 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
     if identity and "to be filled" in identity:
         raise FilmError(
             "lock-style requires identity_lock filled with face/hair/eyes/wardrobe "
-            "(edit style-bible.json before locking)"
+            "(edit style-bible.json or style-lock apply before locking)"
         )
     if not style.get("canonical_style_path"):
         raise FilmError("lock-style requires --canonical style master image")
+
+    from scripts import style_lock as sl
+
+    check = sl.validate_style_lock_bible(style)
+    if not check.get("ok") and bool(getattr(args, "strict_style_lock", False)):
+        raise FilmError("style-lock hard fail: " + ",".join(check.get("hard") or []))
 
     style["locked"] = True
     style["state"] = "Approved"
     from scripts.visual_bible import save_bible
 
     save_bible(root, style)
+    # receipt
+    receipt = root / "receipts" / "style-lock.json"
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    write_json(
+        receipt,
+        {
+            "ok": True,
+            "medium_key": check.get("medium_key"),
+            "stability": check.get("stability"),
+            "canonical_style_path": style.get("canonical_style_path"),
+            "cast_masters": style.get("cast_masters") or {},
+            "cast_locks": list((style.get("cast_locks") or {}).keys()),
+            "check": check,
+        },
+    )
     manifest = load_manifest(root)
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
@@ -1612,6 +1971,10 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
             "style_locked": True,
             "canonical_style_path": style.get("canonical_style_path"),
             "cast_masters": style.get("cast_masters") or {},
+            "medium_key": check.get("medium_key"),
+            "stability": check.get("stability"),
+            "style_lock_check": check,
+            "receipt": str(receipt),
         }
     )
     return 0
@@ -1666,11 +2029,14 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     source = Path(args.source).expanduser().resolve()
     # Lesson 2026-07-22: compressed/wrong-aspect still → mushy I2V (vivian-ep01)
     aspect = "9:16"
+    spec: dict[str, Any] = {}
     try:
         spec = read_json(root / "film-spec.json") if (root / "film-spec.json").is_file() else {}
+        if not isinstance(spec, dict):
+            spec = {}
         aspect = str(spec.get("aspect_ratio") or aspect)
     except Exception:
-        pass
+        spec = {}
     from media_qa import analyze_still_geometry
     from quality_gates import evaluate_keyframe, require_quality, write_quality_receipt
 
@@ -1718,11 +2084,61 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     if args.status == "approved":
         record["identity_approved"] = True
         record["review_note"] = review_note
+        # Pixel face-identity check when cast enrolled
+        face_id_result = None
+        try:
+            from scripts import face_identity as fi
+
+            char_guess = str(getattr(args, "char_id", None) or "").strip()
+            if not char_guess:
+                # from film-spec shot cast
+                try:
+                    for sc in spec.get("scenes") or []:
+                        for sh in sc.get("shots") or []:
+                            if str(sh.get("id")) != str(args.shot_id):
+                                continue
+                            dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+                            cast = dsl.get("cast") if isinstance(dsl.get("cast"), list) else []
+                            if cast:
+                                char_guess = str(cast[0])
+                except Exception:
+                    char_guess = ""
+            receipt = fi.load_receipt(root)
+            enrolled = receipt.get("enrolled") if isinstance(receipt.get("enrolled"), dict) else {}
+            if char_guess and char_guess in enrolled:
+                face_id_result = fi.verify_image(root, source, char_guess)
+                record["face_identity"] = {
+                    "ok": face_id_result.get("ok"),
+                    "char_id": char_guess,
+                    "score": face_id_result.get("score"),
+                    "ahash_distance": face_id_result.get("ahash_distance"),
+                    "dhash_distance": face_id_result.get("dhash_distance"),
+                }
+                if bool(getattr(args, "require_face_identity", False)) and not face_id_result.get(
+                    "ok"
+                ):
+                    raise FilmError(
+                        f"face-identity verify failed for {args.shot_id} vs {char_guess}: "
+                        f"score={face_id_result.get('score')} "
+                        f"(ahash={face_id_result.get('ahash_distance')} "
+                        f"dhash={face_id_result.get('dhash_distance')})"
+                    )
+        except FilmError:
+            raise
+        except Exception:
+            face_id_result = None
     manifest = load_manifest(root)
     manifest.setdefault("stills", {})[record["shot_id"]] = record
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
-    emit({"ok": True, "record": record, "geometry_qa": geo})
+    emit(
+        {
+            "ok": True,
+            "record": record,
+            "geometry_qa": geo,
+            "face_identity": record.get("face_identity"),
+        }
+    )
     return 0
 
 
@@ -2492,18 +2908,29 @@ def cmd_final(args: argparse.Namespace) -> int:
     if args.out_name:
         film_output_path(root, args.out_name)
 
-    # Designed-post path:
-    # - SRT only on FFmpeg plate (subs off) so designed captions don't double-burn
-    # - blank plate title/end glyphs so designed cards don't double-burn titles
-    #   (pad duration kept for VO/SRT clock)
+    # ── Staged final (P0 · 2026-07-23): no assumed captions ──
+    # stage_plate  → FFmpeg VO/BGM/clips; HF/Remotion path forces plate subs=off
+    # stage_hf     → HyperFrames owns designed captions (export+render)
+    # stage_caption→ verify pixels; pil_recovery only as named stage if HF failed
+    # Never: hand-mux silent plate and claim "HF will have burned subs".
+    stages_receipt: dict[str, Any] = {}
     subs_mode = str(getattr(args, "subs", None) or "").strip().lower()
     if not subs_mode:
+        # HF/Remotion: plate must NOT burn (HF owns captions). FFmpeg: plate burns.
         subs_mode = "off" if post_engine in {"hyperframes", "remotion"} else "burn"
     plate_cards = str(getattr(args, "plate_cards", None) or "auto").strip().lower()
     if plate_cards in {"", "auto"}:
         plate_cards = "blank" if post_engine in {"hyperframes", "remotion"} else "text"
     if plate_cards not in {"text", "blank"}:
         raise FilmError("--plate-cards must be auto|text|blank")
+    if post_engine in {"hyperframes", "remotion"} and subs_mode == "burn":
+        log(
+            "stage_plate: forcing --subs off for designed-post "
+            "(HF/Remotion owns captions; plate burn would double-burn underlay)"
+        )
+        subs_mode = "off"
+        if plate_cards == "text":
+            plate_cards = "blank"
 
     cmd = [sys.executable, str(script), "--root", str(root)]
     if args.out_name:
@@ -2572,11 +2999,12 @@ def cmd_final(args: argparse.Namespace) -> int:
     cmd += ["--subs", subs_mode]
     cmd += ["--plate-cards", plate_cards]
     log(
-        f"running render_final.py (post_engine={post_engine}, "
-        f"subs={subs_mode}, plate_cards={plate_cards}) ..."
+        f"stage_plate: render_final.py (post_engine={post_engine}, "
+        f"subs={subs_mode}, plate_cards={plate_cards}) — captions NOT assumed here"
     )
-    # P0 · 少婦案：render_final 常 >2min；默认 run(timeout=60) 会 TimeoutExpired
-    proc = run(cmd, check=False, timeout=600)
+    # P0: plate alone often >10min with mix; do not use default 60s / short 600s
+    plate_timeout = int(getattr(args, "plate_timeout", 0) or 0) or 1200
+    proc = run(cmd, check=False, timeout=plate_timeout)
     sys.stderr.write(proc.stderr or "")
     ffmpeg_result: dict[str, Any] | None = None
     if proc.stdout:
@@ -2586,6 +3014,18 @@ def cmd_final(args: argparse.Namespace) -> int:
             # keep raw for ffmpeg-only path
             if post_engine == "ffmpeg":
                 print(proc.stdout)
+    stages_receipt["plate"] = {
+        "ok": proc.returncode == 0,
+        "returncode": proc.returncode,
+        "subs": subs_mode,
+        "plate_cards": plate_cards,
+        "timeout_sec": plate_timeout,
+        "ffmpeg": {
+            "output": (ffmpeg_result or {}).get("output"),
+            "srt": (ffmpeg_result or {}).get("srt") or str(root / "out" / "final.srt"),
+            "subtitles": (ffmpeg_result or {}).get("subtitles"),
+        },
+    }
     if proc.returncode != 0:
         if post_engine == "ffmpeg" and not proc.stdout:
             pass
@@ -2594,7 +3034,8 @@ def cmd_final(args: argparse.Namespace) -> int:
                 {
                     "ok": False,
                     "post_engine": post_engine,
-                    "stage": "ffmpeg",
+                    "stage": "plate",
+                    "stages": stages_receipt,
                     "error": (proc.stderr or proc.stdout or "render_final failed")[:2000],
                     "ffmpeg": ffmpeg_result,
                 }
@@ -2603,7 +3044,12 @@ def cmd_final(args: argparse.Namespace) -> int:
 
     if post_engine == "ffmpeg":
         if ffmpeg_result is not None:
-            out_obj = {**ffmpeg_result, "post_engine": "ffmpeg"}
+            out_obj = {
+                **ffmpeg_result,
+                "post_engine": "ffmpeg",
+                "stages": stages_receipt,
+                "caption_owner": "ffmpeg_plate",
+            }
             if preflight_report is not None:
                 out_obj["preflight"] = {
                     "hard_ok": preflight_report.get("hard_ok"),
@@ -2619,7 +3065,7 @@ def cmd_final(args: argparse.Namespace) -> int:
             print(proc.stdout)
         return 0
 
-    # Designed-post: HyperFrames or Remotion after FFmpeg plate (subs off)
+    # stage_hf / stage_remotion: designed-post AFTER plate (subs off)
     sys.path.insert(0, str(skill_dir / "scripts"))
     try:
         from compose_render import (
@@ -2628,8 +3074,13 @@ def cmd_final(args: argparse.Namespace) -> int:
             probe_designed_post_tooling,
             probe_remotion_readiness,
         )
+        from final_stages import (
+            ensure_captions_after_hf,
+            patch_delivery_burned_in,
+            write_stages_receipt,
+        )
     except ImportError as exc:
-        raise FilmError(f"Cannot import compose_render: {exc}") from exc
+        raise FilmError(f"Cannot import compose_render/final_stages: {exc}") from exc
 
     if post_engine == "hyperframes":
         tooling = probe_designed_post_tooling()
@@ -2639,7 +3090,10 @@ def cmd_final(args: argparse.Namespace) -> int:
                 f"tooling={tooling}。可改用 --post-engine ffmpeg，"
                 "或安装 Node 22+ 后重试。"
             )
-        log("post-engine=hyperframes → compose-render ...")
+        log(
+            "stage_hf: HyperFrames export+render owns designed captions "
+            "(plate was subs=off; no double-burn assume)"
+        )
         try:
             result = compose_render(
                 root,
@@ -2662,13 +3116,61 @@ def cmd_final(args: argparse.Namespace) -> int:
             )
         except ComposeRenderError as exc:
             raise FilmError(str(exc)) from exc
+        stages_receipt["hf"] = {
+            "ok": True,
+            "output": result.get("output"),
+            "output_sha256": result.get("output_sha256"),
+        }
+
+        # stage_caption: verify HF put captions in delivery; recover explicitly if not
+        final_path = Path(str(result.get("output") or root / "out" / "film_final.mp4"))
+        log("stage_caption: verify HF caption ownership (no assume) ...")
+        caption_gate = ensure_captions_after_hf(
+            root,
+            final_mp4=final_path,
+            allow_pil_recovery=not bool(getattr(args, "no_caption_recovery", False)),
+        )
+        stages_receipt["caption"] = caption_gate
+        if not caption_gate.get("ok"):
+            stages_path = write_stages_receipt(root, stages_receipt)
+            emit(
+                {
+                    "ok": False,
+                    "post_engine": "hyperframes",
+                    "stage": "caption",
+                    "stages": stages_receipt,
+                    "stages_receipt": str(stages_path),
+                    "error": caption_gate.get("error")
+                    or "HF caption gate failed and recovery did not produce burned subs",
+                    "next": [
+                        f'python3 "{skill_dir}/scripts/burn_srt_pil.py" '
+                        f'--video "{final_path}" --srt "{root}/out/final.srt" '
+                        f'--out "{final_path}"',
+                        "or re-run: aifilm final --post-engine hyperframes",
+                    ],
+                }
+            )
+            return 2
+        owner = str(caption_gate.get("caption_owner") or "hyperframes")
+        burned = owner in {
+            "hyperframes",
+            "hyperframes_export_only",
+            "pil_recovery",
+            "ffmpeg_plate",
+        }
+        stages_receipt["deliver"] = patch_delivery_burned_in(root, burned_in=burned, owner=owner)
+        stages_path = write_stages_receipt(root, stages_receipt)
+        log(f"stage_deliver: caption_owner={owner} burned_in={burned} receipt={stages_path}")
         out_obj: dict[str, Any] = {
             "ok": True,
             "post_engine": "hyperframes",
             "ffmpeg": ffmpeg_result,
             "compose": result,
-            "output": result.get("output"),
+            "output": str(final_path),
             "output_sha256": result.get("output_sha256"),
+            "caption_owner": owner,
+            "stages": stages_receipt,
+            "stages_receipt": str(stages_path),
             "final_complete": False,
             "next": result.get("next"),
         }
@@ -2773,6 +3275,35 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
     if not technical_qa.get("ok"):
         raise FilmError(f"Cannot approve final: technical QA failed: {technical_qa.get('errors')}")
+    # v1.23: objective delivery-quality gate before the director's subjective scorecard.
+    # Fails here = not worth a human reviewer's time (decode errors, missing audio,
+    # black frames, freezes, or overall score below the floor).
+    from quality_check_video import QualityCheckError, load_quality_report, run_quality_check
+
+    quality_report = load_quality_report(root)
+    if not quality_report or quality_report.get("video") != str(final_path):
+        try:
+            quality_report = run_quality_check(
+                final_path,
+                out_dir=str(out_dir),
+                expect_audio=True,
+                expect_subtitles=True,
+                srt=str(out_dir / "final.srt") if (out_dir / "final.srt").is_file() else None,
+                min_score=0,
+            )
+        except QualityCheckError as exc:
+            raise FilmError(f"Cannot approve final: delivery quality check failed: {exc}") from exc
+    if quality_report.get("hard_fail"):
+        failed_gates = [
+            name
+            for name, gate in (quality_report.get("gates") or {}).items()
+            if isinstance(gate, dict) and gate.get("status") == "fail"
+        ]
+        raise FilmError(
+            f"Cannot approve final: delivery quality hard-fail on {', '.join(failed_gates)} "
+            f"(score={quality_report.get('score')}/100). "
+            "Fix the technical issue then re-run review-final."
+        )
     reviewer = str(args.reviewer or "").strip()
     notes = str(args.notes or "").strip()
     if not args.approve:
@@ -3934,6 +4465,7 @@ def cmd_director(args: argparse.Namespace) -> int:
                 rigor=args.rigor,
                 format_pack=args.format_pack,
                 genre_pack=args.genre_pack,
+                quality_target=args.quality_target,
             )
         elif action == "migrate-audit":
             report = migrate_audit(root)
@@ -4743,7 +5275,98 @@ def build_parser() -> argparse.ArgumentParser:
     ls.add_argument("--root", required=True)
     ls.add_argument("--canonical", help="Path to approved style master image")
     ls.add_argument("--cast-master", help="Path to approved cast master (face/wardrobe lock)")
+    ls.add_argument(
+        "--char-id",
+        default="hero",
+        help="Cast master character id (default hero; e.g. lushiran)",
+    )
     ls.add_argument("--signature", help="Override signature block (≥40 chars)")
+    ls.add_argument(
+        "--medium",
+        choices=["anime", "manhua", "semi_real", "photoreal"],
+        help="Force medium fingerprint into style-bible before lock",
+    )
+    ls.add_argument(
+        "--from-plan",
+        action="store_true",
+        help="Merge receipts/style-lock-plan.json into bible before lock",
+    )
+    ls.add_argument(
+        "--strict-style-lock",
+        action="store_true",
+        help="Fail lock if style_fingerprint/cast_locks hard checks fail",
+    )
+
+    # Pixel face-identity fingerprints
+    fid = sub.add_parser(
+        "face-identity",
+        help="Pixel face lock: enroll|enroll-bible|verify|audit|status → receipts/face-identity.json",
+    )
+    fid_sub = fid.add_subparsers(dest="face_identity_cmd", required=True)
+    fe = fid_sub.add_parser("enroll", help="Enroll one cast master / face plate")
+    fe.add_argument("--root", required=True)
+    fe.add_argument("--char-id", default="hero")
+    fe.add_argument("--source", required=True, help="Cast master or face-lock image")
+    fe.add_argument("--label", default="")
+    feb = fid_sub.add_parser("enroll-bible", help="Enroll all style-bible cast_masters")
+    feb.add_argument("--root", required=True)
+    fv = fid_sub.add_parser("verify", help="Verify one still against enrolled cast")
+    fv.add_argument("--root", required=True)
+    fv.add_argument("--image", required=True)
+    fv.add_argument("--char-id", default="hero")
+    fv.add_argument(
+        "--ahash-max", type=int, default=None, help="default from face_identity.DEFAULT_*"
+    )
+    fv.add_argument("--dhash-max", type=int, default=None)
+    fv.add_argument("--hist-max", type=float, default=None)
+    fa = fid_sub.add_parser("audit", help="Verify keyframes/ vs enrolled; set verified flag")
+    fa.add_argument("--root", required=True)
+    fa.add_argument("--char-id", help="Default cast when shot map missing")
+    fa.add_argument("--strict", action="store_true", help="Exit 2 if any keyframe fails")
+    fa.add_argument("--ahash-max", type=int, default=None)
+    fa.add_argument("--dhash-max", type=int, default=None)
+    fa.add_argument("--hist-max", type=float, default=None)
+    fs = fid_sub.add_parser("status", help="Show face-identity receipt + post_audit view")
+    fs.add_argument("--root", required=True)
+
+    # Input-ref style lock (medium + cast_locks + agent prompt prefixes)
+    slock = sub.add_parser(
+        "style-lock",
+        help="Lock medium/identity from user ref image (plan|apply|check|prompt|recommend)",
+    )
+    slock_sub = slock.add_subparsers(dest="style_lock_cmd", required=True)
+    slp = slock_sub.add_parser("plan", help="Analyze ref → style-lock-plan.json + face crops")
+    slp.add_argument("--root", required=True)
+    slp.add_argument("--ref", required=True, help="User character sheet or face/ref image")
+    slp.add_argument("--char-id", default="hero")
+    slp.add_argument("--name", help="Display name")
+    slp.add_argument(
+        "--medium",
+        choices=["anime", "manhua", "semi_real", "photoreal", "auto"],
+        default="auto",
+        help="auto=infer from theme/hint; manhua recommended for 漫剧 stability",
+    )
+    slp.add_argument("--theme", default="")
+    slp.add_argument("--title", default="")
+    slp.add_argument("--hint", default="", help="Free text: 漫剧/写实/要稳定…")
+    slp.add_argument("--face-notes", default="")
+    slp.add_argument("--hair", default="")
+    slp.add_argument("--never", default="")
+    slp.add_argument("--wardrobe", default="")
+    slp.add_argument("--palette", default="")
+    slp.add_argument("--lighting", default="")
+    slp.add_argument("--no-crop", action="store_true", help="Skip heuristic face crops")
+    sla = slock_sub.add_parser("apply", help="Merge plan into style-bible.json")
+    sla.add_argument("--root", required=True)
+    sla.add_argument("--plan-file", help="Default receipts/style-lock-plan.json")
+    slc = slock_sub.add_parser("check", help="Validate style fingerprint + cast locks")
+    slc.add_argument("--root", required=True)
+    slpr = slock_sub.add_parser("prompt", help="Print still/I2V prompt prefixes")
+    slpr.add_argument("--root", required=True)
+    slpr.add_argument("--cast", help="Comma cast ids")
+    slpr.add_argument("--motion", default="")
+    slr = slock_sub.add_parser("recommend", help="Recommend medium for a stability goal")
+    slr.add_argument("--goal", required=True, help="e.g. 要稳定像漫剧")
 
     bible = sub.add_parser("bible", help="Manage Visual Bible")
     bible_sub = bible.add_subparsers(dest="bible_cmd", required=True)
@@ -4773,6 +5396,15 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument(
         "--review-note",
         help="Required when --status approved: brief visual review note",
+    )
+    rs.add_argument(
+        "--char-id",
+        help="Cast id for pixel face-identity verify (default: first dsl.cast)",
+    )
+    rs.add_argument(
+        "--require-face-identity",
+        action="store_true",
+        help="Fail approved register if face-identity pixel match fails",
     )
 
     rc = sub.add_parser("register-clip", help="Register approved I2V clip")
@@ -5093,19 +5725,37 @@ def build_parser() -> argparse.ArgumentParser:
         default="ffmpeg",
         choices=["ffmpeg", "hyperframes", "remotion"],
         help=(
-            "ffmpeg=default burn delivery; hyperframes|remotion=FFmpeg VO/BGM "
-            "(subs off) then designed captions render+register"
+            "Staged final: ffmpeg=plate burns captions; "
+            "hyperframes|remotion=stage_plate (subs off) → stage_hf captions → "
+            "stage_caption verify (pil_recovery if HF pixels empty) → deliver. "
+            "Never assumes HF burned without gate."
         ),
     )
     fin.add_argument(
         "--subs",
         default=None,
         choices=["burn", "off"],
-        help="burn|off (default: burn for ffmpeg, off for hyperframes|remotion post-engine)",
+        help=(
+            "Plate only: burn|off. Default burn for ffmpeg; forced off for "
+            "hyperframes|remotion so HF owns captions (double-burn guard)."
+        ),
+    )
+    fin.add_argument(
+        "--plate-timeout",
+        type=int,
+        default=1200,
+        help="Seconds for stage_plate render_final (default 1200; short values cause fake fails)",
+    )
+    fin.add_argument(
+        "--no-caption-recovery",
+        action="store_true",
+        help=(
+            "After HF, if caption pixel gate fails do NOT run pil burn recovery — hard fail instead"
+        ),
     )
     fin.add_argument(
         "--compose-quality",
-        default="standard",
+        default=None,
         choices=["draft", "standard", "high"],
         help="HyperFrames render quality when --post-engine hyperframes",
     )
@@ -5224,6 +5874,75 @@ def build_parser() -> argparse.ArgumentParser:
         "subtitle-cut-boundaries", help="Check subtitle cues against hard and Continue cuts"
     )
     subtitle_boundaries.add_argument("--root", required=True)
+
+    # v1.23: delivery-level FFmpeg quality gates (objective, pre-scorecard)
+    qcheck = sub.add_parser(
+        "quality-check",
+        help="Run 8-gate FFmpeg delivery quality check with weighted scoring",
+    )
+    qcheck.add_argument("video", help="Final video path")
+    qcheck.add_argument("--root", default=None, help="Film root (defaults --out to <root>/out)")
+    qcheck.add_argument(
+        "--out", default=None, help="Output dir for quality-report.json + artefacts"
+    )
+    qcheck.add_argument(
+        "--expect-audio", action="store_true", default=True, help="Require audio stream"
+    )
+    qcheck.add_argument("--no-expect-audio", dest="expect_audio", action="store_false")
+    qcheck.add_argument("--expect-subtitles", action="store_true", help="Require sidecar SRT")
+    qcheck.add_argument("--srt", default=None, help="Expected sidecar SRT file")
+    qcheck.add_argument(
+        "--min-score", type=int, default=80, help="Minimum score to pass (default 80)"
+    )
+    qcheck.add_argument(
+        "--allow-black", action="store_true", help="Downgrade black-frame fail to warn"
+    )
+    qcheck.add_argument("--allow-freeze", action="store_true", help="Downgrade freeze fail to warn")
+
+    benchmark_p = sub.add_parser(
+        "benchmark", help="Run a no-spend premium vertical benchmark contract"
+    )
+    benchmark_p.add_argument("--root", default=None, help="Optional film root for receipt binding")
+    benchmark_p.add_argument("--suite", choices=("premium-vertical",), default="premium-vertical")
+    benchmark_p.add_argument("--mode", choices=("contract", "live"), default="contract")
+
+    # v1.23: reference video audit — reverse-engineer shot grammar
+    refaudit = sub.add_parser(
+        "analyze-reference",
+        help="Analyze a reference video: probe, contact sheet, keyframes, shot grammar",
+    )
+    refaudit.add_argument("video", help="Reference video path")
+    refaudit.add_argument(
+        "--root", default=None, help="Film root (writes to <root>/reference-analysis)"
+    )
+    refaudit.add_argument("--out", default=None, help="Output dir (overrides --root)")
+    refaudit.add_argument(
+        "--frames",
+        default="0,3,6,9,13,18,24,30,36",
+        help="Comma-separated timestamps (seconds) for keyframe extraction",
+    )
+
+    # v1.23: product brief expansion (product intro video track)
+    brief_p = sub.add_parser(
+        "brief",
+        help="Product brief: expand a product intro into a structured video brief",
+    )
+    brief_sub = brief_p.add_subparsers(dest="brief_action", required=True)
+    brief_expand = brief_sub.add_parser(
+        "expand", help="Expand raw product text → product-brief.json"
+    )
+    brief_expand.add_argument("--root", required=True, help="Film root")
+    brief_expand.add_argument("--text", default=None, help="Raw product description text")
+    brief_expand.add_argument("--file", default=None, help="Path to product description file")
+    brief_expand.add_argument("--title", default=None, help="Product name override")
+    brief_expand.add_argument(
+        "--target-duration", type=float, default=40.0, help="Target duration seconds"
+    )
+    brief_expand.add_argument(
+        "--voice-style", default="warm", help="Voice style hint (warm/tech/neutral)"
+    )
+    brief_expand.add_argument("--language", default="zh", choices=["zh", "en"], help="VO language")
+
     ledger = sub.add_parser(
         "director-ledger", help="Build checksum-bound ledger of human-approved exceptions"
     )
@@ -5696,6 +6415,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     d_init.add_argument("--format-pack", default="vertical-short")
     d_init.add_argument("--genre-pack", default="drama")
+    d_init.add_argument(
+        "--quality-target",
+        choices=("standard", "premium_vertical"),
+        default=None,
+        help="Creative quality gate profile; legacy projects default to standard",
+    )
     d_migrate_audit = director_sub.add_parser("migrate-audit")
     d_migrate_audit.add_argument("--root", required=True)
     d_migrate = director_sub.add_parser("migrate")
@@ -5964,6 +6689,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_continuity_chain(args)
         if args.cmd == "lock-style":
             return cmd_lock_style(args)
+        if args.cmd == "style-lock":
+            return cmd_style_lock(args)
+        if args.cmd == "face-identity":
+            return cmd_face_identity(args)
         if args.cmd == "bible":
             root = Path(args.root).expanduser().resolve()
             if args.bible_cmd == "init":
@@ -6031,6 +6760,63 @@ def main(argv: list[str] | None = None) -> int:
             report = build_subtitle_cut_boundaries(Path(args.root))
             emit(report)
             return 0 if report["ok"] else 2
+        if args.cmd == "quality-check":
+            from quality_check_video import QualityCheckError, run_quality_check
+
+            out_dir = args.out
+            if not out_dir and args.root:
+                out_dir = str(Path(args.root).expanduser().resolve() / "out")
+            try:
+                report = run_quality_check(
+                    args.video,
+                    out_dir=out_dir,
+                    expect_audio=args.expect_audio,
+                    expect_subtitles=args.expect_subtitles,
+                    srt=args.srt,
+                    min_score=args.min_score,
+                    allow_black=args.allow_black,
+                    allow_freeze=args.allow_freeze,
+                )
+            except QualityCheckError as exc:
+                raise FilmError(str(exc)) from exc
+            emit(report)
+            return 0 if report["passed"] else 1
+        if args.cmd == "benchmark":
+            return cmd_benchmark(args)
+        if args.cmd == "analyze-reference":
+            from reference_audit import ReferenceAuditError, run_reference_audit
+
+            out_dir = args.out
+            if not out_dir and args.root:
+                out_dir = str(Path(args.root).expanduser().resolve() / "reference-analysis")
+            try:
+                report = run_reference_audit(args.video, out_dir=out_dir, frames=args.frames)
+            except ReferenceAuditError as exc:
+                raise FilmError(str(exc)) from exc
+            emit(report)
+            return 0
+        if args.cmd == "brief":
+            from product_brief import ProductBriefError, expand_product_brief, save_product_brief
+
+            text = args.text
+            if not text and args.file:
+                text = Path(args.file).expanduser().resolve().read_text(encoding="utf-8")
+            if not text:
+                raise FilmError("brief expand requires --text or --file")
+            try:
+                packet = expand_product_brief(
+                    text,
+                    title=args.title,
+                    target_duration=args.target_duration,
+                    voice_style=args.voice_style,
+                    language=args.language,
+                )
+            except ProductBriefError as exc:
+                raise FilmError(str(exc)) from exc
+            path = save_product_brief(args.root, packet)
+            packet["receipt_path"] = str(path)
+            emit(packet)
+            return 0
         if args.cmd == "director-ledger":
             from director_ledger import build_director_ledger
 

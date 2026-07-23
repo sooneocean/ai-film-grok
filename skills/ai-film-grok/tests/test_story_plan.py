@@ -12,7 +12,9 @@ sys.path.insert(0, str(SCRIPTS))
 
 from drama_graph import validate_graph  # noqa: E402
 from story_plan import (  # noqa: E402
+    export_legacy_story_plan,
     normalize_story,
+    normalize_story_graph,
     project_graph_to_film_spec,
     run_plan,
 )
@@ -107,6 +109,42 @@ class StoryPlanTests(unittest.TestCase):
             graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
             spec = project_graph_to_film_spec(graph)
             self.assertTrue(spec["scenes"][0]["shots"])
+
+    def test_legacy_flat_graph_is_normalized_without_losing_ids(self) -> None:
+        legacy = {
+            "title": "旧格式",
+            "scenes": [{
+                "id": "scene-A",
+                "beats": [{"id": "beat-A", "shots": [{"id": "shot-A"}]}],
+            }],
+        }
+        graph = normalize_story_graph(legacy)
+        self.assertEqual(graph["story_plan_schema_version"], 2)
+        self.assertEqual(graph["episodes"][0]["id"], "ep01")
+        self.assertEqual(graph["episodes"][0]["scenes"][0]["id"], "scene-A")
+        self.assertEqual(graph["episodes"][0]["scenes"][0]["beats"][0]["id"], "beat-A")
+        self.assertEqual(
+            graph["episodes"][0]["scenes"][0]["beats"][0]["shots"][0]["id"], "shot-A"
+        )
+        self.assertNotIn("scenes", graph)
+
+    def test_nested_multi_episode_roundtrip_to_explicit_legacy_shape(self) -> None:
+        nested = {
+            "episodes": [
+                {"id": "ep01", "scenes": [{"id": "sc01", "beats": [{"id": "bt01", "shots": [{"id": "sh01"}]}]}]},
+                {"id": "ep02", "scenes": [{"id": "sc02", "beats": [{"id": "bt02", "shots": [{"id": "sh02"}]}]}]},
+            ]
+        }
+        legacy = export_legacy_story_plan(nested)
+        self.assertEqual([shot["id"] for shot in legacy["shots"]], ["sh01", "sh02"])
+        self.assertEqual([shot["episode_id"] for shot in legacy["shots"]], ["ep01", "ep02"])
+        self.assertEqual(normalize_story_graph(legacy)["episodes"][0]["id"], "ep01")
+
+    def test_empty_episode_is_safe_for_projection(self) -> None:
+        graph = normalize_story_graph({"episodes": [{"id": "ep-empty", "scenes": []}]})
+        self.assertEqual(graph["episodes"][0]["id"], "ep-empty")
+        spec = project_graph_to_film_spec(graph)
+        self.assertEqual(spec["scenes"], [])
 
 
 if __name__ == "__main__":

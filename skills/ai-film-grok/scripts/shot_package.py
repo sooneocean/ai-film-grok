@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from shot_inventory import flatten_shot_inventory
+from story_plan import normalize_story_graph
 from util import canonical_json_sha256
 
 _VISUAL_GROUPS = {
@@ -23,6 +24,7 @@ def _stable_hash(value: Any) -> str:
 
 
 def _find_shot(graph: dict[str, Any], shot_id: str) -> tuple[dict[str, Any], dict[str, str]]:
+    graph = normalize_story_graph(graph)
     for episode in graph.get("episodes") or []:
         if not isinstance(episode, dict):
             continue

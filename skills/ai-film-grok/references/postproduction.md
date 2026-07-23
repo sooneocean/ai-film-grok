@@ -172,7 +172,7 @@ Skill **不附带**版权曲库。你把**自己有权使用**的 rnb/许可文�
 `status.audio.local_music_available` / `mix_report.music_template` 可查是否命中。  
 输出 `audio/mix_report.json` 列出 `applied_events`。
 
-`final` 结束后，`final_complete` 仍为 false。完整播放当前成片，并完成**导演评分卡**（**七维**全 pass）：
+`final` 结束后，`final_complete` 仍为 false。完整播放当前成片，并完成**导演评分卡**（**十一维**全 pass）：
 
 | 维度 | CLI | 含义 |
 |---|---|---|

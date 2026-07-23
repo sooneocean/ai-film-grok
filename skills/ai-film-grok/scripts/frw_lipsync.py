@@ -29,7 +29,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-DEFAULT_HOST = "https://frw-dreamaiai-api2.aiaiartist.com"
+from frw_canary import DEFAULT_HOST  # single source of truth for FRW API host
 
 # Prefer order when auto: ltx (params known) → wan → seedance (often 403)
 LIPSYNC_MODELS: dict[str, dict[str, Any]] = {

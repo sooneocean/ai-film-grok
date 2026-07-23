@@ -19,7 +19,7 @@ memory/case-study/
 ├── 2026-07-22-雨夜后座/
 │   ├── overview.md             ← logline / 受众 / 片长 / 风格 / heat_scale
 │   ├── decisions.md            ← 关键导演决策 + 对应 P0–P5
-│   ├── results.md              ← 成片 hash / 七维 review / 受众反馈（如有）
+│   ├── results.md              ← 成片 hash / 十一维 review / 受众反馈（如有）
 │   └── takeaways.md           ← 复盘：什么有效 / 什么会改 / 可迁移结论
 └── _template/
     └── overview.md             ← 新片例模板
@@ -52,7 +52,7 @@ date: 2026-07-22
 ## results.md 字段
 
 - `final_film` sha256 + 导出路径
-- 七维 review-final 分数（identity/style/motion/escalation/audio/subs/dead_air）
+- 十一维 review-final 分数（identity/style/motion/escalation/audio/subs/dead_air）
 - screening_evidence 时间点
 - 受众反馈（如有完播率/评论/点赞）——没有就标 `未采集`
 

@@ -1,6 +1,6 @@
 # References 索引
 
-> 91 个 reference 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
+> 92 个 reference 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
 > 踩坑 lessons（47 个）见末节,按日期归档;新规则须标 P 码 + 层。
 
 ---
@@ -25,6 +25,7 @@
 | 文件 | 主题 |
 |---|---|
 | [professional-director-system.md](professional-director-system.md) | Production Book / 部门合同 / 审批 ledger / stale 传播 |
+| [director-methodology.md](director-methodology.md) | 40 年导演方法论注入总纲（前期/制作/后期三阶段 + 考验矩阵） |
 
 ## 规格与契约
 
@@ -105,6 +106,15 @@
 ## 踩坑 Lessons（按日期）
 
 > 新规则须标 P 码 + 层。验证稳定后可晋升到上方稳定 references。
+
+### 2026-07-23
+
+| 文件 | 主题 |
+|---|---|
+| [style-lock-from-ref](lessons-2026-07-23-style-lock-from-ref.md) | 输入图画风锁 medium/cast_locks（P0） |
+| [face-identity-pixel](lessons-2026-07-23-face-identity-pixel.md) | 像素 face-identity 哈希 + post_audit（P0） |
+| [photoreal-vs-manhua-stability](lessons-2026-07-23-photoreal-vs-manhua-stability.md) | 写实不稳 vs 漫剧质感·介质路由（P0） |
+| [subs-always-burn-hard](lessons-2026-07-23-subs-always-burn-hard.md) | 字幕必烧硬门（若存在） |
 
 ### 2026-07-22
 

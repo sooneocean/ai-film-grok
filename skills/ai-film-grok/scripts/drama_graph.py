@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from story_plan import normalize_story_graph
 from util import read_json, write_json
 
 GRAPH_NAME = "drama-graph.json"
@@ -91,6 +92,7 @@ def _finalize_execution_jobs(
 
 def _iter_graph_nodes(graph: dict[str, Any]):
     """Small local iterator to avoid coupling execution status to authoring code."""
+    graph = normalize_story_graph(graph)
     story = graph.get("story")
     if isinstance(story, dict):
         yield "story", "story", story, None

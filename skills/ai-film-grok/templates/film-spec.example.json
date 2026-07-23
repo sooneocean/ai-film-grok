@@ -50,9 +50,47 @@
         "type": "duck",
         "shot_id": "shot02",
         "depth": 0.4
+      },
+      {
+        "type": "music_in",
+        "shot_id": "shot01",
+        "label": "main_theme"
+      },
+      {
+        "type": "music_out",
+        "shot_id": "shot02",
+        "label": "main_theme"
       }
-    ]
+    ],
+    "music_spotting": [
+      {
+        "label": "main_theme",
+        "start_sec": 0.0,
+        "end_sec": 12.0,
+        "fade_in_sec": 0.5,
+        "fade_out_sec": 1.0,
+        "emotion": "tension",
+        "beat_ref": "approach",
+        "intensity": 7
+      }
+    ],
+    "audio_tracks": {
+      "dialogue": {"gain": 1.0, "duck_to_bgm": true},
+      "sfx": {"gain": 0.8, "duck_to_bgm": true},
+      "ambience": {"gain": 0.5},
+      "foley": {"gain": 0.6},
+      "music": {"gain": 0.7, "duck_to_vo": true}
+    }
   },
+  "grade": {
+    "color_temperature": "warm 3200K",
+    "saturation": 1.15,
+    "contrast": 1.1,
+    "brightness": 0.0,
+    "skin_tone_protection": true,
+    "gamma": 0.95
+  },
+  "color_grade_strict": true,
   "title": "雨夜后座",
   "description": "说书人讲述：雨夜女司机与后座升温——色气靠距离与感官，不对口型",
   "aspect_ratio": "9:16",

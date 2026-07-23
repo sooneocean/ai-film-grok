@@ -34,9 +34,23 @@ def director_init(
     rigor: str = "professional",
     format_pack: str = "vertical-short",
     genre_pack: str = "drama",
+    quality_target: str | None = None,
 ) -> dict[str, Any]:
+    existing = Path(root).expanduser().resolve() / "production-book.json"
+    if existing.is_file() and quality_target is not None:
+        current = read_production_book(root).get("quality_target", "standard")
+        if quality_target != current:
+            raise ValueError(
+                f"existing production book already uses quality_target={current}; "
+                "create a migration/change record before switching profiles"
+            )
     book = init_production_book(
-        root, title=title, rigor=rigor, format_pack=format_pack, genre_pack=genre_pack
+        root,
+        title=title,
+        rigor=rigor,
+        format_pack=format_pack,
+        genre_pack=genre_pack,
+        quality_target=quality_target or "standard",
     )
     return {"ok": True, "action": "init", "book": book}
 
@@ -102,6 +116,7 @@ def status(root: Path | str) -> dict[str, Any]:
         "ok": True,
         "action": "status",
         "rigor": book.get("rigor"),
+        "quality_target": book.get("quality_target", "standard"),
         "revision": book.get("revision"),
         "state": book.get("state"),
         "department_locks": {
@@ -122,6 +137,7 @@ def check(root: Path | str) -> dict[str, Any]:
 
     book = read_production_book(root)
     errors: list[str] = []
+    quality_target = str(book.get("quality_target") or "standard")
     if book.get("content_sha256") != stable_content_hash(book):
         errors.append("production-book content hash is stale")
     departments = []
@@ -154,6 +170,12 @@ def check(root: Path | str) -> dict[str, Any]:
             errors.append(f"{department}: required department bible is missing")
     stage_gates = stage_status(root)
     errors.extend(f"stage {item['stage']}: {item['message']}" for item in stage_gates["blocking"])
+    quality = None
+    if quality_target == "premium_vertical":
+        from creative_quality import validate_premium_vertical
+
+        quality = validate_premium_vertical(root)
+        errors.extend(f"creative: {item['message']}" for item in quality["errors"])
     if book.get("rigor") == "professional" and stage_gates.get("next_stage") is None:
         from master_delivery import validate_master_delivery
 
@@ -169,6 +191,7 @@ def check(root: Path | str) -> dict[str, Any]:
         "errors": errors,
         "departments": departments,
         "stage_gates": stage_gates,
+        "quality": quality,
     }
 
 

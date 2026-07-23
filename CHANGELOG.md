@@ -3,6 +3,70 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [1.25.0] — 2026-07-23
+
+### Added — Gates & test hardening (audit P1)
+
+- **CI `aifilm doctor` gate**: validate-core job now runs doctor and asserts schema + requirements.lock + script fingerprint integrity (version drift tolerated on CI, script fingerprint drift fails the build).
+- **CI schema/commands coverage**: plugin validate now checks all `schemas/*.json` (was 2) and asserts `commands/*.md` launchers reference aifilm dispatch.
+- **`tests/test_hard_defaults.py`**: contract-level regression locking the machine-readable rules in `hard-defaults.md` — sex-duration floor 0.30, wardrobe rank monotonicity (no re-dress), 11-dimension scorecard, keyframe 720×1280 9:16, pilot-gate default strict. 11 assertions.
+- **`tests/conftest.py`**: shared pytest config auto-injects `scripts/` on sys.path + `film_root` fixture; new tests no longer need the boilerplate.
+
+### Fixed — Architecture debt (audit P2/P3)
+
+- **Broke util↔aifilm_grok circular import**: `FilmError` extracted to dependency-free `util/errors.py`; `util/json_io.py` + `util/validators.py` now top-level import (was 5 lazy `from aifilm_grok import FilmError`); `aifilm_grok.py` re-exports for backward compat. 65 lazy imports no longer needed for cycle avoidance.
+- **sound_plan events enum synced**: `SPOT_EVENT_TYPES` expanded to match schema (added music_in/music_out/fade_in/fade_out); was stale at 3 values while schema had 7.
+- **FRW host single source of truth**: `frw_lipsync.py` + `env_plate.py` now import `DEFAULT_HOST` from `frw_canary.py` (was 3× hardcoded duplicate).
+- **config.env.example**: added 13 missing keys the code actually reads (FRW_API_KEY, FRWCLAW_ROOT, COSYVOICE_*, AIFILM_MUSIC_*, OPENAI_BASE_URL, XAI_BASE_URL, XAI_MODEL, AIFILM_SKIP_PILOT_GATE, SKIP_LOOP_RISK_GATE, AIFILM_STRICT_TTS_REHEARSAL); marked AIFILM_TTS_CMD/AIFILM_LIPSYNC_CMD as DEPRECATED (disabled, unsafe shell).
+- **templates/film-spec.example.json**: added `grade` + `color_grade_strict` + `sound_plan.music_spotting` + `sound_plan.audio_tracks` + music_in/out events examples to match v1.22 schema.
+- **lessons promotion labels**: 3 same-named lessons (character-stance/editorial-craft/directors-lens) now carry explicit "已晋升" headers pointing to their stable reference.
+- **Deleted `grok_oauth.py.bak-pre-sdk-pack-*`** dead file (git retains history).
+
+## [1.24.1] — 2026-07-23
+
+### Added — Director methodology P3 close-out (release hygiene)
+
+- **Scorecard 7→11 dimensions doc-sync**: `director_review.py` already enforced 11 dimensions (rhythm/emotion/theme/performance added to `--approve`), but all docs still said "seven dimensions". Aligned SKILL.md, README.md, and 12 reference files (principles, craft-spine, post-compose, grok-build-sdk, pipeline-methodology, director-self-scorecard, postproduction, auto-dispatch) + scripts (next_actions, craft_spine) to "eleven dimensions"; added the 4 new `--score-*` flags to the SKILL.md `review-final` example.
+- **director-methodology.md registered**: the methodology master file existed but was unreachable from the spine/INDEX. Now listed in `references/INDEX.md` (professional-director section) and the SKILL.md on-demand-load table; file count 91→92.
+- **Tests synced to 11 dimensions**: `test_delivery_gates.py` screening evidence + score flags expanded 7→11; added sidecar SRT to satisfy the `expect_subtitles` delivery quality gate. All delivery-gate slow tests green.
+
+### Lessons written
+- `lessons-2026-07-23-style-lock-from-ref.md` (full P0)
+- `lessons-2026-07-23-face-identity-pixel.md` (full P0)
+- `lessons-2026-07-23-photoreal-vs-manhua-stability.md` (medium routing)
+- INDEX / SKILL / director-methodology cross-links
+
+### Fixed — code hygiene
+- ruff: removed unused imports (`math` in face_identity, `re` in style_lock); fixed f-string-without-placeholder; replaced dead `or True` / `False if strict else True` with `True` / `not strict`; `try/except:pass` → `contextlib.suppress` in render_final.
+- runtime-lock.json regenerated after script fingerprint drift.
+
+## [1.24.0] — 2026-07-23
+
+### Pixel face-identity
+- `scripts/face_identity.py`: aHash+dHash+hist on blurred face-region; multi-anchor enroll
+- CLI `aifilm face-identity enroll|enroll-bible|verify|audit|status` → `receipts/face-identity.json`
+- `lock-style --cast-master` auto-enrolls; `register-still --require-face-identity` optional hard gate
+- `post_audit` uses real receipt (FACE_IDENTITY_DRIFT when not verified)
+- tests/test_face_identity.py
+
+## [1.23.0] — 2026-07-23
+
+### Style lock from input ref (P0 stability)
+- New `scripts/style_lock.py`: medium presets (anime/manhua/semi_real/photoreal), cast_locks, agent still/I2V prefixes
+- CLI `aifilm style-lock plan|apply|check|prompt|recommend`
+- `lock-style` gains `--medium` `--char-id` `--from-plan` `--strict-style-lock`
+- `prompt_injector` emits MEDIUM LOCK from style_fingerprint
+- Docs: lessons-2026-07-23-style-lock-from-ref.md + consistency §1a + SKILL open-film flow
+
+## [1.22.0] — 2026-07-23
+
+### Added — Director methodology injection (P3-1~P3-5: color grading + sound plan + scorecard)
+
+- **film-spec schema**: `sound_plan` gained `music_spotting` (label/start/end/fade/emotion/beat_ref/intensity) and `audio_tracks` (dialogue/SFX/ambience/foley/music gain+ducking); `grade` field (lut/color_temperature/saturation/contrast/brightness/skin_tone_protection/gamma) + `color_grade_strict` gate.
+- **Director review scorecard expanded 7→11 dimensions**: added `rhythm`, `emotion`, `theme`, `performance` to `SCORECARD_DIMENSIONS`; `--approve` now requires all 11 `--score-*` flags; `_DEFAULT_ACTION_FOR_DIM` maps each new dimension's fail→action.
+- **director-methodology.md**: 40-year director methodology master file (pre-production/production/post-production three-phase + test matrix).
+- Tests: `test_color_grading.py`, `test_sound_and_review.py`.
+
 ## [1.21.0] — 2026-07-23
 
 ### Improved — FFmpeg render safety

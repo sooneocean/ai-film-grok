@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 # All dimensions must be explicitly scored on --approve.
+# P3-5: expanded from 7 to 11 dimensions — added rhythm/emotion/theme/performance.
 SCORECARD_DIMENSIONS: tuple[str, ...] = (
     "identity",
     "style",  # medium/palette/line language coherence across whole film
@@ -15,6 +16,10 @@ SCORECARD_DIMENSIONS: tuple[str, ...] = (
     "audio",
     "subs",
     "dead_air",
+    "rhythm",  # P3-5: pacing/rhythm curve — does cut frequency match pace_chart?
+    "emotion",  # P3-5: emotional arc — does the film land its emotional beats?
+    "theme",  # P3-5: thematic coherence — is the theme communicated?
+    "performance",  # P3-5: acting quality — does the performance serve the story?
 )
 
 # CLI flag stem: --score-identity, --score-dead-air, ...
@@ -33,6 +38,10 @@ _DEFAULT_ACTION_FOR_DIM: dict[str, str] = {
     "audio": "recut",
     "subs": "recut",
     "dead_air": "recut",
+    "rhythm": "recut",
+    "emotion": "recut",
+    "theme": "recut",
+    "performance": "reshoot",
 }
 
 

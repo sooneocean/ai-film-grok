@@ -37,6 +37,10 @@ ALLOWED_VIDEO_ENDPOINTS = frozenset(
 )
 MOTION_SAMPLE_WIDTH = 64
 MOTION_SAMPLE_HEIGHT = 64
+# Public contract for vertical keyframes. Keep these aliases stable for
+# hard-defaults checks and downstream adapters.
+KEYFRAME_MIN_W = 720
+KEYFRAME_MIN_H = 1280
 # The 64x64 probe intentionally measures broad frame-to-frame change.  The
 # shipped testsrc2 motion plate scores ~3.6 after vertical downsampling, so a
 # 3.5 floor preserves a real-motion gate without rejecting deterministic motion

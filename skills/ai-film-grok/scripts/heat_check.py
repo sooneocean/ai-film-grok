@@ -118,6 +118,22 @@ def heat_check(root: Path) -> dict[str, Any]:
     }
 
 
+def build_heat_report(
+    spec: dict[str, Any], shots: list[dict[str, Any]], *, total_duration_sec: float
+) -> dict[str, Any]:
+    """Build the historical contract report without requiring a film root."""
+
+    rep = lint_heat_arc(
+        shots,
+        heat_scale=str(spec.get("heat_scale") or "") or None,
+        sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
+        advise=True,
+    )
+    rep.setdefault("sex_duration_floor", float(spec.get("sex_min_duration_ratio") or 0.30))
+    rep.setdefault("sex_duration_ratio", 0.0)
+    return rep
+
+
 def heat_vo_suggest(
     root: Path,
     *,

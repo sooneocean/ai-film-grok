@@ -33,7 +33,7 @@ jobs:
           pip install pytest
           pip install -r requirements.lock
 
-      - name: Validate plugin.json + layout
+      - name: Validate plugin.json + layout + commands
         run: |
           python - <<'PY'
           import json
@@ -44,22 +44,34 @@ jobs:
           assert data["name"] == "ai-film-grok"
           assert Path("skills/ai-film-grok/SKILL.md").is_file()
           assert Path("skills/ai-film-grok/scripts/aifilm").is_file()
-          print("OK", data["name"], data["version"])
+          # commands/ must contain at least one .md launcher
+          cmds = sorted(Path("commands").glob("*.md"))
+          assert cmds, "commands/*.md is empty"
+          for c in cmds:
+              assert "aifilm" in c.read_text(encoding="utf-8").lower(), f"{c.name} missing aifilm dispatch"
+          print("OK", data["name"], data["version"], "cmds:", [c.name for c in cmds])
+          PY
 
       - name: CLI and shell launcher smoke test
         run: |
           skills/ai-film-grok/scripts/aifilm --help >/dev/null
           bash -n skills/ai-film-grok/scripts/aifilm
 
-      - name: Validate shipped JSON schemas and registry
+      - name: Validate all shipped JSON schemas and registry
         working-directory: skills/ai-film-grok
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          for path in [Path("schemas/drama-graph.schema.json"), Path("registry/skills.json")]:
+          schemas = sorted(Path("schemas").glob("*.json"))
+          assert schemas, "schemas/*.json is empty"
+          for path in schemas:
               json.loads(path.read_text(encoding="utf-8"))
               print("OK", path)
+          reg = Path("registry/skills.json")
+          if reg.is_file():
+              json.loads(reg.read_text(encoding="utf-8"))
+              print("OK", reg)
           PY
           python scripts/aifilm skill list >/dev/null
 
@@ -68,6 +80,37 @@ jobs:
           python -m pip install ruff
           ruff check skills/ai-film-grok/scripts/
           ruff format --check skills/ai-film-grok/scripts/
+
+      - name: aifilm doctor (schema + script fingerprint gate)
+        working-directory: skills/ai-film-grok
+        env:
+          AIFILM_CI: "1"
+        run: |
+          # doctor returns 0 when core readiness is green. On CI, python patch
+          # version + ffmpeg version may differ from the local machine that
+          # generated runtime-lock.json — those drifts are environment-only and
+          # not merge blockers. What matters on CI: script fingerprints
+          # (caught source drift) + film-spec schema validity + requirements.lock.
+          python scripts/aifilm doctor >/tmp/doctor.json || true
+          python - <<'PY'
+          import json
+          d = json.load(open("/tmp/doctor.json"))
+          # hard requirements (machine-independent)
+          schema = d.get("film_spec_schema", {})
+          assert schema.get("ok"), f"film_spec schema invalid: {schema.get('error')}"
+          assert d["core_readiness"]["checks"]["film_spec_schema"], "schema check failed"
+          assert d["core_readiness"]["checks"]["requirements_lock"], "requirements.lock drift"
+          # script fingerprint drift = real source change not committed to lock
+          rl = d.get("core_readiness", {}).get("checks", {}).get("runtime_lock", False)
+          if not rl:
+              errs = d.get("core_readiness", {}).get("failed_checks", [])
+              # tolerate python/ffmpeg version drift on CI; fail on script fingerprint drift
+              script_drift = [e for e in errs if "fingerprint" in str(e)]
+              assert not script_drift, f"script fingerprint drift (run 'aifilm lock-runtime' and commit): {script_drift}"
+              print("doctor: schema+deps+scripts OK (version drift tolerated on CI)")
+          else:
+              print("doctor: runtime_lock fully OK")
+          PY
 
       - name: Core pytest (fast path: all tests, excluding slow)
         working-directory: skills/ai-film-grok

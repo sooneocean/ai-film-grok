@@ -164,6 +164,14 @@ class DeliveryGateTests(unittest.TestCase):
             "subs@0.9:subtitles readable",
             "--screening-evidence",
             "dead_air@1.1:no dead air",
+            "--screening-evidence",
+            "rhythm@1.3:cut frequency matches pace",
+            "--screening-evidence",
+            "emotion@1.5:emotional beat lands",
+            "--screening-evidence",
+            "theme@1.7:theme comes through",
+            "--screening-evidence",
+            "performance@1.9:acting serves story",
         ]
 
     @pytest.mark.slow
@@ -216,6 +224,10 @@ class DeliveryGateTests(unittest.TestCase):
             aifilm_grok.cmd_register_clip(self.register_args())
         final_path = self.root / "out" / "film_final.mp4"
         shutil.copy2(self.final_source, final_path)
+        (self.root / "out" / "final.srt").write_text(
+            "1\n00:00:00,000 --> 00:00:02,000\n(test subtitle)\n",
+            encoding="utf-8",
+        )
         manifest = aifilm_grok.load_manifest(self.root)
         manifest.setdefault("outputs", {})["final_film"] = {
             "path": str(final_path),
@@ -253,6 +265,14 @@ class DeliveryGateTests(unittest.TestCase):
                     "pass",
                     "--score-dead-air",
                     "pass",
+                    "--score-rhythm",
+                    "pass",
+                    "--score-emotion",
+                    "pass",
+                    "--score-theme",
+                    "pass",
+                    "--score-performance",
+                    "pass",
                 ]
             )
         self.assertEqual(missing_evidence_rc, 2)
@@ -284,6 +304,14 @@ class DeliveryGateTests(unittest.TestCase):
                     "pass",
                     "--score-dead-air",
                     "pass",
+                    "--score-rhythm",
+                    "pass",
+                    "--score-emotion",
+                    "pass",
+                    "--score-theme",
+                    "pass",
+                    "--score-performance",
+                    "pass",
                     *self.screening_args(),
                 ]
             )
@@ -300,6 +328,10 @@ class DeliveryGateTests(unittest.TestCase):
             aifilm_grok.cmd_register_clip(self.register_args())
         final_path = self.root / "out" / "film_final.mp4"
         shutil.copy2(self.final_source, final_path)
+        (self.root / "out" / "final.srt").write_text(
+            "1\n00:00:00,000 --> 00:00:02,000\n(test subtitle)\n",
+            encoding="utf-8",
+        )
         manifest = aifilm_grok.load_manifest(self.root)
         manifest.setdefault("outputs", {})["final_film"] = {
             "path": str(final_path),
@@ -354,6 +386,14 @@ class DeliveryGateTests(unittest.TestCase):
                     "pass",
                     "--score-dead-air",
                     "fail",
+                    "--score-rhythm",
+                    "pass",
+                    "--score-emotion",
+                    "pass",
+                    "--score-theme",
+                    "pass",
+                    "--score-performance",
+                    "pass",
                     "--reshoot-shots",
                     "shot01",
                     *self.screening_args(),

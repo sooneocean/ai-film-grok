@@ -23,6 +23,28 @@
 
 角色转面设定图（turnaround）**只能当参考**，不能直接当 `style-v1` 锁定成片画风。
 
+### 1a. 输入图 → 画风锁（2026-07-23 · P0 稳定性）
+
+> 写实多镜 I2V 脸漂；漫剧更稳。完整：[lessons-2026-07-23-style-lock-from-ref.md](lessons-2026-07-23-style-lock-from-ref.md)。
+
+| 规则 | 要求 |
+|------|------|
+| **S0 Medium 先锁** | 开片选定 `anime` / `manhua` / `semi_real` / `photoreal`；写入 `style_fingerprint` |
+| **S1 输入图 plan** | 有用户角色图 → `aifilm style-lock plan --ref`（裁 face-lock + plan JSON） |
+| **S2 禁止 sheet 当 9:16 脸** | 整页设定表只裁 FRONT/脸；cast master 9:16 用 `image_edit` |
+| **S3 稳优先默认 manhua** | 用户要「漫剧/稳/一致」→ **不要**默认 photoreal |
+| **S4 photoreal 明示低稳** | bulk 前 soft warn；pilot 人脸严拒 |
+| **S5 prompt 前缀** | 每镜 still 含 `MEDIUM LOCK` + `cast_locks`（`style-lock prompt` / prompt_injector） |
+| **S6 像素路径** | 有角色 → 只 `image_edit(cast\|face-lock\|已过审 still)`，禁纯 gen 绕脸 |
+| **S7 face-identity** | `aifilm face-identity enroll-bible && audit`；`receipts/face-identity.json#verified`；post_audit `FACE_IDENTITY_DRIFT` |
+
+```bash
+aifilm style-lock plan --root "$ROOT" --ref sheet.png --char-id hero --medium manhua
+aifilm style-lock apply --root "$ROOT"
+aifilm lock-style --root "$ROOT" --from-plan --canonical … --cast-master … --char-id hero
+aifilm style-lock check --root "$ROOT"
+```
+
 **Keyframe-first**：视频坏了 → **回头改 keyframe / 状态照**，不是从 full cast 平行重抽。详 [keyframe-first-state-index.md](keyframe-first-state-index.md)。
 
 ### Cast master 验收清单（全勾才算过）

@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from util.errors import FilmError
+
 
 def slugify(text: str) -> str:
     text = text.strip().lower()
@@ -15,8 +17,6 @@ def slugify(text: str) -> str:
 
 
 def aspect_dims(aspect: str) -> tuple[int, int]:
-    from aifilm_grok import FilmError
-
     table = {
         "9:16": (720, 1280),
         "16:9": (1280, 720),
@@ -30,7 +30,6 @@ def aspect_dims(aspect: str) -> tuple[int, int]:
 
 
 def film_output_path(root: Path, name: str, *, field: str = "output name") -> Path:
-    from aifilm_grok import FilmError
     from security_policy import SecurityPolicyError, safe_output_path, safe_workspace_directory
 
     try:
@@ -41,7 +40,6 @@ def film_output_path(root: Path, name: str, *, field: str = "output name") -> Pa
 
 
 def valid_shot_id(value: str) -> str:
-    from aifilm_grok import FilmError
     from security_policy import SecurityPolicyError, validate_identifier
 
     try:

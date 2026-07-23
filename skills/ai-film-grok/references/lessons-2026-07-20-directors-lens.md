@@ -1,5 +1,8 @@
 # Lessons · Director’s Lens 叙事上游（2026-07-20）
 
+> 权威：[directors-lens.md](directors-lens.md)
+> **已晋升**：稳定规则见 directors-lens.md；本档保留为踩坑时间线。
+
 ## 问题
 
 skill 生产环从 `write-spec` / pilot / I2V 很完整，但**用户给一段文本**时，agent 容易：

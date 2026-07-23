@@ -174,13 +174,30 @@ class PromptInjector:
         """
         parts = []
 
-        # 1. Signature / Visual Style
+        # 1. Signature / Visual Style (+ medium fingerprint hard lock)
+        fp = (
+            self.bible.get("style_fingerprint")
+            if isinstance(self.bible.get("style_fingerprint"), dict)
+            else {}
+        )
+        medium_key = str(fp.get("medium_key") or "").strip()
+        if medium_key or fp.get("medium"):
+            parts.append(
+                f"MEDIUM LOCK: {fp.get('medium') or medium_key} — NEVER switch medium mid-film"
+            )
+        if fp.get("still_hint"):
+            parts.append(f"Style medium: {fp['still_hint']}")
         sig = self.bible.get("signature_block", "")
         if sig:
             parts.append(f"Style: {sig}")
+        # Prefer bible agent prefix tokens when present (input-ref style-lock)
+        prefix = str(self.bible.get("agent_still_prompt_prefix") or "").strip()
+        # Avoid double-dumping full prefix (can exceed budget); only identity lines if huge
+        if prefix and len(prefix) < 900 and "MEDIUM LOCK" not in " ".join(parts):
+            parts.insert(0, prefix.split("\n")[0])
 
         # 2. Location / Lighting
-        lighting = self.bible.get("lighting", "")
+        lighting = self.bible.get("lighting", "") or str(fp.get("lighting") or "")
         if lighting:
             parts.append(f"Lighting: {lighting}")
 
@@ -288,6 +305,11 @@ class PromptInjector:
 
         if char_locks:
             parts.append(" | ".join(char_locks))
+        elif fp.get("medium_key") == "photoreal":
+            # Force identity reminder when cast_locks empty (common drift path)
+            il = str(self.bible.get("identity_lock") or "").strip()
+            if il and "to be filled" not in il.lower():
+                parts.append(f"Identity lock: {il}")
 
         # Keyframe-first state index: tell agent which pixel ref to use
         reference_instruction = ""

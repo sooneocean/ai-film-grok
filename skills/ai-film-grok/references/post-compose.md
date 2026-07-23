@@ -1,7 +1,7 @@
 # 设计后期桥：HyperFrames / Remotion（双引擎闭环）
 
-> **一句话**：Grok Imagine 拍戏（I2V + continuity chain）→ FFmpeg plate（`visual_fit: vo` + hard match-cut；非 continue 可 soft）→ **设计后期** HyperFrames / Remotion（字幕/片头/统一 grade/双字幕，补**观感**流畅）→ 仍须 `review-final` 七维。  
-> **不能**用 HF/Remotion 替代 I2V，也**不能**在 underlay 接戏缝上再 dissolve 盖断裂。  
+> **一句话**：Grok Imagine 拍戏（I2V + continuity chain）→ FFmpeg plate（`visual_fit: vo` + hard match-cut；非 continue 可 soft）→ **设计后期** HyperFrames / Remotion（字幕/片头/统一 grade/双字幕，补**观感**流畅）→ 仍须 `review-final` 十一维。
+> **不能**用 HF/Remotion 替代 I2V，也**不能**在 underlay 接戏缝上再 dissolve 盖断裂。
 > 能力盘点：[hf-remotion-capability-matrix.md](hf-remotion-capability-matrix.md) · 丝滑剪辑+双字幕：[lessons-2026-07-20-cut-silk-bilingual.md](lessons-2026-07-20-cut-silk-bilingual.md) · 观感：[lessons-2026-07-20-designed-post-fluency.md](lessons-2026-07-20-designed-post-fluency.md)。
 
 ## 分工（硬边界）
@@ -21,7 +21,7 @@
 
 - 用 HyperFrames/Remotion **Ken Burns 静图**冒充 I2V 成片。
 - 跳过 pilot / cast master，直接在 compose 里「拼成片」。
-- 未 `review-final` 七维 pass 就 `export-desktop`。
+- 未 `review-final` 十一维 pass 就 `export-desktop`。
 - 半片 Grok clip + 半片随机 FRW still 混进同一角色轨道。
 - 声称 `export-compose` 成功 = 正式交付。
 - 在 **byte_identical continue 缝** 的 underlay 视频轨上再套 xfade/dissolve「抹平」——会双影更糊；接戏用 plate hard cut。
@@ -38,7 +38,7 @@
 | 3b 实验 | `final --post-engine remotion --npm-install` | 帧级字幕组件 |
 | 4 预览 | `compose-preview`（HF 或 `--engine remotion`） | 调字不调戏 |
 
-**continue-chain 片默认路由**：plate 用 ffmpeg → 交付用 **hyperframes underlay**（不要停在裸 ffmpeg 烧录字幕）。  
+**continue-chain 片默认路由**：plate 用 ffmpeg → 交付用 **hyperframes underlay**（不要停在裸 ffmpeg 烧录字幕）。
 package 内 `fluency` 字段声明 `recommended_post_engine` / `designed_post_must_not`——改 compose 前必读。
 
 ### HyperFrames 可做 / 不可做
@@ -131,8 +131,8 @@ npx remotion render src/index.ts Film out/film_remotion.mp4
   --post-engine remotion
 ```
 
-**时间轴（与 HF 对齐）**：multiclip I2V 从 t=0 pack；underlay caption offset=0；export 写 `caption_clock_offset` 进 captions。  
-**engine=both**：只 export 双引擎 + remotion media-copy + **渲 HF**；Remotion 不自动渲（见 steps.remotion_render.skipped）。  
+**时间轴（与 HF 对齐）**：multiclip I2V 从 t=0 pack；underlay caption offset=0；export 写 `caption_clock_offset` 进 captions。
+**engine=both**：只 export 双引擎 + remotion media-copy + **渲 HF**；Remotion 不自动渲（见 steps.remotion_render.skipped）。
 **字幕实验（agent）**：改 `Film.tsx` 前 load `/remotion-captions`；主路径仍推荐 HyperFrames。
 
 ### D. 注册任意外部成片
@@ -222,9 +222,9 @@ HTML 根节点会写：`data-compose-preset`、`data-caption-clock-offset`。
 1. `export-compose` / `compose-render` 需要 **`clips_complete`**。
 2. `register-final` / compose-render 注册会跑 **decode + motion + audio** 技术 QA。
 3. 替换 final 会 **作废** 旧 `final_review`（写入 `final_review_stale`）。
-4. `final_complete` 只在 `review-final --approve` 七维全 pass 后为 true。
+4. `final_complete` 只在 `review-final --approve` 十一维全 pass 后为 true。
 5. 无音频时：compose-render 会从既有 `film_final` 或 VO/BGM stems 混轨；都没有则失败并提示先 `final`。
-6. **双烧字幕**：`final --post-engine hyperframes|remotion` 时 FFmpeg 默认 `--subs off`。  
+6. **双烧字幕**：`final --post-engine hyperframes|remotion` 时 FFmpeg 默认 `--subs off`。
    另：**hard gate**——`out/final-delivery.json` 若 `subtitles.burned_in=true` 且 layout=underlay，`compose-render` **拒绝**（防 burn final + 设计字幕叠字）。覆盖：`--allow-burned-underlay`。
 7. Remotion 未 bootstrap 时 **不得** 以 ok=true 假装已渲；必须 `rendered: false` + `next_steps`。
 8. remotion media-copy **fail-closed**（计划条数不全则 error，不 silent ok）。

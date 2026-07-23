@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 _CONFIG: ConfigSchema | None = None
 _CONFIG_ENV_FINGERPRINT: tuple[tuple[str, str], ...] | None = None
@@ -277,6 +278,18 @@ def get_config() -> ConfigSchema:
     )
     _CONFIG_ENV_FINGERPRINT = fingerprint
     return _CONFIG
+
+
+def load_config(root: Path | None = None) -> dict[str, Any]:
+    """Compatibility mapping for callers that need a simple ``.get`` API.
+
+    ``root`` is accepted for legacy adapters; configuration remains sourced
+    from the canonical plugin config and environment so callers cannot switch
+    secrets by changing a film-root path.
+    """
+
+    del root
+    return dict(get_config().__dict__)
 
 
 _ENV_HELP: dict[str, str] = {

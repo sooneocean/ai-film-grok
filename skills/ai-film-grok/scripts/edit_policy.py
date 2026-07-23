@@ -10,16 +10,33 @@ import math
 import re
 from typing import Any
 
-# Video fit-to-VO — prefer gentle loops over harsh speed changes (smoother feel)
+# Video fit-to-VO — prefer gentle speed over harsh freezes; avoid short-form double-play
 MAX_SPEEDUP = 1.12
 MIN_SPEED = 0.88
-LOOP_STRETCH_RATIO = 1.15  # earlier loop upgrade = less freeze/slow-mo mush
-MAX_FREEZE_PAD_SEC = 0.25  # hard cap; prefer loop if more extension needed
-# When loop is forbidden (hook/action), allow slightly longer freeze so VO can finish
-# without replaying the whole action beat (Kei 2026-07-16 lesson).
-MAX_FREEZE_PAD_NO_LOOP_SEC = 1.25
+# P0 · 2026-07-23: was 1.15 — I2V 6s→7–8s plate triggered stream_loop (= “跑两遍”)
+# Only allow loop when target truly needs multi-cycle (e.g. long VO chapter bed).
+LOOP_STRETCH_RATIO = 1.55
+MAX_FREEZE_PAD_SEC = 0.25  # hard cap; prefer clamp plate over loop/freeze mush
+# When loop is forbidden (hook/action), keep freeze short — long freeze reads as stuck cut
+# (was 1.25s → “断在奇怪的地方”). Prefer clamp plate or re-I2V 10s.
+MAX_FREEZE_PAD_NO_LOOP_SEC = 0.40
 # Beats that must never stream_loop (product rule; mirrored in film_spec)
-NO_LOOP_DRAMATIC_FUNCTIONS = frozenset({"hook", "action"})
+# P0 · 2026-07-23: expand — short-form I2V almost never wants a full replay.
+NO_LOOP_DRAMATIC_FUNCTIONS = frozenset(
+    {
+        "hook",
+        "action",
+        "approach",
+        "bridge",
+        "sensory",
+        "reaction",
+        "afterglow",
+    }
+)
+# Mild overshoot where we clamp target to one play (+ micro hold) instead of looping
+SHORTFORM_NO_DOUBLE_RATIO = 1.50
+# Typical Grok I2V plate length — never full-replay these unless author forces loop bed
+SHORTFORM_SRC_MAX_SEC = 7.5
 
 # Inter-shot transition (visual + matching audio acrossfade)
 # Slightly longer soft dissolve reads as "丝滑" on vertical short-form
@@ -480,6 +497,7 @@ def plan_stretch(
     *,
     forbid_loop: bool = False,
     dramatic_function: str | None = None,
+    allow_shortform_clamp: bool = True,
 ) -> dict[str, Any]:
     """Decide how to fit a silent clip to a VO-driven target duration.
 
@@ -489,9 +507,12 @@ def plan_stretch(
       loops: stream_loop count (0 = no loop)
       freeze_sec: tpad clone seconds (capped)
       ratio: target/src
+      target_clamped: optional new target when shortform clamp applied
 
-    Product rule (2026-07-16 Kei): hook/action never stream_loop — replaying the beat
-    kills pacing. Prefer setpts+short freeze, or fail so agent fixes VO/plate.
+    Product rules:
+      - 2026-07-16 Kei: hook/action never stream_loop
+      - 2026-07-23 E-virus: short I2V plates must not stream_loop for mild overshoot
+        (6s clip → 7–8s slot = “跑两遍”); clamp to one play + micro hold instead.
     """
     if src_dur <= 0:
         raise PolicyError("src_dur must be > 0")
@@ -500,11 +521,52 @@ def plan_stretch(
     beat = (dramatic_function or "").strip().lower()
     if beat in NO_LOOP_DRAMATIC_FUNCTIONS:
         forbid_loop = True
+    # P0 · 2026-07-23: short I2V (~6s) stream_loop always reads as “跑两遍”
+    if src_dur <= SHORTFORM_SRC_MAX_SEC:
+        forbid_loop = True
     ratio = target / src_dur
     max_freeze = MAX_FREEZE_PAD_NO_LOOP_SEC if forbid_loop else MAX_FREEZE_PAD_SEC
 
+    # Short-form anti-double: mild overshoot → clamp target to one natural play
+    if (
+        allow_shortform_clamp
+        and ratio > 1.0
+        and ratio <= SHORTFORM_NO_DOUBLE_RATIO
+        and (forbid_loop or ratio <= LOOP_STRETCH_RATIO)
+    ):
+        # One play at ≤ MAX_SPEEDUP, then ≤ max_freeze hold — never stream_loop
+        natural = src_dur * MAX_SPEEDUP + max_freeze
+        clamped = min(target, max(src_dur, natural))
+        if clamped + 1e-3 < target:
+            plan = _setpts_pad_plan(
+                src_dur,
+                clamped,
+                clamped / src_dur,
+                max_freeze=max_freeze,
+                forbid_loop=True,
+            )
+            plan["target_clamped"] = clamped
+            plan["target_requested"] = target
+            plan["clamp_reason"] = "shortform_no_double_play"
+            return plan
+
     if forbid_loop:
-        return _setpts_pad_plan(src_dur, target, ratio, max_freeze=max_freeze, forbid_loop=True)
+        # If still cannot cover, clamp rather than raise (agent can still pad VO)
+        try:
+            return _setpts_pad_plan(src_dur, target, ratio, max_freeze=max_freeze, forbid_loop=True)
+        except PolicyError:
+            natural = src_dur * MAX_SPEEDUP + max_freeze
+            plan = _setpts_pad_plan(
+                src_dur,
+                natural,
+                natural / src_dur,
+                max_freeze=max_freeze,
+                forbid_loop=True,
+            )
+            plan["target_clamped"] = natural
+            plan["target_requested"] = target
+            plan["clamp_reason"] = "forbid_loop_clamp"
+            return plan
 
     if ratio > LOOP_STRETCH_RATIO:
         return _loop_plan(src_dur, target, ratio)
@@ -518,10 +580,24 @@ def plan_stretch(
 
     after = src_dur * factor
     pad = max(0.0, target - after)
-    # If freeze would dominate the extension, upgrade to loop instead
+    # Mild pad only — do not upgrade to loop for shortform double-play
     extension = max(0.0, target - src_dur)
     if pad > MAX_FREEZE_PAD_SEC or (extension > 0.5 and pad > extension * 0.45):
-        return _loop_plan(src_dur, target, ratio, upgraded_from="setpts_pad")
+        if ratio > LOOP_STRETCH_RATIO:
+            return _loop_plan(src_dur, target, ratio, upgraded_from="setpts_pad")
+        # Clamp instead of loop for mild cases
+        natural = after + MAX_FREEZE_PAD_SEC
+        plan = _setpts_pad_plan(
+            src_dur,
+            min(target, natural),
+            min(target, natural) / src_dur,
+            max_freeze=MAX_FREEZE_PAD_SEC,
+            forbid_loop=True,
+        )
+        plan["target_clamped"] = plan["target"]
+        plan["target_requested"] = target
+        plan["clamp_reason"] = "prefer_clamp_over_loop"
+        return plan
 
     freeze = min(pad, MAX_FREEZE_PAD_SEC) if pad > 0.05 else 0.0
     mode = "setpts_pad" if freeze > 0 else "setpts"

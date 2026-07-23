@@ -290,7 +290,7 @@
             "type": "object",
             "required": ["type"],
             "properties": {
-              "type": { "enum": ["mute", "sfx_accent", "duck"] },
+              "type": { "enum": ["mute", "sfx_accent", "duck", "music_in", "music_out", "fade_in", "fade_out"] },
               "shot_id": { "type": "string" },
               "duration_sec": { "type": "number" },
               "kind": { "type": "string" },
@@ -298,6 +298,34 @@
               "at_sec": { "type": "number" }
             },
             "additionalProperties": true
+          }
+        },
+        "music_spotting": {
+          "type": "array",
+          "description": "P3-3: BGM spotting sheet — music entry/exit/fade aligned to narrative beats.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string", "description": "e.g. 'main_theme', 'tension_rise', 'climax_hit'" },
+              "start_sec": { "type": "number", "description": "Music entry point in seconds" },
+              "end_sec": { "type": "number", "description": "Music exit point in seconds" },
+              "fade_in_sec": { "type": "number", "description": "Fade-in duration" },
+              "fade_out_sec": { "type": "number", "description": "Fade-out duration" },
+              "emotion": { "type": "string", "description": "Emotional function of this music segment" },
+              "beat_ref": { "type": "string", "description": "Beat id this music segment serves" },
+              "intensity": { "type": "number", "minimum": 0, "maximum": 10, "description": "Music intensity 0-10" }
+            }
+          }
+        },
+        "audio_tracks": {
+          "type": "object",
+          "description": "P3-2: Multi-track audio mixing — independent tracks with各自的 gain/ducking.",
+          "properties": {
+            "dialogue": { "type": "object", "properties": { "gain": {"type":"number"}, "duck_to_bgm": {"type":"boolean"} } },
+            "sfx": { "type": "object", "properties": { "gain": {"type":"number"}, "duck_to_bgm": {"type":"boolean"} } },
+            "ambience": { "type": "object", "properties": { "gain": {"type":"number"} } },
+            "foley": { "type": "object", "properties": { "gain": {"type":"number"} } },
+            "music": { "type": "object", "properties": { "gain": {"type":"number"}, "sidechain_duck": {"type":"boolean"} } }
           }
         }
       },

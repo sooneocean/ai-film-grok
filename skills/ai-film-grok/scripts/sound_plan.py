@@ -5,7 +5,9 @@ from __future__ import annotations
 
 from typing import Any
 
-SPOT_EVENT_TYPES = frozenset({"mute", "sfx_accent", "duck"})
+SPOT_EVENT_TYPES = frozenset(
+    {"mute", "sfx_accent", "duck", "music_in", "music_out", "fade_in", "fade_out"}
+)
 SFX_KINDS = frozenset({"heartbeat", "whoosh", "chime", "impact", "breath", "generic"})
 # Canonical BGM moods (render_final / make_sfx_bed)
 SOUND_MOODS = frozenset({"playful", "dark", "warm", "rnb", "sensual"})

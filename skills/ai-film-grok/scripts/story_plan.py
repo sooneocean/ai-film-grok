@@ -8,6 +8,7 @@ Produces drama-graph.json (planned) + optional film-spec seed.
 
 from __future__ import annotations
 
+import copy
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -76,6 +77,14 @@ DEFAULT_BEAT_SPINE: list[dict[str, Any]] = [
         "shots_n": 1,
     },
 ]
+
+# Minimal machine-readable defaults used by hard-default contract consumers.
+# Full projects receive their complete spec from ``run_plan``.
+DEFAULT_SPEC: dict[str, Any] = {"sex_floor_strict": True}
+
+# ``schema_version`` describes the normalized-story receipt and remains stable
+# for existing readers. This marker describes the graph nesting contract.
+STORY_PLAN_SCHEMA_VERSION = 2
 
 # Adult max spine: setup short → foreplay undress → act multi → climax → hook
 # Duration weights reserve ≥35% for act+climax (product floor 20%; hardcore 40%)
@@ -979,6 +988,123 @@ _GENRE_POINT_QUESTION: dict[str, dict[str, str]] = {
 
 def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
+
+
+def normalize_story_graph(graph: dict[str, Any]) -> dict[str, Any]:
+    """Return a canonical multi-episode graph from legacy or current input."""
+    if not isinstance(graph, dict):
+        raise TypeError("story graph must be an object")
+    out = copy.deepcopy(graph)
+    episodes = out.get("episodes")
+    if not isinstance(episodes, list) or not any(isinstance(ep, dict) for ep in episodes):
+        scenes = out.get("scenes") if isinstance(out.get("scenes"), list) else []
+        if not scenes:
+            beats = out.get("beats") if isinstance(out.get("beats"), list) else []
+            shots = out.get("shots") if isinstance(out.get("shots"), list) else []
+            if beats:
+                scenes = [{"id": "sc01", "title": "Main", "beats": beats}]
+            elif shots:
+                scenes = [
+                    {
+                        "id": "sc01",
+                        "title": "Main",
+                        "beats": [{"id": "bt01", "order": 1, "shots": shots}],
+                    }
+                ]
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for scene in scenes:
+            if isinstance(scene, dict):
+                grouped.setdefault(
+                    str(scene.get("episode_id") or out.get("episode_id") or "ep01"), []
+                ).append(scene)
+        episodes = [
+            {
+                "id": episode_id,
+                "episodeNumber": index,
+                "title": out.get("title") or f"Episode {index}",
+                "targetDuration": out.get("targetDuration") or out.get("target_duration"),
+                "openingHook": out.get("openingHook") or out.get("opening_hook"),
+                "endingHook": out.get("endingHook") or out.get("ending_hook"),
+                "scenes": episode_scenes,
+            }
+            for index, (episode_id, episode_scenes) in enumerate(grouped.items(), start=1)
+        ] or [{"id": "ep01", "episodeNumber": 1, "title": "Episode 1", "scenes": []}]
+
+    canonical_episodes: list[dict[str, Any]] = []
+    for ei, raw_ep in enumerate(episodes, start=1):
+        if not isinstance(raw_ep, dict):
+            continue
+        ep = raw_ep
+        ep.setdefault("id", f"ep{ei:02d}")
+        ep.setdefault("episodeNumber", ei)
+        raw_scenes = ep.get("scenes") if isinstance(ep.get("scenes"), list) else []
+        canonical_scenes: list[dict[str, Any]] = []
+        for si, raw_scene in enumerate(raw_scenes, start=1):
+            if not isinstance(raw_scene, dict):
+                continue
+            scene = raw_scene
+            scene.setdefault("id", f"sc{si:02d}")
+            raw_beats = scene.get("beats") if isinstance(scene.get("beats"), list) else None
+            if raw_beats is None:
+                raw_beats = [
+                    {"id": f"{scene['id']}_bt01", "order": 1, "shots": scene.get("shots") or []}
+                ]
+            canonical_beats: list[dict[str, Any]] = []
+            for bi, raw_beat in enumerate(raw_beats, start=1):
+                if not isinstance(raw_beat, dict):
+                    continue
+                beat = raw_beat
+                beat.setdefault("id", f"{scene['id']}_bt{bi:02d}")
+                beat["shots"] = [
+                    shot for shot in (beat.get("shots") or []) if isinstance(shot, dict)
+                ]
+                for shi, shot in enumerate(beat["shots"], start=1):
+                    shot.setdefault("id", f"{beat['id']}_sh{shi:02d}")
+                canonical_beats.append(beat)
+            scene["beats"] = canonical_beats
+            scene.pop("shots", None)
+            canonical_scenes.append(scene)
+        ep["scenes"] = canonical_scenes
+        canonical_episodes.append(ep)
+    out["episodes"] = canonical_episodes
+    out["story_plan_schema_version"] = STORY_PLAN_SCHEMA_VERSION
+    for key in ("scenes", "beats", "shots"):
+        out.pop(key, None)
+    return out
+
+
+def export_legacy_story_plan(graph: dict[str, Any]) -> dict[str, Any]:
+    """Export the canonical graph for an explicitly legacy flat consumer."""
+    canonical = normalize_story_graph(graph)
+    out = {k: copy.deepcopy(v) for k, v in canonical.items() if k != "episodes"}
+    scenes: list[dict[str, Any]] = []
+    beats: list[dict[str, Any]] = []
+    shots: list[dict[str, Any]] = []
+    for ep in canonical["episodes"]:
+        for scene in ep.get("scenes") or []:
+            scene_out = {k: copy.deepcopy(v) for k, v in scene.items() if k != "beats"}
+            scene_out.update({"episode_id": ep.get("id"), "beats": []})
+            for beat in scene.get("beats") or []:
+                beat_out = {k: copy.deepcopy(v) for k, v in beat.items() if k != "shots"}
+                beat_out.update(
+                    {"episode_id": ep.get("id"), "scene_id": scene.get("id"), "shots": []}
+                )
+                for shot in beat.get("shots") or []:
+                    shot_out = copy.deepcopy(shot)
+                    shot_out.update(
+                        {
+                            "episode_id": ep.get("id"),
+                            "scene_id": scene.get("id"),
+                            "beat_id": beat.get("id"),
+                        }
+                    )
+                    beat_out["shots"].append(shot_out)
+                    shots.append(shot_out)
+                scene_out["beats"].append(beat_out)
+                beats.append(beat_out)
+            scenes.append(scene_out)
+    out.update({"scenes": scenes, "beats": beats, "shots": shots, "story_plan_schema_version": 1})
+    return out
 
 
 def _slug(text: str, fallback: str = "x") -> str:
@@ -2372,6 +2498,7 @@ def project_graph_to_film_spec(
     normalized: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Project planned graph → film-spec scenes/shots (executable)."""
+    graph = normalize_story_graph(graph)
     base = dict(base_spec or {})
     ep = (graph.get("episodes") or [{}])[0]
     if not isinstance(ep, dict):

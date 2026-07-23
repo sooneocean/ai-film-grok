@@ -1,7 +1,7 @@
 # Grok Build · SDK 能力矩阵（ai-film-grok 专用）
 
-> 本 skill **为 Grok Build 打造**：agent 在会话内用 **原生工具** 发挥 Grok 最大价值；  
-> 本地 `aifilm` 管门禁/队列/成片；**OAuth pack**（`grok_oauth.py`）吃满 SuperGrok 订阅额度做批处理。  
+> 本 skill **为 Grok Build 打造**：agent 在会话内用 **原生工具** 发挥 Grok 最大价值；
+> 本地 `aifilm` 管门禁/队列/成片；**OAuth pack**（`grok_oauth.py`）吃满 SuperGrok 订阅额度做批处理。
 > 官方 `xai-sdk` pip **不必装**——本 pack 用 REST + `~/.grok/auth.json`（stdlib only）。
 
 ## 一句话
@@ -61,7 +61,7 @@ Grok 脑（推理+工具）→ Imagine 静帧/I2V（会话原生或 OAuth 批处
 | **Media** | **Still**：`image_edit(cast)` / `image_gen` 空镜；**I2V 兜底** Grok | FRW Seedance bulk；edge TTS；BGM | 半片混 provider；并行多 I2V 429 |
 | **Selects** | 视觉审 identity/motion（读图） | register · selects report | 有文件=可选 |
 | **Rough** | 剪辑建议 Editor’s Cut | assemble · plate | continue 缝 dissolve |
-| **Verified** | 七维人审措辞 | final · review-final · export | 技术 final 冒充交付 |
+| **Verified** | 十一维人审措辞 | final · review-final · export | 技术 final 冒充交付 |
 
 入口：`aifilm dispatch --root`（`routing.grok_build` 含本表指针）。
 
@@ -199,7 +199,7 @@ aifilm grok-oauth video --image kf.png --prompt "…" --out clip.mp4 --wait
 aifilm grok-oauth tts --text "…" --out vo.mp3 --language zh
 ```
 
-详见 [grok-oauth.md](grok-oauth.md)。鉴权：`auth.json` OAuth → 可选 `XAI_API_KEY`。  
+详见 [grok-oauth.md](grok-oauth.md)。鉴权：`auth.json` OAuth → 可选 `XAI_API_KEY`。
 **不强制** `pip install xai-sdk`；需要 OpenAI 兼容壳时见 `adapters/xai_openai_compat.example.py`。
 
 **Grok Build 内做片：优先原生工具；批处理 / 离线：优先 OAuth pack。**
@@ -208,14 +208,14 @@ aifilm grok-oauth tts --text "…" --out vo.mp3 --language zh
 
 ## Agent 检查单（每片）
 
-- [ ] `dispatch` 定环  
-- [ ] `grok-oauth doctor` 绿（有 bulk/OAuth 需求时）  
-- [ ] Still：Grok `image_edit(cast)` 或 OAuth `image-edit`，加载 `/imagine`  
-- [ ] I2V：会话 `image_to_video` 或 `grok-oauth video --wait`；register 真 endpoint  
-- [ ] 文本：Structured 字段进 film-spec，不是只有故事散文  
-- [ ] 事实：该搜的先 `web_search`  
-- [ ] 声：edge 默认；升档才 `grok`；不把 Neural 塞 EL  
-- [ ] 记忆：写回 film-root receipts  
-- [ ] 交付：七维 + export  
+- [ ] `dispatch` 定环
+- [ ] `grok-oauth doctor` 绿（有 bulk/OAuth 需求时）
+- [ ] Still：Grok `image_edit(cast)` 或 OAuth `image-edit`，加载 `/imagine`
+- [ ] I2V：会话 `image_to_video` 或 `grok-oauth video --wait`；register 真 endpoint
+- [ ] 文本：Structured 字段进 film-spec，不是只有故事散文
+- [ ] 事实：该搜的先 `web_search`
+- [ ] 声：edge 默认；升档才 `grok`；不把 Neural 塞 EL
+- [ ] 记忆：写回 film-root receipts
+- [ ] 交付：十一维 + export
 
 权威交叉：[craft-spine.md](craft-spine.md) · [grok-media-pipeline.md](grok-media-pipeline.md) · [consistency.md](consistency.md) · [auto-dispatch.md](auto-dispatch.md)

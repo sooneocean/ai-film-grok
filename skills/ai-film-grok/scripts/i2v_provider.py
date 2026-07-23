@@ -94,8 +94,45 @@ class GrokI2VProvider(I2VProvider):
     endpoints = frozenset({"image_to_video", "reference_to_video"})
 
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
-        # Grok I2V is in-session (Build SDK); readiness is gated by oauth, not a CLI.
-        # Treat grok as the always-available fallback per AIFILM_I2V_PROFILE=grok_primary.
+        # A no-root probe describes the in-session Build capability. For a film
+        # root, only a hash-bound live canary may claim batch readiness.
+        if root is not None:
+            receipt = Path(root) / "receipts" / "grok-i2v-canary.json"
+            if not receipt.is_file():
+                return CapabilityReport(
+                    provider=self.name,
+                    ok=False,
+                    available=False,
+                    reason="Grok I2V canary not run for this film root.",
+                    models=["image_to_video", "reference_to_video"],
+                    profile="grok_primary",
+                    detail={"canary_required": True, "receipt": str(receipt)},
+                )
+            try:
+                import json
+
+                data = json.loads(receipt.read_text(encoding="utf-8"))
+                available = bool(data.get("ok") and data.get("output_sha256"))
+                return CapabilityReport(
+                    provider=self.name,
+                    ok=available,
+                    available=available,
+                    reason="Grok I2V live canary passed."
+                    if available
+                    else "Grok I2V canary failed.",
+                    models=["image_to_video", "reference_to_video"],
+                    profile="grok_primary",
+                    detail=data,
+                )
+            except (OSError, ValueError) as exc:
+                return CapabilityReport(
+                    provider=self.name,
+                    ok=False,
+                    available=False,
+                    reason=f"Grok I2V canary unreadable: {exc}",
+                    models=["image_to_video", "reference_to_video"],
+                    profile="grok_primary",
+                )
         return CapabilityReport(
             provider=self.name,
             ok=True,
@@ -164,18 +201,20 @@ class SeedanceProvider(I2VProvider):
                     )
                 except OSError:
                     pass
-        # Fallback: probe frw_dispatch.py resolvable
+        # Resolving the adapter is not a provider canary. Keep it unavailable
+        # until a receipt proves the endpoint actually accepted a request.
         try:
             from frw_dispatch import resolve_frw_root
 
             resolve_frw_root()
             return CapabilityReport(
                 provider=self.name,
-                ok=True,
-                available=True,
-                reason="frwclaw-pro resolvable (canary not run).",
+                ok=False,
+                available=False,
+                reason="frwclaw-pro resolvable, but Seedance canary not run.",
                 models=list(self.MODELS.values()),
-                profile="seedance_first",
+                profile="grok_primary",
+                detail={"canary_required": True},
             )
         except SystemExit as exc:
             return CapabilityReport(

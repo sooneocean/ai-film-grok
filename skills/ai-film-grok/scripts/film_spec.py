@@ -883,6 +883,15 @@ def validate_film_spec(
                 raise FilmSpecError(f"duplicate shot id: {shot_id}")
             seen.add(shot_id)
             shot["nar"] = validate_nar_budget(shot.get("nar"), field=f"{shot_id}.nar")
+            # v1.23: VO script lint — brochure phrase / AI-cadence / long-sentence warnings.
+            # Advisory only (warnings); genre=product can elevate to hard gate.
+            from vo_lint import lint_nar_text
+
+            _vo_warnings = lint_nar_text(shot["nar"], shot_id=shot_id)
+            if _vo_warnings:
+                shot.setdefault("_vo_lint_warnings", [w.to_dict() for w in _vo_warnings])
+            elif "_vo_lint_warnings" in shot:
+                del shot["_vo_lint_warnings"]
             # Optional English line for dual captions (designed-post); not TTS-spoken by default
             nar_en = shot.get("nar_en")
             if nar_en is not None:

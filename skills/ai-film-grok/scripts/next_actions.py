@@ -409,7 +409,7 @@ def build_next_actions(
                 f'aifilm review-final --root "{r}" --approve --reviewer <you> --notes "已完整观看…" '
                 "--score-identity pass --score-style pass --score-motion pass "
                 "--score-escalation pass --score-audio pass --score-subs pass --score-dead-air pass",
-                "[层4·后处理] 成片已渲，待七维 scorecard 审批",
+                "[层4·后处理] 成片已渲，待十一维 scorecard 审批",
             )
 
     # Evidence: sound_plan intent without mix/final when clips ready

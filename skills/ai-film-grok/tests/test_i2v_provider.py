@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -27,11 +28,26 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIn("seedance", names)
 
     def test_grok_probe_ok(self) -> None:
-        """Grok is the always-available fallback."""
+        """The in-session probe is available without a film root."""
         report = get("grok").probe()
         self.assertTrue(report.ok)
         self.assertTrue(report.available)
         self.assertEqual(report.profile, "grok_primary")
+
+    def test_grok_film_root_requires_live_canary(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            report = get("grok").probe(root=Path(raw))
+            self.assertFalse(report.available)
+            self.assertIn("canary", str(report.reason).lower())
+
+    def test_grok_film_root_accepts_hash_bound_canary(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            tmp_path = Path(raw)
+            receipt = tmp_path / "receipts" / "grok-i2v-canary.json"
+            receipt.parent.mkdir()
+            receipt.write_text('{"ok": true, "output_sha256": "abc"}', encoding="utf-8")
+            report = get("grok").probe(root=tmp_path)
+            self.assertTrue(report.available)
 
     def test_endpoint_resolution(self) -> None:
         """Existing source_endpoint labels resolve to owning provider."""

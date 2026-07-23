@@ -1,7 +1,7 @@
 # Craft Spine · 八环工序主脊
 
-> 2026-07-21 · **Idea → Verified MP4**  
-> 与工具四层正交：本文件管**叙事/决策分层**；工具见 [pipeline-methodology.md](pipeline-methodology.md)。  
+> 2026-07-21 · **Idea → Verified MP4**
+> 与工具四层正交：本文件管**叙事/决策分层**；工具见 [pipeline-methodology.md](pipeline-methodology.md)。
 > 原则：每环 = 问题 + 输入 + 产出 + 门禁强度 + 失败回退；前环未确认不 bulk。
 
 ## 八环总表
@@ -19,7 +19,7 @@ Idea → Story → Beats → Shots → Media → Selects → Rough Cut → Verif
 | 5 | `media` | 哪条模型路径拿真素材？ | hard 工程 | clips/queue · capability · canary | shots |
 | 6 | `selects` | 这段能否进时间线？ | hard | register approved | media |
 | 7 | `rough` | 顺序与节奏是否成立？ | soft | assemble/plate · rough-cut 回执 | selects/beats |
-| 8 | `verified` | 能否声称可发布？ | hard | final + 七维 + export | rough/media |
+| 8 | `verified` | 能否声称可发布？ | hard | final + 十一维 + export | rough/media |
 
 **短片可压缩** Idea+Story、跳过 beat-sheet 文档，但 **不得倒序**：Shots 前要有意图；Media 前要 pilot；Verified 前要 human_review。
 
@@ -36,49 +36,49 @@ Idea → Story → Beats → Shots → Media → Selects → Rough Cut → Verif
 ## 每环卡片（agent 必守）
 
 ### idea
-- **禁止**：无命题 bulk I2V；关键词自动钉 heat max  
-- **命令**：`aifilm init`；可选写 `receipts/creative-brief.md`  
-- **下一环**：有 theme/title/audience 或用户明确跳过 brief  
+- **禁止**：无命题 bulk I2V；关键词自动钉 heat max
+- **命令**：`aifilm init`；可选写 `receipts/creative-brief.md`
+- **下一环**：有 theme/title/audience 或用户明确跳过 brief
 
 ### story
-- **禁止**：原文插图化  
-- **命令**：Director’s Lens → `director_intent`  
-- **下一环**：logline + theme（或等价 description）非空  
+- **禁止**：原文插图化
+- **命令**：Director’s Lens → `director_intent`
+- **下一环**：logline + theme（或等价 description）非空
 
 ### beats
-- **禁止**：Beat=无信息「走一步」  
-- **字段**：`dramatic_function` · `dsl.story_beat` · `visible_change`  
-- **可选**：`receipts/beat-sheet.md`  
-- **lint**：`BEAT_SEMANTICS_MISS` / `MOTION_NO_MEANING`  
+- **禁止**：Beat=无信息「走一步」
+- **字段**：`dramatic_function` · `dsl.story_beat` · `visible_change`
+- **可选**：`receipts/beat-sheet.md`
+- **lint**：`BEAT_SEMANTICS_MISS` / `MOTION_NO_MEANING`
 
 ### shots
-- **hard**：`write-spec`；pilot 用户批准后 bulk（无批 ≤3 shot）  
-- **字段**：nar · dsl · shot_role · camera_axis · continue  
-- **Radio**：可交错 `tts-rehearse`，VO 预算 hard  
+- **hard**：`write-spec`；pilot 用户批准后 bulk（无批 ≤3 shot）
+- **字段**：nar · dsl · shot_role · camera_axis · continue
+- **Radio**：可交错 `tts-rehearse`，VO 预算 hard
 
 ### media
-- **开场**：`capability`（TTS/FRW/BGM/lipsync）  
-- **I2V**：Seedance → Grok → 显式 legacy；`capability --suggest-i2v`  
-- **TTS**：edge 默认；Voicebox 质量/FALLBACK；禁 Neural→EL  
-- **BGM**：片级模板 → skill `assets/bgm/` → 程序化 rnb  
-- **Lipsync**：默认 off；说书强制 off；canary 后 auto  
-- **失败**：fail/requeue；禁手改 queue JSON  
+- **开场**：`capability`（TTS/FRW/BGM/lipsync）
+- **I2V**：Seedance → Grok → 显式 legacy；`capability --suggest-i2v`
+- **TTS**：edge 默认；Voicebox 质量/FALLBACK；禁 Neural→EL
+- **BGM**：片级模板 → skill `assets/bgm/` → 程序化 rnb
+- **Lipsync**：默认 off；说书强制 off；canary 后 auto
+- **失败**：fail/requeue；禁手改 queue JSON
 
 ### selects
-- **hard**：register + identity/motion approved  
-- **命令**：`aifilm selects report`  
-- **禁止**：有文件自动当 selects  
+- **hard**：register + identity/motion approved
+- **命令**：`aifilm selects report`
+- **禁止**：有文件自动当 selects
 
 ### rough
-- **产出**：silent/plate；`receipts/rough-cut.json`（可选）  
-- **禁止**：continue 缝 dissolve；无 selects 上调色冒充剪辑  
-- **可压缩**：用户赶交付可缩短 Editor’s Cut  
+- **产出**：silent/plate；`receipts/rough-cut.json`（可选）
+- **禁止**：continue 缝 dissolve；无 selects 上调色冒充剪辑
+- **可压缩**：用户赶交付可缩短 Editor’s Cut
 
 ### verified
-- **hard**：`final` 技术成功 ≠ `final_complete`  
-- **七维** review-final + 完整观看 + hash  
-- **export-desktop**  
-- **禁止**：假交付；双烧  
+- **hard**：`final` 技术成功 ≠ `final_complete`
+- **十一维** review-final + 完整观看 + hash
+- **export-desktop**
+- **禁止**：假交付；双烧
 
 ## 音频嵌套（不另起主脊）
 

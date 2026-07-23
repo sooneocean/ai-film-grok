@@ -109,7 +109,8 @@ def resolve_edit_strategy(spec: dict[str, Any] | None) -> dict[str, Any]:
         "lock_craft": bool(author.get("lock_craft", False)),
         "prefer_vo_fit_on_act": bool(author.get("prefer_vo_fit_on_act", True)),
         "hard_join_sec": float(author.get("hard_join_sec", 0.06)),
-        "soft_join_sec": float(author.get("soft_join_sec", 0.26)),
+        # P0 · 2026-07-23: 0.26s soft + first-last promote felt like double frames
+        "soft_join_sec": float(author.get("soft_join_sec", 0.12)),
         "hold_join_sec": float(author.get("hold_join_sec", 0.40)),
         "whip_join_sec": float(author.get("whip_join_sec", 0.18)),
         "color_tail_sec": float(author.get("color_tail_sec", 0.55)),
@@ -205,7 +206,8 @@ def plan_join_transition_secs(
     strategy: dict[str, Any],
 ) -> list[float]:
     hard = float(strategy.get("hard_join_sec", 0.06))
-    soft = float(strategy.get("soft_join_sec", 0.26))
+    # Default must match resolve_edit_strategy (0.12); 0.26 + first/last ≈ double
+    soft = float(strategy.get("soft_join_sec", 0.12))
     hold = float(strategy.get("hold_join_sec", 0.40))
     whip = float(strategy.get("whip_join_sec", 0.18))
     out: list[float] = []
@@ -237,17 +239,25 @@ def plan_shot_visual_fit(
     """Return visual_fit override or None to leave author value."""
     if shot.get("visual_fit"):
         return None  # respect author
+    mode = str(strategy.get("mode") or "").strip().lower()
+    # P0 · 2026-07-23: voice_coupled short-form defaults to VO-timed plates so
+    # 6s I2V is not padded to 7–8s (stream_loop double-play / long freeze).
+    if mode in {"voice_coupled", "punchy"}:
+        hp = _heat(shot)
+        if hp == "afterglow" and _has_color(shot):
+            return "slot"
+        return "vo"
     if not strategy.get("prefer_vo_fit_on_act", True):
         return None
     hp = _heat(shot)
     # act/climax: snap plate to VO (+ color tail handled by offset, not dead pad)
-    if hp in {"act", "climax"}:
+    if hp in {"act", "climax", "foreplay"}:
         return "vo"
     if hp == "afterglow" and _has_color(shot):
         return "slot"  # keep plate for 呼… tail
     if hp == "setup":
-        return "slot"
-    return None
+        return "vo"  # was slot — caused empty tail + freeze on I2V 6s
+    return "vo"
 
 
 def plan_cut_on(shot: dict[str, Any]) -> str | None:

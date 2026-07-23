@@ -45,7 +45,7 @@ I2V/Seedance hero + promote → P1 P2 P3（脸只走 I2V；403→LTX i2v→Grok�
 LTX T2V env beds           → P5 合成层（无脸；拼进时间线，不锁身份）
 final ffmpeg               → P3（visual_fit vo + hard；env↔hero 可 soft）
 final hyperframes|remotion → P5（blank plate + 字幕/片头；不替代 P0–P4）
-review-final               → P0–P5 人工七维（含 style/motion）
+review-final               → P0–P5 人工十一维（含 style/motion）
 ```
 
 **禁止**：只用 P5（设计后期）掩盖 P0–P4 失败；只用 motion QA「能动」代替 P0「有戏」。  

@@ -557,30 +557,37 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
             }
         )
 
-    # P2-1: face identity drift check — verify cast masters have identity verification
-    bible_path = _first_file(root, "style-bible.json")
-    if bible_path:
-        bible = read_json(bible_path) or {}
-        cast_masters = bible.get("cast_masters") or {}
-        if isinstance(cast_masters, dict) and cast_masters:
-            identity_receipt_path = root / "receipts" / "face-identity.json"
-            if identity_receipt_path.is_file():
-                id_receipt = read_json(identity_receipt_path) or {}
-                verified = id_receipt.get("verified") if isinstance(id_receipt, dict) else False
-                if not verified:
+    # P2-1: face identity drift — pixel fingerprints in receipts/face-identity.json
+    try:
+        from scripts.face_identity import post_audit_face_status
+    except Exception:
+        try:
+            from face_identity import post_audit_face_status  # type: ignore
+        except Exception:
+            post_audit_face_status = None  # type: ignore
+    if post_audit_face_status is not None:
+        face_st = post_audit_face_status(root)
+        for w in face_st.get("warnings") or []:
+            if isinstance(w, dict) and w.get("code"):
+                warnings.append(w)
+        for h in face_st.get("hard") or []:
+            if isinstance(h, dict) and h.get("code"):
+                hard.append(h)
+    else:
+        # Fallback if module missing
+        bible_path = _first_file(root, "style-bible.json")
+        if bible_path:
+            bible = read_json(bible_path) or {}
+            cast_masters = bible.get("cast_masters") or {}
+            if isinstance(cast_masters, dict) and cast_masters:
+                identity_receipt_path = root / "receipts" / "face-identity.json"
+                if not identity_receipt_path.is_file():
                     warnings.append(
                         {
                             "code": "FACE_IDENTITY_DRIFT",
-                            "message": "face-identity.json exists but not verified — cast master identity not pixel-confirmed",
+                            "message": f"cast_masters has {len(cast_masters)} character(s) but no face-identity.json",
                         }
                     )
-            else:
-                warnings.append(
-                    {
-                        "code": "FACE_IDENTITY_DRIFT",
-                        "message": f"cast_masters has {len(cast_masters)} character(s) but no face-identity.json receipt — pixel-level face lock not verified",
-                    }
-                )
 
     # P3-1: color grade check — verify grade parameters exist when strict
     spec_path = _first_file(root, "film-spec.json")

@@ -17,6 +17,7 @@ from util import exclusive_file_lock, read_json, write_json
 BOOK_NAME = "production-book.json"
 SCHEMA_VERSION = 1
 RIGOR_LEVELS = {"legacy", "guided", "professional"}
+QUALITY_TARGETS = {"standard", "premium_vertical"}
 STATES = {"draft", "review", "locked", "stale"}
 
 DEFAULT_DEPENDENCIES: dict[str, list[str]] = {
@@ -85,17 +86,21 @@ def new_production_book(
     rigor: str = "professional",
     format_pack: str = "vertical-short",
     genre_pack: str = "drama",
+    quality_target: str = "standard",
     phase: str = "development",
     stage: str = "idea",
 ) -> dict[str, Any]:
     if rigor not in RIGOR_LEVELS:
         raise ProductionBookError("rigor must be legacy|guided|professional")
+    if quality_target not in QUALITY_TARGETS:
+        raise ProductionBookError("quality_target must be standard|premium_vertical")
     now = utc_now()
     book: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "kind": "production-book",
         "title": str(title),
         "rigor": rigor,
+        "quality_target": quality_target,
         "packs": {"format": str(format_pack), "genre": str(genre_pack)},
         "phase": str(phase),
         "stage": str(stage),
@@ -121,6 +126,10 @@ def _normalize_legacy(raw: dict[str, Any]) -> dict[str, Any]:
     book["rigor"] = "legacy" if is_legacy else str(book["rigor"])
     if book["rigor"] not in RIGOR_LEVELS:
         raise ProductionBookError("rigor must be legacy|guided|professional")
+    book.setdefault("quality_target", "standard")
+    book["quality_target"] = str(book["quality_target"])
+    if book["quality_target"] not in QUALITY_TARGETS:
+        raise ProductionBookError("quality_target must be standard|premium_vertical")
     book.setdefault("title", "Untitled")
     book.setdefault("packs", {"format": "legacy", "genre": "legacy"})
     book.setdefault("phase", "development")
@@ -191,6 +200,7 @@ def init_production_book(
     rigor: str = "professional",
     format_pack: str = "vertical-short",
     genre_pack: str = "drama",
+    quality_target: str = "standard",
     phase: str = "development",
     stage: str = "idea",
 ) -> dict[str, Any]:
@@ -202,6 +212,7 @@ def init_production_book(
         rigor=rigor,
         format_pack=format_pack,
         genre_pack=genre_pack,
+        quality_target=quality_target,
         phase=phase,
         stage=stage,
     )

@@ -162,9 +162,19 @@ def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[st
     executable = Path(argv[0]).name if argv else ""
     if executable == "ffmpeg" and "-nostdin" not in argv:
         argv.insert(1, "-nostdin")
+    # P0 · 2026-07-23: complex sidechain mix on ~60–90s films can exceed 600s wall
+    # (TimeoutExpired mid-plate). Override with AIFILM_FFMPEG_TIMEOUT seconds.
+    if executable == "ffmpeg":
+        try:
+            ff_timeout = float(os.environ.get("AIFILM_FFMPEG_TIMEOUT") or 1800)
+        except (TypeError, ValueError):
+            ff_timeout = 1800.0
+        ff_timeout = max(120.0, ff_timeout)
+    else:
+        ff_timeout = 60.0
     return subprocess.run(
         argv,
-        timeout=600 if executable == "ffmpeg" else 60,
+        timeout=ff_timeout,
         check=check,
         capture_output=True,
         text=True,
@@ -1335,9 +1345,14 @@ def stretch_clip(
         plan = plan_stretch(src_dur, target, dramatic_function=dramatic_function)
     except PolicyError as exc:
         raise RenderError(str(exc)) from exc
+    # P0 · 2026-07-23: shortform clamp may shrink target (anti stream_loop double-play)
+    if plan.get("target_clamped") is not None:
+        with contextlib.suppress(TypeError, ValueError):
+            target = float(plan["target_clamped"])
     plan["in_point_sec"] = t0
     plan["out_point_sec"] = t1
     plan["source_full_dur"] = full_dur
+    plan["effective_target"] = target
 
     base = (
         f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
@@ -1639,17 +1654,15 @@ def build_subtitle_cues_for_shots(
 
 
 def write_srt(path: Path, cues: list[dict[str, Any]]) -> None:
-    def ts(sec: float) -> str:
-        ms = max(0, int(round(sec * 1000)))
-        h, ms = divmod(ms, 3_600_000)
-        m, ms = divmod(ms, 60_000)
-        s, ms = divmod(ms, 1000)
-        return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+    """Write an SRT sidecar file. Delegates to the shared subtitle_srt module.
 
-    blocks = []
-    for i, cue in enumerate(cues, start=1):
-        blocks.append(f"{i}\n{ts(cue['start'])} --> {ts(cue['end'])}\n{cue['text']}\n")
-    atomic_write_text(path, "\n".join(blocks))
+    v1.23: extracted to subtitle_srt.write_srt_file so all post-engines
+    (ffmpeg / hyperframes / remotion) share one validated SRT generator.
+    Kept as a thin wrapper for backward compatibility with internal callers.
+    """
+    from subtitle_srt import write_srt_file
+
+    write_srt_file(path, cues)
 
 
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
@@ -1896,12 +1909,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         # shorter tail — snappier cut to next shot
         pad = float(getattr(args, "vo_pad", 0.12) or 0.12)
         target = dur + pad
-        # visual_fit: "slot" (default) locks to duration_sec plate;
-        # "vo" follows VO length only — critical for continue-chain fluency
-        # (avoids playing settle/hold tail to fill 6s before match-cut).
-        # See references/lessons-2026-07-20-action-fluency.md
-        # cn three-axis (slot): video plate fixed + VO atempo to plate — not stretch video to VO.
-        visual_fit = str(spec.get("visual_fit") or "slot").strip().lower()
+        # visual_fit: "slot" locks to duration_sec; "vo" follows VO length.
+        # P0 · 2026-07-23: default for voice_coupled / short I2V is vo-timed so we
+        # do not pad 6s clips to 7–8s plates (stream_loop double-play / long freeze).
+        # See lessons-2026-07-20-action-fluency.md · shortform_no_double_play.
+        es = spec.get("edit_strategy") if isinstance(spec.get("edit_strategy"), dict) else {}
+        es_mode = str(es.get("mode") or "").strip().lower()
+        default_fit = "vo" if es_mode in {"voice_coupled", "punchy"} else "slot"
+        visual_fit = str(spec.get("visual_fit") or default_fit).strip().lower()
         try:
             slot = float(shot.get("duration_sec") or 0)
         except (TypeError, ValueError):
@@ -1915,7 +1930,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         elif visual_fit == "vo" or cut_on == "mid_motion":
             use_fit = "vo"
         else:
-            use_fit = visual_fit if visual_fit in {"vo", "slot"} else "slot"
+            use_fit = visual_fit if visual_fit in {"vo", "slot"} else default_fit
 
         vo_atempo_plan: dict[str, Any] | None = None
         raw_vo_dur = float(dur)
@@ -2021,6 +2036,20 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             out_point_sec=item.get("out_point_sec"),
         )
         item["stretch_plan"] = stretch_plan
+        # Keep VO/join clock aligned when stretch clamps target (anti double-play)
+        eff = stretch_plan.get("effective_target")
+        if eff is not None:
+            try:
+                eff_f = float(eff)
+                if eff_f > 0 and abs(eff_f - float(item["target"])) > 0.04:
+                    log(
+                        f"  clamp target {item['target']:.2f}s → {eff_f:.2f}s "
+                        f"({stretch_plan.get('clamp_reason') or 'stretch'})"
+                    )
+                    item["target"] = eff_f
+                    item["vo_dur"] = min(float(item.get("vo_dur") or eff_f), eff_f)
+            except (TypeError, ValueError):
+                pass
         log(
             f"  stretch mode={stretch_plan.get('mode')} loops={stretch_plan.get('loops')} "
             f"freeze={stretch_plan.get('freeze_sec')}"
@@ -2295,9 +2324,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         },
     }
     # Spotting map shared by procedural + user music (mute/duck/sfx on bed)
+    spot_shot_targets = [float(item["target"]) for item in shot_audio]
     spot_tl = film_segment_timeline(
         title_duration=title_dur,
-        shot_targets=[float(item["target"]) for item in shot_audio],
+        shot_targets=spot_shot_targets,
         end_duration=end_dur,
         transition_sec=active_transition,
         story_join_intents=list(story_intents) if story_intents is not None else None,
@@ -2306,8 +2336,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     shot_start_map = {
         str(item["id"]): float(spot_tl["shot_starts"][i]) for i, item in enumerate(shot_audio)
     }
+    # film_segment_timeline returns shot_starts only; durations stay in spot_shot_targets
     shot_end_map = {
-        str(item["id"]): float(spot_tl["shot_starts"][i] + spot_tl["shot_targets"][i])
+        str(item["id"]): float(spot_tl["shot_starts"][i] + spot_shot_targets[i])
         for i, item in enumerate(shot_audio)
     }
     sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
@@ -2628,7 +2659,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         v_motifs = (spec.get("director_intent") or {}).get("visual_motifs") or []
         loc_tags = [str(x) for x in v_motifs]
         ac = resolve_acoustic_space(loc_tags)
-        sfx_dsp = f"highpass=f={ac['highpass']},lowpass=f={ac['lowpass']},aecho=1.0:1.0:{ac['reverb_time'] * 1000}:{ac['wet_level']}"
+        # P0 · 2026-07-23: aecho on full ~60s stems hung ffmpeg 50+ min (wall clock).
+        # Keep EQ only; reverb can be opt-in via film-spec acoustic_reverb=true later.
+        sfx_dsp = f"highpass=f={ac['highpass']},lowpass=f={ac['lowpass']}"
+        if bool((spec.get("audio_policy") or {}).get("acoustic_reverb")) or bool(
+            os.environ.get("AIFILM_SFX_REVERB", "").strip() in {"1", "true", "yes"}
+        ):
+            sfx_dsp += f",aecho=1.0:1.0:{ac['reverb_time'] * 1000}:{ac['wet_level']}"
     except Exception:
         sfx_dsp = "anull"
     mix_spotting["sfx_dsp_applied"] = sfx_dsp
