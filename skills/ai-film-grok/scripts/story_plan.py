@@ -915,6 +915,67 @@ _CHAR_LINE = re.compile(
 _DIALOGUE = re.compile(r"^[\s]*([^\s:：]{1,12})\s*[:：]\s*(.+)$", re.MULTILINE)
 _NAME_CAND = re.compile(r"[\u4e00-\u9fff]{2,4}")
 
+_PLOT_POINT_MARKERS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "character_secret",
+        ("秘密", "真相", "隐瞒", "不为人知", "身份", "过去", "背叛", "照片背面"),
+    ),
+    (
+        "danger_omen",
+        ("危险", "警告", "追杀", "威胁", "不能打开", "不要告诉", "小心", "出事", "血", "枪"),
+    ),
+    (
+        "relationship_promise",
+        ("答应", "承诺", "等我", "保护你", "不会离开", "只爱", "下次", "换你", "跟我走"),
+    ),
+    (
+        "prop_clue",
+        ("钥匙", "照片", "手机", "录音", "信", "戒指", "项链", "文件", "盒子", "门票", "名单"),
+    ),
+    (
+        "world_info",
+        ("规则", "传说", "组织", "禁令", "能力", "制度", "历史", "档案", "实验"),
+    ),
+)
+
+_GENRE_POINT_QUESTION: dict[str, dict[str, str]] = {
+    "mystery": {
+        "character_secret": "这个秘密会被谁先发现？",
+        "prop_clue": "这个线索会把调查带向哪里？",
+        "danger_omen": "警告背后真正的危险是什么？",
+        "relationship_promise": "这句承诺会不会成为新的破绽？",
+        "world_info": "这条规则究竟隐藏了什么例外？",
+    },
+    "drama": {
+        "character_secret": "主角会为这个秘密付出什么代价？",
+        "prop_clue": "这个物件会改变谁和谁的关系？",
+        "danger_omen": "他们会选择面对危险还是逃开？",
+        "relationship_promise": "这句承诺能否经受下一次选择？",
+        "world_info": "这条规则会限制谁的选择？",
+    },
+    "adult": {
+        "character_secret": "这个秘密会在谁面前失守？",
+        "prop_clue": "这个物件会把两人的距离推到哪一步？",
+        "danger_omen": "下一步会是谁先越过边界？",
+        "relationship_promise": "这句承诺会兑现还是被反过来利用？",
+        "world_info": "这条规则会怎样改变下一次行动？",
+    },
+    "arthouse": {
+        "character_secret": "这个未说出口的秘密会留下什么回声？",
+        "prop_clue": "这个物件会让哪段记忆重新出现？",
+        "danger_omen": "这份不安会在什么时刻显形？",
+        "relationship_promise": "这句承诺会留下靠近还是离开的余韵？",
+        "world_info": "这条规则会让谁失去原来的位置？",
+    },
+    "documentary": {
+        "character_secret": "这个说法还需要什么事实来验证？",
+        "prop_clue": "这份证据能支持哪一个结论？",
+        "danger_omen": "这个警告对应的现实风险是什么？",
+        "relationship_promise": "这项承诺是否有可核验的后果？",
+        "world_info": "这条规则如何影响现实中的谁？",
+    },
+}
+
 
 def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
@@ -1054,6 +1115,58 @@ def _dialogue_blocks(raw: str) -> list[dict[str, Any]]:
     return blocks[:40]
 
 
+def _plot_point_question(point_type: str, genre: str, excerpt: str) -> str:
+    questions = _GENRE_POINT_QUESTION.get(genre) or _GENRE_POINT_QUESTION["adult"]
+    return questions.get(point_type) or f"这段信息接下来会造成什么后果：{_clip_nar(excerpt, 24)}？"
+
+
+def _extract_plot_point_candidates(
+    raw: str,
+    *,
+    genre: str = "adult",
+    source_refs: list[str] | None = None,
+    episode_hint: int | None = None,
+) -> list[dict[str, Any]]:
+    """Deterministic high-signal candidate extraction; never calls a provider."""
+    text = (raw or "").strip()
+    sentences = [part.strip() for part in re.split(r"(?<=[。！？!?])\s*|\n+", text) if part.strip()]
+    refs = list(source_refs or []) or ["planner:unmapped-source"]
+    candidates: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for index, sentence in enumerate(sentences):
+        matched: list[tuple[str, str]] = []
+        for point_type, markers in _PLOT_POINT_MARKERS:
+            hits = [marker for marker in markers if marker in sentence]
+            if hits:
+                matched.append((point_type, hits[0]))
+        if not matched:
+            continue
+        # One sentence yields one point; priority follows the marker table.
+        point_type, marker = matched[0]
+        key = (point_type, sentence)
+        if key in seen:
+            continue
+        seen.add(key)
+        confidence = 0.92 if matched else 0.0
+        source_ref = refs[min(index, len(refs) - 1)]
+        candidates.append(
+            {
+                "candidate_id": f"candidate_{point_type}_{index + 1:03d}",
+                "point_type": point_type,
+                "marker": marker,
+                "source_refs": [source_ref],
+                "source_excerpt": _clip_nar(sentence, 160),
+                "audience_question": _plot_point_question(point_type, genre, sentence),
+                "visible_evidence": _clip_nar(sentence, 120),
+                "confidence": confidence,
+                "authoring_status": "confirmed" if confidence >= 0.85 else "candidate",
+                "episode_hint": episode_hint,
+                "source_index": index,
+            }
+        )
+    return candidates[:12]
+
+
 def _scene_chunks(raw: str) -> list[dict[str, str]]:
     """Split source into scene-sized text chunks.
 
@@ -1168,6 +1281,11 @@ def normalize_story(
     for gw in genre_info.get("warnings", []):
         warnings.append(gw)
     genre = genre_info["genre"]
+    plot_point_candidates = _extract_plot_point_candidates(
+        raw,
+        genre=genre,
+        source_refs=source_evidence_refs,
+    )
 
     return {
         "schema_version": 1,
@@ -1185,6 +1303,7 @@ def normalize_story(
         "scene_chunks": chunks,
         "episode_chunks": episode_chunks,
         "source_evidence_refs": list(source_evidence_refs or []),
+        "plot_point_candidates": plot_point_candidates,
         "vo_mode_suggest": "character" if dialogues else "storyteller",
         "heat_signals": heat,
         "genre_evidence": genre_info["evidence"],
@@ -1899,6 +2018,12 @@ def build_planned_graph(
                     :2000
                 ],
                 "scene_chunks": _scene_chunks(str(ep_chunk.get("body") or "")),
+                "plot_point_candidates": _extract_plot_point_candidates(
+                    str(ep_chunk.get("body") or ""),
+                    genre=str(normalized.get("genre") or "adult"),
+                    source_refs=list(ep_chunk.get("source_refs") or normalized.get("source_evidence_refs") or []),
+                    episode_hint=episode_number,
+                ),
             }
         )
         episode = structure_episode(
@@ -1970,7 +2095,14 @@ def build_planned_graph(
                     "beats": beats_out,
                 }
             )
-        episode_outs.append({**episode, "scenes": scenes_out, "status": "planning"})
+        episode_outs.append(
+            {
+                **episode,
+                "scenes": scenes_out,
+                "status": "planning",
+                "plot_point_candidates": list(ep_norm.get("plot_point_candidates") or []),
+            }
+        )
 
     characters = []
     for c in normalized.get("character_candidates") or []:
@@ -2038,9 +2170,10 @@ def build_planned_graph(
 
 
 def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) -> None:
-    """Seed honest, shot-bound promises so every planned episode has a hook arc."""
+    """Turn semantic source candidates into shot-bound narrative contracts."""
     episodes = [ep for ep in graph.get("episodes") or [] if isinstance(ep, dict)]
     points: list[dict[str, Any]] = []
+    authoring_queue: list[dict[str, Any]] = []
     source_refs = list(normalized.get("source_evidence_refs") or [])
     if not source_refs:
         source_refs = [str(normalized.get("source_path") or "planner:story-source")]
@@ -2062,83 +2195,102 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
             continue
         first_beat = beats[0]
         first_shot = shots[0]
-        mid_beat = beats[min(max(1, len(beats) // 2), len(beats) - 1)]
-        mid_shots = [sh for sh in mid_beat.get("shots") or [] if isinstance(sh, dict)] or [
-            first_shot
-        ]
         last_beat = beats[-1]
         last_shot = shots[-1]
-        point_id = f"{ep_id}_point_01"
+        candidates = [
+            c
+            for c in (ep.get("plot_point_candidates") or [])
+            if isinstance(c, dict)
+        ]
+        confirmed = [c for c in candidates if c.get("authoring_status") == "confirmed"][:3]
+        authoring_queue.extend(c for c in candidates if c not in confirmed)
+        if not confirmed:
+            fallback = {
+                "candidate_id": f"{ep_id}_candidate_01",
+                "point_type": "custom",
+                "source_refs": list(source_refs),
+                "source_excerpt": str(ep.get("logline") or normalized.get("raw_excerpt") or ""),
+                "audience_question": "本集真正留下的未解决问题是什么？",
+                "visible_evidence": "needs_authoring",
+                "confidence": 0.0,
+                "authoring_status": "candidate",
+                "episode_hint": index + 1,
+            }
+            authoring_queue.append(fallback)
+            confirmed = [fallback]
         next_ep = episodes[index + 1].get("id") if index + 1 < len(episodes) else None
-        status = "planted" if next_ep else "season_hook"
-        point_question = str(mid_beat.get("audience_question") or "").strip()
-        if not point_question or point_question == AUTHORING_PLACEHOLDER:
-            point_question = "这个变化接下来会带来什么后果？"
-        point = {
-            "point_id": point_id,
-            "point_type": "custom",
-            "introduced_episode": ep_id,
-            "introduced_beat_id": str(mid_beat.get("id") or ""),
-            "introduced_shot_ids": [str(sh.get("id")) for sh in mid_shots if sh.get("id")],
-            "visible_evidence": str(
-                mid_shots[0].get("must_show") or mid_beat.get("objective") or "新线索进入画面"
-            ),
-            "audience_question": point_question,
-            "planned_payoff_episode": int(str(next_ep).removeprefix("ep"))
-            if next_ep
-            else int(str(ep_id).removeprefix("ep")),
-            "payoff_condition": "下一集必须回应该线索并改变人物或局势"
-            if next_ep
-            else "本季结束时明确回收或声明下一季承诺",
-            "status": status,
-            "source_refs": [source_refs[min(index, len(source_refs) - 1)]],
-        }
-        points.append(point)
+        point_ids: list[str] = []
+        for point_index, candidate in enumerate(confirmed[:3], start=1):
+            beat = beats[min(point_index, len(beats) - 1)]
+            beat_shots = [sh for sh in beat.get("shots") or [] if isinstance(sh, dict)] or [first_shot]
+            point_id = f"{ep_id}_point_{point_index:02d}"
+            point_ids.append(point_id)
+            payoff_episode = (
+                int(str(next_ep).removeprefix("ep")) if next_ep else int(str(ep_id).removeprefix("ep"))
+            )
+            point = {
+                "point_id": point_id,
+                "point_type": candidate.get("point_type") or "custom",
+                "source_refs": list(candidate.get("source_refs") or source_refs),
+                "source_excerpt": candidate.get("source_excerpt") or "",
+                "introduced_episode": ep_id,
+                "introduced_beat_id": str(beat.get("id") or ""),
+                "introduced_shot_ids": [str(sh.get("id")) for sh in beat_shots if sh.get("id")],
+                "visible_evidence": candidate.get("visible_evidence") or str(beat.get("action") or ""),
+                "audience_question": candidate.get("audience_question") or "这个线索接下来会带来什么变化？",
+                "planned_payoff_episode": payoff_episode,
+                "payoff_condition": "下一集必须回应该线索并改变人物或局势" if next_ep else "本季结束时明确回收或声明下一季承诺",
+                "status": "planted" if next_ep else "season_hook",
+                "confidence": float(candidate.get("confidence") or 0.0),
+                "authoring_status": candidate.get("authoring_status") or "confirmed",
+            }
+            points.append(point)
+            for shot in beat_shots:
+                shot.setdefault("narrative_point_ids", []).append(point_id)
+        if not point_ids:
+            point_ids = [f"{ep_id}_point_01"]
+        opening_point = points[-len(point_ids)]
+        ending_point = points[-1]
         ep["opening_hook"] = {
             "hook_id": f"{ep_id}_opening",
-            "point_id": point_id,
+            "point_id": opening_point["point_id"],
             "beat_id": str(first_beat.get("id") or ""),
             "shot_ids": [str(first_shot.get("id") or "")],
-            "question": str(
-                ep.get("openingHook") or first_beat.get("objective") or "观众必须立刻知道发生了什么"
-            ),
+            "source_refs": list(opening_point["source_refs"]),
+            "question": str(opening_point["audience_question"]),
+            "visible_evidence": opening_point["visible_evidence"],
         }
-        ep["mid_episode_points"] = [point_id]
+        ep["mid_episode_points"] = point_ids
         ep["ending_hook"] = {
             "hook_id": f"{ep_id}_ending",
-            "point_id": point_id,
+            "point_id": ending_point["point_id"],
             "beat_id": str(last_beat.get("id") or ""),
             "shot_ids": [str(last_shot.get("id") or "")],
-            "question": "这个线索的真正后果是什么？",
+            "source_refs": list(ending_point["source_refs"]),
+            "question": str(ending_point["audience_question"]),
+            "visible_evidence": ending_point["visible_evidence"],
         }
         ep["carry_in_points"] = []
         ep["payoff_points"] = []
-        ep["new_audience_question"] = "这个线索的真正后果是什么？"
+        ep["new_audience_question"] = ending_point["audience_question"]
         ep["endingHook"] = ep["ending_hook"]["question"]
-        for shot in mid_shots:
-            shot.setdefault("narrative_point_ids", []).append(point_id)
         if index > 0:
             previous_ep = episodes[index - 1]
-            previous_hook = previous_ep.get("ending_hook") or {}
-            previous_point_id = str(previous_hook.get("point_id") or "")
-            if previous_point_id:
-                ep["carry_in_points"].append(previous_point_id)
-                ep["payoff_points"].append(previous_point_id)
-                for previous_point in points:
-                    if previous_point.get("point_id") == previous_point_id:
-                        previous_point["status"] = "paid_off"
-                        previous_point["payoff_evidence"] = {
-                            "episode": ep_id,
-                            "shot_ids": [str(first_shot.get("id") or "")],
-                            "visible_change": str(
-                                first_shot.get("visible_change")
-                                or first_shot.get("must_show")
-                                or "回应上一集钩子"
-                            ),
-                        }
-                        break
+            previous_ids = list(previous_ep.get("mid_episode_points") or [])
+            ep["carry_in_points"] = previous_ids
+            ep["payoff_points"] = previous_ids
+            for previous_point in points:
+                if previous_point.get("point_id") in previous_ids:
+                    previous_point["status"] = "paid_off"
+                    previous_point["payoff_evidence"] = {
+                        "episode": ep_id,
+                        "beat_id": str(first_beat.get("id") or ""),
+                        "shot_ids": [str(first_shot.get("id") or "")],
+                        "visible_change": str(first_shot.get("visible_change") or first_shot.get("must_show") or "回应上一集钩子"),
+                    }
 
     graph["plot_points"] = points
+    graph["plot_point_candidates"] = authoring_queue
     graph["narrative_policy"] = {
         "midpoint_min": 1,
         "payoff_window_episodes": 3,

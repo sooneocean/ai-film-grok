@@ -3,6 +3,14 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [1.19.0] — 2026-07-23
+
+### Added — Department evidence and take integrity
+
+- Added hash-bound active-take history with superseded evidence preservation.
+- Added `beat-evidence`, `editor-cut`, and `audio-visual` reports for action, edit, and sound-picture alignment.
+- Added per-shot take comparison to `aifilm quality --shot-id`.
+
 ## [1.18.0] — 2026-07-23
 
 ### Added — Quality receipt observability

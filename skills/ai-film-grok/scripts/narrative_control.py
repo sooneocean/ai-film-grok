@@ -381,7 +381,43 @@ def validate_narrative_contract(
                     node_ref=point_id,
                 )
             )
-        for field in ("visible_evidence", "audience_question", "payoff_condition"):
+        point_type = str(point.get("point_type") or "")
+        if point_type not in PLOT_POINT_TYPES:
+            issues.append(
+                _issue(
+                    "PLOT_POINT_TYPE_INVALID", f"invalid point type: {point_id}", node_ref=point_id
+                )
+            )
+        if "authoring_status" in point and point.get("authoring_status") != "confirmed":
+            issues.append(
+                _issue(
+                    "PLOT_POINT_NOT_CONFIRMED",
+                    f"point requires author confirmation: {point_id}",
+                    node_ref=point_id,
+                )
+            )
+        if "confidence" in point:
+            try:
+                confidence = float(point.get("confidence"))
+                if not 0 <= confidence <= 1:
+                    raise ValueError
+            except (TypeError, ValueError):
+                issues.append(
+                    _issue(
+                        "PLOT_POINT_CONFIDENCE_INVALID",
+                        f"invalid confidence: {point_id}",
+                        node_ref=point_id,
+                    )
+                )
+        if not _nonempty(point.get("source_excerpt")):
+            issues.append(
+                _issue(
+                    "PLOT_POINT_SOURCE_EXCERPT_MISSING",
+                    f"point.source_excerpt is required: {point_id}",
+                    node_ref=point_id,
+                )
+            )
+        for field in ("visible_evidence", "audience_question"):
             if not _nonempty(point.get(field)):
                 issues.append(
                     _issue(
@@ -429,6 +465,39 @@ def validate_narrative_contract(
                     node_ref=point_id,
                 )
             )
+        if status == "paid_off":
+            payoff = (
+                point.get("payoff_evidence")
+                if isinstance(point.get("payoff_evidence"), dict)
+                else {}
+            )
+            if (
+                not payoff.get("episode")
+                or not payoff.get("beat_id")
+                or not payoff.get("shot_ids")
+                or not _nonempty(payoff.get("visible_change"))
+            ):
+                issues.append(
+                    _issue(
+                        "PAYOFF_EVIDENCE_MISSING",
+                        f"paid_off point needs payoff evidence: {point_id}",
+                        node_ref=point_id,
+                    )
+                )
+            else:
+                payoff_refs = refs_by_ep.get(
+                    str(payoff.get("episode")), {"beats": set(), "shots": set()}
+                )
+                if str(payoff.get("beat_id")) not in payoff_refs["beats"] or not set(
+                    map(str, payoff.get("shot_ids") or [])
+                ).intersection(payoff_refs["shots"]):
+                    issues.append(
+                        _issue(
+                            "PAYOFF_EVIDENCE_ORPHAN",
+                            f"payoff evidence is not bound to a real shot: {point_id}",
+                            node_ref=point_id,
+                        )
+                    )
 
     for index, (episode_id, episode) in enumerate(episodes.items()):
         refs = refs_by_ep.get(episode_id, {"beats": set(), "shots": set()})
@@ -510,6 +579,19 @@ def validate_narrative_contract(
                     _issue(
                         "PAYOFF_STATUS_INVALID",
                         f"payoff point is not marked paid_off: {point_id}",
+                        node_ref=episode_id,
+                    )
+                )
+            payoff_evidence = (
+                point.get("payoff_evidence")
+                if point and isinstance(point.get("payoff_evidence"), dict)
+                else {}
+            )
+            if point and str(payoff_evidence.get("episode") or "") != episode_id:
+                issues.append(
+                    _issue(
+                        "PAYOFF_EVIDENCE_MISMATCH",
+                        f"payoff evidence does not match episode: {point_id}",
                         node_ref=episode_id,
                     )
                 )

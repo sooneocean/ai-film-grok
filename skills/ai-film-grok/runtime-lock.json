@@ -13,7 +13,7 @@
   },
   "scripts": {
     "scripts/aifilm": "97f131b75cd6954e6aed0c8a7a05387bd45499e110226dd13df8cb6af4f996e9",
-    "scripts/aifilm_grok.py": "774eb53308d26e824842d610fd1c05d7b49bf1dc003610668f2cd827a327f44b",
+    "scripts/aifilm_grok.py": "35f260e596204252adeec4a474684d68918434ed9bea7d018bddc732096d7f31",
     "scripts/backend-lock": "60b86b253cb393b587af4ca6e63a2403daa42b515f7501fffe407e2b8e257f25",
     "scripts/backend_lock.py": "ce829087a062bba9a217a5a90cec3573dbdf1417e72c5f7a669df45a57dab730",
     "scripts/edit_policy.py": "1df4da37127776b74a1a98e813741b08d81b323e5ee4048657e87e979558dece",

@@ -1058,6 +1058,11 @@ def cmd_quality(args: argparse.Namespace) -> int:
     from quality_gates import summarize_quality
 
     report = summarize_quality(Path(args.root), shot_id=getattr(args, "shot_id", None))
+    if getattr(args, "shot_id", None):
+        from take_registry import compare_takes
+
+        manifest = load_manifest(Path(args.root).expanduser().resolve())
+        report["take_comparison"] = compare_takes(manifest, str(args.shot_id))
     emit(report)
     return 0 if report["ok"] else 2
 
@@ -2082,6 +2087,9 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     )
     if args.status == "approved":
         require_quality(quality, kind="clip")
+    from take_registry import archive_active_clip, register_active_take
+
+    previous_take = archive_active_clip(root, str(args.shot_id), manifest)
     record = _register_media(
         shot_id=args.shot_id,
         source=source,
@@ -2149,7 +2157,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             }
         except (SecurityPolicyError, subprocess.CalledProcessError, OSError, ValueError) as exc:
             raise FilmError(f"Could not preserve generated native audio: {exc}") from exc
-    manifest.setdefault("clips", {})[record["shot_id"]] = record
+    record = register_active_take(root, manifest, record, previous=previous_take)
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
 
@@ -2336,6 +2344,51 @@ def cmd_assemble(args: argparse.Namespace) -> int:
         }
     )
     return 0
+
+
+def cmd_ingest_footage(args: argparse.Namespace) -> int:
+    """Ingest real footage: copy → transcribe (local Whisper) → takes_packed.md.
+
+    Bridges the video-use skill so ai-film-grok can ingest real talking-head /
+    interview footage for the editing ring (the one stage that was absent).
+    """
+    try:
+        from real_footage import RealFootageError, ingest_footage
+    except ImportError as exc:
+        raise FilmError(f"real_footage module unavailable: {exc}") from exc
+    try:
+        receipt = ingest_footage(
+            Path(args.root),
+            Path(args.source),
+            label=getattr(args, "label", None),
+            whisper_model=getattr(args, "whisper_model", "base"),
+        )
+    except RealFootageError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(receipt)
+    return 0 if receipt.get("ok") else 1
+
+
+def cmd_auto_cut(args: argparse.Namespace) -> int:
+    """Auto-cut real footage on word boundaries + silence gaps (video-use logic).
+
+    Reads a cached word-level transcript (from ingest-footage) and produces an
+    EDL JSON honoring video-use Hard Rules 6 (word-boundary cuts) + 7 (pad edges).
+    """
+    try:
+        from auto_cut import AutoCutError, build_edl_for_root
+    except ImportError as exc:
+        raise FilmError(f"auto_cut module unavailable: {exc}") from exc
+    try:
+        edl = build_edl_for_root(
+            Path(args.root),
+            str(args.source_id),
+            target_duration_sec=getattr(args, "target_duration", None),
+        )
+    except AutoCutError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(edl)
+    return 0 if edl.get("ranges") else 1
 
 
 def cmd_reencode_clips(args: argparse.Namespace) -> int:
@@ -4765,14 +4818,38 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument("--root", required=True)
     quality.add_argument("--shot-id", default=None)
 
+    sub.add_parser(
+        "beat-evidence", help="Validate planned shot actions against human review evidence"
+    ).add_argument("--root", required=True)
+    sub.add_parser(
+        "editor-cut", help="Check deterministic rough-cut readiness and active take integrity"
+    ).add_argument("--root", required=True)
+    sub.add_parser(
+        "audio-visual", help="Check audio, dialogue, subtitle and timeline alignment"
+    ).add_argument("--root", required=True)
+
     pe = sub.add_parser("production-evidence", help="Read-only production evidence ledger")
     pe.add_argument("--root", required=True)
     ne = sub.add_parser(
         "narrative-evidence",
         help="Create or validate executed/human evidence for episode hooks and plot points",
     )
-    ne.add_argument("--root", required=True)
-    ne.add_argument("--validate", action="store_true", help="Require verified executed evidence")
+    ne_sub = ne.add_subparsers(dest="narrative_evidence_action", required=True)
+    ne_init = ne_sub.add_parser("init", help="Create the plan-side evidence ledger")
+    ne_init.add_argument("--root", required=True)
+    ne_record = ne_sub.add_parser("record", help="Register one executed evidence item")
+    ne_record.add_argument("--root", required=True)
+    ne_record.add_argument("--evidence-id", required=True)
+    ne_record.add_argument("--status", required=True, choices=("verified", "missing", "uncertain"))
+    ne_record.add_argument("--shot-id")
+    ne_record.add_argument("--start-sec", type=float)
+    ne_record.add_argument("--end-sec", type=float)
+    ne_record.add_argument("--media-path")
+    ne_record.add_argument("--reviewer")
+    ne_record.add_argument("--user-phrase")
+    ne_record.add_argument("--note", default="")
+    ne_validate = ne_sub.add_parser("validate", help="Validate current media-backed evidence")
+    ne_validate.add_argument("--root", required=True)
     pa = sub.add_parser("post-audit", help="Unified post-production audit")
     pa.add_argument("--root", required=True)
     caption_audit = sub.add_parser(
@@ -5971,14 +6048,34 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "production-evidence":
             return cmd_production_evidence(args)
         if args.cmd == "narrative-evidence":
-            from narrative_evidence import build_narrative_evidence, validate_narrative_evidence
+            from narrative_evidence import (
+                NarrativeEvidenceError,
+                init_narrative_evidence,
+                record_narrative_evidence,
+                validate_narrative_evidence,
+            )
 
             root = Path(args.root).expanduser().resolve()
-            report = (
-                validate_narrative_evidence(root, require_verified=True)
-                if args.validate
-                else build_narrative_evidence(root, write=True)
-            )
+            try:
+                if args.narrative_evidence_action == "init":
+                    report = init_narrative_evidence(root)
+                elif args.narrative_evidence_action == "record":
+                    report = record_narrative_evidence(
+                        root,
+                        evidence_id=args.evidence_id,
+                        status=args.status,
+                        shot_id=args.shot_id,
+                        start_sec=args.start_sec,
+                        end_sec=args.end_sec,
+                        media_path=args.media_path,
+                        reviewer=args.reviewer,
+                        user_phrase=args.user_phrase,
+                        note=args.note,
+                    )
+                else:
+                    report = validate_narrative_evidence(root, require_verified=True)
+            except NarrativeEvidenceError as exc:
+                report = {"ok": False, "issues": [{"code": exc.code, "message": str(exc)}]}
             emit(report)
             return 0 if report.get("ok", True) else 1
         if args.cmd == "post-audit":
@@ -6036,6 +6133,10 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_register_clip(args)
         if args.cmd == "assemble":
             return cmd_assemble(args)
+        if args.cmd == "ingest-footage":
+            return cmd_ingest_footage(args)
+        if args.cmd == "auto-cut":
+            return cmd_auto_cut(args)
         if args.cmd == "reencode-clips":
             return cmd_reencode_clips(args)
         if args.cmd == "final":
@@ -6150,6 +6251,24 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_preflight(args)
         if args.cmd == "quality":
             return cmd_quality(args)
+        if args.cmd == "beat-evidence":
+            from beat_action_evidence import build_beat_action_evidence
+
+            report = build_beat_action_evidence(Path(args.root))
+            emit(report)
+            return 0 if report["ok"] else 2
+        if args.cmd == "editor-cut":
+            from editor_cut import build_editor_cut_report
+
+            report = build_editor_cut_report(Path(args.root))
+            emit(report)
+            return 0 if report["ok"] else 2
+        if args.cmd == "audio-visual":
+            from audio_visual_alignment import build_audio_visual_alignment
+
+            report = build_audio_visual_alignment(Path(args.root))
+            emit(report)
+            return 0 if report["ok"] else 2
         if args.cmd == "heat":
             return cmd_heat(args)
         if args.cmd == "state-index":

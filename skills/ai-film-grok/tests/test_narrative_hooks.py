@@ -76,6 +76,24 @@ def test_explicit_episode_headers_seed_cross_episode_contract() -> None:
     assert all(any(str(sh["id"]).startswith(f"ep{i:02d}_") for sc in ep["scenes"] for bt in sc["beats"] for sh in bt["shots"]) for i, ep in enumerate(graph["episodes"], 1))
 
 
+def test_semantic_candidates_are_source_bound_and_not_generic_custom() -> None:
+    graph = build_planned_graph(
+        normalize_story("她隐瞒了自己的身份。她手里攥着一把钥匙。门外传来追杀警告。"),
+        target_duration=30,
+    )
+    types = {point["point_type"] for point in graph["plot_points"]}
+    assert {"character_secret", "prop_clue", "danger_omen"}.issubset(types)
+    assert all(point["source_excerpt"] and point["source_refs"] for point in graph["plot_points"])
+    assert all(point["authoring_status"] == "confirmed" for point in graph["plot_points"])
+    assert all("敬请期待" not in ep["ending_hook"]["question"] for ep in graph["episodes"])
+
+
+def test_low_confidence_candidate_is_not_lockable() -> None:
+    graph = build_planned_graph(normalize_story("两人的距离越来越近。"), target_duration=30)
+    report = validate_narrative_graph(graph, strict=True)
+    assert "PLOT_POINT_NOT_CONFIRMED" in report["issue_codes"]
+
+
 def test_strict_validation_rejects_missing_midpoint_point() -> None:
     graph = _authored(build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30))
     graph["episodes"][0]["mid_episode_points"] = []

@@ -98,6 +98,48 @@
       }
     },
     "cast_state_masters": { "type": "object" },
+    "art_direction": {
+      "type": "object",
+      "description": "P1-6 art direction layer — structured beyond single-string palette/lighting. Holds color script, visual motifs, texture continuity.",
+      "properties": {
+        "color_script": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": { "type": "string" },
+              "color_temperature": { "type": "string", "description": "Warm/cool/neutral + motivation" },
+              "palette_override": { "type": "string", "description": "Scene-specific palette override" },
+              "emotional_motivation": { "type": "string", "description": "Why this color — narrative/emotional reason" }
+            }
+          },
+          "description": "Per-scene color temperature script — the 'color arc' of the film"
+        },
+        "visual_motifs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "motif": { "type": "string", "description": "e.g. 'rain=coldness', 'red door=danger'" },
+              "first_appearance": { "type": "string", "description": "scene/shot id where motif first appears" },
+              "recurrence_rule": { "type": "string", "description": "When/how this motif repeats" }
+            }
+          },
+          "description": "Recurring visual symbols with narrative meaning"
+        },
+        "texture_continuity": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "element": { "type": "string", "description": "e.g. 'wall texture', 'skin pores', 'fabric weave'" },
+              "lock_description": { "type": "string", "description": "How this texture must look consistently" }
+            }
+          },
+          "description": "Texture elements that must be consistent across shots"
+        }
+      }
+    },
     "locations": { "type": "object" },
     "props": { "type": "object" },
     "continuity_states": { "type": "object" },

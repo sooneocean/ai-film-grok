@@ -104,6 +104,10 @@
       "description": "Cross-episode promise and payoff ledger.",
       "items": { "$ref": "#/$defs/PlotPoint" }
     },
+    "plot_point_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/PlotPointCandidate" }
+    },
     "narrative_policy": {
       "type": "object",
       "properties": {
@@ -146,6 +150,7 @@
         "endingHook": { "type": "string" },
         "opening_hook": { "$ref": "#/$defs/Hook" },
         "mid_episode_points": { "type": "array", "items": { "type": "string" } },
+        "plot_point_candidates": { "type": "array", "items": { "$ref": "#/$defs/PlotPointCandidate" } },
         "ending_hook": { "$ref": "#/$defs/Hook" },
         "carry_in_points": { "type": "array", "items": { "type": "string" } },
         "payoff_points": { "type": "array", "items": { "type": "string" } },
@@ -176,6 +181,23 @@
         "beat_id": { "type": "string" },
         "shot_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
         "question": { "type": "string", "minLength": 1 }
+        ,"source_refs": { "type": "array", "items": { "type": "string" } }
+        ,"visible_evidence": { "type": "string" }
+      }
+    },
+    "PlotPointCandidate": {
+      "type": "object",
+      "required": ["candidate_id", "point_type", "source_refs", "source_excerpt", "confidence", "authoring_status"],
+      "properties": {
+        "candidate_id": { "type": "string" },
+        "point_type": { "enum": ["character_secret", "prop_clue", "relationship_promise", "danger_omen", "world_info", "custom"] },
+        "source_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "source_excerpt": { "type": "string", "minLength": 1 },
+        "audience_question": { "type": "string", "minLength": 1 },
+        "visible_evidence": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "authoring_status": { "enum": ["candidate", "confirmed", "stale"] },
+        "episode_hint": { "type": "integer", "minimum": 1 }
       }
     },
     "PlotPoint": {
@@ -183,11 +205,11 @@
       "required": [
         "point_id", "point_type", "introduced_episode", "introduced_beat_id",
         "introduced_shot_ids", "visible_evidence", "audience_question",
-        "planned_payoff_episode", "payoff_condition", "status", "source_refs"
+        "planned_payoff_episode", "payoff_condition", "status", "source_refs", "source_excerpt", "confidence", "authoring_status"
       ],
       "properties": {
         "point_id": { "type": "string" },
-        "point_type": { "type": "string" },
+        "point_type": { "enum": ["character_secret", "prop_clue", "relationship_promise", "danger_omen", "world_info", "custom"] },
         "introduced_episode": { "type": "string" },
         "introduced_beat_id": { "type": "string" },
         "introduced_shot_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
@@ -197,7 +219,17 @@
         "payoff_condition": { "type": "string" },
         "status": { "enum": ["planted", "carried", "paid_off", "season_hook"] },
         "source_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-        "payoff_evidence": { "type": "object" }
+        "source_excerpt": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "authoring_status": { "enum": ["candidate", "confirmed", "stale"] },
+        "payoff_evidence": {
+          "type": "object",
+          "properties": {
+            "episode": { "type": "string" }, "beat_id": { "type": "string" },
+            "shot_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            "visible_change": { "type": "string", "minLength": 1 }
+          }
+        }
       }
     },
     "Scene": {

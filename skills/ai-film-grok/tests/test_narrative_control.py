@@ -88,6 +88,15 @@ def _fill_graph(graph: dict) -> dict:
                             "body_state": "手指停住，肩膀绷紧",
                         }
                     )
+    for point in graph.get("plot_points") or []:
+        point.update(
+            {
+                "source_excerpt": "雨夜出租車，兩人的距離越來越近。",
+                "visible_evidence": "照片背面出现地址",
+                "authoring_status": "confirmed",
+                "confidence": 1.0,
+            }
+        )
     return graph
 
 

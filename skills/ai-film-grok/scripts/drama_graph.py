@@ -339,6 +339,16 @@ def derive_graph(root: Path, *, write: bool = True) -> dict[str, Any]:
 
     for si, scene in enumerate(_iter_scenes(spec), start=1):
         scene_id = f"sc{si:02d}_{_slug(str(scene.get('title') or 'scene'), f'sc{si}')}"
+        # P1-5: populate locationId from scene (was hardcoded None)
+        scene_loc = scene.get("locationId") or scene.get("location_id") or ""
+        if not scene_loc:
+            # try to infer from first shot's dsl.location
+            for _sh in _shot_list(scene):
+                _dsl = _sh.get("dsl") if isinstance(_sh.get("dsl"), dict) else {}
+                _loc = _dsl.get("location") or _sh.get("locationId")
+                if _loc:
+                    scene_loc = str(_loc)
+                    break
         shots_raw = _shot_list(scene)
         if not shots_raw:
             warnings.append(f"scene {si} has no shots")
@@ -393,7 +403,7 @@ def derive_graph(root: Path, *, write: bool = True) -> dict[str, Any]:
                             or sh.get("heroine_ids")
                             or []
                         ),
-                        "locationId": None,
+                        "locationId": str(dsl.get("location") or scene_loc or ""),
                         "wardrobeState": str(
                             sh.get("wardrobe_state") or dsl.get("wardrobe_state") or ""
                         ),
@@ -456,7 +466,7 @@ def derive_graph(root: Path, *, write: bool = True) -> dict[str, Any]:
                 "order": si,
                 "title": str(scene.get("title") or f"Scene {si}"),
                 "synopsis": str(scene.get("summary") or scene.get("synopsis") or ""),
-                "locationId": None,
+                "locationId": scene_loc or "",
                 "characterIds": [],
                 "targetDuration": scene_dur or None,
                 "productionMode": sc_mode,
