@@ -92,8 +92,7 @@ def transcribe(source: Path, *, model: str = "base") -> Path:
     if out.is_file() and out.stat().st_mtime >= source.stat().st_mtime:
         return out
     proc = subprocess.run(
-        [shutil.which("python3") or "python3", str(helper), str(source),
-         "--model", model],
+        [shutil.which("python3") or "python3", str(helper), str(source), "--model", model],
         capture_output=True,
         text=True,
         check=False,
@@ -113,8 +112,7 @@ def pack_transcripts(transcripts_dir: Path, edit_dir: Path) -> Path:
     helper = vu / "helpers" / "pack_transcripts.py"
     out = edit_dir / "takes_packed.md"
     proc = subprocess.run(
-        [shutil.which("python3") or "python3", str(helper),
-         "--edit-dir", str(edit_dir)],
+        [shutil.which("python3") or "python3", str(helper), "--edit-dir", str(edit_dir)],
         capture_output=True,
         text=True,
         check=False,

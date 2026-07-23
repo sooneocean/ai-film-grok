@@ -37,6 +37,7 @@ BACKEND_PRIORITY = ("musetalk", "wav2lip", "external")
 def emit(obj: dict[str, Any]) -> None:
     print(json.dumps(obj, ensure_ascii=False, indent=2))
 
+
 def env_backend() -> str:
     return (get_config().lipsync_backend or "auto").strip().lower()
 

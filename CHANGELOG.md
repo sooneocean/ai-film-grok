@@ -3,6 +3,35 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [1.18.0] — 2026-07-23
+
+### Added — Quality receipt observability
+
+- Added read-only `aifilm quality --root <film>` reporting with optional `--shot-id` filtering.
+- Dispatch now consumes the same shared quality summary, keeping operator output and orchestration gates consistent.
+
+## [1.17.0] — 2026-07-23
+
+### Added — Quality-first generation gates
+
+- Added per-shot keyframe and clip quality receipts with stricter hero-shot promotion gates.
+- Provider fallback now records routing evidence and requires a fresh hero pilot before bulk work.
+- Dispatch now reports persisted quality blockers; hero quality evidence is required before promotion.
+- Kept `grok_primary` as the reproducible hero default; Seedance requires canary and pilot evidence.
+
+## [1.16.0] — 2026-07-23
+
+### Added — Director methodology injection (P1-1/P1-2/P1-3: face-lock + hairstyle + makeup)
+
+- **Structured `cast_locks`** (P1-1): style-bible.schema now defines `cast_locks` as a per-character structured object with `face_ref_path`, `identity_lock_tokens`, `never_tokens`, `hair_lock`, `makeup_lock`. prompt_injector prefers structured cast_locks over free-text identity_lock — locks are no longer a free-text blob.
+- **`hair_swatches`** (P1-2): style-bible.schema now defines `hair_swatches` as structured per-character field `{color_name, hex, description}` — independent from identity_lock free text. prompt_injector auto-builds Hair lock line from swatches when cast_locks.hair_lock is absent.
+- **`makeup`** (P1-3): style-bible.schema now defines `makeup` as structured per-character field `{name, ref_path, lock_tokens, cross_scene_consistency}` — from 0/10 to parameterized. prompt_injector injects Makeup line from cast_locks.makeup_lock or makeup field fallback.
+- **Hair lock line injection** (consistency.md H4 compliance): prompt_injector now injects `Hair lock <char>: <color> (<NEVER tokens>)` — this was explicitly missing per consistency.md:148. Fallback chain: cast_locks.hair_lock → hair_swatches.color_name+description.
+- **Makeup line injection**: prompt_injector injects `Makeup <char>: <lock_tokens>`. Fallback chain: cast_locks.makeup_lock → makeup[char].lock_tokens.
+- Updated `references/style-bible.md` documentation for all three fields.
+- **Backward compatibility**: no cast_locks/hair_swatches/makeup → behavior unchanged (identity_lock free text used, no Hair/Makeup lines injected).
+- 9 new tests covering structured locks, fallback chains, precedence, and backward compat.
+
 ## [1.15.0] — 2026-07-23
 
 ### Added — Director methodology injection (P0-1: de-type-bias)
@@ -15,6 +44,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](
 - **Structured `pace_chart`**: `director_intent.pace_chart` upgraded from string array to structured entries: `{label, start_ratio, end_ratio, cut_freq, intensity}` (≥3 segments). Validates ratio ranges, end>start, intensity 0-10. `pace_chart_strict: true` → write-spec hard-gates non-empty + ≥3 segments. Legacy string-array format still accepted (backward compat).
 - `validate_director_intent()` in `film_spec.py` now validates both structures. `_draft_story_contract()` initializes act_structure defaults. `project_graph_to_film_spec()` projects act_structure + pace_chart into film-spec.
 - Updated `film-spec.md` + `directors-lens.md` documentation.
+
+### Added — Director methodology injection (P0-3: character bible)
+
+- **Character schema expanded**: `drama-graph.schema.json` Character upgraded from 4 fields (id/identity/defaultWardrobe/castMaster) to full dramatic character bible: `name`, `age`, `personality`, `want`, `need`, `flaw`, `ghost_wound`, `arc_turning_points[]`, `relationships[]`, `psych_markers[]`, `dramatic_role` (protagonist/antagonist/mentor/ally/trickster/guardian/supporting). Visual identity fields preserved for backward compat.
+- **Protagonist arc gate**: new `character_bible_strict: true` flag → write-spec hard-gates `director_intent.protagonist_want` / `protagonist_need` / `protagonist_arc` non-empty. New schema fields in film-spec + drama-graph.
+- `_draft_story_contract()` initializes protagonist_want/need/arc fields. `project_graph_to_film_spec()` projects them into film-spec director_intent. Character generation in `story_plan.py` now populates dramatic role fields with authoring placeholders for leads.
+- Legacy import path in `aifilm_grok.py` updated to project genre + protagonist fields + act_structure into drama-graph story.
+- New `templates/character-bible.example.md` — full character bible template with dramatic arc, relationships, psych_markers, wardrobe table.
 - `detect_genre()`: parallel to `detect_heat_signals()`, infers genre from brief text markers. Priority: explicit genre field > adult heat signals > genre text markers > default adult.
 - `select_beat_spine()` accepts `genre` parameter; non-adult genres return `GENRE_SPINES[genre]` directly (ignores heat signals). Adult genre preserves existing heat-signal logic unchanged.
 - `normalize_story()` now returns `genre` + `genre_evidence` fields.

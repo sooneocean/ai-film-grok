@@ -194,6 +194,20 @@ def validate_master_delivery(
             _issue("FULL_SCREENING_MISSING", "full-film human screening approval is required")
         )
 
+    try:
+        from narrative_evidence import validate_narrative_evidence
+
+        narrative = validate_narrative_evidence(base, require_verified=True)
+        if narrative.get("required") and not narrative.get("ok"):
+            issues.append(
+                _issue(
+                    "NARRATIVE_EVIDENCE_UNVERIFIED",
+                    "episode hooks and plot points lack current executed/human evidence",
+                )
+            )
+    except Exception as exc:  # noqa: BLE001
+        issues.append(_issue("NARRATIVE_EVIDENCE_READ_FAILED", str(exc)[:200]))
+
     if final_hash and recorded_assets.get("film_final.mp4") != final_hash:
         if not any(item["code"] == "MOTION_EVIDENCE_STALE" for item in issues):
             issues.append(

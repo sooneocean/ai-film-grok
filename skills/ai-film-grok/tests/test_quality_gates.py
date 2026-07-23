@@ -11,7 +11,12 @@ sys.path.insert(0, str(SCRIPTS))
 
 from i2v_provider import preferred  # noqa: E402
 from production_gates import ProductionGateError, assert_provider_pilot_current  # noqa: E402
-from quality_gates import evaluate_clip, evaluate_keyframe, shot_role  # noqa: E402
+from quality_gates import (  # noqa: E402
+    evaluate_clip,
+    evaluate_keyframe,
+    shot_role,
+    summarize_quality,
+)
 
 
 def _root(tmp_path: Path, *, shot_role_value: str | None = None) -> Path:
@@ -109,3 +114,43 @@ def test_provider_fallback_requires_new_pilot_evidence(tmp_path: Path) -> None:
     )
     with pytest.raises(ProductionGateError, match="new user-approved pilot"):
         assert_provider_pilot_current(tmp_path)
+
+
+def test_quality_summary_reports_failures_and_supports_shot_filter(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    quality_dir = root / "receipts" / "quality"
+    quality_dir.mkdir(parents=True)
+    (quality_dir / "shot01.json").write_text(
+        json.dumps(
+            {
+                "shot_id": "shot01",
+                "kind": "clip-quality",
+                "ok": False,
+                "codes": ["HERO_MOTION_REVIEW_MISSING"],
+                "hard": ["hero clip requires full-clip motion approval"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (quality_dir / "shot02.json").write_text(
+        json.dumps({"shot_id": "shot02", "kind": "keyframe-quality", "ok": True}),
+        encoding="utf-8",
+    )
+
+    report = summarize_quality(root)
+    assert report["status"] == "blocked"
+    assert report["ok"] is False
+    assert report["receipt_count"] == 2
+    assert report["failed_shots"][0]["shot_id"] == "shot01"
+
+    filtered = summarize_quality(root, shot_id="shot02")
+    assert filtered["status"] == "pass"
+    assert filtered["ok"] is True
+    assert filtered["receipt_count"] == 1
+
+
+def test_quality_summary_empty_root_is_actionable_but_not_blocked(tmp_path: Path) -> None:
+    report = summarize_quality(_root(tmp_path))
+    assert report["status"] == "no_receipts"
+    assert report["ok"] is True
+    assert report["receipt_count"] == 0

@@ -33,6 +33,10 @@ DIRECTOR_BOARD_FIELDS = (
 )
 DIRECTOR_BOARD_APPROVAL_STATES = frozenset({"draft", "review", "approved"})
 STABLE_SHOT_RE = re.compile(r"^ep\d+_sc\d+_bt\d+_sh\d+$")
+PLOT_POINT_STATUSES = frozenset({"planted", "carried", "paid_off", "season_hook"})
+PLOT_POINT_TYPES = frozenset(
+    {"character_secret", "prop_clue", "relationship_promise", "danger_omen", "world_info", "custom"}
+)
 PLACEHOLDER_RE = re.compile(
     r"^(?:todo|tbd|needs_authoring|待补|待定|待填写|冲突顶点|余韵与续集钩子|advance story)$",
     re.IGNORECASE,
@@ -241,6 +245,277 @@ def validate_director_board(
     return issues
 
 
+def _episode_tree(graph: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
+        str(ep.get("id")): ep
+        for ep in graph.get("episodes") or []
+        if isinstance(ep, dict) and ep.get("id")
+    }
+
+
+def _episode_refs(graph: dict[str, Any]) -> dict[str, dict[str, set[str]]]:
+    """Index episode-local beat and shot ids for hook/point evidence checks."""
+    out: dict[str, dict[str, set[str]]] = {}
+    for ep in graph.get("episodes") or []:
+        if not isinstance(ep, dict) or not ep.get("id"):
+            continue
+        beats: set[str] = set()
+        shots: set[str] = set()
+        for scene in ep.get("scenes") or []:
+            if not isinstance(scene, dict):
+                continue
+            for beat in scene.get("beats") or []:
+                if not isinstance(beat, dict):
+                    continue
+                if beat.get("id"):
+                    beats.add(str(beat["id"]))
+                for shot in beat.get("shots") or []:
+                    if isinstance(shot, dict) and shot.get("id"):
+                        shots.add(str(shot["id"]))
+        out[str(ep["id"])] = {"beats": beats, "shots": shots}
+    return out
+
+
+def _hook_issues(
+    hook: object,
+    *,
+    code: str,
+    episode_id: str,
+    refs: dict[str, set[str]],
+    points: dict[str, dict[str, Any]],
+    require_unresolved: bool = False,
+) -> list[dict[str, Any]]:
+    if not isinstance(hook, dict) or not _nonempty(hook.get("question")):
+        return [
+            _issue(
+                code,
+                f"episode {episode_id} hook requires a non-empty question",
+                node_ref=episode_id,
+            )
+        ]
+    point_id = str(hook.get("point_id") or "")
+    beat_id = str(hook.get("beat_id") or "")
+    shot_ids = {str(x) for x in hook.get("shot_ids") or [] if str(x).strip()}
+    issues: list[dict[str, Any]] = []
+    if not point_id or point_id not in points:
+        issues.append(
+            _issue(
+                "PLOT_POINT_ORPHAN",
+                f"hook references unknown point: {point_id}",
+                node_ref=episode_id,
+            )
+        )
+    if beat_id not in refs["beats"] or not shot_ids.intersection(refs["shots"]):
+        issues.append(
+            _issue(
+                "PLOT_POINT_NO_EVIDENCE",
+                f"hook has no local beat/shot evidence: {episode_id}",
+                node_ref=episode_id,
+            )
+        )
+    if require_unresolved and point_id in points and points[point_id].get("status") == "paid_off":
+        payoff = points[point_id].get("payoff_evidence") or {}
+        try:
+            paid_in = int(str(payoff.get("episode") or "").removeprefix("ep"))
+            current = int(str(episode_id).removeprefix("ep"))
+        except (TypeError, ValueError):
+            paid_in = current = 0
+        if not paid_in or paid_in <= current:
+            issues.append(
+                _issue(
+                    "ENDING_HOOK_ALREADY_PAID",
+                    f"ending hook point is already paid off: {point_id}",
+                    node_ref=episode_id,
+                )
+            )
+    return issues
+
+
+def validate_narrative_contract(
+    graph: dict[str, Any], *, strict: bool = False
+) -> list[dict[str, Any]]:
+    """Validate cross-episode promises, hooks, and their shot-level evidence."""
+    if not strict:
+        return []
+    episodes = _episode_tree(graph)
+    refs_by_ep = _episode_refs(graph)
+    raw_points = graph.get("plot_points")
+    points_list = raw_points if isinstance(raw_points, list) else []
+    points: dict[str, dict[str, Any]] = {
+        str(item.get("point_id")): item
+        for item in points_list
+        if isinstance(item, dict) and item.get("point_id")
+    }
+    issues: list[dict[str, Any]] = []
+    if not points:
+        issues.append(
+            _issue(
+                "PLOT_POINT_ORPHAN",
+                "graph.plot_points must contain at least one tracked point",
+                node_ref="graph",
+            )
+        )
+
+    for point_id, point in points.items():
+        intro_ep = str(point.get("introduced_episode") or "")
+        refs = refs_by_ep.get(intro_ep, {"beats": set(), "shots": set()})
+        intro_beat = str(point.get("introduced_beat_id") or "")
+        intro_shots = {str(x) for x in point.get("introduced_shot_ids") or [] if str(x).strip()}
+        if (
+            intro_ep not in episodes
+            or intro_beat not in refs["beats"]
+            or not intro_shots.intersection(refs["shots"])
+        ):
+            issues.append(
+                _issue(
+                    "PLOT_POINT_ORPHAN",
+                    f"point has invalid introduction evidence: {point_id}",
+                    node_ref=point_id,
+                )
+            )
+        if not point.get("source_refs"):
+            issues.append(
+                _issue(
+                    "PLOT_POINT_NO_SOURCE",
+                    f"point has no source_refs: {point_id}",
+                    node_ref=point_id,
+                )
+            )
+        for field in ("visible_evidence", "audience_question", "payoff_condition"):
+            if not _nonempty(point.get(field)):
+                issues.append(
+                    _issue(
+                        "PLOT_POINT_NO_EVIDENCE"
+                        if field == "visible_evidence"
+                        else "PLOT_POINT_FIELD_MISSING",
+                        f"point.{field} is required: {point_id}",
+                        node_ref=point_id,
+                    )
+                )
+        status = str(point.get("status") or "")
+        if status not in PLOT_POINT_STATUSES:
+            issues.append(
+                _issue(
+                    "PLOT_POINT_STATUS_INVALID",
+                    f"invalid point status: {point_id}",
+                    node_ref=point_id,
+                )
+            )
+        try:
+            intro_no = int(str(intro_ep).removeprefix("ep"))
+            payoff_no = int(point.get("planned_payoff_episode"))
+        except (TypeError, ValueError):
+            intro_no = payoff_no = 0
+            issues.append(
+                _issue(
+                    "PLOT_POINT_NO_PAYOFF_PLAN",
+                    f"point has no valid payoff episode: {point_id}",
+                    node_ref=point_id,
+                )
+            )
+        if payoff_no and payoff_no < intro_no:
+            issues.append(
+                _issue(
+                    "PAYOFF_BEFORE_SETUP",
+                    f"payoff precedes introduction: {point_id}",
+                    node_ref=point_id,
+                )
+            )
+        if payoff_no and payoff_no > intro_no + 3 and status != "season_hook":
+            issues.append(
+                _issue(
+                    "PAYOFF_WINDOW_EXCEEDED",
+                    f"payoff exceeds three-episode window: {point_id}",
+                    node_ref=point_id,
+                )
+            )
+
+    for index, (episode_id, episode) in enumerate(episodes.items()):
+        refs = refs_by_ep.get(episode_id, {"beats": set(), "shots": set()})
+        contract = episode
+        issues.extend(
+            _hook_issues(
+                contract.get("opening_hook"),
+                code="EPISODE_OPENING_HOOK_MISSING",
+                episode_id=episode_id,
+                refs=refs,
+                points=points,
+            )
+        )
+        issues.extend(
+            _hook_issues(
+                contract.get("ending_hook"),
+                code="EPISODE_ENDING_HOOK_MISSING",
+                episode_id=episode_id,
+                refs=refs,
+                points=points,
+                require_unresolved=True,
+            )
+        )
+        if not isinstance(contract.get("mid_episode_points"), list) or not contract.get(
+            "mid_episode_points"
+        ):
+            issues.append(
+                _issue(
+                    "EPISODE_MIDPOINT_POINT_MISSING",
+                    f"episode has no midpoint plot point: {episode_id}",
+                    node_ref=episode_id,
+                )
+            )
+        for point_id in contract.get("mid_episode_points") or []:
+            point = points.get(str(point_id))
+            if not point or str(point.get("introduced_episode")) != episode_id:
+                issues.append(
+                    _issue(
+                        "PLOT_POINT_ORPHAN",
+                        f"midpoint point is not introduced in episode: {point_id}",
+                        node_ref=episode_id,
+                    )
+                )
+        if not _nonempty(contract.get("new_audience_question")):
+            issues.append(
+                _issue(
+                    "ENDING_HOOK_EMPTY_QUESTION",
+                    f"episode has no new audience question: {episode_id}",
+                    node_ref=episode_id,
+                )
+            )
+        if index > 0:
+            previous_id = list(episodes)[index - 1]
+            previous = episodes[previous_id]
+            previous_hook = previous.get("ending_hook") if isinstance(previous, dict) else {}
+            carry = {str(x) for x in contract.get("carry_in_points") or []}
+            payoff = {str(x) for x in contract.get("payoff_points") or []}
+            previous_point = str((previous_hook or {}).get("point_id") or "")
+            if previous_point and previous_point not in carry:
+                issues.append(
+                    _issue(
+                        "HOOK_NOT_CARRIED_FORWARD",
+                        f"episode does not carry prior ending hook: {episode_id}",
+                        node_ref=episode_id,
+                    )
+                )
+            if previous_point and previous_point not in payoff:
+                issues.append(
+                    _issue(
+                        "HOOK_NOT_PAID_OFF",
+                        f"episode does not respond to prior ending hook: {episode_id}",
+                        node_ref=episode_id,
+                    )
+                )
+        for point_id in contract.get("payoff_points") or []:
+            point = points.get(str(point_id))
+            if point and point.get("status") not in {"paid_off", "season_hook"}:
+                issues.append(
+                    _issue(
+                        "PAYOFF_STATUS_INVALID",
+                        f"payoff point is not marked paid_off: {point_id}",
+                        node_ref=episode_id,
+                    )
+                )
+    return issues
+
+
 def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> dict[str, Any]:
     """Validate narrative meaning in addition to graph shape."""
     issues: list[dict[str, Any]] = []
@@ -395,6 +670,8 @@ def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> 
                     )
                 if action:
                     previous = re.sub(r"\s+", " ", action)
+
+    issues.extend(validate_narrative_contract(graph, strict=strict))
 
     hard = [item for item in issues if item.get("severity") == "hard"]
     return {

@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from quality_gates import summarize_quality
 from util import read_json, write_json
 
 _ACTION_SKILLS = {
@@ -34,36 +35,8 @@ _ACTION_SKILLS = {
 
 
 def _quality_summary(root: Path) -> dict[str, Any]:
-    """Summarize persisted per-shot quality evidence without rescanning media."""
-    directory = root / "receipts" / "quality"
-    reports: list[dict[str, Any]] = []
-    if directory.is_dir():
-        for path in sorted(directory.glob("*.json")):
-            report = read_json(path)
-            if isinstance(report, dict):
-                reports.append(report)
-    failed = [
-        {
-            "shot_id": report.get("shot_id"),
-            "kind": report.get("kind"),
-            "codes": report.get("codes") or [],
-            "blockers": report.get("hard") or [],
-        }
-        for report in reports
-        if report.get("ok") is not True
-    ]
-    return {
-        "schema_version": 1,
-        "receipt_count": len(reports),
-        "passed_count": sum(report.get("ok") is True for report in reports),
-        "failed_count": len(failed),
-        "failed_shots": failed[:20],
-        "next_action": (
-            f"repair quality gate for shot {failed[0]['shot_id']} before regeneration"
-            if failed
-            else None
-        ),
-    }
+    """Compatibility wrapper around the shared quality receipt summary."""
+    return summarize_quality(root)
 
 
 def structured_next_action(

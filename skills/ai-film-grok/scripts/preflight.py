@@ -63,6 +63,24 @@ def run_preflight(root: Path) -> dict[str, Any]:
         hard.append(
             _issue("hard", "no_spec", "missing film-spec.json", fix="aifilm write-spec --root …")
         )
+
+    graph_path = root / "drama-graph.json"
+    if graph_path.is_file():
+        try:
+            from narrative_control import validate_narrative_graph
+
+            narrative = validate_narrative_graph(read_json(graph_path) or {}, strict=True)
+            for issue in narrative.get("errors") or []:
+                hard.append(
+                    _issue(
+                        "hard",
+                        str(issue.get("code") or "NARRATIVE_INVALID"),
+                        str(issue.get("message") or "narrative contract failed"),
+                        fix='aifilm plan edit --root "<root>" then plan validate --strict',
+                    )
+                )
+        except Exception as exc:  # noqa: BLE001
+            hard.append(_issue("hard", "NARRATIVE_VALIDATION_FAILED", str(exc)[:200]))
     if style.get("state") != "Approved" and not style.get("locked"):
         soft.append(
             _issue(

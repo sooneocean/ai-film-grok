@@ -99,6 +99,21 @@
       "minItems": 1,
       "items": { "$ref": "#/$defs/Episode" }
     },
+    "plot_points": {
+      "type": "array",
+      "description": "Cross-episode promise and payoff ledger.",
+      "items": { "$ref": "#/$defs/PlotPoint" }
+    },
+    "narrative_policy": {
+      "type": "object",
+      "properties": {
+        "midpoint_min": { "type": "integer", "minimum": 1 },
+        "payoff_window_episodes": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "require_plan_evidence": { "type": "boolean" },
+        "require_executed_evidence": { "type": "boolean" },
+        "season_end_mode": { "enum": ["closed", "season_hook"] }
+      }
+    },
     "characters": {
       "type": "array",
       "items": { "$ref": "#/$defs/Character" }
@@ -129,6 +144,12 @@
         "centralConflict": { "type": "string" },
         "climax": { "type": "string" },
         "endingHook": { "type": "string" },
+        "opening_hook": { "$ref": "#/$defs/Hook" },
+        "mid_episode_points": { "type": "array", "items": { "type": "string" } },
+        "ending_hook": { "$ref": "#/$defs/Hook" },
+        "carry_in_points": { "type": "array", "items": { "type": "string" } },
+        "payoff_points": { "type": "array", "items": { "type": "string" } },
+        "new_audience_question": { "type": "string" },
         "aspectRatio": { "enum": ["9:16"] },
         "status": {
           "enum": [
@@ -144,6 +165,39 @@
           "type": "array",
           "items": { "$ref": "#/$defs/Scene" }
         }
+      }
+    },
+    "Hook": {
+      "type": "object",
+      "required": ["hook_id", "point_id", "beat_id", "shot_ids", "question"],
+      "properties": {
+        "hook_id": { "type": "string" },
+        "point_id": { "type": "string" },
+        "beat_id": { "type": "string" },
+        "shot_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "question": { "type": "string", "minLength": 1 }
+      }
+    },
+    "PlotPoint": {
+      "type": "object",
+      "required": [
+        "point_id", "point_type", "introduced_episode", "introduced_beat_id",
+        "introduced_shot_ids", "visible_evidence", "audience_question",
+        "planned_payoff_episode", "payoff_condition", "status", "source_refs"
+      ],
+      "properties": {
+        "point_id": { "type": "string" },
+        "point_type": { "type": "string" },
+        "introduced_episode": { "type": "string" },
+        "introduced_beat_id": { "type": "string" },
+        "introduced_shot_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "visible_evidence": { "type": "string" },
+        "audience_question": { "type": "string" },
+        "planned_payoff_episode": { "type": "integer", "minimum": 1 },
+        "payoff_condition": { "type": "string" },
+        "status": { "enum": ["planted", "carried", "paid_off", "season_hook"] },
+        "source_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "payoff_evidence": { "type": "object" }
       }
     },
     "Scene": {
@@ -392,7 +446,18 @@
       "required": ["id"],
       "properties": {
         "id": { "type": "string" },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "structure": { "type": "string", "description": "Spatial layout / geography" },
+        "timeOfDay": { "type": "string", "description": "Time of day (dawn/day/dusk/night)" },
+        "lighting": { "type": "string", "description": "Lighting setup (key/fill/practical)" },
+        "palette": { "type": "string", "description": "Scene color palette / color temperature motivation" },
+        "immutableRules": { "type": "array", "items": { "type": "string" }, "description": "Rules that must not change across shots in this location" },
+        "recurringObjects": { "type": "array", "items": { "type": "string" }, "description": "Set dressing / props that anchor this location" },
+        "primaryAngles": { "type": "array", "items": { "type": "string" }, "description": "Primary camera angles for this location" },
+        "atmosphere": { "type": "string", "description": "Mood/atmosphere descriptor" },
+        "color_temperature": { "type": "string", "description": "Color temperature motivation (warm/cool/neutral + Kelvin hint)" },
+        "set_dressing": { "type": "array", "items": { "type": "string" }, "description": "Detailed set dressing inventory" },
+        "lighting_plot": { "type": "string", "description": "Lighting plot: key light direction, fill ratio, practicals" }
       }
     },
     "Prop": {

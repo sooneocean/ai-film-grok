@@ -1053,6 +1053,15 @@ def cmd_preflight(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_quality(args: argparse.Namespace) -> int:
+    """Read persisted per-shot quality receipts without touching media."""
+    from quality_gates import summarize_quality
+
+    report = summarize_quality(Path(args.root), shot_id=getattr(args, "shot_id", None))
+    emit(report)
+    return 0 if report["ok"] else 2
+
+
 def cmd_state_index(args: argparse.Namespace) -> int:
     """Checkpoint: state photos + keyframes + promote plan for fluid transitions."""
     skill_dir = Path(__file__).resolve().parents[1]
@@ -4750,8 +4759,20 @@ def build_parser() -> argparse.ArgumentParser:
     st = sub.add_parser("status", help="Gate status")
     st.add_argument("--root", required=True)
 
+    quality = sub.add_parser(
+        "quality", help="Read persisted per-shot quality receipts (no media scan)"
+    )
+    quality.add_argument("--root", required=True)
+    quality.add_argument("--shot-id", default=None)
+
     pe = sub.add_parser("production-evidence", help="Read-only production evidence ledger")
     pe.add_argument("--root", required=True)
+    ne = sub.add_parser(
+        "narrative-evidence",
+        help="Create or validate executed/human evidence for episode hooks and plot points",
+    )
+    ne.add_argument("--root", required=True)
+    ne.add_argument("--validate", action="store_true", help="Require verified executed evidence")
     pa = sub.add_parser("post-audit", help="Unified post-production audit")
     pa.add_argument("--root", required=True)
     caption_audit = sub.add_parser(
@@ -4892,6 +4913,35 @@ def build_parser() -> argparse.ArgumentParser:
     asb = sub.add_parser("assemble", help="Assemble silent film from timeline + clips")
     asb.add_argument("--root", required=True)
     asb.add_argument("--out-name", default="film_silent.mp4")
+
+    # Real-footage ingestion + auto-cut (video-use bridge, 2026-07-23)
+    ingf = sub.add_parser(
+        "ingest-footage",
+        help="Ingest real footage → transcribe (local Whisper) → takes_packed.md",
+    )
+    ingf.add_argument("--root", required=True)
+    ingf.add_argument("--source", required=True, help="Path to source video file")
+    ingf.add_argument("--label", default=None, help="Human label for the source")
+    ingf.add_argument(
+        "--whisper-model",
+        default="base",
+        dest="whisper_model",
+        help="Whisper model: base (fast) | medium (accurate)",
+    )
+
+    acut = sub.add_parser(
+        "auto-cut",
+        help="Auto-cut real footage on word boundaries + silence gaps (video-use logic)",
+    )
+    acut.add_argument("--root", required=True)
+    acut.add_argument("--source-id", required=True, help="Footage source_id from ingest-footage")
+    acut.add_argument(
+        "--target-duration",
+        type=float,
+        default=None,
+        dest="target_duration",
+        help="Optional target total duration (sec) to aim segment count at",
+    )
 
     extf = sub.add_parser(
         "extract-frame",
@@ -5920,6 +5970,17 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_status(args)
         if args.cmd == "production-evidence":
             return cmd_production_evidence(args)
+        if args.cmd == "narrative-evidence":
+            from narrative_evidence import build_narrative_evidence, validate_narrative_evidence
+
+            root = Path(args.root).expanduser().resolve()
+            report = (
+                validate_narrative_evidence(root, require_verified=True)
+                if args.validate
+                else build_narrative_evidence(root, write=True)
+            )
+            emit(report)
+            return 0 if report.get("ok", True) else 1
         if args.cmd == "post-audit":
             from post_audit import audit
 
@@ -6087,6 +6148,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_next(args)
         if args.cmd == "preflight":
             return cmd_preflight(args)
+        if args.cmd == "quality":
+            return cmd_quality(args)
         if args.cmd == "heat":
             return cmd_heat(args)
         if args.cmd == "state-index":

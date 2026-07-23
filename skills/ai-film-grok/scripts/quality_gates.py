@@ -201,6 +201,46 @@ def write_quality_receipt(root: Path, shot_id: str, report: dict[str, Any]) -> P
     return path
 
 
+def summarize_quality(root: Path, *, shot_id: str | None = None) -> dict[str, Any]:
+    """Summarize persisted quality receipts for operators and dispatch."""
+    directory = Path(root).expanduser().resolve() / "receipts" / "quality"
+    reports: list[dict[str, Any]] = []
+    if directory.is_dir():
+        for path in sorted(directory.glob("*.json")):
+            report = read_json(path)
+            if not isinstance(report, dict):
+                continue
+            if shot_id is not None and str(report.get("shot_id")) != str(shot_id):
+                continue
+            reports.append(report)
+    failed = [
+        {
+            "shot_id": report.get("shot_id"),
+            "kind": report.get("kind"),
+            "codes": list(report.get("codes") or []),
+            "blockers": list(report.get("hard") or []),
+        }
+        for report in reports
+        if report.get("ok") is not True
+    ]
+    status = "no_receipts" if not reports else ("blocked" if failed else "pass")
+    return {
+        "schema_version": 1,
+        "status": status,
+        "ok": not failed,
+        "shot_id": str(shot_id) if shot_id is not None else None,
+        "receipt_count": len(reports),
+        "passed_count": sum(report.get("ok") is True for report in reports),
+        "failed_count": len(failed),
+        "failed_shots": failed[:20],
+        "next_action": (
+            f"repair quality gate for shot {failed[0]['shot_id']} before regeneration"
+            if failed
+            else None
+        ),
+    }
+
+
 def require_quality(report: dict[str, Any], *, kind: str) -> None:
     if report.get("ok") is True:
         return

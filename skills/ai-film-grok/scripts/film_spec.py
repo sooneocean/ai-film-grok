@@ -99,29 +99,6 @@ FRW_VIDEO_MODELS = frozenset(
 )
 
 
-def _load_i2v_profile_env() -> None:
-    """Load skill config.env once so AIFILM_I2V_PROFILE applies without export."""
-    import os
-    from pathlib import Path
-
-    cfg = (
-        Path(__file__).resolve().parents[1] / "config.env"
-        if (Path(__file__).resolve().parents[1] / "config.env").is_file()
-        else Path.home() / ".grok/skills/ai-film-grok/config.env"
-    )
-    if not cfg.is_file():
-        return
-    for line in cfg.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k.startswith("AIFILM_I2V") or k.startswith("AIFILM_SEEDANCE"):
-            if k and k not in os.environ:
-                os.environ[k] = v
-
-
 def resolve_i2v_profile() -> str:
     """Operating profile for hero I2V bulk.
 
@@ -131,19 +108,15 @@ def resolve_i2v_profile() -> str:
     Default (2026-07-21 Seedance outage season): grok_primary.
     Restore Seedance bulk: AIFILM_I2V_PROFILE=seedance_first and canary 201.
     """
-    import os
+    from config_loader import get_config
 
-    _load_i2v_profile_env()
-    raw = (os.environ.get("AIFILM_I2V_PROFILE") or "").strip().lower()
+    cfg = get_config()
+    raw = cfg.i2v_profile.strip().lower()
     if raw in I2V_PROFILES:
         return raw
-    seed_flag = (os.environ.get("AIFILM_SEEDANCE_AVAILABLE") or "").strip().lower()
-    if seed_flag in {"0", "false", "no", "off", "unavailable"}:
+    if not cfg.seedance_available:
         return "grok_primary"
-    if seed_flag in {"1", "true", "yes", "on"}:
-        return "seedance_first"
-    # Temporary global default while Seedance permissions flaky
-    return "grok_primary"
+    return "seedance_first"
 
 
 def default_i2v_provider() -> str:

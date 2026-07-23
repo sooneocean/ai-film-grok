@@ -381,7 +381,7 @@ _TIME_OR_BRACKET_SECTION = re.compile(
     re.MULTILINE,
 )
 _EPISODE_HEADER = re.compile(
-    r"(?m)^\s*(?:#{1,4}\s*)?(第[一二三四五六七八九十百\d]+[集章]|Episode\s*\d+|EP\s*\d+)\s*[:：\-—]?\s*(.*)$",
+    r"(?m)^[ \t]*(?:#{1,4}[ \t]*)?(第[一二三四五六七八九十百\d]+[集章]|Episode[ \t]*\d+|EP[ \t]*\d+)[ \t]*[:：\-—]?[ \t]*([^\n]*)$",
     re.IGNORECASE,
 )
 
@@ -1125,7 +1125,9 @@ def _episode_chunks(raw: str, *, source_refs: list[str] | None = None) -> list[d
         if not body:
             continue
         ref = refs[min(i, len(refs) - 1)] if refs else f"source:episode_{i + 1:02d}"
-        chunks.append({"title": title_suffix or f"Episode {i + 1}", "body": body, "source_refs": [ref]})
+        chunks.append(
+            {"title": title_suffix or f"Episode {i + 1}", "body": body, "source_refs": [ref]}
+        )
     return chunks or [{"title": "Episode 1", "body": text, "source_refs": list(source_refs or [])}]
 
 
@@ -1890,12 +1892,18 @@ def build_planned_graph(
         ep_norm.update(
             {
                 "title": str(ep_chunk.get("title") or f"Episode {episode_number}"),
-                "logline": _clip_nar(str(ep_chunk.get("body") or normalized.get("logline") or ""), 80),
-                "raw_excerpt": str(ep_chunk.get("body") or normalized.get("raw_excerpt") or "")[:2000],
+                "logline": _clip_nar(
+                    str(ep_chunk.get("body") or normalized.get("logline") or ""), 80
+                ),
+                "raw_excerpt": str(ep_chunk.get("body") or normalized.get("raw_excerpt") or "")[
+                    :2000
+                ],
                 "scene_chunks": _scene_chunks(str(ep_chunk.get("body") or "")),
             }
         )
-        episode = structure_episode(ep_norm, target_duration=target_duration, episode_number=episode_number)
+        episode = structure_episode(
+            ep_norm, target_duration=target_duration, episode_number=episode_number
+        )
         scenes = segment_scenes(ep_norm, episode)
         total = float(episode["targetDuration"])
         weights = [max(1, len(str(sc.get("body") or ""))) for sc in scenes]
@@ -2015,7 +2023,8 @@ def build_planned_graph(
             "targetFps": 30,
             "root": root_s,
         },
-        "episodes": episode_outs or [structure_episode(normalized, target_duration=target_duration)],
+        "episodes": episode_outs
+        or [structure_episode(normalized, target_duration=target_duration)],
         "story": _draft_story_contract(normalized),
         "characters": characters,
         "locations": locations,
@@ -2054,22 +2063,33 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
         first_beat = beats[0]
         first_shot = shots[0]
         mid_beat = beats[min(max(1, len(beats) // 2), len(beats) - 1)]
-        mid_shots = [sh for sh in mid_beat.get("shots") or [] if isinstance(sh, dict)] or [first_shot]
+        mid_shots = [sh for sh in mid_beat.get("shots") or [] if isinstance(sh, dict)] or [
+            first_shot
+        ]
         last_beat = beats[-1]
         last_shot = shots[-1]
         point_id = f"{ep_id}_point_01"
         next_ep = episodes[index + 1].get("id") if index + 1 < len(episodes) else None
         status = "planted" if next_ep else "season_hook"
+        point_question = str(mid_beat.get("audience_question") or "").strip()
+        if not point_question or point_question == AUTHORING_PLACEHOLDER:
+            point_question = "这个变化接下来会带来什么后果？"
         point = {
             "point_id": point_id,
             "point_type": "custom",
             "introduced_episode": ep_id,
             "introduced_beat_id": str(mid_beat.get("id") or ""),
             "introduced_shot_ids": [str(sh.get("id")) for sh in mid_shots if sh.get("id")],
-            "visible_evidence": str(mid_shots[0].get("must_show") or mid_beat.get("objective") or "新线索进入画面"),
-            "audience_question": f"{str(mid_beat.get('audience_question') or '').strip() or '这个变化接下来会带来什么后果？'}",
-            "planned_payoff_episode": int(str(next_ep).removeprefix("ep")) if next_ep else int(str(ep_id).removeprefix("ep")),
-            "payoff_condition": "下一集必须回应该线索并改变人物或局势" if next_ep else "本季结束时明确回收或声明下一季承诺",
+            "visible_evidence": str(
+                mid_shots[0].get("must_show") or mid_beat.get("objective") or "新线索进入画面"
+            ),
+            "audience_question": point_question,
+            "planned_payoff_episode": int(str(next_ep).removeprefix("ep"))
+            if next_ep
+            else int(str(ep_id).removeprefix("ep")),
+            "payoff_condition": "下一集必须回应该线索并改变人物或局势"
+            if next_ep
+            else "本季结束时明确回收或声明下一季承诺",
             "status": status,
             "source_refs": [source_refs[min(index, len(source_refs) - 1)]],
         }
@@ -2079,7 +2099,9 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
             "point_id": point_id,
             "beat_id": str(first_beat.get("id") or ""),
             "shot_ids": [str(first_shot.get("id") or "")],
-            "question": str(ep.get("openingHook") or first_beat.get("objective") or "观众必须立刻知道发生了什么"),
+            "question": str(
+                ep.get("openingHook") or first_beat.get("objective") or "观众必须立刻知道发生了什么"
+            ),
         }
         ep["mid_episode_points"] = [point_id]
         ep["ending_hook"] = {
@@ -2108,7 +2130,11 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
                         previous_point["payoff_evidence"] = {
                             "episode": ep_id,
                             "shot_ids": [str(first_shot.get("id") or "")],
-                            "visible_change": str(first_shot.get("visible_change") or first_shot.get("must_show") or "回应上一集钩子"),
+                            "visible_change": str(
+                                first_shot.get("visible_change")
+                                or first_shot.get("must_show")
+                                or "回应上一集钩子"
+                            ),
                         }
                         break
 
@@ -2118,7 +2144,9 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
         "payoff_window_episodes": 3,
         "require_plan_evidence": True,
         "require_executed_evidence": True,
-        "season_end_mode": "season_hook" if episodes and any(p.get("status") == "season_hook" for p in points) else "closed",
+        "season_end_mode": "season_hook"
+        if episodes and any(p.get("status") == "season_hook" for p in points)
+        else "closed",
     }
 
 
@@ -2198,84 +2226,86 @@ def project_graph_to_film_spec(
         cast_ids = ["hero"]
 
     scenes_fs: list[dict[str, Any]] = []
-    for sc in ep.get("scenes") or []:
-        if not isinstance(sc, dict):
+    for ep_item in graph.get("episodes") or []:
+        if not isinstance(ep_item, dict):
             continue
-        shots_fs: list[dict[str, Any]] = []
-        for bt in sc.get("beats") or []:
-            if not isinstance(bt, dict):
+        for sc in ep_item.get("scenes") or []:
+            if not isinstance(sc, dict):
                 continue
-            for sh in bt.get("shots") or []:
-                if not isinstance(sh, dict):
+            shots_fs: list[dict[str, Any]] = []
+            for bt in sc.get("beats") or []:
+                if not isinstance(bt, dict):
                     continue
-                film = sh.get("_film") if isinstance(sh.get("_film"), dict) else {}
-                dsl = film.get("dsl") if isinstance(film.get("dsl"), dict) else {}
-                if not dsl:
-                    dsl = {
-                        "subject": "vertical 9:16 subject",
-                        # nar is audio text, never an automatic instruction for
-                        # character movement.  Author a visible action separately.
-                        "action": sh.get("must_show") or "needs_authoring",
-                        "motion": sh.get("cameraMovement") or "dolly_in",
-                        "camera_axis": sh.get("cameraMovement") or "dolly_in",
-                        "visible_change": sh.get("visible_change") or "needs_authoring",
-                        "story_beat": sh.get("narrativePurpose") or "",
-                        "chain_mode": sh.get("chainMode") or "continue",
-                        "cast": sh.get("characterIds") or cast_ids[:1],
+                for sh in bt.get("shots") or []:
+                    if not isinstance(sh, dict):
+                        continue
+                    film = sh.get("_film") if isinstance(sh.get("_film"), dict) else {}
+                    dsl = film.get("dsl") if isinstance(film.get("dsl"), dict) else {}
+                    if not dsl:
+                        dsl = {
+                            "subject": "vertical 9:16 subject",
+                            "action": sh.get("must_show") or "needs_authoring",
+                            "motion": sh.get("cameraMovement") or "dolly_in",
+                            "camera_axis": sh.get("cameraMovement") or "dolly_in",
+                            "visible_change": sh.get("visible_change") or "needs_authoring",
+                            "story_beat": sh.get("narrativePurpose") or "",
+                            "chain_mode": sh.get("chainMode") or "continue",
+                            "cast": sh.get("characterIds") or cast_ids[:1],
+                        }
+                    shot_obj: dict[str, Any] = {
+                        "id": sh.get("id") or sh.get("filmSpecShotId"),
+                        "title": film.get("title") or sh.get("narrativePurpose") or sh.get("id"),
+                        "shot_role": film.get("shot_role") or "hero",
+                        "dramatic_function": film.get("dramatic_function")
+                        or sh.get("dramaticFunction")
+                        or "action",
+                        "duration_sec": float(
+                            film.get("duration_sec") or sh.get("targetDuration") or 5
+                        ),
+                        "nar": film.get("nar") or sh.get("nar") or "……",
+                        "beat_id": film.get("beat_id") or sh.get("beatId"),
+                        "coverage_role": sh.get("coverage_role") or "",
+                        "must_show": sh.get("must_show") or "",
+                        "visible_change": sh.get("visible_change") or "",
+                        "start_state": sh.get("start_state") or "",
+                        "end_state": sh.get("end_state") or "",
+                        "playable_action": sh.get("playable_action") or "",
+                        "expectation": sh.get("expectation") or "",
+                        "subtext": sh.get("subtext") or "",
+                        "gaze_target": sh.get("gaze_target") or "",
+                        "reaction_trigger": sh.get("reaction_trigger") or "",
+                        "body_state": sh.get("body_state") or "",
+                        "source_refs": list(sh.get("source_refs") or []),
+                        "production_mode": sh.get("productionMode"),
+                        "vertical_composition": sh.get("verticalComposition"),
+                        "lipsync": False,
+                        "dsl": dsl,
                     }
-                shot_obj: dict[str, Any] = {
-                    "id": sh.get("id") or sh.get("filmSpecShotId"),
-                    "title": film.get("title") or sh.get("narrativePurpose") or sh.get("id"),
-                    "shot_role": film.get("shot_role") or "hero",
-                    "dramatic_function": film.get("dramatic_function")
-                    or sh.get("dramaticFunction")
-                    or "action",
-                    "duration_sec": float(
-                        film.get("duration_sec") or sh.get("targetDuration") or 5
-                    ),
-                    "nar": film.get("nar") or sh.get("nar") or "……",
-                    "beat_id": film.get("beat_id") or sh.get("beatId"),
-                    "coverage_role": sh.get("coverage_role") or "",
-                    "must_show": sh.get("must_show") or "",
-                    "visible_change": sh.get("visible_change") or "",
-                    "start_state": sh.get("start_state") or "",
-                    "end_state": sh.get("end_state") or "",
-                    "playable_action": sh.get("playable_action") or "",
-                    "expectation": sh.get("expectation") or "",
-                    "subtext": sh.get("subtext") or "",
-                    "gaze_target": sh.get("gaze_target") or "",
-                    "reaction_trigger": sh.get("reaction_trigger") or "",
-                    "body_state": sh.get("body_state") or "",
-                    "source_refs": list(sh.get("source_refs") or []),
-                    "production_mode": sh.get("productionMode"),
-                    "vertical_composition": sh.get("verticalComposition"),
-                    "lipsync": False,
-                    "dsl": dsl,
+                    hp = film.get("heat_phase") or sh.get("heatPhase")
+                    if hp:
+                        shot_obj["heat_phase"] = hp
+                    cb = film.get("coitus_beat") or sh.get("coitusBeat")
+                    if cb:
+                        shot_obj["coitus_beat"] = cb
+                    sp = film.get("sex_pose") or sh.get("sexPose")
+                    if sp:
+                        shot_obj["sex_pose"] = sp
+                        if not dsl.get("sex_pose"):
+                            dsl["sex_pose"] = sp
+                    ws = film.get("wardrobe_state") or sh.get("wardrobeState")
+                    if ws:
+                        shot_obj["wardrobe_state"] = ws
+                        if not dsl.get("wardrobe_state"):
+                            dsl["wardrobe_state"] = ws
+                    shots_fs.append(shot_obj)
+            scenes_fs.append(
+                {
+                    "episode_id": ep_item.get("id"),
+                    "title": sc.get("title") or "Scene",
+                    "summary": sc.get("synopsis") or "",
+                    "shots": shots_fs,
                 }
-                hp = film.get("heat_phase") or sh.get("heatPhase")
-                if hp:
-                    shot_obj["heat_phase"] = hp
-                cb = film.get("coitus_beat") or sh.get("coitusBeat")
-                if cb:
-                    shot_obj["coitus_beat"] = cb
-                sp = film.get("sex_pose") or sh.get("sexPose")
-                if sp:
-                    shot_obj["sex_pose"] = sp
-                    if isinstance(dsl, dict) and not dsl.get("sex_pose"):
-                        dsl["sex_pose"] = sp
-                ws = film.get("wardrobe_state") or sh.get("wardrobeState")
-                if ws:
-                    shot_obj["wardrobe_state"] = ws
-                    if isinstance(dsl, dict) and not dsl.get("wardrobe_state"):
-                        dsl["wardrobe_state"] = ws
-                shots_fs.append(shot_obj)
-        scenes_fs.append(
-            {
-                "title": sc.get("title") or "Scene",
-                "summary": sc.get("synopsis") or "",
-                "shots": shots_fs,
-            }
-        )
+            )
 
     story = graph.get("story") if isinstance(graph.get("story"), dict) else {}
     emotional = [str(x) for x in (story.get("emotional_arc") or []) if str(x).strip()]
