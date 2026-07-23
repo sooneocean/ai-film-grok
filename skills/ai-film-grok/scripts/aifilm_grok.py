@@ -410,7 +410,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         )
     if log_mode is not None and log_mode & 0o077:
         environment_warnings.append(
-            f"Grok unified log is readable beyond the owner (mode {oct(log_mode)})"
+            f"Grok unified log is readable beyond the owner (mode {oct(log_mode)}); "
+            f"fix: chmod 600 {grok_log}"
         )
     if config_env_mode is not None and config_env_mode & 0o077:
         environment_warnings.append(
