@@ -11,6 +11,7 @@ sys.path.insert(
 )
 
 from dailies import dailies_status, update_dailies
+from delivery_package import build_delivery_package
 from post_quality import (
     audio_delivery_gate,
     premium_master_qc,
@@ -88,3 +89,10 @@ def test_premium_master_qc_requires_caption_vfx_audio(tmp_path: Path) -> None:
     assert report["ok"] is False
     codes = {item["code"] for item in report["blockers"]}
     assert "CAPTION_BURN_MISSING" in codes
+
+
+def test_delivery_package_records_hash_bound_contract(tmp_path: Path) -> None:
+    report = build_delivery_package(tmp_path, allow_missing=True)
+    assert report["ok"] is True
+    assert report["kind"] == "premium-delivery-package"
+    assert (tmp_path / "receipts" / "premium-delivery-package.json").is_file()

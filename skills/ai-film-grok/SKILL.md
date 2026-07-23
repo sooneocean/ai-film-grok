@@ -36,6 +36,8 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 
 **premium_vertical 质量档（v1.24）**：`director init --quality-target premium_vertical` 启用高质量竖屏创作门禁；缺少 authored beats、shot performance、Director Board 或摄影意图时，`preflight` 会在 Pilot/付费生成前 fail closed。旧项目默认 `standard`，不会被静默升级。
 
+**premium production gates（v1.25）**：premium 项目还必须通过 `creative-pipeline readiness`（Radio Cut + Animatic）、真实 `provider-canary record`、逐镜 `dailies record`、`post-quality vfx-check/audio-check/master-qc` 与 `delivery-package`。这些回执均绑定当前文件 hash；缺证据时系统阻断，不把 mock、外挂字幕或 advisory 误报成 Master 完成。
+
 ```text
 【工序八环】Idea → Story → Beats → Shots → Media → Selects → (Cut) → Rough → Verified MP4
 【工具】Agent → 1视觉 → 2语音 → 3设计(HF) → 4FFmpeg → 交付
