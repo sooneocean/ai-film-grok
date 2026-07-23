@@ -416,6 +416,32 @@
       "tags": ["narrative", "qa"],
       "phases": ["3"],
       "cli": { "run": "aifilm plan validate --root --strict", "validate": "aifilm plan validate --root --strict" }
+    },
+    {
+      "id": "director.control",
+      "version": "1.0.0",
+      "summary": "Manage Production Book rigor, stages, approvals, impact, and rebuilds",
+      "status": "implemented",
+      "produces": ["ProductionBook", "ImpactReport"],
+      "dependsOnAssets": ["FilmSpec"],
+      "capabilities": ["control", "approval", "invalidation"],
+      "providers": ["local"],
+      "tags": ["director", "agent", "qa"],
+      "phases": ["0", "1", "2", "3", "4", "5", "6", "7"],
+      "cli": { "run": "aifilm director status --root", "validate": "aifilm director check --root" }
+    },
+    {
+      "id": "department.manage",
+      "version": "1.0.0",
+      "summary": "Read, edit, compare, validate, and human-lock department bibles",
+      "status": "implemented",
+      "produces": ["DepartmentBible", "DepartmentReceipt"],
+      "dependsOnAssets": ["ProductionBook"],
+      "capabilities": ["control", "atomic-edit", "approval"],
+      "providers": ["local"],
+      "tags": ["department", "agent", "consistency"],
+      "phases": ["1", "2", "3", "4", "5", "6", "7"],
+      "cli": { "run": "aifilm department list --root", "validate": "aifilm department validate --root --id visual" }
     }
   ]
 }

@@ -2123,6 +2123,11 @@ def project_graph_to_film_spec(
         "climax_choice": story.get("climax_choice") or "",
         "ending_hook": story.get("ending_hook") or "",
     }
+    # P0-2: project act_structure + pace_chart from story contract
+    if story.get("act_structure") and not di.get("act_structure"):
+        di["act_structure"] = story["act_structure"]
+    if story.get("pace_chart") and not di.get("pace_chart"):
+        di["pace_chart"] = story["pace_chart"]
     if heat.get("audience_profile"):
         di["audience_profile"] = heat["audience_profile"]
         di["audience"] = di.get("audience") or "重口男向短片观众"

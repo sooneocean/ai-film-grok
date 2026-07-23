@@ -2285,8 +2285,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
 
     def _apply_spotting_and_convert_to_stereo(
         float_bed: np.ndarray,
-    ) -> tuple[np.ndarray, dict[str, Any]]:
-        """mute/duck + sfx_accent overlay on float bed (upmixes mono to stereo)."""
+    ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+        """mute/duck on bgm bed, sfx_accent on sfx bed (upmixes mono to stereo)."""
         spotting: dict[str, Any]
         try:
             spotting = expand_sound_events(
@@ -2299,23 +2299,26 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         events = spotting.get("applied_events") or []
 
         if float_bed.ndim == 1:
-            out = np.column_stack((float_bed, float_bed))
+            bgm_out = np.column_stack((float_bed, float_bed))
         elif float_bed.ndim == 2 and float_bed.shape[1] == 1:
-            out = np.column_stack((float_bed[:, 0], float_bed[:, 0]))
+            bgm_out = np.column_stack((float_bed[:, 0], float_bed[:, 0]))
         else:
-            out = float_bed.copy()
+            bgm_out = float_bed.copy()
+
+        sfx_out = np.zeros_like(bgm_out)
 
         if events:
-            out = apply_mute_windows_to_samples(out, sr=SR, events=events)
-            out = apply_sfx_accents_to_samples(out, sr=SR, events=events, level=0.55)
-            out = np.clip(out, -1.0, 1.0)
+            bgm_out = apply_mute_windows_to_samples(bgm_out, sr=SR, events=events)
+            sfx_out = apply_sfx_accents_to_samples(sfx_out, sr=SR, events=events, level=0.55)
+            bgm_out = np.clip(bgm_out, -1.0, 1.0)
+            sfx_out = np.clip(sfx_out, -1.0, 1.0)
             spotting["sfx_overlay_count"] = sum(
                 1 for e in events if e.get("type") == "sfx_accent" and e.get("overlay_applied")
             )
         else:
             spotting["sfx_overlay_count"] = 0
         spotting["bed_source"] = spotting.get("bed_source") or "unknown"
-        return out, spotting
+        return bgm_out, sfx_out, spotting
 
     # Anti-fatigue seed first (pool pick + procedural style share it)
     plan_mood = (sound_plan or {}).get("mood") if sound_plan else None
@@ -2415,22 +2418,22 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         with wave.open(str(mono_tmp), "rb") as handle:
             frames = handle.readframes(handle.getnframes())
             user_i16 = np.frombuffer(frames, dtype=np.int16).astype(np.float64) / 32767.0
-        user_f, spotting_only = _apply_spotting_and_convert_to_stereo(user_i16)
+        user_f, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(user_i16)
         # keep multi-track voice metadata (not wiped by bed spotting)
         mix_spotting = {**mix_spotting, **spotting_only}
         mix_spotting["mood"] = (sound_plan or {}).get("mood", mood) if sound_plan else mood
         mix_spotting["bed_source"] = str(music_resolved.get("source") or "user_music_file")
         mix_spotting["music_seed"] = music_seed
-        mix_spotting["note"] = (
-            "user/external music — mute/duck/sfx_accent on bed before VO sidechain"
-        )
+        mix_spotting["note"] = "user/external music — mute/duck on bgm, sfx separated"
         if sound_plan and sound_plan.get("bed") is False:
             user_f = np.zeros_like(user_f)
             mix_spotting["bed_applied"] = False
         else:
             mix_spotting["bed_applied"] = True
         stereo = work / "bgm_stereo.wav"
+        sfx_stereo_path = work / "sfx_stereo.wav"
         write_wav_stereo(stereo, (np.clip(user_f, -1.0, 1.0) * 32767.0).astype(np.int16))
+        write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
         music_path = stereo
     else:
         license_note = "original generative numpy score (ai-film-grok procedural v3 multi-style, no third-party samples)"
@@ -2464,7 +2467,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             mood_timeline=(sound_plan or {}).get("mood_timeline"),
         )
         float_bed = samples.astype(np.float64) / 32767.0
-        float_bed, spotting_only = _apply_spotting_and_convert_to_stereo(float_bed)
+        float_bed, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(float_bed)
         mix_spotting = {**mix_spotting, **spotting_only}
         mix_spotting["bed_source"] = "procedural"
         mix_spotting["music_seed"] = music_seed
@@ -2485,7 +2488,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         else:
             mix_spotting["bed_applied"] = True
         stereo = work / "bgm_stereo.wav"
+        sfx_stereo_path = work / "sfx_stereo.wav"
         write_wav_stereo(stereo, (np.clip(float_bed, -1.0, 1.0) * 32767.0).astype(np.int16))
+        write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
         music_path = stereo
 
     # 7) Dual-track mix: VO primary + BGM always audible (两条音轨)
@@ -2529,59 +2534,67 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     mix_spotting["sidechain"] = sidechain
     sc_frag = sidechain_filter_fragment(sidechain)
     filters_help = run(["ffmpeg", "-filters"], check=False).stdout
-    # Default 3-input: 0=nar 1=bgm 2=native. Color (娇喘) only when stems exist.
+
+    try:
+        from acoustic_policy import resolve_acoustic_space
+
+        v_motifs = (spec.get("director_intent") or {}).get("visual_motifs") or []
+        loc_tags = [str(x) for x in v_motifs]
+        ac = resolve_acoustic_space(loc_tags)
+        sfx_dsp = f"highpass=f={ac['highpass']},lowpass=f={ac['lowpass']},aecho=1.0:1.0:{ac['reverb_time'] * 1000}:{ac['wet_level']}"
+    except Exception:
+        sfx_dsp = "anull"
+    mix_spotting["sfx_dsp_applied"] = sfx_dsp
+
     use_color = color_track is not None and Path(str(color_track)).is_file()
     color_in_gain = 1.0  # per-stem gain already applied in build_vocal_color_track
-    if use_color and "sidechaincompress" in filters_help:
-        fc = (
-            f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];"
-            f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[mus];"
-            f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[native];"
-            f"[3:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[color];"
-            f"[mus][native]amix=inputs=2:duration=first:normalize=0[bed];"
-            f"[bed][narr]{sc_frag}[ducked];"
-            f"[narr][ducked][color]amix=inputs=3:duration=first:normalize=0,"
-            f"aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
-            f"alimiter=limit=0.95[aout]"
+
+    fc_parts = [
+        f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr]",
+        f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[mus]",
+        f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[native]",
+        f"[3:a]volume=1.0,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,{sfx_dsp}[sfx]",
+    ]
+    if use_color:
+        fc_parts.append(
+            f"[4:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[color]"
         )
-        mix_spotting["sidechain_applied"] = True
-        mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "vocal_color"]
-    elif use_color:
-        fc = (
-            f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];"
-            f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[mus];"
-            f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[native];"
-            f"[3:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[color];"
-            f"[narr][mus][native][color]amix=inputs=4:duration=first:normalize=0,"
-            f"aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
-            f"alimiter=limit=0.95[aout]"
+
+    if "sidechaincompress" in filters_help and "acrossover" in filters_help:
+        fc_parts.append("[mus]acrossover=split=300 4000[mus_l][mus_m][mus_h]")
+        fc_parts.append("[narr]asplit[narr_main][narr_sc]")
+        fc_parts.append(f"[mus_m][narr_sc]{sc_frag}[mus_m_ducked]")
+        fc_parts.append(
+            "[mus_l][mus_m_ducked][mus_h]amix=inputs=3:duration=longest:normalize=0[mus_ducked]"
         )
-        mix_spotting["sidechain_applied"] = False
-        mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "vocal_color"]
+        fc_parts.append("[mus_ducked][native][sfx]amix=inputs=3:duration=longest:normalize=0[bed]")
+        final_amix_count = 2 + (1 if use_color else 0)
+        color_in = "[color]" if use_color else ""
+        fc_parts.append(
+            f"[narr_main][bed]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
+        )
+        mix_spotting["sidechain_applied"] = "dynamic_eq"
     elif "sidechaincompress" in filters_help:
-        fc = (
-            f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];"
-            f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[mus];"
-            f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[native];"
-            f"[mus][native]amix=inputs=2:duration=first:normalize=0[bed];"
-            f"[bed][narr]{sc_frag}[ducked];"
-            f"[narr][ducked]amix=inputs=2:duration=first:normalize=0,"
-            f"aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
-            f"alimiter=limit=0.95[aout]"
+        fc_parts.append("[mus][native][sfx]amix=inputs=3:duration=longest:normalize=0[bed]")
+        fc_parts.append(f"[bed][narr]{sc_frag}[ducked]")
+        final_amix_count = 2 + (1 if use_color else 0)
+        color_in = "[color]" if use_color else ""
+        fc_parts.append(
+            f"[narr][ducked]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
         )
-        mix_spotting["sidechain_applied"] = True
-        mix_spotting["mix_inputs"] = ["narration", "bgm", "native"]
+        mix_spotting["sidechain_applied"] = "broadband"
     else:
-        fc = (
-            f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];"
-            f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[mus];"
-            f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[native];"
-            f"[narr][mus][native]amix=inputs=3:duration=first:normalize=0,"
-            f"aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
-            f"alimiter=limit=0.95[aout]"
+        final_amix_count = 4 + (1 if use_color else 0)
+        color_in = "[color]" if use_color else ""
+        fc_parts.append(
+            f"[narr][mus][native][sfx]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
         )
         mix_spotting["sidechain_applied"] = False
-        mix_spotting["mix_inputs"] = ["narration", "bgm", "native"]
+
+    fc = ";".join(fc_parts)
+    mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "sfx"] + (
+        ["vocal_color"] if use_color else []
+    )
 
     try:
         mix_report_path = safe_output_path(
@@ -2604,6 +2617,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         str(music_path),
         "-i",
         str(native_track),
+        "-i",
+        str(sfx_stereo_path),
     ]
     if use_color:
         mix_cmd.extend(["-i", str(color_track)])
@@ -3077,6 +3092,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--width", type=int)
     p.add_argument("--height", type=int)
+    p.add_argument(
+        "--export-stems",
+        action="store_true",
+        help="Export isolated VO, BGM, and SFX stems",
+    )
     p.add_argument("--fps", type=int)
     args = p.parse_args(argv)
     try:

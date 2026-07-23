@@ -24,7 +24,7 @@
     "scripts/media-queue": "da195a2746cf766603bca02d970ff22679a4481d3f245bb0ce28538210bf2ae0",
     "scripts/media_queue.py": "b764cab43e9246936d92728fc2ef5da9f0c29e90ebca01f04683475fcd9adeb1",
     "scripts/production_gates.py": "5ecd4e232d403ca53883f61f218223d5c44fb48fa3e2f0c605c92fc340037aed",
-    "scripts/render_final.py": "ce079d08bc0ac753f748c86abdefdc1837a1220973293ec7adc2bdb25fc4d166",
+    "scripts/render_final.py": "b7a5e5c26a8512a82ed7859ed88ae3e6b240b862a7b2039177dfd7554ff2d1ae",
     "scripts/runtime_policy.py": "05b7f15166f47df725d41fc23b65fbef4bedf811b2aa2329a04019fa0cc7e94b",
     "scripts/security_policy.py": "a25d5c352f263b2c5e8037309dc0cafec50e515f9277591f3b169993b49be1e8",
     "scripts/tts_backend.py": "cbec30603e4ceac8b3b78a5fc97f919a0d3045dfd2edb176f693df37fdc09542",
