@@ -33,6 +33,18 @@ CODE_CHARACTER_STATE_REGRESSION = "CHARACTER_STATE_REGRESSION"
 CODE_POSE_MONOTONY = "POSE_MONOTONY"
 CODE_SIZE_MONOTONY = "SIZE_MONOTONY"
 CODE_GAZE_MISALIGNMENT = "GAZE_MISALIGNMENT"
+# P2-2: cross-shot wardrobe/hair/makeup consistency
+CODE_WARDROBE_DRIFT = "WARDROBE_DRIFT"
+CODE_HAIR_DRIFT = "HAIR_DRIFT"
+CODE_MAKEUP_DRIFT = "MAKEUP_DRIFT"
+# P2-3: scene light/temperature continuity
+CODE_SCENE_LIGHT_DRIFT = "SCENE_LIGHT_DRIFT"
+# P2-4: camera rhythm flatness (whole group, not just 3-shot)
+CODE_CAMERA_RHYTHM_FLAT = "CAMERA_RHYTHM_FLAT"
+# P2-5: lipsync quality drift
+CODE_LIPSYNC_DRIFT = "LIPSYNC_DRIFT"
+# P2-6: voice↔character binding mismatch
+CODE_VOICE_CHARACTER_MISMATCH = "VOICE_CHARACTER_MISMATCH"
 CODE_AXIS_JUMP = "AXIS_JUMP"
 
 # Micro-motion fillers — allowed as support, not as sole motion for hook/approach/action
@@ -1083,7 +1095,184 @@ def lint_continuity(
     }
 
 
-def assert_continuity_or_raise(
+def lint_production_consistency(
+    shots: list[dict[str, Any]],
+    *,
+    bible: dict[str, Any] | None = None,
+    spec: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """P2-2~P2-6: Production-period consistency lints.
+
+    Checks:
+    - P2-2: wardrobe/hair/makeup drift across shots for same character
+    - P2-3: scene light/temperature drift (same locationId, different lighting)
+    - P2-4: camera rhythm flatness (whole group, not just 3-shot)
+    - P2-5: lipsync quality drift (shots with lipsync but no quality metric)
+    - P2-6: voice↔character binding mismatch (same character, different vo_voice)
+    """
+    issues: list[dict[str, Any]] = []
+    b = bible or {}
+    _ = spec or {}  # reserved for future spec-driven checks
+
+    # P2-2: wardrobe/hair/makeup drift
+    char_wardrobe_seen: dict[str, str] = {}
+    char_hair_seen: dict[str, str] = {}
+    char_makeup_seen: dict[str, str] = {}
+
+    cast_locks = b.get("cast_locks") or {}
+    hair_swatches = b.get("hair_swatches") or {}
+    makeup = b.get("makeup") or {}
+
+    for sh in shots:
+        sid = str(sh.get("id") or "?")
+        dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+        cast = dsl.get("cast") or sh.get("heroine_ids") or []
+        if not isinstance(cast, list):
+            cast = [cast]
+
+        w_state = str(sh.get("wardrobe_state") or dsl.get("wardrobe_state") or "").strip()
+
+        for cid in cast:
+            cid_s = str(cid)
+            # Wardrobe drift: same character in full state should have same wardrobe
+            if w_state and w_state in {"full", "default"}:
+                wv = b.get("wardrobe_variants", {}).get(cid_s, {}).get(w_state, "")
+                if wv and cid_s in char_wardrobe_seen:
+                    if char_wardrobe_seen[cid_s] != wv:
+                        issues.append(
+                            {
+                                "code": CODE_WARDROBE_DRIFT,
+                                "severity": "warning",
+                                "message": f"wardrobe drift: {cid_s} wardrobe changed between shots (was={char_wardrobe_seen[cid_s][:40]}, now={wv[:40]})",
+                                "shot_ids": [sid],
+                            }
+                        )
+                elif wv:
+                    char_wardrobe_seen[cid_s] = wv
+
+            # Hair drift: check if hair_lock/swatch is consistent
+            cl = cast_locks.get(cid_s, {}) if isinstance(cast_locks, dict) else {}
+            hair_lock = cl.get("hair_lock") if isinstance(cl, dict) else ""
+            if not hair_lock:
+                sw = hair_swatches.get(cid_s, {}) if isinstance(hair_swatches, dict) else {}
+                hair_lock = sw.get("color_name", "") if isinstance(sw, dict) else ""
+            if hair_lock and cid_s in char_hair_seen:
+                if char_hair_seen[cid_s] != hair_lock:
+                    issues.append(
+                        {
+                            "code": CODE_HAIR_DRIFT,
+                            "severity": "warning",
+                            "message": f"hair drift: {cid_s} hair lock changed between shots",
+                            "shot_ids": [sid],
+                        }
+                    )
+            elif hair_lock:
+                char_hair_seen[cid_s] = hair_lock
+
+            # Makeup drift
+            mu = makeup.get(cid_s, {}) if isinstance(makeup, dict) else {}
+            makeup_lock = cl.get("makeup_lock") if isinstance(cl, dict) else ""
+            if not makeup_lock:
+                makeup_lock = mu.get("lock_tokens", "") if isinstance(mu, dict) else ""
+            if makeup_lock and cid_s in char_makeup_seen:
+                if char_makeup_seen[cid_s] != makeup_lock:
+                    issues.append(
+                        {
+                            "code": CODE_MAKEUP_DRIFT,
+                            "severity": "warning",
+                            "message": f"makeup drift: {cid_s} makeup changed between shots",
+                            "shot_ids": [sid],
+                        }
+                    )
+            elif makeup_lock:
+                char_makeup_seen[cid_s] = makeup_lock
+
+    # P2-3: scene light drift — same locationId, different lighting
+    loc_light_seen: dict[str, str] = {}
+    for sh in shots:
+        sid = str(sh.get("id") or "?")
+        loc = str(sh.get("locationId") or (sh.get("dsl") or {}).get("location") or "").strip()
+        lighting = str(sh.get("lighting") or (sh.get("dsl") or {}).get("lighting") or "").strip()
+        if loc and lighting:
+            if loc in loc_light_seen and loc_light_seen[loc] != lighting:
+                issues.append(
+                    {
+                        "code": CODE_SCENE_LIGHT_DRIFT,
+                        "severity": "warning",
+                        "message": f"light drift: location {loc!r} lighting changed ({loc_light_seen[loc][:30]} → {lighting[:30]})",
+                        "shot_ids": [sid],
+                    }
+                )
+            else:
+                loc_light_seen[loc] = lighting
+
+    # P2-4: camera rhythm flatness — if ALL shots use same camera_axis
+    axes = []
+    for sh in shots:
+        dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+        ax = str(sh.get("camera_axis") or dsl.get("camera_axis") or "").strip()
+        if ax:
+            axes.append(ax)
+    if axes and len(set(axes)) == 1 and len(axes) >= 4:
+        issues.append(
+            {
+                "code": CODE_CAMERA_RHYTHM_FLAT,
+                "severity": "warning",
+                "message": f"all {len(axes)} shots use same camera_axis={axes[0]!r} — no rhythm variation",
+                "shot_ids": [],
+            }
+        )
+
+    # P2-5: lipsync quality drift — shots with lipsync but no quality metric
+    for sh in shots:
+        sid = str(sh.get("id") or "?")
+        if sh.get("lipsync") and not sh.get("lipsync_quality_score"):
+            issues.append(
+                {
+                    "code": CODE_LIPSYNC_DRIFT,
+                    "severity": "warning",
+                    "message": f"shot {sid} has lipsync=true but no lipsync_quality_score — quality unmeasured",
+                    "shot_ids": [sid],
+                }
+            )
+
+    # P2-6: voice↔character binding mismatch
+    char_voice_seen: dict[str, str] = {}
+    for sh in shots:
+        sid = str(sh.get("id") or "?")
+        dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+        cast = dsl.get("cast") or []
+        if not isinstance(cast, list):
+            cast = [cast]
+        shot_vo = str(sh.get("vo_voice") or dsl.get("vo_voice") or "").strip()
+        if shot_vo:
+            for cid in cast:
+                cid_s = str(cid)
+                if cid_s in char_voice_seen and char_voice_seen[cid_s] != shot_vo:
+                    issues.append(
+                        {
+                            "code": CODE_VOICE_CHARACTER_MISMATCH,
+                            "severity": "warning",
+                            "message": f"voice mismatch: {cid_s} uses different vo_voice across shots ({char_voice_seen[cid_s]} → {shot_vo})",
+                            "shot_ids": [sid],
+                        }
+                    )
+                else:
+                    char_voice_seen[cid_s] = shot_vo
+
+    codes = sorted({iss["code"] for iss in issues})
+    warning_count = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warning_count == 0,
+        "issues": issues,
+        "codes": codes,
+        "warning_count": warning_count,
+        "error_count": 0,
+        "note": "P2-2~P2-6: wardrobe/hair/makeup drift, scene light, camera rhythm, lipsync quality, voice binding. Soft by default.",
+    }
+
+
+def require_continuity(
     shots: list[dict[str, Any]],
     *,
     strict: bool = False,

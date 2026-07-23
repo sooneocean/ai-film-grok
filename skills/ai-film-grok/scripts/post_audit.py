@@ -556,6 +556,54 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
                 "message": "post-audit evidence hashes do not match current production files",
             }
         )
+
+    # P2-1: face identity drift check — verify cast masters have identity verification
+    bible_path = _first_file(root, "style-bible.json")
+    if bible_path:
+        bible = read_json(bible_path) or {}
+        cast_masters = bible.get("cast_masters") or {}
+        if isinstance(cast_masters, dict) and cast_masters:
+            identity_receipt_path = root / "receipts" / "face-identity.json"
+            if identity_receipt_path.is_file():
+                id_receipt = read_json(identity_receipt_path) or {}
+                verified = id_receipt.get("verified") if isinstance(id_receipt, dict) else False
+                if not verified:
+                    warnings.append(
+                        {
+                            "code": "FACE_IDENTITY_DRIFT",
+                            "message": "face-identity.json exists but not verified — cast master identity not pixel-confirmed",
+                        }
+                    )
+            else:
+                warnings.append(
+                    {
+                        "code": "FACE_IDENTITY_DRIFT",
+                        "message": f"cast_masters has {len(cast_masters)} character(s) but no face-identity.json receipt — pixel-level face lock not verified",
+                    }
+                )
+
+    # P3-1: color grade check — verify grade parameters exist when strict
+    spec_path = _first_file(root, "film-spec.json")
+    if spec_path:
+        spec = read_json(spec_path) or {}
+        grade = spec.get("grade") if isinstance(spec, dict) else None
+        grade_strict = bool(spec.get("color_grade_strict")) if isinstance(spec, dict) else False
+        if grade_strict:
+            if not isinstance(grade, dict) or not grade.get("color_temperature"):
+                hard.append(
+                    {
+                        "code": "COLOR_GRADE_MISSING",
+                        "message": "color_grade_strict is true but grade.color_temperature is missing — color grading not defined",
+                    }
+                )
+        elif not grade:
+            warnings.append(
+                {
+                    "code": "COLOR_GRADE_MISSING",
+                    "message": "no grade parameters in film-spec — color grading is unparameterized (from 0/10 baseline)",
+                }
+            )
+
     report = {
         "ok": True,
         "kind": "post-audit",

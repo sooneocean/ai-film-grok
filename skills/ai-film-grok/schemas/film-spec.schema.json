@@ -304,6 +304,20 @@
       "additionalProperties": true
     },
     "continuity_strict": { "type": "boolean" },
+    "grade": {
+      "type": "object",
+      "description": "P3-1: Color grading parameters. From 0/10 to parameterized. color_grade_strict: true → COLOR_GRADE_MISSING gate in post_audit.",
+      "properties": {
+        "lut_path": { "type": "string", "description": "Path to LUT file (.cube) for color grading" },
+        "color_temperature": { "type": "string", "description": "Target color temperature (warm/cool/neutral + Kelvin)" },
+        "saturation": { "type": "number", "minimum": 0, "maximum": 3, "description": "Saturation multiplier (1.0 = normal)" },
+        "contrast": { "type": "number", "minimum": 0, "maximum": 2, "description": "Contrast multiplier (1.0 = normal)" },
+        "brightness": { "type": "number", "minimum": 0, "maximum": 2, "description": "Brightness multiplier (1.0 = normal)" },
+        "skin_tone_protection": { "type": "boolean", "description": "If true, protect skin tones from grade drift" },
+        "gamma": { "type": "number", "minimum": 0.1, "maximum": 3, "description": "Gamma adjustment (1.0 = normal)" }
+      }
+    },
+    "color_grade_strict": { "type": "boolean", "description": "P3-1: If true, post_audit hard-fails when grade is missing or incomplete" },
     "vo_voice": { "type": "string", "minLength": 1 },
     "director_intent": {
       "type": "object",

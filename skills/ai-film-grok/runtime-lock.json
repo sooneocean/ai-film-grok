@@ -13,10 +13,10 @@
   },
   "scripts": {
     "scripts/aifilm": "97f131b75cd6954e6aed0c8a7a05387bd45499e110226dd13df8cb6af4f996e9",
-    "scripts/aifilm_grok.py": "935860c7765c7ca61744802a72694a498ce9a39e1095ba6f71c1cfd2a3e9a883",
+    "scripts/aifilm_grok.py": "41b351c124a1113105093dd3543b1a095cae360ddb3d1fc24afb66bb54d34656",
     "scripts/backend-lock": "60b86b253cb393b587af4ca6e63a2403daa42b515f7501fffe407e2b8e257f25",
     "scripts/backend_lock.py": "ce829087a062bba9a217a5a90cec3573dbdf1417e72c5f7a669df45a57dab730",
-    "scripts/edit_policy.py": "67754ee29d6afba212faa82d30f532bb359bf9bcac266fd6e9fcac60d1475579",
+    "scripts/edit_policy.py": "bcd832142bcea0ed06c0ede01c4a2fe31ba19c76016a0b0a9257928cfebfd48a",
     "scripts/film_spec.py": "633531ab6326339707567b4a536b112d5391bc7481a3b4378f4bcc09c9e4a119",
     "scripts/lipsync_backend.py": "afccdbd52c3720b46533ec8243d3e3aab727eb286505d9260ca024a1b2632a63",
     "scripts/make_sfx_bed.py": "a007a92f091b2e53ff74035ee002dcfdc5a00df19ca2fe24356cafb8815a295e",

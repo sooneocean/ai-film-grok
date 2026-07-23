@@ -25,8 +25,9 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 **专业导演系统（v1.15）**：创作判断不再只存在 Prompt。`production-book.json` 总控 Graph、Visual/Audio/Post Bible、版本锁、审批 ledger、精准 stale 传播、Dailies/Selects、Picture Lock 与 Master Gate；模型评分永远只作 advisory。见 [professional-director-system.md](references/professional-director-system.md)。
 
 ```text
-【工序八环】Idea → Story → Beats → Shots → Media → Selects → Rough → Verified MP4
+【工序八环】Idea → Story → Beats → Shots → Media → Selects → (Cut) → Rough → Verified MP4
 【工具】Agent → 1视觉 → 2语音 → 3设计(HF) → 4FFmpeg → 交付
+【四工具闭环】Seedance(运镜) → I2V(Grok/Seedance) → video-use(剪辑) → HF/Remotion(设计后期)
 【六动词】Define → Structure → Visualize → Generate → Select → Edit
 【自动调配】每回合优先 aifilm dispatch --root <film> → 执行 next_action（兼容 next_cmd）
 ```
@@ -35,6 +36,9 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 剪辑与字幕细则：[lessons-2026-07-20-cut-silk-bilingual.md](references/lessons-2026-07-20-cut-silk-bilingual.md) · [lessons-2026-07-20-transition-motion-v2.md](references/lessons-2026-07-20-transition-motion-v2.md) · [lessons-2026-07-20-title-double-burn.md](references/lessons-2026-07-20-title-double-burn.md)
 FRW 降级路线：[frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)；Seedance 为恢复路径，不是 first-last-frame 默认流程：`frw_video_model=seedance-2-fast-i2v`、`frw newvideo`、`seedance_first`、[lessons-2026-07-20-seedance-quality.md](references/lessons-2026-07-20-seedance-quality.md)。
 设计后期默认 `plate-cards blank` + `subs off`，避免标题双烧。
+
+**四工具闭环（v1.22 · 2026-07-23）**：从脚本→动效→剪辑→渲染全程 AI 闭环。
+Seedance 运镜词库（`cinema_prompt.py` → `dsl.camera_prompt`）补齐审美短板；I2V provider 抽象层（`i2v_provider.py`，Grok/Seedance 注册表）消除散乱；video-use 真人素材通路（`ingest-footage` + `auto-cut`）补上唯一缺环；HyperFrames/Remotion designed-post 打磨（时长分卷、转场受控、TikTok 字幕）。见 [four-tool-closed-loop.md](references/four-tool-closed-loop.md)。
 
 ### Agent 自动调配（强制）
 
