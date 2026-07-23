@@ -76,7 +76,7 @@ def load_registry() -> dict[str, Any]:
             else "none",
         )
     data["validation"] = validate_registry(data)
-    data["ok"] = True
+    data["ok"] = bool(data["validation"]["ok"])
     data["path"] = str(path)
     return data
 
@@ -136,10 +136,14 @@ def validate_registry(registry: dict[str, Any]) -> dict[str, Any]:
         if status not in VALID_STATUSES:
             errors.append(f"{sid}: invalid status={status!r}")
         contract = skill.get("executionContract") or {}
-        if status == "implemented" and not contract.get("validator"):
-            incomplete.append(sid)
+        if status == "implemented":
+            missing_contract = [
+                key for key in ("input", "output", "validator", "runner") if not contract.get(key)
+            ]
+            if missing_contract:
+                incomplete.append(f"{sid}({','.join(missing_contract)})")
     if incomplete:
-        warnings.append("implemented skills missing validator: " + ", ".join(incomplete))
+        errors.append("implemented skills have incomplete contracts: " + ", ".join(incomplete))
     return {
         "ok": not errors,
         "errors": errors,
@@ -226,12 +230,12 @@ def validate_skill_payload(
     if not isinstance(payload, dict):
         errors.append("payload must be an object")
     else:
-        required = (
-            ("skillId", "nodeRef", "inputHash")
-            if direction == "input"
-            else ("skillId", "nodeRef", "outputHash")
-        )
+        required = ("skillId", "projectRoot") if direction == "input" else ("ok", "skillId")
         for key in required:
+            if key == "ok":
+                if not isinstance(payload.get(key), bool):
+                    errors.append("ok must be a boolean")
+                continue
             if not str(payload.get(key) or "").strip():
                 errors.append(f"{key} is required")
         if payload.get("skillId") and payload.get("skillId") != skill_id:

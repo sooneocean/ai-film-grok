@@ -97,6 +97,23 @@ except ImportError:  # pragma: no cover
 # TTS 质量与稳定声线分开选择；跨服务商降级必须显式开启。
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"  # edge 显式后端默认女声
 STORYTELLER_VOICE = "zh-CN-XiaoxiaoNeural"
+
+
+def build_post_enhancement_vf_chain(
+    enable_denoise: bool = True,
+    enable_sharpen: bool = True,
+    denoise_strength: str = "2.0:1.5:3.0:2.5",
+    sharpen_strength: float = 0.35,
+) -> str:
+    """Build FFmpeg video filter chain for 3D temporal denoising and CAS sharpening."""
+    filters = []
+    if enable_denoise:
+        filters.append(f"hqdn3d={denoise_strength}")
+    if enable_sharpen:
+        filters.append(f"cas=strength={sharpen_strength:.2f}")
+    return ",".join(filters)
+
+
 # 混音：旁白永远是主角
 # Multi-track mix (旁白 / 娇喘语助 / 原生 clip 音 / BGM 独立增益):
 # - BGM 生成用固定健康 amp（不吃 music_volume，避免「生成压一次 + 混音再压一次」→ 音乐消失）
@@ -714,10 +731,10 @@ def procedural_music(
         final_float = _generate_single(dur, mood, seed)
         return (np.clip(final_float, -1, 1) * 32767).astype(np.int16)
 
-    # Plot-Adaptive Dynamic Timeline
+    # Plot-Adaptive Dynamic Timeline with Equal-Power Crossfading & Anti-Fatigue Mutation
     final_bed = np.zeros(int(SR * dur))
     base_seed = seed or 42
-    crossfade_sec = 2.0
+    crossfade_sec = 2.5
 
     for i, chapter in enumerate(mood_timeline):
         st = float(chapter.get("start_sec", 0.0))
@@ -732,6 +749,7 @@ def procedural_music(
         if i < len(mood_timeline) - 1:
             gen_dur += crossfade_sec
 
+        # Seed mutation: mutate seed per chapter index i
         chapter_seed = base_seed + i
         chapter_sig = _generate_single(gen_dur, str(chapter.get("mood", mood)), chapter_seed)
 
@@ -741,15 +759,19 @@ def procedural_music(
             i1 = len(final_bed)
             chapter_sig = chapter_sig[: i1 - i0]
 
-        if i > 0 and len(chapter_sig) > 0:
-            xfade_samples = min(int(crossfade_sec * SR), len(chapter_sig))
-            chapter_sig[:xfade_samples] *= np.linspace(0, 1, xfade_samples)
+        span = len(chapter_sig)
+        if span > 0:
+            xfade_samples = min(int(crossfade_sec * SR), span)
+            # Equal-Power Crossfade (constant acoustic energy: sin^2 + cos^2 = 1.0)
+            if i > 0:
+                t_in = np.linspace(0, 1, xfade_samples, endpoint=False)
+                chapter_sig[:xfade_samples] *= np.sin(0.5 * np.pi * t_in)
 
-        if i < len(mood_timeline) - 1 and len(chapter_sig) > 0:
-            xfade_samples = min(int(crossfade_sec * SR), len(chapter_sig))
-            chapter_sig[-xfade_samples:] *= np.linspace(1, 0, xfade_samples)
+            if i < len(mood_timeline) - 1:
+                t_out = np.linspace(0, 1, xfade_samples, endpoint=False)
+                chapter_sig[-xfade_samples:] *= np.cos(0.5 * np.pi * t_out)
 
-        final_bed[i0:i1] += chapter_sig
+            final_bed[i0:i1] += chapter_sig
 
     return (np.clip(final_bed, -1, 1) * 32767).astype(np.int16)
 
@@ -1059,7 +1081,15 @@ def _wrap_title_lines(text: str, max_chars: int) -> list[str]:
 
 
 def sub_png(
-    text: str, path: Path, *, width: int, height: int, font_path: str, title: bool = False
+    text: str,
+    path: Path,
+    *,
+    width: int,
+    height: int,
+    font_path: str,
+    title: bool = False,
+    dodge: bool = False,
+    italic: bool = False,
 ) -> None:
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -1082,26 +1112,70 @@ def sub_png(
                 stroke_fill=(40, 10, 24, 255),
             )
     else:
-        # slightly taller bar + soft top edge for readability on busy anime frames
-        bar_h = max(78, height // 14)
-        # gradient-ish bar (darker bottom)
-        for dy in range(bar_h):
-            a = int(120 + 70 * (dy / max(1, bar_h - 1)))
-            draw.line([(0, height - bar_h + dy), (width, height - bar_h + dy)], fill=(0, 0, 0, a))
+        try:
+            from subtitle_typesetter import break_text_semantically
+
+            lines = break_text_semantically(text, max_chars=18)
+        except Exception:
+            lines = [text]
+
         font = ImageFont.truetype(font_path, max(30, width // 21))
-        bbox = draw.textbbox((0, 0), text, font=font)
-        tw = bbox[2] - bbox[0]
-        th = bbox[3] - bbox[1]
-        x = (width - tw) // 2
-        y = height - bar_h + (bar_h - th) // 2 - 2
-        draw.text(
-            (x, y),
-            text,
-            font=font,
-            fill=(255, 250, 252, 255),
-            stroke_width=2,
-            stroke_fill=(0, 0, 0, 255),
-        )
+        lh = font.size + 10
+        total_th = len(lines) * lh
+        bar_h = total_th + max(40, height // 20)
+
+        text_img = Image.new("RGBA", (width, bar_h + 20), (0, 0, 0, 0))
+        text_draw = ImageDraw.Draw(text_img)
+
+        y0 = (bar_h - total_th) // 2
+
+        for i, line in enumerate(lines):
+            bbox = text_draw.textbbox((0, 0), line, font=font)
+            tw = bbox[2] - bbox[0]
+            x = (width - tw) // 2
+            y = y0 + i * lh
+
+            # soft drop shadow
+            shadow_offset = 3
+            text_draw.text(
+                (x + shadow_offset, y + shadow_offset),
+                line,
+                font=font,
+                fill=(0, 0, 0, 180),
+                stroke_width=3,
+                stroke_fill=(0, 0, 0, 180),
+            )
+            # main text with stroke
+            text_draw.text(
+                (x, y),
+                line,
+                font=font,
+                fill=(255, 250, 252, 255),
+                stroke_width=2,
+                stroke_fill=(0, 0, 0, 255),
+            )
+
+        if italic:
+            text_img = text_img.transform(
+                (width, bar_h + 20),
+                Image.AFFINE,
+                (1, -0.25, 0.25 * (bar_h / 2), 0, 1, 0),
+                resample=Image.BICUBIC,
+            )
+
+        if dodge:
+            for dy in range(bar_h):
+                a = int(120 + 70 * ((bar_h - dy) / max(1, bar_h - 1)))
+                draw.line([(0, dy), (width, dy)], fill=(0, 0, 0, a))
+            img.alpha_composite(text_img, (0, 0))
+        else:
+            for dy in range(bar_h):
+                a = int(120 + 70 * (dy / max(1, bar_h - 1)))
+                draw.line(
+                    [(0, height - bar_h + dy), (width, height - bar_h + dy)], fill=(0, 0, 0, a)
+                )
+            img.alpha_composite(text_img, (0, height - bar_h))
+
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path)
 
@@ -1538,6 +1612,12 @@ def build_subtitle_cues_for_shots(
         speech_end = t0 + speech_dur
         shot_end = t0 + plate - 0.02
         hard_end = min(speech_end, shot_end)
+        # Determine italic from voice_type or intent
+        is_monologue = False
+        nar_item = item.get("narration") or {}
+        if isinstance(nar_item, dict) and nar_item.get("voice_type") == "internal_monologue":
+            is_monologue = True
+
         for u, bs, be in segs:
             sb = max(0.0, t0 + bs - sub_lead)
             eb = t0 + be
@@ -1547,7 +1627,9 @@ def build_subtitle_cues_for_shots(
                 eb = hard_end
             if eb <= sb:
                 eb = min(hard_end, sb + 0.4)
-            cues.append({"start": sb, "end": eb, "text": u, "shot_index": i})
+            cues.append(
+                {"start": sb, "end": eb, "text": u, "shot_index": i, "is_monologue": is_monologue}
+            )
     return cues, film_tl
 
 
@@ -2748,7 +2830,23 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         oidx = 1
         for i, cue in enumerate(cues):
             png = overlays_dir / f"sub_{i:03d}.png"
-            sub_png(cue["text"], png, width=width, height=height, font_path=font_path)
+            shot_index = cue.get("shot_index", 0)
+            shot = shot_dicts[shot_index] if shot_dicts and shot_index < len(shot_dicts) else {}
+            safe_area = (shot.get("dsl") or {}).get("safe_area") or {}
+
+            # Subtitles default to bottom, but we dodge to top if subtitle_clear is explicitly false
+            dodge = safe_area.get("subtitle_clear") is False
+            italic = cue.get("is_monologue", False)
+
+            sub_png(
+                cue["text"],
+                png,
+                width=width,
+                height=height,
+                font_path=font_path,
+                dodge=dodge,
+                italic=italic,
+            )
             overlay_inputs += ["-i", str(png)]
             out_label = f"[o{i}]"
             filter_parts.append(

@@ -1022,12 +1022,41 @@ def expand_sound_events(
     }
 
 
+def quantize_timeline_to_beat(
+    timeline: list[dict[str, Any]], bpm: float = 76.0, *, quantize_step_sec: float | None = None
+) -> list[dict[str, Any]]:
+    """Quantize timeline boundary points to the nearest musical beat/downbeat grid."""
+    if not timeline:
+        return timeline
+    if quantize_step_sec is None:
+        # half-bar (2 beats) step at target BPM
+        beat_sec = 60.0 / max(30.0, float(bpm))
+        quantize_step_sec = beat_sec * 2.0
+
+    quantized = []
+    for item in timeline:
+        st = float(item["start_sec"])
+        ed = float(item["end_sec"])
+        # Keep 0.0 fixed for absolute film start
+        q_st = 0.0 if st <= 0.01 else round(st / quantize_step_sec) * quantize_step_sec
+        q_ed = round(ed / quantize_step_sec) * quantize_step_sec
+        if q_ed <= q_st:
+            q_ed = q_st + quantize_step_sec
+        c = item.copy()
+        c["start_sec"] = round(q_st, 3)
+        c["end_sec"] = round(q_ed, 3)
+        quantized.append(c)
+    return quantized
+
+
 def build_mood_timeline(
     shots: list[dict[str, Any]],
     *,
     shot_starts: dict[str, float],
     shot_ends: dict[str, float],
     default_mood: str = "rnb",
+    bpm: float = 76.0,
+    quantize: bool = True,
 ) -> list[dict[str, Any]]:
     """Build a time-based mood map by analyzing the dramatic curve of shots."""
     if not shots:
@@ -1045,22 +1074,40 @@ def build_mood_timeline(
             continue
 
         # Determine mood from dramatic function and heat phase
-        func = str(shot.get("dramatic_function") or "").strip().lower()
+        func = (
+            str(
+                shot.get("dramatic_function")
+                or (shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}).get(
+                    "dramatic_function"
+                )
+                or ""
+            )
+            .strip()
+            .lower()
+        )
         hp = _shot_heat_phase(shot)
 
         mood = default_mood
-        if hp in {"act", "climax", "foreplay"}:
-            mood = "rnb" if default_mood != "dark" else default_mood
-        elif func in {"climax", "crisis", "rising_action"}:
-            mood = "dark" if default_mood == "dark" else "rnb"
-        elif func in {"intro", "establishing"}:
-            mood = "ambient" if default_mood != "dark" else "ambient"
-        elif func in {"resolution", "falling_action"}:
+        if hp in {"act", "climax", "foreplay"} or func == "climax":
+            mood = "rnb" if default_mood != "dark" else "dark"
+        elif func in {"buildup", "rising_action", "crisis", "suspense"}:
+            mood = "dark"
+        elif func in {"intro", "establishing", "hook"}:
+            mood = "ambient"
+        elif func in {"resolution", "falling_action", "afterglow"}:
             mood = "warm"
         else:
             mood = default_mood
 
-        timeline.append({"start_sec": st, "end_sec": ed, "mood": mood})
+        timeline.append(
+            {
+                "start_sec": st,
+                "end_sec": ed,
+                "mood": mood,
+                "dramatic_function": func,
+                "heat_phase": hp,
+            }
+        )
 
     # Merge adjacent identical moods
     if not timeline:
@@ -1077,5 +1124,8 @@ def build_mood_timeline(
             merged.append(curr)
             curr = item.copy()
     merged.append(curr)
+
+    if quantize and bpm > 0:
+        return quantize_timeline_to_beat(merged, bpm)
 
     return merged

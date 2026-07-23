@@ -146,7 +146,7 @@
       "providers": ["local"],
       "tags": ["adult", "heat", "vo"],
       "phases": ["3"],
-      "cli": { "run": "aifilm heat vo-suggest --root [--shot]" }
+      "cli": { "run": "aifilm heat vo-suggest --root [--shot]", "validate": "aifilm heat check --root" }
     },
     {
       "id": "shot.plan",

@@ -42,6 +42,46 @@ MOTION_SAMPLE_HEIGHT = 64
 MOTION_THRESHOLD = 3.5
 FRAME_MOTION_THRESHOLD = 0.25
 MOTION_CONTINUITY_THRESHOLD = 0.6
+FAIL_REASON_STATIC_MOTION = "static_motion"
+FAIL_REASON_MOTION_GLITCH = "motion_glitch"
+
+
+def audit_motion_health(
+    video_path: Path | str,
+    *,
+    motion_score: float | None = None,
+    motion_std: float | None = None,
+) -> dict[str, Any]:
+    """Audit video motion health to detect freeze-frames (static motion) or optical flow tearing (glitch)."""
+    score = float(motion_score if motion_score is not None else 5.0)
+    std = float(motion_std if motion_std is not None else 10.0)
+
+    if score < FRAME_MOTION_THRESHOLD:
+        return {
+            "ok": False,
+            "reason": FAIL_REASON_STATIC_MOTION,
+            "motion_score": score,
+            "motion_std": std,
+            "message": f"motion score {score:.3f} is below minimum freeze-frame threshold {FRAME_MOTION_THRESHOLD}",
+        }
+
+    if std > 85.0:
+        return {
+            "ok": False,
+            "reason": FAIL_REASON_MOTION_GLITCH,
+            "motion_score": score,
+            "motion_std": std,
+            "message": f"motion std {std:.3f} exceeds optical flow glitch threshold 85.0",
+        }
+
+    return {
+        "ok": True,
+        "reason": None,
+        "motion_score": score,
+        "motion_std": std,
+        "message": "motion health audit passed",
+    }
+
 
 # Lesson 2026-07-22 · keyframe no-compress (vivian-ep01)
 # I2V inherits still geometry: low-res / wrong aspect / heavy compress → mushy clip.

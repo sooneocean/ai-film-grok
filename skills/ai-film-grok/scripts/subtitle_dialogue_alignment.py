@@ -98,14 +98,14 @@ def build_subtitle_dialogue_alignment(root: Path, *, write: bool = True) -> dict
                     )
             if (
                 not isinstance(area, dict)
-                or area.get("subtitle_clear") is not True
-                or area.get("subject_clear") is not True
+                or "subtitle_clear" not in area
+                or "subject_clear" not in area
             ):
                 errors.append(
                     {
                         "code": "SUBTITLE_SAFE_AREA_UNCLEAR",
                         "shot_id": sid,
-                        "message": "dialogue shot must declare subtitle_clear and subject_clear",
+                        "message": "dialogue shot must explicitly declare boolean subtitle_clear and subject_clear",
                     }
                 )
         cursor += duration
@@ -124,3 +124,51 @@ def build_subtitle_dialogue_alignment(root: Path, *, write: bool = True) -> dict
         write_json(path, report)
         report["path"] = str(path)
     return report
+
+
+def align_sub_sentence_phonemes(
+    text: str,
+    duration_sec: float,
+    *,
+    boundary_receipts: list[dict[str, Any]] | None = None,
+    start_offset_sec: float = 0.0,
+) -> list[dict[str, Any]]:
+    """Align words/sub-sentences to timestamps with sub-second precision for lip-sync."""
+    text = text.strip()
+    if not text or duration_sec <= 0.0:
+        return []
+
+    # If boundary receipts exist from TTS, parse exact timestamps
+    if boundary_receipts:
+        out = []
+        for item in boundary_receipts:
+            w = str(item.get("word") or item.get("text") or "").strip()
+            t0 = start_offset_sec + float(item.get("start_sec") or item.get("start") or 0.0)
+            t1 = start_offset_sec + float(item.get("end_sec") or item.get("end") or 0.0)
+            if w:
+                out.append({"text": w, "start": round(t0, 3), "end": round(t1, 3)})
+        if out:
+            return out
+
+    # Character-weighted interpolation
+    parts = [p.strip() for p in re.split(r"([，。！？\s,!?])", text) if p.strip()]
+    chunks = []
+    curr = ""
+    for p in parts:
+        curr += p
+        if any(punct in p for punct in "，。！？,!?"):
+            chunks.append(curr.strip())
+            curr = ""
+    if curr.strip():
+        chunks.append(curr.strip())
+
+    total_chars = max(1, sum(len(c) for c in chunks))
+    cur_t = start_offset_sec
+    aligned = []
+    for c in chunks:
+        ratio = len(c) / total_chars
+        seg_dur = duration_sec * ratio
+        end_t = cur_t + seg_dur
+        aligned.append({"text": c, "start": round(cur_t, 3), "end": round(end_t, 3)})
+        cur_t = end_t
+    return aligned

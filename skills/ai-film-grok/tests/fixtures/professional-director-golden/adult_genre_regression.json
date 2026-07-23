@@ -1,0 +1,14 @@
+{
+  "kind": "professional-director-golden",
+  "format": {"aspect": "9:16", "duration_sec": 45},
+  "genre_pack": "adult",
+  "core_rules": ["human-approval", "hash-bound", "source-chain"],
+  "genre_rules": ["heat-arc", "wardrobe-ladder", "rnb-default"],
+  "characters": {},
+  "locations": ["room-a", "room-b"],
+  "props": {},
+  "dialogue": {},
+  "music": {"motif_id": "adult-rnb", "licensed": true},
+  "shots": [],
+  "approvals": []
+}

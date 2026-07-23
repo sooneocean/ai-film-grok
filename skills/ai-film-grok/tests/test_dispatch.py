@@ -52,6 +52,9 @@ class DispatchTests(unittest.TestCase):
             self.assertIn("jobs_summary", packet)
             self.assertIn("execution_plan_digest", packet)
             self.assertIn("graph", packet)
+            self.assertIsNotNone(packet.get("next_action"))
+            self.assertTrue(packet["next_action"].get("argv"))
+            self.assertFalse(str(packet.get("next_cmd") or "").lstrip().startswith("#"))
             self.assertIsNotNone(packet.get("jobs_summary"))
             self.assertIn("total", packet["jobs_summary"] or {})
 

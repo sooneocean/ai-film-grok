@@ -46,6 +46,35 @@ SOFT_XFADE_STYLES = frozenset(
 _STYLE_SOFT_ROTATION = ("smoothleft", "hblur", "smoothup", "dissolve", "fade", "smoothright")
 _STYLE_HOLD_ROTATION = ("dissolve", "fadeblack", "hblur", "fade")
 
+
+def derive_micro_edit_cut(prev_shot: dict[str, Any], cur_shot: dict[str, Any]) -> dict[str, Any]:
+    """Derive J-Cut or L-Cut audio overlap parameters between adjacent shots."""
+    p_hp = str(prev_shot.get("heat_phase") or prev_shot.get("heatPhase") or "").lower()
+    c_hp = str(cur_shot.get("heat_phase") or cur_shot.get("heatPhase") or "").lower()
+
+    if c_hp in {"climax", "act"} and p_hp not in {"climax", "act"}:
+        # Entering high tension -> J-Cut (audio leads video)
+        return {
+            "mode": "j_cut",
+            "offset_sec": 0.45,
+            "description": "Audio leads video cut into climax",
+        }
+    elif p_hp in {"climax", "act"} and c_hp not in {"climax", "act"}:
+        # Exiting high tension -> L-Cut (audio lingers)
+        return {
+            "mode": "l_cut",
+            "offset_sec": 0.45,
+            "description": "Audio lingers past video cut into resolution",
+        }
+    elif p_hp == "climax" and c_hp == "climax":
+        # Rapid climax cuts -> alternating J-Cut / L-Cut
+        sid_num = sum(ord(ch) for ch in str(cur_shot.get("id") or "0"))
+        mode = "j_cut" if sid_num % 2 == 0 else "l_cut"
+        return {"mode": mode, "offset_sec": 0.35, "description": f"Alternating {mode} in climax"}
+
+    return {"mode": "standard", "offset_sec": 0.0, "description": "Standard concurrent cut"}
+
+
 # ---------------------------------------------------------------------------
 # Character stance / multi-POV (角色立场 · 2026-07-20)
 # Whose eyes is this shot? Who has power? Cutting across stances elevates cinema.

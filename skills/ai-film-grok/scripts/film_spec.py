@@ -299,7 +299,8 @@ def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
     # P0-2: act_structure + pace_chart validation (strict mode)
     act_raw = raw.get("act_structure")
     pace_raw = raw.get("pace_chart")
-    strict = bool(spec.get("pace_chart_strict") or spec.get("act_structure_strict"))
+    act_strict = bool(spec.get("act_structure_strict"))
+    pace_strict = bool(spec.get("pace_chart_strict"))
 
     # act_structure: if present, validate shape + ratio sum
     if isinstance(act_raw, dict):
@@ -326,13 +327,13 @@ def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
             act_cleaned.update(ratios)
         elif ratios:
             act_cleaned.update(ratios)
-        if strict and not act_cleaned.get("setup"):
+        if act_strict and not act_cleaned.get("setup"):
             raise FilmSpecError(
                 "act_structure_strict: setup/confrontation/resolution required when strict"
             )
         if act_cleaned:
             intent["act_structure"] = act_cleaned
-    elif strict:
+    elif act_strict:
         raise FilmSpecError(
             "act_structure_strict: act_structure object required when strict mode is enabled"
         )
@@ -341,7 +342,7 @@ def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
     # Also accept legacy string-array format (backward compat)
     if isinstance(pace_raw, list):
         if len(pace_raw) == 0:
-            if strict:
+            if pace_strict:
                 raise FilmSpecError("pace_chart_strict: pace_chart must be non-empty when strict")
         else:
             pace_cleaned: list[Any] = []
@@ -384,14 +385,25 @@ def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
                     raise FilmSpecError(
                         f"pace_chart[{i}] must be string or object, got {type(entry).__name__}"
                     )
-            if strict and len(pace_cleaned) < 3:
+            if pace_strict and len(pace_cleaned) < 3:
                 raise FilmSpecError(f"pace_chart_strict: need ≥3 segments, got {len(pace_cleaned)}")
             if pace_cleaned:
                 intent["pace_chart"] = pace_cleaned
-    elif strict:
+    elif pace_strict:
         raise FilmSpecError(
             "pace_chart_strict: pace_chart array required when strict mode is enabled"
         )
+
+    # P0-3: character bible strict — protagonist must have want/need/arc
+    char_strict = bool(spec.get("character_bible_strict"))
+    for pfield in ("protagonist_want", "protagonist_need", "protagonist_arc"):
+        val = raw.get(pfield)
+        if val is not None:
+            intent[pfield] = _required_text(val, field=f"director_intent.{pfield}")
+        elif char_strict:
+            raise FilmSpecError(
+                f"character_bible_strict: director_intent.{pfield} required when strict mode is enabled"
+            )
 
     spec["director_intent"] = intent
     return intent

@@ -101,9 +101,13 @@ class PromptInjector:
         )
 
     @staticmethod
-    def _identity_for_wardrobe(identity: str, wardrobe_state: str) -> str:
-        """Strip full-dress phrases from identity lock when already undressed."""
-        if wardrobe_state not in {"partial", "undressed", "bare"} or not identity:
+    def _identity_for_wardrobe(
+        identity: str, wardrobe_state: str, shot: dict[str, Any] | None = None
+    ) -> str:
+        out = identity or ""
+        if wardrobe_state not in {"partial", "undressed", "bare"} and not (
+            isinstance(shot, dict) and isinstance(shot.get("character_states"), dict)
+        ):
             return identity
         # Keep face/hair/eyes; drop outfit-complete language that fights undress ladder
         bad = (
@@ -130,6 +134,32 @@ class PromptInjector:
             "undressed": " [NOW undressed — main outfit off, bare skin readable, NOT full dress]",
             "bare": " [NOW bare/exposed — clothes discarded, NEVER re-clothe]",
         }.get(wardrobe_state, "")
+
+        # Multi-axis character physical state tag formatting
+        c_states = (
+            shot.get("character_states")
+            if isinstance(shot, dict) and isinstance(shot.get("character_states"), dict)
+            else {}
+        )
+        state_tags = []
+        if c_states.get("hair") and c_states["hair"] != "neat":
+            state_tags.append(f"hair: {c_states['hair']}")
+        if c_states.get("skin") and c_states["skin"] != "normal":
+            state_tags.append(f"skin: {c_states['skin']}")
+        if c_states.get("arousal") and c_states["arousal"] != "calm":
+            state_tags.append(f"state: {c_states['arousal']}")
+
+        gaze = (
+            (shot.get("gaze_target") or shot.get("gazeTarget") or "")
+            if isinstance(shot, dict)
+            else ""
+        )
+        if gaze:
+            state_tags.append(f"gaze: {gaze.replace('_', ' ')}")
+
+        if state_tags:
+            extra += f" [{'; '.join(state_tags)}]"
+
         return (out.strip(" ,;") + extra).strip()
 
     def assemble(self, shot: dict[str, Any], root: Path) -> dict[str, Any]:
@@ -179,7 +209,7 @@ class PromptInjector:
             identity = char_info.get("identity", "")
             if not identity and hid in {"hero", "fufu", "astra", "xide"}:
                 identity = self.bible.get("identity_lock", "")
-            identity = self._identity_for_wardrobe(identity, wardrobe_state)
+            identity = self._identity_for_wardrobe(identity, wardrobe_state, shot=shot)
 
             wardrobe = self.bible.get("wardrobe_variants", {}).get(hid, {}).get(wardrobe_state, "")
             # Never fall back to default_wardrobe when undressed — that re-dresses
@@ -267,6 +297,12 @@ class PromptInjector:
         cine_block = ""
         if cine_parts:
             cine_block = "Cinematography: " + ", ".join(cine_parts)
+        # Seedance camera language bridge (2026-07-23): append the rich cinema-grade
+        # camera_prompt produced by cinema_prompt so I2V providers receive move/shot/
+        # angle/pacing/lighting/palette in one structured block.
+        camera_prompt = str(dsl.get("camera_prompt") or "").strip()
+        if camera_prompt:
+            cine_block = f"{cine_block}\n{camera_prompt}" if cine_block else camera_prompt
 
         # 5. Continuity State
         states = self.bible.get("continuity_states", {})

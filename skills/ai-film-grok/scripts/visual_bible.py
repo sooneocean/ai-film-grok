@@ -151,3 +151,50 @@ def update_bible_state(root: Path, state: str) -> None:
 
     bible["state"] = state
     save_bible(root, bible)
+
+
+LIGHTING_COLOR_PALETTES = {
+    "setup": {
+        "theme": "subdued_ambient",
+        "description": "Natural ambient daylight/soft window light",
+        "ffmpeg_filter": "eq=contrast=1.05:saturation=1.0",
+    },
+    "foreplay": {
+        "theme": "neon_magenta_glow",
+        "description": "Sensual magenta/violet neon atmosphere",
+        "ffmpeg_filter": "colorbalance=rs=0.1:gs=-0.05:bs=0.15",
+    },
+    "act": {
+        "theme": "dramatic_chiaroscuro_velvet",
+        "description": "High-contrast chiaroscuro velvet shadows",
+        "ffmpeg_filter": "eq=contrast=1.18:saturation=1.12",
+    },
+    "climax": {
+        "theme": "dramatic_chiaroscuro_velvet",
+        "description": "Extreme dramatic lighting, vivid highlights and deep shadows",
+        "ffmpeg_filter": "eq=contrast=1.2:saturation=1.15",
+    },
+    "afterglow": {
+        "theme": "warm_golden_hour",
+        "description": "Warm golden hour warmth, soft amber glow",
+        "ffmpeg_filter": "colorbalance=rs=0.15:gs=0.08:bs=-0.1",
+    },
+}
+
+
+def derive_lighting_timeline(shots: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Derive dynamic lighting and color grading timeline across shots."""
+    timeline = []
+    for shot in shots:
+        hp = str(shot.get("heat_phase") or shot.get("heatPhase") or "setup").strip().lower()
+        preset = LIGHTING_COLOR_PALETTES.get(hp) or LIGHTING_COLOR_PALETTES["setup"]
+        timeline.append(
+            {
+                "shot_id": str(shot.get("id")),
+                "heat_phase": hp,
+                "lighting_theme": preset["theme"],
+                "description": preset["description"],
+                "ffmpeg_filter": preset["ffmpeg_filter"],
+            }
+        )
+    return timeline

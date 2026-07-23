@@ -31,6 +31,52 @@ def write_wav_stereo(path: Path, samples: np.ndarray, sr: int = SR) -> None:
         handle.writeframes(pcm.tobytes())
 
 
+def apply_spatial_pan(samples: np.ndarray, pan: float = 0.0) -> np.ndarray:
+    """Apply equal-power stereo panning (-1.0 full left to +1.0 full right)."""
+    pan = float(np.clip(pan, -1.0, 1.0))
+    angle = 0.25 * np.pi * (pan + 1.0)
+    left_gain = float(np.cos(angle))
+    right_gain = float(np.sin(angle))
+
+    if samples.ndim == 1:
+        left = samples * left_gain
+        right = samples * right_gain
+    else:
+        left = samples[:, 0] * left_gain
+        right = samples[:, 1] * right_gain
+    return np.stack([left, right], axis=1)
+
+
+RIR_ROOM_PRESETS = {
+    "bedroom": {"decay_sec": 0.15, "damp": 0.5, "mix": 0.25},
+    "bathroom": {"decay_sec": 0.45, "damp": 0.2, "mix": 0.40},
+    "spacious_hall": {"decay_sec": 1.20, "damp": 0.3, "mix": 0.50},
+}
+
+
+def apply_room_reverb(samples: np.ndarray, room_type: str = "bedroom", sr: int = SR) -> np.ndarray:
+    """Apply Room Impulse Response (RIR) physical acoustic reverberation decay."""
+    preset = RIR_ROOM_PRESETS.get(room_type) or RIR_ROOM_PRESETS["bedroom"]
+    decay_sec = preset["decay_sec"]
+    mix = preset["mix"]
+
+    n_imp = int(sr * decay_sec)
+    t = np.linspace(0, decay_sec, n_imp, endpoint=False)
+    impulse = np.exp(-t * (4.0 / decay_sec)) * (np.random.randn(n_imp) * 0.3)
+
+    if samples.ndim == 1:
+        rev = np.convolve(samples, impulse, mode="full")[: len(samples)]
+        out = (1.0 - mix) * samples + mix * rev
+    else:
+        rev_l = np.convolve(samples[:, 0], impulse, mode="full")[: len(samples)]
+        rev_r = np.convolve(samples[:, 1], impulse, mode="full")[: len(samples)]
+        out_l = (1.0 - mix) * samples[:, 0] + mix * rev_l
+        out_r = (1.0 - mix) * samples[:, 1] + mix * rev_r
+        out = np.stack([out_l, out_r], axis=1)
+
+    return np.clip(out, -1.0, 1.0)
+
+
 def env_adsr(n: int, a=0.01, d=0.05, s=0.7, r=0.1) -> np.ndarray:
     ea, ed, er = int(SR * a), int(SR * d), int(SR * r)
     es = max(0, n - ea - ed - er)
@@ -114,6 +160,42 @@ def heartbeat(amp: float = 0.12) -> np.ndarray:
     b = tone(45, 0.1, amp * 0.9)
     gap = np.zeros(int(SR * 0.12))
     return np.concatenate([a, gap[: int(SR * 0.06)], b])
+
+
+def sub_drop(dur: float = 1.2, amp: float = 0.35) -> np.ndarray:
+    """Cinematic sub-bass drop hit (160 Hz -> 35 Hz exponential sweep + decay)."""
+    n = int(SR * max(0.2, dur))
+    t = np.linspace(0, dur, n, endpoint=False)
+    freq = 35.0 + 125.0 * np.exp(-12.0 * t)
+    phase = np.cumsum(2 * np.pi * freq / SR)
+    body = np.sin(phase) * np.exp(-3.5 * t)
+    sub = np.sin(phase * 0.5) * np.exp(-2.8 * t) * 0.5
+    return amp * np.tanh(body + sub)
+
+
+def reverse_cymbal(dur: float = 1.0, amp: float = 0.25) -> np.ndarray:
+    """Cinematic reverse cymbal swell/inhale leading into a climax hit."""
+    n = int(SR * max(0.2, dur))
+    t = np.linspace(0, dur, n, endpoint=False)
+    noise = np.random.randn(n)
+    noise = np.diff(noise, prepend=noise[0])
+    noise = noise / (np.max(np.abs(noise)) + 1e-9)
+    # exponential swell in
+    env = np.exp(4.0 * (t / dur - 1.0))
+    chirp = np.sin(2 * np.pi * (300 + 1500 * (t / dur) ** 2) * t) * env * 0.4
+    return amp * (noise * env * 0.6 + chirp)
+
+
+def calculate_tempo_from_pacing(shot_starts: list[float], duration: float) -> float:
+    """Calculate BGM tempo (BPM) based on storyboard cutting rhythm (Average Shot Duration ASD)."""
+    if not shot_starts or duration <= 0:
+        return 76.0
+    asd = float(duration) / max(1, len(shot_starts))
+    if asd < 3.5:
+        return 86.0
+    elif asd > 6.0:
+        return 68.0
+    return 76.0
 
 
 def classroom_ambience(dur: float, amp: float = 0.04) -> np.ndarray:
@@ -711,30 +793,129 @@ def place(base: np.ndarray, clip: np.ndarray, at: float, pan: float = 0.0) -> No
         base[i0:i1] += clip
 
 
+def generate_procedural_bgm_stem(
+    dur: float,
+    *,
+    mood: str = "rnb",
+    amp: float = 0.17,
+    bpm: float = 76.0,
+    seed: int | None = None,
+    shot_starts: list[float] | None = None,
+    events: list[dict] | None = None,
+) -> np.ndarray:
+    """Generate a single procedural BGM stem according to target mood and mutated seed."""
+    m = (mood or "rnb").lower()
+    if m in ("rnb", "r&b", "sensual", "seductive", "ecchi", "soul"):
+        return rnb_bgm(dur, amp=amp, bpm=bpm, seed=seed, shot_starts=shot_starts, events=events)
+    elif m == "dark":
+        return rnb_bgm(
+            dur, amp=amp * 0.9, bpm=68.0, seed=seed, shot_starts=shot_starts, events=events
+        )
+    elif m == "ambient":
+        return rnb_bgm(
+            dur,
+            amp=amp * 0.8,
+            bpm=62.0,
+            seed=seed,
+            style="ambient",
+            shot_starts=shot_starts,
+            events=events,
+        )
+    elif m == "warm":
+        return rnb_bgm(
+            dur,
+            amp=amp * 0.85,
+            bpm=72.0,
+            seed=seed,
+            style="velvet",
+            shot_starts=shot_starts,
+            events=events,
+        )
+    else:
+        return rnb_bgm(
+            dur, amp=amp * 0.85, bpm=82.0, seed=seed, shot_starts=shot_starts, events=events
+        )
+
+
 def build_bed(
     duration: float,
     shot_starts: list[float],
     *,
     mood: str = "rnb",
+    mood_timeline: list[dict] | None = None,
     sfx_level: float = 0.9,
     bpm: float = 76.0,
     seed: int | None = None,
 ) -> np.ndarray:
     n = int(SR * duration)
     bed = np.zeros((n, 2), dtype=np.float64)
+    base_seed = seed if seed is not None else 42
 
-    mood = (mood or "rnb").lower()
-    # BGM: seductive R&B is default for 色气 / storyteller
-    if mood in ("rnb", "r&b", "sensual", "seductive", "ecchi", "soul"):
-        bgm = rnb_bgm(duration, amp=0.17, bpm=bpm, seed=seed)
-        # light room air only — classroom murmur fights R&B
-        amb = classroom_ambience(duration, amp=0.012)
-    elif mood == "dark":
-        bgm = rnb_bgm(duration, amp=0.14, bpm=68.0, seed=seed)
-        amb = classroom_ambience(duration, amp=0.02)
+    # Tempo-Pacing Lock: adapt BPM to cutting rhythm if using default tempo
+    if bpm == 76.0 and shot_starts and len(shot_starts) > 1:
+        bpm = calculate_tempo_from_pacing(shot_starts, duration)
+
+    if mood_timeline and len(mood_timeline) > 0:
+        bgm = np.zeros(n, dtype=np.float64)
+        crossfade_sec = 2.5
+        xfade_samples = int(crossfade_sec * SR)
+
+        for i, chapter in enumerate(mood_timeline):
+            st = float(chapter.get("start_sec", 0.0))
+            ed = float(chapter.get("end_sec", duration))
+            ed = min(duration, ed)
+            ch_dur = ed - st
+            if ch_dur <= 0:
+                continue
+
+            gen_dur = ch_dur + (crossfade_sec if i < len(mood_timeline) - 1 else 0.0)
+            # Anti-fatigue seed mutation: mutate seed per chapter index i
+            ch_seed = base_seed + i
+            ch_mood = str(chapter.get("mood") or mood)
+            ch_stem = generate_procedural_bgm_stem(
+                gen_dur, mood=ch_mood, amp=0.17, bpm=bpm, seed=ch_seed
+            )
+
+            i0 = int(st * SR)
+            i1 = i0 + len(ch_stem)
+            if i1 > n:
+                i1 = n
+                ch_stem = ch_stem[: i1 - i0]
+
+            span = len(ch_stem)
+            if span == 0:
+                continue
+
+            # Equal-Power Crossfade (constant power: sin^2 + cos^2 = 1.0)
+            if i > 0:
+                xf = min(xfade_samples, span)
+                t_in = np.linspace(0, 1, xf, endpoint=False)
+                ch_stem[:xf] *= np.sin(0.5 * np.pi * t_in)
+
+                # Automatic Stinger Accent: Sub-drop + Reverse Cymbal on transition to climax/rnb
+                prev_mood = str(mood_timeline[i - 1].get("mood") or "").lower()
+                if ch_mood.lower() in ("rnb", "r&b", "sensual", "climax") and prev_mood in (
+                    "dark",
+                    "ambient",
+                ):
+                    rev_dur = min(1.2, st)
+                    if rev_dur > 0.3:
+                        place(bed, reverse_cymbal(rev_dur, 0.22 * sfx_level), st - rev_dur)
+                    place(bed, sub_drop(1.4, 0.32 * sfx_level), st)
+
+            if i < len(mood_timeline) - 1:
+                xf = min(xfade_samples, span)
+                t_out = np.linspace(0, 1, xf, endpoint=False)
+                ch_stem[-xf:] *= np.cos(0.5 * np.pi * t_out)
+
+            bgm[i0:i1] += ch_stem
+
+        amb = classroom_ambience(duration, amp=0.015)
     else:
-        bgm = rnb_bgm(duration, amp=0.13, bpm=82.0, seed=seed)
-        amb = classroom_ambience(duration, amp=0.03)
+        m = (mood or "rnb").lower()
+        bgm = generate_procedural_bgm_stem(duration, mood=m, amp=0.17, bpm=bpm, seed=seed)
+        amb_amp = 0.012 if m in ("rnb", "r&b", "sensual", "seductive", "ecchi", "soul") else 0.02
+        amb = classroom_ambience(duration, amp=amb_amp)
 
     place(bed, amb, 0.0)
     place(bed, bgm, 0.0)
@@ -769,6 +950,9 @@ def main() -> int:
     ap.add_argument("--shot-starts", type=str, required=True, help="comma-separated seconds")
     ap.add_argument("--out", required=True)
     ap.add_argument("--mood", default="rnb", help="rnb|sensual|dark|playful — 色气片默认 rnb")
+    ap.add_argument(
+        "--mood-timeline", type=str, default=None, help="JSON array of mood timeline objects"
+    )
     ap.add_argument("--sfx-level", type=float, default=0.9)
     ap.add_argument("--bpm", type=float, default=76.0, help="R&B tempo, ~72-80 seductive")
     ap.add_argument(
@@ -776,10 +960,12 @@ def main() -> int:
     )
     args = ap.parse_args()
     starts = [float(x) for x in args.shot_starts.split(",") if x.strip()]
+    timeline = json.loads(args.mood_timeline) if args.mood_timeline else None
     bed = build_bed(
         args.duration,
         starts,
         mood=args.mood,
+        mood_timeline=timeline,
         sfx_level=args.sfx_level,
         bpm=args.bpm,
         seed=args.seed,

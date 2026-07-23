@@ -34,7 +34,6 @@ _ACTION_SKILLS = {
 
 
 def structured_next_action(
-    root: Path,
     action: dict[str, Any] | None,
     *,
     context: dict[str, Any] | None = None,
@@ -44,11 +43,21 @@ def structured_next_action(
         return None
     context = context or {}
     raw_cmd = str(action.get("cmd") or "")
+    if (
+        not raw_cmd.strip()
+        or raw_cmd.lstrip().startswith("#")
+        or "…" in raw_cmd
+        or "<" in raw_cmd
+        or ">" in raw_cmd
+    ):
+        return None
     try:
         tokens = shlex.split(raw_cmd)
     except ValueError:
         tokens = []
     argv = tokens[1:] if tokens[:1] == ["aifilm"] else []
+    if not argv:
+        return None
     operation = argv[0] if argv else str(action.get("id") or "status")
     action_id = str(action.get("id") or "")
     skill_id = _ACTION_SKILLS.get(action_id, "dispatch.orchestrate")
@@ -317,7 +326,10 @@ def build_dispatch(
         except Exception as exc:  # noqa: BLE001
             cap = {"ok": False, "error": str(exc)[:200]}
 
-    primary = actions[0] if actions else None
+    primary = next(
+        (action for action in actions if structured_next_action(action) is not None),
+        None,
+    )
     next_cmd = (primary or {}).get("cmd")
     next_id = (primary or {}).get("id")
     next_why = (primary or {}).get("why")
@@ -447,6 +459,7 @@ def build_dispatch(
         jobs_summary = {"ok": False, "error": str(exc)[:200]}
 
     execution_plan_digest: dict[str, Any] | None = None
+    primary_job: dict[str, Any] | None = None
     if isinstance(jobs_summary, dict) and jobs_summary.get("jobs") is not None:
         primary_job = jobs_summary.get("primary_job")
         execution_plan_digest = {
@@ -509,7 +522,24 @@ def build_dispatch(
         )
     except (FileNotFoundError, ValueError):
         pass
-    next_action = structured_next_action(root, primary)
+    action_context = {
+        "node_refs": [primary_job.get("nodeRef")]
+        if isinstance(primary_job, dict) and primary_job.get("nodeRef")
+        else [],
+        "input_hashes": {str(primary_job.get("id") or "job"): str(primary_job["inputHash"])}
+        if isinstance(primary_job, dict) and primary_job.get("inputHash")
+        else {},
+        "dependencies": list(primary_job.get("dependsOn") or [])
+        if isinstance(primary_job, dict)
+        else [],
+        "expected_outputs": list(primary_job.get("produces") or [])
+        if isinstance(primary_job, dict)
+        else [],
+        "verification": list(primary_job.get("verification") or [])
+        if isinstance(primary_job, dict)
+        else [],
+    }
+    next_action = structured_next_action(primary, context=action_context)
 
     packet = {
         "ok": True,

@@ -3816,16 +3816,23 @@ def cmd_graph(args: argparse.Namespace) -> int:
             "imported_at": utc_now(),
         }
         graph["story"] = {
+            "genre": str(spec.get("genre") or "adult"),
             "premise": str(spec.get("description") or di.get("logline") or ""),
             "logline": str(di.get("logline") or spec.get("description") or ""),
             "theme": str(di.get("theme") or ""),
             "protagonist_ids": list(di.get("cast") or spec.get("cast_ids") or []),
             "protagonist_goal": str(di.get("protagonist_goal") or ""),
+            "protagonist_want": str(di.get("protagonist_want") or ""),
+            "protagonist_need": str(di.get("protagonist_need") or ""),
+            "protagonist_arc": str(di.get("protagonist_arc") or ""),
             "opposition": str(di.get("opposition") or ""),
             "stakes": str(di.get("stakes") or ""),
             "climax_choice": str(di.get("climax_choice") or ""),
             "ending_hook": str(di.get("ending_hook") or ""),
             "emotional_arc": list(di.get("emotional_arc") or []),
+            "act_structure": di.get("act_structure")
+            if isinstance(di.get("act_structure"), dict)
+            else {},
             "pace_chart": list(di.get("pace_chart") or []),
             "constraints": list(di.get("taboos") or []),
             "status": "needs_authoring",
@@ -5688,12 +5695,12 @@ def build_parser() -> argparse.ArgumentParser:
     dept_lock.add_argument("--root", required=True)
     dept_lock.add_argument("--id", dest="department_id", required=True)
     dept_lock.add_argument("--approval-ref", required=True)
-    dept_lock.add_argument("--expected-revision", type=int, default=None)
+    dept_lock.add_argument("--expected-revision", type=int, required=True)
     dept_unlock = department_sub.add_parser("unlock")
     dept_unlock.add_argument("--root", required=True)
     dept_unlock.add_argument("--id", dest="department_id", required=True)
     dept_unlock.add_argument("--reason", required=True)
-    dept_unlock.add_argument("--expected-revision", type=int, default=None)
+    dept_unlock.add_argument("--expected-revision", type=int, required=True)
 
     # Phase 2: Skill Registry shell
     skill_p = sub.add_parser("skill", help="Skill Registry: list|show|validate|run")

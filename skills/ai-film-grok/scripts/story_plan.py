@@ -1181,6 +1181,9 @@ def _draft_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:
             if isinstance(c, dict) and c.get("id")
         ][:2],
         "protagonist_goal": "",
+        "protagonist_want": "",
+        "protagonist_need": "",
+        "protagonist_arc": "",
         "opposition": "",
         "stakes": "",
         "climax_choice": "",
@@ -1560,6 +1563,19 @@ def plan_shots(
         heat_phase = str(beat.get("heat_phase") or "").strip().lower() or ""
         coitus_beat = str(beat.get("coitus_beat") or "").strip().lower() or ""
         wardrobe_state = str(beat.get("wardrobe_state") or "full").strip().lower() or "full"
+        # Cinema-grade camera prompt (Seedance camera language bridge, 2026-07-23).
+        # Enriches the fixed-enum axis with structured move/shot/angle/pacing/lighting.
+        from cinema_prompt import build_camera_prompt as _build_cinema_prompt
+
+        scene_type = str(scene.get("genre") or "").strip().lower() or None
+        cinema = _build_cinema_prompt(
+            dramatic_function=local_df,
+            shot_index=idx,
+            heat_phase=heat_phase or None,
+            scene_type=scene_type,
+            duration_sec=float(beat.get("duration_sec") or 5.0),
+        )
+        camera_prompt = cinema["camera_prompt"]
         # Adult: coitus-readable action — but keep user text in must_show when present
         adult_actions = {
             "entry": "pin partner entry mount-settle weight drop pelvis aim",
@@ -1665,11 +1681,35 @@ def plan_shots(
         subject = f"vertical 9:16, adult {char_ids[0] if char_ids else 'hero'}"
         if wardrobe_state in {"partial", "undressed", "bare"}:
             subject += f" {wardrobe_state} bare skin readable"
+        # Derive multi-axis character states (hair, skin, arousal, wardrobe)
+        c_hair = "neat"
+        c_skin = "normal"
+        c_arousal = "calm"
+        if heat_phase in {"act", "climax"}:
+            c_hair = "disheveled"
+            c_skin = "glistening_sweat"
+            c_arousal = "climax_ecstasy" if heat_phase == "climax" else "heavy_breathing"
+        elif heat_phase == "foreplay":
+            c_hair = "slightly_moussed"
+            c_skin = "flushed"
+            c_arousal = "heavy_breathing"
+        elif heat_phase == "afterglow":
+            c_hair = "sweat_moistened_strands"
+            c_skin = "afterglow_blush"
+            c_arousal = "calm"
+        character_states = {
+            "wardrobe": wardrobe_state,
+            "hair": c_hair,
+            "skin": c_skin,
+            "arousal": c_arousal,
+        }
+
         film_dsl: dict[str, Any] = {
             "subject": subject,
             "action": action_text,
             "motion": motion,
             "camera_axis": axis,
+            "camera_prompt": camera_prompt,
             "visible_change": visible_change,
             "story_beat": str(beat.get("objective") or local_df),
             "start_pose": (
@@ -1690,6 +1730,7 @@ def plan_shots(
                 else "eye_level",
             },
             "wardrobe_state": wardrobe_state,
+            "character_states": character_states,
         }
         if heat_phase:
             film_dsl["heat_phase"] = heat_phase
@@ -1714,6 +1755,8 @@ def plan_shots(
                 "characterIds": char_ids,
                 "locationId": location_id,
                 "wardrobeState": wardrobe_state,
+                "characterStates": character_states,
+                "character_states": character_states,
                 "heatPhase": heat_phase,
                 "coitusBeat": coitus_beat,
                 "sexPose": sex_pose,
@@ -1886,10 +1929,23 @@ def build_planned_graph(
     for c in normalized.get("character_candidates") or []:
         if not isinstance(c, dict):
             continue
+        role = str(c.get("role") or "supporting")
+        is_lead = role in ("lead", "speaking")
         characters.append(
             {
                 "id": c.get("id"),
                 "identity": c.get("name") or c.get("id"),
+                "name": c.get("name") or c.get("id"),
+                "age": "",
+                "personality": "",
+                "want": AUTHORING_PLACEHOLDER if is_lead else "",
+                "need": AUTHORING_PLACEHOLDER if is_lead else "",
+                "flaw": "",
+                "ghost_wound": "",
+                "arc_turning_points": [],
+                "relationships": [],
+                "psych_markers": [],
+                "dramatic_role": "protagonist" if role == "lead" else "supporting",
                 "defaultWardrobe": "",
                 "castMaster": None,
             }
@@ -2118,6 +2174,9 @@ def project_graph_to_film_spec(
         "cast": cast_ids,
         "taboos": taboos,
         "protagonist_goal": story.get("protagonist_goal") or "",
+        "protagonist_want": story.get("protagonist_want") or "",
+        "protagonist_need": story.get("protagonist_need") or "",
+        "protagonist_arc": story.get("protagonist_arc") or "",
         "opposition": story.get("opposition") or "",
         "stakes": story.get("stakes") or "",
         "climax_choice": story.get("climax_choice") or "",

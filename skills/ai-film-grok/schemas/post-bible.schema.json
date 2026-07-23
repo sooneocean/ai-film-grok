@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/post-bible.schema.json",
+  "title": "ai-film-grok post bible",
+  "type": "object",
+  "required": ["schema_version", "kind", "revision", "state", "hash", "approval_ref", "stale_reasons", "nodes"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "kind": { "type": "string", "const": "post-bible" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "state": { "enum": ["draft", "review", "locked", "stale"] },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "approval_ref": { "type": ["string", "null"] },
+    "stale_reasons": { "type": "array", "items": { "type": "object" } },
+    "nodes": {
+      "type": "object",
+      "required": ["coverage", "takes", "edl", "picture_lock", "vfx", "color", "captions", "mix", "master"],
+      "properties": {
+        "coverage": { "$ref": "#/$defs/parameterNode" },
+        "takes": { "$ref": "#/$defs/parameterNode" },
+        "edl": { "$ref": "#/$defs/parameterNode" },
+        "picture_lock": { "$ref": "#/$defs/parameterNode" },
+        "vfx": { "$ref": "#/$defs/parameterNode" },
+        "color": { "$ref": "#/$defs/parameterNode" },
+        "captions": { "$ref": "#/$defs/parameterNode" },
+        "mix": { "$ref": "#/$defs/parameterNode" },
+        "master": { "$ref": "#/$defs/parameterNode" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "parameterNode": {
+      "type": "object",
+      "required": ["id", "revision", "hash", "source_refs", "dependency_refs", "state", "approval_ref", "stale_reasons", "data"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^post\\.[a-z0-9_-]+\\.primary$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "source_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
+        "dependency_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "state": { "enum": ["draft", "review", "locked", "stale"] },
+        "approval_ref": { "type": ["string", "null"] },
+        "stale_reasons": { "type": "array", "items": { "type": "object" } },
+        "data": {}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

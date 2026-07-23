@@ -51,7 +51,10 @@
         "logline": { "type": "string" },
         "theme": { "type": "string" },
         "protagonist_ids": { "type": "array", "items": { "type": "string" } },
-        "protagonist_goal": { "type": "string" },
+        "protagonist_goal": { "type": "string", "description": "What protagonist wants (external goal)" },
+        "protagonist_want": { "type": "string", "description": "Conscious external desire" },
+        "protagonist_need": { "type": "string", "description": "Unconscious internal need (growth)" },
+        "protagonist_arc": { "type": "string", "description": "Arc: A→B state change" },
         "opposition": { "type": "string" },
         "stakes": { "type": "string" },
         "climax_choice": { "type": "string" },
@@ -345,7 +348,41 @@
       "required": ["id"],
       "properties": {
         "id": { "type": "string" },
-        "identity": { "type": "string" },
+        "identity": { "type": "string", "description": "Physical description: face/hair/eyes/wardrobe (visual identity)" },
+        "name": { "type": "string", "description": "Character name (dramatic identity, not just id)" },
+        "age": { "type": ["string", "integer"], "description": "Age or age band (e.g. 'mid-20s')" },
+        "personality": { "type": "string", "description": "Core personality traits (3-5 words)" },
+        "want": { "type": "string", "description": "What the character consciously wants (external goal)" },
+        "need": { "type": "string", "description": "What the character actually needs (internal growth)" },
+        "flaw": { "type": "string", "description": "Core flaw that prevents growth until arc resolves" },
+        "ghost_wound": { "type": "string", "description": "Backstory wound/ghost that drives behavior" },
+        "arc_turning_points": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Key moments where character changes (mapped to beat ids)"
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "to_character": { "type": "string", "description": "id of related character" },
+              "type": { "type": "string", "description": "e.g. mentor/rival/lover/family" },
+              "dynamic": { "type": "string", "description": "Power dynamic or emotional dynamic" }
+            }
+          },
+          "description": "Character relationship graph edges"
+        },
+        "psych_markers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Psychological externalization markers (body language, habits, tells)"
+        },
+        "dramatic_role": {
+          "type": "string",
+          "enum": ["protagonist", "antagonist", "mentor", "ally", "trickster", "guardian", "supporting"],
+          "description": "Dramatic function in the story (not just lead/supporting)"
+        },
         "defaultWardrobe": { "type": "string" },
         "castMaster": { "type": ["string", "null"] }
       }

@@ -186,6 +186,9 @@ class MediaQueue:
         max_attempts: int = 3,
         allow_without_pilot: bool = False,
         assembly_receipt: Path | None = None,
+        is_canary: bool = False,
+        canary_group_id: str | None = None,
+        seed_offset: int = 0,
     ) -> dict[str, Any]:
         try:
             shot_id = validate_identifier(shot_id, field="shot id")
@@ -243,10 +246,13 @@ class MediaQueue:
                 "operation": operation,
                 "prompt": prompt_hash,
                 "inputs": input_records,
+                "is_canary": is_canary,
+                "seed_offset": seed_offset,
             },
             sort_keys=True,
         ).encode("utf-8")
-        job_id = f"{shot_id}-{hashlib.sha256(identity).hexdigest()[:16]}"
+        canary_suffix = f"-canary{seed_offset}" if is_canary else ""
+        job_id = f"{shot_id}-{hashlib.sha256(identity).hexdigest()[:16]}{canary_suffix}"
         with self._locked():
             state = self._read()
             existing = next((job for job in state["jobs"] if job.get("id") == job_id), None)
@@ -284,12 +290,52 @@ class MediaQueue:
                 "max_attempts": max_attempts,
                 "next_attempt_at": utc_now(),
                 "created_at": utc_now(),
+                "is_canary": is_canary,
+                "seed_offset": seed_offset,
             }
+            if canary_group_id:
+                job["canary_group_id"] = canary_group_id
             if assembly_receipt:
                 job["assembly_receipt"] = str(assembly_receipt.expanduser().resolve())
             state["jobs"].append(job)
             self._write(state)
             return job
+
+    def add_canary_pair(
+        self,
+        *,
+        shot_id: str,
+        operation: str,
+        prompt_file: Path,
+        inputs: list[Path],
+        max_attempts: int = 3,
+        allow_without_pilot: bool = False,
+        seed_offset: int = 101,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Enqueue primary job and canary speculative mutation job in parallel."""
+        group_id = f"canary_grp_{shot_id}_{secrets.token_hex(4)}"
+        primary = self.add_job(
+            shot_id=shot_id,
+            operation=operation,
+            prompt_file=prompt_file,
+            inputs=inputs,
+            max_attempts=max_attempts,
+            allow_without_pilot=allow_without_pilot,
+            is_canary=False,
+            canary_group_id=group_id,
+        )
+        canary = self.add_job(
+            shot_id=shot_id,
+            operation=operation,
+            prompt_file=prompt_file,
+            inputs=inputs,
+            max_attempts=max_attempts,
+            allow_without_pilot=allow_without_pilot,
+            is_canary=True,
+            canary_group_id=group_id,
+            seed_offset=seed_offset,
+        )
+        return primary, canary
 
     def claim(self, *, now: str | None = None) -> dict[str, Any]:
         current = _parse_time(now or utc_now())

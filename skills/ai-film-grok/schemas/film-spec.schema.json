@@ -345,6 +345,21 @@
           "minItems": 3
         },
         "audience": { "type": "string", "minLength": 1 },
+        "protagonist_want": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the protagonist consciously wants (external goal). character_bible_strict: true → required."
+        },
+        "protagonist_need": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the protagonist actually needs (internal growth). character_bible_strict: true → required."
+        },
+        "protagonist_arc": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Protagonist arc: A→B state change. character_bible_strict: true → required."
+        },
         "taboos": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }

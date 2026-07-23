@@ -25,6 +25,11 @@ CODE_FRAME_CHAIN_ORPHAN = "FRAME_CHAIN_ORPHAN"
 CODE_MOTION_NO_MEANING = "MOTION_NO_MEANING"
 CODE_BEAT_SEMANTICS_MISS = "BEAT_SEMANTICS_MISS"
 CODE_VISIBLE_CHANGE_MISSING = "VISIBLE_CHANGE_MISSING"
+CODE_CHARACTER_STATE_REGRESSION = "CHARACTER_STATE_REGRESSION"
+CODE_POSE_MONOTONY = "POSE_MONOTONY"
+CODE_SIZE_MONOTONY = "SIZE_MONOTONY"
+CODE_GAZE_MISALIGNMENT = "GAZE_MISALIGNMENT"
+CODE_AXIS_JUMP = "AXIS_JUMP"
 
 # Micro-motion fillers — allowed as support, not as sole motion for hook/approach/action
 _MICRO_ONLY_TOKENS = frozenset(
@@ -897,6 +902,130 @@ def lint_continuity(
                     "severity": "warning",
                     "message": f"props {sorted(pp)} disappear between shots without afterglow/bridge",
                     "shot_ids": pair,
+                }
+            )
+
+        # Character state regression check (wardrobe / hair / skin / arousal level regression)
+        w0 = str(
+            prev.get("wardrobe_state")
+            or (prev.get("dsl") if isinstance(prev.get("dsl"), dict) else {}).get("wardrobe_state")
+            or ""
+        ).lower()
+        w1 = str(
+            cur.get("wardrobe_state")
+            or (cur.get("dsl") if isinstance(cur.get("dsl"), dict) else {}).get("wardrobe_state")
+            or ""
+        ).lower()
+        w_ranks = {"full": 0, "loosened": 1, "partial": 2, "undressed": 3, "bare": 4}
+        if w0 in w_ranks and w1 in w_ranks and w_ranks[w1] < w_ranks[w0]:
+            issues.append(
+                {
+                    "code": CODE_CHARACTER_STATE_REGRESSION,
+                    "severity": "warning",
+                    "message": f"character wardrobe_state regressed from {w0!r} to {w1!r} without scene reset",
+                    "shot_ids": pair,
+                }
+            )
+
+        # Gaze misalignment check (abrupt break from intense eye contact without transition)
+        g0 = str(prev.get("gaze_target") or prev.get("gazeTarget") or "").strip().lower()
+        g1 = str(cur.get("gaze_target") or cur.get("gazeTarget") or "").strip().lower()
+        if g0 == "intense_eye_contact" and g1 in {"gaze_away_abrupt", "gaze_away"}:
+            issues.append(
+                {
+                    "code": CODE_GAZE_MISALIGNMENT,
+                    "severity": "warning",
+                    "message": f"gaze target abruptly broke from {g0!r} to {g1!r} without transition",
+                    "shot_ids": pair,
+                }
+            )
+
+        # 180-degree camera axis jump check (e.g. over_right_shoulder to over_left_shoulder)
+        a0 = (
+            str(
+                prev.get("camera_axis")
+                or prev.get("cameraMovement")
+                or (prev.get("dsl") if isinstance(prev.get("dsl"), dict) else {}).get("camera_axis")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        a1 = (
+            str(
+                cur.get("camera_axis")
+                or cur.get("cameraMovement")
+                or (cur.get("dsl") if isinstance(cur.get("dsl"), dict) else {}).get("camera_axis")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        if (a0 == "over_right_shoulder" and a1 == "over_left_shoulder") or (
+            a0 == "over_left_shoulder" and a1 == "over_right_shoulder"
+        ):
+            issues.append(
+                {
+                    "code": CODE_AXIS_JUMP,
+                    "severity": "warning",
+                    "message": f"camera axis crossed 180-degree line between {a0!r} and {a1!r} without neutral cut",
+                    "shot_ids": pair,
+                }
+            )
+
+    # 3-shot sliding window check for pose and framing monotony
+    for i in range(len(shots) - 2):
+        s0, s1, s2 = shots[i], shots[i + 1], shots[i + 2]
+        p0 = (
+            str(
+                s0.get("sex_pose")
+                or s0.get("sexPose")
+                or (s0.get("dsl") if isinstance(s0.get("dsl"), dict) else {}).get("sex_pose")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        p1 = (
+            str(
+                s1.get("sex_pose")
+                or s1.get("sexPose")
+                or (s1.get("dsl") if isinstance(s1.get("dsl"), dict) else {}).get("sex_pose")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        p2 = (
+            str(
+                s2.get("sex_pose")
+                or s2.get("sexPose")
+                or (s2.get("dsl") if isinstance(s2.get("dsl"), dict) else {}).get("sex_pose")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        if p0 and p0 == p1 == p2:
+            issues.append(
+                {
+                    "code": CODE_POSE_MONOTONY,
+                    "severity": "warning",
+                    "message": f"3 consecutive shots use identical sex_pose {p0!r}",
+                    "shot_ids": [str(s0.get("id")), str(s1.get("id")), str(s2.get("id"))],
+                }
+            )
+
+        z0 = str(s0.get("shot_size") or s0.get("shotSize") or "").strip().lower()
+        z1 = str(s1.get("shot_size") or s1.get("shotSize") or "").strip().lower()
+        z2 = str(s2.get("shot_size") or s2.get("shotSize") or "").strip().lower()
+        if z0 and z0 == z1 == z2:
+            issues.append(
+                {
+                    "code": CODE_SIZE_MONOTONY,
+                    "severity": "warning",
+                    "message": f"3 consecutive shots use identical shot_size {z0!r}",
+                    "shot_ids": [str(s0.get("id")), str(s1.get("id")), str(s2.get("id"))],
                 }
             )
 

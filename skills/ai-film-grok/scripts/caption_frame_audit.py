@@ -100,6 +100,25 @@ def build_caption_frame_audit(root: Path, *, max_frames: int = 5) -> dict[str, A
     return report
 
 
+def select_best_canary_candidate(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    """Select highest-scoring Canary candidate based on status, QA audit, and file size."""
+    if not candidates:
+        raise ValueError("candidates list cannot be empty")
+
+    def score(cand: dict[str, Any]) -> float:
+        s = 0.0
+        if cand.get("status") == "succeeded":
+            s += 100.0
+        if not cand.get("is_canary"):
+            # Prefer primary candidate slightly if both succeeded
+            s += 5.0
+        s += min(float(cand.get("qa_score") or 0.0), 50.0)
+        s += min(float(cand.get("file_size_kb") or 0.0) / 100.0, 10.0)
+        return s
+
+    return max(candidates, key=score)
+
+
 def caption_frame_audit_fresh(root: Path) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
     report = read_json(root / "receipts" / "caption-frame-audit.json") or {}

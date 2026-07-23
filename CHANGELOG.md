@@ -8,6 +8,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](
 ### Added — Director methodology injection (P0-1: de-type-bias)
 
 - **Multi-genre beat spines**: `dramatic_function` seven-value enum is now decoupled from the adult six-shot spine. New `genre` field (drama-graph + film-spec schemas) selects the beat spine template. Five genres supported: `adult` (default, backward-compat), `drama`, `mystery`, `arthouse`, `documentary` — each with its own beat spine (key/objective/weight/shots_n).
+
+### Added — Director methodology injection (P0-2: three-act structure + pace chart)
+
+- **Structured `act_structure`**: `director_intent.act_structure` upgraded from free-form to structured object with `setup`/`confrontation`/`resolution` text + optional ratio fields (`setup_ratio`/`confrontation_ratio`/`resolution_ratio`, classic 0.20/0.50/0.30, sum validated ≈1.0). `act_structure_strict: true` → write-spec hard-gates non-empty + all three acts present.
+- **Structured `pace_chart`**: `director_intent.pace_chart` upgraded from string array to structured entries: `{label, start_ratio, end_ratio, cut_freq, intensity}` (≥3 segments). Validates ratio ranges, end>start, intensity 0-10. `pace_chart_strict: true` → write-spec hard-gates non-empty + ≥3 segments. Legacy string-array format still accepted (backward compat).
+- `validate_director_intent()` in `film_spec.py` now validates both structures. `_draft_story_contract()` initializes act_structure defaults. `project_graph_to_film_spec()` projects act_structure + pace_chart into film-spec.
+- Updated `film-spec.md` + `directors-lens.md` documentation.
 - `detect_genre()`: parallel to `detect_heat_signals()`, infers genre from brief text markers. Priority: explicit genre field > adult heat signals > genre text markers > default adult.
 - `select_beat_spine()` accepts `genre` parameter; non-adult genres return `GENRE_SPINES[genre]` directly (ignores heat signals). Adult genre preserves existing heat-signal logic unchanged.
 - `normalize_story()` now returns `genre` + `genre_evidence` fields.

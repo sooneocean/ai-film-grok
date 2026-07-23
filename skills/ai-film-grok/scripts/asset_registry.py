@@ -694,6 +694,7 @@ def assets_check(root: Path, *, sync_first: bool = True) -> dict[str, Any]:
         "re_dress_risks": re_dress,
         "issues": list(cons.get("issues") or []),
         "generate_plan_preview": cons.get("generate_plan_preview") or [],
+        "consistency": (sync_rep.get("consistency") or {}),
         "counts": sync_rep.get("counts"),
         "line": sync_rep.get("line"),
         "path": str(registry_path(root)),
@@ -704,3 +705,75 @@ def assets_check(root: Path, *, sync_first: bool = True) -> dict[str, Any]:
             else "fix re_dress in film-spec wardrobe_state; generate missing cast-states via state-index plan"
         ),
     }
+
+
+CHARACTER_STATE_AXES = {
+    "wardrobe": ["full", "loosened", "partial", "undressed", "bare"],
+    "hair": ["neat", "slightly_moussed", "disheveled", "sweat_moistened_strands"],
+    "skin": ["normal", "flushed", "glistening_sweat", "afterglow_blush"],
+    "arousal": ["calm", "intrigued", "heavy_breathing", "climax_ecstasy"],
+    "expression": [
+        "calm",
+        "flushed_anticipation",
+        "lip_bite_gasp",
+        "ecstasy_eyes_closed",
+        "gentle_smile_tear",
+    ],
+}
+
+
+def derive_character_state_timeline(
+    shots: list[dict[str, Any]], heroine_ids: list[str] | None = None
+) -> list[dict[str, Any]]:
+    """Derive monotonic multi-axis character states for shots within a scene."""
+    if not shots:
+        return []
+
+    curr_states: dict[str, int] = {
+        "wardrobe": 0,
+        "hair": 0,
+        "skin": 0,
+        "arousal": 0,
+        "expression": 0,
+    }
+
+    timeline = []
+    for shot in shots:
+        hp = (
+            str(
+                shot.get("heat_phase")
+                or (shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}).get("heat_phase")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+
+        # Map heat phase to target minimum state levels
+        if hp in {"act", "climax"}:
+            target = {"wardrobe": 3, "hair": 2, "skin": 2, "arousal": 3, "expression": 3}
+        elif hp == "foreplay":
+            target = {"wardrobe": 2, "hair": 1, "skin": 1, "arousal": 2, "expression": 2}
+        elif hp == "teaser":
+            target = {"wardrobe": 1, "hair": 1, "skin": 1, "arousal": 1, "expression": 1}
+        elif hp == "afterglow":
+            target = {"wardrobe": 3, "hair": 3, "skin": 3, "arousal": 1, "expression": 4}
+        else:
+            target = {"wardrobe": 0, "hair": 0, "skin": 0, "arousal": 0, "expression": 0}
+
+        # Monotonic non-regression: state level cannot decrease within scene
+        for axis, target_idx in target.items():
+            curr_states[axis] = max(curr_states[axis], target_idx)
+
+        shot_states = {
+            axis: CHARACTER_STATE_AXES[axis][curr_states[axis]] for axis in CHARACTER_STATE_AXES
+        }
+        timeline.append(
+            {
+                "shot_id": str(shot.get("id")),
+                "heat_phase": hp,
+                "character_states": shot_states,
+            }
+        )
+
+    return timeline

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/production-book.schema.json",
+  "title": "ai-film-grok Production Book",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "rigor",
+    "packs",
+    "phase",
+    "stage",
+    "state",
+    "revision",
+    "content_sha256",
+    "departments",
+    "dependency_graph",
+    "stale_reasons",
+    "exception_ledger"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "kind": { "type": "string", "const": "production-book" },
+    "title": { "type": "string" },
+    "rigor": { "enum": ["legacy", "guided", "professional"] },
+    "packs": {
+      "type": "object",
+      "required": ["format", "genre"],
+      "properties": {
+        "format": { "type": "string", "minLength": 1 },
+        "genre": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "phase": { "type": "string", "minLength": 1 },
+    "stage": { "type": "string", "minLength": 1 },
+    "state": { "enum": ["draft", "review", "locked", "stale"] },
+    "revision": { "type": "integer", "minimum": 1 },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "departments": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/department" }
+    },
+    "dependency_graph": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" },
+        "uniqueItems": true
+      }
+    },
+    "stale_reasons": { "type": "array", "items": { "type": "object" } },
+    "exception_ledger": { "type": "array", "items": { "type": "object" } },
+    "assets": { "type": "array" }
+  },
+  "$defs": {
+    "department": {
+      "type": "object",
+      "required": ["ref", "revision", "content_sha256", "state", "stale_reasons"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "revision": { "type": "integer", "minimum": 1 },
+        "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "state": { "enum": ["draft", "review", "locked", "stale"] },
+        "stale_reasons": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

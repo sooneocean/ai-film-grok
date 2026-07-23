@@ -1,0 +1,84 @@
+{
+  "kind": "professional-director-golden",
+  "format": {"aspect": "9:16", "duration_sec": 45},
+  "genre_pack": "drama",
+  "core_rules": ["human-approval", "hash-bound", "source-chain"],
+  "genre_rules": [],
+  "characters": {
+    "mei": {
+      "face_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "hair": {"color": "black", "style": "low ponytail"},
+      "voice": {"provider": "edge", "voice_id": "zh-TW-HsiaoChenNeural"},
+      "wardrobe_states": {"coat": 0, "coat_wet": 1}
+    },
+    "lin": {
+      "face_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "hair": {"color": "brown", "style": "short crop"},
+      "voice": {"provider": "edge", "voice_id": "zh-TW-YunJheNeural"},
+      "wardrobe_states": {"suit": 0}
+    }
+  },
+  "locations": ["station-platform", "night-train"],
+  "props": {"red-umbrella": {"states": {"closed": 0, "open": 1}}},
+  "dialogue": {
+    "line-01": {
+      "character": "mei",
+      "text": "如果这班车开走，我们就真的回不去了。",
+      "checksum": "9e93b5fdd74b9adac2bf48f71fae0056fa8d80544a9ea2981338f1c0e0ef1dc5",
+      "required": true
+    }
+  },
+  "music": {"motif_id": "last-train", "licensed": true},
+  "shots": [
+    {
+      "id": "shot-01",
+      "start": 0,
+      "end": 9,
+      "location": "station-platform",
+      "axis": "A",
+      "characters": {
+        "mei": {"face_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "hair_color": "black", "wardrobe_state": "coat", "voice_provider": "edge", "voice_id": "zh-TW-HsiaoChenNeural"}
+      },
+      "props": {"red-umbrella": "closed"}
+    },
+    {
+      "id": "shot-02",
+      "start": 9,
+      "end": 20,
+      "location": "station-platform",
+      "axis": "A",
+      "characters": {
+        "mei": {"face_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "hair_color": "black", "wardrobe_state": "coat_wet", "voice_provider": "edge", "voice_id": "zh-TW-HsiaoChenNeural"},
+        "lin": {"face_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "hair_color": "brown", "wardrobe_state": "suit", "voice_provider": "edge", "voice_id": "zh-TW-YunJheNeural"}
+      },
+      "props": {"red-umbrella": "open"},
+      "dialogue_events": [{"id": "line-01", "start": 11, "end": 16, "checksum": "9e93b5fdd74b9adac2bf48f71fae0056fa8d80544a9ea2981338f1c0e0ef1dc5"}],
+      "caption_events": [{"dialogue_id": "line-01", "start": 11, "end": 16}],
+      "music_cues": [{"motif_id": "last-train", "start": 9, "end": 20, "duck_db": 10}]
+    },
+    {
+      "id": "shot-03",
+      "start": 20,
+      "end": 32,
+      "location": "night-train",
+      "axis": "B",
+      "axis_bridge": true,
+      "characters": {
+        "mei": {"face_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "hair_color": "black", "wardrobe_state": "coat_wet", "voice_provider": "edge", "voice_id": "zh-TW-HsiaoChenNeural"}
+      },
+      "props": {"red-umbrella": "open"}
+    },
+    {
+      "id": "shot-04",
+      "start": 32,
+      "end": 45,
+      "location": "night-train",
+      "axis": "B",
+      "characters": {
+        "lin": {"face_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "hair_color": "brown", "wardrobe_state": "suit", "voice_provider": "edge", "voice_id": "zh-TW-YunJheNeural"}
+      },
+      "props": {"red-umbrella": "open"}
+    }
+  ],
+  "approvals": [{"scope": "golden", "input_hash": "current-golden-hash", "current_hash": "current-golden-hash", "approver_type": "human"}]
+}
