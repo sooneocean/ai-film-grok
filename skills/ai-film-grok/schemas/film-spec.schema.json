@@ -25,6 +25,20 @@
       "description": "Beat spine selector. Determines which beat template drives dramatic_function assignment. See references/beat-spines.md. Default: adult (backward compat)."
     },
     "vo_mode": { "enum": ["storyteller", "character", "hybrid"] },
+    "audio_tracks_strict": {
+      "type": "boolean",
+      "description": "Require explicit dialogue/BGM/SFX contract and rendered artifact evidence. Defaults false for backward compatibility."
+    },
+    "audio_tracks": {
+      "type": "object",
+      "properties": {
+        "dialogue": { "type": "object", "additionalProperties": true },
+        "sfx": { "type": "object", "additionalProperties": true },
+        "music": { "type": "object", "additionalProperties": true },
+        "bgm": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
     "tts_backend": { "enum": ["auto", "minimax", "fish", "voicebox", "edge", "external"] },
     "i2v_provider": {
       "enum": ["frw", "grok", "auto"],

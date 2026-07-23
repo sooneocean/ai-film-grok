@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 SPOT_EVENT_TYPES = frozenset(
@@ -64,6 +66,73 @@ HORROR_TONE_HINTS = (
 
 class SoundPlanError(ValueError):
     pass
+
+
+def validate_audio_tracks_contract(
+    spec: dict[str, Any],
+    *,
+    audio_dir: Path | None = None,
+    require_artifacts: bool = False,
+) -> dict[str, Any]:
+    """Validate the optional dual-track contract without breaking old specs."""
+    strict = bool(spec.get("audio_tracks_strict"))
+    sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else {}
+    tracks = spec.get("audio_tracks")
+    if tracks is None:
+        tracks = sound_plan.get("audio_tracks")
+    warnings: list[str] = []
+    errors: list[str] = []
+    if tracks is None:
+        warnings.append("audio_tracks missing; using renderer defaults")
+        tracks = {}
+    elif not isinstance(tracks, dict):
+        errors.append("audio_tracks must be an object")
+        tracks = {}
+
+    music = tracks.get("music") or tracks.get("bgm")
+    if strict:
+        for name in ("dialogue", "sfx"):
+            if not isinstance(tracks.get(name), dict):
+                errors.append(f"audio_tracks.{name} is required")
+        if not isinstance(music, dict):
+            errors.append("audio_tracks.music or audio_tracks.bgm is required")
+        for name, item in (("sfx", tracks.get("sfx")), ("music", music)):
+            if isinstance(item, dict) and not str(item.get("source") or item.get("license") or "").strip():
+                errors.append(f"audio_tracks.{name}.source or license is required")
+    elif not isinstance(music, dict):
+        warnings.append("audio_tracks.music missing; renderer will generate procedural BGM")
+
+    result: dict[str, Any] = {"strict": strict, "tracks": tracks, "warnings": warnings}
+    if require_artifacts and audio_dir is not None:
+        expected = {name: audio_dir / filename for name, filename in (
+            ("bgm", "bgm_stereo.wav"), ("sfx", "sfx_stereo.wav"),
+            ("mixed", "mixed.wav"), ("mix_report", "mix_report.json"),
+        )}
+        missing = [name for name, path in expected.items() if not path.is_file()]
+        if missing:
+            errors.append("audio artifacts missing: " + ", ".join(missing))
+        report = expected["mix_report"]
+        if report.is_file():
+            try:
+                report_obj = json.loads(report.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                errors.append(f"mix_report.json unreadable: {exc}")
+            else:
+                artifacts = report_obj.get("artifacts") if isinstance(report_obj, dict) else None
+                if not isinstance(artifacts, dict):
+                    errors.append("mix_report.artifacts is required")
+                else:
+                    for name in ("bgm", "sfx", "mixed"):
+                        item = artifacts.get(name)
+                        if not isinstance(item, dict) or not item.get("sha256"):
+                            errors.append(f"mix_report.artifacts.{name}.sha256 is required")
+        result["artifacts"] = {name: str(path) for name, path in expected.items()}
+    if errors and strict:
+        raise SoundPlanError("audio_tracks_strict: " + "; ".join(errors))
+    if errors:
+        warnings.extend(errors)
+    result["errors"] = errors
+    return result
 
 
 # VO sidechain-compress defaults (FFmpeg sidechaincompress on BGM bed)

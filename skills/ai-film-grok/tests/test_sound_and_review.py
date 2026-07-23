@@ -63,6 +63,34 @@ class TestSoundPlanSchema:
         assert "fade_in" in enum_vals
         assert "fade_out" in enum_vals
 
+    def test_audio_tracks_strict_defaults_to_legacy_warning(self):
+        from sound_plan import validate_audio_tracks_contract
+
+        result = validate_audio_tracks_contract({})
+        assert result["strict"] is False
+        assert result["warnings"]
+
+    def test_audio_tracks_strict_requires_explicit_tracks_and_sources(self):
+        import pytest
+        from sound_plan import SoundPlanError, validate_audio_tracks_contract
+
+        with pytest.raises(SoundPlanError, match="audio_tracks_strict"):
+            validate_audio_tracks_contract({"audio_tracks_strict": True})
+
+    def test_audio_tracks_accepts_bgm_alias_and_sfx_source(self):
+        from sound_plan import validate_audio_tracks_contract
+
+        result = validate_audio_tracks_contract({
+            "audio_tracks_strict": True,
+            "audio_tracks": {
+                "dialogue": {"gain": 1.0},
+                "sfx": {"source": "procedural"},
+                "bgm": {"license": "original"},
+            },
+        })
+        assert result["strict"] is True
+        assert result["errors"] == []
+
 
 class TestDirectorReviewExpansion:
     """P3-5: director review scorecard expanded."""

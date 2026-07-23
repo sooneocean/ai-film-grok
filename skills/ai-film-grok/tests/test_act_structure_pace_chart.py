@@ -93,6 +93,17 @@ class TestActStructureValidation:
         except FilmSpecError as e:
             assert "act_structure" in str(e).lower()
 
+    def test_act_structure_strict_rejects_partial_act(self):
+        spec = _base_spec()
+        spec["act_structure_strict"] = True
+        spec["director_intent"]["act_structure"] = {"setup": "建立世界"}
+        try:
+            validate_director_intent(spec)
+            raise AssertionError("should have raised FilmSpecError")
+        except FilmSpecError as e:
+            assert "confrontation" in str(e)
+            assert "resolution" in str(e)
+
 
 class TestPaceChartValidation:
     """pace_chart structured entry validation."""

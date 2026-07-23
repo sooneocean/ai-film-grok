@@ -300,10 +300,12 @@ def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
             act_cleaned.update(ratios)
         elif ratios:
             act_cleaned.update(ratios)
-        if act_strict and not act_cleaned.get("setup"):
-            raise FilmSpecError(
-                "act_structure_strict: setup/confrontation/resolution required when strict"
-            )
+        if act_strict:
+            missing_acts = [key for key in ("setup", "confrontation", "resolution") if not act_cleaned.get(key)]
+            if missing_acts:
+                raise FilmSpecError(
+                    "act_structure_strict: required fields missing: " + ", ".join(missing_acts)
+                )
         if act_cleaned:
             intent["act_structure"] = act_cleaned
     elif act_strict:

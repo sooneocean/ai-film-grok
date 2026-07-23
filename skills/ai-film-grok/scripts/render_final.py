@@ -61,6 +61,7 @@ from sound_plan import (
     resolve_sidechain,
     should_apply_loudnorm,
     sidechain_filter_fragment,
+    validate_audio_tracks_contract,
 )
 
 # local sibling import
@@ -97,6 +98,18 @@ except ImportError:  # pragma: no cover
 # TTS 质量与稳定声线分开选择；跨服务商降级必须显式开启。
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"  # edge 显式后端默认女声
 STORYTELLER_VOICE = "zh-CN-XiaoxiaoNeural"
+# P0 · 2026-07-23: character dialogue defaults to Japanese edge voices
+HEROINE_JA_VOICE = "ja-JP-NanamiNeural"
+PARTNER_JA_VOICE = "ja-JP-KeitaNeural"
+_NARRATOR_SPEAKERS = frozenset(
+    {"storyteller", "narrator", "vo", "旁白", "os", "inner", "内心"}
+)
+_HEROINE_SPEAKERS = frozenset(
+    {"heroine", "female", "fufu", "girl", "woman", "she", "女主", "沈筱", "astra"}
+)
+_PARTNER_SPEAKERS = frozenset(
+    {"partner", "male_hero", "hero", "male", "boy", "man", "he", "男主", "杨舟"}
+)
 
 
 def build_post_enhancement_vf_chain(
@@ -1269,17 +1282,92 @@ def flatten_shots(spec: dict[str, Any], film_root: Path | None = None) -> list[d
         raise RenderError(str(exc)) from exc
 
 
+def _shot_speaker_key(shot: dict[str, Any]) -> str:
+    raw = shot.get("speaker") or shot.get("role") or ""
+    return str(raw).strip().lower()
+
+
+def is_character_speech_shot(shot: dict[str, Any]) -> bool:
+    """True when this plate should use character-dialogue TTS (not pure storyteller)."""
+    sp = _shot_speaker_key(shot)
+    if sp and sp not in _NARRATOR_SPEAKERS:
+        return True
+    for key in ("dialogue", "dialogue_ja", "nar_ja", "spoken_ja"):
+        val = shot.get(key)
+        if isinstance(val, str) and val.strip():
+            return True
+    explicit = str(shot.get("vo_voice") or shot.get("voice") or "")
+    if explicit.startswith("ja-JP-") or explicit.startswith("ja-"):
+        return True
+    return False
+
+
 def narration_for_shot(shot: dict[str, Any]) -> str:
-    for key in ("nar", "narration", "dialogue", "vo", "caption"):
+    """Chinese / default caption+legacy text (not necessarily what TTS speaks)."""
+    for key in ("nar", "narration", "nar_zh", "dialogue", "vo", "caption"):
         val = shot.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
-    # fall back to purpose/title
     for key in ("purpose", "title"):
         val = shot.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
     return ""
+
+
+def caption_text_for_shot(shot: dict[str, Any], *, caption_lang: str = "zh") -> str:
+    """On-screen subtitle text. Default Chinese even when TTS is Japanese."""
+    lang = (caption_lang or "zh").strip().lower()
+    if lang in {"ja", "jp", "japanese"}:
+        for key in ("nar_ja", "dialogue_ja", "spoken_ja", "nar", "narration"):
+            val = shot.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+    # zh / default: never let Japanese be the only caption source when Chinese exists
+    for key in ("nar", "narration", "nar_zh", "caption", "dialogue"):
+        val = shot.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    for key in ("nar_ja", "dialogue_ja"):
+        val = shot.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return narration_for_shot(shot)
+
+
+def spoken_text_for_shot(
+    shot: dict[str, Any],
+    *,
+    dialogue_spoken_lang: str = "ja",
+    narration_spoken_lang: str = "zh",
+    vo_mode: str = "storyteller",
+) -> str:
+    """Text fed to TTS. Character lines prefer Japanese when policy is ja."""
+    dlang = (dialogue_spoken_lang or "ja").strip().lower()
+    nlang = (narration_spoken_lang or "zh").strip().lower()
+    character = is_character_speech_shot(shot)
+    if character and dlang in {"ja", "jp", "japanese"}:
+        for key in ("nar_ja", "dialogue_ja", "spoken_ja", "dialogue"):
+            val = shot.get(key)
+            if isinstance(val, str) and val.strip():
+                # Prefer Japanese scripts; skip pure CJK Chinese if ja field missing
+                text = val.strip()
+                if key in {"nar_ja", "dialogue_ja", "spoken_ja"}:
+                    return text
+                # dialogue field may be Chinese — only use if no ja and looks JP-ish
+                if any("\u3040" <= ch <= "\u30ff" or "\u31f0" <= ch <= "\u31ff" for ch in text):
+                    return text
+        # Soft fallback: Chinese dialogue still spoken (agent should fill nar_ja)
+        for key in ("dialogue", "nar", "narration"):
+            val = shot.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+    if nlang in {"ja", "jp", "japanese"} and not character:
+        for key in ("nar_ja", "nar", "narration"):
+            val = shot.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+    return narration_for_shot(shot)
 
 
 def voice_for_shot(
@@ -1288,10 +1376,11 @@ def voice_for_shot(
     default_voice: str,
     cast_voices: dict[str, str] | None,
     vo_mode: str,
+    dialogue_spoken_lang: str = "ja",
 ) -> str:
     """Resolve one stable voice id for this shot — 一角一声.
 
-    Priority: shot.vo_voice → cast_voices[cast[0]] → default_voice
+    Priority: shot.vo_voice → cast_voices[speaker|cast] → JA character defaults → default_voice
     Storyteller mode ignores per-shot cast unless shot.speaker is set.
     """
     cast_voices = cast_voices or {}
@@ -1309,7 +1398,26 @@ def voice_for_shot(
         c0 = str(casts[0]).strip()
         if c0 in cast_voices:
             return cast_voices[c0]
+    sp = _shot_speaker_key(shot)
+    dlang = (dialogue_spoken_lang or "ja").strip().lower()
+    if is_character_speech_shot(shot) and dlang in {"ja", "jp", "japanese"}:
+        if sp in cast_voices:
+            return cast_voices[sp]
+        if sp in _PARTNER_SPEAKERS or any(k in cast_voices for k in ("partner", "male_hero")):
+            for k in ("partner", "male_hero", "hero"):
+                if k in cast_voices:
+                    return cast_voices[k]
+            if sp in _PARTNER_SPEAKERS:
+                return PARTNER_JA_VOICE
+        if sp in _HEROINE_SPEAKERS or "heroine" in cast_voices:
+            if "heroine" in cast_voices:
+                return cast_voices["heroine"]
+            return HEROINE_JA_VOICE
+        # character speech without clear gender → heroine JA default
+        return cast_voices.get("heroine") or HEROINE_JA_VOICE
     if vo_mode == "storyteller" and "storyteller" in cast_voices:
+        return cast_voices["storyteller"]
+    if "storyteller" in cast_voices and not is_character_speech_shot(shot):
         return cast_voices["storyteller"]
     return default_voice
 
@@ -1687,6 +1795,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
 
     manifest = read_json(root / "manifest.json")
     spec = read_json(root / "film-spec.json")
+    audio_contract = validate_audio_tracks_contract(spec)
+    for warning in audio_contract.get("warnings") or []:
+        log(f"audio contract warning: {warning}")
     # Hard gate: long VO on short plates → stream_loop (boring). Split nars first.
     from production_gates import ProductionGateError, assert_no_loop_risk
 
@@ -1830,13 +1941,39 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 raise RenderError(str(exc)) from exc
             if native_record.get("sha256") != sha256(native_audio):
                 raise RenderError(f"Native audio fingerprint changed for {sid}")
-        text = narration_for_shot(shot)
+        dialogue_spoken_lang = str(
+            spec.get("dialogue_spoken_lang")
+            or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
+            or "ja"
+        )
+        narration_spoken_lang = str(
+            spec.get("narration_spoken_lang")
+            or (spec.get("voice_policy") or {}).get("narration_spoken_lang")
+            or "zh"
+        )
+        caption_lang = str(
+            spec.get("caption_lang")
+            or (spec.get("voice_policy") or {}).get("caption_lang")
+            or "zh"
+        )
+        text = spoken_text_for_shot(
+            shot,
+            dialogue_spoken_lang=dialogue_spoken_lang,
+            narration_spoken_lang=narration_spoken_lang,
+            vo_mode=vo_mode,
+        )
+        caption_text = caption_text_for_shot(shot, caption_lang=caption_lang) or text
         if not text:
-            raise RenderError(f"Shot {sid} has no nar/narration/dialogue text for VO")
+            raise RenderError(
+                f"Shot {sid} has no spoken text for VO "
+                f"(need nar/nar_ja/dialogue; character lines prefer nar_ja when "
+                f"dialogue_spoken_lang=ja)"
+            )
         max_chars = int(
             getattr(args, "sub_max_chars", DEFAULT_SUB_MAX_CHARS) or DEFAULT_SUB_MAX_CHARS
         )
-        units = split_units(text, max_len=max_chars)
+        # Subtitles use caption language (default zh); TTS may be Japanese
+        units = split_units(caption_text, max_len=max_chars)
         try:
             mp3 = safe_output_path(
                 audio_dir, f"{sid}_vo.mp3", suffixes={".mp3"}, field=f"VO output for {sid}"
@@ -1848,7 +1985,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             raise RenderError(str(exc)) from exc
         log(f"TTS {sid}: {text[:40]}...")
         shot_voice = voice_for_shot(
-            shot, default_voice=voice, cast_voices=cast_voices, vo_mode=vo_mode
+            shot,
+            default_voice=voice,
+            cast_voices=cast_voices,
+            vo_mode=vo_mode,
+            dialogue_spoken_lang=dialogue_spoken_lang,
         )
         wav, dur, tts_meta = tts_to_wav(
             text,
@@ -2819,11 +2960,19 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 )[-400:]
         else:
             mix_spotting["loudnorm_applied"] = False
+        mix_spotting["artifacts"] = {
+            "bgm": {"path": str(music_path), "sha256": sha256(music_path)},
+            "sfx": {"path": str(sfx_stereo_path), "sha256": sha256(sfx_stereo_path)},
+            "mixed": {"path": str(mixed), "sha256": sha256(mixed)},
+        }
         if mix_spotting.get("report_path"):
             atomic_write_text(
                 Path(str(mix_spotting["report_path"])),
                 json.dumps(mix_spotting, ensure_ascii=False, indent=2) + "\n",
             )
+        validate_audio_tracks_contract(spec, audio_dir=audio_dir, require_artifacts=True)
+    except SoundPlanError:
+        raise
     except Exception as exc:  # pragma: no cover — probe must never fail final
         mix_spotting["loudness_error"] = str(exc)[:200]
         if mix_spotting.get("report_path"):
