@@ -19,6 +19,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from master_delivery import validate_master_delivery  # noqa: E402
 from production_book import (  # noqa: E402
     ProductionBookConflict,
     apply_stale_propagation,
@@ -27,7 +28,6 @@ from production_book import (  # noqa: E402
     read_production_book,
     update_department,
 )
-from master_delivery import validate_master_delivery  # noqa: E402
 
 _SHA = "a" * 64
 
