@@ -32,6 +32,9 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 ```
 
 主脊详解：[craft-spine.md](references/craft-spine.md) · 音频三阶梯：[audio-fallback.md](references/audio-fallback.md) · 调度：[auto-dispatch.md](references/auto-dispatch.md)
+剪辑与字幕细则：[lessons-2026-07-20-cut-silk-bilingual.md](references/lessons-2026-07-20-cut-silk-bilingual.md) · [lessons-2026-07-20-transition-motion-v2.md](references/lessons-2026-07-20-transition-motion-v2.md) · [lessons-2026-07-20-title-double-burn.md](references/lessons-2026-07-20-title-double-burn.md)
+FRW 降级路线：[frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)；Seedance 为恢复路径，不是 first-last-frame 默认流程：`frw_video_model=seedance-2-fast-i2v`、`frw newvideo`、`seedance_first`、[lessons-2026-07-20-seedance-quality.md](references/lessons-2026-07-20-seedance-quality.md)。
+设计后期默认 `plate-cards blank` + `subs off`，避免标题双烧。
 
 ### Agent 自动调配（强制）
 
@@ -149,34 +152,18 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 
 ## 硬门禁（工程 · 不可跳）
 
-完整表见 [hard-defaults.md](references/hard-defaults.md)。**仅工程/一致性**最低线：
+完整表见 [hard-defaults.md](references/hard-defaults.md)。**仅工程/一致性**最低线（P0 红线，其余见 hard-defaults §量产十条）：
 
-1. **write-spec 过**（intent / beat / vo_budget）→ 才 queue
-2. **pilot 用户批准** → 才 bulk（无批准 ≤3 shot_id）
-3. **continue**：末帧 SHA = 下镜 keyframe；缝 **hard**；禁 cast 重起
-4. **VO 预算**：`nar`≤55 字；pacing；hook/action 不 loop
-5. **双烧**：设计路径 `plate-cards blank` + `subs off`
-6. **交付**：七维全 pass + 完整观看 → `final_complete`
-7. **失败**：`media-queue fail/requeue`；禁手改 queue JSON
-8. **同源**：禁半片 Grok + 半片 FRW still/2V
-9. **卸装不回穿（P0 像素）**：peak 后 still **禁止**全装 cast 源；`canonical/wardrobe/undress-anchor` → 只改姿势；I2V 锁 first-frame 衣着（见 [wardrobe-no-redress-still](references/lessons-2026-07-21-wardrobe-no-redress-still.md)）
-   **+ 末帧门（2026-07-22）**：register 前验 last frame 未把已脱衣物穿回；毒末帧禁止 promote（见 [i2v-endframe-no-redress](references/lessons-2026-07-22-i2v-endframe-no-redress.md)）
-10. **Keyframe-first · 状态照检查门**：`aifilm state-index check|plan` — 查状态照/keyframe/promote；**有缺口本阶段可补生成**，再 bulk，保障运镜转场流畅（见 [keyframe-first-state-index](references/keyframe-first-state-index.md)）
-11. **静帧禁压缩/错幅（P0）**：keyframe **≥720×1280 且 9:16**；禁横图/缩略图/缩水 jpg 进 I2V；`register-still`+`preflight` 硬闸；同 stem 用 `pick_best_keyframe`（见 [keyframe-no-compress](references/lessons-2026-07-22-keyframe-no-compress.md)）
-12. **先验后生 · 算力刀口（P0）**：**验证完再** `image_to_video` / bulk `image_edit`；图与视频同一逻辑；禁止未验 30 still 就开 30 I2V；坏了只修上游不盲重烧（见 [verify-before-generate](references/lessons-2026-07-22-verify-before-generate.md)）
-13. **用户原文保真（P0）**：`plan`/`write-spec` 不得用 adult-max 库存旁白整句覆盖用户诗白/对白；多段输入独立场景，禁止 dual-climax 自动克隆；`USER_SOURCE_NAR_POLLUTED` hard fail（见 [user-source-fidelity](references/lessons-2026-07-22-user-source-fidelity.md)）
-
-14. **用户定妆脸锁（P0）**：角色 still 禁纯 t2i；cast FRONT+face；moderated 不绕（[shaofu-cast-subs-bgm-final](references/lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)）
-15. **字幕交付**：HF 路径失败必须 burn；禁空 SRT
-16. **色气 BGM**：优先 `assets/bgm/rnb/*` + `--music-mood rnb`
+1. **write-spec 过** → 才 queue；**pilot 用户批准** → 才 bulk（无批准 ≤3 shot_id）
+2. **先验后生**：still/视频验证完再烧下一级；坏输入只修上游不盲重烧（[verify-before-generate](references/lessons-2026-07-22-verify-before-generate.md)）
+3. **卸装不回穿**：`wardrobe_state` 只前进；peak 后禁全装 cast 源；末帧门验不回穿（[wardrobe-no-redress-still](references/lessons-2026-07-21-wardrobe-no-redress-still.md) · [i2v-endframe-no-redress](references/lessons-2026-07-22-i2v-endframe-no-redress.md)）
+4. **静帧几何**：keyframe ≥720×1280 且 9:16；禁横图/缩略图/压糊 jpg（[keyframe-no-compress](references/lessons-2026-07-22-keyframe-no-compress.md)）
+5. **用户原文保真**：禁模板整句覆盖用户诗白/对白；`USER_SOURCE_NAR_POLLUTED` hard fail（[user-source-fidelity](references/lessons-2026-07-22-user-source-fidelity.md)）
+6. **交付**：七维全 pass + 完整观看 → `final_complete`；HF 失字必 burn；禁空 SRT
 
 **弹性（跟 brief）**：`heat_scale` / 亲密核镜比 / 单·多女主——由 Prompt 与参考图推断。
-**例外硬底**（`heat_scale=max` write-spec 默认 hard）：
-1) 性爱片段 act+climax **时长 ≥30%**（`sex_floor_strict`；hardcore ≥40%）
-2) **办事必须卸甲/脱衣**到 `wardrobe_state`=partial\|undressed\|bare，且有卸装动作拍（`sex_wardrobe_strict`）；**后镜延续前镜卸装、禁止回穿**（`HEAT_WARDROBE_RE_DRESS` / clamp / `start_pose` 从已脱开场 / `HEAT_WARDROBE_TEXT_CONFLICT`）
-3) **旁白全程荤梗**；act/climax 必须办事动词（`sex_vo_strict`）——实打实办事剧，禁纯文艺说书
-4) **静帧源链**：卸装峰值 → `undress-anchor`；之后 **永不** `image_edit(全装 cast)`（文字 bare + 像素 full = 事故）
-见 [ecchi-story.md](references/ecchi-story.md) · [sex-duration-floor](references/lessons-2026-07-21-sex-duration-floor.md) · [sex-undress-ladder](references/lessons-2026-07-21-sex-undress-ladder.md) · [wardrobe-no-redress-still](references/lessons-2026-07-21-wardrobe-no-redress-still.md) · [sex-vo-spice](references/lessons-2026-07-21-sex-vo-spice.md)。
+**`heat_scale=max` 例外硬底**（详见 [hard-defaults.md](references/hard-defaults.md) §叙事与规划）：性爱时长 ≥30% · 卸甲脱衣不回穿 · 旁白全程荤梗 · 静帧源链 undress-anchor。
+
 
 ---
 
@@ -218,43 +205,13 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 
 - **加载** `/imagine`：reference-first、一角一脸、失败不绕审
 - 静帧：空镜 `image_gen`；有角色 **`image_edit(cast)`**（禁反复纯 gen 抽脸）
-- **Keyframe-first · 状态照检查门（P0 · 可补生成）**
-  - **检查**：`aifilm state-index check --root …`（receipts/state-index.json）；缺口清单：`state-index plan`
-  - **可补**：本阶段按 plan 生成缺的状态照 / keyframe / `extract-frame --promote-keyframe`（不必等 final 才发现跳戏）
-  - 状态照路径 `canonical/cast-states/<id>/{full,partial,undressed,bare}.*` → bible `cast_state_masters`
-  - 每镜 still 主 ref = 状态照[wardrobe_state]；**I2V 只吃 keyframe**；坏了回头改 keyframe/状态照
-  - 目的：**运镜转场流畅**（不回穿、continue 末帧=下镜首帧）
-  - 详：[keyframe-first-state-index](references/keyframe-first-state-index.md)
-- **卸装不回穿（P0 必触发 · 席德案）**：`wardrobe_state` 只前进；后镜 still **从已脱状态开场**
-  - 卸装峰值 still → 立刻 `cp` 为 `canonical/wardrobe/undress-anchor.png`
-  - **禁止**对 `partial|undressed|bare` 镜用「全装 cast master」当 still 主 ref（= 像素回穿）
-  - **只许**：`image_edit(state photo | undress-anchor | 上一已脱 still | promote 末帧)`，prompt 只改姿势
-  - 必写：`do NOT put clothes back on` / `Keep first-frame clothing`；保留 `Costume continuity HARD`
-  - 审核双轨可软裸半脱，**不可**为过审回全装；抽检 peak 后每镜 t=1s 半脱标记仍在
-  - 详：[wardrobe-no-redress-still](references/lessons-2026-07-21-wardrobe-no-redress-still.md)
-- **生成 first/last（必触发 · 剧情实况）**：[lessons-2026-07-21-first-last-gen.md](references/lessons-2026-07-21-first-last-gen.md)
-  - **串行** I2V：`register-clip` 成功后 **自动** 抽上镜 last → 写成下镜 `keyframes/<next>.png`
-  - 下镜 I2V **只吃** 该 keyframe（= 上镜真实末帧）；按末帧里的衣着/姿势写 motion prompt
-  - 禁并行多镜 cast 重起；`chain_mode: cut` 才允许新构图，衣着仍不回穿
-- **先验后生（P0 · 算力刀口）**：
-  - **图片**：`image_edit/gen` 落盘 → 先验（几何+身份+结构）→ 过才 register / 当 ref / 进 bulk
-  - **视频**：keyframe 全过闸 → 才 `image_to_video`；**禁止**未验就串行烧 I2V
-  - 坏输入 → **停下游**，只修 still；禁止对糊图/横图「再试一次 I2V」碰运气
-  - 详：[verify-before-generate](references/lessons-2026-07-22-verify-before-generate.md)
-- **静帧几何门（P0 · 2026-07-22）**：写入 keyframe 后立刻验 **W×H**；9:16 须 ≥720×1280、竖比；**禁止**会话缩略图/横图/二次压糊 jpg 当 I2V 输入；同 stem 优先高清 png（`pick_best_keyframe`）
-- **人物动 bulk**：**`image_to_video` 720p** 串行（一次 claim 一件，防 429）；**只吃**过几何门的 keyframe（先验后生）
-- register：`--source-endpoint image_to_video`（**禁止**假装 seedance）
-- 无原生 T2V；`reference_to_video` 少用
-- continue：末帧 promote → 只对该 keyframe 再 `image_to_video`
-- **无角色/环境床**：FRW **`ltx-t2v`**（平台 ltx-文生视频，无限额度，已测 completed）
-  ```bash
-  "$AIFILM" env-plate --root "<root>" --shot-id shot_env01 \
-    --prompt "empty scene, soft light, no people, no faces" --wait
-  # → clips/*_ltx_t2v.mp4 + keyframes 首帧 + register frw_ltx_t2v
-  ```
-- **对白口型（可选更顺）**：近景 + `lipsync:true` → `aifilm frw-lipsync probe` → 201 再 `run`（face still + VO wav）；说书默认 off
-  见 [frw-lipsync.md](references/frw-lipsync.md)
-- 详：[ltx-env-plate.md](references/ltx-env-plate.md) · [i2v-grok-primary.md](references/i2v-grok-primary.md)
+- **Keyframe-first · 状态照门**：`state-index check|plan` 查缺口 → 可补生成状态照/keyframe；`canonical/cast-states/<id>/{full,partial,undressed,bare}.*`；每镜 still 主 ref=状态照[wardrobe_state]；I2V 只吃 keyframe。详 [keyframe-first-state-index](references/keyframe-first-state-index.md)
+- **卸装不回穿（P0）**：`wardrobe_state` 只前进；peak still → `canonical/wardrobe/undress-anchor.png`；partial\|undressed\|bare 镜禁用全装 cast 当 ref，只许 `image_edit(state photo|undress-anchor|已脱 still|promote 末帧)` + 只改姿势。详 [wardrobe-no-redress-still](references/lessons-2026-07-21-wardrobe-no-redress-still.md)
+- **生成 first/last（串行）**：`register-clip` 后自动抽上镜 last → 下镜 `keyframes/<next>.png`；下镜 I2V 只吃该 keyframe；按末帧衣着/姿势写 motion prompt。详 [first-last-gen](references/lessons-2026-07-21-first-last-gen.md)
+- **先验后生（P0）**：still 落盘 → 先验（几何+身份+结构）→ 过才 register/ref/bulk；keyframe 全过闸 → 才 `image_to_video`；坏输入停下游只修 still。详 [verify-before-generate](references/lessons-2026-07-22-verify-before-generate.md)
+- **静帧几何门（P0）**：keyframe 写入即验 W×H；9:16 须 ≥720×1280；禁缩略图/横图/压糊 jpg；`pick_best_keyframe`。详 [keyframe-no-compress](references/lessons-2026-07-22-keyframe-no-compress.md)
+- **人物动 bulk**：`image_to_video` 720p 串行（防 429）；register `--source-endpoint image_to_video`（禁假装 seedance）；continue 末帧 promote → 再 I2V
+- **无角色/环境床**：FRW `ltx-t2v`（`env-plate`，无限额度）；**口型**（可选）：近景 `lipsync:true` → `frw-lipsync probe`→run；说书默认 off。详 [ltx-env-plate.md](references/ltx-env-plate.md) · [i2v-grok-primary.md](references/i2v-grok-primary.md) · [frw-lipsync.md](references/frw-lipsync.md)
 
 ```bash
 # write-spec 已自動生成 prompt，直接使用
@@ -273,17 +230,13 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 
 ```bash
 "$AIFILM" tts-rehearse --root "<root>" --backend edge
-# 机位一页（TTS/FRW/runtime）："$AIFILM" capability [--root "<root>"]
-# 同句对照试听：        "$AIFILM" tts-ab --root "<root>" --shot shot01 --backends edge,voicebox
+# 机位一页："$AIFILM" capability [--root "<root>"]
+# 同句对照试听："$AIFILM" tts-ab --root "<root>" --shot shot01 --backends edge,voicebox
 ```
 
-中文 **edge 默认**（零依赖、可复现）。**质量档**（不改默认）：SuperGrok → **`grok`**（OAuth TTS + speech tags，`--tts-backend grok`）；本机克隆 → `voicebox`；中文最高自然度本地 → **CosyVoice 2** `external`；情感精修 → MiniMax。场景表见 [voices.md](references/voices.md) · [grok-oauth.md](references/grok-oauth.md)。**失败 opt-in 兜底**：`AIFILM_TTS_VOICEBOX_FALLBACK=1`（不静默换声）。有回执则 vo_pacing **优先 measured**。混音在 final plate（sidechain / loudnorm / auto_sfx）。
+中文 **edge 默认**；质量档：SuperGrok→`grok`(OAuth)·本机克隆→`voicebox`·最高自然度→CosyVoice 2`external`·情感精修→MiniMax。失败 opt-in 兜底 `AIFILM_TTS_VOICEBOX_FALLBACK=1`（不静默换声）。场景表见 [voices.md](references/voices.md) · [grok-oauth.md](references/grok-oauth.md)。
 
-**BGM 抗重复 + 色气默认（定稿 · 2026-07-22）**：色气/里番/heat 亲密 → **优先** `assets/bgm/rnb/*`（CC0 曲库，显式 `--music` + `--music-volume 0.55–0.58`）；`--music-mood rnb|sensual|soul`，**禁止**对色气用 `dark`。曲库为空时才程序 v3 multi-style（`--music-seed`）。HF 未完成时勿假设有字——plate 须 `--subs burn`。见 [bgm-generation.md](references/bgm-generation.md) · [shaofu-cast-subs-bgm-final](references/lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)。
-
-**场景自适应声轨**：`write-spec` 按 beat 写每镜 `audio_recipe`；片级 `audio_policy`（默认不自动唱）。见 [audio-recipe.md](references/audio-recipe.md) · `audio-plan`。
-**声线默认**：**旁白 `nar` + BGM** 主导；`vocal_color` 娇喘独立轨 **默认关闭**（鸡肋）。`tone_tags` 仍可进画面 prompt；`sound_cues` 仍可进 SFX。见 [voice-tracks.md](references/voice-tracks.md)。
-**声线耦合剪辑**：`edit_strategy.mode=voice_coupled`（heat max 默认）→ craft + `join_transition_secs` + act `visual_fit=vo`。见 [edit-strategy-voice-coupled.md](references/edit-strategy-voice-coupled.md)。
+**BGM**：色气/heat 亲密优先 `assets/bgm/rnb/*` + `--music-mood rnb`（禁 dark）；曲库空才程序 v3。**声线**：旁白 `nar`+BGM 主导，娇喘轨 `vocal_color` 默认关。**声轨**：`write-spec` 按 beat 写 `audio_recipe`；`edit_strategy.mode=voice_coupled`（heat max 默认）。见 [bgm-generation.md](references/bgm-generation.md) · [audio-recipe.md](references/audio-recipe.md) · [voice-tracks.md](references/voice-tracks.md) · [edit-strategy-voice-coupled.md](references/edit-strategy-voice-coupled.md) · [shaofu-cast-subs-bgm-final](references/lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)。
 
 ### 3 · 设计 + 4 · 后处理
 
@@ -310,11 +263,9 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 
 `final` 技术成功 ≠ `final_complete`。fail → `director-notes`。
 
-**v1.6 审片证据**：新项目在 `register-clip --status approved` 前须先跑 `review-shot`；它会抽首/中/末帧、生成联系表并要求五维 1–5 分与时间点。使用 content channels 的镜头另以 `--performance-evidence kind@seconds:note` 记录真实动作、触发、反应、嘴型或口型静止；这是完整观看后的人工事实，不是自动表演判定。`review-final` 另须七维 `--screening-evidence`。失败重拍单只能显式 resolve，之后的全片 pass 不会自动抹除。
+**审片证据**（v1.6+）：`register-clip --status approved` 前须先 `review-shot`（抽首/中/末帧 + 联系表 + 五维评分 + 时间点）；content channels 镜头另记 `--performance-evidence kind@seconds:note`（完整观看后的人工事实，非自动判定）。`review-final` 须七维 `--screening-evidence`；失败重拍单只能显式 resolve。`performance-timeline`（v1.11.4）将已批准镜头表演事实按全片时间排序，review-final 时校验收据与证据帧仍绑定，但不把自动分析伪装成导演判断。
 
-**v1.11.4 导演时间轴**：`performance-timeline` 将已批准镜头的表演事实按全片时间排序；content channels 项目在 `review-final` 时自动重建并校验它。它检查收据与证据帧是否仍在、是否仍绑定当前审片事实，但不会把自动视觉分析伪装成导演判断。
-
-**完整环**：Define/Structure（Lens）→ Visualize（lock）→ Generate → Select（register）→ Edit（Editor’s Cut · [editor-cut-pass.md](references/editor-cut-pass.md)）→ final(hyperframes) → review → export。
+**完整环**：Define/Structure（Lens）→ Visualize（lock）→ Generate → Select（register）→ Edit（Editor's Cut · [editor-cut-pass.md](references/editor-cut-pass.md)）→ final(hyperframes) → review → export。
 
 ---
 
@@ -359,26 +310,5 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 | 后期 | [postproduction.md](references/postproduction.md) · [post-compose.md](references/post-compose.md) · [hf-remotion-capability-matrix.md](references/hf-remotion-capability-matrix.md) |
 | 量产 | [production-discipline.md](references/production-discipline.md) |
 | 色气 / 剪辑 | [ecchi-story.md](references/ecchi-story.md) · [editor-cut-pass.md](references/editor-cut-pass.md) · [editorial-craft.md](references/editorial-craft.md) |
-| 剪辑丝滑 / 双语字 | [lessons-2026-07-20-cut-silk-bilingual.md](references/lessons-2026-07-20-cut-silk-bilingual.md) · [lessons-2026-07-20-transition-motion-v2.md](references/lessons-2026-07-20-transition-motion-v2.md) |
-| 标题双烧 | [lessons-2026-07-20-title-double-burn.md](references/lessons-2026-07-20-title-double-burn.md)（`plate-cards blank` + `subs off`） |
-| FRW 降级 / Seedance | [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md) · [lessons-2026-07-20-seedance-quality.md](references/lessons-2026-07-20-seedance-quality.md) · `frw_video_model` / `seedance-2-fast-i2v` · `frw newvideo`（恢复时 `seedance_first`，**不是 first-last-frame**） |
-| 踩坑 lessons | `references/lessons-2026-07-*.md`（新规则须标 P 码 + 层） |
-| **发色硬锁** | [lessons-2026-07-21-hair-color-lock.md](references/lessons-2026-07-21-hair-color-lock.md) · [consistency.md](references/consistency.md) §1b |
-| **禁 shot 水印** | [lessons-2026-07-21-no-shot-watermark.md](references/lessons-2026-07-21-no-shot-watermark.md) · [consistency.md](references/consistency.md) §1c · **致命** |
-| **蒙太奇+重口男向** | [lessons-2026-07-21-montage-hardcore-male.md](references/lessons-2026-07-21-montage-hardcore-male.md) · [editorial-craft.md](references/editorial-craft.md) · [ecchi-story.md](references/ecchi-story.md) §重口 |
-| **首帧毒化** | [lessons-2026-07-21-keyframe-first-frame-poison.md](references/lessons-2026-07-21-keyframe-first-frame-poison.md) · [consistency.md](references/consistency.md) §1d · **坏 still=整 clip 废** |
-| **静帧禁压缩/错幅** | [lessons-2026-07-22-keyframe-no-compress.md](references/lessons-2026-07-22-keyframe-no-compress.md) · [consistency.md](references/consistency.md) §1e · **缩水/横图 still=I2V 整段糊** |
-| **先验后生·算力刀口** | [lessons-2026-07-22-verify-before-generate.md](references/lessons-2026-07-22-verify-before-generate.md) · **验证完再出图/出视频**；重复生成成本过高 |
-| **景别情绪堆叠** | [lessons-2026-07-21-size-ladder-hardcore-stack.md](references/lessons-2026-07-21-size-ladder-hardcore-stack.md) · 全景→中→近→特写加压 + 成人六拍剧情 |
-| **性交冲击力标竿** | [lessons-2026-07-21-intercourse-impact-benchmark.md](references/lessons-2026-07-21-intercourse-impact-benchmark.md) · 性交六拍 + Mute Frame 测试 + 冲击七刀（成片「尺度小」根因课） |
-| **性爱时长硬底 ≥20%** | [lessons-2026-07-21-sex-duration-floor.md](references/lessons-2026-07-21-sex-duration-floor.md) · act+climax `duration_sec` 加权 · write-spec `sex_floor_strict` |
-| **办事卸甲阶梯·不回穿** | [lessons-2026-07-21-sex-undress-ladder.md](references/lessons-2026-07-21-sex-undress-ladder.md) · full→partial→undressed/bare · clamp 回穿 · start_pose 延续 · 禁全装跨坐 |
-| **卸装后 still 源链（P0）** | [lessons-2026-07-21-wardrobe-no-redress-still.md](references/lessons-2026-07-21-wardrobe-no-redress-still.md) · undress-anchor · 禁 cast 全装重起 · 席德回穿案 |
-| **I2V 末帧不回穿 + promote 门（P0）** | [lessons-2026-07-22-i2v-endframe-no-redress.md](references/lessons-2026-07-22-i2v-endframe-no-redress.md) · last-frame 门 · 禁毒 promote · astra 红外套案 |
-| **Keyframe-first · 状态照索引** | [keyframe-first-state-index.md](references/keyframe-first-state-index.md) · cast_state_masters · 倒推改 keyframe · State photo ref |
-| **生成 first/last 接戏** | [lessons-2026-07-21-first-last-gen.md](references/lessons-2026-07-21-first-last-gen.md) · register 自动 promote 末帧→下镜首帧 · 按实况优化 prompt |
-| **旁白荤梗硬底** | [lessons-2026-07-21-sex-vo-spice.md](references/lessons-2026-07-21-sex-vo-spice.md) · 每镜 nar 荤梗 · act 办事动词 · `sex_vo_strict` |
-| **用户原文保真（禁模板污染）** | [lessons-2026-07-22-user-source-fidelity.md](references/lessons-2026-07-22-user-source-fidelity.md) · `preserve_user_nar` · `USER_SOURCE_NAR_POLLUTED` · 多段独立 |
-| **少婦案·脸锁/字幕/BGM/final** | [lessons-2026-07-22-shaofu-cast-subs-bgm-final.md](references/lessons-2026-07-22-shaofu-cast-subs-bgm-final.md) · cast edit-only · HF 空字必 burn · rnb 曲库 · final≥600s |
-| **成人办事剧单入口（v1.10）** | [adult-max-playbook.md](references/adult-max-playbook.md) · sex≥30% · extreme VO · 肉体 SFX · 蒙太奇 · 多体位 · `heat check|vo-suggest|soften-log` · [pose-packs](references/pose-packs/coitus-beats.md) |
-| **FRW key 能力 / 403·502** | [lessons-2026-07-21-frw-key-capability.md](references/lessons-2026-07-21-frw-key-capability.md) · [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md) |
+| 成人办事剧单入口（v1.10） | [adult-max-playbook.md](references/adult-max-playbook.md) · sex≥30% · extreme VO · 肉体 SFX · 蒙太奇 · 多体位 · [pose-packs](references/pose-packs/coitus-beats.md) |
+| **踩坑 lessons**（P0 红线已在上方门禁/视觉段引用） | `references/lessons-2026-07-*.md`（新规则须标 P 码 + 层）· [keyframe-first-state-index.md](references/keyframe-first-state-index.md) |
