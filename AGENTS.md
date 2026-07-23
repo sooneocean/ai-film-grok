@@ -78,6 +78,7 @@ grok plugin update ai-film-grok
 1. **单一真相**：禁止在 `~/.grok/skills/` 另开可写副本。  
 2. **密钥**：`config.env` 永不提交；只用 `config.env.example`。  
 3. **pilot / bulk**：不自批 pilot；不静默改 `i2v_provider`。  
+4. **人物对白日文（P0 · 2026-07-23）**：角色开口 TTS 默认 **ja**（`ja-JP-NanamiNeural` / `ja-JP-KeitaNeural`）；说书旁白 **zh**；烧字字幕 **zh**（`nar` 中文 + `nar_ja` 日文 TTS）。见 skill `references/lessons-2026-07-23-character-dialogue-ja.md`。  
 4. **文档分层**：SKILL 短；稳定规则进 `references/`；当日坑进 `lessons-*`，验证后再晋升。  
 5. **完成定义**：doctor 绿 + 相关 pytest 绿 +（若改 CLI）`plugin validate` 过；不是「改完文件」。  
 6. **对外**：PR / release 文案给人过目后再发；本仓默认 private。

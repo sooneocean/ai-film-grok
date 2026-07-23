@@ -45,15 +45,16 @@
 | 规则 | 默认 |
 |---|---|
 | TTS | 中文成片 **edge**；storyteller `auto`→edge |
+| **人物对白语言** | **P0**（2026-07-23）：角色开口 TTS 默认 **日文**（`dialogue_spoken_lang=ja`，女 `ja-JP-NanamiNeural` / 男 `ja-JP-KeitaNeural`）；说书旁白默认 **中文**；**字幕仍中文**（`caption_lang=zh`，用 `nar` 非 `nar_ja`）。角色镜须 `speaker` + `nar` + `nar_ja`。见 [character-dialogue-ja](lessons-2026-07-23-character-dialogue-ja.md) · [voices.md](voices.md) |
 | Voicebox | **质量升级 + opt-in 本地兜底**（非默认替换 edge）；固定 `VOICEBOX_PROFILE`；`AIFILM_TTS_VOICEBOX_FALLBACK=1` 才 edge 失败再试 |
 | 机位 | 开场 **`aifilm dispatch`**（craft+capability+next）；或 `capability`；`--suggest-i2v` / `--apply` 改 I2V 须显式 |
 | 自动调配 | 每回合 `dispatch` → 只执行 `next_cmd`；不自批 pilot；不静默换 provider |
 | 语速 | `vo_rate +0%`（色气 +5%~+8%；禁 -3% 拖腔） |
 | VO 增益 | ~1.32；BGM 侧链；优先 `audio/mixed.wav` |
 | BGM | 色气 **rnb**（禁 dark 除非 horror）；**硬兜底=程序 v3 multi-style**；**听感兜底=纯乐器曲库池**；`--music-seed` / `audio_policy.music_seed`；`audio_recipe` 调床厚薄；auto_sfx；见 [bgm-generation.md](bgm-generation.md) |
-| VO 预算 | `nar` ≤55 字（快节奏 ≤28）；`est_vo_sec ≤ duration_sec+0.5` |
+| VO 预算 | `nar` ≤55 字（快节奏 ≤28）；`est_vo_sec ≤ duration_sec+0.5`；日文对白按 `nar_ja` 估长 |
 | loop | hook/action 永不 stream_loop |
-| 一角一声 | 固定 `vo_voice`；显式 TTS 失败不静默跨商降级 |
+| 一角一声 | 固定 `vo_voice` / `cast_voices`；显式 TTS 失败不静默跨商降级 |
 | **声线主导** | **旁白 `nar` + BGM**；`vocal_color` 娇喘独立轨 **默认关**（`voice_tracks.enabled=false` · gain=0）；`tone_tags` 只进画面；`sound_cues` 可进 SFX；见 [voice-tracks.md](voice-tracks.md) |
 
 ## 视觉与一致性

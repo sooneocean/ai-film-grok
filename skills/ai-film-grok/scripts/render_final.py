@@ -101,9 +101,7 @@ STORYTELLER_VOICE = "zh-CN-XiaoxiaoNeural"
 # P0 · 2026-07-23: character dialogue defaults to Japanese edge voices
 HEROINE_JA_VOICE = "ja-JP-NanamiNeural"
 PARTNER_JA_VOICE = "ja-JP-KeitaNeural"
-_NARRATOR_SPEAKERS = frozenset(
-    {"storyteller", "narrator", "vo", "旁白", "os", "inner", "内心"}
-)
+_NARRATOR_SPEAKERS = frozenset({"storyteller", "narrator", "vo", "旁白", "os", "inner", "内心"})
 _HEROINE_SPEAKERS = frozenset(
     {"heroine", "female", "fufu", "girl", "woman", "she", "女主", "沈筱", "astra"}
 )
@@ -1824,6 +1822,21 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         for k, v in cast_voices_raw.items():
             if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
                 cast_voices[k.strip()] = v.strip()
+    # P0 · 2026-07-23: default JA character voices when dialogue_spoken_lang=ja
+    _dlg_lang = (
+        str(
+            spec.get("dialogue_spoken_lang")
+            or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
+            or "ja"
+        )
+        .strip()
+        .lower()
+    )
+    if _dlg_lang in {"ja", "jp", "japanese"}:
+        cast_voices.setdefault("heroine", HEROINE_JA_VOICE)
+        cast_voices.setdefault("partner", PARTNER_JA_VOICE)
+        cast_voices.setdefault("male_hero", PARTNER_JA_VOICE)
+    cast_voices.setdefault("storyteller", STORYTELLER_VOICE)
     vo_rate = str(getattr(args, "vo_rate", None) or spec.get("vo_rate") or DEFAULT_VO_RATE)
     vo_pitch = str(getattr(args, "vo_pitch", None) or spec.get("vo_pitch") or DEFAULT_VO_PITCH)
     vo_tts_vol = str(getattr(args, "vo_tts_volume", None) or spec.get("vo_tts_volume") or "+0%")
@@ -1952,9 +1965,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             or "zh"
         )
         caption_lang = str(
-            spec.get("caption_lang")
-            or (spec.get("voice_policy") or {}).get("caption_lang")
-            or "zh"
+            spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
         )
         text = spoken_text_for_shot(
             shot,

@@ -62,32 +62,64 @@ def vfx_gate(root: Path | str) -> dict[str, Any]:
         if not plate.is_absolute():
             plate = base / plate
         if item.get("status") != "approved":
-            blockers.append({"code": "VFX_NOT_APPROVED", "message": f"{shot_id} has unresolved VFX status"})
+            blockers.append(
+                {"code": "VFX_NOT_APPROVED", "message": f"{shot_id} has unresolved VFX status"}
+            )
         if not plate.is_file() or item.get("plate_sha256") != _sha(plate):
-            blockers.append({"code": "VFX_PLATE_STALE", "message": f"{shot_id} plate hash is stale"})
-    if not report and (base / "film-spec.json").is_file():
-        blockers.append({"code": "VFX_REGISTRY_MISSING", "message": "VFX registry is required before Master Lock"})
-    return {"ok": not blockers, "kind": "vfx-gate", "blockers": blockers, "shot_count": len(report.get("shots") or {})}
+            blockers.append(
+                {"code": "VFX_PLATE_STALE", "message": f"{shot_id} plate hash is stale"}
+            )
+    if not report:
+        blockers.append(
+            {
+                "code": "VFX_REGISTRY_MISSING",
+                "message": "VFX registry is required before Master Lock",
+            }
+        )
+    return {
+        "ok": not blockers,
+        "kind": "vfx-gate",
+        "blockers": blockers,
+        "shot_count": len(report.get("shots") or {}),
+    }
 
 
 def audio_delivery_gate(root: Path | str) -> dict[str, Any]:
     base = Path(root).expanduser().resolve()
-    mix = read_json(base / "audio" / "mix_report.json") or read_json(base / "receipts" / "mix_report.json") or {}
+    mix = (
+        read_json(base / "audio" / "mix_report.json")
+        or read_json(base / "receipts" / "mix_report.json")
+        or {}
+    )
     blockers: list[dict[str, str]] = []
     if not mix:
         blockers.append({"code": "MIX_REPORT_MISSING", "message": "mix_report.json is required"})
     if mix:
         for stem in ("dialogue", "adr", "ambience", "foley", "sfx", "music"):
             if stem not in mix.get("stems", {}) and not mix.get(f"{stem}_stems"):
-                blockers.append({"code": "AUDIO_STEM_MISSING", "message": f"missing professional stem: {stem}"})
+                blockers.append(
+                    {"code": "AUDIO_STEM_MISSING", "message": f"missing professional stem: {stem}"}
+                )
         lufs = mix.get("integrated_lufs")
         peak = mix.get("true_peak_dbtp")
         if lufs is None or not -18 <= float(lufs) <= -14:
-            blockers.append({"code": "LOUDNESS_OUT_OF_RANGE", "message": "integrated loudness must be -16 LUFS ±2"})
+            blockers.append(
+                {
+                    "code": "LOUDNESS_OUT_OF_RANGE",
+                    "message": "integrated loudness must be -16 LUFS ±2",
+                }
+            )
         if peak is None or float(peak) > -1:
-            blockers.append({"code": "TRUE_PEAK_TOO_HIGH", "message": "true peak must be <= -1 dBTP"})
+            blockers.append(
+                {"code": "TRUE_PEAK_TOO_HIGH", "message": "true peak must be <= -1 dBTP"}
+            )
         if mix.get("dialogue_intelligibility_ok") is not True:
-            blockers.append({"code": "DIALOGUE_INTELLIGIBILITY_MISSING", "message": "dialogue intelligibility review is required"})
+            blockers.append(
+                {
+                    "code": "DIALOGUE_INTELLIGIBILITY_MISSING",
+                    "message": "dialogue intelligibility review is required",
+                }
+            )
     return {"ok": not blockers, "kind": "audio-delivery-gate", "blockers": blockers}
 
 
@@ -102,17 +134,33 @@ def premium_master_qc(root: Path | str, *, final: str | None = None) -> dict[str
     else:
         try:
             proc = subprocess.run(
-                ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(final_path)],
-                capture_output=True, text=True, timeout=120, check=False,
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-show_streams",
+                    "-show_format",
+                    "-of",
+                    "json",
+                    str(final_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
             )
             data = json.loads(proc.stdout or "{}")
             streams = data.get("streams") or []
             video = next((s for s in streams if s.get("codec_type") == "video"), None)
             audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
             if not video or int(video.get("height") or 0) <= int(video.get("width") or 0):
-                blockers.append({"code": "MASTER_NOT_VERTICAL", "message": "master must be 9:16 vertical"})
+                blockers.append(
+                    {"code": "MASTER_NOT_VERTICAL", "message": "master must be 9:16 vertical"}
+                )
             if not audio:
-                blockers.append({"code": "MASTER_AUDIO_MISSING", "message": "master audio stream is missing"})
+                blockers.append(
+                    {"code": "MASTER_AUDIO_MISSING", "message": "master audio stream is missing"}
+                )
         except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
             blockers.append({"code": "MASTER_READBACK_FAILED", "message": str(exc)})
     vfx = vfx_gate(base)
@@ -123,7 +171,12 @@ def premium_master_qc(root: Path | str, *, final: str | None = None) -> dict[str
         blockers.extend(audio["blockers"])
     caption = read_json(base / "receipts" / "final-stages.json") or {}
     if caption.get("burned_in") is not True:
-        blockers.append({"code": "CAPTION_BURN_MISSING", "message": "pixel-visible burned captions are required"})
+        blockers.append(
+            {
+                "code": "CAPTION_BURN_MISSING",
+                "message": "pixel-visible burned captions are required",
+            }
+        )
     report = {
         "schema_version": 1,
         "kind": "premium-master-qc",

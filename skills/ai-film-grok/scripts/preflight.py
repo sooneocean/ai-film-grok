@@ -75,6 +75,21 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 )
         except Exception as exc:  # noqa: BLE001
             hard.append(_issue("hard", "CREATIVE_QUALITY_VALIDATION_FAILED", str(exc)[:200]))
+        try:
+            from creative_pipeline import preproduction_readiness
+
+            readiness = preproduction_readiness(root, write=True)
+            for blocker in readiness.get("blockers") or []:
+                hard.append(
+                    _issue(
+                        "hard",
+                        str(blocker.get("code") or "PREPRODUCTION_NOT_READY"),
+                        str(blocker.get("message") or "premium pre-production gate failed"),
+                        fix="完成 Radio Cut 与 Animatic 人审回执后重新运行 preflight",
+                    )
+                )
+        except Exception as exc:  # noqa: BLE001
+            hard.append(_issue("hard", "PREPRODUCTION_READINESS_FAILED", str(exc)[:200]))
 
     # --- structure ---
     if not man:

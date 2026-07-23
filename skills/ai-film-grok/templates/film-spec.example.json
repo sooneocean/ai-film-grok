@@ -1,7 +1,15 @@
 {
-  "vo_mode": "storyteller",
+  "vo_mode": "hybrid",
   "vo_voice": "zh-CN-XiaoxiaoNeural",
   "tts_backend": "edge",
+  "dialogue_spoken_lang": "ja",
+  "narration_spoken_lang": "zh",
+  "caption_lang": "zh",
+  "cast_voices": {
+    "storyteller": "zh-CN-XiaoxiaoNeural",
+    "heroine": "ja-JP-NanamiNeural",
+    "partner": "ja-JP-KeitaNeural"
+  },
   "i2v_provider": "grok",
   "frw_video_model": "seedance-2-fast-i2v",
   "frw_env_model": "ltx-t2v",

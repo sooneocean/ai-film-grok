@@ -29,6 +29,7 @@ description: Grok Build 专用 AI 短片 skill：八环 Idea→Verified 自动�
 4. `stage_deliver`：写 `receipts/final-stages.json` + `caption_owner`
 见 [subs-always-burn-hard](references/lessons-2026-07-23-subs-always-burn-hard.md) · `scripts/final_stages.py`。
 **色气 BGM（P0 · 同案）**：色气/heat 亲密默认 **rnb 曲库** `assets/bgm/rnb/*`（显式 `--music`）；勿用 dark；procedural 仅曲库缺失时。
+**人物对白日文（P0 · 2026-07-23）**：**角色开口 TTS 默认日文**（edge `ja-JP-NanamiNeural` / `ja-JP-KeitaNeural`）；说书旁白中文；**烧字字幕仍中文**（`nar`≠`nar_ja`）。角色镜写 `speaker`+`nar`+`nar_ja`；`dialogue_spoken_lang=ja`。见 [character-dialogue-ja](references/lessons-2026-07-23-character-dialogue-ja.md) · [voices.md](references/voices.md)。
 **final 超时（P0 · 同案）**：`aifilm final` 调 render_final 默认 **≥1200s**（`--plate-timeout`）；短超时会假失败。
 
 **专业导演系统（v1.15）**：创作判断不再只存在 Prompt。`production-book.json` 总控 Graph、Visual/Audio/Post Bible、版本锁、审批 ledger、精准 stale 传播、Dailies/Selects、Picture Lock 与 Master Gate；模型评分永远只作 advisory。见 [professional-director-system.md](references/professional-director-system.md)。
@@ -261,7 +262,7 @@ max 成片规划时先算性爱时长：act+climax 秒数 / 全片秒数 ≥ **0
 # 同句对照试听："$AIFILM" tts-ab --root "<root>" --shot shot01 --backends edge,voicebox
 ```
 
-中文 **edge 默认**；质量档：SuperGrok→`grok`(OAuth)·本机克隆→`voicebox`·最高自然度→CosyVoice 2`external`·情感精修→MiniMax。失败 opt-in 兜底 `AIFILM_TTS_VOICEBOX_FALLBACK=1`（不静默换声）。场景表见 [voices.md](references/voices.md) · [grok-oauth.md](references/grok-oauth.md)。
+中文旁白 **edge 默认**；**人物对白默认日文 edge**（Nanami/Keita）+ 中文字幕。质量档：SuperGrok→`grok`(OAuth)·本机克隆→`voicebox`·最高自然度→CosyVoice 2`external`·情感精修→MiniMax。失败 opt-in 兜底 `AIFILM_TTS_VOICEBOX_FALLBACK=1`（不静默换声）。场景表见 [voices.md](references/voices.md) · [character-dialogue-ja](references/lessons-2026-07-23-character-dialogue-ja.md) · [grok-oauth.md](references/grok-oauth.md)。
 
 **BGM**：色气/heat 亲密优先 `assets/bgm/rnb/*` + `--music-mood rnb`（禁 dark）；曲库空才程序 v3。**声线**：旁白 `nar`+BGM 主导，娇喘轨 `vocal_color` 默认关。**声轨**：`write-spec` 按 beat 写 `audio_recipe`；`edit_strategy.mode=voice_coupled`（heat max 默认）。见 [bgm-generation.md](references/bgm-generation.md) · [audio-recipe.md](references/audio-recipe.md) · [voice-tracks.md](references/voice-tracks.md) · [edit-strategy-voice-coupled.md](references/edit-strategy-voice-coupled.md) · [shaofu-cast-subs-bgm-final](references/lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)。
 

@@ -66,6 +66,38 @@ Voicebox 未开时 `tts-ab` 会 skip 该后端，不崩；不修改 film-spec。
 
 `storyteller`：只有一条旁白声线。`character | hybrid`：每个 cast ID 都需要固定 voice/ref，不得让 provider 每镜随机抽样。
 
+## 人物对白日文（P0 · 2026-07-23）
+
+**角色开口用日文 TTS；说书旁白用中文；烧字字幕默认中文。**  
+详见 [lessons-2026-07-23-character-dialogue-ja.md](lessons-2026-07-23-character-dialogue-ja.md)。
+
+| 轨 | 默认语言 | edge 声线 |
+|----|----------|-----------|
+| 女主 / heroine 对白 | **ja** | `ja-JP-NanamiNeural` |
+| 男主 / partner 对白 | **ja** | `ja-JP-KeitaNeural` |
+| 说书 storyteller | **zh** | `zh-CN-XiaoxiaoNeural`（或 Yunxi） |
+| 字幕 caption | **zh** | （不走 TTS；用 `nar`/`nar_zh`） |
+
+```json
+{
+  "vo_mode": "hybrid",
+  "tts_backend": "edge",
+  "dialogue_spoken_lang": "ja",
+  "narration_spoken_lang": "zh",
+  "caption_lang": "zh",
+  "vo_voice": "zh-CN-XiaoxiaoNeural",
+  "cast_voices": {
+    "storyteller": "zh-CN-XiaoxiaoNeural",
+    "heroine": "ja-JP-NanamiNeural",
+    "partner": "ja-JP-KeitaNeural"
+  }
+}
+```
+
+- 角色镜：`speaker` + **`nar`（中文观众字幕）** + **`nar_ja`（日文成片 TTS）**
+- 用户强制中文对白：`dialogue_spoken_lang: "zh"`
+- **禁止** 用 `zh-CN-*` 名塞进 ElevenLabs / CosyVoice；日文对白也不要混中文 Neural
+
 ## External TTS
 
 `AIFILM_TTS_CMD` 已禁用。使用 JSON argv，支持 `{text}`、`{text_file}`、`{out}`、`{voice}` 完整参数占位：

@@ -1129,19 +1129,27 @@ def cmd_creative_pipeline(args: argparse.Namespace) -> int:
         report = preproduction_readiness(root)
     elif action == "radio-cut":
         if args.write:
-            write_authoring_receipt(root, "radio-cut", {
-                "timing_ok": bool(args.timing_ok),
-                "emotion_turns_ok": bool(args.emotion_turns_ok),
-                "shot_count": int(args.shot_count),
-            })
+            write_authoring_receipt(
+                root,
+                "radio-cut",
+                {
+                    "timing_ok": bool(args.timing_ok),
+                    "emotion_turns_ok": bool(args.emotion_turns_ok),
+                    "shot_count": int(args.shot_count),
+                },
+            )
         report = build_radio_cut(root)
     elif action == "animatic":
         if args.write:
-            write_authoring_receipt(root, "animatic", {
-                "coverage_ok": bool(args.coverage_ok),
-                "pace_ok": bool(args.pace_ok),
-                "performance_ok": bool(args.performance_ok),
-            })
+            write_authoring_receipt(
+                root,
+                "animatic",
+                {
+                    "coverage_ok": bool(args.coverage_ok),
+                    "pace_ok": bool(args.pace_ok),
+                    "performance_ok": bool(args.performance_ok),
+                },
+            )
         report = build_animatic_gate(root)
     else:
         raise FilmError(f"Unknown creative pipeline action: {action}")
@@ -1175,7 +1183,14 @@ def cmd_post_quality(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     action = str(args.post_action)
     if action == "vfx-register":
-        report = register_vfx_shot(root, shot_id=args.shot_id, plate=args.plate, status=args.status, reviewer=args.reviewer, notes=args.notes)
+        report = register_vfx_shot(
+            root,
+            shot_id=args.shot_id,
+            plate=args.plate,
+            status=args.status,
+            reviewer=args.reviewer,
+            notes=args.notes,
+        )
     elif action == "vfx-check":
         report = vfx_gate(root)
     elif action == "audio-check":
@@ -1196,8 +1211,13 @@ def cmd_provider_canary(args: argparse.Namespace) -> int:
         report = canary_status(root)
     else:
         report = record_canary(
-            root, provider=args.provider, output=args.output, reviewer=args.reviewer,
-            identity_ok=args.identity_ok, motion_ok=args.motion_ok, notes=args.notes,
+            root,
+            provider=args.provider,
+            output=args.output,
+            reviewer=args.reviewer,
+            identity_ok=args.identity_ok,
+            motion_ok=args.motion_ok,
+            notes=args.notes,
         )
     emit(report)
     return 0 if report.get("ok") else 2
@@ -5906,6 +5926,65 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_p.add_argument("--suite", choices=("premium-vertical",), default="premium-vertical")
     benchmark_p.add_argument("--mode", choices=("contract", "live"), default="contract")
 
+    creative = sub.add_parser("creative-pipeline", help="Radio cut, animatic and premium pre-production gates")
+    creative_sub = creative.add_subparsers(dest="pipeline_action", required=True)
+    cr = creative_sub.add_parser("readiness")
+    cr.add_argument("--root", required=True)
+    radio = creative_sub.add_parser("radio-cut")
+    radio.add_argument("--root", required=True)
+    radio.add_argument("--write", action="store_true")
+    radio.add_argument("--timing-ok", action="store_true")
+    radio.add_argument("--emotion-turns-ok", action="store_true")
+    radio.add_argument("--shot-count", type=int, default=0)
+    anim = creative_sub.add_parser("animatic")
+    anim.add_argument("--root", required=True)
+    anim.add_argument("--write", action="store_true")
+    anim.add_argument("--coverage-ok", action="store_true")
+    anim.add_argument("--pace-ok", action="store_true")
+    anim.add_argument("--performance-ok", action="store_true")
+
+    dailies = sub.add_parser("dailies", help="Record and audit Select/Alternate/Reject/Reshoot candidates")
+    dailies_sub = dailies.add_subparsers(dest="dailies_action", required=True)
+    ds = dailies_sub.add_parser("status")
+    ds.add_argument("--root", required=True)
+    dr = dailies_sub.add_parser("record")
+    dr.add_argument("--root", required=True)
+    dr.add_argument("--shot-id", required=True)
+    dr.add_argument("--candidate", required=True)
+    dr.add_argument("--status", choices=("select", "alternate", "reject", "reshoot"), required=True)
+    dr.add_argument("--reviewer", required=True)
+    dr.add_argument("--notes", default="")
+    dr.add_argument("--approved-budget", type=int, default=None)
+
+    postq = sub.add_parser("post-quality", help="VFX, audio and premium Master QC contracts")
+    postq_sub = postq.add_subparsers(dest="post_action", required=True)
+    vr = postq_sub.add_parser("vfx-register")
+    vr.add_argument("--root", required=True)
+    vr.add_argument("--shot-id", required=True)
+    vr.add_argument("--plate", required=True)
+    vr.add_argument("--status", choices=("pending", "wip", "review", "approved", "rejected"), required=True)
+    vr.add_argument("--reviewer", required=True)
+    vr.add_argument("--notes", default="")
+    for name in ("vfx-check", "audio-check"):
+        post_check = postq_sub.add_parser(name)
+        post_check.add_argument("--root", required=True)
+    mq = postq_sub.add_parser("master-qc")
+    mq.add_argument("--root", required=True)
+    mq.add_argument("--final", default=None)
+
+    canary = sub.add_parser("provider-canary", help="Record or inspect a real provider canary")
+    canary_sub = canary.add_subparsers(dest="canary_action", required=True)
+    cs = canary_sub.add_parser("status")
+    cs.add_argument("--root", required=True)
+    cc = canary_sub.add_parser("record")
+    cc.add_argument("--root", required=True)
+    cc.add_argument("--provider", choices=("grok", "seedance"), required=True)
+    cc.add_argument("--output", required=True)
+    cc.add_argument("--reviewer", required=True)
+    cc.add_argument("--identity-ok", action="store_true")
+    cc.add_argument("--motion-ok", action="store_true")
+    cc.add_argument("--notes", default="")
+
     # v1.23: reference video audit — reverse-engineer shot grammar
     refaudit = sub.add_parser(
         "analyze-reference",
@@ -6783,6 +6862,14 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if report["passed"] else 1
         if args.cmd == "benchmark":
             return cmd_benchmark(args)
+        if args.cmd == "creative-pipeline":
+            return cmd_creative_pipeline(args)
+        if args.cmd == "dailies":
+            return cmd_dailies(args)
+        if args.cmd == "post-quality":
+            return cmd_post_quality(args)
+        if args.cmd == "provider-canary":
+            return cmd_provider_canary(args)
         if args.cmd == "analyze-reference":
             from reference_audit import ReferenceAuditError, run_reference_audit
 

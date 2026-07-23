@@ -301,7 +301,9 @@ def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
         elif ratios:
             act_cleaned.update(ratios)
         if act_strict:
-            missing_acts = [key for key in ("setup", "confrontation", "resolution") if not act_cleaned.get(key)]
+            missing_acts = [
+                key for key in ("setup", "confrontation", "resolution") if not act_cleaned.get(key)
+            ]
             if missing_acts:
                 raise FilmSpecError(
                     "act_structure_strict: required fields missing: " + ", ".join(missing_acts)

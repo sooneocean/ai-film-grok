@@ -97,17 +97,25 @@ def validate_audio_tracks_contract(
         if not isinstance(music, dict):
             errors.append("audio_tracks.music or audio_tracks.bgm is required")
         for name, item in (("sfx", tracks.get("sfx")), ("music", music)):
-            if isinstance(item, dict) and not str(item.get("source") or item.get("license") or "").strip():
+            if (
+                isinstance(item, dict)
+                and not str(item.get("source") or item.get("license") or "").strip()
+            ):
                 errors.append(f"audio_tracks.{name}.source or license is required")
     elif not isinstance(music, dict):
         warnings.append("audio_tracks.music missing; renderer will generate procedural BGM")
 
     result: dict[str, Any] = {"strict": strict, "tracks": tracks, "warnings": warnings}
     if require_artifacts and audio_dir is not None:
-        expected = {name: audio_dir / filename for name, filename in (
-            ("bgm", "bgm_stereo.wav"), ("sfx", "sfx_stereo.wav"),
-            ("mixed", "mixed.wav"), ("mix_report", "mix_report.json"),
-        )}
+        expected = {
+            name: audio_dir / filename
+            for name, filename in (
+                ("bgm", "bgm_stereo.wav"),
+                ("sfx", "sfx_stereo.wav"),
+                ("mixed", "mixed.wav"),
+                ("mix_report", "mix_report.json"),
+            )
+        }
         missing = [name for name, path in expected.items() if not path.is_file()]
         if missing:
             errors.append("audio artifacts missing: " + ", ".join(missing))

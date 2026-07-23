@@ -7,6 +7,12 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from creative_pipeline import (  # noqa: E402
+    build_animatic_gate,
+    build_radio_cut,
+    preproduction_readiness,
+    write_authoring_receipt,
+)
 from creative_quality import validate_premium_vertical  # noqa: E402
 from preflight import run_preflight  # noqa: E402
 from production_book import init_production_book  # noqa: E402
@@ -77,3 +83,20 @@ def test_preflight_blocks_premium_profile_before_paid_work(tmp_path: Path) -> No
     report = run_preflight(tmp_path)
     assert report["hard_ok"] is False
     assert any(item["code"] == "BEATS_MISSING" for item in report["hard"])
+
+
+def test_premium_preproduction_requires_radio_and_animatic(tmp_path: Path) -> None:
+    init_production_book(tmp_path, quality_target="premium_vertical")
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps({"scenes": [{"shots": [{"id": "shot01"}]}]}), encoding="utf-8"
+    )
+    report = preproduction_readiness(tmp_path)
+    assert report["ok"] is False
+    write_authoring_receipt(
+        tmp_path, "radio-cut", {"timing_ok": True, "emotion_turns_ok": True, "shot_count": 1}
+    )
+    write_authoring_receipt(
+        tmp_path, "animatic", {"coverage_ok": True, "pace_ok": True, "performance_ok": True}
+    )
+    assert build_radio_cut(tmp_path)["ok"] is True
+    assert build_animatic_gate(tmp_path)["ok"] is True
