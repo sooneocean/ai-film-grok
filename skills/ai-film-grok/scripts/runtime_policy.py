@@ -55,6 +55,28 @@ DEFAULT_SCRIPTS = (
 )
 
 
+def _default_script_paths(skill_dir: Path) -> list[Path]:
+    """Fingerprint every shipped executable/module, including new split-out domains.
+
+    The historical allow-list remains as a compatibility floor, while discovery
+    prevents a newly extracted production gate from silently escaping runtime
+    protection.  Tests and bytecode caches are deliberately excluded.
+    """
+    scripts_dir = skill_dir / "scripts"
+    discovered = {
+        path
+        for path in scripts_dir.rglob("*")
+        if path.is_file()
+        and "__pycache__" not in path.parts
+        and (
+            path.suffix == ".py"
+            or path.name in {"aifilm", "backend-lock", "media-queue", "test-skill"}
+        )
+    }
+    discovered.update(scripts_dir / name for name in DEFAULT_SCRIPTS)
+    return sorted(discovered)
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -125,7 +147,7 @@ def build_runtime_lock(
 ) -> dict[str, Any]:
     root = skill_dir.expanduser().resolve()
     if script_paths is None:
-        script_paths = [root / "scripts" / name for name in DEFAULT_SCRIPTS]
+        script_paths = _default_script_paths(root)
     scripts: dict[str, str] = {}
     for path in script_paths:
         resolved = path.expanduser().resolve()

@@ -152,22 +152,63 @@ def plan_shot_grades(root: Path | str) -> dict[str, Any]:
         "clean": "none",
     }
 
-    shots: list[dict[str, Any]] = []
+    # heat_phase → grade preset fallback (drives narrative color arc when no
+    # explicit palette is set). Derived from visual_bible.LIGHTING_COLOR_PALETTES.
+    # P1-9: previously derive_lighting_timeline was orphan code with no callers.
+    heat_phase_to_preset = {
+        "setup": "none",
+        "teaser": "warm_cinematic",
+        "foreplay": "warm_cinematic",
+        "act": "high_contrast",
+        "climax": "high_contrast",
+        "afterglow": "warm_cinematic",
+    }
+
+    # Derive lighting timeline from heat_phase for shots without explicit palette.
+    # This connects the narrative lighting arc to the color grade pipeline.
+    all_shots_raw: list[dict[str, Any]] = []
     for scene in spec.get("scenes") or []:
         for shot in scene.get("shots") or []:
-            if not isinstance(shot, dict):
-                continue
-            dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
-            palette = str(dsl.get("palette") or "").strip().lower()
+            if isinstance(shot, dict):
+                all_shots_raw.append(shot)
+
+    lighting_timeline: list[dict[str, Any]] = []
+    try:
+        from visual_bible import derive_lighting_timeline
+
+        lighting_timeline = derive_lighting_timeline(all_shots_raw)
+    except Exception:
+        pass
+    lighting_by_shot: dict[str, dict[str, Any]] = {
+        str(t.get("shot_id")): t for t in lighting_timeline if isinstance(t, dict)
+    }
+
+    shots: list[dict[str, Any]] = []
+    for shot in all_shots_raw:
+        dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+        palette = str(dsl.get("palette") or "").strip().lower()
+        sid = str(shot.get("id") or "")
+        lt = lighting_by_shot.get(sid) or {}
+
+        if palette:
             preset = palette_to_preset.get(palette, "none")
-            shots.append(
-                {
-                    "shot_id": shot.get("id"),
-                    "palette": palette or None,
-                    "grade_preset": preset,
-                    "filter": build_ffmpeg_filter(preset),
-                }
-            )
+            source = "palette"
+        else:
+            # Fallback: derive from heat-phase lighting timeline (narrative color arc)
+            hp = str(lt.get("heat_phase") or shot.get("heat_phase") or "").strip().lower()
+            preset = heat_phase_to_preset.get(hp, "none")
+            source = f"lighting_timeline:{hp}" if hp else "default"
+
+        shots.append(
+            {
+                "shot_id": shot.get("id"),
+                "palette": palette or None,
+                "grade_preset": preset,
+                "filter": build_ffmpeg_filter(preset),
+                "lighting_theme": lt.get("lighting_theme"),
+                "lighting_source": source,
+            }
+        )
 
     receipt = {
         "schema_version": 1,
@@ -176,8 +217,9 @@ def plan_shot_grades(root: Path | str) -> dict[str, Any]:
         "shots": shots,
         "presets_available": list_presets(),
         "created_at": utc_now(),
-        "note": "Per-shot ASC CDL grade plan from cinema_prompt palette; "
-        "apply per-segment during extraction (video-use Hard Rule).",
+        "note": "Per-shot ASC CDL grade plan: explicit dsl.palette → preset; "
+        "fallback to heat-phase lighting timeline (narrative color arc). "
+        "Apply per-segment during extraction (video-use Hard Rule).",
     }
     out = root / "receipts" / "color-grade-plan.json"
     write_json(out, receipt)

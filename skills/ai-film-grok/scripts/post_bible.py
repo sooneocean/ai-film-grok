@@ -128,9 +128,9 @@ def _validate_mix(data: Mapping[str, Any], errors: list[dict[str, str]]) -> None
         peak = float(data["true_peak_dbtp"])
     except (KeyError, TypeError, ValueError):
         lufs, peak = 0.0, 1.0
-    if not -24.0 <= lufs <= -14.0:
+    if not -18.0 <= lufs <= -14.0:
         errors.append(
-            _issue("MIX_LUFS_OUT_OF_RANGE", "integrated loudness must be -24 to -14 LUFS")
+            _issue("MIX_LUFS_OUT_OF_RANGE", "integrated loudness must be -16 LUFS ±2 (-18 to -14)")
         )
     if peak > -1.0:
         errors.append(_issue("MIX_TRUE_PEAK_TOO_HIGH", "true peak must not exceed -1.0 dBTP"))

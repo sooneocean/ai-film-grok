@@ -591,25 +591,106 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
 
     # P3-1: color grade check — verify grade parameters exist when strict
     spec_path = _first_file(root, "film-spec.json")
-    if spec_path:
-        spec = read_json(spec_path) or {}
-        grade = spec.get("grade") if isinstance(spec, dict) else None
-        grade_strict = bool(spec.get("color_grade_strict")) if isinstance(spec, dict) else False
-        if grade_strict:
-            if not isinstance(grade, dict) or not grade.get("color_temperature"):
-                hard.append(
-                    {
-                        "code": "COLOR_GRADE_MISSING",
-                        "message": "color_grade_strict is true but grade.color_temperature is missing — color grading not defined",
+    spec = read_json(spec_path) or {} if spec_path else {}
+
+    # Determine premium quality target (from production-book or film-spec)
+    is_premium = False
+    pb_path = root / "production-book.json"
+    if pb_path.is_file():
+        pb = read_json(pb_path) or {}
+        is_premium = str(pb.get("quality_target") or "standard") == "premium_vertical"
+    if not is_premium and isinstance(spec, dict):
+        is_premium = str(spec.get("quality_target") or "standard") == "premium_vertical"
+
+    # P2-6: face identity drift — premium projects elevate warnings to hard
+    if post_audit_face_status is not None:
+        face_st = post_audit_face_status(root)
+        for w in face_st.get("warnings") or []:
+            if isinstance(w, dict) and w.get("code"):
+                if is_premium and w.get("code") in (
+                    "FACE_IDENTITY_DRIFT",
+                    "FACE_IDENTITY_ENROLL_GAP",
+                ):
+                    hard.append(w)
+                else:
+                    warnings.append(w)
+        for h in face_st.get("hard") or []:
+            if isinstance(h, dict) and h.get("code"):
+                hard.append(h)
+    else:
+        # Fallback if module missing
+        bible_path = _first_file(root, "style-bible.json")
+        if bible_path:
+            bible = read_json(bible_path) or {}
+            cast_masters = bible.get("cast_masters") or {}
+            if isinstance(cast_masters, dict) and cast_masters:
+                identity_receipt_path = root / "receipts" / "face-identity.json"
+                if not identity_receipt_path.is_file():
+                    drift_msg = {
+                        "code": "FACE_IDENTITY_DRIFT",
+                        "message": f"cast_masters has {len(cast_masters)} character(s) but no face-identity.json",
                     }
-                )
-        elif not grade:
-            warnings.append(
+                    if is_premium:
+                        hard.append(drift_msg)
+                    else:
+                        warnings.append(drift_msg)
+
+    grade = spec.get("grade") if isinstance(spec, dict) else None
+    # P2-8: color grade strict — premium defaults to strict
+    grade_strict = bool(spec.get("color_grade_strict")) if isinstance(spec, dict) else False
+    if is_premium and not grade_strict:
+        grade_strict = True
+    if grade_strict:
+        if not isinstance(grade, dict) or not grade.get("color_temperature"):
+            hard.append(
                 {
                     "code": "COLOR_GRADE_MISSING",
-                    "message": "no grade parameters in film-spec — color grading is unparameterized (from 0/10 baseline)",
+                    "message": "color_grade_strict is true but grade.color_temperature is missing — color grading not defined",
                 }
             )
+    elif not grade:
+        warnings.append(
+            {
+                "code": "COLOR_GRADE_MISSING",
+                "message": "no grade parameters in film-spec — color grading is unparameterized (from 0/10 baseline)",
+            }
+        )
+
+    # P2-11: audio_bible / post_bible — premium projects elevate advisory to hard
+    if is_premium:
+        audio_bible_path = _first_file(root, "audio-bible.json")
+        if audio_bible_path:
+            try:
+                from audio_bible import validate_audio_bible
+
+                ab = read_json(audio_bible_path) or {}
+                ab_report = validate_audio_bible(ab)
+                for err in ab_report.get("errors") or []:
+                    hard.append(
+                        {
+                            "code": str(err.get("code") or "AUDIO_BIBLE_VIOLATION"),
+                            "message": f"audio-bible: {err.get('message', '')}",
+                        }
+                    )
+            except Exception:
+                pass
+
+        post_bible_path = _first_file(root, "post-bible.json")
+        if post_bible_path:
+            try:
+                from post_bible import validate_post_bible
+
+                pb2 = read_json(post_bible_path) or {}
+                pb2_report = validate_post_bible(pb2)
+                for err in pb2_report.get("errors") or []:
+                    hard.append(
+                        {
+                            "code": str(err.get("code") or "POST_BIBLE_VIOLATION"),
+                            "message": f"post-bible: {err.get('message', '')}",
+                        }
+                    )
+            except Exception:
+                pass
 
     report = {
         "ok": True,

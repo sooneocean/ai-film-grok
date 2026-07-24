@@ -30,11 +30,30 @@ def update_dailies(
     reviewer: str,
     notes: str,
     approved_budget: int | None = None,
+    provider: str = "",
+    model: str = "",
+    cost_usd: float | None = None,
+    source_keyframe: str = "",
+    qa: dict[str, Any] | None = None,
+    director_score: int | None = None,
+    issue_tags: list[str] | None = None,
+    reshoot_decision: str = "",
+    selection_rationale: str = "",
 ) -> dict[str, Any]:
     if status not in STATUSES:
         raise ValueError("status must be select|alternate|reject|reshoot")
     if not shot_id.strip() or not candidate.strip() or not reviewer.strip():
         raise ValueError("shot_id, candidate and reviewer are required")
+    if cost_usd is not None and cost_usd < 0:
+        raise ValueError("cost_usd must be >= 0")
+    if director_score is not None and not 1 <= director_score <= 5:
+        raise ValueError("director_score must be from 1 to 5")
+    if reshoot_decision and reshoot_decision not in {"none", "reshoot", "repair"}:
+        raise ValueError("reshoot_decision must be none|reshoot|repair")
+    if status == "reshoot" and reshoot_decision not in {"", "reshoot"}:
+        raise ValueError("reshoot status requires reshoot_decision=reshoot")
+    if status != "reshoot" and reshoot_decision == "reshoot":
+        raise ValueError("reshoot_decision=reshoot requires status=reshoot")
     base = Path(root).expanduser().resolve()
     path = base / "receipts" / "dailies.json"
     report = read_json(path) or {"schema_version": 1, "kind": "dailies", "shots": {}}
@@ -55,6 +74,17 @@ def update_dailies(
         "status": status,
         "reviewer": reviewer.strip(),
         "notes": notes.strip(),
+        "generation": {
+            "provider": provider.strip() or None,
+            "model": model.strip() or None,
+            "cost_usd": cost_usd,
+            "source_keyframe": source_keyframe.strip() or None,
+        },
+        "objective_qa": qa or {},
+        "director_score": director_score,
+        "issue_tags": sorted({item.strip() for item in (issue_tags or []) if item.strip()}),
+        "reshoot_decision": reshoot_decision or ("reshoot" if status == "reshoot" else "none"),
+        "selection_rationale": selection_rationale.strip(),
     }
     entries.append(entry)
     report["shot_count"] = len(shots)

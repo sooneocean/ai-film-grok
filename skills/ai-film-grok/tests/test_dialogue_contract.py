@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 from pathlib import Path
+
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from dialogue_contract import validate_dialogue_contract  # noqa: E402
+from dialogue_contracts import summarize_dialogue_contracts  # noqa: E402
 
 
 def _contract() -> dict:
@@ -58,3 +63,195 @@ def test_dialogue_must_remain_inside_shot_window() -> None:
     report = validate_dialogue_contract(contract)
 
     assert "DIALOGUE_OUTSIDE_SHOT_WINDOW" in {issue["code"] for issue in report["errors"]}
+
+
+def test_shared_summary_preserves_shot_id_and_contract_count() -> None:
+    bad = _contract()
+    bad["lines"][0]["window"]["end_sec"] = 12.1
+
+    report = summarize_dialogue_contracts(
+        [
+            {"id": "s001", "dialogue_contracts": [_contract()]},
+            {"id": "s002", "dialogue_contracts": [bad]},
+        ]
+    )
+
+    assert report["contracts_validated"] == 2
+    assert report["error_count"] == 1
+    assert report["errors"][0]["shot_id"] == "s002"
+
+
+def test_shared_summary_rejects_non_object_contracts() -> None:
+    report = summarize_dialogue_contracts([{"id": "s001", "dialogue_contracts": [None]}])
+
+    assert report["ok"] is False
+    assert report["codes"] == ["DIALOGUE_CONTRACT_INVALID"]
+    assert report["errors"][0]["shot_id"] == "s001"
+
+
+# ─── Gate path tests (write-spec strict + preflight) ─────────────────────
+
+
+def _dc_shot(sid="shot01", *, contracts=None):
+    """Minimal shot for write-spec validation, optionally carrying dialogue_contracts."""
+    sh = {
+        "id": sid,
+        "dramatic_function": "approach",
+        "nar": f"旁白{sid}。",
+        "dsl": {
+            "subject": "woman",
+            "cast": ["heroine"],
+            "camera": {"shot_size": "medium"},
+            "motion": "idle",
+        },
+    }
+    if contracts is not None:
+        sh["dialogue_contracts"] = contracts
+    return sh
+
+
+def _dc_spec(shots):
+    return {
+        "schema_version": 1,
+        "title": "dc-test",
+        "vo_mode": "storyteller",
+        "aspect": "9:16",
+        "director_intent": {
+            "logline": "Test dialogue contracts.",
+            "tone": "neutral",
+            "emotional_arc": ["a", "b", "c"],
+        },
+        "transition_sec": 0.25,
+        "transition_default": "soft",
+        "scenes": [{"shots": shots}],
+    }
+
+
+def _good_contract():
+    return {
+        "shot_id": "shot01",
+        "shot_window": {"start_sec": 10.0, "end_sec": 12.0},
+        "lines": [
+            {
+                "line_id": "line-1",
+                "text_sha256": "b" * 64,
+                "delivery": "quiet warning",
+                "window": {"start_sec": 10.2, "end_sec": 11.4},
+                "audio_origin": "native",
+                "lipsync_required": True,
+                "lipsync_evidence": {
+                    "method": "generated_native_audio",
+                    "artifact_sha256": "c" * 64,
+                },
+            }
+        ],
+    }
+
+
+def _bad_contract():
+    """Post-VO on silent I2V with no real lipsync evidence."""
+    c = _good_contract()
+    c["lines"][0]["audio_origin"] = "post_vo"
+    c["lines"][0]["source_video_audio"] = "silent"
+    c["lines"][0]["lipsync_evidence"] = {"method": "timed_post_vo", "artifact_sha256": "d" * 64}
+    return c
+
+
+class TestWriteSpecDialogueContractGate:
+    """dialogue_contract_strict=True → FilmSpecError when contract violations detected."""
+
+    def test_strict_raises_on_bad_contract(self):
+        from film_spec import FilmSpecError, validate_film_spec
+
+        shots = [_dc_shot(contracts=[_bad_contract()])]
+        spec = _dc_spec(shots)
+        spec["dialogue_contract_strict"] = True
+        with pytest.raises(FilmSpecError, match="dialogue_contract_strict"):
+            validate_film_spec(spec, assign_missing_ids=False)
+
+    def test_non_strict_no_raise_on_bad_contract(self):
+        from film_spec import validate_film_spec
+
+        shots = [_dc_shot(contracts=[_bad_contract()])]
+        spec = _dc_spec(shots)
+        validate_film_spec(spec, assign_missing_ids=False)
+        pcr = spec.get("_dialogue_contracts") or {}
+        assert not pcr.get("ok", True)
+        assert pcr.get("error_count", 0) > 0
+
+    def test_strict_passes_on_good_contract(self):
+        from film_spec import validate_film_spec
+
+        shots = [_dc_shot(contracts=[_good_contract()])]
+        spec = _dc_spec(shots)
+        spec["dialogue_contract_strict"] = True
+        validate_film_spec(spec, assign_missing_ids=False)
+        pcr = spec.get("_dialogue_contracts") or {}
+        assert pcr.get("ok") is True
+
+    def test_no_contracts_no_issue(self):
+        from film_spec import validate_film_spec
+
+        shots = [_dc_shot()]
+        spec = _dc_spec(shots)
+        spec["dialogue_contract_strict"] = True
+        validate_film_spec(spec, assign_missing_ids=False)
+        pcr = spec.get("_dialogue_contracts") or {}
+        assert pcr.get("ok") is True
+        assert pcr.get("contracts_validated") == 0
+
+    def test_strict_rejects_non_object_contract(self):
+        from film_spec import FilmSpecError, validate_film_spec
+
+        spec = _dc_spec([_dc_shot(contracts=[None])])
+        spec["dialogue_contract_strict"] = True
+        with pytest.raises(FilmSpecError, match="dialogue_contract_strict"):
+            validate_film_spec(spec, assign_missing_ids=False)
+
+
+class TestPreflightDialogueContractGate:
+    """preflight reports dialogue_contract_violation soft (default) / hard (strict)."""
+
+    def _make_root(self, shots, *, strict=False):
+        tmp = tempfile.mkdtemp(prefix="aifilm_dc_test_")
+        root = Path(tmp)
+        spec = _dc_spec(shots)
+        if strict:
+            spec["dialogue_contract_strict"] = True
+        (root / "film-spec.json").write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+        return root
+
+    def test_preflight_soft_on_bad_contract_default(self):
+        import preflight
+
+        shots = [_dc_shot(contracts=[_bad_contract()])]
+        root = self._make_root(shots, strict=False)
+        rep = preflight.run_preflight(root)
+        soft_codes = [i["code"] for i in rep["soft"]]
+        assert "dialogue_contract_violation" in soft_codes
+
+    def test_preflight_hard_on_bad_contract_strict(self):
+        import preflight
+
+        shots = [_dc_shot(contracts=[_bad_contract()])]
+        root = self._make_root(shots, strict=True)
+        rep = preflight.run_preflight(root)
+        hard_codes = [i["code"] for i in rep["hard"]]
+        assert "dialogue_contract_violation" in hard_codes
+        assert not rep["hard_ok"]
+
+    def test_preflight_clean_no_issue(self):
+        import preflight
+
+        shots = [_dc_shot(contracts=[_good_contract()])]
+        root = self._make_root(shots, strict=True)
+        rep = preflight.run_preflight(root)
+        all_codes = [i["code"] for i in rep["hard"]] + [i["code"] for i in rep["soft"]]
+        assert "dialogue_contract_violation" not in all_codes
+
+    def test_preflight_hard_on_non_object_contract_strict(self):
+        import preflight
+
+        root = self._make_root([_dc_shot(contracts=[None])], strict=True)
+        rep = preflight.run_preflight(root)
+        assert "dialogue_contract_violation" in [item["code"] for item in rep["hard"]]

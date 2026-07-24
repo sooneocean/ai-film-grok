@@ -121,5 +121,167 @@ class PostAuditTests(unittest.TestCase):
             self.assertIn("SCREENING_EVIDENCE_INCOMPLETE", codes)
 
 
+class PremiumGateElevationTests(unittest.TestCase):
+    """P2-6/P2-8: premium projects elevate face-identity drift + color-grade to hard."""
+
+    def test_premium_face_identity_drift_is_hard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "style-bible.json").write_text(
+                json.dumps({"cast_masters": {"hero": "cast/hero-v1.png"}}), encoding="utf-8"
+            )
+            (root / "production-book.json").write_text(
+                json.dumps({"quality_target": "premium_vertical"}), encoding="utf-8"
+            )
+            # No receipts/face-identity.json → drift
+            report = audit(root, write=False)
+            hard_codes = {item["code"] for item in report["hard_failures"]}
+            self.assertIn("FACE_IDENTITY_DRIFT", hard_codes)
+
+    def test_standard_face_identity_drift_is_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "style-bible.json").write_text(
+                json.dumps({"cast_masters": {"hero": "cast/hero-v1.png"}}), encoding="utf-8"
+            )
+            (root / "production-book.json").write_text(
+                json.dumps({"quality_target": "standard"}), encoding="utf-8"
+            )
+            report = audit(root, write=False)
+            hard_codes = {item["code"] for item in report["hard_failures"]}
+            warn_codes = {item["code"] for item in report["warnings"]}
+            self.assertNotIn("FACE_IDENTITY_DRIFT", hard_codes)
+            self.assertIn("FACE_IDENTITY_DRIFT", warn_codes)
+
+    def test_premium_color_grade_missing_is_hard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "film-spec.json").write_text(json.dumps({"title": "t"}), encoding="utf-8")
+            (root / "production-book.json").write_text(
+                json.dumps({"quality_target": "premium_vertical"}), encoding="utf-8"
+            )
+            report = audit(root, write=False)
+            hard_codes = {item["code"] for item in report["hard_failures"]}
+            self.assertIn("COLOR_GRADE_MISSING", hard_codes)
+
+    def test_standard_color_grade_missing_is_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "film-spec.json").write_text(json.dumps({"title": "t"}), encoding="utf-8")
+            (root / "production-book.json").write_text(
+                json.dumps({"quality_target": "standard"}), encoding="utf-8"
+            )
+            report = audit(root, write=False)
+            hard_codes = {item["code"] for item in report["hard_failures"]}
+            warn_codes = {item["code"] for item in report["warnings"]}
+            self.assertNotIn("COLOR_GRADE_MISSING", hard_codes)
+            self.assertIn("COLOR_GRADE_MISSING", warn_codes)
+
+    def test_premium_audio_bible_violation_is_hard(self) -> None:
+        """P2-11: premium projects elevate audio_bible advisory to hard at delivery."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "production-book.json").write_text(
+                json.dumps({"quality_target": "premium_vertical"}), encoding="utf-8"
+            )
+            (root / "audio-bible.json").write_text(
+                json.dumps({"schema_version": 1, "kind": "audio-bible", "nodes": {}}),
+                encoding="utf-8",
+            )
+            report = audit(root, write=False)
+            hard_codes = {item["code"] for item in report["hard_failures"]}
+            self.assertIn("VOICE_LOCK_MISSING", hard_codes)
+
+    def test_premium_post_bible_violation_is_hard(self) -> None:
+        """P2-11: premium projects elevate post_bible advisory to hard at delivery."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "production-book.json").write_text(
+                json.dumps({"quality_target": "premium_vertical"}), encoding="utf-8"
+            )
+            (root / "post-bible.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "post-bible",
+                        "nodes": {
+                            "mix": {"data": {"integrated_lufs": -10.0, "true_peak_dbtp": 0.5}},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = audit(root, write=False)
+            hard_codes = {item["code"] for item in report["hard_failures"]}
+            self.assertTrue(
+                hard_codes & {"MIX_LUFS_OUT_OF_RANGE", "MIX_TRUE_PEAK_TOO_HIGH"},
+                f"expected mix violation in hard, got {hard_codes}",
+            )
+
+    def test_standard_audio_bible_not_checked(self) -> None:
+        """Standard projects don't check audio_bible at delivery (advisory only)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "production-book.json").write_text(
+                json.dumps({"quality_target": "standard"}), encoding="utf-8"
+            )
+            (root / "audio-bible.json").write_text(
+                json.dumps({"schema_version": 1, "kind": "audio-bible", "nodes": {}}),
+                encoding="utf-8",
+            )
+            report = audit(root, write=False)
+            hard_codes = {item["code"] for item in report["hard_failures"]}
+            self.assertNotIn("VOICE_LOCK_MISSING", hard_codes)
+
+
+class UnifiedLufsStandardTests(unittest.TestCase):
+    """P3-15: LUFS standard unified to -16 ±2 (-18..-14) across all modules."""
+
+    def test_post_bible_lufs_band_is_unified(self):
+        """post_bible MIX_LUFS_OUT_OF_RANGE uses -18..-14 (was -24..-14)."""
+        from post_bible import validate_post_bible
+
+        # -16 is in range → no LUFS error
+        bible = {
+            "schema_version": 1,
+            "kind": "post-bible",
+            "nodes": {
+                "mix": {
+                    "data": {
+                        "integrated_lufs": -16.0,
+                        "true_peak_dbtp": -2.0,
+                        "degraded_from": None,
+                    }
+                },
+            },
+        }
+        rep = validate_post_bible(bible)
+        codes = {e["code"] for e in rep.get("errors") or []}
+        self.assertNotIn("MIX_LUFS_OUT_OF_RANGE", codes)
+
+        # -22 is out of range → error (previously -24..-14 would have passed)
+        bible["nodes"]["mix"]["data"]["integrated_lufs"] = -22.0
+        rep = validate_post_bible(bible)
+        codes = {e["code"] for e in rep.get("errors") or []}
+        self.assertIn("MIX_LUFS_OUT_OF_RANGE", codes)
+
+    def test_quality_check_video_lufs_band_is_unified(self):
+        """quality_check_video MEAN_VOLUME constants are -18..-14 (was -22..-16)."""
+        import quality_check_video
+
+        self.assertAlmostEqual(quality_check_video.MEAN_VOLUME_MIN_DB, -18.0)
+        self.assertAlmostEqual(quality_check_video.MEAN_VOLUME_MAX_DB, -14.0)
+
+    def test_quality_check_video_strict_audio_loudness_param(self):
+        """The strict_audio_loudness parameter exists on run_quality_check."""
+        import inspect
+
+        import quality_check_video
+
+        sig = inspect.signature(quality_check_video.run_quality_check)
+        self.assertIn("strict_audio_loudness", sig.parameters)
+        self.assertFalse(sig.parameters["strict_audio_loudness"].default)
+
+
 if __name__ == "__main__":
     unittest.main()

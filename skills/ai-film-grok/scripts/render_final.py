@@ -39,15 +39,14 @@ from edit_policy import (
 from film_spec import FilmSpecError, validate_film_spec
 from media_qa import MediaQAError, analyze_media, approved_clip_record
 from PIL import Image, ImageDraw, ImageFont
+from render_workspace import RenderWorkspaceError, prepare_render_workspace, resolve_render_paths
 from runtime_policy import sha256
 from security_policy import (
     SecurityPolicyError,
     atomic_write_text,
     minimal_subprocess_env,
-    reject_symlinks,
     safe_existing_file,
     safe_output_path,
-    safe_workspace_directory,
 )
 from sound_plan import (
     SoundPlanError,
@@ -1774,17 +1773,11 @@ def write_srt(path: Path, cues: list[dict[str, Any]]) -> None:
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
     try:
-        out_dir = safe_workspace_directory(root, "out", field="film output directory")
-        final_path = safe_output_path(
-            out_dir,
-            args.out_name or "film_final.mp4",
-            suffixes={".mp4"},
-            field="final output name",
-        )
-    except SecurityPolicyError as exc:
+        paths = resolve_render_paths(root, args.out_name)
+    except RenderWorkspaceError as exc:
         raise RenderError(str(exc)) from exc
-    if not root.is_dir():
-        raise RenderError(f"Film root missing: {root}")
+    out_dir = paths["out_dir"]
+    final_path = paths["final"]
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
         raise RenderError("ffmpeg/ffprobe required")
 
@@ -1906,29 +1899,15 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     shots = flatten_shots(spec, film_root=root)
     clips_map = manifest.get("clips") or {}
     try:
-        clips_dir = safe_workspace_directory(root, "clips", field="film clips directory")
-        audio_dir = safe_workspace_directory(root, "audio", field="film audio directory")
-        native_dir = safe_workspace_directory(audio_dir, "native", field="native audio directory")
-        keyframes_dir = safe_workspace_directory(
-            root, "keyframes", field="film keyframes directory"
-        )
-        work = safe_workspace_directory(out_dir, "_final_work", field="final work directory")
-        for directory, field in (
-            (out_dir, "film output directory"),
-            (audio_dir, "film audio directory"),
-            (clips_dir, "film clips directory"),
-            (keyframes_dir, "film keyframes directory"),
-            (native_dir, "native audio directory"),
-        ):
-            reject_symlinks(directory, field=field)
-    except SecurityPolicyError as exc:
+        prepare_render_workspace(paths)
+    except RenderWorkspaceError as exc:
         raise RenderError(str(exc)) from exc
-    if work.exists():
-        shutil.rmtree(work)
-    work.mkdir(parents=True)
-    audio_dir.mkdir(exist_ok=True)
+    clips_dir = paths["clips_dir"]
+    audio_dir = paths["audio_dir"]
+    native_dir = paths["native_dir"]
+    keyframes_dir = paths["keyframes_dir"]
+    work = paths["work"]
     overlays_dir = work / "overlays"
-    overlays_dir.mkdir()
 
     # 1) Per-shot TTS
     shot_audio: list[dict[str, Any]] = []

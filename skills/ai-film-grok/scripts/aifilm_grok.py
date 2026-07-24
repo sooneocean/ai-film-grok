@@ -1172,6 +1172,15 @@ def cmd_dailies(args: argparse.Namespace) -> int:
             reviewer=args.reviewer,
             notes=args.notes,
             approved_budget=args.approved_budget,
+            provider=args.provider,
+            model=args.model,
+            cost_usd=args.cost_usd,
+            source_keyframe=args.source_keyframe,
+            qa=json.loads(args.qa_json) if args.qa_json else None,
+            director_score=args.director_score,
+            issue_tags=args.issue_tag,
+            reshoot_decision=args.reshoot_decision,
+            selection_rationale=args.selection_rationale,
         )
     emit(report)
     return 0 if report.get("ok") else 2
@@ -1227,6 +1236,30 @@ def cmd_delivery_package(args: argparse.Namespace) -> int:
     from delivery_package import build_delivery_package
 
     report = build_delivery_package(Path(args.root), allow_missing=bool(args.allow_missing))
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
+def cmd_quality_closure(args: argparse.Namespace) -> int:
+    """Operate the evidence-only premium quality closure; never spends credits."""
+    from quality_closure import build_benchmark_package, build_quality_report, record_blind_review
+
+    root = Path(args.root).expanduser().resolve()
+    action = str(args.quality_closure_action)
+    if action == "package":
+        report = build_benchmark_package(root)
+    elif action == "report":
+        report = build_quality_report(root)
+    elif action == "review":
+        try:
+            scores = json.loads(args.scores_json)
+        except json.JSONDecodeError as exc:
+            raise FilmError("--scores-json must be a JSON object") from exc
+        if not isinstance(scores, dict):
+            raise FilmError("--scores-json must be a JSON object")
+        report = record_blind_review(root, reviewer=args.reviewer, scores=scores, notes=args.notes)
+    else:
+        raise FilmError(f"Unknown quality closure action: {action}")
     emit(report)
     return 0 if report.get("ok") else 2
 
@@ -5967,6 +6000,17 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument("--reviewer", required=True)
     dr.add_argument("--notes", default="")
     dr.add_argument("--approved-budget", type=int, default=None)
+    dr.add_argument("--provider", default="", help="Generation provider recorded with this take")
+    dr.add_argument("--model", default="", help="Generation model recorded with this take")
+    dr.add_argument(
+        "--cost-usd", type=float, default=None, help="Known provider cost; never inferred"
+    )
+    dr.add_argument("--source-keyframe", default="", help="Approved source still/keyframe path")
+    dr.add_argument("--qa-json", default="", help="Objective QA JSON object")
+    dr.add_argument("--director-score", type=int, default=None, help="Director score 1-5")
+    dr.add_argument("--issue-tag", action="append", default=[], help="Repeatable quality issue tag")
+    dr.add_argument("--reshoot-decision", choices=("none", "reshoot", "repair"), default="")
+    dr.add_argument("--selection-rationale", default="")
 
     postq = sub.add_parser("post-quality", help="VFX, audio and premium Master QC contracts")
     postq_sub = postq.add_subparsers(dest="post_action", required=True)
@@ -6004,6 +6048,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     package.add_argument("--root", required=True)
     package.add_argument("--allow-missing", action="store_true")
+
+    closure = sub.add_parser(
+        "quality-closure", help="No-spend premium benchmark, blind-review, and evidence report"
+    )
+    closure_sub = closure.add_subparsers(dest="quality_closure_action", required=True)
+    closure_package = closure_sub.add_parser("package", help="Write the fixed benchmark package")
+    closure_package.add_argument("--root", required=True)
+    closure_report = closure_sub.add_parser(
+        "report", help="Summarize evidence without inflating claims"
+    )
+    closure_report.add_argument("--root", required=True)
+    closure_review = closure_sub.add_parser("review", help="Record one independent blind review")
+    closure_review.add_argument("--root", required=True)
+    closure_review.add_argument("--reviewer", required=True)
+    closure_review.add_argument("--scores-json", required=True)
+    closure_review.add_argument("--notes", default="")
 
     # v1.23: reference video audit — reverse-engineer shot grammar
     refaudit = sub.add_parser(
@@ -6892,6 +6952,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_provider_canary(args)
         if args.cmd == "delivery-package":
             return cmd_delivery_package(args)
+        if args.cmd == "quality-closure":
+            return cmd_quality_closure(args)
         if args.cmd == "analyze-reference":
             from reference_audit import ReferenceAuditError, run_reference_audit
 

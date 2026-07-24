@@ -55,6 +55,18 @@ class BackendLockTests(unittest.TestCase):
 
 
 class RuntimeLockTests(unittest.TestCase):
+    def test_default_lock_discovers_new_python_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            (scripts / "new_quality_gate.py").write_text("VALUE = 1\n", encoding="utf-8")
+            from runtime_policy import build_runtime_lock
+
+            report = build_runtime_lock(root)
+
+            self.assertIn("scripts/new_quality_gate.py", report["scripts"])
+
     def test_script_change_invalidates_runtime_lock(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -238,11 +238,11 @@ def build_next_actions(
     *,
     gates: dict[str, Any] | None = None,
     open_reshoot_count: int = 0,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     """Return ordered actionable steps: [{id, cmd, why, stage}, ...]. Max ~8 items."""
     root = Path(root).expanduser().resolve()
     gates = gates or {}
-    actions: list[dict[str, str]] = []
+    actions: list[dict[str, Any]] = []
 
     def add(aid: str, cmd: str, why: str) -> None:
         stage = _ACTION_STAGE.get(aid, "agent")
@@ -251,6 +251,21 @@ def build_next_actions(
         actions.append({"id": aid, "cmd": cmd, "why": why, "stage": stage, "stage_label": label})
 
     r = str(root)
+
+    # A completed independent review with a failed dimension is more useful
+    # than generic advisory.  Return its one evidence-backed repair instead of
+    # asking an agent to choose among unrelated next steps.
+    try:
+        from quality_closure import repair_action
+
+        quality_repair = repair_action(root)
+    except (OSError, ValueError):
+        quality_repair = None
+    if quality_repair is not None:
+        quality_repair["stage_label"] = _STAGE_LABELS_ZH.get(
+            str(quality_repair.get("stage")), str(quality_repair.get("stage"))
+        )
+        return [quality_repair]
 
     if not (root / "brief.json").is_file() and not gates.get("brief"):
         add(

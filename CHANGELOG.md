@@ -3,6 +3,17 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [1.26.0] — 2026-07-24
+
+### Added — Evidence-bound premium quality closure
+
+- `aifilm quality-closure package|review|report` creates a no-spend, versioned premium benchmark package; records two independent blind reviews; and distinguishes contract, local-render, real-provider and human-review evidence.
+- The report never upgrades contract-only evidence to an artistic-quality claim. Real provider media, current Master QC, delivery package, and two independent reviews remain required.
+- Dailies now retain provider/model/cost, source keyframe, objective QA, director score, issue tags, reshoot decision, and selection rationale for each candidate.
+- `aifilm next` returns only the highest-priority, receipt-backed repair when an independent review exposes a quality failure.
+- Runtime locks now discover every shipped script/module; CI publishes a coverage JSON artifact as a non-blocking trend input.
+- P2 boundary extraction: `dialogue_contracts.py` is now the shared pure aggregation used by both `film_spec` and `preflight`; `render_workspace.py` owns final-render path validation and its isolated work directory lifecycle.
+
 ## [1.25.0] — 2026-07-23
 
 ### Added — Gates & test hardening (audit P1)

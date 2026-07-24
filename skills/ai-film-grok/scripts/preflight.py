@@ -657,18 +657,26 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 except Exception:
                     pass
         if mm_codes:
-            soft.append(
-                _issue(
-                    "soft",
-                    "meaningful_motion",
-                    f"动态叙事意涵 soft lint: {mm_codes} (warn={mm.get('warning_count')})",
-                    fix=(
-                        "每镜 motion 须回答 beat 故事问题（登场/靠近/感官/反应/行动/余韵）；"
-                        "写 dsl.visible_change + 主动词领先；禁止只有 blink/push-in 氛围。"
-                        "见 lessons-2026-07-20-meaningful-motion.md"
-                    ),
-                )
+            mm_strict = spec.get("meaningful_motion_strict") is True
+            mm_msg = (
+                f"动态叙事意涵 {'hard' if mm_strict else 'soft'} lint: {mm_codes} "
+                f"(warn={mm.get('warning_count')})"
             )
+            mm_fix = (
+                "每镜 motion 须回答 beat 故事问题（登场/靠近/感官/反应/行动/余韵）；"
+                "写 dsl.visible_change + 主动词领先；禁止只有 blink/push-in 氛围。"
+                "见 lessons-2026-07-20-meaningful-motion.md"
+            )
+            mm_issue = _issue(
+                "hard" if mm_strict else "soft",
+                "meaningful_motion",
+                mm_msg,
+                fix=mm_fix,
+            )
+            if mm_strict:
+                hard.append(mm_issue)
+            else:
+                soft.append(mm_issue)
 
         # --- Production consistency P2-2~P2-6 (wardrobe/hair/makeup/light/rhythm/lipsync/voice drift) ---
         # Soft by default; hard when production_consistency_strict (premium).
@@ -758,6 +766,52 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "composition_rules_probe_error",
                     f"composition rules lint probe failed: {exc}"[:200],
                     fix="check framing_lint.lint_composition_rules",
+                )
+            )
+
+        # --- Dialogue contract P1-8 (timing/origin/lipsync truth) ---
+        # Soft by default; hard when dialogue_contract_strict (premium).
+        try:
+            from dialogue_contracts import summarize_dialogue_contracts
+
+            shots_dc: list = []
+            if isinstance(spec.get("scenes"), list):
+                for sc in spec["scenes"]:
+                    if isinstance(sc, dict) and isinstance(sc.get("shots"), list):
+                        shots_dc.extend(sc["shots"])
+            dc_summary = summarize_dialogue_contracts(shots_dc)
+            dc_errors = dc_summary["errors"]
+            if dc_errors:
+                dc_strict = spec.get("dialogue_contract_strict") is True
+                dc_codes = dc_summary["codes"]
+                dc_message = (
+                    f"dialogue contract violations: {dc_codes} "
+                    f"({len(dc_errors)} errors) — "
+                    f"{dc_errors[0].get('message', '')[:140]}"
+                )
+                dc_fix = (
+                    "对白台词库: 每句对白须有 line_id + text_sha256 + delivery + 显式 lipsync_required；"
+                    "对白窗口须在镜头窗口内；post_vo+silent I2V 非原生音频；"
+                    "lipsync_required 须有 hash-bound 真实方法证据。"
+                    "见 references/director-methodology.md §二-11 · dialogue_contract.py"
+                )
+                dc_issue = _issue(
+                    "hard" if dc_strict else "soft",
+                    "dialogue_contract_violation",
+                    dc_message,
+                    fix=dc_fix,
+                )
+                if dc_strict:
+                    hard.append(dc_issue)
+                else:
+                    soft.append(dc_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "dialogue_contract_probe_error",
+                    f"dialogue contract lint probe failed: {exc}"[:200],
+                    fix="check dialogue_contract.validate_dialogue_contract",
                 )
             )
 

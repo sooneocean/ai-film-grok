@@ -90,6 +90,57 @@ class ColorGradeTests(unittest.TestCase):
             with self.assertRaises(ColorGradeError):
                 plan_shot_grades(Path(tmp))
 
+    def test_plan_shot_grades_from_heat_phase_lighting_timeline(self) -> None:
+        """P1-9: shots without explicit palette derive grade from heat-phase lighting arc."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            spec = {
+                "title": "t",
+                "scenes": [
+                    {
+                        "id": "s1",
+                        "shots": [
+                            {"id": "sh1", "heat_phase": "setup"},
+                            {"id": "sh2", "heat_phase": "act"},
+                            {"id": "sh3", "heat_phase": "afterglow"},
+                        ],
+                    }
+                ],
+            }
+            write_json(root / "film-spec.json", spec)
+            receipt = plan_shot_grades(root)
+            self.assertTrue(receipt["ok"])
+            self.assertEqual(len(receipt["shots"]), 3)
+            # setup → none; act → high_contrast; afterglow → warm_cinematic
+            self.assertEqual(receipt["shots"][0]["grade_preset"], "none")
+            self.assertEqual(receipt["shots"][1]["grade_preset"], "high_contrast")
+            self.assertEqual(receipt["shots"][2]["grade_preset"], "warm_cinematic")
+            # lighting_theme attached from derive_lighting_timeline
+            self.assertIsNotNone(receipt["shots"][1].get("lighting_theme"))
+            # source indicates lighting_timeline derivation
+            self.assertIn("lighting_timeline", receipt["shots"][1].get("lighting_source", ""))
+
+    def test_explicit_palette_overrides_heat_phase(self) -> None:
+        """Explicit dsl.palette takes priority over heat-phase lighting fallback."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            spec = {
+                "title": "t",
+                "scenes": [
+                    {
+                        "id": "s1",
+                        "shots": [
+                            {"id": "sh1", "heat_phase": "act", "dsl": {"palette": "cool_steel"}},
+                        ],
+                    }
+                ],
+            }
+            write_json(root / "film-spec.json", spec)
+            receipt = plan_shot_grades(root)
+            # palette=cool_steel wins over heat_phase=act→high_contrast
+            self.assertEqual(receipt["shots"][0]["grade_preset"], "cool_steel")
+            self.assertEqual(receipt["shots"][0].get("lighting_source"), "palette")
+
     def test_presets_have_required_fields(self) -> None:
         for name, p in PRESETS.items():
             self.assertIn("slope", p)

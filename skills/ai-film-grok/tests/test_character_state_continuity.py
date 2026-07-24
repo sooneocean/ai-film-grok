@@ -75,5 +75,78 @@ class CharacterStateContinuityTests(unittest.TestCase):
         self.assertIn("glistening_sweat", prompt)
 
 
+class AssetsCheckStateRegressionTests(unittest.TestCase):
+    """P2-7: assets_check now derives 5-axis timeline and detects state regression."""
+
+    def _make_root(self, shots: list[dict]) -> Path:
+        import json
+        import tempfile
+
+        tmp = tempfile.mkdtemp(prefix="aifilm_cst_test_")
+        root = Path(tmp)
+        spec = {
+            "schema_version": 1,
+            "title": "cst-test",
+            "vo_mode": "storyteller",
+            "aspect": "9:16",
+            "director_intent": {
+                "logline": "State regression test.",
+                "tone": "neutral",
+                "emotional_arc": ["a", "b"],
+            },
+            "transition_sec": 0.25,
+            "transition_default": "soft",
+            "scenes": [{"shots": shots}],
+        }
+        (root / "film-spec.json").write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+        return root
+
+    def _shot(self, sid, heat_phase="setup"):
+        return {
+            "id": sid,
+            "heat_phase": heat_phase,
+            "dramatic_function": "approach",
+            "nar": f"旁白{sid}。",
+            "dsl": {
+                "subject": "woman",
+                "cast": ["heroine"],
+                "camera": {"shot_size": "medium"},
+                "motion": "idle",
+            },
+        }
+
+    def test_monotonic_progression_no_regression(self):
+        from asset_registry import assets_check
+
+        shots = [
+            self._shot("shot01", "teaser"),
+            self._shot("shot02", "foreplay"),
+            self._shot("shot03", "act"),
+        ]
+        root = self._make_root(shots)
+        rep = assets_check(root)
+        timeline = rep.get("character_state_timeline") or []
+        self.assertEqual(len(timeline), 3)
+        self.assertEqual(rep.get("state_regression_issues") or [], [])
+        self.assertFalse(rep.get("hard_fail_state_regression", False))
+
+    def test_timeline_attached_to_assets_check(self):
+        """The 5-axis timeline is now part of assets_check output (was orphan)."""
+        from asset_registry import assets_check
+
+        shots = [self._shot("shot01", "act"), self._shot("shot02", "afterglow")]
+        root = self._make_root(shots)
+        rep = assets_check(root)
+        timeline = rep.get("character_state_timeline") or []
+        self.assertGreater(len(timeline), 0)
+        first = timeline[0]
+        self.assertIn("shot_id", first)
+        self.assertIn("character_states", first)
+        cs = first["character_states"]
+        # All 5 axes present
+        for axis in ("wardrobe", "hair", "skin", "arousal", "expression"):
+            self.assertIn(axis, cs)
+
+
 if __name__ == "__main__":
     unittest.main()

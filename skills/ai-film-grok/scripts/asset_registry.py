@@ -688,21 +688,51 @@ def assets_check(root: Path, *, sync_first: bool = True) -> dict[str, Any]:
     cons = sync_rep.get("consistency") or {}
     re_dress = int((sync_rep.get("counts") or {}).get("re_dress_risks") or 0)
     ok = bool(cons.get("aligned")) and re_dress == 0
+
+    # Multi-axis character state timeline (P2-7): derive 5-axis monotonic states
+    # from film-spec shots and detect non-monotonic regression (state level drops).
+    state_issues: list[str] = []
+    state_timeline: list[dict[str, Any]] = []
+    try:
+        spec = read_json(root / "film-spec.json") or {}
+        shots = _shots_from_spec(spec)
+        state_timeline = derive_character_state_timeline(shots)
+        prev_levels: dict[str, int] = {}
+        for entry in state_timeline:
+            sid = str(entry.get("shot_id") or "?")
+            cs = entry.get("character_states") or {}
+            for axis, label in cs.items():
+                axis_idx = 0
+                axis_list = CHARACTER_STATE_AXES.get(axis) or []
+                if label in axis_list:
+                    axis_idx = axis_list.index(label)
+                prev = prev_levels.get(axis, -1)
+                if axis_idx < prev:
+                    state_issues.append(f"state_regression:{sid}:{axis}:{label}<{axis_list[prev]}")
+                prev_levels[axis] = max(prev, axis_idx)
+    except Exception:
+        pass
+    has_state_regression = len(state_issues) > 0
+
     return {
-        "ok": ok,
+        "ok": ok and not has_state_regression,
         "aligned": bool(cons.get("aligned")),
         "re_dress_risks": re_dress,
-        "issues": list(cons.get("issues") or []),
+        "state_regression_issues": state_issues,
+        "character_state_timeline": state_timeline,
+        "issues": list(cons.get("issues") or []) + state_issues,
         "generate_plan_preview": cons.get("generate_plan_preview") or [],
         "consistency": (sync_rep.get("consistency") or {}),
         "counts": sync_rep.get("counts"),
         "line": sync_rep.get("line"),
         "path": str(registry_path(root)),
         "hard_fail_redress": re_dress > 0,
+        "hard_fail_state_regression": has_state_regression,
         "hint": (
             "ok"
-            if ok
-            else "fix re_dress in film-spec wardrobe_state; generate missing cast-states via state-index plan"
+            if ok and not has_state_regression
+            else "fix re_dress / state regression in film-spec wardrobe_state+heat_phase; "
+            "generate missing cast-states via state-index plan"
         ),
     }
 

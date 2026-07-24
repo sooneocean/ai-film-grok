@@ -39,8 +39,8 @@ GATE_WEIGHTS: dict[str, int] = {
 }
 
 # Pass band for mean volume (dB).  Outside this → warn (not hard fail).
-MEAN_VOLUME_MIN_DB = -22.0
-MEAN_VOLUME_MAX_DB = -16.0
+MEAN_VOLUME_MIN_DB = -18.0  # P3-15: unified to -16 LUFS ±2 (was -22)
+MEAN_VOLUME_MAX_DB = -14.0  # P3-15: unified to -16 LUFS ±2 (was -16)
 MAX_VOLUME_CEILING_DB = -1.0
 
 # Detector thresholds (match reference-repo defaults).
@@ -208,6 +208,7 @@ def run_quality_check(
     min_score: int = 0,
     allow_black: bool = False,
     allow_freeze: bool = False,
+    strict_audio_loudness: bool = False,
 ) -> dict[str, Any]:
     """Run the full delivery-quality gate suite on one final video.
 
@@ -284,8 +285,8 @@ def run_quality_check(
         or max_volume > MAX_VOLUME_CEILING_DB
     ):
         gates["audio_loudness"] = _gate(
-            "warn",
-            f"volume outside target: mean={mean_volume} dB, max={max_volume} dB",
+            "fail" if strict_audio_loudness else "warn",
+            f"volume outside target (-16 LUFS ±2): mean={mean_volume} dB, max={max_volume} dB",
         )
     else:
         gates["audio_loudness"] = _gate(

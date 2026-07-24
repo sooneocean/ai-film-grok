@@ -98,6 +98,15 @@ aifilm director status --root <film-root>
 aifilm preflight --root <film-root>
 ```
 
+Premium 项目在真实 Pilot 前可先建立无花费的质量闭环；它不会调用 provider 或花费额度：
+
+```bash
+aifilm quality-closure package --root <film-root>
+aifilm quality-closure report --root <film-root>
+```
+
+只有真实 provider 媒体、当前成片交付证据和两位独立盲审齐全，报告才会标示艺术品质已验证；provider canary 还必须匹配已注册、approved、active 的 manifest clip。细则见 [`references/quality-closure.md`](references/quality-closure.md)。
+
 旧项目默认 `standard`，不会被静默升级。
 
 | 组件 | 用途 |

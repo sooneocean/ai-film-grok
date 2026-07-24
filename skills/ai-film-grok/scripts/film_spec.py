@@ -22,6 +22,7 @@ from continuity import (
 from continuity_chain import (
     is_long_form,
 )
+from dialogue_contracts import summarize_dialogue_contracts
 from edit_policy import (
     _CRAFT_WHY,
     DEFAULT_TRANSITION_SEC,
@@ -848,6 +849,7 @@ def validate_film_spec(
     previous_viewpoints: list[str] = []
     previous_focal: str | None = None
     previous_viewpoint: str | None = None
+    _vo_lint_violations: list[dict[str, Any]] = []  # P2-10: collected for vo_lint_strict
     previous_look: str | None = None
     previous_end_pose: str | None = None
     # Cast ids for multi-stance (style-bible keys or director_intent.cast)
@@ -895,6 +897,8 @@ def validate_film_spec(
             _vo_warnings = lint_nar_text(shot["nar"], shot_id=shot_id)
             if _vo_warnings:
                 shot.setdefault("_vo_lint_warnings", [w.to_dict() for w in _vo_warnings])
+                for w in _vo_warnings:
+                    _vo_lint_violations.append({"shot_id": shot_id, **w.to_dict()})
             elif "_vo_lint_warnings" in shot:
                 del shot["_vo_lint_warnings"]
             # Optional English line for dual captions (designed-post); not TTS-spoken by default
@@ -1009,6 +1013,18 @@ def validate_film_spec(
             shots.append(shot)
     if not shots:
         raise FilmSpecError("film-spec requires at least one shot")
+
+    # P2-10: vo_lint_strict — product genre or explicit flag elevates VO de-AI lint to hard
+    if spec.get("vo_lint_strict") is True and _vo_lint_violations:
+        codes = sorted({v.get("code", "VO_LINT") for v in _vo_lint_violations})
+        raise FilmSpecError("vo_lint failed (vo_lint_strict): " + ",".join(codes))
+    spec["_vo_lint_summary"] = {
+        "ok": len(_vo_lint_violations) == 0,
+        "violation_count": len(_vo_lint_violations),
+        "violations": _vo_lint_violations,
+        "note": "VO de-AI lint: brochure phrase / AI cadence / long sentence. "
+        "Soft by default; vo_lint_strict raises.",
+    }
 
     # Aggregate VO budget report (non-blocking summary for agents / status)
     total_est = sum(float(s.get("est_vo_sec") or 0) for s in shots)
@@ -1589,6 +1605,20 @@ def validate_film_spec(
     if spec.get("composition_strict") is True and not compr["ok"]:
         raise FilmSpecError(
             "composition rules lint failed (composition_strict): " + ",".join(compr["codes"])
+        )
+
+    # Dialogue contract P1-8 (timing/origin/lipsync truth)
+    # Each shot may carry dialogue_contracts[]; validate each and collect errors.
+    # Soft by default; dialogue_contract_strict raises.
+    dialogue_contracts = summarize_dialogue_contracts(shots)
+    spec["_dialogue_contracts"] = {
+        **dialogue_contracts,
+        "note": "P1-8: dialogue timing window, audio origin, lipsync truth. Soft by default.",
+    }
+    if spec.get("dialogue_contract_strict") is True and dialogue_contracts["errors"]:
+        codes = dialogue_contracts["codes"]
+        raise FilmSpecError(
+            "dialogue contract validation failed (dialogue_contract_strict): " + ",".join(codes)
         )
 
     # Heat + cast: elastic (no auto-pin heat_scale; metrics optional)
