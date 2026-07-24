@@ -53,6 +53,7 @@ flowchart TD
 - `test_audio_bible.py`
 - `test_audio_provenance.py`
 - `test_audio_recipe.py`
+- `test_audio_visual_alignment.py`
 - `test_auto_cut.py`
 - `test_axis_jump_gate.py`
 - `test_benchmark.py`
