@@ -24,8 +24,6 @@ class RenderWorkspaceError(RuntimeError):
 def resolve_render_paths(root: Path, out_name: str | None) -> dict[str, Path]:
     """Resolve all renderer-owned paths before any media command runs."""
     root = root.expanduser().resolve()
-    if not root.is_dir():
-        raise RenderWorkspaceError(f"Film root missing: {root}")
     try:
         out_dir = safe_workspace_directory(root, "out", field="film output directory")
         audio_dir = safe_workspace_directory(root, "audio", field="film audio directory")
@@ -43,6 +41,10 @@ def resolve_render_paths(root: Path, out_name: str | None) -> dict[str, Path]:
         )
     except SecurityPolicyError as exc:
         raise RenderWorkspaceError(str(exc)) from exc
+    # Preserve the renderer's security contract: reject a malicious output name
+    # before reporting an unrelated missing-root error.
+    if not root.is_dir():
+        raise RenderWorkspaceError(f"Film root missing: {root}")
     return {
         "root": root,
         "out_dir": out_dir,

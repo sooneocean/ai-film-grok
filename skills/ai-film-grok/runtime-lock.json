@@ -130,7 +130,7 @@
     "scripts/real_footage.py": "2d0688bbd307bbac8e5a779a8b6025b27bf8728c094f4fb72a496bc43f8b8a8a",
     "scripts/reference_audit.py": "09e7bf0abdeaa60f14abb3436052dcf5d0636f1214bf27a2a80bc045773251d2",
     "scripts/render_final.py": "8cad04c295d410fff38d15d099404d89a6db6f3bf6a08518febf4607d8a7e624",
-    "scripts/render_workspace.py": "c63c5eb8b3b133f009c4446892503a4ee6a6eff7c12c87dbf40dc60dc1120cbc",
+    "scripts/render_workspace.py": "b0d7bc1184d96a45cd1b3f2e0327478cb74ed63c0c5664841e5052f95ac6c84b",
     "scripts/rhythm.py": "4828eb411b52844a4f4bcd95e1589764e892dd1030d8b1e3e573463e334a01ad",
     "scripts/runtime_policy.py": "705411aa5c11dd857c7858c7020edd5dacad9992ffcbc65ca414943d30423b12",
     "scripts/security_policy.py": "a25d5c352f263b2c5e8037309dc0cafec50e515f9277591f3b169993b49be1e8",
