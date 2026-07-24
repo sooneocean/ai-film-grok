@@ -55,6 +55,8 @@ def lint_bgm_cue_alignment(
     tolerance: float = CUE_TOLERANCE_SEC,
 ) -> list[dict[str, str]]:
     """Check BGM cue in/out points land near shot boundaries."""
+    if not shot_boundaries:
+        return []
     issues: list[dict[str, str]] = []
     for item in music_spotting:
         if not isinstance(item, dict):
@@ -96,6 +98,8 @@ def lint_vo_cut_alignment(
     tolerance: float = CUE_TOLERANCE_SEC,
 ) -> list[dict[str, str]]:
     """Check VO onset points align with cut points."""
+    if not shot_boundaries:
+        return []
     issues: list[dict[str, str]] = []
     for entry in vo_entries:
         if not isinstance(entry, dict):

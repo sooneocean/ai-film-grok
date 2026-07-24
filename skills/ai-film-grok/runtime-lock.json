@@ -31,7 +31,7 @@
     "scripts/audio_plan.py": "30ceb9809f411e2499586ca9cb5556054e1ad993a3dc0b37a5303dd1eb6d51f7",
     "scripts/audio_provenance.py": "2b8ba1aca66cb209dd7378294faf56fd4ffae6f551accdc0149626a0dc9447e5",
     "scripts/audio_recipe.py": "b444fd3174361f5836316a89700c10c7ab28eb0362d39a067e33a118e6e0c72d",
-    "scripts/audio_visual_alignment.py": "ed4c0f12779bb9536d75bfbfdb190d3b72165ab5455074ff31b5ac9912bc495d",
+    "scripts/audio_visual_alignment.py": "f4374ab9344a05d1c7760fb7b8c87418dcb7770b99df1c886629a9659dcbfcf7",
     "scripts/auto_cut.py": "341ee1cb6cf173976db60c878cd8f3e219f316d9e2e385046d988d6b2d4becdf",
     "scripts/backend-lock": "60b86b253cb393b587af4ca6e63a2403daa42b515f7501fffe407e2b8e257f25",
     "scripts/backend_lock.py": "ce829087a062bba9a217a5a90cec3573dbdf1417e72c5f7a669df45a57dab730",
