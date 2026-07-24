@@ -107,6 +107,7 @@ flowchart TD
 - `test_external_backends.py`
 - `test_face_identity.py`
 - `test_final_preflight.py`
+- `test_final_stages.py`
 - `test_frame_chain.py`
 - `test_frame_promote.py`
 - `test_framing_lint.py`
