@@ -74,6 +74,7 @@
 | 文件 | 主题 |
 |---|---|
 | [audio-fallback.md](audio-fallback.md) | 音频三阶梯 TTS/BGM/Lipsync |
+| [loudnorm-policy.md](loudnorm-policy.md) | 响度标准 LUFS -16±2（单一真相） |
 | [audio-recipe.md](audio-recipe.md) | 场景自适应声轨配方 |
 | [bgm-generation.md](bgm-generation.md) | BGM 生成与抗疲劳 |
 | [voice-tracks.md](voice-tracks.md) | 多轨声线（娇喘轨 opt-in） |
@@ -156,7 +157,7 @@
 | [keyframe-first-frame-poison](lessons-2026-07-21-keyframe-first-frame-poison.md) | 首帧毒化 |
 | [montage-hardcore-male](lessons-2026-07-21-montage-hardcore-male.md) | 蒙太奇+重口男向 |
 | [no-shot-watermark](lessons-2026-07-21-no-shot-watermark.md) | 禁 shot 水印 |
-| [sex-duration-floor](lessons-2026-07-21-sex-duration-floor.md) | 性爱时长硬底 ≥20% |
+| [sex-duration-floor](lessons-2026-07-21-sex-duration-floor.md) | 性爱时长硬底 ≥30% |
 | [sex-undress-ladder](lessons-2026-07-21-sex-undress-ladder.md) | 办事卸甲阶梯·不回穿 |
 | [sex-vo-spice](lessons-2026-07-21-sex-vo-spice.md) | 旁白荤梗硬底 |
 | [size-ladder-hardcore-stack](lessons-2026-07-21-size-ladder-hardcore-stack.md) | 景别情绪堆叠 |

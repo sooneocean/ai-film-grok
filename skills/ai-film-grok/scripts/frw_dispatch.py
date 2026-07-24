@@ -42,7 +42,12 @@ def run_canary(argv: list[str]) -> int:
         )
         return 1
     # Prefer frwclaw venv only if present; canary is stdlib-only so system py is fine
-    return int(subprocess.call([sys.executable, str(canary), *argv]), timeout=120)
+    proc = subprocess.run(
+        [sys.executable, str(canary), *argv],
+        timeout=120,
+        check=False,
+    )
+    return proc.returncode
 
 
 def resolve_frw_root() -> Path:

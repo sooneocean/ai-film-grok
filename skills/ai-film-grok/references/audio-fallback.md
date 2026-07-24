@@ -2,6 +2,7 @@
 
 > 嵌在 craft **Media → Verified**；不替代八环主脊。  
 > 默认：**说书 = edge TTS + rnb 床轨 + lipsync off**。
+> 响度标准（LUFS -16±2）：[loudnorm-policy.md](loudnorm-policy.md)（单一真相，禁止多套阈值）。
 
 ## TTS
 

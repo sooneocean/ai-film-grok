@@ -3937,7 +3937,12 @@ def cmd_frw(args: argparse.Namespace) -> int:
     if not argv:
         argv = ["help"]
     # Do not capture stdout — FRW protocol is one-line JSON for the agent.
-    return int(subprocess.call([sys.executable, str(launcher), *argv]), timeout=120)
+    proc = subprocess.run(
+        [sys.executable, str(launcher), *argv],
+        timeout=120,
+        check=False,
+    )
+    return proc.returncode
 
 
 def cmd_export_desktop(args: argparse.Namespace) -> int:
