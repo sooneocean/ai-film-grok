@@ -4176,6 +4176,9 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
     )
 
     action = str(getattr(args, "oauth_action", None) or "doctor")
+    usage_root = getattr(args, "root", None)
+    shot_id = str(getattr(args, "shot_id", "") or "")
+    job_id = str(getattr(args, "job_id", "") or "")
     try:
         if action == "doctor":
             rep = probe(deep=bool(getattr(args, "deep", False)))
@@ -4219,6 +4222,9 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
                     model=getattr(args, "model", None),
                     aspect_ratio=getattr(args, "aspect", None) or "9:16",
                     resolution=getattr(args, "resolution", None),
+                    usage_root=usage_root,
+                    shot_id=shot_id,
+                    job_id=job_id,
                 )
             )
             return 0
@@ -4237,6 +4243,9 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
                     model=getattr(args, "model", None),
                     aspect_ratio=getattr(args, "aspect", None),
                     extra_images=refs,
+                    usage_root=usage_root,
+                    shot_id=shot_id,
+                    job_id=job_id,
                 )
             )
             return 0
@@ -4259,6 +4268,9 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
                         resolution=getattr(args, "resolution", None) or "720p",
                         reference_images=refs,
                         timeout_sec=float(getattr(args, "timeout", 600) or 600),
+                        usage_root=usage_root,
+                        shot_id=shot_id,
+                        job_id=job_id,
                     )
                 )
             else:
@@ -4271,6 +4283,9 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
                         aspect_ratio=getattr(args, "aspect", None) or "9:16",
                         resolution=getattr(args, "resolution", None) or "720p",
                         reference_images=refs,
+                        usage_root=usage_root,
+                        shot_id=shot_id,
+                        job_id=job_id,
                     )
                 )
             return 0
@@ -4285,10 +4300,18 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
                         str(rid),
                         out=Path(out) if out else None,
                         timeout_sec=float(getattr(args, "timeout", 600) or 600),
+                        usage_root=usage_root,
+                        generation_id=getattr(args, "generation_id", None),
                     )
                 )
             else:
-                emit(video_status(str(rid)))
+                emit(
+                    video_status(
+                        str(rid),
+                        usage_root=usage_root,
+                        generation_id=getattr(args, "generation_id", None),
+                    )
+                )
             return 0
         if action == "tts":
             text = getattr(args, "text", None)
@@ -4306,6 +4329,9 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
                     language=getattr(args, "language", None),
                     speed=getattr(args, "speed", None),
                     with_timestamps=bool(getattr(args, "timestamps", False)),
+                    usage_root=usage_root,
+                    shot_id=shot_id,
+                    job_id=job_id,
                 )
             )
             return 0
@@ -4315,6 +4341,57 @@ def cmd_grok_oauth(args: argparse.Namespace) -> int:
     except GrokOAuthError as exc:
         raise FilmError(str(exc)) from exc
     raise FilmError(f"unknown grok-oauth action {action!r}")
+
+
+def cmd_generation_usage(args: argparse.Namespace) -> int:
+    from generation_usage import (
+        GenerationUsageError,
+        format_usage_table,
+        manual_record,
+        scan_usage,
+        usage_list,
+        usage_status,
+    )
+
+    action = str(getattr(args, "usage_action", "") or "status")
+    try:
+        if action == "status":
+            report = usage_status(Path(args.root))
+        elif action == "list":
+            report = usage_list(Path(args.root), operation=getattr(args, "operation", None))
+            if getattr(args, "output_format", "json") == "table":
+                print(format_usage_table(report))
+                return 0 if report.get("ok") else 2
+        elif action == "summary":
+            report = scan_usage(Path(args.scan_root))
+        elif action == "record":
+            report = {
+                "ok": True,
+                "kind": "generation-usage-record",
+                "record": manual_record(
+                    Path(args.root),
+                    operation=args.operation,
+                    provider=args.provider,
+                    model=args.model,
+                    status=args.status,
+                    measurement=args.measurement,
+                    provider_request_id=args.provider_request_id,
+                    output=Path(args.output) if args.output else None,
+                    idempotency_key=args.idempotency_key,
+                    shot_id=args.shot_id,
+                    job_id=args.job_id,
+                    input_tokens=args.input_tokens,
+                    output_tokens=args.output_tokens,
+                    total_tokens=args.total_tokens,
+                    cost_in_usd_ticks=args.cost_in_usd_ticks,
+                ),
+            }
+        else:
+            raise FilmError(f"unknown usage action {action!r}")
+    except GenerationUsageError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok") else 2
 
 
 def cmd_graph(args: argparse.Namespace) -> int:
@@ -4642,6 +4719,44 @@ def cmd_assets(args: argparse.Namespace) -> int:
 def cmd_plan(args: argparse.Namespace) -> int:
     """Phase 3: story.normalize → beat/shot plan → drama-graph (+ film-spec seed)."""
     action = str(getattr(args, "plan_action", "") or "")
+    if action == "receive":
+        from narrative_control import control_status
+        from story_reception import ReceptionError, load_story_reception
+        from util import write_json
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan receive requires --root")
+        root = Path(root_s).expanduser().resolve()
+        status = control_status(root)
+        if "story" in set(status.get("locked_scopes") or []):
+            raise FilmError("story is locked; unlock story before receiving a revised treatment")
+        try:
+            reception_path = Path(str(getattr(args, "file", ""))).expanduser().resolve()
+            reception = load_story_reception(reception_path)
+        except ReceptionError as exc:
+            raise FilmError(str(exc)) from exc
+        output = root / "receipts" / "story-reception.json"
+        if output.exists() and not bool(getattr(args, "force", False)):
+            raise FilmError(
+                "story reception already exists; pass --force before story lock to replace it"
+            )
+        write_json(output, reception)
+        emit(
+            {
+                "ok": True,
+                "action": "receive",
+                "path": str(output),
+                "source_sha256": reception["source"]["sha256"],
+                "summary": {
+                    "title": reception["treatment"].get("title"),
+                    "logline": reception["treatment"].get("logline"),
+                    "unknowns": reception["fidelity"].get("unknowns") or [],
+                    "mature_intimacy": reception["treatment"].get("mature_intimacy") or {},
+                },
+            }
+        )
+        return 0
     if action in {"edit", "lock", "unlock", "replan"}:
         from cli_plan_mutation import PlanMutationError, run
 
@@ -4837,6 +4952,7 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
     """Auto-orchestrate: craft + capability + next → single agent packet."""
     root = Path(args.root).expanduser().resolve()
     from dispatch import build_dispatch
+    from dispatch_compact import compact_dispatch, record_orchestration_metrics
 
     gates: dict[str, Any] = {}
     open_n = 0
@@ -4853,6 +4969,7 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
         open_reshoot_count=open_n,
         include_capability=not bool(getattr(args, "no_capability", False)),
         write_receipt=not bool(getattr(args, "no_write", False)),
+        refresh_capability=bool(getattr(args, "refresh_capability", False)),
     )
 
     # Keep pipeline HUD in sync
@@ -4876,8 +4993,50 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
         print(packet.get("agent_instruction") or "")
         return 0
 
-    emit(packet)
+    configured_format = (
+        str(
+            getattr(args, "dispatch_format", None)
+            or os.environ.get("AIFILM_DISPATCH_FORMAT")
+            or "compact"
+        )
+        .strip()
+        .lower()
+    )
+    if bool(getattr(args, "full", False)):
+        configured_format = "full"
+    if configured_format not in {"compact", "full"}:
+        raise FilmError("dispatch format must be compact or full")
+    output = packet if configured_format == "full" else compact_dispatch(packet)
+    if configured_format == "compact" and not bool(getattr(args, "no_write", False)):
+        record_orchestration_metrics(root, output)
+    emit(output)
     return 0 if packet.get("ok") else 1
+
+
+def cmd_advance(args: argparse.Namespace) -> int:
+    """Execute a bounded sequence of allowlisted local dispatch actions."""
+    root = Path(args.root).expanduser().resolve()
+    from advance import AdvanceError, advance_local
+
+    gates: dict[str, Any] = {}
+    open_n = 0
+    if (root / MANIFEST_NAME).is_file():
+        man = load_manifest(root)
+        summary = recompute_gates(root, man)
+        gates = summary.get("gates") or {}
+        open_n = int(summary.get("open_reshoot_count") or 0)
+        save_manifest(root, man)
+    try:
+        report = advance_local(
+            root,
+            gates=gates,
+            open_reshoot_count=open_n,
+            max_local=int(args.max_local),
+        )
+    except AdvanceError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok") else 2
 
 
 def cmd_craft(args: argparse.Namespace) -> int:
@@ -5137,6 +5296,13 @@ def build_parser() -> argparse.ArgumentParser:
         ],
     )
     goauth.add_argument("--prompt", default=None)
+    goauth.add_argument(
+        "--root",
+        default=None,
+        help="Film root; enables exact-first generation usage accounting",
+    )
+    goauth.add_argument("--shot-id", default="", help="Optional shot id for usage accounting")
+    goauth.add_argument("--job-id", default="", help="Optional media queue job id")
     goauth.add_argument("--out", default=None, help="output path (image/video/tts)")
     goauth.add_argument("--model", default=None)
     goauth.add_argument("--system", default=None)
@@ -5154,6 +5320,12 @@ def build_parser() -> argparse.ArgumentParser:
     goauth.add_argument("--wait", action="store_true", help="video: poll until done")
     goauth.add_argument("--timeout", type=float, default=600.0, help="video poll timeout sec")
     goauth.add_argument("--request-id", default=None, dest="request_id")
+    goauth.add_argument(
+        "--generation-id",
+        default=None,
+        dest="generation_id",
+        help="Tracking id returned by video submit; required to finish async accounting",
+    )
     goauth.add_argument("--text", default=None, help="tts text")
     goauth.add_argument("--text-file", default=None, dest="text_file")
     goauth.add_argument("--voice", default=None, help="tts voice_id (default eve)")
@@ -5172,7 +5344,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only print agent_instruction checklist",
     )
     disp.add_argument("--no-capability", action="store_true", help="Skip capability probe (faster)")
+    disp.add_argument(
+        "--refresh-capability",
+        action="store_true",
+        help="Bypass the ten-minute guidance cache and run a live capability probe",
+    )
+    disp.add_argument(
+        "--format",
+        choices=("compact", "full"),
+        default=None,
+        dest="dispatch_format",
+        help="Output compact agent packet (default) or full audit packet",
+    )
+    disp.add_argument("--full", action="store_true", help="Alias for --format full")
     disp.add_argument("--no-write", action="store_true", help="Do not write receipts/dispatch.json")
+    advance_p = sub.add_parser(
+        "advance",
+        help="Execute only allowlisted local actions; stop at paid, external or human gates",
+    )
+    advance_p.add_argument("--root", required=True)
+    advance_p.add_argument(
+        "--max-local",
+        type=int,
+        default=3,
+        help="Maximum local steps, hard-capped at 10",
+    )
 
     craft_p = sub.add_parser(
         "craft",
@@ -6129,6 +6325,60 @@ def build_parser() -> argparse.ArgumentParser:
         "planning-history", help="Show planning readiness progression and current blockers"
     )
     history.add_argument("--root", required=True)
+    usage = sub.add_parser(
+        "usage",
+        help="Exact-first T2I/I2V/TTS request counts, tokens and provider costs",
+    )
+    usage_sub = usage.add_subparsers(dest="usage_action", required=True)
+    usage_status_p = usage_sub.add_parser("status", help="Summarize one film usage ledger")
+    usage_status_p.add_argument("--root", required=True)
+    usage_list_p = usage_sub.add_parser("list", help="List each generation request")
+    usage_list_p.add_argument("--root", required=True)
+    usage_list_p.add_argument(
+        "--operation",
+        choices=("t2i", "image_edit", "i2v", "t2v", "tts"),
+        default=None,
+    )
+    usage_list_p.add_argument(
+        "--format",
+        choices=("json", "table"),
+        default="json",
+        dest="output_format",
+    )
+    usage_summary_p = usage_sub.add_parser(
+        "summary", help="Aggregate ledgers below one explicit projects directory"
+    )
+    usage_summary_p.add_argument("--scan-root", required=True)
+    usage_record_p = usage_sub.add_parser(
+        "record", help="Record one native/manual generation without inventing missing usage"
+    )
+    usage_record_p.add_argument("--root", required=True)
+    usage_record_p.add_argument(
+        "--operation",
+        required=True,
+        choices=("t2i", "image_edit", "i2v", "t2v", "tts"),
+    )
+    usage_record_p.add_argument("--provider", required=True)
+    usage_record_p.add_argument("--model", default="")
+    usage_record_p.add_argument(
+        "--status",
+        required=True,
+        choices=("succeeded", "failed", "moderated"),
+    )
+    usage_record_p.add_argument(
+        "--measurement",
+        choices=("unknown", "manual_exact", "local_zero"),
+        default="unknown",
+    )
+    usage_record_p.add_argument("--provider-request-id", default="")
+    usage_record_p.add_argument("--output", default="")
+    usage_record_p.add_argument("--idempotency-key", default="")
+    usage_record_p.add_argument("--shot-id", default="")
+    usage_record_p.add_argument("--job-id", default="")
+    usage_record_p.add_argument("--input-tokens", type=int, default=None)
+    usage_record_p.add_argument("--output-tokens", type=int, default=None)
+    usage_record_p.add_argument("--total-tokens", type=int, default=None)
+    usage_record_p.add_argument("--cost-in-usd-ticks", type=int, default=None)
     prompt_budget = sub.add_parser(
         "prompt-budget", help="Audit prompt-token estimates and repeated provider-bound lines"
     )
@@ -6649,9 +6899,17 @@ def build_parser() -> argparse.ArgumentParser:
     # Phase 3: story → beat/shot planning
     plan_p = sub.add_parser(
         "plan",
-        help="Story plan: normalize|run|validate|edit|lock|unlock|replan|project|status",
+        help="Story plan: receive|normalize|run|validate|edit|lock|unlock|replan|project|status",
     )
     plan_sub = plan_p.add_subparsers(dest="plan_action", required=True)
+    p_receive = plan_sub.add_parser(
+        "receive", help="Validate agent T2T StoryReception and write its receipt"
+    )
+    p_receive.add_argument("--root", required=True, help="Film root")
+    p_receive.add_argument("--file", required=True, help="Agent-authored StoryReception JSON")
+    p_receive.add_argument(
+        "--force", action="store_true", help="Replace an existing reception before story lock"
+    )
     p_norm = plan_sub.add_parser(
         "normalize", help="story.normalize → receipts/story-normalize.json"
     )
@@ -6666,6 +6924,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--root", required=True, help="Film root")
     p_run.add_argument("--text", default=None, help="Raw story / one-liner idea")
     p_run.add_argument("--file", default=None, help="Path to story file")
+    p_run.add_argument(
+        "--received-file",
+        default=None,
+        help="Validated StoryReception JSON; uses its planning_text while preserving original source",
+    )
     p_run.add_argument("--title", default=None, help="Title override")
     p_run.add_argument(
         "--target-duration",
@@ -6771,6 +7034,8 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_grok_oauth(args)
         if args.cmd == "dispatch":
             return cmd_dispatch(args)
+        if args.cmd == "advance":
+            return cmd_advance(args)
         if args.cmd == "craft":
             return cmd_craft(args)
         if args.cmd == "selects":
@@ -7021,6 +7286,8 @@ def main(argv: list[str] | None = None) -> int:
 
             emit(planning_history_summary(Path(args.root)))
             return 0
+        if args.cmd == "usage":
+            return cmd_generation_usage(args)
         if args.cmd == "prompt-budget":
             from prompt_budget import prompt_budget_report
 

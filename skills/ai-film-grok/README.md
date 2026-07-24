@@ -144,6 +144,20 @@ film-root/
 
 中断后续跑：`aifilm next --root …` / `media-queue claim`，不必重开人脑。
 
+### 生成次数 / token / 费用
+
+```bash
+aifilm usage status --root "<film-root>"
+aifilm usage list --root "<film-root>" --format table
+aifilm usage summary --scan-root "/Users/dex/AI FILM SPACE"
+```
+
+OAuth/API 路径传 `--root` 后会自动保存每次请求的真实
+`usage.cost_in_usd_ticks`；没有 provider 回执时明确显示 `unknown`。会话内原生
+`image_gen` / `image_edit` / `image_to_video` 完成后用 `aifilm usage record`
+补录次数，禁止按总 quota 差分摊。详见
+[generation-usage-accounting.md](references/generation-usage-accounting.md)。
+
 ---
 
 ## 端到端流水线（技术细节）
@@ -345,10 +359,10 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`1.26.0`
-- Skill Registry：`30/32` 项标记为 `implemented`
-- CLI 脚本：`139` 个
-- pytest 文件：`164` 个
+- 插件版本：`2.0.0`
+- Skill Registry：`31/33` 项标记为 `implemented`
+- CLI 脚本：`144` 个
+- pytest 文件：`168` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

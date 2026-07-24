@@ -9,6 +9,7 @@ Produces drama-graph.json (planned) + optional film-spec seed.
 from __future__ import annotations
 
 import copy
+import hashlib
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -1448,7 +1449,7 @@ def _draft_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:
     """Create an honest story contract; unknown intent stays blank/draft."""
     logline = str(normalized.get("logline") or "")
     genre = str(normalized.get("genre") or "adult")
-    return {
+    contract = {
         "genre": genre,
         "premise": logline,
         "logline": logline,
@@ -1486,6 +1487,12 @@ def _draft_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:
             "结尾留下什么未解决问题？",
         ],
     }
+    seed = normalized.get("story_contract_seed")
+    if isinstance(seed, dict):
+        for key, value in seed.items():
+            if key in contract and value not in (None, "", [], {}):
+                contract[key] = copy.deepcopy(value)
+    return contract
 
 
 def structure_episode(
@@ -2294,6 +2301,8 @@ def build_planned_graph(
         "props": [],
         "warnings": list(normalized.get("warnings") or []),
     }
+    if isinstance(normalized.get("reception"), dict):
+        graph["story_reception"] = copy.deepcopy(normalized["reception"])
     _seed_narrative_contract(graph, normalized)
     ensure_graph_controls(graph)
     graph["content_sha256"] = graph_content_sha256(graph)
@@ -2740,6 +2749,8 @@ def project_graph_to_film_spec(
                 "beats": coitus_beats,
             }
     spec["narrative_policy"] = dict(graph.get("narrative_policy") or {})
+    if isinstance(graph.get("story_reception"), dict):
+        spec["story_reception"] = copy.deepcopy(graph["story_reception"])
     return spec
 
 
@@ -2848,6 +2859,7 @@ def run_plan(
     seed_bible: bool = True,
     character_id_overrides: dict[str, str] | None = None,
     source_evidence_refs: list[str] | None = None,
+    reception: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """End-to-end Phase 3 planner for a film root."""
     root = Path(root).expanduser().resolve()
@@ -2859,6 +2871,29 @@ def run_plan(
         source_path=source_path,
         source_evidence_refs=source_evidence_refs,
     )
+    if reception:
+        from story_reception import reception_summary, story_contract_seed
+
+        source = reception["source"]
+        treatment = reception["treatment"]
+        normalized["raw_excerpt"] = str(source["raw_text"])[:2000]
+        normalized["source_chars"] = len(str(source["raw_text"]))
+        normalized["source_path"] = str(source_path or source["source_ref"])
+        normalized["source_evidence_refs"] = [str(source["source_ref"])]
+        normalized["title"] = str(treatment.get("title") or normalized["title"])
+        normalized["logline"] = str(treatment.get("logline") or normalized["logline"])
+        normalized["story_contract_seed"] = story_contract_seed(reception)
+        normalized["reception"] = reception_summary(
+            reception, path=Path(source_path) if source_path else None
+        )
+        normalized["source_map"] = {
+            **dict(normalized.get("source_map") or {}),
+            "method": "agent_t2t_story_reception_v1",
+            "original_source_sha256": source["sha256"],
+            "planning_text_sha256": hashlib.sha256(
+                str(treatment["planning_text"]).encode("utf-8")
+            ).hexdigest(),
+        }
     if character_id_overrides:
         for candidate in normalized.get("character_candidates") or []:
             name = str(candidate.get("name") or "")

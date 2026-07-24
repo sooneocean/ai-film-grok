@@ -30,6 +30,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--model", default=None)
     p.add_argument("--aspect", default=None)
     p.add_argument("--ref", action="append", default=[])
+    p.add_argument("--root", default=None)
+    p.add_argument("--shot-id", default="")
+    p.add_argument("--job-id", default="")
     args = p.parse_args(argv)
 
     try:
@@ -40,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
             model=args.model,
             aspect_ratio=args.aspect,
             extra_images=list(args.ref or []) or None,
+            usage_root=args.root,
+            shot_id=args.shot_id,
+            job_id=args.job_id,
         )
     except GrokOAuthError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))

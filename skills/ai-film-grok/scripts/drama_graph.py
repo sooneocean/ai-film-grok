@@ -757,13 +757,18 @@ def iter_shots(graph: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def build_jobs_summary(root: Path, *, craft_stage: str | None = None) -> dict[str, Any]:
+def build_jobs_summary(
+    root: Path,
+    *,
+    craft_stage: str | None = None,
+    auto_derive: bool = True,
+) -> dict[str, Any]:
     """Execution Graph v0: linear jobs from graph asset gaps + craft stage.
 
     Not a full DAG runner — surface for Agent + dispatch packet.
     """
     root = Path(root).expanduser().resolve()
-    st = graph_status(root, auto_derive=True)
+    st = graph_status(root, auto_derive=auto_derive)
     graph = read_json(graph_path(root)) or {}
     jobs: list[dict[str, Any]] = []
 

@@ -9,7 +9,9 @@
 aifilm dispatch --root "<film>"
 ```
 
-读返回 JSON 的 `next_cmd` 与 `agent_instruction`，做完再跑一次，直到 `craft_stage=verified` 且已 export。
+默认只读 compact JSON 的 `next_cmd`、`next_action`、`hard_gate_codes` 与
+`context_refs`；做完再跑一次，直到 `craft_stage=verified` 且已 export。
+完整审计包始终写入 `receipts/dispatch.json`。
 
 ## 会自动帮你调什么
 
@@ -35,7 +37,32 @@ aifilm dispatch --root "<film>"
 ## 回执
 
 - `receipts/dispatch.json` — 完整包
+- `receipts/orchestration-usage.jsonl` — 调度 bytes、估算 Token、耗时、cache hit 与引用数；不含 prompt、凭据或供应商生成成本
 - `~/.grok/hud/aifilm-dispatch.json` / `.txt` — HUD 短行
+
+## 输出与缓存
+
+```bash
+aifilm dispatch --root "<film>"                  # compact（默认）
+aifilm dispatch --root "<film>" --full           # 完整旧格式
+aifilm dispatch --root "<film>" --format full    # 同上
+aifilm dispatch --root "<film>" --refresh-capability
+AIFILM_DISPATCH_FORMAT=full aifilm dispatch --root "<film>"
+```
+
+- capability 缓存为十分钟指导性缓存；付费、外部服务、人审动作与显式 refresh 强制实时探测。
+- `state_hash` 未变时可复用 Graph、Production Book、quality 与 evidence 的完整包；输入变化立即失效。
+- 普通步骤 `context_refs` 最多三份、合计不超过 8KB；异常按 issue code 精确扩展。
+
+## 安全本地推进
+
+```bash
+aifilm advance --root "<film>" --max-local 3
+```
+
+`advance` 只执行固定白名单内的 `approval_class=none`、`spend_class=local`
+动作，并在每一步验证 state/transaction、运行对应 verification、重新
+dispatch。遇付费、外部服务、pilot、人审、重复、状态过期或失败立即停止。
 
 ## 与 next / craft / capability
 

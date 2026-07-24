@@ -133,6 +133,8 @@ def run_tts_ab(
                 backend=be_l,
                 voice=use_voice,
                 allow_network_fallback=False,
+                usage_root=root,
+                shot_id=shot_id,
             )
             # synthesize may write .mp3 even if we asked wav
             final_path = Path(synth.get("path") or out_path)

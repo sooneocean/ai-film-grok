@@ -53,20 +53,23 @@ class FrwSeedanceDocsTests(unittest.TestCase):
     @pytest.mark.slow
     def test_skill_yaml_and_body_seedance(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")
+        visual_card = (ROOT / "references" / "stages" / "visual.md").read_text(encoding="utf-8")
+        reachable = skill + visual_card
         # Current season: grok_primary; Seedance kept as restore path + FRW degrade docs
-        self.assertIn("grok_primary", skill)
-        self.assertIn("seedance-2-fast-i2v", skill)
-        self.assertIn("frw_video_model", skill)
-        self.assertIn("frw newvideo", skill)
-        self.assertIn("frw-degrade-dispatch.md", skill)
-        self.assertIn("lessons-2026-07-20-seedance-quality.md", skill)
-        self.assertIn("不是 first-last-frame", skill)
-        self.assertIn("seedance_first", skill)
+        self.assertIn("grok_primary", reachable)
+        self.assertIn("seedance-2-fast-i2v", reachable)
+        self.assertIn("frw_video_model", reachable)
+        self.assertIn("frw-degrade-dispatch.md", reachable)
+        degrade = REF.read_text(encoding="utf-8")
+        seedance_lesson = LESSON_SEED.read_text(encoding="utf-8")
+        self.assertIn("lessons-2026-07-20-seedance-quality.md", degrade)
+        self.assertIn("不是默认 bulk", seedance_lesson)
+        self.assertIn("AIFILM_I2V_PROFILE", degrade)
         desc_line = next(
             (ln for ln in skill.splitlines() if ln.startswith("description:")),
             "",
         )
-        self.assertIn("grok_primary", desc_line)
+        self.assertIn("Grok Imagine", desc_line)
         self.assertNotIn("默认 FRW 2V 优先", desc_line)
 
     @pytest.mark.slow

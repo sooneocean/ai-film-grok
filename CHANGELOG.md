@@ -3,6 +3,29 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.0.0] — 2026-07-24
+
+### Changed — Compact orchestration and bounded context
+
+- `aifilm dispatch` now prints a compact, versioned packet by default while preserving the complete audit packet in `receipts/dispatch.json`; `--full`, `--format full`, and `AIFILM_DISPATCH_FORMAT=full` retain the legacy output contract.
+- Dispatch separates state collection, full receipt construction, and compact presentation. State-hash and capability caches avoid unchanged recomputation while paid, external, and human-gated actions still force a live capability probe.
+- Machine-readable context routing limits ordinary turns to three targeted stage or issue references, and the entry `SKILL.md` is reduced to the execution spine and P0 safety kernel.
+- Orchestration bytes, estimated tokens, latency, cache state, and reference counts are recorded separately from provider generation usage and cost.
+
+### Added
+
+- `aifilm advance --root <film> --max-local <n>` safely advances only closed-allowlist local actions with state/transaction binding, fixed argument grammars, verification, and immediate stops at paid, external, pilot, human, duplicate, stale, or failed boundaries.
+- Compact/full compatibility, cache invalidation, routing bounds, metrics separation, and safe-advance regression tests.
+
+## [1.28.0] — 2026-07-24
+
+### Added — Exact-first media generation usage accounting
+
+- `aifilm usage status|list|summary|record` reports every T2I, image-edit, I2V/T2V and TTS request from the per-film `receipts/generation-usage.json` ledger.
+- xAI OAuth image/video responses retain normalized token counters and exact `usage.cost_in_usd_ticks`; async video submit/poll shares one generation id while real retries remain separate requests.
+- Native Grok Build calls can be recorded idempotently by provider request id or output hash. Missing provider usage remains explicitly `unknown` and is never inferred from quota deltas.
+- Edge/Voicebox TTS records known local-zero cost; external backends without authoritative usage remain unknown. Dispatch and media-queue metrics expose actual request counts separately from planned budget units.
+
 ## [1.26.0] — 2026-07-24
 
 ### Added — Evidence-bound premium quality closure

@@ -14,6 +14,7 @@ import hashlib
 import json
 import shlex
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -28,9 +29,28 @@ _ACTION_SKILLS = {
     "grok-i2v-bulk": "image.animate",
     "state-index-plan": "character.state.update",
     "audio-plan": "sound.design",
-    "selects-report": "quality.inspect",
-    "post-audit-gate": "quality.inspect",
+    "selects-report": "projection.verify",
+    "post-audit-gate": "projection.verify",
     "production-evidence-gate": "projection.verify",
+}
+_SKILL_POLICIES = {
+    "keyframe.generate": ("external", "human_required"),
+    "image.animate": ("paid", "human_required"),
+    "voice.synthesize": ("external", "human_required"),
+    "video.render": ("external", "human_required"),
+    "quality.inspect": ("local", "human_required"),
+    "export.package": ("local", "human_required"),
+}
+_COMMAND_POLICIES = {
+    "dailies": ("local", "human_required"),
+    "export-desktop": ("local", "human_required"),
+    "final": ("external", "human_required"),
+    "grok-oauth": ("external", "human_required"),
+    "media-queue": ("external", "human_required"),
+    "pilot": ("local", "human_required"),
+    "queue-run-oauth": ("paid", "human_required"),
+    "review-final": ("local", "human_required"),
+    "tts-rehearse": ("external", "human_required"),
 }
 
 
@@ -67,11 +87,12 @@ def structured_next_action(
     operation = argv[0] if argv else str(action.get("id") or "status")
     action_id = str(action.get("id") or "")
     skill_id = _ACTION_SKILLS.get(action_id, "dispatch.orchestrate")
-    paid_or_external = any(
-        word in action_id.lower() for word in ("bulk", "grok", "frw", "export")
-    ) or skill_id in {"image.animate", "keyframe.generate", "video.render", "export.package"}
-    spend_class = "paid" if paid_or_external else "local"
-    approval_class = "human_required" if paid_or_external else "none"
+    spend_class, approval_class = _SKILL_POLICIES.get(skill_id, ("local", "none"))
+    command_policy = _COMMAND_POLICIES.get(operation)
+    if command_policy is not None:
+        spend_class, approval_class = command_policy
+    if operation == "plan" and "lock" in argv:
+        approval_class = "human_required"
     payload = {
         "skill_id": skill_id,
         "operation": operation,
@@ -91,8 +112,137 @@ def structured_next_action(
     return payload
 
 
+def bind_action_to_state(
+    action: dict[str, Any] | None,
+    *,
+    root: Path,
+    state_hash: str,
+) -> dict[str, Any] | None:
+    if action is None:
+        return None
+    bound = dict(action)
+    payload = dict(bound)
+    payload.pop("transaction_id", None)
+    payload["project_root"] = str(Path(root).expanduser().resolve())
+    payload["state_hash"] = state_hash
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    bound["state_hash"] = state_hash
+    bound["transaction_id"] = f"tx-{digest[:24]}"
+    return bound
+
+
 def skill_scripts() -> Path:
     return Path(__file__).resolve().parent
+
+
+def _capability_cache_key(root: Path, i2v_profile: str) -> str:
+    digest = hashlib.sha256(i2v_profile.encode("utf-8"))
+    inputs = [
+        skill_scripts().parent / "runtime-lock.json",
+        skill_scripts().parent / "config.env",
+        skill_scripts().parent / "config.env.example",
+        root / "film-spec.json",
+    ]
+    for path in inputs:
+        digest.update(str(path.name).encode("utf-8"))
+        try:
+            digest.update(path.read_bytes())
+        except OSError:
+            digest.update(b"missing")
+    return digest.hexdigest()
+
+
+def _safe_capability_report(report: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: report.get(key)
+        for key in (
+            "ok",
+            "error",
+            "recommendations",
+            "tts",
+            "frw",
+            "grok_oauth",
+            "music",
+            "suggested_film_spec_patch",
+        )
+        if key in report
+    }
+
+
+def _capability_report_cached(
+    root: Path,
+    *,
+    i2v_profile: str,
+    refresh: bool,
+    write_cache: bool,
+    ttl_sec: int = 600,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    from capability_report import build_capability_report
+
+    cache_path = root / "receipts" / "capability-cache.json"
+    cache_key = _capability_cache_key(root, i2v_profile)
+    now = time.time()
+    cached = read_json(cache_path)
+    if (
+        not refresh
+        and isinstance(cached, dict)
+        and cached.get("cache_key") == cache_key
+        and now - float(cached.get("cached_at_epoch") or 0) <= ttl_sec
+        and isinstance(cached.get("report"), dict)
+    ):
+        return dict(cached["report"]), {
+            "hit": True,
+            "ttl_sec": ttl_sec,
+            "age_sec": round(now - float(cached.get("cached_at_epoch") or now), 3),
+            "cached_at_epoch": float(cached.get("cached_at_epoch") or 0),
+            "cache_key": cache_key,
+        }
+
+    report = build_capability_report(root=root, run_canary=False, suggest_i2v=False)
+    safe = _safe_capability_report(report)
+    if write_cache and safe.get("ok") is not False:
+        write_json(
+            cache_path,
+            {
+                "schema_version": 1,
+                "kind": "capability-cache",
+                "cached_at_epoch": now,
+                "cache_key": cache_key,
+                "ttl_sec": ttl_sec,
+                "report": safe,
+            },
+        )
+    return safe, {
+        "hit": False,
+        "ttl_sec": ttl_sec,
+        "age_sec": 0,
+        "cached_at_epoch": now,
+        "cache_key": cache_key,
+    }
+
+
+def _cached_packet_is_reusable(
+    packet: dict[str, Any],
+    *,
+    state_hash: str,
+    include_capability: bool,
+    refresh_capability: bool,
+) -> bool:
+    if refresh_capability or packet.get("state_hash") != state_hash:
+        return False
+    action = packet.get("next_action") if isinstance(packet.get("next_action"), dict) else {}
+    if action.get("spend_class") != "local" or action.get("approval_class") == "human_required":
+        return False
+    if not include_capability:
+        return True
+    cap_cache = (
+        packet.get("capability_cache") if isinstance(packet.get("capability_cache"), dict) else {}
+    )
+    cached_at = float(cap_cache.get("cached_at_epoch") or 0)
+    ttl_sec = int(cap_cache.get("ttl_sec") or 600)
+    return cached_at > 0 and time.time() - cached_at <= ttl_sec
 
 
 def build_dispatch(
@@ -102,19 +252,49 @@ def build_dispatch(
     open_reshoot_count: int = 0,
     include_capability: bool = True,
     write_receipt: bool = True,
+    refresh_capability: bool = False,
+    use_state_cache: bool = True,
 ) -> dict[str, Any]:
     """Assemble auto-dispatch packet for agent orchestration."""
+    started = time.perf_counter()
     root = Path(root).expanduser().resolve()
     scripts = skill_scripts()
     if str(scripts) not in sys.path:
         sys.path.insert(0, str(scripts))
+
+    from dispatch_compact import compute_state_hash
+
+    gates = gates or {}
+    state_hash = compute_state_hash(
+        root,
+        gates=gates,
+        open_reshoot_count=open_reshoot_count,
+    )
+    receipt_path = root / "receipts" / "dispatch.json"
+    previous = read_json(receipt_path) if use_state_cache else None
+    if isinstance(previous, dict) and _cached_packet_is_reusable(
+        previous,
+        state_hash=state_hash,
+        include_capability=include_capability,
+        refresh_capability=refresh_capability,
+    ):
+        packet = dict(previous)
+        packet["at"] = datetime.now(UTC).replace(microsecond=0).isoformat()
+        packet["metrics"] = {
+            "build_elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+            "state_cache_hit": True,
+            "capability_cache_hit": bool((packet.get("capability_cache") or {}).get("hit", True)),
+        }
+        if write_receipt:
+            write_json(receipt_path, packet)
+            packet["receipt_path"] = str(receipt_path)
+        return packet
 
     from craft_spine import craft_status_report, detect_craft_stage
     from narrative_control import control_status
     from next_actions import build_next_actions, detect_pipeline_stage
     from production_evidence import build_evidence
 
-    gates = gates or {}
     craft_report = craft_status_report(root, gates=gates)
     craft = craft_report.get("craft") or detect_craft_stage(root, gates=gates)
     pipeline = detect_pipeline_stage(root, gates=gates, open_reshoot_count=open_reshoot_count)
@@ -316,12 +496,33 @@ def build_dispatch(
         unique.append(a)
     actions = unique[:10]
 
+    provisional_primary = next(
+        (action for action in actions if structured_next_action(action) is not None),
+        None,
+    )
+    provisional_action = structured_next_action(provisional_primary)
+    requires_live_capability = bool(
+        provisional_action
+        and (
+            provisional_action.get("spend_class") != "local"
+            or provisional_action.get("approval_class") == "human_required"
+        )
+    )
     cap: dict[str, Any] | None = None
+    capability_cache: dict[str, Any] = {
+        "hit": False,
+        "ttl_sec": 600,
+        "cached_at_epoch": 0,
+        "skipped": not include_capability,
+    }
     if include_capability:
         try:
-            from capability_report import build_capability_report
-
-            cap = build_capability_report(root=root, run_canary=False, suggest_i2v=False)
+            cap, capability_cache = _capability_report_cached(
+                root,
+                i2v_profile=i2v_profile,
+                refresh=bool(refresh_capability or requires_live_capability),
+                write_cache=write_receipt,
+            )
             # Surface critical recs as soft actions
             for rec in (cap.get("recommendations") or [])[:3]:
                 rid = "cap-" + str(abs(hash(rec)) % 10000)
@@ -340,6 +541,12 @@ def build_dispatch(
             actions = actions[:12]
         except Exception as exc:  # noqa: BLE001
             cap = {"ok": False, "error": str(exc)[:200]}
+            capability_cache = {
+                "hit": False,
+                "ttl_sec": 600,
+                "cached_at_epoch": 0,
+                "error": str(exc)[:200],
+            }
 
     primary = next(
         (action for action in actions if structured_next_action(action) is not None),
@@ -471,8 +678,14 @@ def build_dispatch(
     try:
         from drama_graph import build_jobs_summary, graph_status
 
-        graph_digest = graph_status(root, auto_derive=bool((root / "film-spec.json").is_file()))
-        jobs_summary = build_jobs_summary(root, craft_stage=craft_stage)
+        # Dispatch is observation-only: deriving a canonical graph here can make
+        # the already-selected write-spec action stale before it executes.
+        graph_digest = graph_status(root, auto_derive=False)
+        jobs_summary = build_jobs_summary(
+            root,
+            craft_stage=craft_stage,
+            auto_derive=False,
+        )
     except Exception as exc:  # noqa: BLE001
         graph_digest = {"ok": False, "error": str(exc)[:200]}
         jobs_summary = {"ok": False, "error": str(exc)[:200]}
@@ -558,7 +771,37 @@ def build_dispatch(
         if isinstance(primary_job, dict)
         else [],
     }
-    next_action = structured_next_action(primary, context=action_context)
+    # Bind after all collectors have read the project so the action represents
+    # the exact state returned in this packet.
+    state_hash = compute_state_hash(
+        root,
+        gates=gates,
+        open_reshoot_count=open_reshoot_count,
+    )
+    next_action = bind_action_to_state(
+        structured_next_action(primary, context=action_context),
+        root=root,
+        state_hash=state_hash,
+    )
+    try:
+        from generation_usage import usage_status
+
+        usage_report = usage_status(root)
+        generation_usage = {
+            "tracking_status": usage_report.get("tracking_status"),
+            "requests_total": usage_report.get("requests_total"),
+            "operation_counts": usage_report.get("operation_counts"),
+            "cost_in_usd_ticks": usage_report.get("cost_in_usd_ticks"),
+            "cost_usd": usage_report.get("cost_usd"),
+            "unknown_cost_requests": usage_report.get("unknown_cost_requests"),
+            "token_reported_requests": usage_report.get("token_reported_requests"),
+        }
+    except (OSError, ValueError):
+        generation_usage = {
+            "tracking_status": "unavailable",
+            "requests_total": 0,
+            "unknown_cost_requests": 0,
+        }
 
     packet = {
         "ok": True,
@@ -616,6 +859,9 @@ def build_dispatch(
         else None,
         "execution_plan_digest": execution_plan_digest,
         "context_digest": context_digest,
+        "generation_usage": generation_usage,
+        "state_hash": state_hash,
+        "capability_cache": capability_cache,
         "narrative_control": {
             "canonical": narrative.get("canonical"),
             "state": narrative.get("state"),
@@ -657,11 +903,15 @@ def build_dispatch(
             "skill": "aifilm skill list|show --id <skill_id>",
         },
     }
+    packet["metrics"] = {
+        "build_elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+        "state_cache_hit": False,
+        "capability_cache_hit": bool(capability_cache.get("hit")),
+    }
 
     if write_receipt:
-        path = root / "receipts" / "dispatch.json"
-        write_json(path, packet)
-        packet["receipt_path"] = str(path)
+        write_json(receipt_path, packet)
+        packet["receipt_path"] = str(receipt_path)
         # also HUD-friendly slim
         try:
             hud = Path.home() / ".grok" / "hud"

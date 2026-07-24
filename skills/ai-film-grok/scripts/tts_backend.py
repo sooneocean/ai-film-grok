@@ -370,6 +370,9 @@ def tts_grok(
     language: str | None = None,
     speed: float | None = None,
     with_timestamps: bool = False,
+    usage_root: Path | str | None = None,
+    shot_id: str = "",
+    job_id: str = "",
 ) -> Path:
     """Grok OAuth TTS (POST /v1/tts). Opt-in only — never film default."""
     try:
@@ -388,6 +391,9 @@ def tts_grok(
             language=lang,
             speed=speed,
             with_timestamps=with_timestamps,
+            usage_root=usage_root,
+            shot_id=shot_id,
+            job_id=job_id,
         )
     except GrokOAuthError as exc:
         raise TTSError(f"grok TTS failed: {exc}") from exc
@@ -771,6 +777,9 @@ def synthesize(
     pitch: str = "+0Hz",
     speed: float | None = None,
     allow_network_fallback: bool = False,
+    usage_root: Path | str | None = None,
+    shot_id: str = "",
+    job_id: str = "",
 ) -> dict[str, Any]:
     """Synthesize speech. Returns {backend, path, voice}."""
     info = probe()
@@ -783,6 +792,44 @@ def synthesize(
     if choice not in TTS_BACKENDS - {"auto"}:
         raise TTSError(f"Unknown TTS backend {choice!r}; choose one of {sorted(TTS_BACKENDS)}")
     assert_voice_backend_compatible(choice, voice)
+
+    def _tracked(
+        provider: str,
+        model: str,
+        *,
+        local_zero: bool,
+        call,
+    ) -> None:
+        if usage_root is None:
+            call()
+            return
+        from generation_usage import finish_generation, start_generation
+
+        generation_id = start_generation(
+            usage_root,
+            operation="tts",
+            provider=provider,
+            model=model,
+            shot_id=shot_id,
+            job_id=job_id,
+        )
+        try:
+            call()
+        except Exception:
+            finish_generation(
+                usage_root,
+                generation_id,
+                status="failed",
+                measurement="local_zero" if local_zero else "unknown",
+            )
+            raise
+        finish_generation(
+            usage_root,
+            generation_id,
+            status="succeeded",
+            measurement="local_zero" if local_zero else "unknown",
+            output=out_mp3,
+        )
 
     def _speed_from_rate() -> float:
         if speed is not None:
@@ -805,7 +852,12 @@ def synthesize(
             sp = _speed_from_rate()
             # If --voice looks like MiniMax id (not edge zh-CN-*), use it
             vid = voice if voice and not voice.startswith("zh-") else None
-            tts_minimax(text, out_mp3, voice_id=vid, speed=sp)
+            _tracked(
+                "minimax",
+                minimax_model(),
+                local_zero=False,
+                call=lambda: tts_minimax(text, out_mp3, voice_id=vid, speed=sp),
+            )
             voice_used = vid or minimax_voice_id()
             model_used = minimax_model()
         elif choice == "fish":
@@ -819,7 +871,12 @@ def synthesize(
                     "Fish backend requires a fixed FISH_VOICE_ID in strict voice mode; "
                     "explicit backends never cross providers"
                 )
-            tts_fish(text, out_mp3, voice_id=vid, speed=sp)
+            _tracked(
+                "fish",
+                fish_model(),
+                local_zero=False,
+                call=lambda: tts_fish(text, out_mp3, voice_id=vid, speed=sp),
+            )
             voice_used = vid or fish_voice_id() or "fish-default"
             model_used = fish_model()
         elif choice == "voicebox":
@@ -832,7 +889,12 @@ def synthesize(
                     "Voicebox backend requires VOICEBOX_PROFILE (or vo_voice = profile name) "
                     "in strict voice mode"
                 )
-            tts_voicebox(text, out_mp3, voice=vb_voice)
+            _tracked(
+                "voicebox",
+                voicebox_engine() or "voicebox",
+                local_zero=True,
+                call=lambda: tts_voicebox(text, out_mp3, voice=vb_voice),
+            )
             voice_used = (
                 vb_voice or info.get("voicebox_profile") or voicebox_profile() or "voicebox-default"
             )
@@ -843,14 +905,39 @@ def synthesize(
             sp = _speed_from_rate()
             # Map edge-like rate % into Grok speed range 0.7–1.5
             sp = max(0.7, min(1.5, sp))
-            tts_grok(text, out_mp3, voice_id=g_voice or None, speed=sp)
+            tts_grok(
+                text,
+                out_mp3,
+                voice_id=g_voice or None,
+                speed=sp,
+                usage_root=usage_root,
+                shot_id=shot_id,
+                job_id=job_id,
+            )
             voice_used = g_voice or grok_tts_voice()
             model_used = "grok-tts"
         elif choice == "external":
-            tts_external(text, out_mp3, voice=voice)
+            _tracked(
+                "external",
+                "external-tts",
+                local_zero=False,
+                call=lambda: tts_external(text, out_mp3, voice=voice),
+            )
         else:
             used = "edge"
-            tts_edge(text, out_mp3, voice, rate=rate, volume=volume, pitch=pitch)
+            _tracked(
+                "edge",
+                "edge-neural",
+                local_zero=True,
+                call=lambda: tts_edge(
+                    text,
+                    out_mp3,
+                    voice,
+                    rate=rate,
+                    volume=volume,
+                    pitch=pitch,
+                ),
+            )
             voice_used = voice
     except TTSError as exc:
         primary_error = exc
@@ -862,7 +949,12 @@ def synthesize(
             if choice != "voicebox" and info["backends"].get("voicebox"):
                 try:
                     vb_voice = "" if _is_edge_voice_name(voice) else (voice or "")
-                    tts_voicebox(text, out_mp3, voice=vb_voice)
+                    _tracked(
+                        "voicebox",
+                        voicebox_engine() or "voicebox",
+                        local_zero=True,
+                        call=lambda: tts_voicebox(text, out_mp3, voice=vb_voice),
+                    )
                     used = f"{choice}->voicebox_opt_in_fallback"
                     voice_used = vb_voice or info.get("voicebox_profile") or "voicebox-fallback"
                     model_used = voicebox_engine() or "voicebox"
@@ -871,7 +963,19 @@ def synthesize(
                     recovered = False
             if not recovered and info["backends"].get("edge"):
                 edge_v = _edge_voice_or_default(voice)
-                tts_edge(text, out_mp3, edge_v, rate=rate, volume=volume, pitch=pitch)
+                _tracked(
+                    "edge",
+                    "edge-neural",
+                    local_zero=True,
+                    call=lambda: tts_edge(
+                        text,
+                        out_mp3,
+                        edge_v,
+                        rate=rate,
+                        volume=volume,
+                        pitch=pitch,
+                    ),
+                )
                 used = f"{choice}->edge_opt_in_fallback"
                 voice_used = edge_v
                 recovered = True
@@ -885,7 +989,12 @@ def synthesize(
         ):
             try:
                 vb_voice = "" if _is_edge_voice_name(voice) else (voice or "")
-                tts_voicebox(text, out_mp3, voice=vb_voice)
+                _tracked(
+                    "voicebox",
+                    voicebox_engine() or "voicebox",
+                    local_zero=True,
+                    call=lambda: tts_voicebox(text, out_mp3, voice=vb_voice),
+                )
                 used = f"{choice}->voicebox_opt_in_fallback"
                 voice_used = vb_voice or info.get("voicebox_profile") or "voicebox-fallback"
                 model_used = voicebox_engine() or "voicebox"

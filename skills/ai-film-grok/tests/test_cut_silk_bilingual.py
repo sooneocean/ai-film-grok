@@ -26,12 +26,16 @@ class CutSilkBilingualDocsTests(unittest.TestCase):
 
     def test_skill_points_to_docs(self) -> None:
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("cut-silk-bilingual.md", skill)
-        self.assertIn("hf-remotion-capability-matrix.md", skill)
-        self.assertIn("caption_mode", skill)
-        self.assertIn("transition_fluency", skill)
-        self.assertIn("transition-motion-v2.md", skill)
-        self.assertIn("camera_axis", skill)
+        post_card = (ROOT / "references" / "stages" / "post.md").read_text(encoding="utf-8")
+        routing = (ROOT / "registry" / "context-routing.json").read_text(encoding="utf-8")
+        index = (ROOT / "references" / "INDEX.md").read_text(encoding="utf-8")
+        reachable = skill + post_card + index
+        self.assertIn("cut-silk-bilingual.md", reachable)
+        self.assertIn("hf-remotion-capability-matrix.md", reachable)
+        self.assertIn("caption_mode", reachable)
+        self.assertIn("transition_fluency", reachable)
+        self.assertIn('"post"', routing)
+        self.assertIn("context_refs", skill)
 
     def test_sediment_opt8_opt9(self) -> None:
         text = (ROOT / "references" / "lessons-2026-07-20-sediment-cn-codex.md").read_text(

@@ -57,6 +57,11 @@ class DispatchTests(unittest.TestCase):
             self.assertFalse(str(packet.get("next_cmd") or "").lstrip().startswith("#"))
             self.assertIsNotNone(packet.get("jobs_summary"))
             self.assertIn("total", packet["jobs_summary"] or {})
+            self.assertEqual(
+                packet.get("generation_usage", {}).get("tracking_status"),
+                "tracking_not_started",
+            )
+            self.assertEqual(packet.get("generation_usage", {}).get("requests_total"), 0)
 
 
 if __name__ == "__main__":

@@ -257,6 +257,8 @@ def run_rehearsal(
                 out_mp3,
                 backend=used_backend,
                 voice=voice,
+                usage_root=root,
+                shot_id=sid,
             )
             used_backend = str(meta.get("backend") or used_backend)
         except Exception as exc:

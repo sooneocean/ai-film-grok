@@ -12,7 +12,6 @@ up here. Use the ``film_root`` fixture below instead of hand-rolling a tmp dir.
 from __future__ import annotations
 
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest

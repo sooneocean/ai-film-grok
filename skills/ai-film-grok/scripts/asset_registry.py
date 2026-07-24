@@ -737,6 +737,103 @@ def assets_check(root: Path, *, sync_first: bool = True) -> dict[str, Any]:
     }
 
 
+def lint_locations(
+    shots: list[dict[str, Any]],
+    locations: list[dict[str, Any]] | dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """P3-13: Scene art / location continuity lint.
+
+    Checks:
+    - Shots referencing a locationId not in the registry → SCENE_LOCATION_UNREGISTERED
+    - Same location with contradicting immutableRules mentioned in dsl → SCENE_RULE_VIOLATION
+    - Recurring objects declared but not findable in shot dsl → SCENE_RECURRING_OBJECT_MISSING (soft)
+    """
+    issues: list[dict[str, Any]] = []
+
+    # Normalize locations to a dict keyed by id
+    loc_map: dict[str, dict[str, Any]] = {}
+    if isinstance(locations, list):
+        for loc in locations:
+            if isinstance(loc, dict):
+                lid = str(loc.get("id") or "")
+                if lid:
+                    loc_map[lid] = loc
+    elif isinstance(locations, dict):
+        loc_map = {str(k): v for k, v in locations.items() if isinstance(v, dict)}
+
+    for sh in shots:
+        sid = str(sh.get("id") or "?")
+        dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+        loc_id = str(
+            sh.get("locationId") or dsl.get("location") or dsl.get("locationId") or ""
+        ).strip()
+
+        if not loc_id:
+            continue
+        # If no location registry provided, skip registration checks (can't verify)
+        if not loc_map:
+            continue
+
+        loc = loc_map.get(loc_id)
+        if not loc:
+            issues.append(
+                {
+                    "code": "SCENE_LOCATION_UNREGISTERED",
+                    "severity": "warning",
+                    "message": f"shot {sid} references locationId {loc_id!r} not in assets registry",
+                    "shot_ids": [sid],
+                }
+            )
+            continue
+
+        # Check recurring objects (soft — just warn if none mentioned in dsl text)
+        recurring = loc.get("recurringObjects") or loc.get("recurring_objects") or []
+        if isinstance(recurring, list) and recurring:
+            dsl_text = (
+                " ".join(str(k) for k in dsl)
+                + " "
+                + " ".join(str(v) for v in dsl.values() if isinstance(v, (str, int, float)))
+            )
+            missing = [
+                obj for obj in recurring if str(obj) and str(obj).lower() not in dsl_text.lower()
+            ]
+            if missing and len(missing) == len(recurring):
+                issues.append(
+                    {
+                        "code": "SCENE_RECURRING_OBJECT_MISSING",
+                        "severity": "warning",
+                        "message": f"shot {sid} at location {loc_id!r}: none of recurring objects {recurring} found in dsl",
+                        "shot_ids": [sid],
+                    }
+                )
+
+        # Check immutable rules (soft — warn if a rule keyword is contradicted)
+        rules = loc.get("immutableRules") or loc.get("immutable_rules") or []
+        if isinstance(rules, list) and rules:
+            for rule in rules:
+                rule_s = str(rule).strip().lower()
+                if "no " in rule_s and "daylight" in rule_s:
+                    if "daylight" in dsl_text.lower() or "sunlight" in dsl_text.lower():
+                        issues.append(
+                            {
+                                "code": "SCENE_RULE_VIOLATION",
+                                "severity": "warning",
+                                "message": f"shot {sid} violates location rule: {rule}",
+                                "shot_ids": [sid],
+                            }
+                        )
+
+    codes = sorted({i["code"] for i in issues})
+    warning_count = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warning_count == 0,
+        "issues": issues,
+        "codes": codes,
+        "warning_count": warning_count,
+        "note": "P3-13: location registration, recurring objects, immutable rules. Soft by default.",
+    }
+
+
 CHARACTER_STATE_AXES = {
     "wardrobe": ["full", "loosened", "partial", "undressed", "bare"],
     "hair": ["neat", "slightly_moussed", "disheveled", "sweat_moistened_strands"],

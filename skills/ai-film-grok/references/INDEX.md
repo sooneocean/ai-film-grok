@@ -1,9 +1,23 @@
 # References 索引
 
-> 92 个 reference 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
-> 踩坑 lessons（47 个）见末节,按日期归档;新规则须标 P 码 + 层。
+> 106 个 reference 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
+> 踩坑 lessons（54 个）见末节,按日期归档;新规则须标 P 码 + 层。
 
 ---
+
+## 每回合阶段卡（Token 精简入口）
+
+| 文件 | 主题 |
+|---|---|
+| [stages/agent.md](stages/agent.md) | Brief、Lens、Graph、locks、projection |
+| [stages/visual.md](stages/visual.md) | 身份、状态、几何、pilot、媒体 |
+| [stages/voice.md](stages/voice.md) | 对白、旁白、BGM/SFX、mix |
+| [stages/post.md](stages/post.md) | 剪辑、设计后期、字幕、post audit |
+| [stages/deliver.md](stages/deliver.md) | screening、Master、export read-back |
+| [stages/approval.md](stages/approval.md) | 人审、付费与外部动作暂停边界 |
+
+机器路由：`registry/context-routing.json`。`dispatch` 默认只返回当前回合最多三份
+`context_refs`；完整审计包仍写 `receipts/dispatch.json`。
 
 ## 工序与主脊（Craft Spine）
 
@@ -42,6 +56,7 @@
 | [grok-build-sdk.md](grok-build-sdk.md) | SDK 能力矩阵 |
 | [grok-oauth.md](grok-oauth.md) | OAuth Pack chat/image/edit/video/tts |
 | [grok-media-pipeline.md](grok-media-pipeline.md) | Grok 媒体管线 + FRW 2V 优先 |
+| [generation-usage-accounting.md](generation-usage-accounting.md) | T2I/I2V/TTS 逐次次数、token 与真实费用账本 |
 | [auto-dispatch.md](auto-dispatch.md) | aifilm dispatch 自动调配 |
 
 ## 工具栈 · I2V / FRW

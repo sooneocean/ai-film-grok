@@ -13,18 +13,18 @@ Verifies:
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from product_brief import BROCHURE_PHRASES, expand_product_brief
+from product_brief import expand_product_brief
 from quality_check_video import GATE_WEIGHTS, score_gates
 from reference_audit import _aspect_ratio, _audio_reality, _classify_aspect
 from subtitle_srt import SrtError, segments_to_srt_text, validate_segments, write_srt_file
 from vo_lint import lint_film_spec_vo, lint_nar_text
-
 
 # ---------------------------------------------------------------------------
 # quality_check_video
@@ -98,9 +98,7 @@ class TestReferenceAuditHelpers:
         assert result["kind"] == "speech"
 
     def test_audio_reality_music_only(self):
-        result = _audio_reality(
-            "mean_volume: -30.0 dB\n", "silence_start: 1.5\nsilence_end: 2.0\n"
-        )
+        result = _audio_reality("mean_volume: -30.0 dB\n", "silence_start: 1.5\nsilence_end: 2.0\n")
         assert result["kind"] == "music_only"
 
 
@@ -122,30 +120,21 @@ class TestSubtitleSrt:
 
     def test_empty_text_rejected(self):
         segments = [{"start": 0.0, "end": 2.0, "text": "  "}]
-        try:
+        with pytest.raises(SrtError, match="empty text"):
             validate_segments(segments)
-            assert False, "should have raised"
-        except SrtError as exc:
-            assert "empty text" in str(exc)
 
     def test_end_before_start_rejected(self):
         segments = [{"start": 5.0, "end": 2.0, "text": "反转"}]
-        try:
+        with pytest.raises(SrtError, match="after start"):
             validate_segments(segments)
-            assert False, "should have raised"
-        except SrtError as exc:
-            assert "after start" in str(exc)
 
     def test_overlap_rejected(self):
         segments = [
             {"start": 0.0, "end": 3.0, "text": "第一句"},
             {"start": 2.0, "end": 4.0, "text": "重叠"},
         ]
-        try:
+        with pytest.raises(SrtError, match="before previous"):
             validate_segments(segments)
-            assert False, "should have raised"
-        except SrtError as exc:
-            assert "before previous" in str(exc)
 
     def test_srt_text_format(self):
         segments = [{"start": 0.0, "end": 1.5, "text": "测试"}]
@@ -173,11 +162,8 @@ class TestSubtitleSrt:
         assert "00:00:00,000" in content
 
     def test_non_list_input_rejected(self):
-        try:
+        with pytest.raises(SrtError, match="must be a list"):
             validate_segments("not a list")  # type: ignore[arg-type]
-            assert False, "should have raised"
-        except SrtError as exc:
-            assert "must be a list" in str(exc)
 
 
 # ---------------------------------------------------------------------------
@@ -207,9 +193,7 @@ class TestProductBrief:
         assert abs(total - 50.0) < 2.0  # rounding tolerance
 
     def test_proof_markers_detected(self):
-        packet = expand_product_brief(
-            "产品速度提升 3 倍。官网有截图。开源在 GitHub。"
-        )
+        packet = expand_product_brief("产品速度提升 3 倍。官网有截图。开源在 GitHub。")
         assert "stats" in packet["proof_markers"]
         assert "screenshot" in packet["proof_markers"]
         assert "repo" in packet["proof_markers"]
@@ -220,11 +204,8 @@ class TestProductBrief:
         assert "革命性" in packet["brochure_phrase_warnings"]
 
     def test_empty_brief_rejected(self):
-        try:
+        with pytest.raises(Exception):
             expand_product_brief("")
-            assert False, "should have raised"
-        except Exception:
-            pass
 
     def test_narrative_angle_demo_first(self):
         packet = expand_product_brief("产品有 demo 演示。截图如下。")
@@ -258,14 +239,19 @@ class TestVoLint:
         assert "VO_AI_CADENCE_STARTER" in codes
 
     def test_long_sentence_detected(self):
-        long_sentence = "这是一段非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常长的旁白句子" * 2
+        long_sentence = (
+            "这是一段非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常非常长的旁白句子"
+            * 2
+        )
         warnings = lint_nar_text(long_sentence, shot_id="shot01")
         codes = [w.code for w in warnings]
         assert "VO_SENTENCE_TOO_LONG" in codes
 
     def test_paragraph_not_spoken_detected(self):
         # Single block with no sentence breaks and long
-        long_block = "这是一个没有任何句号断开的超长旁白文本块它会让配音听起来像在念稿子而不是说话" * 2
+        long_block = (
+            "这是一个没有任何句号断开的超长旁白文本块它会让配音听起来像在念稿子而不是说话" * 2
+        )
         warnings = lint_nar_text(long_block, shot_id="shot01")
         codes = [w.code for w in warnings]
         assert "VO_PARAGRAPH_NOT_SPOKEN" in codes
@@ -293,9 +279,7 @@ class TestVoLint:
 
     def test_lint_film_spec_clean(self):
         spec = {
-            "scenes": [
-                {"shots": [{"id": "shot01", "nar": "雨夜，街灯亮起。"}]}
-            ],
+            "scenes": [{"shots": [{"id": "shot01", "nar": "雨夜，街灯亮起。"}]}],
             "director_intent": {"logline": "一个关于选择的故事。"},
         }
         result = lint_film_spec_vo(spec)

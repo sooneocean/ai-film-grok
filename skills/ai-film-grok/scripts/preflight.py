@@ -815,6 +815,42 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 )
             )
 
+        # --- Scene art / locations P3-13 (unregistered location, recurring objects, rules) ---
+        # Soft by default.
+        try:
+            from asset_registry import lint_locations
+
+            shots_loc: list = []
+            if isinstance(spec.get("scenes"), list):
+                for sc in spec["scenes"]:
+                    if isinstance(sc, dict) and isinstance(sc.get("shots"), list):
+                        shots_loc.extend(sc["shots"])
+            # Load locations from assets-registry if it exists
+            reg = read_json(root / "assets-registry.json") or {}
+            locations = (
+                reg.get("locations")
+                if isinstance(reg.get("locations"), dict)
+                else reg.get("locations")
+            )
+            if shots_loc and locations:
+                loc_rep = lint_locations(shots_loc, locations)
+                loc_codes = list(loc_rep.get("codes") or [])
+                if loc_codes:
+                    soft.append(
+                        _issue(
+                            "soft",
+                            "scene_location_art",
+                            f"scene art/location lint: {loc_codes} (warn={loc_rep.get('warning_count')})",
+                            fix=(
+                                "场景美术: 每镜 locationId 须在 assets-registry 注册；"
+                                "recurring objects 须在 dsl 提及；immutableRules 不得违反。"
+                                "见 references/director-methodology.md §二-8"
+                            ),
+                        )
+                    )
+        except Exception:
+            pass
+
         # Long-form continuity_chain.md (hard if missing)
         try:
             from continuity_chain import check_continuity_chain, is_long_form

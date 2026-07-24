@@ -231,6 +231,20 @@ flowchart TB
 └── out/                    # 成片与导出
 ```
 
+### 生成次数 / token / 费用
+
+```bash
+aifilm usage status --root "<film-root>"
+aifilm usage list --root "<film-root>" --format table
+aifilm usage summary --scan-root "/Users/dex/AI FILM SPACE"
+```
+
+每次 T2I、image edit、I2V/T2V 与 TTS 请求写入
+`receipts/generation-usage.json`。真实费用只认 provider 返回的
+`usage.cost_in_usd_ticks`；没有真实字段时为 `unknown`，不会根据 quota 差倒推。
+原生 Imagine 工具须在调用后执行 `aifilm usage record`。详见
+[generation-usage-accounting.md](skills/ai-film-grok/references/generation-usage-accounting.md)。
+
 ### 工程一键交付顺序（勿与工序心智搞反）
 
 ```text
@@ -470,10 +484,10 @@ MIT © [dex](https://github.com/sooneocean)
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`1.26.0`
-- Skill Registry：`30/32` 项标记为 `implemented`
-- CLI 脚本：`139` 个
-- pytest 文件：`164` 个
+- 插件版本：`2.0.0`
+- Skill Registry：`31/33` 项标记为 `implemented`
+- CLI 脚本：`144` 个
+- pytest 文件：`168` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

@@ -10,7 +10,12 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from asset_registry import assets_check, registry_path, sync_assets  # noqa: E402
+from asset_registry import (  # noqa: E402
+    assets_check,
+    lint_locations,
+    registry_path,
+    sync_assets,
+)
 from story_plan import run_plan  # noqa: E402
 
 
@@ -110,6 +115,44 @@ class AssetRegistryTests(unittest.TestCase):
             bible = json.loads((root / "style-bible.json").read_text(encoding="utf-8"))
             props = bible.get("props") or {}
             self.assertTrue(any(isinstance(v, dict) for v in props.values()))
+
+
+class LintLocationsTests(unittest.TestCase):
+    """P3-13: scene art / location continuity lint."""
+
+    def test_unregistered_location_triggers_warning(self):
+        shots = [{"id": "s1", "locationId": "unknown"}]
+        locs = [{"id": "alley"}]
+        rep = lint_locations(shots, locs)
+        self.assertFalse(rep["ok"])
+        self.assertIn("SCENE_LOCATION_UNREGISTERED", rep["codes"])
+
+    def test_registered_location_no_issue(self):
+        shots = [{"id": "s1", "locationId": "alley", "dsl": {"subject": "woman"}}]
+        locs = [{"id": "alley"}]
+        rep = lint_locations(shots, locs)
+        self.assertTrue(rep["ok"])
+
+    def test_recurring_object_in_dsl_key_no_issue(self):
+        """Recurring object mentioned as a dsl key → no issue."""
+        shots = [{"id": "s1", "locationId": "alley", "dsl": {"subject": "woman", "rain": "wet"}}]
+        locs = [{"id": "alley", "recurringObjects": ["rain"]}]
+        rep = lint_locations(shots, locs)
+        self.assertNotIn("SCENE_RECURRING_OBJECT_MISSING", rep["codes"])
+
+    def test_recurring_object_missing_triggers_warning(self):
+        shots = [{"id": "s1", "locationId": "alley", "dsl": {"subject": "woman"}}]
+        locs = [{"id": "alley", "recurringObjects": ["streetlamp"]}]
+        rep = lint_locations(shots, locs)
+        self.assertIn("SCENE_RECURRING_OBJECT_MISSING", rep["codes"])
+
+    def test_empty_shots_no_issues(self):
+        rep = lint_locations([], [{"id": "alley"}])
+        self.assertTrue(rep["ok"])
+
+    def test_no_locations_no_issues(self):
+        rep = lint_locations([{"id": "s1", "locationId": "alley"}], None)
+        self.assertTrue(rep["ok"])
 
 
 if __name__ == "__main__":

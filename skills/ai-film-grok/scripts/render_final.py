@@ -482,6 +482,8 @@ def tts_to_wav(
     pitch: str = "+0Hz",
     backend: str | None = None,
     allow_network_fallback: bool = False,
+    usage_root: Path | str | None = None,
+    shot_id: str = "",
 ) -> tuple[Path, float, dict[str, Any]]:
     """Synthesize VO via pluggable backend (fish > edge). Returns wav path, duration, meta."""
     out_mp3.parent.mkdir(parents=True, exist_ok=True)
@@ -498,6 +500,8 @@ def tts_to_wav(
             volume=volume,
             pitch=pitch,
             allow_network_fallback=allow_network_fallback,
+            usage_root=usage_root,
+            shot_id=shot_id,
         )
     except Exception as exc:
         raise RenderError(f"TTS failed without cross-provider fallback: {exc}") from exc
@@ -1990,6 +1994,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             pitch=vo_pitch,
             backend=None if tts_backend == "auto" else str(tts_backend),
             allow_network_fallback=tts_allow_network_fallback,
+            usage_root=root,
+            shot_id=sid,
         )
         log(
             f"  tts backend={tts_meta.get('backend')} voice={tts_meta.get('voice') or shot_voice} "
@@ -2031,6 +2037,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                     pitch=str(color_payload.get("pitch") or "+2Hz"),
                     backend=None if tts_backend == "auto" else str(tts_backend),
                     allow_network_fallback=tts_allow_network_fallback,
+                    usage_root=root,
+                    shot_id=f"{sid}-vocal-color",
                 )
                 log(f"  vocal_color dur={color_dur:.2f}s gain={color_gain:.2f}")
             except Exception as exc:  # noqa: BLE001 — color is soft layer

@@ -122,29 +122,36 @@
 
 ## 五、考验矩阵
 
-| 维度 | schema | lint | 门禁 | 测试 | 评分(前→后) |
-|---|:---:|:---:|:---:|:---:|---|
-| 节拍骨架 | ✓ | ✓ | ✓ | ✓ | 3→8 |
-| 三幕+节奏 | ✓ | — | ✓ | ✓ | 2→7 |
-| 角色设定表 | ✓ | — | ✓ | ✓ | 2→7 |
-| 锁脸 | ✓ | — | ✓ | ✓ | 4→6 |
-| 发型 | ✓ | ✓ | — | ✓ | 2→6 |
-| 妆造 | ✓ | ✓ | — | ✓ | 0→5 |
-| 服装设计表 | ✓ | — | — | ✓ | 9→9 |
-| 场景设计 | ✓ | ✓ | ✓ | ✓ | 6→8 |
-| 美术设计 | ✓ | — | — | ✓ | 5→7 |
-| 分镜+构图 | ✓ | ✓ | — | ✓ | 3→7 |
-| 对白台词库 | ✓ | ✓ | ✓ | ✓ | 3→6 |
-| face identity | — | — | ✓ | ✓ | 4→6 |
-| 服装/发型/妆造一致 | — | ✓ | — | ✓ | —→5 |
-| 场景光影 | — | ✓ | — | ✓ | 2→5 |
-| 运镜曲线 | — | ✓ | — | ✓ | 4→5 |
-| lipsync质量 | — | ✓ | — | ✓ | 2→4 |
-| voice绑定 | — | ✓ | — | ✓ | 4→5 |
-| 调色 | ✓ | — | ✓ | ✓ | 0→5 |
-| 声音分层 | ✓ | — | — | ✓ | 3→5 |
-| BGM spotting | ✓ | — | — | ✓ | 2→5 |
-| 导演复审 | — | — | ✓ | ✓ | 3→6 |
+> 2026-07-24 更新：P1 接活 5 处死代码 + P2 升级 6 处门禁硬度 + P3 补齐 3 处 stub。
+> "骨架"→"肌肉"已填充，矩阵评分反映实际接线状态。
+
+| 维度 | schema | lint | 门禁 | 测试 | 评分(前→后) | 备注 |
+|---|:---:|:---:|:---:|:---:|---|---|
+| 节拍骨架 | ✓ | ✓ | ✓ | ✓ | 3→8 | |
+| 三幕+节奏 | ✓ | — | ✓ | ✓ | 2→7 | rhythm_strict 路径已测 |
+| 角色设定表 | ✓ | — | ✓ | ✓ | 2→7 | |
+| 锁脸 | ✓ | — | ✓ | ✓ | 4→6 | premium 默认 hard（P2-6） |
+| 发型 | ✓ | ✓ | ✓ | ✓ | 2→7 | lint_production_consistency 接活（P1-1） |
+| 妆造 | ✓ | ✓ | ✓ | ✓ | 0→6 | lint_production_consistency 接活（P1-1） |
+| 服装设计表 | ✓ | — | ✓ | ✓ | 9→9 | lint_production_consistency 接活 |
+| 场景设计 | ✓ | ✓ | ✓ | ✓ | 6→8 | lint_locations 接活（P3-13） |
+| 美术设计 | ✓ | — | — | ✓ | 5→7 | |
+| 分镜+构图 | ✓ | ✓ | ✓ | ✓ | 3→8 | lint_composition_rules 接活（P1-2） |
+| 对白台词库 | ✓ | ✓ | ✓ | ✓ | 3→7 | validate_dialogue_contract 接活（P1-3） |
+| face identity | — | — | ✓ | ✓ | 4→7 | premium 默认 hard + drift 测试（P2-6） |
+| 服装/发型/妆造一致 | — | ✓ | ✓ | ✓ | —→7 | lint_production_consistency 接活 + 测试（P1-1） |
+| 场景光影 | — | ✓ | ✓ | ✓ | 2→7 | lint_production_consistency SCENE_LIGHT_DRIFT |
+| 运镜曲线 | — | ✓ | ✓ | ✓ | 4→7 | meaningful_motion_strict 接入 preflight hard（P2-7） |
+| lipsync质量 | — | ✓ | ✓ | ✓ | 2→6 | lint_production_consistency LIPSYNC_DRIFT |
+| voice绑定 | — | ✓ | ✓ | ✓ | 4→6 | lint_production_consistency VOICE_CHARACTER_MISMATCH |
+| 调色 | ✓ | — | ✓ | ✓ | 0→7 | premium 默认 strict（P2-8）+ lighting timeline 驱动（P1-5） |
+| 声音分层 | ✓ | — | ✓ | ✓ | 3→7 | audio_bible premium hard（P2-11） |
+| BGM spotting | ✓ | ✓ | ✓ | ✓ | 2→7 | audio_visual_alignment AV 对齐度量（P3-12）+ premium hard |
+| 导演复审 | — | — | ✓ | ✓ | 3→6 | |
+| AV 时序对齐 | ✓ | ✓ | ✓ | ✓ | 0→7 | audio_visual_alignment 重写（P3-12）：BGM cue vs shot boundary, VO onset vs cut |
+| LUFS 响度 | ✓ | ✓ | ✓ | ✓ | 2→7 | 三套统一为 -16±2（P3-15）|
+| VO 去 AI 味 | ✓ | ✓ | ✓ | ✓ | 0→6 | vo_lint_strict（P2-10）|
+| post_bible | ✓ | ✓ | ✓ | ✓ | 2→7 | premium advisory→hard（P2-11）|
 
 ---
 
@@ -152,10 +159,9 @@
 
 剩余可深化的方向（后续迭代）：
 - **像素级 CV 校验**：face embedding / 服装颜色直方图 / 光照估计（需 CV 后端）
-- **LUFS 分轨 hard gate**：目前 LUFS 仍为 warning，可升级为 hard
-- **三幕比例自动校验**：成片实际幕比例 vs act_structure 声明比例
-- **节奏曲线兑现校验**：成片切镜频率 vs pace_chart 声明曲线
-- **BGM 与 beat 对齐校验**：music_spotting.beat_ref vs 实际 beat 时间轴
+- **三幕比例自动校验**：成片实际幕比例 vs act_structure 声明比例（P4-16）
+- **节奏曲线兑现校验**：成片切镜频率 vs pace_chart 声明曲线（P4-17）
+- **BGM 与 beat 对齐校验**：music_spotting.beat_ref vs 实际 beat 时间轴（P4-18）
 
 这些方向的 schema 字段和 lint 代码已就位——只差 CV/音频分析后端的接入。
-方法论注入的"骨架"已完成，"肌肉"（自动度量）可在后续迭代中逐步填充。
+**2026-07-24 进展**：LUFS 已统一为 -16±2 hard（不再是 warning）；AV 时序对齐已实现（BGM cue vs boundary, VO onset vs cut）；死代码全部接活；premium 项目门禁硬度已到位。剩余 CV/成片兑现校验为后续迭代。

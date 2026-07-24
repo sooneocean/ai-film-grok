@@ -43,6 +43,13 @@ from pathlib import Path
 from typing import Any
 
 from config_loader import get_config
+from generation_usage import (
+    GenerationUsageError,
+    accept_generation,
+    finish_generation,
+    normalize_usage,
+    start_generation,
+)
 
 DEFAULT_AUTH_PATH = Path.home() / ".grok" / "auth.json"
 DEFAULT_API_BASE = "https://api.x.ai/v1"
@@ -65,6 +72,55 @@ VIDEO_POLL_TIMEOUT_SEC = 600
 
 class GrokOAuthError(RuntimeError):
     pass
+
+
+def _start_usage(
+    root: Path | str | None,
+    *,
+    operation: str,
+    model: str,
+    shot_id: str = "",
+    job_id: str = "",
+) -> str | None:
+    if root is None:
+        return None
+    try:
+        return start_generation(
+            root,
+            operation=operation,
+            provider="xai",
+            model=model,
+            shot_id=shot_id,
+            job_id=job_id,
+        )
+    except GenerationUsageError as exc:
+        raise GrokOAuthError(f"usage tracking failed before provider request: {exc}") from exc
+
+
+def _finish_usage(
+    root: Path | str | None,
+    generation_id: str | None,
+    *,
+    status: str,
+    usage: object = None,
+    provider_request_id: str = "",
+    output: Path | str | None = None,
+) -> None:
+    if root is None or generation_id is None:
+        return
+    normalized = normalize_usage(usage)
+    try:
+        finish_generation(
+            root,
+            generation_id,
+            status=status,
+            usage=normalized,
+            measurement=("provider_exact" if "cost_in_usd_ticks" in normalized else "unknown"),
+            provider_request_id=provider_request_id,
+            output=output,
+        )
+    except GenerationUsageError as exc:
+        raise GrokOAuthError(f"usage tracking failed after provider request: {exc}") from exc
 
 
 def auth_path() -> Path:
@@ -516,6 +572,9 @@ def images_generate(
     aspect_ratio: str | None = "9:16",
     resolution: str | None = None,
     n: int = 1,
+    usage_root: Path | str | None = None,
+    shot_id: str = "",
+    job_id: str = "",
 ) -> dict[str, Any]:
     """Text-to-image via api.x.ai (OAuth). Prefer Grok Build image_gen in-session."""
     tok = get_access_token()
@@ -530,24 +589,43 @@ def images_generate(
         body["aspect_ratio"] = aspect_ratio
     if resolution:
         body["resolution"] = resolution
+    generation_id = _start_usage(
+        usage_root,
+        operation="t2i",
+        model=model,
+        shot_id=shot_id,
+        job_id=job_id,
+    )
     try:
-        resp = _http_json(
-            "POST",
-            f"{tok['api_base']}/images/generations",
-            token=tok["token"],
-            body=body,
-            timeout=180,
-        )
+        try:
+            resp = _http_json(
+                "POST",
+                f"{tok['api_base']}/images/generations",
+                token=tok["token"],
+                body=body,
+                timeout=180,
+            )
+        except GrokOAuthError:
+            _finish_usage(usage_root, generation_id, status="failed")
+            body.pop("aspect_ratio", None)
+            body.pop("resolution", None)
+            generation_id = _start_usage(
+                usage_root,
+                operation="t2i",
+                model=model,
+                shot_id=shot_id,
+                job_id=job_id,
+            )
+            resp = _http_json(
+                "POST",
+                f"{tok['api_base']}/images/generations",
+                token=tok["token"],
+                body=body,
+                timeout=180,
+            )
     except GrokOAuthError:
-        body.pop("aspect_ratio", None)
-        body.pop("resolution", None)
-        resp = _http_json(
-            "POST",
-            f"{tok['api_base']}/images/generations",
-            token=tok["token"],
-            body=body,
-            timeout=180,
-        )
+        _finish_usage(usage_root, generation_id, status="failed")
+        raise
     url = None
     if isinstance(resp, dict):
         data = resp.get("data") or []
@@ -556,15 +634,41 @@ def images_generate(
                 f"data:image/png;base64,{data[0]['b64_json']}" if data[0].get("b64_json") else None
             )
     if not url:
+        _finish_usage(
+            usage_root,
+            generation_id,
+            status="failed",
+            usage=(resp or {}).get("usage") if isinstance(resp, dict) else None,
+        )
         raise GrokOAuthError(f"image response missing url: {str(resp)[:200]}")
     out = Path(out).expanduser().resolve()
-    if str(url).startswith("data:"):
-        # data URL path
-        _, _, b64 = str(url).partition(",")
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes(base64.b64decode(b64))
-    else:
-        _download_url(str(url), out)
+    normalized_usage = normalize_usage(
+        (resp or {}).get("usage") if isinstance(resp, dict) else None
+    )
+    try:
+        if str(url).startswith("data:"):
+            # data URL path
+            _, _, b64 = str(url).partition(",")
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(base64.b64decode(b64))
+        else:
+            _download_url(str(url), out)
+    except Exception:
+        # Provider completion is still billable when only the local download fails.
+        _finish_usage(
+            usage_root,
+            generation_id,
+            status="succeeded",
+            usage=normalized_usage,
+        )
+        raise
+    _finish_usage(
+        usage_root,
+        generation_id,
+        status="succeeded",
+        usage=normalized_usage,
+        output=out,
+    )
     return {
         "ok": out.is_file() and out.stat().st_size > 100,
         "path": str(out),
@@ -572,6 +676,8 @@ def images_generate(
         "model": model,
         "source": tok.get("source"),
         "operation": "images.generations",
+        "generation_id": generation_id,
+        "usage": normalized_usage,
     }
 
 
@@ -583,6 +689,9 @@ def images_edit(
     model: str | None = None,
     aspect_ratio: str | None = None,
     extra_images: list[str | Path] | None = None,
+    usage_root: Path | str | None = None,
+    shot_id: str = "",
+    job_id: str = "",
 ) -> dict[str, Any]:
     """Image edit / multi-ref edit via POST /v1/images/edits (JSON + data URL)."""
     tok = get_access_token()
@@ -599,19 +708,15 @@ def images_edit(
     if extra_images:
         # multi-image edit: some APIs accept images[] — try common shape
         body["images"] = [_image_input_object(x) for x in extra_images]
+    generation_id = _start_usage(
+        usage_root,
+        operation="image_edit",
+        model=model,
+        shot_id=shot_id,
+        job_id=job_id,
+    )
     try:
-        resp = _http_json(
-            "POST",
-            f"{tok['api_base']}/images/edits",
-            token=tok["token"],
-            body=body,
-            timeout=180,
-        )
-    except GrokOAuthError as exc:
-        # retry without multi-image / aspect if rejected
-        if "images" in body or "aspect_ratio" in body:
-            body.pop("images", None)
-            body.pop("aspect_ratio", None)
+        try:
             resp = _http_json(
                 "POST",
                 f"{tok['api_base']}/images/edits",
@@ -619,8 +724,30 @@ def images_edit(
                 body=body,
                 timeout=180,
             )
-        else:
-            raise exc
+        except GrokOAuthError as exc:
+            _finish_usage(usage_root, generation_id, status="failed")
+            # retry without multi-image / aspect if rejected
+            if "images" not in body and "aspect_ratio" not in body:
+                raise exc
+            body.pop("images", None)
+            body.pop("aspect_ratio", None)
+            generation_id = _start_usage(
+                usage_root,
+                operation="image_edit",
+                model=model,
+                shot_id=shot_id,
+                job_id=job_id,
+            )
+            resp = _http_json(
+                "POST",
+                f"{tok['api_base']}/images/edits",
+                token=tok["token"],
+                body=body,
+                timeout=180,
+            )
+    except GrokOAuthError:
+        _finish_usage(usage_root, generation_id, status="failed")
+        raise
     url = None
     if isinstance(resp, dict):
         data = resp.get("data") or []
@@ -629,14 +756,39 @@ def images_edit(
             if not url and data[0].get("b64_json"):
                 url = f"data:image/png;base64,{data[0]['b64_json']}"
     if not url:
+        _finish_usage(
+            usage_root,
+            generation_id,
+            status="failed",
+            usage=(resp or {}).get("usage") if isinstance(resp, dict) else None,
+        )
         raise GrokOAuthError(f"image-edit response missing url: {str(resp)[:200]}")
     out = Path(out).expanduser().resolve()
-    if str(url).startswith("data:"):
-        _, _, b64 = str(url).partition(",")
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes(base64.b64decode(b64))
-    else:
-        _download_url(str(url), out)
+    normalized_usage = normalize_usage(
+        (resp or {}).get("usage") if isinstance(resp, dict) else None
+    )
+    try:
+        if str(url).startswith("data:"):
+            _, _, b64 = str(url).partition(",")
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(base64.b64decode(b64))
+        else:
+            _download_url(str(url), out)
+    except Exception:
+        _finish_usage(
+            usage_root,
+            generation_id,
+            status="succeeded",
+            usage=normalized_usage,
+        )
+        raise
+    _finish_usage(
+        usage_root,
+        generation_id,
+        status="succeeded",
+        usage=normalized_usage,
+        output=out,
+    )
     return {
         "ok": out.is_file() and out.stat().st_size > 100,
         "path": str(out),
@@ -645,6 +797,8 @@ def images_edit(
         "source": tok.get("source"),
         "operation": "images.edits",
         "input": str(image),
+        "generation_id": generation_id,
+        "usage": normalized_usage,
     }
 
 
@@ -660,6 +814,9 @@ def video_submit(
     aspect_ratio: str | None = "9:16",
     resolution: str | None = "720p",
     reference_images: list[str | Path] | None = None,
+    usage_root: Path | str | None = None,
+    shot_id: str = "",
+    job_id: str = "",
 ) -> dict[str, Any]:
     """Submit async video job. Returns {request_id, …}. Does not wait."""
     tok = get_access_token()
@@ -685,16 +842,43 @@ def video_submit(
         raise GrokOAuthError(
             f"model {model} is image-to-video only — pass --image (see docs.x.ai Imagine Video 1.5)"
         )
-    resp = _http_json(
-        "POST",
-        f"{tok['api_base']}/videos/generations",
-        token=tok["token"],
-        body=body,
-        timeout=120,
+    generation_id = _start_usage(
+        usage_root,
+        operation="i2v" if image is not None or reference_images else "t2v",
+        model=model,
+        shot_id=shot_id,
+        job_id=job_id,
     )
+    try:
+        resp = _http_json(
+            "POST",
+            f"{tok['api_base']}/videos/generations",
+            token=tok["token"],
+            body=body,
+            timeout=120,
+        )
+    except GrokOAuthError:
+        _finish_usage(usage_root, generation_id, status="failed")
+        raise
     rid = (resp or {}).get("request_id") if isinstance(resp, dict) else None
     if not rid:
+        _finish_usage(
+            usage_root,
+            generation_id,
+            status="failed",
+            usage=(resp or {}).get("usage") if isinstance(resp, dict) else None,
+        )
         raise GrokOAuthError(f"video submit missing request_id: {str(resp)[:200]}")
+    if usage_root is not None and generation_id is not None:
+        try:
+            accept_generation(
+                usage_root,
+                generation_id,
+                provider_request_id=str(rid),
+                usage=(resp or {}).get("usage") if isinstance(resp, dict) else None,
+            )
+        except GenerationUsageError as exc:
+            raise GrokOAuthError(f"usage tracking failed after video submit: {exc}") from exc
     return {
         "ok": True,
         "request_id": str(rid),
@@ -705,10 +889,17 @@ def video_submit(
         "source": tok.get("source"),
         "has_image": image is not None,
         "operation": "videos.generations",
+        "generation_id": generation_id,
+        "usage": normalize_usage((resp or {}).get("usage") if isinstance(resp, dict) else None),
     }
 
 
-def video_status(request_id: str) -> dict[str, Any]:
+def video_status(
+    request_id: str,
+    *,
+    usage_root: Path | str | None = None,
+    generation_id: str | None = None,
+) -> dict[str, Any]:
     tok = get_access_token()
     resp = _http_json(
         "GET",
@@ -720,7 +911,8 @@ def video_status(request_id: str) -> dict[str, Any]:
         raise GrokOAuthError(f"empty video status for {request_id}")
     status = str(resp.get("status") or "")
     video = resp.get("video") if isinstance(resp.get("video"), dict) else {}
-    return {
+    normalized_usage = normalize_usage(resp.get("usage"))
+    result = {
         "ok": status in {"done", "pending", "processing"} or bool(status),
         "request_id": request_id,
         "status": status,
@@ -730,9 +922,40 @@ def video_status(request_id: str) -> dict[str, Any]:
         "video_url": (video or {}).get("url"),
         "video_duration": (video or {}).get("duration"),
         "respect_moderation": (video or {}).get("respect_moderation"),
-        "usage": resp.get("usage"),
+        "usage": normalized_usage,
         "raw_keys": list(resp.keys()),
+        "generation_id": generation_id,
     }
+    moderated = (
+        status == "done"
+        and not result.get("respect_moderation", True)
+        and not result.get("video_url")
+    )
+    if moderated:
+        _finish_usage(
+            usage_root,
+            generation_id,
+            status="moderated",
+            usage=normalized_usage,
+            provider_request_id=request_id,
+        )
+    elif status == "done":
+        _finish_usage(
+            usage_root,
+            generation_id,
+            status="succeeded",
+            usage=normalized_usage,
+            provider_request_id=request_id,
+        )
+    elif status in {"failed", "error"}:
+        _finish_usage(
+            usage_root,
+            generation_id,
+            status="failed",
+            usage=normalized_usage,
+            provider_request_id=request_id,
+        )
+    return result
 
 
 def video_wait(
@@ -741,12 +964,18 @@ def video_wait(
     out: Path | None = None,
     timeout_sec: float = VIDEO_POLL_TIMEOUT_SEC,
     poll_interval: float = VIDEO_POLL_INTERVAL_SEC,
+    usage_root: Path | str | None = None,
+    generation_id: str | None = None,
 ) -> dict[str, Any]:
     """Poll until done/failed; optionally download MP4 to out."""
     deadline = time.time() + max(30.0, float(timeout_sec))
     last: dict[str, Any] = {}
     while time.time() < deadline:
-        last = video_status(request_id)
+        last = video_status(
+            request_id,
+            usage_root=usage_root,
+            generation_id=generation_id,
+        )
         st = str(last.get("status") or "")
         if st == "done":
             break
@@ -784,6 +1013,9 @@ def video_generate(
     resolution: str | None = "720p",
     reference_images: list[str | Path] | None = None,
     timeout_sec: float = VIDEO_POLL_TIMEOUT_SEC,
+    usage_root: Path | str | None = None,
+    shot_id: str = "",
+    job_id: str = "",
 ) -> dict[str, Any]:
     """Submit + wait + download. Primary batch I2V path for grok_primary offline."""
     sub = video_submit(
@@ -794,8 +1026,17 @@ def video_generate(
         aspect_ratio=aspect_ratio,
         resolution=resolution,
         reference_images=reference_images,
+        usage_root=usage_root,
+        shot_id=shot_id,
+        job_id=job_id,
     )
-    done = video_wait(sub["request_id"], out=out, timeout_sec=timeout_sec)
+    done = video_wait(
+        sub["request_id"],
+        out=out,
+        timeout_sec=timeout_sec,
+        usage_root=usage_root,
+        generation_id=sub.get("generation_id"),
+    )
     done.update(
         {
             "model": sub.get("model"),
@@ -843,6 +1084,9 @@ def tts_speak(
     codec: str = "mp3",
     sample_rate: int | None = None,
     bit_rate: int | None = None,
+    usage_root: Path | str | None = None,
+    shot_id: str = "",
+    job_id: str = "",
 ) -> dict[str, Any]:
     """Grok TTS via POST /v1/tts. Supports speech tags in text. Opt-in film backend.
 
@@ -871,33 +1115,74 @@ def tts_speak(
     if codec != "mp3" or sample_rate or bit_rate:
         body["output_format"] = ofmt
 
-    raw, ct = _http_bytes(
-        "POST",
-        f"{tok['api_base']}/tts",
-        token=tok["token"],
-        body=body,
-        timeout=180,
-        accept="application/json, audio/*, */*",
+    generation_id = _start_usage(
+        usage_root,
+        operation="tts",
+        model="grok-tts",
+        shot_id=shot_id,
+        job_id=job_id,
     )
+    try:
+        raw, ct = _http_bytes(
+            "POST",
+            f"{tok['api_base']}/tts",
+            token=tok["token"],
+            body=body,
+            timeout=180,
+            accept="application/json, audio/*, */*",
+        )
+    except GrokOAuthError:
+        _finish_usage(usage_root, generation_id, status="failed")
+        raise
     out = Path(out).expanduser().resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
     timestamps = None
     duration = None
+    payload_usage: object = None
+    audio_bytes: bytes
     if "application/json" in (ct or "") or (raw[:1] == b"{"):
         try:
             payload = json.loads(raw.decode("utf-8"))
         except json.JSONDecodeError as exc:
+            _finish_usage(usage_root, generation_id, status="failed")
             raise GrokOAuthError(f"tts json parse failed: {exc}") from exc
         audio_b64 = payload.get("audio")
+        payload_usage = payload.get("usage")
         if not audio_b64:
+            _finish_usage(
+                usage_root,
+                generation_id,
+                status="failed",
+                usage=payload.get("usage"),
+            )
             raise GrokOAuthError(f"tts json missing audio: {str(payload)[:200]}")
-        out.write_bytes(base64.b64decode(audio_b64))
+        try:
+            audio_bytes = base64.b64decode(audio_b64)
+        except (TypeError, ValueError) as exc:
+            _finish_usage(
+                usage_root,
+                generation_id,
+                status="failed",
+                usage=payload_usage,
+            )
+            raise GrokOAuthError(f"tts audio decode failed: {exc}") from exc
         timestamps = payload.get("audio_timestamps")
         duration = payload.get("duration")
     else:
         if len(raw) < 200:
+            _finish_usage(usage_root, generation_id, status="failed")
             raise GrokOAuthError(f"tts audio too small ({len(raw)}B): {raw[:80]!r}")
-        out.write_bytes(raw)
+        audio_bytes = raw
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(audio_bytes)
+    except OSError as exc:
+        _finish_usage(
+            usage_root,
+            generation_id,
+            status="failed",
+            usage=payload_usage,
+        )
+        raise GrokOAuthError(f"tts output write failed: {exc}") from exc
 
     result: dict[str, Any] = {
         "ok": out.is_file() and out.stat().st_size > 200,
@@ -909,7 +1194,16 @@ def tts_speak(
         "operation": "tts",
         "content_type": ct,
         "with_timestamps": bool(with_timestamps),
+        "generation_id": generation_id,
+        "usage": normalize_usage(payload_usage),
     }
+    _finish_usage(
+        usage_root,
+        generation_id,
+        status="succeeded",
+        usage=payload_usage,
+        output=out,
+    )
     if duration is not None:
         result["duration"] = duration
     if timestamps is not None:
@@ -956,6 +1250,9 @@ def main(argv: list[str] | None = None) -> int:
     im.add_argument("--model", default=None)
     im.add_argument("--aspect", default="9:16")
     im.add_argument("--resolution", default=None, help="1k | 2k when supported")
+    im.add_argument("--root", default=None)
+    im.add_argument("--shot-id", default="")
+    im.add_argument("--job-id", default="")
 
     ie = sub.add_parser("image-edit", help="Image edit via /v1/images/edits")
     ie.add_argument("--image", required=True, help="local path | data URL | public URL")
@@ -964,6 +1261,9 @@ def main(argv: list[str] | None = None) -> int:
     ie.add_argument("--model", default=None)
     ie.add_argument("--aspect", default=None)
     ie.add_argument("--ref", action="append", default=[], help="extra reference image (repeatable)")
+    ie.add_argument("--root", default=None)
+    ie.add_argument("--shot-id", default="")
+    ie.add_argument("--job-id", default="")
 
     vid = sub.add_parser("video", help="I2V/T2V via /v1/videos/generations (+ optional --wait)")
     vid.add_argument("--prompt", default=None)
@@ -976,12 +1276,17 @@ def main(argv: list[str] | None = None) -> int:
     vid.add_argument("--wait", action="store_true", help="poll until done and download")
     vid.add_argument("--timeout", type=float, default=VIDEO_POLL_TIMEOUT_SEC)
     vid.add_argument("--ref", action="append", default=[], help="reference image for R2V")
+    vid.add_argument("--root", default=None)
+    vid.add_argument("--shot-id", default="")
+    vid.add_argument("--job-id", default="")
 
     pol = sub.add_parser("video-status", help="Poll a video request_id")
     pol.add_argument("--request-id", required=True)
     pol.add_argument("--out", default=None, help="if done, download here")
     pol.add_argument("--wait", action="store_true")
     pol.add_argument("--timeout", type=float, default=VIDEO_POLL_TIMEOUT_SEC)
+    pol.add_argument("--root", default=None)
+    pol.add_argument("--generation-id", default=None)
 
     tt = sub.add_parser("tts", help="Grok TTS (/v1/tts) — opt-in film backend")
     tt.add_argument("--text", default=None)
@@ -992,6 +1297,9 @@ def main(argv: list[str] | None = None) -> int:
     tt.add_argument("--speed", type=float, default=None)
     tt.add_argument("--timestamps", action="store_true", help="character timestamps sidecar")
     tt.add_argument("--codec", default="mp3")
+    tt.add_argument("--root", default=None)
+    tt.add_argument("--shot-id", default="")
+    tt.add_argument("--job-id", default="")
 
     sub.add_parser("voices", help="List Grok TTS voices")
     sub.add_parser("refresh", help="Force token refresh and persist auth.json")
@@ -1042,6 +1350,9 @@ def main(argv: list[str] | None = None) -> int:
                         model=args.model,
                         aspect_ratio=args.aspect,
                         resolution=args.resolution,
+                        usage_root=args.root,
+                        shot_id=args.shot_id,
+                        job_id=args.job_id,
                     ),
                     ensure_ascii=False,
                     indent=2,
@@ -1058,6 +1369,9 @@ def main(argv: list[str] | None = None) -> int:
                         model=args.model,
                         aspect_ratio=args.aspect,
                         extra_images=list(args.ref or []) or None,
+                        usage_root=args.root,
+                        shot_id=args.shot_id,
+                        job_id=args.job_id,
                     ),
                     ensure_ascii=False,
                     indent=2,
@@ -1081,6 +1395,9 @@ def main(argv: list[str] | None = None) -> int:
                             resolution=args.resolution,
                             reference_images=refs,
                             timeout_sec=args.timeout,
+                            usage_root=args.root,
+                            shot_id=args.shot_id,
+                            job_id=args.job_id,
                         ),
                         ensure_ascii=False,
                         indent=2,
@@ -1097,6 +1414,9 @@ def main(argv: list[str] | None = None) -> int:
                             aspect_ratio=args.aspect,
                             resolution=args.resolution,
                             reference_images=refs,
+                            usage_root=args.root,
+                            shot_id=args.shot_id,
+                            job_id=args.job_id,
                         ),
                         ensure_ascii=False,
                         indent=2,
@@ -1111,13 +1431,25 @@ def main(argv: list[str] | None = None) -> int:
                             args.request_id,
                             out=Path(args.out) if args.out else None,
                             timeout_sec=args.timeout,
+                            usage_root=args.root,
+                            generation_id=args.generation_id,
                         ),
                         ensure_ascii=False,
                         indent=2,
                     )
                 )
             else:
-                print(json.dumps(video_status(args.request_id), ensure_ascii=False, indent=2))
+                print(
+                    json.dumps(
+                        video_status(
+                            args.request_id,
+                            usage_root=args.root,
+                            generation_id=args.generation_id,
+                        ),
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                )
             return 0
         if args.cmd == "tts":
             text = args.text
@@ -1135,6 +1467,9 @@ def main(argv: list[str] | None = None) -> int:
                         speed=args.speed,
                         with_timestamps=bool(args.timestamps),
                         codec=args.codec,
+                        usage_root=args.root,
+                        shot_id=args.shot_id,
+                        job_id=args.job_id,
                     ),
                     ensure_ascii=False,
                     indent=2,

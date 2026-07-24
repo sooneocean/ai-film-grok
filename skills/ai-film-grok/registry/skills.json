@@ -6,6 +6,21 @@
   "notes": "Phase 2–4: planning + asset registry (character/location/prop/state). Contracts are minimal envelopes.",
   "skills": [
     {
+      "id": "story.receive",
+      "version": "1.0.0",
+      "summary": "Agent T2T receiver: preserve a user story while creating a cinematic planning package",
+      "status": "implemented",
+      "produces": ["StoryReception"],
+      "dependsOnAssets": [],
+      "capabilities": ["structure"],
+      "providers": ["agent"],
+      "tags": ["intake", "narrative", "fidelity", "planning"],
+      "phases": ["1", "3"],
+      "cli": {"run": "aifilm plan receive --root --file", "validate": "aifilm plan receive --root --file"},
+      "inputContract": "schemas/story-reception.schema.json",
+      "outputContract": "schemas/story-reception.schema.json"
+    },
+    {
       "id": "story.normalize",
       "version": "1.0.0",
       "summary": "Normalize raw story/script/brief into structured candidates",

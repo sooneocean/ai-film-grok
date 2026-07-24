@@ -80,14 +80,16 @@ class TestSoundPlanSchema:
     def test_audio_tracks_accepts_bgm_alias_and_sfx_source(self):
         from sound_plan import validate_audio_tracks_contract
 
-        result = validate_audio_tracks_contract({
-            "audio_tracks_strict": True,
-            "audio_tracks": {
-                "dialogue": {"gain": 1.0},
-                "sfx": {"source": "procedural"},
-                "bgm": {"license": "original"},
-            },
-        })
+        result = validate_audio_tracks_contract(
+            {
+                "audio_tracks_strict": True,
+                "audio_tracks": {
+                    "dialogue": {"gain": 1.0},
+                    "sfx": {"source": "procedural"},
+                    "bgm": {"license": "original"},
+                },
+            }
+        )
         assert result["strict"] is True
         assert result["errors"] == []
 

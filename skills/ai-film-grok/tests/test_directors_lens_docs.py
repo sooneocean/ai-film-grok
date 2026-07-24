@@ -43,16 +43,19 @@ class DirectorsLensDocsTests(unittest.TestCase):
 
     def test_skill_wires_lens_upstream(self) -> None:
         skill = SKILL.read_text(encoding="utf-8")
-        self.assertIn("directors-lens.md", skill)
-        self.assertIn("lessons-2026-07-20-directors-lens.md", skill)
-        self.assertIn("先 Director’s Lens", skill)
+        agent_card = (ROOT / "references" / "stages" / "agent.md").read_text(encoding="utf-8")
+        index = (ROOT / "references" / "INDEX.md").read_text(encoding="utf-8")
+        reachable = skill + agent_card + index
+        self.assertIn("directors-lens.md", reachable)
+        self.assertIn("lessons-2026-07-20-directors-lens.md", reachable)
+        self.assertIn("先 Director’s Lens", reachable)
         # Main spine keeps Agent 区简写；Lens 细节在 references 表
         self.assertTrue(
             "### 0. Director’s Lens" in skill
             or "Directors Lens" in skill
             or "directors-lens.md" in skill
         )
-        self.assertIn("插图化", skill)
+        self.assertIn("插图化", LENS.read_text(encoding="utf-8"))
 
     def test_refs_point_to_lens(self) -> None:
         for path in (FILM_SPEC_MD, PRINCIPLES, SHOT_MOTION, LESSON):

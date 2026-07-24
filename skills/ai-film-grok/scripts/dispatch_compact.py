@@ -1,0 +1,270 @@
+#!/usr/bin/env python3
+"""Compact agent-facing dispatch projection and orchestration-only metrics."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import os
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from context_routing import select_context_refs
+
+_STATE_SUFFIXES = {".json", ".md", ".txt", ".srt"}
+_STATE_IGNORES = {
+    "dispatch.json",
+    "capability-cache.json",
+    "orchestration-usage.jsonl",
+    "pipeline_stage.json",
+}
+HARD_GATE_CODES = [
+    "WRITE_SPEC_REQUIRED",
+    "PILOT_USER_APPROVAL_REQUIRED",
+    "SILENT_PROVIDER_SWITCH_FORBIDDEN",
+    "FINAL_HUMAN_REVIEW_REQUIRED",
+    "STATE_INDEX_REQUIRED",
+    "NARRATIVE_PROJECTION_CURRENT_REQUIRED",
+    "PRODUCTION_EVIDENCE_REQUIRED",
+    "HERO_QUALITY_RECEIPT_REQUIRED",
+    "PROVIDER_FALLBACK_REPILOT_REQUIRED",
+]
+
+
+def _json_bytes(value: object) -> int:
+    return len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+
+
+def estimated_tokens(value: object) -> int:
+    """Cheap, explicitly estimated orchestration token count."""
+    return math.ceil(_json_bytes(value) / 4)
+
+
+def _bounded_text(value: object, *, max_bytes: int) -> str | None:
+    if value is None:
+        return None
+    raw = str(value)
+    encoded = raw.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return raw
+    suffix = "…（详见完整回执）"
+    budget = max(0, max_bytes - len(suffix.encode("utf-8")))
+    prefix = encoded[:budget]
+    while prefix:
+        try:
+            return prefix.decode("utf-8") + suffix
+        except UnicodeDecodeError:
+            prefix = prefix[:-1]
+    return suffix
+
+
+def _compact_action(action: dict[str, Any]) -> dict[str, Any] | None:
+    if not action:
+        return None
+    # The terminal packet needs the executable contract, approval boundary,
+    # verifier and transaction binding—not the full job/evidence context.
+    return {
+        key: action.get(key)
+        for key in (
+            "skill_id",
+            "operation",
+            "argv",
+            "spend_class",
+            "approval_class",
+            "verification",
+            "transaction_id",
+            "state_hash",
+        )
+    }
+
+
+def compute_state_hash(
+    root: Path,
+    *,
+    gates: dict[str, Any] | None = None,
+    open_reshoot_count: int = 0,
+) -> str:
+    """Hash control-plane text inputs while excluding generated dispatch telemetry."""
+    root = Path(root).expanduser().resolve()
+    digest = hashlib.sha256()
+    digest.update(str(root).encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(
+        json.dumps(
+            {"gates": gates or {}, "open_reshoot_count": open_reshoot_count},
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    if not root.is_dir():
+        return digest.hexdigest()
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in _STATE_SUFFIXES:
+            continue
+        if path.name in _STATE_IGNORES:
+            continue
+        try:
+            rel = path.relative_to(root)
+        except ValueError:
+            continue
+        if any(
+            part in {"out", "clips", "keyframes", ".cache", "_final_work"} for part in rel.parts
+        ):
+            continue
+        if rel.parts[:2] == ("receipts", "transactions"):
+            continue
+        try:
+            size = path.stat().st_size
+            if size > 4 * 1024 * 1024:
+                continue
+            digest.update(str(rel).encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(path.read_bytes())
+            digest.update(b"\0")
+        except OSError:
+            continue
+    return digest.hexdigest()
+
+
+def _attention(packet: dict[str, Any]) -> list[dict[str, str]]:
+    attention: list[dict[str, str]] = []
+    action = packet.get("next_action") if isinstance(packet.get("next_action"), dict) else {}
+    if action.get("approval_class") == "human_required":
+        attention.append(
+            {
+                "code": "HUMAN_APPROVAL_REQUIRED",
+                "severity": "stop",
+                "summary": "下一动作涉及用户批准、付费或外部服务；不得自动执行。",
+            }
+        )
+    narrative = (
+        packet.get("narrative_control") if isinstance(packet.get("narrative_control"), dict) else {}
+    )
+    for code in narrative.get("issue_codes") or []:
+        attention.append(
+            {
+                "code": str(code),
+                "severity": "block",
+                "summary": "叙事控制存在阻断；按错误码加载对应阶段卡。",
+            }
+        )
+    quality = packet.get("quality") if isinstance(packet.get("quality"), dict) else {}
+    if int(quality.get("failed_count") or 0) > 0:
+        attention.append(
+            {
+                "code": "QUALITY_GATE_FAILED",
+                "severity": "block",
+                "summary": "质量回执未通过，先修上游再重新生成。",
+            }
+        )
+    post = packet.get("post_audit") if isinstance(packet.get("post_audit"), dict) else {}
+    if int(post.get("hard_failure_count") or 0) > 0:
+        attention.append(
+            {
+                "code": "POST_AUDIT_FAILED",
+                "severity": "block",
+                "summary": "后期审计存在硬失败，禁止宣称 final_complete。",
+            }
+        )
+    if not packet.get("next_action"):
+        attention.append(
+            {
+                "code": "NO_EXECUTABLE_NEXT_ACTION",
+                "severity": "info",
+                "summary": "当前没有可直接执行的结构化动作；读取 next_why 或完整回执。",
+            }
+        )
+    return attention[:8]
+
+
+def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
+    """Project the full audit packet into the default agent-facing schema."""
+    attention = _attention(packet)
+    issue_codes = [item["code"] for item in attention]
+    action = packet.get("next_action") if isinstance(packet.get("next_action"), dict) else {}
+    refs = select_context_refs(
+        craft_stage=str(packet.get("craft_stage") or "idea"),
+        pipeline_stage=str(packet.get("pipeline_stage") or "agent"),
+        skill_id=str(action.get("skill_id") or ""),
+        issue_codes=issue_codes,
+    )
+    full_bytes = _json_bytes(packet)
+    base_metrics = packet.get("metrics") if isinstance(packet.get("metrics"), dict) else {}
+    compact = {
+        "ok": bool(packet.get("ok")),
+        "kind": "ai-film-dispatch",
+        "schema_version": 3,
+        "full_schema_version": packet.get("schema_version"),
+        "mode": "compact",
+        "at": packet.get("at"),
+        "root": packet.get("root"),
+        "craft_stage": packet.get("craft_stage"),
+        "pipeline_stage": packet.get("pipeline_stage"),
+        "next_id": packet.get("next_id"),
+        "next_cmd": _bounded_text(packet.get("next_cmd"), max_bytes=1536),
+        "next_why": _bounded_text(packet.get("next_why"), max_bytes=768),
+        "next_action": _compact_action(action),
+        "attention": attention,
+        "hard_gate_codes": HARD_GATE_CODES,
+        "context_refs": refs,
+        "state_hash": packet.get("state_hash"),
+        "receipt_path": packet.get("receipt_path"),
+        "metrics": {
+            "build_elapsed_ms": base_metrics.get("build_elapsed_ms"),
+            "state_cache_hit": bool(base_metrics.get("state_cache_hit")),
+            "capability_cache_hit": bool(base_metrics.get("capability_cache_hit")),
+            "full_bytes": full_bytes,
+            "output_bytes": 0,
+            "estimated_tokens": 0,
+            "context_ref_count": len(refs),
+            "context_ref_bytes": sum(int(ref.get("bytes") or 0) for ref in refs),
+            "estimator": "utf8_bytes_div_4",
+        },
+    }
+    compact["metrics"]["output_bytes"] = _json_bytes(compact)
+    compact["metrics"]["estimated_tokens"] = estimated_tokens(compact)
+    compact["metrics"]["output_bytes"] = _json_bytes(compact)
+    if compact["metrics"]["output_bytes"] > 5000:
+        compact["next_cmd"] = _bounded_text(compact.get("next_cmd"), max_bytes=512)
+        compact["next_why"] = "内容过长；详见完整回执。"
+        compact["metrics"]["output_bytes"] = _json_bytes(compact)
+        compact["metrics"]["estimated_tokens"] = estimated_tokens(compact)
+        compact["metrics"]["output_bytes"] = _json_bytes(compact)
+    return compact
+
+
+def record_orchestration_metrics(root: Path, compact: dict[str, Any]) -> Path:
+    """Append only dispatch telemetry; never generation cost, prompts or credentials."""
+    root = Path(root).expanduser().resolve()
+    path = root / "receipts" / "orchestration-usage.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    metrics = compact.get("metrics") if isinstance(compact.get("metrics"), dict) else {}
+    record = {
+        "schema_version": 1,
+        "kind": "orchestration-usage",
+        "at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        "state_hash": compact.get("state_hash"),
+        "craft_stage": compact.get("craft_stage"),
+        "pipeline_stage": compact.get("pipeline_stage"),
+        "next_id": compact.get("next_id"),
+        "build_elapsed_ms": metrics.get("build_elapsed_ms"),
+        "state_cache_hit": bool(metrics.get("state_cache_hit")),
+        "capability_cache_hit": bool(metrics.get("capability_cache_hit")),
+        "full_bytes": metrics.get("full_bytes"),
+        "output_bytes": metrics.get("output_bytes"),
+        "estimated_tokens": metrics.get("estimated_tokens"),
+        "context_ref_count": metrics.get("context_ref_count"),
+        "context_ref_bytes": metrics.get("context_ref_bytes"),
+    }
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(path, flags, 0o600)
+    try:
+        os.write(fd, (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"))
+    finally:
+        os.close(fd)
+    return path

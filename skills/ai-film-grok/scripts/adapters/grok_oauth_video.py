@@ -66,6 +66,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--aspect", default="9:16")
     p.add_argument("--resolution", default="720p", choices=["480p", "720p", "1080p"])
     p.add_argument("--timeout", type=float, default=600.0)
+    p.add_argument("--root", default=None)
+    p.add_argument("--shot-id", default="")
+    p.add_argument("--job-id", default="")
     args = p.parse_args(argv)
 
     prompt = args.prompt
@@ -84,6 +87,9 @@ def main(argv: list[str] | None = None) -> int:
             aspect_ratio=args.aspect,
             resolution=args.resolution,
             timeout_sec=args.timeout,
+            usage_root=args.root,
+            shot_id=args.shot_id,
+            job_id=args.job_id,
         )
     except GrokOAuthError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))

@@ -33,6 +33,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--language", default="zh")
     p.add_argument("--speed", type=float, default=None)
     p.add_argument("--timestamps", action="store_true")
+    p.add_argument("--root", default=None)
+    p.add_argument("--shot-id", default="")
+    p.add_argument("--job-id", default="")
     args = p.parse_args(argv)
 
     text = args.text
@@ -50,6 +53,9 @@ def main(argv: list[str] | None = None) -> int:
             language=args.language,
             speed=args.speed,
             with_timestamps=bool(args.timestamps),
+            usage_root=args.root,
+            shot_id=args.shot_id,
+            job_id=args.job_id,
         )
     except GrokOAuthError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))

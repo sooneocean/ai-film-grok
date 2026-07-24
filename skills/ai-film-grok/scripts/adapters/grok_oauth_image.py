@@ -22,6 +22,9 @@ def main() -> int:
     p.add_argument("--out", required=True)
     p.add_argument("--model", default=None)
     p.add_argument("--aspect", default="9:16")
+    p.add_argument("--root", default=None)
+    p.add_argument("--shot-id", default="")
+    p.add_argument("--job-id", default="")
     p.add_argument("--doctor", action="store_true")
     args = p.parse_args()
     if args.doctor:
@@ -35,6 +38,9 @@ def main() -> int:
             out=Path(args.out),
             model=args.model,
             aspect_ratio=args.aspect,
+            usage_root=args.root,
+            shot_id=args.shot_id,
+            job_id=args.job_id,
         )
     except GrokOAuthError as exc:
         print(f"error: {exc}", file=sys.stderr)

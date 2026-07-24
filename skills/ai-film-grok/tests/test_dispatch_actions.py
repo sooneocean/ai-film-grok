@@ -34,3 +34,15 @@ def test_structured_next_action_rejects_comments_and_placeholders() -> None:
         structured_next_action({"id": "bulk", "cmd": 'aifilm media --shot-id <id> --prompt "…"'})
         is None
     )
+
+
+def test_structured_next_action_fails_closed_for_human_and_external_commands() -> None:
+    for action_id, cmd in (
+        ("pilot-approve", 'aifilm pilot approve --root "/film" --user-phrase ok'),
+        ("review-final", 'aifilm review-final --root "/film" --approve'),
+        ("grok-video", 'aifilm grok-oauth video --root "/film"'),
+        ("render", 'aifilm final --root "/film"'),
+    ):
+        action = structured_next_action({"id": action_id, "cmd": cmd})
+        assert action["approval_class"] == "human_required"
+        assert action["spend_class"] in {"local", "external", "paid"}

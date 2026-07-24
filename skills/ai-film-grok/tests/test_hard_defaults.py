@@ -21,8 +21,12 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from director_review import SCORECARD_DIMENSIONS  # noqa: E402
-from edit_policy import DEFAULT_SEX_DURATION_FLOOR, HOT_SEX_DURATION_FLOOR, lint_heat_arc  # noqa: E402
-from media_qa import STILL_MIN_WIDTH_9_16, STILL_MIN_HEIGHT_9_16  # noqa: E402
+from edit_policy import (  # noqa: E402
+    DEFAULT_SEX_DURATION_FLOOR,
+    HOT_SEX_DURATION_FLOOR,
+    lint_heat_arc,
+)
+from media_qa import STILL_MIN_HEIGHT_9_16, STILL_MIN_WIDTH_9_16  # noqa: E402
 from state_index_gate import UNDRESS_STATES, WARDROBE_RANK  # noqa: E402
 
 

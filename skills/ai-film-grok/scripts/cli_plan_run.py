@@ -8,6 +8,7 @@ from typing import Any
 
 from intake import validate_intake
 from story_plan import run_plan
+from story_reception import ReceptionError, load_story_reception
 
 
 class PlanRunError(RuntimeError):
@@ -50,6 +51,26 @@ def run_from_intake(args: Namespace, root: Path) -> tuple[dict[str, Any], int]:
 
 
 def run(args: Namespace, root: Path) -> tuple[dict[str, Any], int]:
+    received_file = getattr(args, "received_file", None)
+    if received_file:
+        try:
+            reception = load_story_reception(Path(str(received_file)))
+        except ReceptionError as exc:
+            raise PlanRunError(str(exc)) from exc
+        from narrative_control import control_status
+
+        if "story" in set(control_status(root).get("locked_scopes") or []):
+            raise PlanRunError("story is locked; unlock story before applying a revised reception")
+        source = reception["source"]
+        return _run_raw(
+            args,
+            root,
+            str(reception["treatment"]["planning_text"]),
+            {},
+            source_path=str(Path(str(received_file)).expanduser().resolve()),
+            source_evidence_refs=[str(source["source_ref"])],
+            reception=reception,
+        )
     file_path = getattr(args, "file", None)
     if file_path:
         source = Path(str(file_path)).expanduser().resolve()
@@ -72,6 +93,7 @@ def _run_raw(
     *,
     source_path: str,
     source_evidence_refs: list[str] | None = None,
+    reception: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], int]:
     report = run_plan(
         root,
@@ -85,5 +107,6 @@ def _run_raw(
         seed_bible=not bool(getattr(args, "no_bible", False)),
         character_id_overrides=character_id_overrides,
         source_evidence_refs=source_evidence_refs,
+        reception=reception,
     )
     return report, 0 if report.get("ok") else 1

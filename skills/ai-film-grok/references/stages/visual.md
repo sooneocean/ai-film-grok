@@ -1,0 +1,11 @@
+# Visual 阶段卡
+
+先验后生：静帧、身份、状态、几何未过闸，不得进入 I2V。
+
+- 有角色的 still 使用已批准 cast/face/state 来源；禁止从零抽脸绕过 moderated 结果。
+- 9:16 keyframe 至少 720×1280；禁止横图、缩略图和压糊来源。
+- `state-index check|plan` 先于 bulk；衣着状态只前进，已脱不得回穿。
+- Continue 镜使用已批准末帧作为下一镜输入，按实际姿势、服装与视线接戏。
+- pilot 必须由用户批准；付费或外部生成必须实时 capability 检查。
+
+深入资料：[consistency.md](../consistency.md) · [keyframe-first-state-index.md](../keyframe-first-state-index.md) · [i2v-grok-primary.md](../i2v-grok-primary.md) · [frw-degrade-dispatch.md](../frw-degrade-dispatch.md)

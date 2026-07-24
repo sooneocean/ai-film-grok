@@ -158,7 +158,7 @@ class MediaQueue:
                     )
                 )
         terminal = sum(counts.get(status, 0) for status in TERMINAL_STATUSES)
-        return {
+        result = {
             "counts": counts,
             "jobs": len(state["jobs"]),
             "attempts": attempts,
@@ -175,6 +175,20 @@ class MediaQueue:
                 - len(state["jobs"]),
             ),
         }
+        try:
+            from generation_usage import usage_status
+
+            usage = usage_status(self.root)
+            result["actual_generation_requests"] = usage.get("requests_total", 0)
+            result["actual_generation_status_counts"] = usage.get("status_counts", {})
+            result["actual_generation_unknown_cost_requests"] = usage.get(
+                "unknown_cost_requests", 0
+            )
+        except (OSError, ValueError):
+            result["actual_generation_requests"] = 0
+            result["actual_generation_status_counts"] = {}
+            result["actual_generation_unknown_cost_requests"] = 0
+        return result
 
     def add_job(
         self,
@@ -450,6 +464,7 @@ class MediaQueue:
         output: Path,
         endpoint: str,
         provider_request_id: str | None = None,
+        generation_id: str | None = None,
     ) -> dict[str, Any]:
         media = output.expanduser().resolve()
         if endpoint not in ALLOWED_VIDEO_ENDPOINTS:
@@ -471,6 +486,7 @@ class MediaQueue:
             job["receipt"] = {
                 "endpoint": endpoint,
                 "provider_request_id": provider_request_id,
+                "generation_id": generation_id,
                 "output": str(media),
                 "output_sha256": sha256(media),
                 "qa": qa,
@@ -561,6 +577,7 @@ def main(argv: list[str] | None = None) -> int:
     complete.add_argument("--output", required=True)
     complete.add_argument("--endpoint", required=True, choices=sorted(ALLOWED_VIDEO_ENDPOINTS))
     complete.add_argument("--provider-request-id")
+    complete.add_argument("--generation-id")
     fail = sub.add_parser("fail")
     fail.add_argument("--root", required=True)
     fail.add_argument("--job-id", required=True)
@@ -624,6 +641,7 @@ def main(argv: list[str] | None = None) -> int:
                 output=Path(args.output),
                 endpoint=args.endpoint,
                 provider_request_id=args.provider_request_id,
+                generation_id=args.generation_id,
             )
         elif args.command == "fail":
             result = queue.fail(
