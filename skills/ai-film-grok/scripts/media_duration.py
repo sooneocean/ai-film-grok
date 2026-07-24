@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from cache import ContentCache
 from media_probe import MediaProbeError, probe_media
 
 
@@ -22,6 +23,7 @@ def probe_duration_sec(
     *,
     label: str = "media",
     min_sec: float = 0.01,
+    cache_root: Path | str | None = None,
 ) -> float:
     """Return media duration in seconds. Raises MediaDurationError on any failure."""
     p = Path(path).expanduser()
@@ -33,6 +35,25 @@ def probe_duration_sec(
         raise MediaDurationError(f"{label}: cannot stat {p}: {exc}") from exc
     if size <= 0:
         raise MediaDurationError(f"{label}: empty file (0 bytes): {p}")
+
+    cache: ContentCache | None = None
+    cache_key: str | None = None
+    if cache_root is not None:
+        try:
+            cache = ContentCache(cache_root, namespace="media-duration")
+            cache_key = ContentCache.key(
+                f"{ContentCache.file_fingerprint(p)}|{label}|{min_sec:.9f}"
+            )
+            cached = cache.get_json(cache_key)
+            if cached is not None:
+                duration = float(cached.get("duration_sec"))
+                if duration >= min_sec:
+                    return duration
+        except (OSError, TypeError, ValueError, KeyError):
+            # Cache is an optimization only; an unusable cache must never
+            # weaken the fail-loud media probe contract.
+            cache = None
+            cache_key = None
 
     try:
         report = probe_media(p)
@@ -49,6 +70,8 @@ def probe_duration_sec(
         raise MediaDurationError(f"{label}: invalid duration {dur} for {p}")
     if dur < min_sec:
         raise MediaDurationError(f"{label}: duration {dur}s below min {min_sec}s for {p}")
+    if cache is not None and cache_key is not None:
+        cache.put_json(cache_key, {"duration_sec": float(dur), "path": str(p)})
     return float(dur)
 
 

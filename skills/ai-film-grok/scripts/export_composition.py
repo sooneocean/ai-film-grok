@@ -30,6 +30,7 @@ from security_policy import (
     safe_existing_file,
     safe_workspace_directory,
 )
+from util import read_json as _util_read_json
 from util import utc_now, write_json
 
 SCHEMA_VERSION = 1
@@ -56,9 +57,11 @@ def write_text(path: Path, text: str) -> None:
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
+    """Strict read_json — raises ComposeExportError on missing (unlike util.read_json's None)."""
+    data = _util_read_json(path)
+    if data is None:
         raise ComposeExportError(f"Missing JSON: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return data
 
 
 def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:

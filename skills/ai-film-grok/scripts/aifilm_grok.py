@@ -59,6 +59,7 @@ from security_policy import (
     safe_workspace_directory,
     validate_identifier,
 )
+from util import read_json as _util_read_json
 from util import sha256_file, utc_now, write_json
 from util.errors import FilmError  # noqa: E402 — re-exported for backward compat
 
@@ -92,9 +93,11 @@ EXPORT_METADATA_FILES = (
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
+    """Strict read_json — raises FilmError on missing file (unlike util.read_json's None)."""
+    data = _util_read_json(path)
+    if data is None:
         raise FilmError(f"Missing JSON: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return data
 
 
 def slugify(text: str) -> str:
@@ -3052,6 +3055,10 @@ def cmd_final(args: argparse.Namespace) -> int:
         cmd += ["--allow-loop-risk"]
     if getattr(args, "vo_fit", None):
         cmd += ["--vo-fit", str(args.vo_fit)]
+    if bool(getattr(args, "resume", False)):
+        cmd += ["--resume"]
+    if bool(getattr(args, "force", False)):
+        cmd += ["--force"]
     cmd += ["--subs", subs_mode]
     cmd += ["--plate-cards", plate_cards]
     log(
@@ -5852,6 +5859,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     fin.add_argument("--root", required=True)
     fin.add_argument("--out-name", default="film_final.mp4")
+    fin.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume valid per-shot stretch/lipsync checkpoints from receipts/checkpoints/",
+    )
+    fin.add_argument(
+        "--force",
+        action="store_true",
+        help="Clear per-shot final-render checkpoints before rendering",
+    )
     fin.add_argument("--transition-sec", type=float, default=None, help="Inter-shot xfade seconds")
     fin.add_argument(
         "--allow-loop-risk",
@@ -7029,44 +7046,75 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.cmd == "doctor":
-            return cmd_doctor(args)
-        if args.cmd == "lock-runtime":
-            return cmd_lock_runtime(args)
-        if args.cmd == "review-shot":
-            return cmd_review_shot(args)
-        if args.cmd == "review-contract":
-            return cmd_review_contract(args)
-        if args.cmd == "frw-lipsync":
-            return cmd_frw_lipsync(args)
-        if args.cmd == "env-plate":
-            return cmd_env_plate(args)
-        if args.cmd == "motion-plan":
-            return cmd_motion_plan(args)
-        if args.cmd == "grok-oauth":
-            return cmd_grok_oauth(args)
-        if args.cmd == "dispatch":
-            return cmd_dispatch(args)
-        if args.cmd == "advance":
-            return cmd_advance(args)
-        if args.cmd == "craft":
-            return cmd_craft(args)
-        if args.cmd == "selects":
-            return cmd_selects(args)
-        if args.cmd == "audio-plan":
-            return cmd_audio_plan(args)
-        if args.cmd == "lipsync-canary":
-            return cmd_lipsync_canary(args)
-        if args.cmd == "capability":
-            return cmd_capability(args)
-        if args.cmd == "tts-ab":
-            return cmd_tts_ab(args)
-        if args.cmd == "init":
-            return cmd_init(args)
-        if args.cmd == "status":
-            return cmd_status(args)
-        if args.cmd == "production-evidence":
-            return cmd_production_evidence(args)
+        # Fast dispatch: simple one-command → one-handler (61 commands).
+        # Inline branches below handle lazy imports / sub-actions.
+        _SIMPLE_DISPATCH: dict[str, argparse.Namespace] = {
+            "doctor": cmd_doctor,
+            "lock-runtime": cmd_lock_runtime,
+            "review-shot": cmd_review_shot,
+            "review-contract": cmd_review_contract,
+            "frw-lipsync": cmd_frw_lipsync,
+            "env-plate": cmd_env_plate,
+            "motion-plan": cmd_motion_plan,
+            "grok-oauth": cmd_grok_oauth,
+            "dispatch": cmd_dispatch,
+            "advance": cmd_advance,
+            "craft": cmd_craft,
+            "selects": cmd_selects,
+            "audio-plan": cmd_audio_plan,
+            "lipsync-canary": cmd_lipsync_canary,
+            "capability": cmd_capability,
+            "tts-ab": cmd_tts_ab,
+            "init": cmd_init,
+            "status": cmd_status,
+            "production-evidence": cmd_production_evidence,
+            "stage": cmd_stage,
+            "write-spec": cmd_write_spec,
+            "lint-continuity": cmd_lint_continuity,
+            "extract-frame": cmd_extract_frame,
+            "continuity-chain": cmd_continuity_chain,
+            "lock-style": cmd_lock_style,
+            "style-lock": cmd_style_lock,
+            "face-identity": cmd_face_identity,
+            "register-still": cmd_register_still,
+            "tts-rehearse": cmd_tts_rehearse,
+            "register-clip": cmd_register_clip,
+            "assemble": cmd_assemble,
+            "ingest-footage": cmd_ingest_footage,
+            "auto-cut": cmd_auto_cut,
+            "reencode-clips": cmd_reencode_clips,
+            "final": cmd_final,
+            "review-final": cmd_review_final,
+            "benchmark": cmd_benchmark,
+            "creative-pipeline": cmd_creative_pipeline,
+            "dailies": cmd_dailies,
+            "post-quality": cmd_post_quality,
+            "provider-canary": cmd_provider_canary,
+            "delivery-package": cmd_delivery_package,
+            "quality-closure": cmd_quality_closure,
+            "director-notes": cmd_director_notes,
+            "next": cmd_next,
+            "preflight": cmd_preflight,
+            "quality": cmd_quality,
+            "heat": cmd_heat,
+            "state-index": cmd_state_index,
+            "pilot": cmd_pilot,
+            "compose-preview": cmd_compose_preview,
+            "export-compose": cmd_export_compose,
+            "compose-render": cmd_compose_render,
+            "register-final": cmd_register_final,
+            "export-desktop": cmd_export_desktop,
+            "frw": cmd_frw,
+            "director": cmd_director,
+            "department": cmd_department,
+            "plan": cmd_plan,
+            "assets": cmd_assets,
+            "usage": cmd_generation_usage,
+        }
+        handler = _SIMPLE_DISPATCH.get(args.cmd)
+        if handler is not None:
+            return handler(args)
+
         if args.cmd == "narrative-evidence":
             from narrative_evidence import (
                 NarrativeEvidenceError,
@@ -7114,22 +7162,6 @@ def main(argv: list[str] | None = None) -> int:
 
             emit(attest_caption_readability(Path(args.root), user_phrase=args.user_phrase))
             return 0
-        if args.cmd == "stage":
-            return cmd_stage(args)
-        if args.cmd == "write-spec":
-            return cmd_write_spec(args)
-        if args.cmd == "lint-continuity":
-            return cmd_lint_continuity(args)
-        if args.cmd == "extract-frame":
-            return cmd_extract_frame(args)
-        if args.cmd == "continuity-chain":
-            return cmd_continuity_chain(args)
-        if args.cmd == "lock-style":
-            return cmd_lock_style(args)
-        if args.cmd == "style-lock":
-            return cmd_style_lock(args)
-        if args.cmd == "face-identity":
-            return cmd_face_identity(args)
         if args.cmd == "bible":
             root = Path(args.root).expanduser().resolve()
             if args.bible_cmd == "init":
@@ -7149,24 +7181,6 @@ def main(argv: list[str] | None = None) -> int:
                 update_bible_state(root, args.set)
                 emit({"ok": True, "msg": f"Visual Bible state updated to {args.set}"})
             return 0
-        if args.cmd == "register-still":
-            return cmd_register_still(args)
-        if args.cmd == "tts-rehearse":
-            return cmd_tts_rehearse(args)
-        if args.cmd == "register-clip":
-            return cmd_register_clip(args)
-        if args.cmd == "assemble":
-            return cmd_assemble(args)
-        if args.cmd == "ingest-footage":
-            return cmd_ingest_footage(args)
-        if args.cmd == "auto-cut":
-            return cmd_auto_cut(args)
-        if args.cmd == "reencode-clips":
-            return cmd_reencode_clips(args)
-        if args.cmd == "final":
-            return cmd_final(args)
-        if args.cmd == "review-final":
-            return cmd_review_final(args)
         if args.cmd == "performance-timeline":
             from performance_timeline import build_performance_timeline
 
@@ -7218,20 +7232,6 @@ def main(argv: list[str] | None = None) -> int:
                 raise FilmError(str(exc)) from exc
             emit(report)
             return 0 if report["passed"] else 1
-        if args.cmd == "benchmark":
-            return cmd_benchmark(args)
-        if args.cmd == "creative-pipeline":
-            return cmd_creative_pipeline(args)
-        if args.cmd == "dailies":
-            return cmd_dailies(args)
-        if args.cmd == "post-quality":
-            return cmd_post_quality(args)
-        if args.cmd == "provider-canary":
-            return cmd_provider_canary(args)
-        if args.cmd == "delivery-package":
-            return cmd_delivery_package(args)
-        if args.cmd == "quality-closure":
-            return cmd_quality_closure(args)
         if args.cmd == "analyze-reference":
             from reference_audit import ReferenceAuditError, run_reference_audit
 
@@ -7299,8 +7299,6 @@ def main(argv: list[str] | None = None) -> int:
 
             emit(planning_history_summary(Path(args.root)))
             return 0
-        if args.cmd == "usage":
-            return cmd_generation_usage(args)
         if args.cmd == "prompt-budget":
             from prompt_budget import prompt_budget_report
 
@@ -7338,14 +7336,6 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0
-        if args.cmd == "director-notes":
-            return cmd_director_notes(args)
-        if args.cmd == "next":
-            return cmd_next(args)
-        if args.cmd == "preflight":
-            return cmd_preflight(args)
-        if args.cmd == "quality":
-            return cmd_quality(args)
         if args.cmd == "beat-evidence":
             from beat_action_evidence import build_beat_action_evidence
 
@@ -7364,24 +7354,6 @@ def main(argv: list[str] | None = None) -> int:
             report = build_audio_visual_alignment(Path(args.root))
             emit(report)
             return 0 if report["ok"] else 2
-        if args.cmd == "heat":
-            return cmd_heat(args)
-        if args.cmd == "state-index":
-            return cmd_state_index(args)
-        if args.cmd == "pilot":
-            return cmd_pilot(args)
-        if args.cmd == "compose-preview":
-            return cmd_compose_preview(args)
-        if args.cmd == "export-compose":
-            return cmd_export_compose(args)
-        if args.cmd == "compose-render":
-            return cmd_compose_render(args)
-        if args.cmd == "register-final":
-            return cmd_register_final(args)
-        if args.cmd == "export-desktop":
-            return cmd_export_desktop(args)
-        if args.cmd == "frw":
-            return cmd_frw(args)
         if args.cmd == "graph":
             # allow --no-derive to flip auto_derive off for status
             if getattr(args, "graph_action", None) == "status" and bool(
@@ -7389,10 +7361,6 @@ def main(argv: list[str] | None = None) -> int:
             ):
                 args.derive_if_missing = False
             return cmd_graph(args)
-        if args.cmd == "director":
-            return cmd_director(args)
-        if args.cmd == "department":
-            return cmd_department(args)
         if args.cmd == "skill":
             if args.skill_action == "run":
                 from skill_runner import run_skill
@@ -7401,10 +7369,6 @@ def main(argv: list[str] | None = None) -> int:
                 emit(report)
                 return 0 if report.get("ok") else 2
             return cmd_skill(args)
-        if args.cmd == "plan":
-            return cmd_plan(args)
-        if args.cmd == "assets":
-            return cmd_assets(args)
         raise FilmError(f"Unknown command {args.cmd}")
     except FilmError as exc:
         emit({"ok": False, "error": str(exc)})

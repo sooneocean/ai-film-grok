@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from checkpoint import CheckpointManager
 from edit_policy import (
     DEFAULT_TRANSITION_SEC,
     PolicyError,
@@ -61,6 +62,7 @@ from sound_plan import (
     sidechain_filter_fragment,
     validate_audio_tracks_contract,
 )
+from util import read_json as _util_read_json
 from util import utc_now, write_json
 
 # local sibling import
@@ -152,7 +154,15 @@ class RenderError(RuntimeError):
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    """Read JSON — delegates to util.read_json, raises on missing/invalid."""
+    data = _util_read_json(path)
+    if data is None:
+        # util.read_json returns None for missing/invalid; render_final callers
+        # expect an exception (original raised FileNotFoundError/JSONDecodeError)
+        if not path.is_file():
+            raise FileNotFoundError(f"Missing JSON: {path}")
+        raise ValueError(f"Invalid JSON: {path}")
+    return data
 
 
 def log(msg: str) -> None:
@@ -1904,6 +1914,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     keyframes_dir = paths["keyframes_dir"]
     work = paths["work"]
     overlays_dir = work / "overlays"
+    checkpoint = CheckpointManager(root)
+    if bool(getattr(args, "force", False)):
+        checkpoint.clear()
+    resume = bool(getattr(args, "resume", False))
 
     # 1) Per-shot TTS
     shot_audio: list[dict[str, Any]] = []
@@ -2152,9 +2166,35 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     shots_by_id = {shot.get("id"): shot for shot in shots}
     for i, item in enumerate(shot_audio):
         out = work / f"v_{i:02d}_{item['id']}.mp4"
-        log(f"stretch {item['id']} -> {item['target']:.2f}s")
         shot_meta = shots_by_id.get(item["id"], {})
         beat = shot_meta.get("dramatic_function") if isinstance(shot_meta, dict) else None
+        checkpoint_signature = checkpoint.signature(
+            item["clip"],
+            target=float(item["target"]),
+            width=width,
+            height=height,
+            fps=fps,
+            lipsync=lipsync_mode,
+            in_point_sec=item.get("in_point_sec"),
+            out_point_sec=item.get("out_point_sec"),
+        )
+        if resume:
+            cached = checkpoint.get(item["id"], checkpoint_signature)
+            if cached is not None:
+                metadata = (
+                    cached.get("metadata") if isinstance(cached.get("metadata"), dict) else {}
+                )
+                item["stretch_plan"] = metadata.get("stretch_plan")
+                if metadata.get("target") is not None:
+                    item["target"] = float(metadata["target"])
+                cached_lipsync = metadata.get("lipsync")
+                if isinstance(cached_lipsync, dict) and cached_lipsync.get("id"):
+                    lipsync_report.append(cached_lipsync)
+                cached_output = Path(str(cached["output"]))
+                stretched.append(cached_output)
+                log(f"resume {item['id']} -> {cached_output.name}")
+                continue
+        log(f"stretch {item['id']} -> {item['target']:.2f}s")
         stretch_plan = stretch_clip(
             item["clip"],
             out,
@@ -2256,6 +2296,19 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                     raise RenderError(f"lipsync failed for {item['id']}: {exc}") from exc
                 log(f"lipsync skip {item['id']}: {exc}")
         stretched.append(out)
+        checkpoint.mark_done(
+            item["id"],
+            signature=checkpoint_signature,
+            output=out,
+            metadata={
+                "target": item["target"],
+                "stretch_plan": item.get("stretch_plan"),
+                "lipsync": next(
+                    (entry for entry in reversed(lipsync_report) if entry.get("id") == item["id"]),
+                    None,
+                ),
+            },
+        )
 
     # 3) Title / end cards
     # plate_cards=blank: keep pad duration for VO/SRT clock, no burned glyphs
@@ -3377,6 +3430,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Export isolated VO, BGM, and SFX stems",
     )
     p.add_argument("--fps", type=int)
+    p.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume valid shot stretch/lipsync checkpoints; stale or missing outputs rerun",
+    )
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="Clear shot checkpoints before rendering",
+    )
     args = p.parse_args(argv)
     try:
         # Explicit --music still requires license text OR sidecar (checked inside resolve)

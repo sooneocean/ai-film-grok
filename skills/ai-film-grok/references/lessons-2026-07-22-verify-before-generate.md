@@ -1,11 +1,14 @@
 # Lesson 2026-07-22 · 先验后生 · 算力放在刀口上（Verify Before Generate）
 
-> **触发原话**（续 EP01 压缩 still 案）：  
-> 「对的验证完再生成视频 图片也是一样逻辑 这样才能把算力放在刀口上 重复生成的成本过高 请写入教训」  
-> **P 码**：**P0 工序/成本** · Visualize → Generate  
-> **互补**：  
-> - [keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md) → 几何/压缩硬指标  
-> - [keyframe-first-frame-poison](lessons-2026-07-21-keyframe-first-frame-poison.md) → 结构/解剖  
+> **已晋升**：本规则已整合进稳定文档 [production-discipline.md](production-discipline.md) §先验后生。
+> 此 lesson 保留为踩坑历史记录，新代码/文档请引用稳定版本。
+
+> **触发原话**（续 EP01 压缩 still 案）：
+> 「对的验证完再生成视频 图片也是一样逻辑 这样才能把算力放在刀口上 重复生成的成本过高 请写入教训」
+> **P 码**：**P0 工序/成本** · Visualize → Generate
+> **互补**：
+> - [keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md) → 几何/压缩硬指标
+> - [keyframe-first-frame-poison](lessons-2026-07-21-keyframe-first-frame-poison.md) → 结构/解剖
 > - [consistency.md](consistency.md) · pilot 批准  
 
 ---

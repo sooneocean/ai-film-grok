@@ -71,3 +71,17 @@ aifilm grok-oauth video --root "<film-root>" --shot-id shot01 \
 
 旧项目没有账本时，`usage status` 返回 `tracking_not_started`，不会伪造历史
 或阻断 dispatch/final。
+
+## 队列绑定与重试证据
+
+媒体队列在 `complete --generation-id` 时会读取同一 film root 的账本，并要求：
+
+- `generation_id` 恰好对应一条记录；
+- 记录的 `job_id` 与队列 job 相同（旧记录未填 job id 时仍可兼容）；
+- provider 请求已经进入 `succeeded`、`failed` 或 `moderated` 终态；
+- 只有 `succeeded` 才能把媒体标记为队列成功，并把用量、provider request id、成本 ticks
+  写进 `media-queue.json` 的 `receipt.generation_usage`。
+
+队列每次自动失败或人工 requeue 都追加 `retry_history`，记录 attempt、标准化失败原因、
+是否可重试、退避时间和错误摘要。这样可以区分“重新计算了媒体”与“只是重新提交了同一请求”，
+也能在成本回读时把 provider 请求数与最终媒体 job 对上。

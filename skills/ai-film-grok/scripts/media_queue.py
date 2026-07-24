@@ -48,6 +48,35 @@ class QueueError(RuntimeError):
     pass
 
 
+def _usage_binding(root: Path, generation_id: str, job_id: str) -> dict[str, Any]:
+    """Require a completed usage record before binding provider media to a job."""
+    try:
+        from generation_usage import usage_list
+
+        records = usage_list(root, generation_id=generation_id).get("records") or []
+    except (OSError, ValueError) as exc:
+        raise QueueError(f"cannot read generation usage for {generation_id}: {exc}") from exc
+    if len(records) != 1 or not isinstance(records[0], dict):
+        raise QueueError(f"generation usage receipt missing for {generation_id}")
+    record = records[0]
+    recorded_job = record.get("job_id")
+    if recorded_job not in {None, "", job_id}:
+        raise QueueError(
+            f"generation {generation_id} belongs to job {recorded_job!r}, not {job_id!r}"
+        )
+    if record.get("status") not in {"succeeded", "failed", "moderated"}:
+        raise QueueError(f"generation {generation_id} is not terminal in usage receipt")
+    usage = record.get("usage") if isinstance(record.get("usage"), dict) else {}
+    return {
+        "generation_id": generation_id,
+        "status": record.get("status"),
+        "measurement": record.get("measurement", "unknown"),
+        "provider_request_id": record.get("provider_request_id"),
+        "usage": usage,
+        "cost_in_usd_ticks": usage.get("cost_in_usd_ticks"),
+    }
+
+
 def normalize_fail_reason(value: object) -> str:
     """Map free-text or enum to a FAIL_REASONS member."""
     if value is None or (isinstance(value, str) and not value.strip()):
@@ -412,6 +441,17 @@ class MediaQueue:
                 )
             else:
                 job["status"] = STATUS_FAILED
+            job.setdefault("retry_history", []).append(
+                {
+                    "attempt": attempts,
+                    "reason": reason_norm,
+                    "retryable": bool(retryable),
+                    "status_after": job["status"],
+                    "next_attempt_at": job.get("next_attempt_at"),
+                    "error": str(error)[:1000],
+                    "recorded_at": utc_now(),
+                }
+            )
             job.pop("claim_token", None)
             self._write(state)
             return job
@@ -450,6 +490,17 @@ class MediaQueue:
             if reset_attempts:
                 job["attempts"] = 0
             job["requeued_at"] = current.replace(microsecond=0).isoformat()
+            job.setdefault("retry_history", []).append(
+                {
+                    "attempt": int(job.get("attempts") or 0),
+                    "reason": normalize_fail_reason(reason) if reason is not None else None,
+                    "retryable": True,
+                    "status_after": STATUS_PENDING,
+                    "next_attempt_at": job["next_attempt_at"],
+                    "manual": True,
+                    "recorded_at": utc_now(),
+                }
+            )
             self._write(state)
             return job
 
@@ -478,6 +529,13 @@ class MediaQueue:
                 raise QueueError(
                     f"job operation {job.get('operation')} does not match endpoint {endpoint}"
                 )
+            usage_binding = None
+            if generation_id:
+                usage_binding = _usage_binding(self.root, generation_id, job_id)
+                if usage_binding["status"] != STATUS_SUCCEEDED:
+                    raise QueueError(
+                        f"generation {generation_id} ended as {usage_binding['status']}, not succeeded"
+                    )
             job["status"] = STATUS_SUCCEEDED
             job["completed_at"] = utc_now()
             job["receipt"] = {
@@ -488,6 +546,9 @@ class MediaQueue:
                 "output_sha256": sha256(media),
                 "qa": qa,
             }
+            if usage_binding is not None:
+                job["receipt"]["generation_usage"] = usage_binding
+            job["attempts_completed"] = int(job.get("attempts") or 0)
             job.pop("claim_token", None)
             self._write(state)
             return job
