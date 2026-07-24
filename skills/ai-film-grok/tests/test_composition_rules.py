@@ -27,6 +27,7 @@ from framing_lint import (
     lint_composition_rules,
 )
 
+
 class TestPanelSchemaFields:
     """Panel schema has new storyboard fields."""
 
@@ -232,7 +233,7 @@ class TestWriteSpecCompositionGate:
             validate_film_spec(spec, assign_missing_ids=False)
 
     def test_non_strict_no_raise_on_axis_break(self):
-        from film_spec import FilmSpecError, validate_film_spec
+        from film_spec import validate_film_spec
 
         shots = [
             _comp_shot("s1", look_axis="left", shot_size="wide"),
@@ -245,7 +246,7 @@ class TestWriteSpecCompositionGate:
         assert not pcr.get("ok", True)
 
     def test_strict_passes_on_clean_shots(self):
-        from film_spec import FilmSpecError, validate_film_spec
+        from film_spec import validate_film_spec
 
         shots = [
             _comp_shot("s1", look_axis="left", shot_size="wide"),
@@ -310,4 +311,3 @@ class TestPreflightCompositionGate:
         rep = preflight.run_preflight(root)
         all_codes = [i["code"] for i in rep["hard"]] + [i["code"] for i in rep["soft"]]
         assert "composition_rules_violation" not in all_codes
-
