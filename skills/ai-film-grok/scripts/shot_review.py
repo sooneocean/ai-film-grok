@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +18,7 @@ from performance_evidence import (
 )
 from security_policy import minimal_subprocess_env, validate_identifier
 from util import read_json, write_json
+from util import sha256_file as _sha256
 
 # Core five always required; coitus optional (act/climax mute-frame when scored)
 CORE_REVIEW_DIMENSIONS = (
@@ -38,14 +38,6 @@ class ShotReviewError(ValueError):
 
 def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def review_dir(root: Path) -> Path:

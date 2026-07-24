@@ -18,6 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from security_policy import minimal_subprocess_env
+
 
 def _parse_ts(s: str) -> float:
     h, m, rest = s.split(":")
@@ -117,7 +119,7 @@ def main() -> int:
             "copy",
             str(out_path),
         ]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        r = subprocess.run(cmd, capture_output=True, text=True, env=minimal_subprocess_env())
         if r.returncode != 0:
             sys.stderr.write(r.stderr[-3000:])
             return r.returncode

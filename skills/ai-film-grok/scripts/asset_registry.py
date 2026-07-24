@@ -8,11 +8,10 @@ Does not invent pixels — only registry slots, variants, and consistency report
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from util import read_json, write_json
+from util import read_json, utc_now, write_json
 
 REGISTRY_NAME = "assets-registry.json"
 SCHEMA_VERSION = 1
@@ -35,10 +34,6 @@ DEFAULT_VARIANT_BLURBS = {
     "bare": "bare / minimal coverage",
     "default": "default wardrobe",
 }
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def registry_path(root: Path) -> Path:

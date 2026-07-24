@@ -20,7 +20,6 @@ import shutil
 import subprocess
 import sys
 import wave
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +61,7 @@ from sound_plan import (
     sidechain_filter_fragment,
     validate_audio_tracks_contract,
 )
+from util import utc_now, write_json
 
 # local sibling import
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -149,14 +149,6 @@ DEFAULT_SUB_MAX_CHARS = 12  # phrase-sized cue; long nar always splits at ï¼Œ/ã€
 
 class RenderError(RuntimeError):
     pass
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
-
-
-def write_json(path: Path, value: dict[str, Any]) -> None:
-    atomic_write_text(path, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
 
 
 def read_json(path: Path) -> dict[str, Any]:

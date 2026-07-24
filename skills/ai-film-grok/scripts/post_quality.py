@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from security_policy import minimal_subprocess_env
 from util import read_json, write_json
 
 
@@ -148,6 +149,7 @@ def premium_master_qc(root: Path | str, *, final: str | None = None) -> dict[str
                 text=True,
                 timeout=120,
                 check=False,
+                env=minimal_subprocess_env(),
             )
             data = json.loads(proc.stdout or "{}")
             streams = data.get("streams") or []

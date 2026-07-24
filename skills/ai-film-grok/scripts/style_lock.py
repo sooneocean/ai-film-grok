@@ -17,12 +17,13 @@ image_edit(cast|face-lock) for pixels; this locks the *language* and gates.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from util import sha256_file as _sha256
+from util import utc_now
 
 # ---------------------------------------------------------------------------
 # Medium presets — the biggest lever for identity stability
@@ -145,10 +146,6 @@ _PHOTO_KEYS = (
     "电影感",
     "实拍",
 )
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _blob(*parts: str) -> str:
@@ -591,14 +588,6 @@ def _agent_checklist(medium_key: str, char_id: str, crops: dict[str, str]) -> li
     if crops.get("error"):
         steps.insert(1, f"Face auto-crop failed: {crops['error']} — crop manually")
     return steps
-
-
-def _sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with Path(path).open("rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def recommend_medium_for_user_goal(goal: str) -> dict[str, Any]:

@@ -10,7 +10,7 @@ from typing import Any
 
 from approval_ledger import approval_is_current, read_approval_ledger
 from media_probe import MediaProbeError, probe_media, verify_full_decode
-from util import sha256_file as _sha256_file
+from util import sha256_file
 
 REQUIRED_ASSETS = (
     "film_final.mp4",
@@ -24,10 +24,6 @@ REQUIRED_ASSETS = (
     "provenance.json",
     "receipts/approval-ledger.json",
 )
-
-
-def sha256_file(path: Path) -> str:
-    return _sha256_file(path)
 
 
 def parse_ffprobe(value: dict[str, Any] | str) -> dict[str, Any]:

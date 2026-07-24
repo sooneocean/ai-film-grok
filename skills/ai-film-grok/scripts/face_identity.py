@@ -20,11 +20,12 @@ post_audit reads ``verified``; use ``aifilm face-identity audit`` before final.
 
 from __future__ import annotations
 
-import hashlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from util import sha256_file as _sha256_file
+from util import utc_now
 
 RECEIPT_NAME = "face-identity.json"
 SCHEMA_VERSION = 1
@@ -36,18 +37,6 @@ DEFAULT_AHASH_MAX = 22
 DEFAULT_DHASH_MAX = 24
 # Histogram L1 distance after L1-normalize (0..2); face-region only
 DEFAULT_HIST_MAX = 0.72
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
-
-
-def _sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with Path(path).open("rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def _open_rgb(path: Path):

@@ -12,16 +12,15 @@ Supports:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from content_channels import resolve_content_channels
 from film_spec import estimate_nar_vo_sec, validate_film_spec
 from media_duration import MediaDurationError, probe_duration_sec
-from util import write_json
+from util import sha256_file as _sha256
+from util import utc_now, write_json
 
 SCHEMA_VERSION = 1
 KIND = "ai-film-tts-rehearsal"
@@ -31,18 +30,6 @@ AUDIO_DIR_REL = "receipts/tts-rehearsal-audio"
 
 class TTSRehearsalError(RuntimeError):
     pass
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def rehearsal_receipt_path(root: Path) -> Path:

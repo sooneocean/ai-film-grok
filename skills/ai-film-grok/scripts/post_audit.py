@@ -11,6 +11,7 @@ from typing import Any
 
 from director_review import open_reshoot_items
 from media_qa import analyze_media
+from security_policy import minimal_subprocess_env
 from util import read_json, write_json
 
 _SRT_TIME = re.compile(r"(\d{2}):(\d{2}):(\d{2})[,\.](\d{3})")
@@ -58,6 +59,7 @@ def _probe(path: Path) -> dict[str, Any]:
             text=True,
             timeout=15,
             check=False,
+            env=minimal_subprocess_env(),
         )
         return {
             "ok": proc.returncode == 0 and bool(proc.stdout.strip()),
@@ -361,6 +363,40 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
                 "message": "mix_report exists but contains no loudness measurement",
             }
         )
+
+    # P3-4: LUFS hard gate — when lufs_strict, out-of-range LUFS is a hard failure
+    spec_for_lufs = read_json(root / "film-spec.json") or {}
+    lufs_strict = (
+        bool(spec_for_lufs.get("lufs_strict")) if isinstance(spec_for_lufs, dict) else False
+    )
+    if loudness and isinstance(loudness, dict):
+        integrated_lufs = loudness.get("integrated") or loudness.get("integrated_lufs")
+        if integrated_lufs is not None:
+            lufs_val = float(integrated_lufs)
+            # EBU R128: integrated should be in [-23, -14] for streaming short-form
+            lufs_min = (
+                float(spec_for_lufs.get("lufs_min", -23))
+                if isinstance(spec_for_lufs, dict)
+                else -23.0
+            )
+            lufs_max = (
+                float(spec_for_lufs.get("lufs_max", -14))
+                if isinstance(spec_for_lufs, dict)
+                else -14.0
+            )
+            if lufs_val < lufs_min or lufs_val > lufs_max:
+                msg = (
+                    f"LUFS integrated={lufs_val:.1f} out of range [{lufs_min:.0f}, {lufs_max:.0f}]"
+                )
+                if lufs_strict:
+                    hard.append(
+                        {
+                            "code": "LUFS_OUT_OF_RANGE",
+                            "message": msg + " (lufs_strict=true → hard fail)",
+                        }
+                    )
+                else:
+                    warnings.append({"code": "LUFS_OUT_OF_RANGE", "message": msg})
     spec = read_json(root / "film-spec.json") or {}
     shots = [
         shot

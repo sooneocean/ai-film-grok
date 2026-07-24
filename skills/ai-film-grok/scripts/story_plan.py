@@ -11,7 +11,6 @@ from __future__ import annotations
 import copy
 import hashlib
 import re
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +21,7 @@ from narrative_control import (
     graph_content_sha256,
     validate_narrative_graph,
 )
-from util import read_json, write_json
+from util import read_json, utc_now, write_json
 
 # film-spec dramatic_function enum
 DRAMATIC_FUNCS = (
@@ -985,10 +984,6 @@ _GENRE_POINT_QUESTION: dict[str, dict[str, str]] = {
         "world_info": "这条规则如何影响现实中的谁？",
     },
 }
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def normalize_story_graph(graph: dict[str, Any]) -> dict[str, Any]:

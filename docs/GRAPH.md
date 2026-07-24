@@ -45,6 +45,7 @@ flowchart TD
 ## Test inventory
 
 - `test_act_structure_pace_chart.py`
+- `test_act_structure_verify.py`
 - `test_adapter_smoke.py`
 - `test_adult_heat_upgrade.py`
 - `test_advance.py`
@@ -93,6 +94,7 @@ flowchart TD
 - `test_director_ledger.py`
 - `test_director_migration.py`
 - `test_director_stage_gates.py`
+- `test_director_verify.py`
 - `test_directors_lens_docs.py`
 - `test_dispatch.py`
 - `test_dispatch_actions.py`
@@ -128,6 +130,7 @@ flowchart TD
 - `test_launchers.py`
 - `test_lock_style_samefile.py`
 - `test_loudnorm_policy.py`
+- `test_lufs_and_face_hash.py`
 - `test_master_delivery.py`
 - `test_meaningful_motion.py`
 - `test_media_duration.py`
@@ -137,6 +140,7 @@ flowchart TD
 - `test_merge_edls.py`
 - `test_micro_motion.py`
 - `test_motion_plan.py`
+- `test_music_spotting_verify.py`
 - `test_music_template.py`
 - `test_narrative_control.py`
 - `test_narrative_hooks.py`
@@ -145,6 +149,7 @@ flowchart TD
 - `test_next_actions.py`
 - `test_opt2_edge_queue_framing.py`
 - `test_p2_director_control.py`
+- `test_p4_fulfillment_gates.py`
 - `test_pace_chart_verify.py`
 - `test_performance_director_board.py`
 - `test_performance_timeline.py`

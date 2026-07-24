@@ -10,7 +10,7 @@ import json
 import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,7 @@ from security_policy import (
     safe_workspace_directory,
     validate_identifier,
 )
+from util import utc_now
 
 OPERATIONS = frozenset({"image_gen", "image_edit", "image_to_video", "reference_to_video"})
 STATUS_PENDING = "pending"
@@ -64,10 +65,6 @@ def normalize_fail_reason(value: object) -> str:
     if "decode" in text or "ffprobe" in text or "corrupt" in text:
         return "decode"
     return "other"
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _parse_time(value: str) -> datetime:

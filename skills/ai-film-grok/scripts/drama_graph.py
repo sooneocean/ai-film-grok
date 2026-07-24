@@ -11,12 +11,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from story_plan import normalize_story_graph
-from util import read_json, write_json
+from util import read_json, utc_now, write_json
 
 GRAPH_NAME = "drama-graph.json"
 SCHEMA_VERSION = 2
@@ -29,10 +28,6 @@ _BEAT_BUCKETS: list[tuple[str, frozenset[str], str]] = [
     ("sensory", frozenset({"sensory", "action"}), "important"),
     ("reaction", frozenset({"reaction", "afterglow"}), "supporting"),
 ]
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _stable_hash(value: Any) -> str:

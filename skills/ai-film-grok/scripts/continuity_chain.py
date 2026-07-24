@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from datetime import UTC, datetime
@@ -25,14 +24,6 @@ CHECKLIST_KEYS = (
 CODE_MISSING_CHAIN_DOC = "CONTINUITY_CHAIN_DOC_MISSING"
 CODE_BYTE_MISMATCH = "CONTINUITY_CHAIN_BYTE_MISMATCH"
 CODE_CHECKLIST_INCOMPLETE = "CONTINUITY_CHAIN_CHECKLIST_INCOMPLETE"
-
-
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:

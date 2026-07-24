@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -11,8 +12,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import tempfile
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,14 +23,11 @@ for _p in (_SKILL_DIR, _SCRIPTS_DIR):
     if _s not in sys.path:
         sys.path.insert(0, _s)
 
-import contextlib
-
 from continuity import lint_continuity, lint_frame_chain
 from continuity_chain import (
     check_continuity_chain,
     init_chain_doc,
     is_long_form,
-    sha256_file,
     upsert_join,
 )
 from director_review import (
@@ -63,6 +59,8 @@ from security_policy import (
     safe_workspace_directory,
     validate_identifier,
 )
+from util import sha256_file, utc_now, write_json
+from util.errors import FilmError  # noqa: E402 — re-exported for backward compat
 
 from scripts.prompt_injector import PromptConflictError, PromptInjector
 from scripts.visual_bible import load_bible
@@ -91,24 +89,6 @@ EXPORT_METADATA_FILES = (
     "manifest.json",
     "README.md",
 )
-
-
-from util.errors import FilmError  # noqa: E402 — re-exported for backward compat
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
-
-
-def write_json(path: Path, value: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=path.parent, delete=False
-    ) as handle:
-        json.dump(value, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-        temp = Path(handle.name)
-    os.replace(temp, path)
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -2221,9 +2201,7 @@ def _auto_promote_last_to_next(
             should_auto_promote_next,
             upsert_join,
         )
-        from continuity_chain import (
-            sha256_file as chain_sha,
-        )
+        from util import sha256_file as chain_sha
     except Exception:
         return None
     spec_path = root / "film-spec.json"
@@ -4596,6 +4574,7 @@ def cmd_director(args: argparse.Namespace) -> int:
         migrate_audit,
         rebuild,
         status,
+        verify,
     )
 
     root = Path(args.root).expanduser().resolve()
@@ -4628,6 +4607,8 @@ def cmd_director(args: argparse.Namespace) -> int:
                 expected_revision=args.expected_revision,
                 transaction_id=args.transaction_id,
             )
+        elif action == "verify":
+            report = verify(root)
         else:
             raise FilmError(f"unknown director action {action!r}")
     except (OSError, ValueError) as exc:
@@ -5219,6 +5200,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     doctor.add_argument(
         "--strict", action="store_true", help="Also fail on global security warnings"
+    )
+    doctor.add_argument(
+        "--art-check",
+        action="store_true",
+        help="Also run director methodology verification (pace_chart/act_structure/music_spotting)",
     )
     sub.add_parser(
         "lock-runtime", help="Fingerprint the current verified Python/FFmpeg/script runtime"
@@ -6818,7 +6804,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     director_p = sub.add_parser(
         "director",
-        help="Production book: init|migrate-audit|migrate|status|check|impact|rebuild",
+        help="Production book: init|migrate-audit|migrate|status|check|impact|rebuild|verify",
     )
     director_sub = director_p.add_subparsers(dest="director_action", required=True)
     d_init = director_sub.add_parser("init")
@@ -6840,7 +6826,7 @@ def build_parser() -> argparse.ArgumentParser:
     d_migrate = director_sub.add_parser("migrate")
     d_migrate.add_argument("--root", required=True)
     d_migrate.add_argument("--title", default="Untitled")
-    for director_action in ("status", "check"):
+    for director_action in ("status", "check", "verify"):
         action_parser = director_sub.add_parser(director_action)
         action_parser.add_argument("--root", required=True)
     for director_action in ("impact", "rebuild"):

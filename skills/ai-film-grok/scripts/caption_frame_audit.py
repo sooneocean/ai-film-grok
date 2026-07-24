@@ -2,21 +2,14 @@
 
 from __future__ import annotations
 
-import hashlib
 import subprocess
 from pathlib import Path
 from typing import Any
 
+from security_policy import minimal_subprocess_env
 from subtitle_dialogue_alignment import _cues
 from util import read_json, write_json
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from util import sha256_file as _sha256
 
 
 def _first_file(root: Path, *relative: str) -> Path | None:
@@ -72,6 +65,7 @@ def build_caption_frame_audit(root: Path, *, max_frames: int = 5) -> dict[str, A
             text=True,
             timeout=30,
             check=False,
+            env=minimal_subprocess_env(),
         )
         if proc.returncode != 0 or not output.is_file() or output.stat().st_size == 0:
             raise ValueError(f"could not extract caption review frame at {timestamp:.3f}s")

@@ -9,9 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import tempfile
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +20,8 @@ from production_gates import (
     pilot_is_user_approved,
 )
 from security_policy import SecurityPolicyError, safe_workspace_directory
+from util import read_json as _util_read_json
+from util import utc_now, write_json
 
 # Pilot scorecard is the pre-batch gate — three dimensions, not full final seven.
 PILOT_SCORE_DIMS: tuple[str, ...] = ("identity", "style", "motion")
@@ -43,29 +42,9 @@ class PilotReviewError(RuntimeError):
     pass
 
 
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
-
-
-def write_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=path.parent, delete=False
-    ) as handle:
-        json.dump(value, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-        temp = Path(handle.name)
-    os.replace(temp, path)
-
-
 def read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
+    """Permissive read_json — returns {} on missing/error (unlike util.read_json's None)."""
+    return _util_read_json(path) or {}
 
 
 def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:

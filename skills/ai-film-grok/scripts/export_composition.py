@@ -13,7 +13,6 @@ import json
 import os
 import re
 import tempfile
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +30,7 @@ from security_policy import (
     safe_existing_file,
     safe_workspace_directory,
 )
+from util import utc_now, write_json
 
 SCHEMA_VERSION = 1
 ENGINES = ("hyperframes", "remotion", "both")
@@ -41,21 +41,6 @@ COMPOSE_PRESET_RESOLVED = ("ecchi-rnb", "minimal")
 
 class ComposeExportError(RuntimeError):
     """User-facing composition export error."""
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
-
-
-def write_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=path.parent, delete=False
-    ) as handle:
-        json.dump(value, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-        temp = Path(handle.name)
-    os.replace(temp, path)
 
 
 def write_text(path: Path, text: str) -> None:

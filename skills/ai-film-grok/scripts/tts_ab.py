@@ -11,11 +11,10 @@ from __future__ import annotations
 import json
 import re
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from util import read_json
+from util import read_json, utc_now
 
 AUDIO_DIR_REL = "receipts/tts-ab"
 MANIFEST_NAME = "manifest.json"
@@ -23,10 +22,6 @@ MANIFEST_NAME = "manifest.json"
 
 class TTSAbError(RuntimeError):
     pass
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _shot_nar(spec: dict[str, Any], shot_id: str) -> tuple[str, str]:

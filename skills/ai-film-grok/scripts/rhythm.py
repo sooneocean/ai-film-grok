@@ -229,3 +229,190 @@ def verify_pace_chart(
         "segments_checked": segments_checked,
         "note": "P4-extend: verifies actual cut frequency vs declared pace_chart. Soft by default.",
     }
+
+
+# Map dramatic_function to three-act structure
+_ACT1_FUNCS = {"hook", "approach"}
+_ACT2_FUNCS = {"sensory", "reaction", "action"}
+_ACT3_FUNCS = {"afterglow", "bridge"}
+
+
+def _shot_act(shot: dict[str, Any]) -> str:
+    """Map a shot's dramatic_function to act 1/2/3."""
+    df = str(shot.get("dramatic_function") or "").strip().lower()
+    if df in _ACT1_FUNCS:
+        return "setup"
+    if df in _ACT2_FUNCS:
+        return "confrontation"
+    if df in _ACT3_FUNCS:
+        return "resolution"
+    return "setup"  # default
+
+
+def verify_act_structure(
+    shots: list[dict[str, Any]],
+    act_structure: dict[str, Any],
+    *,
+    total_duration: float | None = None,
+    tolerance: float = 0.10,
+) -> dict[str, Any]:
+    """Verify actual act proportions match declared act_structure ratios.
+
+    Compares declared setup_ratio/confrontation_ratio/resolution_ratio against
+    the actual proportion of total duration spent in each act (mapped via
+    dramatic_function).
+
+    Returns {ok, issues, codes, warning_count, actual_ratios}.
+    """
+    issues: list[dict[str, Any]] = []
+    ordered = [s for s in shots if isinstance(s, dict)]
+    if not ordered or not act_structure:
+        return {"ok": True, "issues": [], "codes": [], "warning_count": 0, "actual_ratios": {}}
+
+    if total_duration is None:
+        total_duration = sum(
+            float(s.get("duration_sec") or s.get("targetDuration") or 0) for s in ordered
+        )
+    if total_duration <= 0:
+        total_duration = max(len(ordered) * 5.0, 30.0)
+
+    # Calculate actual act durations
+    act_durations: dict[str, float] = {"setup": 0.0, "confrontation": 0.0, "resolution": 0.0}
+    for s in ordered:
+        dur = float(s.get("duration_sec") or s.get("targetDuration") or 5.0)
+        act = _shot_act(s)
+        act_durations[act] += dur
+
+    actual_ratios = {k: v / total_duration for k, v in act_durations.items()}
+
+    # Compare with declared ratios
+    declared_map = {
+        "setup": act_structure.get("setup_ratio"),
+        "confrontation": act_structure.get("confrontation_ratio"),
+        "resolution": act_structure.get("resolution_ratio"),
+    }
+
+    for act_name, declared in declared_map.items():
+        if declared is None:
+            continue
+        declared_f = float(declared)
+        actual_f = actual_ratios[act_name]
+        delta = abs(actual_f - declared_f)
+        if delta > tolerance:
+            direction = "over" if actual_f > declared_f else "under"
+            issues.append(
+                {
+                    "code": "ACT_RATIO_MISMATCH",
+                    "level": "warning",
+                    "message": (
+                        f"act_structure.{act_name}_ratio: declared={declared_f:.2f} "
+                        f"but actual={actual_f:.2f} (Δ={delta:.2f}, {direction} by tolerance {tolerance:.2f})"
+                    ),
+                }
+            )
+
+    codes = sorted({str(x.get("code")) for x in issues})
+    return {
+        "ok": not issues,
+        "codes": codes,
+        "warning_count": len(issues),
+        "issues": issues,
+        "actual_ratios": actual_ratios,
+        "note": "Verifies actual act proportions vs declared act_structure ratios. Soft by default.",
+    }
+
+
+def verify_music_spotting(
+    music_spotting: list[dict[str, Any]],
+    beats: list[dict[str, Any]] | None = None,
+    *,
+    total_duration: float | None = None,
+) -> dict[str, Any]:
+    """Verify BGM spotting entries align with declared beats.
+
+    Checks:
+    - Each music_spotting entry with beat_ref references a valid beat id
+    - Music segments don't overlap
+    - start_sec < end_sec for each segment
+    - Segments fit within total duration
+
+    Returns {ok, issues, codes, warning_count, segments_checked}.
+    """
+    issues: list[dict[str, Any]] = []
+    if not music_spotting:
+        return {"ok": True, "issues": [], "codes": [], "warning_count": 0, "segments_checked": 0}
+
+    beat_ids: set[str] = set()
+    if beats:
+        for bt in beats:
+            if isinstance(bt, dict):
+                bid = str(bt.get("id") or "").strip()
+                if bid:
+                    beat_ids.add(bid)
+
+    segments_checked = 0
+    prev_end = 0.0
+    for i, entry in enumerate(music_spotting):
+        if not isinstance(entry, dict):
+            continue
+        label = str(entry.get("label") or f"segment_{i}")
+        start = entry.get("start_sec")
+        end = entry.get("end_sec")
+        beat_ref = entry.get("beat_ref")
+
+        segments_checked += 1
+
+        # start < end
+        if start is not None and end is not None:
+            if float(end) <= float(start):
+                issues.append(
+                    {
+                        "code": "MUSIC_SPOT_INVALID_RANGE",
+                        "level": "warning",
+                        "message": f"music_spotting '{label}': end_sec={end} must be > start_sec={start}",
+                    }
+                )
+
+        # Total duration boundary
+        if total_duration and start is not None:
+            if float(start) < 0 or (end is not None and float(end) > total_duration):
+                issues.append(
+                    {
+                        "code": "MUSIC_SPOT_OUT_OF_RANGE",
+                        "level": "warning",
+                        "message": f"music_spotting '{label}': segment extends beyond total_duration={total_duration}",
+                    }
+                )
+
+        # Beat ref validity
+        if beat_ref and beat_ids:
+            if str(beat_ref).strip() not in beat_ids:
+                issues.append(
+                    {
+                        "code": "MUSIC_SPOT_BEAT_REF_INVALID",
+                        "level": "warning",
+                        "message": f"music_spotting '{label}': beat_ref='{beat_ref}' not found in beats",
+                    }
+                )
+
+        # Overlap check
+        if start is not None and float(start) < prev_end - 0.01:
+            issues.append(
+                {
+                    "code": "MUSIC_SPOT_OVERLAP",
+                    "level": "warning",
+                    "message": f"music_spotting '{label}': starts at {start} but previous segment ends at {prev_end} — overlap",
+                }
+            )
+        if end is not None:
+            prev_end = max(prev_end, float(end))
+
+    codes = sorted({str(x.get("code")) for x in issues})
+    return {
+        "ok": not issues,
+        "codes": codes,
+        "warning_count": len(issues),
+        "issues": issues,
+        "segments_checked": segments_checked,
+        "note": "Verifies BGM spotting alignment with beats. Soft by default.",
+    }

@@ -18,11 +18,10 @@ from __future__ import annotations
 import json
 import shutil
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from util import read_json, write_json
+from util import read_json, utc_now, write_json
 
 FRW_RECEIPT_REL = "receipts/frw-key-capability.json"
 SPEC_REL = "film-spec.json"
@@ -37,10 +36,6 @@ APPLY_I2V_KEYS = (
 
 class CapabilityError(RuntimeError):
     pass
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def skill_dir() -> Path:

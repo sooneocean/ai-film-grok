@@ -6,12 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from runtime_policy import sha256
 from security_policy import atomic_write_text, minimal_subprocess_env
+from util import utc_now
 
 BACKEND_FILES = {
     "wav2lip": {
@@ -28,10 +28,6 @@ BACKEND_FILES = {
         ),
     },
 }
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _git(root: Path, *args: str) -> str | None:

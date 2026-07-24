@@ -6,12 +6,11 @@ from __future__ import annotations
 import copy
 import re
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from production_book import stable_content_hash
-from util import exclusive_file_lock, read_json, write_json
+from util import exclusive_file_lock, read_json, utc_now, write_json
 
 LEDGER_NAME = "approval-ledger.json"
 SCHEMA_VERSION = 1
@@ -25,10 +24,6 @@ class ApprovalValidationError(ValueError):
 
 class ApprovalLedgerConflict(ApprovalValidationError):
     """Approval-ledger optimistic lock failed."""
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def approval_ledger_path(root: Path | str) -> Path:

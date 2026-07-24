@@ -10,7 +10,6 @@ import argparse
 import json
 import os
 import re
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +18,7 @@ from production_gates import (
     loop_risk_shots_from_spec,
     pilot_is_user_approved,
 )
-from util import read_json
+from util import read_json, utc_now
 
 ECCHI_TONE = re.compile(
     r"色气|里番|同人|诱惑|后宫|sensual|ecchi|seductive|rnb|soul",
@@ -29,10 +28,6 @@ ECCHI_TONE = re.compile(
 
 class PreflightError(RuntimeError):
     pass
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _issue(level: str, code: str, msg: str, *, fix: str = "") -> dict[str, str]:
@@ -851,7 +846,78 @@ def run_preflight(root: Path) -> dict[str, Any]:
         except Exception:
             pass
 
-        # Long-form continuity_chain.md (hard if missing)
+        # --- P4 fulfillment checks (act proportions, pace chart, music spotting) ---
+        # Soft by default; hard when respective strict flag is set (premium).
+        try:
+            from rhythm import verify_act_structure, verify_music_spotting, verify_pace_chart
+
+            shots_p4: list = []
+            if isinstance(spec.get("scenes"), list):
+                for sc in spec["scenes"]:
+                    if isinstance(sc, dict) and isinstance(sc.get("shots"), list):
+                        shots_p4.extend(sc["shots"])
+            intent = spec.get("director_intent") if isinstance(spec, dict) else {}
+            act_structure = intent.get("act_structure") if isinstance(intent, dict) else None
+            pace_chart = intent.get("pace_chart") if isinstance(intent, dict) else None
+
+            total_dur = (
+                sum(float(s.get("duration_sec") or 0) for s in shots_p4 if isinstance(s, dict))
+                or None
+            )
+
+            # P4-16: act structure fulfillment
+            if act_structure and shots_p4:
+                act_rep = verify_act_structure(shots_p4, act_structure, total_duration=total_dur)
+                if not act_rep.get("ok"):
+                    act_strict = spec.get("act_structure_strict") is True
+                    p4_issue = _issue(
+                        "hard" if act_strict else "soft",
+                        "act_structure_fulfillment",
+                        f"act ratio mismatch: {act_rep.get('codes')} — "
+                        f"{(act_rep.get('issues') or [{}])[0].get('message', '')[:120]}",
+                        fix="调整镜头 dramatic_function 分布或 duration_sec 使实际幕比例匹配 act_structure 声明",
+                    )
+                    if act_strict:
+                        hard.append(p4_issue)
+                    else:
+                        soft.append(p4_issue)
+
+            # P4-17: pace chart fulfillment
+            if pace_chart and shots_p4:
+                pace_rep = verify_pace_chart(shots_p4, pace_chart, total_duration=total_dur)
+                if not pace_rep.get("ok"):
+                    pace_strict = spec.get("pace_chart_strict") is True
+                    p4_issue = _issue(
+                        "hard" if pace_strict else "soft",
+                        "pace_chart_fulfillment",
+                        f"pace chart mismatch: {pace_rep.get('codes')} — "
+                        f"{(pace_rep.get('issues') or [{}])[0].get('message', '')[:120]}",
+                        fix="调整镜头密度/duration 使实际切镜频率匹配 pace_chart 声明曲线",
+                    )
+                    if pace_strict:
+                        hard.append(p4_issue)
+                    else:
+                        soft.append(p4_issue)
+
+            # P4-18: music spotting beat alignment
+            sound_plan = spec.get("sound_plan") if isinstance(spec, dict) else {}
+            music_spotting = (
+                sound_plan.get("music_spotting") if isinstance(sound_plan, dict) else None
+            )
+            if music_spotting and isinstance(music_spotting, list):
+                beats = intent.get("beats") if isinstance(intent, dict) else None
+                music_rep = verify_music_spotting(music_spotting, beats, total_duration=total_dur)
+                if not music_rep.get("ok"):
+                    p4_issue = _issue(
+                        "soft",
+                        "music_spotting_alignment",
+                        f"music spotting alignment: {music_rep.get('codes')} — "
+                        f"{(music_rep.get('issues') or [{}])[0].get('message', '')[:120]}",
+                        fix="修正 music_spotting beat_ref / start_sec / end_sec 与 beats 时间轴对齐",
+                    )
+                    soft.append(p4_issue)
+        except Exception:
+            pass
         try:
             from continuity_chain import check_continuity_chain, is_long_form
 

@@ -241,3 +241,81 @@ def rebuild(
         "impact": preview,
         "book": written,
     }
+
+
+def verify(root: Path | str) -> dict[str, Any]:
+    """Run director methodology verification: pace_chart, act_structure, music_spotting.
+
+    Loads film-spec + drama-graph, extracts shots/beats, and runs the three
+    verification functions from rhythm.py. Returns a combined report.
+    """
+    root = Path(root)
+    spec = read_json(root / "film-spec.json") or {}
+    graph = read_json(root / "drama-graph.json") or {}
+
+    # Collect all shots from film-spec scenes
+    shots: list[dict[str, Any]] = []
+    for sc in spec.get("scenes") or []:
+        if isinstance(sc, dict):
+            for sh in sc.get("shots") or []:
+                if isinstance(sh, dict):
+                    shots.append(sh)
+
+    # Collect beats from drama-graph episodes
+    beats: list[dict[str, Any]] = []
+    for ep in graph.get("episodes") or []:
+        if isinstance(ep, dict):
+            for sc in ep.get("scenes") or []:
+                if isinstance(sc, dict):
+                    for bt in sc.get("beats") or []:
+                        if isinstance(bt, dict):
+                            beats.append(bt)
+
+    di = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+    pace_chart = di.get("pace_chart") or []
+    act_structure = di.get("act_structure") or {}
+    sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else {}
+    music_spotting = sound_plan.get("music_spotting") or []
+
+    total_duration = (
+        sum(float(s.get("duration_sec") or s.get("targetDuration") or 0) for s in shots) or None
+    )
+
+    results: dict[str, Any] = {"ok": True, "action": "verify"}
+
+    # 1. Pace chart verification
+    if pace_chart and shots:
+        from rhythm import verify_pace_chart
+
+        pace_result = verify_pace_chart(shots, pace_chart, total_duration=total_duration)
+        results["pace_chart"] = pace_result
+        if not pace_result["ok"]:
+            results["ok"] = False
+
+    # 2. Act structure verification
+    if act_structure and shots:
+        from rhythm import verify_act_structure
+
+        act_result = verify_act_structure(shots, act_structure, total_duration=total_duration)
+        results["act_structure"] = act_result
+        if not act_result["ok"]:
+            results["ok"] = False
+
+    # 3. Music spotting verification
+    if music_spotting:
+        from rhythm import verify_music_spotting
+
+        music_result = verify_music_spotting(
+            music_spotting, beats=beats, total_duration=total_duration
+        )
+        results["music_spotting"] = music_result
+        if not music_result["ok"]:
+            results["ok"] = False
+
+    results["shots_checked"] = len(shots)
+    results["beats_checked"] = len(beats)
+    results["note"] = (
+        "Director methodology verification: pace_chart + act_structure + music_spotting. "
+        "Soft warnings only — does not block delivery."
+    )
+    return results

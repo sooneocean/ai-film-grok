@@ -17,11 +17,11 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from security_policy import SecurityPolicyError, minimal_subprocess_env, safe_workspace_directory
+from util import utc_now
 
 URL_RE = re.compile(r"https?://[^\s)>\"]+")
 PREVIEW_RECEIPT_REL = "receipts/compose-preview.json"
@@ -30,10 +30,6 @@ PREVIEW_META_REL = "compose/preview.json"
 
 class ComposePreviewError(RuntimeError):
     pass
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def log(msg: str) -> None:

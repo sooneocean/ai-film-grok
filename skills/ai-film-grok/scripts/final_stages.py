@@ -17,25 +17,15 @@ PIL burn is a **named recovery stage**, never a silent assumption that HF worked
 
 from __future__ import annotations
 
-import hashlib
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from security_policy import minimal_subprocess_env
+from util import sha256_file as _sha256
+from util import utc_now
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
@@ -121,6 +111,7 @@ def sample_bottom_band_activity(
             text=True,
             timeout=30,
             check=False,
+            env=minimal_subprocess_env(),
         )
         if proc.returncode != 0 or not tmp.is_file():
             samples.append({"ts": ts, "ok": False, "error": "extract_failed"})
@@ -171,7 +162,9 @@ def run_pil_caption_burn(root: Path, *, video: Path, srt: Path, out: Path) -> di
         "--out",
         str(out),
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900, check=False)
+    proc = subprocess.run(
+        cmd, capture_output=True, text=True, timeout=900, check=False, env=minimal_subprocess_env()
+    )
     return {
         "ok": proc.returncode == 0 and out.is_file(),
         "returncode": proc.returncode,

@@ -8,11 +8,10 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from util import exclusive_file_lock, read_json, write_json
+from util import exclusive_file_lock, read_json, utc_now, write_json
 
 BOOK_NAME = "production-book.json"
 SCHEMA_VERSION = 1
@@ -40,10 +39,6 @@ class ProductionBookError(ValueError):
 
 class ProductionBookConflict(ProductionBookError):
     """An optimistic-lock revision did not match the current book."""
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def production_book_path(root: Path | str) -> Path:

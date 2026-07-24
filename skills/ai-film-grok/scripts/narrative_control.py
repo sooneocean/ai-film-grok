@@ -12,11 +12,10 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from util import read_json, write_json
+from util import read_json, utc_now, write_json
 
 GRAPH_SCHEMA_VERSION = 2
 GRAPH_NAME = "drama-graph.json"
@@ -52,10 +51,6 @@ class NarrativeControlError(ValueError):
     def __init__(self, message: str, *, code: str = "NARRATIVE_CONTROL") -> None:
         super().__init__(message)
         self.code = code
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _nonempty(value: Any) -> bool:

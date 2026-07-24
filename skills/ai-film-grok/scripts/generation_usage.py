@@ -6,12 +6,18 @@ from __future__ import annotations
 import re
 import uuid
 from collections import Counter
-from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from util import canonical_json_sha256, exclusive_file_lock, read_json, sha256_file, write_json
+from util import (
+    canonical_json_sha256,
+    exclusive_file_lock,
+    read_json,
+    sha256_file,
+    utc_now,
+    write_json,
+)
 
 LEDGER_RELATIVE_PATH = Path("receipts/generation-usage.json")
 OPERATIONS = frozenset({"t2i", "image_edit", "i2v", "t2v", "tts"})
@@ -32,10 +38,6 @@ _SAFE_TEXT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}$")
 
 class GenerationUsageError(ValueError):
     """A generation usage event is unsafe, inconsistent, or not idempotent."""
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def ledger_path(root: Path | str) -> Path:

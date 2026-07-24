@@ -19,8 +19,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,27 +33,13 @@ from security_policy import (
     safe_output_path,
     safe_workspace_directory,
 )
+from util import utc_now, write_json
 
 SCHEMA_VERSION = 1
 
 
 class ComposeRenderError(RuntimeError):
     """User-facing compose render error."""
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
-
-
-def write_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=path.parent, delete=False
-    ) as handle:
-        json.dump(value, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-        temp = Path(handle.name)
-    os.replace(temp, path)
 
 
 def read_json(path: Path) -> dict[str, Any]:

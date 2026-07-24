@@ -25,19 +25,14 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from util import sha256_file, write_json
+from util import sha256_file, utc_now, write_json
 
 
 class RealFootageError(RuntimeError):
     pass
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 # video-use skill helpers live under this absolute path (symlinked skill root)

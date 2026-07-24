@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from util import read_json, write_json
 
 try:
     from .department_contracts import migrate_style_bible
@@ -13,21 +14,6 @@ except ImportError:  # direct script imports used by the CLI
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat()
-
-
-def read_json(path: Path) -> dict[str, Any] | None:
-    if not path.is_file():
-        return None
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        return None
-
-
-def write_json(path: Path, data: dict[str, Any]) -> None:
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 def migrate_to_v2(bible: dict[str, Any]) -> dict[str, Any]:

@@ -13,19 +13,14 @@ Pure logic — no ffmpeg execution here (the render layer calls ffmpeg).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from util import read_json, write_json
+from util import read_json, utc_now, write_json
 
 
 class ColorGradeError(ValueError):
     pass
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 # Preset grade profiles (slopes/offsets/power per RGB channel + saturation).

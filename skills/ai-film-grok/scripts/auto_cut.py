@@ -21,19 +21,14 @@ ai-film-grok final pipeline.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from util import write_json
+from util import utc_now, write_json
 
 
 class AutoCutError(ValueError):
     pass
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 # video-use cut padding (Hard Rule 7 working window: 30–200ms)
