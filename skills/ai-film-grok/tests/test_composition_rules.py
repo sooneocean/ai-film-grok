@@ -15,6 +15,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from framing_lint import (
@@ -24,7 +26,6 @@ from framing_lint import (
     CODE_THIRTY_DEGREE_VIOLATION,
     lint_composition_rules,
 )
-
 
 class TestPanelSchemaFields:
     """Panel schema has new storyboard fields."""
@@ -178,3 +179,135 @@ class TestCleanShots:
         shots = [{"id": "s1", "dsl": {"camera": {"shot_size": "medium"}}}]
         result = lint_composition_rules(shots)
         assert result["ok"] is True
+
+
+# ─── Gate path tests (write-spec strict + preflight) ─────────────────────
+
+
+def _comp_shot(sid, *, look_axis="", shot_size="", dramatic_function="approach"):
+    """Minimal shot for write-spec validation."""
+    dsl: dict = {"subject": "woman", "cast": ["heroine"], "motion": "idle"}
+    if look_axis:
+        dsl["look_axis"] = look_axis
+    if shot_size:
+        dsl["camera"] = {"shot_size": shot_size}
+    return {
+        "id": sid,
+        "dramatic_function": dramatic_function,
+        "nar": f"旁白{sid}。",
+        "dsl": dsl,
+    }
+
+
+def _comp_spec(shots):
+    return {
+        "schema_version": 1,
+        "title": "comp-test",
+        "vo_mode": "storyteller",
+        "aspect": "9:16",
+        "director_intent": {
+            "logline": "A test about composition rules.",
+            "tone": "neutral",
+            "emotional_arc": ["a", "b", "c"],
+        },
+        "transition_sec": 0.25,
+        "transition_default": "soft",
+        "scenes": [{"shots": shots}],
+    }
+
+
+class TestWriteSpecCompositionGate:
+    """composition_strict=True → FilmSpecError when axis break detected."""
+
+    def test_strict_raises_on_axis_break(self):
+        from film_spec import FilmSpecError, validate_film_spec
+
+        shots = [
+            _comp_shot("s1", look_axis="left", shot_size="wide"),
+            _comp_shot("s2", look_axis="right", shot_size="medium"),
+        ]
+        spec = _comp_spec(shots)
+        spec["composition_strict"] = True
+        with pytest.raises(FilmSpecError, match="composition_strict"):
+            validate_film_spec(spec, assign_missing_ids=False)
+
+    def test_non_strict_no_raise_on_axis_break(self):
+        from film_spec import FilmSpecError, validate_film_spec
+
+        shots = [
+            _comp_shot("s1", look_axis="left", shot_size="wide"),
+            _comp_shot("s2", look_axis="right", shot_size="medium"),
+        ]
+        spec = _comp_spec(shots)
+        validate_film_spec(spec, assign_missing_ids=False)
+        pcr = spec.get("_composition_rules") or {}
+        assert CODE_AXIS_BREAK in pcr.get("codes", [])
+        assert not pcr.get("ok", True)
+
+    def test_strict_passes_on_clean_shots(self):
+        from film_spec import FilmSpecError, validate_film_spec
+
+        shots = [
+            _comp_shot("s1", look_axis="left", shot_size="wide"),
+            _comp_shot("s2", look_axis="left", shot_size="medium"),
+            _comp_shot("s3", look_axis="left", shot_size="close_up"),
+        ]
+        spec = _comp_spec(shots)
+        spec["composition_strict"] = True
+        validate_film_spec(spec, assign_missing_ids=False)
+        pcr = spec.get("_composition_rules") or {}
+        assert pcr.get("ok") is True
+
+
+class TestPreflightCompositionGate:
+    """preflight reports composition_rules_violation soft (default) / hard (strict)."""
+
+    def _make_root(self, shots, *, strict=False):
+        import tempfile
+
+        tmp = tempfile.mkdtemp(prefix="aifilm_comp_test_")
+        root = Path(tmp)
+        spec = _comp_spec(shots)
+        if strict:
+            spec["composition_strict"] = True
+        (root / "film-spec.json").write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+        return root
+
+    def test_preflight_soft_on_axis_break_default(self):
+        import preflight
+
+        shots = [
+            _comp_shot("s1", look_axis="left", shot_size="wide"),
+            _comp_shot("s2", look_axis="right", shot_size="medium"),
+        ]
+        root = self._make_root(shots, strict=False)
+        rep = preflight.run_preflight(root)
+        soft_codes = [i["code"] for i in rep["soft"]]
+        assert "composition_rules_violation" in soft_codes
+
+    def test_preflight_hard_on_axis_break_strict(self):
+        import preflight
+
+        shots = [
+            _comp_shot("s1", look_axis="left", shot_size="wide"),
+            _comp_shot("s2", look_axis="right", shot_size="medium"),
+        ]
+        root = self._make_root(shots, strict=True)
+        rep = preflight.run_preflight(root)
+        hard_codes = [i["code"] for i in rep["hard"]]
+        assert "composition_rules_violation" in hard_codes
+        assert not rep["hard_ok"]
+
+    def test_preflight_clean_no_issue(self):
+        import preflight
+
+        shots = [
+            _comp_shot("s1", look_axis="left", shot_size="wide"),
+            _comp_shot("s2", look_axis="left", shot_size="medium"),
+            _comp_shot("s3", look_axis="left", shot_size="close_up"),
+        ]
+        root = self._make_root(shots, strict=True)
+        rep = preflight.run_preflight(root)
+        all_codes = [i["code"] for i in rep["hard"]] + [i["code"] for i in rep["soft"]]
+        assert "composition_rules_violation" not in all_codes
+
