@@ -120,3 +120,112 @@ def lint_rhythm(
 
     codes = sorted({str(x.get("code")) for x in issues})
     return {"ok": not issues, "codes": codes, "warning_count": len(issues), "issues": issues}
+
+
+def verify_pace_chart(
+    shots: list[dict[str, Any]],
+    pace_chart: list[dict[str, Any]] | list[str],
+    *,
+    total_duration: float | None = None,
+) -> dict[str, Any]:
+    """P4-extend: verify actual cut frequency matches declared pace_chart.
+
+    Compares the declared pace_chart segments (start_ratio/end_ratio/cut_freq/intensity)
+    against the actual shot timeline — measures cut frequency (shots per second)
+    within each segment's time range.
+
+    Returns {ok, issues, codes, warning_count, segments_checked}.
+    """
+    issues: list[dict[str, Any]] = []
+    ordered = [s for s in shots if isinstance(s, dict)]
+    if not ordered or not pace_chart:
+        return {"ok": True, "issues": [], "codes": [], "warning_count": 0, "segments_checked": 0}
+
+    # Calculate total duration
+    if total_duration is None:
+        total_duration = sum(
+            float(s.get("duration_sec") or s.get("targetDuration") or 0) for s in ordered
+        )
+    if total_duration <= 0:
+        total_duration = max(len(ordered) * 5.0, 30.0)  # fallback estimate
+
+    # Build cumulative shot timeline
+    shot_times: list[tuple[float, float]] = []
+    cursor = 0.0
+    for s in ordered:
+        dur = float(s.get("duration_sec") or s.get("targetDuration") or 5.0)
+        shot_times.append((cursor, cursor + dur))
+        cursor += dur
+
+    segments_checked = 0
+    for i, entry in enumerate(pace_chart):
+        if isinstance(entry, str):
+            continue  # legacy string format — skip
+
+        if not isinstance(entry, dict):
+            continue
+
+        sr = entry.get("start_ratio")
+        er = entry.get("end_ratio")
+        declared_freq = entry.get("cut_freq")
+        label = str(entry.get("label") or f"segment_{i}")
+
+        if sr is None or er is None:
+            continue
+
+        start_sec = float(sr) * total_duration
+        end_sec = float(er) * total_duration
+
+        # Count shots that start within this segment's time range
+        shots_in_segment = [
+            idx for idx, (s, e) in enumerate(shot_times) if s < end_sec and e > start_sec
+        ]
+        segment_duration = end_sec - start_sec
+        if segment_duration <= 0:
+            continue
+
+        actual_freq = len(shots_in_segment) / segment_duration
+        segments_checked += 1
+
+        # Map declared cut_freq to expected range
+        freq_ranges = {
+            "slow": (0.0, 0.15),      # ≤1 shot per 6.5s
+            "medium": (0.15, 0.3),    # ~1 shot per 3-6s
+            "fast": (0.3, 0.6),       # ~1 shot per 1.5-3s
+            "rapid": (0.6, 99.0),     # >1 shot per 1.5s
+        }
+
+        if declared_freq and declared_freq in freq_ranges:
+            lo, hi = freq_ranges[declared_freq]
+            if actual_freq < lo:
+                issues.append(
+                    {
+                        "code": "PACE_CHART_TOO_SLOW",
+                        "level": "warning",
+                        "message": (
+                            f"pace_chart segment '{label}': actual cut freq {actual_freq:.3f}/s "
+                            f"is below declared '{declared_freq}' range [{lo:.2f}, {hi:.2f}]"
+                        ),
+                    }
+                )
+            elif actual_freq > hi:
+                issues.append(
+                    {
+                        "code": "PACE_CHART_TOO_FAST",
+                        "level": "warning",
+                        "message": (
+                            f"pace_chart segment '{label}': actual cut freq {actual_freq:.3f}/s "
+                            f"exceeds declared '{declared_freq}' range [{lo:.2f}, {hi:.2f}]"
+                        ),
+                    }
+                )
+
+    codes = sorted({str(x.get("code")) for x in issues})
+    return {
+        "ok": not issues,
+        "codes": codes,
+        "warning_count": len(issues),
+        "issues": issues,
+        "segments_checked": segments_checked,
+        "note": "P4-extend: verifies actual cut frequency vs declared pace_chart. Soft by default.",
+    }
