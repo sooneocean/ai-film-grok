@@ -50,7 +50,9 @@ def _make_moving_clip(path: Path, *, duration: float = 2.0, fps: int = 30) -> No
 class EditPolicyUnitTests(unittest.TestCase):
     @pytest.mark.slow
     def test_plan_stretch_long_target_is_loop_not_freeze(self) -> None:
-        plan = edit_policy.plan_stretch(6.0, 14.0)
+        # Use a long (non-shortform) plate so loop is permitted: shortform
+        # (src <= 7.5s) forbids loop to prevent "跑两遍" double-play.
+        plan = edit_policy.plan_stretch(10.0, 24.0)
         self.assertEqual(plan["mode"], "loop")
         self.assertEqual(plan["freeze_sec"], 0.0)
         self.assertGreaterEqual(plan["loops"], 1)
@@ -227,15 +229,17 @@ class StretchAndTransitionIntegrationTests(unittest.TestCase):
             root = Path(tmp)
             src = root / "src.mp4"
             dest = root / "out.mp4"
-            _make_moving_clip(src, duration=2.0)
-            plan = render_final.stretch_clip(src, dest, target=6.0, width=320, height=568, fps=30)
+            # Use a non-shortform plate (>= 8s) so loop is permitted for the
+            # long-target stretch; shortform (<= 7.5s) forbids loop.
+            _make_moving_clip(src, duration=8.0)
+            plan = render_final.stretch_clip(src, dest, target=20.0, width=320, height=568, fps=30)
             self.assertEqual(plan["mode"], "loop")
             self.assertEqual(plan["freeze_sec"], 0.0)
             self.assertTrue(dest.is_file())
             qa = media_qa.analyze_media(dest, require_audio=False, require_motion=True)
             self.assertTrue(qa.get("ok"), qa)
             self.assertTrue(qa.get("motion_ok"), qa)
-            self.assertGreaterEqual(qa.get("duration_sec", 0), 5.5)
+            self.assertGreaterEqual(qa.get("duration_sec", 0), 18.0)
 
     @pytest.mark.slow
     def test_concat_videos_inserts_xfade_shortening_duration(self) -> None:

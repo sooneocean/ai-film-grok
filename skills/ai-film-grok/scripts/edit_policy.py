@@ -37,6 +37,10 @@ NO_LOOP_DRAMATIC_FUNCTIONS = frozenset(
 SHORTFORM_NO_DOUBLE_RATIO = 1.50
 # Typical Grok I2V plate length — never full-replay these unless author forces loop bed
 SHORTFORM_SRC_MAX_SEC = 7.5
+# When forbid_loop cannot cover the target, clamp is allowed for mild shortfall
+# (agent can pad VO). Below this ratio of target, raise PolicyError instead —
+# a 6s plate clamped to ~7s for a 14s target is a silently broken clip.
+FORBID_LOOP_SEVERE_SHORTFALL_RATIO = 0.70
 
 # Inter-shot transition (visual + matching audio acrossfade)
 # Slightly longer soft dissolve reads as "丝滑" on vertical short-form
@@ -521,8 +525,9 @@ def plan_stretch(
     beat = (dramatic_function or "").strip().lower()
     if beat in NO_LOOP_DRAMATIC_FUNCTIONS:
         forbid_loop = True
-    # P0 · 2026-07-23: short I2V (~6s) stream_loop always reads as “跑两遍”
-    if src_dur <= SHORTFORM_SRC_MAX_SEC:
+    # P0 · 2026-07-23: typical short I2V plates (~4–7.5s) stream_loop reads
+    # as “跑两遍”; very short source clips still need looping to reach a shot.
+    if 4.0 <= src_dur <= SHORTFORM_SRC_MAX_SEC:
         forbid_loop = True
     ratio = target / src_dur
     max_freeze = MAX_FREEZE_PAD_NO_LOOP_SEC if forbid_loop else MAX_FREEZE_PAD_SEC
@@ -556,6 +561,11 @@ def plan_stretch(
             return _setpts_pad_plan(src_dur, target, ratio, max_freeze=max_freeze, forbid_loop=True)
         except PolicyError:
             natural = src_dur * MAX_SPEEDUP + max_freeze
+            # Severe shortfall: clamp would silently produce a clip far shorter
+            # than the VO (e.g. 6s plate → 7s natural for a 14s target).
+            # Fail closed so the agent shortens nar / re-I2Vs at a longer duration.
+            if natural < target * FORBID_LOOP_SEVERE_SHORTFALL_RATIO:
+                raise
             plan = _setpts_pad_plan(
                 src_dur,
                 natural,

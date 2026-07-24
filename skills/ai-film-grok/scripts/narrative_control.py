@@ -113,12 +113,21 @@ def _set_control(node: dict[str, Any], **updates: Any) -> None:
     node["control"] = current
 
 
-def iter_nodes(graph: dict[str, Any]) -> Iterable[tuple[str, str, dict[str, Any], str | None]]:
-    """Yield (node_ref, node_type, node, parent_ref) in stable tree order."""
+def iter_nodes(
+    graph: dict[str, Any], *, normalize: bool = True
+) -> Iterable[tuple[str, str, dict[str, Any], str | None]]:
+    """Yield (node_ref, node_type, node, parent_ref) in stable tree order.
+
+    When ``normalize=True`` (default), a deep-copied normalized copy is
+    traversed — safe for read-only consumers but writes to ``node`` are
+    discarded. Pass ``normalize=False`` when you need to mutate nodes in place
+    (e.g. ensure_graph_controls, node_index for descendants writes).
+    """
     # Local import avoids the story_plan ↔ narrative_control module cycle.
     from story_plan import normalize_story_graph
 
-    graph = normalize_story_graph(graph)
+    if normalize:
+        graph = normalize_story_graph(graph)
     story = graph.get("story")
     if isinstance(story, dict):
         yield "story", "story", story, None
@@ -151,7 +160,9 @@ def iter_nodes(graph: dict[str, Any]) -> Iterable[tuple[str, str, dict[str, Any]
 
 def node_index(graph: dict[str, Any]) -> dict[str, tuple[str, str, dict[str, Any], str | None]]:
     out: dict[str, tuple[str, str, dict[str, Any], str | None]] = {}
-    for row in iter_nodes(graph):
+    # normalize=False: keep original node refs so descendants() callers
+    # (edit_node, mark_replan) mutate the real graph, not a deepcopy.
+    for row in iter_nodes(graph, normalize=False):
         ref, node_type, node, parent = row
         out[ref] = row
         out.setdefault(f"{node_type}:{ref}", row)
@@ -186,7 +197,10 @@ def ensure_graph_controls(graph: dict[str, Any]) -> dict[str, Any]:
     graph.setdefault("lock_scopes", [])
     if graph.get("state") not in CONTROL_STATES:
         graph["state"] = "draft"
-    for _, _, node, _ in iter_nodes(graph):
+    # normalize=False: write control into the ORIGINAL graph nodes, not the
+    # deepcopy that normalize_story_graph produces (writing to the copy
+    # silently discards the control field, causing KeyError in callers).
+    for _, _, node, _ in iter_nodes(graph, normalize=False):
         node["control"] = _control(node)
     graph["content_sha256"] = graph_content_sha256(graph)
     return graph
@@ -943,7 +957,8 @@ def _scope_nodes(
     if scope not in LOCK_SCOPES:
         raise NarrativeControlError(f"unknown lock scope: {scope}", code="UNKNOWN_LOCK_SCOPE")
     wanted = {"story": {"story"}, "beats": {"beat"}, "shots": {"shot"}, "panels": {"panel"}}[scope]
-    return [row for row in iter_nodes(graph) if row[1] in wanted]
+    # normalize=False: lock_scope writes locked state into the real nodes.
+    return [row for row in iter_nodes(graph, normalize=False) if row[1] in wanted]
 
 
 def lock_scope(graph: dict[str, Any], scope: str, *, user_phrase: str) -> dict[str, Any]:

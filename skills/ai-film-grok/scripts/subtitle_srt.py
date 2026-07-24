@@ -89,7 +89,9 @@ def write_srt_file(path: Path | str, cues: list[dict[str, Any]]) -> Path:
     end<=start, and overlap are hard errors.  This catches the P0
     "字幕空窗" bug where cues were silently dropped.
     """
-    target = Path(path).expanduser().resolve()
+    # Keep the lexical path: resolving here follows a symlink and would make
+    # os.replace overwrite an external target instead of replacing the link.
+    target = Path(path).expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
     # Use write_json's atomic-write pattern (temp file + os.replace)
     # but write plain text, not JSON.
