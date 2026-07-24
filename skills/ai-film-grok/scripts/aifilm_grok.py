@@ -612,18 +612,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     # P4-3: art check — run director methodology verification
     if getattr(args, "art_check", False):
         art_report: dict[str, Any] = {"ok": True, "checks": {}}
-        for film_root_str in getattr(args, "_art_roots", ["."]):
-            film_root = Path(film_root_str).expanduser().resolve()
-            if (film_root / "film-spec.json").is_file():
-                try:
-                    from director_cli import verify as director_verify
+        film_root = Path(getattr(args, "art_root", ".")).expanduser().resolve()
+        if (film_root / "film-spec.json").is_file():
+            try:
+                from director_cli import verify as director_verify
 
-                    result = director_verify(film_root)
-                    art_report["checks"][str(film_root)] = result
-                    if not result.get("ok"):
-                        art_report["ok"] = False
-                except Exception as exc:  # noqa: BLE001
-                    art_report["checks"][str(film_root)] = {"ok": False, "error": str(exc)[:200]}
+                result = director_verify(film_root)
+                art_report["checks"][str(film_root)] = result
+                if not result.get("ok"):
+                    art_report["ok"] = False
+            except Exception as exc:  # noqa: BLE001
+                art_report["checks"][str(film_root)] = {"ok": False, "error": str(exc)[:200]}
         report["art_check"] = art_report
 
     emit(report)
@@ -5223,6 +5222,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--art-check",
         action="store_true",
         help="Also run director methodology verification (pace_chart/act_structure/music_spotting)",
+    )
+    doctor.add_argument(
+        "--art-root",
+        default=".",
+        help="Film root for --art-check (default: current dir)",
     )
     sub.add_parser(
         "lock-runtime", help="Fingerprint the current verified Python/FFmpeg/script runtime"
