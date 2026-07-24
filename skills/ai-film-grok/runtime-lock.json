@@ -135,7 +135,7 @@
     "scripts/reference_audit.py": "09e7bf0abdeaa60f14abb3436052dcf5d0636f1214bf27a2a80bc045773251d2",
     "scripts/render_final.py": "7c85d65010c1558ece2714c3594fe2349dde5f96e4eea36bae43607bf82afca2",
     "scripts/render_workspace.py": "b0d7bc1184d96a45cd1b3f2e0327478cb74ed63c0c5664841e5052f95ac6c84b",
-    "scripts/rhythm.py": "4828eb411b52844a4f4bcd95e1589764e892dd1030d8b1e3e573463e334a01ad",
+    "scripts/rhythm.py": "28c6d95d164f67313ac7c1d9ccb16cd7f80deecf8610f51d4e8bd6f966bdcc11",
     "scripts/runtime_policy.py": "705411aa5c11dd857c7858c7020edd5dacad9992ffcbc65ca414943d30423b12",
     "scripts/security_policy.py": "a25d5c352f263b2c5e8037309dc0cafec50e515f9277591f3b169993b49be1e8",
     "scripts/seedance_bridge.py": "b8bb4fe8e1b526076346591de22bcee895c9189244a2128fcf26366cd1fe6aaa",

@@ -7,6 +7,7 @@ Verifies:
 - Legacy string pace_chart entries are skipped gracefully
 - Empty pace_chart or shots → ok
 """
+
 from __future__ import annotations
 
 import sys

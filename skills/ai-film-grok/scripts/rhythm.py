@@ -189,10 +189,10 @@ def verify_pace_chart(
 
         # Map declared cut_freq to expected range
         freq_ranges = {
-            "slow": (0.0, 0.15),      # ≤1 shot per 6.5s
-            "medium": (0.15, 0.3),    # ~1 shot per 3-6s
-            "fast": (0.3, 0.6),       # ~1 shot per 1.5-3s
-            "rapid": (0.6, 99.0),     # >1 shot per 1.5s
+            "slow": (0.0, 0.15),  # ≤1 shot per 6.5s
+            "medium": (0.15, 0.3),  # ~1 shot per 3-6s
+            "fast": (0.3, 0.6),  # ~1 shot per 1.5-3s
+            "rapid": (0.6, 99.0),  # >1 shot per 1.5s
         }
 
         if declared_freq and declared_freq in freq_ranges:

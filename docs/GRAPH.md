@@ -58,6 +58,7 @@ flowchart TD
 - `test_auto_cut.py`
 - `test_axis_jump_gate.py`
 - `test_benchmark.py`
+- `test_burn_srt_pil.py`
 - `test_capability.py`
 - `test_caption_frame_audit.py`
 - `test_cast_hair_makeup_locks.py`
@@ -112,6 +113,7 @@ flowchart TD
 - `test_frame_promote.py`
 - `test_framing_lint.py`
 - `test_frw_degrade_docs.py`
+- `test_frw_subprocess_contract.py`
 - `test_gaze_tracking.py`
 - `test_generation_usage.py`
 - `test_genre_beat_spines.py`
@@ -143,6 +145,7 @@ flowchart TD
 - `test_next_actions.py`
 - `test_opt2_edge_queue_framing.py`
 - `test_p2_director_control.py`
+- `test_pace_chart_verify.py`
 - `test_performance_director_board.py`
 - `test_performance_timeline.py`
 - `test_phase_f_audio_status.py`
