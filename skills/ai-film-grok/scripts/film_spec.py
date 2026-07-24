@@ -46,7 +46,7 @@ from edit_policy import (
     suggest_transition_styles,
     validate_motion,
 )
-from framing_lint import lint_framing_iron, lint_vertical_safe_area
+from framing_lint import lint_composition_rules, lint_framing_iron, lint_vertical_safe_area
 from rhythm import lint_rhythm
 from security_policy import SecurityPolicyError, validate_identifier
 from sound_plan import (
@@ -1573,6 +1573,22 @@ def validate_film_spec(
         raise FilmSpecError(
             "vertical safe-area lint failed (vertical_safe_area_strict): "
             + ",".join(safe_area["codes"] or ["VERTICAL_SAFE_AREA"])
+        )
+
+    # Composition rules P1-7 (180° axis / 30° / eyeline / size progression)
+    # Soft by default; composition_strict raises.
+    compr = lint_composition_rules(shots)
+    spec["_composition_rules"] = {
+        "ok": compr["ok"],
+        "codes": compr["codes"],
+        "warning_count": compr["warning_count"],
+        "error_count": compr["error_count"],
+        "issues": compr["issues"],
+        "note": compr.get("note"),
+    }
+    if spec.get("composition_strict") is True and not compr["ok"]:
+        raise FilmSpecError(
+            "composition rules lint failed (composition_strict): " + ",".join(compr["codes"])
         )
 
     # Heat + cast: elastic (no auto-pin heat_scale; metrics optional)

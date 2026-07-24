@@ -716,6 +716,51 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 )
             )
 
+        # --- Composition rules P1-7 (180° axis / 30° / eyeline / size progression) ---
+        # Soft by default; hard when composition_strict (premium).
+        try:
+            from framing_lint import lint_composition_rules
+
+            shots_comp: list = []
+            if isinstance(spec.get("scenes"), list):
+                for sc in spec["scenes"]:
+                    if isinstance(sc, dict) and isinstance(sc.get("shots"), list):
+                        shots_comp.extend(sc["shots"])
+            if len(shots_comp) >= 2:
+                compr = lint_composition_rules(shots_comp)
+                comp_codes = list(compr.get("codes") or [])
+                if comp_codes:
+                    comp_strict = spec.get("composition_strict") is True
+                    comp_summary = (
+                        f"composition rules violation: {comp_codes} "
+                        f"(warn={compr.get('warning_count')}) — "
+                        f"{(compr.get('issues') or [{}])[0].get('message', '')[:140]}"
+                    )
+                    comp_fix = (
+                        "分镜构图法则: 180°轴线不跳（bridge/axis_break 例外）；"
+                        "30°原则（相邻同景别须换角度）；eyeline match（视线方向→对侧）；"
+                        "景别递进（禁连续3镜同 size）。见 references/director-methodology.md §二-10"
+                    )
+                    comp_issue = _issue(
+                        "hard" if comp_strict else "soft",
+                        "composition_rules_violation",
+                        comp_summary,
+                        fix=comp_fix,
+                    )
+                    if comp_strict:
+                        hard.append(comp_issue)
+                    else:
+                        soft.append(comp_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "composition_rules_probe_error",
+                    f"composition rules lint probe failed: {exc}"[:200],
+                    fix="check framing_lint.lint_composition_rules",
+                )
+            )
+
         # Long-form continuity_chain.md (hard if missing)
         try:
             from continuity_chain import check_continuity_chain, is_long_form
