@@ -608,6 +608,24 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     report.update(readiness)
     if not report["ok"] and "error" not in report:
         report["error"] = "Core readiness failed; inspect core_readiness.failed_checks"
+
+    # P4-3: art check — run director methodology verification
+    if getattr(args, "art_check", False):
+        art_report: dict[str, Any] = {"ok": True, "checks": {}}
+        for film_root_str in getattr(args, "_art_roots", ["."]):
+            film_root = Path(film_root_str).expanduser().resolve()
+            if (film_root / "film-spec.json").is_file():
+                try:
+                    from director_cli import verify as director_verify
+
+                    result = director_verify(film_root)
+                    art_report["checks"][str(film_root)] = result
+                    if not result.get("ok"):
+                        art_report["ok"] = False
+                except Exception as exc:  # noqa: BLE001
+                    art_report["checks"][str(film_root)] = {"ok": False, "error": str(exc)[:200]}
+        report["art_check"] = art_report
+
     emit(report)
     return 0 if (report["strict_ok"] if getattr(args, "strict", False) else report["ok"]) else 1
 
