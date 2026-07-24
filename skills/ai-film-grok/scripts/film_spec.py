@@ -15,6 +15,7 @@ from continuity import (
     lint_continuity,
     lint_frame_chain,
     lint_meaningful_motion,
+    lint_production_consistency,
     lint_transition_styles,
     lint_vo_motion_link,
 )
@@ -1540,6 +1541,24 @@ def validate_film_spec(
     if spec.get("framing_strict") is True and (frm["warning_count"] > 0 or frm["error_count"] > 0):
         raise FilmSpecError(
             "framing iron lint failed (framing_strict): " + ",".join(frm["codes"] or ["FRAMING"])
+        )
+
+    # Production consistency P2-2~P2-6 (wardrobe/hair/makeup/light/rhythm/lipsync/voice drift)
+    # Soft by default; production_consistency_strict raises. bible=spec so cast_locks/
+    # hair_swatches/makeup/wardrobe_variants on spec (often mirrored from style-bible) are checked.
+    pcr = lint_production_consistency(shots, bible=spec, spec=spec)
+    spec["_production_consistency"] = {
+        "ok": pcr["ok"],
+        "codes": pcr["codes"],
+        "warning_count": pcr["warning_count"],
+        "error_count": pcr["error_count"],
+        "issues": pcr["issues"],
+        "note": pcr.get("note"),
+    }
+    if spec.get("production_consistency_strict") is True and not pcr["ok"]:
+        raise FilmSpecError(
+            "production consistency lint failed (production_consistency_strict): "
+            + ",".join(pcr["codes"])
         )
 
     safe_area = lint_vertical_safe_area(shots)

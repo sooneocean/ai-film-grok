@@ -670,6 +670,52 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 )
             )
 
+        # --- Production consistency P2-2~P2-6 (wardrobe/hair/makeup/light/rhythm/lipsync/voice drift) ---
+        # Soft by default; hard when production_consistency_strict (premium).
+        try:
+            from continuity import lint_production_consistency
+
+            shots_pc: list = []
+            if isinstance(spec.get("scenes"), list):
+                for sc in spec["scenes"]:
+                    if isinstance(sc, dict) and isinstance(sc.get("shots"), list):
+                        shots_pc.extend(sc["shots"])
+            if shots_pc:
+                pcr = lint_production_consistency(shots_pc, bible=style, spec=spec)
+                pc_codes = list(pcr.get("codes") or [])
+                if pc_codes:
+                    pc_strict = spec.get("production_consistency_strict") is True
+                    pc_summary = (
+                        f"production consistency drift: {pc_codes} "
+                        f"(warn={pcr.get('warning_count')}) — "
+                        f"{(pcr.get('issues') or [{}])[0].get('message', '')[:140]}"
+                    )
+                    pc_fix = (
+                        "跨镜头一致性: 角色服装/发型/妆造/场景光影/运镜节奏/口型/声线 "
+                        "须与 cast_locks/hair_swatches/make-up/wardrobe_variants 锚一致；"
+                        "漂移只修上游（状态照/cast master），禁平行重抽。"
+                        "见 references/consistency.md §1b/§1e · director-methodology.md §三-2"
+                    )
+                    pc_issue = _issue(
+                        "hard" if pc_strict else "soft",
+                        "production_consistency_drift",
+                        pc_summary,
+                        fix=pc_fix,
+                    )
+                    if pc_strict:
+                        hard.append(pc_issue)
+                    else:
+                        soft.append(pc_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "production_consistency_probe_error",
+                    f"production consistency lint probe failed: {exc}"[:200],
+                    fix="check continuity.lint_production_consistency",
+                )
+            )
+
         # Long-form continuity_chain.md (hard if missing)
         try:
             from continuity_chain import check_continuity_chain, is_long_form
