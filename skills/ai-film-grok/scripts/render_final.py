@@ -2228,6 +2228,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         out = work / f"v_{i:02d}_{item['id']}.mp4"
         shot_meta = shots_by_id.get(item["id"], {})
         beat = shot_meta.get("dramatic_function") if isinstance(shot_meta, dict) else None
+        checkpoint_contract = {
+            "tts_backend": str(tts_backend),
+            "vo_mode": vo_mode,
+            "lipsync": lipsync_mode,
+            "native_audio_volume": native_audio_volume,
+        }
         checkpoint_signature = checkpoint.signature(
             item["clip"],
             target=float(item["target"]),
@@ -2237,6 +2243,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             lipsync=lipsync_mode,
             in_point_sec=item.get("in_point_sec"),
             out_point_sec=item.get("out_point_sec"),
+            contract=checkpoint_contract,
         )
         if resume:
             cached = checkpoint.get(item["id"], checkpoint_signature)
@@ -2362,6 +2369,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             output=out,
             metadata={
                 "target": item["target"],
+                "checkpoint_contract": checkpoint_contract,
                 "stretch_plan": item.get("stretch_plan"),
                 "lipsync": next(
                     (entry for entry in reversed(lipsync_report) if entry.get("id") == item["id"]),

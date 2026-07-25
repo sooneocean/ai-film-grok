@@ -44,6 +44,7 @@ class CheckpointManager:
         lipsync: str,
         in_point_sec: float | None = None,
         out_point_sec: float | None = None,
+        contract: dict[str, Any] | None = None,
     ) -> str:
         source = Path(clip).expanduser().resolve()
         stat = source.stat()
@@ -60,6 +61,7 @@ class CheckpointManager:
             "lipsync": str(lipsync),
             "in_point_sec": in_point_sec,
             "out_point_sec": out_point_sec,
+            "contract": contract or {},
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()

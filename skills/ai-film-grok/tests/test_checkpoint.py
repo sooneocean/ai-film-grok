@@ -39,6 +39,16 @@ def test_checkpoint_roundtrip_and_resume_requires_matching_signature(tmp_path: P
     assert record is not None
     assert record["metadata"]["target"] == 4.0
     assert restored.get("shot01", "0" * 64) is None
+    changed_contract = restored.signature(
+        clip,
+        target=4.0,
+        width=720,
+        height=1280,
+        fps=30,
+        lipsync="off",
+        contract={"tts_backend": "edge"},
+    )
+    assert changed_contract != signature
     assert (
         json.loads((tmp_path / "receipts/checkpoints/final-render.json").read_text())[
             "schema_version"
