@@ -4457,116 +4457,37 @@ def cmd_generation_usage(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") else 2
 
 
-def cmd_metrics(args: argparse.Namespace) -> int:
-    from optimization_metrics import emit_metrics
-    from pipeline_events import append_event, load_events
+def _run_optimization_cli(args: argparse.Namespace, action: str) -> int:
+    from cli_optimization import OptimizationCliError, dashboard, experiment, gold, metrics
 
-    action = args.metrics_action
+    runners = {
+        "metrics": metrics,
+        "experiment": experiment,
+        "gold": gold,
+        "dashboard": dashboard,
+    }
     try:
-        if action == "emit":
-            report = emit_metrics(args.root, run_id=args.run_id)
-        elif action == "status":
-            events, invalid = load_events(args.root)
-            report = {
-                "ok": not invalid,
-                "kind": "pipeline-events-status",
-                "event_count": len(events),
-                "invalid": invalid,
-            }
-        else:
-            event = append_event(
-                args.root,
-                stage=args.stage,
-                phase="human_time",
-                human_minutes=args.minutes,
-                actor=args.actor,
-                note=args.note,
-                run_id=args.run_id,
-            )
-            report = {"ok": True, "kind": "human-time", "event": event}
-    except (ValueError, OSError) as exc:
+        report, code = runners[action](args)
+    except OptimizationCliError as exc:
         raise FilmError(str(exc)) from exc
     emit(report)
-    return 0 if report.get("ok", True) else 2
+    return code
+
+
+def cmd_metrics(args: argparse.Namespace) -> int:
+    return _run_optimization_cli(args, "metrics")
 
 
 def cmd_experiment(args: argparse.Namespace) -> int:
-    from optimization_experiments import (
-        decide,
-        diff_experiment,
-        import_arm,
-        init_experiment,
-        run_request,
-    )
-
-    try:
-        if args.experiment_action == "init":
-            report = init_experiment(
-                args.root,
-                experiment_id=args.id,
-                hypothesis=args.hypothesis,
-                treatment_axis=args.treatment_axis,
-                primary_metric=args.primary_metric,
-                min_effect=args.min_effect,
-                fixtures=args.fixture,
-                seed=args.seed,
-                shot_count=args.shot_count,
-                aspect=args.aspect,
-                duration_budget_sec=args.duration_budget_sec,
-            )
-        elif args.experiment_action == "import":
-            config = {
-                "fixtures": args.fixture,
-                "seed": args.seed,
-                "shot_count": args.shot_count,
-                "aspect": args.aspect,
-                "duration_budget_sec": args.duration_budget_sec,
-            }
-            report = import_arm(
-                args.root,
-                experiment_id=args.id,
-                arm=args.arm,
-                metrics_root=args.metrics_root,
-                config=config,
-            )
-        elif args.experiment_action == "run":
-            report = run_request(
-                args.root,
-                experiment_id=args.id,
-                arm=args.arm,
-                authorize_spend=args.authorize_spend,
-                max_usd=args.max_usd,
-            )
-        elif args.experiment_action == "diff":
-            report = diff_experiment(args.root, experiment_id=args.id)
-        else:
-            report = decide(args.root, experiment_id=args.id, decision=args.decision)
-    except (ValueError, OSError) as exc:
-        raise FilmError(str(exc)) from exc
-    emit(report)
-    return 0
+    return _run_optimization_cli(args, "experiment")
 
 
 def cmd_gold(args: argparse.Namespace) -> int:
-    from gold_calibration import calibrate
-
-    try:
-        report = calibrate(args.manifest)
-    except (ValueError, OSError) as exc:
-        raise FilmError(str(exc)) from exc
-    emit(report)
-    return 0 if report.get("ok") else 2
+    return _run_optimization_cli(args, "gold")
 
 
 def cmd_dashboard(args: argparse.Namespace) -> int:
-    from optimization_dashboard import build
-
-    try:
-        report = build(args.roots_dir, days=args.days, out=args.out)
-    except (ValueError, OSError) as exc:
-        raise FilmError(str(exc)) from exc
-    emit(report)
-    return 0
+    return _run_optimization_cli(args, "dashboard")
 
 
 def _cmd_graph_legacy(args: argparse.Namespace) -> int:
