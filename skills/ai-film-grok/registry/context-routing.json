@@ -50,6 +50,11 @@
         "path": "references/stages/post.md",
         "reason": "Audio, edit and designed post",
         "required": true
+      },
+      {
+        "path": "references/lessons-2026-07-24-ep2-voice-heat-final.md",
+        "reason": "final SRT/sub_lead/register-clip 工程坑",
+        "required": false
       }
     ],
     "verified": [
@@ -65,6 +70,11 @@
       {
         "path": "references/stages/voice.md",
         "reason": "Voice, dialogue and mix routing",
+        "required": true
+      },
+      {
+        "path": "references/lessons-2026-07-24-ep2-voice-heat-final.md",
+        "reason": "P0 口白中文/角色日文/禁乒乓 + final SRT 坑",
         "required": true
       }
     ],
@@ -131,6 +141,11 @@
         "path": "references/stages/voice.md",
         "reason": "Audio contract and mix evidence",
         "required": true
+      },
+      {
+        "path": "references/lessons-2026-07-24-ep2-voice-heat-final.md",
+        "reason": "Hybrid ZH/JA voice contract and anti-switch",
+        "required": false
       }
     ],
     "quality.inspect": [

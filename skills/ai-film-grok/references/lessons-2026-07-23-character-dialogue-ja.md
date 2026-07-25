@@ -5,8 +5,23 @@
 
 ## 一句话
 
-**角色开口（对白）→ 日文 TTS；说书旁白 → 中文 TTS；烧进画面的字幕 → 默认中文。**  
+**角色开口（对白）→ 日文 TTS；说书口白/旁白 → 中文 TTS；烧进画面的字幕 → 默认中文。**  
 禁止把 `zh-CN-*-Neural` 塞给「角色在说」的镜，也禁止用日文 TTS 文本当唯一字幕源。
+
+### P0 · 禁止突然中日切换（2026-07-24 强化）
+
+用户硬令：**口白用中文，角色用日文；不要镜镜乱跳。**
+
+| 层 | 语言 | speaker | 字段 |
+|----|------|---------|------|
+| **口白/说书** | **中文 only** | `storyteller` / `narrator` | 只 `nar`；**禁止** `nar_ja` |
+| **角色开口** | **日文 only** | `heroine` / `partner` / 具名 | `nar`(中文字幕) + **`nar_ja` 必填** |
+| **字幕** | **中文** | — | 烧 `nar`，永不默认烧 `nar_ja` |
+
+- **成块切换**：开场说书中文成段 → 身体/情绪段角色日文成段 → 蒙太奇/章卡回中文。禁止无 `speaker` 理由的 `ZH→JA→ZH→JA` 乒乓。  
+- **禁赶片删轨**：禁止为出片清空全部 `nar_ja` 改「全中文方案 B」。  
+- **禁说书填日文**：`speaker=storyteller` 时写了 `nar_ja` 会误触发角色轨，听感乱。  
+- 详课（含 final/SRT/肉戏坑）：[lessons-2026-07-24-ep2-voice-heat-final.md](lessons-2026-07-24-ep2-voice-heat-final.md)
 
 ---
 
@@ -84,17 +99,22 @@
 ## Agent 纪律
 
 - 写镜时：角色开口 **同时** 写 `nar`（中文）+ `nar_ja`（日文）+ `speaker`
+- 说书镜：**只** `nar` 中文 + `speaker=storyteller`，清空 `nar_ja`/`dialogue_ja`
+- final 前打印 `speaker|voice|spoken_lang` 表：相邻语言跳变必须对应 speaker 层变化
 - `write-spec`：`dialogue_spoken_lang=ja` 且角色镜缺 `nar_ja` → soft fail/报告，final 前补齐
 - 用户显式「对白也要中文」→ 设 `dialogue_spoken_lang: "zh"` 并清日文 voice
+- **禁止**「赶片清空 nar_ja」；用户要 hybrid 时保持分轨
 - 与 [subs-always-burn-hard](lessons-2026-07-23-subs-always-burn-hard.md) 并存：**字幕语言 ≠ 对白 TTS 语言**
+- 与 [ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md) 并存：final/SRT/肉戏工程坑
 
 ---
 
 ## 验收
 
 - [ ] 角色近景对白听感为日文（Nanami/Keita 或用户锁声）
-- [ ] 旁白镜仍为中文
+- [ ] **口白/说书镜仍为中文**（非日文说书）
 - [ ] 主 mp4 抽帧可见 **中文**字幕
+- [ ] **无无理由的中日乒乓**（成块切换，speaker 可解释）
 - [ ] `cast_voices` 一角一声，无跨镜随机
 - [ ] 未把 `zh-CN-*` 名塞进 ElevenLabs / CosyVoice
 

@@ -80,6 +80,8 @@ jobs:
           python -m pip install ruff
           ruff check skills/ai-film-grok/scripts/
           ruff format --check skills/ai-film-grok/scripts/
+          ruff check --config skills/ai-film-grok/pyproject.toml scripts/project_audit.py scripts/audit_lessons.py
+          ruff format --check --config skills/ai-film-grok/pyproject.toml scripts/project_audit.py scripts/audit_lessons.py
 
       - name: aifilm doctor (schema + script fingerprint gate)
         working-directory: skills/ai-film-grok
@@ -119,6 +121,7 @@ jobs:
         run: |
           pip install coverage
           coverage run -m pytest tests/ -q --tb=line -m "not slow"
+          coverage report --fail-under=58
           coverage json -o coverage.json
 
       - name: Upload coverage trend input

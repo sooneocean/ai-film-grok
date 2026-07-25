@@ -15,7 +15,7 @@ Grok SDK 拉满画面顶格 suggestive；审核软化时 **VO/SFX/insert 双轨�
 | 成人 / 办事 / 性爱 / 里番 / 尺度拉满… | `heat_scale=max` + `ADULT_MAX` 脊柱 |
 | 重口 / 男向 / 尺度太小… | + `audience_profile=hardcore_male` + 六拍/景别 **strict** |
 
-`story_plan.detect_heat_signals` · **无证据不钉 max**。
+`story_plan.detect_heat_signals` · 成人/脱/裸/办事信号 → 钉 max + extreme；显式 soft/降火除外。
 
 ## 八环 × 工具
 
@@ -29,13 +29,16 @@ Grok SDK 拉满画面顶格 suggestive；审核软化时 **VO/SFX/insert 双轨�
 | Selects | `review-shot` | coitus 证据建议填 |
 | Rough/Final | montage hard + rnb | escalation 可勾 |
 
-## 机器闸（write-spec · v1.10）
+## 机器闸（write-spec · IRON 2026-07-24）
 
 | 闸 | 字段 | max 默认 |
 |---|---|---|
-| 性爱秒数 | `sex_floor_strict` | hard **≥30%**（hardcore **≥40%**） |
-| 卸装 | `sex_wardrobe_strict` | hard |
-| 荤 VO | `sex_vo_strict` | hard；`spice_level` explicit\|**extreme** |
+| 性爱秒数 | `sex_floor_strict` | hard **≥50%**（hardcore **≥55%**） |
+| 亲密核 / setup | `heat_arc_strict` | hard 亲密 **≥60%** · setup **≤20%** |
+| **持续挑战最大** | `challenge_max_scale` + `heat_arc_strict` | hard：phase 只升→climax；禁泄火/长 foreplay；`HEAT_ESCALATION_*` |
+| 卸装 + 露点 | `sex_wardrobe_strict` | hard：act≥undressed · climax=**bare** · `HEAT_BARE_PEAK_MISSING` |
+| 自动脱衣 | `apply_wardrobe_continuity` | phase floor 自动抬升（能脱就脱） |
+| 荤 VO | `sex_vo_strict` | hard；`spice_level` **extreme** |
 | 声画同动词 | `sex_vo_motion_strict` | hardcore hard |
 | 性交六拍 | `coitus_strict` | hardcore 或 `coitus_grammar.enabled` |
 | 景别 | `size_ladder_strict` | hardcore |

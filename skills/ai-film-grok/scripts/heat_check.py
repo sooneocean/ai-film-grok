@@ -100,13 +100,19 @@ def heat_check(root: Path) -> dict[str, Any]:
             "sex_floor_strict": spec.get("sex_floor_strict"),
             "sex_wardrobe_strict": spec.get("sex_wardrobe_strict"),
             "sex_vo_strict": spec.get("sex_vo_strict"),
+            "heat_arc_strict": spec.get("heat_arc_strict"),
             "coitus_strict": spec.get("coitus_strict"),
             "size_ladder_strict": spec.get("size_ladder_strict"),
         },
         "spice_level": rep.get("spice_level") or spec.get("spice_level"),
+        "sex_duration_floor": rep.get("sex_duration_floor"),
+        "intimacy_ratio": rep.get("intimacy_ratio"),
+        "bare_peak_ok": (rep.get("wardrobe") or {}).get("bare_peak_ok"),
         "line": (
             f"heat={heat_scale} spice={rep.get('spice_level') or spec.get('spice_level')} "
-            f"sex={rep.get('sex_duration_ratio')} "
+            f"sex={rep.get('sex_duration_ratio')}/floor={rep.get('sex_duration_floor')} "
+            f"intimacy={rep.get('intimacy_ratio')} "
+            f"bare={(rep.get('wardrobe') or {}).get('bare_peak_ok')} "
             f"wardrobe_ok={(rep.get('wardrobe') or {}).get('ok')} "
             f"vo_ok={(rep.get('vo_spice') or {}).get('ok')} "
             f"coitus_ok={(rep.get('coitus') or {}).get('ok')} "
@@ -129,7 +135,7 @@ def build_heat_report(
         sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
         advise=True,
     )
-    rep.setdefault("sex_duration_floor", float(spec.get("sex_min_duration_ratio") or 0.30))
+    rep.setdefault("sex_duration_floor", float(spec.get("sex_min_duration_ratio") or 0.50))
     rep.setdefault("sex_duration_ratio", 0.0)
     return rep
 

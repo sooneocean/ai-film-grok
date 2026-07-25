@@ -286,7 +286,7 @@ DUAL_CLIMAX_BEAT_SPINE: list[dict[str, Any]] = [
     {**ADULT_MAX_BEAT_SPINE[7], "weight": 0.06},
 ]
 
-# Brief signals → heat (never pin max without evidence)
+# Brief signals → heat (adult max IRON · 2026-07-24: pin max when adult evidence)
 _HEAT_MAX_MARKERS: tuple[str, ...] = (
     "成人",
     "办事",
@@ -295,6 +295,10 @@ _HEAT_MAX_MARKERS: tuple[str, ...] = (
     "色气",
     "大尺度",
     "尺度拉满",
+    "脱衣",
+    "裸",
+    "露点",
+    "肉戏",
     "heat max",
     "heat_scale=max",
     "heat_scale:max",
@@ -308,6 +312,9 @@ _HEAT_MAX_MARKERS: tuple[str, ...] = (
     "性交",
     "高潮",
     "沉腰",
+    "nude",
+    "undress",
+    "strip",
 )
 _HARDCORE_MARKERS: tuple[str, ...] = (
     "重口",
@@ -473,9 +480,38 @@ def preserve_user_nar(
 
 
 def detect_heat_signals(text: str) -> dict[str, Any]:
-    """Parse brief for heat_scale / hardcore — evidence only, no silent pin."""
+    """Parse brief for heat_scale / hardcore.
+
+    Adult max IRON (2026-07-24): adult markers → heat_scale=max + spice extreme intent.
+    Explicit soft/medium/hot in text still wins as non-max (caller may pass genre).
+    Empty brief does not silent-pin max (genre=adult default handles plan path).
+    """
     raw = (text or "").strip()
     low = raw.lower()
+    # Explicit cool-down wins
+    if any(
+        m in low or m in raw
+        for m in (
+            "heat_scale=soft",
+            "heat_scale:soft",
+            "heat_scale=medium",
+            "heat_scale:medium",
+            "heat soft",
+            "降火",
+            "不要色",
+            "全年龄",
+            "全年齢",
+        )
+    ):
+        return {
+            "heat_scale": "soft",
+            "audience_profile": None,
+            "spine": "default",
+            "hardcore": False,
+            "dual_climax": False,
+            "evidence_max": False,
+            "spice_level": None,
+        }
     hardcore = any(m.lower() in low or m in raw for m in _HARDCORE_MARKERS)
     dual = any(m.lower() in low or m in raw for m in _DUAL_CLIMAX_MARKERS)
     want_max = hardcore or dual or any(m.lower() in low or m in raw for m in _HEAT_MAX_MARKERS)
@@ -495,6 +531,7 @@ def detect_heat_signals(text: str) -> dict[str, Any]:
         "hardcore": hardcore or dual,
         "dual_climax": dual,
         "evidence_max": want_max,
+        "spice_level": "extreme" if want_max else None,
     }
 
 
@@ -2724,9 +2761,15 @@ def project_graph_to_film_spec(
         spec["sex_floor_strict"] = True
         spec["sex_wardrobe_strict"] = True
         spec["sex_vo_strict"] = True
-        spec["spice_level"] = "extreme" if heat.get("hardcore") else "explicit"
+        spec["heat_arc_strict"] = True
+        if heat.get("heat_scale") == "max":
+            spec["challenge_max_scale"] = True  # 持续挑战尺度最大
+        # max IRON: spice always extreme when max
+        spec["spice_level"] = heat.get("spice_level") or (
+            "extreme" if heat.get("heat_scale") == "max" or heat.get("hardcore") else "explicit"
+        )
         if heat.get("hardcore"):
-            spec["sex_min_duration_ratio"] = 0.40
+            spec["sex_min_duration_ratio"] = 0.55
             spec["coitus_strict"] = True
             spec["size_ladder_strict"] = True
             spec["montage_strict"] = True
@@ -2734,9 +2777,9 @@ def project_graph_to_film_spec(
             spec["sex_vo_motion_strict"] = True
             spec["audience_profile"] = "hardcore_male"
         else:
-            # max adult: sex floor product 30% (overrideable)
+            # max adult IRON: sex floor 50% (overrideable)
             if spec.get("sex_min_duration_ratio") is None:
-                spec["sex_min_duration_ratio"] = 0.30
+                spec["sex_min_duration_ratio"] = 0.50
         if coitus_beats:
             spec["coitus_grammar"] = {
                 "enabled": True,

@@ -1,5 +1,8 @@
 # Lessons · 2026-07-21 · 重复 BGM + 纯乐器兜底（收工沉淀）
 
+> **已晋升**：BGM 纯乐器兜底规则已整合进稳定文档 [bgm-generation.md](bgm-generation.md)。
+> 此 lesson 保留为踩坑历史记录。
+
 **层**：voice · **P**：硬兜底有声；听感用纯乐器池；不静默换商
 
 ## 问题

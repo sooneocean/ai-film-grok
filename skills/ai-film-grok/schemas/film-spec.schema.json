@@ -117,7 +117,7 @@
       "type": "number",
       "minimum": 0,
       "maximum": 1,
-      "description": "Min duration_sec share of act+climax (性爱片段). Default 0.20 for heat_scale=max; hardcore_male default 0.40"
+      "description": "Min duration_sec share of act+climax (性爱片段). Default 0.50 for heat_scale=max (adult max IRON 2026-07-24); hardcore_male default 0.55"
     },
     "sex_floor_strict": {
       "type": "boolean",
@@ -125,11 +125,19 @@
     },
     "sex_wardrobe_strict": {
       "type": "boolean",
-      "description": "Hard-fail when act/climax still full armor/dress, undress beat missing, or wardrobe re-dresses mid-film (HEAT_WARDROBE_RE_DRESS). Default true when heat_scale=max. Continuity: wardrobe_state rank only rises; later shots inherit prior undress."
+      "description": "Hard-fail when act/climax not undressed|bare, bare peak missing, undress beat missing, or re-dress (HEAT_BARE_PEAK_MISSING / HEAT_WARDROBE_*). Default true when heat_scale=max. IRON: act≥undressed, climax=bare."
     },
     "sex_vo_strict": {
       "type": "boolean",
       "description": "Hard-fail when nar lacks 荤梗 or act/climax lack sex verbs. Default true when heat_scale=max"
+    },
+    "heat_arc_strict": {
+      "type": "boolean",
+      "description": "Hard-fail when intimacy core <70% or setup >20% on max (HEAT_INTIMACY_RATIO_LOW / HEAT_SETUP_RATIO_HIGH). Default true when heat_scale=max."
+    },
+    "adult_max_iron": {
+      "type": "boolean",
+      "description": "When false, disable auto heat_arc_strict default on max. Agent must not set false to pass gates without user consent."
     },
     "heat_arc_strict": {
       "type": "boolean",
@@ -510,7 +518,7 @@
                 "wardrobe_state": {
                   "type": "string",
                   "enum": ["full", "armored", "partial", "undressed", "bare"],
-                  "description": "Costume ladder (monotonic undress). act/climax must be partial|undressed|bare. Later shots must not re-dress below prior peak. Missing → inherit previous on write-spec. See sex-undress-ladder lesson."
+                  "description": "Costume ladder (monotonic undress). max IRON: act≥undressed, climax=bare; partial only foreplay. Later shots must not re-dress. Missing → inherit + phase escalate on write-spec. See sex-undress-ladder + adult-max iron."
                 },
                 "dsl": {
                   "type": "object",

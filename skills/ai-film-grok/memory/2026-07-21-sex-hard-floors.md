@@ -9,9 +9,10 @@
 
 | # | 规则 | 字段 / 码 | 课 |
 |---|---|---|---|
-| 1 | act+climax **时长 ≥20%** 总片板 | `sex_floor_strict` · `HEAT_SEX_DURATION_LOW` | [sex-duration-floor](../references/lessons-2026-07-21-sex-duration-floor.md) |
-| 2 | 办事 **卸甲/脱衣** → partial\|undressed\|bare；**延续不回穿** | `sex_wardrobe_strict` · `HEAT_SEX_WARDROBE_*` · `HEAT_UNDRESS_BEAT_MISSING` · **`HEAT_WARDROBE_RE_DRESS`** · `apply_wardrobe_continuity` | [sex-undress-ladder](../references/lessons-2026-07-21-sex-undress-ladder.md) |
-| 3 | **每镜 nar 荤梗**；act/climax 办事动词 | `sex_vo_strict` · `HEAT_VO_SPICE_*` | [sex-vo-spice](../references/lessons-2026-07-21-sex-vo-spice.md) |
+| 1 | act+climax **时长 ≥50%** 总片板（IRON 2026-07-24；曾 20%→30%→50%） | `sex_floor_strict` · `HEAT_SEX_DURATION_LOW` | [sex-duration-floor](../references/lessons-2026-07-21-sex-duration-floor.md) · [adult-max-iron](../references/lessons-2026-07-24-adult-max-iron.md) |
+| 2 | 办事 **卸甲/脱衣** → act≥undressed · climax=**bare**；**延续不回穿**；自动 phase 抬升 | `sex_wardrobe_strict` · `HEAT_SEX_WARDROBE_*` · `HEAT_BARE_PEAK_MISSING` · `HEAT_UNDRESS_BEAT_MISSING` · **`HEAT_WARDROBE_RE_DRESS`** · `apply_wardrobe_continuity` | [sex-undress-ladder](../references/lessons-2026-07-21-sex-undress-ladder.md) |
+| 3 | **每镜 nar 荤梗**；act/climax 办事动词；max 默认 **extreme** | `sex_vo_strict` · `HEAT_VO_SPICE_*` | [sex-vo-spice](../references/lessons-2026-07-21-sex-vo-spice.md) |
+| 4 | 亲密 ≥60% · setup ≤20% | `heat_arc_strict` · `HEAT_INTIMACY_RATIO_LOW` · `HEAT_SETUP_RATIO_HIGH` | adult-max-iron |
 
 ## 代码入口
 

@@ -25,6 +25,8 @@ def test_optional_lipsync_absence_does_not_fail_core_or_strict() -> None:
 
     assert report["ok"] is True
     assert report["strict_ok"] is True
+    assert report["strict_status"] == "pass"
+    assert report["strict_blocking"] is False
     assert report["core_readiness"]["failed_checks"] == []
     assert report["optional_capabilities"]["lipsync"]["ready"] is False
 
@@ -52,9 +54,13 @@ def test_environment_advisory_preserves_default_ok_but_fails_strict() -> None:
 
     assert report["ok"] is True
     assert report["strict_ok"] is False
+    assert report["strict_status"] == "advisory_only"
+    assert report["strict_blocking"] is False
     assert report["environment_advisories"] == {
         "ok": False,
         "warnings": ["global permission mode is unsafe"],
+        "severity": "advisory",
+        "blocks_core": False,
     }
 
 
@@ -67,4 +73,6 @@ def test_core_failure_fails_default_and_strict_compatibility_fields() -> None:
 
     assert report["ok"] is False
     assert report["strict_ok"] is False
+    assert report["strict_status"] == "blocked"
+    assert report["strict_blocking"] is True
     assert report["core_readiness"]["failed_checks"] == ["runtime_lock"]

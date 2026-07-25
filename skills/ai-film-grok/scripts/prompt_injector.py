@@ -214,7 +214,7 @@ class PromptInjector:
         char_locks = []
         state_photo_paths: list[str] = []
         try:
-            from scripts.visual_bible import resolve_state_photo
+            from visual_bible import resolve_state_photo
         except Exception:
             try:
                 from visual_bible import resolve_state_photo  # type: ignore
@@ -325,6 +325,26 @@ class PromptInjector:
         if wardrobe_state in {"partial", "undressed", "bare"}:
             costume_line = self._costume_continuity_line(wardrobe_state)
             parts.append(costume_line)
+
+        # 3a. Adult max IRON (能脱就脱 / 能露就露)
+        heat_scale_global = (
+            str(
+                self.bible.get("heat_scale")
+                or (self.bible.get("film") or {}).get("heat_scale")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        if heat_scale_global == "max" or wardrobe_state in {"partial", "undressed", "bare"}:
+            iron = (
+                "Adult max IRON: undress/expose when possible; never re-dress; "
+                "climax must be bare readable; discarded clothes stay off; "
+                "prefer bare skin / undressed over full costume; "
+                "CONTINUOUSLY CHALLENGE MAXIMUM HEAT — escalate every beat, "
+                "never cool down mid-film, never plateau soft, no safer retake language"
+            )
+            parts.append(iron)
 
         # 3b. Coitus / heat pose lock (act/climax — Mute Frame readable)
         heat_phase = (

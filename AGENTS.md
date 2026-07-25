@@ -78,6 +78,9 @@ grok plugin update ai-film-grok
 1. **单一真相**：禁止在 `~/.grok/skills/` 另开可写副本。  
 2. **密钥**：`config.env` 永不提交；只用 `config.env.example`。  
 3. **pilot / bulk**：不自批 pilot；不静默改 `i2v_provider`。  
+4. **声线分轨（P0 · 2026-07-24）**：**口白/说书=中文**；**角色开口=日文**；**字幕=中文**。禁止无 `speaker` 理由的中日乒乓；说书镜禁 `nar_ja`；禁赶片清空日文轨。课：`skills/ai-film-grok/references/lessons-2026-07-24-ep2-voice-heat-final.md`。  
+5. **Adult max IRON（P0 · 2026-07-24）**：肉戏 act+climax **≥50%**；亲密 ≥60%；setup ≤20%；act≥undressed · climax=**bare**；能脱就脱/能露就露（自动抬升）；spice=extreme；**持续挑战尺度最大**（phase 只升、禁泄火、`HEAT_ESCALATION_*`）。课：`lessons-2026-07-24-adult-max-iron.md`。  
+6. **final SRT**：`sub_lead` 默认 0 + cue 钳制；长片直调 `render_final.py`；review 后还要 `register-clip --status approved`。 
 4. **人物对白日文（P0 · 2026-07-23）**：角色开口 TTS 默认 **ja**（`ja-JP-NanamiNeural` / `ja-JP-KeitaNeural`）；说书旁白 **zh**；烧字字幕 **zh**（`nar` 中文 + `nar_ja` 日文 TTS）。见 skill `references/lessons-2026-07-23-character-dialogue-ja.md`。  
 4. **文档分层**：SKILL 短；稳定规则进 `references/`；当日坑进 `lessons-*`，验证后再晋升。  
 5. **完成定义**：doctor 绿 + 相关 pytest 绿 +（若改 CLI）`plugin validate` 过；不是「改完文件」。  

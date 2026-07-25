@@ -6,11 +6,11 @@ SKILL := $(ROOT)/skills/ai-film-grok
 AIFILM := $(SKILL)/scripts/aifilm
 RUNTIME_PYTHON := $(SKILL)/scripts/runtime-python
 
-.PHONY: help validate doctor test test-fast release-check update inspect version sync-docs sync install-hooks
+.PHONY: help validate doctor test test-fast coverage audit audit-full lessons-audit release-check update inspect version sync-docs sync install-hooks
 
 help:
 	@echo "ROOT=$(ROOT)"
-	@echo "targets: validate doctor test test-fast release-check sync-docs sync install-hooks update inspect"
+	@echo "targets: validate doctor test test-fast coverage audit audit-full lessons-audit release-check sync-docs sync install-hooks update inspect"
 
 validate:
 	grok plugin validate "$(ROOT)"
@@ -23,6 +23,20 @@ test:
 
 test-fast:
 	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m pytest tests/test_dispatch.py tests/test_craft_spine.py tests/test_delivery_gates.py -q --tb=line
+
+coverage:
+	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m coverage run --source=scripts -m pytest tests/ -q --tb=line -m "not slow"
+	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m coverage report --fail-under=58
+	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m coverage json -o coverage.json
+
+audit:
+	@"$$($(RUNTIME_PYTHON))" "$(ROOT)/scripts/project_audit.py" --run-tests --write-baseline
+
+audit-full:
+	@"$$($(RUNTIME_PYTHON))" "$(ROOT)/scripts/project_audit.py" --full-tests --write-baseline
+
+lessons-audit:
+	@"$$($(RUNTIME_PYTHON))" "$(ROOT)/scripts/audit_lessons.py" --write-report
 
 release-check:
 	@echo "[release] runtime=$$($(RUNTIME_PYTHON))"

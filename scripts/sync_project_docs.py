@@ -69,7 +69,9 @@ def project_data() -> dict[str, object]:
     scripts = sorted(
         p.name for p in (ROOT / "skills/ai-film-grok/scripts").iterdir() if p.is_file()
     )
-    tests = sorted(p.stem for p in (ROOT / "skills/ai-film-grok/tests").glob("test_*.py"))
+    tests = sorted(
+        p.stem for p in (ROOT / "skills/ai-film-grok/tests").glob("test_*.py")
+    )
     return {
         "name": plugin["name"],
         "version": plugin["version"],
@@ -105,6 +107,8 @@ def install_block() -> str:
             "代码或插件结构变更后，在仓库根目录执行：",
             "",
             "```bash",
+            "make audit       # 只读审计 + fast tests + 更新 baseline",
+            "make coverage    # 生成 coverage.json 并检查 baseline 门槛",
             "make sync-docs   # 生成 Graph、状态摘要与安装说明",
             "make release-check",
             "make sync        # 验证通过后提交、push，并核对 origin SHA",
@@ -151,7 +155,7 @@ def graph_markdown(data: dict[str, object]) -> str:
             '    D --> E["Audio + Post"]',
             '    E --> F["QA Gates + Delivery"]',
             '    G["Skill Registry"] -. routes .-> B',
-            '    G -. capabilities .-> D',
+            "    G -. capabilities .-> D",
             "```",
             "",
             "## Registry by phase",
@@ -188,7 +192,9 @@ def generate() -> None:
     data = project_data()
     replace_block(ROOT / "README.md", "project-status", status_block(data))
     replace_block(ROOT / "README.md", "maintainer-install", install_block())
-    replace_block(ROOT / "skills/ai-film-grok/README.md", "project-status", status_block(data))
+    replace_block(
+        ROOT / "skills/ai-film-grok/README.md", "project-status", status_block(data)
+    )
     (ROOT / "docs").mkdir(exist_ok=True)
     (ROOT / "docs/GRAPH.md").write_text(graph_markdown(data) + "\n", encoding="utf-8")
 
@@ -232,7 +238,9 @@ def check_clean_for_sync() -> None:
     unexpected = []
     for line in git_status():
         path = line[3:]
-        if line.startswith("?? ") and not any(path.startswith(prefix) for prefix in allowed_untracked + ignored):
+        if line.startswith("?? ") and not any(
+            path.startswith(prefix) for prefix in allowed_untracked + ignored
+        ):
             unexpected.append(line)
     if unexpected:
         print("同步前发现未提交改动；请先确认这些改动属于本次发布：", file=sys.stderr)
@@ -253,9 +261,12 @@ def commit_and_push() -> None:
         "skills/ai-film-grok/tests",
     )
     run("git", "diff", "--cached", "--check")
-    if subprocess.run(
-        ("git", "diff", "--cached", "--quiet"), cwd=ROOT, check=False
-    ).returncode == 0:
+    if (
+        subprocess.run(
+            ("git", "diff", "--cached", "--quiet"), cwd=ROOT, check=False
+        ).returncode
+        == 0
+    ):
         print("没有可提交的变更。")
         return
     branch = run("git", "branch", "--show-current")
@@ -271,7 +282,9 @@ def commit_and_push() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--check", action="store_true", help="只检查生成结果是否已是最新")
+    parser.add_argument(
+        "--check", action="store_true", help="只检查生成结果是否已是最新"
+    )
     parser.add_argument("--commit", action="store_true")
     parser.add_argument("--push", action="store_true")
     args = parser.parse_args()

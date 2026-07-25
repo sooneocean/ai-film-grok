@@ -130,6 +130,22 @@ def validate_audio_bible(
                     character_id=str(character_id),
                 )
             )
+        if isinstance(voice, Mapping):
+            cues = voice.get("performance_profiles")
+            if cues is not None and not isinstance(cues, Mapping):
+                errors.append(
+                    _issue(
+                        "PERFORMANCE_PROFILE_INVALID",
+                        "performance_profiles must be an object",
+                        character_id=str(character_id),
+                    )
+                )
+
+    performance = _data(bible, "voice").get("performance")
+    if performance is not None and not isinstance(performance, Mapping):
+        errors.append(
+            _issue("PERFORMANCE_LOCK_INVALID", "voice performance lock must be an object")
+        )
 
     dialogue = _data(bible, "dialogue_delivery").get("key_dialogue")
     if not isinstance(dialogue, list) or not dialogue:

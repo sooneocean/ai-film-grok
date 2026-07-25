@@ -595,7 +595,7 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
 
     # P2-1: face identity drift — pixel fingerprints in receipts/face-identity.json
     try:
-        from scripts.face_identity import post_audit_face_status
+        from face_identity import post_audit_face_status
     except Exception:
         try:
             from face_identity import post_audit_face_status  # type: ignore

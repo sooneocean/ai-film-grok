@@ -2265,31 +2265,43 @@ def apply_coverage_defaults_to_shot(
     return report
 
 
-# --- Heat arc / multi-heroine (elastic · 2026-07-21; sex-duration floor 2026-07-21) ---
-# Metrics + soft advice. Sex duration floor is a real floor for heat_scale=max
-# (write-spec hard by default via sex_floor_strict). Other ratios stay advisory
-# unless heat_arc_strict.
+# --- Heat arc / multi-heroine (adult max iron · 2026-07-24) ---
+# Adult max IRON: meat-ratio high, heat max, undress/expose when possible.
+# Sex duration + intimacy + setup + bare peak are hard on heat_scale=max
+# (write-spec via sex_floor_strict / sex_wardrobe_strict / heat_arc_strict).
 
 HEAT_SCALES = frozenset({"soft", "medium", "hot", "max"})
 HEAT_PHASES = frozenset({"setup", "foreplay", "act", "climax", "afterglow", "bridge"})
 INTIMACY_PHASES = frozenset({"foreplay", "act", "climax"})
 # Sex / intercourse beats only (NOT foreplay) — user KPI: 「性爱片段」
 SEX_PHASES = frozenset({"act", "climax"})
-# Advisory targets (docs / agent guidance)
-ADVISORY_MAX_INTIMACY_RATIO = 0.60
-ADVISORY_MAX_SETUP_RATIO = 0.25
-ADVISORY_MAX_SEX_DURATION_RATIO = 0.35  # advise mode target for max
-# Extreme floor: intimacy shot-share soft warn on max
-EXTREME_INTIMACY_FLOOR = 0.30
-EXTREME_SETUP_CEILING = 0.75
+# Adult max IRON targets (2026-07-24 · raised: 30%→50%, intimacy 60%→70%)
+ADVISORY_MAX_INTIMACY_RATIO = 0.70
+ADVISORY_MAX_SETUP_RATIO = 0.20
+ADVISORY_MAX_SEX_DURATION_RATIO = 0.55  # advise target for max
+# Hard floors on max: intimacy 60% (achievable on 8-shot spines); advise still 70%
+EXTREME_INTIMACY_FLOOR = 0.60
+EXTREME_SETUP_CEILING = 0.20
 # Product floor: act+climax duration share of total plate (duration_sec weighted)
 # heat_scale=max → default hard at write-spec (sex_floor_strict default True)
-# max adult product floor (v1.10 · raised from 0.20 so act+climax dominate)
-DEFAULT_SEX_DURATION_FLOOR = 0.30
+DEFAULT_SEX_DURATION_FLOOR = 0.50
 # hot soft floor (warning only)
 HOT_SEX_DURATION_FLOOR = 0.15
-# hardcore_male / 尺度太小 target (metrics + advise; not auto-hard unless set)
-HARDCORE_SEX_DURATION_TARGET = 0.40
+# hardcore_male / 尺度太小 target
+HARDCORE_SEX_DURATION_TARGET = 0.55
+# max films must reach bare peak at least once
+DEFAULT_BARE_PEAK_REQUIRED = True
+# Continuous challenge max scale (2026-07-24+): heat phase rank must not regress
+# before climax; max 2 consecutive plateau shots at same phase rank pre-climax
+HEAT_PHASE_ESCALATION_RANK: dict[str, int] = {
+    "setup": 0,
+    "bridge": 0,
+    "foreplay": 1,
+    "act": 2,
+    "climax": 3,
+    "afterglow": 4,
+}
+MAX_PRE_CLIMAX_PLATEAU_SHOTS = 2  # same rank in a row before climax → stall
 DEFAULT_SHOT_DURATION_SEC = 6.0
 
 # spice_level: how dirty VO must be (v1.10)
@@ -2403,7 +2415,14 @@ WARDROBE_UNDRESS_RANK: dict[str, int] = {
     "bare": 4,
 }
 SEX_WARDROBE_OK = frozenset({"partial", "undressed", "bare"})
-SEX_WARDROBE_STRONG = frozenset({"undressed", "bare"})  # hardcore prefers these
+SEX_WARDROBE_STRONG = frozenset({"undressed", "bare"})  # max IRON: act+ uses these
+# Phase → minimum wardrobe rank floor when auto-escalating (能脱就脱 / 能露就露)
+PHASE_WARDROBE_FLOOR: dict[str, str] = {
+    "foreplay": "partial",
+    "act": "undressed",
+    "climax": "bare",
+    # afterglow: no floor — inherit peak via clamp only (never re-dress)
+}
 _EXPOSED_WARDROBE_MARKERS: tuple[str, ...] = (
     "undressed",
     "unclothed",
@@ -2712,6 +2731,178 @@ def apply_heat_phase_defaults(shots: list[dict[str, Any]]) -> list[str]:
     return filled
 
 
+def heat_phase_escalation_rank(phase: str | None) -> int:
+    """Higher = hotter. afterglow only valid after climax peak."""
+    if not phase:
+        return 0
+    return HEAT_PHASE_ESCALATION_RANK.get(str(phase).strip().lower(), 0)
+
+
+def lint_heat_escalation_challenge(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+) -> dict[str, Any]:
+    """Force continuous challenge of maximum heat on max films.
+
+    Product rule (2026-07-24 user): 持续挑战尺度最大.
+    - Phase rank must not drop before climax (泄火 = fail)
+    - After first act, cannot return to setup for body-avoidance
+    - Pre-climax: cannot plateau same rank for > MAX_PRE_CLIMAX_PLATEAU_SHOTS
+      without advancing (stall = fail)
+    - Afterglow only after climax peak was reached
+    """
+    scale = (heat_scale or "").strip().lower() or None
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+
+    def _issue(code: str, severity: str, message: str) -> None:
+        codes.append(code)
+        issues.append({"code": code, "severity": severity, "message": message})
+
+    if scale not in {"max", "hot"}:
+        return {
+            "ok": True,
+            "codes": [],
+            "warning_count": 0,
+            "info_count": 0,
+            "issues": [],
+            "heat_scale": scale,
+            "note": "escalation challenge skipped (not max/hot)",
+        }
+
+    peak_rank = -1
+    peak_sid: str | None = None
+    climax_seen = False
+    plateau_run = 0
+    last_rank: int | None = None
+    regression_ids: list[str] = []
+    stall_ids: list[str] = []
+    afterglow_early: list[str] = []
+    post_act_setup: list[str] = []
+    act_seen = False
+    per_shot: list[dict[str, Any]] = []
+
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        sid = str(shot.get("id") or "?")
+        ph = infer_heat_phase(shot)
+        rank = heat_phase_escalation_rank(ph)
+        row: dict[str, Any] = {"id": sid, "heat_phase": ph, "rank": rank}
+
+        if ph == "climax":
+            climax_seen = True
+        if ph == "act":
+            act_seen = True
+
+        # afterglow before any climax = premature cool-down
+        if ph == "afterglow" and not climax_seen:
+            afterglow_early.append(sid)
+            row["early_afterglow"] = True
+
+        # phase regression before climax (泄火)
+        if not climax_seen and peak_rank >= 0 and rank < peak_rank:
+            # allow bridge as connective tissue only if rank gap is small and not from act
+            if not (ph == "bridge" and peak_rank <= 1):
+                regression_ids.append(f"{sid}:{ph}<peak@{peak_sid or '?'}")
+                row["regression"] = True
+
+        # after act has started, setup = body avoidance (泄火铺垫)
+        if act_seen and not climax_seen and ph == "setup":
+            post_act_setup.append(sid)
+            row["post_act_setup"] = True
+
+        # plateau: only pre-act ranks (setup/foreplay) — act may run long for meat %
+        # stall = stuck in foreplay/setup without ascending to act/climax
+        if not climax_seen and 0 < rank < 2:  # foreplay only
+            if last_rank is not None and rank == last_rank:
+                plateau_run += 1
+            else:
+                plateau_run = 1
+            if plateau_run > MAX_PRE_CLIMAX_PLATEAU_SHOTS:
+                stall_ids.append(sid)
+                row["stall"] = True
+        elif not climax_seen and rank == 0 and last_rank == 0:
+            # long pure setup also stalls challenge
+            plateau_run = (plateau_run + 1) if last_rank == 0 else 1
+            # setup may open film: allow more (3) before stall
+            if plateau_run > MAX_PRE_CLIMAX_PLATEAU_SHOTS + 1:
+                stall_ids.append(sid)
+                row["stall"] = True
+        else:
+            if rank >= 2:
+                plateau_run = 0
+            elif last_rank != rank:
+                plateau_run = 1
+
+        if rank > peak_rank:
+            peak_rank = rank
+            peak_sid = sid
+        last_rank = rank
+        per_shot.append(row)
+
+    if regression_ids:
+        _issue(
+            "HEAT_ESCALATION_REGRESSION",
+            "warning",
+            "max IRON continuous challenge: heat_phase regressed before climax (泄火) — "
+            f"{', '.join(regression_ids[:8])}. "
+            "Phase must only rise setup→foreplay→act→climax until peak. "
+            "禁止中途回到更冷的 phase。",
+        )
+    if post_act_setup:
+        _issue(
+            "HEAT_ESCALATION_REGRESSION",
+            "warning",
+            "max IRON: setup after act started (回避身体) — "
+            f"{', '.join(post_act_setup[:8])}. 进入 act 后禁止再写 setup 泄火。",
+        )
+    if afterglow_early:
+        _issue(
+            "HEAT_ESCALATION_REGRESSION",
+            "warning",
+            "max IRON: afterglow before climax — "
+            f"{', '.join(afterglow_early[:8])}. 高潮前禁止 afterglow 收火。",
+        )
+    if stall_ids:
+        _issue(
+            "HEAT_ESCALATION_STALL",
+            "warning",
+            "max IRON continuous challenge: pre-climax phase plateau too long — "
+            f"{', '.join(stall_ids[:8])}. "
+            f"同一 heat 档位连续 >{MAX_PRE_CLIMAX_PLATEAU_SHOTS} 镜必须加压升档 "
+            "(foreplay→act 或 act→climax / 换体位加深)。持续挑战尺度最大。",
+        )
+    # No climax on max with enough shots = never reached maximum challenge
+    n = sum(1 for s in shots if isinstance(s, dict))
+    if scale == "max" and n >= 6 and not climax_seen and act_seen:
+        _issue(
+            "HEAT_ESCALATION_NO_PEAK",
+            "warning",
+            "max IRON: act without climax — 持续挑战必须抵达 climax bare 峰值，禁止只办事不办穿。",
+        )
+
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "codes": sorted(set(codes)),
+        "warning_count": warn_n,
+        "info_count": 0,
+        "issues": issues,
+        "heat_scale": scale,
+        "peak_rank": peak_rank,
+        "climax_seen": climax_seen,
+        "regression_shots": regression_ids,
+        "stall_shots": stall_ids,
+        "per_shot": per_shot,
+        "note": (
+            "Continuous challenge max scale: phase monotonic rise to climax; "
+            "no mid-film cool-down; no long plateau. See adult-max-iron."
+        ),
+    }
+
+
 def _shot_duration_sec(shot: dict[str, Any]) -> float:
     """Plate seconds for duration-weighted heat ratios (defaults 6s)."""
     try:
@@ -2882,26 +3073,29 @@ def apply_wardrobe_continuity(
     *,
     heat_scale: str | None = None,
     clamp_re_dress: bool | None = None,
+    auto_escalate: bool | None = None,
 ) -> dict[str, Any]:
-    """Carry wardrobe_state forward; never re-dress; fill act/climax defaults on max/hot.
+    """Carry wardrobe_state forward; never re-dress; escalate undress on max/hot.
 
-    Product rule (2026-07-21+ / 强化): 卸装阶梯必须 · 分镜延续前镜 · **衣服不回穿**.
+    Product rule (2026-07-21+ / **IRON 2026-07-24**): 卸装阶梯 · 不回穿 · **能脱就脱/能露就露**.
     - Missing state inherits previous known (peak) state
     - Undress action on still-dressed shot bumps to at least ``partial``
-    - act/climax without state on max/hot defaults to ``undressed``
-    - Explicit regression: **clamp** to peak on max/hot (default) so write-spec always
-      enforces continuity; residual regressions still lint as HEAT_WARDROBE_RE_DRESS
+    - max/hot **phase floor**: foreplay≥partial, act≥undressed, climax≥bare
+    - Explicit regression: **clamp** to peak on max/hot
     - Also writes ``dsl.start_pose`` wardrobe continuity hint when missing/weak
     """
     scale = (heat_scale or "").strip().lower() or None
     if clamp_re_dress is None:
         # Default ON for adult max/hot so mechanism always fires in write-spec
         clamp_re_dress = scale in {"max", "hot"}
+    if auto_escalate is None:
+        auto_escalate = scale in {"max", "hot"}
     prev_state: str | None = None
     peak_state: str | None = None
     filled: list[str] = []
     bumped: list[str] = []
     clamped: list[str] = []
+    escalated: list[dict[str, str]] = []
     start_pose_filled: list[str] = []
 
     for shot in shots:
@@ -2911,6 +3105,7 @@ def apply_wardrobe_continuity(
         ph = infer_heat_phase(shot)
         st = resolve_wardrobe_state(shot)
         undress = shot_has_undress_action(shot)
+        from_state = st or ""
 
         if st is None and prev_state is not None:
             _write_shot_wardrobe_state(shot, prev_state)
@@ -2924,12 +3119,36 @@ def apply_wardrobe_continuity(
                 _write_shot_wardrobe_state(shot, "partial")
                 st = "partial"
                 bumped.append(sid)
+            # Undress action on max: prefer undressed when already partial
+            elif auto_escalate and scale == "max" and r < WARDROBE_UNDRESS_RANK["undressed"]:
+                _write_shot_wardrobe_state(shot, "undressed")
+                st = "undressed"
+                bumped.append(sid)
 
         if st is None and scale in {"max", "hot"} and ph in SEX_PHASES:
             # Sex beat with no evidence: default undressed (must not stay armored)
-            _write_shot_wardrobe_state(shot, "undressed")
-            st = "undressed"
+            target = "bare" if ph == "climax" else "undressed"
+            _write_shot_wardrobe_state(shot, target)
+            st = target
             filled.append(sid)
+
+        # IRON: phase floor — 能脱就脱 / 能露就露 (only raise, never lower)
+        if auto_escalate and scale in {"max", "hot"}:
+            floor_state = PHASE_WARDROBE_FLOOR.get(ph)
+            if floor_state:
+                fr = wardrobe_undress_rank(floor_state)
+                sr = wardrobe_undress_rank(st)
+                if fr is not None and (sr is None or sr < fr):
+                    _write_shot_wardrobe_state(shot, floor_state)
+                    st = floor_state
+                    escalated.append(
+                        {
+                            "id": sid,
+                            "from": from_state or "none",
+                            "to": floor_state,
+                            "reason": f"phase_floor:{ph}",
+                        }
+                    )
 
         # Clamp re-dress: never allow rank below film peak so far
         if clamp_re_dress and st is not None and peak_state is not None:
@@ -2953,8 +3172,6 @@ def apply_wardrobe_continuity(
             pass
 
         # Start-pose continuity: next beat must OPEN already undressed if peak says so
-        # Use prev_state *before* this shot's action would further undress — for this
-        # shot, opening state is peak at entry. After clamp, st is entry wardrobe.
         if st in {"partial", "undressed", "bare"}:
             _ensure_start_pose_wardrobe(shot, st)
             start_pose_filled.append(sid)
@@ -2974,12 +3191,14 @@ def apply_wardrobe_continuity(
         "filled_ids": filled,
         "bumped_ids": bumped,
         "clamped_ids": clamped,
+        "escalated": escalated,
         "start_pose_ids": start_pose_filled,
         "final_peak": peak_state or prev_state,
         "clamp_re_dress": bool(clamp_re_dress),
+        "auto_escalate": bool(auto_escalate),
         "note": (
-            "wardrobe continuity: inherit forward; undress bumps partial; "
-            "clamp re-dress on max/hot; start_pose carries undress; clothes never reappear"
+            "wardrobe continuity IRON: inherit; undress bump; phase floor "
+            "foreplay≥partial act≥undressed climax≥bare; clamp re-dress; never reappear"
         ),
     }
 
@@ -3061,16 +3280,17 @@ def lint_sex_wardrobe(
 ) -> dict[str, Any]:
     """Sex shots must not stay fully armored/clothed; undress beat required on max.
 
-    Product rule (2026-07-21): 办事 = 卸甲/脱衣 → 裸露可读。
-    act/climax wardrobe_state must be partial|undressed|bare (hardcore prefers undressed|bare).
+    Product rule (2026-07-21 / **IRON 2026-07-24**): 办事 = 卸甲/脱衣 → 裸露可读。
+    act/climax wardrobe_state must be undressed|bare on max (strong); climax must reach bare.
     At least one undress-action beat in foreplay or early act.
-    Continuity (2026-07-21+): wardrobe rank monotonic — **衣服不回穿** (HEAT_WARDROBE_RE_DRESS).
+    Continuity: wardrobe rank monotonic — **衣服不回穿** (HEAT_WARDROBE_RE_DRESS).
     """
     scale = (heat_scale or "").strip().lower() or None
     profile = (audience_profile or "").strip().lower() or None
     hardcore = profile in {"hardcore_male", "hardcore", "重口男向"}
     if require_strong is None:
-        require_strong = hardcore
+        # max IRON: strong wardrobe by default (not only hardcore)
+        require_strong = hardcore or scale == "max"
     ok_states = SEX_WARDROBE_STRONG if require_strong else SEX_WARDROBE_OK
 
     issues: list[dict[str, Any]] = []
@@ -3080,6 +3300,7 @@ def lint_sex_wardrobe(
     undress_beats: list[str] = []
     re_dress_ids: list[str] = []
     text_conflict_ids: list[str] = []
+    bare_peak_ok = True
 
     def _issue(code: str, severity: str, message: str) -> None:
         codes.append(code)
@@ -3227,8 +3448,36 @@ def lint_sex_wardrobe(
         _issue(
             "HEAT_SEX_WARDROBE_WEAK",
             "warning",
-            "hardcore: act/climax wardrobe only partial — prefer undressed|bare "
+            "max IRON: act/climax wardrobe only partial — must be undressed|bare "
             f"({', '.join(weak_ids[:8])})",
+        )
+    # Bare peak: max films with sex must expose bare at least once (能露点就要露点)
+    climax_not_bare: list[str] = []
+    for shot, ph in sex_shots:
+        if ph != "climax":
+            continue
+        sid = str(shot.get("id") or "?")
+        st = resolve_wardrobe_state(shot)
+        if st != "bare":
+            climax_not_bare.append(f"{sid}:{st or 'none'}")
+    if sex_shots:
+        bare_peak_ok = peak_state == "bare" or any(
+            resolve_wardrobe_state(sh) == "bare" for sh, _ph in sex_shots if isinstance(sh, dict)
+        )
+    if scale == "max" and sex_shots and DEFAULT_BARE_PEAK_REQUIRED and not bare_peak_ok:
+        _issue(
+            "HEAT_BARE_PEAK_MISSING",
+            "warning",
+            "max IRON: film never reaches wardrobe_state=bare — "
+            "climax (and peak act) must expose bare/readable nudity. "
+            "能露点就要露点；set climax wardrobe_state=bare.",
+        )
+    elif scale == "max" and climax_not_bare:
+        _issue(
+            "HEAT_BARE_PEAK_MISSING",
+            "warning",
+            "max IRON: climax shot(s) not bare — "
+            f"{', '.join(climax_not_bare[:8])}. climax must be wardrobe_state=bare.",
         )
     if not undress_beats and sex_shots:
         _issue(
@@ -3279,11 +3528,12 @@ def lint_sex_wardrobe(
         "per_shot": per_shot,
         "required_states": sorted(ok_states),
         "peak_state": peak_state,
+        "bare_peak_ok": bare_peak_ok,
         "note": (
-            "Sex wardrobe ladder: full/armored → partial → undressed/bare. "
-            "act+climax must be exposed; undress beat required; "
-            "continuity monotonic (衣服不回穿); subject/start_pose must match. "
-            "See references/lessons-2026-07-21-sex-undress-ladder.md"
+            "Sex wardrobe IRON: full→partial→undressed→bare. "
+            "max act+ = undressed|bare; climax = bare; undress beat required; "
+            "continuity monotonic (衣服不回穿). "
+            "See lessons-2026-07-21-sex-undress-ladder.md · adult-max iron 2026-07-24"
         ),
     }
 
@@ -3462,7 +3712,7 @@ def normalize_spice_level(
     if profile in {"hardcore_male", "hardcore", "重口男向"}:
         return "extreme"
     if scale == "max":
-        return "explicit"
+        return "extreme"  # adult max IRON · 2026-07-24 (was explicit)
     if scale == "hot":
         return "suggestive"
     return None
@@ -4198,6 +4448,17 @@ def suggest_vo_lines(
     return list(bank.get(ph, bank["act"]))
 
 
+def _merge_sub_issues(rep: dict[str, Any], issues: list[dict[str, Any]], codes: list[str]) -> None:
+    """Merge a sub-lint report's issues into the parent issues/codes lists."""
+    for iss in rep.get("issues") or []:
+        if not isinstance(iss, dict):
+            continue
+        c = str(iss.get("code") or "")
+        if c and c not in codes:
+            codes.append(c)
+        issues.append(iss)
+
+
 def lint_heat_arc(
     shots: list[dict[str, Any]],
     *,
@@ -4212,14 +4473,16 @@ def lint_heat_arc(
     edit_craft: list[str] | None = None,
     source_excerpt: str | None = None,
 ) -> dict[str, Any]:
-    """Heat metrics + sex-duration floor for adult films.
+    """Heat metrics + sex-duration floor for adult films (max IRON 2026-07-24).
 
-    - intimacy_ratio / setup_ratio: **shot-count** share (legacy metrics)
+    - intimacy_ratio / setup_ratio: **shot-count** share
     - sex_duration_ratio / intimacy_duration_ratio: **duration_sec-weighted**
       sex = act+climax only (性爱片段); intimacy = foreplay+act+climax
-    - heat_scale=max: sex_duration_ratio < floor (default 20%) → HEAT_SEX_DURATION_LOW
+    - heat_scale=max: sex_duration_ratio < floor (default **50%**) → HEAT_SEX_DURATION_LOW
       (write-spec hard by default via sex_floor_strict)
-    - coitus grammar + size ladder soft metrics (strict via film_spec flags)
+    - intimacy < 70% / setup > 20% → HEAT_INTIMACY_RATIO_LOW / HEAT_SETUP_RATIO_HIGH
+      (write-spec hard via heat_arc_strict default true on max)
+    - coitus grammar + size ladder (strict via film_spec flags)
     """
     scale = (heat_scale or "").strip().lower() or None
     profile = (audience_profile or "").strip().lower() or None
@@ -4324,7 +4587,7 @@ def lint_heat_arc(
                 f"({sex_dur:.1f}s/{total_dur:.1f}s act+climax)",
             )
 
-    # Extreme soft warnings only when author chose max and spine is clearly empty of intimacy
+    # max IRON: intimacy / setup are hard-relevant warnings (heat_arc_strict)
     if scale == "max" and n >= 6:
         if act_n + climax_n == 0:
             _issue(
@@ -4337,15 +4600,17 @@ def lint_heat_arc(
             _issue(
                 "HEAT_INTIMACY_RATIO_LOW",
                 "warning",
-                f"intimacy core {intimacy_ratio:.0%} is very low for heat_scale=max "
-                f"(extreme floor ~{EXTREME_INTIMACY_FLOOR:.0%}); raise only if user wants hotter",
+                f"max IRON: intimacy core {intimacy_ratio:.0%} < floor "
+                f"{EXTREME_INTIMACY_FLOOR:.0%} (foreplay+act+climax shot share). "
+                "Cut setup; add body beats. Override: heat_arc_strict:false.",
             )
         if setup_ratio > EXTREME_SETUP_CEILING + 1e-9:
             _issue(
                 "HEAT_SETUP_RATIO_HIGH",
                 "warning",
-                f"setup phase {setup_ratio:.0%} is very high — "
-                "consider entering body beats earlier if brief is adult",
+                f"max IRON: setup phase {setup_ratio:.0%} > ceiling "
+                f"{EXTREME_SETUP_CEILING:.0%} — enter undress/act earlier. "
+                "Override: heat_arc_strict:false.",
             )
 
     # Optional full advisory (agent asked heat_arc_advise / guide ratios)
@@ -4383,13 +4648,11 @@ def lint_heat_arc(
         heat_scale=scale,
         audience_profile=profile,
     )
-    for iss in wardrobe_rep.get("issues") or []:
-        if not isinstance(iss, dict):
-            continue
-        c = str(iss.get("code") or "")
-        if c and c not in codes:
-            codes.append(c)
-        issues.append(iss)
+    _merge_sub_issues(wardrobe_rep, issues, codes)
+
+    # Continuous challenge max scale — 持续挑战尺度最大 (no cool-down / stall)
+    esc_rep = lint_heat_escalation_challenge(shots, heat_scale=scale)
+    _merge_sub_issues(esc_rep, issues, codes)
 
     # VO 荤梗：实打实办事剧，旁白不能纯文艺
     level = normalize_spice_level(spice_level, heat_scale=scale, audience_profile=profile)
@@ -4399,13 +4662,7 @@ def lint_heat_arc(
         audience_profile=profile,
         spice_level=level,
     )
-    for iss in vo_rep.get("issues") or []:
-        if not isinstance(iss, dict):
-            continue
-        c = str(iss.get("code") or "")
-        if c and c not in codes:
-            codes.append(c)
-        issues.append(iss)
+    _merge_sub_issues(vo_rep, issues, codes)
 
     # User source fidelity: ban wholesale 展厅-template overwrite of user script
     fidelity_rep = lint_user_source_fidelity(
@@ -4413,13 +4670,7 @@ def lint_heat_arc(
         heat_scale=scale,
         source_excerpt=source_excerpt,
     )
-    for iss in fidelity_rep.get("issues") or []:
-        if not isinstance(iss, dict):
-            continue
-        c = str(iss.get("code") or "")
-        if c and c not in codes:
-            codes.append(c)
-        issues.append(iss)
+    _merge_sub_issues(fidelity_rep, issues, codes)
 
     # Coitus grammar + size ladder (impact / pressure)
     coitus_rep = lint_coitus_grammar(
@@ -4428,44 +4679,20 @@ def lint_heat_arc(
         audience_profile=profile,
         coitus_grammar=coitus_grammar,
     )
-    for iss in coitus_rep.get("issues") or []:
-        if not isinstance(iss, dict):
-            continue
-        c = str(iss.get("code") or "")
-        if c and c not in codes:
-            codes.append(c)
-        issues.append(iss)
+    _merge_sub_issues(coitus_rep, issues, codes)
 
     size_rep = lint_size_ladder(
         shots,
         heat_scale=scale,
         audience_profile=profile,
     )
-    for iss in size_rep.get("issues") or []:
-        if not isinstance(iss, dict):
-            continue
-        c = str(iss.get("code") or "")
-        if c and c not in codes:
-            codes.append(c)
-        issues.append(iss)
+    _merge_sub_issues(size_rep, issues, codes)
 
     vo_motion_rep = lint_vo_motion_align(shots, heat_scale=scale, audience_profile=profile)
-    for iss in vo_motion_rep.get("issues") or []:
-        if not isinstance(iss, dict):
-            continue
-        c = str(iss.get("code") or "")
-        if c and c not in codes:
-            codes.append(c)
-        issues.append(iss)
+    _merge_sub_issues(vo_motion_rep, issues, codes)
 
     pose_rep = lint_sex_pose_variety(shots, heat_scale=scale, audience_profile=profile)
-    for iss in pose_rep.get("issues") or []:
-        if not isinstance(iss, dict):
-            continue
-        c = str(iss.get("code") or "")
-        if c and c not in codes:
-            codes.append(c)
-        issues.append(iss)
+    _merge_sub_issues(pose_rep, issues, codes)
 
     montage_rep = lint_montage_craft(
         edit_craft,
@@ -4473,13 +4700,7 @@ def lint_heat_arc(
         audience_profile=profile,
         shot_count=n,
     )
-    for iss in montage_rep.get("issues") or []:
-        if not isinstance(iss, dict):
-            continue
-        c = str(iss.get("code") or "")
-        if c and c not in codes:
-            codes.append(c)
-        issues.append(iss)
+    _merge_sub_issues(montage_rep, issues, codes)
 
     warn_n = sum(1 for i in issues if i.get("severity") == "warning")
     return {
@@ -4518,8 +4739,17 @@ def lint_heat_arc(
             "re_dress_shots": wardrobe_rep.get("re_dress_shots"),
             "text_conflict_shots": wardrobe_rep.get("text_conflict_shots"),
             "peak_state": wardrobe_rep.get("peak_state"),
+            "bare_peak_ok": wardrobe_rep.get("bare_peak_ok"),
             "per_shot": wardrobe_rep.get("per_shot"),
             "required_states": wardrobe_rep.get("required_states"),
+        },
+        "escalation_challenge": {
+            "ok": esc_rep.get("ok"),
+            "codes": esc_rep.get("codes"),
+            "peak_rank": esc_rep.get("peak_rank"),
+            "climax_seen": esc_rep.get("climax_seen"),
+            "regression_shots": esc_rep.get("regression_shots"),
+            "stall_shots": esc_rep.get("stall_shots"),
         },
         "spice_level": level,
         "vo_spice": {

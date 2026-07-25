@@ -1,6 +1,6 @@
 {
   "title": "落锁加演",
-  "description": "成人办事剧脚手架：性爱时长≥20%、卸装不回穿、旁白荤梗、性交六拍、景别加压",
+  "description": "成人办事剧脚手架 IRON：性爱时长≥50%、act undressed/climax bare、能脱就脱、旁白 extreme、性交六拍",
   "aspect_ratio": "9:16",
   "vo_mode": "storyteller",
   "tts_backend": "edge",
@@ -10,7 +10,9 @@
   "sex_floor_strict": true,
   "sex_wardrobe_strict": true,
   "sex_vo_strict": true,
-  "sex_min_duration_ratio": 0.20,
+  "heat_arc_strict": true,
+  "spice_level": "extreme",
+  "sex_min_duration_ratio": 0.50,
   "coitus_strict": false,
   "size_ladder_strict": false,
   "coitus_grammar": {

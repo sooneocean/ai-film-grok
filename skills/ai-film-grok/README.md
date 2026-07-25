@@ -116,7 +116,8 @@ aifilm quality-closure report --root <film-root>
 | **film-spec JSON + schema** | 导演意图、分镜 beat、旁白、运镜 DSL、转场与 sound_plan |
 | **style-bible** | medium / palette / signature_block / identity_lock / cast_masters |
 | **FFmpeg + PIL** | 拼接、xfade、stretch/hold、VO 混音、BGM duck、字幕烧录 |
-| **Edge TTS（默认中文）** | 说书 `write-spec` 钉 edge；禁止 Neural 名塞 ElevenLabs |
+| **Edge TTS（默认中文）** | 说书 `write-spec` 钉 edge；支持 shot-level `performance_cue`；禁止 Neural 名塞 ElevenLabs |
+| **表达式 TTS（显式）** | `qwen3` 本机 voice design/clone；`higgs` 可信 adapter；未就绪不静默替换 |
 | **程序化 R&B + 听感** | rnb / auto_sfx / sidechain / loudnorm auto；本地 `audio/bgm.wav` 模板曲 |
 | **HyperFrames / Remotion**（层 3 · 交付推荐） | 标题/双字幕/grade；`final --post-engine hyperframes`；Remotion 备选；**不能替代** I2V |
 | **FFmpeg**（层 4） | 多镜拼板、VO/BGM 混音、loudnorm、编码导出；设计路径下 plate 默认 blank+subs off |
@@ -359,10 +360,10 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.2.0`
+- 插件版本：`2.6.0`
 - Skill Registry：`31/33` 项标记为 `implemented`
-- CLI 脚本：`146` 个
-- pytest 文件：`192` 个
+- CLI 脚本：`155` 个
+- pytest 文件：`201` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

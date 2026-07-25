@@ -16,7 +16,7 @@
       "type": "object",
       "required": ["voice", "dialogue_delivery", "adr_lipsync", "ambience", "foley", "sfx", "bgm_motif_cue", "licensing"],
       "properties": {
-        "voice": { "$ref": "#/$defs/parameterNode" },
+        "voice": { "$ref": "#/$defs/voiceNode" },
         "dialogue_delivery": { "$ref": "#/$defs/parameterNode" },
         "adr_lipsync": { "$ref": "#/$defs/parameterNode" },
         "ambience": { "$ref": "#/$defs/parameterNode" },
@@ -44,6 +44,32 @@
         "data": {}
       },
       "additionalProperties": true
+    }
+    ,"voiceNode": {
+      "allOf": [{ "$ref": "#/$defs/parameterNode" }],
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "performance": { "$ref": "#/$defs/performanceLock" },
+            "characters": { "type": "object" }
+          }
+        }
+      }
+    },
+    "performanceLock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "emotions": { "type": "array", "items": { "type": "string" } },
+        "delivery_tags": { "type": "array", "items": { "type": "string" } },
+        "default_rate": { "type": "string" },
+        "default_pitch": { "type": "string" },
+        "default_volume": { "type": "string" },
+        "reference_audio_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "provider": { "type": "string" },
+        "model": { "type": "string" }
+      }
     }
   },
   "additionalProperties": true

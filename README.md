@@ -492,10 +492,10 @@ MIT © [dex](https://github.com/sooneocean)
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.2.0`
+- 插件版本：`2.6.0`
 - Skill Registry：`31/33` 项标记为 `implemented`
-- CLI 脚本：`146` 个
-- pytest 文件：`192` 个
+- CLI 脚本：`155` 个
+- pytest 文件：`201` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->
@@ -506,6 +506,8 @@ MIT © [dex](https://github.com/sooneocean)
 代码或插件结构变更后，在仓库根目录执行：
 
 ```bash
+make audit       # 只读审计 + fast tests + 更新 baseline
+make coverage    # 生成 coverage.json 并检查 baseline 门槛
 make sync-docs   # 生成 Graph、状态摘要与安装说明
 make release-check
 make sync        # 验证通过后提交、push，并核对 origin SHA

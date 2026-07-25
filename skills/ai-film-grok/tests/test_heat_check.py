@@ -150,14 +150,14 @@ class TestBuildHeatReport(unittest.TestCase):
     """build_heat_report builds report from spec + shots directly."""
 
     def test_basic_report(self):
-        spec = {"heat_scale": "max", "sex_min_duration_ratio": 0.30}
+        spec = {"heat_scale": "max", "sex_min_duration_ratio": 0.50}
         shots = [
             {"id": "s1", "heat_phase": "act", "duration_sec": 10},
             {"id": "s2", "heat_phase": "climax", "duration_sec": 8},
         ]
         report = build_heat_report(spec, shots, total_duration_sec=60)
         self.assertIn("sex_duration_ratio", report)
-        self.assertEqual(report["sex_duration_floor"], 0.30)
+        self.assertEqual(report["sex_duration_floor"], 0.50)
 
     def test_empty_shots(self):
         report = build_heat_report({}, [], total_duration_sec=0)

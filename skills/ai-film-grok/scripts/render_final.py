@@ -76,11 +76,14 @@ except ImportError:  # pragma: no cover
     lipsync_probe = None  # type: ignore
 
 try:
+    from performance_cue import normalize_performance_cue, summarize_bgm_response
     from tts_backend import probe as tts_probe
     from tts_backend import synthesize as tts_synthesize
 except ImportError:  # pragma: no cover
     tts_synthesize = None  # type: ignore
     tts_probe = None  # type: ignore
+    normalize_performance_cue = None  # type: ignore
+    summarize_bgm_response = None  # type: ignore
 
 try:
     from voice_tracks import (
@@ -486,6 +489,7 @@ def tts_to_wav(
     allow_network_fallback: bool = False,
     usage_root: Path | str | None = None,
     shot_id: str = "",
+    performance: dict[str, Any] | None = None,
 ) -> tuple[Path, float, dict[str, Any]]:
     """Synthesize VO via pluggable backend (fish > edge). Returns wav path, duration, meta."""
     out_mp3.parent.mkdir(parents=True, exist_ok=True)
@@ -504,6 +508,7 @@ def tts_to_wav(
             allow_network_fallback=allow_network_fallback,
             usage_root=usage_root,
             shot_id=shot_id,
+            performance=performance,
         )
     except Exception as exc:
         raise RenderError(f"TTS failed without cross-provider fallback: {exc}") from exc
@@ -1291,8 +1296,15 @@ def _shot_speaker_key(shot: dict[str, Any]) -> str:
 
 
 def is_character_speech_shot(shot: dict[str, Any]) -> bool:
-    """True when this plate should use character-dialogue TTS (not pure storyteller)."""
+    """True when this plate should use character-dialogue TTS (not pure storyteller).
+
+    P0 · 2026-07-24: explicit narrator/storyteller speaker **always** wins over
+    stray ``nar_ja`` / ``dialogue_ja`` fields so 口白 stays Chinese and we do not
+    randomly flip ZH↔JA because an agent left Japanese fields on a 说书镜.
+    """
     sp = _shot_speaker_key(shot)
+    if sp in _NARRATOR_SPEAKERS:
+        return False
     if sp and sp not in _NARRATOR_SPEAKERS:
         return True
     for key in ("dialogue", "dialogue_ja", "nar_ja", "spoken_ja"):
@@ -1700,7 +1712,7 @@ def build_subtitle_cues_for_shots(
     title_duration: float,
     end_duration: float,
     transition_sec: float,
-    sub_lead: float = 0.08,
+    sub_lead: float = 0.0,
     sub_min: float = 0.48,
     sub_max: float = 1.75,
     story_join_intents: list[str] | None = None,
@@ -1710,6 +1722,9 @@ def build_subtitle_cues_for_shots(
 
     Returns (cues, film_timeline). Using hard-cut t0+=target would lag ~transition_sec
     per join once xfade shortens the picture clock.
+
+    P0 · 2026-07-24: default ``sub_lead=0`` and clamp non-overlapping cues so SRT
+    write never fails with ``segment N starts before previous segment ends``.
     """
     film_tl = film_segment_timeline(
         title_duration=title_duration,
@@ -1761,7 +1776,22 @@ def build_subtitle_cues_for_shots(
             cues.append(
                 {"start": sb, "end": eb, "text": u, "shot_index": i, "is_monologue": is_monologue}
             )
-    return cues, film_tl
+    # Non-overlap clamp (sub_lead or dense units can otherwise fail SRT validation)
+    clamped: list[dict[str, Any]] = []
+    prev_end = 0.0
+    for cue in cues:
+        text = str(cue.get("text") or "").strip()
+        if not text:
+            continue
+        start = float(cue["start"])
+        end = float(cue["end"])
+        if start < prev_end:
+            start = prev_end
+        if end <= start:
+            end = start + max(0.2, min(sub_min, 0.4))
+        clamped.append({**cue, "start": start, "end": end, "text": text})
+        prev_end = end
+    return clamped, film_tl
 
 
 def write_srt(path: Path, cues: list[dict[str, Any]]) -> None:
@@ -1770,10 +1800,26 @@ def write_srt(path: Path, cues: list[dict[str, Any]]) -> None:
     v1.23: extracted to subtitle_srt.write_srt_file so all post-engines
     (ffmpeg / hyperframes / remotion) share one validated SRT generator.
     Kept as a thin wrapper for backward compatibility with internal callers.
+
+    P0 · 2026-07-24: clamp non-overlapping starts before validate (dense units / sub_lead).
     """
     from subtitle_srt import write_srt_file
 
-    write_srt_file(path, cues)
+    fixed: list[dict[str, Any]] = []
+    prev_end = 0.0
+    for cue in cues:
+        text = str(cue.get("text") or "").strip()
+        if not text:
+            continue
+        start = float(cue["start"])
+        end = float(cue["end"])
+        if start < prev_end:
+            start = prev_end
+        if end <= start:
+            end = start + 0.35
+        fixed.append({**cue, "start": start, "end": end, "text": text})
+        prev_end = end
+    write_srt_file(path, fixed)
 
 
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
@@ -2002,6 +2048,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             allow_network_fallback=tts_allow_network_fallback,
             usage_root=root,
             shot_id=sid,
+            performance=(
+                normalize_performance_cue(
+                    shot.get("performance_cue"), tone_tags=shot.get("tone_tags")
+                )
+                if normalize_performance_cue is not None
+                else None
+            ),
         )
         log(
             f"  tts backend={tts_meta.get('backend')} voice={tts_meta.get('voice') or shot_voice} "
@@ -2045,6 +2098,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                     allow_network_fallback=tts_allow_network_fallback,
                     usage_root=root,
                     shot_id=f"{sid}-vocal-color",
+                    performance=(
+                        normalize_performance_cue(
+                            shot.get("performance_cue"), tone_tags=shot.get("tone_tags")
+                        )
+                        if normalize_performance_cue is not None
+                        else None
+                    ),
                 )
                 log(f"  vocal_color dur={color_dur:.2f}s gain={color_gain:.2f}")
             except Exception as exc:  # noqa: BLE001 — color is soft layer
@@ -2804,6 +2864,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     except SecurityPolicyError as exc:
         raise RenderError(str(exc)) from exc
     music_vol = float(args.music_volume)
+    performance_bgm = (
+        summarize_bgm_response(spec.get("shots") or [])
+        if summarize_bgm_response is not None
+        else {"shots": 0, "mean_intensity": 0.0, "music_gain": 1.0, "duck_db": -2.0}
+    )
+    music_vol = max(0.02, min(1.0, music_vol * float(performance_bgm.get("music_gain", 1.0))))
+    mix_spotting["performance_bgm"] = performance_bgm
     # Recipe bed_gain also nudges mix music_volume once (author CLI still wins base)
     try:
         bg_hint = float(
@@ -2834,6 +2901,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     except SoundPlanError as exc:
         raise RenderError(str(exc)) from exc
     mix_spotting["sidechain"] = sidechain
+    if performance_bgm.get("shots"):
+        sidechain["performance_duck_db"] = performance_bgm.get("duck_db")
     sc_frag = sidechain_filter_fragment(sidechain)
     filters_help = run(["ffmpeg", "-filters"], check=False).stdout
 
@@ -3026,7 +3095,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 )
 
     # 8) Subtitle cues — char-weighted, early; same xfade clock as picture/VO/native
-    sub_lead = float(getattr(args, "sub_lead", 0.08) or 0.0)  # show slightly before speech
+    # P0 · 2026-07-24: default 0 — positive lead caused SRT overlap hard-fail on dense ZH units
+    sub_lead = float(getattr(args, "sub_lead", 0.0) or 0.0)
     sub_min = float(getattr(args, "sub_min_unit", 0.48) or 0.48)
     sub_max = float(getattr(args, "sub_max_unit", 1.75) or 1.75)
     cues, film_tl = build_subtitle_cues_for_shots(
@@ -3316,7 +3386,10 @@ def main(argv: list[str] | None = None) -> int:
         help="text=FFmpeg burns title/end glyphs; blank=pad only (for HyperFrames/Remotion designed cards)",
     )
     p.add_argument(
-        "--sub-lead", type=float, default=0.08, help="Show subtitles this many seconds early"
+        "--sub-lead",
+        type=float,
+        default=0.0,
+        help="Show subtitles this many seconds early (default 0; >0 risks SRT overlap hard-fail)",
     )
     p.add_argument("--sub-min-unit", type=float, default=0.48)
     p.add_argument("--sub-max-unit", type=float, default=1.75)

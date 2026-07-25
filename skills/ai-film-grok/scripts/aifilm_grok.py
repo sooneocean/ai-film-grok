@@ -50,6 +50,7 @@ from director_review import (
 )
 from film_spec import FilmSpecError, validate_film_spec
 from media_qa import ALLOWED_VIDEO_ENDPOINTS, MediaQAError, analyze_media, approved_clip_record
+from prompt_injector import PromptConflictError, PromptInjector
 from runtime_policy import build_runtime_lock, sha256, verify_requirements_lock, verify_runtime_lock
 from security_policy import (
     SecurityPolicyError,
@@ -64,9 +65,7 @@ from security_policy import (
 from util import read_json as _util_read_json
 from util import sha256_file, utc_now, write_json
 from util.errors import FilmError  # noqa: E402 — re-exported for backward compat
-
-from scripts.prompt_injector import PromptConflictError, PromptInjector
-from scripts.visual_bible import load_bible
+from visual_bible import load_bible
 
 SCHEMA_VERSION = 1
 MANIFEST_NAME = "manifest.json"
@@ -319,13 +318,21 @@ def _classify_doctor_readiness(
     environment_advisories = {
         "ok": not environment_warnings,
         "warnings": list(environment_warnings),
+        "severity": "advisory" if environment_warnings else "none",
+        "blocks_core": False,
     }
+    strict_blocking = bool(failed_checks)
+    strict_status = (
+        "blocked" if strict_blocking else "advisory_only" if environment_warnings else "pass"
+    )
     return {
         "core_readiness": core_readiness,
         "optional_capabilities": optional_capabilities,
         "environment_advisories": environment_advisories,
         "ok": core_readiness["ok"],
         "strict_ok": bool(core_readiness["ok"] and environment_advisories["ok"]),
+        "strict_status": strict_status,
+        "strict_blocking": strict_blocking,
     }
 
 
@@ -1832,7 +1839,7 @@ def cmd_style_lock(args: argparse.Namespace) -> int:
             raise FilmError("no style-lock plan; run: aifilm style-lock plan --root … --ref …")
         style = load_bible(root)
         style = sl.apply_plan_to_bible(style, plan)
-        from scripts.visual_bible import save_bible
+        from visual_bible import save_bible
 
         save_bible(root, style)
         # also keep plan path
@@ -2015,7 +2022,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
 
     style["locked"] = True
     style["state"] = "Approved"
-    from scripts.visual_bible import save_bible
+    from visual_bible import save_bible
 
     save_bible(root, style)
     # receipt
@@ -4562,7 +4569,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_graph(args: argparse.Namespace) -> int:
+def _cmd_graph_legacy(args: argparse.Namespace) -> int:
     """Vertical Drama Graph: legacy derive/import + canonical project/validate/status."""
     root = Path(args.root).expanduser().resolve()
     if str(getattr(args, "graph_action", "") or "") in {"validate", "status"}:
@@ -4739,6 +4746,19 @@ def cmd_graph(args: argparse.Namespace) -> int:
         )
         return 0
     raise FilmError(f"unknown graph action {action!r}")
+
+
+def cmd_graph(args: argparse.Namespace) -> int:
+    """Graph command adapter; mutation logic lives in cli_graph_mutation."""
+    from cli_graph_mutation import GraphMutationError, run
+
+    root = Path(args.root).expanduser().resolve()
+    try:
+        report, code = run(args, root)
+    except GraphMutationError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return code
 
 
 def cmd_skill(args: argparse.Namespace) -> int:
@@ -4985,9 +5005,6 @@ def cmd_plan(args: argparse.Namespace) -> int:
         unlock_scope,
         write_revision_receipt,
     )
-    from story_plan import (
-        normalize_story,
-    )
     from util import read_json, write_json
 
     def _load_text() -> str:
@@ -5003,23 +5020,18 @@ def cmd_plan(args: argparse.Namespace) -> int:
         raise FilmError("plan requires --text or --file")
 
     if action == "normalize":
-        raw = _load_text()
+        from cli_plan_normalize import PlanNormalizeError, run
+
         root_s = getattr(args, "root", None)
-        norm = normalize_story(
-            raw,
-            title_hint=getattr(args, "title", None),
-            source_path=str(getattr(args, "file", None) or ""),
-        )
-        if root_s:
-            root = Path(root_s).expanduser().resolve()
-            root.mkdir(parents=True, exist_ok=True)
-            (root / "receipts").mkdir(parents=True, exist_ok=True)
-            out = root / "receipts" / "story-normalize.json"
-            write_json(out, norm)
-            emit({"ok": True, "action": "normalize", "path": str(out), "story": norm})
-        else:
-            emit({"ok": True, "action": "normalize", "story": norm})
-        return 0
+        try:
+            report, code = run(
+                args,
+                Path(root_s).expanduser().resolve() if root_s else None,
+            )
+        except PlanNormalizeError as exc:
+            raise FilmError(str(exc)) from exc
+        emit(report)
+        return code
 
     if action in {"edit", "lock", "unlock", "replan"}:
         root_s = getattr(args, "root", None)
@@ -7425,18 +7437,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "bible":
             root = Path(args.root).expanduser().resolve()
             if args.bible_cmd == "init":
-                from scripts.visual_bible import load_bible, save_bible
+                from visual_bible import load_bible, save_bible
 
                 bible = load_bible(root)
                 save_bible(root, bible)
                 emit({"ok": True, "msg": "Visual Bible initialized/migrated to v2"})
             elif args.bible_cmd == "lock":
-                from scripts.visual_bible import update_bible_state
+                from visual_bible import update_bible_state
 
                 update_bible_state(root, "Approved")
                 emit({"ok": True, "msg": "Visual Bible locked (Approved)"})
             elif args.bible_cmd == "state":
-                from scripts.visual_bible import update_bible_state
+                from visual_bible import update_bible_state
 
                 update_bible_state(root, args.set)
                 emit({"ok": True, "msg": f"Visual Bible state updated to {args.set}"})

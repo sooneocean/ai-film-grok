@@ -66,17 +66,20 @@ Voicebox 未开时 `tts-ab` 会 skip 该后端，不崩；不修改 film-spec。
 
 `storyteller`：只有一条旁白声线。`character | hybrid`：每个 cast ID 都需要固定 voice/ref，不得让 provider 每镜随机抽样。
 
-## 人物对白日文（P0 · 2026-07-23）
+## 人物对白日文 / 口白中文（P0 · 2026-07-23 / 07-24 强化）
 
-**角色开口用日文 TTS；说书旁白用中文；烧字字幕默认中文。**  
-详见 [lessons-2026-07-23-character-dialogue-ja.md](lessons-2026-07-23-character-dialogue-ja.md)。
+**口白·说书 = 中文 TTS；角色开口 = 日文 TTS；烧字字幕 = 中文。**  
+**禁止突然中日乱切**（成块切换；说书镜禁填 `nar_ja`；禁赶片清空日文轨）。  
+详见 [character-dialogue-ja](lessons-2026-07-23-character-dialogue-ja.md) · **[ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md)**。
 
 | 轨 | 默认语言 | edge 声线 |
 |----|----------|-----------|
 | 女主 / heroine 对白 | **ja** | `ja-JP-NanamiNeural` |
 | 男主 / partner 对白 | **ja** | `ja-JP-KeitaNeural` |
-| 说书 storyteller | **zh** | `zh-CN-XiaoxiaoNeural`（或 Yunxi） |
+| 说书 / 口白 storyteller | **zh only** | `zh-CN-XiaoxiaoNeural`（或 Yunxi）；**无 nar_ja** |
 | 字幕 caption | **zh** | （不走 TTS；用 `nar`/`nar_zh`） |
+
+代码：`is_character_speech_shot` 在 `speaker∈storyteller|narrator|…` 时 **强制非角色轨**（残留 `nar_ja` 也不会跳日文）。
 
 ```json
 {

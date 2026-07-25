@@ -51,3 +51,4 @@
 # session / run-continuation tooling artifacts (never commit)
 .omo/
 .zcode/
+coverage.json

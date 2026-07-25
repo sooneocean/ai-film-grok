@@ -1,9 +1,10 @@
 # Memory · 2026-07-21 索引
 
-Agent 开新片先扫本页 + [2026-07-20-session-index](2026-07-20-session-index.md)。
+Agent 开新片先扫本页 + [2026-07-20-session-index](2026-07-20-session-index.md) + **[2026-07-24-session-index](2026-07-24-session-index.md)**（声线分轨 / final 坑）。
 
 | 主题 | 记忆 / 课 | 要点 |
 |------|-----------|------|
+| **口白中文·角色日文·禁乱切（P0）** | [2026-07-24-ep2-voice-heat-final](2026-07-24-ep2-voice-heat-final.md) | 成块切换；说书禁 nar_ja；sub_lead=0；长片直调 render_final |
 | 四层流水线主脊 | [pipeline-methodology](../references/pipeline-methodology.md) | Agent→视觉→语音→HF→FFmpeg |
 | 生成式电影工序 | [generative-film-craft](../references/generative-film-craft.md) | Beat/Coverage/五锁 |
 | FRW key 能力 | [frw-key-capability](../references/lessons-2026-07-21-frw-key-capability.md) · [frw-degrade-dispatch](../references/frw-degrade-dispatch.md) | **403≠502**；canary 回执 |

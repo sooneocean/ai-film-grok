@@ -37,12 +37,15 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from config_loader import get_config
+from performance_cue import compile_edge, compile_instruction, cue_hash, normalize_performance_cue
 from security_policy import (
     SecurityPolicyError,
     atomic_write_bytes,
@@ -57,7 +60,9 @@ class TTSError(RuntimeError):
     pass
 
 
-TTS_BACKENDS = frozenset({"auto", "minimax", "fish", "voicebox", "edge", "external", "grok"})
+TTS_BACKENDS = frozenset(
+    {"auto", "minimax", "fish", "voicebox", "edge", "external", "grok", "qwen3", "higgs"}
+)
 DEFAULT_VOICEBOX_URL = "http://127.0.0.1:17493"
 # Built-in Grok voices (subset; full list via aifilm grok-oauth voices)
 GROK_BUILTIN_VOICES = frozenset(
@@ -270,6 +275,30 @@ def probe_grok_tts() -> dict[str, Any]:
         return {"ok": False, "error": str(exc)[:200]}
 
 
+def probe_qwen3_tts() -> dict[str, Any]:
+    try:
+        import qwen_tts  # type: ignore  # noqa: F401
+        import soundfile  # type: ignore  # noqa: F401
+
+        return {
+            "ok": True,
+            "model": get_config().qwen3_tts_model,
+            "ref_audio": bool(get_config().qwen3_tts_ref_audio),
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:240], "model": get_config().qwen3_tts_model}
+
+
+def probe_higgs_audio() -> dict[str, Any]:
+    configured = bool(get_config().higgs_audio_argv.strip())
+    return {
+        "ok": configured,
+        "argv_configured": configured,
+        "model": get_config().higgs_audio_model,
+        "error": None if configured else "HIGGS_AUDIO_ARGV not configured",
+    }
+
+
 def probe() -> dict[str, Any]:
     external_error = None
     try:
@@ -279,6 +308,8 @@ def probe() -> dict[str, Any]:
         external_error = str(exc)
     vb = probe_voicebox()
     grok = probe_grok_tts()
+    qwen = probe_qwen3_tts()
+    higgs = probe_higgs_audio()
     backends: dict[str, bool] = {
         "edge": True,
         "fish": bool(fish_api_key()),
@@ -286,6 +317,8 @@ def probe() -> dict[str, Any]:
         "external": bool(ext),
         "voicebox": bool(vb.get("ok")),
         "grok": bool(grok.get("ok")),
+        "qwen3": bool(qwen.get("ok")),
+        "higgs": bool(higgs.get("ok")),
     }
     try:
         import edge_tts  # noqa: F401
@@ -332,6 +365,8 @@ def probe() -> dict[str, Any]:
         "grok_voice": grok_tts_voice() if backends["grok"] else None,
         "grok_language": grok_tts_language() if backends["grok"] else None,
         "grok_error": grok.get("error"),
+        "qwen3": qwen,
+        "higgs": higgs,
         "voicebox_ok": backends["voicebox"],
         "voicebox_base_url": voicebox_base_url(),
         "voicebox_profile": vb.get("profile_name") or voicebox_profile(),
@@ -360,6 +395,72 @@ def probe() -> dict[str, Any]:
 EDGE_MIN_AUDIO_BYTES = 500
 EDGE_EMPTY_RETRIES = 3
 EDGE_RETRY_BACKOFF_SEC = 0.35
+
+
+def _local_adapter(
+    name: str,
+    text: str,
+    out_mp3: Path,
+    *,
+    voice: str,
+    performance: dict[str, Any],
+) -> None:
+    """Run an optional local adapter without exposing the parent secret env."""
+    script = Path(__file__).resolve().parent / "adapters" / f"{name}.py"
+    if not script.is_file():
+        raise TTSError(f"missing {name} adapter: {script}")
+    out_mp3.parent.mkdir(parents=True, exist_ok=True)
+    text_fd, text_name = tempfile.mkstemp(prefix="aifilm-tts-", suffix=".txt", dir=out_mp3.parent)
+    perf_fd, perf_name = tempfile.mkstemp(
+        prefix="aifilm-performance-", suffix=".json", dir=out_mp3.parent
+    )
+    os.close(text_fd)
+    os.close(perf_fd)
+    text_file = Path(text_name)
+    perf_file = Path(perf_name)
+    try:
+        atomic_write_text(text_file, text)
+        atomic_write_text(perf_file, json.dumps(performance, ensure_ascii=False, sort_keys=True))
+        env = minimal_subprocess_env()
+        cfg = get_config()
+        env.update(
+            {
+                "QWEN3_TTS_MODEL": cfg.qwen3_tts_model,
+                "QWEN3_TTS_REF_AUDIO": cfg.qwen3_tts_ref_audio,
+                "QWEN3_TTS_REF_TEXT": cfg.qwen3_tts_ref_text,
+                "QWEN3_TTS_DEVICE": cfg.qwen3_tts_device,
+                "HIGGS_AUDIO_MODEL": cfg.higgs_audio_model,
+                "HIGGS_AUDIO_DEVICE": cfg.higgs_audio_device,
+            }
+        )
+        if cfg.higgs_audio_argv:
+            env["HIGGS_AUDIO_ARGV"] = cfg.higgs_audio_argv
+        p = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--text-file",
+                str(text_file),
+                "--out",
+                str(out_mp3),
+                "--voice",
+                voice or "",
+                "--performance-file",
+                str(perf_file),
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if p.returncode != 0:
+            detail = (p.stderr or p.stdout or "adapter failed").strip()[-800:]
+            raise TTSError(f"{name} adapter failed: {detail}")
+        if not out_mp3.is_file() or out_mp3.stat().st_size < 500:
+            raise TTSError(f"{name} adapter produced no usable audio")
+    finally:
+        text_file.unlink(missing_ok=True)
+        perf_file.unlink(missing_ok=True)
 
 
 def tts_grok(
@@ -749,7 +850,7 @@ def assert_voice_backend_compatible(backend: str, voice: str | None) -> None:
     if not is_edge_neural_voice_id(voice):
         return
     # Neural id only safe on explicit edge (fish/minimax/voicebox/grok strip Neural themselves)
-    if choice in {"edge", "fish", "minimax", "voicebox", "grok"}:
+    if choice in {"edge", "fish", "minimax", "voicebox", "grok", "qwen3", "higgs"}:
         return
     if choice == "external" or external_tts_argv_hints_provider("eleven"):
         raise TTSError(
@@ -780,8 +881,15 @@ def synthesize(
     usage_root: Path | str | None = None,
     shot_id: str = "",
     job_id: str = "",
+    performance: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Synthesize speech. Returns {backend, path, voice}."""
+    cue_input = dict(performance or {})
+    cue_input.setdefault("rate", rate)
+    cue_input.setdefault("pitch", pitch)
+    cue_input.setdefault("volume", volume)
+    cue = normalize_performance_cue(cue_input)
+    edge_plan = compile_edge(cue, text)
     info = probe()
     # Hard gate: Edge Neural ids never go to external/ElevenLabs
     req = "auto" if backend is None else str(backend).lower()
@@ -916,6 +1024,28 @@ def synthesize(
             )
             voice_used = g_voice or grok_tts_voice()
             model_used = "grok-tts"
+        elif choice == "qwen3":
+            _tracked(
+                "qwen3",
+                get_config().qwen3_tts_model,
+                local_zero=True,
+                call=lambda: _local_adapter(
+                    "qwen3_tts", text, out_mp3, voice=voice, performance=cue
+                ),
+            )
+            voice_used = voice or ("clone" if get_config().qwen3_tts_ref_audio else "designed")
+            model_used = get_config().qwen3_tts_model
+        elif choice == "higgs":
+            _tracked(
+                "higgs",
+                get_config().higgs_audio_model,
+                local_zero=True,
+                call=lambda: _local_adapter(
+                    "higgs_audio", text, out_mp3, voice=voice, performance=cue
+                ),
+            )
+            voice_used = voice or "higgs-reference"
+            model_used = get_config().higgs_audio_model
         elif choice == "external":
             _tracked(
                 "external",
@@ -930,12 +1060,12 @@ def synthesize(
                 "edge-neural",
                 local_zero=True,
                 call=lambda: tts_edge(
-                    text,
+                    edge_plan["text"],
                     out_mp3,
                     voice,
-                    rate=rate,
-                    volume=volume,
-                    pitch=pitch,
+                    rate=edge_plan["rate"],
+                    volume=edge_plan["volume"],
+                    pitch=edge_plan["pitch"],
                 ),
             )
             voice_used = voice
@@ -968,12 +1098,12 @@ def synthesize(
                     "edge-neural",
                     local_zero=True,
                     call=lambda: tts_edge(
-                        text,
+                        edge_plan["text"],
                         out_mp3,
                         edge_v,
-                        rate=rate,
-                        volume=volume,
-                        pitch=pitch,
+                        rate=edge_plan["rate"],
+                        volume=edge_plan["volume"],
+                        pitch=edge_plan["pitch"],
                     ),
                 )
                 used = f"{choice}->edge_opt_in_fallback"
@@ -1013,6 +1143,9 @@ def synthesize(
         "fish_model": fish_model() if "fish" in used else None,
         "minimax_model": minimax_model() if "minimax" in used else None,
         "voicebox_profile": info.get("voicebox_profile") if "voicebox" in used else None,
+        "performance": cue,
+        "performance_hash": cue_hash(cue),
+        "performance_compile": {"edge": edge_plan, "instruction": compile_instruction(cue)},
     }
 
 

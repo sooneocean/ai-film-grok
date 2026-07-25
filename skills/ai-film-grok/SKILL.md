@@ -35,14 +35,15 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 2. **用户原文保真**：用户剧本、对白、主题与动作是脊柱，模板不得整句覆盖。
 3. **身份与介质**：参考图先锁 medium/cast/face。有角色 still 只编辑已批准来源；moderated 禁止 `image_gen` 绕脸。漫剧默认 manhua，不静默跳 photoreal。
 4. **先验后生**：still 的身份、结构、画风、几何通过后才 I2V；9:16 keyframe 至少 720×1280。
-5. **连续性**：`state-index check|plan` 先于 bulk；衣着只前进。Continue 镜用已批准末帧硬接下一镜。
-6. **审批/用量**：pilot 必须用户批准；付费/外部动作绑定 hash、预算并实时探测。生成请求写 `receipts/generation-usage.json`，只认真实 `usage.cost_in_usd_ticks`，缺值为 `unknown`；原生 Imagine 后执行 `aifilm usage record`。详见 [generation usage](references/generation-usage-accounting.md)；`advance` 遇 human/paid/external 暂停。
+5. **连续性**：`state-index check|plan` 先于 bulk；衣着只前进，Continue 镜硬接批准末帧。
+6. **审批/用量**：pilot 必须用户批准；付费/外部动作绑定 hash、预算并探测。生成写 `receipts/generation-usage.json`，缺真实 cost 为 `unknown`；Imagine 后执行 `usage record`。`advance` 遇 human/paid/external 暂停。
 7. **供应商**：I2V 默认 `grok_primary`；Seedance 仅恢复路径，`frw_video_model=seedance-2-fast-i2v` 不得静默启用。
-8. **声音**：角色日文 Edge（Nanami/Keita）+ 中文字幕；旁白中文 Edge。亲密 BGM 默认 rnb；外部 TTS/lipsync 不静默开启。
-9. **字幕像素门**：交付 MP4 必须看得到中文字幕；SRT 不等于烧字。HF 失字时显式 stage_caption recovery，禁止清空 `final.srt`。
-10. **后期单一责任**：title/subtitle/end card 只由一个 post engine 负责；`plate-cards blank`、plate `subs=off`，防双烧。见 [title-double-burn](references/lessons-2026-07-20-title-double-burn.md)。
-11. **完成定义**：`final` 技术成功不等于 `final_complete`。镜头 review receipt、post audit、字幕可读 attestation、十一维 review-final、重拍关闭与 export 回读必须齐全。
-12. **安全**：凭据仅从本机读取；日志、metrics、manifest 禁存 token、授权头或 prompt。外部调用不自动重试花费。
+8. **声音（P0 分轨）**：口白/说书中文 Edge；角色开口日文 Edge；字幕中文 `nar`。禁止无 `speaker` 的中日乒乓、说书镜填 `nar_ja` 或赶片清空日文轨。亲密 BGM 默认 rnb；外部 TTS/lipsync 不静默开启。详见 [voice lesson](references/lessons-2026-07-24-ep2-voice-heat-final.md)。
+9. **Adult max IRON（P0）**：肉戏 act+climax ≥50%、亲密 ≥60%、setup ≤20%；act≥undressed、climax=bare、`spice=extreme`，phase 只升不降。`challenge_max_scale` 默认 true，禁静默降 `heat_scale`；显式 `soft` 或 `adult_max_iron:false` 才可退出。详见 [hard-defaults](references/hard-defaults.md)。
+10. **字幕像素门**：交付 MP4 必须看得到中文字幕；SRT 不等于烧字。HF 失字时显式 stage_caption recovery，禁止清空 `final.srt`。`sub_lead=0` 防 SRT 重叠；长片直调 `render_final.py`。
+11. **后期单一责任**：title/subtitle/end card 只由一个 post engine 负责；`plate-cards blank`、plate `subs=off` 防双烧。
+12. **完成定义**：`final` 技术成功不等于 `final_complete`；review receipt、post audit、字幕 attestation、review-final、重拍关闭与 export 回读必须齐全。
+13. **安全**：凭据仅从本机读取；日志、metrics、manifest 禁存 token、授权头或 prompt。外部调用不自动重试花费。
 
 ## 阶段执行
 

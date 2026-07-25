@@ -68,6 +68,7 @@ def run_tts_ab(
     sp = Path(spec_path).expanduser().resolve() if spec_path else (root / "film-spec.json")
     nar = (text or "").strip()
     use_voice = (voice or "").strip()
+    performance: dict[str, Any] | None = None
     if not nar:
         if not sp.is_file():
             raise TTSAbError(f"film-spec missing: {sp} (or pass --text)")
@@ -75,6 +76,17 @@ def run_tts_ab(
         nar, default_voice = _shot_nar(spec, shot_id)
         if not use_voice:
             use_voice = default_voice
+        for shot in spec.get("shots") or []:
+            if (
+                isinstance(shot, dict)
+                and str(shot.get("id") or shot.get("shot_id") or "") == shot_id
+            ):
+                performance = (
+                    shot.get("performance_cue")
+                    if isinstance(shot.get("performance_cue"), dict)
+                    else None
+                )
+                break
     if not use_voice:
         use_voice = "zh-CN-XiaoxiaoNeural"
 
@@ -130,6 +142,7 @@ def run_tts_ab(
                 allow_network_fallback=False,
                 usage_root=root,
                 shot_id=shot_id,
+                performance=performance,
             )
             # synthesize may write .mp3 even if we asked wav
             final_path = Path(synth.get("path") or out_path)

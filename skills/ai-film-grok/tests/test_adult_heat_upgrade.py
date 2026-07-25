@@ -239,10 +239,10 @@ class SpiceExtremeTests(unittest.TestCase):
         )
         self.assertIn("HEAT_VO_SPICE_TOO_MILD", rep["codes"])
 
-    def test_sex_floor_default_30(self) -> None:
+    def test_sex_floor_default_50(self) -> None:
         from edit_policy import DEFAULT_SEX_DURATION_FLOOR
 
-        self.assertAlmostEqual(DEFAULT_SEX_DURATION_FLOOR, 0.30, places=2)
+        self.assertAlmostEqual(DEFAULT_SEX_DURATION_FLOOR, 0.50, places=2)
 
     def test_pose_variety_and_montage(self) -> None:
         from edit_policy import lint_montage_craft, lint_sex_pose_variety

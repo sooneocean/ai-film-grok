@@ -1,5 +1,8 @@
 # Lessons · 2026-07-21 · BGM 听腻 / multi-style
 
+> **已晋升**：BGM multi-style 规则已整合进稳定文档 [bgm-generation.md](bgm-generation.md)。
+> 此 lesson 保留为踩坑历史记录。
+
 **层**：voice·post · **P**：可复现默认 + 显式换 take；不假静音
 
 ## 现象

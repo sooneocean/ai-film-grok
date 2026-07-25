@@ -95,6 +95,8 @@ def _config_env_fingerprint() -> tuple[tuple[str, str], ...]:
         "MINIMAX_",
         "VOICEBOX_",
         "COSYVOICE_",
+        "QWEN3_",
+        "HIGGS_",
         "ELEVENLABS_",
         "MUSIC_",
         "ACESTEP_",
@@ -128,6 +130,15 @@ class ConfigSchema:
     tts_strict_voice: bool = True
     tts_voicebox_fallback: bool = False
     tts_argv: str = ""
+    qwen3_tts_model: str = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
+    qwen3_tts_ref_audio: str = ""
+    qwen3_tts_ref_text: str = ""
+    qwen3_tts_device: str = "auto"
+    qwen3_tts_argv: str = ""
+    higgs_audio_model: str = "bosonai/higgs-audio-v2.5"
+    higgs_audio_ref_audio: str = ""
+    higgs_audio_device: str = "auto"
+    higgs_audio_argv: str = ""
 
     # ── Fish Audio ──────────────────────────────────────────────────────
     fish_api_key: str = ""
@@ -215,6 +226,19 @@ def get_config() -> ConfigSchema:
         tts_strict_voice=_resolve_bool("AIFILM_TTS_STRICT_VOICE", default=True),
         tts_voicebox_fallback=_resolve_bool("AIFILM_TTS_VOICEBOX_FALLBACK", default=False),
         tts_argv=_env("AIFILM_TTS_ARGV"),
+        qwen3_tts_model=_resolve(
+            "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", "QWEN3_TTS_MODEL", "AIFILM_QWEN3_TTS_MODEL"
+        ),
+        qwen3_tts_ref_audio=_env("QWEN3_TTS_REF_AUDIO", "AIFILM_QWEN3_TTS_REF_AUDIO"),
+        qwen3_tts_ref_text=_env("QWEN3_TTS_REF_TEXT", "AIFILM_QWEN3_TTS_REF_TEXT"),
+        qwen3_tts_device=_resolve("auto", "QWEN3_TTS_DEVICE", "AIFILM_QWEN3_TTS_DEVICE"),
+        qwen3_tts_argv=_env("QWEN3_TTS_ARGV", "AIFILM_QWEN3_TTS_ARGV"),
+        higgs_audio_model=_resolve(
+            "bosonai/higgs-audio-v2.5", "HIGGS_AUDIO_MODEL", "AIFILM_HIGGS_AUDIO_MODEL"
+        ),
+        higgs_audio_ref_audio=_env("HIGGS_AUDIO_REF_AUDIO", "AIFILM_HIGGS_AUDIO_REF_AUDIO"),
+        higgs_audio_device=_resolve("auto", "HIGGS_AUDIO_DEVICE", "AIFILM_HIGGS_AUDIO_DEVICE"),
+        higgs_audio_argv=_env("HIGGS_AUDIO_ARGV", "AIFILM_HIGGS_AUDIO_ARGV"),
         # Fish
         fish_api_key=_env("FISH_API_KEY", "FISH_AUDIO_API_KEY", "AIFILM_FISH_API_KEY"),
         fish_voice_id=_env("FISH_VOICE_ID", "AIFILM_FISH_VOICE_ID", "FISH_REFERENCE_ID"),

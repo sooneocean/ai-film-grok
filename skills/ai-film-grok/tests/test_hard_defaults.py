@@ -37,34 +37,34 @@ def _shot(sid: str, phase: str, dur: float = 6.0) -> dict[str, object]:
 class HardDefaultsContractTests(unittest.TestCase):
     """Lock the hard-defaults.md contract values to the code."""
 
-    # --- §叙事与规划: 性爱片段时长硬底 ---
-    def test_sex_duration_floor_is_30_percent(self) -> None:
-        """hard-defaults.md: 'v1.10 抬到 30%' — DEFAULT_SEX_DURATION_FLOOR == 0.30."""
-        self.assertEqual(DEFAULT_SEX_DURATION_FLOOR, 0.30)
+    # --- §叙事与规划: 性爱片段时长硬底 (adult max IRON 2026-07-24 · 50%) ---
+    def test_sex_duration_floor_is_50_percent(self) -> None:
+        """hard-defaults.md IRON: DEFAULT_SEX_DURATION_FLOOR == 0.50."""
+        self.assertEqual(DEFAULT_SEX_DURATION_FLOOR, 0.50)
 
     def test_hot_floor_is_15_percent(self) -> None:
         """hard-defaults.md: hot (non-max) floor is lower — 0.15."""
         self.assertEqual(HOT_SEX_DURATION_FLOOR, 0.15)
 
     def test_max_sex_duration_below_floor_warns(self) -> None:
-        """heat_scale=max: act+climax duration ratio < 0.30 → HEAT_SEX_DURATION_LOW."""
+        """heat_scale=max: act+climax duration ratio < 0.50 → HEAT_SEX_DURATION_LOW."""
         shots = [_shot(f"s{i:02d}", "setup") for i in range(7)]
-        shots += [_shot(f"a{i:02d}", "act") for i in range(2)]  # 2/10 = 0.20 < 0.30
+        shots += [_shot(f"a{i:02d}", "act") for i in range(2)]  # 2/10 = 0.20 < 0.50
         rep = lint_heat_arc(shots, heat_scale="max", advise=True)
         self.assertIn("HEAT_SEX_DURATION_LOW", rep.get("codes", []))
 
     def test_max_sex_duration_at_floor_passes(self) -> None:
-        """heat_scale=max: act+climax ratio == 0.30 → no HEAT_SEX_DURATION_LOW."""
-        shots = [_shot(f"s{i:02d}", "setup") for i in range(7)]
-        shots += [_shot(f"a{i:02d}", "act") for i in range(3)]  # 3/10 = 0.30
+        """heat_scale=max: act+climax ratio == 0.50 → no HEAT_SEX_DURATION_LOW."""
+        shots = [_shot(f"s{i:02d}", "setup") for i in range(5)]
+        shots += [_shot(f"a{i:02d}", "act") for i in range(5)]  # 5/10 = 0.50
         rep = lint_heat_arc(shots, heat_scale="max", advise=True)
         self.assertNotIn("HEAT_SEX_DURATION_LOW", rep.get("codes", []))
 
     def test_sex_floor_reported(self) -> None:
-        """heat report exposes sex_duration_floor == 0.30 for max scale."""
+        """heat report exposes sex_duration_floor == 0.50 for max scale."""
         shots = [_shot("s00", "setup"), _shot("a00", "act")]
         rep = lint_heat_arc(shots, heat_scale="max", advise=True)
-        self.assertAlmostEqual(rep["sex_duration_floor"], 0.30, places=2)
+        self.assertAlmostEqual(rep["sex_duration_floor"], 0.50, places=2)
 
     # --- §叙事与规划: 卸装延续·不回穿 ---
     def test_wardrobe_rank_monotonic_no_redress(self) -> None:

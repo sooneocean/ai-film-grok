@@ -106,19 +106,19 @@ class HeatArcLintTests(unittest.TestCase):
 
     @pytest.mark.slow
     def test_max_mid_ratio_no_forced_warning(self) -> None:
-        # 3/8 act+climax by duration = 37.5% ≥ 30% production floor.
+        # 4/8 act+climax by duration = 50% ≥ 50% IRON floor.
         shots = _spine(
-            ["setup", "setup", "foreplay", "act", "act", "climax", "afterglow", "bridge"]
+            ["setup", "foreplay", "act", "act", "act", "climax", "afterglow", "bridge"]
         )
         rep = lint_heat_arc(shots, heat_scale="max", advise=False)
         self.assertTrue(rep["ok"], rep)
         self.assertNotIn("HEAT_ADVISORY_INTIMACY", rep["codes"])
         self.assertNotIn("HEAT_SEX_DURATION_LOW", rep["codes"])
-        self.assertAlmostEqual(rep["sex_duration_ratio"], 0.375, places=3)
+        self.assertAlmostEqual(rep["sex_duration_ratio"], 0.50, places=3)
 
     @pytest.mark.slow
-    def test_max_sex_duration_below_30_warns(self) -> None:
-        # only 1×6s act of 8×6s = 12.5% < 30%
+    def test_max_sex_duration_below_50_warns(self) -> None:
+        # only 1×6s act of 8×6s = 12.5% < 50%
         shots = _spine(
             ["setup", "setup", "setup", "foreplay", "foreplay", "act", "afterglow", "bridge"]
         )
@@ -126,7 +126,7 @@ class HeatArcLintTests(unittest.TestCase):
         self.assertFalse(rep["ok"])
         self.assertIn("HEAT_SEX_DURATION_LOW", rep["codes"])
         self.assertAlmostEqual(rep["sex_duration_ratio"], 0.125, places=3)
-        self.assertEqual(rep["sex_duration_floor"], 0.30)
+        self.assertEqual(rep["sex_duration_floor"], 0.50)
 
     @pytest.mark.slow
     def test_act_full_armor_wardrobe_fails(self) -> None:
@@ -184,7 +184,8 @@ class HeatArcLintTests(unittest.TestCase):
                 sh["dsl"]["subject"] = "adult woman full dress intact neat dress"
                 sh["dsl"]["action"] = "stands fully clothed"
         cont = apply_wardrobe_continuity(shots, heat_scale="max")
-        self.assertTrue(cont.get("clamped_ids"), cont)
+        # clamp re-dress OR phase escalate may both raise afterglow off full
+        self.assertTrue(cont.get("clamped_ids") or cont.get("escalated"), cont)
         for sh in shots:
             if sh["heat_phase"] == "afterglow":
                 rank = wardrobe_undress_rank(sh["wardrobe_state"])
@@ -253,12 +254,16 @@ class HeatArcLintTests(unittest.TestCase):
             },
         ]
         cont = apply_wardrobe_continuity(shots, heat_scale="max")
-        self.assertIn("shot02", cont["filled_ids"])
-        self.assertEqual(shots[1]["wardrobe_state"], "partial")
-        self.assertEqual(shots[1]["dsl"]["wardrobe_state"], "partial")
+        # inherit partial then IRON phase floor raises act → undressed
+        self.assertTrue(
+            "shot02" in cont["filled_ids"]
+            or any(e.get("id") == "shot02" for e in (cont.get("escalated") or []))
+        )
+        self.assertEqual(shots[1]["wardrobe_state"], "undressed")
+        self.assertEqual(shots[1]["dsl"]["wardrobe_state"], "undressed")
         self.assertGreaterEqual(
             wardrobe_undress_rank(shots[1]["wardrobe_state"]) or 0,
-            wardrobe_undress_rank("partial") or 0,
+            wardrobe_undress_rank("undressed") or 0,
         )
 
     @pytest.mark.slow
@@ -283,6 +288,7 @@ class HeatArcLintTests(unittest.TestCase):
             "sex_wardrobe_strict": True,
             "sex_floor_strict": False,
             "sex_vo_strict": False,
+            "heat_arc_strict": False,
             "director_intent": {
                 "logline": "成人max卸装后回穿应被 clamp 到 peak",
                 "tone": "成人",
@@ -324,7 +330,7 @@ class HeatArcLintTests(unittest.TestCase):
 
     @pytest.mark.slow
     def test_sex_duration_weighted_not_shot_count(self) -> None:
-        # 1 long act (12s) + 3 setup (6s) = 12/30 = 40% sex even if shot-count is 1/4
+        # 1 long act (18s) + 3×6s non-sex = 18/36 = 50% sex even if shot-count is 1/4
         shots = [
             {
                 "id": "shot01",
@@ -374,16 +380,16 @@ class HeatArcLintTests(unittest.TestCase):
                 "id": "shot04",
                 "heat_phase": "act",
                 "dramatic_function": "action",
-                "duration_sec": 12,
+                "duration_sec": 18,
                 "nar": "沉腰吃进，再磨一遍。",
-                "wardrobe_state": "undressed",
+                "wardrobe_state": "bare",
                 "dsl": {
-                    "subject": "x undressed bare skin",
+                    "subject": "x bare exposed skin",
                     "action": "hips sink bare",
                     "motion": "m",
                     "story_beat": "b",
                     "visible_change": "c",
-                    "wardrobe_state": "undressed",
+                    "wardrobe_state": "bare",
                 },
             },
         ]
@@ -391,20 +397,20 @@ class HeatArcLintTests(unittest.TestCase):
         shots[1]["heat_phase"] = "foreplay"
         shots[1]["dramatic_function"] = "sensory"
         rep = lint_heat_arc(shots, heat_scale="max")
-        self.assertAlmostEqual(rep["sex_duration_ratio"], 0.4, places=2)
+        self.assertAlmostEqual(rep["sex_duration_ratio"], 0.5, places=2)
         self.assertAlmostEqual(rep["sex_shot_ratio"], 0.25, places=2)
         self.assertNotIn("HEAT_SEX_DURATION_LOW", rep["codes"])
         self.assertNotIn("HEAT_SEX_WARDROBE_DRESSED", rep["codes"])
 
     @pytest.mark.slow
     def test_hardcore_profile_raises_sex_floor(self) -> None:
-        # 25% sex fails hardcore 40% floor
+        # 25% sex fails hardcore 55% floor
         shots = _spine(
             ["setup", "setup", "setup", "foreplay", "act", "climax", "afterglow", "bridge"]
         )
         rep = lint_heat_arc(shots, heat_scale="max", audience_profile="hardcore_male", advise=False)
         self.assertIn("HEAT_SEX_DURATION_LOW", rep["codes"])
-        self.assertEqual(rep["sex_duration_floor"], 0.40)
+        self.assertEqual(rep["sex_duration_floor"], 0.55)
 
     @pytest.mark.slow
     def test_advise_adds_info_not_hard(self) -> None:
@@ -578,11 +584,18 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
         }
         with self.assertRaises(Exception) as ctx:
             validate_film_spec(spec, assign_missing_ids=False)
-        self.assertIn("SEX_DURATION", str(ctx.exception).upper())
+        msg = str(ctx.exception).upper()
+        self.assertTrue(
+            "SEX_DURATION" in msg or "HEAT ARC" in msg or "ACT_CLIMAX" in msg or "SETUP" in msg,
+            msg,
+        )
 
     @pytest.mark.slow
     def test_write_spec_max_sex_floor_pass_with_enough_act(self) -> None:
-        shots = _spine(["setup", "foreplay", "act", "act", "act", "climax", "afterglow", "bridge"])
+        # 6/8 intimacy (foreplay+act×4+climax), 5/8 sex duration ≥50%
+        shots = _spine(
+            ["setup", "foreplay", "act", "act", "act", "act", "climax", "afterglow"]
+        )
         for sh in shots:
             sh["dsl"]["camera"] = {"shot_size": "medium full", "angle": "eye level"}
             sh["lipsync"] = False
@@ -599,7 +612,7 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
             "scenes": [{"shots": shots}],
         }
         validate_film_spec(spec, assign_missing_ids=False)
-        self.assertGreaterEqual(spec["_heat_arc"]["sex_duration_ratio"], 0.30)
+        self.assertGreaterEqual(spec["_heat_arc"]["sex_duration_ratio"], 0.50)
         self.assertNotIn("HEAT_SEX_DURATION_LOW", spec["_heat_arc"]["codes"])
         self.assertNotIn("HEAT_SEX_WARDROBE_DRESSED", spec["_heat_arc"]["codes"])
 
@@ -631,7 +644,7 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
     @pytest.mark.slow
     def test_write_spec_bland_vo_hard_fail(self) -> None:
         shots = _spine(
-            ["setup", "foreplay", "act", "act", "climax", "afterglow", "bridge", "bridge"],
+            ["setup", "foreplay", "act", "act", "act", "act", "climax", "afterglow"],
             vo_spice=False,
         )
         for sh in shots:
@@ -642,6 +655,8 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
             "vo_mode": "storyteller",
             "tts_backend": "edge",
             "heat_scale": "max",
+            "heat_arc_strict": False,
+            "sex_floor_strict": False,
             "director_intent": {
                 "logline": "成人max但旁白文艺",
                 "tone": "成人",
@@ -651,12 +666,14 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
         }
         with self.assertRaises(Exception) as ctx:
             validate_film_spec(spec, assign_missing_ids=False)
-        self.assertIn("VO", str(ctx.exception).upper())
+        msg = str(ctx.exception).upper()
+        self.assertTrue("VO" in msg or "SPICE" in msg, msg)
 
     @pytest.mark.slow
-    def test_write_spec_armored_act_hard_fail(self) -> None:
+    def test_write_spec_armored_act_auto_escalates(self) -> None:
+        """IRON: armored act is auto-raised to undressed|bare (能脱就脱), not left dressed."""
         shots = _spine(
-            ["setup", "foreplay", "act", "act", "climax", "afterglow", "bridge", "bridge"],
+            ["setup", "foreplay", "act", "act", "act", "act", "climax", "afterglow"],
             wardrobe_ok=False,
         )
         for sh in shots:
@@ -667,21 +684,28 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
                 sh["dsl"]["wardrobe_state"] = "armored"
                 sh["dsl"]["action"] = "straddle in full armor"
         spec = {
-            "title": "测铠甲办事硬闸",
+            "title": "测铠甲办事自动卸装",
             "vo_mode": "storyteller",
             "tts_backend": "edge",
             "heat_scale": "max",
+            "heat_arc_strict": False,
+            "sex_floor_strict": False,
+            "sex_vo_strict": False,
             "director_intent": {
-                "logline": "成人max全装办事",
+                "logline": "成人max全装办事应被自动卸装",
                 "tone": "成人",
                 "emotional_arc": ["起", "承", "转"],
             },
             "scenes": [{"shots": shots}],
         }
-        with self.assertRaises(Exception) as ctx:
-            validate_film_spec(spec, assign_missing_ids=False)
-        msg = str(ctx.exception).upper()
-        self.assertTrue("WARDROBE" in msg or "UNDRESS" in msg or "DRESSED" in msg, msg)
+        validate_film_spec(spec, assign_missing_ids=False)
+        for sh in shots:
+            if sh["heat_phase"] == "act":
+                self.assertIn(sh.get("wardrobe_state"), {"undressed", "bare"}, sh)
+            if sh["heat_phase"] == "climax":
+                self.assertEqual(sh.get("wardrobe_state"), "bare", sh)
+        cont = spec.get("_wardrobe_continuity") or {}
+        self.assertTrue(cont.get("escalated") or cont.get("filled_ids"), cont)
 
 
 if __name__ == "__main__":

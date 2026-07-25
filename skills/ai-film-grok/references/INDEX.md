@@ -123,10 +123,18 @@
 
 > 新规则须标 P 码 + 层。验证稳定后可晋升到上方稳定 references。
 
+### 2026-07-24
+
+| 文件 | 主题 |
+|---|---|
+| **[ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md)** | **P0**：口白中文 / 角色日文 / 禁中日乒乓；final SRT·timeout·register；肉戏 2× 动态路径（ep2 全量复盘） |
+| [director-methodology-activation](lessons-2026-07-24-director-methodology-activation.md) | 导演方法论激活（若存在） |
+
 ### 2026-07-23
 
 | 文件 | 主题 |
 |---|---|
+| [character-dialogue-ja](lessons-2026-07-23-character-dialogue-ja.md) | 角色日文 TTS · 旁白/字幕中文（P0；07-24 强化禁乱切） |
 | [style-lock-from-ref](lessons-2026-07-23-style-lock-from-ref.md) | 输入图画风锁 medium/cast_locks（P0） |
 | [face-identity-pixel](lessons-2026-07-23-face-identity-pixel.md) | 像素 face-identity 哈希 + post_audit（P0） |
 | [photoreal-vs-manhua-stability](lessons-2026-07-23-photoreal-vs-manhua-stability.md) | 写实不稳 vs 漫剧质感·介质路由（P0） |

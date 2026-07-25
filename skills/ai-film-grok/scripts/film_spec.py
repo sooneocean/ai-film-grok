@@ -1654,6 +1654,7 @@ def validate_film_spec(
         wardrobe_cont.get("filled_ids")
         or wardrobe_cont.get("bumped_ids")
         or wardrobe_cont.get("clamped_ids")
+        or wardrobe_cont.get("escalated")
         or wardrobe_cont.get("start_pose_ids")
     ):
         notes = list(spec.get("_heat_notes") or [])
@@ -1664,6 +1665,16 @@ def validate_film_spec(
             bits.append("wardrobe undress-bump: " + ",".join(wardrobe_cont["bumped_ids"][:12]))
         if wardrobe_cont.get("clamped_ids"):
             bits.append("wardrobe re-dress CLAMPED: " + ",".join(wardrobe_cont["clamped_ids"][:12]))
+        esc = wardrobe_cont.get("escalated") or []
+        if esc:
+            bits.append(
+                "wardrobe IRON escalate: "
+                + ",".join(
+                    f"{e.get('id')}:{e.get('from')}→{e.get('to')}"
+                    for e in esc[:12]
+                    if isinstance(e, dict)
+                )
+            )
         if wardrobe_cont.get("start_pose_ids"):
             bits.append(
                 "start_pose undress-lock: " + ",".join(wardrobe_cont["start_pose_ids"][:12])
@@ -1756,10 +1767,35 @@ def validate_film_spec(
         source_excerpt=source_excerpt,
     )
     spec["_heat_arc"] = heat_rep
-    if spec.get("heat_arc_strict") is True and heat_rep["warning_count"] > 0:
+    # max IRON: heat_arc_strict defaults true (intimacy ≥70% / setup ≤20%)
+    heat_arc_strict = spec.get("heat_arc_strict")
+    if heat_arc_strict is None:
+        heat_arc_strict = heat_scale == "max" and spec.get("adult_max_iron") is not False
+    arc_fail_codes = [
+        c
+        for c in (heat_rep.get("codes") or [])
+        if c
+        in {
+            "HEAT_INTIMACY_RATIO_LOW",
+            "HEAT_SETUP_RATIO_HIGH",
+            "HEAT_ACT_CLIMAX_EMPTY",
+            "HEAT_ESCALATION_REGRESSION",
+            "HEAT_ESCALATION_STALL",
+            "HEAT_ESCALATION_NO_PEAK",
+        }
+    ]
+    if heat_arc_strict is True and arc_fail_codes:
         raise FilmSpecError(
-            "heat arc lint failed (heat_arc_strict): " + ",".join(heat_rep["codes"] or ["HEAT"])
+            "heat arc IRON failed (heat_arc_strict): "
+            + ",".join(arc_fail_codes)
+            + " — max: intimacy ≥60%, setup ≤20%, continuous challenge to climax bare "
+            "(no mid-film cool-down / plateau). "
+            "Override: heat_arc_strict:false or adult_max_iron:false."
         )
+    # Explicit continuous-challenge flag (defaults with max iron)
+    if spec.get("challenge_max_scale") is None and heat_scale == "max":
+        if spec.get("adult_max_iron") is not False:
+            spec["challenge_max_scale"] = True
     # P0 user-source fidelity only protects actual user source, never stock plans.
     fidelity_strict = spec.get("user_source_fidelity_strict")
     if fidelity_strict is None:
@@ -1814,10 +1850,10 @@ def validate_film_spec(
         raise FilmSpecError(
             "sex duration floor failed (sex_floor_strict): HEAT_SEX_DURATION_LOW "
             f"sex_duration_ratio={ratio} floor={floor} — "
-            "raise act+climax duration_sec share to ≥30% of total (or set "
-            "sex_min_duration_ratio / sex_floor_strict:false). See ecchi-story.md"
+            "raise act+climax duration_sec share to ≥50% of total (or set "
+            "sex_min_duration_ratio / sex_floor_strict:false). See adult-max iron."
         )
-    # Sex wardrobe: act/climax must undress; continuity monotonic (衣服不回穿); hard on max.
+    # Sex wardrobe IRON: undress|bare + bare peak; continuity monotonic; hard on max.
     sex_wardrobe_strict = spec.get("sex_wardrobe_strict")
     if sex_wardrobe_strict is None:
         sex_wardrobe_strict = heat_scale == "max"
@@ -1831,17 +1867,15 @@ def validate_film_spec(
             "HEAT_UNDRESS_BEAT_MISSING",
             "HEAT_WARDROBE_RE_DRESS",
             "HEAT_WARDROBE_TEXT_CONFLICT",
+            "HEAT_BARE_PEAK_MISSING",
         }
     ]
     if sex_wardrobe_strict is True and wardrobe_fail_codes:
         raise FilmSpecError(
-            "sex wardrobe ladder failed (sex_wardrobe_strict): "
+            "sex wardrobe IRON failed (sex_wardrobe_strict): "
             + ",".join(wardrobe_fail_codes)
-            + " — act/climax must set wardrobe_state=partial|undressed|bare "
-            "(or dsl bare skin / armor off / 半裸 / 卸甲); include undress beat; "
-            "后镜必须延续前镜卸装状态、禁止回穿；"
-            "下一镜 start_pose/subject 从已脱状态开场，禁 full wardrobe。"
-            " See lessons-2026-07-21-sex-undress-ladder.md"
+            + " — act≥undressed, climax=bare, undress beat required; "
+            "能脱就脱/能露就露；禁止回穿。See lessons-2026-07-21-sex-undress-ladder.md"
         )
     # VO 荤梗：实打实办事剧，旁白全程要荤；act/climax 要办事动词
     sex_vo_strict = spec.get("sex_vo_strict")

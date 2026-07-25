@@ -2,7 +2,8 @@
 
 > 从 SKILL.md 抽出。  
 > **工程门禁**（pilot / VO 预算 / continue / 双烧）= 硬。  
-> **叙事·尺度·女主人数** = **软**：跟用户 Prompt 与参考图，禁止用固定比例或关键词钉死。
+> **成人尺度（2026-07-24 IRON）** = **硬**：肉戏拉满、能脱就脱、能露就露。  
+> 女主人数 / 非成人 genre = 仍跟用户；显式 `heat_scale:soft` / `adult_max_iron:false` 才降火。
 
 ## 叙事与规划
 
@@ -10,11 +11,12 @@
 |---|---|
 | 文本入口 | Director’s Lens → 再 film-spec；禁止原文一句一图 |
 | 规划 vs 剪辑 | clips 齐后建议 Editor’s Cut；用户赶交付可缩短 |
-| 成人尺度 | **用户要热才 `heat_scale:max`**；不自动钉 max |
-| 亲密核 | **建议**（max 时可参考 ≥60% 镜比）；`_heat_arc` 报指标；极端偏低 soft warn |
-| **性爱片段时长** | **产品硬底**（2026-07-21 · **v1.10 抬到 30%**）：`heat_scale=max` 时 **act+climax ≥ 总片板 30%**；write-spec 默认 `sex_floor_strict`；重口男向 ≥40%；`sex_min_duration_ratio` 可覆盖 |
-| **办事卸甲/脱衣** | **产品硬底**（2026-07-21）：act/climax 禁止全装铠甲；`wardrobe_state`=partial\|undressed\|bare；须有卸甲/脱衣动作拍；默认 `sex_wardrobe_strict`；静帧/I2V 须画到裸露可读 |
-| **卸装延续·不回穿** | **产品硬底**（2026-07-21+）：rank 单调不降；后镜继承；**回穿自动 clamp**（max/hot）；`start_pose` 从已脱开场；prompt 注入 `Costume continuity HARD` + 禁 default 全装回退；码 `HEAT_WARDROBE_RE_DRESS` / `HEAT_WARDROBE_TEXT_CONFLICT` |
+| **成人尺度 IRON** | 成人信号 → **自动 `heat_scale:max` + `spice_level:extreme`**；禁静默降档 |
+| **亲密核** | max 硬底 **≥60%** 镜比（foreplay+act+climax）；建议 ≥70%；`heat_arc_strict` 默认 true |
+| **setup 天花板** | max 硬底 **≤20%** 镜比 |
+| **性爱片段时长** | **IRON 硬底**（2026-07-24 · **50%**）：`heat_scale=max` 时 **act+climax ≥ 总片板 50%**；write-spec 默认 `sex_floor_strict`；重口男向 ≥55%；`sex_min_duration_ratio` 可覆盖 |
+| **办事卸甲/脱衣 IRON** | **产品硬底**：act ≥`undressed`；**climax = bare**；须有卸甲拍；默认 `sex_wardrobe_strict`；write-spec **自动 phase 抬升**（能脱就脱/能露就露）；码 `HEAT_SEX_WARDROBE_*` / `HEAT_BARE_PEAK_MISSING` |
+| **卸装延续·不回穿** | **产品硬底**（2026-07-21+）：rank 单调不降；后镜继承；**回穿自动 clamp**（max/hot）；`start_pose` 从已脱开场；prompt 注入 `Costume continuity HARD` + Adult max IRON 行；码 `HEAT_WARDROBE_RE_DRESS` / `HEAT_WARDROBE_TEXT_CONFLICT` |
 | **卸装后 still 源** | **P0 像素硬底**（2026-07-21 席德案）：peak 后 **禁止** `image_edit(全装 cast master)`；必须 `canonical/wardrobe/undress-anchor` 或上一已脱 still；I2V 锁 first-frame 衣着；见 [wardrobe-no-redress-still](lessons-2026-07-21-wardrobe-no-redress-still.md) |
 | **I2V 末帧不回穿 + promote 门** | **P0**（2026-07-22 astra 红外套案）：register 前验 last frame 肩/胸未整穿已脱衣物；毒末帧禁止 promote；identity 只锁脸发；见 [i2v-endframe-no-redress](lessons-2026-07-22-i2v-endframe-no-redress.md) |
 | **Keyframe-first · 状态照** | **产品硬底**（2026-07-21）：先状态照索引 `cast_state_masters` → 再 keyframe → 再 I2V；视频坏先改 keyframe/状态照；prompt 注入 `State photo ref`；见 [keyframe-first-state-index](keyframe-first-state-index.md) |
@@ -27,7 +29,8 @@
 | 发色 | **硬锁**（P1）：`cast_locks` 写色名+NEVER 禁色；`hair_swatches` 建议；双人多 cast 锚；pilot 发色 fail=identity fail（2026-07-21） |
 | **画面工程字** | **致命禁**（P0）：禁烧 `shot##`/keyframe/cast master v#；prompt 不写镜号字串；register 前四角检；脏 still 先 scrub（2026-07-21） |
 | **资深剪辑** | Editor’s Cut 必写蒙太奇设计；craft **≥4 种**；60s insert≥2 / smash≥1 / montage 段≥1；禁顺序幻灯片（2026-07-21） |
-| **重口男向** | 用户点名重口/男向 → heat max + 亲密核目标≥70% + act≥4 + climax≥2 + 荤 VO；禁 setup 过长（2026-07-21） |
+| **重口男向** | 用户点名重口/男向 → heat max + sex≥55% + act≥4 + climax≥2 + 荤 VO + coitus/size/montage strict（2026-07-21 / IRON 抬档） |
+| **Adult max IRON** | 肉戏≥50% · 亲密≥60% · setup≤20% · act undressed · climax bare · spice extreme · 自动卸装抬升 · **持续挑战尺度最大**（phase 只升不降、禁泄火/长平台、必 climax bare；`challenge_max_scale`）（2026-07-24） |
 | **首帧结构** | **致命**（P0）：keyframe 解剖/融合 fail → 禁 I2V；I2V 后必抽 t=0；坏首帧=整段废（2026-07-21 33s 案） |
 | **景别堆叠** | 成人 60s：宽≥1·中≥2·近≥2·局部≥2；act→climax 收紧不回退全景；连续 3 镜同 size fail（2026-07-21） |
 | **性交冲击力标竿** | 用户要性交/办事冲击/尺度太小→`coitus_grammar`；act 静帧过 **Mute Frame Test**；六拍 ENTRY→HOOK；禁拥抱冒充办事；审核软化走双轨不降 heat（2026-07-21） |
@@ -45,7 +48,8 @@
 | 规则 | 默认 |
 |---|---|
 | TTS | 中文成片 **edge**；storyteller `auto`→edge |
-| **人物对白语言** | **P0**（2026-07-23）：角色开口 TTS 默认 **日文**（`dialogue_spoken_lang=ja`，女 `ja-JP-NanamiNeural` / 男 `ja-JP-KeitaNeural`）；说书旁白默认 **中文**；**字幕仍中文**（`caption_lang=zh`，用 `nar` 非 `nar_ja`）。角色镜须 `speaker` + `nar` + `nar_ja`。见 [character-dialogue-ja](lessons-2026-07-23-character-dialogue-ja.md) · [voices.md](voices.md) |
+| **人物对白 / 口白语言** | **P0**（2026-07-23 / **07-24 强化**）：**口白·说书=中文**；**角色开口=日文**（`dialogue_spoken_lang=ja`，女 `ja-JP-NanamiNeural` / 男 `ja-JP-KeitaNeural`）；**字幕仍中文**（`caption_lang=zh`，烧 `nar` 非 `nar_ja`）。角色镜须 `speaker` + `nar` + `nar_ja`；说书镜 **禁** `nar_ja`。**禁止无 speaker 理由的中日乒乓**；成块切换。禁赶片清空 `nar_ja`。见 [character-dialogue-ja](lessons-2026-07-23-character-dialogue-ja.md) · [ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md) · [voices.md](voices.md) |
+| **final / SRT** | **P0**（2026-07-24）：`sub_lead=0` 或写盘前非重叠钳制；长片直调 `render_final.py`（勿被 plate-timeout 假失败）；plate 后中文硬烧。见 [ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md) |
 | Voicebox | **质量升级 + opt-in 本地兜底**（非默认替换 edge）；固定 `VOICEBOX_PROFILE`；`AIFILM_TTS_VOICEBOX_FALLBACK=1` 才 edge 失败再试 |
 | 机位 | 开场 **`aifilm dispatch`**（craft+capability+next）；或 `capability`；`--suggest-i2v` / `--apply` 改 I2V 须显式 |
 | 自动调配 | 每回合 `dispatch` → 只执行 `next_cmd`；不自批 pilot；不静默换 provider |

@@ -3,7 +3,25 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
-## [2.0.0] — 2026-07-24
+## [2.6.0] — 2026-07-24
+
+### Added — Adult max IRON（肉戏/脱衣/露点铁律）
+
+- **肉戏时长硬底 50%**（`DEFAULT_SEX_DURATION_FLOOR=0.50`；hardcore 0.55）；亲密核 ≥60%、setup ≤20%（`heat_arc_strict`）。
+- **能脱就脱 / 能露就露**：write-spec `apply_wardrobe_continuity` phase floor（act≥undressed、climax=bare）；新码 `HEAT_BARE_PEAK_MISSING`。
+- **max 默认 spice=extreme**；plan 投影 `sex_min_duration_ratio=0.50` + `heat_arc_strict`。
+- **持续挑战尺度最大**：`lint_heat_escalation_challenge` — phase 只升不降至 climax；禁 act 后 setup / 早 afterglow；禁 foreplay 长平台；必 climax 峰值。码 `HEAT_ESCALATION_*`；`challenge_max_scale` 默认 true。
+- **prompt** Adult max IRON + continuous challenge 行；课 `lessons-2026-07-24-adult-max-iron.md`；测试 `test_adult_max_iron.py`。
+- 逃生阀：显式 soft / `adult_max_iron:false` / `sex_*_strict:false`。
+
+## [2.5.1] — 2026-07-24
+
+### Fixed — ep2 声线分轨 + final SRT（P0 写回插件）
+
+- **口白中文 / 角色日文 / 禁乒乓**：`is_character_speech_shot` 在显式 `storyteller|narrator` 时忽略残留 `nar_ja`，避免说书镜误跳日文。
+- **SRT 硬失败**：`sub_lead` 默认改为 `0`；`build_subtitle_cues_for_shots` + `write_srt` 写盘前非重叠钳制。
+- **阶段卡 / 路由 / 索引**：`stages/voice.md` · `stages/post.md` · `context-routing.json`（voice/rough/sound.design）· `INDEX.md` · `hard-defaults` · `SKILL.md` P0#8 · 全局 `Agents.md`。
+- **课**：`references/lessons-2026-07-24-ep2-voice-heat-final.md` · `memory/2026-07-24-*`。
 
 ### Changed — Compact orchestration and bounded context
 
