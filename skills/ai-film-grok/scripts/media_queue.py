@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from cache import ContentCache
 from media_qa import ALLOWED_VIDEO_ENDPOINTS, MediaQAError, analyze_media
 from production_gates import ProductionGateError, assert_pilot_allows_add
 from runtime_policy import sha256
@@ -229,6 +230,7 @@ class MediaQueue:
         is_canary: bool = False,
         canary_group_id: str | None = None,
         seed_offset: int = 0,
+        generation_contract: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         try:
             shot_id = validate_identifier(shot_id, field="shot id")
@@ -280,16 +282,36 @@ class MediaQueue:
                 )
         prompt_hash = sha256(prompt)
         input_records = [{"path": str(path), "sha256": sha256(path)} for path in resolved_inputs]
-        identity = json.dumps(
-            {
-                "shot_id": shot_id,
-                "operation": operation,
-                "prompt": prompt_hash,
-                "inputs": input_records,
-                "is_canary": is_canary,
-                "seed_offset": seed_offset,
-            },
-            sort_keys=True,
+        legacy_identity = {
+            "shot_id": shot_id,
+            "operation": operation,
+            "prompt": prompt_hash,
+            "inputs": input_records,
+            "is_canary": is_canary,
+            "seed_offset": seed_offset,
+        }
+        cache_key = None
+        if generation_contract:
+            input_hash = ContentCache.key(
+                json.dumps(input_records, sort_keys=True, separators=(",", ":"))
+            )
+            extra_parameters = generation_contract.get("parameters")
+            cache_key = ContentCache.contract_key(
+                input_hash=input_hash,
+                provider=str(generation_contract.get("provider") or "unspecified"),
+                model=str(generation_contract.get("model") or "unspecified"),
+                parameters={
+                    "shot_id": shot_id,
+                    "operation": operation,
+                    "prompt_sha256": prompt_hash,
+                    "is_canary": is_canary,
+                    "seed_offset": seed_offset,
+                    **(extra_parameters if isinstance(extra_parameters, dict) else {}),
+                },
+                version=str(generation_contract.get("version") or "1"),
+            )
+        identity = (
+            cache_key or ContentCache.key(json.dumps(legacy_identity, sort_keys=True))
         ).encode("utf-8")
         canary_suffix = f"-canary{seed_offset}" if is_canary else ""
         job_id = f"{shot_id}-{hashlib.sha256(identity).hexdigest()[:16]}{canary_suffix}"
@@ -333,6 +355,9 @@ class MediaQueue:
                 "is_canary": is_canary,
                 "seed_offset": seed_offset,
             }
+            if cache_key:
+                job["cache_key"] = cache_key
+                job["generation_contract"] = generation_contract
             if canary_group_id:
                 job["canary_group_id"] = canary_group_id
             if assembly_receipt:
@@ -351,6 +376,7 @@ class MediaQueue:
         max_attempts: int = 3,
         allow_without_pilot: bool = False,
         seed_offset: int = 101,
+        generation_contract: dict[str, Any] | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Enqueue primary job and canary speculative mutation job in parallel."""
         group_id = f"canary_grp_{shot_id}_{secrets.token_hex(4)}"
@@ -363,6 +389,7 @@ class MediaQueue:
             allow_without_pilot=allow_without_pilot,
             is_canary=False,
             canary_group_id=group_id,
+            generation_contract=generation_contract,
         )
         canary = self.add_job(
             shot_id=shot_id,
@@ -374,6 +401,7 @@ class MediaQueue:
             is_canary=True,
             canary_group_id=group_id,
             seed_offset=seed_offset,
+            generation_contract=generation_contract,
         )
         return primary, canary
 

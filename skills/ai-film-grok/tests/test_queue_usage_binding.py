@@ -128,3 +128,35 @@ def test_complete_rejects_usage_receipt_for_other_job(tmp_path: Path) -> None:
             assert "belongs to job" in str(exc)
         else:
             raise AssertionError("mismatched generation usage was accepted")
+
+
+def test_generation_contract_changes_queue_identity(tmp_path: Path) -> None:
+    queue, prompt, image = _queue(tmp_path)
+    first = queue.add_job(
+        shot_id="shot01",
+        operation="image_to_video",
+        prompt_file=prompt,
+        inputs=[image],
+        allow_without_pilot=True,
+        generation_contract={
+            "provider": "grok",
+            "model": "grok-imagine-video",
+            "parameters": {"duration": 5},
+            "version": "1",
+        },
+    )
+    second = queue.add_job(
+        shot_id="shot01",
+        operation="image_to_video",
+        prompt_file=prompt,
+        inputs=[image],
+        allow_without_pilot=True,
+        generation_contract={
+            "provider": "grok",
+            "model": "grok-imagine-video",
+            "parameters": {"duration": 6},
+            "version": "1",
+        },
+    )
+    assert first["id"] != second["id"]
+    assert first["cache_key"] != second["cache_key"]
