@@ -662,6 +662,33 @@ def record_capability(root: Path | str, *, endpoint: str, media: Path) -> dict[s
     return result
 
 
+def _generation_contract_from_args(args: argparse.Namespace) -> dict[str, Any] | None:
+    values = {
+        "provider": getattr(args, "provider", None),
+        "model": getattr(args, "model", None),
+        "parameters_json": getattr(args, "parameters_json", None),
+        "version": getattr(args, "contract_version", None),
+    }
+    if not any(values.values()):
+        return None
+    parameters: dict[str, Any] = {}
+    raw = values["parameters_json"]
+    if raw:
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise QueueError(f"--parameters-json must be valid JSON: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise QueueError("--parameters-json must be a JSON object")
+        parameters = parsed
+    return {
+        "provider": values["provider"] or "unspecified",
+        "model": values["model"] or "unspecified",
+        "parameters": parameters,
+        "version": values["version"] or "1",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="ai-film-grok persistent media queue")
     parser.add_argument("--budget-units", type=int, default=20)
@@ -681,6 +708,12 @@ def main(argv: list[str] | None = None) -> int:
     add.add_argument(
         "--assembly-receipt", help="Path to prompt_assembly_shot.json receipt for traceability"
     )
+    add.add_argument("--provider", help="Generation provider for contract-bound job identity")
+    add.add_argument("--model", help="Generation model for contract-bound job identity")
+    add.add_argument(
+        "--parameters-json", help="JSON object of generation parameters for job identity"
+    )
+    add.add_argument("--contract-version", default="1")
     claim = sub.add_parser("claim")
     claim.add_argument("--root", required=True)
     status = sub.add_parser("status")
@@ -743,6 +776,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_attempts=args.max_attempts,
                 allow_without_pilot=bool(getattr(args, "allow_without_pilot", False)),
                 assembly_receipt=Path(args.assembly_receipt) if args.assembly_receipt else None,
+                generation_contract=_generation_contract_from_args(args),
             )
         elif args.command == "claim":
             result = queue.claim()

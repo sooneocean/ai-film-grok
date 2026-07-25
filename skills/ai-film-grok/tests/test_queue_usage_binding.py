@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -11,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from generation_usage import finish_generation, start_generation
 from media_queue import MediaQueue, QueueError
+from media_queue import main as queue_main
 
 
 def _iso(offset: int = 0) -> str:
@@ -160,3 +162,39 @@ def test_generation_contract_changes_queue_identity(tmp_path: Path) -> None:
     )
     assert first["id"] != second["id"]
     assert first["cache_key"] != second["cache_key"]
+
+
+def test_queue_cli_accepts_generation_contract(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "film"
+    prompt = tmp_path / "prompt.txt"
+    prompt.write_text("slow push in", encoding="utf-8")
+    image = tmp_path / "frame.jpg"
+    image.write_bytes(b"frame")
+    assert (
+        queue_main(
+            [
+                "add",
+                "--root",
+                str(root),
+                "--shot-id",
+                "shot01",
+                "--operation",
+                "image_to_video",
+                "--prompt-file",
+                str(prompt),
+                "--input",
+                str(image),
+                "--allow-without-pilot",
+                "--provider",
+                "grok",
+                "--model",
+                "grok-imagine-video",
+                "--parameters-json",
+                '{"duration":5}',
+            ]
+        )
+        == 0
+    )
+    output = json.loads(capsys.readouterr().out)
+    assert output["result"]["cache_key"]
+    assert output["result"]["generation_contract"]["model"] == "grok-imagine-video"
