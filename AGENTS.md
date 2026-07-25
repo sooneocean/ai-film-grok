@@ -5,7 +5,7 @@
 ## Absolute path（本机开发真相）
 
 ```text
-/Users/dex/.grok/plugins/ai-film-grok
+/Users/asd/YOLO/ai-film-grok
 ```
 
 - **只改这里**（plugin 源码）。  
@@ -49,7 +49,7 @@ ai-film-grok/                    ← plugin root / git root
 ## 迭代循环（agent 默认）
 
 ```bash
-ROOT="/Users/dex/.grok/plugins/ai-film-grok"
+ROOT="/Users/asd/YOLO/ai-film-grok"
 SKILL="$ROOT/skills/ai-film-grok"
 AIFILM="$SKILL/scripts/aifilm"
 

@@ -242,6 +242,14 @@ aifilm usage summary --scan-root "/Users/dex/AI FILM SPACE"
 每次 T2I、image edit、I2V/T2V 与 TTS 请求写入
 `receipts/generation-usage.json`。真实费用只认 provider 返回的
 `usage.cost_in_usd_ticks`；没有真实字段时为 `unknown`，不会根据 quota 差倒推。
+
+### 可量化优化
+
+`aifilm metrics emit --root <film>` 会把 receipts 聚合成 `metrics.json`；未知成本、
+时间或人工输入会明确保留为 `unknown`，绝不当作零。用 `aifilm metrics human-time`
+追加人工分钟，`aifilm experiment` 保存单变量 baseline/treatment 比较，`aifilm gold
+calibrate` 只校准 early-reject 指标，不能替代 `review-final`。`aifilm dashboard build`
+输出只读 receipts 的静态 HTML，默认只扫最近 30 天。
 原生 Imagine 工具须在调用后执行 `aifilm usage record`。详见
 [generation-usage-accounting.md](skills/ai-film-grok/references/generation-usage-accounting.md)。
 

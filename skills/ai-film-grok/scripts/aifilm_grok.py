@@ -34,10 +34,12 @@ from director_review import (
     SCORECARD_DIMENSIONS,
     DirectorReviewError,
     add_reshoot_item,
+    build_grades_from_cli,
     build_notes_from_scorecard_failures,
     build_scorecard_from_cli,
     empty_director_notes,
     open_reshoot_items,
+    parse_fail_reasons,
     parse_shot_id_list,
     reshoots_clear,
     resolve_reshoot_item,
@@ -730,8 +732,16 @@ def cmd_init(args: argparse.Namespace) -> int:
     write_json(root / "film-spec.json", film_spec)
     write_json(root / "timeline.json", timeline)
     manifest = empty_manifest(title=title, theme=theme, aspect=aspect)
+    # Existing projects and clients remain on v2 until they explicitly opt in
+    # to v3; v3 changes the review input contract and must not be silent.
     manifest["review_contract_version"] = 2
     save_manifest(root, manifest)
+    try:
+        from pipeline_events import append_event
+
+        append_event(root, stage="init", phase="completed")
+    except OSError:
+        pass
     (root / "README.md").write_text(
         f"# {title}\n\nTheme: {theme}\n\nProvider: Grok Imagine\nRoot: `{root}`\n",
         encoding="utf-8",
@@ -2512,6 +2522,14 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             manifest.setdefault("clips", {})[record["shot_id"]] = record
             save_manifest(root, manifest)
 
+    if args.status == "approved":
+        try:
+            from pipeline_events import append_event
+
+            append_event(root, stage="i2v", phase="registered", shot_id=str(args.shot_id))
+        except OSError:
+            pass
+
     emit({"ok": True, "record": record, "auto_promote_next": promote})
     return 0
 
@@ -3377,9 +3395,17 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         raise FilmError("Full-film review requires non-empty --reviewer and --notes")
     try:
         card = build_scorecard_from_cli(args)
+        manifest_contract = int(manifest.get("review_contract_version") or 1)
+        grades = build_grades_from_cli(args, required=manifest_contract >= 3)
+        fail_reasons = parse_fail_reasons(
+            list(getattr(args, "fail_reason", None) or []),
+            failures=[dim for dim, passed in card.items() if not passed],
+            required=manifest_contract >= 3,
+        )
     except DirectorReviewError as exc:
         raise FilmError(str(exc)) from exc
-    manifest_contract = int(manifest.get("review_contract_version") or 1)
+    if manifest_contract >= 3 and not getattr(args, "watched_full", False):
+        raise FilmError("review contract v3 requires --watched-full")
     screening_evidence: dict[str, Any] = {}
     if manifest_contract >= 2:
         try:
@@ -3463,6 +3489,9 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             "output_sha256": final_record["sha256"],
             "technical_qa": technical_qa,
             "scorecard": scorecard_payload(card),
+            "grades": grades,
+            "fail_reasons": fail_reasons,
+            "watched_full": bool(getattr(args, "watched_full", False)),
             "screening_evidence": screening_evidence,
             "performance_timeline": performance_timeline,
             "speech_performance_timing": speech_performance_timing,
@@ -3491,6 +3520,9 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         "output_sha256": final_record["sha256"],
         "technical_qa": technical_qa,
         "scorecard": scorecard,
+        "grades": grades,
+        "fail_reasons": fail_reasons,
+        "watched_full": bool(getattr(args, "watched_full", False)),
         "screening": {
             "path": str(final_path),
             "sha256": final_record["sha256"],
@@ -3511,6 +3543,12 @@ def cmd_review_final(args: argparse.Namespace) -> int:
     manifest.setdefault("outputs", {})["final_review"] = review
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
+    try:
+        from pipeline_events import append_event
+
+        append_event(root, stage="review-final", phase="completed")
+    except OSError:
+        pass
     emit({"ok": True, "final_complete": manifest["gates"]["final_complete"], "review": review})
     return 0
 
@@ -3533,6 +3571,17 @@ def cmd_review_shot(args: argparse.Namespace) -> int:
 def cmd_review_contract(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     manifest = load_manifest(root)
+    if args.review_contract_action == "upgrade-v3":
+        manifest["review_contract_version"] = 3
+        save_manifest(root, manifest)
+        emit(
+            {
+                "ok": True,
+                "review_contract_version": 3,
+                "note": "Future review-final calls require watched_full, grades, and canonical fail reasons.",
+            }
+        )
+        return 0
     if args.review_contract_action != "migrate":
         raise FilmError(f"unknown review-contract action: {args.review_contract_action}")
     from cli.review import migrate_review_contract
@@ -4399,6 +4448,118 @@ def cmd_generation_usage(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
     emit(report)
     return 0 if report.get("ok") else 2
+
+
+def cmd_metrics(args: argparse.Namespace) -> int:
+    from optimization_metrics import emit_metrics
+    from pipeline_events import append_event, load_events
+
+    action = args.metrics_action
+    try:
+        if action == "emit":
+            report = emit_metrics(args.root, run_id=args.run_id)
+        elif action == "status":
+            events, invalid = load_events(args.root)
+            report = {
+                "ok": not invalid,
+                "kind": "pipeline-events-status",
+                "event_count": len(events),
+                "invalid": invalid,
+            }
+        else:
+            event = append_event(
+                args.root,
+                stage=args.stage,
+                phase="human_time",
+                human_minutes=args.minutes,
+                actor=args.actor,
+                note=args.note,
+                run_id=args.run_id,
+            )
+            report = {"ok": True, "kind": "human-time", "event": event}
+    except (ValueError, OSError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok", True) else 2
+
+
+def cmd_experiment(args: argparse.Namespace) -> int:
+    from optimization_experiments import (
+        decide,
+        diff_experiment,
+        import_arm,
+        init_experiment,
+        run_request,
+    )
+
+    try:
+        if args.experiment_action == "init":
+            report = init_experiment(
+                args.root,
+                experiment_id=args.id,
+                hypothesis=args.hypothesis,
+                treatment_axis=args.treatment_axis,
+                primary_metric=args.primary_metric,
+                min_effect=args.min_effect,
+                fixtures=args.fixture,
+                seed=args.seed,
+                shot_count=args.shot_count,
+                aspect=args.aspect,
+                duration_budget_sec=args.duration_budget_sec,
+            )
+        elif args.experiment_action == "import":
+            config = {
+                "fixtures": args.fixture,
+                "seed": args.seed,
+                "shot_count": args.shot_count,
+                "aspect": args.aspect,
+                "duration_budget_sec": args.duration_budget_sec,
+            }
+            report = import_arm(
+                args.root,
+                experiment_id=args.id,
+                arm=args.arm,
+                metrics_root=args.metrics_root,
+                config=config,
+            )
+        elif args.experiment_action == "run":
+            report = run_request(
+                args.root,
+                experiment_id=args.id,
+                arm=args.arm,
+                authorize_spend=args.authorize_spend,
+                max_usd=args.max_usd,
+            )
+        elif args.experiment_action == "diff":
+            report = diff_experiment(args.root, experiment_id=args.id)
+        else:
+            report = decide(args.root, experiment_id=args.id, decision=args.decision)
+    except (ValueError, OSError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0
+
+
+def cmd_gold(args: argparse.Namespace) -> int:
+    from gold_calibration import calibrate
+
+    try:
+        report = calibrate(args.manifest)
+    except (ValueError, OSError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    from optimization_dashboard import build
+
+    try:
+        report = build(args.roots_dir, days=args.days, out=args.out)
+    except (ValueError, OSError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0
 
 
 def cmd_graph(args: argparse.Namespace) -> int:
@@ -5753,6 +5914,10 @@ def build_parser() -> argparse.ArgumentParser:
         "migrate", help="Require real shot reviews for historical approved clips"
     )
     review_contract_migrate.add_argument("--root", required=True)
+    review_contract_v3 = review_contract_sub.add_parser(
+        "upgrade-v3", help="Opt into grades and canonical fail reasons for future final reviews"
+    )
+    review_contract_v3.add_argument("--root", required=True)
 
     asb = sub.add_parser("assemble", help="Assemble silent film from timeline + clips")
     asb.add_argument("--root", required=True)
@@ -6114,6 +6279,9 @@ def build_parser() -> argparse.ArgumentParser:
     review.add_argument("--approve", action="store_true")
     review.add_argument("--reviewer", required=True)
     review.add_argument("--notes", required=True)
+    review.add_argument(
+        "--watched-full", action="store_true", help="Required by review contract v3"
+    )
     for dim in SCORECARD_DIMENSIONS:
         flag = f"--score-{dim.replace('_', '-')}"
         review.add_argument(
@@ -6122,6 +6290,14 @@ def build_parser() -> argparse.ArgumentParser:
             default=None,
             dest=f"score_{dim}",
             help=f"Director scorecard dimension '{dim}' (required with --approve)",
+        )
+        review.add_argument(
+            f"--grade-{dim.replace('_', '-')}",
+            type=int,
+            choices=range(1, 6),
+            default=None,
+            dest=f"grade_{dim}",
+            help="v3 numeric grade 1-5",
         )
     review.add_argument(
         "--reshoot-shots",
@@ -6133,6 +6309,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="v1.6: repeat dimension@seconds:note for each final scorecard dimension",
+    )
+    review.add_argument(
+        "--fail-reason",
+        action="append",
+        default=[],
+        help="v3 repeat dimension:CANONICAL_CODE[:shot]",
     )
 
     performance_timeline = sub.add_parser(
@@ -6185,6 +6367,80 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-black", action="store_true", help="Downgrade black-frame fail to warn"
     )
     qcheck.add_argument("--allow-freeze", action="store_true", help="Downgrade freeze fail to warn")
+
+    metrics = sub.add_parser("metrics", help="Emit receipt-backed optimisation metrics")
+    metrics_sub = metrics.add_subparsers(dest="metrics_action", required=True)
+    metrics_emit = metrics_sub.add_parser(
+        "emit", help="Aggregate one film root into receipts/metrics.json"
+    )
+    metrics_emit.add_argument("--root", required=True)
+    metrics_emit.add_argument("--run-id", default="default")
+    metrics_status = metrics_sub.add_parser("status", help="Inspect append-only pipeline events")
+    metrics_status.add_argument("--root", required=True)
+    metrics_human = metrics_sub.add_parser("human-time", help="Record explicit human minutes")
+    metrics_human.add_argument("--root", required=True)
+    metrics_human.add_argument("--stage", required=True)
+    metrics_human.add_argument("--minutes", type=float, required=True)
+    metrics_human.add_argument("--actor", required=True)
+    metrics_human.add_argument("--note", default="")
+    metrics_human.add_argument("--run-id", default="default")
+
+    experiment = sub.add_parser(
+        "experiment", help="Receipt-backed, single-axis optimisation experiments"
+    )
+    experiment_sub = experiment.add_subparsers(dest="experiment_action", required=True)
+    experiment_init = experiment_sub.add_parser("init")
+    experiment_init.add_argument("--root", required=True)
+    experiment_init.add_argument("--id", required=True)
+    experiment_init.add_argument("--hypothesis", required=True)
+    experiment_init.add_argument("--treatment-axis", required=True)
+    experiment_init.add_argument(
+        "--primary-metric",
+        choices=("cost_usd", "wall_sec", "grade_p50", "motion_p10"),
+        required=True,
+    )
+    experiment_init.add_argument("--min-effect", type=float, required=True)
+    experiment_init.add_argument("--fixture", action="append", required=True)
+    experiment_init.add_argument("--seed", required=True)
+    experiment_init.add_argument("--shot-count", type=int, required=True)
+    experiment_init.add_argument("--aspect", required=True)
+    experiment_init.add_argument("--duration-budget-sec", type=float, required=True)
+    experiment_import = experiment_sub.add_parser("import")
+    experiment_import.add_argument("--root", required=True)
+    experiment_import.add_argument("--id", required=True)
+    experiment_import.add_argument("--arm", choices=("baseline", "treatment"), required=True)
+    experiment_import.add_argument("--metrics-root", required=True)
+    experiment_import.add_argument("--fixture", action="append", required=True)
+    experiment_import.add_argument("--seed", required=True)
+    experiment_import.add_argument("--shot-count", type=int, required=True)
+    experiment_import.add_argument("--aspect", required=True)
+    experiment_import.add_argument("--duration-budget-sec", type=float, required=True)
+    experiment_run = experiment_sub.add_parser("run")
+    experiment_run.add_argument("--root", required=True)
+    experiment_run.add_argument("--id", required=True)
+    experiment_run.add_argument("--arm", choices=("baseline", "treatment"), required=True)
+    experiment_run.add_argument("--authorize-spend", action="store_true")
+    experiment_run.add_argument("--max-usd", type=float, default=None)
+    experiment_diff = experiment_sub.add_parser("diff")
+    experiment_diff.add_argument("--root", required=True)
+    experiment_diff.add_argument("--id", required=True)
+    experiment_decide = experiment_sub.add_parser("decide")
+    experiment_decide.add_argument("--root", required=True)
+    experiment_decide.add_argument("--id", required=True)
+    experiment_decide.add_argument("--decision", choices=("ship", "reject"), required=True)
+
+    gold = sub.add_parser("gold", help="Calibrate early-reject metrics against a reviewed gold set")
+    gold_sub = gold.add_subparsers(dest="gold_action", required=True)
+    gold_calibrate = gold_sub.add_parser("calibrate")
+    gold_calibrate.add_argument("--manifest", required=True)
+    dashboard = sub.add_parser(
+        "dashboard", help="Build a receipt-only static optimisation dashboard"
+    )
+    dashboard_sub = dashboard.add_subparsers(dest="dashboard_action", required=True)
+    dashboard_build = dashboard_sub.add_parser("build")
+    dashboard_build.add_argument("--roots-dir", required=True)
+    dashboard_build.add_argument("--days", type=int, default=30)
+    dashboard_build.add_argument("--out", required=True)
 
     benchmark_p = sub.add_parser(
         "benchmark", help="Run a no-spend premium vertical benchmark contract"
@@ -7110,6 +7366,10 @@ def main(argv: list[str] | None = None) -> int:
             "plan": cmd_plan,
             "assets": cmd_assets,
             "usage": cmd_generation_usage,
+            "metrics": cmd_metrics,
+            "experiment": cmd_experiment,
+            "gold": cmd_gold,
+            "dashboard": cmd_dashboard,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:

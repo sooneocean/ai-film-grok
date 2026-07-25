@@ -132,6 +132,45 @@ def build_scorecard_from_cli(args: Any) -> dict[str, bool]:
     return build_scorecard_from_mapping(raw)
 
 
+def build_grades_from_cli(args: Any, *, required: bool) -> dict[str, int]:
+    """Read optional v3 1-5 grades without changing legacy review semantics."""
+    grades: dict[str, int] = {}
+    missing: list[str] = []
+    for dim in SCORECARD_DIMENSIONS:
+        value = getattr(args, f"grade_{dim}", None)
+        if value is None:
+            missing.append(dim)
+        elif isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 5:
+            grades[dim] = value
+        else:
+            raise DirectorReviewError(f"grade_{dim} must be an integer from 1 to 5")
+    if required and missing:
+        raise DirectorReviewError("review contract v3 requires grades: " + ", ".join(missing))
+    return grades
+
+
+def parse_fail_reasons(
+    values: list[str], *, failures: list[str], required: bool
+) -> dict[str, list[str]]:
+    """Parse repeatable ``dimension:CANONICAL_CODE[:shot]`` entries."""
+    from optimization_taxonomy import UNCLASSIFIED, normalize_code
+
+    result: dict[str, list[str]] = {dim: [] for dim in failures}
+    for raw in values:
+        parts = str(raw).split(":")
+        if len(parts) < 2 or parts[0] not in result:
+            raise DirectorReviewError("fail reason must be dimension:CODE[:shot]")
+        code = normalize_code(parts[1])
+        if code == UNCLASSIFIED:
+            raise DirectorReviewError("fail reason must use a canonical error code")
+        result[parts[0]].append(code if len(parts) == 2 else f"{code}@{parts[2]}")
+    if required and any(not result[dim] for dim in failures):
+        raise DirectorReviewError(
+            "review contract v3 requires a fail reason for every failed dimension"
+        )
+    return {dim: codes for dim, codes in result.items() if codes}
+
+
 def scorecard_all_pass(card: dict[str, bool]) -> bool:
     return all(card.get(dim) is True for dim in SCORECARD_DIMENSIONS)
 

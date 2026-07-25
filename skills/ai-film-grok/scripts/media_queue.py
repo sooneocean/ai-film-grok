@@ -397,7 +397,19 @@ class MediaQueue:
             job["claimed_at"] = current.replace(microsecond=0).isoformat()
             job["claim_token"] = secrets.token_hex(16)
             self._write(state)
-            return job
+        try:
+            from pipeline_events import append_event
+
+            append_event(
+                self.root,
+                stage="i2v",
+                phase="claimed",
+                shot_id=str(job.get("shot_id") or ""),
+                retry_of=str(job.get("id") or "") if int(job.get("attempts") or 0) > 1 else None,
+            )
+        except OSError:
+            pass
+        return job
 
     def _running_job(self, state: dict[str, Any], job_id: str, claim_token: str) -> dict[str, Any]:
         job = next((item for item in state["jobs"] if item.get("id") == job_id), None)
@@ -454,7 +466,19 @@ class MediaQueue:
             )
             job.pop("claim_token", None)
             self._write(state)
-            return job
+        try:
+            from pipeline_events import append_event
+
+            append_event(
+                self.root,
+                stage="i2v",
+                phase="failed",
+                shot_id=str(job.get("shot_id") or ""),
+                error_code=reason_norm,
+            )
+        except OSError:
+            pass
+        return job
 
     def requeue(
         self,
@@ -551,7 +575,15 @@ class MediaQueue:
             job["attempts_completed"] = int(job.get("attempts") or 0)
             job.pop("claim_token", None)
             self._write(state)
-            return job
+        try:
+            from pipeline_events import append_event
+
+            append_event(
+                self.root, stage="i2v", phase="completed", shot_id=str(job.get("shot_id") or "")
+            )
+        except OSError:
+            pass
+        return job
 
     def reconcile(self, *, stale_after_seconds: int = 1800, now: str | None = None) -> list[str]:
         current = _parse_time(now or utc_now())

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "kind": "optimization-canary-suite",
+  "cases": [
+    {"id": "C-identity", "minimum_shots": 3, "focus": "identity"},
+    {"id": "C-motion", "minimum_shots": 2, "focus": "motion"},
+    {"id": "C-continue", "minimum_shots": 3, "focus": "continuity"},
+    {"id": "C-audio", "minimum_seconds": 20, "focus": "audio-captions"},
+    {"id": "C-genre", "minimum_shots": 1, "focus": "narrative"}
+  ]
+}
