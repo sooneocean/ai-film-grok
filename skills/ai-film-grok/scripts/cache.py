@@ -30,6 +30,26 @@ class ContentCache:
         return hashlib.sha256(payload).hexdigest()
 
     @staticmethod
+    def contract_key(
+        *,
+        input_hash: str,
+        provider: str,
+        model: str,
+        parameters: dict[str, Any] | None = None,
+        version: str = "1",
+    ) -> str:
+        """Build a stable cache key from the complete generation contract."""
+        payload = {
+            "input_hash": str(input_hash),
+            "provider": str(provider),
+            "model": str(model),
+            "parameters": parameters or {},
+            "version": str(version),
+        }
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return ContentCache.key(encoded)
+
+    @staticmethod
     def file_fingerprint(path: Path | str) -> str:
         source = Path(path).expanduser().resolve()
         stat = source.stat()

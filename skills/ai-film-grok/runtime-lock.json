@@ -41,7 +41,7 @@
     "scripts/beat_action_evidence.py": "5f32da697722ac99b2734f4142b26c5d4263b4dd15e485c7c2297fd003672555",
     "scripts/benchmark.py": "7f6e40fefe94662a94180c3f486752afb4fb612ff702bf21f6d1be482b7155f5",
     "scripts/burn_srt_pil.py": "e0b39892d7b639b340e52c91ff122bcb6c80061d9f0ccda1a49e4f32b320defa",
-    "scripts/cache.py": "1611629bb9f77bbb85d2c485f12faaa0feddfff68a046bab466083bcd64a89d4",
+    "scripts/cache.py": "ad3c18cc721e277eeb5d881e9c47097e35feb816ee2e7b9c740ec2a85956e0d8",
     "scripts/capability_report.py": "3110c707203c6cab712a18c03f2c2e4585e0d6379483e034beb3d2bb9e7e4b06",
     "scripts/caption_frame_audit.py": "e61f1c2bbf5f4f51ba3066893019fc41d142833c78907319ac78a974dfe28107",
     "scripts/checkpoint.py": "1b0c576280477cf4db24528bba676e8c1b396f505906e7d92a41fe7b12656800",

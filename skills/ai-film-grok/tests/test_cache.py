@@ -51,3 +51,23 @@ def test_file_fingerprint_changes_when_file_changes(tmp_path: Path) -> None:
     first = ContentCache.file_fingerprint(source)
     source.write_bytes(b"two")
     assert ContentCache.file_fingerprint(source) != first
+
+
+def test_contract_key_changes_for_provider_model_parameters_and_version() -> None:
+    base = dict(
+        input_hash="a" * 64,
+        provider="grok",
+        model="grok-imagine",
+        parameters={"duration": 5, "seed": 7},
+        version="2",
+    )
+    first = ContentCache.contract_key(**base)
+    assert first == ContentCache.contract_key(**base)
+    for field, value in (
+        ("provider", "other"),
+        ("model", "other-model"),
+        ("parameters", {"duration": 6, "seed": 7}),
+        ("version", "3"),
+    ):
+        changed = {**base, field: value}
+        assert ContentCache.contract_key(**changed) != first
