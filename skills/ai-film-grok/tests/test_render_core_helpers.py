@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+import render_final as render_mod
 from compose_render import (
     ComposeRenderError,
     assert_underlay_not_double_burn,
@@ -9,6 +12,7 @@ from compose_render import (
     probe_remotion_readiness,
 )
 from render_final import (
+    RenderError,
     _ensure_caption_density,
     build_subtitle_cues_for_shots,
     caption_text_for_shot,
@@ -82,3 +86,52 @@ def test_remotion_readiness_reports_actionable_missing_state(film_root) -> None:
     report = probe_remotion_readiness(film_root)
     assert report["ready"] is False
     assert "compose/remotion/" in report["missing"][0]
+
+
+def test_render_subprocess_contract_adds_noninteractive_flags(monkeypatch) -> None:
+    calls = {}
+
+    def fake_run(argv, **kwargs):
+        calls["argv"] = argv
+        calls["kwargs"] = kwargs
+        return type("Completed", (), {"stdout": "", "stderr": "", "returncode": 0})()
+
+    monkeypatch.setattr(render_mod.subprocess, "run", fake_run)
+    render_mod.run(["ffmpeg", "-i", "input.mp4"], check=False)
+    assert calls["argv"][1] == "-nostdin"
+    assert calls["kwargs"]["timeout"] == 1800
+    assert calls["kwargs"]["stdin"] is render_mod.subprocess.DEVNULL
+
+
+def test_render_json_and_font_fail_closed(tmp_path: Path, monkeypatch) -> None:
+    with pytest.raises(FileNotFoundError, match="Missing JSON"):
+        render_mod.read_json(tmp_path / "missing.json")
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text("{broken", encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid JSON"):
+        render_mod.read_json(invalid)
+    monkeypatch.setattr(render_mod, "FONT_CANDIDATES", [str(tmp_path / "missing.ttf")])
+    with pytest.raises(RenderError, match="Chinese-capable"):
+        render_mod.resolve_font()
+
+
+def test_voice_resolution_keeps_character_and_storyteller_defaults_distinct() -> None:
+    cast = {"partner": "partner-voice", "storyteller": "narrator-voice"}
+    assert (
+        voice_for_shot(
+            {"speaker": "partner", "dialogue_ja": "行く"},
+            default_voice="default",
+            cast_voices=cast,
+            vo_mode="storyteller",
+        )
+        == "partner-voice"
+    )
+    assert (
+        voice_for_shot(
+            {"speaker": "narrator", "nar": "中文"},
+            default_voice="default",
+            cast_voices=cast,
+            vo_mode="storyteller",
+        )
+        == "narrator-voice"
+    )

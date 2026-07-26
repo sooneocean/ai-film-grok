@@ -8,18 +8,21 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+import compose_render as compose_mod  # noqa: E402
 from compose_render import (  # noqa: E402
     ComposeRenderError,
     assert_underlay_not_double_burn,
     compose_render,
     copy_remotion_media,
     ensure_audio_mux,
+    plate_subtitles_burned_in,
     probe_designed_post_tooling,
     probe_has_audio,
     probe_remotion_readiness,
@@ -29,6 +32,52 @@ from compose_render import (  # noqa: E402
 )
 from export_composition import export_composition  # noqa: E402
 from runtime_policy import sha256  # noqa: E402
+
+
+def test_compose_subprocess_contract_adds_noninteractive_ffmpeg_flag(monkeypatch) -> None:
+    calls = {}
+
+    def fake_run(argv, **kwargs):
+        calls["argv"] = argv
+        calls["kwargs"] = kwargs
+        return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+    monkeypatch.setattr(compose_mod.subprocess, "run", fake_run)
+    compose_mod.run(["ffmpeg", "-i", "input.mp4"], check=False, timeout=7)
+    assert calls["argv"][1] == "-nostdin"
+    assert calls["kwargs"]["timeout"] == 7
+    assert calls["kwargs"]["stdin"] is compose_mod.subprocess.DEVNULL
+
+
+def test_designed_post_probe_reports_missing_npx_and_timeout(monkeypatch) -> None:
+    monkeypatch.setattr(compose_mod, "which_npx", lambda: None)
+    missing = probe_designed_post_tooling()
+    assert missing["hyperframes_ok"] is False
+    assert "npx missing" in missing["error"]
+
+    monkeypatch.setattr(compose_mod, "which_npx", lambda: "/fake/npx")
+
+    def timeout_run(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired("npx", 120)
+
+    monkeypatch.setattr(compose_mod, "run", timeout_run)
+    timed_out = probe_designed_post_tooling()
+    assert timed_out["hyperframes_ok"] is False
+    assert "timed out" in timed_out["error"].lower()
+
+
+def test_compose_metadata_and_npm_gate_fail_closed(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "film"
+    (root / "out").mkdir(parents=True)
+    (root / "out" / "final-delivery.json").write_text("{broken", encoding="utf-8")
+    assert plate_subtitles_burned_in(root) is None
+
+    rem = root / "compose" / "remotion"
+    rem.mkdir(parents=True)
+    (rem / "package.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(compose_mod, "which_npm", lambda: None)
+    with pytest.raises(ComposeRenderError, match="npm not found"):
+        remotion_npm_install(rem)
 
 
 def _ffmpeg_available() -> bool:
