@@ -74,6 +74,24 @@ def test_async_video_accept_and_finish_count_once(tmp_path: Path) -> None:
     assert usage_list(root)["records"][0]["provider_request_id"] == "rid-1"
 
 
+def test_generation_contract_identity_is_retained_without_raw_parameters(tmp_path: Path) -> None:
+    root = tmp_path / "film"
+    gid = start_generation(
+        root,
+        operation="i2v",
+        provider="xai",
+        model="video-1",
+        input_hash="a" * 64,
+        cache_key="b" * 64,
+        contract_version="2",
+    )
+    finish_generation(root, gid, status="succeeded")
+    record = usage_list(root, generation_id=gid)["records"][0]
+    assert record["input_hash"] == "a" * 64
+    assert record["cache_key"] == "b" * 64
+    assert record["contract_version"] == "2"
+
+
 def test_split_provider_usage_merges_token_components_exactly(tmp_path: Path) -> None:
     gid = start_generation(tmp_path, operation="i2v", provider="xai")
     accept_generation(

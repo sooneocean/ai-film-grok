@@ -132,6 +132,84 @@ def test_complete_rejects_usage_receipt_for_other_job(tmp_path: Path) -> None:
             raise AssertionError("mismatched generation usage was accepted")
 
 
+def test_complete_rejects_usage_receipt_from_different_generation_contract(
+    tmp_path: Path,
+) -> None:
+    queue, prompt, image = _queue(tmp_path)
+    job = queue.add_job(
+        shot_id="shot01",
+        operation="image_to_video",
+        prompt_file=prompt,
+        inputs=[image],
+        allow_without_pilot=True,
+        generation_contract={
+            "provider": "grok",
+            "model": "grok-imagine-video",
+            "parameters": {"duration": 6},
+            "version": "1",
+        },
+    )
+    claimed = queue.claim(now=_iso())
+    output = tmp_path / "clip.mp4"
+    output.write_bytes(b"video")
+    generation_id = start_generation(
+        queue.root,
+        operation="i2v",
+        provider="grok",
+        model="grok-imagine-video",
+        job_id=job["id"],
+        cache_key="0" * 64,
+    )
+    finish_generation(queue.root, generation_id, status="succeeded", output=output)
+    with patch("media_queue.analyze_media", return_value={"ok": True, "motion": {"ok": True}}):
+        try:
+            queue.complete(
+                job["id"],
+                claim_token=claimed["claim_token"],
+                output=output,
+                endpoint="image_to_video",
+                generation_id=generation_id,
+            )
+        except QueueError as exc:
+            assert "contract does not match" in str(exc)
+        else:
+            raise AssertionError("mismatched generation contract was accepted")
+
+
+def test_complete_receipt_carries_generation_contract_identity(tmp_path: Path) -> None:
+    queue, prompt, image = _queue(tmp_path)
+    job = queue.add_job(
+        shot_id="shot01",
+        operation="image_to_video",
+        prompt_file=prompt,
+        inputs=[image],
+        allow_without_pilot=True,
+        generation_contract={"provider": "grok", "model": "video-1", "version": "1"},
+    )
+    claimed = queue.claim(now=_iso())
+    output = tmp_path / "clip.mp4"
+    output.write_bytes(b"video")
+    generation_id = start_generation(
+        queue.root,
+        operation="i2v",
+        provider="grok",
+        model="video-1",
+        job_id=job["id"],
+        cache_key=job["cache_key"],
+    )
+    finish_generation(queue.root, generation_id, status="succeeded", output=output)
+    with patch("media_queue.analyze_media", return_value={"ok": True, "motion": {"ok": True}}):
+        result = queue.complete(
+            job["id"],
+            claim_token=claimed["claim_token"],
+            output=output,
+            endpoint="image_to_video",
+            generation_id=generation_id,
+        )
+    binding = result["receipt"]["generation_usage"]
+    assert binding["cache_key"] == job["cache_key"]
+
+
 def test_generation_contract_changes_queue_identity(tmp_path: Path) -> None:
     queue, prompt, image = _queue(tmp_path)
     first = queue.add_job(

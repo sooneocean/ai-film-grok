@@ -177,6 +177,9 @@ def start_generation(
     shot_id: str = "",
     job_id: str = "",
     generation_id: str | None = None,
+    input_hash: str = "",
+    cache_key: str = "",
+    contract_version: str = "",
 ) -> str:
     if operation not in OPERATIONS:
         raise GenerationUsageError(f"operation must be one of {sorted(OPERATIONS)}")
@@ -191,6 +194,9 @@ def start_generation(
         "model": _safe_text(model, "model"),
         "shot_id": _safe_text(shot_id, "shot_id"),
         "job_id": _safe_text(job_id, "job_id"),
+        "input_hash": _safe_text(input_hash, "input_hash"),
+        "cache_key": _safe_text(cache_key, "cache_key"),
+        "contract_version": _safe_text(contract_version, "contract_version"),
     }
     _append_event(root, event)
     return gid
@@ -364,7 +370,16 @@ def _records_from_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         )
         phase = event.get("phase")
         if phase == "started":
-            for key in ("operation", "provider", "model", "shot_id", "job_id"):
+            for key in (
+                "operation",
+                "provider",
+                "model",
+                "shot_id",
+                "job_id",
+                "input_hash",
+                "cache_key",
+                "contract_version",
+            ):
                 if event.get(key) is not None:
                     record[key] = event.get(key)
             record["started_at"] = event.get("recorded_at")

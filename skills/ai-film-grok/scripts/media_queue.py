@@ -49,7 +49,13 @@ class QueueError(RuntimeError):
     pass
 
 
-def _usage_binding(root: Path, generation_id: str, job_id: str) -> dict[str, Any]:
+def _usage_binding(
+    root: Path,
+    generation_id: str,
+    job_id: str,
+    *,
+    expected_cache_key: str | None = None,
+) -> dict[str, Any]:
     """Require a completed usage record before binding provider media to a job."""
     try:
         from generation_usage import usage_list
@@ -67,12 +73,18 @@ def _usage_binding(root: Path, generation_id: str, job_id: str) -> dict[str, Any
         )
     if record.get("status") not in {"succeeded", "failed", "moderated"}:
         raise QueueError(f"generation {generation_id} is not terminal in usage receipt")
+    recorded_cache_key = record.get("cache_key")
+    if expected_cache_key and recorded_cache_key != expected_cache_key:
+        raise QueueError(f"generation {generation_id} contract does not match queue cache key")
     usage = record.get("usage") if isinstance(record.get("usage"), dict) else {}
     return {
         "generation_id": generation_id,
         "status": record.get("status"),
         "measurement": record.get("measurement", "unknown"),
         "provider_request_id": record.get("provider_request_id"),
+        "input_hash": record.get("input_hash"),
+        "cache_key": recorded_cache_key,
+        "contract_version": record.get("contract_version"),
         "usage": usage,
         "cost_in_usd_ticks": usage.get("cost_in_usd_ticks"),
     }
@@ -583,7 +595,12 @@ class MediaQueue:
                 )
             usage_binding = None
             if generation_id:
-                usage_binding = _usage_binding(self.root, generation_id, job_id)
+                usage_binding = _usage_binding(
+                    self.root,
+                    generation_id,
+                    job_id,
+                    expected_cache_key=job.get("cache_key"),
+                )
                 if usage_binding["status"] != STATUS_SUCCEEDED:
                     raise QueueError(
                         f"generation {generation_id} ended as {usage_binding['status']}, not succeeded"

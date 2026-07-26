@@ -360,7 +360,7 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.6.7`
+- 插件版本：`2.6.8`
 - Skill Registry：`31/33` 项标记为 `implemented`
 - CLI 脚本：`156` 个
 - pytest 文件：`201` 个
