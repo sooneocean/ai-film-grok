@@ -16,9 +16,11 @@ from pathlib import Path
 
 import pytest
 
-SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
-if str(SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS))
+SKILL_ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS = SKILL_ROOT / "scripts"
+for import_root in (SKILL_ROOT, SCRIPTS):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
 
 
 @pytest.fixture()
