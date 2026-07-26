@@ -9,6 +9,7 @@ It never invokes paid media providers and does not mutate project state unless
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -61,6 +62,37 @@ def plugin_version() -> str:
 def git_value(*args: str) -> str:
     code, output = command("git", *args)
     return output if code == 0 else f"unavailable: {output}"
+
+
+def source_fingerprint() -> str:
+    """Hash repository files without including this generated report itself."""
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    except OSError:
+        return "unavailable"
+    if proc.returncode != 0:
+        return "unavailable"
+    digest = hashlib.sha256()
+    baseline_rel = BASELINE.relative_to(ROOT).as_posix()
+    for raw_path in sorted(item for item in proc.stdout.split(b"\0") if item):
+        relative = raw_path.decode("utf-8")
+        if relative == baseline_rel:
+            continue
+        path = ROOT / relative
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        try:
+            digest.update(path.read_bytes())
+        except OSError:
+            digest.update(b"<missing>")
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def parse_json_output(output: str) -> dict[str, Any] | None:
@@ -139,17 +171,17 @@ def coverage_snapshot() -> dict[str, Any]:
 
 
 def baseline_is_current(path: Path = BASELINE) -> bool:
-    """Return whether a generated baseline identifies the current HEAD/version."""
+    """Return whether a generated baseline matches the current source/version."""
     if not path.is_file():
         return False
     text = path.read_text(encoding="utf-8")
-    head = re.search(r"^- HEAD: `([^`]+)`$", text, re.MULTILINE)
     version = re.search(r"^- Plugin version: `([^`]+)`$", text, re.MULTILINE)
+    fingerprint = re.search(r"^- Source fingerprint: `([^`]+)`$", text, re.MULTILINE)
     return bool(
-        head
-        and version
-        and head.group(1) == git_value("rev-parse", "HEAD")
+        version
+        and fingerprint
         and version.group(1) == plugin_version()
+        and fingerprint.group(1) == source_fingerprint()
     )
 
 
@@ -160,6 +192,7 @@ def build_snapshot(
     snapshot: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(),
         "head": git_value("rev-parse", "HEAD"),
+        "source_fingerprint": source_fingerprint(),
         "branch": git_value("branch", "--show-current"),
         "remote": git_value(
             "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"
@@ -248,6 +281,7 @@ def markdown(snapshot: dict[str, Any]) -> str:
         "",
         f"- Generated at: `{snapshot['generated_at']}`",
         f"- HEAD: `{snapshot['head']}`",
+        f"- Source fingerprint: `{snapshot['source_fingerprint']}`",
         f"- Branch: `{snapshot['branch']}`",
         f"- Upstream: `{snapshot['remote']}`",
         f"- Plugin version: `{snapshot['version']}`",
