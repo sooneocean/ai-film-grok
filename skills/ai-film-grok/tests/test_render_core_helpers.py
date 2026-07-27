@@ -19,8 +19,10 @@ from render_final import (
     narration_for_shot,
     split_units,
     spoken_text_for_shot,
+    tts_backend_for_shot,
     unit_timings,
     validate_linear_narration,
+    validate_voice_language_locks,
     voice_for_shot,
 )
 from util import write_json
@@ -173,4 +175,132 @@ def test_voice_resolution_keeps_character_and_storyteller_defaults_distinct() ->
             vo_mode="storyteller",
         )
         == "narrator-voice"
+    )
+
+
+def test_locked_voice_roles_ignore_per_shot_override() -> None:
+    cast = {
+        "storyteller": "zh-CN-XiaoxiaoNeural",
+        "heroine": "ja-JP-NanamiNeural",
+        "partner": "ja-JP-KeitaNeural",
+    }
+    assert (
+        voice_for_shot(
+            {"speaker": "narrator", "nar": "中文", "vo_voice": "other-voice"},
+            default_voice="default",
+            cast_voices=cast,
+            vo_mode="hybrid",
+        )
+        == "zh-CN-XiaoxiaoNeural"
+    )
+    assert (
+        voice_for_shot(
+            {"speaker": "heroine", "dialogue_ja": "行く", "vo_voice": "other-voice"},
+            default_voice="default",
+            cast_voices=cast,
+            vo_mode="hybrid",
+        )
+        == "ja-JP-NanamiNeural"
+    )
+    assert (
+        voice_for_shot(
+            {"speaker": "male_hero", "dialogue_ja": "行く", "vo_voice": "other-voice"},
+            default_voice="default",
+            cast_voices=cast,
+            vo_mode="hybrid",
+        )
+        == "ja-JP-KeitaNeural"
+    )
+
+
+def test_lead_dialogue_locks_require_japanese_script_and_language() -> None:
+    with pytest.raises(RenderError, match="not per-shot vo_voice"):
+        validate_voice_language_locks(
+            [{"id": "n02", "speaker": "narrator", "nar": "中文", "vo_voice": "other"}],
+            dialogue_spoken_lang="ja",
+        )
+    with pytest.raises(RenderError, match="not per-shot tts_backend"):
+        validate_voice_language_locks(
+            [
+                {
+                    "id": "m02",
+                    "speaker": "male_hero",
+                    "dialogue_ja": "行く",
+                    "tts_backend": "edge",
+                }
+            ],
+            dialogue_spoken_lang="ja",
+        )
+    with pytest.raises(RenderError, match="dialogue_spoken_lang=ja"):
+        validate_voice_language_locks(
+            [{"id": "f01", "speaker": "heroine", "nar": "中文"}],
+            dialogue_spoken_lang="zh",
+        )
+    with pytest.raises(RenderError, match="needs nar_ja/dialogue_ja/spoken_ja"):
+        validate_voice_language_locks(
+            [{"id": "m01", "speaker": "male_hero", "nar": "中文"}],
+            dialogue_spoken_lang="ja",
+        )
+    with pytest.raises(RenderError, match="not per-shot vo_voice"):
+        validate_voice_language_locks(
+            [
+                {
+                    "id": "f02",
+                    "speaker": "heroine",
+                    "dialogue_ja": "行く",
+                    "vo_voice": "ja-JP-OtherNeural",
+                }
+            ],
+            dialogue_spoken_lang="ja",
+        )
+    with pytest.raises(RenderError, match="must contain Japanese kana"):
+        validate_voice_language_locks(
+            [{"id": "f04", "speaker": "heroine", "dialogue_ja": "中文"}],
+            dialogue_spoken_lang="ja",
+        )
+    validate_voice_language_locks(
+        [
+            {"id": "n01", "speaker": "narrator", "nar": "中文"},
+            {"id": "f03", "speaker": "heroine", "dialogue_ja": "行く"},
+            {"id": "m03", "speaker": "male_hero", "dialogue_ja": "待って"},
+        ],
+        dialogue_spoken_lang="ja",
+    )
+
+
+def test_named_roles_can_lock_different_tts_providers_without_shot_switching() -> None:
+    providers = {"storyteller": "edge", "heroine": "fish", "partner": "grok"}
+    assert (
+        tts_backend_for_shot(
+            {"speaker": "narrator", "tts_backend": "other"},
+            default_backend="edge",
+            cast_tts_backends=providers,
+        )
+        == "edge"
+    )
+    assert (
+        tts_backend_for_shot(
+            {"speaker": "heroine", "tts_backend": "edge"},
+            default_backend="edge",
+            cast_tts_backends=providers,
+        )
+        == "fish"
+    )
+    assert (
+        tts_backend_for_shot(
+            {"speaker": "male_hero", "tts_backend": "edge"},
+            default_backend="edge",
+            cast_tts_backends=providers,
+        )
+        == "grok"
+    )
+    with pytest.raises(RenderError, match="not auto"):
+        tts_backend_for_shot(
+            {"speaker": "heroine"},
+            default_backend="edge",
+            cast_tts_backends={"heroine": "auto"},
+        )
+    assert (
+        tts_backend_for_shot({"speaker": "heroine"}, default_backend="auto", cast_tts_backends={})
+        == "edge"
     )

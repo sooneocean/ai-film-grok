@@ -2,6 +2,11 @@
   "vo_mode": "hybrid",
   "vo_voice": "zh-CN-XiaoxiaoNeural",
   "tts_backend": "edge",
+  "cast_tts_backends": {
+    "storyteller": "edge",
+    "heroine": "edge",
+    "partner": "edge"
+  },
   "dialogue_spoken_lang": "ja",
   "narration_spoken_lang": "zh",
   "caption_lang": "zh",

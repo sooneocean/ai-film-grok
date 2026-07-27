@@ -132,6 +132,97 @@ _PARTNER_SPEAKERS = frozenset(
 )
 
 
+def _locked_voice_role(shot: dict[str, Any]) -> str | None:
+    """Return the immutable cast role for the three production voice tracks."""
+    speaker = _shot_speaker_key(shot)
+    if speaker in _NARRATOR_SPEAKERS:
+        return "storyteller"
+    if speaker in _HEROINE_SPEAKERS:
+        return "heroine"
+    if speaker in _PARTNER_SPEAKERS:
+        return "partner"
+    return None
+
+
+def validate_voice_language_locks(
+    shots: list[dict[str, Any]], *, dialogue_spoken_lang: str
+) -> None:
+    """Fail closed if a named lead could lose its Japanese dialogue track.
+
+    The film-level cast voice is the accent lock.  A per-shot ``vo_voice`` is
+    intentionally rejected for locked roles: allowing it would make a voice
+    switch look like an ordinary shot-level tweak.
+    """
+    dlang = (dialogue_spoken_lang or "").strip().lower()
+    for shot in shots:
+        role = _locked_voice_role(shot)
+        if role is None:
+            continue
+        sid = str(shot.get("id") or "<unknown>")
+        explicit = shot.get("vo_voice") or shot.get("voice")
+        if isinstance(explicit, str) and explicit.strip():
+            raise RenderError(
+                f"Shot {sid} ({role}) must use its cast_voices lock, not per-shot vo_voice"
+            )
+        explicit_backend = shot.get("tts_backend")
+        if isinstance(explicit_backend, str) and explicit_backend.strip():
+            raise RenderError(
+                f"Shot {sid} ({role}) must use its cast_tts_backends lock, not per-shot tts_backend"
+            )
+        if role == "storyteller":
+            continue
+        if dlang not in {"ja", "jp", "japanese"}:
+            raise RenderError(
+                f"Shot {sid} ({role}) requires dialogue_spoken_lang=ja; "
+                "female and male lead dialogue is Japanese-locked"
+            )
+        japanese_line = next(
+            (
+                str(shot[key]).strip()
+                for key in ("nar_ja", "dialogue_ja", "spoken_ja")
+                if isinstance(shot.get(key), str) and shot[key].strip()
+            ),
+            "",
+        )
+        if not japanese_line:
+            raise RenderError(
+                f"Shot {sid} ({role}) needs nar_ja/dialogue_ja/spoken_ja; "
+                "do not synthesize a Chinese fallback for Japanese-locked dialogue"
+            )
+        if not re.search(r"[\u3040-\u30ff\u31f0-\u31ff]", japanese_line):
+            raise RenderError(
+                f"Shot {sid} ({role}) Japanese-locked dialogue must contain Japanese kana"
+            )
+
+
+def tts_backend_for_shot(
+    shot: dict[str, Any], *, default_backend: str, cast_tts_backends: dict[str, str] | None
+) -> str:
+    """Resolve a locked TTS provider per named role, without shot-level switching."""
+    locked_role = _locked_voice_role(shot)
+    if locked_role is None:
+        explicit = shot.get("tts_backend")
+        return (
+            str(explicit).strip()
+            if isinstance(explicit, str) and explicit.strip()
+            else default_backend
+        )
+    providers = cast_tts_backends or {}
+    provider = providers.get(locked_role, default_backend)
+    if not isinstance(provider, str) or not provider.strip():
+        raise RenderError(f"{locked_role} TTS backend lock must be a non-empty string")
+    provider = provider.strip().lower()
+    if provider == "auto" and locked_role in providers:
+        raise RenderError(
+            f"{locked_role} cast_tts_backends must name an explicit provider, not auto"
+        )
+    if provider == "auto":
+        # Existing films that did not yet author a per-role provider retain the
+        # safe, deterministic Edge default instead of silently probing another TTS.
+        return "edge"
+    return provider
+
+
 def build_post_enhancement_vf_chain(
     enable_denoise: bool = True,
     enable_sharpen: bool = True,
@@ -1768,10 +1859,22 @@ def voice_for_shot(
 ) -> str:
     """Resolve one stable voice id for this shot — 一角一声.
 
-    Priority: shot.vo_voice → cast_voices[speaker|cast] → JA character defaults → default_voice
-    Storyteller mode ignores per-shot cast unless shot.speaker is set.
+    Named storyteller/heroine/partner roles are immutable at shot level: their
+    global cast voice is the accent lock. Other roles retain legacy priority.
     """
     cast_voices = cast_voices or {}
+    locked_role = _locked_voice_role(shot)
+    if locked_role == "storyteller":
+        return cast_voices.get("storyteller") or STORYTELLER_VOICE
+    if locked_role == "heroine":
+        return cast_voices.get("heroine") or HEROINE_JA_VOICE
+    if locked_role == "partner":
+        return (
+            cast_voices.get("partner")
+            or cast_voices.get("male_hero")
+            or cast_voices.get("hero")
+            or PARTNER_JA_VOICE
+        )
     explicit = shot.get("vo_voice") or shot.get("voice")
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
@@ -2265,6 +2368,18 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         or "auto"
     )
     tts_allow_network_fallback = bool(spec.get("tts_allow_network_fallback", False))
+    cast_tts_backends_raw = spec.get("cast_tts_backends") or {}
+    cast_tts_backends: dict[str, str] = {}
+    if not isinstance(cast_tts_backends_raw, dict):
+        raise RenderError("cast_tts_backends must be an object when configured")
+    for role, provider in cast_tts_backends_raw.items():
+        if (
+            isinstance(role, str)
+            and isinstance(provider, str)
+            and role.strip()
+            and provider.strip()
+        ):
+            cast_tts_backends[role.strip()] = provider.strip().lower()
     raw_gain = getattr(args, "vo_gain", None)
     if raw_gain is None:
         raw_gain = spec.get("vo_gain")
@@ -2342,6 +2457,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     # 1) Per-shot TTS
+    validate_voice_language_locks(shots, dialogue_spoken_lang=dialogue_spoken_lang)
     validate_linear_narration(
         shots,
         vo_mode=vo_mode,
@@ -2414,6 +2530,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             vo_mode=vo_mode,
             dialogue_spoken_lang=dialogue_spoken_lang,
         )
+        shot_tts_backend = tts_backend_for_shot(
+            shot,
+            default_backend=str(tts_backend),
+            cast_tts_backends=cast_tts_backends,
+        )
         wav, dur, tts_meta = tts_to_wav(
             text,
             mp3,
@@ -2421,7 +2542,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             rate=vo_rate,
             volume=vo_tts_vol,
             pitch=vo_pitch,
-            backend=None if tts_backend == "auto" else str(tts_backend),
+            backend=None if shot_tts_backend == "auto" else shot_tts_backend,
             allow_network_fallback=tts_allow_network_fallback,
             usage_root=root,
             shot_id=sid,
@@ -2581,6 +2702,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 "clip": clip_path,
                 "title": shot.get("title") or sid,
                 "tts": tts_meta,
+                "tts_backend_lock": shot_tts_backend,
                 "native_audio": native_audio,
                 "native_audio_audible": native_audio_audible,
                 "native_audio_gain": native_audio_gain,
@@ -3750,6 +3872,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "sound_spotting": mix_spotting,
         "tts": {
             "backend_requested": tts_backend,
+            "cast_tts_backends": cast_tts_backends,
             "probe": tts_info,
             "shots": [item.get("tts") for item in shot_audio],
         },
