@@ -3,7 +3,7 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
-## [2.7.1] — 2026-07-27
+## [2.7.2] — 2026-07-27
 
 ### Fixed — release evidence and shipped-surface verification
 
