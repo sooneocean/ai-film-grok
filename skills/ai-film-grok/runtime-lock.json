@@ -174,7 +174,7 @@
     "scripts/show_package.py": "747d1349ff6acd00ee1b6cb74e68d476681be660b4e5dd604b4a6282a75f45b7",
     "scripts/skill_registry.py": "775234356b9d530db1c44329be1ed65aa26fae33bec9011507a7e77178b0638f",
     "scripts/skill_runner.py": "0dbf61a040bc7742dac773e8347a50c7339b4a8d88a107cb846e2543d8060169",
-    "scripts/sound_plan.py": "cd0211dd4c6e537b9ec22682c2c2e971194b281d187ace596c1bb338ebe020b6",
+    "scripts/sound_plan.py": "ff77badb20a04b5686987906e8a562f693289306649316719e411a2a2915027c",
     "scripts/source_chain.py": "a87d3eea3899939a08e5cd9f067408a5ed91b5566fe94b4b52116e6b45534718",
     "scripts/speech_performance_timing.py": "7894d3434165b9c5829e93c6a000f5dbb8c4a7fa3e0dd5eaf25ba13c89188503",
     "scripts/state_index_gate.py": "7e3ad1679f70d3c195ff53e05c37bc1974fb0bb1c5749b96d1e73dcce544abfc",
