@@ -3,6 +3,12 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.7.9] — 2026-07-27
+
+### Fixed
+
+- Pre-push rechecks the clean Git HEAD after the full release suite, so a commit or tracked edit made during validation cannot receive a stale success receipt.
+
 ## [2.7.8] — 2026-07-27
 
 ### Added

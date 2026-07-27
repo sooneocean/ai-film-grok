@@ -104,6 +104,49 @@ def write_success_receipt(path: Path, head: str) -> None:
 
 
 @contextmanager
+def release_snapshot(root: Path, head: str) -> Iterator[Path]:
+    """Run checks from a detached worktree pinned to the inspected commit."""
+    with tempfile.TemporaryDirectory(prefix="ai-film-grok-release-") as temporary:
+        snapshot = Path(temporary) / "checkout"
+        created = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "worktree",
+                "add",
+                "--detach",
+                "--quiet",
+                str(snapshot),
+                head,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if created.returncode:
+            detail = created.stderr.strip() or "git worktree add failed"
+            raise ReleaseGateError(f"cannot create release snapshot: {detail}")
+        try:
+            yield snapshot
+        finally:
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "worktree",
+                    "remove",
+                    "--force",
+                    str(snapshot),
+                ],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+
+@contextmanager
 def exclusive_release_lock(path: Path, *, timeout_sec: float) -> Iterator[None]:
     """Hold a process-scoped advisory lock, waiting only up to the stated timeout."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -144,14 +187,21 @@ def run_release_gate(root: Path, *, timeout_sec: float = 900) -> int:
         if successful_receipt_matches(receipt_path, head):
             print(f"[release] reusing successful gate for {head[:12]}")
             return 0
-        sync = subprocess.run(
-            [sys.executable, str(root / "scripts" / "sync_project_docs.py"), "--check"],
-            cwd=root,
-            check=False,
-        )
-        if sync.returncode:
-            return sync.returncode
-        release = subprocess.run(["make", "release-check"], cwd=root, check=False)
+        with release_snapshot(root, head) as snapshot:
+            sync = subprocess.run(
+                [
+                    sys.executable,
+                    str(snapshot / "scripts" / "sync_project_docs.py"),
+                    "--check",
+                ],
+                cwd=snapshot,
+                check=False,
+            )
+            if sync.returncode:
+                return sync.returncode
+            release = subprocess.run(
+                ["make", "release-check"], cwd=snapshot, check=False
+            )
         if release.returncode == 0:
             write_success_receipt(receipt_path, head)
         return release.returncode

@@ -4,6 +4,7 @@ import importlib.util
 import json
 import multiprocessing
 import subprocess
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
@@ -93,6 +94,9 @@ def test_release_gate_reuses_only_matching_success_receipt(
     monkeypatch.setattr(release_gate, "release_lock_path", lambda _: lock)
     monkeypatch.setattr(release_gate, "release_success_receipt_path", lambda _: receipt)
     monkeypatch.setattr(release_gate, "current_clean_head", lambda _: head)
+    monkeypatch.setattr(
+        release_gate, "release_snapshot", lambda *_: nullcontext(tmp_path)
+    )
 
     assert release_gate.run_release_gate(tmp_path, timeout_sec=0) == 0
 
@@ -107,3 +111,28 @@ def test_release_gate_reuses_only_matching_success_receipt(
     assert release_gate.run_release_gate(tmp_path, timeout_sec=0) == 0
     assert calls[-1] == ["make", "release-check"]
     assert json.loads(receipt.read_text(encoding="utf-8"))["head"] == "b" * 40
+
+
+def test_release_snapshot_stays_on_the_checked_head_after_root_advances(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test"], check=True)
+    tracked = repo / "tracked.txt"
+    tracked.write_text("before\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "tracked.txt"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "before"], check=True)
+    checked_head = release_gate.current_clean_head(repo)
+
+    with release_gate.release_snapshot(repo, checked_head) as snapshot:
+        tracked.write_text("after\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "-C", str(repo), "commit", "-am", "after", "-q"], check=True
+        )
+        assert (snapshot / "tracked.txt").read_text(encoding="utf-8") == "before\n"
+        assert release_gate.current_clean_head(repo) != checked_head
