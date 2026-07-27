@@ -3,6 +3,14 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.7.6] — 2026-07-27
+
+### Added
+
+- Show packages select a validated deterministic motion preset for branded HyperFrames opening and ending cards.
+- Audible native I2V stems receive a bounded per-shot gain plan before the final mix.
+- The local review UI reports action success and failure through an accessible non-blocking status region.
+
 ## [2.7.5] — 2026-07-27
 
 ### Fixed
