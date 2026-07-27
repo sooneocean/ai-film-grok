@@ -32,13 +32,13 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 ## P0 核心
 
-1. **故事真相**：`drama-graph.json` 真相，`film-spec.json` 投影；locks + projection hash 齐再进媒体；[directors-lens](references/directors-lens.md)。
+1. **故事真相**：`drama-graph.json` 真相，`film-spec.json` 投影；locks + projection hash 齐再进媒体；先 Director’s Lens（[directors-lens.md](references/directors-lens.md)）。
 2. **用户原文保真**：用户剧本/对白/主题是脊柱，模板禁整句覆盖。
 3. **身份与介质**：先锁 medium/cast/face；角色 still 只编辑已批来源；moderated 禁 `image_gen` 绕脸；漫剧默认 manhua。
 4. **先验后生**：still 过身份/结构/画风/几何（≥720×1280 9:16）才 I2V。
 5. **连续性**：`state-index check|plan` 先于 bulk；衣着只前进；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 须用户批；付费绑 hash/预算；`generation-usage.json`；`advance` 遇 human/paid/external 暂停。
-7. **供应商**：I2V 默认 `grok_primary`；Seedance 仅恢复路径，禁静默启用。
+7. **供应商**：I2V 默认 `grok_primary`；恢复路径才用 `frw_video_model=seedance-2-fast-i2v`（见 [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)），禁静默 bulk。
 8. **声音分轨**：口白中文 Edge；角色日文 Edge；字幕中文 `nar`。禁无 speaker 中日乒乓、说书填 `nar_ja`、清空日文轨。亲密 BGM=rnb。[voice lesson](references/lessons-2026-07-24-ep2-voice-heat-final.md)
 9. **成人尺度 MAX（最重要）**：act+climax≥50%、亲密≥60%、setup≤20%；act≥undressed、climax=bare、spice=extreme、phase 只升；**前戏→插入→射出**全有。禁静默降 heat。见 [adult-scale-max-sex-arc](references/lessons-2026-07-27-adult-scale-max-sex-arc.md) · [hard-defaults](references/hard-defaults.md) · [core memory](memory/2026-07-27-core-adult-iron-shipped.md)
 10. **字幕像素门**：成片须可见中文字幕；HF 失字须 recovery，禁清空 SRT；`sub_lead=0`；长片可直调 `render_final.py`。
@@ -71,4 +71,4 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" review-final --root "<film>"
 ```
 
-按需：[hard-defaults](references/hard-defaults.md) · [双语剪辑](references/lessons-2026-07-20-cut-silk-bilingual.md) · [防双烧](references/lessons-2026-07-20-title-double-burn.md) · [INDEX](references/INDEX.md)
+按需：[hard-defaults](references/hard-defaults.md) · [双语剪辑](references/lessons-2026-07-20-cut-silk-bilingual.md)（`caption_mode`、`transition_fluency`） · [防双烧](references/lessons-2026-07-20-title-double-burn.md) · [Directors Lens 课](references/lessons-2026-07-20-directors-lens.md) · [INDEX](references/INDEX.md)

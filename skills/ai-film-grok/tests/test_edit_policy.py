@@ -423,10 +423,14 @@ class FilmSpecMotionTests(unittest.TestCase):
         good = self._base_spec()
         custom = "slow orbit, soft blink, breath, idle not speaking"
         good["scenes"][0]["shots"][0]["dsl"]["motion"] = custom
-        good["scenes"][0]["shots"][0]["dsl"]["camera"] = {"shot_size": "extreme close-up"}
+        # Author-owned size that still passes framing iron (no head-crop language)
+        good["scenes"][0]["shots"][0]["dsl"]["camera"] = {"shot_size": "medium close"}
+        good["scenes"][0]["shots"][0]["dsl"]["framing"] = (
+            "full head and both shoulders inside frame, ample headroom, safe framing"
+        )
         shots = validate_film_spec(good, assign_missing_ids=False)
         self.assertEqual(shots[0]["dsl"]["motion"], custom)
-        self.assertEqual(shots[0]["dsl"]["camera"]["shot_size"], "extreme close-up")
+        self.assertEqual(shots[0]["dsl"]["camera"]["shot_size"], "medium close")
         # motion + shot_size author-owned; angle/framing may still be filled
         filled = shots[0].get("coverage_defaults_applied", {}).get("filled", [])
         self.assertNotIn("dsl.motion", filled)
