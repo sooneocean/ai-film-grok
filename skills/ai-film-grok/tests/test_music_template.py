@@ -5,14 +5,22 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+import wave
 from pathlib import Path
 from unittest import mock
+
+import numpy as np
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import sound_plan  # noqa: E402
-from sound_plan import SoundPlanError, resolve_music_template  # noqa: E402
+from render_final import SR, render_music_template_timeline  # noqa: E402
+from sound_plan import (  # noqa: E402
+    SoundPlanError,
+    resolve_music_template,
+    resolve_music_template_timeline,
+)
 
 
 class MusicTemplateTests(unittest.TestCase):
@@ -116,6 +124,94 @@ class MusicTemplateTests(unittest.TestCase):
             self.assertNotEqual(hit0["path"], hit1["path"])
             self.assertEqual(hit0["pool_index"], 0)
             self.assertEqual(hit1["pool_index"], 1)
+
+    def test_timeline_selects_by_mood_and_ignores_global_bgm(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "audio"
+            (audio / "templates" / "rnb").mkdir(parents=True)
+            (audio / "templates" / "dark").mkdir(parents=True)
+            (audio / "bgm.wav").write_bytes(b"global" * 100)
+            (audio / "templates" / "rnb" / "velvet.wav").write_bytes(b"rnb" * 100)
+            (audio / "templates" / "dark" / "pulse.wav").write_bytes(b"dark" * 100)
+            routed = resolve_music_template_timeline(
+                root,
+                seed=9,
+                timeline=[
+                    {
+                        "shot_id": "s1",
+                        "mood": "rnb",
+                        "motif_id": "hook",
+                        "start_sec": 0,
+                        "end_sec": 2,
+                    },
+                    {
+                        "shot_id": "s2",
+                        "mood": "dark",
+                        "motif_id": "threat",
+                        "start_sec": 2,
+                        "end_sec": 4,
+                    },
+                ],
+            )
+            self.assertEqual([item["shot_id"] for item in routed], ["s1", "s2"])
+            self.assertIn("velvet.wav", routed[0]["path"])
+            self.assertIn("pulse.wav", routed[1]["path"])
+            self.assertNotIn("bgm.wav", " ".join(item["path"] for item in routed))
+
+    def test_timeline_does_not_substitute_default_for_missing_mood(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tdir = root / "audio" / "templates"
+            tdir.mkdir(parents=True)
+            (tdir / "default.wav").write_bytes(b"default" * 100)
+            routed = resolve_music_template_timeline(
+                root,
+                timeline=[{"shot_id": "s1", "mood": "warm", "start_sec": 0, "end_sec": 2}],
+            )
+            self.assertEqual(routed, [])
+
+    def test_timeline_renders_different_template_sources_per_cue(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rnb = root / "audio" / "templates" / "rnb" / "a.wav"
+            dark = root / "audio" / "templates" / "dark" / "b.wav"
+            for path, level in ((rnb, 0.2), (dark, -0.2)):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with wave.open(str(path), "wb") as handle:
+                    handle.setnchannels(1)
+                    handle.setsampwidth(2)
+                    handle.setframerate(SR)
+                    handle.writeframes((np.full(SR, level * 32767)).astype(np.int16).tobytes())
+            bed, selections = render_music_template_timeline(
+                root=root,
+                work=root / "work",
+                seed=4,
+                total_dur=4,
+                plan={},
+                music_license="test",
+                timeline=[
+                    {
+                        "shot_id": "s1",
+                        "mood": "rnb",
+                        "motif_id": "hook",
+                        "start_sec": 0,
+                        "end_sec": 2,
+                        "transition": "crossfade",
+                    },
+                    {
+                        "shot_id": "s2",
+                        "mood": "dark",
+                        "motif_id": "threat",
+                        "start_sec": 2,
+                        "end_sec": 4,
+                        "transition": "cut",
+                    },
+                ],
+            )
+            self.assertEqual([item["shot_id"] for item in selections], ["s1", "s2"])
+            self.assertGreater(float(bed[: SR // 2].mean()), 0.0)
+            self.assertLess(float(bed[3 * SR : 3 * SR + SR // 2].mean()), 0.0)
 
 
 if __name__ == "__main__":

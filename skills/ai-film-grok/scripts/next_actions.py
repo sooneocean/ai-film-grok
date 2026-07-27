@@ -60,6 +60,29 @@ _STAGE_LABELS_ZH: dict[str, str] = {
     "done": "完成",
 }
 
+_STAGE_RESPONSIBILITY: dict[str, tuple[str, str | None]] = {
+    "agent": ("director", None),
+    "visual": ("visual", "visual"),
+    "voice": ("audio", "audio"),
+    "design": ("post", "post"),
+    "post": ("post", "post"),
+    "deliver": ("delivery", None),
+    "done": ("delivery", None),
+}
+
+
+def responsibility_for_stage(stage: str) -> dict[str, str | None]:
+    """Map each pipeline stage to its one accountable owner."""
+    owner, department = _STAGE_RESPONSIBILITY.get(stage, ("director", None))
+    return {"owner": owner, "department": department, "stage": stage}
+
+
+def with_responsibility(action: dict[str, Any]) -> dict[str, Any]:
+    """Attach ownership to actions created outside the normal add() helper."""
+    output = dict(action)
+    output["responsibility"] = responsibility_for_stage(str(output.get("stage") or "agent"))
+    return output
+
 
 def _preview_ok(root: Path) -> bool:
     try:
@@ -266,7 +289,16 @@ def build_next_actions(
         stage = _ACTION_STAGE.get(aid, "agent")
         label = _STAGE_LABELS_ZH.get(stage, stage)
         # Keep why short; stage is a separate field for agents/UI.
-        actions.append({"id": aid, "cmd": cmd, "why": why, "stage": stage, "stage_label": label})
+        actions.append(
+            {
+                "id": aid,
+                "cmd": cmd,
+                "why": why,
+                "stage": stage,
+                "stage_label": label,
+                "responsibility": responsibility_for_stage(stage),
+            }
+        )
 
     r = str(root)
 
@@ -283,7 +315,7 @@ def build_next_actions(
         quality_repair["stage_label"] = _STAGE_LABELS_ZH.get(
             str(quality_repair.get("stage")), str(quality_repair.get("stage"))
         )
-        return [quality_repair]
+        return [with_responsibility(quality_repair)]
 
     if not (root / "brief.json").is_file() and not gates.get("brief"):
         add(
@@ -481,7 +513,7 @@ def build_next_actions(
     if gates.get("desktop_exported"):
         add("done", f'aifilm status --root "{r}"', "本集交付门禁已齐")
 
-    return actions[:8]
+    return [with_responsibility(action) for action in actions[:8]]
 
 
 def pilot_gate_hint(root: Path) -> str:

@@ -64,6 +64,7 @@ from sound_plan import (
     inject_auto_sfx_if_empty,
     resolve_loudnorm,
     resolve_music_template,
+    resolve_music_template_timeline,
     resolve_sidechain,
     should_apply_loudnorm,
     sidechain_filter_fragment,
@@ -716,6 +717,7 @@ def procedural_music_rnb(
     density: float = 0.5,
     bass_presence: float = 0.5,
     brightness: float = 0.5,
+    key_shift: int = 0,
 ) -> np.ndarray:
     """Seductive late-night R&B bed (Rhodes + sub + soft kit). float mono."""
     # Prefer shared implementation from make_sfx_bed when available
@@ -732,6 +734,7 @@ def procedural_music_rnb(
             density=density,
             bass_presence=bass_presence,
             brightness=brightness,
+            key_shift=key_shift,
         )
     except Exception:
         pass
@@ -788,6 +791,8 @@ def procedural_music(
         g_density: float = 0.5,
         g_bass_presence: float = 0.5,
         g_brightness: float = 0.5,
+        g_bpm: float = 76.0,
+        g_key_shift: int = 0,
     ) -> np.ndarray:
         g_mood = (g_mood or "playful").lower()
         if g_mood in (
@@ -804,13 +809,14 @@ def procedural_music(
             return procedural_music_rnb(
                 g_dur,
                 amp=amp * 1.05,
-                bpm=76.0,
+                bpm=g_bpm,
                 seed=g_seed,
                 shot_starts=shot_starts,
                 events=events,
                 density=g_density,
                 bass_presence=g_bass_presence,
                 brightness=g_brightness,
+                key_shift=g_key_shift,
             )
 
         n = int(SR * max(0.5, g_dur))
@@ -837,11 +843,25 @@ def procedural_music(
             bass = 110.0
             pad = [220.0, 261.6, 329.6]
             counter = [440.0, 392.0, 329.6, 293.7]
+        elif g_mood == "ambient":
+            # A suspended, low-motion pad palette: deliberately no bass ostinato
+            # or melodic counterline, so establishing shots do not sound like a
+            # warm-resolution cue with its volume turned down.
+            notes = [196.0, 246.9, 293.7, 370.0]
+            bass = 0.0
+            pad = [196.0, 293.7, 370.0]
+            counter = []
         else:  # warm
             notes = [246.9, 293.7, 370.0, 493.9]
             bass = 123.5
             pad = [246.9, 293.7, 370.0]
             counter = [493.9, 440.0, 370.0, 329.6]
+
+        pitch = 2.0 ** (g_key_shift / 12.0)
+        notes = [freq * pitch for freq in notes]
+        pad = [freq * pitch for freq in pad]
+        counter = [freq * pitch for freq in counter]
+        bass *= pitch
 
         for i, f in enumerate(notes):
             s0, s1 = i * seg_n, (i + 1) * seg_n
@@ -849,11 +869,19 @@ def procedural_music(
             sig[s0:s1] += tone[: s1 - s0]
         for f in pad:
             sig += make_tone(f, 0.04, n, rel=n / SR)
-        sig += make_tone(bass, 0.09, n, rel=n / SR)
+        if bass:
+            sig += make_tone(bass, 0.09, n, rel=n / SR)
         for i, f in enumerate(counter):
             s0, s1 = i * seg_n, (i + 1) * seg_n
             tone = make_tone(f, 0.035, seg_n, rel=0.2)
             sig[s0:s1] += tone[: s1 - s0]
+        # BPM creates a perceptible motion difference in the non-R&B palettes;
+        # ambient moves slowly while suspense can pulse without changing genre.
+        pulse_rate = max(0.15, g_bpm / 240.0)
+        if g_mood == "ambient":
+            sig *= 0.72 + 0.28 * np.sin(2 * np.pi * pulse_rate * tt) ** 2
+        else:
+            sig *= 0.84 + 0.16 * np.sin(2 * np.pi * pulse_rate * tt) ** 2
         sig *= amp * (1 + emo * 0.45) * dyn
         return np.tanh(sig)
 
@@ -875,9 +903,19 @@ def procedural_music(
         if ch_dur <= 0:
             continue
 
-        gen_dur = ch_dur
-        if i < len(mood_timeline) - 1:
-            gen_dur += crossfade_sec
+        next_transition = (
+            str(mood_timeline[i + 1].get("transition") or "crossfade").lower()
+            if i < len(mood_timeline) - 1
+            else "cut"
+        )
+        overlap_sec = (
+            crossfade_sec
+            if next_transition == "crossfade"
+            else 0.12
+            if next_transition == "stinger"
+            else 0.0
+        )
+        gen_dur = ch_dur + overlap_sec
 
         # Seed mutation: mutate seed per chapter index i
         chapter_seed = (
@@ -885,6 +923,10 @@ def procedural_music(
             if motif_seed is not None
             else base_seed + i
         )
+        # `take_seed` is an authored variation knob. Keep the semantic motif
+        # stable while changing its concrete take, rather than silently ignoring
+        # the cue field or forcing a different genre.
+        chapter_seed = (chapter_seed + int(chapter.get("seed", 0))) & 0x7FFFFFFF
         chapter_sig = _generate_single(
             gen_dur,
             str(chapter.get("mood", mood)),
@@ -892,6 +934,8 @@ def procedural_music(
             g_density=float(chapter.get("density", 0.5)),
             g_bass_presence=float(chapter.get("bass_presence", 0.5)),
             g_brightness=float(chapter.get("brightness", 0.5)),
+            g_bpm=float(chapter.get("bpm", 76.0)),
+            g_key_shift=int(chapter.get("key_shift", 0)),
         )
         energy = max(0.0, min(1.0, float(chapter.get("energy", 0.55))))
         profile = str(chapter.get("stem_profile") or "full")
@@ -909,15 +953,31 @@ def procedural_music(
 
         span = len(chapter_sig)
         if span > 0:
+            transition = str(chapter.get("transition") or "crossfade").lower()
             xfade_samples = min(int(crossfade_sec * SR), span)
-            # Equal-Power Crossfade (constant acoustic energy: sin^2 + cos^2 = 1.0)
-            if i > 0:
+            xfade_out_samples = min(int(crossfade_sec * SR), span)
+            # An authored cut has no overlap; crossfade keeps constant acoustic
+            # energy, while a stinger gets a short, intentional mute before the
+            # incoming chapter. This makes the cue contract audible, not metadata.
+            if transition == "cut":
+                xfade_samples = 0
+            elif transition == "stinger":
+                xfade_samples = min(int(0.12 * SR), span)
+                chapter_sig[:xfade_samples] *= np.linspace(0.0, 1.0, xfade_samples)
+            if next_transition == "cut":
+                xfade_out_samples = 0
+            elif next_transition == "stinger":
+                xfade_out_samples = min(int(0.12 * SR), span)
+            if i > 0 and xfade_samples:
                 t_in = np.linspace(0, 1, xfade_samples, endpoint=False)
                 chapter_sig[:xfade_samples] *= np.sin(0.5 * np.pi * t_in)
 
-            if i < len(mood_timeline) - 1:
-                t_out = np.linspace(0, 1, xfade_samples, endpoint=False)
-                chapter_sig[-xfade_samples:] *= np.cos(0.5 * np.pi * t_out)
+            if i < len(mood_timeline) - 1 and xfade_out_samples:
+                out_start = min(span, int(ch_dur * SR))
+                out_span = min(xfade_out_samples, span - out_start)
+                if out_span:
+                    t_out = np.linspace(0, 1, out_span, endpoint=False)
+                    chapter_sig[out_start : out_start + out_span] *= np.cos(0.5 * np.pi * t_out)
 
             final_bed[i0:i1] += chapter_sig
 
@@ -940,6 +1000,96 @@ def write_wav_stereo(path: Path, samples: np.ndarray, sr: int = SR) -> None:
         handle.setsampwidth(2)
         handle.setframerate(sr)
         handle.writeframes(samples.tobytes())
+
+
+def render_music_template_timeline(
+    *,
+    root: Path,
+    work: Path,
+    timeline: list[dict[str, Any]],
+    plan: dict[str, Any] | None,
+    music_license: str | None,
+    seed: int,
+    total_dur: float,
+) -> tuple[np.ndarray, list[dict[str, Any]]]:
+    """Render one licensed local template per cue into one mono BGM bed.
+
+    A timeline choice is intentionally all-or-nothing: an absent mood-specific
+    template blocks this mode rather than silently looping the film-wide bed.
+    """
+    selections = resolve_music_template_timeline(
+        root,
+        timeline=timeline,
+        plan=plan,
+        music_license=music_license,
+        seed=seed,
+    )
+    expected_ids = [str(item.get("shot_id") or "") for item in timeline]
+    selected_ids = [str(item.get("shot_id") or "") for item in selections]
+    if selected_ids != expected_ids:
+        missing = sorted(set(expected_ids) - set(selected_ids))
+        raise RenderError(
+            "music_template=timeline missing mood-specific local BGM for: " + ", ".join(missing)
+        )
+
+    work.mkdir(parents=True, exist_ok=True)
+    total = int(SR * total_dur)
+    bed = np.zeros(total, dtype=np.float64)
+    for index, selection in enumerate(selections):
+        start = max(0.0, float(selection.get("start_sec") or 0.0))
+        end = min(total_dur, float(selection.get("end_sec") or total_dur))
+        if end <= start:
+            continue
+        next_transition = (
+            str(timeline[index + 1].get("transition") or "crossfade").lower()
+            if index < len(timeline) - 1
+            else "cut"
+        )
+        overlap = (
+            2.5 if next_transition == "crossfade" else 0.12 if next_transition == "stinger" else 0.0
+        )
+        segment_dur = min(total_dur - start, end - start + overlap)
+        wav_path = work / f"bgm_timeline_{index:03d}.wav"
+        run(
+            [
+                "ffmpeg",
+                "-y",
+                "-stream_loop",
+                "-1",
+                "-i",
+                str(selection["path"]),
+                "-t",
+                f"{segment_dur:.3f}",
+                "-ar",
+                str(SR),
+                "-ac",
+                "1",
+                "-c:a",
+                "pcm_s16le",
+                str(wav_path),
+            ]
+        )
+        with wave.open(str(wav_path), "rb") as handle:
+            segment = np.frombuffer(handle.readframes(handle.getnframes()), dtype=np.int16)
+        segment = segment.astype(np.float64) / 32767.0
+        nominal = min(len(segment), int((end - start) * SR))
+        if overlap and nominal < len(segment):
+            fade_len = min(len(segment) - nominal, int(overlap * SR))
+            segment[nominal : nominal + fade_len] *= np.cos(
+                0.5 * np.pi * np.linspace(0, 1, fade_len, endpoint=False)
+            )
+        if index and str(selection.get("transition") or "crossfade").lower() != "cut":
+            fade_len = min(
+                len(segment), int((0.12 if selection.get("transition") == "stinger" else 2.5) * SR)
+            )
+            if fade_len:
+                segment[:fade_len] *= np.sin(
+                    0.5 * np.pi * np.linspace(0, 1, fade_len, endpoint=False)
+                )
+        out_start = int(start * SR)
+        out_end = min(total, out_start + len(segment))
+        bed[out_start:out_end] += segment[: out_end - out_start]
+    return np.clip(bed, -1.0, 1.0), selections
 
 
 def probe_mixed_loudness(path: Path) -> dict[str, Any] | None:
@@ -2928,22 +3078,45 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             except ValueError as exc:
                 raise RenderError(f"invalid shot music_cue: {exc}") from exc
 
-    # Phase H: local template pool (audio/bgm.wav or assets/bgm/{mood}/*)
-    try:
-        music_resolved = resolve_music_template(
-            root,
-            mood=mood,
-            plan=sound_plan if isinstance(sound_plan, dict) else None,
-            music_arg=getattr(args, "music", None),
-            mode=getattr(args, "music_template", None),
-            music_license=getattr(args, "music_license", None),
-            seed=music_seed,
-        )
-    except SoundPlanError as exc:
-        raise RenderError(str(exc)) from exc
+    # Phase H: local template pool. `timeline` is opt-in because it requires a
+    # licensed mood-specific file for every cue; it never degrades to one loop.
+    template_mode = str(
+        getattr(args, "music_template", None) or (sound_plan or {}).get("music_template") or "auto"
+    ).lower()
+    template_timeline_samples: np.ndarray | None = None
+    template_timeline_selections: list[dict[str, Any]] = []
+    if template_mode == "timeline":
+        try:
+            template_timeline_samples, template_timeline_selections = (
+                render_music_template_timeline(
+                    root=root,
+                    work=work,
+                    timeline=(sound_plan or {}).get("music_timeline") or [],
+                    plan=sound_plan if isinstance(sound_plan, dict) else None,
+                    music_license=getattr(args, "music_license", None),
+                    seed=music_seed,
+                    total_dur=total_dur,
+                )
+            )
+        except SoundPlanError as exc:
+            raise RenderError(str(exc)) from exc
+        music_resolved = None
+    else:
+        try:
+            music_resolved = resolve_music_template(
+                root,
+                mood=mood,
+                plan=sound_plan if isinstance(sound_plan, dict) else None,
+                music_arg=getattr(args, "music", None),
+                mode=getattr(args, "music_template", None),
+                music_license=getattr(args, "music_license", None),
+                seed=music_seed,
+            )
+        except SoundPlanError as exc:
+            raise RenderError(str(exc)) from exc
 
     # Optional external AI music (ACE-Step / MusicGen…) when no local bed
-    if music_resolved is None:
+    if music_resolved is None and template_timeline_samples is None:
         ext_music = _try_external_music_gen(
             work=work,
             duration=total_dur,
@@ -2965,9 +3138,48 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         if music_resolved
         else {"source": "procedural", "mode": getattr(args, "music_template", None) or "auto"}
     )
+    if template_timeline_samples is not None:
+        mix_spotting["music_template"] = {
+            "source": "timeline_templates",
+            "mode": "timeline",
+            "cue_count": len(template_timeline_selections),
+            "selections": [
+                {
+                    "shot_id": item["shot_id"],
+                    "path": item["relative"],
+                    "mood": item["mood"],
+                    "motif_id": item["motif_id"],
+                    "take_seed": item["take_seed"],
+                    "license_note": item["license_note"],
+                }
+                for item in template_timeline_selections
+            ],
+        }
     mix_spotting["music_seed"] = music_seed
 
-    if music_resolved and Path(music_resolved["path"]).is_file():
+    if template_timeline_samples is not None:
+        license_note = (
+            "timeline of licensed local BGM templates; see mix_report music_template.selections"
+        )
+        user_f, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(
+            template_timeline_samples
+        )
+        mix_spotting = {**mix_spotting, **spotting_only}
+        mix_spotting["mood"] = "timeline"
+        mix_spotting["bed_source"] = "timeline_templates"
+        mix_spotting["music_seed"] = music_seed
+        mix_spotting["note"] = "mood-routed local BGM templates — mute/duck on bgm, sfx separated"
+        if sound_plan and sound_plan.get("bed") is False:
+            user_f = np.zeros_like(user_f)
+            mix_spotting["bed_applied"] = False
+        else:
+            mix_spotting["bed_applied"] = True
+        stereo = work / "bgm_stereo.wav"
+        sfx_stereo_path = work / "sfx_stereo.wav"
+        write_wav_stereo(stereo, (np.clip(user_f, -1.0, 1.0) * 32767.0).astype(np.int16))
+        write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
+        music_path = stereo
+    elif music_resolved and Path(music_resolved["path"]).is_file():
         music_src = Path(music_resolved["path"]).expanduser().resolve()
         license_note = str(music_resolved.get("license_note") or "user-supplied file")
         mono_tmp = work / "bgm_user_mono.wav"

@@ -54,6 +54,7 @@ def test_compact_packet_is_small_and_keeps_execution_contract(tmp_path: Path) ->
         "argv",
         "spend_class",
         "approval_class",
+        "responsibility",
         "verification",
         "transaction_id",
         "state_hash",
@@ -66,6 +67,7 @@ def test_compact_packet_is_small_and_keeps_execution_contract(tmp_path: Path) ->
     assert "routing" not in compact
     assert "production_evidence" not in compact
     assert "agent_instruction" not in compact
+    assert compact["responsibility"] == full["responsibility"]
 
 
 def test_compact_packet_bounds_untrusted_human_readable_fields() -> None:

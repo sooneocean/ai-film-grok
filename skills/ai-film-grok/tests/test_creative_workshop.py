@@ -10,8 +10,10 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+import creative_workshop as workshop  # noqa: E402
 from creative_workshop import (  # noqa: E402
     WorkshopConflict,
+    WorkshopError,
     WorkshopLocked,
     apply_workshop,
     compile_workshop,
@@ -21,6 +23,7 @@ from creative_workshop import (  # noqa: E402
     validate_workshop,
 )
 from story_plan import project_graph_to_film_spec  # noqa: E402
+from util import canonical_json_sha256  # noqa: E402
 
 
 def _graph() -> dict:
@@ -168,6 +171,48 @@ def test_validate_and_export_reject_a_tampered_packet(tmp_path: Path) -> None:
         export_workshop(tmp_path, target="generic")
 
 
+def test_validate_rejects_a_rehashed_noncanonical_packet(tmp_path: Path) -> None:
+    intake_workshop(tmp_path, _brief(), expected_revision=0)
+    (tmp_path / "drama-graph.json").write_text(json.dumps(_graph()), encoding="utf-8")
+    compile_workshop(tmp_path)
+    packet_path = tmp_path / "receipts" / "workshop" / "compile.json"
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    packet["shots"][0]["director_prompt"]["subject"] = "a substituted subject"
+    packet["content_sha256"] = canonical_json_sha256(
+        {key: value for key, value in packet.items() if key != "content_sha256"}
+    )
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+
+    report = validate_workshop(tmp_path, strict=True)
+    assert "WORKSHOP_PACKET_NONCANONICAL" in {item["code"] for item in report["errors"]}
+    with pytest.raises(ValueError, match="WORKSHOP_PACKET_NONCANONICAL"):
+        export_workshop(tmp_path, target="grok")
+
+
+def test_validate_rejects_duplicate_compiled_shot_ids(tmp_path: Path) -> None:
+    intake_workshop(tmp_path, _brief(), expected_revision=0)
+    graph = _graph()
+    duplicate = json.loads(json.dumps(graph["episodes"][0]["scenes"][0]["beats"][0]["shots"][0]))
+    duplicate["id"] = "shot01"
+    graph["episodes"][0]["scenes"][0]["beats"][0]["shots"].append(duplicate)
+    (tmp_path / "drama-graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    compile_workshop(tmp_path)
+
+    report = validate_workshop(tmp_path, strict=True)
+    assert "WORKSHOP_SHOT_ID_DUPLICATE" in {item["code"] for item in report["errors"]}
+
+
+def test_validate_rejects_missing_compiled_shot_ids(tmp_path: Path) -> None:
+    intake_workshop(tmp_path, _brief(), expected_revision=0)
+    graph = _graph()
+    graph["episodes"][0]["scenes"][0]["beats"][0]["shots"][0]["id"] = ""
+    (tmp_path / "drama-graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    compile_workshop(tmp_path)
+
+    report = validate_workshop(tmp_path, strict=True)
+    assert "WORKSHOP_SHOT_ID_MISSING" in {item["code"] for item in report["errors"]}
+
+
 def test_validate_blocks_asset_underscore_internal_ids(tmp_path: Path) -> None:
     intake_workshop(tmp_path, _brief(), expected_revision=0)
     graph = _graph()
@@ -226,6 +271,7 @@ def test_apply_is_revision_bound_and_projects_creative_fields_to_unlocked_shots(
     assert applied["graph_revision_after"] == 2
     assert shot["creative"]["shot_function"] == "evidence reveal"
     assert shot["creative"]["reference_assets"][0]["label"] == "heroine reference"
+    assert shot["creative"]["workshop_packet_sha256"] == applied["packet_sha256"]
     assert (tmp_path / "receipts" / "narrative" / "revision-0002.json").is_file()
     film_spec = project_graph_to_film_spec(graph)
     assert film_spec["scenes"][0]["shots"][0]["creative"] == shot["creative"]
@@ -249,6 +295,33 @@ def test_apply_refuses_locked_shot_scope_and_empty_packets(tmp_path: Path) -> No
     compile_workshop(empty_root)
     report = validate_workshop(empty_root, strict=True)
     assert "WORKSHOP_SHOTS_EMPTY" in {item["code"] for item in report["errors"]}
+
+
+def test_apply_revalidates_sources_after_acquiring_the_graph_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    intake_workshop(tmp_path, _brief(), expected_revision=0)
+    (tmp_path / "drama-graph.json").write_text(json.dumps(_graph()), encoding="utf-8")
+    compile_workshop(tmp_path)
+    original_validate = workshop.validate_workshop
+    calls = 0
+
+    def mutate_between_validations(root: Path, *, strict: bool = False) -> dict:
+        nonlocal calls
+        calls += 1
+        report = original_validate(root, strict=strict)
+        if calls == 1:
+            graph = json.loads((tmp_path / "drama-graph.json").read_text(encoding="utf-8"))
+            graph["title"] = "changed between preflight and lock"
+            (tmp_path / "drama-graph.json").write_text(json.dumps(graph), encoding="utf-8")
+        return report
+
+    monkeypatch.setattr(workshop, "validate_workshop", mutate_between_validations)
+    with pytest.raises(WorkshopError, match="locked validation: WORKSHOP_SOURCE_STALE"):
+        apply_workshop(tmp_path, expected_graph_revision=1)
+    graph = json.loads((tmp_path / "drama-graph.json").read_text(encoding="utf-8"))
+    shot = graph["episodes"][0]["scenes"][0]["beats"][0]["shots"][0]
+    assert "creative" not in shot
 
 
 def test_diagnose_covers_the_remaining_dialogue_dimensions(tmp_path: Path) -> None:

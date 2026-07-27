@@ -27,6 +27,26 @@ DEPARTMENT_FILES = {
 }
 _CANONICAL_DEPARTMENTS = {"visual", "audio", "post"}
 
+# A handoff names the department that may start work next.  It is deliberately
+# read-only: ownership changes only through the existing human-approved locks.
+_HANDOFFS = {
+    "visual": {
+        "owner": "visual",
+        "inputs": (),
+        "produces": ("style-bible.json", "shot visual direction"),
+    },
+    "audio": {
+        "owner": "audio",
+        "inputs": (),
+        "produces": ("audio-bible.json", "dialogue, music, and mix direction"),
+    },
+    "post": {
+        "owner": "post",
+        "inputs": ("visual", "audio"),
+        "produces": ("post-bible.json", "editorial and finishing instructions"),
+    },
+}
+
 
 class DepartmentCliError(ValueError):
     """A department mutation was invalid or raced another writer."""
@@ -138,6 +158,91 @@ def show_department(root: Path | str, department: str) -> dict[str, Any]:
         "department_id": department,
         "path": str(department_path(root, department)),
         "department": value,
+    }
+
+
+def _has_current_lock_approval(root: Path | str, department: str, value: dict[str, Any]) -> bool:
+    approval_ref = value.get("approval_ref")
+    if not isinstance(approval_ref, str) or not approval_ref:
+        return False
+    approval = next(
+        (
+            item
+            for item in read_approval_ledger(root).get("approvals") or []
+            if item.get("approval_id") == approval_ref
+        ),
+        None,
+    )
+    canonical = _canonical_department(department)
+    return bool(
+        isinstance(approval, dict)
+        and approval.get("revoked") is not True
+        and approval.get("project_binding_current") is True
+        and approval.get("ledger_integrity_current") is True
+        and approval.get("approver_type") in {"human", "user"}
+        and approval.get("scope") == f"department:{canonical}"
+        and approval.get("approval_type") == "department_lock"
+        and approval_is_current(approval, {f"department:{canonical}": value["hash"]}).get("ok")
+    )
+
+
+def handoff_department(root: Path | str, department: str) -> dict[str, Any]:
+    """Report whether a department has immutable upstream inputs to begin work.
+
+    The report is an assignment receipt, not a state transition.  A receiving
+    department can use it to reject stale, draft, or missing upstream bibles
+    before any render or media work starts.
+    """
+    target = _canonical_department(department)
+    contract = _HANDOFFS.get(target)
+    if contract is None:
+        raise DepartmentCliError(f"unknown handoff department: {department}")
+
+    inputs: list[dict[str, Any]] = []
+    blockers: list[dict[str, str]] = []
+    for upstream in contract["inputs"]:
+        try:
+            value = _read(root, upstream)
+        except (FileNotFoundError, DepartmentCliError) as exc:
+            inputs.append({"id": upstream, "ready": False, "error": str(exc)})
+            blockers.append({"id": upstream, "reason": "missing_or_invalid"})
+            continue
+        state = str(value.get("state") or "draft")
+        approval_current = state == "locked" and _has_current_lock_approval(root, upstream, value)
+        ready = state == "locked" and approval_current
+        inputs.append(
+            {
+                "id": upstream,
+                "ready": ready,
+                "revision": value.get("revision"),
+                "state": state,
+                "hash": value["hash"],
+                "approval_ref": value.get("approval_ref"),
+                "approval_current": approval_current,
+            }
+        )
+        if not ready:
+            reason = f"state_{state}" if state != "locked" else "approval_not_current"
+            blockers.append({"id": upstream, "reason": reason})
+
+    fingerprint = stable_hash(
+        {
+            "to": target,
+            "inputs": [
+                {key: item.get(key) for key in ("id", "revision", "state", "hash")}
+                for item in inputs
+            ],
+        }
+    )
+    return {
+        "ok": not blockers,
+        "action": "handoff",
+        "to": target,
+        "owner": contract["owner"],
+        "inputs": inputs,
+        "blocked_by": blockers,
+        "produces": list(contract["produces"]),
+        "handoff_id": f"department-handoff-{target}-{fingerprint[:20]}",
     }
 
 

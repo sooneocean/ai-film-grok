@@ -25,6 +25,11 @@ def test_structured_next_action_is_directly_executable_and_paid_is_human_require
     assert action["operation"] == "skill"
     assert action["argv"][:2] == ["skill", "run"]
     assert action["approval_class"] == "human_required"
+    assert action["responsibility"] == {
+        "owner": "visual",
+        "department": "visual",
+        "stage": "visual",
+    }
     assert action["transaction_id"].startswith("tx-")
 
 

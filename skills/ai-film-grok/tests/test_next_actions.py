@@ -18,6 +18,7 @@ from next_actions import (  # noqa: E402
     detect_pipeline_stage,
     format_stage_line,
     persist_pipeline_stage,
+    responsibility_for_stage,
 )
 from pilot_review import (  # noqa: E402
     build_pilot_scorecard,
@@ -28,6 +29,19 @@ from production_gates import (  # noqa: E402
     ProductionGateError,
     assert_pilot_allows_add,
 )
+
+
+def test_next_actions_publish_a_single_owner_per_stage(tmp_path: Path) -> None:
+    (tmp_path / "brief.json").write_text('{"title":"t"}', encoding="utf-8")
+    actions = build_next_actions(tmp_path, gates={"brief": True, "style_locked": False})
+
+    lock_style = next(action for action in actions if action["id"] == "lock-style")
+    assert lock_style["responsibility"] == responsibility_for_stage("agent")
+    assert responsibility_for_stage("design") == {
+        "owner": "post",
+        "department": "post",
+        "stage": "design",
+    }
 
 
 @pytest.mark.slow

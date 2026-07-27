@@ -291,7 +291,9 @@ def diagnose_workshop(root: Path) -> dict[str, Any]:
     return report
 
 
-def _creative_projection(shot: dict[str, Any], *, rhythm_profile: str) -> dict[str, Any]:
+def _creative_projection(
+    shot: dict[str, Any], *, rhythm_profile: str, packet_sha256: str
+) -> dict[str, Any]:
     """Build the graph-owned, provider-neutral creative fields for one shot."""
     prompt = _director_prompt(shot)
     duration = shot.get("duration_sec") or shot.get("targetDuration") or film_duration(shot)
@@ -300,6 +302,7 @@ def _creative_projection(shot: dict[str, Any], *, rhythm_profile: str) -> dict[s
     if isinstance(duration, (int, float)) and float(duration) > 0 and sound:
         pacing["dialogue_characters_per_sec"] = round(len(sound) / float(duration), 2)
     return {
+        "workshop_packet_sha256": packet_sha256,
         "shot_function": prompt["function"],
         "end_state": prompt["end_state"],
         "dialogue_pacing": pacing,
@@ -338,12 +341,21 @@ def apply_workshop(root: Path, *, expected_graph_revision: int) -> dict[str, Any
             raise WorkshopConflict(
                 f"expected graph revision {expected_graph_revision}, current revision is {actual_revision}"
             )
+        # Re-check under the graph lock: a graph/brief edit between the optimistic
+        # preflight and this critical section must never be projected silently.
+        locked_validation = validate_workshop(root, strict=True)
+        if not locked_validation["ok"]:
+            codes = ", ".join(item["code"] for item in locked_validation["errors"])
+            raise WorkshopError(f"workshop apply blocked by locked validation: {codes}")
         if "shots" in set(graph.get("lock_scopes") or []):
             raise WorkshopLocked(
                 "workshop apply blocked: shots scope is locked; unlock and approve first"
             )
         brief = _require_brief(root)
         packet = read_json(_receipt_path(root, "compile.json")) or {}
+        packet_sha256 = _text(packet.get("content_sha256"))
+        if not packet_sha256:
+            raise WorkshopError("validated workshop packet is missing content_sha256")
         packet_shots = {str(item.get("shot_id")): item for item in packet.get("shots") or []}
         index = node_index(graph)
         applied: list[str] = []
@@ -358,7 +370,9 @@ def apply_workshop(root: Path, *, expected_graph_revision: int) -> dict[str, Any
                     f"workshop apply blocked: shot {shot_id} is locked; unlock and approve first"
                 )
             shot["creative"] = _creative_projection(
-                shot, rhythm_profile=str(brief["rhythm_profile"])
+                shot,
+                rhythm_profile=str(brief["rhythm_profile"]),
+                packet_sha256=packet_sha256,
             )
             control["state"] = "review"
             shot["control"] = control
@@ -389,7 +403,8 @@ def apply_workshop(root: Path, *, expected_graph_revision: int) -> dict[str, Any
     return report
 
 
-def compile_workshop(root: Path) -> dict[str, Any]:
+def _compile_payload(root: Path) -> dict[str, Any]:
+    """Return the deterministic director-packet payload for the current sources."""
     root = Path(root).expanduser().resolve()
     brief = _require_brief(root)
     graph, graph_ref = _load_graph(root)
@@ -421,10 +436,9 @@ def compile_workshop(root: Path) -> dict[str, Any]:
     sources = [graph_ref, _source_ref(_path(root, BRIEF_NAME), kind="creative-brief")]
     if book_path.is_file():
         sources.append(_source_ref(book_path, kind="production-book"))
-    packet = {
+    return {
         "schema_version": 1,
         "kind": "workshop-director-packet",
-        "created_at": utc_now(),
         "provider_policy": "provider_neutral",
         "provider_default_changed": False,
         "sources": sources,
@@ -446,6 +460,11 @@ def compile_workshop(root: Path) -> dict[str, Any]:
         "shots": compiled_shots,
         "sound_cue_sheet": cues,
     }
+
+
+def compile_workshop(root: Path) -> dict[str, Any]:
+    root = Path(root).expanduser().resolve()
+    packet = {"created_at": utc_now(), **_compile_payload(root)}
     packet["content_sha256"] = _content_hash(packet)
     write_json(_receipt_path(root, "compile.json"), packet)
     return packet
@@ -484,12 +503,47 @@ def validate_workshop(root: Path, *, strict: bool = False) -> dict[str, Any]:
                     f"compiled packet source is missing or changed: {path}",
                 )
             )
+    if not errors:
+        try:
+            expected_payload = _compile_payload(root)
+        except WorkshopError as exc:
+            errors.append(_issue("WORKSHOP_SOURCE_INVALID", "", str(exc)))
+        else:
+            actual_payload = {
+                key: value
+                for key, value in packet.items()
+                if key not in {"created_at", "content_sha256"}
+            }
+            if canonical_json_sha256(actual_payload) != canonical_json_sha256(expected_payload):
+                errors.append(
+                    _issue(
+                        "WORKSHOP_PACKET_NONCANONICAL",
+                        "",
+                        "compiled workshop packet is not the deterministic projection of current sources",
+                    )
+                )
     if not isinstance(packet.get("shots"), list) or not packet["shots"]:
         errors.append(
             _issue("WORKSHOP_SHOTS_EMPTY", "", "workshop packet must contain at least one shot")
         )
+    seen_shot_ids: set[str] = set()
     for item in packet.get("shots") or []:
         shot_id = _text(item.get("shot_id"))
+        if not shot_id:
+            errors.append(
+                _issue(
+                    "WORKSHOP_SHOT_ID_MISSING", "", "compiled workshop shot needs a non-empty id"
+                )
+            )
+        elif shot_id in seen_shot_ids:
+            errors.append(
+                _issue(
+                    "WORKSHOP_SHOT_ID_DUPLICATE",
+                    shot_id,
+                    "compiled workshop shot ids must be unique",
+                )
+            )
+        seen_shot_ids.add(shot_id)
         duration = item.get("duration_sec")
         prompt = (
             item.get("director_prompt") if isinstance(item.get("director_prompt"), dict) else {}

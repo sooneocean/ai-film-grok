@@ -52,6 +52,33 @@ _COMMAND_POLICIES = {
     "review-final": ("local", "human_required"),
     "tts-rehearse": ("external", "human_required"),
 }
+_STAGE_OWNERS = {
+    "agent": ("director", None),
+    "visual": ("visual", "visual"),
+    "voice": ("audio", "audio"),
+    "design": ("post", "post"),
+    "post": ("post", "post"),
+    "deliver": ("delivery", None),
+    "done": ("delivery", None),
+}
+
+
+def responsibility_for_action(action: dict[str, Any] | None) -> dict[str, str | None]:
+    """Return the single accountable owner for a routed action."""
+    explicit = (action or {}).get("responsibility")
+    if isinstance(explicit, dict) and isinstance(explicit.get("owner"), str):
+        return {
+            "owner": explicit["owner"],
+            "department": explicit.get("department")
+            if isinstance(explicit.get("department"), str)
+            else None,
+            "stage": explicit.get("stage")
+            if isinstance(explicit.get("stage"), str)
+            else str((action or {}).get("stage") or "agent"),
+        }
+    stage = str((action or {}).get("stage") or "agent")
+    owner, department = _STAGE_OWNERS.get(stage, ("director", None))
+    return {"owner": owner, "department": department, "stage": stage}
 
 
 def _quality_summary(root: Path) -> dict[str, Any]:
@@ -104,6 +131,7 @@ def structured_next_action(
         "approval_class": approval_class,
         "expected_outputs": list(context.get("expected_outputs") or []),
         "verification": list(context.get("verification") or []),
+        "responsibility": responsibility_for_action(action),
     }
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -783,6 +811,26 @@ def build_dispatch(
         root=root,
         state_hash=state_hash,
     )
+    responsibility = responsibility_for_action(primary)
+    department_handoff: dict[str, Any] | None = None
+    department = responsibility.get("department")
+    if isinstance(department, str):
+        try:
+            from department_cli import handoff_department
+
+            department_handoff = handoff_department(root, department)
+        except (FileNotFoundError, ValueError) as exc:
+            department_handoff = {
+                "ok": False,
+                "to": department,
+                "owner": responsibility["owner"],
+                "blocked_by": [{"id": department, "reason": "handoff_unavailable"}],
+                "error": str(exc),
+            }
+    agent_do.insert(2, f"本动作负责人：{responsibility['owner']}")
+    if department_handoff is not None and department_handoff.get("ok") is False:
+        blockers = department_handoff.get("blocked_by") or []
+        agent_do.append(f"部门交接未就绪：{blockers}；不得越过上游锁定")
     try:
         from generation_usage import usage_status
 
@@ -822,6 +870,8 @@ def build_dispatch(
         "next_id": next_id,
         "next_cmd": next_cmd,
         "next_action": next_action,
+        "responsibility": responsibility,
+        "department_handoff": department_handoff,
         "next_why": next_why,
         "next_actions": actions,
         "agent_do": agent_do,

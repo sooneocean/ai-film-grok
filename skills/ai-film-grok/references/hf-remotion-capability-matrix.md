@@ -8,8 +8,12 @@
 | 引擎 | 在本 skill 里干什么 | 默认交付 |
 |------|---------------------|----------|
 | **HyperFrames** | underlay 整条 plate + 片头/片尾 + 字幕叠层 + Studio 预览 | **推荐** `final --post-engine hyperframes` |
-| **Remotion** | 同上（React 帧级）+ Caption JSON；首次需 npm | 实验 / 组件字幕 |
+| **Remotion** | React 帧级组件、逐词字幕、参数化 variant；首次需 npm | 明确选择时的替代 owner，不与 HF 同片叠加 |
 | **FFmpeg plate** | VO/BGM/转场/空白 pad；**设计后期时不烧字不烧字幕** | 中间层，不是最终观感层 |
+
+**归属规则**：FFmpeg 负责戏与声音；每集只由 HyperFrames 或 Remotion 其中之一负责正式设计叠层。
+`engine=both` 仅双导出对照，不能产生两个正式 final。完整交接与门禁见
+[post-compose.md](post-compose.md#后期引擎归属合约p0)。
 
 ---
 
@@ -52,7 +56,7 @@
 | **双行中英字幕** | caption text `zh\nen` + `whiteSpace: pre-line` | ✅ 2026-07-20 |
 | npm bootstrap | `--npm-install` | ✅ 已接 |
 | Studio / preview | `compose-preview --engine remotion` | 部分 |
-| 帧级 spring / 复杂 MG | 可手改 Film.tsx | ⚠️ 高级；改前 load skill |
+| 帧级组件 / 逐词字幕 / 数据驱动 variant | 明确选择 Remotion owner 时实现 | ⚠️ 高级；改前 load skill |
 | Lambda / SaaS render | 不默认 | ❌ |
 | 自动转写 Whisper | 旁白来自 film-spec nar，不自动 ASR | ❌ |
 
@@ -78,7 +82,7 @@
   captions: caption_mode zh | zh_en
   transitions: transition_fluency silk (auto)
   continue 缝: hard only
-需要 React 字幕实验 → remotion + --npm-install
+需要 React 特有组件 → remotion + --npm-install，并由它单独拥有正式设计层
 只要技术验收 → ffmpeg（会烧字/烧字幕）
 ```
 

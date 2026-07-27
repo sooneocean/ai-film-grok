@@ -4,6 +4,38 @@
 > **不能**用 HF/Remotion 替代 I2V，也**不能**在 underlay 接戏缝上再 dissolve 盖断裂。
 > 能力盘点：[hf-remotion-capability-matrix.md](hf-remotion-capability-matrix.md) · 丝滑剪辑+双字幕：[lessons-2026-07-20-cut-silk-bilingual.md](lessons-2026-07-20-cut-silk-bilingual.md) · 观感：[lessons-2026-07-20-designed-post-fluency.md](lessons-2026-07-20-designed-post-fluency.md)。
 
+## 后期引擎归属合约（P0）
+
+**一集只允许一个正式 designed-post owner。** FFmpeg 始终拥有剪辑时间轴、VO/BGM/SFX
+混音、SRT 真相与技术 plate；HyperFrames 与 Remotion 只能择一拥有最终的文字和图形叠层。
+这不是性能选择，而是防止同一片头、字幕、转场或音轨被两套运行时重复处理。
+
+| 资产 / 决策 | 唯一 owner | 另一个引擎可做什么 | 禁止 |
+|---|---|---|---|
+| I2V 镜头、镜间 hard/soft cut、VO/BGM/SFX、`final.srt` | FFmpeg / `render_final` | 读取 plate、SRT 与 composition data | 重排 continue-chain、二次混音、以设计转场掩盖动作断裂 |
+| 默认正式交付、平台 `post-package.json`、片头/片尾、品牌字幕、安全区、轻量统一 grade | **HyperFrames** | Remotion 只可 export/preview 作对照 | 两者都 render/register 同一集正式 final |
+| 逐词字幕、数据驱动图形、可参数化 A/B 文案、复杂 React 帧级组件 | **Remotion（明确选用时）** | HyperFrames 不渲、只保留可比对导出物 | 把 HF 的平台标题/字幕卡逐项复刻后再叠上 |
+| 正式候选 MP4 与 `final_film` receipt | 当前 selected owner | 未选 owner 的输出只可标为 preview/variant | 两份设计成片共用同一个 `final_film` 或 approval |
+
+### 路由
+
+1. **没有明确实验需求**：选 HyperFrames。它是稳定的默认包装台，拥有平台包、字幕、片头与片尾。
+2. **需求明确是 React 特有能力**（逐词高亮、参数化多版本、数据图形或可交互 Studio 控件）：选 Remotion，并让它完整接管该集的设计层。
+3. `--engine both` 只表示「双导出／视觉对照」；不是双正式渲染。默认只渲 HyperFrames，若改为 Remotion，则不得再执行 HyperFrames 的 render/register。
+
+### 不可变交接物
+
+两个设计引擎读取同一份 `film_final` underlay、`final.srt`、`composition-data.json`、混音产物与
+时间轴。它们只能改变**自己拥有的叠层**。切换 owner 必须从相同的 FFmpeg plate 重渲，不能把一个
+设计引擎的 MP4 当另一个设计引擎的 underlay 再加工。
+
+### 交付门禁
+
+- `post_engine` 必须等于本集 selected owner；不一致不得 `register-final`。
+- `subs=off` + `plate-cards=blank` 是两条设计路径的共同前提；纯 FFmpeg 才拥有烧字。
+- 同一 `final_film` 只接受一个 designed-post receipt；另一个引擎的成片必须标记 preview/variant，重新走独立 review 才能替换。
+- continue-chain 缝仍由 plate hard cut 拥有；HF/Remotion 都不得再叠 dissolve、xfade 或重复转场。
+
 ## 分工（硬边界）
 
 | 层 | 谁做 | 工具 | 可否宣称成片 |

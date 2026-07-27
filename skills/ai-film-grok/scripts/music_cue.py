@@ -45,6 +45,7 @@ def _inferred(shot: dict[str, Any], default_mood: str) -> dict[str, Any]:
     if phase in {"act", "climax"} or func == "climax":
         return {
             "mood": "rnb" if default_mood != "dark" else "dark",
+            "motif_id": "heat:climax" if phase == "climax" or func == "climax" else "heat:act",
             "energy": 0.9,
             "density": 0.8,
             "bass_presence": 0.8,
@@ -54,6 +55,7 @@ def _inferred(shot: dict[str, Any], default_mood: str) -> dict[str, Any]:
     if func in {"buildup", "rising_action", "crisis", "suspense"}:
         return {
             "mood": "dark",
+            "motif_id": f"tension:{func}",
             "energy": 0.7,
             "density": 0.55,
             "bass_presence": 0.7,
@@ -63,6 +65,7 @@ def _inferred(shot: dict[str, Any], default_mood: str) -> dict[str, Any]:
     if func in {"intro", "establishing", "hook"}:
         return {
             "mood": "ambient",
+            "motif_id": f"arrival:{func}",
             "energy": 0.35,
             "density": 0.2,
             "bass_presence": 0.2,
@@ -72,6 +75,7 @@ def _inferred(shot: dict[str, Any], default_mood: str) -> dict[str, Any]:
     if func in {"resolution", "falling_action", "afterglow"}:
         return {
             "mood": "warm",
+            "motif_id": f"release:{func}",
             "energy": 0.35,
             "density": 0.25,
             "bass_presence": 0.25,
@@ -80,6 +84,7 @@ def _inferred(shot: dict[str, Any], default_mood: str) -> dict[str, Any]:
         }
     return {
         "mood": default_mood,
+        "motif_id": f"{default_mood}:scene",
         "energy": 0.55,
         "density": 0.45,
         "bass_presence": 0.5,
@@ -129,6 +134,8 @@ def normalize_music_cue(
         seed = int(cue.get("take_seed", 0))
     except (TypeError, ValueError) as exc:
         raise MusicCueError("music_cue.take_seed must be an integer") from exc
+    if not 0 <= seed <= 0x7FFFFFFF:
+        raise MusicCueError("music_cue.take_seed must be between 0 and 2147483647")
     return {
         "mood": mood,
         "energy": _bounded(cue.get("energy"), "energy", 0.55),
@@ -179,6 +186,10 @@ def summarize_music_timeline(timeline: list[dict[str, Any]]) -> dict[str, Any]:
         "density_curve": [item["density"] for item in timeline],
         "bass_presence_curve": [item["bass_presence"] for item in timeline],
         "brightness_curve": [item["brightness"] for item in timeline],
+        "bpm_curve": [item["bpm"] for item in timeline],
+        "key_shift_curve": [item["key_shift"] for item in timeline],
+        "take_seeds": [item["seed"] for item in timeline],
+        "transitions": [item["transition"] for item in timeline],
         "explainable": True,
         "source": "shot.music_cue with dramaturgical defaults",
     }

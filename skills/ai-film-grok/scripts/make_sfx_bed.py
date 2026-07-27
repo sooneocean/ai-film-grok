@@ -486,6 +486,7 @@ def rnb_bgm(
     density: float = 0.5,
     bass_presence: float = 0.5,
     brightness: float = 0.5,
+    key_shift: int = 0,
 ) -> np.ndarray:
     """Seductive late-night R&B with anti-fatigue arrangement (v3 multi-style).
 
@@ -496,6 +497,8 @@ def rnb_bgm(
       2026-07-21 (Phase III): DJ Dynamic Mix — aligns drops, breaks, and filter sweeps to shots/events.
     """
     seed_i = None if seed is None else int(seed) & 0x7FFFFFFF
+    key_shift = max(-12, min(12, int(key_shift)))
+    pitch = 2.0 ** (key_shift / 12.0)
     rng = np.random.default_rng(seed_i)
     if seed_i is not None:
         np.random.seed(seed_i)
@@ -604,9 +607,9 @@ def rnb_bgm(
         f1 = f0 * float(rng.choice([0.75, 1.0, 1.5]))
         morph = 0.5 + 0.5 * np.sin(2 * np.pi * (0.03 + 0.01 * i) * t + i)
         f = f0 * (1 - morph) + f1 * morph
-        pad += (0.16 / len(base_pads)) * np.sin(2 * np.pi * f * det * t)
+        pad += (0.16 / len(base_pads)) * np.sin(2 * np.pi * f * pitch * det * t)
         if bright > 0 and i >= len(base_pads) // 2:
-            pad += (0.06 * bright / len(base_pads)) * np.sin(2 * np.pi * f * 2.01 * det * t)
+            pad += (0.06 * bright / len(base_pads)) * np.sin(2 * np.pi * f * pitch * 2.01 * det * t)
     pad_lfo = 0.5 + 0.5 * np.sin(2 * np.pi * (0.5 / max(bar * 6, 1)) * t)
     pad_levels = np.array([s[0] for s in sections], dtype=np.float64)
     sec_idx = np.minimum(len(sections) - 1, (t / max(sec_len, 1e-6)).astype(np.int32))
@@ -624,10 +627,10 @@ def rnb_bgm(
         chords = prog["chords"]  # type: ignore[assignment]
         bass_roots = prog["bass"]  # type: ignore[assignment]
         assert isinstance(chords, list) and isinstance(bass_roots, list)
-        freqs = list(chords[ci % len(chords)])
+        freqs = [float(freq) * pitch for freq in chords[ci % len(chords)]]
         if rng.random() < 0.22 and len(freqs) >= 2:
             freqs[0] *= 0.5
-        root = float(bass_roots[ci % len(bass_roots)])
+        root = float(bass_roots[ci % len(bass_roots)]) * pitch
         cdur = min(chord_dur, dur - t0 + 0.05)
         _, rh_g, _, sub_g, _ = _section_at(t0)
         ch = rhodes_chord(freqs, cdur, amp=rhodes_mix * amp * rh_g)

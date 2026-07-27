@@ -3,6 +3,14 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.7.8] — 2026-07-27
+
+### Added
+
+- Workshop packets now bind graph projections to a validated canonical packet, departments can prove immutable upstream handoff readiness, and dispatch packets retain accountable ownership.
+- Music cues now carry semantic motifs, tempo, key, takes, transitions, and optional per-shot local-template routing into final render behavior.
+- Review queues expose a bounded, schema-checked recent decision trail for the local approval UI.
+
 ## [2.7.7] — 2026-07-27
 
 ### Fixed

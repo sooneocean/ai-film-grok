@@ -4935,6 +4935,7 @@ def cmd_department(args: argparse.Namespace) -> int:
     from department_cli import (
         diff_department,
         edit_department,
+        handoff_department,
         list_departments,
         lock_department,
         show_department,
@@ -4959,6 +4960,8 @@ def cmd_department(args: argparse.Namespace) -> int:
             )
         elif action == "diff":
             report = diff_department(root, args.department_id, payload_file=args.payload_file)
+        elif action == "handoff":
+            report = handoff_department(root, args.department_id)
         elif action == "validate":
             report = validate_department(root, args.department_id)
         elif action == "lock":
@@ -7071,7 +7074,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     department_p = sub.add_parser(
         "department",
-        help="Department bibles: list|show|edit|diff|validate|lock|unlock|status",
+        help="Department bibles: list|show|edit|diff|handoff|validate|lock|unlock|status",
     )
     department_sub = department_p.add_subparsers(dest="department_action", required=True)
     dept_list = department_sub.add_parser("list")
@@ -7090,6 +7093,11 @@ def build_parser() -> argparse.ArgumentParser:
     dept_diff.add_argument("--root", required=True)
     dept_diff.add_argument("--id", dest="department_id", required=True)
     dept_diff.add_argument("--payload-file", required=True)
+    dept_handoff = department_sub.add_parser(
+        "handoff", help="Verify immutable upstream bibles before a department starts work"
+    )
+    dept_handoff.add_argument("--root", required=True)
+    dept_handoff.add_argument("--to", dest="department_id", required=True)
     dept_lock = department_sub.add_parser("lock")
     dept_lock.add_argument("--root", required=True)
     dept_lock.add_argument("--id", dest="department_id", required=True)

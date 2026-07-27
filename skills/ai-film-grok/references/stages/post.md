@@ -1,9 +1,10 @@
 # Post 阶段卡
 
 - `stage_plate` 只做 clips、VO、BGM；HyperFrames/Remotion 负责 designed post。
+- 每集先选一个 `post owner`：默认 HyperFrames；只有逐词字幕、参数化 variant 或 React 帧级 MG 是明确需求时才选 Remotion。`engine=both` 仅导出对照，不能双正式渲。
 - 字幕必须真正进入交付 MP4 像素；外挂 SRT 或抽帧存在不等于可读。
-- HyperFrames 未烧字时显式进入 `stage_caption` recovery，禁止清空 `final.srt` 过关。
-- title、subtitle 与 end card 只允许一个 owning post engine，避免双烧。
+- selected owner 未烧字时显式进入 `stage_caption` recovery，禁止清空 `final.srt` 过关。
+- title、subtitle、end card、轻 grade 与设计转场只允许 selected post owner 输出；另一个引擎只能 preview/variant，避免双烧与双转场。
 - `final` 技术成功不等于 `final_complete`；仍需 post audit、caption attestation 与完整观看。
 
 ## P0 · final 工程（2026-07-24 ep2 复盘）

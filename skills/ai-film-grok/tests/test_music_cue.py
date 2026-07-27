@@ -16,7 +16,9 @@ from music_cue import (  # noqa: E402
     build_music_timeline,
     motif_seed,
     normalize_music_cue,
+    summarize_music_timeline,
 )
+from render_final import procedural_music  # noqa: E402
 
 
 def test_music_cue_infers_drama_and_explicit_fields_win() -> None:
@@ -29,6 +31,18 @@ def test_music_cue_infers_drama_and_explicit_fields_win() -> None:
     assert cue["motif_id"] == "secret"
 
 
+def test_music_cue_infers_semantic_motifs_for_distinct_contexts() -> None:
+    assert normalize_music_cue(shot={"dramatic_function": "hook"})["motif_id"] == "arrival:hook"
+    assert (
+        normalize_music_cue(shot={"dramatic_function": "suspense"})["motif_id"]
+        == "tension:suspense"
+    )
+    assert (
+        normalize_music_cue(shot={"dramatic_function": "afterglow"})["motif_id"]
+        == "release:afterglow"
+    )
+
+
 def test_music_timeline_keeps_each_shot_even_when_mood_matches() -> None:
     shots = [
         {"id": "s1", "dramatic_function": "afterglow"},
@@ -39,12 +53,18 @@ def test_music_timeline_keeps_each_shot_even_when_mood_matches() -> None:
     )
     assert len(timeline) == 2
     assert timeline[0]["energy"] != timeline[1]["energy"]
+    summary = summarize_music_timeline(timeline)
+    assert summary["bpm_curve"] == [76.0, 76.0]
+    assert summary["transitions"] == ["crossfade", "crossfade"]
+    assert summary["take_seeds"] == [0, 0]
 
 
 def test_music_cue_is_deterministic_and_validates_bounds() -> None:
     assert motif_seed(42, "love", 0) == motif_seed(42, "love", 0)
     with pytest.raises(MusicCueError):
         normalize_music_cue({"brightness": 2})
+    with pytest.raises(MusicCueError):
+        normalize_music_cue({"take_seed": 2**31})
 
 
 def test_music_timeline_automates_supplied_audio() -> None:
@@ -69,3 +89,87 @@ def test_bgm_cue_controls_real_low_and_high_layers() -> None:
     full_fft = np.abs(np.fft.rfft(full))
     assert full_fft[freqs < 180].mean() > quiet_fft[freqs < 180].mean()
     assert full_fft[freqs > 5000].mean() > quiet_fft[freqs > 5000].mean()
+
+
+def test_procedural_timeline_honors_mood_bpm_key_and_transition() -> None:
+    base = {"start_sec": 0, "end_sec": 2, "energy": 0.5, "motif_id": "same"}
+    ambient = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "mood": "ambient", "bpm": 54, "key_shift": 0}]
+    )
+    warm = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "mood": "warm", "bpm": 54, "key_shift": 0}]
+    )
+    shifted = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "mood": "warm", "bpm": 54, "key_shift": 7}]
+    )
+    assert not np.array_equal(ambient, warm)
+    assert not np.array_equal(warm, shifted)
+
+    rnb_base = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "mood": "rnb", "bpm": 54, "key_shift": 0}]
+    )
+    rnb_shifted = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "mood": "rnb", "bpm": 54, "key_shift": 7}]
+    )
+    assert not np.array_equal(rnb_base, rnb_shifted)
+
+    rnb_take_two = procedural_music(
+        2,
+        seed=11,
+        mood_timeline=[{**base, "mood": "rnb", "bpm": 54, "key_shift": 0, "seed": 2}],
+    )
+    assert not np.array_equal(rnb_base, rnb_take_two)
+
+    fade = procedural_music(
+        4,
+        seed=11,
+        mood_timeline=[
+            {**base, "mood": "warm", "transition": "crossfade"},
+            {**base, "start_sec": 2, "end_sec": 4, "mood": "dark", "transition": "crossfade"},
+        ],
+    )
+    cut = procedural_music(
+        4,
+        seed=11,
+        mood_timeline=[
+            {**base, "mood": "warm", "transition": "crossfade"},
+            {**base, "start_sec": 2, "end_sec": 4, "mood": "dark", "transition": "cut"},
+        ],
+    )
+    assert not np.array_equal(fade, cut)
+
+    cut_to_silence = procedural_music(
+        4,
+        seed=11,
+        mood_timeline=[
+            {**base, "mood": "warm", "transition": "crossfade"},
+            {
+                **base,
+                "start_sec": 2,
+                "end_sec": 4,
+                "mood": "dark",
+                "stem_profile": "silence",
+                "transition": "cut",
+            },
+        ],
+    )
+    assert not np.any(cut_to_silence[2 * SR :])
+
+    # Crossfade starts at the chapter boundary, never 0.5 seconds before it
+    # when a short 2-second chapter has the normal 2.5-second overlap.
+    previous_only = procedural_music(
+        4,
+        seed=11,
+        mood_timeline=[
+            {**base, "mood": "warm", "transition": "crossfade"},
+            {
+                **base,
+                "start_sec": 2,
+                "end_sec": 4,
+                "mood": "dark",
+                "stem_profile": "silence",
+                "transition": "crossfade",
+            },
+        ],
+    )
+    assert np.any(previous_only[int(1.75 * SR) : 2 * SR])

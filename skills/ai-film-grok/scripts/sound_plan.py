@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -295,7 +296,7 @@ def should_apply_loudnorm(
 
 # Phase H: local licensed BGM templates (user places files; skill never ships copyrighted packs)
 MUSIC_TEMPLATE_EXTS = (".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg")
-MUSIC_TEMPLATE_MODES = frozenset({"off", "auto", "on"})
+MUSIC_TEMPLATE_MODES = frozenset({"off", "auto", "on", "timeline"})
 
 
 def _first_existing_music(candidates: list[Any]) -> Any | None:
@@ -367,6 +368,7 @@ def resolve_music_template(
     mode: str | None = None,
     music_license: str | None = None,
     seed: int | None = None,
+    prefer_mood_templates: bool = False,
 ) -> dict[str, Any] | None:
     """Resolve optional local BGM file for final.
 
@@ -398,7 +400,10 @@ def resolve_music_template(
     if mode_s in {"false", "no", "0", "never"}:
         mode_s = "off"
     if mode_s not in MUSIC_TEMPLATE_MODES:
-        raise SoundPlanError(f"music_template mode must be off|auto|on; got {raw_mode!r}")
+        raise SoundPlanError(f"music_template mode must be off|auto|on|timeline; got {raw_mode!r}")
+    if mode_s == "timeline":
+        mode_s = "auto"
+        prefer_mood_templates = True
 
     # Explicit --music always wins
     if music_arg:
@@ -428,17 +433,19 @@ def resolve_music_template(
     film_candidates: list[Path] = []
     skill_candidates: list[Path] = []
     # 1) sound_plan.music_file
-    mf = plan.get("music_file") or plan.get("bgm_file")
-    if isinstance(mf, str) and mf.strip():
-        rel = mf.strip()
-        film_candidates.append(root / rel)
-        film_candidates.append(Path(rel).expanduser())
+    if not prefer_mood_templates:
+        mf = plan.get("music_file") or plan.get("bgm_file")
+        if isinstance(mf, str) and mf.strip():
+            rel = mf.strip()
+            film_candidates.append(root / rel)
+            film_candidates.append(Path(rel).expanduser())
 
     audio = root / "audio"
     # 2) audio/bgm.* audio/music.*
-    for stem in ("bgm", "music", "bed"):
-        for ext in MUSIC_TEMPLATE_EXTS:
-            film_candidates.append(audio / f"{stem}{ext}")
+    if not prefer_mood_templates:
+        for stem in ("bgm", "music", "bed"):
+            for ext in MUSIC_TEMPLATE_EXTS:
+                film_candidates.append(audio / f"{stem}{ext}")
     # 3) mood-named templates + pool dirs
     mood_aliases = {
         "rnb": ("rnb", "soul", "sensual", "seductive", "ecchi"),
@@ -457,9 +464,11 @@ def resolve_music_template(
         if pool_dir.is_dir():
             for ext in MUSIC_TEMPLATE_EXTS:
                 film_candidates.extend(sorted(pool_dir.glob(f"*{ext}")))
-    # 4) default template
-    for ext in MUSIC_TEMPLATE_EXTS:
-        film_candidates.append(audio / "templates" / f"default{ext}")
+    # 4) default template only for a deliberately single-bed render. Timeline
+    # routing must expose a missing mood rather than disguising it as default.
+    if not prefer_mood_templates:
+        for ext in MUSIC_TEMPLATE_EXTS:
+            film_candidates.append(audio / "templates" / f"default{ext}")
 
     # 5) skill-level shared library (user-placed licensed beds) + pool
     skill_bgm = Path(__file__).resolve().parents[1] / "assets" / "bgm"
@@ -471,9 +480,10 @@ def resolve_music_template(
         if mood_dir.is_dir():
             for ext in MUSIC_TEMPLATE_EXTS:
                 skill_candidates.extend(sorted(mood_dir.glob(f"*{ext}")))
-    for ext in MUSIC_TEMPLATE_EXTS:
-        skill_candidates.append(skill_bgm / f"default{ext}")
-        skill_candidates.append(skill_bgm / "default" / f"bed{ext}")
+    if not prefer_mood_templates:
+        for ext in MUSIC_TEMPLATE_EXTS:
+            skill_candidates.append(skill_bgm / f"default{ext}")
+            skill_candidates.append(skill_bgm / "default" / f"bed{ext}")
 
     film_pool = _list_existing_music(film_candidates)
     skill_pool = _list_existing_music(skill_candidates)
@@ -527,6 +537,59 @@ def resolve_music_template(
         "pool_size": len(pool),
         "pool_index": pool_index,
     }
+
+
+def resolve_music_template_timeline(
+    root: Any,
+    *,
+    timeline: list[dict[str, Any]],
+    plan: dict[str, Any] | None = None,
+    music_license: str | None = None,
+    seed: int = 0,
+) -> list[dict[str, Any]]:
+    """Choose one local licensed template per music cue without global-file fallback.
+
+    This is deliberately a routing receipt, not a mixer: callers can inspect all
+    selected paths and licences before rendering a multi-song bed.  A missing
+    mood template leaves that cue absent so the caller can fail closed or choose
+    its declared procedural fallback explicitly.
+    """
+    selections: list[dict[str, Any]] = []
+    for index, cue in enumerate(timeline):
+        if not isinstance(cue, dict):
+            continue
+        mood = str(cue.get("mood") or "rnb")
+        shot_id = str(cue.get("shot_id") or "")
+        motif_id = str(cue.get("motif_id") or mood)
+        take_seed = int(cue.get("seed") or 0)
+        digest = hashlib.sha256(
+            f"{int(seed)}|{index}|{shot_id}|{motif_id}|{take_seed}".encode()
+        ).digest()
+        selection_seed = int.from_bytes(digest[:8], "big") & 0x7FFFFFFF
+        resolved = resolve_music_template(
+            root,
+            mood=mood,
+            plan=plan,
+            mode="auto",
+            music_license=music_license,
+            seed=selection_seed,
+            prefer_mood_templates=True,
+        )
+        if resolved is None:
+            continue
+        selections.append(
+            {
+                **resolved,
+                "shot_id": shot_id,
+                "start_sec": cue.get("start_sec"),
+                "end_sec": cue.get("end_sec"),
+                "motif_id": motif_id,
+                "take_seed": take_seed,
+                "selection_seed": selection_seed,
+                "transition": str(cue.get("transition") or "crossfade").lower(),
+            }
+        )
+    return selections
 
 
 def normalize_sound_mood(value: object) -> str:
