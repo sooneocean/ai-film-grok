@@ -3,6 +3,19 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.7.4] — 2026-07-27
+
+### Added — creative review and guarded delivery
+
+- A local creative workshop compiles revision- and hash-bound briefs, diagnostics, shot decisions, and provider-neutral export packages without invoking paid providers.
+- Review controls require explicit human approval and preserve native character dialogue, narration, music, and effects as separate delivery evidence.
+- Final delivery resolves the reviewed artifact from its manifest path and SHA-256 instead of assuming a fixed filename.
+
+### Fixed
+
+- Post-audit is now a required, freshness-bound stage before Desktop export.
+- The pre-push release gate serializes expensive checks and rejects stale generated project documentation.
+
 ## [2.7.2] — 2026-07-27
 
 ### Fixed — release evidence and shipped-surface verification

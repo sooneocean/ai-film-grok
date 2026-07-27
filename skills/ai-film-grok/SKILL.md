@@ -31,9 +31,10 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 ## 创作工作室（按需）
 
-剧本会诊、台词节奏、平台留存、资产用途、导演提示词或后期声音设计，读取
-[creative-workshop.md](references/creative-workshop.md)。`workshop` 只编译创作决定：不改
-故事真相、供应商默认或已锁内容，也不提交外部生成；产物在 `receipts/workshop/` 并绑定输入 SHA-256。
+剧本会诊、台词节奏、留存、导演提示词或声音设计读取
+[creative-workshop.md](references/creative-workshop.md)。`workshop` 默认只编译决定；仅显式
+`apply --expected-graph-revision` 可写回未锁定故事图，绝不改供应商默认或提交外部生成。
+产物在 `receipts/workshop/` 并绑定输入 SHA-256。
 
 ## P0 核心
 

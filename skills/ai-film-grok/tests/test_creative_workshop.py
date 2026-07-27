@@ -20,6 +20,7 @@ from creative_workshop import (  # noqa: E402
     intake_workshop,
     validate_workshop,
 )
+from story_plan import project_graph_to_film_spec  # noqa: E402
 
 
 def _graph() -> dict:
@@ -226,6 +227,8 @@ def test_apply_is_revision_bound_and_projects_creative_fields_to_unlocked_shots(
     assert shot["creative"]["shot_function"] == "evidence reveal"
     assert shot["creative"]["reference_assets"][0]["label"] == "heroine reference"
     assert (tmp_path / "receipts" / "narrative" / "revision-0002.json").is_file()
+    film_spec = project_graph_to_film_spec(graph)
+    assert film_spec["scenes"][0]["shots"][0]["creative"] == shot["creative"]
     with pytest.raises(WorkshopConflict, match="expected graph revision"):
         apply_workshop(tmp_path, expected_graph_revision=1)
 

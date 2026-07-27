@@ -139,6 +139,22 @@ def test_package_hash_is_stable_and_detects_changed_source_node() -> None:
     assert "visual.wardrobe.primary" in report["changedNodeIds"]
 
 
+def test_package_tracks_workshop_creative_projection() -> None:
+    graph = _graph()
+    graph["episodes"][0]["scenes"][0]["beats"][0]["shots"][0]["creative"] = {
+        "shot_function": "evidence reveal",
+        "end_state": "ticket remains visible",
+    }
+    visual = _lock_nodes(migrate_style_bible({"characters": {"hero": {}}}))
+    audio = _lock_nodes(migrate_audio_bible({}))
+    post = _lock_nodes(migrate_post_bible({}))
+    package = compile_shot_package(
+        "shot01", graph=graph, visual_bible=visual, audio_bible=audio, post_bible=post
+    )
+    refs = {ref["nodeId"] for ref in package["departments"]["performance"]}
+    assert "creative.shot.shot01" in refs
+
+
 def test_package_detects_execution_shot_fields_and_rejects_stale_nodes() -> None:
     graph = _graph()
     visual = _lock_nodes(migrate_style_bible({"characters": {"hero": {}}}))
