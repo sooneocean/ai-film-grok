@@ -29,6 +29,12 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 展示导演摘要与假设，再 `plan run --received-file`。原文不可覆盖；story lock
 前必须用户确认。
 
+## 创作工作室（按需）
+
+剧本会诊、台词节奏、平台留存、资产用途、导演提示词或后期声音设计，读取
+[creative-workshop.md](references/creative-workshop.md)。`workshop` 只编译创作决定：不改
+故事真相、供应商默认或已锁内容，也不提交外部生成；产物在 `receipts/workshop/` 并绑定输入 SHA-256。
+
 ## P0 核心
 
 1. **故事真相**：`drama-graph.json` 是真相，`film-spec.json` 是投影。严格校验、四级 locks 与当前 projection hash 未齐不进媒体；先 Director’s Lens（[directors-lens.md](references/directors-lens.md)）。
@@ -47,16 +53,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 ## 阶段执行
 
-| 阶段 | 只读哪张卡 | 目标 |
-|---|---|---|
-| Idea/Story/Beats | [agent.md](references/stages/agent.md) | brief、Lens、Graph、locks、write-spec |
-| Shots/Media/Selects | [visual.md](references/stages/visual.md) | style/cast/state、pilot、verified media |
-| Voice | [voice.md](references/stages/voice.md) | 日文对白、中文旁白、BGM/SFX/mix |
-| Rough/Design/Post | [post.md](references/stages/post.md) | edit、HF/Remotion、字幕、post audit |
-| Verified/Deliver | [deliver.md](references/stages/deliver.md) | screening、Master gate、export read-back |
-| 人工/付费暂停 | [approval.md](references/stages/approval.md) | 说明批准对象与 hash，不代签 |
-
-`context_refs` 由 `registry/context-routing.json` 按阶段、skill 与 issue code 选择；深挖再查 [INDEX](references/INDEX.md)。
+按阶段只读对应卡：[agent](references/stages/agent.md)（故事/locks）→ [visual](references/stages/visual.md)（pilot/media）→ [voice](references/stages/voice.md)（双语声轨）→ [post](references/stages/post.md)（剪辑/字幕）→ [deliver](references/stages/deliver.md)（screening/export）；人工或付费暂停读 [approval](references/stages/approval.md)。`context_refs` 最多三份；深挖再查 [INDEX](references/INDEX.md)。
 
 ## 最小命令
 

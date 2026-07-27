@@ -757,7 +757,7 @@ def validate_film_spec(
     allow_fallback = spec.get("tts_allow_network_fallback", False)
     if not isinstance(allow_fallback, bool):
         raise FilmSpecError("film-spec tts_allow_network_fallback must be boolean")
-    native_volume = spec.get("native_audio_volume", 0.16)
+    native_volume = spec.get("native_audio_volume", 0.72)
     if not isinstance(native_volume, (int, float)) or isinstance(native_volume, bool):
         raise FilmSpecError("film-spec native_audio_volume must be a number between 0 and 1")
     if float(native_volume) < 0 or float(native_volume) > 1:

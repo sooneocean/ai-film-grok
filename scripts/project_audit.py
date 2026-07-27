@@ -273,6 +273,14 @@ def build_snapshot(
     else:
         checks["tests_fast"] = {"ok": None, "status": "not run; use --run-tests"}
 
+    # Some read-only probes update ignored local state. Capture identity only after
+    # those probes so a freshly generated baseline can be current immediately.
+    snapshot.update(
+        head=current_head(),
+        source_fingerprint=source_fingerprint(),
+        version=plugin_version(),
+        working_tree=git_value("status", "--porcelain"),
+    )
     return snapshot
 
 

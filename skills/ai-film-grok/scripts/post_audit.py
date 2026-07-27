@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from delivery_artifact import DeliveryArtifactError, resolve_final_artifact
 from director_review import open_reshoot_items
 from media_qa import analyze_media
 from security_policy import minimal_subprocess_env
@@ -78,15 +79,22 @@ def audit_freshness(root: Path, receipt: dict[str, Any] | None = None) -> dict[s
     """Compare a stored audit's bound hashes with the current film files."""
     stored = receipt or read_json(root / "receipts" / "post-audit.json") or {}
     ev = (stored.get("evidence") or {}) if isinstance(stored, dict) else {}
-    # Prefer registered film_final / hyperframes over stale out/final.mp4 alias
-    final = _first_file(
-        root,
-        "out/film_final.mp4",
-        "out/film_hyperframes.mp4",
-        "out/final.mp4",
-        "final.mp4",
-        "deliverables/final.mp4",
-    )
+    manifest = read_json(root / "manifest.json") or {}
+    final_record = (manifest.get("outputs") or {}).get("final_film")
+    if isinstance(final_record, dict) and final_record:
+        try:
+            final = resolve_final_artifact(root, manifest).path
+        except DeliveryArtifactError:
+            final = None
+    else:
+        final = _first_file(
+            root,
+            "out/film_final.mp4",
+            "out/film_hyperframes.mp4",
+            "out/final.mp4",
+            "final.mp4",
+            "deliverables/final.mp4",
+        )
     subtitle = _first_file(root, "out/final.srt", "final.srt")
     audio = _first_file(root, "audio/mix_report.json")
     timeline = _first_file(root, "timeline.json")

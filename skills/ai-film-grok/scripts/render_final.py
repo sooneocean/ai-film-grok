@@ -146,12 +146,35 @@ def build_post_enhancement_vf_chain(
     return ",".join(filters)
 
 
-# 混音：旁白永远是主角
+def resolve_native_audio_volume(
+    args: argparse.Namespace,
+    spec: dict[str, Any],
+    voice_policy: dict[str, Any] | None = None,
+) -> float:
+    """Resolve native I2V audio gain without letting a policy override the CLI."""
+    cli_value = getattr(args, "native_audio_volume", None)
+    if cli_value is not None:
+        raw_value = cli_value
+    elif (voice_policy or {}).get("native_audio_volume") is not None:
+        raw_value = (voice_policy or {})["native_audio_volume"]
+    else:
+        raw_value = spec.get("native_audio_volume", DEFAULT_NATIVE_AUDIO_VOLUME)
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise RenderError("native_audio_volume must be between 0 and 1") from exc
+    if value < 0 or value > 1:
+        raise RenderError("native_audio_volume must be between 0 and 1")
+    return value
+
+
+# 混音：I2V 原生声是主视频声；旁白出现时让原生 BGM 与配乐暂避。
 # Multi-track mix (旁白 / 娇喘语助 / 原生 clip 音 / BGM 独立增益):
 # - BGM 生成用固定健康 amp（不吃 music_volume，避免「生成压一次 + 混音再压一次」→ 音乐消失）
 # - music_volume 只在 amix 时用；sidechain 说话时让路，停顿时音乐回来
 # - vocal_color = 色气语助词/娇喘，独立 TTS 轨，不写进 nar（见 voice-tracks.md）
 DEFAULT_MUSIC_VOLUME = 0.48  # 略降 BGM，旁白更贴耳、节奏更干净
+DEFAULT_NATIVE_AUDIO_VOLUME = 0.72  # I2V 自带音乐/环境声是默认主视频声
 DEFAULT_BGM_GEN_AMP = 0.22  # 程序化 BGM 生成响度（固定，勿再乘 music_volume）
 DEFAULT_VO_GAIN = 1.32  # 旁白增益：清晰压过环境音与 BGM（星声 lesson 略抬）
 DEFAULT_VOCAL_COLOR_GAIN = 0.0  # 2026-07-21: 语助轨默认关闭；成片以 nar+BGM 主导
@@ -2006,12 +2029,6 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         or "auto"
     )
     tts_allow_network_fallback = bool(spec.get("tts_allow_network_fallback", False))
-    raw_native_volume = getattr(args, "native_audio_volume", None)
-    if raw_native_volume is None:
-        raw_native_volume = spec.get("native_audio_volume", 0.16)
-    native_audio_volume = float(raw_native_volume)
-    if native_audio_volume < 0 or native_audio_volume > 1:
-        raise RenderError("native_audio_volume must be between 0 and 1")
     raw_gain = getattr(args, "vo_gain", None)
     if raw_gain is None:
         raw_gain = spec.get("vo_gain")
@@ -2026,9 +2043,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     if voice_policy.get("nar_gain") is not None:
         with contextlib.suppress(TypeError, ValueError):
             vo_gain = float(voice_policy["nar_gain"])
-    if voice_policy.get("native_audio_volume") is not None:
-        with contextlib.suppress(TypeError, ValueError):
-            native_audio_volume = float(voice_policy["native_audio_volume"])
+    native_audio_volume = resolve_native_audio_volume(args, spec, voice_policy)
     raw_color_gain = getattr(args, "vocal_color_gain", None)
     if raw_color_gain is None:
         raw_color_gain = voice_policy.get("vocal_color_gain")
@@ -3099,13 +3114,17 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
 
     if "sidechaincompress" in filters_help and "acrossover" in filters_help:
-        fc_parts.append("[mus]acrossover=split=300 4000[mus_l][mus_m][mus_h]")
+        # Native I2V audio is the main picture sound.  Route it through the
+        # same narration sidechain as BGM, so that it returns to full level in
+        # gaps but does not bury narration or character dialogue.
+        fc_parts.append("[mus][native]amix=inputs=2:duration=longest:normalize=0[picture_bed]")
+        fc_parts.append("[picture_bed]acrossover=split=300 4000[mus_l][mus_m][mus_h]")
         fc_parts.append("[narr]asplit[narr_main][narr_sc]")
         fc_parts.append(f"[mus_m][narr_sc]{sc_frag}[mus_m_ducked]")
         fc_parts.append(
             "[mus_l][mus_m_ducked][mus_h]amix=inputs=3:duration=longest:normalize=0[mus_ducked]"
         )
-        fc_parts.append("[mus_ducked][native][sfx]amix=inputs=3:duration=longest:normalize=0[bed]")
+        fc_parts.append("[mus_ducked][sfx]amix=inputs=2:duration=longest:normalize=0[bed]")
         final_amix_count = 2 + (1 if use_color else 0)
         color_in = "[color]" if use_color else ""
         fc_parts.append(
@@ -3113,7 +3132,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
         mix_spotting["sidechain_applied"] = "dynamic_eq"
     elif "sidechaincompress" in filters_help:
-        fc_parts.append("[mus][native][sfx]amix=inputs=3:duration=longest:normalize=0[bed]")
+        fc_parts.append("[mus][native]amix=inputs=2:duration=longest:normalize=0[picture_bed]")
+        fc_parts.append("[picture_bed][sfx]amix=inputs=2:duration=longest:normalize=0[bed]")
         fc_parts.append(f"[bed][narr]{sc_frag}[ducked]")
         final_amix_count = 2 + (1 if use_color else 0)
         color_in = "[color]" if use_color else ""
@@ -3431,6 +3451,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "path": str(native_track),
             "sha256": sha256(native_track),
             "volume": native_audio_volume,
+            "role": "primary_video_sound",
+            "ducked_under_narration": "sidechaincompress" in filters_help,
             "preserved_shots": [item["id"] for item in shot_audio if item.get("native_audio")],
         },
         "audio_provenance": {
@@ -3592,7 +3614,7 @@ def main(argv: list[str] | None = None) -> int:
         "--native-audio-volume",
         type=float,
         default=None,
-        help="Mix gain for original generated clip audio (0..1; default film-spec or 0.16)",
+        help="Mix gain for original generated clip audio (0..1; default film-spec or 0.72; primary video sound)",
     )
     p.add_argument(
         "--music-mood",

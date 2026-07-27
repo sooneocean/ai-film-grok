@@ -265,6 +265,28 @@ class PipelineStageTests(unittest.TestCase):
             self.assertEqual(stage["stage"], "post")
             self.assertEqual(stage["detail"], "review-final")
 
+    def test_post_audit_precedes_export_after_final_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "brief.json").write_text("{}", encoding="utf-8")
+
+            gates = {
+                "brief": True,
+                "style_locked": True,
+                "spec": True,
+                "clips_complete": True,
+                "final_complete": True,
+                "desktop_exported": False,
+            }
+            stage = detect_pipeline_stage(root, gates=gates)
+            actions = build_next_actions(root, gates=gates)
+            ids = [action["id"] for action in actions]
+
+            self.assertEqual(stage["stage"], "post")
+            self.assertEqual(stage["detail"], "post-audit")
+            self.assertIn("post-audit", ids)
+            self.assertNotIn("export-desktop", ids)
+
     @pytest.mark.slow
     def test_actions_carry_stage_field(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

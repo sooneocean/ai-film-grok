@@ -31,7 +31,7 @@
     "enabled": false,
     "nar_gain": 1.32,
     "vocal_color_gain": 0.0,
-    "native_audio_volume": 0.14,
+    "native_audio_volume": 0.72,
     "sfx_bed_gain": 0.55,
     "auto_vocal_color": false
   }

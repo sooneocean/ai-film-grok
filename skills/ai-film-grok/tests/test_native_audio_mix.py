@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,22 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import render_final  # noqa: E402
+
+
+def test_native_i2v_audio_defaults_to_primary_picture_sound() -> None:
+    assert render_final.DEFAULT_NATIVE_AUDIO_VOLUME == 0.72
+    assert render_final.DEFAULT_NATIVE_AUDIO_VOLUME > render_final.DEFAULT_MUSIC_VOLUME
+
+
+def test_cli_native_audio_volume_overrides_voice_track_policy() -> None:
+    assert (
+        render_final.resolve_native_audio_volume(
+            Namespace(native_audio_volume=0.9),
+            {"native_audio_volume": 0.72},
+            {"native_audio_volume": 0.14},
+        )
+        == 0.9
+    )
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg required")

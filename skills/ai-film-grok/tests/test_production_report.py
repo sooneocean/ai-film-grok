@@ -115,7 +115,18 @@ def test_desktop_export_copies_production_report_artifacts(tmp_path: Path) -> No
     (root / "receipts" / "post-audit.json").write_text('{"delivery_ready":true}')
     (dirs["out"] / "production-report.html").write_text("<h1>report</h1>")
     (root / "receipts" / "production-report.json").write_text('{"kind":"production-report"}')
-    manifest = {"title": "film", "gates": {"final_complete": True}, "outputs": {}}
+    final = dirs["out"] / "custom-final.mp4"
+    final.write_bytes(b"reviewed-final")
+    manifest = {
+        "title": "film",
+        "gates": {"final_complete": True},
+        "outputs": {
+            "final_film": {
+                "path": final.name,
+                "sha256": aifilm_grok.sha256(final),
+            }
+        },
+    }
 
     def gates(_root: Path, target: dict[str, object]) -> dict[str, object]:
         target["gates"] = {"final_complete": True}
@@ -137,5 +148,6 @@ def test_desktop_export_copies_production_report_artifacts(tmp_path: Path) -> No
         )
 
     destination = desktop / "export"
+    assert (destination / "成片" / "custom-final.mp4").is_file()
     assert (destination / "成片" / "production-report.html").is_file()
     assert (destination / "项目状态" / "production-report.json").is_file()

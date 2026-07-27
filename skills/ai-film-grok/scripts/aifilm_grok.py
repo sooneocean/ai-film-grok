@@ -4197,20 +4197,13 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
         except SecurityPolicyError as exc:
             raise FilmError(str(exc)) from exc
 
-    # films: only ship clean deliverables (skip film_final_pre_*, dual intermediates)
     out_dir = dirs["out"]
-    prefer = ["film_final.mp4", "film_silent.mp4"]
-    copied_any = False
-    for name in prefer:
-        src = out_dir / name
-        if src.is_file():
-            shutil.copy2(src, dest / "成片" / name)
-            copied_any = True
-    if not copied_any:
-        for mp4 in sorted(out_dir.glob("*.mp4")):
-            if mp4.name.startswith("_") or "pre_" in mp4.name or "_work" in mp4.name:
-                continue
-            shutil.copy2(mp4, dest / "成片" / mp4.name)
+    from delivery_artifact import DeliveryArtifactError, export_final_artifacts
+
+    try:
+        export_final_artifacts(root, manifest, dest / "成片")
+    except DeliveryArtifactError as exc:
+        raise FilmError(f"Desktop export final artifact is invalid: {exc}") from exc
     for side in ("final.srt", "final-delivery.json", "production-report.html"):
         src = out_dir / side
         if src.is_file():
@@ -5106,6 +5099,31 @@ def cmd_plan(args: argparse.Namespace) -> int:
         return code
 
     raise FilmError(f"unknown plan action {action!r}")
+
+
+def cmd_workshop(args: argparse.Namespace) -> int:
+    """Creative workshop contracts stay local and never invoke a provider."""
+    from cli_workshop import WorkshopError, run_workshop
+
+    try:
+        report, code = run_workshop(args)
+    except WorkshopError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return code
+
+
+def cmd_review_ui(args: argparse.Namespace) -> int:
+    """Run the loopback-only review console without duplicating approval state."""
+    from review_ui import ReviewUIError, run_review_ui
+
+    try:
+        report, code = run_review_ui(args)
+    except (OSError, ValueError, ReviewUIError) as exc:
+        raise FilmError(str(exc)) from exc
+    if args.review_ui_action != "serve":
+        emit(report)
+    return code
 
 
 def cmd_dispatch(args: argparse.Namespace) -> int:
@@ -6089,7 +6107,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--native-audio-volume",
         type=float,
         default=None,
-        help="Mix gain for generated clip audio preserved as native stems (default from film-spec or 0.16)",
+        help="Mix gain for generated clip audio preserved as native stems (default from film-spec or 0.72; primary video sound)",
     )
     fin.add_argument(
         "--music-mood",
@@ -7087,6 +7105,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_assets_parsers(sub)
 
+    from cli_workshop import add_workshop_parsers
+
+    add_workshop_parsers(sub)
+
+    from review_ui import add_review_ui_parsers
+
+    add_review_ui_parsers(sub)
+
     return p
 
 
@@ -7157,6 +7183,8 @@ def main(argv: list[str] | None = None) -> int:
             "department": cmd_department,
             "plan": cmd_plan,
             "assets": cmd_assets,
+            "workshop": cmd_workshop,
+            "review-ui": cmd_review_ui,
             "usage": cmd_generation_usage,
             "metrics": cmd_metrics,
             "experiment": cmd_experiment,

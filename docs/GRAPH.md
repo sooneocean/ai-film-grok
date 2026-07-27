@@ -93,8 +93,10 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_continuity_chain.py`
 - `skills/ai-film-grok/tests/test_craft_spine.py`
 - `skills/ai-film-grok/tests/test_creative_quality.py`
+- `skills/ai-film-grok/tests/test_creative_workshop.py`
 - `skills/ai-film-grok/tests/test_cut_silk_bilingual.py`
 - `skills/ai-film-grok/tests/test_dailies_selects.py`
+- `skills/ai-film-grok/tests/test_delivery_artifact.py`
 - `skills/ai-film-grok/tests/test_delivery_gates.py`
 - `skills/ai-film-grok/tests/test_delivery_package.py`
 - `skills/ai-film-grok/tests/test_department_cli.py`

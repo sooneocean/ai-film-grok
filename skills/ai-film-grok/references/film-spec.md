@@ -21,7 +21,7 @@
   "frw_resolution": "720p",
   "frw_duration": "5",
   "tts_allow_network_fallback": false,
-  "native_audio_volume": 0.16,
+  "native_audio_volume": 0.72,
   "transition_sec": 0.2,
   "director_intent": {
     "logline": "雨夜出租车后座，说书人陪你靠近一位湿透的女司机。",
@@ -178,7 +178,7 @@ lint 码：`CAMERA_AXIS_FLAT` · `SOFT_SOUP` · `STYLE_SOUP` · `MOTION_MONOTONY
 - **转场**：默认 `transition_sec=0.28`；intents 按 beat 建议；**continue 缝强制 hard**（`enforce_continue_hard_joins`，fixes 写入 `_transition_continue_hard_fixes`）；styles 自动轮转。
 - `duration_sec` 必须大于 0 且不超过 60。
 - `transition_sec` 为 0–0.6；0 表示硬切。
-- `native_audio_volume` 为 0–1，默认 0.16。
+- `native_audio_volume` 为 0–1，默认 0.72。I2V 自带的背景音乐／环境音会保留为主视频声；旁白或角色对白出现时会自动闪避，避免盖住台词。显式填写本值或 `--native-audio-volume` 可覆盖。
 - `tts_backend` 只能是 `auto | external | minimax | fish | voicebox | edge`。
 - `tts_allow_network_fallback` 默认 `false`。开启后只允许 `auto` 在已选 provider 运行失败时走 **voicebox（若就绪）→ Edge**；显式 `fish | minimax | external | voicebox` 仍然闭锁报错（除非另开 `AIFILM_TTS_VOICEBOX_FALLBACK=1`）。
 

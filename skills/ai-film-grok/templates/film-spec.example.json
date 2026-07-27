@@ -22,7 +22,7 @@
   "caption_mode": "zh_en",
   "transition_fluency": "cinematic",
   "tts_allow_network_fallback": false,
-  "native_audio_volume": 0.14,
+  "native_audio_volume": 0.72,
   "vo_rate": "+0%",
   "vo_pitch": "+0Hz",
   "vo_gain": 1.32,

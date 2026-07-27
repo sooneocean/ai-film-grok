@@ -199,6 +199,67 @@ class ExportCompositionTests(unittest.TestCase):
                 export_composition(root, engine="hyperframes", force=True)
 
     @pytest.mark.slow
+    def test_show_package_honors_cli_none(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=1)
+            (root / "show-package.json").write_text(
+                json.dumps(
+                    {
+                        "id": "episode-brand",
+                        "version": "1.0.0",
+                        "opening": {"series_title": "Series"},
+                        "ending": {"cta": "Continue"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = export_composition(
+                root,
+                engine="hyperframes",
+                force=True,
+                title_sequence="none",
+                end_roll="none",
+            )
+
+            self.assertTrue(result["ok"])
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
+            self.assertNotIn('id="platform-opening"', html)
+            self.assertNotIn('id="platform-ending"', html)
+
+    @pytest.mark.slow
+    def test_show_package_honors_platform_none(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=1)
+            (root / "show-package.json").write_text(
+                json.dumps({"id": "episode-brand", "version": "1.0.0"}),
+                encoding="utf-8",
+            )
+            (root / "post-package.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "short-drama-platform-package",
+                        "package_id": "no-cards",
+                        "intro": {"mode": "none"},
+                        "outro": {"mode": "none"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = export_composition(root, engine="hyperframes", force=True)
+
+            self.assertTrue(result["ok"])
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
+            self.assertNotIn('id="platform-opening"', html)
+            self.assertNotIn('id="platform-ending"', html)
+
+    @pytest.mark.slow
     def test_refuses_overwrite_without_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"

@@ -1237,13 +1237,17 @@ def write_hyperframes(
     show_package = (
         package.get("show_package") if isinstance(package.get("show_package"), dict) else None
     )
-    if show_package:
+    title_suppressed = str(title_sequence.get("mode") or "").strip().lower() == "none"
+    end_suppressed = str(end_roll.get("mode") or "").strip().lower() == "none"
+    if show_package and not title_suppressed:
         title_seq_html = build_platform_opening_html(package, show_package, title_dur=title_show)
-        end_roll_html = build_platform_ending_html(package, show_package, end_dur=end_show)
     else:
         title_seq_html = build_title_sequence_html(
             package, title_sequence, resolved_preset, styles, title_dur=title_show
         )
+    if show_package and not end_suppressed:
+        end_roll_html = build_platform_ending_html(package, show_package, end_dur=end_show)
+    else:
         end_roll_html = build_end_roll_html(
             package, end_roll, resolved_preset, styles, credits, output_duration=total
         )

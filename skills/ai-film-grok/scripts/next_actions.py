@@ -45,6 +45,7 @@ _ACTION_STAGE: dict[str, str] = {
     "final": "post",
     "final-audio": "post",
     "review-final": "post",
+    "post-audit": "post",
     "export-desktop": "deliver",
     "done": "done",
 }
@@ -101,6 +102,18 @@ def _pilot_user_ok(root: Path) -> bool:
         return False
 
 
+def _post_audit_current(root: Path) -> bool:
+    receipt = read_json(root / "receipts" / "post-audit.json") or {}
+    if not isinstance(receipt, dict) or receipt.get("delivery_ready") is not True:
+        return False
+    try:
+        from post_audit import audit_freshness
+
+        return audit_freshness(root, receipt).get("stale") is False
+    except (ImportError, OSError, ValueError):
+        return False
+
+
 def detect_pipeline_stage(
     root: Path,
     *,
@@ -124,6 +137,7 @@ def detect_pipeline_stage(
     final_rec = _final_record(root)
     rehearse_ok = _tts_rehearse_ok(root)
     preview_ok = _preview_ok(root)
+    post_audit_current = _post_audit_current(root)
 
     blockers: list[str] = []
     stage = "agent"
@@ -149,6 +163,9 @@ def detect_pipeline_stage(
         blockers.append("clips_incomplete")
     elif final_ok and export_ok:
         stage, detail = "done", "complete"
+    elif final_ok and not post_audit_current:
+        stage, detail = "post", "post-audit"
+        blockers.append("post_audit_missing_or_stale")
     elif final_ok and not export_ok:
         stage, detail = "deliver", "export-desktop"
         blockers.append("desktop_not_exported")
@@ -220,6 +237,7 @@ def detect_pipeline_stage(
             "compose_preview": preview_ok,
             "final_film": bool(final_rec),
             "final_complete": final_ok,
+            "post_audit_current": post_audit_current,
             "desktop_exported": export_ok,
             "open_reshoot_count": int(open_reshoot_count or 0),
             "post_engine": (final_rec or {}).get("post_engine"),
@@ -447,11 +465,18 @@ def build_next_actions(
             pass
 
     if gates.get("final_complete") and not gates.get("desktop_exported"):
-        add(
-            "export-desktop",
-            f'aifilm export-desktop --root "{r}" --name "<中文名>"',
-            "正式审批完成 → 导出桌面",
-        )
+        if _post_audit_current(root):
+            add(
+                "export-desktop",
+                f'aifilm export-desktop --root "{r}" --name "<中文名>"',
+                "正式审批和 post-audit 完成 → 导出桌面",
+            )
+        else:
+            add(
+                "post-audit",
+                f'aifilm post-audit --root "{r}"',
+                "正式导出前需要当前且无 hard failure 的 post-audit",
+            )
 
     if gates.get("desktop_exported"):
         add("done", f'aifilm status --root "{r}"', "本集交付门禁已齐")

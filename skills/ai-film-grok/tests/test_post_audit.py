@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import tempfile
@@ -47,6 +48,36 @@ class PostAuditTests(unittest.TestCase):
             fresh = audit_freshness(root, first)
             self.assertTrue(fresh["stale"])
             self.assertIn("subtitles", fresh["mismatches"])
+
+    def test_custom_manifest_final_is_current_when_bound_hash_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            final = root / "out" / "custom-final.mp4"
+            final.parent.mkdir()
+            final.write_bytes(b"reviewed-final")
+            digest = hashlib.sha256(final.read_bytes()).hexdigest()
+            (root / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "outputs": {
+                            "final_film": {
+                                "path": final.name,
+                                "sha256": digest,
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            receipt = {
+                "delivery_ready": True,
+                "evidence": {"final": {"sha256": digest}},
+            }
+
+            freshness = audit_freshness(root, receipt)
+
+            self.assertFalse(freshness["stale"])
+            self.assertEqual(freshness["current"]["final"], digest)
 
     def test_burned_subtitles_plus_compose_captions_is_hard_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
