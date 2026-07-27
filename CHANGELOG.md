@@ -3,6 +3,12 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.7.10] — 2026-07-27
+
+### Added
+
+- Character and pair motifs now carry instrumental palettes across the music timeline; procedural rendering makes every exported palette audibly distinct while keeping the motif and language tracks stable.
+
 ## [2.7.9] — 2026-07-27
 
 ### Fixed
