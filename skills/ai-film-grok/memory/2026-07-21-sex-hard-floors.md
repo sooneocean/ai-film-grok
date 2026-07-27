@@ -25,6 +25,11 @@
 
 **秒数够 + 衣服卸了 + 耳朵也荤** = 才算办事剧；缺一环观众就觉得尺度小。
 
+## 2026-07-27 加码（最重要）
+
+用户明示：**成人尺度拉到最高 = 全片最优先**；肉戏须 **起承转合全弧**：**前戏 → 插入 → 射出** 都要有（连贯，不可只抱吻或跳切高潮）。  
+见 [adult-scale-max-sex-arc](../references/lessons-2026-07-27-adult-scale-max-sex-arc.md) · [memory](2026-07-27-adult-scale-max-sex-arc.md)。
+
 ## 片例
 
 - 片场：`/Users/dex/AI FILM SPACE/0721/xide-private-encore`（席德·私展加演）

@@ -1975,6 +1975,20 @@ def validate_film_spec(
             "(straddle/hips-sink/grind), not hug-only. See intercourse-impact-benchmark."
         )
 
+    # 肉戏起承转合 (前戏→插入→射出) hard on max iron
+    sex_arc_strict = spec.get("sex_arc_strict")
+    if sex_arc_strict is None:
+        sex_arc_strict = heat_scale == "max" and spec.get("adult_max_iron") is not False
+    sex_arc_fail = [c for c in (heat_rep.get("codes") or []) if str(c).startswith("SEX_ARC_")]
+    if sex_arc_strict is True and sex_arc_fail:
+        raise FilmSpecError(
+            "sex arc IRON failed (sex_arc_strict): "
+            + ",".join(sex_arc_fail)
+            + " — 前戏→插入→射出 must all exist (sex_arc_beat / heat_phase). "
+            "禁只抱吻、禁无纳入、禁无高潮射出拍。Override: sex_arc_strict:false. "
+            "See lessons-2026-07-27-adult-scale-max-sex-arc.md"
+        )
+
     size_ladder_strict = spec.get("size_ladder_strict")
     if size_ladder_strict is None:
         size_ladder_strict = str(audience_profile or "").strip().lower() in _hardcore_profiles

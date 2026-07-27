@@ -31,6 +31,9 @@
 | **资深剪辑** | Editor’s Cut 必写蒙太奇设计；craft **≥4 种**；60s insert≥2 / smash≥1 / montage 段≥1；禁顺序幻灯片（2026-07-21） |
 | **重口男向** | 用户点名重口/男向 → heat max + sex≥55% + act≥4 + climax≥2 + 荤 VO + coitus/size/montage strict（2026-07-21 / IRON 抬档） |
 | **Adult max IRON** | 肉戏≥50% · 亲密≥60% · setup≤20% · act undressed · climax bare · spice extreme · 自动卸装抬升 · **持续挑战尺度最大**（phase 只升不降、禁泄火/长平台、必 climax bare；`challenge_max_scale`）（2026-07-24） |
+| **成人尺度最高优先（P0 · 最重要 · 2026-07-27）** | 用户明示：**尺度拉满是最重要目标**。与画风/剪辑偏好冲突时 **先保 max 尺度与完整办事弧**。退出仅显式 soft / `adult_max_iron:false`。见 [adult-scale-max-sex-arc](lessons-2026-07-27-adult-scale-max-sex-arc.md) |
+| **肉戏起承转合全弧（P0 · 同日）** | 成人 max 肉戏块必须可读：**前戏（起）→ 蓄力/纳入前（承）→ 插入抽送（转）→ 高潮/射出（合）**。禁只抱吻；禁无插入；禁无射出/高潮拍。建议 `sex_arc_beat` 标注；时间四拍皆非零。见同上 lesson |
+| **插入衣裤脱尽 + 定器特写（P0 · 同日追加）** | **插入拍双方衣裤脱尽**（女 bare；男至少下装脱尽）；禁内裤/军裤冒充办事。肉戏块默认至少 **1 镜结合部/腰腹定器特写**。Imagine 若拦 true bare → 记 PARTIAL，**禁止**静默改回内衣全穿当「已插入」。见 [adult-scale-max-sex-arc](lessons-2026-07-27-adult-scale-max-sex-arc.md) |
 | **首帧结构** | **致命**（P0）：keyframe 解剖/融合 fail → 禁 I2V；I2V 后必抽 t=0；坏首帧=整段废（2026-07-21 33s 案） |
 | **景别堆叠** | 成人 60s：宽≥1·中≥2·近≥2·局部≥2；act→climax 收紧不回退全景；连续 3 镜同 size fail（2026-07-21） |
 | **性交冲击力标竿** | 用户要性交/办事冲击/尺度太小→`coitus_grammar`；act 静帧过 **Mute Frame Test**；六拍 ENTRY→HOOK；禁拥抱冒充办事；审核软化走双轨不降 heat（2026-07-21） |
@@ -79,7 +82,7 @@
 | **静帧几何·禁压缩** | **P0**（2026-07-22）：I2V 前 keyframe **≥720×1280 且 9:16 竖比**；禁横图/缩略图/缩水 jpg；`register-still`+`preflight` 硬闸；同 stem 优先全分辨率 png。见 [keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md) |
 | **先验后生·算力刀口** | **P0**（2026-07-22）：**验证通过才烧下一级**（still 先验→I2V；ref 先验→image_edit bulk）。禁止未验批量 I2V/出图；坏了只修上游。见 [verify-before-generate](lessons-2026-07-22-verify-before-generate.md) |
 | Grok Build | 推理+Imagine 优先；无原生 T2V；bulk 动默认 FRW；会话外 xai-sdk 可选非默认 |
-| 构图 | 禁 ECU/fill frame/push-in on face 裁头；full head + headroom |
+| 构图 | 禁裁头（P0·2026-07-27 强化）：主戏镜 full head+headroom；**裁脚优先于裁头**；定器特写=「脸+结合同镜」或短 insert，禁无头主镜；打包慎用 increase+crop 切顶。见 [headroom-no-crop-heads](lessons-2026-07-27-headroom-no-crop-heads.md) |
 | 库存 | film-spec 镜数 = approved clips |
 | 同源 | 禁止半 Grok 半 FRW still/2V |
 | 漫剧 | 禁默认 photoreal bible；改 medium+signature 再 lock-style |

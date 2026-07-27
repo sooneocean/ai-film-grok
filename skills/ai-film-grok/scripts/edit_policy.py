@@ -4069,6 +4069,291 @@ def lint_coitus_grammar(
     }
 
 
+# --- Sex arc 起承转合 (P0 · 2026-07-27 adult-scale-max-sex-arc) ---
+# Product four-beat: foreplay(起) → entry(承) → penetration(转) → climax_release(合)
+SEX_ARC_BEATS = frozenset({"foreplay", "entry", "penetration", "climax_release", "afterglow"})
+SEX_ARC_REQUIRED = ("foreplay", "penetration", "climax_release")
+_SEX_ARC_PENETRATION_MARKERS: tuple[str, ...] = (
+    "hips-sink",
+    "hip-sink",
+    "grind",
+    "thrust",
+    "straddle",
+    "mount",
+    "pelvis",
+    "union",
+    "penetration",
+    "insert",
+    "沉腰",
+    "顶弄",
+    "顶撞",
+    "抽送",
+    "纳入",
+    "插入",
+    "办穿",
+    "吃进",
+    "跨坐",
+    "结合",
+)
+_SEX_ARC_RELEASE_MARKERS: tuple[str, ...] = (
+    "climax",
+    "finish",
+    "arch-finish",
+    "release",
+    "ejaculat",
+    "cum",
+    "orgasm",
+    "高潮",
+    "射出",
+    "失声",
+    "痉挛",
+    "办穿",
+    "residual",
+    "tremor",
+)
+_SEX_ARC_FOREPLAY_MARKERS: tuple[str, ...] = (
+    "undress",
+    "strip",
+    "kiss",
+    "caress",
+    "foreplay",
+    "肩带",
+    "解衣",
+    "脱",
+    "贴身",
+    "摩擦",
+    "亲吻",
+    "前戏",
+    "卸甲",
+)
+
+
+def resolve_sex_arc_beat(shot: dict[str, Any]) -> str | None:
+    """Map shot → sex_arc_beat (explicit field, coitus_beat, or phase/markers)."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    raw = (
+        shot.get("sex_arc_beat")
+        or dsl.get("sex_arc_beat")
+        or shot.get("sex_arc_role")
+        or dsl.get("sex_arc_role")
+    )
+    if raw:
+        s = str(raw).strip().lower()
+        # role aliases
+        role_map = {
+            "setup": "foreplay",
+            "build": "entry",
+            "turn": "penetration",
+            "resolve": "climax_release",
+        }
+        if s in SEX_ARC_BEATS:
+            return s
+        if s in role_map:
+            return role_map[s]
+    # coitus six-beat → four-beat
+    cb = resolve_coitus_beat(shot)
+    if cb in {"undress"}:
+        return "foreplay"
+    if cb in {"entry", "hook"}:
+        return "entry" if cb == "entry" else "afterglow"
+    if cb in {"union", "rhythm", "lock"}:
+        return "penetration"
+    if cb == "finish":
+        return "climax_release"
+    ph = infer_heat_phase(shot)
+    blob = _shot_visual_pose_blob(shot)
+    if ph == "foreplay" or any(m in blob for m in _SEX_ARC_FOREPLAY_MARKERS):
+        if ph in SEX_PHASES and any(m in blob for m in _SEX_ARC_PENETRATION_MARKERS):
+            return "penetration"
+        if ph == "foreplay" or (
+            ph == "setup" and any(m in blob for m in _SEX_ARC_FOREPLAY_MARKERS)
+        ):
+            return "foreplay"
+    if ph == "climax" or any(m in blob for m in _SEX_ARC_RELEASE_MARKERS):
+        if ph == "climax" or any(
+            m in blob for m in ("高潮", "射出", "arch-finish", "finish", "climax", "ejaculat")
+        ):
+            return "climax_release"
+    if ph in SEX_PHASES:
+        if any(m in blob for m in _SEX_ARC_PENETRATION_MARKERS):
+            return "penetration"
+        if any(m in blob for m in _SEX_ARC_RELEASE_MARKERS):
+            return "climax_release"
+        # bare act without verbs still counts as penetration attempt if undressed/bare
+        st = resolve_wardrobe_state(shot)
+        if st in {"undressed", "bare"} and ph == "act":
+            return "penetration"
+    if ph == "afterglow":
+        return "afterglow"
+    if ph == "foreplay":
+        return "foreplay"
+    return None
+
+
+def lint_sex_arc(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+) -> dict[str, Any]:
+    """Adult max 起承转合: 前戏 → 插入 → 射出 must all exist (P0 · 2026-07-27).
+
+    Codes: SEX_ARC_FOREPLAY_MISSING · SEX_ARC_PENETRATION_MISSING ·
+    SEX_ARC_CLIMAX_RELEASE_MISSING · SEX_ARC_HUG_AS_SEX · SEX_ARC_ORDER_BROKEN
+    """
+    scale = (heat_scale or "").strip().lower() or None
+    issues: list[dict[str, Any]] = []
+    codes: list[str] = []
+
+    def _issue(code: str, severity: str, message: str) -> None:
+        codes.append(code)
+        issues.append({"code": code, "severity": severity, "message": message})
+
+    if scale != "max":
+        return {
+            "ok": True,
+            "enabled": False,
+            "codes": [],
+            "issues": [],
+            "beats_present": {},
+            "note": "sex arc lint skipped (not heat_scale=max)",
+        }
+
+    # Eligible when film has intimacy core
+    phases = [infer_heat_phase(sh) for sh in shots if isinstance(sh, dict)]
+    if not any(p in SEX_PHASES or p == "foreplay" for p in phases):
+        return {
+            "ok": True,
+            "enabled": True,
+            "codes": [],
+            "issues": [],
+            "beats_present": {},
+            "note": "sex arc skipped (no foreplay/act/climax)",
+        }
+
+    beats_present: dict[str, list[str]] = {b: [] for b in SEX_ARC_BEATS}
+    order: list[tuple[int, str, str]] = []  # index, beat, id
+    hug_only: list[str] = []
+    for i, shot in enumerate(shots):
+        if not isinstance(shot, dict):
+            continue
+        sid = str(shot.get("id") or f"idx{i}")
+        beat = resolve_sex_arc_beat(shot)
+        if beat:
+            beats_present.setdefault(beat, []).append(sid)
+            order.append((i, beat, sid))
+        ph = infer_heat_phase(shot)
+        if ph in SEX_PHASES and shot_coitus_pseudo_only(shot):
+            hug_only.append(sid)
+
+    has_foreplay = bool(beats_present.get("foreplay")) or any(
+        infer_heat_phase(sh) == "foreplay" for sh in shots if isinstance(sh, dict)
+    )
+    # entry counts as soft 承; penetration must be explicit
+    has_penetration = bool(beats_present.get("penetration"))
+    if not has_penetration:
+        # act phase with readable coitus counts
+        for sh in shots:
+            if not isinstance(sh, dict):
+                continue
+            if infer_heat_phase(sh) == "act" and shot_coitus_readable(sh):
+                has_penetration = True
+                beats_present.setdefault("penetration", []).append(str(sh.get("id") or "?"))
+                break
+    has_release = bool(beats_present.get("climax_release")) or any(
+        infer_heat_phase(sh) == "climax" for sh in shots if isinstance(sh, dict)
+    )
+    # climax phase alone is not enough if no release markers and all hug-pseudo
+    if has_release and not beats_present.get("climax_release"):
+        climax_shots = [
+            sh for sh in shots if isinstance(sh, dict) and infer_heat_phase(sh) == "climax"
+        ]
+        if climax_shots and all(shot_coitus_pseudo_only(sh) for sh in climax_shots):
+            has_release = False
+        else:
+            for sh in climax_shots:
+                beats_present.setdefault("climax_release", []).append(str(sh.get("id") or "?"))
+
+    if not has_foreplay:
+        _issue(
+            "SEX_ARC_FOREPLAY_MISSING",
+            "warning",
+            "sex arc 起 missing: no foreplay beat — add heat_phase=foreplay or "
+            "sex_arc_beat=foreplay / undress contact before penetration. "
+            "See lessons-2026-07-27-adult-scale-max-sex-arc.md",
+        )
+    if not has_penetration:
+        _issue(
+            "SEX_ARC_PENETRATION_MISSING",
+            "warning",
+            "sex arc 转 missing: no penetration/insert beat — act must show "
+            "纳入/抽送 (hips-sink/thrust/straddle/union), not hug-only. "
+            "set sex_arc_beat=penetration or coitus_beat=union|rhythm.",
+        )
+    if not has_release:
+        _issue(
+            "SEX_ARC_CLIMAX_RELEASE_MISSING",
+            "warning",
+            "sex arc 合 missing: no climax_release / 射出高潮 beat — climax must "
+            "read as peak release (arch-finish/高潮/射出). set heat_phase=climax "
+            "and sex_arc_beat=climax_release.",
+        )
+    if hug_only and not has_penetration:
+        _issue(
+            "SEX_ARC_HUG_AS_SEX",
+            "warning",
+            f"act/climax uses hug/kiss-only language: {','.join(hug_only[:8])} — "
+            "not coitus; rewrite with penetration verbs.",
+        )
+
+    # Order: first foreplay index should be before first penetration before first release
+    def _first(beat: str) -> int | None:
+        for i, b, _sid in order:
+            if b == beat:
+                return i
+        # phase fallback indices
+        for i, sh in enumerate(shots):
+            if not isinstance(sh, dict):
+                continue
+            if beat == "foreplay" and infer_heat_phase(sh) == "foreplay":
+                return i
+            if beat == "penetration" and infer_heat_phase(sh) == "act" and shot_coitus_readable(sh):
+                return i
+            if beat == "climax_release" and infer_heat_phase(sh) == "climax":
+                return i
+        return None
+
+    i_fp, i_pen, i_rel = _first("foreplay"), _first("penetration"), _first("climax_release")
+    if (
+        i_fp is not None
+        and i_pen is not None
+        and i_rel is not None
+        and not (i_fp <= i_pen <= i_rel)
+    ):
+        _issue(
+            "SEX_ARC_ORDER_BROKEN",
+            "warning",
+            f"sex arc order broken (foreplay@{i_fp}, penetration@{i_pen}, "
+            f"release@{i_rel}) — 起→转→合 must progress in time order.",
+        )
+
+    warn_n = sum(1 for i in issues if i.get("severity") == "warning")
+    return {
+        "ok": warn_n == 0,
+        "enabled": True,
+        "codes": sorted(set(codes)),
+        "issues": issues,
+        "beats_present": {k: v for k, v in beats_present.items() if v},
+        "required": list(SEX_ARC_REQUIRED),
+        "has_foreplay": has_foreplay,
+        "has_penetration": has_penetration,
+        "has_climax_release": has_release,
+        "note": (
+            "sex arc IRON: 前戏→插入→射出 (lessons-2026-07-27-adult-scale-max-sex-arc); "
+            "write-spec hard via sex_arc_strict default true on max"
+        ),
+    }
+
+
 def _shot_size_rank(shot: dict[str, Any]) -> int | None:
     """Map shot_size text → L0–L4 rank (higher = tighter)."""
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
@@ -4680,6 +4965,10 @@ def lint_heat_arc(
         coitus_grammar=coitus_grammar,
     )
     _merge_sub_issues(coitus_rep, issues, codes)
+
+    # 起承转合 full arc (foreplay → penetration → climax_release)
+    sex_arc_rep = lint_sex_arc(shots, heat_scale=scale)
+    _merge_sub_issues(sex_arc_rep, issues, codes)
 
     size_rep = lint_size_ladder(
         shots,

@@ -16,6 +16,7 @@ from edit_policy import (  # noqa: E402
     HARDCORE_SEX_DURATION_TARGET,
     apply_wardrobe_continuity,
     lint_heat_arc,
+    lint_sex_arc,
     lint_sex_wardrobe,
     normalize_spice_level,
 )
@@ -199,6 +200,66 @@ class AdultMaxIronContinuousChallenge(unittest.TestCase):
         self.assertIn("HEAT_ESCALATION_NO_PEAK", rep.get("codes", []))
 
 
+class AdultMaxIronSexArc(unittest.TestCase):
+    def test_missing_penetration_flags(self) -> None:
+        shots = [
+            {"id": "f1", "heat_phase": "foreplay", "duration_sec": 6, "dsl": {"action": "kiss caress"}},
+            {
+                "id": "a1",
+                "heat_phase": "act",
+                "duration_sec": 10,
+                "dsl": {"action": "embrace hug lean soft"},
+            },
+            {
+                "id": "c1",
+                "heat_phase": "climax",
+                "duration_sec": 8,
+                "dsl": {"action": "arch-finish residual tremor 高潮"},
+            },
+        ]
+        rep = lint_sex_arc(shots, heat_scale="max")
+        self.assertIn("SEX_ARC_PENETRATION_MISSING", rep.get("codes", []))
+
+    def test_full_arc_ok(self) -> None:
+        shots = [
+            {
+                "id": "f1",
+                "heat_phase": "foreplay",
+                "duration_sec": 6,
+                "dsl": {"action": "strips undress shoulder"},
+            },
+            {
+                "id": "a1",
+                "heat_phase": "act",
+                "duration_sec": 10,
+                "dsl": {"action": "straddle hips-sink thrust 沉腰"},
+            },
+            {
+                "id": "c1",
+                "heat_phase": "climax",
+                "duration_sec": 8,
+                "dsl": {"action": "arch-finish 高潮 射出"},
+            },
+        ]
+        rep = lint_sex_arc(shots, heat_scale="max")
+        self.assertTrue(rep.get("ok"), rep)
+        self.assertTrue(rep.get("has_foreplay"))
+        self.assertTrue(rep.get("has_penetration"))
+        self.assertTrue(rep.get("has_climax_release"))
+
+    def test_merged_into_heat_arc(self) -> None:
+        shots = [
+            {"id": "s1", "heat_phase": "setup", "duration_sec": 6},
+            {"id": "a1", "heat_phase": "act", "duration_sec": 12, "dsl": {"action": "hug only"}},
+        ]
+        rep = lint_heat_arc(shots, heat_scale="max")
+        codes = rep.get("codes") or []
+        self.assertTrue(
+            any(str(c).startswith("SEX_ARC_") for c in codes),
+            codes,
+        )
+
+
 class AdultMaxIronStillSource(unittest.TestCase):
     """still_source_strict is wired into validate_film_spec (shipped path)."""
 
@@ -265,6 +326,7 @@ class AdultMaxIronStillSource(unittest.TestCase):
             "sex_floor_strict": False,
             "sex_vo_strict": False,
             "heat_arc_strict": False,
+            "sex_arc_strict": False,
             "sex_wardrobe_strict": True,
             "still_source_strict": True,
             "director_intent": {
@@ -300,6 +362,7 @@ class AdultMaxIronStillSource(unittest.TestCase):
             "sex_floor_strict": False,
             "sex_vo_strict": False,
             "heat_arc_strict": False,
+            "sex_arc_strict": False,
             "sex_wardrobe_strict": True,
             "still_source_strict": True,
             "director_intent": {

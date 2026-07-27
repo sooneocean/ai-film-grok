@@ -46,7 +46,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 6. **审批/用量**：pilot 必须用户批准；付费/外部动作绑定 hash、预算并探测。生成写 `receipts/generation-usage.json`，缺真实 cost 为 `unknown`；Imagine 后执行 `usage record`。`advance` 遇 human/paid/external 暂停。
 7. **供应商**：I2V 默认 `grok_primary`；Seedance 仅恢复路径，`frw_video_model=seedance-2-fast-i2v` 不得静默启用。
 8. **声音（P0 分轨）**：口白/说书中文 Edge；角色开口日文 Edge；字幕中文 `nar`。禁止无 `speaker` 的中日乒乓、说书镜填 `nar_ja` 或赶片清空日文轨。亲密 BGM 默认 rnb；外部 TTS/lipsync 不静默开启。详见 [voice lesson](references/lessons-2026-07-24-ep2-voice-heat-final.md)。
-9. **Adult max IRON（P0）**：肉戏 act+climax ≥50%、亲密 ≥60%、setup ≤20%；act≥undressed、climax=bare、`spice=extreme`，phase 只升不降。`challenge_max_scale` 默认 true，禁静默降 `heat_scale`；显式 `soft` 或 `adult_max_iron:false` 才可退出。详见 [hard-defaults](references/hard-defaults.md)。
+9. **成人尺度 MAX（P0 · 最重要 · 2026-07-27）**：成人片 **尺度拉到最高是第一优先**（压过装饰性优化）。IRON：act+climax ≥50%、亲密 ≥60%、setup ≤20%；act≥undressed、climax=bare、`spice=extreme`，phase 只升不降；`challenge_max_scale` 默认 true，禁静默降 `heat_scale`。**肉戏须连贯起承转合：前戏 → 插入 → 射出 全有**（禁只抱吻/跳切无纳入/无高潮射出拍）。详见 [adult-scale-max-sex-arc](references/lessons-2026-07-27-adult-scale-max-sex-arc.md) · [hard-defaults](references/hard-defaults.md) · [adult-max-iron](references/lessons-2026-07-24-adult-max-iron.md)。
 10. **字幕像素门**：交付 MP4 必须看得到中文字幕；SRT 不等于烧字。HF 失字时显式 stage_caption recovery，禁止清空 `final.srt`。`sub_lead=0` 防 SRT 重叠；长片直调 `render_final.py`。
 11. **后期单一责任**：title/subtitle/end card 只由一个 post engine 负责；`plate-cards blank`、plate `subs=off` 防双烧。
 12. **完成定义**：`final` 技术成功不等于 `final_complete`；review receipt、post audit、字幕 attestation、review-final、重拍关闭与 export 回读必须齐全。

@@ -76,6 +76,7 @@
 | [audio-fallback.md](audio-fallback.md) | 音频三阶梯 TTS/BGM/Lipsync |
 | [loudnorm-policy.md](loudnorm-policy.md) | 响度标准 LUFS -16±2（单一真相） |
 | [audio-recipe.md](audio-recipe.md) | 场景自适应声轨配方 |
+| [scene-sound-standard.md](scene-sound-standard.md) | **P0** 每次运行场景声音检查、环境音/拟音契约与交付门 |
 | [bgm-generation.md](bgm-generation.md) | BGM 生成与抗疲劳 |
 | [voice-tracks.md](voice-tracks.md) | 多轨声线（娇喘轨 opt-in） |
 | [voices.md](voices.md) | 旁白与声线一致性 |
@@ -129,6 +130,8 @@
 |---|---|
 | **[ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md)** | **P0**：口白中文 / 角色日文 / 禁中日乒乓；final SRT·timeout·register；肉戏 2× 动态路径（ep2 全量复盘） |
 | **[high-motion-style-lock-final](lessons-2026-07-27-high-motion-style-lock-final.md)** | **P0**：高动态常态（平常≥18 肉戏≥20）；MEDIUM LOCK cel；gate 才桌面；禁弱 raw/半写实漂移（ep3 案） |
+| **[adult-scale-max-sex-arc](lessons-2026-07-27-adult-scale-max-sex-arc.md)** | **P0 最重要**：成人尺度拉满优先；肉戏起承转合 **前戏→插入→射出** 全有 |
+| **[headroom-no-crop-heads](lessons-2026-07-27-headroom-no-crop-heads.md)** | **P0 禁裁头**：主戏 full head；定器同镜双锁或短 insert；裁脚>裁头；打包防切顶 |
 | [director-methodology-activation](lessons-2026-07-24-director-methodology-activation.md) | 导演方法论激活（若存在） |
 
 ### 2026-07-23

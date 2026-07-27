@@ -2251,6 +2251,42 @@ def cmd_register_still(args: argparse.Namespace) -> int:
                 "Approved stills require --review-note "
                 "(e.g. 'id-ok face/hair/outfit; medium matches style-v1')"
             )
+        # 卸装不回穿 still 源：undressed/bare 禁 sole-ref 全装 cast master
+        heat_scale = str(spec.get("heat_scale") or "").strip().lower()
+        if heat_scale == "max" and spec.get("adult_max_iron") is not False:
+            wardrobe_state = None
+            for sc in spec.get("scenes") or []:
+                if not isinstance(sc, dict):
+                    continue
+                for sh in sc.get("shots") or []:
+                    if isinstance(sh, dict) and str(sh.get("id") or "") == str(args.shot_id):
+                        wardrobe_state = sh.get("wardrobe_state") or (
+                            (sh.get("dsl") or {}).get("wardrobe_state")
+                            if isinstance(sh.get("dsl"), dict)
+                            else None
+                        )
+                        break
+            if wardrobe_state in {"partial", "undressed", "bare"}:
+                from i2v_motion_gate import lint_still_source_policy
+
+                still_src = str(getattr(args, "still_source", None) or source.name or source)
+                still_rep = lint_still_source_policy(
+                    [
+                        {
+                            "id": str(args.shot_id),
+                            "wardrobe_state": wardrobe_state,
+                            "still_source": still_src,
+                            "still_tags": [review_note],
+                        }
+                    ]
+                )
+                if not still_rep.get("ok"):
+                    raise FilmError(
+                        "approved still re-dress risk (wardrobe undressed/bare + full cast source): "
+                        + ",".join(still_rep.get("codes") or [])
+                        + " — use undress-anchor / prior undressed still; "
+                        "禁 image_edit(全装 cast) 当 peak still 源。"
+                    )
     quality = evaluate_keyframe(
         root,
         shot_id=str(args.shot_id),
