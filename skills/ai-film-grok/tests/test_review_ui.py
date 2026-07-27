@@ -9,7 +9,10 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from review_ui import make_handler  # noqa: E402
+from review_ui import (
+    _PAGE,  # noqa: E402
+    make_handler,  # noqa: E402
+)
 
 
 def _server(root: Path):
@@ -89,3 +92,13 @@ def test_media_range_and_workspace_escape_are_handled(tmp_path: Path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_page_exposes_media_preview_and_budget_controls() -> None:
+    assert "<video" in _PAGE
+    assert "saveSettings" in _PAGE
+    assert "budget_envelopes" in _PAGE
+    assert "onclick=" not in _PAGE
+    assert "data-review-action" in _PAGE
+    assert "renderedStages.has(stage)" in _PAGE
+    assert "reviewActions.has(action)" in _PAGE

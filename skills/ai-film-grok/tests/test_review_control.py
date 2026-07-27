@@ -118,3 +118,11 @@ def test_unbound_or_unsealed_approval_is_never_presented_as_approved(tmp_path: P
         source / "receipts" / "approval-ledger.json", target / "receipts" / "approval-ledger.json"
     )
     assert review_queue(target)["items"][0]["state"] == "stale"
+
+
+def test_queue_rejects_unsafe_manifest_shot_ids(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    (root / "manifest.json").write_text(
+        json.dumps({"clips": {"');globalThis.pwned=1;//": {}}}), encoding="utf-8"
+    )
+    assert not any(item["id"].startswith("shot:") for item in review_queue(root)["items"])

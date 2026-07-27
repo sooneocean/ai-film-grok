@@ -185,6 +185,40 @@ class ExportCompositionTests(unittest.TestCase):
             self.assertIn("skill_load", pkg.get("post_policy") or {})
 
     @pytest.mark.slow
+    def test_remotion_uses_platform_safe_area_and_frame_animations(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=1)
+            (root / "post-package.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "package_id": "safe-area-remotion",
+                        "safe_area": {"top_pct": 10, "bottom_pct": 20},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            export_composition(root, engine="remotion", force=True)
+
+            data = json.loads(
+                (root / "compose" / "remotion" / "public" / "composition-data.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(data["remotion"]["captionBottomPx"], 256)
+            film_tsx = (root / "compose" / "remotion" / "src" / "Film.tsx").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("CaptionCard", film_tsx)
+            self.assertIn("useCurrentFrame", film_tsx)
+            self.assertIn("Easing.bezier", film_tsx)
+            self.assertIn("paddingBottom: captionBottomPx", film_tsx)
+            self.assertNotIn('paddingBottom: "8%"', film_tsx)
+
+    @pytest.mark.slow
     def test_requires_approved_clips(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -588,6 +622,10 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
             self.assertIn('data-show-package="vertical-drama.v1"', html)
             self.assertIn("午夜祕密", html)
             self.assertIn("下一集，敬请期待", html)
+            self.assertIn(".platform-opening-card", html)
+            self.assertIn(".platform-ending-card", html)
+            self.assertIn('tl.from(".platform-opening-card"', html)
+            self.assertIn('tl.from(".platform-ending-card"', html)
             self.assertEqual(manifest["show_package"]["id"], "vertical-drama.v1")
 
     @pytest.mark.slow

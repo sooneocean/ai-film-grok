@@ -48,6 +48,7 @@ VALID_ISSUES = frozenset(
     }
 )
 _STAGE_RE = re.compile(r"^(?:story|design|budget|pilot|audio|preview|final|shot:[A-Za-z0-9_.-]+)$")
+_SHOT_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 class ReviewControlError(ValueError):
@@ -148,7 +149,11 @@ def _shot_items(root: Path) -> list[tuple[str, str, tuple[str, ...]]]:
     manifest = read_json(root / "manifest.json") or {}
     clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
     stills = manifest.get("stills") if isinstance(manifest.get("stills"), dict) else {}
-    ids = sorted({str(key) for key in clips} | {str(key) for key in stills})
+    ids = sorted(
+        shot_id
+        for shot_id in ({str(key) for key in clips} | {str(key) for key in stills})
+        if _SHOT_ID_RE.fullmatch(shot_id)
+    )
     items: list[tuple[str, str, tuple[str, ...]]] = []
     for shot_id in ids:
         candidates = ["manifest.json", f"receipts/reviews/{shot_id}.json"]

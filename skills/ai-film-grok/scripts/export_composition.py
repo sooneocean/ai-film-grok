@@ -1254,6 +1254,13 @@ def write_hyperframes(
 
     title_disabled = bool(show_package) or bool(package.get("_platform_title_disabled"))
     end_disabled = bool(show_package) or bool(package.get("_platform_end_disabled"))
+    ending_config = (
+        show_package.get("ending")
+        if isinstance(show_package, dict) and isinstance(show_package.get("ending"), dict)
+        else {}
+    )
+    platform_ending_duration = float(ending_config.get("duration_sec") or end_show)
+    platform_ending_start = max(0.0, total - platform_ending_duration)
     if title_seq_html:
         overlay_parts.append(title_seq_html)
     elif not title_disabled:
@@ -1416,6 +1423,55 @@ def write_hyperframes(
         opacity: 0.88;
         letter-spacing: 0.02em;
       }}
+      .platform-opening, .platform-ending {{
+        background:
+          radial-gradient(circle at 20% 18%, color-mix(in srgb, var(--platform-accent, #f5c2d5) 30%, transparent), transparent 36%),
+          linear-gradient(145deg, rgba(5, 8, 18, 0.96), rgba(17, 10, 24, 0.90));
+      }}
+      .platform-opening-card, .platform-ending-card {{
+        box-sizing: border-box;
+        width: min(84%, 620px);
+        padding: 9% 7%;
+        border: 1px solid color-mix(in srgb, var(--platform-accent, #f5c2d5) 68%, white);
+        border-radius: 28px;
+        background: rgba(8, 10, 20, 0.42);
+        box-shadow: 0 22px 70px rgba(0, 0, 0, 0.48);
+        text-align: center;
+      }}
+      .platform-brand {{
+        margin: 0 0 0.8em;
+        color: var(--platform-accent, #f5c2d5);
+        font-size: {max(15, int(width) // 32)}px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+      }}
+      .platform-opening-card h1 {{
+        margin: 0;
+        font-size: {max(36, int(width) // 11)}px;
+        line-height: 1.12;
+        letter-spacing: 0.04em;
+        text-shadow: 0 3px 20px rgba(0, 0, 0, 0.72);
+      }}
+      .platform-opening-card > p:last-child {{
+        margin: 1.0em 0 0;
+        font-size: {max(17, int(width) // 25)}px;
+        opacity: 0.82;
+      }}
+      .platform-ending-card {{
+        --platform-accent: {html.escape(str((show_package.get("brand") or {}).get("accent") or "#f5c2d5")) if isinstance(show_package, dict) else "#f5c2d5"};
+      }}
+      .platform-ending-card p {{
+        margin: 0;
+        font-size: {max(20, int(width) // 21)}px;
+        font-weight: 650;
+        line-height: 1.35;
+      }}
+      .platform-ending-card p + p {{
+        margin-top: 0.8em;
+        color: var(--platform-accent, #f5c2d5);
+        font-size: {max(16, int(width) // 28)}px;
+        font-weight: 600;
+      }}
       .title-sequence {{
         background: transparent;
       }}
@@ -1564,6 +1620,9 @@ def write_hyperframes(
       tl.from(".ts-subtitle", {{ y: 20, opacity: 0, duration: 0.55, ease: "power2.out" }}, 0.35);
       tl.from(".ts-tagline", {{ y: 14, opacity: 0, duration: 0.45, ease: "power2.out" }}, 0.55);
       tl.from(".motif-tag", {{ scale: 0.6, opacity: 0, duration: 0.38, stagger: 0.06, ease: "back.out(1.4)" }}, 0.70);
+      tl.from(".platform-opening-card", {{ scale: 0.92, y: 28, opacity: 0, duration: 0.62, ease: "power3.out" }}, 0.10);
+      tl.from(".platform-brand", {{ y: 12, opacity: 0, duration: 0.36, ease: "power2.out" }}, 0.28);
+      tl.from(".platform-ending-card", {{ scale: 0.94, y: 20, opacity: 0, duration: 0.52, ease: "power3.out" }}, {platform_ending_start + 0.08:.3f});
       tl.from("#end-text", {{ y: 24, opacity: 0, duration: 0.45, ease: "power2.out" }}, {end_start + 0.1:.3f});
       tl.from(".er-section", {{ y: 30, opacity: 0, duration: 0.50, stagger: 0.12, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.05:.3f});
       tl.from(".er-line", {{ x: -12, opacity: 0, duration: 0.35, stagger: 0.04, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.20:.3f});
@@ -1759,7 +1818,11 @@ def write_remotion(compose_root: Path, package: dict[str, Any], film_root: Path)
             continue
         t0 = max(0.0, float(cue.get("start") or 0.0) - caption_clock_offset)
         t1 = max(t0 + 0.2, float(cue.get("end") or 0.0) - caption_clock_offset)
-        shifted.append({"start": t0, "end": t1, "text": cue.get("text") or ""})
+        # A final SRT can carry a trailing cue beyond a packed multiclip timeline.
+        # Do not let Remotion render a caption outside its registered composition.
+        if t0 >= total:
+            continue
+        shifted.append({"start": t0, "end": min(t1, total), "text": cue.get("text") or ""})
     captions = remotion_captions(shifted)
     write_json(public_dir / "captions.json", captions)
 
@@ -1772,6 +1835,15 @@ def write_remotion(compose_root: Path, package: dict[str, Any], film_root: Path)
         cap_bg = "rgba(0,0,0,0.55)"
         cap_border = "1px solid rgba(255,255,255,0.12)"
         overlay_bg = "linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.55))"
+    platform_package = (
+        package.get("platform_package") if isinstance(package.get("platform_package"), dict) else {}
+    )
+    safe_area = (
+        platform_package.get("safe_area")
+        if isinstance(platform_package.get("safe_area"), dict)
+        else {}
+    )
+    caption_bottom_px = int(height * float(safe_area.get("bottom_pct") or 16.0) / 100)
 
     remotion_meta = {
         "fps": fps,
@@ -1788,6 +1860,7 @@ def write_remotion(compose_root: Path, package: dict[str, Any], film_root: Path)
         "mediaCopyPlan": copy_plan,
         "compositionId": "Film",
         "captionStyle": {"background": cap_bg, "border": cap_border},
+        "captionBottomPx": caption_bottom_px,
         "overlayBackground": overlay_bg,
     }
     write_json(
@@ -1880,7 +1953,7 @@ Config.setOverwriteOutput(true);
   * This file only adds title/end cards + captions — not a motion source.
   */
  import React from "react";
- import {{ AbsoluteFill, OffthreadVideo, Sequence, staticFile, useVideoConfig }} from "remotion";
+ import {{ AbsoluteFill, Easing, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig }} from "remotion";
  import type {{ Caption }} from "@remotion/captions";
  import compositionData from "../public/composition-data.json";
  import captions from "../public/captions.json";
@@ -1907,10 +1980,52 @@ Config.setOverwriteOutput(true);
  const captionList = captions as Caption[];
  const captionBg = {json.dumps(cap_bg)};
  const captionBorder = {json.dumps(cap_border)};
+ const captionBottomPx = {caption_bottom_px};
  const overlayBg = {json.dumps(overlay_bg)};
+
+ const CaptionCard: React.FC<{{ text: string }}> = ({{ text }}) => {{
+   const frame = useCurrentFrame();
+   return (
+     <AbsoluteFill
+       style={{{{
+         justifyContent: "flex-end",
+         alignItems: "center",
+         paddingBottom: captionBottomPx,
+         pointerEvents: "none",
+       }}}}
+     >
+       <div
+         style={{{{
+           maxWidth: "92%",
+           padding: "0.45em 0.85em",
+           borderRadius: 12,
+           background: captionBg,
+           border: captionBorder,
+           color: "white",
+           fontSize: Math.max(22, width / 22),
+           fontWeight: 600,
+           textAlign: "center",
+           whiteSpace: "pre-line",
+           lineHeight: 1.35,
+           opacity: interpolate(frame, [0, 4, 8], [0, 0.88, 1], {{
+             extrapolateRight: "clamp",
+             easing: Easing.bezier(0.16, 1, 0.3, 1),
+           }}),
+           translate: `0 ${{interpolate(frame, [0, 8], [18, 0], {{
+             extrapolateRight: "clamp",
+             easing: Easing.bezier(0.16, 1, 0.3, 1),
+           }})}}px`,
+         }}}}
+       >
+         {{text.trim()}}
+       </div>
+     </AbsoluteFill>
+   );
+ }};
 
  export const Film: React.FC = () => {{
    const {{ fps, width, height }} = useVideoConfig();
+   const frame = useCurrentFrame();
    const titleFrames = Math.max(1, Math.round({title_dur} * fps));
    const endFrames = Math.max(1, Math.round({end_dur} * fps));
    const total = {duration_in_frames};
@@ -1937,6 +2052,8 @@ Config.setOverwriteOutput(true);
          ))
        )}}
 
+       <AbsoluteFill style={{{{ background: overlayBg, opacity: 0.16, pointerEvents: "none" }}}} />
+
        {{{str(has_title_seq).lower()} ? (
          <Sequence from={{0}} durationInFrames={{titleFrames}}>
            <TitleSequence />
@@ -1951,12 +2068,20 @@ Config.setOverwriteOutput(true);
              }}}}
            >
              <h1
-               style={{{{
-                 color: "white",
-                 fontSize: Math.max(36, width / 14),
-                 textAlign: "center",
-                 padding: 24,
-               }}}}
+             style={{{{
+               color: "white",
+               fontSize: Math.max(36, width / 14),
+               textAlign: "center",
+               padding: 24,
+               opacity: interpolate(frame, [0, 6, titleFrames], [0, 1, 1], {{
+                 extrapolateRight: "clamp",
+                 easing: Easing.bezier(0.16, 1, 0.3, 1),
+               }}),
+               translate: `0 ${{interpolate(frame, [0, 12], [24, 0], {{
+                 extrapolateRight: "clamp",
+                 easing: Easing.bezier(0.16, 1, 0.3, 1),
+               }})}}px`,
+             }}}}
              >
                {{{title_js}}}
              </h1>
@@ -1970,8 +2095,15 @@ Config.setOverwriteOutput(true);
          </Sequence>
        ) : (
          <Sequence from={{Math.max(0, total - endFrames)}} durationInFrames={{endFrames}}>
-           <AbsoluteFill style={{{{ justifyContent: "center", alignItems: "center" }}}}>
-             <p style={{{{ color: "white", fontSize: Math.max(28, width / 18) }}}}>完</p>
+           <AbsoluteFill style={{{{ justifyContent: "center", alignItems: "center", background: overlayBg }}}}>
+             <p style={{{{
+               color: "white",
+               fontSize: Math.max(28, width / 18),
+               opacity: interpolate(frame - Math.max(0, total - endFrames), [0, 6], [0, 1], {{
+                 extrapolateRight: "clamp",
+                 easing: Easing.bezier(0.16, 1, 0.3, 1),
+               }}),
+             }}}}>完</p>
            </AbsoluteFill>
          </Sequence>
        )}}
@@ -1982,31 +2114,7 @@ Config.setOverwriteOutput(true);
         const dur = Math.max(1, Math.round(((c.endMs - c.startMs) / 1000) * fps));
         return (
           <Sequence key={{i}} from={{from}} durationInFrames={{dur}}>
-            <AbsoluteFill
-              style={{{{
-                justifyContent: "flex-end",
-                alignItems: "center",
-                paddingBottom: "8%",
-              }}}}
-            >
-              <div
-                style={{{{
-                  maxWidth: "92%",
-                  padding: "0.45em 0.85em",
-                  borderRadius: 12,
-                  background: captionBg,
-                  border: captionBorder,
-                  color: "white",
-                  fontSize: Math.max(22, width / 22),
-                  fontWeight: 600,
-                  textAlign: "center",
-                  whiteSpace: "pre-line",
-                  lineHeight: 1.35,
-                }}}}
-              >
-                {{c.text.trim()}}
-              </div>
-            </AbsoluteFill>
+            <CaptionCard text={{c.text}} />
           </Sequence>
         );
       }})}}

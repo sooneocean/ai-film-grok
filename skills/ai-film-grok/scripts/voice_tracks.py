@@ -197,13 +197,19 @@ def resolve_voice_tracks(
         base.get("vocal_color_policy") or ""
     ).strip().lower() in {"never", "off", "forbidden", "禁止"}
     if isinstance(author, dict):
-        forbid_color = forbid_color or bool(author.get("forbid_vocal_color")) or str(
-            author.get("vocal_color_policy") or ""
-        ).strip().lower() in {"never", "off", "forbidden", "禁止"}
+        forbid_color = (
+            forbid_color
+            or bool(author.get("forbid_vocal_color"))
+            or str(author.get("vocal_color_policy") or "").strip().lower()
+            in {"never", "off", "forbidden", "禁止"}
+        )
     if isinstance(spec, dict):
-        forbid_color = forbid_color or bool(spec.get("forbid_vocal_color")) or str(
-            spec.get("vocal_color_policy") or ""
-        ).strip().lower() in {"never", "off", "forbidden", "禁止"}
+        forbid_color = (
+            forbid_color
+            or bool(spec.get("forbid_vocal_color"))
+            or str(spec.get("vocal_color_policy") or "").strip().lower()
+            in {"never", "off", "forbidden", "禁止"}
+        )
     # Adult hardcore: enable color track unless author explicitly disabled / forbade
     if hardcore and heat in {"max", "hot"} and "enabled" not in author_keys and not forbid_color:
         base["enabled"] = True
@@ -260,7 +266,9 @@ def resolve_shot_vocal_color(
     if not policy.get("enabled"):
         return {"text": "", "offset_sec": 0.0, "source": "disabled", "gain": 0.0}
     # Film/user P0: never emit 娇喘 even if shot still has leftover vocal_color text
-    if policy.get("forbid_vocal_color") or str(policy.get("vocal_color_policy") or "").strip().lower() in {
+    if policy.get("forbid_vocal_color") or str(
+        policy.get("vocal_color_policy") or ""
+    ).strip().lower() in {
         "never",
         "off",
         "forbidden",
