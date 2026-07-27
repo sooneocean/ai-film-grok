@@ -1573,7 +1573,7 @@ def validate_film_spec(
             "vo_motion_link lint failed (vo_motion_strict): " + ",".join(vml["codes"])
         )
 
-    # Framing iron (soft; sediment from ai-film-cn head-crop discipline)
+    # A clipped head is never a deliverable state, so this is not opt-in.
     frm = lint_framing_iron(shots)
     spec["_framing_lint"] = {
         "ok": frm["ok"],
@@ -1583,9 +1583,10 @@ def validate_film_spec(
         "issues": frm["issues"],
         "note": frm.get("note"),
     }
-    if spec.get("framing_strict") is True and (frm["warning_count"] > 0 or frm["error_count"] > 0):
+    if not frm["ok"]:
         raise FilmSpecError(
-            "framing iron lint failed (framing_strict): " + ",".join(frm["codes"] or ["FRAMING"])
+            "framing iron lint failed (full head + headroom required): "
+            + ",".join(frm["codes"] or ["HEAD_CROP"])
         )
 
     # Production consistency P2-2~P2-6 (wardrobe/hair/makeup/light/rhythm/lipsync/voice drift)

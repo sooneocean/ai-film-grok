@@ -66,8 +66,8 @@ class FramingLintTests(unittest.TestCase):
         ]
         report = lint_framing_iron(shots)
         self.assertFalse(report["ok"])
-        self.assertIn("FRAMING_CROP_RISK", report["codes"])
-        self.assertGreater(report["warning_count"], 0)
+        self.assertIn("HEAD_CROP", report["codes"])
+        self.assertGreater(report["error_count"], 0)
 
     def test_safe_framing_passes(self) -> None:
         shots = [
@@ -87,23 +87,23 @@ class FramingLintTests(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertEqual(report["warning_count"], 0)
 
-    def test_write_spec_path_emits_framing_lint(self) -> None:
+    def test_write_spec_path_rejects_head_crop(self) -> None:
         spec = _minimal(
             framing="extreme close-up, detail fills frame, push-in on face",
         )
-        shots = validate_film_spec(spec, assign_missing_ids=False)
-        self.assertEqual(len(shots), 1)
-        lint = spec.get("_framing_lint")
-        self.assertIsInstance(lint, dict)
-        self.assertIn("FRAMING_CROP_RISK", lint.get("codes") or [])
-        self.assertFalse(lint.get("ok"))
+        with self.assertRaisesRegex(FilmSpecError, "HEAD_CROP"):
+            validate_film_spec(spec, assign_missing_ids=False)
 
-    def test_framing_strict_hard_fails(self) -> None:
+    def test_head_crop_hard_fails_without_opt_in(self) -> None:
         spec = _minimal(
             framing="extreme close-up, face fills the frame",
         )
-        spec["framing_strict"] = True
         with self.assertRaisesRegex(FilmSpecError, "framing"):
+            validate_film_spec(spec, assign_missing_ids=False)
+
+    def test_full_head_without_headroom_hard_fails(self) -> None:
+        spec = _minimal(framing="medium shot, full head and both shoulders inside frame")
+        with self.assertRaisesRegex(FilmSpecError, "headroom"):
             validate_film_spec(spec, assign_missing_ids=False)
 
     def test_default_coverage_not_crop_prone(self) -> None:
@@ -112,9 +112,10 @@ class FramingLintTests(unittest.TestCase):
         # no explicit framing → coverage injects defaults
         shots = validate_film_spec(spec, assign_missing_ids=False)
         lint = spec.get("_framing_lint") or {}
-        # soft headroom miss ok; crop risk from defaults must be absent
+        # Coverage defaults must satisfy the non-negotiable full-head lock.
         codes = lint.get("codes") or []
-        self.assertNotIn("FRAMING_CROP_RISK", codes)
+        self.assertNotIn("HEAD_CROP", codes)
+        self.assertNotIn("HEADROOM_MISS", codes)
         framing = (shots[0].get("dsl") or {}).get("framing") or ""
         import re
 

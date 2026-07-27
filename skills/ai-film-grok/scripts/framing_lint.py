@@ -26,11 +26,20 @@ CROP_PRONE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"top\s+of\s+(?:the\s+)?head\s+(?:cut|crop|off)", re.I),
 )
 
-# Positive framing discipline (cn medium + headroom hard words).
-SAFE_FRAMING_PATTERNS: tuple[re.Pattern[str], ...] = (
+# A head must be entirely visible and have space above the hair.  One condition
+# cannot substitute for the other.
+FULL_HEAD_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"full\s+head", re.I),
-    re.compile(r"headroom", re.I),
     re.compile(r"head\s+and\s+(?:both\s+)?shoulders", re.I),
+    re.compile(r"full\s+heads?\s+(?:both|of\s+both)", re.I),
+)
+HEADROOM_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"(?:ample\s+)?headroom", re.I),
+    re.compile(r"space\s+above\s+(?:the\s+)?(?:hair|head)", re.I),
+)
+SAFE_FRAMING_PATTERNS: tuple[re.Pattern[str], ...] = (
+    *FULL_HEAD_PATTERNS,
+    *HEADROOM_PATTERNS,
     re.compile(r"safe\s+framing", re.I),
     re.compile(r"no\s+crop(?:ping)?", re.I),
     re.compile(r"subject\s+stays\s+(?:framed|centered|visible)", re.I),
@@ -105,8 +114,8 @@ def lint_framing_iron(shots: list[dict[str, Any]]) -> dict[str, Any]:
             issues.append(
                 {
                     "shot_id": sid,
-                    "code": "FRAMING_CROP_RISK",
-                    "level": "warning",
+                    "code": "HEAD_CROP",
+                    "level": "error",
                     "message": (
                         f"{sid}: crop-prone framing language {crop_hits!r} — "
                         f"prefer medium/waist-up with headroom; hint: {SAFE_FRAMING_HINT}"
@@ -116,8 +125,9 @@ def lint_framing_iron(shots: list[dict[str, Any]]) -> dict[str, Any]:
             )
         beat = str(shot.get("dramatic_function") or "").strip().lower()
         if beat in SUBJECT_BEATS:
-            safe_hits = _match_any(blob, SAFE_FRAMING_PATTERNS)
-            # Only flag when framing-ish text exists but lacks safety tokens
+            full_head_hits = _match_any(blob, FULL_HEAD_PATTERNS)
+            headroom_hits = _match_any(blob, HEADROOM_PATTERNS)
+            # Only flag when framing-ish text exists but lacks the full lock.
             has_framing_field = False
             dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
             camera = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
@@ -125,15 +135,14 @@ def lint_framing_iron(shots: list[dict[str, Any]]) -> dict[str, Any]:
                 if isinstance(val, str) and val.strip():
                     has_framing_field = True
                     break
-            if has_framing_field and not safe_hits and not crop_hits:
-                # soft nudge only when no crop risk already reported
+            if has_framing_field and (not full_head_hits or not headroom_hits) and not crop_hits:
                 issues.append(
                     {
                         "shot_id": sid,
-                        "code": "FRAMING_HEADROOM_MISS",
-                        "level": "warning",
+                        "code": "HEADROOM_MISS",
+                        "level": "error",
                         "message": (
-                            f"{sid}: framing lacks full-head/headroom/safe-framing tokens — "
+                            f"{sid}: framing must explicitly retain the full head and headroom — "
                             f"add: {SAFE_FRAMING_HINT}"
                         ),
                         "hits": [],
@@ -150,9 +159,8 @@ def lint_framing_iron(shots: list[dict[str, Any]]) -> dict[str, Any]:
         "error_count": error_count,
         "issues": issues,
         "note": (
-            "Soft: ban crop-prone ECU/fill-frame/push-in-on-face language; "
-            "keep full head + headroom + subject stays framed "
-            "(sediment from ai-film-cn). Strict: framing_strict: true"
+            "Hard: people-facing shots must explicitly retain a full head and "
+            "headroom; crop-prone language is rejected."
         ),
     }
 

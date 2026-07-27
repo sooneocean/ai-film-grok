@@ -121,7 +121,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
             )
         )
 
-    # --- Framing iron (cn sediment; soft unless framing_strict) ---
+    # --- Framing iron: full head + headroom is a hard delivery gate. ---
     # Never validate_film_spec() on live `spec` — it mutates sound_plan/coverage in place.
     if spec:
         try:
@@ -145,16 +145,13 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 if not frm.get("ok"):
                     codes = ",".join(frm.get("codes") or ["FRAMING"])
                     issue = _issue(
-                        "hard" if spec.get("framing_strict") is True else "soft",
+                        "hard",
                         "framing_crop_prone",
                         f"framing crop-prone language: {codes} — "
                         f"{(frm.get('issues') or [{}])[0].get('message', '')[:160]}",
-                        fix="改 framing/motion：full head + headroom + safe framing；或 framing_strict 后硬拦",
+                        fix="改 framing/motion：每个主角完整头部 + 头顶留白；空间不足时裁脚，不得裁头",
                     )
-                    if spec.get("framing_strict") is True:
-                        hard.append(issue)
-                    else:
-                        soft.append(issue)
+                    hard.append(issue)
         except Exception as exc:
             soft.append(
                 _issue(
