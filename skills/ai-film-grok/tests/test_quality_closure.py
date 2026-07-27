@@ -120,6 +120,29 @@ def test_quality_report_requires_matching_registered_provider_clip(tmp_path: Pat
     assert report["evidence"]["real_provider"]["present"] is True
 
 
+def test_quality_report_blocks_current_contract_without_per_shot_evidence(tmp_path: Path) -> None:
+    _premium_root(tmp_path)
+    build_benchmark_package(tmp_path)
+    clip = tmp_path / "clips" / "provider.mp4"
+    clip.parent.mkdir()
+    clip.write_bytes(b"provider output")
+    digest = sha256_file(clip)
+    (tmp_path / "manifest.json").write_text(
+        '{"quality_evidence_contract_version":1,"clips":{"s001":{"path":"'
+        + str(clip)
+        + '","sha256":"'
+        + digest
+        + '","status":"approved","active":true,"uniqueness":{"sha256":"'
+        + digest
+        + '"}}}}'
+    )
+
+    report = build_quality_report(tmp_path)
+
+    assert report["evidence"]["shot_quality"]["ok"] is False
+    assert "SHOT_QUALITY_EVIDENCE_MISSING" in report["blocking_codes"]
+
+
 def test_repair_action_prefers_the_highest_priority_review_failure(tmp_path: Path) -> None:
     _premium_root(tmp_path)
     build_benchmark_package(tmp_path)

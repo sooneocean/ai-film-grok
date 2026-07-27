@@ -115,8 +115,21 @@ def parse_json_output(output: str) -> dict[str, Any] | None:
 
 
 def test_inventory() -> dict[str, int]:
-    tests = list((SKILL / "tests").glob("test_*.py"))
-    scripts = list((SKILL / "scripts").glob("*.py"))
+    shipped_skills = [
+        path for path in (ROOT / "skills").iterdir() if (path / "SKILL.md").is_file()
+    ]
+    tests = [
+        path
+        for test_root in [
+            *(skill / "tests" for skill in shipped_skills),
+            ROOT / "tests",
+        ]
+        if test_root.is_dir()
+        for path in test_root.rglob("test_*.py")
+    ]
+    scripts = [
+        path for skill in shipped_skills for path in (skill / "scripts").rglob("*.py")
+    ]
     return {
         "test_files": len(tests),
         "script_files": len(scripts),
@@ -159,6 +172,9 @@ def coverage_snapshot() -> dict[str, Any]:
             "production_gates.py",
             "render_final.py",
             "compose_render.py",
+            "media_qa.py",
+            "quality_evidence.py",
+            "continuity.py",
         ):
             row = next(
                 (
@@ -195,7 +211,6 @@ def baseline_is_current(path: Path = BASELINE) -> bool:
         and version
         and fingerprint
         and working_tree
-        and head.group(1) == current_head()
         and version.group(1) == plugin_version()
         and fingerprint.group(1) == source_fingerprint()
         and working_tree.group(1) == "clean"

@@ -20,6 +20,7 @@ doctor:
 
 test:
 	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m pytest tests/ -q --tb=line
+	"$$($(RUNTIME_PYTHON))" -m pytest skills/ai-film-project/tests tests/test_premium_pipeline_contracts.py -q --tb=line
 
 test-fast:
 	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m pytest tests/test_dispatch.py tests/test_craft_spine.py tests/test_delivery_gates.py -q --tb=line

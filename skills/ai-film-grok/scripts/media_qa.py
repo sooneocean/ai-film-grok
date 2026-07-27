@@ -282,6 +282,26 @@ def approved_clip_record(record: object) -> bool:
     quality = record.get("quality_gate")
     if isinstance(quality, dict) and quality.get("ok") is not True:
         return False
+    evidence = record.get("quality_evidence")
+    if evidence is not None:
+        try:
+            from quality_evidence import quality_evidence_is_current
+
+            if not quality_evidence_is_current(evidence, clip=Path(str(record.get("path") or ""))):
+                return False
+        except (ImportError, OSError, ValueError):
+            return False
+    motion_evidence = record.get("motion_evidence")
+    if motion_evidence is not None:
+        try:
+            from motion_evidence import motion_evidence_is_current
+
+            if not motion_evidence_is_current(
+                motion_evidence, clip=Path(str(record.get("path") or ""))
+            ):
+                return False
+        except (ImportError, OSError, ValueError):
+            return False
     return bool(
         record.get("status") == "approved"
         and record.get("source_endpoint") in ALLOWED_VIDEO_ENDPOINTS

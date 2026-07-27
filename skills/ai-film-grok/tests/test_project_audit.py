@@ -131,7 +131,7 @@ def test_baseline_becomes_stale_when_source_fingerprint_changes(
     assert project_audit.baseline_is_current(report) is False
 
 
-def test_baseline_becomes_stale_when_head_changes(tmp_path: Path, monkeypatch) -> None:
+def test_baseline_remains_current_when_only_head_changes(tmp_path: Path, monkeypatch) -> None:
     import project_audit
 
     snapshot = project_audit.build_snapshot()
@@ -143,7 +143,9 @@ def test_baseline_becomes_stale_when_head_changes(tmp_path: Path, monkeypatch) -
     monkeypatch.setattr(project_audit, "current_head", lambda: "different-head")
     monkeypatch.setattr(project_audit, "working_tree_is_clean", lambda: True)
 
-    assert project_audit.baseline_is_current(report) is False
+    # The baseline is committed with the source it describes, so its own commit
+    # necessarily advances HEAD. Source/version/cleanliness are the stable truth.
+    assert project_audit.baseline_is_current(report) is True
 
 
 def test_dirty_baseline_is_never_current(tmp_path: Path, monkeypatch) -> None:

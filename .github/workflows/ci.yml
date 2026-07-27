@@ -132,6 +132,18 @@ jobs:
           coverage run -m pytest tests/ -q --tb=line -m "not slow"
           coverage report --fail-under=58
           coverage json -o coverage.json
+          python - <<'PY'
+          import json
+          data = json.load(open("coverage.json"))
+          files = data.get("files", {})
+          floors = {"media_qa.py": 45, "quality_evidence.py": 80, "continuity.py": 85}
+          for name, floor in floors.items():
+              row = next((value for key, value in files.items() if key.endswith(f"scripts/{name}")), None)
+              assert row is not None, f"coverage row missing: {name}"
+              actual = row["summary"]["percent_covered"]
+              assert actual >= floor, f"{name} coverage {actual:.1f}% < {floor}%"
+              print(f"coverage floor OK: {name}={actual:.1f}%")
+          PY
 
       - name: Upload coverage trend input
         uses: actions/upload-artifact@v4

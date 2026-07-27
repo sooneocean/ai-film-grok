@@ -166,6 +166,43 @@ def _extract_performance_evidence_frames(
         record["frame"] = {"path": str(out), "sha256": _sha256(out)}
 
 
+def _continuity_packet(root: Path, shot_id: str, source: Path) -> dict[str, Any]:
+    """Bind the review to neighbouring takes without inventing continuity approval."""
+    manifest = read_json(Path(root) / "manifest.json") or {}
+    clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
+    ordered = list(clips)
+    try:
+        index = ordered.index(shot_id)
+    except ValueError:
+        index = -1
+    neighbours: dict[str, dict[str, Any]] = {}
+    for label, neighbour_index in (("previous", index - 1), ("next", index + 1)):
+        if neighbour_index < 0 or neighbour_index >= len(ordered):
+            continue
+        other_id = str(ordered[neighbour_index])
+        record = clips.get(other_id)
+        if not isinstance(record, dict) or record.get("status") != "approved":
+            continue
+        other_path = Path(str(record.get("path") or "")).expanduser()
+        if other_path.is_file():
+            neighbours[label] = {
+                "shot_id": other_id,
+                "clip_sha256": _sha256(other_path),
+                "quality_evidence_sha256": (record.get("quality_evidence") or {}).get("sha256"),
+                "review_sha256": (record.get("shot_review") or {}).get("sha256"),
+            }
+    style = read_json(Path(root) / "style-bible.json") or {}
+    return {
+        "ok": True,
+        "reviewed_clip_sha256": _sha256(source),
+        "neighbours": neighbours,
+        "style_lock_sha256": _sha256(Path(root) / "style-bible.json")
+        if style.get("locked") is True and (Path(root) / "style-bible.json").is_file()
+        else None,
+        "note": "Neighbour hashes make continuity approval stale when an adjacent approved take changes.",
+    }
+
+
 def create_shot_review(
     root: Path,
     *,
@@ -238,7 +275,7 @@ def create_shot_review(
         and performance["ok"]
     )
     packet = {
-        "schema_version": 4,
+        "schema_version": 5,
         "kind": "shot-review",
         "at": _utc_now(),
         "shot_id": sid,
@@ -256,6 +293,7 @@ def create_shot_review(
         },
         "evidence": evidence,
         "performance_contract": performance,
+        "continuity_packet": _continuity_packet(root, sid, source),
     }
     path = review_receipt_path(root, sid)
     write_json(path, packet)
@@ -289,6 +327,9 @@ def approved_review_for_clip(
         checked = validate_performance_evidence(expected, receipt_contract.get("evidence") or {})
         if not checked["ok"]:
             raise ShotReviewError("shot-review receipt lacks valid performance evidence")
+    continuity = packet.get("continuity_packet")
+    if not isinstance(continuity, dict) or continuity.get("ok") is not True:
+        raise ShotReviewError("shot-review receipt lacks continuity review packet")
     return {
         "path": str(path),
         "sha256": _sha256(path),

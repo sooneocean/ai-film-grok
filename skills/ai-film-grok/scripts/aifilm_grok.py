@@ -1092,6 +1092,22 @@ def cmd_stage(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_quality_status(args: argparse.Namespace) -> int:
+    """Read the hash-bound quality, motion, and review receipts for one film."""
+    from cli_motion import motion_evidence_status
+    from cli_quality import quality_contract_status
+    from cli_review import review_packet_status
+
+    root = Path(args.root).expanduser().resolve()
+    payload: dict[str, Any] = {"quality": quality_contract_status(root)}
+    shot_id = getattr(args, "shot_id", None)
+    if shot_id:
+        payload["motion"] = motion_evidence_status(root, str(shot_id))
+        payload["review"] = review_packet_status(root, str(shot_id))
+    emit(payload)
+    return 0
+
+
 def cmd_heat(args: argparse.Namespace) -> int:
     """Adult heat gates: check | vo-suggest | soften-log."""
     root = Path(str(args.root)).expanduser().resolve()
@@ -2594,6 +2610,41 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             "uniqueness": uniqueness,
         }
     )
+    if args.status == "approved":
+        from quality_evidence import QualityEvidenceError, build_shot_quality_evidence
+
+        try:
+            evidence = build_shot_quality_evidence(
+                root,
+                shot_id=str(args.shot_id),
+                clip=Path(record["path"]),
+                qa=qa,
+                source_endpoint=endpoint,
+                identity_approved=identity_approved,
+                motion_approved=motion_approved,
+                review=shot_review,
+                uniqueness=uniqueness,
+            )
+        except QualityEvidenceError as exc:
+            raise FilmError(f"approved clips require current quality evidence: {exc}") from exc
+        record["quality_evidence"] = evidence
+        manifest["quality_evidence_contract_version"] = 1
+        queue_job_id = str(getattr(args, "queue_job_id", "") or "").strip()
+        if queue_job_id:
+            from motion_evidence import MotionEvidenceError, build_motion_generation_evidence
+
+            try:
+                record["motion_evidence"] = build_motion_generation_evidence(
+                    root,
+                    shot_id=str(args.shot_id),
+                    clip=Path(record["path"]),
+                    source_endpoint=str(endpoint),
+                    queue_job_id=queue_job_id,
+                )
+            except MotionEvidenceError as exc:
+                raise FilmError(
+                    f"approved clips require matching motion generation evidence: {exc}"
+                ) from exc
     if style_job:
         record["style_reference_job"] = style_job
     record["quality_receipt"] = str(write_quality_receipt(root, record["shot_id"], quality))
@@ -5893,6 +5944,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="v1.6 approved review receipt (defaults to receipts/reviews/<shot>.json)",
     )
 
+    quality_status = sub.add_parser(
+        "quality-status", help="Show hash-bound per-shot quality, motion, and review evidence"
+    )
+    quality_status.add_argument("--root", required=True)
+    quality_status.add_argument("--shot-id")
+
     shot_review = sub.add_parser(
         "review-shot",
         help="Create evidence-backed first/middle/last-frame director review for one clip",
@@ -7170,6 +7227,7 @@ def main(argv: list[str] | None = None) -> int:
             "tts-ab": cmd_tts_ab,
             "init": cmd_init,
             "status": cmd_status,
+            "quality-status": cmd_quality_status,
             "production-evidence": cmd_production_evidence,
             "stage": cmd_stage,
             "write-spec": cmd_write_spec,

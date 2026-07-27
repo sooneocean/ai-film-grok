@@ -250,6 +250,39 @@ def _has_real_provider_media(root: Path) -> bool:
     return False
 
 
+def _shot_quality_closure(root: Path) -> dict[str, Any]:
+    """Validate every current-contract approved shot before master claims."""
+    manifest = read_json(root / "manifest.json") or {}
+    if int(manifest.get("quality_evidence_contract_version") or 0) < 1:
+        return {"required": False, "ok": True, "missing": [], "duplicates": []}
+    clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
+    required = [
+        str(sid)
+        for sid, record in clips.items()
+        if isinstance(record, dict) and record.get("status") == "approved"
+    ]
+    try:
+        from clip_uniqueness import active_clip_reuse_report
+        from quality_evidence import quality_evidence_is_current
+    except ImportError:
+        return {"required": True, "ok": False, "missing": required, "duplicates": []}
+    missing: list[str] = []
+    for shot_id in required:
+        record = clips[shot_id]
+        if not quality_evidence_is_current(
+            record.get("quality_evidence"), clip=Path(str(record.get("path") or ""))
+        ):
+            missing.append(shot_id)
+    uniqueness = active_clip_reuse_report(manifest, required_shot_ids=required)
+    return {
+        "required": True,
+        "ok": not missing and uniqueness["ok"],
+        "missing": sorted(missing),
+        "duplicates": uniqueness["duplicate_sha256_groups"],
+        "missing_fingerprints": uniqueness["missing_fingerprint_shots"],
+    }
+
+
 def build_quality_report(root: Path | str) -> dict[str, Any]:
     """Summarize evidence without upgrading contract-only work into an art claim."""
     base = _root(root)
@@ -258,6 +291,7 @@ def build_quality_report(root: Path | str) -> dict[str, Any]:
     provider = read_json(_receipt(base, "provider-canary.json")) or {}
     post = read_json(_receipt(base, "premium-master-qc.json")) or {}
     delivery = read_json(_receipt(base, "premium-delivery-package.json")) or {}
+    shot_quality = _shot_quality_closure(base)
     evidence = {
         "contract": {
             "present": bool(package.get("ok")),
@@ -275,6 +309,7 @@ def build_quality_report(root: Path | str) -> dict[str, Any]:
             "present": bool(review.get("independent_review_complete")),
             "receipt": "blind-review.json",
         },
+        "shot_quality": shot_quality,
     }
     blocking_codes: list[str] = []
     if not evidence["contract"]["present"]:
@@ -283,6 +318,8 @@ def build_quality_report(root: Path | str) -> dict[str, Any]:
         blocking_codes.append("REAL_PROVIDER_MEDIA_MISSING")
     if not evidence["human_reviewed"]["present"]:
         blocking_codes.append("INDEPENDENT_BLIND_REVIEW_MISSING")
+    if not shot_quality["ok"]:
+        blocking_codes.append("SHOT_QUALITY_EVIDENCE_MISSING")
     blocking_codes.extend(
         item["code"] for item in review.get("reshoot_queue", []) if item.get("code")
     )

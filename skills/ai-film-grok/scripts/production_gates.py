@@ -86,6 +86,7 @@ def assert_pilot_user_approved(
         return {"skipped": True, "reason": "env"}
     data = load_pilot_approval(root)
     if pilot_is_user_approved(data):
+        _assert_pilot_quality_evidence(root, data)
         return {"ok": True, "pilot": data}
     path = pilot_approval_path(root)
     if not path.is_file():
@@ -101,6 +102,35 @@ def assert_pilot_user_approved(
         f"approved_by={data.get('approved_by')!r}. "
         "Do not self-approve. Wait for user phrase like 'pilot 过'."
     )
+
+
+def _assert_pilot_quality_evidence(root: Path, approval: dict[str, Any]) -> None:
+    """New evidence-contract projects cannot bulk from stale pilot approvals."""
+    manifest = read_json(Path(root).expanduser().resolve() / "manifest.json") or {}
+    if int(manifest.get("quality_evidence_contract_version") or 0) < 1:
+        return
+    clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
+    pilot_shots = approval.get("shots") if isinstance(approval.get("shots"), list) else []
+    if not pilot_shots:
+        raise ProductionGateError("pilot approval lacks reviewed pilot shot ids")
+    try:
+        from quality_evidence import quality_evidence_is_current
+    except ImportError as exc:
+        raise ProductionGateError("quality evidence verifier is unavailable") from exc
+    stale: list[str] = []
+    for shot_id in pilot_shots:
+        record = clips.get(str(shot_id))
+        if not isinstance(record, dict):
+            stale.append(str(shot_id))
+            continue
+        clip = Path(str(record.get("path") or ""))
+        if not quality_evidence_is_current(record.get("quality_evidence"), clip=clip):
+            stale.append(str(shot_id))
+    if stale:
+        raise ProductionGateError(
+            "pilot approval is missing current shot-quality evidence for: "
+            + ", ".join(sorted(stale))
+        )
 
 
 def assert_pilot_allows_add(

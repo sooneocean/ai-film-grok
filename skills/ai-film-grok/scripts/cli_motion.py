@@ -1,4 +1,4 @@
-"""Media-generation CLI routes with no dependency on the main control plane."""
+"""Media-generation CLI routes and read-only motion evidence status."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import Any
 
 from env_plate import EnvPlateError, run_env_plate
 from motion_plan import MotionPlanError, build_motion_plan
+from util import read_json
 
 
 class MotionRouteError(RuntimeError):
@@ -48,3 +49,16 @@ def motion_plan(args: Namespace) -> dict[str, Any]:
         return build_motion_plan(Path(args.root), str(args.shot_id))
     except MotionPlanError as exc:
         raise MotionRouteError(str(exc)) from exc
+
+
+def motion_evidence_status(root: Path | str, shot_id: str) -> dict[str, Any]:
+    base = Path(root).expanduser().resolve()
+    receipt = read_json(base / "receipts" / "motion-evidence" / f"{shot_id}.json") or {}
+    return {
+        "kind": "motion-evidence-status",
+        "shot_id": shot_id,
+        "recorded": bool(receipt),
+        "delivery_eligible": receipt.get("delivery_eligible") is True,
+        "dry_run": receipt.get("dry_run") is True,
+        "receipt": receipt,
+    }

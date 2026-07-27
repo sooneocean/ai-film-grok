@@ -3,6 +3,17 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.8.0] - 2026-07-27
+
+### Added
+
+- Hash-bound `shot-quality-evidence` receipts join media decode/motion QA, human review, and clip uniqueness so replaced media cannot inherit approval.
+- Queue-backed motion evidence, continuity-aware review packets, `aifilm quality-status`, and quality-closure blocking for missing per-shot evidence.
+
+### Changed
+
+- Release audit inventory now uses the same recursive shipped-surface definition as generated documentation; `make test` includes plugin-level contracts.
+
 ## [2.7.10] — 2026-07-27
 
 ### Added
