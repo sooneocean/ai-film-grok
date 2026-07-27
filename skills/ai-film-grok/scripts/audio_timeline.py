@@ -136,6 +136,7 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                     event.update(
                         {
                             "asset": str(cue.get("asset") or cue.get("asset_hint") or ""),
+                            "track": kind,
                             "source": str(cue.get("source") or ""),
                             "license": str(cue.get("license") or ""),
                             "source_sha256": str(cue.get("source_sha256") or ""),
@@ -208,7 +209,9 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
         )
         if not str(event.get("shot_id") or ""):
             raise AudioTimelineError(f"{prefix}.shot_id is required")
-        for field in ("gain", "pan", "fade_in_sec", "fade_out_sec"):
+        _number(event.get("gain", 0), f"{prefix}.gain")
+        _number(event.get("pan", 0), f"{prefix}.pan", -1.0)
+        for field in ("fade_in_sec", "fade_out_sec"):
             _number(event.get(field, 0), f"{prefix}.{field}")
         if abs(float(event.get("pan", 0))) > 1:
             raise AudioTimelineError(f"{prefix}.pan must be between -1 and 1")
@@ -281,6 +284,67 @@ def caption_bindings(timeline: dict[str, Any]) -> list[dict[str, Any]]:
         for event in timeline["events"]
         if event.get("type") in VOCAL_TYPES and not event.get("muted")
     ]
+
+
+def build_mix_execution_plan(
+    timeline: dict[str, Any], *, sample_rate: int = 48000
+) -> dict[str, Any]:
+    """Compile timeline controls into an FFmpeg-ready, URL-free mix receipt."""
+    validate_timeline(timeline)
+    if sample_rate not in {44100, 48000}:
+        raise AudioTimelineError("mix sample_rate must be 44100 or 48000")
+    lanes: list[dict[str, Any]] = []
+    duck_triggers: list[str] = []
+    for event in timeline["events"]:
+        if event.get("muted"):
+            continue
+        event_type = str(event["type"])
+        pan = float(event.get("pan", 0.0))
+        left, right = round((1.0 - pan) / 2.0, 4), round((1.0 + pan) / 2.0, 4)
+        delay_ms = int(round(float(event["start_sec"]) * 1000))
+        filters = [f"adelay={delay_ms}|{delay_ms}"]
+        if float(event.get("fade_in_sec", 0)):
+            filters.append(f"afade=t=in:st=0:d={float(event['fade_in_sec']):.3f}")
+        if float(event.get("fade_out_sec", 0)):
+            end = max(0.0, float(event["duration_sec"]) - float(event["fade_out_sec"]))
+            filters.append(f"afade=t=out:st={end:.3f}:d={float(event['fade_out_sec']):.3f}")
+        if event_type == "inner_voice":
+            filters.append("highpass=f=250,lowpass=f=3200")
+        filters.extend(
+            [
+                f"volume={float(event.get('gain', 1.0)):.3f}",
+                f"pan=stereo|c0={left:.4f}*c0|c1={right:.4f}*c1",
+            ]
+        )
+        source_kind = (
+            "tts"
+            if event_type in VOCAL_TYPES
+            else ("asset" if event_type in ASSET_TYPES else "silence")
+        )
+        lane = {
+            "audio_event_id": event["id"],
+            "type": event_type,
+            "source_kind": source_kind,
+            "start_sec": event["start_sec"],
+            "duration_sec": event["duration_sec"],
+            "filters": filters,
+        }
+        if source_kind == "asset":
+            lane["source_sha256"] = event["source_sha256"]
+        lanes.append(lane)
+        if event_type in VOCAL_TYPES:
+            duck_triggers.append(event["id"])
+    return {
+        "schema_version": 1,
+        "kind": "audio-mix-execution-plan",
+        "sample_rate": sample_rate,
+        "channel_layout": "stereo",
+        "voice_target_lufs": -18.0,
+        "voice_peak_db": -2.0,
+        "final_limiter": 0.95,
+        "ducking": {"trigger_event_ids": duck_triggers, "release_ms": 550},
+        "lanes": lanes,
+    }
 
 
 def write_timeline(root: Path, timeline: dict[str, Any], *, out: Path | None = None) -> Path:

@@ -207,6 +207,17 @@ def _instrument_palette(cue: dict[str, Any]) -> tuple[str, ...]:
     return palette
 
 
+def compile_music_cue(shot: dict[str, Any], *, default_mood: str = "rnb") -> dict[str, Any]:
+    """Compile one shot's reviewable, instrumental-only music direction."""
+    cue = normalize_music_cue(shot.get("music_cue"), shot=shot, default_mood=default_mood)
+    cue["motif_id"] = _story_motif(shot, cue)
+    return {
+        **cue,
+        "instrumental_only": True,
+        "instrument_palette": list(_instrument_palette(cue)),
+    }
+
+
 def build_music_timeline(
     shots: list[dict[str, Any]],
     *,
@@ -222,15 +233,12 @@ def build_music_timeline(
         start, end = float(shot_starts[sid]), float(shot_ends[sid])
         if end <= start:
             continue
-        cue = normalize_music_cue(shot.get("music_cue"), shot=shot, default_mood=default_mood)
-        cue["motif_id"] = _story_motif(shot, cue)
+        cue = compile_music_cue(shot, default_mood=default_mood)
         timeline.append(
             {
                 "shot_id": sid,
                 "start_sec": start,
                 "end_sec": end,
-                "instrumental_only": True,
-                "instrument_palette": list(_instrument_palette(cue)),
                 **cue,
             }
         )

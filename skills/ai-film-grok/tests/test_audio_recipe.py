@@ -94,6 +94,7 @@ class AudioRecipeTests(unittest.TestCase):
             {
                 "id": "shot01",
                 "dramatic_function": "hook",
+                "characterIds": ["mei"],
                 "nar": "夜里她推门进来，外套还带着雨。",
             },
             {
@@ -121,6 +122,13 @@ class AudioRecipeTests(unittest.TestCase):
         # storyteller forces lipsync false
         self.assertFalse(shots[0].get("lipsync"))
         self.assertGreater(summary["counts"]["narrate_bed"], 0)
+        self.assertEqual(shots[0]["music_cue"]["motif_id"], "character:mei")
+        self.assertTrue(shots[0]["music_cue"]["instrumental_only"])
+        self.assertTrue(shots[0]["music_cue"]["instrument_palette"])
+        self.assertEqual(
+            summary["music_cue_routing"]["instrument_palettes"],
+            [shot["music_cue"]["instrument_palette"] for shot in shots],
+        )
 
 
 if __name__ == "__main__":

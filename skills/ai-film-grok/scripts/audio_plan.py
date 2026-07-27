@@ -31,7 +31,7 @@ def build_audio_plan(
     timeline_error: str | None = None
     voice_cast: dict[str, Any] | None = None
     try:
-        from audio_timeline import caption_bindings, validate_timeline
+        from audio_timeline import build_mix_execution_plan, caption_bindings, validate_timeline
         from audio_timeline import compile_timeline as compile_audio_timeline
         from audio_timeline import write_timeline as persist_timeline
 
@@ -41,6 +41,9 @@ def build_audio_plan(
             path = persist_timeline(root, timeline)
             timeline["path"] = str(path)
         timeline["caption_bindings"] = caption_bindings(timeline)
+        timeline["mix_execution"] = build_mix_execution_plan(
+            timeline, sample_rate=48000 if spec.get("audio_timeline_v1") else 44100
+        )
         if write_voice_cast:
             import json
 
@@ -212,6 +215,7 @@ def build_audio_plan(
             "timeline": timeline if compile_timeline else None,
             "event_count": len((timeline or {}).get("events") or []),
             "caption_binding_count": len((timeline or {}).get("caption_bindings") or []),
+            "mix_lane_count": len(((timeline or {}).get("mix_execution") or {}).get("lanes") or []),
             "error": timeline_error,
         },
         "voice_cast": voice_cast,

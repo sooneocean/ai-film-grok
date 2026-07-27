@@ -487,7 +487,7 @@ def apply_audio_recipes_to_spec(
         summary["voice_tracks_error"] = str(exc)
     # Normalize authored per-line performance controls into the executable projection.
     try:
-        from music_cue import normalize_music_cue, summarize_music_timeline
+        from music_cue import compile_music_cue, summarize_music_timeline
         from performance_cue import normalize_performance_cue, summarize_bgm_response
 
         music_timeline = []
@@ -497,8 +497,8 @@ def apply_audio_recipes_to_spec(
             shot["performance_cue"] = normalize_performance_cue(
                 shot.get("performance_cue"), tone_tags=shot.get("tone_tags")
             )
-            shot["music_cue"] = normalize_music_cue(
-                shot.get("music_cue"), shot=shot, default_mood=str(policy.get("mood") or "rnb")
+            shot["music_cue"] = compile_music_cue(
+                shot, default_mood=str(policy.get("mood") or "rnb")
             )
             music_timeline.append({"shot_id": shot.get("id"), **shot["music_cue"]})
         performance_bgm = summarize_bgm_response(shots)

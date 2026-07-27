@@ -9,7 +9,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from audio_plan import build_audio_plan
-from audio_timeline import AudioTimelineError, caption_bindings, compile_timeline
+from audio_timeline import (
+    AudioTimelineError,
+    build_mix_execution_plan,
+    caption_bindings,
+    compile_timeline,
+)
 from voice_cast_profiles import VoiceCastError, assign_profiles, validate_event_language
 
 
@@ -174,6 +179,40 @@ def test_asset_requires_hash_and_license_in_v1():
                 ]
             )
         )
+
+
+def test_mix_plan_has_inner_voice_filter_event_pan_fades_and_all_vocal_ducking():
+    timeline = compile_timeline(
+        _spec(
+            [
+                {
+                    "kind": "voice",
+                    "line_type": "inner_monologue",
+                    "speaker": "hero",
+                    "spoken_text": "不能回头",
+                    "start_offset_sec": 1,
+                    "duration_sec": 2,
+                    "pan": -0.5,
+                    "fade_in_sec": 0.2,
+                    "fade_out_sec": 0.3,
+                },
+                {
+                    "kind": "voice",
+                    "line_type": "dialogue",
+                    "speaker": "heroine",
+                    "spoken_text": "快走",
+                    "start_offset_sec": 3,
+                    "duration_sec": 1,
+                },
+            ]
+        )
+    )
+    plan = build_mix_execution_plan(timeline)
+    first = plan["lanes"][0]
+    assert plan["sample_rate"] == 48000
+    assert "highpass=f=250,lowpass=f=3200" in first["filters"]
+    assert any(item.startswith("pan=stereo") for item in first["filters"])
+    assert plan["ducking"]["trigger_event_ids"] == [event["id"] for event in timeline["events"]]
 
 
 def test_audio_plan_writes_timeline_and_deterministic_voice_cast(tmp_path: Path):

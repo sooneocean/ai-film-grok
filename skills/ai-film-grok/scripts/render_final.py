@@ -25,7 +25,7 @@ from typing import Any
 
 import numpy as np
 from audio_cues import AudioCueError, compile_audio_timeline, primary_voice_cue, strict_tts_text
-from audio_timeline import AudioTimelineError
+from audio_timeline import AudioTimelineError, build_mix_execution_plan
 from audio_timeline import caption_bindings as timeline_caption_bindings
 from audio_timeline import compile_timeline as compile_audio_timeline_v1
 from audio_timeline import timeline_hash as audio_timeline_hash
@@ -53,6 +53,7 @@ from narrative_timeline import (
 from PIL import Image, ImageDraw, ImageFont
 from render_workspace import RenderWorkspaceError, prepare_render_workspace, resolve_render_paths
 from runtime_policy import sha256
+from scene_sound_stems import SceneSoundError, render_scene_sound_stem
 from security_policy import (
     SecurityPolicyError,
     atomic_write_text,
@@ -2569,8 +2570,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             performance=(
                 voice_cue.get("performance")
                 if voice_cue and isinstance(voice_cue.get("performance"), dict)
-                else
-                normalize_performance_cue(
+                else normalize_performance_cue(
                     shot.get("performance_cue"), tone_tags=shot.get("tone_tags")
                 )
                 if normalize_performance_cue is not None
@@ -2680,14 +2680,30 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             if slot <= 0:
                 raise RenderError(f"{sid} timed voice cue requires duration_sec")
             timed_wav = work / f"vo_timed_{i:02d}_{sid}.wav"
-            run([
-                "ffmpeg", "-y", "-i", str(wav), "-af",
-                f"adelay={int(round(cue_offset * 1000))}|{int(round(cue_offset * 1000))},apad=pad_dur={slot:.3f},atrim=0:{slot:.3f}",
-                "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", str(timed_wav),
-            ])
+            run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(wav),
+                    "-af",
+                    f"adelay={int(round(cue_offset * 1000))}|{int(round(cue_offset * 1000))},apad=pad_dur={slot:.3f},atrim=0:{slot:.3f}",
+                    "-ar",
+                    str(SR),
+                    "-ac",
+                    "1",
+                    "-c:a",
+                    "pcm_s16le",
+                    str(timed_wav),
+                ]
+            )
             raw_vo_dur = float(dur)
             wav, dur, target, use_fit = timed_wav, slot, slot, "slot"
-            vo_atempo_plan = {"mode": "timed_cue", "window_sec": cue_window, "offset_sec": cue_offset}
+            vo_atempo_plan = {
+                "mode": "timed_cue",
+                "window_sec": cue_window,
+                "offset_sec": cue_offset,
+            }
         elif use_fit == "slot" and slot > 0 and vo_fit == "atempo":
             # Three-axis: plate = duration_sec; VO atempo to plate; video stretch only to plate
             try:
@@ -3150,17 +3166,40 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     if bool(spec.get("audio_timeline_v1", False)):
         try:
             formal_timeline = compile_audio_timeline_v1(spec)
+            execution_plan = build_mix_execution_plan(formal_timeline)
         except AudioTimelineError as exc:
             raise RenderError(str(exc)) from exc
         write_json(audio_timeline_path, formal_timeline)
+        write_json(audio_dir / "audio-mix-execution-plan.json", execution_plan)
     else:
         write_json(audio_timeline_path, {"version": 1, "cues": audio_timeline})
     mix_spotting["audio_timeline"] = {
         "path": str(audio_timeline_path),
         "cue_count": len(formal_timeline["events"]) if formal_timeline else len(audio_timeline),
         "schema": "audio-timeline" if formal_timeline else "legacy-audio-cues",
-        "sha256": audio_timeline_hash(formal_timeline) if formal_timeline else sha256(audio_timeline_path),
+        "sha256": audio_timeline_hash(formal_timeline)
+        if formal_timeline
+        else sha256(audio_timeline_path),
+        "execution_plan": str(audio_dir / "audio-mix-execution-plan.json")
+        if formal_timeline
+        else None,
     }
+    scene_sound_path = audio_dir / "scene_sound_stereo.wav"
+    if formal_timeline is not None:
+        try:
+            scene_sound = render_scene_sound_stem(
+                root,
+                formal_timeline,
+                duration_sec=float(total_dur),
+                out=scene_sound_path,
+                sample_rate=48000,
+            )
+        except SceneSoundError as exc:
+            raise RenderError(str(exc)) from exc
+    else:
+        silence_wav(scene_sound_path, float(total_dur))
+        scene_sound = {"path": str(scene_sound_path), "event_count": 0, "events": []}
+    mix_spotting["scene_sound"] = scene_sound
     sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
     if sound_plan is None:
         sound_plan = {}
@@ -3602,17 +3641,20 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[mus]",
         f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[native]",
         f"[3:a]volume=1.0,aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo,{sfx_dsp}[sfx]",
+        f"[4:a]volume=1.0,aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[scene]",
     ]
     if use_color:
         fc_parts.append(
-            f"[4:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[color]"
+            f"[5:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[color]"
         )
 
     if "sidechaincompress" in filters_help and "acrossover" in filters_help:
         # Native I2V audio is the main picture sound.  Route it through the
         # same narration sidechain as BGM, so that it returns to full level in
         # gaps but does not bury narration or character dialogue.
-        fc_parts.append("[mus][native]amix=inputs=2:duration=longest:normalize=0[picture_bed]")
+        fc_parts.append(
+            "[mus][native][scene]amix=inputs=3:duration=longest:normalize=0[picture_bed]"
+        )
         fc_parts.append("[picture_bed]acrossover=split=300 4000[mus_l][mus_m][mus_h]")
         fc_parts.append("[narr]asplit[narr_main][narr_sc]")
         fc_parts.append(f"[mus_m][narr_sc]{sc_frag}[mus_m_ducked]")
@@ -3627,7 +3669,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
         mix_spotting["sidechain_applied"] = "dynamic_eq"
     elif "sidechaincompress" in filters_help:
-        fc_parts.append("[mus][native]amix=inputs=2:duration=longest:normalize=0[picture_bed]")
+        fc_parts.append(
+            "[mus][native][scene]amix=inputs=3:duration=longest:normalize=0[picture_bed]"
+        )
         fc_parts.append("[picture_bed][sfx]amix=inputs=2:duration=longest:normalize=0[bed]")
         fc_parts.append(f"[bed][narr]{sc_frag}[ducked]")
         final_amix_count = 2 + (1 if use_color else 0)
@@ -3637,15 +3681,15 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
         mix_spotting["sidechain_applied"] = "broadband"
     else:
-        final_amix_count = 4 + (1 if use_color else 0)
+        final_amix_count = 5 + (1 if use_color else 0)
         color_in = "[color]" if use_color else ""
         fc_parts.append(
-            f"[narr][mus][native][sfx]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
+            f"[narr][mus][native][sfx][scene]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
         )
         mix_spotting["sidechain_applied"] = False
 
     fc = ";".join(fc_parts)
-    mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "sfx"] + (
+    mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "sfx", "scene_sound"] + (
         ["vocal_color"] if use_color else []
     )
     preserved_native_shots = primary_native_shot_ids(shot_audio)
@@ -3682,6 +3726,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         str(native_track),
         "-i",
         str(sfx_stereo_path),
+        "-i",
+        str(scene_sound_path),
     ]
     if use_color:
         mix_cmd.extend(["-i", str(color_track)])
@@ -3908,7 +3954,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         raise RenderError("Final MP4 missing video or audio stream")
     audio_stream = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
     if bool(spec.get("audio_timeline_v1", False)) and (
-        not audio_stream or str(audio_stream.get("sample_rate")) != "48000" or int(audio_stream.get("channels") or 0) != 2
+        not audio_stream
+        or str(audio_stream.get("sample_rate")) != "48000"
+        or int(audio_stream.get("channels") or 0) != 2
     ):
         raise RenderError("audio_timeline_v1 final must be 48kHz stereo")
 
@@ -3970,7 +4018,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "mix_report": str(mix_report_path) if mix_report_path.is_file() else None,
             "mix_report_sha256": sha256(mix_report_path) if mix_report_path.is_file() else None,
             "audio_timeline": str(audio_timeline_path) if audio_timeline_path.is_file() else None,
-            "audio_timeline_sha256": sha256(audio_timeline_path) if audio_timeline_path.is_file() else None,
+            "audio_timeline_sha256": sha256(audio_timeline_path)
+            if audio_timeline_path.is_file()
+            else None,
+            "audio_mix_execution_plan": str(audio_dir / "audio-mix-execution-plan.json")
+            if formal_timeline
+            else None,
         },
         "timeline": {
             "path": str(timeline_path) if timeline_path.is_file() else None,
@@ -3982,7 +4035,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "cue_count": len(cues),
             "burned_in": subs_mode == "burn",
             "mode": subs_mode,
-            "audio_event_bindings": timeline_caption_bindings(formal_timeline) if formal_timeline else None,
+            "audio_event_bindings": timeline_caption_bindings(formal_timeline)
+            if formal_timeline
+            else None,
         },
         "shots": [
             {
