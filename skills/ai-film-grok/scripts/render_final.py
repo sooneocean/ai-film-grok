@@ -3166,6 +3166,21 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     if bool(spec.get("audio_timeline_v1", False)):
         try:
             formal_timeline = compile_audio_timeline_v1(spec)
+            legacy_cursor = 0.0
+            legacy_starts: dict[str, float] = {}
+            for shot in shots:
+                shot_id = str(shot.get("id") or "")
+                legacy_starts[shot_id] = legacy_cursor
+                legacy_cursor += float(shot.get("duration_sec") or 0.0)
+            for event in formal_timeline.get("events") or []:
+                if not isinstance(event, dict):
+                    continue
+                shot_id = str(event.get("shot_id") or "")
+                if shot_id not in shot_start_map or shot_id not in legacy_starts:
+                    raise RenderError(f"audio timeline event has unknown shot_id: {shot_id}")
+                offset = float(event.get("start_sec") or 0.0) - legacy_starts[shot_id]
+                event["start_sec"] = round(shot_start_map[shot_id] + offset, 3)
+            formal_timeline["duration_sec"] = round(float(total_dur), 3)
             execution_plan = build_mix_execution_plan(formal_timeline)
         except AudioTimelineError as exc:
             raise RenderError(str(exc)) from exc

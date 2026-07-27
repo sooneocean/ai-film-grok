@@ -37,7 +37,7 @@ def _apply_event_controls(
 
 
 def _local_asset(root: Path, event: dict[str, Any]) -> Path:
-    source = str(event.get("source") or "")
+    source = str(event.get("source") or event.get("asset") or "")
     if not source.startswith("local:"):
         raise SceneSoundError(f"{event.get('id')}: final only accepts local: scene-sound assets")
     raw = source.removeprefix("local:")
