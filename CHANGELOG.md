@@ -3,6 +3,12 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.7.5] — 2026-07-27
+
+### Fixed
+
+- Pre-push release checks now resolve their advisory lock through Git, so linked worktrees retain the same serialized release boundary.
+
 ## [2.7.4] — 2026-07-27
 
 ### Added — creative review and guarded delivery

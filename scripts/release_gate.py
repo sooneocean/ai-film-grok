@@ -14,6 +14,33 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
+class ReleaseGateError(RuntimeError):
+    """Describe a local condition that prevents a release check from starting."""
+
+
+def release_lock_path(root: Path) -> Path:
+    """Resolve the lock through Git so linked worktrees do not treat `.git` as a directory."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "rev-parse",
+            "--git-path",
+            "ai-film-grok-release-gate.lock",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    raw_path = result.stdout.strip()
+    if result.returncode or not raw_path:
+        detail = result.stderr.strip() or "git did not return a lock path"
+        raise ReleaseGateError(f"cannot resolve release-gate lock: {detail}")
+    lock_path = Path(raw_path)
+    return lock_path if lock_path.is_absolute() else root / lock_path
+
+
 @contextmanager
 def exclusive_release_lock(path: Path, *, timeout_sec: float) -> Iterator[None]:
     """Hold a process-scoped advisory lock, waiting only up to the stated timeout."""
@@ -48,7 +75,7 @@ def exclusive_release_lock(path: Path, *, timeout_sec: float) -> Iterator[None]:
 def run_release_gate(root: Path, *, timeout_sec: float = 900) -> int:
     """Run both pre-push validations under one repository-local lock."""
     root = root.expanduser().resolve()
-    lock_path = root / ".git" / "ai-film-grok-release-gate.lock"
+    lock_path = release_lock_path(root)
     with exclusive_release_lock(lock_path, timeout_sec=timeout_sec):
         sync = subprocess.run(
             [sys.executable, str(root / "scripts" / "sync_project_docs.py"), "--check"],
@@ -70,7 +97,7 @@ def main() -> int:
         return run_release_gate(
             Path(__file__).resolve().parents[1], timeout_sec=args.timeout_sec
         )
-    except TimeoutError as exc:
+    except (ReleaseGateError, TimeoutError) as exc:
         print(f"pre-push blocked: {exc}", file=sys.stderr)
         return 1
 
