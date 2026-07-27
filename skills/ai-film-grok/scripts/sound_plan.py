@@ -527,6 +527,13 @@ def resolve_music_template(
         rel = str(found.relative_to(root)) if found.is_relative_to(root) else str(found)
     except (ValueError, AttributeError):
         rel = str(found)
+    if source == "skill_library":
+        # Receipts travel with film artifacts: never expose this machine's skill
+        # installation root merely because the shared licensed library was used.
+        try:
+            rel = "skill_library/" + str(found.relative_to(skill_bgm))
+        except ValueError:
+            rel = "skill_library/" + found.name
     return {
         "path": str(found.resolve()),
         "license_note": lic,

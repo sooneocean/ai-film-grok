@@ -213,6 +213,21 @@ class MusicTemplateTests(unittest.TestCase):
             self.assertGreater(float(bed[: SR // 2].mean()), 0.0)
             self.assertLess(float(bed[3 * SR : 3 * SR + SR // 2].mean()), 0.0)
 
+    def test_skill_library_receipt_path_is_not_absolute(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            library = root / "shared" / "assets" / "bgm" / "rnb"
+            library.mkdir(parents=True)
+            (library / "bed.wav").write_bytes(b"shared" * 100)
+            with mock.patch.object(
+                sound_plan, "__file__", str(root / "shared" / "scripts" / "sound_plan.py")
+            ):
+                routed = resolve_music_template_timeline(
+                    root,
+                    timeline=[{"shot_id": "s1", "mood": "rnb", "start_sec": 0, "end_sec": 2}],
+                )
+            self.assertEqual(routed[0]["relative"], "skill_library/rnb/bed.wav")
+
 
 if __name__ == "__main__":
     unittest.main()
