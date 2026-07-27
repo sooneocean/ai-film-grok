@@ -59,6 +59,65 @@ def test_music_timeline_keeps_each_shot_even_when_mood_matches() -> None:
     assert summary["take_seeds"] == [0, 0]
 
 
+def test_music_director_reuses_character_or_pair_motif_with_instrumental_palette() -> None:
+    shots = [
+        {"id": "s1", "dramatic_function": "hook", "characterIds": ["mei"]},
+        {"id": "s2", "dramatic_function": "reaction", "characterIds": ["ren", "mei"]},
+        {"id": "s3", "dramatic_function": "afterglow", "characterIds": ["mei"]},
+    ]
+    timeline = build_music_timeline(
+        shots, shot_starts={"s1": 0, "s2": 2, "s3": 4}, shot_ends={"s1": 2, "s2": 4, "s3": 6}
+    )
+    assert [item["motif_id"] for item in timeline] == [
+        "character:mei",
+        "pair:mei+ren",
+        "character:mei",
+    ]
+    assert all(item["instrumental_only"] for item in timeline)
+    assert all(item["instrument_palette"] for item in timeline)
+    assert summarize_music_timeline(timeline)["instrumental_only"] is True
+
+
+def test_instrument_palette_changes_procedural_render_without_changing_motif() -> None:
+    base = {
+        "start_sec": 0,
+        "end_sec": 2,
+        "energy": 0.5,
+        "motif_id": "character:mei",
+        "mood": "warm",
+        "bpm": 72,
+    }
+    piano = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "instrument_palette": ["felt_piano"]}]
+    )
+    strings = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "instrument_palette": ["warm_strings"]}]
+    )
+    assert not np.array_equal(piano, strings)
+
+
+def test_rnb_palette_is_audible_and_null_palette_is_safe() -> None:
+    base = {
+        "start_sec": 0,
+        "end_sec": 2,
+        "energy": 0.5,
+        "motif_id": "character:mei",
+        "mood": "rnb",
+        "bpm": 72,
+    }
+    rhodes = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "instrument_palette": ["rhodes"]}]
+    )
+    bass = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "instrument_palette": ["upright_bass"]}]
+    )
+    null_palette = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "instrument_palette": None}]
+    )
+    assert not np.array_equal(rhodes, bass)
+    assert null_palette.shape == rhodes.shape
+
+
 def test_music_cue_is_deterministic_and_validates_bounds() -> None:
     assert motif_seed(42, "love", 0) == motif_seed(42, "love", 0)
     with pytest.raises(MusicCueError):

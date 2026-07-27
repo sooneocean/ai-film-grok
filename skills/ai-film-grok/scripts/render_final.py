@@ -793,6 +793,7 @@ def procedural_music(
         g_brightness: float = 0.5,
         g_bpm: float = 76.0,
         g_key_shift: int = 0,
+        g_palette: tuple[str, ...] = (),
     ) -> np.ndarray:
         g_mood = (g_mood or "playful").lower()
         if g_mood in (
@@ -806,7 +807,7 @@ def procedural_music(
             "ecchi",
             "sexy",
         ):
-            return procedural_music_rnb(
+            sig = procedural_music_rnb(
                 g_dur,
                 amp=amp * 1.05,
                 bpm=g_bpm,
@@ -818,6 +819,14 @@ def procedural_music(
                 brightness=g_brightness,
                 key_shift=g_key_shift,
             )
+            n = len(sig)
+            tt = np.linspace(0, g_dur, n, endpoint=False)
+            if "upright_bass" in g_palette:
+                sig += 0.035 * np.sin(2 * np.pi * 55.0 * tt)
+            if "brush_drums" in g_palette:
+                brush = np.sin(2 * np.pi * (g_bpm / 60.0) * tt) ** 12
+                sig += 0.012 * brush * np.sin(2 * np.pi * 3200.0 * tt)
+            return np.tanh(sig)
 
         n = int(SR * max(0.5, g_dur))
         seg_n = max(1, n // 4)
@@ -875,6 +884,16 @@ def procedural_music(
             s0, s1 = i * seg_n, (i + 1) * seg_n
             tone = make_tone(f, 0.035, seg_n, rel=0.2)
             sig[s0:s1] += tone[: s1 - s0]
+        # Palette controls are deliberately small, instrumental colour shifts.
+        # They give the recurring motif a new orchestration without replacing it
+        # with an unrelated cue at every shot boundary.
+        if "low_strings" in g_palette or "upright_bass" in g_palette:
+            sig += 0.055 * np.sin(2 * np.pi * max(45.0, bass * 0.5) * tt * n / SR)
+        if "warm_strings" in g_palette or "high_strings" in g_palette:
+            sig += 0.022 * np.sin(2 * np.pi * notes[-1] * 2.0 * tt * n / SR)
+        if "vibraphone" in g_palette or "marimba" in g_palette:
+            shimmer = 0.5 + 0.5 * np.sin(2 * np.pi * (g_bpm / 60.0) * tt * n / SR)
+            sig += 0.018 * shimmer * np.sin(2 * np.pi * notes[0] * 4.0 * tt * n / SR)
         # BPM creates a perceptible motion difference in the non-R&B palettes;
         # ambient moves slowly while suspense can pulse without changing genre.
         pulse_rate = max(0.15, g_bpm / 240.0)
@@ -927,6 +946,12 @@ def procedural_music(
         # stable while changing its concrete take, rather than silently ignoring
         # the cue field or forcing a different genre.
         chapter_seed = (chapter_seed + int(chapter.get("seed", 0))) & 0x7FFFFFFF
+        palette_value = chapter.get("instrument_palette")
+        palette = (
+            tuple(str(item) for item in palette_value if str(item))
+            if isinstance(palette_value, (list, tuple))
+            else ()
+        )
         chapter_sig = _generate_single(
             gen_dur,
             str(chapter.get("mood", mood)),
@@ -936,6 +961,7 @@ def procedural_music(
             g_brightness=float(chapter.get("brightness", 0.5)),
             g_bpm=float(chapter.get("bpm", 76.0)),
             g_key_shift=int(chapter.get("key_shift", 0)),
+            g_palette=palette,
         )
         energy = max(0.0, min(1.0, float(chapter.get("energy", 0.55))))
         profile = str(chapter.get("stem_profile") or "full")

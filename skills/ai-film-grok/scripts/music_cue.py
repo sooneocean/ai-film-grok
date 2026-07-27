@@ -16,6 +16,17 @@ _MOODS = frozenset({"rnb", "dark", "ambient", "warm", "playful"})
 _TRANSITIONS = frozenset({"crossfade", "cut", "stinger"})
 _PROFILES = frozenset({"full", "thin", "pulse", "pad", "bass", "silence"})
 
+# These are arrangement instructions, not sample-pack identifiers.  Keeping the
+# palette small makes a film sound like one score whose orchestration evolves,
+# rather than a playlist that changes genre every shot.
+_INSTRUMENT_PALETTES = {
+    "ambient": ("felt_piano", "high_strings", "vibraphone"),
+    "dark": ("low_strings", "prepared_piano", "frame_drum"),
+    "warm": ("felt_piano", "warm_strings", "upright_bass"),
+    "playful": ("pizzicato_strings", "marimba", "brush_drums"),
+    "rnb": ("rhodes", "upright_bass", "brush_drums"),
+}
+
 
 def _bounded(value: Any, name: str, default: float) -> float:
     if value is None:
@@ -157,6 +168,45 @@ def motif_seed(base_seed: int, motif_id: str, index: int) -> int:
     return (int(digest[:8], 16) + index) & 0x7FFFFFFF
 
 
+def _character_ids(shot: dict[str, Any]) -> list[str]:
+    """Read common shot-plan cast projections without requiring a new schema field."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    for key in ("character_ids", "characterIds", "cast"):
+        value = shot.get(key, dsl.get(key))
+        if isinstance(value, list):
+            ids = [str(item).strip() for item in value if str(item).strip()]
+            if ids:
+                return sorted(dict.fromkeys(ids))
+    return []
+
+
+def _story_motif(shot: dict[str, Any], cue: dict[str, Any]) -> str:
+    """Prefer an authored motif; otherwise preserve character/pair recognition."""
+    raw = shot.get("music_cue")
+    if isinstance(raw, dict) and raw.get("motif_id"):
+        return cue["motif_id"]
+    cast = _character_ids(shot)
+    if len(cast) >= 2:
+        return f"pair:{'+'.join(cast[:2])}"
+    if cast:
+        return f"character:{cast[0]}"
+    return cue["motif_id"]
+
+
+def _instrument_palette(cue: dict[str, Any]) -> tuple[str, ...]:
+    palette = _INSTRUMENT_PALETTES[cue["mood"]]
+    profile = cue["stem_profile"]
+    if profile == "silence":
+        return ()
+    if profile in {"pad", "thin"}:
+        return palette[:2]
+    if profile == "bass":
+        return (palette[-1],)
+    if profile == "pulse":
+        return tuple(dict.fromkeys((palette[0], palette[-1])))
+    return palette
+
+
 def build_music_timeline(
     shots: list[dict[str, Any]],
     *,
@@ -173,7 +223,17 @@ def build_music_timeline(
         if end <= start:
             continue
         cue = normalize_music_cue(shot.get("music_cue"), shot=shot, default_mood=default_mood)
-        timeline.append({"shot_id": sid, "start_sec": start, "end_sec": end, **cue})
+        cue["motif_id"] = _story_motif(shot, cue)
+        timeline.append(
+            {
+                "shot_id": sid,
+                "start_sec": start,
+                "end_sec": end,
+                "instrumental_only": True,
+                "instrument_palette": list(_instrument_palette(cue)),
+                **cue,
+            }
+        )
     return sorted(timeline, key=lambda item: item["start_sec"])
 
 
@@ -189,6 +249,8 @@ def summarize_music_timeline(timeline: list[dict[str, Any]]) -> dict[str, Any]:
         "bpm_curve": [item["bpm"] for item in timeline],
         "key_shift_curve": [item["key_shift"] for item in timeline],
         "take_seeds": [item["seed"] for item in timeline],
+        "instrument_palettes": [item.get("instrument_palette", []) for item in timeline],
+        "instrumental_only": all(item.get("instrumental_only") for item in timeline),
         "transitions": [item["transition"] for item in timeline],
         "explainable": True,
         "source": "shot.music_cue with dramaturgical defaults",
