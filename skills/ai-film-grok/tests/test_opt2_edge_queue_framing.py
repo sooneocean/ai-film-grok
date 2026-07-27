@@ -138,7 +138,7 @@ class QueueShotMembershipTests(unittest.TestCase):
 
 
 class PreflightFramingTests(unittest.TestCase):
-    def test_soft_crop_prone_framing(self) -> None:
+    def test_crop_prone_framing_is_hard(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "receipts").mkdir()
@@ -158,12 +158,10 @@ class PreflightFramingTests(unittest.TestCase):
                 encoding="utf-8",
             )
             report = run_preflight(root)
-            soft = {i["code"] for i in report["soft"]}
             hard = {i["code"] for i in report["hard"]}
-            self.assertIn("framing_crop_prone", soft)
-            self.assertNotIn("framing_crop_prone", hard)
+            self.assertIn("framing_crop_prone", hard)
 
-    def test_strict_framing_is_hard(self) -> None:
+    def test_missing_headroom_is_hard_without_strict_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "receipts").mkdir()
@@ -175,21 +173,13 @@ class PreflightFramingTests(unittest.TestCase):
                 json.dumps({"locked": True, "identity_lock": "ok"}),
                 encoding="utf-8",
             )
-            spec = _spec_one(framing="extreme close-up, fills the frame")
-            spec["framing_strict"] = True
+            spec = _spec_one(framing="medium shot, full head visible")
             (root / "film-spec.json").write_text(
                 json.dumps(spec, ensure_ascii=False), encoding="utf-8"
             )
             report = run_preflight(root)
             hard = {i["code"] for i in report["hard"]}
-            # write-spec would also hard-fail validate; preflight may hit framing
-            # via live lint OR no_spec if validate fails first path
-            # Live lint on raw/validated shots should still flag
-            self.assertTrue(
-                "framing_crop_prone" in hard
-                or any("framing" in str(i.get("code", "")).lower() for i in report["hard"])
-                or report.get("hard_ok") is False
-            )
+            self.assertIn("framing_crop_prone", hard)
 
 
 class AifilmMediaDurationFailLoudTests(unittest.TestCase):
