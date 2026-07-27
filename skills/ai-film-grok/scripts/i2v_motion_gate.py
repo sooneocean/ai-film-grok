@@ -15,6 +15,7 @@ Pure functions first — measure mean elsewhere (ffmpeg) and feed numbers here.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -79,21 +80,45 @@ def target_for_tier(tier: str) -> float:
 
 
 def source_is_forbidden(source: str | None, *, tags: list[str] | None = None) -> bool:
-    """True if take is Ken Burns / micro-breath / static pad (cannot pass high-motion)."""
-    blob_parts: list[str] = []
+    """True if take is Ken Burns / micro-breath / static pad (cannot pass high-motion).
+
+    Token/phrase match only — never bare substring (``kb`` must not hit ``backboard``;
+    ``static`` must not hit ``ecstatic_dance``).
+    """
+    raw_parts: list[str] = []
     if source:
-        blob_parts.append(str(source).strip().lower())
+        raw_parts.append(str(source).strip().lower())
     for t in tags or []:
-        blob_parts.append(str(t).strip().lower())
-    blob = " ".join(blob_parts)
-    if not blob:
+        raw_parts.append(str(t).strip().lower())
+    if not raw_parts:
         return False
-    for bad in FORBIDDEN_SOURCE_TAGS:
-        if bad in blob.replace("-", "_") or bad in blob:
-            return True
-    # common aliases
-    if "ken burns" in blob or "ken_burns" in blob:
+    blob = " ".join(raw_parts)
+    # Multi-word phrases first
+    if "ken burns" in blob or "ken_burns" in blob or "ken-burns" in blob:
         return True
+    # Normalize separators → tokens (word chars only)
+    tokens = set(re.findall(r"[a-z0-9]+", blob.replace("-", "_")))
+    # Whole-token forbidden tags (short ones like kb/static only as full tokens)
+    token_bads = {
+        "ken_burns",
+        "kenburns",
+        "kb",
+        "micro_breath",
+        "microbreath",
+        "static_hold",
+        "statichold",
+        "static",
+        "slideshow",
+        "still_hold",
+        "stillhold",
+    }
+    if tokens & token_bads:
+        return True
+    # Also accept hyphen/underscore compound as single token already covered
+    for part in raw_parts:
+        p = part.replace("-", "_").strip()
+        if p in FORBIDDEN_SOURCE_TAGS or p in token_bads:
+            return True
     return False
 
 

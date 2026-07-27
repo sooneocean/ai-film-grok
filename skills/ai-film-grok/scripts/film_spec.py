@@ -1906,6 +1906,26 @@ def validate_film_spec(
             + " — act≥undressed, climax=bare, undress beat required; "
             "能脱就脱/能露就露；禁止回穿。See lessons-2026-07-21-sex-undress-ladder.md"
         )
+    # Peak still sole-ref: undressed/bare must not restart from full cast master
+    still_src_strict = spec.get("still_source_strict")
+    if still_src_strict is None:
+        still_src_strict = heat_scale == "max" and spec.get("adult_max_iron") is not False
+    if still_src_strict is True:
+        try:
+            from i2v_motion_gate import lint_still_source_policy
+        except Exception:  # pragma: no cover
+            lint_still_source_policy = None  # type: ignore
+        if lint_still_source_policy is not None:
+            still_rep = lint_still_source_policy(shots)
+            spec["_still_source_policy"] = still_rep
+            if not still_rep.get("ok"):
+                raise FilmSpecError(
+                    "still source wardrobe IRON failed (still_source_strict): "
+                    + ",".join(still_rep.get("codes") or [])
+                    + " — peak/undressed still sole-ref must be undress-anchor or prior "
+                    "undressed still; 禁 image_edit(全装 cast)。"
+                    " Override: still_source_strict:false."
+                )
     # VO 荤梗：实打实办事剧，旁白全程要荤；act/climax 要办事动词
     sex_vo_strict = spec.get("sex_vo_strict")
     if sex_vo_strict is None:

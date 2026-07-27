@@ -199,6 +199,122 @@ class AdultMaxIronContinuousChallenge(unittest.TestCase):
         self.assertIn("HEAT_ESCALATION_NO_PEAK", rep.get("codes", []))
 
 
+class AdultMaxIronStillSource(unittest.TestCase):
+    """still_source_strict is wired into validate_film_spec (shipped path)."""
+
+    _DF = {
+        "setup": "hook",
+        "foreplay": "sensory",
+        "act": "action",
+        "climax": "action",
+        "afterglow": "afterglow",
+        "bridge": "bridge",
+    }
+
+    def _base_shot(
+        self,
+        sid: str,
+        phase: str,
+        wardrobe: str,
+        *,
+        still_source: str | None = None,
+        dur: float | None = None,
+    ) -> dict:
+        duration = dur if dur is not None else (10.0 if phase in {"act", "climax"} else 4.0)
+        sh: dict = {
+            "id": sid,
+            "heat_phase": phase,
+            "dramatic_function": self._DF[phase],
+            "wardrobe_state": wardrobe,
+            "duration_sec": duration,
+            "lipsync": False,
+            "nar": "沉腰办穿锁腰高潮顶弄吃进",
+            "dsl": {
+                "subject": f"{wardrobe} bare skin already undressed clothes discarded",
+                "action": "strips hips-sink removes undress arch-finish",
+                "motion": "thrust continuous body",
+                "story_beat": phase,
+                "visible_change": "undress A to B",
+                "camera": {"shot_size": "medium full", "angle": "eye level"},
+                "wardrobe_state": wardrobe,
+            },
+        }
+        if still_source:
+            sh["still_source"] = still_source
+        return sh
+
+    def test_write_spec_rejects_full_cast_after_undress(self) -> None:
+        from film_spec import FilmSpecError, validate_film_spec
+
+        shots = [
+            self._base_shot("s01", "setup", "full"),
+            self._base_shot("f01", "foreplay", "partial"),
+            self._base_shot("a01", "act", "undressed"),
+            self._base_shot("a02", "act", "undressed"),
+            self._base_shot("c01", "climax", "bare", still_source="cast_master"),
+            self._base_shot("g01", "afterglow", "bare"),
+            self._base_shot("b01", "bridge", "bare"),
+            self._base_shot("b02", "bridge", "bare"),
+        ]
+        spec = {
+            "title": "still-source-redress",
+            "vo_mode": "storyteller",
+            "tts_backend": "edge",
+            "heat_scale": "max",
+            "spice_level": "extreme",
+            "sex_floor_strict": False,
+            "sex_vo_strict": False,
+            "heat_arc_strict": False,
+            "sex_wardrobe_strict": True,
+            "still_source_strict": True,
+            "director_intent": {
+                "logline": "成人max peak still 禁全装 cast",
+                "tone": "成人",
+                "emotional_arc": ["起", "承", "转"],
+            },
+            "scenes": [{"shots": shots}],
+        }
+        with self.assertRaises(FilmSpecError) as ctx:
+            validate_film_spec(spec, assign_missing_ids=False)
+        self.assertIn("still source", str(ctx.exception).lower())
+
+    def test_write_spec_allows_undress_anchor(self) -> None:
+        from film_spec import validate_film_spec
+
+        shots = [
+            self._base_shot("s01", "setup", "full"),
+            self._base_shot("f01", "foreplay", "partial"),
+            self._base_shot("a01", "act", "undressed", still_source="undress-anchor"),
+            self._base_shot("a02", "act", "undressed", still_source="undress-anchor"),
+            self._base_shot("a03", "act", "bare", still_source="undress-anchor"),
+            self._base_shot("c01", "climax", "bare", still_source="undress-anchor"),
+            self._base_shot("g01", "afterglow", "bare", still_source="prior undressed still"),
+            self._base_shot("b01", "bridge", "bare"),
+        ]
+        spec = {
+            "title": "still-source-ok",
+            "vo_mode": "storyteller",
+            "tts_backend": "edge",
+            "heat_scale": "max",
+            "spice_level": "extreme",
+            "sex_floor_strict": False,
+            "sex_vo_strict": False,
+            "heat_arc_strict": False,
+            "sex_wardrobe_strict": True,
+            "still_source_strict": True,
+            "director_intent": {
+                "logline": "成人max undress-anchor ok",
+                "tone": "成人",
+                "emotional_arc": ["起", "承", "转"],
+            },
+            "scenes": [{"shots": shots}],
+        }
+        out = validate_film_spec(spec, assign_missing_ids=False)
+        self.assertTrue(out)
+        pol = spec.get("_still_source_policy") or {}
+        self.assertTrue(pol.get("ok"), pol)
+
+
 class AdultMaxIronDuration(unittest.TestCase):
     def test_below_50_flags(self) -> None:
         shots = [

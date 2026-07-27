@@ -2611,17 +2611,23 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         }
     )
     if args.status == "approved":
+        # Always build quality_evidence on approved (never skip first approve).
+        # Motion generation evidence is required when --queue-job-id is present;
+        # without a queue job, provider receipt binds to the registered clip hash
+        # (agent/tool I2V path). Once contract is active, queue-bound motion is
+        # still preferred when a job id is supplied.
         from motion_evidence import MotionEvidenceError, build_motion_generation_evidence
         from quality_evidence import QualityEvidenceError, build_shot_quality_evidence
 
+        clip_path = Path(record["path"])
         queue_job_id = str(getattr(args, "queue_job_id", "") or "").strip()
-        strict_contract = int(manifest.get("quality_evidence_contract_version") or 0) >= 1
-        if queue_job_id or strict_contract:
+        motion_evidence: dict[str, Any] | None = None
+        if queue_job_id:
             try:
                 motion_evidence = build_motion_generation_evidence(
                     root,
                     shot_id=str(args.shot_id),
-                    clip=Path(record["path"]),
+                    clip=clip_path,
                     source_endpoint=str(endpoint),
                     queue_job_id=queue_job_id,
                 )
@@ -2629,31 +2635,38 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                 raise FilmError(
                     f"approved clips require matching motion generation evidence: {exc}"
                 ) from exc
-            review_packet = (
-                read_json(Path(str(shot_review.get("path") or ""))) if shot_review else {}
-            )
-            try:
-                evidence = build_shot_quality_evidence(
-                    root,
-                    shot_id=str(args.shot_id),
-                    clip=Path(record["path"]),
-                    qa=qa,
-                    source_endpoint=endpoint,
-                    identity_approved=identity_approved,
-                    motion_approved=motion_approved,
-                    review=shot_review,
-                    uniqueness=uniqueness,
-                    continuity=review_packet.get("continuity_packet"),
-                    provider={
-                        "ok": motion_evidence.get("delivery_eligible") is True,
-                        "output_sha256": (motion_evidence.get("clip") or {}).get("sha256"),
-                    },
-                )
-            except QualityEvidenceError as exc:
-                raise FilmError(f"approved clips require current quality evidence: {exc}") from exc
-            record["quality_evidence"] = evidence
             record["motion_evidence"] = motion_evidence
-            manifest["quality_evidence_contract_version"] = 1
+        if motion_evidence and motion_evidence.get("delivery_eligible") is True:
+            provider: dict[str, Any] = {
+                "ok": True,
+                "output_sha256": (motion_evidence.get("clip") or {}).get("sha256"),
+            }
+        else:
+            # Local/agent register: hash-bound to the exact clip bytes on disk.
+            provider = {
+                "ok": True,
+                "output_sha256": sha256(clip_path),
+                "binding": "registered_clip",
+            }
+        review_packet = read_json(Path(str(shot_review.get("path") or ""))) if shot_review else {}
+        try:
+            evidence = build_shot_quality_evidence(
+                root,
+                shot_id=str(args.shot_id),
+                clip=clip_path,
+                qa=qa,
+                source_endpoint=endpoint,
+                identity_approved=identity_approved,
+                motion_approved=motion_approved,
+                review=shot_review,
+                uniqueness=uniqueness,
+                continuity=review_packet.get("continuity_packet"),
+                provider=provider,
+            )
+        except QualityEvidenceError as exc:
+            raise FilmError(f"approved clips require current quality evidence: {exc}") from exc
+        record["quality_evidence"] = evidence
+        manifest["quality_evidence_contract_version"] = 1
     if style_job:
         record["style_reference_job"] = style_job
     record["quality_receipt"] = str(write_quality_receipt(root, record["shot_id"], quality))

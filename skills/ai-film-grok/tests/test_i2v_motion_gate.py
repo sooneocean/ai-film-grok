@@ -71,6 +71,19 @@ class EvaluateShotMotion(unittest.TestCase):
         self.assertFalse(r["ok"])
         self.assertIn(CODE_FORBIDDEN_SOURCE, r["codes"])
 
+    def test_forbidden_is_token_not_substring(self) -> None:
+        from i2v_motion_gate import source_is_forbidden
+
+        # Must NOT false-positive on substring embedding of "kb" / "static"
+        self.assertFalse(source_is_forbidden("backboard"))
+        self.assertFalse(source_is_forbidden("ecstatic_dance"))
+        self.assertFalse(source_is_forbidden("boost_take_staticish"))
+        # Must still catch real pads
+        self.assertTrue(source_is_forbidden("kb"))
+        self.assertTrue(source_is_forbidden("static"))
+        self.assertTrue(source_is_forbidden("ken burns pad"))
+        self.assertTrue(source_is_forbidden("raw", tags=["micro_breath"]))
+
 
 class AuditAndFinalGate(unittest.TestCase):
     def test_audit_meat_fail_blocks_ok(self) -> None:
