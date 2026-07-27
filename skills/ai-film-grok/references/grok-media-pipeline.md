@@ -1,6 +1,6 @@
-# Grok 媒体管线（+ FRW 2V 优先）
+# Grok 媒体管线（+ FRW 2V 显式恢复）
 
-**Grok Imagine** 负责身份/静帧；**FRW 2V**（无限配额时）负责确定性 bulk 动画。本地持久化队列负责去重、预算、退避、回执与断点续作。Python 不内嵌 key；FRW 经 frwclaw `.env`。
+**Grok Imagine** 负责身份/静帧与当前默认 I2V；**FRW 2V** 仅在 Seedance canary + pilot 通过后显式恢复。本地持久化队列负责去重、预算、退避、回执与断点续作。Python 不内嵌 key；FRW 经 frwclaw `.env`。
 
 ## 工具分工
 
@@ -8,9 +8,9 @@
 |---|---|
 | Grok `image_gen` | 无源图的风格/角色/场景 master |
 | Grok `image_edit` | 身份保持的镜头变体与修复（bulk still） |
-| **FRW `img2video`** | **默认 bulk 2V**；已批准关键帧作 frame 1 |
+| **FRW `img2video`** | 显式 legacy 救生艇；不得作为默认 bulk 2V |
 | **FRW `first-last-frame`** | 有明确首尾帧时锁构图 |
-| Grok `image_to_video` | 兜底 / `i2v_provider: grok`；不宣称 FLF |
+| Grok `image_to_video` | 当前 `grok_primary` 默认；不宣称 FLF |
 | Grok `reference_to_video` | 多参考运动；不宣称精确 first/last 锁定 |
 | `"$AIFILM" frw …` | 官方 dispatch 代理 |
 
@@ -42,10 +42,10 @@ Q="$SKILL_DIR/scripts/media-queue"
 "$Q" budget --root "<root>" --units 30
 ```
 
-每次只 claim 一项，复制回传的 `job_id` 和 `claim_token`，调用 **FRW 2V（默认）** 或 Grok 兜底后立即回写：
+每次只 claim 一项，复制回传的 `job_id` 和 `claim_token`，调用当前锁定的 provider 后立即回写。FRW 只能在 canary + pilot 通过后启用：
 
 ```bash
-# 默认 FRW bulk（先 upload keyframe，再 img2video --wait，下载 video_url）
+# 显式 FRW legacy 救生艇（先 upload keyframe，再 img2video --wait）
 "$Q" complete --root "<root>" \
   --job-id "<job-id>" --claim-token "<token>" \
   --output "<generated.mp4>" --endpoint frw_img2video \

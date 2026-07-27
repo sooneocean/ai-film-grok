@@ -1,5 +1,11 @@
 name: ci
 
+env:
+  PYTHON_VERSION: "3.11.15"
+  PYTEST_VERSION: "9.0.3"
+  COVERAGE_VERSION: "7.13.5"
+  RUFF_VERSION: "0.15.10"
+
 on:
   push:
     branches: [main, master]
@@ -24,16 +30,16 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install pinned skill deps
         working-directory: skills/ai-film-grok
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install "pytest==${PYTEST_VERSION}"
           pip install -r requirements.lock
 
-      - name: Validate plugin.json + layout + commands
+      - name: Validate plugin metadata + layout + commands
         run: |
           python - <<'PY'
           import json
@@ -58,26 +64,29 @@ jobs:
           bash -n skills/ai-film-grok/scripts/aifilm
 
       - name: Validate all shipped JSON schemas and registry
-        working-directory: skills/ai-film-grok
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          schemas = sorted(Path("schemas").glob("*.json"))
-          assert schemas, "schemas/*.json is empty"
+          schemas = sorted(Path("skills").glob("*/schemas/*.json"))
+          assert schemas, "skills/*/schemas/*.json is empty"
           for path in schemas:
               json.loads(path.read_text(encoding="utf-8"))
               print("OK", path)
-          reg = Path("registry/skills.json")
+          reg = Path("skills/ai-film-grok/registry/skills.json")
           if reg.is_file():
               json.loads(reg.read_text(encoding="utf-8"))
               print("OK", reg)
           PY
-          python scripts/aifilm skill list >/dev/null
+          python skills/ai-film-grok/scripts/aifilm skill list >/dev/null
+
+      - name: Test shipped skill and root contracts
+        run: |
+          python -m pytest skills/ai-film-project/tests tests/test_premium_pipeline_contracts.py -q --tb=line
 
       - name: Ruff lint + format check (full scripts)
         run: |
-          python -m pip install ruff
+          python -m pip install "ruff==${RUFF_VERSION}"
           ruff check skills/ai-film-grok/scripts/
           ruff format --check skills/ai-film-grok/scripts/
           ruff check --config skills/ai-film-grok/pyproject.toml scripts/project_audit.py scripts/audit_lessons.py
@@ -114,12 +123,12 @@ jobs:
               print("doctor: runtime_lock fully OK")
           PY
 
-      - name: Core pytest (fast path: all tests, excluding slow)
+      - name: "Core pytest (fast path: all tests, excluding slow)"
         working-directory: skills/ai-film-grok
         env:
           AIFILM_CI: "1"
         run: |
-          pip install coverage
+          pip install "coverage==${COVERAGE_VERSION}"
           coverage run -m pytest tests/ -q --tb=line -m "not slow"
           coverage report --fail-under=58
           coverage json -o coverage.json
@@ -149,17 +158,16 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install pinned skill deps
         working-directory: skills/ai-film-grok
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install "pytest==${PYTEST_VERSION}"
           pip install -r requirements.lock
 
       - name: Full pytest suite
-        working-directory: skills/ai-film-grok
         env:
           AIFILM_CI: "1"
-        run: python -m pytest tests/ -q --tb=line
+        run: python -m pytest -q --tb=line

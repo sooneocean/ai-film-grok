@@ -208,15 +208,15 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 4. 缺 `approved_by: user`（或会话中用户原话批准）→ **禁止**批量。  
 5. 全片 still **同一 img2img 锚**（cast master）。禁止「机构戏用 cast、色气戏用 naked 用户图」两套锚。用户高色气图只作 **style 参考/lookbook**，定妆锚用着衣 cast。
 
-## 3. Provider 路由（Grok 身份 + FRW Seedance 优先）
+## 3. Provider 路由（Grok 默认 + FRW Seedance 显式恢复）
 
-**无限 FRW 配额时**：bulk **2V 默认 Seedance `newvideo`**（质量优先，**前提 key 已开通模板**）；定妆 / still 仍 **Grok**。完整契约见 [frw-degrade-dispatch.md](frw-degrade-dispatch.md)、[lessons-2026-07-20-seedance-quality.md](lessons-2026-07-20-seedance-quality.md)、[lessons-2026-07-21-frw-key-capability.md](lessons-2026-07-21-frw-key-capability.md)。
+当前可复现默认是 `grok_primary`。Seedance 只有 provider canary 与当前项目 pilot 都通过后才能显式恢复；定妆 / still 仍使用 **Grok**。完整契约见 [hard-defaults.md](hard-defaults.md)、[frw-degrade-dispatch.md](frw-degrade-dispatch.md) 与历史 Seedance lessons。
 
 | 规则 | 要求 |
 |------|------|
-| **分层** | 创作/身份 → Grok still；**确定性 bulk 2V → FRW Seedance** `newvideo`（权限开时） |
+| **分层** | 创作/身份 → Grok still；bulk 默认 Grok；FRW Seedance `newvideo` 仅在 canary + pilot 通过后启用 |
 | **Key canary** | bulk 前 `balance` + Seedance 一枪 + `ltx-t2v`；**403**=未开通，**502**=平台挂 |
-| film-spec | `i2v_provider: frw` + **`frw_video_model: seedance-2-fast-i2v`**（默认）；`auto`→二者 |
+| film-spec | 默认 `i2v_provider: grok`；显式恢复时使用 `frw` + `seedance-2-fast-i2v` |
 | Seedance 全 403 | L1→**Grok 720p**；L2→**`ltx-t2v`**→classic t2v；legacy I2V 仅显式救生艇 |
 | 锚点（若 FRW still） | 必须先 `upload` cast；每镜 **img2image**（禁止 text2image 出主角） |
 | 模型 | FRW 侧 **整片固定同一 `frw_video_model`**；禁止半 Seedance 半 legacy 冒充 |

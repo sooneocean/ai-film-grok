@@ -78,13 +78,13 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 | 能力 | 在本 skill 中的角色 | 入口 |
 |------|---------------------|------|
 | **Grok Imagine（图像）** | 文生图 / 图生图：风格样张、定妆、每镜关键帧 | `image_gen`、`image_edit` |
-| **FRW Seedance（默认 bulk 2V）** | 已批 keyframe → 真实运动 clip；**9:16 720p 原生** | `"$AIFILM" frw newvideo --model seedance-2-fast-i2v` |
-| **Grok Imagine Video** | I2V **兜底**（`i2v_provider: grok`）或单镜救急 | `image_to_video` |
+| **Grok Imagine Video** | 当前 `grok_primary` 默认 I2V | `image_to_video` |
+| **FRW Seedance（显式恢复）** | canary + pilot 通过后用于已批 keyframe；**9:16 720p 原生** | `"$AIFILM" frw newvideo --model seedance-2-fast-i2v` |
 
 要点：
 
-- **分层**：Still 锁身份用 Grok；bulk 动画默认 **Seedance**，不是旧 FRW `img2video`（576 质量地板，见胃镜室复盘）。  
-- film-spec：`i2v_provider: frw` + `frw_video_model: seedance-2-fast-i2v` + `frw_resolution: 720p`。  
+- **分层**：Still 锁身份用 Grok；bulk 动画当前默认 **Grok**。Seedance 仅在 canary + pilot 通过后显式恢复。
+- 恢复 Seedance 时，film-spec 使用 `i2v_provider: frw` + `frw_video_model: seedance-2-fast-i2v` + `frw_resolution: 720p`。
 - **禁止** 默认 legacy `img2video`；**禁止** 576 生成再放大到 720 当高清。  
 - Python **不内嵌 key**：Grok 工具由 agent 调；FRW 经 `frw_dispatch` + frwclaw `.env`；本仓库负责 **规格、队列、QA、成片门禁**。  
 - **单 provider 原则**：同一角色禁止半片 Grok still + 半片 FRW still；2V 禁止半 Seedance 半 legacy。
@@ -378,9 +378,10 @@ Private skill for team use unless otherwise stated.
 ### 当前项目状态（自动同步）
 
 - 插件版本：`2.7.1`
+- Published skills：`2`
 - Skill Registry：`31/33` 项标记为 `implemented`
-- CLI 脚本：`166` 个
-- pytest 文件：`207` 个
+- Python 脚本：`181` 个
+- pytest 文件：`211` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

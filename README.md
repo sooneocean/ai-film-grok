@@ -3,7 +3,7 @@
 **Grok Build 插件**：把「灵感到可验收的 AI 动态短片」收成一条**可恢复、可门禁、可插拔模型**的流水线。
 
 - **不是**静图轮播 / Ken Burns / 只有关键帧  
-- **是** I2V 真动态 + 旁白混音 + 字幕 + 七维验收 → 可交付 MP4  
+- **是** I2V 真动态 + 旁白混音 + 字幕 + 十一维验收 → 可交付 MP4
 
 | | |
 |---|---|
@@ -129,7 +129,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 | `visual` | 生产画面 | still → **I2V** → register · continue | `media-queue` `image_to_video` / OAuth `queue-run-oauth` `register-clip` |
 | `voice` | 声轨 | Radio 测旁白 | `tts-rehearse --backend edge` |
 | `design` | 后期设计 | Studio / 设计成片 | `compose-preview` · `final --post-engine hyperframes` |
-| `post` | 锁画 | 七维审批 | `review-final` |
+| `post` | 锁画 | 十一维审批 | `review-final` |
 | `deliver` / `done` | Master | 导出 | `export-desktop` |
 
 ### 硬门禁（工程 · 不可跳）
@@ -139,7 +139,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 3. **continue**：末帧 SHA = 下镜 keyframe；缝 **hard**  
 4. **VO 预算**：`nar`≤55 字；hook/action 不 loop  
 5. **双烧**：设计路径 `plate-cards blank` + `subs off`  
-6. **交付**：七维全 pass + 完整观看 → `final_complete`  
+6. **交付**：十一维全 pass + 完整观看 → `final_complete`
 7. **失败**：`media-queue fail/requeue`；禁手改 queue JSON  
 8. **同源**：禁半片 Grok + 半片 FRW still/2V  
 
@@ -151,7 +151,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 2. 给主题 / 参考图 / film root  
 3. Agent 跑 `dispatch`，只执行 `next_cmd`  
 4. 静帧 / I2V 优先会话内 Imagine 工具；量产可用 OAuth 队列  
-5. 你批准 pilot → bulk → `final` → 你完整看片签七维  
+5. 你批准 pilot → bulk → `final` → 你完整看片签十一维
 
 ---
 
@@ -204,7 +204,7 @@ flowchart TB
   end
 
   subgraph OUT["交付"]
-    RV["review-final 七维"]
+    RV["review-final 十一维"]
     EX["export-desktop · final MP4"]
     RV --> EX
   end
@@ -344,7 +344,7 @@ AIFILM_TTS_BACKEND=edge          # 推荐中文成片
 
 | 插槽 | 默认 | 可切换 | 说明 |
 |------|------|--------|------|
-| 听感池 | 用户提供的 `assets/bgm/<mood>/*` 纯乐器 | `playful` / `warm` / `dark` | 当前仓库未附带曲目；每首须有 `.license.txt` |
+| 听感池 | 内置 5 首 CC0 程序化 R&B loop；也可放入已授权纯乐器 | `playful` / `warm` / `dark` | 每首内置或用户曲目均须有 `.license.txt` |
 | 工程默认 | 程序化 multi-style v3 | `--music-seed` / `audio_policy.music_seed` | 当前无已授权本地曲目时的唯一默认床轨 |
 | 用户文件 | — | `--music <path>` | 优先于生成 |
 | 外接生成 | off | `AIFILM_MUSIC_ARGV` | 失败回落池 / 程序化 |
@@ -515,9 +515,10 @@ MIT © [dex](https://github.com/sooneocean)
 ### 当前项目状态（自动同步）
 
 - 插件版本：`2.7.1`
+- Published skills：`2`
 - Skill Registry：`31/33` 项标记为 `implemented`
-- CLI 脚本：`166` 个
-- pytest 文件：`207` 个
+- Python 脚本：`181` 个
+- pytest 文件：`211` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

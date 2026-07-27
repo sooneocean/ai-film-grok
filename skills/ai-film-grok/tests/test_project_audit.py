@@ -166,3 +166,11 @@ def test_release_baseline_requires_clean_snapshot() -> None:
 
     assert release_baseline_is_writable("") is True
     assert release_baseline_is_writable("modified.py") is False
+
+
+def test_pytest_collects_every_shipped_contract_surface() -> None:
+    config = (ROOT / "pytest.ini").read_text(encoding="utf-8")
+
+    assert "skills/ai-film-grok/tests" in config
+    assert "skills/ai-film-project/tests" in config
+    assert "tests" in config

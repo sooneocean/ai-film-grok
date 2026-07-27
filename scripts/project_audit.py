@@ -54,7 +54,9 @@ def executable(name: str, *fallbacks: str) -> str:
 
 
 def plugin_version() -> str:
-    return str(json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))["version"])
+    return str(
+        json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))["version"]
+    )
 
 
 def git_value(*args: str) -> str:
@@ -118,7 +120,9 @@ def test_inventory() -> dict[str, int]:
     return {
         "test_files": len(tests),
         "script_files": len(scripts),
-        "script_lines": sum(path.read_text(encoding="utf-8").count("\n") for path in scripts),
+        "script_lines": sum(
+            path.read_text(encoding="utf-8").count("\n") for path in scripts
+        ),
     }
 
 
@@ -133,7 +137,9 @@ def doctor_snapshot() -> dict[str, Any]:
         "strict_status": data.get("strict_status", "unknown"),
         "strict_blocking": bool(data.get("strict_blocking")),
         "failed_checks": core.get("failed_checks", []),
-        "environment_advisories": (data.get("environment_advisories") or {}).get("warnings", []),
+        "environment_advisories": (data.get("environment_advisories") or {}).get(
+            "warnings", []
+        ),
         "provider_default": data.get("provider_default"),
     }
 
@@ -155,7 +161,11 @@ def coverage_snapshot() -> dict[str, Any]:
             "compose_render.py",
         ):
             row = next(
-                (value for key, value in files.items() if key.endswith(f"scripts/{name}")),
+                (
+                    value
+                    for key, value in files.items()
+                    if key.endswith(f"scripts/{name}")
+                ),
                 None,
             )
             if row:
@@ -193,14 +203,18 @@ def baseline_is_current(path: Path = BASELINE) -> bool:
     )
 
 
-def build_snapshot(*, run_tests: bool = False, full_tests: bool = False) -> dict[str, Any]:
+def build_snapshot(
+    *, run_tests: bool = False, full_tests: bool = False
+) -> dict[str, Any]:
     inventory = test_inventory()
     snapshot: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(),
         "head": current_head(),
         "source_fingerprint": source_fingerprint(),
         "branch": git_value("branch", "--show-current"),
-        "remote": git_value("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"),
+        "remote": git_value(
+            "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"
+        ),
         "version": plugin_version(),
         "working_tree": git_value("status", "--porcelain"),
         "inventory": inventory,
@@ -323,7 +337,9 @@ def markdown(snapshot: dict[str, Any]) -> str:
             f"- Coverage: `{snapshot['coverage'].get('percent_covered', snapshot['coverage'].get('status'))}`",
             *[
                 f"- Coverage `{name}`: `{percent}`"
-                for name, percent in (snapshot["coverage"].get("critical_modules") or {}).items()
+                for name, percent in (
+                    snapshot["coverage"].get("critical_modules") or {}
+                ).items()
             ],
             "",
             "## Remaining production gates",
@@ -337,15 +353,23 @@ def markdown(snapshot: dict[str, Any]) -> str:
         ]
     )
     warnings = doctor.get("environment_advisories") or []
-    lines.extend(f"- {warning}" for warning in warnings) if warnings else lines.append("- None")
+    lines.extend(f"- {warning}" for warning in warnings) if warnings else lines.append(
+        "- None"
+    )
     return "\n".join(lines) + "\n"
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
-    parser.add_argument("--run-tests", action="store_true", help="run the fast pytest suite")
-    parser.add_argument("--full-tests", action="store_true", help="run the full pytest suite")
+    parser.add_argument(
+        "--json", action="store_true", help="emit machine-readable JSON"
+    )
+    parser.add_argument(
+        "--run-tests", action="store_true", help="run the fast pytest suite"
+    )
+    parser.add_argument(
+        "--full-tests", action="store_true", help="run the full pytest suite"
+    )
     parser.add_argument(
         "--write-baseline", action="store_true", help="write the generated baseline"
     )

@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import hashlib
 import json
 import mimetypes
 import os
@@ -81,6 +82,7 @@ def _start_usage(
     model: str,
     shot_id: str = "",
     job_id: str = "",
+    input_hash: str = "",
 ) -> str | None:
     if root is None:
         return None
@@ -92,6 +94,7 @@ def _start_usage(
             model=model,
             shot_id=shot_id,
             job_id=job_id,
+            input_hash=input_hash,
         )
     except GenerationUsageError as exc:
         raise GrokOAuthError(f"usage tracking failed before provider request: {exc}") from exc
@@ -415,6 +418,19 @@ def _image_input_object(image: str | Path) -> dict[str, str]:
     if s.startswith("data:") or s.startswith("http://") or s.startswith("https://"):
         return {"url": s}
     return {"url": file_to_data_url(s)}
+
+
+def _local_image_sha256(image: str | Path | None) -> str | None:
+    """Hash local media for receipts without storing its path or data URL."""
+    if image is None:
+        return None
+    raw = str(image).strip()
+    if raw.startswith(("data:", "http://", "https://")):
+        return None
+    path = Path(raw).expanduser()
+    if not path.is_file():
+        return None
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 # ── Probe ──────────────────────────────────────────────────────────────
@@ -842,12 +858,24 @@ def video_submit(
         raise GrokOAuthError(
             f"model {model} is image-to-video only — pass --image (see docs.x.ai Imagine Video 1.5)"
         )
+    input_provenance = {
+        "keyframe_sha256": _local_image_sha256(image),
+        "reference_image_sha256s": [
+            digest
+            for ref in reference_images or []
+            if (digest := _local_image_sha256(ref)) is not None
+        ],
+    }
+    input_hash = hashlib.sha256(
+        json.dumps(input_provenance, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     generation_id = _start_usage(
         usage_root,
         operation="i2v" if image is not None or reference_images else "t2v",
         model=model,
         shot_id=shot_id,
         job_id=job_id,
+        input_hash=input_hash,
     )
     try:
         resp = _http_json(
@@ -888,6 +916,7 @@ def video_submit(
         "resolution": resolution,
         "source": tok.get("source"),
         "has_image": image is not None,
+        "input_provenance": input_provenance,
         "operation": "videos.generations",
         "generation_id": generation_id,
         "usage": normalize_usage((resp or {}).get("usage") if isinstance(resp, dict) else None),

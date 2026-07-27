@@ -1,8 +1,8 @@
 # feat: Full ai-film-grok optimization — 4 technical modules + 16 infrastructure upgrades
 
 **Created:** 2026-07-23
-**Status:** active
-**Target repo:** ai-film-grok (plugin root: `/Users/dex/.grok/plugins/ai-film-grok`)
+**Status:** superseded on 2026-07-27; retained as historical input only
+**Target repo:** ai-film-grok
 **Total work units:** 20 (U1–U20)
 
 ---

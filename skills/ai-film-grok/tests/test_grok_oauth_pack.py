@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -99,6 +100,49 @@ def test_video_submit_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     out = go.video_submit("motion", image="/tmp/x.png", duration=6)
     assert out["request_id"] == "rid-123"
     assert out["ok"] is True
+
+
+def test_video_submit_records_local_reference_hashes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    keyframe = tmp_path / "keyframe.png"
+    style = tmp_path / "style.png"
+    keyframe.write_bytes(b"keyframe")
+    style.write_bytes(b"style")
+    monkeypatch.setattr(
+        go,
+        "get_access_token",
+        lambda **_k: {"token": "t", "api_base": "https://api.x.ai/v1", "source": "test"},
+    )
+    monkeypatch.setattr(go, "_http_json", lambda *a, **k: {"request_id": "rid-refs"})
+    monkeypatch.setattr(go, "_image_input_object", lambda x: {"url": "data:image/png;base64,AA"})
+    out = go.video_submit("motion", image=keyframe, reference_images=[style])
+    assert out["input_provenance"]["keyframe_sha256"] == hashlib.sha256(b"keyframe").hexdigest()
+    assert out["input_provenance"]["reference_image_sha256s"] == [
+        hashlib.sha256(b"style").hexdigest()
+    ]
+
+
+def test_video_submit_binds_reference_provenance_to_usage_ledger(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    keyframe = tmp_path / "keyframe.png"
+    style = tmp_path / "style.png"
+    keyframe.write_bytes(b"keyframe")
+    style.write_bytes(b"style")
+    monkeypatch.setattr(
+        go,
+        "get_access_token",
+        lambda **_k: {"token": "t", "api_base": "https://api.x.ai/v1", "source": "test"},
+    )
+    monkeypatch.setattr(go, "_http_json", lambda *a, **k: {"request_id": "rid-ledger"})
+    monkeypatch.setattr(go, "_image_input_object", lambda x: {"url": "data:image/png;base64,AA"})
+    go.video_submit("motion", image=keyframe, reference_images=[style], usage_root=tmp_path)
+    ledger = json.loads((tmp_path / "receipts" / "generation-usage.json").read_text())
+    started = next(event for event in ledger["events"] if event["phase"] == "started")
+    assert len(started["input_hash"]) == 64
+    assert str(keyframe) not in json.dumps(ledger)
+    assert str(style) not in json.dumps(ledger)
 
 
 @pytest.mark.slow

@@ -3,6 +3,15 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.7.1] — 2026-07-27
+
+### Fixed — release evidence and shipped-surface verification
+
+- Release baselines now require a clean working tree and bind plugin version, source fingerprint, and exact Git HEAD.
+- CI collects the main skill tests, the shipped `ai-film-project` validator tests, and root-level plugin contracts.
+- Generated status inventory covers every shipped skill instead of only the main skill directory.
+- Current documentation consistently describes the eleven-dimension review gate and `grok_primary` I2V default.
+
 ## [2.6.0] — 2026-07-24
 
 ### Added — Adult max IRON（肉戏/脱衣/露点铁律）
