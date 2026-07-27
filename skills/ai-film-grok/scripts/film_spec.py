@@ -48,6 +48,11 @@ from edit_policy import (
     validate_motion,
 )
 from framing_lint import lint_composition_rules, lint_framing_iron, lint_vertical_safe_area
+from narrative_timeline import (
+    NarrativeTimelineError,
+    validate_linear_narration,
+    validate_sfx_scene_bindings,
+)
 from rhythm import lint_rhythm
 from security_policy import SecurityPolicyError, validate_identifier
 from sound_plan import (
@@ -554,6 +559,7 @@ def validate_film_spec(
     *,
     assign_missing_ids: bool,
     film_root: Any | None = None,
+    enforce_narrative_timeline: bool = False,
 ) -> list[dict[str, Any]]:
     if not isinstance(spec, dict):
         raise FilmSpecError("film-spec must be a JSON object")
@@ -1518,6 +1524,29 @@ def validate_film_spec(
         raise FilmSpecError(
             "rhythm lint failed (rhythm_strict): " + ",".join(rhythm["codes"] or ["RHYTHM"])
         )
+
+    # Keep general schema/craft validation usable by authoring tools. Timeline
+    # playback is enforced at write-spec and render boundaries, where every VO
+    # line is actually committed to production.
+    if enforce_narrative_timeline:
+        try:
+            validate_linear_narration(
+                shots,
+                vo_mode=str(spec["vo_mode"]),
+                dialogue_spoken_lang=str(
+                    spec.get("dialogue_spoken_lang")
+                    or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
+                    or "ja"
+                ),
+                narration_spoken_lang=str(
+                    spec.get("narration_spoken_lang")
+                    or (spec.get("voice_policy") or {}).get("narration_spoken_lang")
+                    or "zh"
+                ),
+            )
+            validate_sfx_scene_bindings(spec.get("sound_plan"), shots)
+        except NarrativeTimelineError as exc:
+            raise FilmSpecError(f"narrative timeline invalid: {exc}") from exc
     # Frame chain (soft; lessons-2026-07-20-frame-chain) — soft/hold joins need end→start poses
     fch = lint_frame_chain(shots, transition_intents=intents)
     spec["_frame_chain"] = {

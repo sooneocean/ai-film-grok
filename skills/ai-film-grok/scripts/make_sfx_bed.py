@@ -483,6 +483,9 @@ def rnb_bgm(
     style: str | None = None,
     shot_starts: list[float] | None = None,
     events: list[dict] | None = None,
+    density: float = 0.5,
+    bass_presence: float = 0.5,
+    brightness: float = 0.5,
 ) -> np.ndarray:
     """Seductive late-night R&B with anti-fatigue arrangement (v3 multi-style).
 
@@ -575,10 +578,13 @@ def rnb_bgm(
 
     pad_mix = float(sp["pad_mix"])
     rhodes_mix = float(sp["rhodes_mix"])
-    kit_scale = float(sp["kit_scale"])
-    sub_scale = float(sp["sub_scale"])
-    air_amp = float(sp["air"])
-    bright = float(sp["bright"])
+    density = max(0.0, min(1.0, float(density)))
+    bass_presence = max(0.0, min(1.0, float(bass_presence)))
+    brightness = max(0.0, min(1.0, float(brightness)))
+    kit_scale = float(sp["kit_scale"]) * (0.55 + 0.9 * density)
+    sub_scale = float(sp["sub_scale"]) * (0.35 + 1.3 * bass_presence)
+    air_amp = float(sp["air"]) * (0.55 + 1.1 * brightness)
+    bright = max(-0.5, min(0.5, float(sp["bright"]) + brightness - 0.5))
     swing = float(sp["swing"])
     kit_pattern = str(sp["kit_pattern"])
     do_lofi = bool(sp["lofi"])
@@ -802,14 +808,35 @@ def generate_procedural_bgm_stem(
     seed: int | None = None,
     shot_starts: list[float] | None = None,
     events: list[dict] | None = None,
+    density: float = 0.5,
+    bass_presence: float = 0.5,
+    brightness: float = 0.5,
 ) -> np.ndarray:
     """Generate a single procedural BGM stem according to target mood and mutated seed."""
     m = (mood or "rnb").lower()
     if m in ("rnb", "r&b", "sensual", "seductive", "ecchi", "soul"):
-        return rnb_bgm(dur, amp=amp, bpm=bpm, seed=seed, shot_starts=shot_starts, events=events)
+        return rnb_bgm(
+            dur,
+            amp=amp,
+            bpm=bpm,
+            seed=seed,
+            shot_starts=shot_starts,
+            events=events,
+            density=density,
+            bass_presence=bass_presence,
+            brightness=brightness,
+        )
     elif m == "dark":
         return rnb_bgm(
-            dur, amp=amp * 0.9, bpm=68.0, seed=seed, shot_starts=shot_starts, events=events
+            dur,
+            amp=amp * 0.9,
+            bpm=68.0,
+            seed=seed,
+            shot_starts=shot_starts,
+            events=events,
+            density=density,
+            bass_presence=bass_presence,
+            brightness=brightness,
         )
     elif m == "ambient":
         return rnb_bgm(
@@ -820,6 +847,9 @@ def generate_procedural_bgm_stem(
             style="ambient",
             shot_starts=shot_starts,
             events=events,
+            density=density,
+            bass_presence=bass_presence,
+            brightness=brightness,
         )
     elif m == "warm":
         return rnb_bgm(
@@ -830,10 +860,21 @@ def generate_procedural_bgm_stem(
             style="velvet",
             shot_starts=shot_starts,
             events=events,
+            density=density,
+            bass_presence=bass_presence,
+            brightness=brightness,
         )
     else:
         return rnb_bgm(
-            dur, amp=amp * 0.85, bpm=82.0, seed=seed, shot_starts=shot_starts, events=events
+            dur,
+            amp=amp * 0.85,
+            bpm=82.0,
+            seed=seed,
+            shot_starts=shot_starts,
+            events=events,
+            density=density,
+            bass_presence=bass_presence,
+            brightness=brightness,
         )
 
 
@@ -873,7 +914,14 @@ def build_bed(
             ch_seed = base_seed + i
             ch_mood = str(chapter.get("mood") or mood)
             ch_stem = generate_procedural_bgm_stem(
-                gen_dur, mood=ch_mood, amp=0.17, bpm=bpm, seed=ch_seed
+                gen_dur,
+                mood=ch_mood,
+                amp=0.17,
+                bpm=float(chapter.get("bpm") or bpm),
+                seed=ch_seed,
+                density=float(chapter.get("density", 0.5)),
+                bass_presence=float(chapter.get("bass_presence", 0.5)),
+                brightness=float(chapter.get("brightness", 0.5)),
             )
 
             i0 = int(st * SR)

@@ -313,13 +313,31 @@ class PromptInjector:
 
         # Keyframe-first state index: tell agent which pixel ref to use
         reference_instruction = ""
+        style_reference = (
+            self.bible.get("style_reference")
+            if isinstance(self.bible.get("style_reference"), dict)
+            else {}
+        )
+        if style_reference.get("staged_path") and style_reference.get("sha256"):
+            reference_instruction = (
+                "Style reference: "
+                f"{style_reference['staged_path']} (sha256={style_reference['sha256']}) — "
+                "attach/use this uploaded image as the PRIMARY style reference for every still; "
+                "match its linework/rendering, palette, texture, and lighting language; "
+                "do not substitute a new style. "
+            )
         if state_photo_paths:
             primary = state_photo_paths[0]
-            reference_instruction = (
-                f"State photo ref: {primary} — image_edit MUST use this state photo "
-                f"(or undress-anchor / prior undressed still) as PRIMARY ref for wardrobe_state={wardrobe_state}; "
+            if reference_instruction:
+                reference_instruction = reference_instruction.replace(
+                    "PRIMARY style reference", "SECONDARY style-only reference"
+                )
+            state_instruction = (
+                f"State photo ref: {primary} — image_edit MUST use this state photo as the PRIMARY pixel reference "
+                f"(or undress-anchor / prior undressed still) for wardrobe_state={wardrobe_state}; "
                 f"do NOT restart from full cast master unless state=full"
             )
+            reference_instruction += state_instruction
 
         costume_line = ""
         if wardrobe_state in {"partial", "undressed", "bare"}:
@@ -525,6 +543,7 @@ class PromptInjector:
             "wardrobe_state": wardrobe_state,
             "state_photo_paths": state_photo_paths,
             "state_photo_primary": state_photo_paths[0] if state_photo_paths else None,
+            "style_reference": style_reference or None,
             "reference_instruction": reference_instruction or None,
             "prompt_text": final_prompt,
             "prompt_hash": _sha256(final_prompt),

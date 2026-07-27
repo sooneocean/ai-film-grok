@@ -596,7 +596,9 @@ def default_sound_plan_for_film(
         "mood": mood,
         "bed": True,
         "events": [],
-        "auto_sfx": True,
+        # SFX is story/action-specific. Do not invent an accent merely because
+        # a shot has a generic dramatic label.
+        "auto_sfx": False,
         "loudnorm": "auto",
         "target_lufs": DEFAULT_TARGET_LUFS,
     }
@@ -674,9 +676,11 @@ def validate_sound_plan(
     }
     if notes:
         out["_notes"] = notes
-    # default auto_sfx on unless author disabled
-    if "auto_sfx" not in out:
-        out["auto_sfx"] = True
+    # Default to authored scene cues only. Legacy projects may opt in explicitly.
+    auto_sfx = raw.get("auto_sfx", False)
+    if not isinstance(auto_sfx, bool):
+        raise SoundPlanError("sound_plan.auto_sfx must be boolean")
+    out["auto_sfx"] = auto_sfx
     return out
 
 

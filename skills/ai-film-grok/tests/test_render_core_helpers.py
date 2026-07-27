@@ -16,9 +16,11 @@ from render_final import (
     _ensure_caption_density,
     build_subtitle_cues_for_shots,
     caption_text_for_shot,
+    narration_for_shot,
     split_units,
     spoken_text_for_shot,
     unit_timings,
+    validate_linear_narration,
     voice_for_shot,
 )
 from util import write_json
@@ -51,6 +53,43 @@ def test_shot_text_and_voice_follow_language_contract() -> None:
     assert spoken_text_for_shot(character) == "行く"
     assert voice_for_shot(character, default_voice="default", cast_voices={}, vo_mode="character")
     assert caption_text_for_shot({"nar": "中文", "nar_ja": "日本語"}, caption_lang="ja") == "日本語"
+
+
+def test_metadata_is_not_promoted_to_spoken_narration() -> None:
+    assert narration_for_shot({"title": "角色表", "purpose": "格式说明"}) == ""
+    with pytest.raises(RenderError, match="metadata is not playable VO"):
+        validate_linear_narration(
+            [{"id": "metadata", "title": "角色表"}],
+            vo_mode="storyteller",
+            dialogue_spoken_lang="ja",
+            narration_spoken_lang="zh",
+        )
+
+
+def test_linear_narration_rejects_replayed_causal_beat() -> None:
+    with pytest.raises(RenderError, match="repeats narration from shot01"):
+        validate_linear_narration(
+            [
+                {"id": "shot01", "nar": "她推开门，雨声扑面而来。"},
+                {"id": "shot02", "nar": "她 推开门，雨声扑面而来！"},
+            ],
+            vo_mode="storyteller",
+            dialogue_spoken_lang="ja",
+            narration_spoken_lang="zh",
+        )
+
+
+def test_linear_narration_uses_actual_character_tts_text() -> None:
+    with pytest.raises(RenderError, match="repeats narration from shot01"):
+        validate_linear_narration(
+            [
+                {"id": "shot01", "speaker": "heroine", "nar": "她点头", "dialogue_ja": "行く"},
+                {"id": "shot02", "speaker": "heroine", "nar": "她转身", "dialogue_ja": "行く"},
+            ],
+            vo_mode="character",
+            dialogue_spoken_lang="ja",
+            narration_spoken_lang="zh",
+        )
 
 
 def test_subtitle_cues_stop_at_raw_speech_not_padding() -> None:

@@ -321,6 +321,12 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertTrue(after["gates"]["final_complete"], after)
         review = after_manifest["outputs"]["final_review"]
         self.assertTrue(review["scorecard"]["all_pass"])
+        ledger = json.loads((self.root / "receipts" / "quality-ledger.json").read_text())
+        self.assertFalse(ledger["retrospective_complete"])
+        self.assertTrue(ledger["delivery"]["final_complete"])
+        report = json.loads((self.root / "receipts" / "production-report.json").read_text())
+        self.assertEqual(report["kind"], "production-report")
+        self.assertTrue((self.root / "out" / "production-report.html").is_file())
 
     @pytest.mark.slow
     def test_review_final_rejects_incomplete_or_failing_scorecard(self) -> None:

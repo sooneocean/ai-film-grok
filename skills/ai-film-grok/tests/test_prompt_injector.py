@@ -77,3 +77,29 @@ def test_state_photo_path_stays_in_receipt_not_provider_prompt(tmp_path):
     assert receipt["reference_instruction"].startswith("State photo ref: " + state_photo)
     assert receipt["prompt_metrics"]["estimated_input_tokens"] > 0
     assert receipt["prompt_text"].count("no text") == 1
+
+
+def test_uploaded_style_reference_is_required_in_reference_instruction(tmp_path):
+    bible = {
+        "style_reference": {
+            "staged_path": "/production/source/style-ref-hero.png",
+            "sha256": "a" * 64,
+        }
+    }
+    receipt = PromptInjector(bible).assemble({"id": "shot03", "dsl": {}}, tmp_path)
+    assert receipt["style_reference"]["sha256"] == "a" * 64
+    assert "PRIMARY style reference" in receipt["reference_instruction"]
+
+
+def test_state_photo_remains_primary_over_style_reference(tmp_path):
+    style_ref = "/production/source/style-ref-hero.png"
+    state_photo = "/production/cast/hero-undressed.png"
+    bible = {
+        "style_reference": {"staged_path": style_ref, "sha256": "a" * 64},
+        "characters": {"hero": {"identity": "short black hair"}},
+        "cast_state_masters": {"hero": {"undressed": state_photo}},
+    }
+    shot = {"id": "shot04", "heroine_ids": ["hero"], "wardrobe_state": "undressed", "dsl": {}}
+    receipt = PromptInjector(bible, template_version="I2V").assemble(shot, tmp_path)
+    assert "SECONDARY style-only reference" in receipt["reference_instruction"]
+    assert "PRIMARY pixel reference" in receipt["reference_instruction"]

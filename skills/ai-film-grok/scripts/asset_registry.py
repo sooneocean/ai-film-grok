@@ -173,8 +173,10 @@ def _ensure_cast_state_slots(
     bible: dict[str, Any],
     character_id: str,
     states_used: set[str],
+    *,
+    write: bool,
 ) -> dict[str, Any]:
-    """Register expected paths in cast_state_masters; create dirs (no pixel gen)."""
+    """Register expected paths in cast_state_masters; create directories only when writing."""
     csm = bible.setdefault("cast_state_masters", {})
     if not isinstance(csm, dict):
         csm = {}
@@ -183,8 +185,9 @@ def _ensure_cast_state_slots(
     if not isinstance(block, dict):
         block = {}
     states_dir = root / "canonical" / "cast-states" / character_id
-    states_dir.mkdir(parents=True, exist_ok=True)
-    (root / "canonical" / "wardrobe").mkdir(parents=True, exist_ok=True)
+    if write:
+        states_dir.mkdir(parents=True, exist_ok=True)
+        (root / "canonical" / "wardrobe").mkdir(parents=True, exist_ok=True)
 
     needed = set(states_used) | {"full"}
     if states_used & {"partial", "undressed", "bare"}:
@@ -474,7 +477,7 @@ def sync_assets(
         )
         used = used_by_char.get(cid) or {"full"}
         variants = _ensure_wardrobe_variants(bible, cid, used, force=False)
-        slots = _ensure_cast_state_slots(root, bible, cid, used)
+        slots = _ensure_cast_state_slots(root, bible, cid, used, write=write)
         # forbid drift defaults
         forbid = (
             body.get("forbid_drift")
@@ -669,8 +672,20 @@ def assets_status(root: Path, *, auto_sync: bool = False) -> dict[str, Any]:
 def assets_check(root: Path, *, sync_first: bool = True) -> dict[str, Any]:
     """Consistency check: registry ↔ state-index ↔ wardrobe monotonicity."""
     root = Path(root).expanduser().resolve()
-    if sync_first or not registry_path(root).is_file():
+    if sync_first:
         sync_rep = sync_assets(root, write=True)
+    elif not registry_path(root).is_file():
+        sync_rep = {
+            "ok": False,
+            "consistency": {
+                "ok": False,
+                "aligned": False,
+                "issues": ["ASSET_REGISTRY_MISSING"],
+                "generate_plan_preview": [],
+            },
+            "counts": {},
+            "line": "assets-registry.json missing; run: aifilm assets sync --root …",
+        }
     else:
         sync_rep = assets_status(root)
         reg = read_json(registry_path(root)) or {}

@@ -125,6 +125,55 @@ class PipelineValidationTests(unittest.TestCase):
             saved = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
             self.assertEqual(saved["scenes"][0]["shots"][0]["id"], "shot01")
 
+    def test_write_spec_rejects_repeated_actual_tts_and_unbound_sfx(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            self.init_root(root)
+            spec = valid_spec()
+            shots = spec["scenes"][0]["shots"]  # type: ignore[index]
+            shots.extend(
+                [
+                    {
+                        "id": "shot02",
+                        "title": "转身",
+                        "dramatic_function": "action",
+                        "speaker": "heroine",
+                        "nar": "她转身离开。",
+                        "dialogue_ja": "行く",
+                        "dsl": {
+                            "subject": "an adult woman",
+                            "action": "turns away",
+                            "motion": "turn",
+                        },
+                    },
+                    {
+                        "id": "shot03",
+                        "title": "回应",
+                        "dramatic_function": "reaction",
+                        "speaker": "heroine",
+                        "nar": "她停在门边。",
+                        "dialogue_ja": "行く",
+                        "dsl": {"subject": "an adult woman", "action": "stops", "motion": "still"},
+                    },
+                ]
+            )
+            rc, result = self.write_spec(root, spec)
+            self.assertEqual(rc, 2)
+            self.assertIn("repeats narration", result["error"])
+
+            shots.pop()
+            spec["sound_plan"] = {
+                "mood": "rnb",
+                "events": [{"type": "sfx_accent", "kind": "chime", "shot_id": "missing"}],
+            }
+            rc, result = self.write_spec(root, spec)
+            self.assertEqual(rc, 2)
+            self.assertIn("unknown shot_id", result["error"])
+
+            spec["sound_plan"]["events"][0]["shot_id"] = "shot02"  # type: ignore[index]
+            rc, result = self.write_spec(root, spec)
+            self.assertEqual(rc, 0, result)
+
     @pytest.mark.slow
     def test_register_media_rejects_unsafe_shot_id_without_writing_outside_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

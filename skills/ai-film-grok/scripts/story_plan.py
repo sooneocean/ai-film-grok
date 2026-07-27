@@ -383,6 +383,28 @@ _CHAR_META_BLOCKLIST: frozenset[str] = frozenset(
         "转场",
     }
 )
+
+
+def _is_non_story_section(title: str) -> bool:
+    """Whether a labelled source section is production metadata, not a scene."""
+    label = re.sub(r"[【】#*\s]", "", title or "").casefold()
+    return any(
+        marker in label
+        for marker in (
+            "角色表",
+            "人物表",
+            "角色设定",
+            "人物设定",
+            "格式",
+            "制作说明",
+            "制作备注",
+            "镜头说明",
+            "字幕说明",
+            "元数据",
+        )
+    )
+
+
 _BULLET_CHAR = re.compile(
     r"^[\-\*·]\s*([^\s:：\-\d]{2,12})\s*[:：]",
     re.MULTILINE,
@@ -1348,7 +1370,10 @@ def _scene_chunks(raw: str) -> list[dict[str, str]]:
             end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
             body = text[start:end].strip()
             title = m.group(1).strip()[:40] if m.lastindex else f"Scene {i + 1}"
-            chunks.append({"title": title or f"Scene {i + 1}", "body": body or title})
+            # A heading is production metadata, not a playable scene. Do not
+            # turn it into VO/shot material merely to keep the plan non-empty.
+            if body and not _is_non_story_section(title):
+                chunks.append({"title": title or f"Scene {i + 1}", "body": body})
         if chunks:
             return chunks
 
@@ -1361,11 +1386,12 @@ def _scene_chunks(raw: str) -> list[dict[str, str]]:
             start = m.end()
             end = sec_matches[i + 1].start() if i + 1 < len(sec_matches) else len(text)
             body = text[start:end].strip()
-            # skip pure metadata sections (角色表 / 格式) with no VO/action
-            if not body and "角色" in title:
+            # Never manufacture a scene from a timing/format/character heading.
+            # A heading alone has neither observable action nor narration.
+            if not body or _is_non_story_section(title):
                 continue
-            chunks.append({"title": title, "body": body or title})
-        if len(chunks) >= 2:
+            chunks.append({"title": title, "body": body})
+        if chunks:
             return chunks[:8]
 
     paras = _split_paragraphs(text)
@@ -1767,7 +1793,9 @@ def extract_beats(
             "importance": sp["importance"],
             "dramatic_function": sp["dramatic_function"],
             "targetDuration": dur,
-            "shots_n": int(sp["shots_n"]),
+            # Do not manufacture a second spoken take from the same source
+            # sentence. Additional coverage needs its own authored beat.
+            "shots_n": min(int(sp["shots_n"]), max(1, len(chunk_sents))),
             "source_text": action_text,
             "obstacle": AUTHORING_PLACEHOLDER,
             "tactic": AUTHORING_PLACEHOLDER,
@@ -1815,6 +1843,18 @@ def _camera_axis(df: str, idx: int) -> str:
     if idx % 3 == 1 and base == "dolly_in":
         return "ecu_hold"
     return base
+
+
+def _motion_text(axis: str) -> str:
+    """Compile a camera label into a playable camera/body instruction."""
+    return {
+        "dolly_in": "slow dolly in as the body commits to the action",
+        "pan_with": "camera pans with the character's movement",
+        "low_lean": "low-angle lean in with a visible weight shift",
+        "ecu_hold": "locked close-up with breathing and an eye shift",
+        "pull_back": "slow pull back as the result settles",
+        "locked": "locked frame with a small observable body shift",
+    }.get(axis, "restrained camera move with a visible body shift")
 
 
 def _production_mode(df: str, shot_role: str) -> str:
@@ -1994,7 +2034,7 @@ def plan_shots(
             "finish": "arch-finish residual-tremor static hold",
             "hook": "lean to ear residual pull-back hold",
         }
-        motion = motion_by_cb.get(coitus_beat) or axis.replace("_", " ")
+        motion = motion_by_cb.get(coitus_beat) or _motion_text(axis)
         char_ids = list(character_ids[:2]) or ["hero"]
         subject = f"vertical 9:16, adult {char_ids[0] if char_ids else 'hero'}"
         if wardrobe_state in {"partial", "undressed", "bare"}:
@@ -2679,9 +2719,32 @@ def project_graph_to_film_spec(
         "climax_choice": story.get("climax_choice") or "",
         "ending_hook": story.get("ending_hook") or "",
     }
-    # P0-2: project act_structure + pace_chart from story contract
-    if story.get("act_structure") and not di.get("act_structure"):
-        di["act_structure"] = story["act_structure"]
+    # Optional character/story fields are validated when present. Do not emit
+    # empty draft placeholders into the executable projection.
+    for field in (
+        "protagonist_goal",
+        "protagonist_want",
+        "protagonist_need",
+        "protagonist_arc",
+        "opposition",
+        "stakes",
+        "climax_choice",
+        "ending_hook",
+    ):
+        if not str(di.get(field) or "").strip():
+            di.pop(field, None)
+    # A draft scaffold has blank act fields. Keep it in drama-graph authoring
+    # state, but never project it as an executable film-spec contract.
+    draft_act = story.get("act_structure")
+    if (
+        isinstance(draft_act, dict)
+        and not di.get("act_structure")
+        and all(
+            str(draft_act.get(key) or "").strip()
+            for key in ("setup", "confrontation", "resolution")
+        )
+    ):
+        di["act_structure"] = draft_act
     if story.get("pace_chart") and not di.get("pace_chart"):
         di["pace_chart"] = story["pace_chart"]
     if heat.get("audience_profile"):

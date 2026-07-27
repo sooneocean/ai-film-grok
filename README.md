@@ -253,6 +253,28 @@ calibrate` 只校准 early-reject 指标，不能替代 `review-final`。`aifilm
 原生 Imagine 工具须在调用后执行 `aifilm usage record`。详见
 [generation-usage-accounting.md](skills/ai-film-grok/references/generation-usage-accounting.md)。
 
+### 成片生成复盘
+
+`review-final` 通过后会自动写入 `receipts/production-report.json` 与
+`out/production-report.html`，统计 T2I、I2I、I2V、T2V、TTS 的请求、状态、重试、
+Token 与真实成本；HTML 会随 Desktop export 一起带出。算力统一采用真实成本，未知
+provider 回执绝不换算为零。
+
+在 `production-book.json` 中明确配置可比作品库，才会生成同模板趋势：
+
+```json
+"optimization": {
+  "template_id": "vertical-drama-v1",
+  "history_root": "/Users/dex/AI FILM SPACE"
+}
+```
+
+也可只读重建或临时覆盖作品库：
+
+```bash
+aifilm production-report emit --root "<film-root>" --history-root "/Users/dex/AI FILM SPACE"
+```
+
 ### 工程一键交付顺序（勿与工序心智搞反）
 
 ```text
@@ -492,10 +514,10 @@ MIT © [dex](https://github.com/sooneocean)
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.6.9`
+- 插件版本：`2.7.1`
 - Skill Registry：`31/33` 项标记为 `implemented`
-- CLI 脚本：`156` 个
-- pytest 文件：`201` 个
+- CLI 脚本：`166` 个
+- pytest 文件：`207` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

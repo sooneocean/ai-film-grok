@@ -33,11 +33,13 @@ def _base_spec(shots: list[dict]) -> dict:
     }
 
 
-def _shot(sid: str, *, nar: str = "旁白。", dramatic_function: str = "approach") -> dict:
+def _shot(sid: str, *, nar: str | None = None, dramatic_function: str = "approach") -> dict:
     return {
         "id": sid,
         "dramatic_function": dramatic_function,
-        "nar": nar,
+        # Keep the fixture focused on craft gates, not the independent
+        # no-replayed-narration production contract.
+        "nar": nar if nar is not None else f"{sid} 的新叙事推进。",
         "dsl": {
             "subject": "woman",
             "cast": ["heroine"],

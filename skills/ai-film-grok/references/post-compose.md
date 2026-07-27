@@ -28,6 +28,32 @@
 - 设计字幕与 FFmpeg burned-in **字幕双烧**（`hyperframes|remotion` 时 FFmpeg 必须 `subs off`）。
 - 设计片头与 FFmpeg burned-in **标题双烧**（`hyperframes|remotion` 时 FFmpeg 必须 **`plate-cards blank`**：pad 有时长、无字；字只由 HF/Remotion 画）。见 [lessons-2026-07-20-title-double-burn.md](lessons-2026-07-20-title-double-burn.md)。
 
+## 平台化短剧包装（HyperFrames）
+
+每集可在 film root 放置 `post-package.json`；从
+[`templates/post-package.example.json`](../templates/post-package.example.json) 复制后只改内容。
+它是**后期包装合约**，不替代 `film-spec.json` 的故事真相：
+
+| 字段 | 平台职责 | 交付证据 |
+|---|---|---|
+| `intro` | 固定片头的集号、副标题与 tagline | `composition-data.json` + HTML title layer |
+| `outro` | 下一集钩子与 CTA | HTML end layer |
+| `captions` | 字幕主题、短句最大字数、显示语言 | `final.srt` phrase split + `media-stage-receipt.json` |
+| `safe_area` | 竖屏字幕安全区 | 导出的 CSS caption bottom + package receipt |
+
+规则：包装存在时 HyperFrames 是**唯一**的标题、片尾与字幕画字层；FFmpeg plate 必须
+`subs=off` 且 `plate-cards=blank`。无 `post-package.json` 时保持旧项目行为，不推断或覆盖
+该集的 CLI 标题/片尾覆写。未知字段或不安全的字幕长度/安全区会 fail closed。
+
+推荐闭环：
+
+```bash
+cp "$SKILL/templates/post-package.example.json" "<film-root>/post-package.json"
+"$AIFILM" export-compose --root "<film-root>" --engine hyperframes --layout underlay --force
+"$AIFILM" compose-render --root "<film-root>" --engine hyperframes --layout underlay
+# 再以 ffprobe、抽帧与 review-final 完成正式交付；export/render 本身不等于批准。
+```
+
 ## 流畅度：何时上 HyperFrames / Remotion
 
 | 阶段 | 命令 | 作用 |
@@ -183,6 +209,19 @@ npx remotion render src/index.ts Film out/film_remotion.mp4
 ```
 
 HTML 根节点会写：`data-compose-preset`、`data-caption-clock-offset`。
+
+## 短剧平台包装包（HyperFrames）
+
+平台包装与剧情内容分离：影像、旁白、BGM 仍由 `film-spec` 与 plate 决定；包装包只拥有
+片头、片尾、字幕分句与安全区，并优先于 compose preset：
+
+| 文件 | 责任 | 适用范围 |
+|---|---|---|
+| `<film>/post-package.json` | 固定短剧平台政策：intro/outro 模式、CTA、字幕最大字数、安全区 | 同一平台的每一集 |
+
+从 `templates/post-package.example.json` 复制平台包。导出会把实际使用的包写入
+`compose/package.json` 与 `compose/hyperframes/media-stage-receipt.json`。包装包不能改写
+I2V、BGM、字幕语言或连续接戏规则；underlay plate 必须继续无烧字，避免双烧。
 
 ### Caption 时钟（防字飘戏后）
 

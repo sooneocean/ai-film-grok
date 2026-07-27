@@ -108,6 +108,7 @@ def new_production_book(
         "stale_reasons": [],
         "exception_ledger": [],
         "assets": [],
+        "optimization": {},
     }
     book["content_sha256"] = stable_content_hash(book)
     return book
@@ -138,6 +139,9 @@ def _normalize_legacy(raw: dict[str, Any]) -> dict[str, Any]:
     book.setdefault("stale_reasons", [])
     book.setdefault("exception_ledger", [])
     book.setdefault("assets", [])
+    book.setdefault("optimization", {})
+    if not isinstance(book["optimization"], dict):
+        raise ProductionBookError("optimization must be an object")
     book.setdefault("created_at", utc_now())
     book.setdefault("updated_at", book["created_at"])
     book["content_sha256"] = stable_content_hash(book)

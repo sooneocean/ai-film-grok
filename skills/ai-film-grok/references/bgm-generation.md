@@ -112,6 +112,28 @@ MUSIC_GEN_BASE_URL=http://127.0.0.1:7860
 
 生产更稳：**离线生成 → 池**，不要每 final 现跑。
 
+## 镜头级情绪音乐（music_cue）
+
+每个 shot 可独立指定 `music_cue`，让同一主题在不同情绪中换密度与力度，而不是只换一个随机 seed：
+
+```json
+{
+  "mood": "dark",
+  "energy": 0.72,
+  "density": 0.48,
+  "bass_presence": 0.7,
+  "brightness": 0.25,
+  "stem_profile": "pulse",
+  "motif_id": "secret-theme",
+  "transition": "crossfade",
+  "duck_db": -2
+}
+```
+
+缺少 cue 时，会按 `dramatic_function` 推导：危机偏 dark/pulse，高潮偏 rnb/full，铺陈偏 ambient/pad，余韵偏 warm/thin。程序 BGM 会按镜头切段，确定性地变更动机 seed、能量、鼓组密度、低频与高频层，以及 stem profile；外部曲库则保留原曲，仅施加可解释的镜头级 gain/duck 自动化。实际路由会写入 `mix_report.json.music_cue_routing`，不会把“seed 不同”当作音乐变化的证明。
+
+旁白仍为中文、角色对白仍为日文，字幕仍为中文；`music_cue` 只控制音乐层，不会改变语言分轨。
+
 ## 场景自适应（相关）
 
 - [audio-recipe.md](audio-recipe.md) — 说书厚薄 / bed_focus  

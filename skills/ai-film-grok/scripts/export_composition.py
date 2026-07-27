@@ -24,12 +24,14 @@ from edit_policy import (
     suggest_join_intent,
 )
 from film_spec import FilmSpecError, validate_film_spec
+from platform_package import PlatformPackageError, load_platform_package
 from security_policy import (
     SecurityPolicyError,
     reject_symlinks,
     safe_existing_file,
     safe_workspace_directory,
 )
+from show_package import ShowPackageError, resolve_show_package
 from util import read_json as _util_read_json
 from util import utc_now, write_json
 
@@ -62,6 +64,16 @@ def read_json(path: Path) -> dict[str, Any]:
     if data is None:
         raise ComposeExportError(f"Missing JSON: {path}")
     return data
+
+
+def final_delivery_has_burned_subtitles(root: Path) -> bool:
+    """Read the plate receipt before allowing a designed-caption underlay export."""
+    path = root / "out" / "final-delivery.json"
+    if not path.is_file():
+        return False
+    data = read_json(path)
+    subtitles = data.get("subtitles") if isinstance(data.get("subtitles"), dict) else {}
+    return subtitles.get("burned_in") is True
 
 
 def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
@@ -327,6 +339,14 @@ def build_timeline_package(
         validate_film_spec(spec, assign_missing_ids=False)
     except FilmSpecError as exc:
         raise ComposeExportError(f"film-spec invalid: {exc}") from exc
+    try:
+        platform_package = load_platform_package(root)
+    except PlatformPackageError as exc:
+        raise ComposeExportError(f"post-package invalid: {exc}") from exc
+    try:
+        show_package = resolve_show_package(root, spec)
+    except ShowPackageError as exc:
+        raise ComposeExportError(f"show-package invalid: {exc}") from exc
 
     shots = flatten_shots(spec)
     if not shots:
@@ -456,7 +476,11 @@ def build_timeline_package(
                 "en": en,
                 "mode": caption_mode,
             }
-            cues.extend(expand_cues_phrase_split([base], max_chars=HF_CAPTION_MAX_CHARS))
+            cues.extend(
+                expand_cues_phrase_split(
+                    [base], max_chars=int(platform_package["caption_policy"]["max_chars"])
+                )
+            )
     else:
         enriched: list[dict[str, Any]] = []
         for i, cue in enumerate(cues):
@@ -487,7 +511,9 @@ def build_timeline_package(
                 }
             )
         # Always phrase-split for HF: long SRT lines become 一句一卡
-        cues = expand_cues_phrase_split(enriched, max_chars=HF_CAPTION_MAX_CHARS)
+        cues = expand_cues_phrase_split(
+            enriched, max_chars=int(platform_package["caption_policy"]["max_chars"])
+        )
         caption_source = f"{caption_source}+phrase_split"
 
     # Optional pre-mixed audio / final film as underlay references
@@ -541,6 +567,8 @@ def build_timeline_package(
         "captions": cues,
         "caption_source": caption_source,
         "caption_mode": caption_mode,
+        "platform_package": platform_package,
+        "show_package": show_package,
         "audio": {
             "vo_rel": str(vo_path.relative_to(root)) if vo_path else None,
             "bgm_rel": str(bgm_path.relative_to(root)) if bgm_path else None,
@@ -907,7 +935,7 @@ def build_title_sequence_html(
         subtitle_block += f'<p class="ts-tagline">{tagline}</p>'
 
     inner = f"""<h1 class="ts-title">{safe_title}</h1>{subtitle_block}{motif_tags}"""
-    return f"""    <section id="title-sequence" class="clip overlay title-sequence" data-start="0" data-duration="3" data-track-index="2" data-preset="{html.escape(preset)}">
+    return f"""    <section id="title-sequence" class="clip overlay title-sequence" data-start="0" data-duration="{float(title_dur):.3f}" data-track-index="2" data-preset="{html.escape(preset)}">
       <div class="ts-backdrop">
         <div class="ts-content">{inner}</div>
       </div>
@@ -920,6 +948,8 @@ def build_end_roll_html(
     preset: str,
     styles: dict[str, str],
     credits: dict[str, Any],
+    *,
+    output_duration: float | None = None,
 ) -> str | None:
     if not end_roll:
         return None
@@ -955,6 +985,14 @@ def build_end_roll_html(
 
     scroll_dur = float(end_roll.get("scroll_duration_sec") or 5)
     scroll_dur = max(2.0, min(12.0, scroll_dur))
+    available_duration = (
+        float(output_duration)
+        if output_duration is not None
+        else float(package["film_timeline"].get("output_duration") or 0)
+    )
+    scroll_dur = min(scroll_dur, max(0.0, available_duration))
+    if scroll_dur <= 0:
+        return None
 
     section_blocks = []
     for heading, items in sections:
@@ -969,10 +1007,53 @@ def build_end_roll_html(
             f'<div class="er-section"><h3>{html.escape(heading)}</h3>{lines}</div>'
         )
 
-    inner = "".join(section_blocks)
-    return f"""    <section id="end-roll" class="clip overlay end-roll" data-start="{max(0.0, float(package["film_timeline"].get("output_duration") or 0) - scroll_dur):.3f}" data-duration="{scroll_dur:.3f}" data-track-index="6">
+    platform_copy = ""
+    next_episode = str(end_roll.get("next_episode") or "").strip()
+    cta = str(end_roll.get("cta") or "").strip()
+    if next_episode:
+        platform_copy += f'<p class="er-next">{html.escape(next_episode)}</p>'
+    if cta:
+        platform_copy += f'<p class="er-cta">{html.escape(cta)}</p>'
+    inner = platform_copy + "".join(section_blocks)
+    return f"""    <section id="end-roll" class="clip overlay end-roll" data-start="{max(0.0, available_duration - scroll_dur):.3f}" data-duration="{scroll_dur:.3f}" data-track-index="6">
       <div class="er-track"><div class="er-inner">{inner}</div></div>
     </section>"""
+
+
+def build_platform_opening_html(
+    package: dict[str, Any], show_package: dict[str, Any], *, title_dur: float
+) -> str:
+    """Build an escaped reusable show opening without changing source media."""
+    opening = show_package.get("opening") if isinstance(show_package.get("opening"), dict) else {}
+    brand = show_package.get("brand") if isinstance(show_package.get("brand"), dict) else {}
+    duration = float(opening.get("duration_sec") or title_dur)
+    title = str(opening.get("series_title") or package.get("title") or "")
+    episode = str(opening.get("episode") or "")
+    label = str(brand.get("label") or "")
+    accent = str(brand.get("accent") or "")
+    return f'''    <section id="platform-opening" class="clip overlay platform-opening" data-start="0.000" data-duration="{duration:.3f}" data-track-index="2" data-show-package="{html.escape(str(show_package.get("id") or ""))}">
+      <div class="platform-opening-card" style="--platform-accent:{html.escape(accent)}">
+        <p class="platform-brand">{html.escape(label)}</p><h1>{html.escape(title)}</h1><p>{html.escape(episode)}</p>
+      </div>
+    </section>'''
+
+
+def build_platform_ending_html(
+    package: dict[str, Any], show_package: dict[str, Any], *, end_dur: float
+) -> str:
+    """Build an escaped reusable show ending positioned against the timeline duration."""
+    ending = show_package.get("ending") if isinstance(show_package.get("ending"), dict) else {}
+    timeline = (
+        package.get("film_timeline") if isinstance(package.get("film_timeline"), dict) else {}
+    )
+    duration = float(ending.get("duration_sec") or end_dur)
+    output_duration = float(timeline.get("output_duration") or duration)
+    start = max(0.0, output_duration - duration)
+    cta = str(ending.get("cta") or "")
+    hook = str(ending.get("next_episode_hook") or "")
+    return f'''    <section id="platform-ending" class="clip overlay platform-ending" data-start="{start:.3f}" data-duration="{duration:.3f}" data-track-index="6" data-show-package="{html.escape(str(show_package.get("id") or ""))}">
+      <div class="platform-ending-card"><p>{html.escape(hook)}</p><p>{html.escape(cta)}</p></div>
+    </section>'''
 
 
 def build_title_sequence_tsx(
@@ -1029,6 +1110,18 @@ def write_hyperframes(
     resolved_layout = resolve_layout(package, layout)
     resolved_preset = resolve_compose_preset(package, compose_preset)
     styles = preset_hf_styles(resolved_preset, width=width)
+    platform_package = (
+        package.get("platform_package") if isinstance(package.get("platform_package"), dict) else {}
+    )
+    safe_area = (
+        platform_package.get("safe_area")
+        if isinstance(platform_package.get("safe_area"), dict)
+        else {}
+    )
+    styles = {
+        **styles,
+        "caption_bottom": f"{int(height * float(safe_area.get('bottom_pct') or 16) / 100)}px",
+    }
     caption_source = str(package.get("caption_source") or "")
 
     # Media MUST live under the composition project (HyperFrames missing_local_asset)
@@ -1036,11 +1129,6 @@ def write_hyperframes(
     underlay = ""
     staged: list[dict[str, str]] = []
     # underlay: absolute film clock (offset 0); multiclip: subtract title pad
-    caption_clock_offset = caption_clock_offset_for(
-        layout=resolved_layout,
-        title_dur=title_dur,
-        caption_source=caption_source,
-    )
     if (
         resolved_layout == "underlay"
         and package.get("final_film")
@@ -1091,6 +1179,15 @@ def write_hyperframes(
                 f'data-track-index="1" style="object-fit:cover;"></video>'
             )
 
+    # The actual media clock, not the draft timeline, owns all overlay bounds.
+    title_show = min(title_dur, max(0.4, total * 0.25))
+    end_show = min(end_dur, max(0.4, total * 0.2))
+    caption_clock_offset = caption_clock_offset_for(
+        layout=resolved_layout,
+        title_dur=title_show,
+        caption_source=caption_source,
+    )
+
     audio_tags: list[str] = []
     audio = package.get("audio") or {}
     if resolved_layout == "multiclip":
@@ -1117,20 +1214,29 @@ def write_hyperframes(
     # Title / end / captions as overlays ON TOP of motion
     overlay_parts: list[str] = []
     safe_title = html.escape(title)
-    title_show = min(title_dur, max(0.4, total * 0.25))
-    end_show = min(end_dur, max(0.4, total * 0.2))
     credits = package.get("credits") or {}
     title_sequence = package.get("title_sequence") or {}
     end_roll = package.get("end_roll") or {}
 
-    title_seq_html = build_title_sequence_html(
-        package, title_sequence, resolved_preset, styles, title_dur=title_dur
+    show_package = (
+        package.get("show_package") if isinstance(package.get("show_package"), dict) else None
     )
-    end_roll_html = build_end_roll_html(package, end_roll, resolved_preset, styles, credits)
+    if show_package:
+        title_seq_html = build_platform_opening_html(package, show_package, title_dur=title_show)
+        end_roll_html = build_platform_ending_html(package, show_package, end_dur=end_show)
+    else:
+        title_seq_html = build_title_sequence_html(
+            package, title_sequence, resolved_preset, styles, title_dur=title_show
+        )
+        end_roll_html = build_end_roll_html(
+            package, end_roll, resolved_preset, styles, credits, output_duration=total
+        )
 
+    title_disabled = bool(show_package) or bool(package.get("_platform_title_disabled"))
+    end_disabled = bool(show_package) or bool(package.get("_platform_end_disabled"))
     if title_seq_html:
         overlay_parts.append(title_seq_html)
-    else:
+    elif not title_disabled:
         overlay_parts.append(
             f'    <section id="title-card" class="clip overlay" data-start="0" '
             f'data-duration="{title_show:.3f}" data-track-index="2" '
@@ -1140,7 +1246,7 @@ def write_hyperframes(
     end_start = max(0.0, total - end_show)
     if end_roll_html:
         overlay_parts.append(end_roll_html)
-    else:
+    elif not end_disabled:
         end_label = html.escape(styles["end_label"])
         overlay_parts.append(
             f'    <section id="end-card" class="clip overlay" data-start="{end_start:.3f}" '
@@ -1204,13 +1310,13 @@ def write_hyperframes(
     <title>{safe_title} — ai-film-grok HyperFrames</title>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
-      /* system-ui only: avoids font_family_without_font_face (no @font-face needed) */
+      /* Generic family only: HyperFrames must not inject an unavailable system font. */
       /* preset: {resolved_preset} */
       body {{
         margin: 0;
         background: {styles["body_bg"]};
         color: #fff;
-        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-family: sans-serif;
       }}
       #root {{
         position: relative;
@@ -1341,8 +1447,8 @@ def write_hyperframes(
       .motif-tag {{
         padding: 4px 10px;
         border-radius: 999px;
-        background: rgba(255,255,255,0.10);
-        color: rgba(255,255,255,0.88);
+        background: rgba(0,0,0,0.78);
+        color: #fff;
         font-size: {max(12, int(width) // 32)}px;
         letter-spacing: 0.03em;
       }}
@@ -1362,6 +1468,13 @@ def write_hyperframes(
         align-items: center;
         gap: 18px;
       }}
+      .er-next, .er-cta {{
+        margin: 0;
+        text-align: center;
+        text-shadow: 0 1px 10px rgba(0,0,0,0.55);
+      }}
+      .er-next {{ font-size: {max(20, int(width) // 22)}px; font-weight: 700; }}
+      .er-cta {{ font-size: {max(16, int(width) // 28)}px; opacity: 0.86; }}
       .er-section h3 {{
         margin: 0 0 8px;
         font-size: {max(18, int(width) // 24)}px;
@@ -1410,6 +1523,7 @@ def write_hyperframes(
       data-composition-id="main"
       data-compose-preset="{html.escape(resolved_preset)}"
       data-compose-layout="{html.escape(resolved_layout)}"
+      data-platform-package="{html.escape(str(platform_package.get("package_id") or ""))}"
       data-caption-clock-offset="{caption_clock_offset:.3f}"
       data-start="0"
       data-width="{width}"
@@ -1464,6 +1578,8 @@ def write_hyperframes(
             "captions_placed": placed_captions,
             "title_sequence": title_seq_html is not None,
             "end_roll": end_roll_html is not None,
+            "platform_package": platform_package if platform_package.get("enabled") else None,
+            "show_package": show_package,
         },
     )
     write_text(
@@ -2025,8 +2141,21 @@ def export_composition(
     if not root.is_dir():
         raise ComposeExportError(f"Film root missing: {root}")
 
+    try:
+        platform_package = load_platform_package(root)
+    except PlatformPackageError as exc:
+        raise ComposeExportError(f"post-package invalid: {exc}") from exc
+    if platform_package.get("enabled"):
+        timing = platform_package.get("timing") or {}
+        title_dur = float(timing["title_duration_sec"])
+        end_dur = float(timing["end_duration_sec"])
     package = build_timeline_package(root, title_dur=title_dur, end_dur=end_dur)
     resolved_layout = resolve_layout(package, layout)
+    if resolved_layout == "underlay" and final_delivery_has_burned_subtitles(root):
+        raise ComposeExportError(
+            "underlay double-burn blocked: final-delivery.json says subtitles.burned_in=true; "
+            "rerun the plate with subtitles off or use layout=multiclip"
+        )
     resolved_preset = resolve_compose_preset(package, compose_preset)
     package["layout"] = resolved_layout
     package["compose_preset"] = resolved_preset
@@ -2035,6 +2164,16 @@ def export_composition(
         title_dur=title_dur,
         caption_source=str(package.get("caption_source") or ""),
     )
+    platform_overrides = package.get("platform_package", {}).get("overrides", {})
+    if not isinstance(platform_overrides, dict):
+        platform_overrides = {}
+    for key in ("title_sequence", "end_roll"):
+        value = platform_overrides.get(key)
+        if isinstance(value, dict):
+            package[key] = value
+            if str(value.get("mode") or "").strip().lower() == "none":
+                suffix = "title" if key == "title_sequence" else "end"
+                package[f"_platform_{suffix}_disabled"] = True
 
     if isinstance(title_sequence, str) and title_sequence.strip():
         ts = (title_sequence or "auto").strip().lower()
@@ -2108,6 +2247,8 @@ def export_composition(
         "compose_preset": resolved_preset,
         "title_sequence": package.get("title_sequence"),
         "end_roll": package.get("end_roll"),
+        "platform_package": package.get("platform_package"),
+        "show_package": package.get("show_package"),
         "credits": package.get("credits"),
         "post_policy": {
             "default_final": "ffmpeg render_final.py via aifilm final",

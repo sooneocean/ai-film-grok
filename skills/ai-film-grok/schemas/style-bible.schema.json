@@ -146,6 +146,18 @@
     "approved_keyframes": { "type": "object" },
     "updated_at": { "type": ["string", "null"] },
     "canonical_style_path": { "type": ["string", "null"] },
+    "style_reference": {
+      "type": "object",
+      "description": "Immutable provenance for the uploaded image whose visual language anchors the whole film.",
+      "properties": {
+        "kind": { "const": "uploaded-style-reference" },
+        "original_path": { "type": "string" },
+        "staged_path": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "canonical_path": { "type": "string" },
+        "canonical_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
     "previous_versions": { "type": "array", "items": { "type": "object" } }
   },
   "$defs": {

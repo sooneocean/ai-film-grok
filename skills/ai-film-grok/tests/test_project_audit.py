@@ -41,14 +41,128 @@ def test_generated_baseline_contains_current_identity(tmp_path: Path) -> None:
     assert baseline_is_current(stale) is False
 
 
+def test_markdown_reports_full_tests_when_that_is_the_executed_suite() -> None:
+    from project_audit import markdown
+
+    snapshot = {
+        "generated_at": "2026-07-27T00:00:00+00:00",
+        "head": "abc",
+        "source_fingerprint": "def",
+        "branch": "main",
+        "remote": "origin/main",
+        "version": "2.7.1",
+        "working_tree": "",
+        "inventory": {"script_files": 1, "script_lines": 1, "test_files": 1},
+        "checks": {
+            name: {"ok": True}
+            for name in (
+                "plugin_validate",
+                "ruff_check",
+                "ruff_format",
+                "docs_current",
+                "cli_help",
+                "baseline_current",
+            )
+        }
+        | {"tests_full": {"ok": True}},
+        "doctor": {
+            "core_ok": True,
+            "strict_ok": True,
+            "strict_status": "pass",
+            "strict_blocking": False,
+            "environment_advisories": [],
+        },
+        "coverage": {},
+        "gates": {"pilot": "pilot", "provider_canary": "canary", "delivery": "delivery"},
+    }
+
+    report = markdown(snapshot)
+
+    assert "| `tests_full` | PASS |" in report
+    assert "tests_fast" not in report
+
+
+def test_full_test_failure_blocks_audit_exit(monkeypatch) -> None:
+    import project_audit
+
+    snapshot = {
+        "checks": {
+            name: {"ok": True}
+            for name in (
+                "plugin_validate",
+                "ruff_check",
+                "ruff_format",
+                "docs_current",
+                "cli_help",
+                "baseline_current",
+            )
+        }
+        | {"tests_full": {"ok": False}},
+        "doctor": {"core_ok": True, "strict_ok": True, "strict_status": "pass"},
+        "generated_at": "2026-07-27T00:00:00+00:00",
+        "head": "abc",
+        "source_fingerprint": "def",
+        "branch": "main",
+        "remote": "origin/main",
+        "version": "2.7.1",
+        "working_tree": "",
+        "inventory": {"script_files": 1, "script_lines": 1, "test_files": 1},
+        "coverage": {},
+        "gates": {"pilot": "pilot", "provider_canary": "canary", "delivery": "delivery"},
+    }
+    monkeypatch.setattr(project_audit, "build_snapshot", lambda **_: snapshot)
+
+    assert project_audit.main(["--full-tests"]) == 1
+
+
 def test_baseline_becomes_stale_when_source_fingerprint_changes(
     tmp_path: Path, monkeypatch
 ) -> None:
     import project_audit
 
     snapshot = project_audit.build_snapshot()
+    snapshot["working_tree"] = ""
     report = tmp_path / "baseline.md"
     report.write_text(project_audit.markdown(snapshot), encoding="utf-8")
+    monkeypatch.setattr(project_audit, "current_head", lambda: snapshot["head"])
+    monkeypatch.setattr(project_audit, "working_tree_is_clean", lambda: True)
     assert project_audit.baseline_is_current(report) is True
     monkeypatch.setattr(project_audit, "source_fingerprint", lambda: "changed")
     assert project_audit.baseline_is_current(report) is False
+
+
+def test_baseline_becomes_stale_when_head_changes(tmp_path: Path, monkeypatch) -> None:
+    import project_audit
+
+    snapshot = project_audit.build_snapshot()
+    snapshot["working_tree"] = ""
+    report = tmp_path / "baseline.md"
+    report.write_text(project_audit.markdown(snapshot), encoding="utf-8")
+    monkeypatch.setattr(project_audit, "source_fingerprint", lambda: snapshot["source_fingerprint"])
+    monkeypatch.setattr(project_audit, "plugin_version", lambda: snapshot["version"])
+    monkeypatch.setattr(project_audit, "current_head", lambda: "different-head")
+    monkeypatch.setattr(project_audit, "working_tree_is_clean", lambda: True)
+
+    assert project_audit.baseline_is_current(report) is False
+
+
+def test_dirty_baseline_is_never_current(tmp_path: Path, monkeypatch) -> None:
+    import project_audit
+
+    snapshot = project_audit.build_snapshot()
+    snapshot["working_tree"] = "modified.py"
+    report = tmp_path / "baseline.md"
+    report.write_text(project_audit.markdown(snapshot), encoding="utf-8")
+    monkeypatch.setattr(project_audit, "source_fingerprint", lambda: snapshot["source_fingerprint"])
+    monkeypatch.setattr(project_audit, "plugin_version", lambda: snapshot["version"])
+    monkeypatch.setattr(project_audit, "current_head", lambda: snapshot["head"])
+    monkeypatch.setattr(project_audit, "working_tree_is_clean", lambda: True)
+
+    assert project_audit.baseline_is_current(report) is False
+
+
+def test_release_baseline_requires_clean_snapshot() -> None:
+    from project_audit import release_baseline_is_writable
+
+    assert release_baseline_is_writable("") is True
+    assert release_baseline_is_writable("modified.py") is False

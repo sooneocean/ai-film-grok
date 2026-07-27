@@ -28,6 +28,7 @@ from security_policy import (
 from util import utc_now
 
 OPERATIONS = frozenset({"image_gen", "image_edit", "image_to_video", "reference_to_video"})
+COMPLETION_ENDPOINTS = frozenset({*ALLOWED_VIDEO_ENDPOINTS, "image_gen", "image_edit"})
 STATUS_PENDING = "pending"
 STATUS_RUNNING = "running"
 STATUS_SUCCEEDED = "succeeded"
@@ -47,6 +48,70 @@ REASON_BACKOFF_SEC = {
 
 class QueueError(RuntimeError):
     pass
+
+
+def style_reference_output_evidence(
+    root: Path | str,
+    *,
+    job_id: str,
+    source: Path,
+    shot_id: str,
+    allowed_operations: frozenset[str],
+) -> dict[str, Any]:
+    """Verify a registered asset came from a completed job carrying the current style input."""
+    queue = MediaQueue(root)
+    state = queue.state()
+    job = next((item for item in state.get("jobs") or [] if item.get("id") == job_id), None)
+    if not isinstance(job, dict):
+        raise QueueError(f"style-reference queue job not found: {job_id}")
+    if job.get("status") != STATUS_SUCCEEDED:
+        raise QueueError(f"style-reference queue job is not succeeded: {job_id}")
+    if str(job.get("shot_id") or "") != str(shot_id):
+        raise QueueError("style-reference queue job belongs to another shot")
+    operation = str(job.get("operation") or "")
+    if operation not in allowed_operations:
+        raise QueueError(
+            f"style-reference queue job operation {operation!r} is not one of {sorted(allowed_operations)}"
+        )
+    receipt = job.get("receipt") if isinstance(job.get("receipt"), dict) else {}
+    source_sha = sha256(Path(source).expanduser().resolve())
+    if receipt.get("output_sha256") != source_sha:
+        raise QueueError("style-reference queue job output SHA-256 does not match registered asset")
+    from util import read_json
+
+    style = read_json(Path(root).expanduser().resolve() / "style-bible.json") or {}
+    reference = (
+        style.get("style_reference") if isinstance(style.get("style_reference"), dict) else {}
+    )
+    try:
+        from style_lock import validate_style_lock_bible
+
+        check = validate_style_lock_bible(style)
+    except (ImportError, OSError, ValueError) as exc:
+        raise QueueError(f"cannot validate current uploaded style reference: {exc}") from exc
+    reference_errors = [
+        str(code) for code in check.get("hard") or [] if str(code).startswith("STYLE_REFERENCE_")
+    ]
+    if reference_errors:
+        raise QueueError(
+            "current uploaded style reference failed integrity validation: "
+            + ", ".join(reference_errors)
+        )
+    job_reference = (
+        job.get("style_reference_input")
+        if isinstance(job.get("style_reference_input"), dict)
+        else {}
+    )
+    if not reference or job_reference.get("sha256") != reference.get("sha256"):
+        raise QueueError(
+            "style-reference queue job is not bound to the current uploaded style SHA-256"
+        )
+    return {
+        "job_id": job_id,
+        "operation": operation,
+        "output_sha256": source_sha,
+        "style_reference_sha256": job_reference["sha256"],
+    }
 
 
 def _usage_binding(
@@ -256,6 +321,15 @@ class MediaQueue:
         resolved_inputs = [path.expanduser().resolve() for path in inputs]
         if any(not path.is_file() for path in resolved_inputs):
             raise QueueError("every media input must be an existing file")
+        # Reference-first productions must carry the uploaded style image as an
+        # actual provider input, not merely a sentence in a prompt receipt.
+        # Frame-1-only I2V cannot consume that second image, so it is forbidden
+        # here; use reference_to_video to keep the visual language attached.
+        style_path = self._require_style_reference_input(
+            operation=operation,
+            inputs=resolved_inputs,
+            assembly_receipt=assembly_receipt,
+        )
         if max_attempts < 1 or max_attempts > 10:
             raise QueueError("max_attempts must be between 1 and 10")
         # Shot must exist in film-spec when present (no ghost queue after write-spec)
@@ -374,9 +448,68 @@ class MediaQueue:
                 job["canary_group_id"] = canary_group_id
             if assembly_receipt:
                 job["assembly_receipt"] = str(assembly_receipt.expanduser().resolve())
+            if style_path:
+                job["style_reference_input"] = {
+                    "path": str(style_path),
+                    "sha256": sha256(style_path),
+                }
             state["jobs"].append(job)
             self._write(state)
             return job
+
+    def _require_style_reference_input(
+        self,
+        *,
+        operation: str,
+        inputs: list[Path],
+        assembly_receipt: Path | None,
+    ) -> Path | None:
+        """Fail closed when a reference-first film omits its uploaded style anchor."""
+        from util import read_json
+
+        style = read_json(self.root / "style-bible.json") or {}
+        reference = (
+            style.get("style_reference") if isinstance(style.get("style_reference"), dict) else {}
+        )
+        if not reference:
+            return None
+        try:
+            from style_lock import validate_style_lock_bible
+
+            check = validate_style_lock_bible(style)
+        except (ImportError, OSError, ValueError) as exc:
+            raise QueueError(f"cannot validate uploaded style reference: {exc}") from exc
+        hard = [
+            str(code)
+            for code in check.get("hard") or []
+            if str(code).startswith("STYLE_REFERENCE_")
+        ]
+        if hard:
+            raise QueueError("uploaded style reference is invalid: " + ", ".join(hard))
+        staged = Path(str(reference.get("staged_path") or "")).expanduser().resolve()
+        if operation == "image_to_video":
+            raise QueueError(
+                "reference-first film forbids image_to_video: use reference_to_video with the uploaded "
+                "style image so I2V cannot drift from frame-1 alone"
+            )
+        if staged not in inputs:
+            raise QueueError(
+                "reference-first media job must include the uploaded style reference as --input: "
+                + str(staged)
+            )
+        if assembly_receipt is None or not assembly_receipt.is_file():
+            raise QueueError("reference-first media job requires a prompt_assembly receipt")
+        receipt = read_json(assembly_receipt) or {}
+        recorded = (
+            receipt.get("style_reference")
+            if isinstance(receipt.get("style_reference"), dict)
+            else {}
+        )
+        if recorded.get("sha256") != reference.get("sha256"):
+            raise QueueError(
+                "prompt assembly receipt is not bound to the current uploaded style reference"
+            )
+        return staged
 
     def add_canary_pair(
         self,
@@ -579,13 +712,18 @@ class MediaQueue:
         generation_id: str | None = None,
     ) -> dict[str, Any]:
         media = output.expanduser().resolve()
-        if endpoint not in ALLOWED_VIDEO_ENDPOINTS:
-            raise QueueError(
-                f"completion endpoint must be one of {sorted(ALLOWED_VIDEO_ENDPOINTS)}"
-            )
-        qa = analyze_media(media, require_audio=False, require_motion=True)
-        if not qa.get("ok"):
-            raise QueueError(f"media output failed decode/duration/motion QA: {qa.get('errors')}")
+        if endpoint not in COMPLETION_ENDPOINTS:
+            raise QueueError(f"completion endpoint must be one of {sorted(COMPLETION_ENDPOINTS)}")
+        if endpoint in {"image_gen", "image_edit"}:
+            if not media.is_file():
+                raise QueueError("still output file is missing")
+            qa = {"ok": True, "kind": "still", "bytes": media.stat().st_size}
+        else:
+            qa = analyze_media(media, require_audio=False, require_motion=True)
+            if not qa.get("ok"):
+                raise QueueError(
+                    f"media output failed decode/duration/motion QA: {qa.get('errors')}"
+                )
         with self._locked():
             state = self._read()
             job = self._running_job(state, job_id, claim_token)
@@ -743,7 +881,7 @@ def main(argv: list[str] | None = None) -> int:
     complete.add_argument("--job-id", required=True)
     complete.add_argument("--claim-token", required=True)
     complete.add_argument("--output", required=True)
-    complete.add_argument("--endpoint", required=True, choices=sorted(ALLOWED_VIDEO_ENDPOINTS))
+    complete.add_argument("--endpoint", required=True, choices=sorted(COMPLETION_ENDPOINTS))
     complete.add_argument("--provider-request-id")
     complete.add_argument("--generation-id")
     fail = sub.add_parser("fail")

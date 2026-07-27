@@ -72,6 +72,17 @@ aifilm grok-oauth video --root "<film-root>" --shot-id shot01 \
 旧项目没有账本时，`usage status` 返回 `tracking_not_started`，不会伪造历史
 或阻断 dispatch/final。
 
+## 成片复盘报告
+
+人工 `review-final` 通过后，插件自动建立 `receipts/production-report.json` 与
+`out/production-report.html`。报告以账本中的实际请求为准，按 T2I、I2I、I2V、T2V、
+TTS 展示成功、失败、重试、Token 覆盖率和成本覆盖率；没有回执的原生调用会被明确标成
+未知，不能当成免费或未发生。
+
+跨作品趋势只比较 `production-book.json` 的 `optimization.template_id` 相同、最终审核
+通过的作品。`optimization.history_root` 必须显式指定，或在报告命令传入
+`--history-root`；插件不会猜测项目父目录，也不会自动改 provider、prompt 或模型。
+
 ## 队列绑定与重试证据
 
 媒体队列在 `complete --generation-id` 时会读取同一 film root 的账本，并要求：

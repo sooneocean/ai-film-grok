@@ -17,6 +17,7 @@ from sound_plan import (  # noqa: E402
     inject_auto_sfx_if_empty,
     sfx_clip_for_kind,
     suggest_auto_sfx_events,
+    validate_sound_plan,
 )
 
 
@@ -91,6 +92,22 @@ class SfxAccentTests(unittest.TestCase):
         out = inject_auto_sfx_if_empty(plan, [{"id": "s1", "dramatic_function": "hook"}])
         assert out is not None
         self.assertEqual(out["events"], [])
+
+    def test_unspecified_auto_sfx_is_off(self) -> None:
+        plan = validate_sound_plan({"mood": "rnb", "events": []})
+        assert plan is not None
+        self.assertFalse(plan["auto_sfx"])
+        out = inject_auto_sfx_if_empty(plan, [{"id": "s1", "dramatic_function": "action"}])
+        assert out is not None
+        self.assertEqual(out["events"], [])
+
+    def test_explicit_auto_sfx_remains_an_opt_in(self) -> None:
+        plan = validate_sound_plan({"mood": "rnb", "events": [], "auto_sfx": True})
+        assert plan is not None
+        self.assertTrue(plan["auto_sfx"])
+        out = inject_auto_sfx_if_empty(plan, [{"id": "s1", "dramatic_function": "action"}])
+        assert out is not None
+        self.assertEqual(len(out["events"]), 1)
 
 
 if __name__ == "__main__":

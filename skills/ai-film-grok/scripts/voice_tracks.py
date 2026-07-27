@@ -213,7 +213,8 @@ def resolve_voice_tracks(
         base["enabled"] = False
         base["auto_vocal_color"] = False
         base["vocal_color_gain"] = 0.0
-    base["auto_sex_sfx"] = True
+    # Effects are authored scene events by default; intimate presets may opt in.
+    base["auto_sex_sfx"] = False
     if isinstance(author, dict) and "auto_sex_sfx" in author:
         base["auto_sex_sfx"] = bool(author.get("auto_sex_sfx"))
     if isinstance(spec, dict) and spec.get("auto_sex_sfx") is False:
@@ -294,7 +295,7 @@ def apply_voice_tracks_to_spec(spec: dict[str, Any], *, seed: int = 0) -> dict[s
 
     n_color = 0
     n_sfx = 0
-    auto_sfx = bool(policy.get("auto_sex_sfx", True))
+    auto_sfx = bool(policy.get("auto_sex_sfx", False))
     heat = str(spec.get("heat_scale") or "").strip().lower()
     for scene in scenes:
         if not isinstance(scene, dict):

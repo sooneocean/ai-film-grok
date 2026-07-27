@@ -89,9 +89,15 @@ class I2VProviderTests(unittest.TestCase):
 
     def test_grok_build_command(self) -> None:
         gp = get("grok")
-        cmd = gp.build_command(keyframe=Path("/tmp/kf.png"), prompt="dolly-in", duration_sec=6)
-        self.assertIn("video", cmd)
-        self.assertIn("--wait", cmd)
+        cmd = gp.build_command(
+            keyframe=Path("/tmp/kf.png"),
+            prompt="dolly-in",
+            duration_sec=6,
+            out="/tmp/clip.mp4",
+        )
+        self.assertTrue(cmd[1].endswith("grok_oauth_video.py"))
+        self.assertIn("--out", cmd)
+        self.assertNotIn("--wait", cmd)
 
     def test_unknown_provider_raises(self) -> None:
         with self.assertRaises(I2VProviderError):

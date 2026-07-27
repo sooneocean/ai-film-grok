@@ -11,6 +11,88 @@ class OptimizationCliError(RuntimeError):
     """User-facing optimization CLI error."""
 
 
+def add_optimization_parsers(subparsers: Any) -> None:
+    """Register optimisation commands without coupling parser setup to the CLI facade."""
+    metrics_parser = subparsers.add_parser(
+        "metrics", help="Emit receipt-backed optimisation metrics"
+    )
+    metrics_sub = metrics_parser.add_subparsers(dest="metrics_action", required=True)
+    metrics_emit = metrics_sub.add_parser(
+        "emit", help="Aggregate one film root into receipts/metrics.json"
+    )
+    metrics_emit.add_argument("--root", required=True)
+    metrics_emit.add_argument("--run-id", default="default")
+    metrics_status = metrics_sub.add_parser("status", help="Inspect append-only pipeline events")
+    metrics_status.add_argument("--root", required=True)
+    metrics_human = metrics_sub.add_parser("human-time", help="Record explicit human minutes")
+    metrics_human.add_argument("--root", required=True)
+    metrics_human.add_argument("--stage", required=True)
+    metrics_human.add_argument("--minutes", type=float, required=True)
+    metrics_human.add_argument("--actor", required=True)
+    metrics_human.add_argument("--note", default="")
+    metrics_human.add_argument("--run-id", default="default")
+
+    experiment_parser = subparsers.add_parser(
+        "experiment", help="Receipt-backed, single-axis optimisation experiments"
+    )
+    experiment_sub = experiment_parser.add_subparsers(dest="experiment_action", required=True)
+    experiment_init = experiment_sub.add_parser("init")
+    experiment_init.add_argument("--root", required=True)
+    experiment_init.add_argument("--id", required=True)
+    experiment_init.add_argument("--hypothesis", required=True)
+    experiment_init.add_argument("--treatment-axis", required=True)
+    experiment_init.add_argument(
+        "--primary-metric",
+        choices=("cost_usd", "wall_sec", "grade_p50", "motion_p10"),
+        required=True,
+    )
+    experiment_init.add_argument("--min-effect", type=float, required=True)
+    experiment_init.add_argument("--fixture", action="append", required=True)
+    experiment_init.add_argument("--seed", required=True)
+    experiment_init.add_argument("--shot-count", type=int, required=True)
+    experiment_init.add_argument("--aspect", required=True)
+    experiment_init.add_argument("--duration-budget-sec", type=float, required=True)
+    experiment_import = experiment_sub.add_parser("import")
+    experiment_import.add_argument("--root", required=True)
+    experiment_import.add_argument("--id", required=True)
+    experiment_import.add_argument("--arm", choices=("baseline", "treatment"), required=True)
+    experiment_import.add_argument("--metrics-root", required=True)
+    experiment_import.add_argument("--fixture", action="append", required=True)
+    experiment_import.add_argument("--seed", required=True)
+    experiment_import.add_argument("--shot-count", type=int, required=True)
+    experiment_import.add_argument("--aspect", required=True)
+    experiment_import.add_argument("--duration-budget-sec", type=float, required=True)
+    experiment_run = experiment_sub.add_parser("run")
+    experiment_run.add_argument("--root", required=True)
+    experiment_run.add_argument("--id", required=True)
+    experiment_run.add_argument("--arm", choices=("baseline", "treatment"), required=True)
+    experiment_run.add_argument("--authorize-spend", action="store_true")
+    experiment_run.add_argument("--max-usd", type=float, default=None)
+    experiment_diff = experiment_sub.add_parser("diff")
+    experiment_diff.add_argument("--root", required=True)
+    experiment_diff.add_argument("--id", required=True)
+    experiment_decide = experiment_sub.add_parser("decide")
+    experiment_decide.add_argument("--root", required=True)
+    experiment_decide.add_argument("--id", required=True)
+    experiment_decide.add_argument("--decision", choices=("ship", "reject"), required=True)
+
+    gold_parser = subparsers.add_parser(
+        "gold", help="Calibrate early-reject metrics against a reviewed gold set"
+    )
+    gold_sub = gold_parser.add_subparsers(dest="gold_action", required=True)
+    gold_calibrate = gold_sub.add_parser("calibrate")
+    gold_calibrate.add_argument("--manifest", required=True)
+
+    dashboard_parser = subparsers.add_parser(
+        "dashboard", help="Build a receipt-only static optimisation dashboard"
+    )
+    dashboard_sub = dashboard_parser.add_subparsers(dest="dashboard_action", required=True)
+    dashboard_build = dashboard_sub.add_parser("build")
+    dashboard_build.add_argument("--roots-dir", required=True)
+    dashboard_build.add_argument("--days", type=int, default=30)
+    dashboard_build.add_argument("--out", required=True)
+
+
 def _call(
     fn: Callable[..., dict[str, Any]], *args: Any, **kwargs: Any
 ) -> tuple[dict[str, Any], int]:

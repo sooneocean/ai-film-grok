@@ -363,6 +363,34 @@ def validate_style_lock_bible(bible: dict[str, Any]) -> dict[str, Any]:
         )
     if not bible.get("canonical_style_path"):
         soft.append("STYLE_MASTER_PATH_MISSING")
+    reference = (
+        bible.get("style_reference") if isinstance(bible.get("style_reference"), dict) else {}
+    )
+    # A medium preset is useful guidance, but cannot prove that the selected
+    # look actually came from the image the director supplied.  New
+    # reference-first locks persist this compact provenance record.
+    if bible.get("style_lock_ref_sha256") and not reference:
+        hard.append("STYLE_REFERENCE_PROVENANCE_MISSING")
+    elif reference:
+        expected_sha = str(reference.get("sha256") or "").strip()
+        staged_path = str(reference.get("staged_path") or "").strip()
+        canonical_path = str(reference.get("canonical_path") or "").strip()
+        if not expected_sha:
+            hard.append("STYLE_REFERENCE_SHA256_MISSING")
+        if not staged_path:
+            hard.append("STYLE_REFERENCE_STAGED_PATH_MISSING")
+        else:
+            staged = Path(staged_path)
+            if not staged.is_file():
+                hard.append("STYLE_REFERENCE_STAGED_FILE_MISSING")
+            elif expected_sha and _sha256(staged) != expected_sha:
+                hard.append("STYLE_REFERENCE_STAGED_SHA256_MISMATCH")
+        if canonical_path:
+            canonical = Path(canonical_path)
+            if not canonical.is_file():
+                hard.append("STYLE_REFERENCE_CANONICAL_FILE_MISSING")
+            elif expected_sha and _sha256(canonical) != expected_sha:
+                hard.append("STYLE_REFERENCE_CANONICAL_SHA256_MISMATCH")
     stability = (MEDIUM_PRESETS.get(medium_key) or {}).get("stability", "unknown")
     return {
         "ok": not hard,
@@ -372,6 +400,7 @@ def validate_style_lock_bible(bible: dict[str, Any]) -> dict[str, Any]:
         "stability": stability,
         "cast_master_count": len(cast_masters),
         "cast_lock_count": len(cast_locks),
+        "style_reference": reference or None,
     }
 
 
@@ -479,6 +508,12 @@ def plan_from_ref(
         "ref_path": str(ref_path),
         "ref_staged": str(staged),
         "ref_sha256": _sha256(ref_path),
+        "style_reference": {
+            "kind": "uploaded-style-reference",
+            "original_path": str(ref_path),
+            "staged_path": str(staged),
+            "sha256": _sha256(ref_path),
+        },
         "medium_key": medium_key,
         "stability": fp["stability"],
         "style_fingerprint": fp,
@@ -549,6 +584,7 @@ def apply_plan_to_bible(bible: dict[str, Any], plan: dict[str, Any]) -> dict[str
     bible["cast_locks"] = locks
     bible["style_lock_plan_at"] = plan.get("at")
     bible["style_lock_ref_sha256"] = plan.get("ref_sha256")
+    bible["style_reference"] = dict(plan.get("style_reference") or {})
     # prompt prefixes for agent
     bible["agent_still_prompt_prefix"] = plan.get("agent_still_prompt_prefix")
     bible["agent_i2v_prompt_prefix"] = plan.get("agent_i2v_prompt_prefix")

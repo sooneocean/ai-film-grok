@@ -53,7 +53,15 @@
     },
     "stale_reasons": { "type": "array", "items": { "type": "object" } },
     "exception_ledger": { "type": "array", "items": { "type": "object" } },
-    "assets": { "type": "array" }
+    "assets": { "type": "array" },
+    "optimization": {
+      "type": "object",
+      "properties": {
+        "template_id": { "type": "string", "minLength": 1 },
+        "history_root": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
   },
   "$defs": {
     "department": {

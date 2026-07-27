@@ -147,19 +147,28 @@ class GrokI2VProvider(I2VProvider):
     ) -> list[str]:
         # Grok I2V is invoked via the in-session Grok SDK or grok-oauth adapter,
         # not a standalone CLI. We expose the adapter path for batch use.
-        adapter = Path(__file__).resolve().parent / "adapters" / "grok_oauth_image.py"
-        return [
+        adapter = Path(__file__).resolve().parent / "adapters" / "grok_oauth_video.py"
+        out = kwargs.get("out")
+        if not out:
+            raise I2VProviderError("grok batch I2V requires an explicit output path")
+        command = [
             "python3",
             str(adapter),
-            "video",
             "--image",
             str(keyframe),
             "--prompt",
             prompt,
             "--duration",
             str(duration_sec),
-            "--wait",
+            "--out",
+            str(Path(out).expanduser().resolve()),
         ]
+        reference_images = kwargs.get("reference_images") or []
+        if isinstance(reference_images, (str, Path)):
+            reference_images = [reference_images]
+        for reference in reference_images:
+            command.extend(("--ref", str(Path(reference).expanduser().resolve())))
+        return command
 
 
 class SeedanceProvider(I2VProvider):

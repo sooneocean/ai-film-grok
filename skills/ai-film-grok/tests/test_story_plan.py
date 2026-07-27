@@ -11,6 +11,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from drama_graph import validate_graph  # noqa: E402
+from film_spec import validate_film_spec  # noqa: E402
 from story_plan import (  # noqa: E402
     export_legacy_story_plan,
     normalize_story,
@@ -102,6 +103,33 @@ class StoryPlanTests(unittest.TestCase):
             fs = report2.get("film_spec") or {}
             self.assertTrue(fs.get("skipped"))
 
+    def test_metadata_only_sections_never_become_scenes(self) -> None:
+        raw = """【角色表】
+女主：阿澄
+
+【00:00-00:05】
+阿澄推开雨中的车门，回头看见他还站在路灯下。
+
+【格式说明】
+竖屏，中文字幕。
+"""
+        norm = normalize_story(raw, title_hint="雨夜")
+        chunks = norm["scene_chunks"]
+        self.assertEqual(len(chunks), 1)
+        self.assertIn("推开雨中的车门", chunks[0]["body"])
+
+    def test_metadata_synonyms_never_become_scenes(self) -> None:
+        for label in ("角色设定", "人物设定", "制作备注"):
+            raw = f"""【{label}】
+这是元数据。
+
+【00:00-00:05】
+她收起伞，走进空无一人的车站。
+"""
+            chunks = normalize_story(raw, title_hint="车站")["scene_chunks"]
+            self.assertEqual(len(chunks), 1, label)
+            self.assertIn("收起伞", chunks[0]["body"])
+
     def test_project_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -109,6 +137,23 @@ class StoryPlanTests(unittest.TestCase):
             graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
             spec = project_graph_to_film_spec(graph)
             self.assertTrue(spec["scenes"][0]["shots"])
+
+    def test_source_to_graph_to_film_spec_passes_shared_story_timeline_guard(self) -> None:
+        raw = (
+            "阿澄推开车门，雨水打湿她的袖口。"
+            "她看见后视镜里的乘客没有下车。"
+            "乘客把落在座椅上的旧照片递给她。"
+            "阿澄认出照片背面是自己失踪多年的姐姐。"
+            "她把伞递过去，车门在两人之间轻轻合上。"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = run_plan(root, raw, title="雨夜车门", target_duration=45, force=True)
+            self.assertTrue(result["ok"], result)
+            spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+            shots = validate_film_spec(spec, assign_missing_ids=False, film_root=root)
+            self.assertGreaterEqual(len(shots), 3)
+            self.assertEqual(len({shot["nar"] for shot in shots}), len(shots))
 
     def test_legacy_flat_graph_is_normalized_without_losing_ids(self) -> None:
         legacy = {

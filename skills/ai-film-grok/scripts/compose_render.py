@@ -1106,6 +1106,13 @@ def compose_render(
     if engine not in {"hyperframes", "remotion", "both"}:
         raise ComposeRenderError(f"unsupported engine {engine!r}")
 
+    try:
+        from platform_package import PlatformPackageError, assert_no_double_burn_override
+
+        assert_no_double_burn_override(root, allow_burned_underlay=allow_burned_underlay)
+    except PlatformPackageError as exc:
+        raise ComposeRenderError(str(exc)) from exc
+
     steps: dict[str, Any] = {}
 
     # Resolve layout for gates: when reusing export, honor package layout if CLI says auto

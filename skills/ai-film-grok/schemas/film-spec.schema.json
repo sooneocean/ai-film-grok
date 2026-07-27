@@ -500,6 +500,24 @@
                 "duration_sec": { "type": "number", "exclusiveMinimum": 0, "maximum": 60 },
                 "lipsync": { "type": "boolean" },
                 "dialogue": { "type": "string" },
+                "music_cue": {
+                  "type": "object",
+                  "description": "Per-shot emotional BGM direction; compiled into procedural stems or source automation.",
+                  "properties": {
+                    "mood": { "type": "string", "enum": ["rnb", "dark", "ambient", "warm", "playful"] },
+                    "energy": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "density": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "bass_presence": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "brightness": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "duck_db": { "type": "number", "minimum": -18, "maximum": 0 },
+                    "bpm": { "type": "number", "minimum": 40, "maximum": 180 },
+                    "key_shift": { "type": "integer", "minimum": -12, "maximum": 12 },
+                    "stem_profile": { "type": "string", "enum": ["full", "thin", "pulse", "pad", "bass", "silence"] },
+                    "motif_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+                    "transition": { "type": "string", "enum": ["crossfade", "cut", "stinger"] }
+                  },
+                  "additionalProperties": false
+                },
                 "speaker_on_camera": { "type": "boolean" },
                 "scene_trigger": { "type": "string" },
                 "content_channels": {

@@ -143,6 +143,39 @@ class ShotReviewTests(unittest.TestCase):
         self.assertTrue(review["approved"])
 
     @pytest.mark.slow
+    def test_story_promises_require_ordered_generated_clip_evidence(self) -> None:
+        self._write_spec(
+            {},
+            start_state="门关着",
+            must_show="她推开门",
+            visible_change="门完全打开",
+            end_state="她站在门口",
+        )
+        with self.assertRaisesRegex(ShotReviewError, "performance evidence"):
+            self._review()
+        review = self._review(
+            performance=[
+                "start_state_visible@0.1:门仍关着",
+                "must_show_visible@0.5:她伸手推门",
+                "visible_change_visible@1.0:门完全打开",
+                "end_state_visible@1.6:她停在门口",
+            ]
+        )
+        self.assertTrue(review["approved"])
+
+    @pytest.mark.slow
+    def test_story_end_state_cannot_precede_visible_change(self) -> None:
+        self._write_spec({}, start_state="门关着", visible_change="门打开", end_state="她离开")
+        with self.assertRaisesRegex(ShotReviewError, "END_STATE_BEFORE_VISIBLE_CHANGE"):
+            self._review(
+                performance=[
+                    "start_state_visible@0.1:门关着",
+                    "visible_change_visible@1.2:门打开",
+                    "end_state_visible@0.7:她离开",
+                ]
+            )
+
+    @pytest.mark.slow
     def test_lipsync_dialogue_requires_delivery_evidence(self) -> None:
         self._write_spec(
             {"voice": {"kind": "dialogue", "text": "别走", "on_camera": True}}, lipsync=True

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import tempfile
@@ -10,6 +11,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+import aifilm_grok  # noqa: E402
 from drama_graph import (  # noqa: E402
     build_jobs_summary,
     derive_graph,
@@ -74,6 +76,25 @@ def _mini_spec() -> dict:
 
 
 class DramaGraphTests(unittest.TestCase):
+    def test_graph_parser_domain_preserves_command_contract(self) -> None:
+        from cli_graph import add_graph_parsers
+
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="cmd", required=True)
+        add_graph_parsers(subparsers)
+
+        project = parser.parse_args(["graph", "project", "--root", "film", "--force"])
+        validate = parser.parse_args(["graph", "validate", "--root", "film", "--derive-if-missing"])
+        status = parser.parse_args(
+            ["graph", "status", "--root", "film", "--no-derive", "--with-jobs"]
+        )
+
+        self.assertEqual(project.graph_action, "project")
+        self.assertTrue(project.force)
+        self.assertTrue(validate.derive_if_missing)
+        self.assertTrue(status.no_derive)
+        self.assertTrue(status.with_jobs)
+
     def test_derive_validate_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -140,6 +161,21 @@ class DramaGraphTests(unittest.TestCase):
             self.assertEqual(j_kf["status"], "done")
             j_kf2 = next(j for j in jobs["jobs"] if j["id"] == "job_kf_shot02")
             self.assertEqual(j_kf2["status"], "ready")
+
+    def test_top_level_validate_and_status_route_to_read_only_handlers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "film-spec.json").write_text(json.dumps(_mini_spec()), encoding="utf-8")
+
+            self.assertEqual(
+                aifilm_grok.main(["graph", "validate", "--root", str(root), "--derive-if-missing"]),
+                0,
+            )
+            self.assertTrue(graph_path(root).is_file())
+            self.assertEqual(
+                aifilm_grok.main(["graph", "status", "--root", str(root), "--no-derive"]),
+                0,
+            )
 
     def test_validate_missing_graph(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

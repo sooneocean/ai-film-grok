@@ -38,6 +38,13 @@ from edit_policy import (
 )
 from film_spec import FilmSpecError, validate_film_spec
 from media_qa import MediaQAError, analyze_media, approved_clip_record
+from narrative_timeline import (
+    NarrativeTimelineError,
+    validate_sfx_scene_bindings,
+)
+from narrative_timeline import (
+    validate_linear_narration as _validate_linear_narration,
+)
 from PIL import Image, ImageDraw, ImageFont
 from render_workspace import RenderWorkspaceError, prepare_render_workspace, resolve_render_paths
 from runtime_policy import sha256
@@ -76,6 +83,12 @@ except ImportError:  # pragma: no cover
     lipsync_probe = None  # type: ignore
 
 try:
+    from music_cue import (
+        apply_music_timeline_to_samples,
+        build_music_timeline,
+        motif_seed,
+        summarize_music_timeline,
+    )
     from performance_cue import normalize_performance_cue, summarize_bgm_response
     from tts_backend import probe as tts_probe
     from tts_backend import synthesize as tts_synthesize
@@ -84,6 +97,10 @@ except ImportError:  # pragma: no cover
     tts_probe = None  # type: ignore
     normalize_performance_cue = None  # type: ignore
     summarize_bgm_response = None  # type: ignore
+    apply_music_timeline_to_samples = None  # type: ignore
+    build_music_timeline = None  # type: ignore
+    motif_seed = None  # type: ignore
+    summarize_music_timeline = None  # type: ignore
 
 try:
     from voice_tracks import (
@@ -648,13 +665,26 @@ def procedural_music_rnb(
     seed: int | None = None,
     shot_starts: list[float] | None = None,
     events: list[dict] | None = None,
+    density: float = 0.5,
+    bass_presence: float = 0.5,
+    brightness: float = 0.5,
 ) -> np.ndarray:
     """Seductive late-night R&B bed (Rhodes + sub + soft kit). float mono."""
     # Prefer shared implementation from make_sfx_bed when available
     try:
         from make_sfx_bed import rnb_bgm  # type: ignore
 
-        return rnb_bgm(dur, amp=amp, bpm=bpm, seed=seed, shot_starts=shot_starts, events=events)
+        return rnb_bgm(
+            dur,
+            amp=amp,
+            bpm=bpm,
+            seed=seed,
+            shot_starts=shot_starts,
+            events=events,
+            density=density,
+            bass_presence=bass_presence,
+            brightness=brightness,
+        )
     except Exception:
         pass
     n = int(SR * max(0.5, dur))
@@ -702,7 +732,15 @@ def procedural_music(
     Phase 4: Plot-Adaptive Multi-Stem. Supports timeline of moods stitched with crossfades.
     """
 
-    def _generate_single(g_dur: float, g_mood: str, g_seed: int | None) -> np.ndarray:
+    def _generate_single(
+        g_dur: float,
+        g_mood: str,
+        g_seed: int | None,
+        *,
+        g_density: float = 0.5,
+        g_bass_presence: float = 0.5,
+        g_brightness: float = 0.5,
+    ) -> np.ndarray:
         g_mood = (g_mood or "playful").lower()
         if g_mood in (
             "rnb",
@@ -716,7 +754,15 @@ def procedural_music(
             "sexy",
         ):
             return procedural_music_rnb(
-                g_dur, amp=amp * 1.05, bpm=76.0, seed=g_seed, shot_starts=shot_starts, events=events
+                g_dur,
+                amp=amp * 1.05,
+                bpm=76.0,
+                seed=g_seed,
+                shot_starts=shot_starts,
+                events=events,
+                density=g_density,
+                bass_presence=g_bass_presence,
+                brightness=g_brightness,
             )
 
         n = int(SR * max(0.5, g_dur))
@@ -786,8 +832,26 @@ def procedural_music(
             gen_dur += crossfade_sec
 
         # Seed mutation: mutate seed per chapter index i
-        chapter_seed = base_seed + i
-        chapter_sig = _generate_single(gen_dur, str(chapter.get("mood", mood)), chapter_seed)
+        chapter_seed = (
+            motif_seed(base_seed, str(chapter.get("motif_id") or chapter.get("mood") or mood), i)
+            if motif_seed is not None
+            else base_seed + i
+        )
+        chapter_sig = _generate_single(
+            gen_dur,
+            str(chapter.get("mood", mood)),
+            chapter_seed,
+            g_density=float(chapter.get("density", 0.5)),
+            g_bass_presence=float(chapter.get("bass_presence", 0.5)),
+            g_brightness=float(chapter.get("brightness", 0.5)),
+        )
+        energy = max(0.0, min(1.0, float(chapter.get("energy", 0.55))))
+        profile = str(chapter.get("stem_profile") or "full")
+        chapter_sig *= 0.72 + 0.48 * energy
+        if profile == "thin":
+            chapter_sig *= 0.72
+        elif profile == "silence":
+            chapter_sig *= 0.0
 
         i0 = int(st * SR)
         i1 = i0 + len(chapter_sig)
@@ -1318,16 +1382,66 @@ def is_character_speech_shot(shot: dict[str, Any]) -> bool:
 
 
 def narration_for_shot(shot: dict[str, Any]) -> str:
-    """Chinese / default caption+legacy text (not necessarily what TTS speaks)."""
+    """Chinese/default spoken text; never promote shot metadata into narration."""
     for key in ("nar", "narration", "nar_zh", "dialogue", "vo", "caption"):
         val = shot.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
-    for key in ("purpose", "title"):
-        val = shot.get(key)
-        if isinstance(val, str) and val.strip():
-            return val.strip()
     return ""
+
+
+def _narration_fingerprint(text: str) -> str:
+    """Compare VO semantic text without harmless whitespace/punctuation drift."""
+    return re.sub(r"[\s\W_]+", "", text, flags=re.UNICODE).casefold()
+
+
+def _legacy_validate_linear_narration(
+    shots: list[dict[str, Any]],
+    *,
+    vo_mode: str,
+    dialogue_spoken_lang: str,
+    narration_spoken_lang: str,
+) -> None:
+    """Fail closed when the timeline would replay a narration beat or metadata."""
+    seen: dict[str, str] = {}
+    for shot in shots:
+        sid = str(shot.get("id") or "<unknown>")
+        text = spoken_text_for_shot(
+            shot,
+            dialogue_spoken_lang=dialogue_spoken_lang,
+            narration_spoken_lang=narration_spoken_lang,
+            vo_mode=vo_mode,
+        )
+        if not text:
+            raise RenderError(
+                f"Shot {sid} has no authored narration/dialogue; metadata is not playable VO"
+            )
+        fingerprint = _narration_fingerprint(text)
+        if fingerprint in seen:
+            raise RenderError(
+                f"Shot {sid} repeats narration from {seen[fingerprint]}; "
+                "write the next causal story beat instead"
+            )
+        seen[fingerprint] = sid
+
+
+def validate_linear_narration(
+    shots: list[dict[str, Any]],
+    *,
+    vo_mode: str,
+    dialogue_spoken_lang: str,
+    narration_spoken_lang: str,
+) -> None:
+    """Renderer-facing error wrapper around the shared story-timeline guard."""
+    try:
+        _validate_linear_narration(
+            shots,
+            vo_mode=vo_mode,
+            dialogue_spoken_lang=dialogue_spoken_lang,
+            narration_spoken_lang=narration_spoken_lang,
+        )
+    except NarrativeTimelineError as exc:
+        raise RenderError(str(exc)) from exc
 
 
 def caption_text_for_shot(shot: dict[str, Any], *, caption_lang: str = "zh") -> str:
@@ -1965,7 +2079,24 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         checkpoint.clear()
     resume = bool(getattr(args, "resume", False))
 
+    dialogue_spoken_lang = str(
+        spec.get("dialogue_spoken_lang")
+        or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
+        or "ja"
+    )
+    narration_spoken_lang = str(
+        spec.get("narration_spoken_lang")
+        or (spec.get("voice_policy") or {}).get("narration_spoken_lang")
+        or "zh"
+    )
+
     # 1) Per-shot TTS
+    validate_linear_narration(
+        shots,
+        vo_mode=vo_mode,
+        dialogue_spoken_lang=dialogue_spoken_lang,
+        narration_spoken_lang=narration_spoken_lang,
+    )
     shot_audio: list[dict[str, Any]] = []
     for i, shot in enumerate(shots):
         sid = shot["id"]
@@ -1989,16 +2120,6 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 raise RenderError(str(exc)) from exc
             if native_record.get("sha256") != sha256(native_audio):
                 raise RenderError(f"Native audio fingerprint changed for {sid}")
-        dialogue_spoken_lang = str(
-            spec.get("dialogue_spoken_lang")
-            or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
-            or "ja"
-        )
-        narration_spoken_lang = str(
-            spec.get("narration_spoken_lang")
-            or (spec.get("voice_policy") or {}).get("narration_spoken_lang")
-            or "zh"
-        )
         caption_lang = str(
             spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
         )
@@ -2596,6 +2717,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
     if sound_plan is None:
         sound_plan = {}
+    try:
+        validate_sfx_scene_bindings(
+            sound_plan,
+            [shot for shot in flatten_shots(spec) if isinstance(shot, dict)],
+        )
+    except NarrativeTimelineError as exc:
+        raise RenderError(str(exc)) from exc
     # Auto light SFX accents from dramatic_function when author left events empty
     flat = {str(s["id"]): s for s in flatten_shots(spec) if isinstance(s, dict) and s.get("id")}
     shot_dicts = [flat.get(str(item["id"]), {"id": item["id"]}) for item in shot_audio]
@@ -2675,6 +2803,16 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         else:
             bgm_out = float_bed.copy()
 
+        music_timeline = (
+            (sound_plan or {}).get("music_timeline") if isinstance(sound_plan, dict) else None
+        )
+        if music_timeline and apply_music_timeline_to_samples is not None:
+            bgm_out = apply_music_timeline_to_samples(bgm_out, sr=SR, timeline=music_timeline)
+            spotting["music_cue_applied"] = "energy_duck_profile"
+            spotting["music_cue_shot_count"] = len(music_timeline)
+        else:
+            spotting["music_cue_applied"] = "none"
+
         sfx_out = np.zeros_like(bgm_out)
 
         if events:
@@ -2720,6 +2858,21 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         sound_plan["mood_timeline"] = build_mood_timeline(
             shot_dicts, shot_starts=shot_start_map, shot_ends=shot_end_map, default_mood=mood
         )
+        if build_music_timeline is not None:
+            try:
+                sound_plan["music_timeline"] = build_music_timeline(
+                    shot_dicts,
+                    shot_starts=shot_start_map,
+                    shot_ends=shot_end_map,
+                    default_mood=mood,
+                )
+                mix_spotting["music_cue_routing"] = summarize_music_timeline(
+                    sound_plan["music_timeline"]
+                )
+                # Procedural generators consume the richer cue fields.
+                sound_plan["mood_timeline"] = sound_plan["music_timeline"]
+            except ValueError as exc:
+                raise RenderError(f"invalid shot music_cue: {exc}") from exc
 
     # Phase H: local template pool (audio/bgm.wav or assets/bgm/{mood}/*)
     try:

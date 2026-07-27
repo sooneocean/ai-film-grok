@@ -114,7 +114,7 @@ aifilm quality-closure report --root <film-root>
 | **`aifilm` CLI** | init / lock-style / write-spec / register / final / review / export / next / preflight / doctor |
 | **`media-queue`** | 本地 I2V 任务队列：add → claim → complete/fail → requeue；串行防 429 |
 | **film-spec JSON + schema** | 导演意图、分镜 beat、旁白、运镜 DSL、转场与 sound_plan |
-| **style-bible** | medium / palette / signature_block / identity_lock / cast_masters |
+| **style-bible** | medium / palette / signature_block / identity_lock / cast_masters / 上传画风图 SHA-256 锚 |
 | **FFmpeg + PIL** | 拼接、xfade、stretch/hold、VO 混音、BGM duck、字幕烧录 |
 | **Edge TTS（默认中文）** | 说书 `write-spec` 钉 edge；支持 shot-level `performance_cue`；禁止 Neural 名塞 ElevenLabs |
 | **表达式 TTS（显式）** | `qwen3` 本机 voice design/clone；`higgs` 可信 adapter；未就绪不静默替换 |
@@ -131,6 +131,7 @@ aifilm quality-closure report --root <film-root>
 film-root/
   style-bible.json      # 画风与身份锁
   film-spec.json        # 分镜 + 旁白 + 导演意图
+  source/               # 上传的参考图（style-lock 保存并记录 SHA-256）
   canonical/            # style-v1 + cast/*-v1 + lookbook
   keyframes/            # 每镜静帧
   clips/                # 每镜 I2V（Imagine Video）
@@ -328,7 +329,23 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 
 ```bash
 cd ~/.grok/skills/ai-film-grok
-python3 -m pytest tests/ -q
+scripts/test tests/ -q
+```
+
+`scripts/test` 和 `aifilm` 使用相同的 Python 3.11+ 解析器；如果环境把
+`python3` 指向旧版，会明确失败而不是产生误导性的测试结果。
+
+## 个人品质复盘
+
+每次 `review-final` 成功后都会写入 `receipts/quality-ledger.json`，汇总每镜生成
+尝试、真实或 `unknown` 成本、身份/动作审阅、镜头去重、终片审阅与失败 Pareto。
+完整看片后，只记录下一条片唯一的 P0：
+
+```bash
+scripts/aifilm quality-ledger record --root "<film-root>" \
+  --director-score 82 --worth-publishing \
+  --p0-improvement "先修正动作起讫状态，再开始下一条 pilot" \
+  --reshoot-reason "shot03: 动作结果不可读"
 ```
 
 ---
@@ -360,10 +377,10 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.6.9`
+- 插件版本：`2.7.1`
 - Skill Registry：`31/33` 项标记为 `implemented`
-- CLI 脚本：`156` 个
-- pytest 文件：`201` 个
+- CLI 脚本：`166` 个
+- pytest 文件：`207` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

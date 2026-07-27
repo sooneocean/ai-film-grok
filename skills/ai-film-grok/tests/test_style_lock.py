@@ -73,6 +73,12 @@ def test_apply_plan_merges_cast_locks():
         },
         "at": "now",
         "ref_sha256": "abc",
+        "style_reference": {
+            "kind": "uploaded-style-reference",
+            "original_path": "/uploads/style.png",
+            "staged_path": "/film/source/style-ref-hero.png",
+            "sha256": "a" * 64,
+        },
         "agent_still_prompt_prefix": "PREFIX",
         "agent_i2v_prompt_prefix": "I2V",
     }
@@ -80,6 +86,7 @@ def test_apply_plan_merges_cast_locks():
     out = sl.apply_plan_to_bible(bible, plan)
     assert out["style_fingerprint"]["medium_key"] == "semi_real"
     assert "hero" in out["cast_locks"]
+    assert out["style_reference"]["sha256"] == "a" * 64
     assert out["agent_still_prompt_prefix"] == "PREFIX"
     assert "to be filled" not in str(out.get("palette") or "").lower() or "locked" in str(
         out.get("palette")
@@ -89,3 +96,23 @@ def test_apply_plan_merges_cast_locks():
 def test_recommend_stability():
     r = sl.recommend_medium_for_user_goal("人物稳定性很差 漫剧质感")
     assert r["recommended"] == "manhua"
+
+
+def test_plan_binds_uploaded_style_reference(tmp_path):
+    ref = tmp_path / "reference.png"
+    ref.write_bytes(b"not-a-real-image")
+    plan = sl.plan_from_ref(root=tmp_path, ref_path=ref, crop_faces=False, medium="manhua")
+    ref_lock = plan["style_reference"]
+    assert ref_lock["kind"] == "uploaded-style-reference"
+    assert ref_lock["sha256"] == plan["ref_sha256"]
+    assert Path(ref_lock["staged_path"]).is_file()
+
+
+def test_style_reference_tampering_is_a_hard_failure(tmp_path):
+    ref = tmp_path / "reference.png"
+    ref.write_bytes(b"original")
+    plan = sl.plan_from_ref(root=tmp_path, ref_path=ref, crop_faces=False, medium="manhua")
+    bible = sl.apply_plan_to_bible({}, plan)
+    Path(plan["style_reference"]["staged_path"]).write_bytes(b"substituted")
+    check = sl.validate_style_lock_bible(bible)
+    assert "STYLE_REFERENCE_STAGED_SHA256_MISMATCH" in check["hard"]

@@ -54,14 +54,24 @@ def executable(name: str, *fallbacks: str) -> str:
 
 
 def plugin_version() -> str:
-    return str(
-        json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))["version"]
-    )
+    return str(json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))["version"])
 
 
 def git_value(*args: str) -> str:
     code, output = command("git", *args)
     return output if code == 0 else f"unavailable: {output}"
+
+
+def current_head() -> str:
+    return git_value("rev-parse", "HEAD")
+
+
+def working_tree_is_clean() -> bool:
+    return not git_value("status", "--porcelain")
+
+
+def release_baseline_is_writable(working_tree: str) -> bool:
+    return not working_tree
 
 
 def source_fingerprint() -> str:
@@ -70,8 +80,7 @@ def source_fingerprint() -> str:
         proc = subprocess.run(
             ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
             cwd=ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=False,
         )
     except OSError:
@@ -109,9 +118,7 @@ def test_inventory() -> dict[str, int]:
     return {
         "test_files": len(tests),
         "script_files": len(scripts),
-        "script_lines": sum(
-            path.read_text(encoding="utf-8").count("\n") for path in scripts
-        ),
+        "script_lines": sum(path.read_text(encoding="utf-8").count("\n") for path in scripts),
     }
 
 
@@ -126,9 +133,7 @@ def doctor_snapshot() -> dict[str, Any]:
         "strict_status": data.get("strict_status", "unknown"),
         "strict_blocking": bool(data.get("strict_blocking")),
         "failed_checks": core.get("failed_checks", []),
-        "environment_advisories": (data.get("environment_advisories") or {}).get(
-            "warnings", []
-        ),
+        "environment_advisories": (data.get("environment_advisories") or {}).get("warnings", []),
         "provider_default": data.get("provider_default"),
     }
 
@@ -150,11 +155,7 @@ def coverage_snapshot() -> dict[str, Any]:
             "compose_render.py",
         ):
             row = next(
-                (
-                    value
-                    for key, value in files.items()
-                    if key.endswith(f"scripts/{name}")
-                ),
+                (value for key, value in files.items() if key.endswith(f"scripts/{name}")),
                 None,
             )
             if row:
@@ -175,28 +176,31 @@ def baseline_is_current(path: Path = BASELINE) -> bool:
     if not path.is_file():
         return False
     text = path.read_text(encoding="utf-8")
+    head = re.search(r"^- HEAD: `([^`]+)`$", text, re.MULTILINE)
     version = re.search(r"^- Plugin version: `([^`]+)`$", text, re.MULTILINE)
     fingerprint = re.search(r"^- Source fingerprint: `([^`]+)`$", text, re.MULTILINE)
+    working_tree = re.search(r"^- Working tree: `([^`]+)`$", text, re.MULTILINE)
     return bool(
-        version
+        head
+        and version
         and fingerprint
+        and working_tree
+        and head.group(1) == current_head()
         and version.group(1) == plugin_version()
         and fingerprint.group(1) == source_fingerprint()
+        and working_tree.group(1) == "clean"
+        and working_tree_is_clean()
     )
 
 
-def build_snapshot(
-    *, run_tests: bool = False, full_tests: bool = False
-) -> dict[str, Any]:
+def build_snapshot(*, run_tests: bool = False, full_tests: bool = False) -> dict[str, Any]:
     inventory = test_inventory()
     snapshot: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(),
-        "head": git_value("rev-parse", "HEAD"),
+        "head": current_head(),
         "source_fingerprint": source_fingerprint(),
         "branch": git_value("branch", "--show-current"),
-        "remote": git_value(
-            "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"
-        ),
+        "remote": git_value("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"),
         "version": plugin_version(),
         "working_tree": git_value("status", "--porcelain"),
         "inventory": inventory,
@@ -305,7 +309,11 @@ def markdown(snapshot: dict[str, Any]) -> str:
         [
             f"| `doctor.core_readiness` | {status(doctor['core_ok'])} |",
             f"| `doctor.strict_ok` | {doctor_strict_status} (`{doctor.get('strict_status', 'unknown')}`) |",
-            f"| `tests_fast` | {status((checks.get('tests_fast') or {}).get('ok'))} |",
+            *[
+                f"| `{name}` | {status(check.get('ok'))} |"
+                for name, check in checks.items()
+                if name in {"tests_fast", "tests_full"}
+            ],
             "",
             "## Inventory",
             "",
@@ -315,9 +323,7 @@ def markdown(snapshot: dict[str, Any]) -> str:
             f"- Coverage: `{snapshot['coverage'].get('percent_covered', snapshot['coverage'].get('status'))}`",
             *[
                 f"- Coverage `{name}`: `{percent}`"
-                for name, percent in (
-                    snapshot["coverage"].get("critical_modules") or {}
-                ).items()
+                for name, percent in (snapshot["coverage"].get("critical_modules") or {}).items()
             ],
             "",
             "## Remaining production gates",
@@ -331,23 +337,15 @@ def markdown(snapshot: dict[str, Any]) -> str:
         ]
     )
     warnings = doctor.get("environment_advisories") or []
-    lines.extend(f"- {warning}" for warning in warnings) if warnings else lines.append(
-        "- None"
-    )
+    lines.extend(f"- {warning}" for warning in warnings) if warnings else lines.append("- None")
     return "\n".join(lines) + "\n"
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--json", action="store_true", help="emit machine-readable JSON"
-    )
-    parser.add_argument(
-        "--run-tests", action="store_true", help="run the fast pytest suite"
-    )
-    parser.add_argument(
-        "--full-tests", action="store_true", help="run the full pytest suite"
-    )
+    parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    parser.add_argument("--run-tests", action="store_true", help="run the fast pytest suite")
+    parser.add_argument("--full-tests", action="store_true", help="run the full pytest suite")
     parser.add_argument(
         "--write-baseline", action="store_true", help="write the generated baseline"
     )
@@ -356,24 +354,32 @@ def main(argv: list[str] | None = None) -> int:
         run_tests=args.run_tests or args.full_tests, full_tests=args.full_tests
     )
     if args.write_baseline:
-        snapshot["checks"]["baseline_current"] = {"ok": True, "status": "written"}
-        BASELINE.parent.mkdir(parents=True, exist_ok=True)
-        BASELINE.write_text(markdown(snapshot), encoding="utf-8")
+        if release_baseline_is_writable(str(snapshot["working_tree"])):
+            snapshot["checks"]["baseline_current"] = {"ok": True, "status": "written"}
+            BASELINE.parent.mkdir(parents=True, exist_ok=True)
+            BASELINE.write_text(markdown(snapshot), encoding="utf-8")
+        else:
+            snapshot["checks"]["baseline_current"] = {
+                "ok": False,
+                "status": "not written: working tree is dirty",
+            }
     if args.json:
         print(json.dumps(snapshot, ensure_ascii=False, indent=2))
     else:
         print(markdown(snapshot), end="")
-    hard_checks = (
-        snapshot["checks"][name]["ok"]
-        for name in (
-            "plugin_validate",
-            "ruff_check",
-            "ruff_format",
-            "docs_current",
-            "cli_help",
-            "baseline_current",
-        )
-    )
+    hard_check_names = [
+        "plugin_validate",
+        "ruff_check",
+        "ruff_format",
+        "docs_current",
+        "cli_help",
+        "baseline_current",
+    ]
+    if args.full_tests:
+        hard_check_names.append("tests_full")
+    elif args.run_tests:
+        hard_check_names.append("tests_fast")
+    hard_checks = (snapshot["checks"][name]["ok"] for name in hard_check_names)
     return 0 if all(hard_checks) else 1
 
 

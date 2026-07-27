@@ -779,11 +779,35 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     dirs = film_dirs(root)
     stills = manifest.get("stills") or {}
     clips = manifest.get("clips") or {}
+    style_reference = (
+        style.get("style_reference") if isinstance(style.get("style_reference"), dict) else {}
+    )
+    style_reference_ok = True
+    if style_reference:
+        try:
+            from scripts import style_lock as sl
+
+            style_check = sl.validate_style_lock_bible(style)
+            style_reference_ok = not any(
+                str(code).startswith("STYLE_REFERENCE_") for code in style_check.get("hard") or []
+            )
+        except (ImportError, OSError, ValueError):
+            style_reference_ok = False
+
+    def _has_current_style_job(record: object) -> bool:
+        if not style_reference:
+            return True
+        evidence = record.get("style_reference_job") if isinstance(record, dict) else None
+        return isinstance(evidence, dict) and evidence.get(
+            "style_reference_sha256"
+        ) == style_reference.get("sha256")
+
     approved_stills = [
         sid
         for sid, record in stills.items()
         if isinstance(record, dict)
         and record.get("status") == "approved"
+        and _has_current_style_job(record)
         and record_file_matches(dirs["keyframes"], record, field=f"still path for {sid}")
     ]
     review_contract = int(manifest.get("review_contract_version") or 1)
@@ -791,6 +815,7 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         sid
         for sid, record in clips.items()
         if approved_clip_record(record)
+        and _has_current_style_job(record)
         and (review_contract < 2 or isinstance(record.get("shot_review"), dict))
         and record_file_matches(dirs["clips"], record, field=f"clip path for {sid}")
     ]
@@ -842,10 +867,18 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     )
     dnotes = load_director_notes(root)
     open_items = open_reshoot_items(dnotes)
-    clips_complete = bool(shot_ids) and all(sid in approved_clips for sid in shot_ids)
+    from clip_uniqueness import active_clip_reuse_report
+
+    uniqueness = active_clip_reuse_report(manifest, required_shot_ids=shot_ids)
+    clips_complete = (
+        bool(shot_ids)
+        and all(sid in approved_clips for sid in shot_ids)
+        and uniqueness["ok"]
+        and style_reference_ok
+    )
     gates = {
         "brief": (root / "brief.json").is_file(),
-        "style_locked": bool(style.get("locked")),
+        "style_locked": bool(style.get("locked")) and style_reference_ok,
         "spec": bool(shots) and spec_error is None,
         "canonical": len(canonical) > 0,
         "stills_complete": bool(shot_ids) and all(sid in approved_stills for sid in shot_ids),
@@ -870,6 +903,8 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         "spec_error": spec_error,
         "final_technical_ok": final_technical_ok,
         "final_review_ok": review_ok,
+        "style_reference_ok": style_reference_ok,
+        "clip_uniqueness": uniqueness,
         "open_reshoots": open_items,
         "open_reshoot_count": len(open_items),
         "director_notes_path": str(director_notes_path(root))
@@ -1356,7 +1391,12 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
     spec_path = Path(args.spec).expanduser().resolve() if args.spec else default_spec
     spec = read_json(spec_path)
     try:
-        shots = validate_film_spec(spec, assign_missing_ids=True, film_root=root)
+        shots = validate_film_spec(
+            spec,
+            assign_missing_ids=True,
+            film_root=root,
+            enforce_narrative_timeline=True,
+        )
     except FilmSpecError as exc:
         raise FilmError(str(exc)) from exc
 
@@ -1906,16 +1946,25 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     style = load_bible(root)
     # Optional: auto-apply pending style-lock plan before locking
+    style_plan = None
     if bool(getattr(args, "from_plan", False)):
         from scripts import style_lock as sl
 
-        plan = sl.read_plan(root)
-        if plan:
-            style = sl.apply_plan_to_bible(style, plan)
+        style_plan = sl.read_plan(root)
+        if style_plan:
+            style = sl.apply_plan_to_bible(style, style_plan)
     if args.signature:
         style["signature_block"] = args.signature.strip()
-    if args.canonical:
-        src = Path(args.canonical).expanduser().resolve()
+    canonical = args.canonical
+    # The uploaded reference is the default style master for a reference-first
+    # lock.  This prevents an accidental generic style-v1 from severing the
+    # full-film look from the user's image.
+    if not canonical and style_plan:
+        canonical = (style_plan.get("style_reference") or {}).get("staged_path") or style_plan.get(
+            "ref_staged"
+        )
+    if canonical:
+        src = Path(canonical).expanduser().resolve()
         if not src.is_file():
             raise FilmError(f"Canonical style image missing: {src}")
         canonical_dir = film_dirs(root)["canonical"]
@@ -1933,6 +1982,13 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
             shutil.copy2(src, dest)
         style["canonical_style_path"] = str(dest)
         style["canonical_style_sha256"] = sha256(dest)
+        reference = style.get("style_reference")
+        if isinstance(reference, dict):
+            # A reference-first lock has exactly one image anchor.  Record the
+            # copied canonical path so validation detects a swapped staged or
+            # canonical file before the film can be marked locked.
+            reference["canonical_path"] = str(dest)
+            reference["canonical_sha256"] = style["canonical_style_sha256"]
     cast_master = getattr(args, "cast_master", None)
     char_id = str(getattr(args, "char_id", None) or "hero").strip() or "hero"
     if cast_master:
@@ -2017,7 +2073,11 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
     from scripts import style_lock as sl
 
     check = sl.validate_style_lock_bible(style)
-    if not check.get("ok") and bool(getattr(args, "strict_style_lock", False)):
+    # A reference-first flow must fail closed: otherwise an old/incomplete
+    # plan could be marked locked while its uploaded style anchor is absent.
+    if not check.get("ok") and (
+        bool(getattr(args, "strict_style_lock", False)) or style_plan is not None
+    ):
         raise FilmError("style-lock hard fail: " + ",".join(check.get("hard") or []))
 
     style["locked"] = True
@@ -2035,6 +2095,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
             "medium_key": check.get("medium_key"),
             "stability": check.get("stability"),
             "canonical_style_path": style.get("canonical_style_path"),
+            "style_reference": style.get("style_reference"),
             "cast_masters": style.get("cast_masters") or {},
             "cast_locks": list((style.get("cast_locks") or {}).keys()),
             "check": check,
@@ -2048,6 +2109,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
             "ok": True,
             "style_locked": True,
             "canonical_style_path": style.get("canonical_style_path"),
+            "style_reference": style.get("style_reference"),
             "cast_masters": style.get("cast_masters") or {},
             "medium_key": check.get("medium_key"),
             "stability": check.get("stability"),
@@ -2105,6 +2167,26 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     identity_approved = getattr(args, "identity_approved", False) is True
     review_note = str(getattr(args, "review_note", "") or "").strip()
     source = Path(args.source).expanduser().resolve()
+    style_job = None
+    style = read_json(root / "style-bible.json") if (root / "style-bible.json").is_file() else {}
+    if isinstance(style.get("style_reference"), dict) and args.status == "approved":
+        job_id = str(getattr(args, "queue_job_id", "") or "").strip()
+        if not job_id:
+            raise FilmError(
+                "reference-first approved still requires --queue-job-id from image_gen/image_edit"
+            )
+        try:
+            from media_queue import QueueError, style_reference_output_evidence
+
+            style_job = style_reference_output_evidence(
+                root,
+                job_id=job_id,
+                source=source,
+                shot_id=str(args.shot_id),
+                allowed_operations=frozenset({"image_gen", "image_edit"}),
+            )
+        except QueueError as exc:
+            raise FilmError(str(exc)) from exc
     # Lesson 2026-07-22: compressed/wrong-aspect still → mushy I2V (vivian-ep01)
     aspect = "9:16"
     spec: dict[str, Any] = {}
@@ -2158,6 +2240,8 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     )
     record["geometry_qa"] = geo
     record["quality_gate"] = quality
+    if style_job:
+        record["style_reference_job"] = style_job
     record["quality_receipt"] = str(write_quality_receipt(root, record["shot_id"], quality))
     if args.status == "approved":
         record["identity_approved"] = True
@@ -2401,6 +2485,26 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         if not review_note:
             raise FilmError("Approved clips require --review-note with the visual review result")
     manifest = load_manifest(root)
+    style_job = None
+    style = read_json(root / "style-bible.json") if (root / "style-bible.json").is_file() else {}
+    if isinstance(style.get("style_reference"), dict) and args.status == "approved":
+        job_id = str(getattr(args, "queue_job_id", "") or "").strip()
+        if not job_id:
+            raise FilmError(
+                "reference-first approved clip requires --queue-job-id from reference_to_video"
+            )
+        try:
+            from media_queue import QueueError, style_reference_output_evidence
+
+            style_job = style_reference_output_evidence(
+                root,
+                job_id=job_id,
+                source=Path(args.source).expanduser().resolve(),
+                shot_id=str(args.shot_id),
+                allowed_operations=frozenset({"reference_to_video"}),
+            )
+        except QueueError as exc:
+            raise FilmError(str(exc)) from exc
     shot_review = None
     if args.status == "approved" and int(manifest.get("review_contract_version") or 1) >= 2:
         try:
@@ -2418,6 +2522,15 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             raise FilmError(
                 f"v1.6 approved clips require matching shot-review evidence: {exc}"
             ) from exc
+    if args.status == "approved":
+        from clip_uniqueness import ClipUniquenessError, assert_clip_is_unique
+
+        try:
+            uniqueness = assert_clip_is_unique(source, manifest=manifest, shot_id=str(args.shot_id))
+        except ClipUniquenessError as exc:
+            raise FilmError(f"Approved clips cannot reuse another shot's segment: {exc}") from exc
+    else:
+        uniqueness = None
     try:
         qa = analyze_media(source, require_audio=False, require_motion=True)
     except MediaQAError as exc:
@@ -2462,8 +2575,11 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             "qa": qa,
             "shot_review": shot_review,
             "quality_gate": quality,
+            "uniqueness": uniqueness,
         }
     )
+    if style_job:
+        record["style_reference_job"] = style_job
     record["quality_receipt"] = str(write_quality_receipt(root, record["shot_id"], quality))
     if qa.get("has_audio"):
         try:
@@ -3556,7 +3672,32 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         append_event(root, stage="review-final", phase="completed")
     except OSError:
         pass
-    emit({"ok": True, "final_complete": manifest["gates"]["final_complete"], "review": review})
+    try:
+        from quality_ledger import emit_quality_ledger
+
+        quality_ledger = emit_quality_ledger(root)
+    except (OSError, ValueError) as exc:
+        raise FilmError(
+            f"final review succeeded but quality ledger could not be written: {exc}"
+        ) from exc
+    try:
+        from production_report import emit_production_report
+
+        production_report = emit_production_report(root)
+    except (OSError, ValueError) as exc:
+        raise FilmError(
+            f"final review succeeded but production report could not be written: {exc}"
+        ) from exc
+    emit(
+        {
+            "ok": True,
+            "final_complete": manifest["gates"]["final_complete"],
+            "review": review,
+            "quality_ledger": str(root / "receipts" / "quality-ledger.json"),
+            "retrospective_complete": quality_ledger["retrospective_complete"],
+            "production_report": production_report["paths"],
+        }
+    )
     return 0
 
 
@@ -4070,10 +4211,13 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
             if mp4.name.startswith("_") or "pre_" in mp4.name or "_work" in mp4.name:
                 continue
             shutil.copy2(mp4, dest / "成片" / mp4.name)
-    for side in ("final.srt", "final-delivery.json"):
+    for side in ("final.srt", "final-delivery.json", "production-report.html"):
         src = out_dir / side
         if src.is_file():
             shutil.copy2(src, dest / "成片" / side)
+    production_receipt = root / "receipts" / "production-report.json"
+    if production_receipt.is_file():
+        shutil.copy2(production_receipt, dest / "项目状态" / production_receipt.name)
     # clean stale intermediate copies from previous exports
     for stale in (dest / "成片").glob("*.mp4"):
         if stale.name not in ("film_final.mp4", "film_silent.mp4") and (
@@ -4490,6 +4634,26 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     return _run_optimization_cli(args, "dashboard")
 
 
+def _run_quality_reporting_cli(args: argparse.Namespace, command: str) -> int:
+    from cli_quality_reporting import QualityReportingCliError, production_report, quality_ledger
+
+    runners = {"quality-ledger": quality_ledger, "production-report": production_report}
+    try:
+        report = runners[command](args)
+    except QualityReportingCliError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0
+
+
+def cmd_quality_ledger(args: argparse.Namespace) -> int:
+    return _run_quality_reporting_cli(args, "quality-ledger")
+
+
+def cmd_production_report(args: argparse.Namespace) -> int:
+    return _run_quality_reporting_cli(args, "production-report")
+
+
 def _cmd_graph_legacy(args: argparse.Namespace) -> int:
     """Vertical Drama Graph: legacy derive/import + canonical project/validate/status."""
     root = Path(args.root).expanduser().resolve()
@@ -4670,10 +4834,20 @@ def _cmd_graph_legacy(args: argparse.Namespace) -> int:
 
 
 def cmd_graph(args: argparse.Namespace) -> int:
-    """Graph command adapter; mutation logic lives in cli_graph_mutation."""
+    """Graph command adapter split between read-only and mutation domains."""
+    root = Path(args.root).expanduser().resolve()
+    action = str(getattr(args, "graph_action", "") or "")
+    if action in {"validate", "status"}:
+        from cli_graph import status as status_graph_cli
+        from cli_graph import validate as validate_graph_cli
+
+        runner = validate_graph_cli if action == "validate" else status_graph_cli
+        report, code = runner(args, root)
+        emit(report)
+        return code
+
     from cli_graph_mutation import GraphMutationError, run
 
-    root = Path(args.root).expanduser().resolve()
     try:
         report, code = run(args, root)
     except GraphMutationError as exc:
@@ -4917,29 +5091,6 @@ def cmd_plan(args: argparse.Namespace) -> int:
         )
         emit(report)
         return code
-    from drama_graph import GRAPH_NAME
-    from narrative_control import (
-        NarrativeControlError,
-        edit_node,
-        lock_scope,
-        mark_replan,
-        unlock_scope,
-        write_revision_receipt,
-    )
-    from util import read_json, write_json
-
-    def _load_text() -> str:
-        text = getattr(args, "text", None)
-        file_p = getattr(args, "file", None)
-        if file_p:
-            p = Path(str(file_p)).expanduser().resolve()
-            if not p.is_file():
-                raise FilmError(f"plan source file not found: {p}")
-            return p.read_text(encoding="utf-8")
-        if text is not None and str(text).strip():
-            return str(text)
-        raise FilmError("plan requires --text or --file")
-
     if action == "normalize":
         from cli_plan_normalize import PlanNormalizeError, run
 
@@ -4953,101 +5104,6 @@ def cmd_plan(args: argparse.Namespace) -> int:
             raise FilmError(str(exc)) from exc
         emit(report)
         return code
-
-    if action in {"edit", "lock", "unlock", "replan"}:
-        root_s = getattr(args, "root", None)
-        if not root_s:
-            raise FilmError(f"plan {action} requires --root")
-        root = Path(root_s).expanduser().resolve()
-        graph_path = root / GRAPH_NAME
-        graph = read_json(graph_path)
-        if not graph:
-            raise FilmError(f"missing {graph_path} — run: aifilm plan run --root …")
-        try:
-            if action == "edit":
-                changes: dict[str, Any] = {}
-                for item in list(getattr(args, "set", None) or []):
-                    if "=" not in item:
-                        raise NarrativeControlError(
-                            f"--set requires field=value: {item}", code="INVALID_FIELD"
-                        )
-                    field, raw_value = item.split("=", 1)
-                    try:
-                        value: Any = json.loads(raw_value)
-                    except json.JSONDecodeError:
-                        value = raw_value
-                    if str(getattr(args, "node", "")) == "story" and field.startswith("story."):
-                        field = field.split(".", 1)[1]
-                    changes[field] = value
-                graph, affected = edit_node(graph, str(args.node), changes)
-                write_json(graph_path, graph)
-                receipt = write_revision_receipt(
-                    root, graph, action="edit", node_ref=str(args.node), affected=affected
-                )
-                emit(
-                    {
-                        "ok": True,
-                        "action": action,
-                        "revision": graph.get("revision"),
-                        "affected_nodes": affected,
-                        "receipt_path": str(receipt),
-                    }
-                )
-                return 0
-            if action == "lock":
-                graph = lock_scope(graph, str(args.scope), user_phrase=str(args.user_phrase))
-                write_json(graph_path, graph)
-                receipt = write_revision_receipt(
-                    root, graph, action="lock", reason=str(args.user_phrase)
-                )
-                emit(
-                    {
-                        "ok": True,
-                        "action": action,
-                        "scope": args.scope,
-                        "revision": graph.get("revision"),
-                        "receipt_path": str(receipt),
-                    }
-                )
-                return 0
-            if action == "unlock":
-                graph = unlock_scope(graph, str(args.scope), reason=str(args.reason))
-                write_json(graph_path, graph)
-                receipt = write_revision_receipt(
-                    root, graph, action="unlock", reason=str(args.reason)
-                )
-                emit(
-                    {
-                        "ok": True,
-                        "action": action,
-                        "scope": args.scope,
-                        "revision": graph.get("revision"),
-                        "receipt_path": str(receipt),
-                    }
-                )
-                return 0
-            if not bool(getattr(args, "descendants", False)):
-                raise NarrativeControlError(
-                    "replan requires --descendants to confirm subtree invalidation",
-                    code="DESCENDANTS_CONFIRM_REQUIRED",
-                )
-            affected = mark_replan(graph, str(args.node))
-            write_json(graph_path, graph)
-            receipt = write_revision_receipt(
-                root, graph, action="replan", node_ref=str(args.node), affected=affected
-            )
-            emit(
-                {
-                    "ok": True,
-                    "action": action,
-                    "revision": graph.get("revision"),
-                    "affected_nodes": affected,
-                    "receipt_path": str(receipt),
-                }
-            )
-            return 0
-        except NarrativeControlError as exc:
-            raise FilmError(f"{exc.code}: {exc}") from exc
 
     raise FilmError(f"unknown plan action {action!r}")
 
@@ -5759,6 +5815,7 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument("--role", default="keyframe")
     rs.add_argument("--status", default="approved")
     rs.add_argument("--prompt-file")
+    rs.add_argument("--queue-job-id", help="Required for reference-first approved stills")
     rs.add_argument(
         "--identity-approved",
         action="store_true",
@@ -5784,6 +5841,7 @@ def build_parser() -> argparse.ArgumentParser:
     rc.add_argument("--source", required=True)
     rc.add_argument("--status", default="approved")
     rc.add_argument("--prompt-file")
+    rc.add_argument("--queue-job-id", help="Required for reference-first approved clips")
     rc.add_argument("--source-endpoint", choices=sorted(ALLOWED_VIDEO_ENDPOINTS))
     rc.add_argument("--identity-approved", action="store_true")
     rc.add_argument("--motion-approved", action="store_true")
@@ -5830,7 +5888,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--performance-evidence",
         action="append",
         default=[],
-        help="Repeat kind@seconds:note (action_visible, trigger_visible, reaction_visible, dialogue_delivery, mouth_still)",
+        help=(
+            "Repeat kind@seconds:note. Required authored story facts use "
+            "start_state_visible, must_show_visible, visible_change_visible, end_state_visible; "
+            "also action_visible, trigger_visible, reaction_visible, dialogue_delivery, mouth_still"
+        ),
     )
     shot_review.add_argument(
         "--reference", action="append", default=[], help="Optional reference asset path; repeatable"
@@ -6301,79 +6363,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     qcheck.add_argument("--allow-freeze", action="store_true", help="Downgrade freeze fail to warn")
 
-    metrics = sub.add_parser("metrics", help="Emit receipt-backed optimisation metrics")
-    metrics_sub = metrics.add_subparsers(dest="metrics_action", required=True)
-    metrics_emit = metrics_sub.add_parser(
-        "emit", help="Aggregate one film root into receipts/metrics.json"
-    )
-    metrics_emit.add_argument("--root", required=True)
-    metrics_emit.add_argument("--run-id", default="default")
-    metrics_status = metrics_sub.add_parser("status", help="Inspect append-only pipeline events")
-    metrics_status.add_argument("--root", required=True)
-    metrics_human = metrics_sub.add_parser("human-time", help="Record explicit human minutes")
-    metrics_human.add_argument("--root", required=True)
-    metrics_human.add_argument("--stage", required=True)
-    metrics_human.add_argument("--minutes", type=float, required=True)
-    metrics_human.add_argument("--actor", required=True)
-    metrics_human.add_argument("--note", default="")
-    metrics_human.add_argument("--run-id", default="default")
+    from cli_optimization import add_optimization_parsers
 
-    experiment = sub.add_parser(
-        "experiment", help="Receipt-backed, single-axis optimisation experiments"
-    )
-    experiment_sub = experiment.add_subparsers(dest="experiment_action", required=True)
-    experiment_init = experiment_sub.add_parser("init")
-    experiment_init.add_argument("--root", required=True)
-    experiment_init.add_argument("--id", required=True)
-    experiment_init.add_argument("--hypothesis", required=True)
-    experiment_init.add_argument("--treatment-axis", required=True)
-    experiment_init.add_argument(
-        "--primary-metric",
-        choices=("cost_usd", "wall_sec", "grade_p50", "motion_p10"),
-        required=True,
-    )
-    experiment_init.add_argument("--min-effect", type=float, required=True)
-    experiment_init.add_argument("--fixture", action="append", required=True)
-    experiment_init.add_argument("--seed", required=True)
-    experiment_init.add_argument("--shot-count", type=int, required=True)
-    experiment_init.add_argument("--aspect", required=True)
-    experiment_init.add_argument("--duration-budget-sec", type=float, required=True)
-    experiment_import = experiment_sub.add_parser("import")
-    experiment_import.add_argument("--root", required=True)
-    experiment_import.add_argument("--id", required=True)
-    experiment_import.add_argument("--arm", choices=("baseline", "treatment"), required=True)
-    experiment_import.add_argument("--metrics-root", required=True)
-    experiment_import.add_argument("--fixture", action="append", required=True)
-    experiment_import.add_argument("--seed", required=True)
-    experiment_import.add_argument("--shot-count", type=int, required=True)
-    experiment_import.add_argument("--aspect", required=True)
-    experiment_import.add_argument("--duration-budget-sec", type=float, required=True)
-    experiment_run = experiment_sub.add_parser("run")
-    experiment_run.add_argument("--root", required=True)
-    experiment_run.add_argument("--id", required=True)
-    experiment_run.add_argument("--arm", choices=("baseline", "treatment"), required=True)
-    experiment_run.add_argument("--authorize-spend", action="store_true")
-    experiment_run.add_argument("--max-usd", type=float, default=None)
-    experiment_diff = experiment_sub.add_parser("diff")
-    experiment_diff.add_argument("--root", required=True)
-    experiment_diff.add_argument("--id", required=True)
-    experiment_decide = experiment_sub.add_parser("decide")
-    experiment_decide.add_argument("--root", required=True)
-    experiment_decide.add_argument("--id", required=True)
-    experiment_decide.add_argument("--decision", choices=("ship", "reject"), required=True)
+    add_optimization_parsers(sub)
 
-    gold = sub.add_parser("gold", help="Calibrate early-reject metrics against a reviewed gold set")
-    gold_sub = gold.add_subparsers(dest="gold_action", required=True)
-    gold_calibrate = gold_sub.add_parser("calibrate")
-    gold_calibrate.add_argument("--manifest", required=True)
-    dashboard = sub.add_parser(
-        "dashboard", help="Build a receipt-only static optimisation dashboard"
-    )
-    dashboard_sub = dashboard.add_subparsers(dest="dashboard_action", required=True)
-    dashboard_build = dashboard_sub.add_parser("build")
-    dashboard_build.add_argument("--roots-dir", required=True)
-    dashboard_build.add_argument("--days", type=int, default=30)
-    dashboard_build.add_argument("--out", required=True)
+    from cli_quality_reporting import add_quality_reporting_parsers
+
+    add_quality_reporting_parsers(sub)
 
     benchmark_p = sub.add_parser(
         "benchmark", help="Run a no-spend premium vertical benchmark contract"
@@ -6994,41 +6990,9 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    # Phase 1: Vertical Drama Graph
-    graph_p = sub.add_parser(
-        "graph",
-        help="Vertical Drama Graph: derive|validate|status (from film-spec; Phase 1)",
-    )
-    graph_sub = graph_p.add_subparsers(dest="graph_action", required=True)
-    g_der = graph_sub.add_parser(
-        "derive", help="Derive drama-graph.json from film-spec (read-only projection)"
-    )
-    g_der.add_argument("--root", required=True, help="Film root")
-    g_der.add_argument("--no-write", action="store_true", help="Do not write drama-graph.json")
-    g_imp = graph_sub.add_parser(
-        "import", help="Explicitly import legacy film-spec into canonical drama-graph v2"
-    )
-    g_imp.add_argument("--root", required=True, help="Film root")
-    g_proj = graph_sub.add_parser(
-        "project", help="Project locked canonical drama-graph into film-spec"
-    )
-    g_proj.add_argument("--root", required=True, help="Film root")
-    g_proj.add_argument("--force", action="store_true", help="Overwrite existing film-spec shots")
-    g_val = graph_sub.add_parser("validate", help="Validate drama-graph.json structure")
-    g_val.add_argument("--root", required=True, help="Film root")
-    g_val.add_argument(
-        "--derive-if-missing",
-        action="store_true",
-        help="Derive graph first if missing",
-    )
-    g_st = graph_sub.add_parser("status", help="Graph counts + validate summary")
-    g_st.add_argument("--root", required=True, help="Film root")
-    g_st.add_argument(
-        "--no-derive",
-        action="store_true",
-        help="Do not auto-derive if graph missing",
-    )
-    g_st.add_argument("--with-jobs", action="store_true", help="Include execution jobs_summary")
+    from cli_graph import add_graph_parsers
+
+    add_graph_parsers(sub)
 
     director_p = sub.add_parser(
         "director",
@@ -7115,118 +7079,13 @@ def build_parser() -> argparse.ArgumentParser:
     sk_run.add_argument("--payload-file", required=True)
     sk_run.add_argument("--dry-run", action="store_true")
 
-    # Phase 3: story → beat/shot planning
-    plan_p = sub.add_parser(
-        "plan",
-        help="Story plan: receive|normalize|run|validate|edit|lock|unlock|replan|project|status",
-    )
-    plan_sub = plan_p.add_subparsers(dest="plan_action", required=True)
-    p_receive = plan_sub.add_parser(
-        "receive", help="Validate agent T2T StoryReception and write its receipt"
-    )
-    p_receive.add_argument("--root", required=True, help="Film root")
-    p_receive.add_argument("--file", required=True, help="Agent-authored StoryReception JSON")
-    p_receive.add_argument(
-        "--force", action="store_true", help="Replace an existing reception before story lock"
-    )
-    p_norm = plan_sub.add_parser(
-        "normalize", help="story.normalize → receipts/story-normalize.json"
-    )
-    p_norm.add_argument("--root", default=None, help="Optional film root to write receipt")
-    p_norm.add_argument("--text", default=None, help="Raw story / brief text")
-    p_norm.add_argument("--file", default=None, help="Path to .txt/.md story")
-    p_norm.add_argument("--title", default=None, help="Title override")
-    p_run = plan_sub.add_parser(
-        "run",
-        help="Create draft plan: normalize→episode→scene→beat→shot→canonical drama-graph",
-    )
-    p_run.add_argument("--root", required=True, help="Film root")
-    p_run.add_argument("--text", default=None, help="Raw story / one-liner idea")
-    p_run.add_argument("--file", default=None, help="Path to story file")
-    p_run.add_argument(
-        "--received-file",
-        default=None,
-        help="Validated StoryReception JSON; uses its planning_text while preserving original source",
-    )
-    p_run.add_argument("--title", default=None, help="Title override")
-    p_run.add_argument(
-        "--target-duration",
-        type=float,
-        default=45.0,
-        help="Target episode duration seconds (default 45)",
-    )
-    p_run.add_argument(
-        "--force",
-        action="store_true",
-        help="Overwrite existing film-spec shots / locked bible seed",
-    )
-    p_run.add_argument(
-        "--apply-film-spec", action="store_true", help="Also write a draft film-spec projection"
-    )
-    p_run.add_argument(
-        "--no-film-spec", action="store_true", help="Do not write film-spec (compatibility alias)"
-    )
-    p_run.add_argument(
-        "--no-bible",
-        action="store_true",
-        help="Do not seed style-bible characters/locations",
-    )
-    p_proj = plan_sub.add_parser(
-        "project", help="Project drama-graph → film-spec (when graph already planned)"
-    )
-    p_proj.add_argument("--root", required=True)
-    p_proj.add_argument("--force", action="store_true", help="Overwrite existing shots")
-    p_val = plan_sub.add_parser(
-        "validate", help="Validate story/beat/shot semantics and projection state"
-    )
-    p_val.add_argument("--root", required=True)
-    p_val.add_argument("--strict", action="store_true")
-    p_edit = plan_sub.add_parser("edit", help="Edit one unlocked narrative node")
-    p_edit.add_argument("--root", required=True)
-    p_edit.add_argument("--node", required=True, help="Node id/ref, e.g. story or ep01_sc01_bt03")
-    p_edit.add_argument("--set", action="append", required=True, help="field=value; repeatable")
-    p_lock = plan_sub.add_parser("lock", help="Lock one narrative scope after semantic validation")
-    p_lock.add_argument("--root", required=True)
-    p_lock.add_argument("--scope", choices=("story", "beats", "shots", "panels"), required=True)
-    p_lock.add_argument("--user-phrase", required=True)
-    p_unlock = plan_sub.add_parser("unlock", help="Unlock one narrative scope with an audit reason")
-    p_unlock.add_argument("--root", required=True)
-    p_unlock.add_argument("--scope", choices=("story", "beats", "shots", "panels"), required=True)
-    p_unlock.add_argument("--reason", required=True)
-    p_replan = plan_sub.add_parser(
-        "replan", help="Mark a node and descendants stale without deleting media"
-    )
-    p_replan.add_argument("--root", required=True)
-    p_replan.add_argument("--node", required=True)
-    p_replan.add_argument(
-        "--descendants", action="store_true", help="Required explicit confirmation flag"
-    )
-    p_st = plan_sub.add_parser("status", help="Plan + graph status for film root")
-    p_st.add_argument("--root", required=True)
+    from cli_plan import add_plan_parsers
 
-    # Phase 4: asset registry (character/location/prop/state)
-    assets_p = sub.add_parser(
-        "assets",
-        help="Asset registry: sync|status|check (Phase 4 Character/Location/Prop/State)",
-    )
-    assets_sub = assets_p.add_subparsers(dest="assets_action", required=True)
-    a_sync = assets_sub.add_parser(
-        "sync",
-        help="Structure bible locations/props + wardrobe variants + cast-state slots + timeline",
-    )
-    a_sync.add_argument("--root", required=True)
-    a_sync.add_argument("--force", action="store_true", help="Re-structure locations/props objects")
-    a_sync.add_argument("--no-write", action="store_true")
-    a_sync.add_argument("--no-graph", action="store_true", help="Do not patch drama-graph")
-    a_st = assets_sub.add_parser("status", help="Show assets-registry summary")
-    a_st.add_argument("--root", required=True)
-    a_st.add_argument("--sync", action="store_true", help="Sync if missing")
-    a_ck = assets_sub.add_parser(
-        "check",
-        help="Align assets-registry with state-index + wardrobe re-dress risks",
-    )
-    a_ck.add_argument("--root", required=True)
-    a_ck.add_argument("--no-sync", action="store_true", help="Do not re-sync before check")
+    add_plan_parsers(sub)
+
+    from cli_assets import add_assets_parsers
+
+    add_assets_parsers(sub)
 
     return p
 
@@ -7303,6 +7162,8 @@ def main(argv: list[str] | None = None) -> int:
             "experiment": cmd_experiment,
             "gold": cmd_gold,
             "dashboard": cmd_dashboard,
+            "quality-ledger": cmd_quality_ledger,
+            "production-report": cmd_production_report,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:

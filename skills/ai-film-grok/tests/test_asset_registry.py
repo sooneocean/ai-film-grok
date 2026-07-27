@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import tempfile
@@ -20,6 +21,50 @@ from story_plan import run_plan  # noqa: E402
 
 
 class AssetRegistryTests(unittest.TestCase):
+    def test_assets_parser_domain_preserves_sync_safety_flags(self) -> None:
+        from cli_assets import add_assets_parsers
+
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="cmd", required=True)
+        add_assets_parsers(subparsers)
+
+        sync = parser.parse_args(
+            ["assets", "sync", "--root", "film", "--force", "--no-write", "--no-graph"]
+        )
+        status = parser.parse_args(["assets", "status", "--root", "film", "--sync"])
+        check = parser.parse_args(["assets", "check", "--root", "film", "--no-sync"])
+
+        self.assertTrue(sync.force)
+        self.assertTrue(sync.no_write)
+        self.assertTrue(sync.no_graph)
+        self.assertTrue(status.sync)
+        self.assertTrue(check.no_sync)
+
+    def test_sync_dry_run_does_not_create_asset_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            report = sync_assets(root, write=False)
+
+            self.assertTrue(report.get("ok"), report)
+            self.assertFalse((root / "canonical").exists())
+            self.assertFalse(registry_path(root).exists())
+            self.assertFalse((root / "style-bible.json").exists())
+            self.assertFalse((root / "receipts").exists())
+
+    def test_check_without_sync_fails_closed_when_registry_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            report = assets_check(root, sync_first=False)
+
+            self.assertFalse(report.get("ok"), report)
+            self.assertIn("ASSET_REGISTRY_MISSING", report.get("issues") or [])
+            self.assertFalse((root / "canonical").exists())
+            self.assertFalse(registry_path(root).exists())
+            self.assertFalse((root / "style-bible.json").exists())
+            self.assertFalse((root / "receipts").exists())
+
     def test_plan_then_assets_aligned(self) -> None:
         idea = "雨夜出租车里，女司机与乘客靠近，雨衣半敞。"
         with tempfile.TemporaryDirectory() as tmp:

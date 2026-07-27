@@ -52,11 +52,68 @@ def shot_role(root: Path, shot_id: str) -> str:
 def _style_evidence(root: Path) -> dict[str, Any]:
     style = read_json(root / "style-bible.json") or {}
     cast = style.get("cast_masters") if isinstance(style.get("cast_masters"), dict) else {}
+    reference = (
+        style.get("style_reference") if isinstance(style.get("style_reference"), dict) else {}
+    )
+    reference_hard: list[str] = []
+    if reference:
+        try:
+            from style_lock import validate_style_lock_bible
+
+            check = validate_style_lock_bible(style)
+            reference_hard = [
+                str(code)
+                for code in check.get("hard") or []
+                if str(code).startswith("STYLE_REFERENCE_")
+            ]
+        except (ImportError, OSError, ValueError) as exc:
+            reference_hard = [f"STYLE_REFERENCE_VALIDATION_FAILED:{exc}"]
     return {
         "locked": style.get("locked") is True
         or str(style.get("state") or "").lower() == "approved",
         "canonical_style_path": style.get("canonical_style_path"),
         "cast_masters": cast,
+        "reference": reference or None,
+        "reference_ok": bool(reference) and not reference_hard,
+        "reference_hard": reference_hard,
+    }
+
+
+def _style_assembly_evidence(
+    root: Path, shot_id: str, prompt_file: Path | None, style: dict[str, Any]
+) -> dict[str, Any]:
+    """Prove the generated prompt was assembled from the locked uploaded style ref."""
+    reference = style.get("reference") if isinstance(style.get("reference"), dict) else {}
+    if not reference:
+        return {"required": False, "ok": True, "receipt": None, "errors": []}
+    errors: list[str] = []
+    receipt_path = Path(root) / "receipts" / f"prompt_assembly_{shot_id}.json"
+    receipt = read_json(receipt_path) if receipt_path.is_file() else None
+    if not isinstance(receipt, dict):
+        errors.append("STYLE_REFERENCE_PROMPT_RECEIPT_MISSING")
+    else:
+        recorded = (
+            receipt.get("style_reference")
+            if isinstance(receipt.get("style_reference"), dict)
+            else {}
+        )
+        if recorded.get("sha256") != reference.get("sha256"):
+            errors.append("STYLE_REFERENCE_PROMPT_SHA256_MISMATCH")
+        if recorded.get("staged_path") != reference.get("staged_path"):
+            errors.append("STYLE_REFERENCE_PROMPT_PATH_MISMATCH")
+        if not str(receipt.get("reference_instruction") or "").strip():
+            errors.append("STYLE_REFERENCE_PROMPT_INSTRUCTION_MISSING")
+        if (
+            prompt_file
+            and prompt_file.is_file()
+            and receipt.get("prompt_hash") != sha256_file(prompt_file)
+        ):
+            errors.append("STYLE_REFERENCE_PROMPT_TEXT_MISMATCH")
+    return {
+        "required": True,
+        "ok": not errors,
+        "receipt": str(receipt_path),
+        "errors": errors,
     }
 
 
@@ -82,6 +139,7 @@ def evaluate_keyframe(
     role = shot_role(root, shot_id)
     geometry = analyze_still_geometry(source, aspect_ratio=aspect_ratio)
     style = _style_evidence(root)
+    style_assembly = _style_assembly_evidence(root, shot_id, prompt_file, style)
     prompt_clean, artifact_tokens = _prompt_text_clean(prompt_file)
     errors = list(geometry.get("errors") or [])
     codes = list(geometry.get("codes") or [])
@@ -95,6 +153,12 @@ def evaluate_keyframe(
     if role == "hero" and not style["locked"]:
         codes.append("HERO_STYLE_LOCK_MISSING")
         errors.append("hero keyframe requires a locked style bible")
+    if style.get("reference") and not style.get("reference_ok"):
+        codes.extend(style.get("reference_hard") or ["STYLE_REFERENCE_INVALID"])
+        errors.append("uploaded style reference failed integrity validation")
+    if not style_assembly["ok"]:
+        codes.extend(style_assembly["errors"])
+        errors.append("keyframe prompt is not bound to the uploaded style reference")
     result = {
         "schema_version": 1,
         "kind": "keyframe-quality",
@@ -106,6 +170,7 @@ def evaluate_keyframe(
         "codes": sorted(set(codes)),
         "geometry": geometry,
         "style": style,
+        "style_assembly": style_assembly,
         "prompt": {
             "path": str(prompt_file) if prompt_file else None,
             "sha256": sha256_file(prompt_file) if prompt_file and prompt_file.is_file() else None,
@@ -136,9 +201,29 @@ def evaluate_clip(
     role = shot_role(root, shot_id)
     errors: list[str] = []
     codes: list[str] = []
+    style = _style_evidence(root)
     if not qa.get("ok"):
         errors.extend(str(item) for item in qa.get("errors") or ["technical media QA failed"])
         codes.append("TECHNICAL_MEDIA_QA_FAILED")
+    if style.get("reference") and not style.get("reference_ok"):
+        codes.extend(style.get("reference_hard") or ["STYLE_REFERENCE_INVALID"])
+        errors.append("uploaded style reference failed integrity validation")
+    if style.get("reference"):
+        manifest = read_json(Path(root) / "manifest.json") or {}
+        stills = manifest.get("stills") if isinstance(manifest.get("stills"), dict) else {}
+        still = stills.get(str(shot_id)) if isinstance(stills.get(str(shot_id)), dict) else {}
+        still_gate = (
+            still.get("quality_gate") if isinstance(still.get("quality_gate"), dict) else {}
+        )
+        still_style = still_gate.get("style") if isinstance(still_gate.get("style"), dict) else {}
+        still_reference = (
+            still_style.get("reference") if isinstance(still_style.get("reference"), dict) else {}
+        )
+        if still_reference.get("sha256") != style["reference"].get("sha256"):
+            errors.append(
+                "clip requires a keyframe approved against the same uploaded style reference"
+            )
+            codes.append("STYLE_REFERENCE_KEYFRAME_EVIDENCE_MISSING")
     if role == "environment":
         return {
             "schema_version": 1,
@@ -152,6 +237,7 @@ def evaluate_clip(
             "endpoint": endpoint,
             "technical_qa": qa,
             "review": review,
+            "style": style,
         }
     if not identity_approved:
         errors.append("hero clip requires identity approval")
@@ -191,6 +277,7 @@ def evaluate_clip(
         "endpoint": endpoint,
         "technical_qa": qa,
         "review": review,
+        "style": style,
         "continuity_joins_checked": len(joins),
     }
 

@@ -15,7 +15,17 @@ class PerformanceEvidenceError(ValueError):
 
 
 EVIDENCE_KINDS = frozenset(
-    {"action_visible", "dialogue_delivery", "mouth_still", "reaction_visible", "trigger_visible"}
+    {
+        "action_visible",
+        "dialogue_delivery",
+        "end_state_visible",
+        "mouth_still",
+        "must_show_visible",
+        "reaction_visible",
+        "start_state_visible",
+        "trigger_visible",
+        "visible_change_visible",
+    }
 )
 
 
@@ -54,6 +64,19 @@ def performance_contract(shot: dict[str, Any] | None, *, required: bool) -> dict
     performance = channels["performance"]
     motion = channels["motion"]
     requirements: list[dict[str, str]] = []
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    # These are the director's observable promises.  They cannot be inferred
+    # from a prompt or a thumbnail: the reviewer must point at the generated
+    # clip where each promise is actually visible.
+    for field, kind in (
+        ("start_state", "start_state_visible"),
+        ("must_show", "must_show_visible"),
+        ("visible_change", "visible_change_visible"),
+        ("end_state", "end_state_visible"),
+    ):
+        value = shot.get(field) or dsl.get(field)
+        if _present(value):
+            requirements.append({"kind": kind, "reason": field, "value": str(value).strip()})
     if _present(motion["scene_trigger"]) and motion["scene_trigger"] != "none":
         requirements.append(
             {
@@ -142,6 +165,15 @@ def validate_performance_evidence(
         codes.append("REACTION_BEFORE_TRIGGER")
     if trigger and action and action["timestamp_sec"] < trigger["timestamp_sec"]:
         codes.append("ACTION_BEFORE_TRIGGER")
+    start = evidence.get("start_state_visible")
+    end = evidence.get("end_state_visible")
+    change = evidence.get("visible_change_visible")
+    if start and change and change["timestamp_sec"] < start["timestamp_sec"]:
+        codes.append("VISIBLE_CHANGE_BEFORE_START_STATE")
+    if change and end and end["timestamp_sec"] < change["timestamp_sec"]:
+        codes.append("END_STATE_BEFORE_VISIBLE_CHANGE")
+    if start and end and end["timestamp_sec"] <= start["timestamp_sec"]:
+        codes.append("END_STATE_NOT_AFTER_START_STATE")
     return {
         "ok": not codes,
         "codes": codes,

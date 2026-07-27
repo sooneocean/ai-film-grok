@@ -6,7 +6,7 @@ Prefer Grok Build native image_to_video in-session. This adapter is for:
   - CI / scripts with grok login or XAI_API_KEY
 
   python3 adapters/grok_oauth_video.py \
-    --image keyframes/shot01.png \
+    --image keyframes/shot01.png --ref source/style-ref-hero.png \
     --prompt-file prompts/shot01_i2v.txt \
     --out clips/shot01_grok.mp4 \
     --duration 6 --resolution 720p
@@ -58,6 +58,12 @@ def _retry_video_generate(prompt, **kwargs):
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Grok OAuth image-to-video (batch)")
     p.add_argument("--image", required=True, help="source keyframe PNG/JPEG")
+    p.add_argument(
+        "--ref",
+        action="append",
+        default=[],
+        help="additional reference image; repeat for reference_to_video (e.g. uploaded style anchor)",
+    )
     p.add_argument("--prompt", default=None)
     p.add_argument("--prompt-file", default=None)
     p.add_argument("--out", required=True)
@@ -81,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
         result = _retry_video_generate(
             prompt,
             image=args.image,
+            reference_images=list(args.ref or []) or None,
             out=Path(args.out),
             model=args.model,
             duration=args.duration,

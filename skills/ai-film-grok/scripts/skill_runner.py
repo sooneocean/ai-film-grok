@@ -157,7 +157,21 @@ def _media_queue_argv(payload: dict[str, Any], *, skill_id: str) -> tuple[str, .
         "keyframe.generate": "image_gen",
         "image.animate": "image_to_video",
     }
-    operation = str(values.get("operation") or defaults[skill_id])
+    style = {}
+    try:
+        style = json.loads((root / "style-bible.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        style = {}
+    style_reference = (
+        style.get("style_reference") if isinstance(style.get("style_reference"), dict) else {}
+    )
+    default_operation = defaults[skill_id]
+    # When the caller has not pinned an endpoint, a reference-first film uses
+    # the multi-reference endpoint by default so the uploaded style image is
+    # sent alongside the keyframe rather than being reduced to text guidance.
+    if skill_id == "image.animate" and style_reference:
+        default_operation = "reference_to_video"
+    operation = str(values.get("operation") or default_operation)
     if operation not in allowed_operations[skill_id]:
         allowed = ", ".join(sorted(allowed_operations[skill_id]))
         raise ValueError(f"{skill_id} operation must be one of: {allowed}")
@@ -175,6 +189,20 @@ def _media_queue_argv(payload: dict[str, Any], *, skill_id: str) -> tuple[str, .
         isinstance(item, str) and item.strip() for item in raw_inputs
     ):
         raise ValueError(f"{skill_id} input.inputs must be a list of paths")
+    if style_reference:
+        staged = Path(str(style_reference.get("staged_path") or "")).expanduser().resolve()
+        if not staged.is_file():
+            raise ValueError(f"{skill_id} uploaded style reference is missing: {staged}")
+        resolved_inputs = {
+            (
+                Path(item).expanduser().resolve()
+                if Path(item).expanduser().is_absolute()
+                else (root / item).resolve()
+            )
+            for item in raw_inputs
+        }
+        if staged not in resolved_inputs:
+            raw_inputs.append(str(staged))
 
     max_attempts = values.get("maxAttempts", 3)
     if (
@@ -206,6 +234,8 @@ def _media_queue_argv(payload: dict[str, Any], *, skill_id: str) -> tuple[str, .
         )
         argv.extend(("--input", str(media_input)))
     assembly_receipt = values.get("assemblyReceipt")
+    if assembly_receipt is None and style_reference:
+        assembly_receipt = str(root / "receipts" / f"prompt_assembly_{shot_id}.json")
     if assembly_receipt is not None:
         if not isinstance(assembly_receipt, str) or not assembly_receipt.strip():
             raise ValueError(f"{skill_id} input.assemblyReceipt must be a path")

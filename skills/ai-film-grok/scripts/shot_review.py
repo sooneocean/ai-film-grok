@@ -238,7 +238,7 @@ def create_shot_review(
         and performance["ok"]
     )
     packet = {
-        "schema_version": 3,
+        "schema_version": 4,
         "kind": "shot-review",
         "at": _utc_now(),
         "shot_id": sid,

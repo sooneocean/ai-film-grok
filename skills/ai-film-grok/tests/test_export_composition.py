@@ -142,7 +142,7 @@ class ExportCompositionTests(unittest.TestCase):
             self.assertTrue(any((root / "compose" / "hyperframes" / "media").glob("shot*")))
             # system fonts only — no undeclared CJK font families
             self.assertNotIn("PingFang", html)
-            self.assertIn("system-ui", html)
+            self.assertIn("font-family: sans-serif", html)
             rem = root / "compose" / "remotion" / "src" / "Film.tsx"
             self.assertTrue(rem.is_file())
             root_tsx = root / "compose" / "remotion" / "src" / "Root.tsx"
@@ -342,6 +342,90 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
             self.assertIn("开场旁白", html)
 
     @pytest.mark.slow
+    def test_underlay_rejects_a_plate_that_already_burned_subtitles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=1)
+            (root / "out" / "film_final.mp4").write_bytes(b"\x00fake-final")
+            (root / "out" / "final-delivery.json").write_text(
+                json.dumps({"subtitles": {"burned_in": True}}), encoding="utf-8"
+            )
+            manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            manifest["outputs"] = {
+                "final_film": {"path": "film_final.mp4", "duration_sec": 8.0, "sha256": "x"}
+            }
+            (root / "manifest.json").write_text(
+                json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ComposeExportError, "double-burn"):
+                export_composition(root, engine="hyperframes", force=True, layout="underlay")
+
+    @pytest.mark.slow
+    def test_underlay_end_roll_is_clamped_to_actual_plate_clock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=1)
+            (root / "out" / "film_final.mp4").write_bytes(b"\x00fake-final")
+            (root / "post-package.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "short-drama-platform-package",
+                        "package_id": "clock-safe",
+                        "outro": {"mode": "hook", "next_episode": "第 2 集"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            manifest["outputs"] = {
+                "final_film": {"path": "film_final.mp4", "duration_sec": 8.0, "sha256": "x"}
+            }
+            (root / "manifest.json").write_text(
+                json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
+            )
+            export_composition(root, engine="hyperframes", force=True, layout="underlay")
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
+            self.assertIn('id="end-roll"', html)
+            self.assertIn('data-start="3.000" data-duration="5.000"', html)
+            self.assertIn('data-duration="8.000"', html)
+
+    @pytest.mark.slow
+    def test_underlay_platform_intro_is_clamped_to_actual_plate_clock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=1)
+            (root / "out" / "film_final.mp4").write_bytes(b"\x00fake-final")
+            (root / "post-package.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "short-drama-platform-package",
+                        "package_id": "short-plate",
+                        "intro": {"mode": "short", "duration_sec": 5.0},
+                        "outro": {"mode": "none"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            manifest["outputs"] = {
+                "final_film": {"path": "film_final.mp4", "duration_sec": 1.0, "sha256": "x"}
+            }
+            (root / "manifest.json").write_text(
+                json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
+            )
+            export_composition(root, engine="hyperframes", force=True, layout="underlay")
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
+            self.assertIn('id="title-sequence"', html)
+            self.assertIn('data-duration="0.400"', html)
+            self.assertIn('data-caption-clock-offset="0.000"', html)
+            self.assertIn('data-duration="1.000"', html)
+
+    @pytest.mark.slow
     def test_ecchi_preset_css_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"
@@ -359,6 +443,107 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
             self.assertIn("preset: ecchi-rnb", html)
             self.assertIn("rgba(255, 160, 190", html)  # blush border
             self.assertIn('data-compose-preset="ecchi-rnb"', html)
+
+    @pytest.mark.slow
+    def test_post_package_owns_episode_cards_and_caption_safe_area(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=1)
+            (root / "post-package.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "short-drama-platform-package",
+                        "package_id": "platform-v1",
+                        "intro": {"mode": "short", "duration_sec": 1.1, "subtitle": "EP.01"},
+                        "outro": {
+                            "mode": "hook",
+                            "duration_sec": 2.2,
+                            "next_episode": "第 2 集",
+                            "cta": "敬请期待",
+                        },
+                        "captions": {"max_chars": 10, "languages": ["zh"]},
+                        "safe_area": {"top_pct": 10, "bottom_pct": 20},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            export_composition(root, engine="hyperframes", force=True)
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
+            receipt = json.loads(
+                (root / "compose" / "hyperframes" / "media-stage-receipt.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertIn("EP.01", html)
+            self.assertIn('data-duration="1.100"', html)
+            self.assertIn("第 2 集", html)
+            self.assertIn('data-platform-package="platform-v1"', html)
+            self.assertIn("bottom: 256px", html)  # 20% of vertical 1280 frame
+            self.assertEqual(receipt["platform_package"]["package_id"], "platform-v1")
+
+    @pytest.mark.slow
+    def test_show_package_drives_reusable_opening_and_ending_cards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=1)
+            (root / "show-package.json").write_text(
+                json.dumps(
+                    {
+                        "id": "vertical-drama.v1",
+                        "version": "1.0.0",
+                        "brand": {"label": "AI FILM SPACE", "accent": "#F5C2D5"},
+                        "opening": {
+                            "duration_sec": 1.2,
+                            "series_title": "午夜祕密",
+                            "episode": "EP.01",
+                        },
+                        "captions": {"identity": "platform-drama", "safe_bottom_px": 240},
+                        "ending": {
+                            "duration_sec": 1.8,
+                            "cta": "下一集，敬请期待",
+                            "next_episode_hook": "门后的声音。",
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            export_composition(root, engine="hyperframes", force=True)
+
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
+            manifest = json.loads((root / "compose" / "package.json").read_text(encoding="utf-8"))
+            self.assertIn('data-show-package="vertical-drama.v1"', html)
+            self.assertIn("午夜祕密", html)
+            self.assertIn("下一集，敬请期待", html)
+            self.assertEqual(manifest["show_package"]["id"], "vertical-drama.v1")
+
+    @pytest.mark.slow
+    def test_post_package_none_modes_do_not_fall_back_to_default_cards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=1)
+            (root / "post-package.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "short-drama-platform-package",
+                        "package_id": "no-cards",
+                        "intro": {"mode": "none"},
+                        "outro": {"mode": "none"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            export_composition(root, engine="hyperframes", force=True)
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
+            self.assertNotIn('id="title-card"', html)
+            self.assertNotIn('id="end-card"', html)
 
 
 if __name__ == "__main__":

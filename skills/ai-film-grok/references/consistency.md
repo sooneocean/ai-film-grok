@@ -31,18 +31,32 @@
 |------|------|
 | **S0 Medium 先锁** | 开片选定 `anime` / `manhua` / `semi_real` / `photoreal`；写入 `style_fingerprint` |
 | **S1 输入图 plan** | 有用户角色图 → `aifilm style-lock plan --ref`（裁 face-lock + plan JSON） |
+| **S1a 上传图为全片锚** | plan 将上传图拷入 `source/` 并记录 SHA-256；`lock-style --from-plan` 默认用它建 `canonical/style-v1.*`，所有静帧与 I2V 队列必须把它作为实际 style input；有状态照时，状态照仍是唯一主像素参考 |
 | **S2 禁止 sheet 当 9:16 脸** | 整页设定表只裁 FRONT/脸；cast master 9:16 用 `image_edit` |
 | **S3 稳优先默认 manhua** | 用户要「漫剧/稳/一致」→ **不要**默认 photoreal |
 | **S4 photoreal 明示低稳** | bulk 前 soft warn；pilot 人脸严拒 |
-| **S5 prompt 前缀** | 每镜 still 含 `MEDIUM LOCK` + `cast_locks`（`style-lock prompt` / prompt_injector） |
+| **S5 参考输入硬闸** | 每镜 still 必须带上传 style image；I2V 必须走 `reference_to_video` 并同时带 keyframe + style image。`image_to_video`（只吃首帧）在参考图锁定项目中禁止入队 |
+| **S5a 来源回执硬闸** | `register-still approved` 只接受已完成 `image_gen/image_edit` 队列任务；`register-clip approved` 只接受已完成 `reference_to_video` 队列任务。两者都要同镜、同输出 SHA-256、同上传 style SHA-256 的 `--queue-job-id` |
+
+批量 Grok adapter 也必须真实上传两张图片：`--image` 是已验收 keyframe，`--ref` 是上传的 style anchor；不能只把参考图写在 prompt 里。
 | **S6 像素路径** | 有角色 → 只 `image_edit(cast\|face-lock\|已过审 still)`，禁纯 gen 绕脸 |
 | **S7 face-identity** | `aifilm face-identity enroll-bible && audit`；`receipts/face-identity.json#verified`；post_audit `FACE_IDENTITY_DRIFT` |
 
 ```bash
 aifilm style-lock plan --root "$ROOT" --ref sheet.png --char-id hero --medium manhua
 aifilm style-lock apply --root "$ROOT"
-aifilm lock-style --root "$ROOT" --from-plan --canonical … --cast-master … --char-id hero
+aifilm lock-style --root "$ROOT" --from-plan --cast-master … --char-id hero
 aifilm style-lock check --root "$ROOT"
+```
+
+登记时保留队列回执，不能把未绑定参考图的本地图片直接混入成片：
+
+```bash
+aifilm register-still --root "$ROOT" --shot-id shot01 --source keyframes/shot01.png \
+  --queue-job-id "<image-edit-job>" --identity-approved --review-note "style/id approved"
+aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
+  --source-endpoint reference_to_video --queue-job-id "<reference-to-video-job>" \
+  --identity-approved --motion-approved --review-note "style/motion approved"
 ```
 
 **Keyframe-first**：视频坏了 → **回头改 keyframe / 状态照**，不是从 full cast 平行重抽。详 [keyframe-first-state-index.md](keyframe-first-state-index.md)。

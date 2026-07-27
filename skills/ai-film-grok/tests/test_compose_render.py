@@ -66,6 +66,70 @@ def test_designed_post_probe_reports_missing_npx_and_timeout(monkeypatch) -> Non
     assert "timed out" in timed_out["error"].lower()
 
 
+@pytest.mark.slow
+def test_platform_package_hyperframes_real_render(tmp_path: Path) -> None:
+    """Real 9:16 underlay render proves package → check → MP4, not HTML only."""
+    tooling = probe_designed_post_tooling()
+    if not tooling.get("hyperframes_ok"):
+        pytest.skip(f"HyperFrames unavailable: {tooling.get('error')}")
+
+    root = tmp_path / "film"
+    root.mkdir()
+    _seed_film(root, n_shots=1)
+    plate = root / "out" / "film_final.mp4"
+    _make_motion_clip(plate, seconds=1.2, with_audio=True)
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["outputs"]["final_film"] = {
+        "path": "film_final.mp4",
+        "sha256": sha256(plate),
+        # Keep authored duration below decoded media duration: this canary must
+        # exercise HyperFrames' frame-coverage guard without disabling it.
+        "duration_sec": 1.0,
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (root / "out" / "final-delivery.json").write_text(
+        json.dumps({"subtitles": {"burned_in": False}}), encoding="utf-8"
+    )
+    (root / "out" / "final.srt").write_text(
+        "1\n00:00:00,200 --> 00:00:00,900\n真实渲染验收\n", encoding="utf-8"
+    )
+    (root / "post-package.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "kind": "short-drama-platform-package",
+                "package_id": "render-canary-v1",
+                "intro": {"mode": "short", "subtitle": "EP.01"},
+                "outro": {"mode": "hook", "cta": "下一集，敬请期待"},
+                "captions": {"max_chars": 10, "languages": ["zh"]},
+                "safe_area": {"top_pct": 10, "bottom_pct": 20},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = compose_render(
+        root,
+        engine="hyperframes",
+        export_first=True,
+        layout="underlay",
+        compose_preset="minimal",
+        quality="draft",
+        register=False,
+    )
+
+    output = Path(result["output"])
+    assert result["rendered"] is True
+    assert output.is_file() and output.stat().st_size > 0
+    assert probe_has_audio(output)
+    receipt = json.loads(
+        (root / "compose" / "hyperframes" / "media-stage-receipt.json").read_text(encoding="utf-8")
+    )
+    assert receipt["platform_package"]["package_id"] == "render-canary-v1"
+
+
 def test_compose_metadata_and_npm_gate_fail_closed(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "film"
     (root / "out").mkdir(parents=True)

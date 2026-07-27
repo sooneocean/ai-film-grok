@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -172,3 +173,40 @@ def test_dashboard_only_reads_metrics_receipts(tmp_path: Path) -> None:
     page = Path(report["out"]).read_text()
     assert report["counts"]["runs"] == 1
     assert "Optimisation dashboard" in page
+
+
+def test_optimization_parser_domain_preserves_command_contract() -> None:
+    from cli_optimization import add_optimization_parsers
+
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="cmd", required=True)
+    add_optimization_parsers(subparsers)
+
+    metrics = parser.parse_args(["metrics", "emit", "--root", "film", "--run-id", "run-1"])
+    experiment = parser.parse_args(
+        [
+            "experiment",
+            "run",
+            "--root",
+            "film",
+            "--id",
+            "exp-1",
+            "--arm",
+            "treatment",
+            "--authorize-spend",
+            "--max-usd",
+            "3.5",
+        ]
+    )
+    gold = parser.parse_args(["gold", "calibrate", "--manifest", "gold.json"])
+    dashboard = parser.parse_args(
+        ["dashboard", "build", "--roots-dir", "films", "--days", "14", "--out", "dashboard"]
+    )
+
+    assert metrics.metrics_action == "emit"
+    assert metrics.run_id == "run-1"
+    assert experiment.experiment_action == "run"
+    assert experiment.authorize_spend is True
+    assert experiment.max_usd == 3.5
+    assert gold.gold_action == "calibrate"
+    assert dashboard.dashboard_action == "build"
