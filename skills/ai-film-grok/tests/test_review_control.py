@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from approval_ledger import append_approval  # noqa: E402
 from review_control import (  # noqa: E402
     ReviewControlConflict,
     budget_status,
@@ -19,7 +21,7 @@ from review_control import (  # noqa: E402
 
 
 def _root(tmp_path: Path) -> Path:
-    (tmp_path / "receipts").mkdir()
+    (tmp_path / "receipts").mkdir(parents=True)
     (tmp_path / "drama-graph.json").write_text('{"scenes": []}', encoding="utf-8")
     (tmp_path / "film-spec.json").write_text('{"scenes": []}', encoding="utf-8")
     return tmp_path
@@ -66,6 +68,16 @@ def test_reject_records_structured_note_and_checks_revision(tmp_path: Path) -> N
             timestamp_sec=None,
             expected_ledger_revision=revision - 1,
         )
+    with pytest.raises(ValueError, match="timestamp"):
+        record_action(
+            root,
+            stage="story",
+            action="reject",
+            issue="story",
+            note="invalid timestamp",
+            timestamp_sec=float("nan"),
+            expected_ledger_revision=revision,
+        )
 
 
 def test_settings_use_optimistic_revision_and_budget_envelopes(tmp_path: Path) -> None:
@@ -85,3 +97,24 @@ def test_budget_preserves_unknown_provider_cost(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert budget_status(root)["remaining"]["motion"] is None
+
+
+def test_unbound_or_unsealed_approval_is_never_presented_as_approved(tmp_path: Path) -> None:
+    source = _root(tmp_path / "source")
+    target = _root(tmp_path / "target")
+    item = review_queue(source)["items"][0]
+    append_approval(
+        source,
+        scope="review:story",
+        approval_type="review_gate",
+        approver_type="human",
+        approver="dex",
+        authorization_event="review-ui",
+        input_hashes=item["input_hashes"],
+        evidence_refs=item["evidence_refs"],
+        transaction_id="review-ui:story",
+    )
+    shutil.copyfile(
+        source / "receipts" / "approval-ledger.json", target / "receipts" / "approval-ledger.json"
+    )
+    assert review_queue(target)["items"][0]["state"] == "stale"

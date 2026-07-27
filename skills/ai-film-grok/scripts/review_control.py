@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from contextlib import suppress
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -176,6 +177,10 @@ def _stage_state(
     if not matches:
         return ("blocked" if not hashes else "pending_review"), None
     latest = matches[-1]
+    if latest.get("ledger_integrity_current") is not True:
+        return "stale", str(latest.get("approval_id"))
+    if latest.get("project_binding_current") is not True:
+        return "stale", str(latest.get("approval_id"))
     current = approval_is_current(latest, hashes)
     if current["ok"]:
         return "approved", str(latest.get("approval_id"))
@@ -296,7 +301,13 @@ def record_action(
     note = note.strip()
     if not note or len(note) > 4000:
         raise ReviewControlError("review note is required and must be under 4000 characters")
-    if timestamp_sec is not None and (timestamp_sec < 0 or timestamp_sec > 86_400):
+    if timestamp_sec is not None and (
+        isinstance(timestamp_sec, bool)
+        or not isinstance(timestamp_sec, (int, float))
+        or not isfinite(timestamp_sec)
+        or timestamp_sec < 0
+        or timestamp_sec > 86_400
+    ):
         raise ReviewControlError("timestamp must be a valid non-negative second offset")
     ledger = read_approval_ledger(base)
     if int(ledger["revision"]) != expected_ledger_revision:

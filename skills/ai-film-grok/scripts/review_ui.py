@@ -27,6 +27,9 @@ from review_control import (
 from util import write_json
 
 MAX_BODY = 128 * 1024
+MEDIA_SUFFIXES = frozenset(
+    {".mp4", ".mov", ".m4v", ".webm", ".wav", ".mp3", ".m4a", ".png", ".jpg", ".jpeg", ".webp"}
+)
 
 _PAGE = """<!doctype html><meta charset=utf-8><title>AI Film 审核控制台</title><style>body{font:15px system-ui;margin:2rem;background:#111827;color:#e5e7eb}button{margin:.2rem;padding:.4rem}.item{border:1px solid #374151;padding:1rem;margin:.6rem 0;border-radius:.4rem}.approved{border-color:#15803d}.stale,.blocked{border-color:#dc2626}textarea{width:100%;min-height:4rem}code{word-break:break-all}</style><h1>AI Film 审核控制台</h1><p id=summary>载入中…</p><button onclick=advance()>自动推进至下一审核关</button><div id=items></div><script>const token=new URLSearchParams(location.search).get('token');const h={'X-Review-Token':token};async function api(p,o={}){o.headers={...h,...(o.headers||{})};let r=await fetch(p,o);let j=await r.json();if(!r.ok)throw Error(j.error||r.status);return j}function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}async function load(){let d=await api('/api/status');window.rev=d.queue.ledger_revision;summary.textContent='审批账本 revision '+rev+' · 审核者 '+d.settings.reviewer;items.innerHTML=d.queue.items.map(x=>`<section class="item ${x.state}"><b>${esc(x.title)}</b> — ${x.state}<br><code>${esc(JSON.stringify(x.input_hashes))}</code><textarea id="n-${x.id}" placeholder="审核意见（必填）"></textarea><input id="t-${x.id}" type=number min=0 step=.1 placeholder="视频时间码（秒，可选）"><select id="i-${x.id}"><option value="other">other</option><option value="motion">motion</option><option value="identity">identity</option><option value="technical">technical</option><option value="audio">audio</option><option value="budget">budget</option></select><br>${['approve','reject','reshoot','needs_changes'].map(a=>`<button onclick="act('${x.id}','${a}')">${a}</button>`).join(' ')}</section>`).join('')}async function act(stage,action){let note=document.getElementById('n-'+stage).value;let timestamp_sec=document.getElementById('t-'+stage).value;try{await api('/api/action',{method:'POST',headers:{'Content-Type':'application/json',Origin:location.origin},body:JSON.stringify({stage,action,note,issue:document.getElementById('i-'+stage).value,timestamp_sec:timestamp_sec?Number(timestamp_sec):null,expected_ledger_revision:rev})});await load()}catch(e){alert(e.message)}}async function advance(){try{await api('/api/advance',{method:'POST',headers:{'Content-Type':'application/json',Origin:location.origin},body:JSON.stringify({expected_ledger_revision:rev})});await load()}catch(e){alert(e.message)}}load()</script>"""
 
@@ -41,7 +44,12 @@ def _session_path(root: Path) -> Path:
 
 def _safe_media(root: Path, relative: str) -> Path:
     candidate = (root / relative).resolve()
-    if not candidate.is_file() or candidate.is_symlink() or root not in candidate.parents:
+    if (
+        not candidate.is_file()
+        or candidate.is_symlink()
+        or candidate.suffix.lower() not in MEDIA_SUFFIXES
+        or root not in candidate.parents
+    ):
         raise ReviewUIError("media path is outside the film workspace")
     return candidate
 

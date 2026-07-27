@@ -81,6 +81,9 @@ def test_media_range_and_workspace_escape_are_handled(tmp_path: Path) -> None:
         connection.close()
         status, _ = _request(server, "GET", "/media/../../etc/passwd")
         assert status == 404
+        (tmp_path / "config.env").write_text("FRW_API_KEY=not-for-ui", encoding="utf-8")
+        status, _ = _request(server, "GET", "/media/config.env")
+        assert status == 404
     finally:
         server.shutdown()
         server.server_close()
