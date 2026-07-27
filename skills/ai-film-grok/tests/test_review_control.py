@@ -80,6 +80,35 @@ def test_reject_records_structured_note_and_checks_revision(tmp_path: Path) -> N
         )
 
 
+def test_queue_exposes_only_recent_schema_checked_review_history(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    revision = review_queue(root)["ledger_revision"]
+    for number in range(4):
+        record_action(
+            root,
+            stage="story",
+            action="reshoot",
+            issue="motion",
+            note=f"retake {number}",
+            timestamp_sec=float(number),
+            expected_ledger_revision=revision,
+        )
+    story = review_queue(root)["items"][0]
+    assert [event["note"] for event in story["recent_actions"]] == [
+        "retake 3",
+        "retake 2",
+        "retake 1",
+    ]
+    assert set(story["recent_actions"][0]) == {
+        "action",
+        "issue",
+        "note",
+        "timestamp_sec",
+        "recorded_at",
+    }
+    assert review_queue(root)["items"][1]["recent_actions"] == []
+
+
 def test_settings_use_optimistic_revision_and_budget_envelopes(tmp_path: Path) -> None:
     root = _root(tmp_path)
     updated = update_settings(

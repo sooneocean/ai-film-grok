@@ -102,5 +102,7 @@ def test_page_exposes_media_preview_and_budget_controls() -> None:
     assert "data-review-action" in _PAGE
     assert "renderedStages.has(stage)" in _PAGE
     assert "reviewActions.has(action)" in _PAGE
+    assert "recent_actions" in _PAGE
+    assert "function history(actions)" in _PAGE
     assert "role=status" in _PAGE
     assert "alert(" not in _PAGE

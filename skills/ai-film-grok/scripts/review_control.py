@@ -195,6 +195,7 @@ def _stage_state(
 def review_queue(root: Path | str) -> dict[str, Any]:
     base = _root(root)
     ledger = read_approval_ledger(base)
+    actions = _load_actions(base)
     items: list[dict[str, Any]] = []
     for stage, title, paths in [*STAGES, *_shot_items(base)]:
         hashes = _hashes(base, paths)
@@ -207,6 +208,7 @@ def review_queue(root: Path | str) -> dict[str, Any]:
                 "approval_id": approval_id,
                 "input_hashes": hashes,
                 "evidence_refs": sorted(hashes),
+                "recent_actions": _recent_actions(actions, stage),
                 "media": [
                     path
                     for path in hashes
@@ -287,6 +289,51 @@ def _load_actions(root: Path) -> dict[str, Any]:
         if isinstance(value, dict)
         else {"schema_version": 1, "kind": "review-actions", "revision": 0, "actions": []}
     )
+
+
+def _recent_actions(actions: dict[str, Any], stage: str, *, limit: int = 3) -> list[dict[str, Any]]:
+    """Return a small, schema-checked decision trail without exposing raw receipts."""
+    values = actions.get("actions")
+    if not isinstance(values, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for event in reversed(values):
+        if len(result) >= limit:
+            break
+        if not isinstance(event, dict) or event.get("stage") != stage:
+            continue
+        action = event.get("action")
+        issue = event.get("issue")
+        note = event.get("note")
+        recorded_at = event.get("recorded_at")
+        timestamp_sec = event.get("timestamp_sec")
+        if (
+            action not in VALID_ACTIONS
+            or issue not in VALID_ISSUES
+            or not isinstance(note, str)
+            or not 0 < len(note) <= 4000
+            or not isinstance(recorded_at, str)
+            or not 0 < len(recorded_at) <= 80
+        ):
+            continue
+        if timestamp_sec is not None and (
+            isinstance(timestamp_sec, bool)
+            or not isinstance(timestamp_sec, (int, float))
+            or not isfinite(timestamp_sec)
+            or timestamp_sec < 0
+            or timestamp_sec > 86_400
+        ):
+            continue
+        result.append(
+            {
+                "action": action,
+                "issue": issue,
+                "note": note,
+                "timestamp_sec": timestamp_sec,
+                "recorded_at": recorded_at,
+            }
+        )
+    return result
 
 
 def record_action(
