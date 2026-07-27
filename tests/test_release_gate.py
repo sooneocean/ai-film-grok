@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import multiprocessing
 import subprocess
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,3 +62,48 @@ def test_release_lock_path_supports_linked_worktrees(tmp_path: Path) -> None:
     assert lock != worktree / ".git" / "ai-film-grok-release-gate.lock"
     with release_gate.exclusive_release_lock(lock, timeout_sec=0):
         assert lock.is_file()
+
+
+def test_current_clean_head_rejects_tracked_changes(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test"], check=True)
+    tracked = repo / "tracked.txt"
+    tracked.write_text("before\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "tracked.txt"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "init"], check=True)
+
+    assert release_gate.current_clean_head(repo)
+    tracked.write_text("after\n", encoding="utf-8")
+    with pytest.raises(release_gate.ReleaseGateError, match="tracked worktree changes"):
+        release_gate.current_clean_head(repo)
+
+
+def test_release_gate_reuses_only_matching_success_receipt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    lock = tmp_path / "release.lock"
+    receipt = tmp_path / "success.json"
+    head = "a" * 40
+    receipt.write_text(json.dumps({"head": head, "status": "passed"}), encoding="utf-8")
+    monkeypatch.setattr(release_gate, "release_lock_path", lambda _: lock)
+    monkeypatch.setattr(release_gate, "release_success_receipt_path", lambda _: receipt)
+    monkeypatch.setattr(release_gate, "current_clean_head", lambda _: head)
+
+    assert release_gate.run_release_gate(tmp_path, timeout_sec=0) == 0
+
+    monkeypatch.setattr(release_gate, "current_clean_head", lambda _: "b" * 40)
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(release_gate.subprocess, "run", fake_run)
+    assert release_gate.run_release_gate(tmp_path, timeout_sec=0) == 0
+    assert calls[-1] == ["make", "release-check"]
+    assert json.loads(receipt.read_text(encoding="utf-8"))["head"] == "b" * 40

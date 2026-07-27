@@ -3,6 +3,12 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.7.7] — 2026-07-27
+
+### Fixed
+
+- Pre-push now fails closed on tracked worktree edits and reuses a local success receipt only for the exact clean Git HEAD, avoiding redundant full release checks during concurrent pushes.
+
 ## [2.7.6] — 2026-07-27
 
 ### Added
