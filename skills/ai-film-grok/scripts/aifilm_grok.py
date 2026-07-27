@@ -72,6 +72,7 @@ MANIFEST_NAME = "manifest.json"
 DEFAULT_FPS = 30
 DEFAULT_WIDTH = 720
 DEFAULT_HEIGHT = 1280  # 9:16; overridden by aspect
+NATIVE_AUDIO_AUDIBLE_MIN_DB = -42.0
 GATE_ORDER = (
     "brief",
     "style_locked",
@@ -167,6 +168,21 @@ def media_duration(path: Path) -> float:
         return probe_duration_sec(path, label="aifilm")
     except MediaDurationError as exc:
         raise FilmError(str(exc)) from exc
+
+
+def probe_native_audio_mean_volume(path: Path) -> float | None:
+    """Return native I2V stem mean volume, or None when ffmpeg cannot measure it."""
+    try:
+        result = run(
+            ["ffmpeg", "-hide_banner", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    match = re.search(
+        r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB", (result.stderr or "") + (result.stdout or "")
+    )
+    return float(match.group(1)) if match else None
 
 
 def emit(obj: dict[str, Any]) -> None:
@@ -2615,10 +2631,15 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                 ]
             )
             os.replace(temp_native, native_path)
+            mean_volume_db = probe_native_audio_mean_volume(native_path)
             record["native_audio"] = {
                 "path": str(native_path),
                 "sha256": sha256(native_path),
                 "duration_sec": media_duration(native_path),
+                "mean_volume_db": mean_volume_db,
+                "audible": (
+                    mean_volume_db is not None and mean_volume_db > NATIVE_AUDIO_AUDIBLE_MIN_DB
+                ),
                 "preserved_at": utc_now(),
             }
         except (SecurityPolicyError, subprocess.CalledProcessError, OSError, ValueError) as exc:

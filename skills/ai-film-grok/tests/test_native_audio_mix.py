@@ -32,6 +32,16 @@ def test_cli_native_audio_volume_overrides_voice_track_policy() -> None:
     )
 
 
+def test_primary_native_audio_excludes_measured_near_silence_but_keeps_legacy_stems() -> None:
+    assert render_final.primary_native_shot_ids(
+        [
+            {"id": "shot01", "native_audio": Path("audible.m4a"), "native_audio_audible": True},
+            {"id": "shot02", "native_audio": Path("silent.m4a"), "native_audio_audible": False},
+            {"id": "shot03", "native_audio": Path("legacy.m4a")},
+        ]
+    ) == ["shot01", "shot03"]
+
+
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg required")
 @pytest.mark.slow
 class NativeAudioMixTests(unittest.TestCase):

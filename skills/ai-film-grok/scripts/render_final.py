@@ -168,6 +168,15 @@ def resolve_native_audio_volume(
     return value
 
 
+def primary_native_shot_ids(shot_audio: list[dict[str, Any]]) -> list[str]:
+    """Keep legacy stems, but exclude newly measured near-silent native audio."""
+    return [
+        str(item["id"])
+        for item in shot_audio
+        if item.get("native_audio") and item.get("native_audio_audible") is not False
+    ]
+
+
 # 混音：I2V 原生声是主视频声；旁白出现时让原生 BGM 与配乐暂避。
 # Multi-track mix (旁白 / 娇喘语助 / 原生 clip 音 / BGM 独立增益):
 # - BGM 生成用固定健康 amp（不吃 music_volume，避免「生成压一次 + 混音再压一次」→ 音乐消失）
@@ -2125,6 +2134,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         except (KeyError, SecurityPolicyError) as exc:
             raise RenderError(str(exc)) from exc
         native_audio = None
+        native_audio_audible: bool | None = None
         native_record = rec.get("native_audio")
         if isinstance(native_record, dict):
             try:
@@ -2135,6 +2145,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 raise RenderError(str(exc)) from exc
             if native_record.get("sha256") != sha256(native_audio):
                 raise RenderError(f"Native audio fingerprint changed for {sid}")
+            recorded_audible = native_record.get("audible")
+            native_audio_audible = recorded_audible if isinstance(recorded_audible, bool) else None
         caption_lang = str(
             spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
         )
@@ -2341,6 +2353,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 "title": shot.get("title") or sid,
                 "tts": tts_meta,
                 "native_audio": native_audio,
+                "native_audio_audible": native_audio_audible,
                 "visual_fit": use_fit,
                 "vo_fit": vo_fit if use_fit == "slot" else "n/a",
                 "vo_atempo_plan": vo_atempo_plan,
@@ -3153,7 +3166,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "sfx"] + (
         ["vocal_color"] if use_color else []
     )
-    preserved_native_shots = [item["id"] for item in shot_audio if item.get("native_audio")]
+    preserved_native_shots = primary_native_shot_ids(shot_audio)
     mix_spotting["native_audio"] = {
         "role": "primary_video_sound" if preserved_native_shots else "unavailable",
         "volume": native_audio_volume,

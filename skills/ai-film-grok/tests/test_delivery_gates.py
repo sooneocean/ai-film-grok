@@ -217,6 +217,17 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertTrue(stem.is_file())
         self.assertEqual(native["sha256"], aifilm_grok.sha256(stem))
         self.assertGreater(native["duration_sec"], 1.5)
+        self.assertGreater(native["mean_volume_db"], aifilm_grok.NATIVE_AUDIO_AUDIBLE_MIN_DB)
+        self.assertTrue(native["audible"])
+
+    def test_native_audio_volume_probe_rejects_near_silence(self) -> None:
+        result = subprocess.CompletedProcess(
+            args=["ffmpeg"], returncode=0, stdout="", stderr="mean_volume: -55.4 dB\n"
+        )
+        with mock.patch.object(aifilm_grok, "run", return_value=result):
+            mean = aifilm_grok.probe_native_audio_mean_volume(self.final_source)
+        self.assertEqual(mean, -55.4)
+        self.assertLess(mean, aifilm_grok.NATIVE_AUDIO_AUDIBLE_MIN_DB)
 
     @pytest.mark.slow
     def test_final_is_incomplete_until_explicit_full_film_review(self) -> None:
