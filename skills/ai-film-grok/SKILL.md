@@ -51,6 +51,8 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 11. **后期单一责任**：title/subtitle/end card 只由一个 post engine 负责；`plate-cards blank`、plate `subs=off` 防双烧。
 12. **完成定义**：`final` 技术成功不等于 `final_complete`；review receipt、post audit、字幕 attestation、review-final、重拍关闭与 export 回读必须齐全。
 13. **安全**：凭据仅从本机读取；日志、metrics、manifest 禁存 token、授权头或 prompt。外部调用不自动重试花费。
+14. **高动态常态（P0 · 2026-07-27）**：平常镜 mean≥18、肉戏≥20（目标≥24）；包络 1:00→片尾≥18。禁止 Ken Burns/微抖/弱 raw 装片；多 take 取最高动且时长够；肉戏 10s 优先 6s×2。**桌面 final 仅** `receipts/i2v-final-gate.json` ok。见 [high-motion-style-lock](references/lessons-2026-07-27-high-motion-style-lock-final.md)。
+15. **I2V 画风锁（P0 · 同案）**：每镜 I2V 源=过审 style-locked still；prompt 首段 **MEDIUM LOCK cel 动漫**（禁 photoreal/半写实光泽）；高动重跑与末帧连戏均不得以 mean 换 medium fail。抽帧 style audit 过再交付。
 
 ## 阶段执行
 

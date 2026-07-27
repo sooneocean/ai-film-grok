@@ -62,3 +62,42 @@ def motion_evidence_status(root: Path | str, shot_id: str) -> dict[str, Any]:
         "dry_run": receipt.get("dry_run") is True,
         "receipt": receipt,
     }
+
+
+def i2v_motion_gate_from_rows(
+    shots: list[dict[str, Any]],
+    *,
+    root: Path | str | None = None,
+    write_receipts: bool = False,
+    raw_complete: bool = True,
+    kb_fallback: bool = False,
+    style_ok: bool = True,
+) -> dict[str, Any]:
+    """Shipped entry: grade mean rows → high-motion audit + final gate.
+
+    Each shot: id, heat_phase, mean|mean_absdiff, optional source.
+    """
+    from i2v_motion_gate import (
+        build_high_motion_audit,
+        build_i2v_final_gate,
+        write_motion_gate_receipts,
+    )
+
+    audit = build_high_motion_audit(shots)
+    gate = build_i2v_final_gate(
+        audit,
+        raw_complete=raw_complete,
+        kb_fallback=kb_fallback,
+        style_ok=style_ok,
+        shot_count=len(shots),
+        raw_ok_count=len(shots) if raw_complete else 0,
+    )
+    out: dict[str, Any] = {
+        "kind": "i2v-motion-gate",
+        "ok": gate.get("ok") is True,
+        "audit": audit,
+        "gate": gate,
+    }
+    if write_receipts and root is not None:
+        out["receipts"] = write_motion_gate_receipts(root, audit, gate)
+    return out

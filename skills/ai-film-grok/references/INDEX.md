@@ -128,6 +128,7 @@
 | 文件 | 主题 |
 |---|---|
 | **[ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md)** | **P0**：口白中文 / 角色日文 / 禁中日乒乓；final SRT·timeout·register；肉戏 2× 动态路径（ep2 全量复盘） |
+| **[high-motion-style-lock-final](lessons-2026-07-27-high-motion-style-lock-final.md)** | **P0**：高动态常态（平常≥18 肉戏≥20）；MEDIUM LOCK cel；gate 才桌面；禁弱 raw/半写实漂移（ep3 案） |
 | [director-methodology-activation](lessons-2026-07-24-director-methodology-activation.md) | 导演方法论激活（若存在） |
 
 ### 2026-07-23

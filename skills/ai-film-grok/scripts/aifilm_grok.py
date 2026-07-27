@@ -4449,6 +4449,39 @@ def cmd_motion_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_i2v_motion_gate(args: argparse.Namespace) -> int:
+    """High-motion audit + final gate from mean rows (meat≥20 normal≥18)."""
+    import json as _json
+
+    from cli_motion import i2v_motion_gate_from_rows
+
+    rows_path = getattr(args, "rows", None) or getattr(args, "from_json", None)
+    if not rows_path:
+        raise FilmError("i2v-motion-gate requires --rows JSON (list of {id,heat_phase,mean})")
+    path = Path(rows_path).expanduser().resolve()
+    try:
+        data = _json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError) as exc:
+        raise FilmError(f"cannot read --rows: {exc}") from exc
+    if isinstance(data, dict) and isinstance(data.get("shots"), list):
+        shots = data["shots"]
+    elif isinstance(data, list):
+        shots = data
+    else:
+        raise FilmError("--rows must be a JSON list or {shots:[...]}")
+    root = getattr(args, "root", None)
+    rep = i2v_motion_gate_from_rows(
+        shots,
+        root=root,
+        write_receipts=bool(getattr(args, "write", False)),
+        raw_complete=not bool(getattr(args, "raw_incomplete", False)),
+        kb_fallback=bool(getattr(args, "kb_fallback", False)),
+        style_ok=not bool(getattr(args, "style_fail", False)),
+    )
+    emit(rep)
+    return 0 if rep.get("ok") else 1
+
+
 def cmd_grok_oauth(args: argparse.Namespace) -> int:
     """Grok OAuth pack (chat/image/edit/video/tts) via ~/.grok/auth.json."""
     from grok_oauth import (
@@ -5553,6 +5586,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     mp.add_argument("--root", required=True)
     mp.add_argument("--shot-id", required=True)
+
+    img = sub.add_parser(
+        "i2v-motion-gate",
+        help=(
+            "High-motion product gate: meat mean≥20 / normal≥18 → "
+            "i2v-high-motion-audit + i2v-final-gate (desktop final only if ok)"
+        ),
+    )
+    img.add_argument(
+        "--rows",
+        required=True,
+        help="JSON list of {id,heat_phase,mean|mean_absdiff[,source]}",
+    )
+    img.add_argument("--root", default=None, help="Film root when --write")
+    img.add_argument(
+        "--write",
+        action="store_true",
+        help="Write receipts/i2v-high-motion-audit.json + i2v-final-gate.json",
+    )
+    img.add_argument("--raw-incomplete", action="store_true")
+    img.add_argument("--kb-fallback", action="store_true")
+    img.add_argument("--style-fail", action="store_true")
 
     goauth = sub.add_parser(
         "grok-oauth",
@@ -7235,6 +7290,7 @@ def main(argv: list[str] | None = None) -> int:
             "frw-lipsync": cmd_frw_lipsync,
             "env-plate": cmd_env_plate,
             "motion-plan": cmd_motion_plan,
+            "i2v-motion-gate": cmd_i2v_motion_gate,
             "grok-oauth": cmd_grok_oauth,
             "dispatch": cmd_dispatch,
             "advance": cmd_advance,

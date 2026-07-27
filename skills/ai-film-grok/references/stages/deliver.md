@@ -5,5 +5,6 @@
 - 十一维 review-final 全部通过、重拍单关闭、字幕像素可读后，才允许 `final_complete`。
 - 自动评分只作 advisory；完整观看、人类批准和盲审不能由模型代替。
 - export 后回读文件、hash、ffprobe 与交付 sidecar；“生成过”不等于“交付完成”。
+- **I2V/成片门（P0 · 2026-07-27）**：`receipts/i2v-final-gate.json` ok 前 **禁止** 覆盖桌面 `film_final`。Gate = 全镜真实 I2V + motion 分级过门 + 包络 after_60 + style 抽帧。I2V raw 完成 ≠ 交付。见 [high-motion-style-lock](../lessons-2026-07-27-high-motion-style-lock-final.md)。
 
-深入资料：[quality-closure.md](../quality-closure.md) · [hard-defaults.md](../hard-defaults.md)
+深入资料：[quality-closure.md](../quality-closure.md) · [hard-defaults.md](../hard-defaults.md) · [high-motion-style-lock](../lessons-2026-07-27-high-motion-style-lock-final.md)

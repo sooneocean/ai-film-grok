@@ -66,6 +66,9 @@
 | 规则 | 默认 |
 |---|---|
 | bulk 2V | **当前 `grok_primary`**：Grok `image_to_video` 720p 串行；Seedance 恢复后 `seedance_first` |
+| **高动态常态（P0 · 2026-07-27）** | **产品硬底**：平常 mean≥**18**；肉戏 act/climax mean≥**20**（目标≥24）；成片 1:00→片尾包络≥**18**。禁止 Ken Burns/仅微呼吸/弱 raw 装片；多 take 取 mean 最高且时长≥镜长；肉戏 10s 优先 **6s×2 hybrid**。交付前写 `i2v-high-motion-audit` + `i2v-final-gate`；**仅 gate ok 才拷桌面 film_final**。**代码入口**：`scripts/i2v_motion_gate.py`（`MEAN_NORMAL_FLOOR=18` / `MEAN_MEAT_FLOOR=20`）· CLI `aifilm i2v-motion-gate --rows …`。见 [high-motion-style-lock](lessons-2026-07-27-high-motion-style-lock-final.md) |
+| **I2V 画风锁 MEDIUM（P0 · 同案）** | 源图= style-locked still/keyframe；prompt 首段 **MEDIUM LOCK cel anime**（match style-v1；禁 photoreal/3D/半写实油光）；高动重跑与 last-frame 连戏 **不得** 用 mean 换 medium fail；交付前 style audit 抽帧。见同上 lesson |
+| **vocal_color 默认** | **never**（2026-07-27 用户永久禁娇喘轨除非显式恢复）；`forbid_vocal_color` / gain=0 |
 | I2V profile | `AIFILM_I2V_PROFILE=grok_primary\|seedance_first`；`write-spec` auto 跟 profile |
 | FRW key canary | Seedance 季：bulk 前必 canary；**grok_primary 季可选**（仅 env LTX） |
 | 403 / 502 | **403**=未开通；**502**=平台挂；勿混淆 |

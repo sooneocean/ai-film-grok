@@ -26,6 +26,11 @@ from edit_policy import (  # noqa: E402
     HOT_SEX_DURATION_FLOOR,
     lint_heat_arc,
 )
+from i2v_motion_gate import (  # noqa: E402
+    MEAN_MEAT_FLOOR,
+    MEAN_MEAT_TARGET,
+    MEAN_NORMAL_FLOOR,
+)
 from media_qa import STILL_MIN_HEIGHT_9_16, STILL_MIN_WIDTH_9_16  # noqa: E402
 from state_index_gate import UNDRESS_STATES, WARDROBE_RANK  # noqa: E402
 
@@ -82,6 +87,16 @@ class HardDefaultsContractTests(unittest.TestCase):
         self.assertEqual(UNDRESS_STATES, frozenset({"partial", "undressed", "bare"}))
         self.assertNotIn("full", UNDRESS_STATES)
         self.assertNotIn("armored", UNDRESS_STATES)
+
+    # --- §视觉: 高动态常态 (2026-07-27) ---
+    def test_high_motion_normal_floor_18(self) -> None:
+        """hard-defaults.md: 平常 mean≥18."""
+        self.assertEqual(MEAN_NORMAL_FLOOR, 18.0)
+
+    def test_high_motion_meat_floor_20(self) -> None:
+        """hard-defaults.md: 肉戏 act/climax mean≥20（目标≥24）."""
+        self.assertEqual(MEAN_MEAT_FLOOR, 20.0)
+        self.assertEqual(MEAN_MEAT_TARGET, 24.0)
 
     # --- §后期: 导演复审十一维 ---
     def test_review_scorecard_has_eleven_dimensions(self) -> None:
