@@ -29,6 +29,10 @@
       "type": "boolean",
       "description": "Require explicit dialogue/BGM/SFX contract and rendered artifact evidence. Defaults false for backward compatibility."
     },
+    "audio_cues_strict": {
+      "type": "boolean",
+      "description": "Require every shot to declare its timed audio cues. Legacy projects remain compatible when false."
+    },
     "audio_tracks": {
       "type": "object",
       "properties": {
@@ -498,6 +502,27 @@
                   ]
                 },
                 "duration_sec": { "type": "number", "exclusiveMinimum": 0, "maximum": 60 },
+                "audio_cues": {
+                  "type": "array",
+                  "description": "Timed, shot-relative audio plan. Only kind=voice may carry spoken_text for TTS.",
+                  "items": {
+                    "type": "object",
+                    "required": ["kind", "start_offset_sec", "duration_sec"],
+                    "properties": {
+                      "kind": {"enum": ["voice", "foley", "sfx", "ambience", "music", "silence"]},
+                      "start_offset_sec": {"type": "number", "minimum": 0},
+                      "duration_sec": {"type": "number", "exclusiveMinimum": 0},
+                      "speaker": {"type": "string"},
+                      "line_type": {"enum": ["dialogue", "inner_monologue", "phone_broadcast", "narration"]},
+                      "spoken_text": {"type": "string"},
+                      "emotion": {"type": "string"},
+                      "performance": {"type": "object"},
+                      "asset_hint": {"type": "string"},
+                      "purpose": {"type": "string"}
+                    },
+                    "additionalProperties": true
+                  }
+                },
                 "lipsync": { "type": "boolean" },
                 "dialogue": { "type": "string" },
                 "music_cue": {

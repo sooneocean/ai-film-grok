@@ -37,6 +37,10 @@ from edit_policy import (
     plan_stretch,
 )
 from film_spec import FilmSpecError, validate_film_spec
+from audio_cues import AudioCueError, compile_audio_timeline, primary_voice_cue, strict_tts_text
+from audio_timeline import AudioTimelineError, caption_bindings as timeline_caption_bindings
+from audio_timeline import compile_timeline as compile_audio_timeline_v1
+from audio_timeline import timeline_hash as audio_timeline_hash
 from media_qa import MediaQAError, analyze_media, approved_clip_record
 from narrative_timeline import (
     NarrativeTimelineError,
@@ -2214,6 +2218,7 @@ def build_subtitle_cues_for_shots(
     shot_starts = list(film_tl["shot_starts"])
     for i, item in enumerate(shot_audio):
         t0 = float(shot_starts[i])
+        voice_offset = float(item.get("voice_start_offset_sec") or 0.0)
         # CRITICAL: use raw speech length, NOT padded plate vo_dur.
         # After pad_natural, item["vo_dur"] == plate (silence tail); spreading
         # phrases over that makes late cards appear with no VO (user: 字幕對不上口白).
@@ -2231,7 +2236,8 @@ def build_subtitle_cues_for_shots(
             max_unit=sub_max,
             gap=0.03,
         )
-        speech_end = t0 + speech_dur
+        speech_start = t0 + voice_offset
+        speech_end = speech_start + speech_dur
         shot_end = t0 + plate - 0.02
         hard_end = min(speech_end, shot_end)
         # Determine italic from voice_type or intent
@@ -2241,8 +2247,8 @@ def build_subtitle_cues_for_shots(
             is_monologue = True
 
         for u, bs, be in segs:
-            sb = max(0.0, t0 + bs - sub_lead)
-            eb = t0 + be
+            sb = max(0.0, speech_start + bs - sub_lead)
+            eb = speech_start + be
             if eb - sb < sub_min:
                 eb = sb + sub_min
             if eb > hard_end:
@@ -2429,6 +2435,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     font_path = resolve_font()
 
     shots = flatten_shots(spec, film_root=root)
+    try:
+        # The validator runs in flatten_shots; this makes the renderer's TTS
+        # selection explicit and refuses ambiguous multi-turn shots.
+        shot_voice_cues = {str(shot["id"]): primary_voice_cue(shot) for shot in shots}
+    except AudioCueError as exc:
+        raise RenderError(str(exc)) from exc
     clips_map = manifest.get("clips") or {}
     try:
         prepare_render_workspace(paths)
@@ -2495,12 +2507,18 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         caption_lang = str(
             spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
         )
-        text = spoken_text_for_shot(
-            shot,
-            dialogue_spoken_lang=dialogue_spoken_lang,
-            narration_spoken_lang=narration_spoken_lang,
-            vo_mode=vo_mode,
-        )
+        voice_cue = shot_voice_cues.get(str(sid))
+        try:
+            text = strict_tts_text(shot, strict=bool(spec.get("audio_cues_strict")))
+        except AudioCueError as exc:
+            raise RenderError(str(exc)) from exc
+        if text is None:
+            text = spoken_text_for_shot(
+                shot,
+                dialogue_spoken_lang=dialogue_spoken_lang,
+                narration_spoken_lang=narration_spoken_lang,
+                vo_mode=vo_mode,
+            )
         caption_text = caption_text_for_shot(shot, caption_lang=caption_lang) or text
         if not text:
             raise RenderError(
@@ -2523,8 +2541,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         except SecurityPolicyError as exc:
             raise RenderError(str(exc)) from exc
         log(f"TTS {sid}: {text[:40]}...")
+        voice_source = {**shot, "speaker": voice_cue.get("speaker")} if voice_cue else shot
         shot_voice = voice_for_shot(
-            shot,
+            voice_source,
             default_voice=voice,
             cast_voices=cast_voices,
             vo_mode=vo_mode,
@@ -2547,6 +2566,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             usage_root=root,
             shot_id=sid,
             performance=(
+                voice_cue.get("performance")
+                if voice_cue and isinstance(voice_cue.get("performance"), dict)
+                else
                 normalize_performance_cue(
                     shot.get("performance_cue"), tone_tags=shot.get("tone_tags")
                 )
@@ -2609,6 +2631,15 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 log(f"  vocal_color skip {sid}: {exc}")
                 color_wav = None
                 color_dur = 0.0
+        # Timed voice cues reserve a part of the plate. Pad their stem before
+        # mixing so a deliberate opening silence remains silence, not TTS.
+        cue_offset = float(voice_cue.get("start_offset_sec") or 0.0) if voice_cue else 0.0
+        cue_window = float(voice_cue.get("duration_sec") or 0.0) if voice_cue else 0.0
+        if voice_cue and dur > cue_window + 0.03:
+            raise RenderError(
+                f"{sid} voice cue exceeds its reserved window "
+                f"({dur:.2f}s > {cue_window:.2f}s); shorten text or enlarge audio_cues duration"
+            )
         # shorter tail — snappier cut to next shot
         pad = float(getattr(args, "vo_pad", 0.12) or 0.12)
         target = dur + pad
@@ -2644,7 +2675,19 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         if vo_fit not in {"atempo", "legacy"}:
             vo_fit = "atempo"
 
-        if use_fit == "slot" and slot > 0 and vo_fit == "atempo":
+        if voice_cue:
+            if slot <= 0:
+                raise RenderError(f"{sid} timed voice cue requires duration_sec")
+            timed_wav = work / f"vo_timed_{i:02d}_{sid}.wav"
+            run([
+                "ffmpeg", "-y", "-i", str(wav), "-af",
+                f"adelay={int(round(cue_offset * 1000))}|{int(round(cue_offset * 1000))},apad=pad_dur={slot:.3f},atrim=0:{slot:.3f}",
+                "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", str(timed_wav),
+            ])
+            raw_vo_dur = float(dur)
+            wav, dur, target, use_fit = timed_wav, slot, slot, "slot"
+            vo_atempo_plan = {"mode": "timed_cue", "window_sec": cue_window, "offset_sec": cue_offset}
+        elif use_fit == "slot" and slot > 0 and vo_fit == "atempo":
             # Three-axis: plate = duration_sec; VO atempo to plate; video stretch only to plate
             try:
                 from vo_atempo import VoAtempoError, fit_voice_to_plate, plan_vo_atempo
@@ -2698,6 +2741,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 "wav": wav,
                 "vo_dur": dur,
                 "raw_vo_dur": raw_vo_dur,
+                "voice_start_offset_sec": cue_offset,
+                "audio_cue": voice_cue,
                 "target": target,
                 "clip": clip_path,
                 "title": shot.get("title") or sid,
@@ -3093,6 +3138,27 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     shot_end_map = {
         str(item["id"]): float(spot_tl["shot_starts"][i] + spot_shot_targets[i])
         for i, item in enumerate(shot_audio)
+    }
+    # Legacy cue sidecar remains byte-compatible.  v1 is opt-in and carries
+    # all eight event types plus source/license/overlap validation.
+    audio_timeline = compile_audio_timeline(shots, shot_starts=shot_start_map)
+    # Do not claim unrendered foley/ambience/music was mixed. This is the
+    # renderer-local cue receipt, distinct from the production audio timeline.
+    audio_timeline_path = audio_dir / "audio-cues-timeline.json"
+    formal_timeline: dict[str, Any] | None = None
+    if bool(spec.get("audio_timeline_v1", False)):
+        try:
+            formal_timeline = compile_audio_timeline_v1(spec)
+        except AudioTimelineError as exc:
+            raise RenderError(str(exc)) from exc
+        write_json(audio_timeline_path, formal_timeline)
+    else:
+        write_json(audio_timeline_path, {"version": 1, "cues": audio_timeline})
+    mix_spotting["audio_timeline"] = {
+        "path": str(audio_timeline_path),
+        "cue_count": len(formal_timeline["events"]) if formal_timeline else len(audio_timeline),
+        "schema": "audio-timeline" if formal_timeline else "legacy-audio-cues",
+        "sha256": audio_timeline_hash(formal_timeline) if formal_timeline else sha256(audio_timeline_path),
     }
     sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
     if sound_plan is None:
@@ -3529,15 +3595,16 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     use_color = color_track is not None and Path(str(color_track)).is_file()
     color_in_gain = 1.0  # per-stem gain already applied in build_vocal_color_track
 
+    mix_sample_rate = 48000 if bool(spec.get("audio_timeline_v1", False)) else SR
     fc_parts = [
-        f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr]",
-        f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[mus]",
-        f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[native]",
-        f"[3:a]volume=1.0,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,{sfx_dsp}[sfx]",
+        f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[narr]",
+        f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[mus]",
+        f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[native]",
+        f"[3:a]volume=1.0,aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo,{sfx_dsp}[sfx]",
     ]
     if use_color:
         fc_parts.append(
-            f"[4:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[color]"
+            f"[4:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[color]"
         )
 
     if "sidechaincompress" in filters_help and "acrossover" in filters_help:
@@ -3624,7 +3691,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "-map",
             "[aout]",
             "-ar",
-            "44100",
+            str(mix_sample_rate),
             "-ac",
             "2",
             "-c:a",
@@ -3665,7 +3732,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                     "-af",
                     f"loudnorm=I={tgt:.1f}:TP=-1.5:LRA=11",
                     "-ar",
-                    "44100",
+                    str(mix_sample_rate),
                     "-ac",
                     "2",
                     "-c:a",
@@ -3827,7 +3894,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "-v",
             "error",
             "-show_entries",
-            "stream=codec_type,codec_name",
+            "stream=codec_type,codec_name,sample_rate,channels,bit_rate",
             "-of",
             "json",
             str(final_path),
@@ -3838,6 +3905,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     has_a = any(s.get("codec_type") == "audio" for s in streams)
     if not has_v or not has_a:
         raise RenderError("Final MP4 missing video or audio stream")
+    audio_stream = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
+    if bool(spec.get("audio_timeline_v1", False)) and (
+        not audio_stream or str(audio_stream.get("sample_rate")) != "48000" or int(audio_stream.get("channels") or 0) != 2
+    ):
+        raise RenderError("audio_timeline_v1 final must be 48kHz stereo")
 
     timeline_path = root / "timeline.json"
     mix_report_path = root / "audio" / "mix_report.json"
@@ -3896,6 +3968,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "audio_provenance": {
             "mix_report": str(mix_report_path) if mix_report_path.is_file() else None,
             "mix_report_sha256": sha256(mix_report_path) if mix_report_path.is_file() else None,
+            "audio_timeline": str(audio_timeline_path) if audio_timeline_path.is_file() else None,
+            "audio_timeline_sha256": sha256(audio_timeline_path) if audio_timeline_path.is_file() else None,
         },
         "timeline": {
             "path": str(timeline_path) if timeline_path.is_file() else None,
@@ -3907,6 +3981,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "cue_count": len(cues),
             "burned_in": subs_mode == "burn",
             "mode": subs_mode,
+            "audio_event_bindings": timeline_caption_bindings(formal_timeline) if formal_timeline else None,
         },
         "shots": [
             {

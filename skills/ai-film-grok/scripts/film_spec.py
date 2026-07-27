@@ -1501,6 +1501,16 @@ def validate_film_spec(
             + ",".join(mm["codes"] or ["MOTION"])
         )
 
+    # Shot-local audio is additive for legacy projects, strict for new timed plans.
+    try:
+        from audio_cues import AudioCueError, validate_audio_cues
+
+        spec["_audio_cues"] = validate_audio_cues(
+            shots, strict=bool(spec.get("audio_cues_strict"))
+        )
+    except AudioCueError as exc:
+        raise FilmSpecError(str(exc)) from exc
+
     # Content channels: keep spoken text, visible performance and motion apart.
     channel_report = lint_content_channels(shots)
     spec["_content_channels"] = channel_report
