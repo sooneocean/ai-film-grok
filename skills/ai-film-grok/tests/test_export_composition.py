@@ -463,7 +463,11 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
                             "next_episode": "第 2 集",
                             "cta": "敬请期待",
                         },
-                        "captions": {"max_chars": 10, "languages": ["zh"]},
+                        "captions": {
+                            "theme": "platform-drama",
+                            "max_chars": 10,
+                            "languages": ["zh"],
+                        },
                         "safe_area": {"top_pct": 10, "bottom_pct": 20},
                     },
                     ensure_ascii=False,
@@ -481,8 +485,11 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
             self.assertIn('data-duration="1.100"', html)
             self.assertIn("第 2 集", html)
             self.assertIn('data-platform-package="platform-v1"', html)
+            self.assertIn('data-caption-theme="platform-drama"', html)
+            self.assertIn("rgba(7, 10, 18, 0.78)", html)
             self.assertIn("bottom: 256px", html)  # 20% of vertical 1280 frame
             self.assertEqual(receipt["platform_package"]["package_id"], "platform-v1")
+            self.assertEqual(receipt["caption_theme"], "platform-drama")
 
     @pytest.mark.slow
     def test_show_package_drives_reusable_opening_and_ending_cards(self) -> None:

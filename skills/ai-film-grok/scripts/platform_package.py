@@ -10,6 +10,7 @@ from util import read_json
 PACKAGE_FILE = "post-package.json"
 SCHEMA_VERSION = 1
 KIND = "short-drama-platform-package"
+CAPTION_THEMES = frozenset({"default", "platform-drama"})
 _TOP_LEVEL_KEYS = {
     "schema_version",
     "kind",
@@ -94,6 +95,9 @@ def load_platform_package(root: Path) -> dict[str, Any]:
         raise PlatformPackageError("outro.mode must be auto|hook|cta|full|none")
     title_duration_sec = _duration(intro.get("duration_sec"), "intro.duration_sec", default=1.2)
     end_duration_sec = _duration(outro.get("duration_sec"), "outro.duration_sec", default=1.8)
+    theme = str(captions.get("theme") or "default").strip().lower()
+    if theme not in CAPTION_THEMES:
+        raise PlatformPackageError(f"captions.theme must be one of {sorted(CAPTION_THEMES)}")
     max_chars = captions.get("max_chars", 12)
     if not isinstance(max_chars, int) or not 8 <= max_chars <= 20:
         raise PlatformPackageError("captions.max_chars must be an integer between 8 and 20")
@@ -129,7 +133,7 @@ def load_platform_package(root: Path) -> dict[str, Any]:
         "package_id": package_id,
         "caption_policy": {
             "owner": "hyperframes",
-            "theme": str(captions.get("theme") or "default"),
+            "theme": theme,
             "max_chars": max_chars,
             "languages": languages,
         },

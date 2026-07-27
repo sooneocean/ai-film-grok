@@ -806,6 +806,20 @@ def preset_hf_styles(preset: str, *, width: int) -> dict[str, str]:
     }
 
 
+def caption_theme_styles(theme: str) -> dict[str, str]:
+    """Platform-owned caption identities; all values are static and seek-safe."""
+    if theme == "platform-drama":
+        return {
+            "caption_bg": "rgba(7, 10, 18, 0.78)",
+            "caption_border": "1px solid rgba(255,255,255,0.76)",
+            "caption_shadow": "0 2px 14px rgba(0,0,0,0.82)",
+            "caption_radius": "0.72em",
+            "caption_pad": "0.50em 0.95em",
+            "caption_letter": "0.025em",
+        }
+    return {}
+
+
 def _stage_hf_media(
     hf_dir: Path,
     film_root: Path,
@@ -1118,8 +1132,10 @@ def write_hyperframes(
         if isinstance(platform_package.get("safe_area"), dict)
         else {}
     )
+    caption_theme = str((platform_package.get("caption_policy") or {}).get("theme") or "default")
     styles = {
         **styles,
+        **caption_theme_styles(caption_theme),
         "caption_bottom": f"{int(height * float(safe_area.get('bottom_pct') or 16) / 100)}px",
     }
     caption_source = str(package.get("caption_source") or "")
@@ -1524,6 +1540,7 @@ def write_hyperframes(
       data-compose-preset="{html.escape(resolved_preset)}"
       data-compose-layout="{html.escape(resolved_layout)}"
       data-platform-package="{html.escape(str(platform_package.get("package_id") or ""))}"
+      data-caption-theme="{html.escape(caption_theme)}"
       data-caption-clock-offset="{caption_clock_offset:.3f}"
       data-start="0"
       data-width="{width}"
@@ -1579,6 +1596,7 @@ def write_hyperframes(
             "title_sequence": title_seq_html is not None,
             "end_roll": end_roll_html is not None,
             "platform_package": platform_package if platform_package.get("enabled") else None,
+            "caption_theme": caption_theme,
             "show_package": show_package,
         },
     )

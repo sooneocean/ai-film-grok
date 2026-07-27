@@ -48,7 +48,7 @@ def test_valid_package_drives_caption_and_card_overrides(tmp_path: Path) -> None
                 "cta": "下一集更刺激",
                 "next_episode": "第 4 集：反转",
             },
-            "captions": {"theme": "premium", "max_chars": 10, "languages": ["zh", "ja"]},
+            "captions": {"theme": "platform-drama", "max_chars": 10, "languages": ["zh", "ja"]},
             "safe_area": {"top_pct": 10, "bottom_pct": 16},
         },
     )
@@ -152,6 +152,10 @@ def test_packaged_episode_rejects_double_burn_override(tmp_path: Path) -> None:
         (
             {"schema_version": 1, "package_id": "test", "intro": {"duration_sec": 0.2}},
             "intro.duration_sec",
+        ),
+        (
+            {"schema_version": 1, "package_id": "test", "captions": {"theme": "premium"}},
+            "captions.theme",
         ),
         ({"schema_version": 1, "unknown": True}, "unknown keys"),
     ],
