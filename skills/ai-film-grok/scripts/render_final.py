@@ -24,6 +24,11 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from audio_cues import AudioCueError, compile_audio_timeline, primary_voice_cue, strict_tts_text
+from audio_timeline import AudioTimelineError
+from audio_timeline import caption_bindings as timeline_caption_bindings
+from audio_timeline import compile_timeline as compile_audio_timeline_v1
+from audio_timeline import timeline_hash as audio_timeline_hash
 from checkpoint import CheckpointManager
 from edit_policy import (
     DEFAULT_TRANSITION_SEC,
@@ -37,10 +42,6 @@ from edit_policy import (
     plan_stretch,
 )
 from film_spec import FilmSpecError, validate_film_spec
-from audio_cues import AudioCueError, compile_audio_timeline, primary_voice_cue, strict_tts_text
-from audio_timeline import AudioTimelineError, caption_bindings as timeline_caption_bindings
-from audio_timeline import compile_timeline as compile_audio_timeline_v1
-from audio_timeline import timeline_hash as audio_timeline_hash
 from media_qa import MediaQAError, analyze_media, approved_clip_record
 from narrative_timeline import (
     NarrativeTimelineError,

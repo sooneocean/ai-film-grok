@@ -14,13 +14,60 @@ def skill_dir() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def build_audio_plan(root: Path) -> dict[str, Any]:
+def build_audio_plan(
+    root: Path,
+    *,
+    compile_timeline: bool = False,
+    write_timeline: bool = False,
+    write_voice_cast: bool = False,
+) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
     scripts = skill_dir() / "scripts"
     if str(scripts) not in sys.path:
         sys.path.insert(0, str(scripts))
 
     spec = read_json(root / "film-spec.json") or {}
+    timeline: dict[str, Any] | None = None
+    timeline_error: str | None = None
+    voice_cast: dict[str, Any] | None = None
+    try:
+        from audio_timeline import caption_bindings, validate_timeline
+        from audio_timeline import compile_timeline as compile_audio_timeline
+        from audio_timeline import write_timeline as persist_timeline
+
+        timeline = compile_audio_timeline(spec)
+        validate_timeline(timeline)
+        if write_timeline:
+            path = persist_timeline(root, timeline)
+            timeline["path"] = str(path)
+        timeline["caption_bindings"] = caption_bindings(timeline)
+        if write_voice_cast:
+            import json
+
+            from voice_cast_profiles import VOCAL_LANGUAGE, assign_profiles
+
+            old_path = root / "audio" / "voice-cast.json"
+            old = read_json(old_path) if old_path.is_file() else {}
+            old_profiles = old.get("profiles") if isinstance(old, dict) else {}
+            speakers: dict[str, dict[str, str]] = {}
+            for event in timeline["events"]:
+                if event.get("type") in VOCAL_LANGUAGE and event.get("speaker"):
+                    sid = str(event["speaker"])
+                    speakers.setdefault(
+                        sid,
+                        {"speaker_id": sid, "language": VOCAL_LANGUAGE[str(event["type"])]},
+                    )
+            voice_cast = {
+                "schema_version": 1,
+                "kind": "voice-cast",
+                "profiles": assign_profiles(list(speakers.values()), old_profiles),
+            }
+            old_path.parent.mkdir(parents=True, exist_ok=True)
+            old_path.write_text(
+                json.dumps(voice_cast, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+    except Exception as exc:  # noqa: BLE001 - report compiler blockers in dry-run
+        timeline_error = str(exc)
     tts_backend = str(spec.get("tts_backend") or "edge").lower()
     vo_voice = spec.get("vo_voice")
     mood = "rnb"
@@ -159,6 +206,15 @@ def build_audio_plan(root: Path) -> dict[str, Any]:
         "sfx": {
             "auto_sfx": sp.get("auto_sfx", True) if sp else True,
         },
+        "audio_timeline": {
+            "enabled": bool(spec.get("audio_timeline_v1", False)),
+            "compiled": timeline is not None,
+            "timeline": timeline if compile_timeline else None,
+            "event_count": len((timeline or {}).get("events") or []),
+            "caption_binding_count": len((timeline or {}).get("caption_bindings") or []),
+            "error": timeline_error,
+        },
+        "voice_cast": voice_cast,
         "lipsync": {
             "env_backend": lipsync_info.get("env_backend"),
             "ready": lipsync_info.get("ready") or [],

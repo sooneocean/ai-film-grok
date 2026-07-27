@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/audio-timeline.schema.json",
+  "title": "ai-film-grok audio timeline",
+  "type": "object",
+  "required": ["schema_version", "kind", "mode", "events", "duration_sec"],
+  "properties": {
+    "schema_version": {"const": 1}, "kind": {"const": "audio-timeline"},
+    "mode": {"enum": ["immersive_theatre", "drama_radio", "audiobook"]},
+    "duration_sec": {"type": "number", "minimum": 0},
+    "events": {"type": "array", "items": {"$ref": "#/$defs/event"}}
+  },
+  "$defs": {"event": {"type": "object", "required": ["id", "shot_id", "type", "start_sec", "duration_sec"], "properties": {
+    "id": {"type": "string"}, "shot_id": {"type": "string"},
+    "type": {"enum": ["dialogue", "inner_voice", "media_voice", "narration", "action_sfx", "ambience", "music", "silence"]},
+    "start_sec": {"type": "number", "minimum": 0}, "duration_sec": {"type": "number", "exclusiveMinimum": 0},
+    "gain": {"type": "number"}, "pan": {"type": "number", "minimum": -1, "maximum": 1},
+    "fade_in_sec": {"type": "number", "minimum": 0}, "fade_out_sec": {"type": "number", "minimum": 0},
+    "speaker": {"type": "string"}, "text": {"type": "string"}, "caption_text": {"type": "string"},
+    "asset": {"type": "string"}, "source": {"type": "string"}, "license": {"type": "string"}, "source_sha256": {"type": "string"},
+    "overlap_policy": {"enum": ["interrupt", "cross_talk"]}
+  }, "additionalProperties": true}}}

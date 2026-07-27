@@ -5427,8 +5427,16 @@ def cmd_audio_plan(args: argparse.Namespace) -> int:
     from audio_plan import build_audio_plan
 
     root = Path(args.root).expanduser().resolve()
-    emit(build_audio_plan(root))
-    return 0
+    report = build_audio_plan(
+        root,
+        compile_timeline=bool(getattr(args, "compile", False) or getattr(args, "validate", False)),
+        write_timeline=bool(getattr(args, "write_timeline", False)),
+        write_voice_cast=bool(getattr(args, "write_voice_cast", False)),
+    )
+    emit(report)
+    return (
+        1 if bool(getattr(args, "validate", False)) and report["audio_timeline"].get("error") else 0
+    )
 
 
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
@@ -5780,8 +5788,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sel_p.add_argument("--no-write", action="store_true", help="Do not write selects-report.json")
 
-    ap = sub.add_parser("audio-plan", help="Dry-run TTS/BGM/lipsync plan (no render)")
+    ap = sub.add_parser(
+        "audio-plan", help="Dry-run audio plan; optionally compile/validate audio-timeline v1"
+    )
     ap.add_argument("--root", required=True)
+    ap.add_argument(
+        "--compile", action="store_true", help="Include compiled audio-timeline.json data in report"
+    )
+    ap.add_argument(
+        "--validate", action="store_true", help="Fail if the v1 audio timeline is invalid"
+    )
+    ap.add_argument(
+        "--write-timeline",
+        action="store_true",
+        help="Write audio/audio-timeline.json after successful compile",
+    )
+    ap.add_argument(
+        "--write-voice-cast",
+        action="store_true",
+        help="Write deterministic audio/voice-cast.json from compiled speakers",
+    )
 
     lsc = sub.add_parser(
         "lipsync-canary",
