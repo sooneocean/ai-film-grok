@@ -118,6 +118,40 @@ def test_rnb_palette_is_audible_and_null_palette_is_safe() -> None:
     assert null_palette.shape == rhodes.shape
 
 
+@pytest.mark.parametrize(
+    ("mood", "palette"),
+    [
+        ("ambient", "felt_piano"),
+        ("ambient", "high_strings"),
+        ("ambient", "vibraphone"),
+        ("dark", "low_strings"),
+        ("dark", "prepared_piano"),
+        ("dark", "frame_drum"),
+        ("warm", "warm_strings"),
+        ("playful", "pizzicato_strings"),
+        ("playful", "marimba"),
+        ("playful", "brush_drums"),
+        ("rnb", "rhodes"),
+        ("rnb", "upright_bass"),
+        ("rnb", "brush_drums"),
+    ],
+)
+def test_each_exported_instrument_palette_is_audible(mood: str, palette: str) -> None:
+    base = {
+        "start_sec": 0,
+        "end_sec": 2,
+        "energy": 0.5,
+        "motif_id": "character:mei",
+        "mood": mood,
+        "bpm": 72,
+    }
+    plain = procedural_music(2, seed=11, mood_timeline=[base])
+    arranged = procedural_music(
+        2, seed=11, mood_timeline=[{**base, "instrument_palette": [palette]}]
+    )
+    assert not np.array_equal(plain, arranged)
+
+
 def test_music_cue_is_deterministic_and_validates_bounds() -> None:
     assert motif_seed(42, "love", 0) == motif_seed(42, "love", 0)
     with pytest.raises(MusicCueError):

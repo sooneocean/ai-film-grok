@@ -823,6 +823,12 @@ def procedural_music(
             tt = np.linspace(0, g_dur, n, endpoint=False)
             if "upright_bass" in g_palette:
                 sig += 0.035 * np.sin(2 * np.pi * 55.0 * tt)
+            if "rhodes" in g_palette:
+                sig += (
+                    0.014
+                    * np.sin(2 * np.pi * 440.0 * tt)
+                    * (0.7 + 0.3 * np.sin(2 * np.pi * 5.0 * tt))
+                )
             if "brush_drums" in g_palette:
                 brush = np.sin(2 * np.pi * (g_bpm / 60.0) * tt) ** 12
                 sig += 0.012 * brush * np.sin(2 * np.pi * 3200.0 * tt)
@@ -894,6 +900,28 @@ def procedural_music(
         if "vibraphone" in g_palette or "marimba" in g_palette:
             shimmer = 0.5 + 0.5 * np.sin(2 * np.pi * (g_bpm / 60.0) * tt * n / SR)
             sig += 0.018 * shimmer * np.sin(2 * np.pi * notes[0] * 4.0 * tt * n / SR)
+        t = tt * n / SR
+        if "felt_piano" in g_palette or "prepared_piano" in g_palette:
+            detune = 1.006 if "prepared_piano" in g_palette else 1.002
+            sig += 0.014 * np.sin(2 * np.pi * notes[0] * detune * t)
+        if "pizzicato_strings" in g_palette:
+            sig += (
+                0.016
+                * np.sin(2 * np.pi * notes[-1] * 1.5 * t)
+                * np.maximum(0, np.sin(2 * np.pi * g_bpm / 60.0 * t))
+            )
+        if "frame_drum" in g_palette:
+            sig += (
+                0.025
+                * np.sin(2 * np.pi * 90.0 * t)
+                * np.maximum(0, np.sin(2 * np.pi * g_bpm / 60.0 * t))
+            )
+        if "brush_drums" in g_palette:
+            sig += (
+                0.01
+                * np.sin(2 * np.pi * 2600.0 * t)
+                * np.maximum(0, np.sin(2 * np.pi * g_bpm / 60.0 * t))
+            )
         # BPM creates a perceptible motion difference in the non-R&B palettes;
         # ambient moves slowly while suspense can pulse without changing genre.
         pulse_rate = max(0.15, g_bpm / 240.0)
