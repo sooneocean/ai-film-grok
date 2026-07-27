@@ -69,6 +69,27 @@ def _authored(graph: dict) -> dict:
                             "body_state": "手指绷紧",
                         }
                     )
+        arc = ep["narrative_arc"]
+        arc["reversal"].update(
+            {
+                "setup_expectation": "钥匙会打开一扇空门",
+                "revealed_truth": "门后有人早已等候",
+                "visible_consequence": "她松开钥匙后退一步",
+            }
+        )
+        arc["payoff"].update(
+            {
+                "resolves_point_ids": [ep["ending_hook"]["point_id"]],
+                "visible_change": "她主动开门并面对门后的人",
+            }
+        )
+    graph["story_resolution"].update(
+        {
+            "climax_choice": "她主动开门",
+            "outcome": "她确认门后的人不是敌人",
+            "final_state": "她带着真相离开旧宅",
+        }
+    )
     return graph
 
 
@@ -161,6 +182,64 @@ def test_strict_validation_rejects_unknown_payoff_reference() -> None:
     graph["episodes"][1]["payoff_points"].append("ghost_point")
     report = validate_narrative_graph(graph, strict=True)
     assert "PLOT_POINT_ORPHAN" in report["issue_codes"]
+
+
+def test_strict_validation_requires_a_visible_reversal_and_final_closure() -> None:
+    graph = _authored(
+        build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30)
+    )
+    graph["episodes"][0]["narrative_arc"]["reversal"]["revealed_truth"] = "needs_authoring"
+    graph["story_resolution"]["outcome"] = "needs_authoring"
+    report = validate_narrative_graph(graph, strict=True)
+    assert "REVERSAL_FIELD_MISSING" in report["issue_codes"]
+    assert "STORY_CLOSURE_MISSING" in report["issue_codes"]
+
+
+def test_authored_reversal_and_closure_are_bound_to_real_shots() -> None:
+    graph = _authored(
+        build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30)
+    )
+    episode = graph["episodes"][0]
+    arc = episode["narrative_arc"]
+    reversal = arc["reversal"]
+    reversal.update(
+        {
+            "setup_expectation": "钥匙会打开一扇空门",
+            "revealed_truth": "门后有人早已等候",
+            "visible_consequence": "她松开钥匙后退一步",
+        }
+    )
+    payoff = arc["payoff"]
+    payoff.update(
+        {
+            "resolves_point_ids": [episode["ending_hook"]["point_id"]],
+            "visible_change": "她主动开门并面对门后的人",
+        }
+    )
+    report = validate_narrative_graph(graph, strict=True)
+    assert "REVERSAL_FIELD_MISSING" not in report["issue_codes"]
+    assert "EPISODE_RESOLUTION_MISSING" not in report["issue_codes"]
+    assert "STORY_CLOSURE_MISSING" not in report["issue_codes"]
+
+
+def test_strict_validation_rejects_unresolved_or_hook_only_story_closure() -> None:
+    graph = _authored(
+        build_planned_graph(normalize_story("钥匙指向门后的秘密。"), target_duration=30)
+    )
+    graph["story_resolution"]["outcome"] = "下一集再揭晓"
+    report = validate_narrative_graph(graph, strict=True)
+    assert "STORY_CLOSURE_MISSING" in report["issue_codes"]
+
+    episode = graph["episodes"][0]
+    graph["story_resolution"].update(
+        {
+            "outcome": "她确认门后的人不是敌人",
+            "beat_id": episode["ending_hook"]["beat_id"],
+            "shot_ids": episode["ending_hook"]["shot_ids"],
+        }
+    )
+    report = validate_narrative_graph(graph, strict=True)
+    assert "STORY_CLOSURE_MISSING" in report["issue_codes"]
 
 
 def test_narrative_evidence_requires_executed_and_human_readback(tmp_path: Path) -> None:

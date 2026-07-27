@@ -5,6 +5,38 @@
   "description": "Canonical, revisioned narrative graph projected into executable film-spec.",
   "type": "object",
   "required": ["schema_version", "project", "episodes"],
+  "allOf": [
+    {
+      "if": {
+        "required": ["narrative_policy"],
+        "properties": {
+          "narrative_policy": {
+            "required": ["require_reversal"],
+            "properties": { "require_reversal": { "const": true } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "episodes": {
+            "items": { "required": ["narrative_arc"] }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["narrative_policy"],
+        "properties": {
+          "narrative_policy": {
+            "required": ["require_complete_resolution"],
+            "properties": { "require_complete_resolution": { "const": true } }
+          }
+        }
+      },
+      "then": { "required": ["story_resolution"] }
+    }
+  ],
   "properties": {
     "schema_version": { "type": "integer", "enum": [1, 2] },
     "revision": { "type": "integer", "minimum": 1 },
@@ -108,6 +140,7 @@
       "type": "array",
       "items": { "$ref": "#/$defs/PlotPointCandidate" }
     },
+    "story_resolution": { "$ref": "#/$defs/StoryResolution" },
     "narrative_policy": {
       "type": "object",
       "properties": {
@@ -115,6 +148,8 @@
         "payoff_window_episodes": { "type": "integer", "minimum": 1, "maximum": 3 },
         "require_plan_evidence": { "type": "boolean" },
         "require_executed_evidence": { "type": "boolean" },
+        "require_reversal": { "type": "boolean" },
+        "require_complete_resolution": { "type": "boolean" },
         "season_end_mode": { "enum": ["closed", "season_hook"] }
       }
     },
@@ -160,6 +195,7 @@
         "carry_in_points": { "type": "array", "items": { "type": "string" } },
         "payoff_points": { "type": "array", "items": { "type": "string" } },
         "new_audience_question": { "type": "string" },
+        "narrative_arc": { "$ref": "#/$defs/NarrativeArc" },
         "aspectRatio": { "enum": ["9:16"] },
         "status": {
           "enum": [
@@ -188,6 +224,47 @@
         "question": { "type": "string", "minLength": 1 },
         "source_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
         "visible_evidence": { "type": "string", "minLength": 1 }
+      }
+    },
+    "NarrativeArc": {
+      "type": "object",
+      "properties": {
+        "opening_hook_id": { "type": "string" },
+        "escalation_beat_id": { "type": "string" },
+        "reversal": { "$ref": "#/$defs/Reversal" },
+        "payoff": { "$ref": "#/$defs/ArcPayoff" },
+        "ending_mode": { "enum": ["next_episode", "closed"] }
+      }
+    },
+    "StoryResolution": {
+      "type": "object",
+      "properties": {
+        "episode_id": { "type": "string" },
+        "beat_id": { "type": "string" },
+        "shot_ids": { "type": "array", "items": { "type": "string" } },
+        "climax_choice": { "type": "string" },
+        "outcome": { "type": "string" },
+        "final_state": { "type": "string" }
+      }
+    },
+    "Reversal": {
+      "type": "object",
+      "properties": {
+        "beat_id": { "type": "string" },
+        "shot_ids": { "type": "array", "items": { "type": "string" } },
+        "setup_expectation": { "type": "string" },
+        "revealed_truth": { "type": "string" },
+        "visible_consequence": { "type": "string" },
+        "source_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ArcPayoff": {
+      "type": "object",
+      "properties": {
+        "beat_id": { "type": "string" },
+        "shot_ids": { "type": "array", "items": { "type": "string" } },
+        "resolves_point_ids": { "type": "array", "items": { "type": "string" } },
+        "visible_change": { "type": "string" }
       }
     },
     "PlotPointCandidate": {

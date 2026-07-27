@@ -36,12 +36,16 @@ PLOT_POINT_STATUSES = frozenset({"planted", "carried", "paid_off", "season_hook"
 PLOT_POINT_TYPES = frozenset(
     {"character_secret", "prop_clue", "relationship_promise", "danger_omen", "world_info", "custom"}
 )
+ENDING_MODES = frozenset({"next_episode", "closed"})
 PLACEHOLDER_RE = re.compile(
     r"^(?:todo|tbd|needs_authoring|待补|待定|待填写|冲突顶点|余韵与续集钩子|advance story)$",
     re.IGNORECASE,
 )
 GENERIC_HOOK_RE = re.compile(
     r"^(?:敬请期待|事情还没有结束|未完待续|to be continued|stay tuned)[。！! ]*$", re.I
+)
+UNRESOLVED_CLOSURE_RE = re.compile(
+    r"(?:未完待续|下一集|下集|再揭晓|待揭晓|to be continued|stay tuned)", re.I
 )
 
 
@@ -383,6 +387,168 @@ def _hook_issues(
     return issues
 
 
+def _narrative_arc_issues(
+    episode: dict[str, Any],
+    *,
+    episode_id: str,
+    refs: dict[str, Any],
+    is_final: bool,
+    require_reversal: bool,
+    require_complete_resolution: bool,
+) -> list[dict[str, Any]]:
+    """Require a visible expectation break and a traceable dramatic resolution."""
+    if not require_reversal and not require_complete_resolution:
+        return []
+    arc = episode.get("narrative_arc")
+    if not isinstance(arc, dict):
+        return [
+            _issue(
+                "EPISODE_NARRATIVE_ARC_MISSING",
+                "episode requires narrative_arc",
+                node_ref=episode_id,
+            )
+        ]
+    issues: list[dict[str, Any]] = []
+    if require_reversal:
+        reversal = arc.get("reversal") if isinstance(arc.get("reversal"), dict) else {}
+        reversal_beat = str(reversal.get("beat_id") or "")
+        reversal_shots = {str(x) for x in reversal.get("shot_ids") or [] if str(x).strip()}
+        if reversal_beat not in refs["beats"] or not any(
+            refs.get("shot_to_beat", {}).get(shot_id) == reversal_beat for shot_id in reversal_shots
+        ):
+            issues.append(
+                _issue(
+                    "REVERSAL_EVIDENCE_ORPHAN",
+                    "reversal must bind a local beat and shot",
+                    node_ref=episode_id,
+                )
+            )
+        for field in ("setup_expectation", "revealed_truth", "visible_consequence"):
+            if not _nonempty(reversal.get(field)):
+                issues.append(
+                    _issue(
+                        "REVERSAL_FIELD_MISSING",
+                        f"reversal.{field} is required",
+                        node_ref=episode_id,
+                    )
+                )
+        if not reversal.get("source_refs"):
+            issues.append(
+                _issue(
+                    "REVERSAL_NO_SOURCE", "reversal.source_refs is required", node_ref=episode_id
+                )
+            )
+    if require_complete_resolution:
+        payoff = arc.get("payoff") if isinstance(arc.get("payoff"), dict) else {}
+        payoff_beat = str(payoff.get("beat_id") or "")
+        payoff_shots = {str(x) for x in payoff.get("shot_ids") or [] if str(x).strip()}
+        if payoff_beat not in refs["beats"] or not any(
+            refs.get("shot_to_beat", {}).get(shot_id) == payoff_beat for shot_id in payoff_shots
+        ):
+            issues.append(
+                _issue(
+                    "PAYOFF_EVIDENCE_ORPHAN",
+                    "arc payoff must bind a local beat and shot",
+                    node_ref=episode_id,
+                )
+            )
+        if not _nonempty(payoff.get("visible_change")):
+            issues.append(
+                _issue(
+                    "EPISODE_RESOLUTION_MISSING",
+                    "payoff.visible_change is required",
+                    node_ref=episode_id,
+                )
+            )
+        resolved = {str(x) for x in payoff.get("resolves_point_ids") or [] if str(x).strip()}
+        if not is_final and not resolved:
+            issues.append(
+                _issue(
+                    "EPISODE_RESOLUTION_MISSING",
+                    "non-final episode must resolve its carry-in hook",
+                    node_ref=episode_id,
+                )
+            )
+        mode = str(arc.get("ending_mode") or "")
+        if mode not in ENDING_MODES:
+            issues.append(
+                _issue(
+                    "ENDING_MODE_INVALID",
+                    "ending_mode must be next_episode|closed",
+                    node_ref=episode_id,
+                )
+            )
+        elif is_final and mode != "closed":
+            issues.append(
+                _issue(
+                    "STORY_CLOSURE_MISSING",
+                    "final episode must close the primary story",
+                    node_ref=episode_id,
+                )
+            )
+    return issues
+
+
+def _story_resolution_issues(
+    graph: dict[str, Any],
+    *,
+    episodes: dict[str, dict[str, Any]],
+    refs_by_ep: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Bind the main ending independently from an optional sequel hook."""
+    resolution = graph.get("story_resolution")
+    if not isinstance(resolution, dict):
+        return [
+            _issue("STORY_CLOSURE_MISSING", "graph requires story_resolution", node_ref="story")
+        ]
+    episode_id = str(resolution.get("episode_id") or "")
+    refs = refs_by_ep.get(episode_id, {"beats": set(), "shot_to_beat": {}})
+    beat_id = str(resolution.get("beat_id") or "")
+    shots = {str(x) for x in resolution.get("shot_ids") or [] if str(x).strip()}
+    issues: list[dict[str, Any]] = []
+    if episode_id not in episodes or episode_id != next(reversed(episodes), ""):
+        issues.append(
+            _issue(
+                "STORY_CLOSURE_MISSING",
+                "story_resolution must occur in the final episode",
+                node_ref="story",
+            )
+        )
+    if beat_id not in refs["beats"] or not any(
+        refs.get("shot_to_beat", {}).get(shot_id) == beat_id for shot_id in shots
+    ):
+        issues.append(
+            _issue(
+                "STORY_CLOSURE_EVIDENCE_ORPHAN",
+                "story_resolution must bind a final-episode beat and shot",
+                node_ref="story",
+            )
+        )
+    for field in ("climax_choice", "outcome", "final_state"):
+        value = str(resolution.get(field) or "").strip()
+        if not _nonempty(value) or UNRESOLVED_CLOSURE_RE.search(value):
+            issues.append(
+                _issue(
+                    "STORY_CLOSURE_MISSING",
+                    f"story_resolution.{field} is required",
+                    node_ref="story",
+                )
+            )
+    final_episode = episodes.get(episode_id) or {}
+    ending_hook = final_episode.get("ending_hook") if isinstance(final_episode, dict) else {}
+    hook_beat = str((ending_hook or {}).get("beat_id") or "")
+    hook_shots = {str(x) for x in (ending_hook or {}).get("shot_ids") or [] if str(x).strip()}
+    if hook_beat == beat_id and shots and shots.issubset(hook_shots):
+        issues.append(
+            _issue(
+                "STORY_CLOSURE_MISSING",
+                "story_resolution cannot reuse the ending-hook evidence",
+                node_ref="story",
+            )
+        )
+    return issues
+
+
 def validate_narrative_contract(
     graph: dict[str, Any], *, strict: bool = False
 ) -> list[dict[str, Any]]:
@@ -399,6 +565,13 @@ def validate_narrative_contract(
         if isinstance(item, dict) and item.get("point_id")
     }
     issues: list[dict[str, Any]] = []
+    policy = (
+        graph.get("narrative_policy") if isinstance(graph.get("narrative_policy"), dict) else {}
+    )
+    require_reversal = bool(policy.get("require_reversal"))
+    require_complete_resolution = bool(policy.get("require_complete_resolution"))
+    if require_complete_resolution:
+        issues.extend(_story_resolution_issues(graph, episodes=episodes, refs_by_ep=refs_by_ep))
     if not points:
         issues.append(
             _issue(
@@ -558,6 +731,16 @@ def validate_narrative_contract(
     for index, (episode_id, episode) in enumerate(episodes.items()):
         refs = refs_by_ep.get(episode_id, {"beats": set(), "shots": set()})
         contract = episode
+        issues.extend(
+            _narrative_arc_issues(
+                contract,
+                episode_id=episode_id,
+                refs=refs,
+                is_final=index == len(episodes) - 1,
+                require_reversal=require_reversal,
+                require_complete_resolution=require_complete_resolution,
+            )
+        )
         issues.extend(
             _hook_issues(
                 contract.get("opening_hook"),

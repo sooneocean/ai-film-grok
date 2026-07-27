@@ -2490,6 +2490,30 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
         ep["payoff_points"] = []
         ep["new_audience_question"] = ending_point["audience_question"]
         ep["endingHook"] = ep["ending_hook"]["question"]
+        reversal_beat = beats[len(beats) // 2]
+        reversal_shot = next(
+            (shot for shot in reversal_beat.get("shots") or [] if isinstance(shot, dict)),
+            first_shot,
+        )
+        ep["narrative_arc"] = {
+            "opening_hook_id": ep["opening_hook"]["hook_id"],
+            "escalation_beat_id": str(beats[min(1, len(beats) - 1)].get("id") or ""),
+            "reversal": {
+                "beat_id": str(reversal_beat.get("id") or ""),
+                "shot_ids": [str(reversal_shot.get("id") or "")],
+                "setup_expectation": "needs_authoring",
+                "revealed_truth": "needs_authoring",
+                "visible_consequence": "needs_authoring",
+                "source_refs": list(source_refs),
+            },
+            "payoff": {
+                "beat_id": str(last_beat.get("id") or ""),
+                "shot_ids": [str(last_shot.get("id") or "")],
+                "resolves_point_ids": [],
+                "visible_change": "needs_authoring",
+            },
+            "ending_mode": "closed" if index == len(episodes) - 1 else "next_episode",
+        }
         if index > 0:
             previous_ep = episodes[index - 1]
             previous_ids = list(previous_ep.get("mid_episode_points") or [])
@@ -2508,14 +2532,36 @@ def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) 
                             or "回应上一集钩子"
                         ),
                     }
+            ep["narrative_arc"]["payoff"]["resolves_point_ids"] = previous_ids
 
     graph["plot_points"] = points
     graph["plot_point_candidates"] = authoring_queue
+    if episodes:
+        final_beats, final_shots = flatten(episodes[-1])
+        final_beat = (
+            final_beats[-2] if len(final_beats) > 1 else (final_beats[-1] if final_beats else {})
+        )
+        resolution_shots = [
+            shot for shot in final_beat.get("shots") or [] if isinstance(shot, dict)
+        ]
+        final_shot = (
+            resolution_shots[-1] if resolution_shots else (final_shots[-1] if final_shots else {})
+        )
+        graph["story_resolution"] = {
+            "episode_id": str(episodes[-1].get("id") or ""),
+            "beat_id": str(final_beat.get("id") or ""),
+            "shot_ids": [str(final_shot.get("id") or "")],
+            "climax_choice": "needs_authoring",
+            "outcome": "needs_authoring",
+            "final_state": "needs_authoring",
+        }
     graph["narrative_policy"] = {
         "midpoint_min": 1,
         "payoff_window_episodes": 3,
         "require_plan_evidence": True,
         "require_executed_evidence": True,
+        "require_reversal": True,
+        "require_complete_resolution": True,
         "season_end_mode": "season_hook"
         if episodes and any(p.get("status") == "season_hook" for p in points)
         else "closed",

@@ -107,6 +107,27 @@ def _fill_graph(graph: dict) -> dict:
                         "visible_evidence": "照片背面出现地址",
                     }
                 )
+        arc = ep.get("narrative_arc") or {}
+        (arc.get("reversal") or {}).update(
+            {
+                "setup_expectation": "她以为照片背面没有内容",
+                "revealed_truth": "背面有能改变局面的地址",
+                "visible_consequence": "她停住动作并决定面对过去",
+            }
+        )
+        (arc.get("payoff") or {}).update(
+            {
+                "resolves_point_ids": [str(x) for x in ep.get("carry_in_points") or []],
+                "visible_change": "她用行动回应了已知线索",
+            }
+        )
+    (graph.get("story_resolution") or {}).update(
+        {
+            "climax_choice": "她选择停車并承认真相",
+            "outcome": "她不再逃避照片揭示的过去",
+            "final_state": "她带着新的地址继续前行",
+        }
+    )
     return graph
 
 
