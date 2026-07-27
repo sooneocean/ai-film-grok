@@ -92,6 +92,7 @@ def test_show_package_prefers_inline_and_escapes_platform_cards(tmp_path: Path) 
     assert resolved is not None
     assert resolved["id"] == "inline-v1"
     assert resolved["captions"]["safe_bottom_px"] == 240
+    assert resolved["brand"]["motion_preset"] == "drama-noir"
     resolved["opening"]["series_title"] = "<午夜>"
     resolved["ending"]["cta"] = "追更 <现在>"
     opening = build_platform_opening_html({}, resolved, title_dur=1.2)
@@ -112,6 +113,20 @@ def test_invalid_show_package_color_fails_closed(tmp_path: Path) -> None:
                     "id": "invalid",
                     "version": "1.0.0",
                     "brand": {"accent": "pink"},
+                }
+            },
+        )
+
+
+def test_show_package_rejects_unknown_motion_preset(tmp_path: Path) -> None:
+    with pytest.raises(ShowPackageError, match="motion_preset"):
+        resolve_show_package(
+            tmp_path,
+            {
+                "show_package": {
+                    "id": "invalid-motion",
+                    "version": "1.0.0",
+                    "brand": {"motion_preset": "random"},
                 }
             },
         )

@@ -597,7 +597,11 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
                     {
                         "id": "vertical-drama.v1",
                         "version": "1.0.0",
-                        "brand": {"label": "AI FILM SPACE", "accent": "#F5C2D5"},
+                        "brand": {
+                            "label": "AI FILM SPACE",
+                            "accent": "#F5C2D5",
+                            "motion_preset": "romance-glow",
+                        },
                         "opening": {
                             "duration_sec": 1.2,
                             "series_title": "午夜祕密",
@@ -626,6 +630,8 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
             self.assertIn(".platform-ending-card", html)
             self.assertIn('tl.from(".platform-opening-card"', html)
             self.assertIn('tl.from(".platform-ending-card"', html)
+            self.assertIn('data-show-motion="romance-glow"', html)
+            self.assertIn('ease: "back.out(1.25)"', html)
             self.assertEqual(manifest["show_package"]["id"], "vertical-drama.v1")
 
     @pytest.mark.slow

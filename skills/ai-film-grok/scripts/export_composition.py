@@ -1045,8 +1045,9 @@ def build_platform_opening_html(
     episode = str(opening.get("episode") or "")
     label = str(brand.get("label") or "")
     accent = str(brand.get("accent") or "")
+    motion_preset = str(brand.get("motion_preset") or "drama-noir")
     return f'''    <section id="platform-opening" class="clip overlay platform-opening" data-start="0.000" data-duration="{duration:.3f}" data-track-index="2" data-show-package="{html.escape(str(show_package.get("id") or ""))}">
-      <div class="platform-opening-card" style="--platform-accent:{html.escape(accent)}">
+      <div class="platform-opening-card" data-show-motion="{html.escape(motion_preset)}" style="--platform-accent:{html.escape(accent)}">
         <p class="platform-brand">{html.escape(label)}</p><h1>{html.escape(title)}</h1><p>{html.escape(episode)}</p>
       </div>
     </section>'''
@@ -1065,9 +1066,22 @@ def build_platform_ending_html(
     start = max(0.0, output_duration - duration)
     cta = str(ending.get("cta") or "")
     hook = str(ending.get("next_episode_hook") or "")
+    brand = show_package.get("brand") if isinstance(show_package.get("brand"), dict) else {}
+    motion_preset = str(brand.get("motion_preset") or "drama-noir")
     return f'''    <section id="platform-ending" class="clip overlay platform-ending" data-start="{start:.3f}" data-duration="{duration:.3f}" data-track-index="6" data-show-package="{html.escape(str(show_package.get("id") or ""))}">
-      <div class="platform-ending-card"><p>{html.escape(hook)}</p><p>{html.escape(cta)}</p></div>
+      <div class="platform-ending-card" data-show-motion="{html.escape(motion_preset)}"><p>{html.escape(hook)}</p><p>{html.escape(cta)}</p></div>
     </section>'''
+
+
+def show_motion_profile(show_package: dict[str, Any] | None) -> dict[str, str | float]:
+    """Return one deterministic GSAP motion profile for a validated show package."""
+    brand = show_package.get("brand") if isinstance(show_package, dict) else {}
+    preset = str((brand or {}).get("motion_preset") or "drama-noir")
+    return {
+        "drama-noir": {"x": 0, "y": 28, "scale": 0.92, "ease": "power3.out"},
+        "romance-glow": {"x": 0, "y": 14, "scale": 0.88, "ease": "back.out(1.25)"},
+        "suspense-red": {"x": -22, "y": 0, "scale": 1.06, "ease": "power4.out"},
+    }.get(preset, {"x": 0, "y": 28, "scale": 0.92, "ease": "power3.out"})
 
 
 def build_title_sequence_tsx(
@@ -1261,6 +1275,7 @@ def write_hyperframes(
     )
     platform_ending_duration = float(ending_config.get("duration_sec") or end_show)
     platform_ending_start = max(0.0, total - platform_ending_duration)
+    show_motion = show_motion_profile(show_package)
     if title_seq_html:
         overlay_parts.append(title_seq_html)
     elif not title_disabled:
@@ -1472,6 +1487,16 @@ def write_hyperframes(
         font-size: {max(16, int(width) // 28)}px;
         font-weight: 600;
       }}
+      .platform-opening-card[data-show-motion="romance-glow"],
+      .platform-ending-card[data-show-motion="romance-glow"] {{
+        background: linear-gradient(145deg, rgba(68, 20, 54, 0.56), rgba(11, 10, 25, 0.54));
+        border-radius: 38px;
+      }}
+      .platform-opening-card[data-show-motion="suspense-red"],
+      .platform-ending-card[data-show-motion="suspense-red"] {{
+        border-left-width: 6px;
+        background: linear-gradient(105deg, rgba(80, 8, 16, 0.72), rgba(10, 10, 18, 0.52));
+      }}
       .title-sequence {{
         background: transparent;
       }}
@@ -1620,9 +1645,9 @@ def write_hyperframes(
       tl.from(".ts-subtitle", {{ y: 20, opacity: 0, duration: 0.55, ease: "power2.out" }}, 0.35);
       tl.from(".ts-tagline", {{ y: 14, opacity: 0, duration: 0.45, ease: "power2.out" }}, 0.55);
       tl.from(".motif-tag", {{ scale: 0.6, opacity: 0, duration: 0.38, stagger: 0.06, ease: "back.out(1.4)" }}, 0.70);
-      tl.from(".platform-opening-card", {{ scale: 0.92, y: 28, opacity: 0, duration: 0.62, ease: "power3.out" }}, 0.10);
+      tl.from(".platform-opening-card", {{ scale: {show_motion["scale"]}, x: {show_motion["x"]}, y: {show_motion["y"]}, opacity: 0, duration: 0.62, ease: "{show_motion["ease"]}" }}, 0.10);
       tl.from(".platform-brand", {{ y: 12, opacity: 0, duration: 0.36, ease: "power2.out" }}, 0.28);
-      tl.from(".platform-ending-card", {{ scale: 0.94, y: 20, opacity: 0, duration: 0.52, ease: "power3.out" }}, {platform_ending_start + 0.08:.3f});
+      tl.from(".platform-ending-card", {{ scale: {show_motion["scale"]}, x: {show_motion["x"]}, y: {show_motion["y"]}, opacity: 0, duration: 0.52, ease: "{show_motion["ease"]}" }}, {platform_ending_start + 0.08:.3f});
       tl.from("#end-text", {{ y: 24, opacity: 0, duration: 0.45, ease: "power2.out" }}, {end_start + 0.1:.3f});
       tl.from(".er-section", {{ y: 30, opacity: 0, duration: 0.50, stagger: 0.12, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.05:.3f});
       tl.from(".er-line", {{ x: -12, opacity: 0, duration: 0.35, stagger: 0.04, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.20:.3f});

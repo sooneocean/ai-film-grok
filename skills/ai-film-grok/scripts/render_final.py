@@ -177,6 +177,19 @@ def primary_native_shot_ids(shot_audio: list[dict[str, Any]]) -> list[str]:
     ]
 
 
+def resolve_native_audio_gain(native_record: dict[str, Any] | None) -> float:
+    """Normalize audible I2V stems conservatively; never amplify known silence."""
+    if not isinstance(native_record, dict):
+        return 1.0  # Legacy records have no level receipt.
+    if native_record.get("audible") is False:
+        return 0.0
+    mean_volume_db = native_record.get("mean_volume_db")
+    if not isinstance(mean_volume_db, (int, float)) or isinstance(mean_volume_db, bool):
+        return 1.0
+    gain = 10 ** ((NATIVE_AUDIO_TARGET_DB - float(mean_volume_db)) / 20)
+    return max(NATIVE_AUDIO_GAIN_MIN, min(NATIVE_AUDIO_GAIN_MAX, gain))
+
+
 # 混音：I2V 原生声是主视频声；旁白出现时让原生 BGM 与配乐暂避。
 # Multi-track mix (旁白 / 娇喘语助 / 原生 clip 音 / BGM 独立增益):
 # - BGM 生成用固定健康 amp（不吃 music_volume，避免「生成压一次 + 混音再压一次」→ 音乐消失）
@@ -184,6 +197,9 @@ def primary_native_shot_ids(shot_audio: list[dict[str, Any]]) -> list[str]:
 # - vocal_color = 色气语助词/娇喘，独立 TTS 轨，不写进 nar（见 voice-tracks.md）
 DEFAULT_MUSIC_VOLUME = 0.48  # 略降 BGM，旁白更贴耳、节奏更干净
 DEFAULT_NATIVE_AUDIO_VOLUME = 0.72  # I2V 自带音乐/环境声是默认主视频声
+NATIVE_AUDIO_TARGET_DB = -22.0  # 留出 global gain、BGM 与 narration ducking 的余量
+NATIVE_AUDIO_GAIN_MIN = 0.50
+NATIVE_AUDIO_GAIN_MAX = 1.60
 DEFAULT_BGM_GEN_AMP = 0.22  # 程序化 BGM 生成响度（固定，勿再乘 music_volume）
 DEFAULT_VO_GAIN = 1.32  # 旁白增益：清晰压过环境音与 BGM（星声 lesson 略抬）
 DEFAULT_VOCAL_COLOR_GAIN = 0.0  # 2026-07-21: 语助轨默认关闭；成片以 nar+BGM 主导
@@ -1000,12 +1016,19 @@ def build_native_track(
     When transition_sec > 0, joins use the same acrossfade overlaps as VO/video so native
     stems stay on the xfade clock (not a hard-concat that drifts ahead of picture).
     """
-    segments: list[tuple[Path | None, float]] = [(None, title_duration)]
-    segments.extend((item.get("native_audio"), float(item["target"])) for item in shots)
-    segments.append((None, end_duration))
-    segment_durs = [float(duration) for _, duration in segments]
+    segments: list[tuple[Path | None, float, float]] = [(None, title_duration, 1.0)]
+    segments.extend(
+        (
+            item.get("native_audio"),
+            float(item["target"]),
+            float(item.get("native_audio_gain", 1.0)),
+        )
+        for item in shots
+    )
+    segments.append((None, end_duration, 1.0))
+    segment_durs = [float(duration) for _, duration, _ in segments]
     parts: list[Path] = []
-    for index, (source, duration) in enumerate(segments):
+    for index, (source, duration, gain) in enumerate(segments):
         part = work / f"native_part_{index:02d}.wav"
         if source is not None:
             run(
@@ -1019,7 +1042,7 @@ def build_native_track(
                     "-t",
                     f"{duration:.3f}",
                     "-af",
-                    f"atrim=0:{duration:.3f},asetpts=PTS-STARTPTS",
+                    f"atrim=0:{duration:.3f},asetpts=PTS-STARTPTS,volume={gain:.4f}",
                     "-ar",
                     str(SR),
                     "-ac",
@@ -2135,6 +2158,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             raise RenderError(str(exc)) from exc
         native_audio = None
         native_audio_audible: bool | None = None
+        native_audio_gain = 1.0
         native_record = rec.get("native_audio")
         if isinstance(native_record, dict):
             try:
@@ -2147,6 +2171,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 raise RenderError(f"Native audio fingerprint changed for {sid}")
             recorded_audible = native_record.get("audible")
             native_audio_audible = recorded_audible if isinstance(recorded_audible, bool) else None
+            native_audio_gain = resolve_native_audio_gain(native_record)
         caption_lang = str(
             spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
         )
@@ -2354,6 +2379,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 "tts": tts_meta,
                 "native_audio": native_audio,
                 "native_audio_audible": native_audio_audible,
+                "native_audio_gain": native_audio_gain,
                 "visual_fit": use_fit,
                 "vo_fit": vo_fit if use_fit == "slot" else "n/a",
                 "vo_atempo_plan": vo_atempo_plan,
@@ -3171,6 +3197,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "role": "primary_video_sound" if preserved_native_shots else "unavailable",
         "volume": native_audio_volume,
         "preserved_shots": preserved_native_shots,
+        "gain_plan": {
+            item["id"]: item["native_audio_gain"] for item in shot_audio if item.get("native_audio")
+        },
         "ducked_under_narration": "sidechaincompress" in filters_help,
     }
 

@@ -10,6 +10,7 @@ from util import read_json
 
 SHOW_PACKAGE_FILE = "show-package.json"
 _HEX_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
+MOTION_PRESETS = frozenset({"drama-noir", "romance-glow", "suspense-red"})
 
 
 class ShowPackageError(ValueError):
@@ -55,6 +56,11 @@ def _validate(value: Any) -> dict[str, Any]:
     accent = _text(brand.get("accent"), "brand.accent")
     if accent and not _HEX_COLOR.fullmatch(accent):
         raise ShowPackageError("brand.accent must be a #RRGGBB color")
+    motion_preset = str(brand.get("motion_preset") or "drama-noir").strip().lower()
+    if motion_preset not in MOTION_PRESETS:
+        raise ShowPackageError(
+            f"brand.motion_preset must be one of {', '.join(sorted(MOTION_PRESETS))}"
+        )
     safe_bottom = captions.get("safe_bottom_px", 0)
     if (
         not isinstance(safe_bottom, int)
@@ -66,7 +72,11 @@ def _validate(value: Any) -> dict[str, Any]:
     return {
         "id": package_id,
         "version": version,
-        "brand": {"label": _text(brand.get("label"), "brand.label"), "accent": accent},
+        "brand": {
+            "label": _text(brand.get("label"), "brand.label"),
+            "accent": accent,
+            "motion_preset": motion_preset,
+        },
         "opening": {
             "duration_sec": _duration(opening.get("duration_sec"), "opening.duration_sec", 1.5),
             "series_title": _text(opening.get("series_title"), "opening.series_title"),

@@ -42,6 +42,14 @@ def test_primary_native_audio_excludes_measured_near_silence_but_keeps_legacy_st
     ) == ["shot01", "shot03"]
 
 
+def test_native_audio_gain_normalizes_audible_stems_without_amplifying_silence() -> None:
+    assert render_final.resolve_native_audio_gain({"audible": False, "mean_volume_db": -55}) == 0
+    assert render_final.resolve_native_audio_gain({"audible": True, "mean_volume_db": -80}) == 1.6
+    assert render_final.resolve_native_audio_gain({"audible": True, "mean_volume_db": -5}) == 0.5
+    assert render_final.resolve_native_audio_gain({"audible": True, "mean_volume_db": -22}) == 1.0
+    assert render_final.resolve_native_audio_gain({}) == 1.0
+
+
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg required")
 @pytest.mark.slow
 class NativeAudioMixTests(unittest.TestCase):

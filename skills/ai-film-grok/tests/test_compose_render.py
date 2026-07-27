@@ -109,6 +109,24 @@ def test_platform_package_hyperframes_real_render(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
+    (root / "show-package.json").write_text(
+        json.dumps(
+            {
+                "id": "render-romance-v1",
+                "version": "1.0.0",
+                "brand": {
+                    "label": "AI FILM SPACE",
+                    "accent": "#F5C2D5",
+                    "motion_preset": "romance-glow",
+                },
+                "opening": {"duration_sec": 0.4, "series_title": "真实验收", "episode": "EP.01"},
+                "captions": {"safe_bottom_px": 240},
+                "ending": {"duration_sec": 0.4, "cta": "下一集", "next_episode_hook": "继续"},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
 
     result = compose_render(
         root,
@@ -123,6 +141,8 @@ def test_platform_package_hyperframes_real_render(tmp_path: Path) -> None:
     output = Path(result["output"])
     assert result["rendered"] is True
     assert output.is_file() and output.stat().st_size > 0
+    package = json.loads((root / "compose" / "package.json").read_text(encoding="utf-8"))
+    assert package["show_package"]["brand"]["motion_preset"] == "romance-glow"
     assert probe_has_audio(output)
     receipt = json.loads(
         (root / "compose" / "hyperframes" / "media-stage-receipt.json").read_text(encoding="utf-8")
