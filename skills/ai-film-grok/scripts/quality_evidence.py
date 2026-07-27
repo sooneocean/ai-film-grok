@@ -37,6 +37,13 @@ def _review_binding(review: dict[str, Any] | None) -> dict[str, str]:
     actual = sha256_file(path)
     expected = review.get("sha256")
     _require(expected in {None, actual}, "human review receipt hash does not match")
+    receipt = read_json(path)
+    _require(receipt.get("approved") is True, "human review receipt is not approved")
+    continuity = receipt.get("continuity_packet")
+    _require(
+        isinstance(continuity, dict) and continuity.get("ok") is True,
+        "continuity review is missing",
+    )
     return {"path": str(path), "sha256": actual}
 
 
@@ -78,11 +85,13 @@ def build_shot_quality_evidence(
         "clip fingerprint does not match the approved media",
     )
     review_binding = _review_binding(review)
-    if continuity is not None:
-        _require(continuity.get("ok") is True, "continuity review is not approved")
-    if provider is not None:
-        _require(provider.get("ok") is True, "provider receipt is not successful")
-        _require(provider.get("output_sha256") == clip_hash, "provider receipt does not match clip")
+    _require(
+        isinstance(continuity, dict) and continuity.get("ok") is True,
+        "continuity review is not approved",
+    )
+    _require(isinstance(provider, dict), "approved clip requires provider receipt")
+    _require(provider.get("ok") is True, "provider receipt is not successful")
+    _require(provider.get("output_sha256") == clip_hash, "provider receipt does not match clip")
 
     evidence = {
         "schema_version": 1,
@@ -111,12 +120,35 @@ def quality_evidence_is_current(evidence: object, *, clip: Path | str) -> bool:
         return False
     source = Path(clip).expanduser().resolve()
     record = evidence.get("clip") if isinstance(evidence.get("clip"), dict) else {}
-    return bool(
+    if not (
         evidence.get("ok") is True
         and source.is_file()
         and record.get("sha256") == sha256_file(source)
         and Path(str(record.get("path") or "")).expanduser().resolve() == source
-    )
+    ):
+        return False
+    review = evidence.get("review") if isinstance(evidence.get("review"), dict) else {}
+    path = Path(str(review.get("path") or "")).expanduser()
+    if not path.is_file() or review.get("sha256") != sha256_file(path):
+        return False
+    receipt = read_json(path)
+    continuity = receipt.get("continuity_packet") if isinstance(receipt, dict) else {}
+    if not (
+        receipt.get("approved") is True
+        and continuity.get("ok") is True
+        and continuity.get("reviewed_clip_sha256") == record.get("sha256")
+    ):
+        return False
+    neighbours = continuity.get("neighbours") if isinstance(continuity, dict) else {}
+    if not isinstance(neighbours, dict):
+        return False
+    for item in neighbours.values():
+        if not isinstance(item, dict):
+            return False
+        neighbour = Path(str(item.get("clip_path") or "")).expanduser()
+        if not neighbour.is_file() or item.get("clip_sha256") != sha256_file(neighbour):
+            return False
+    return True
 
 
 def load_current_quality_evidence(

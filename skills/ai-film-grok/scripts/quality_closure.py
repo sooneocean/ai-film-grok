@@ -277,6 +277,7 @@ def _shot_quality_closure(root: Path) -> dict[str, Any]:
     return {
         "required": True,
         "ok": not missing and uniqueness["ok"],
+        "approved_shot_count": len(required),
         "missing": sorted(missing),
         "duplicates": uniqueness["duplicate_sha256_groups"],
         "missing_fingerprints": uniqueness["missing_fingerprint_shots"],

@@ -2611,30 +2611,14 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         }
     )
     if args.status == "approved":
+        from motion_evidence import MotionEvidenceError, build_motion_generation_evidence
         from quality_evidence import QualityEvidenceError, build_shot_quality_evidence
 
-        try:
-            evidence = build_shot_quality_evidence(
-                root,
-                shot_id=str(args.shot_id),
-                clip=Path(record["path"]),
-                qa=qa,
-                source_endpoint=endpoint,
-                identity_approved=identity_approved,
-                motion_approved=motion_approved,
-                review=shot_review,
-                uniqueness=uniqueness,
-            )
-        except QualityEvidenceError as exc:
-            raise FilmError(f"approved clips require current quality evidence: {exc}") from exc
-        record["quality_evidence"] = evidence
-        manifest["quality_evidence_contract_version"] = 1
         queue_job_id = str(getattr(args, "queue_job_id", "") or "").strip()
-        if queue_job_id:
-            from motion_evidence import MotionEvidenceError, build_motion_generation_evidence
-
+        strict_contract = int(manifest.get("quality_evidence_contract_version") or 0) >= 1
+        if queue_job_id or strict_contract:
             try:
-                record["motion_evidence"] = build_motion_generation_evidence(
+                motion_evidence = build_motion_generation_evidence(
                     root,
                     shot_id=str(args.shot_id),
                     clip=Path(record["path"]),
@@ -2645,6 +2629,31 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                 raise FilmError(
                     f"approved clips require matching motion generation evidence: {exc}"
                 ) from exc
+            review_packet = (
+                read_json(Path(str(shot_review.get("path") or ""))) if shot_review else {}
+            )
+            try:
+                evidence = build_shot_quality_evidence(
+                    root,
+                    shot_id=str(args.shot_id),
+                    clip=Path(record["path"]),
+                    qa=qa,
+                    source_endpoint=endpoint,
+                    identity_approved=identity_approved,
+                    motion_approved=motion_approved,
+                    review=shot_review,
+                    uniqueness=uniqueness,
+                    continuity=review_packet.get("continuity_packet"),
+                    provider={
+                        "ok": motion_evidence.get("delivery_eligible") is True,
+                        "output_sha256": (motion_evidence.get("clip") or {}).get("sha256"),
+                    },
+                )
+            except QualityEvidenceError as exc:
+                raise FilmError(f"approved clips require current quality evidence: {exc}") from exc
+            record["quality_evidence"] = evidence
+            record["motion_evidence"] = motion_evidence
+            manifest["quality_evidence_contract_version"] = 1
     if style_job:
         record["style_reference_job"] = style_job
     record["quality_receipt"] = str(write_quality_receipt(root, record["shot_id"], quality))
@@ -4179,6 +4188,16 @@ def cmd_register_final(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise FilmError(f"Cannot import compose_render: {exc}") from exc
     root = Path(args.root).expanduser().resolve()
+    manifest = load_manifest(root) if (root / MANIFEST_NAME).is_file() else {}
+    if int(manifest.get("quality_evidence_contract_version") or 0) >= 1:
+        from quality_closure import _shot_quality_closure
+
+        closure = _shot_quality_closure(root)
+        if not closure.get("ok") or not int(closure.get("approved_shot_count") or 0):
+            raise FilmError(
+                "register-final requires complete current per-shot quality evidence; "
+                f"missing={closure.get('missing')}, duplicates={closure.get('duplicates')}"
+            )
     try:
         result = register_final_film(
             root,

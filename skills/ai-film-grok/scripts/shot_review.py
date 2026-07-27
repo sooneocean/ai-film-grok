@@ -187,6 +187,7 @@ def _continuity_packet(root: Path, shot_id: str, source: Path) -> dict[str, Any]
         if other_path.is_file():
             neighbours[label] = {
                 "shot_id": other_id,
+                "clip_path": str(other_path.resolve()),
                 "clip_sha256": _sha256(other_path),
                 "quality_evidence_sha256": (record.get("quality_evidence") or {}).get("sha256"),
                 "review_sha256": (record.get("shot_review") or {}).get("sha256"),

@@ -59,6 +59,13 @@ def build_motion_generation_evidence(
             raise MotionEvidenceError("queue receipt output hash does not match clip")
         if not isinstance(receipt.get("qa"), dict) or receipt["qa"].get("ok") is not True:
             raise MotionEvidenceError("queue receipt lacks successful media QA")
+        inputs = job.get("inputs") if isinstance(job.get("inputs"), list) else []
+        input_hashes = [str(item.get("sha256")) for item in inputs if isinstance(item, dict)]
+        minimum_inputs = 2 if source_endpoint == "reference_to_video" else 1
+        if len(input_hashes) < minimum_inputs or any(not item for item in input_hashes):
+            raise MotionEvidenceError(
+                f"queue receipt lacks {minimum_inputs} hash-bound input frame(s) for {source_endpoint}"
+            )
         evidence.update(
             {
                 "status": "succeeded",
@@ -67,7 +74,7 @@ def build_motion_generation_evidence(
                     "job_id": queue_job_id,
                     "provider_request_id": receipt.get("provider_request_id"),
                     "generation_id": receipt.get("generation_id"),
-                    "input_hashes": [str(item.get("sha256")) for item in job.get("inputs") or []],
+                    "input_hashes": input_hashes,
                     "receipt_sha256": output_sha,
                 },
             }
