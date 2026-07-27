@@ -12,6 +12,8 @@ sys.path.insert(0, str(SCRIPTS))
 
 from creative_workshop import (  # noqa: E402
     WorkshopConflict,
+    WorkshopLocked,
+    apply_workshop,
     compile_workshop,
     diagnose_workshop,
     export_workshop,
@@ -208,6 +210,58 @@ def test_compile_accepts_canonical_graph_projection_fields_and_lints_dialogue_ra
     assert "DIALOGUE_RATE_HIGH" in {item["code"] for item in report["errors"]}
 
 
+def test_apply_is_revision_bound_and_projects_creative_fields_to_unlocked_shots(
+    tmp_path: Path,
+) -> None:
+    intake_workshop(tmp_path, _brief(), expected_revision=0)
+    (tmp_path / "drama-graph.json").write_text(json.dumps(_graph()), encoding="utf-8")
+    compile_workshop(tmp_path)
+
+    applied = apply_workshop(tmp_path, expected_graph_revision=1)
+    graph = json.loads((tmp_path / "drama-graph.json").read_text(encoding="utf-8"))
+    shot = graph["episodes"][0]["scenes"][0]["beats"][0]["shots"][0]
+
+    assert applied["graph_revision_before"] == 1
+    assert applied["graph_revision_after"] == 2
+    assert shot["creative"]["shot_function"] == "evidence reveal"
+    assert shot["creative"]["reference_assets"][0]["label"] == "heroine reference"
+    assert (tmp_path / "receipts" / "narrative" / "revision-0002.json").is_file()
+    with pytest.raises(WorkshopConflict, match="expected graph revision"):
+        apply_workshop(tmp_path, expected_graph_revision=1)
+
+
+def test_apply_refuses_locked_shot_scope_and_empty_packets(tmp_path: Path) -> None:
+    intake_workshop(tmp_path, _brief(), expected_revision=0)
+    graph = _graph()
+    graph["lock_scopes"] = ["shots"]
+    (tmp_path / "drama-graph.json").write_text(json.dumps(graph), encoding="utf-8")
+    compile_workshop(tmp_path)
+    with pytest.raises(WorkshopLocked, match="shots scope is locked"):
+        apply_workshop(tmp_path, expected_graph_revision=1)
+
+    empty_root = tmp_path / "empty"
+    empty_root.mkdir()
+    intake_workshop(empty_root, _brief(), expected_revision=0)
+    (empty_root / "drama-graph.json").write_text(json.dumps({"episodes": []}), encoding="utf-8")
+    compile_workshop(empty_root)
+    report = validate_workshop(empty_root, strict=True)
+    assert "WORKSHOP_SHOTS_EMPTY" in {item["code"] for item in report["errors"]}
+
+
+def test_diagnose_covers_the_remaining_dialogue_dimensions(tmp_path: Path) -> None:
+    brief = {**_brief(), "genre": "historical"}
+    intake_workshop(tmp_path, brief, expected_revision=0)
+    graph = _graph()
+    shot = graph["episodes"][0]["scenes"][0]["beats"][0]["shots"][0]
+    shot["dialogue"] = "OK，正如你所知，项目今晚必须完成。"
+    shot.pop("subtext", None)
+    (tmp_path / "drama-graph.json").write_text(json.dumps(graph), encoding="utf-8")
+
+    report = diagnose_workshop(tmp_path)
+    codes = {item["code"] for item in report["findings"]}
+    assert {"SUBTEXT_MISSING", "EXPOSITION_RISK", "GENRE_VOICE_DRIFT"} <= codes
+
+
 def test_cli_e2e_writes_only_local_contracts(tmp_path: Path) -> None:
     brief_path = tmp_path / "brief-input.json"
     brief_path.write_text(json.dumps(_brief()), encoding="utf-8")
@@ -217,6 +271,9 @@ def test_cli_e2e_writes_only_local_contracts(tmp_path: Path) -> None:
     for arguments in (
         ("intake", "--file", str(brief_path), "--expected-revision", "0"),
         ("diagnose",),
+        ("compile",),
+        ("validate", "--strict"),
+        ("apply", "--expected-graph-revision", "1"),
         ("compile",),
         ("validate", "--strict"),
         ("export", "--target", "grok"),

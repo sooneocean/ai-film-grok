@@ -3153,6 +3153,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "sfx"] + (
         ["vocal_color"] if use_color else []
     )
+    preserved_native_shots = [item["id"] for item in shot_audio if item.get("native_audio")]
+    mix_spotting["native_audio"] = {
+        "role": "primary_video_sound" if preserved_native_shots else "unavailable",
+        "volume": native_audio_volume,
+        "preserved_shots": preserved_native_shots,
+        "ducked_under_narration": "sidechaincompress" in filters_help,
+    }
 
     try:
         mix_report_path = safe_output_path(
@@ -3451,9 +3458,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "path": str(native_track),
             "sha256": sha256(native_track),
             "volume": native_audio_volume,
-            "role": "primary_video_sound",
+            "role": "primary_video_sound" if preserved_native_shots else "unavailable",
             "ducked_under_narration": "sidechaincompress" in filters_help,
-            "preserved_shots": [item["id"] for item in shot_audio if item.get("native_audio")],
+            "preserved_shots": preserved_native_shots,
         },
         "audio_provenance": {
             "mix_report": str(mix_report_path) if mix_report_path.is_file() else None,

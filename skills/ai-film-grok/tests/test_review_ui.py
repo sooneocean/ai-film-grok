@@ -78,6 +78,8 @@ def test_media_range_and_workspace_escape_are_handled(tmp_path: Path) -> None:
         )
         response = connection.getresponse()
         assert response.status == 206 and response.read() == b"bcd"
+        assert response.getheader("Cache-Control") == "no-store"
+        assert response.getheader("X-Content-Type-Options") == "nosniff"
         connection.close()
         status, _ = _request(server, "GET", "/media/../../etc/passwd")
         assert status == 404

@@ -85,7 +85,7 @@ TTS 后端：`auto | external | voicebox | minimax | fish | edge`。本机 [Voic
 2. 逐镜生成旁白；显式后端失败时不暗中改 provider。
 3. 按 VO 长度 stretch 镜头；**优先 loops=0**（短旁白）。loop 多 = 观感重播，应回改 spec。
 4. 按 `transition_sec` 进行 xfade；0 为硬切。
-5. 混合旁白、程序化 BGM 或用户音乐，再以低增益混入生成片段原生音轨。
+5. 混合旁白、程序化 BGM 或用户音乐；若 I2V 有自带音乐／环境声，保留其原生音轨作为主视频声，并在旁白／角色对白期间自动闪避。
 6. 用 PIL 绘制字幕并烧录，避免系统 libass 差异。  
    - **交付判定**：用户播放时画面底部必须有字；只有 `final.srt` **不算**字幕完成。  
    - 本机 brew ffmpeg 常**无** `ass`/`subtitles` 滤镜 → 用 **半透明底条 PNG + overlay enable=between(t,...)**。  
@@ -105,7 +105,7 @@ TTS 后端：`auto | external | voicebox | minimax | fish | edge`。本机 [Voic
 
 - 字幕只在对应语音时出现，不覆盖脸/重要道具，不截断中文词组。
 - 旁白始终清晰；BGM 停顿时可听见，说话时自动让位。
-- 原生音轨只作环境/动作质感，默认 0.16，不得压过旁白。
+- I2V 原生音轨默认 0.72，是主视频声（高于额外 BGM）；旁白／角色对白期间自动闪避。交付审计会核验保存的 stem、SHA-256 与来源镜头；没有可用 stem 时不得标称为主声。
 - 自带音乐时记录 `--music-license`，不得默认认定可商用。
 
 ## 完整观看门禁

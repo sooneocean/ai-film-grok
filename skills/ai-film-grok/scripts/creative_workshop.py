@@ -9,6 +9,12 @@ from pathlib import Path
 from typing import Any
 
 from music_cue import normalize_music_cue
+from narrative_control import (
+    bump_graph_revision,
+    ensure_graph_controls,
+    node_index,
+    write_revision_receipt,
+)
 from story_plan import normalize_story_graph
 from util import (
     canonical_json_sha256,
@@ -39,6 +45,10 @@ class WorkshopError(ValueError):
 
 class WorkshopConflict(WorkshopError):
     """A creative brief update did not use the current revision."""
+
+
+class WorkshopLocked(WorkshopError):
+    """A requested workshop projection targets a locked story scope or shot."""
 
 
 def _path(root: Path, *parts: str) -> Path:
@@ -166,6 +176,7 @@ def _assets(shot: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _director_prompt(shot: dict[str, Any]) -> dict[str, Any]:
+    creative = shot.get("creative") if isinstance(shot.get("creative"), dict) else {}
     film = shot.get("_film") if isinstance(shot.get("_film"), dict) else {}
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
     if not dsl:
@@ -179,7 +190,8 @@ def _director_prompt(shot: dict[str, Any]) -> dict[str, Any]:
         camera_text = _text(camera)
     return {
         "function": _text(
-            shot.get("shot_function")
+            creative.get("shot_function")
+            or shot.get("shot_function")
             or shot.get("narrativePurpose")
             or shot.get("dramaticFunction")
             or shot.get("dramatic_function")
@@ -191,7 +203,9 @@ def _director_prompt(shot: dict[str, Any]) -> dict[str, Any]:
         "sound": _text(
             shot.get("sound_design") or shot.get("dialogue") or shot.get("nar") or film.get("nar")
         ),
-        "end_state": _text(shot.get("end_state") or shot.get("state_delta")),
+        "end_state": _text(
+            creative.get("end_state") or shot.get("end_state") or shot.get("state_delta")
+        ),
         "references": _assets(shot),
     }
 
@@ -204,6 +218,8 @@ def diagnose_workshop(root: Path) -> dict[str, Any]:
     for shot in _shots(graph):
         dialogue = _text(shot.get("dialogue"))
         purpose = _text(shot.get("narrativePurpose") or shot.get("dramatic_function"))
+        subtext = _text(shot.get("subtext"))
+        genre = _text(brief.get("genre")).lower()
         if dialogue and not purpose:
             findings.append(
                 {
@@ -223,6 +239,34 @@ def diagnose_workshop(root: Path) -> dict[str, Any]:
         if dialogue and not _text((shot.get("performance") or {}).get("intent")):
             findings.append(
                 {"shot_id": shot.get("id"), "dimension": "voice_print", "code": "DELIVERY_MISSING"}
+            )
+        if dialogue and not subtext:
+            findings.append(
+                {"shot_id": shot.get("id"), "dimension": "subtext", "code": "SUBTEXT_MISSING"}
+            )
+        if dialogue and re.search(
+            r"(?:正如你所知|你应该知道|如你所见|as you know)", dialogue, re.I
+        ):
+            findings.append(
+                {
+                    "shot_id": shot.get("id"),
+                    "dimension": "information_efficiency",
+                    "code": "EXPOSITION_RISK",
+                }
+            )
+        if genre in {"historical", "period", "wuxia", "古装", "武侠"} and re.search(
+            r"(?:OK|KPI|项目|push|直播|短视频)", dialogue, re.I
+        ):
+            findings.append(
+                {"shot_id": shot.get("id"), "dimension": "genre_voice", "code": "GENRE_VOICE_DRIFT"}
+            )
+        if dialogue and len(dialogue) < 4:
+            findings.append(
+                {
+                    "shot_id": shot.get("id"),
+                    "dimension": "memorable_line",
+                    "code": "MEMORABLE_LINE_THIN",
+                }
             )
     report = {
         "schema_version": 1,
@@ -244,6 +288,104 @@ def diagnose_workshop(root: Path) -> dict[str, Any]:
     }
     report["content_sha256"] = _content_hash(report)
     write_json(_receipt_path(root, "diagnose.json"), report)
+    return report
+
+
+def _creative_projection(shot: dict[str, Any], *, rhythm_profile: str) -> dict[str, Any]:
+    """Build the graph-owned, provider-neutral creative fields for one shot."""
+    prompt = _director_prompt(shot)
+    duration = shot.get("duration_sec") or shot.get("targetDuration") or film_duration(shot)
+    sound = _text(prompt.get("sound"))
+    pacing: dict[str, Any] = {"rhythm_profile": rhythm_profile}
+    if isinstance(duration, (int, float)) and float(duration) > 0 and sound:
+        pacing["dialogue_characters_per_sec"] = round(len(sound) / float(duration), 2)
+    return {
+        "shot_function": prompt["function"],
+        "end_state": prompt["end_state"],
+        "dialogue_pacing": pacing,
+        "reference_assets": prompt["references"],
+    }
+
+
+def apply_workshop(root: Path, *, expected_graph_revision: int) -> dict[str, Any]:
+    """Write approved workshop fields to unlocked graph shots, once per graph revision.
+
+    This deliberately does not write film-spec or a shot package: those are checked
+    projections and must be regenerated by their existing commands after this receipt.
+    """
+    root = Path(root).expanduser().resolve()
+    preflight_graph = read_json(_path(root, "drama-graph.json"))
+    if not isinstance(preflight_graph, dict):
+        raise WorkshopError("drama-graph.json missing or invalid")
+    ensure_graph_controls(preflight_graph)
+    if int(preflight_graph.get("revision") or 0) != expected_graph_revision:
+        raise WorkshopConflict(
+            "expected graph revision "
+            f"{expected_graph_revision}, current revision is {preflight_graph.get('revision')}"
+        )
+    validation = validate_workshop(root, strict=True)
+    if not validation["ok"]:
+        codes = ", ".join(item["code"] for item in validation["errors"])
+        raise WorkshopError(f"workshop apply blocked by validation: {codes}")
+    graph_path = _path(root, "drama-graph.json")
+    with exclusive_file_lock(graph_path):
+        graph = read_json(graph_path)
+        if not isinstance(graph, dict):
+            raise WorkshopError("drama-graph.json missing or invalid")
+        ensure_graph_controls(graph)
+        actual_revision = int(graph.get("revision") or 0)
+        if actual_revision != expected_graph_revision:
+            raise WorkshopConflict(
+                f"expected graph revision {expected_graph_revision}, current revision is {actual_revision}"
+            )
+        if "shots" in set(graph.get("lock_scopes") or []):
+            raise WorkshopLocked(
+                "workshop apply blocked: shots scope is locked; unlock and approve first"
+            )
+        brief = _require_brief(root)
+        packet = read_json(_receipt_path(root, "compile.json")) or {}
+        packet_shots = {str(item.get("shot_id")): item for item in packet.get("shots") or []}
+        index = node_index(graph)
+        applied: list[str] = []
+        for shot_id, item in packet_shots.items():
+            node = index.get(shot_id)
+            if not node or node[1] != "shot":
+                raise WorkshopError(f"workshop packet references unknown shot {shot_id!r}")
+            shot = node[2]
+            control = shot.get("control") if isinstance(shot.get("control"), dict) else {}
+            if control.get("state") == "locked":
+                raise WorkshopLocked(
+                    f"workshop apply blocked: shot {shot_id} is locked; unlock and approve first"
+                )
+            shot["creative"] = _creative_projection(
+                shot, rhythm_profile=str(brief["rhythm_profile"])
+            )
+            control["state"] = "review"
+            shot["control"] = control
+            applied.append(shot_id)
+        graph["state"] = "review"
+        bump_graph_revision(graph, reason="workshop:apply")
+        write_json(graph_path, graph)
+        revision_receipt = write_revision_receipt(
+            root,
+            graph,
+            action="workshop_apply",
+            affected=applied,
+            reason="hash-bound creative workshop projection",
+        )
+    report = {
+        "schema_version": 1,
+        "kind": "workshop-apply",
+        "created_at": utc_now(),
+        "packet_sha256": packet.get("content_sha256"),
+        "graph_revision_before": actual_revision,
+        "graph_revision_after": graph["revision"],
+        "applied_shot_ids": applied,
+        "revision_receipt": str(revision_receipt),
+        "next_action": "aifilm graph project --root <project-root>",
+    }
+    report["content_sha256"] = _content_hash(report)
+    write_json(_receipt_path(root, "apply.json"), report)
     return report
 
 
@@ -342,6 +484,10 @@ def validate_workshop(root: Path, *, strict: bool = False) -> dict[str, Any]:
                     f"compiled packet source is missing or changed: {path}",
                 )
             )
+    if not isinstance(packet.get("shots"), list) or not packet["shots"]:
+        errors.append(
+            _issue("WORKSHOP_SHOTS_EMPTY", "", "workshop packet must contain at least one shot")
+        )
     for item in packet.get("shots") or []:
         shot_id = _text(item.get("shot_id"))
         duration = item.get("duration_sec")

@@ -440,6 +440,46 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
         )
     delivery_meta = read_json(delivery) if delivery else {}
     delivery_version = int(delivery_meta.get("schema_version") or 1)
+    native_audio_meta = (
+        delivery_meta.get("native_audio")
+        if isinstance(delivery_meta.get("native_audio"), dict)
+        else {}
+    )
+    native_audio_evidence = {
+        "role": native_audio_meta.get("role"),
+        "path": native_audio_meta.get("path"),
+        "sha256": native_audio_meta.get("sha256"),
+        "preserved_shots": native_audio_meta.get("preserved_shots") or [],
+        "available": native_audio_meta.get("role") == "primary_video_sound",
+    }
+    if native_audio_evidence["available"]:
+        raw_native_path = str(native_audio_evidence["path"] or "").strip()
+        native_path = Path(raw_native_path) if raw_native_path else None
+        if native_path and not native_path.is_absolute():
+            native_path = root / native_path
+        native_hash = _hash(native_path) if native_path and native_path.is_file() else None
+        native_audio_evidence["actual_sha256"] = native_hash
+        if not native_path or not native_path.is_file():
+            hard.append(
+                {
+                    "code": "NATIVE_AUDIO_STEM_MISSING",
+                    "message": "primary I2V video sound is declared but its preserved stem is missing",
+                }
+            )
+        elif native_audio_evidence["sha256"] != native_hash:
+            hard.append(
+                {
+                    "code": "NATIVE_AUDIO_STEM_HASH_MISMATCH",
+                    "message": "primary I2V video sound stem no longer matches final-delivery metadata",
+                }
+            )
+        if not native_audio_evidence["preserved_shots"]:
+            hard.append(
+                {
+                    "code": "NATIVE_AUDIO_STEM_UNBOUND",
+                    "message": "primary I2V video sound declares no preserved source shots",
+                }
+            )
     subtitles_meta = (
         delivery_meta.get("subtitles") if isinstance(delivery_meta.get("subtitles"), dict) else {}
     )
@@ -505,6 +545,7 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
             else None,
             "loudness": loudness,
         },
+        "native_audio": native_audio_evidence,
         "timeline": {
             "path": str(_first_file(root, "timeline.json"))
             if _first_file(root, "timeline.json")

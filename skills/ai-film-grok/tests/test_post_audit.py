@@ -139,6 +139,28 @@ class PostAuditTests(unittest.TestCase):
             codes = {item["code"] for item in report["warnings"]}
             self.assertIn("DELIVERY_PROVENANCE_LEGACY", codes)
 
+    def test_primary_native_audio_requires_a_preserved_bound_stem(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "out").mkdir()
+            (root / "out" / "final-delivery.json").write_text(
+                json.dumps(
+                    {
+                        "native_audio": {
+                            "role": "primary_video_sound",
+                            "path": "audio/native_track.wav",
+                            "sha256": "missing",
+                            "preserved_shots": [],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = audit(root, write=False)
+            codes = {item["code"] for item in report["hard_failures"]}
+            self.assertIn("NATIVE_AUDIO_STEM_MISSING", codes)
+            self.assertIn("NATIVE_AUDIO_STEM_UNBOUND", codes)
+
     def test_approved_review_requires_all_scorecard_and_screening_dimensions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

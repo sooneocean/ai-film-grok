@@ -2670,6 +2670,8 @@ def project_graph_to_film_spec(
                         shot_obj["wardrobe_state"] = ws
                         if not dsl.get("wardrobe_state"):
                             dsl["wardrobe_state"] = ws
+                    if isinstance(sh.get("creative"), dict):
+                        shot_obj["creative"] = copy.deepcopy(sh["creative"])
                     shots_fs.append(shot_obj)
             scenes_fs.append(
                 {

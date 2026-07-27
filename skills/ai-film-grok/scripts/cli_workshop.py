@@ -9,6 +9,7 @@ from typing import Any
 
 from creative_workshop import (
     WorkshopError,
+    apply_workshop,
     compile_workshop,
     diagnose_workshop,
     export_workshop,
@@ -19,7 +20,7 @@ from creative_workshop import (
 
 def add_workshop_parsers(subparsers: Any) -> None:
     parser = subparsers.add_parser(
-        "workshop", help="Creative contracts: intake|diagnose|compile|validate|export"
+        "workshop", help="Creative contracts: intake|diagnose|compile|validate|apply|export"
     )
     sub = parser.add_subparsers(dest="workshop_action", required=True)
     intake = sub.add_parser("intake", help="Write revision-bound creative-brief.json")
@@ -32,6 +33,11 @@ def add_workshop_parsers(subparsers: Any) -> None:
     validate = sub.add_parser("validate")
     validate.add_argument("--root", required=True)
     validate.add_argument("--strict", action="store_true")
+    apply = sub.add_parser(
+        "apply", help="Project validated workshop fields into unlocked graph shots"
+    )
+    apply.add_argument("--root", required=True)
+    apply.add_argument("--expected-graph-revision", type=int, required=True)
     export = sub.add_parser("export")
     export.add_argument("--root", required=True)
     export.add_argument("--target", choices=("grok", "frw-seedance", "generic"), required=True)
@@ -52,6 +58,8 @@ def run_workshop(args: Namespace) -> tuple[dict[str, Any], int]:
         if args.workshop_action == "validate":
             report = validate_workshop(root, strict=bool(args.strict))
             return report, 0 if report["ok"] else 1
+        if args.workshop_action == "apply":
+            return apply_workshop(root, expected_graph_revision=args.expected_graph_revision), 0
         if args.workshop_action == "export":
             return export_workshop(root, target=args.target), 0
     except (OSError, ValueError, WorkshopError) as exc:

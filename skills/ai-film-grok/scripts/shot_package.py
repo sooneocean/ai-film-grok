@@ -135,6 +135,7 @@ def compile_shot_package(
         "dialogue": shot.get("dialogue"),
         "nar": shot.get("nar"),
     }
+    creative_data = shot.get("creative") if isinstance(shot.get("creative"), dict) else {}
     departments = {
         "narrative": [_derived_ref(f"narrative.shot.{shot_id}", narrative_data)],
         "visual": _refs(visual_bible, "visual", _VISUAL_GROUPS["visual"]),
@@ -142,6 +143,7 @@ def compile_shot_package(
         "performance": [
             _derived_ref(f"performance.shot.{shot_id}", performance_data),
             _derived_ref(f"dialogue.shot.{shot_id}", dialogue_data),
+            _derived_ref(f"creative.shot.{shot_id}", creative_data),
         ],
         "audio": _refs(audio_bible, "audio", tuple((audio_bible.get("nodes") or {}).keys())),
         "post": _refs(post_bible, "post", tuple((post_bible.get("nodes") or {}).keys())),

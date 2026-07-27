@@ -192,13 +192,26 @@ def resolve_voice_tracks(
         profile = str(spec.get("audience_profile") or "").strip().lower()
     spice = str((spec or {}).get("spice_level") or "").strip().lower()
     hardcore = profile in {"hardcore_male", "hardcore", "重口男向"} or spice == "extreme"
-    # Adult hardcore: enable color track unless author explicitly disabled
-    if hardcore and heat in {"max", "hot"} and "enabled" not in author_keys:
+    # Explicit film forbid: never inject 娇喘/vocal_color (user P0: 移除且以后也不要有)
+    forbid_color = bool(base.get("forbid_vocal_color")) or str(
+        base.get("vocal_color_policy") or ""
+    ).strip().lower() in {"never", "off", "forbidden", "禁止"}
+    if isinstance(author, dict):
+        forbid_color = forbid_color or bool(author.get("forbid_vocal_color")) or str(
+            author.get("vocal_color_policy") or ""
+        ).strip().lower() in {"never", "off", "forbidden", "禁止"}
+    if isinstance(spec, dict):
+        forbid_color = forbid_color or bool(spec.get("forbid_vocal_color")) or str(
+            spec.get("vocal_color_policy") or ""
+        ).strip().lower() in {"never", "off", "forbidden", "禁止"}
+    # Adult hardcore: enable color track unless author explicitly disabled / forbade
+    if hardcore and heat in {"max", "hot"} and "enabled" not in author_keys and not forbid_color:
         base["enabled"] = True
         base["auto_vocal_color"] = (
             True if "auto_vocal_color" not in author_keys else base["auto_vocal_color"]
         )
-        if "vocal_color_gain" not in author_keys or float(base.get("vocal_color_gain") or 0) <= 0:
+        # Respect explicit author gain (including 0 = 用户不要娇喘). Only fill default when unset.
+        if "vocal_color_gain" not in author_keys:
             base["vocal_color_gain"] = 0.52
     # clamp gains
     for gkey in ("vocal_color_gain", "sfx_bed_gain"):
@@ -208,9 +221,13 @@ def resolve_voice_tracks(
             raise VoiceTracksError(f"voice_tracks.{gkey} must be number") from exc
     base["enabled"] = bool(base.get("enabled", False))
     base["auto_vocal_color"] = bool(base.get("auto_vocal_color", False))
-    # hard off: never emit color when disabled or gain 0
-    if not base["enabled"] or float(base.get("vocal_color_gain") or 0) <= 0:
-        base["enabled"] = False
+    # hard off color: gain 0 or forbid — do NOT disable whole voice_tracks (nar still needs enabled)
+    if forbid_color or float(base.get("vocal_color_gain") or 0) <= 0:
+        base["auto_vocal_color"] = False
+        base["vocal_color_gain"] = 0.0
+        base["forbid_vocal_color"] = True
+        base["vocal_color_policy"] = "never"
+    if not base["enabled"]:
         base["auto_vocal_color"] = False
         base["vocal_color_gain"] = 0.0
     # Effects are authored scene events by default; intimate presets may opt in.
@@ -242,6 +259,16 @@ def resolve_shot_vocal_color(
     """Return vocal_color payload for a shot (may be empty / disabled)."""
     if not policy.get("enabled"):
         return {"text": "", "offset_sec": 0.0, "source": "disabled", "gain": 0.0}
+    # Film/user P0: never emit 娇喘 even if shot still has leftover vocal_color text
+    if policy.get("forbid_vocal_color") or str(policy.get("vocal_color_policy") or "").strip().lower() in {
+        "never",
+        "off",
+        "forbidden",
+        "禁止",
+    }:
+        return {"text": "", "offset_sec": 0.0, "source": "forbidden", "gain": 0.0}
+    if float(policy.get("vocal_color_gain") or 0) <= 0:
+        return {"text": "", "offset_sec": 0.0, "source": "gain_zero", "gain": 0.0}
 
     explicit = str(shot.get("vocal_color") or shot.get("color_line") or "").strip()
     source = "author" if explicit else "none"
