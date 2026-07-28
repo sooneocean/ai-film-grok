@@ -119,3 +119,30 @@ def test_delivery_gate_requires_checksum_bound_rendered_tts_asset(tmp_path: Path
     )
     assert report["ok"] is False
     assert any("checksum changed" in error for error in report["errors"])
+
+
+def test_delivery_gate_resolves_symlinked_temp_root_before_containment_check(tmp_path: Path):
+    timeline = _timeline()
+    asset = tmp_path / "audio" / "tts" / "line.wav"
+    asset.parent.mkdir(parents=True)
+    asset.write_bytes(b"rendered tts")
+    manifest = {
+        "jobs": [
+            {
+                "audio_event_id": timeline["events"][0]["id"],
+                "request_sha256": "x",
+                "status": "rendered",
+                "asset_path": "audio/tts/line.wav",
+                "asset_sha256": sha256(asset.read_bytes()).hexdigest(),
+            }
+        ]
+    }
+    alias = tmp_path.parent / f"{tmp_path.name}-alias"
+    alias.symlink_to(tmp_path, target_is_directory=True)
+    report = build_delivery_report(
+        timeline=timeline,
+        tts_manifest=manifest,
+        subtitle_bindings=caption_bindings(timeline),
+        root=alias,
+    )
+    assert report["ok"] is True

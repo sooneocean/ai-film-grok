@@ -32,7 +32,7 @@
     "scripts/asset_registry.py": "9e8488b1acf3485d7d219186a2752199f45200d73be1ce1c19acb4f082454996",
     "scripts/audio_bible.py": "0bf779217c3a824cb77ddcb1b6c768705158cb94bc4fb278ef14ce7ae28183f1",
     "scripts/audio_cues.py": "798f545c6d4ac0adc3d30a6a530226e90c2a845f26f271946306d9a042ad2456",
-    "scripts/audio_delivery_gate.py": "e9f4203f2ad615531378054a09ba7c62193112624e6b07fda29d5aa5fb0d6add",
+    "scripts/audio_delivery_gate.py": "444d84d4db1f7e56c411742c241148655ddb88dcafe70a687030e873001cbf11",
     "scripts/audio_event_editor.py": "a6242efc691e87fa12dac754f390aee3e8328e7b140fe949c6719582c3d59840",
     "scripts/audio_plan.py": "c20d11fe81748f34a6cf00ed0d66f63350f2a0b8eb211a4ec9225e496b835e3a",
     "scripts/audio_provenance.py": "2b8ba1aca66cb209dd7378294faf56fd4ffae6f551accdc0149626a0dc9447e5",

@@ -31,6 +31,7 @@ def _probe(path: Path) -> dict[str, Any]:
 
 
 def _verify_rendered_tts_asset(root: Path, job: dict[str, Any]) -> str | None:
+    root = root.expanduser().resolve()
     relative = Path(str(job.get("asset_path") or ""))
     if not str(relative) or relative.is_absolute() or ".." in relative.parts:
         return "rendered TTS asset path is missing or unsafe"
