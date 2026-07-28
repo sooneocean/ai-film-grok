@@ -143,6 +143,30 @@
       "type": "boolean",
       "description": "When false, disable auto heat_arc_strict default on max. Agent must not set false to pass gates without user consent."
     },
+    "sex_arc_strict": {
+      "type": "boolean",
+      "description": "Hard-fail SEX_ARC_* (四拍 前戏→插入→射出). Default true on heat_scale=max."
+    },
+    "sex_detail_cu_strict": {
+      "type": "boolean",
+      "description": "Hard-fail SEX_DETAIL_CU_MISSING (定器特写). Default true on max."
+    },
+    "both_undress_strict": {
+      "type": "boolean",
+      "description": "Hard-fail SEX_BOTH_UNDRESS_MISSING when partner_wardrobe too dressed. Default true on max."
+    },
+    "coitus_strict": {
+      "type": "boolean",
+      "description": "Hard-fail coitus grammar warnings. Default true on max IRON."
+    },
+    "size_ladder_strict": {
+      "type": "boolean",
+      "description": "Hard-fail size ladder warnings. Default true on max IRON."
+    },
+    "pose_strict": {
+      "type": "boolean",
+      "description": "Hard-fail SEX_POSE_STALE. Default true on max IRON."
+    },
     "heat_arc_strict": {
       "type": "boolean",
       "description": "If true, all heat arc lint warnings hard-fail write-spec"
@@ -574,6 +598,29 @@
                   "type": "string",
                   "enum": ["full", "armored", "partial", "undressed", "bare"],
                   "description": "Costume ladder (monotonic undress). max IRON: act≥undressed, climax=bare; partial only foreplay. Later shots must not re-dress. Missing → inherit + phase escalate on write-spec. See sex-undress-ladder + adult-max iron."
+                },
+                "partner_wardrobe_state": {
+                  "type": "string",
+                  "enum": ["full", "armored", "partial", "undressed", "bare"],
+                  "description": "Partner/male wardrobe. Penetration IRON: ≥undressed (pants off)."
+                },
+                "sex_arc_beat": {
+                  "type": "string",
+                  "enum": ["foreplay", "entry", "penetration", "climax_release", "afterglow"],
+                  "description": "Four-beat sex arc: 起 foreplay → 承 entry → 转 penetration → 合 climax_release"
+                },
+                "coverage_role": {
+                  "type": "string",
+                  "description": "detail|master|insert — detail required once in meat for 定器 CU"
+                },
+                "framing": {
+                  "type": "string",
+                  "description": "e.g. union_closeup | genital_lock | waist_lock for impact CU"
+                },
+                "coitus_beat": {
+                  "type": "string",
+                  "enum": ["entry", "undress", "union", "rhythm", "lock", "finish", "hook"],
+                  "description": "Six-beat coitus grammar"
                 },
                 "dsl": {
                   "type": "object",

@@ -220,6 +220,43 @@ class AdultMaxIronSexArc(unittest.TestCase):
         rep = lint_sex_arc(shots, heat_scale="max")
         self.assertIn("SEX_ARC_PENETRATION_MISSING", rep.get("codes", []))
 
+    def test_bare_hug_not_penetration(self) -> None:
+        """裸抱无办事动词不得假绿 penetration。"""
+        shots = [
+            {
+                "id": "f1",
+                "heat_phase": "foreplay",
+                "duration_sec": 6,
+                "wardrobe_state": "partial",
+                "dsl": {"action": "undress strips"},
+            },
+            {
+                "id": "a1",
+                "heat_phase": "act",
+                "duration_sec": 12,
+                "wardrobe_state": "bare",
+                "dsl": {"action": "embrace hug soft lean", "subject": "bare skin hug"},
+            },
+            {
+                "id": "c1",
+                "heat_phase": "climax",
+                "duration_sec": 8,
+                "wardrobe_state": "bare",
+                "dsl": {"action": "smile soft hold"},
+            },
+        ]
+        rep = lint_sex_arc(shots, heat_scale="max")
+        self.assertFalse(rep.get("has_penetration"))
+        self.assertIn("SEX_ARC_PENETRATION_MISSING", rep.get("codes", []))
+        self.assertIn("SEX_ARC_PENETRATION_VERB_WEAK", rep.get("codes", []))
+        codes = set(rep.get("codes") or [])
+        self.assertTrue(
+            "SEX_ARC_RELEASE_MARKER_WEAK" in codes
+            or "SEX_ARC_CLIMAX_RELEASE_MISSING" in codes,
+            codes,
+        )
+        self.assertFalse(rep.get("has_climax_release"))
+
     def test_full_arc_ok(self) -> None:
         shots = [
             {
@@ -247,6 +284,92 @@ class AdultMaxIronSexArc(unittest.TestCase):
         self.assertTrue(rep.get("has_penetration"))
         self.assertTrue(rep.get("has_climax_release"))
 
+    def test_detail_cu_missing(self) -> None:
+        from edit_policy import lint_sex_detail_cu
+
+        shots = [
+            {
+                "id": "a1",
+                "heat_phase": "act",
+                "duration_sec": 10,
+                "dsl": {
+                    "action": "hips-sink thrust",
+                    "camera": {"shot_size": "medium"},
+                },
+            },
+        ]
+        rep = lint_sex_detail_cu(shots, heat_scale="max")
+        self.assertIn("SEX_DETAIL_CU_MISSING", rep.get("codes", []))
+
+    def test_detail_cu_ok(self) -> None:
+        from edit_policy import lint_sex_detail_cu
+
+        shots = [
+            {
+                "id": "a1",
+                "heat_phase": "act",
+                "coverage_role": "detail",
+                "framing": "union_closeup",
+                "duration_sec": 8,
+                "dsl": {
+                    "action": "hips-sink pelvis-lock",
+                    "camera": {"shot_size": "close-up insert"},
+                },
+            },
+        ]
+        rep = lint_sex_detail_cu(shots, heat_scale="max")
+        self.assertTrue(rep.get("ok"), rep)
+        self.assertIn("a1", rep.get("detail_shots") or [])
+
+    def test_partner_wardrobe_weak(self) -> None:
+        from edit_policy import lint_both_undress
+
+        shots = [
+            {
+                "id": "a1",
+                "heat_phase": "act",
+                "wardrobe_state": "bare",
+                "partner_wardrobe_state": "full",
+                "duration_sec": 10,
+                "dsl": {"action": "hips-sink thrust straddle"},
+            },
+        ]
+        rep = lint_both_undress(shots, heat_scale="max")
+        self.assertIn("SEX_BOTH_UNDRESS_MISSING", rep.get("codes", []))
+
+    def test_erotic_impact_score(self) -> None:
+        from edit_policy import compute_erotic_impact_score
+
+        shots = [
+            {
+                "id": "f1",
+                "heat_phase": "foreplay",
+                "duration_sec": 4,
+                "dsl": {"action": "undress strips"},
+            },
+            {
+                "id": "a1",
+                "heat_phase": "act",
+                "wardrobe_state": "bare",
+                "coverage_role": "detail",
+                "duration_sec": 12,
+                "dsl": {
+                    "action": "hips-sink thrust",
+                    "camera": {"shot_size": "close-up insert"},
+                },
+            },
+            {
+                "id": "c1",
+                "heat_phase": "climax",
+                "wardrobe_state": "bare",
+                "duration_sec": 8,
+                "dsl": {"action": "arch-finish 高潮 射出"},
+            },
+        ]
+        rep = compute_erotic_impact_score(shots, heat_scale="max")
+        self.assertGreaterEqual(rep.get("score", 0), 60)
+        self.assertIn(rep.get("grade"), {"A", "S", "B"})
+
     def test_merged_into_heat_arc(self) -> None:
         shots = [
             {"id": "s1", "heat_phase": "setup", "duration_sec": 6},
@@ -258,6 +381,7 @@ class AdultMaxIronSexArc(unittest.TestCase):
             any(str(c).startswith("SEX_ARC_") for c in codes),
             codes,
         )
+        self.assertIn("SEX_DETAIL_CU_MISSING", codes)
 
 
 class AdultMaxIronStillSource(unittest.TestCase):
@@ -365,6 +489,13 @@ class AdultMaxIronStillSource(unittest.TestCase):
             "sex_arc_strict": False,
             "sex_wardrobe_strict": True,
             "still_source_strict": True,
+            "coitus_strict": False,
+            "size_ladder_strict": False,
+            "pose_strict": False,
+            "montage_strict": False,
+            "sex_detail_cu_strict": False,
+            "both_undress_strict": False,
+            "sex_vo_motion_strict": False,
             "director_intent": {
                 "logline": "成人max undress-anchor ok",
                 "tone": "成人",

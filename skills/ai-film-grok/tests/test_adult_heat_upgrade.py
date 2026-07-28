@@ -115,16 +115,26 @@ class CoitusLintTests(unittest.TestCase):
         self.assertIn("COITUS_BEAT_MISSING", rep["codes"])
 
     def test_plain_max_without_enabled_ok(self) -> None:
+        # max IRON requires core union+rhythm+finish (not full six unless grammar.enabled)
         shots = [
+            {
+                "id": "u",
+                "heat_phase": "act",
+                "coitus_beat": "union",
+                "duration_sec": 6,
+                "dsl": {"action": "straddle pelvis-lock", "motion": "union_settle"},
+            },
             {
                 "id": "a",
                 "heat_phase": "act",
+                "coitus_beat": "rhythm",
                 "duration_sec": 6,
-                "dsl": {"action": "straddle hips-sink", "motion": "grind"},
+                "dsl": {"action": "hips-sink thrust", "motion": "rhythm_hips"},
             },
             {
                 "id": "b",
                 "heat_phase": "climax",
+                "coitus_beat": "finish",
                 "duration_sec": 6,
                 "dsl": {"action": "arch-finish", "motion": "tremor"},
             },

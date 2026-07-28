@@ -375,6 +375,11 @@ class PromptInjector:
             .strip()
             .lower()
         )
+        sex_arc_beat = (
+            str(shot.get("sex_arc_beat") or (shot.get("dsl") or {}).get("sex_arc_beat") or "")
+            .strip()
+            .lower()
+        )
         coitus_line = ""
         if heat_phase in {"act", "climax"} or coitus_beat in {
             "entry",
@@ -382,14 +387,56 @@ class PromptInjector:
             "rhythm",
             "lock",
             "finish",
-        }:
+        } or sex_arc_beat in {"penetration", "climax_release", "entry"}:
             coitus_line = (
                 "Coitus readability HARD: pelvis contact / hips-sink / straddle-seat "
                 "or grind must be visible in frame; NOT soft hug or eye-contact only; "
-                f"coitus_beat={coitus_beat or heat_phase}; weight down, thighs readable; "
+                f"coitus_beat={coitus_beat or heat_phase}; "
+                f"sex_arc_beat={sex_arc_beat or 'n/a'}; weight down, thighs readable; "
                 "do NOT put clothes back on"
             )
             parts.append(coitus_line)
+            # Motion template bind by sex_arc / coitus (I2V thrust readability)
+            motion_bind = {
+                "union": "union_settle hips settle pelvis-lock",
+                "rhythm": "rhythm_hips hips-sink thrust-rhythm twice",
+                "lock": "lock_clutch leg-wrap clutch",
+                "finish": "finish_arch residual-tremor",
+                "penetration": "rhythm_hips hips-sink thrust-rhythm",
+                "climax_release": "finish_arch arch-finish release",
+                "entry": "entry_pin weight drop mount",
+            }
+            bind_key = coitus_beat or sex_arc_beat
+            if bind_key in motion_bind:
+                parts.append(
+                    f"I2V motion HARD bind: {motion_bind[bind_key]}; "
+                    "no soft lean / Ken Burns only; visible hip travel"
+                )
+            pw = (
+                shot.get("partner_wardrobe_state")
+                or (shot.get("dsl") or {}).get("partner_wardrobe_state")
+            )
+            if pw:
+                parts.append(
+                    f"Partner wardrobe HARD: partner_wardrobe_state={pw}; "
+                    "male/partner bottoms discarded when undressed|bare; "
+                    "no pants/underwear during penetration"
+                )
+            cov = str(
+                shot.get("coverage_role")
+                or (shot.get("dsl") or {}).get("coverage_role")
+                or ""
+            ).strip().lower()
+            framing = str(
+                shot.get("framing") or (shot.get("dsl") or {}).get("framing") or ""
+            ).strip().lower()
+            if cov == "detail" or any(
+                x in framing for x in ("union_closeup", "genital_lock", "waist_lock")
+            ):
+                parts.append(
+                    "Detail CU HARD: waist/pelvis union lock framing; "
+                    "suggestive contact readable; keep headroom if face in frame"
+                )
 
         # 4. Cinematography DSL
         dsl = shot.get("dsl", {})

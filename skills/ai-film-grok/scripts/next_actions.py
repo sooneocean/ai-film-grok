@@ -414,6 +414,12 @@ def build_next_actions(
         preview_ok = _preview_ok(root)
         rehearse_ok = _tts_rehearse_ok(root)
         require_reh = bool(spec.get("tts_rehearsal_required") is True) if spec else False
+        if not (root / "post-plan.json").is_file():
+            add(
+                "post-plan-init",
+                f'aifilm post-plan --root "{r}" init --owner hyperframes',
+                "进入设计合成前先锁定后期与字幕 owner；若要 React 模板改为 --owner remotion",
+            )
         if not final_rec and not rehearse_ok:
             add(
                 "tts-rehearse",

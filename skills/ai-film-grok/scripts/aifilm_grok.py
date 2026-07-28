@@ -91,6 +91,7 @@ EXPORT_METADATA_FILES = (
     "timeline.json",
     "manifest.json",
     "README.md",
+    "post-plan.json",
 )
 
 
@@ -3171,6 +3172,21 @@ def cmd_final(args: argparse.Namespace) -> int:
     post_engine = str(getattr(args, "post_engine", "ffmpeg") or "ffmpeg").strip().lower()
     if post_engine not in {"ffmpeg", "hyperframes", "remotion"}:
         raise FilmError("--post-engine must be ffmpeg|hyperframes|remotion")
+    post_plan: dict[str, Any] | None = None
+    if (root / "post-plan.json").is_file():
+        sys.path.insert(0, str(skill_dir / "scripts"))
+        try:
+            from post_plan import PostPlanError, load_post_plan, record_render_evidence
+
+            post_plan = load_post_plan(root, required=True)
+            if post_engine != post_plan["post_owner"]:
+                raise PostPlanError(
+                    f"post-plan post_owner={post_plan['post_owner']}; --post-engine {post_engine} is not allowed"
+                )
+        except ImportError as exc:
+            raise FilmError(f"Cannot import post_plan: {exc}") from exc
+        except PostPlanError as exc:
+            raise FilmError(str(exc)) from exc
 
     # Lesson preflight (default on): hard blocks; soft logs; --skip-preflight escapes
     preflight_report: dict[str, Any] | None = None
@@ -3450,6 +3466,20 @@ def cmd_final(args: argparse.Namespace) -> int:
             )
         except ComposeRenderError as exc:
             raise FilmError(str(exc)) from exc
+        if post_plan is not None and result.get("rendered"):
+            try:
+                record_render_evidence(
+                    root,
+                    engine=post_engine,
+                    output=result.get("output"),
+                    composition_checked=bool(result.get("steps", {}).get("check", {}).get("ok")),
+                    ffprobe_readback=bool(
+                        result.get("register", {}).get("technical_qa", {}).get("ok")
+                    ),
+                    technical_qa_report=result.get("register", {}).get("report"),
+                )
+            except PostPlanError as exc:
+                raise FilmError(str(exc)) from exc
         stages_receipt["hf"] = {
             "ok": True,
             "output": result.get("output"),
@@ -3543,6 +3573,19 @@ def cmd_final(args: argparse.Namespace) -> int:
             )
         except ComposeRenderError as exc:
             raise FilmError(str(exc)) from exc
+        if post_plan is not None and result.get("rendered"):
+            try:
+                record_render_evidence(
+                    root,
+                    engine=post_engine,
+                    output=result.get("output"),
+                    ffprobe_readback=bool(
+                        result.get("register", {}).get("technical_qa", {}).get("ok")
+                    ),
+                    technical_qa_report=result.get("register", {}).get("report"),
+                )
+            except PostPlanError as exc:
+                raise FilmError(str(exc)) from exc
         # compose_render may return ok=False when not ready (no raise)
         out_obj = {
             "ok": bool(result.get("ok")),
@@ -3597,6 +3640,21 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             "Cannot approve final: not every planned clip has endpoint, identity, motion, and decode QA"
         )
     final_record = (manifest.get("outputs") or {}).get("final_film")
+    if (root / "post-plan.json").is_file():
+        try:
+            from post_plan import PostPlanError, load_post_plan
+
+            plan = load_post_plan(root, required=True)
+            if (
+                not isinstance(final_record, dict)
+                or final_record.get("post_engine") != plan["post_owner"]
+            ):
+                raise PostPlanError(
+                    f"post-plan post_owner={plan['post_owner']} does not match final_film post_engine="
+                    f"{(final_record or {}).get('post_engine')}"
+                )
+        except PostPlanError as exc:
+            raise FilmError(f"Cannot approve final: {exc}") from exc
     out_dir = film_dirs(root)["out"]
     if not record_file_matches(out_dir, final_record, field="final film path"):
         raise FilmError(
@@ -4152,10 +4210,34 @@ def cmd_export_compose(args: argparse.Namespace) -> int:
         raise FilmError(
             "export-compose requires clips_complete (every planned shot has approved register-clip)"
         )
+    requested_engine = str(getattr(args, "engine", "both") or "both")
+    requested_owner = str(getattr(args, "post_owner", "") or "").strip().lower()
+    if requested_owner not in {"", "hyperframes", "remotion"}:
+        raise FilmError("--post-owner must be hyperframes|remotion")
+    owner = requested_owner or ("remotion" if requested_engine == "remotion" else "hyperframes")
+    try:
+        from post_plan import PostPlanError, ensure_post_plan
+
+        post_plan, post_plan_created = ensure_post_plan(root, owner=owner)
+    except ImportError as exc:
+        raise FilmError(f"Cannot import post_plan: {exc}") from exc
+    except PostPlanError as exc:
+        raise FilmError(str(exc)) from exc
+    locked_owner = str(post_plan["post_owner"])
+    if not post_plan_created:
+        if requested_owner and requested_owner != locked_owner:
+            raise FilmError(
+                f"post-plan post_owner={locked_owner}; --post-owner {requested_owner} would overwrite it"
+            )
+        if requested_engine not in {locked_owner, "both"}:
+            raise FilmError(
+                f"post-plan post_owner={locked_owner}; export-compose --engine {requested_engine} is not allowed "
+                "(use the owner engine or --engine both for comparison)"
+            )
     try:
         result = export_composition(
             root,
-            engine=str(getattr(args, "engine", "both") or "both"),
+            engine=requested_engine,
             title_dur=float(getattr(args, "title_dur", 1.5) or 1.5),
             end_dur=float(getattr(args, "end_dur", 1.5) or 1.5),
             force=bool(getattr(args, "force", False)),
@@ -4166,6 +4248,11 @@ def cmd_export_compose(args: argparse.Namespace) -> int:
         )
     except ComposeExportError as exc:
         raise FilmError(str(exc)) from exc
+    result["post_plan"] = {
+        "path": str(root / "post-plan.json"),
+        "post_owner": post_plan["post_owner"],
+        "created": post_plan_created,
+    }
     emit(result)
     return 0
 
@@ -4182,6 +4269,19 @@ def cmd_compose_render(args: argparse.Namespace) -> int:
         raise FilmError(f"Cannot import compose_render: {exc}") from exc
 
     root = Path(args.root).expanduser().resolve()
+    try:
+        from post_plan import PostPlanError, record_render_evidence, validate_render_owner
+
+        selected_engine = (
+            str(getattr(args, "post_engine", "external") or "external")
+            if getattr(args, "register_only", None)
+            else str(getattr(args, "engine", "hyperframes") or "hyperframes")
+        )
+        plan = validate_render_owner(root, selected_engine)
+    except ImportError as exc:
+        raise FilmError(f"Cannot import post_plan: {exc}") from exc
+    except PostPlanError as exc:
+        raise FilmError(str(exc)) from exc
     if getattr(args, "register_only", None):
         try:
             result = register_final_film(
@@ -4193,6 +4293,20 @@ def cmd_compose_render(args: argparse.Namespace) -> int:
             )
         except ComposeRenderError as exc:
             raise FilmError(str(exc)) from exc
+        if plan is not None:
+            try:
+                validate_render_owner(
+                    root, str(getattr(args, "post_engine", "external") or "external")
+                )
+                record_render_evidence(
+                    root,
+                    engine=str(plan["post_owner"]),
+                    output=str(args.register_only),
+                    ffprobe_readback=bool(result.get("technical_qa", {}).get("ok")),
+                    technical_qa_report=result.get("report"),
+                )
+            except PostPlanError as exc:
+                raise FilmError(str(exc)) from exc
         emit(result)
         return 0
 
@@ -4224,6 +4338,18 @@ def cmd_compose_render(args: argparse.Namespace) -> int:
         )
     except ComposeRenderError as exc:
         raise FilmError(str(exc)) from exc
+    if plan is not None and result.get("rendered"):
+        try:
+            record_render_evidence(
+                root,
+                engine=str(plan["post_owner"]),
+                output=result.get("output"),
+                composition_checked=bool(result.get("steps", {}).get("check", {}).get("ok")),
+                ffprobe_readback=bool(result.get("register", {}).get("technical_qa", {}).get("ok")),
+                technical_qa_report=result.get("register", {}).get("report"),
+            )
+        except PostPlanError as exc:
+            raise FilmError(str(exc)) from exc
     emit(result)
     return 0
 
@@ -4237,6 +4363,16 @@ def cmd_register_final(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise FilmError(f"Cannot import compose_render: {exc}") from exc
     root = Path(args.root).expanduser().resolve()
+    try:
+        from post_plan import PostPlanError, record_render_evidence, validate_render_owner
+
+        plan = validate_render_owner(
+            root, str(getattr(args, "post_engine", "external") or "external")
+        )
+    except ImportError as exc:
+        raise FilmError(f"Cannot import post_plan: {exc}") from exc
+    except PostPlanError as exc:
+        raise FilmError(str(exc)) from exc
     manifest = load_manifest(root) if (root / MANIFEST_NAME).is_file() else {}
     if int(manifest.get("quality_evidence_contract_version") or 0) >= 1:
         from quality_closure import _shot_quality_closure
@@ -4258,8 +4394,62 @@ def cmd_register_final(args: argparse.Namespace) -> int:
         )
     except ComposeRenderError as exc:
         raise FilmError(str(exc)) from exc
+    if plan is not None:
+        try:
+            record_render_evidence(
+                root,
+                engine=str(plan["post_owner"]),
+                output=str(getattr(args, "source", "")),
+                ffprobe_readback=bool(result.get("technical_qa", {}).get("ok")),
+                technical_qa_report=result.get("report"),
+            )
+        except PostPlanError as exc:
+            raise FilmError(str(exc)) from exc
     emit(result)
     return 0
+
+
+def cmd_post_plan(args: argparse.Namespace) -> int:
+    """Create and validate the single editorial-to-post handoff contract."""
+    skill_dir = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(skill_dir / "scripts"))
+    try:
+        from post_plan import (
+            PostPlanError,
+            delivery_status,
+            load_post_plan,
+            new_post_plan,
+            post_plan_path,
+            validate_post_plan,
+            write_post_plan,
+        )
+    except ImportError as exc:
+        raise FilmError(f"Cannot import post_plan: {exc}") from exc
+    root = Path(args.root).expanduser().resolve()
+    try:
+        if args.post_plan_action == "init":
+            plan = new_post_plan(
+                root,
+                owner=str(getattr(args, "owner", "hyperframes") or "hyperframes"),
+                edl_path=getattr(args, "edl", None),
+                master_subtitles=getattr(args, "master_subtitles", "out/final.srt"),
+                audio_plan=getattr(args, "audio_plan", "sound-plan.json"),
+            )
+            path = write_post_plan(root, plan, force=bool(getattr(args, "force", False)))
+            emit({"ok": True, "path": str(path), "post_plan": plan})
+            return 0
+        plan = load_post_plan(root, required=True)
+        result = validate_post_plan(
+            root, plan, check_artifacts=bool(getattr(args, "check_artifacts", False))
+        )
+        result["path"] = str(post_plan_path(root))
+        result["delivery"] = delivery_status(root, plan)
+        if args.post_plan_action == "show":
+            result["post_plan"] = plan
+        emit(result)
+        return 0 if result["ok"] else 2
+    except PostPlanError as exc:
+        raise FilmError(str(exc)) from exc
 
 
 def cmd_frw(args: argparse.Namespace) -> int:
@@ -7232,6 +7422,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="hyperframes (HTML Studio, default primary) | remotion | both",
     )
     ec.add_argument(
+        "--post-owner",
+        choices=["hyperframes", "remotion"],
+        default=None,
+        help="Create a missing post-plan with this owner (default follows --engine)",
+    )
+    ec.add_argument(
         "--layout",
         default="auto",
         choices=["auto", "multiclip", "underlay"],
@@ -7328,6 +7524,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only register existing MP4 as final_film",
     )
     cr.add_argument("--post-engine", default="external")
+
+    pp = sub.add_parser(
+        "post-plan",
+        help="Create or validate the editorial-to-HyperFrames/Remotion handoff",
+    )
+    pp.add_argument("--root", required=True)
+    pp_sub = pp.add_subparsers(dest="post_plan_action", required=True)
+    pp_init = pp_sub.add_parser("init", help="Write post-plan.json with one post owner")
+    pp_init.add_argument("--owner", choices=["hyperframes", "remotion"], default="hyperframes")
+    pp_init.add_argument("--edl", default=None, help="Workspace-relative video-use EDL path")
+    pp_init.add_argument("--master-subtitles", default="out/final.srt")
+    pp_init.add_argument("--audio-plan", default="sound-plan.json")
+    pp_init.add_argument("--force", action="store_true")
+    pp_validate = pp_sub.add_parser("validate", help="Validate post-plan.json")
+    pp_validate.add_argument("--check-artifacts", action="store_true")
+    pp_sub.add_parser("show", help="Print post-plan.json and its validation result")
 
     rf = sub.add_parser(
         "register-final",
@@ -7568,6 +7780,7 @@ def main(argv: list[str] | None = None) -> int:
             "compose-preview": cmd_compose_preview,
             "export-compose": cmd_export_compose,
             "compose-render": cmd_compose_render,
+            "post-plan": cmd_post_plan,
             "register-final": cmd_register_final,
             "export-desktop": cmd_export_desktop,
             "frw": cmd_frw,

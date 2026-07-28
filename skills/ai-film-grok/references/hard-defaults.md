@@ -34,6 +34,7 @@
 | **成人尺度最高优先（P0 · 最重要 · 2026-07-27）** | 用户明示：**尺度拉满是最重要目标**。与画风/剪辑偏好冲突时 **先保 max 尺度与完整办事弧**。退出仅显式 soft / `adult_max_iron:false`。见 [adult-scale-max-sex-arc](lessons-2026-07-27-adult-scale-max-sex-arc.md) |
 | **肉戏起承转合全弧（P0 · 同日）** | 成人 max 肉戏块必须可读：**前戏（起）→ 蓄力/纳入前（承）→ 插入抽送（转）→ 高潮/射出（合）**。禁只抱吻；禁无插入；禁无射出/高潮拍。建议 `sex_arc_beat` 标注；时间四拍皆非零。见同上 lesson |
 | **插入衣裤脱尽 + 定器特写（P0 · 同日追加）** | **插入拍双方衣裤脱尽**（女 bare；男至少下装脱尽）；禁内裤/军裤冒充办事。肉戏块默认至少 **1 镜结合部/腰腹定器特写**。Imagine 若拦 true bare → 记 PARTIAL，**禁止**静默改回内衣全穿当「已插入」。见 [adult-scale-max-sex-arc](lessons-2026-07-27-adult-scale-max-sex-arc.md) |
+| **max 默认全闸 hard（P0 · 2026-07-28）** | `heat_scale=max` 且 `adult_max_iron≠false` 时默认 **true**：`coitus_strict` · `size_ladder_strict` · `pose_strict` · `sex_arc_strict` · `sex_detail_cu_strict` · `both_undress_strict` · 既有 sex_floor/wardrobe/vo/heat_arc。裸抱不算 penetration；合拍须高潮/射出标记；`aifilm heat check` 输出四拍占比 + 定器 CU + **erotic impact** 分。 |
 | **首帧结构** | **致命**（P0）：keyframe 解剖/融合 fail → 禁 I2V；I2V 后必抽 t=0；坏首帧=整段废（2026-07-21 33s 案） |
 | **景别堆叠** | 成人 60s：宽≥1·中≥2·近≥2·局部≥2；act→climax 收紧不回退全景；连续 3 镜同 size fail（2026-07-21） |
 | **性交冲击力标竿** | 用户要性交/办事冲击/尺度太小→`coitus_grammar`；act 静帧过 **Mute Frame Test**；六拍 ENTRY→HOOK；禁拥抱冒充办事；审核软化走双轨不降 heat（2026-07-21） |

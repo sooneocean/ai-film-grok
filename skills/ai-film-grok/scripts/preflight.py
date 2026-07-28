@@ -51,6 +51,34 @@ def run_preflight(root: Path) -> dict[str, Any]:
     pilot = load_pilot_approval(root)
     score = read_json(root / "receipts" / "pilot-scorecard.json") or {}
 
+    post_plan_path = root / "post-plan.json"
+    if post_plan_path.is_file():
+        try:
+            from post_plan import PostPlanError, load_post_plan
+
+            post_plan = load_post_plan(root, required=True)
+            outputs = man.get("outputs") if isinstance(man.get("outputs"), dict) else {}
+            final = outputs.get("final_film") if isinstance(outputs.get("final_film"), dict) else {}
+            final_engine = final.get("post_engine") if isinstance(final, dict) else None
+            if final_engine and final_engine != post_plan["post_owner"]:
+                hard.append(
+                    _issue(
+                        "hard",
+                        "post_owner_mismatch",
+                        f"post-plan owner={post_plan['post_owner']} but final_film post_engine={final_engine}",
+                        fix="重新以 post-plan owner 渲染/注册 final；勿把 comparison 或 FFmpeg final 记成该 owner",
+                    )
+                )
+        except (PostPlanError, OSError) as exc:
+            hard.append(
+                _issue(
+                    "hard",
+                    "post_plan_invalid",
+                    f"post-plan 无法验证: {exc}",
+                    fix=f'aifilm post-plan --root "{root}" validate',
+                )
+            )
+
     # Premium vertical is an authored creative contract, not a styling hint.
     # Keep standard/legacy roots compatible while failing closed before paid work.
     book = read_json(root / "production-book.json") or {}
@@ -1181,6 +1209,19 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         "compose_preview_recommended",
                         "clips 已齐、尚未 final — 建议先 compose-preview 再设计成片",
                         fix=f'aifilm compose-preview --root "{root}"',
+                    )
+                )
+            if (
+                gates.get("clips_complete")
+                and not has_final
+                and not (root / "post-plan.json").is_file()
+            ):
+                soft.append(
+                    _issue(
+                        "soft",
+                        "post_plan_missing",
+                        "设计后期尚未锁定唯一 owner；先选 HyperFrames 或 Remotion，避免双烧字幕/双 final",
+                        fix=f'aifilm post-plan --root "{root}" init --owner hyperframes',
                     )
                 )
         except Exception:

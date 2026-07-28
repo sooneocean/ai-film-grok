@@ -13,11 +13,19 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from post_plan import new_post_plan, write_post_plan  # noqa: E402
 from preflight import run_preflight  # noqa: E402
 
 
 def _write(root: Path, name: str, obj: dict) -> None:
     (root / name).write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def test_preflight_hard_fails_when_final_engine_disagrees_with_post_plan(tmp_path: Path) -> None:
+    _write(tmp_path, "manifest.json", {"outputs": {"final_film": {"post_engine": "ffmpeg"}}})
+    write_post_plan(tmp_path, new_post_plan(tmp_path, owner="hyperframes"))
+    report = run_preflight(tmp_path)
+    assert "post_owner_mismatch" in {item["code"] for item in report["hard"]}
 
 
 @pytest.mark.slow

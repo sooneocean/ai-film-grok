@@ -40,10 +40,14 @@ Grok SDK 拉满画面顶格 suggestive；审核软化时 **VO/SFX/insert 双轨�
 | 自动脱衣 | `apply_wardrobe_continuity` | phase floor 自动抬升（能脱就脱） |
 | 荤 VO | `sex_vo_strict` | hard；`spice_level` **extreme** |
 | 声画同动词 | `sex_vo_motion_strict` | hardcore hard |
-| 性交六拍 | `coitus_strict` | hardcore 或 `coitus_grammar.enabled` |
-| 景别 | `size_ladder_strict` | hardcore |
-| 蒙太奇 | `montage_strict` | hardcore（inject craft 脊柱） |
-| 多体位 | `pose_strict` | hardcore（`SEX_POSE_STALE`） |
+| 性交六拍 / 核心三拍 | `coitus_strict` | **max 默认 hard**（union+rhythm+finish 最少；六拍当 grammar.enabled/hardcore） |
+| 四拍弧 | `sex_arc_strict` | **max 默认 hard**（动词可读；禁裸抱假绿） |
+| 定器特写 | `sex_detail_cu_strict` | **max 默认 hard**（`SEX_DETAIL_CU_MISSING`） |
+| 双方脱尽 | `both_undress_strict` | **max 默认 hard**（partner 字段过弱时） |
+| 景别 | `size_ladder_strict` | **max 默认 hard**（含 L4 insert） |
+| 蒙太奇 | `montage_strict` | **max 默认 hard**（inject craft 脊柱） |
+| 多体位 | `pose_strict` | **max 默认 hard**（`SEX_POSE_STALE`） |
+| 色情指数 | `_erotic_impact` / heat check | 0–100 分 + grade（时长×脱×弧×CU×动词） |
 
 ```bash
 "$AIFILM" heat check --root "<root>"

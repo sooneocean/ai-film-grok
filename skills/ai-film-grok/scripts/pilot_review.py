@@ -34,8 +34,9 @@ PREFERRED_BEATS: tuple[str, ...] = (
     "afterglow",
     "bridge",
 )
-# Adult max pilot: undress + union + rhythm prove wardrobe ladder + mute-frame + motion
+# Adult max pilot: undress + union(+detail CU) + rhythm prove ladder + 定器 + thrust motion
 ADULT_PILOT_COITUS: tuple[str, ...] = ("undress", "union", "rhythm", "entry", "finish", "lock")
+ADULT_PILOT_PREFER_DETAIL = True
 
 
 class PilotReviewError(RuntimeError):
@@ -68,22 +69,41 @@ def pick_pilot_shots(
     heat = str(spec.get("heat_scale") or "").strip().lower()
     picked: list[str] = []
 
-    # Adult canary: wardrobe undress + coitus-readable union + rhythm hips
+    # Adult canary: undress + union/detail CU + rhythm hips (three-shot impact)
     if heat in {"max", "hot"}:
         by_coitus: dict[str, list[str]] = {}
+        detail_ids: list[str] = []
         for shot in shots:
             dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
             cb = str(shot.get("coitus_beat") or dsl.get("coitus_beat") or "").strip().lower()
             if cb:
                 by_coitus.setdefault(cb, []).append(str(shot["id"]))
+            role = str(
+                shot.get("coverage_role") or dsl.get("coverage_role") or ""
+            ).strip().lower()
+            framing = str(shot.get("framing") or dsl.get("framing") or "").strip().lower()
+            if role == "detail" or "union_closeup" in framing or "genital_lock" in framing:
+                detail_ids.append(str(shot["id"]))
         for cb in ADULT_PILOT_COITUS:
-            # one shot per coitus beat — diversify undress / union / rhythm
-            for sid in by_coitus.get(cb) or []:
+            # prefer detail CU when picking union/rhythm canary
+            candidates = list(by_coitus.get(cb) or [])
+            if ADULT_PILOT_PREFER_DETAIL and cb in {"union", "rhythm", "lock"} and detail_ids:
+                ordered = [s for s in detail_ids if s in candidates] + [
+                    s for s in candidates if s not in detail_ids
+                ]
+                candidates = ordered or candidates
+            for sid in candidates:
                 if sid not in picked:
                     picked.append(sid)
                     break
             if len(picked) >= n:
                 return picked
+        # ensure at least one detail CU in pilot set when present
+        if detail_ids and len(picked) < n:
+            for sid in detail_ids:
+                if sid not in picked:
+                    picked.append(sid)
+                    break
 
     by_beat: dict[str, list[str]] = {}
     for shot in shots:

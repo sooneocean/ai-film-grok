@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from edit_policy import lint_heat_arc
+from edit_policy import compute_erotic_impact_score, lint_heat_arc
 from util import read_json
 
 
@@ -55,6 +55,11 @@ def heat_check(root: Path) -> dict[str, Any]:
         1 for e in (sp.get("events") or []) if isinstance(e, dict) and e.get("type") == "sfx_accent"
     )
     sex_sfx = sum(1 for e in (sp.get("events") or []) if isinstance(e, dict) and e.get("sex_sfx"))
+    impact = compute_erotic_impact_score(
+        shots,
+        heat_scale=str(heat_scale) if heat_scale else None,
+        heat_rep=rep,
+    )
     gates = {
         "sex_duration": {
             "ratio": rep.get("sex_duration_ratio"),
@@ -75,7 +80,11 @@ def heat_check(root: Path) -> dict[str, Any]:
         "poses": rep.get("poses") or {},
         "montage": rep.get("montage") or {},
         "coitus": rep.get("coitus") or {},
+        "sex_arc": rep.get("sex_arc") or {},
+        "detail_cu": rep.get("detail_cu") or {},
+        "both_undress": rep.get("both_undress") or {},
         "size_ladder": rep.get("size_ladder") or {},
+        "erotic_impact": impact,
         "sfx_shots": sfx_n,
         "sound_plan_accents": plan_sfx,
         "sex_sfx_accents": sex_sfx,
@@ -83,8 +92,17 @@ def heat_check(root: Path) -> dict[str, Any]:
     hard_codes = [
         c
         for c in (rep.get("codes") or [])
-        if c.startswith("HEAT_") or c.startswith("COITUS_") or c.startswith("SIZE_")
+        if c.startswith("HEAT_")
+        or c.startswith("COITUS_")
+        or c.startswith("SIZE_")
+        or c.startswith("SEX_ARC_")
+        or c.startswith("SEX_DETAIL_")
+        or c.startswith("SEX_BOTH_")
+        or c.startswith("MONTAGE_")
+        or c == "SEX_POSE_STALE"
     ]
+    sex_arc = rep.get("sex_arc") or {}
+    detail = rep.get("detail_cu") or {}
     return {
         "ok": bool(rep.get("ok")),
         "root": str(root),
@@ -96,6 +114,7 @@ def heat_check(root: Path) -> dict[str, Any]:
         "warning_count": rep.get("warning_count"),
         "gates": gates,
         "hard_relevant_codes": hard_codes,
+        "erotic_impact": impact,
         "strict_flags": {
             "sex_floor_strict": spec.get("sex_floor_strict"),
             "sex_wardrobe_strict": spec.get("sex_wardrobe_strict"),
@@ -103,6 +122,10 @@ def heat_check(root: Path) -> dict[str, Any]:
             "heat_arc_strict": spec.get("heat_arc_strict"),
             "coitus_strict": spec.get("coitus_strict"),
             "size_ladder_strict": spec.get("size_ladder_strict"),
+            "sex_arc_strict": spec.get("sex_arc_strict"),
+            "sex_detail_cu_strict": spec.get("sex_detail_cu_strict"),
+            "both_undress_strict": spec.get("both_undress_strict"),
+            "pose_strict": spec.get("pose_strict"),
         },
         "spice_level": rep.get("spice_level") or spec.get("spice_level"),
         "sex_duration_floor": rep.get("sex_duration_floor"),
@@ -113,13 +136,16 @@ def heat_check(root: Path) -> dict[str, Any]:
             f"sex={rep.get('sex_duration_ratio')}/floor={rep.get('sex_duration_floor')} "
             f"intimacy={rep.get('intimacy_ratio')} "
             f"bare={(rep.get('wardrobe') or {}).get('bare_peak_ok')} "
+            f"arc_ok={sex_arc.get('ok')} pen_ratio={sex_arc.get('penetration_duration_ratio')} "
+            f"detail_cu={','.join(detail.get('detail_shots') or []) or 'none'} "
+            f"impact={impact.get('grade')}:{impact.get('score')} "
             f"wardrobe_ok={(rep.get('wardrobe') or {}).get('ok')} "
             f"vo_ok={(rep.get('vo_spice') or {}).get('ok')} "
             f"coitus_ok={(rep.get('coitus') or {}).get('ok')} "
             f"size_ok={(rep.get('size_ladder') or {}).get('ok')} "
             f"pose_u={(rep.get('poses') or {}).get('unique')} "
             f"sfx={sfx_n}/{plan_sfx}sex={sex_sfx} "
-            f"codes={','.join((rep.get('codes') or [])[:6]) or 'none'}"
+            f"codes={','.join((rep.get('codes') or [])[:8]) or 'none'}"
         ),
     }
 

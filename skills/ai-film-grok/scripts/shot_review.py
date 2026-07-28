@@ -239,6 +239,25 @@ def create_shot_review(
         normalized_scores["coitus"] = value
     evidence = _parse_evidence(evidence_values, duration_sec=duration)
     shot, performance_required = find_shot(root, sid)
+    # max act/climax: Mute Frame coitus score required on approve
+    heat_phase = str((shot or {}).get("heat_phase") or "").strip().lower()
+    film_heat = ""
+    try:
+        spec = read_json(Path(root) / "film-spec.json") or {}
+        film_heat = str(spec.get("heat_scale") or "").strip().lower()
+    except Exception:
+        film_heat = ""
+    mute_frame_required = film_heat == "max" and heat_phase in {"act", "climax"}
+    if mute_frame_required and approve and "coitus" not in normalized_scores:
+        raise ShotReviewError(
+            "max act/climax approve requires mute-frame coitus score "
+            "(--score-coitus 1-5): 静音一帧是否可读办事"
+        )
+    if mute_frame_required and approve and normalized_scores.get("coitus", 0) < 4:
+        raise ShotReviewError(
+            "max act/climax mute-frame coitus score must be ≥4 to approve "
+            "(hug-only / unreadable union fails Mute Frame Test)"
+        )
     contract = performance_contract(shot, required=performance_required)
     try:
         performance_evidence = parse_performance_evidence(

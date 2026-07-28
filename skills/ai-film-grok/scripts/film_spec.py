@@ -30,6 +30,7 @@ from edit_policy import (
     apply_coverage_defaults_to_shot,
     apply_heat_phase_defaults,
     apply_wardrobe_continuity,
+    compute_erotic_impact_score,
     edit_crafts_to_intents,
     enforce_continue_hard_joins,
     lint_character_stance,
@@ -1989,28 +1990,33 @@ def validate_film_spec(
             "extreme 档禁纯双关。See lessons-2026-07-21-sex-vo-spice.md"
         )
 
-    # Coitus six-beat + mute-frame pose (hard on hardcore / enabled grammar / max)
+    # Coitus six-beat + mute-frame pose (hard on max iron / hardcore / grammar)
     _hardcore_profiles = {"hardcore_male", "hardcore", "重口男向"}
+    _max_iron = heat_scale == "max" and spec.get("adult_max_iron") is not False
     coitus_strict = spec.get("coitus_strict")
     if coitus_strict is None:
         ap = str(audience_profile or "").strip().lower()
-        coitus_strict = ap in _hardcore_profiles or bool(
-            (coitus_grammar or {}).get("enabled") is True
+        coitus_strict = (
+            _max_iron
+            or ap in _hardcore_profiles
+            or bool((coitus_grammar or {}).get("enabled") is True)
         )
+    _coitus_hard = {
+        "COITUS_BEAT_MISSING",
+        "COITUS_UNREADABLE_POSE",
+        "COITUS_PSEUDO_SEX",
+    }
     coitus_fail_codes = [
-        c
-        for c in (heat_rep.get("codes") or [])
-        if c
-        in {
-            "COITUS_BEAT_MISSING",
-            "COITUS_UNREADABLE_POSE",
-            "COITUS_PSEUDO_SEX",
-        }
+        str(i.get("code"))
+        for i in (heat_rep.get("issues") or [])
+        if isinstance(i, dict)
+        and str(i.get("code") or "") in _coitus_hard
+        and str(i.get("severity") or "") == "warning"
     ]
     if coitus_strict is True and coitus_fail_codes:
         raise FilmSpecError(
             "coitus grammar failed (coitus_strict): "
-            + ",".join(coitus_fail_codes)
+            + ",".join(sorted(set(coitus_fail_codes)))
             + " — assign coitus_beat entry→hook; act stills must be coitus-readable "
             "(straddle/hips-sink/grind), not hug-only. See intercourse-impact-benchmark."
         )
@@ -2018,33 +2024,76 @@ def validate_film_spec(
     # 肉戏起承转合 (前戏→插入→射出) hard on max iron
     sex_arc_strict = spec.get("sex_arc_strict")
     if sex_arc_strict is None:
-        sex_arc_strict = heat_scale == "max" and spec.get("adult_max_iron") is not False
-    sex_arc_fail = [c for c in (heat_rep.get("codes") or []) if str(c).startswith("SEX_ARC_")]
+        sex_arc_strict = _max_iron
+    # info-level SEX_ARC_RATIO_SKEW never hard-fails
+    sex_arc_fail = [
+        c
+        for c in (heat_rep.get("codes") or [])
+        if str(c).startswith("SEX_ARC_") and c != "SEX_ARC_RATIO_SKEW"
+    ]
     if sex_arc_strict is True and sex_arc_fail:
         raise FilmSpecError(
             "sex arc IRON failed (sex_arc_strict): "
             + ",".join(sex_arc_fail)
-            + " — 前戏→插入→射出 must all exist (sex_arc_beat / heat_phase). "
+            + " — 前戏→插入→射出 must all exist with penetration verbs. "
             "禁只抱吻、禁无纳入、禁无高潮射出拍。Override: sex_arc_strict:false. "
             "See lessons-2026-07-27-adult-scale-max-sex-arc.md"
         )
 
+    # 定器特写 hard on max
+    sex_detail_cu_strict = spec.get("sex_detail_cu_strict")
+    if sex_detail_cu_strict is None:
+        sex_detail_cu_strict = _max_iron
+    if sex_detail_cu_strict is True and "SEX_DETAIL_CU_MISSING" in (heat_rep.get("codes") or []):
+        raise FilmSpecError(
+            "sex detail CU IRON failed (sex_detail_cu_strict): SEX_DETAIL_CU_MISSING — "
+            "肉戏块至少 1 镜结合/腰腹定器特写 (coverage_role=detail 或 "
+            "framing=union_closeup|genital_lock 或 close-up insert). "
+            "Override: sex_detail_cu_strict:false."
+        )
+
+    # 双方脱尽：warning codes only (UNSTATED is info)
+    both_undress_strict = spec.get("both_undress_strict")
+    if both_undress_strict is None:
+        both_undress_strict = _max_iron
+    if both_undress_strict is True and "SEX_BOTH_UNDRESS_MISSING" in (heat_rep.get("codes") or []):
+        raise FilmSpecError(
+            "both undress IRON failed (both_undress_strict): SEX_BOTH_UNDRESS_MISSING — "
+            "插入时女≥undressed/bare；partner_wardrobe_state 若填写则 ≥undressed。 "
+            "Override: both_undress_strict:false."
+        )
+
     size_ladder_strict = spec.get("size_ladder_strict")
     if size_ladder_strict is None:
-        size_ladder_strict = str(audience_profile or "").strip().lower() in _hardcore_profiles
-    size_fail_codes = [c for c in (heat_rep.get("codes") or []) if str(c).startswith("SIZE_")]
+        ap = str(audience_profile or "").strip().lower()
+        size_ladder_strict = _max_iron or ap in _hardcore_profiles
+    # Only warning-severity SIZE_* hard-fail (info stays advisory even when strict)
+    size_fail_codes = [
+        str(i.get("code"))
+        for i in (heat_rep.get("issues") or [])
+        if isinstance(i, dict)
+        and str(i.get("code") or "").startswith("SIZE_")
+        and str(i.get("severity") or "") == "warning"
+    ]
     if size_ladder_strict is True and size_fail_codes:
         raise FilmSpecError(
             "size ladder failed (size_ladder_strict): "
-            + ",".join(size_fail_codes)
+            + ",".join(sorted(set(size_fail_codes)))
             + " — vary WS→MS→CU→insert; do not reopen wide mid-act. "
             "See size-ladder-hardcore-stack."
         )
 
     montage_strict = spec.get("montage_strict")
     if montage_strict is None:
-        montage_strict = str(audience_profile or "").strip().lower() in _hardcore_profiles
-    montage_fail = [c for c in (heat_rep.get("codes") or []) if str(c).startswith("MONTAGE_")]
+        ap = str(audience_profile or "").strip().lower()
+        montage_strict = _max_iron or ap in _hardcore_profiles
+    montage_fail = [
+        str(i.get("code"))
+        for i in (heat_rep.get("issues") or [])
+        if isinstance(i, dict)
+        and str(i.get("code") or "").startswith("MONTAGE_")
+        and str(i.get("severity") or "") == "warning"
+    ]
     if montage_strict is True and montage_fail:
         raise FilmSpecError(
             "montage craft failed (montage_strict): "
@@ -2054,7 +2103,8 @@ def validate_film_spec(
 
     pose_strict = spec.get("pose_strict")
     if pose_strict is None:
-        pose_strict = str(audience_profile or "").strip().lower() in _hardcore_profiles
+        ap = str(audience_profile or "").strip().lower()
+        pose_strict = _max_iron or ap in _hardcore_profiles
     if pose_strict is True and "SEX_POSE_STALE" in (heat_rep.get("codes") or []):
         raise FilmSpecError(
             "sex pose variety failed (pose_strict): SEX_POSE_STALE — "
@@ -2063,12 +2113,21 @@ def validate_film_spec(
 
     vo_motion_strict = spec.get("sex_vo_motion_strict")
     if vo_motion_strict is None:
-        vo_motion_strict = str(audience_profile or "").strip().lower() in _hardcore_profiles
+        ap = str(audience_profile or "").strip().lower()
+        vo_motion_strict = _max_iron or ap in _hardcore_profiles
     if vo_motion_strict is True and "HEAT_VO_MOTION_MISMATCH" in (heat_rep.get("codes") or []):
         raise FilmSpecError(
             "vo-motion align failed (sex_vo_motion_strict): HEAT_VO_MOTION_MISMATCH — "
             "mirror nar sex verbs in dsl.action/motion."
         )
+
+    # Attach erotic impact scorecard (advisory)
+    try:
+        spec["_erotic_impact"] = compute_erotic_impact_score(
+            shots, heat_scale=heat_scale, heat_rep=heat_rep
+        )
+    except Exception:  # pragma: no cover
+        pass
 
     # Heroine cast mode: single (default) vs multi — elastic from prompt/images/fields
     cast_ids: list[str] = []

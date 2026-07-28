@@ -44,6 +44,16 @@ def test_next_actions_publish_a_single_owner_per_stage(tmp_path: Path) -> None:
     }
 
 
+def test_clips_complete_prompts_to_lock_post_owner_before_design(tmp_path: Path) -> None:
+    (tmp_path / "brief.json").write_text('{"title":"t"}', encoding="utf-8")
+    actions = build_next_actions(
+        tmp_path,
+        gates={"brief": True, "style_locked": True, "spec": True, "clips_complete": True},
+    )
+    action = next(item for item in actions if item["id"] == "post-plan-init")
+    assert "post-plan --root" in action["cmd"]
+
+
 @pytest.mark.slow
 class NextActionsTests(unittest.TestCase):
     @pytest.mark.slow
