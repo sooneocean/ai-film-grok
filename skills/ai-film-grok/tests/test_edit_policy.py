@@ -385,6 +385,109 @@ class TTSVoiceLockTests(unittest.TestCase):
             self.assertFalse(out.exists())
 
     @pytest.mark.slow
+    def test_mimo_voice_design_omits_built_in_voice(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "mimo.mp3"
+            audio = b"ID3" + b"mimo-test-audio" * 40
+            response = mock.MagicMock()
+            response.read.return_value = json.dumps(
+                {
+                    "choices": [
+                        {"message": {"audio": {"data": base64.b64encode(audio).decode("ascii")}}}
+                    ]
+                }
+            ).encode("utf-8")
+            cm = mock.MagicMock()
+            cm.__enter__.return_value = response
+            with (
+                mock.patch.object(tts_backend, "mimo_api_key", return_value="test-key"),
+                mock.patch.object(
+                    tts_backend.urllib.request, "urlopen", return_value=cm
+                ) as urlopen,
+                mock.patch.object(
+                    tts_backend.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 0, stdout="1.0\n"),
+                ),
+            ):
+                tts_backend.tts_mimo("测试旁白", out, model="mimo-v2.5-tts-voicedesign")
+            payload = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+            self.assertEqual(payload["audio"], {"format": "mp3"})
+
+    @pytest.mark.slow
+    def test_mimo_voice_clone_requires_valid_reference_audio(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "mimo.mp3"
+            with (
+                mock.patch.object(tts_backend, "mimo_api_key", return_value="test-key"),
+                mock.patch.object(tts_backend, "mimo_tts_reference_audio", return_value=None),
+                self.assertRaisesRegex(tts_backend.TTSError, "REFERENCE_AUDIO is required"),
+            ):
+                tts_backend.tts_mimo("测试旁白", out, model="mimo-v2.5-tts-voiceclone")
+            self.assertFalse(out.exists())
+
+    @pytest.mark.slow
+    def test_mimo_voice_clone_rejects_symbolic_link_before_upload(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            secret = root / "secret.txt"
+            secret.write_text("not audio", encoding="utf-8")
+            reference = root / "reference.wav"
+            reference.symlink_to(secret)
+            out = root / "mimo.mp3"
+            with (
+                mock.patch.object(tts_backend, "mimo_api_key", return_value="test-key"),
+                mock.patch.object(tts_backend, "mimo_tts_reference_audio", return_value=reference),
+                mock.patch.object(tts_backend.urllib.request, "urlopen") as urlopen,
+                self.assertRaisesRegex(tts_backend.TTSError, "must not be a symbolic link"),
+            ):
+                tts_backend.tts_mimo("测试旁白", out, model="mimo-v2.5-tts-voiceclone")
+            urlopen.assert_not_called()
+            self.assertFalse(out.exists())
+
+    @pytest.mark.slow
+    def test_mimo_voice_clone_sends_validated_reference_audio(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reference = root / "reference.wav"
+            reference_bytes = b"RIFF" + b"reference-audio" * 40
+            reference.write_bytes(reference_bytes)
+            out = root / "mimo.mp3"
+            audio = b"ID3" + b"mimo-test-audio" * 40
+            response = mock.MagicMock()
+            response.read.return_value = json.dumps(
+                {
+                    "choices": [
+                        {"message": {"audio": {"data": base64.b64encode(audio).decode("ascii")}}}
+                    ]
+                }
+            ).encode("utf-8")
+            cm = mock.MagicMock()
+            cm.__enter__.return_value = response
+            with (
+                mock.patch.object(tts_backend, "mimo_api_key", return_value="test-key"),
+                mock.patch.object(tts_backend, "mimo_tts_reference_audio", return_value=reference),
+                mock.patch.object(
+                    tts_backend.urllib.request, "urlopen", return_value=cm
+                ) as urlopen,
+                mock.patch.object(
+                    tts_backend.subprocess,
+                    "run",
+                    side_effect=[
+                        subprocess.CompletedProcess([], 0, stdout="1.0\n"),
+                        subprocess.CompletedProcess([], 0, stdout="1.0\n"),
+                    ],
+                ),
+            ):
+                tts_backend.tts_mimo("测试旁白", out, model="mimo-v2.5-tts-voiceclone")
+            payload = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+            self.assertEqual(payload["audio"]["format"], "mp3")
+            self.assertEqual(
+                payload["audio"]["voice"],
+                f"data:audio/wav;base64,{base64.b64encode(reference_bytes).decode('ascii')}",
+            )
+
+    @pytest.mark.slow
     def test_fish_without_voice_id_fails_closed_unless_fallback_is_opted_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out1 = Path(tmp) / "a.mp3"

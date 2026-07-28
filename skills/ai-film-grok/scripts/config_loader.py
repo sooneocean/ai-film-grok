@@ -136,6 +136,7 @@ class ConfigSchema:
     mimo_tts_model: str = "mimo-v2.5-tts"
     mimo_tts_voice: str = "冰糖"
     mimo_tts_style: str = "自然、电影感的中文旁白；保持原文，不改写。"
+    mimo_tts_reference_audio: str = ""
     qwen3_tts_model: str = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
     qwen3_tts_ref_audio: str = ""
     qwen3_tts_ref_text: str = ""
@@ -237,6 +238,7 @@ def get_config() -> ConfigSchema:
         mimo_tts_model=_resolve("mimo-v2.5-tts", "MIMO_TTS_MODEL"),
         mimo_tts_voice=_resolve("冰糖", "MIMO_TTS_VOICE"),
         mimo_tts_style=_resolve("自然、电影感的中文旁白；保持原文，不改写。", "MIMO_TTS_STYLE"),
+        mimo_tts_reference_audio=_env("MIMO_TTS_REFERENCE_AUDIO"),
         qwen3_tts_model=_resolve(
             "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", "QWEN3_TTS_MODEL", "AIFILM_QWEN3_TTS_MODEL"
         ),
@@ -347,6 +349,7 @@ _ENV_HELP: dict[str, str] = {
     "MIMO_TTS_MODEL": "MiMo TTS model; default mimo-v2.5-tts",
     "MIMO_TTS_VOICE": "MiMo built-in voice; default 冰糖",
     "MIMO_TTS_STYLE": "MiMo style instruction for the user message",
+    "MIMO_TTS_REFERENCE_AUDIO": "MP3/WAV reference audio for mimo-v2.5-tts-voiceclone",
     "FISH_API_KEY": "Fish Audio API key (aliases: FISH_AUDIO_API_KEY, AIFILM_FISH_API_KEY)",
     "FISH_VOICE_ID": "Fish Audio reference/voice id (aliases: AIFILM_FISH_VOICE_ID, FISH_REFERENCE_ID)",
     "FISH_MODEL": "Fish Audio model (aliases: AIFILM_FISH_MODEL); default s2.1-pro-free",
@@ -417,6 +420,7 @@ _DEFAULT_EXAMPLES: dict[str, tuple[str, str]] = {
     "MIMO_API_BASE": ("https://api.xiaomimimo.com/v1", "OpenAI-compatible base URL"),
     "MIMO_TTS_MODEL": ("mimo-v2.5-tts", "built-in voices; free for a limited time"),
     "MIMO_TTS_VOICE": ("冰糖", "Chinese female built-in voice"),
+    "MIMO_TTS_REFERENCE_AUDIO": ("", "required only by mimo-v2.5-tts-voiceclone"),
     "AIFILM_TTS_STRICT_VOICE": ("1", ""),
     "AIFILM_LIPSYNC_BACKEND": ("off", "off | auto | musetalk | wav2lip | external"),
     "AIFILM_GROK_AUTH": ("auto", "auto | oauth | api_key"),

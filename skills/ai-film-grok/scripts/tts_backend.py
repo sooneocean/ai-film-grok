@@ -45,6 +45,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Mapping
 from pathlib import Path
+from stat import S_ISREG
 from typing import Any
 
 from config_loader import get_config
@@ -65,6 +66,9 @@ class TTSError(RuntimeError):
 
 TTS_BACKENDS = frozenset(
     {"auto", "mimo", "minimax", "fish", "voicebox", "edge", "external", "grok", "qwen3", "higgs"}
+)
+MIMO_TTS_MODELS = frozenset(
+    {"mimo-v2.5-tts", "mimo-v2.5-tts-voicedesign", "mimo-v2.5-tts-voiceclone"}
 )
 DEFAULT_VOICEBOX_URL = "http://127.0.0.1:17493"
 # Built-in Grok voices (subset; full list via aifilm grok-oauth voices)
@@ -136,6 +140,57 @@ def mimo_tts_voice() -> str:
 
 def mimo_tts_style() -> str:
     return get_config().mimo_tts_style or "自然、电影感的中文旁白；保持原文，不改写。"
+
+
+def mimo_tts_reference_audio() -> Path | None:
+    raw = get_config().mimo_tts_reference_audio.strip()
+    return Path(raw).expanduser() if raw else None
+
+
+def _mimo_model_error(model: str) -> str | None:
+    if model not in MIMO_TTS_MODELS:
+        return f"unsupported MIMO_TTS_MODEL={model!r}; choose one of {sorted(MIMO_TTS_MODELS)}"
+    return None
+
+
+def _validated_mimo_reference_audio(reference: Path) -> tuple[bytes, str]:
+    if reference.is_symlink():
+        raise TTSError("MIMO_TTS_REFERENCE_AUDIO must not be a symbolic link")
+    if reference.suffix.lower() not in {".mp3", ".wav"}:
+        raise TTSError("MIMO_TTS_REFERENCE_AUDIO must be an MP3 or WAV file")
+    try:
+        metadata = reference.stat()
+        reference_bytes = reference.read_bytes()
+    except OSError as exc:
+        raise TTSError(f"cannot read MIMO_TTS_REFERENCE_AUDIO: {exc}") from exc
+    if not S_ISREG(metadata.st_mode):
+        raise TTSError("MIMO_TTS_REFERENCE_AUDIO must be a regular file")
+    if not reference_bytes or len(reference_bytes) > 7_500_000:
+        raise TTSError("MIMO_TTS_REFERENCE_AUDIO must be non-empty and at most 7.5 MB")
+    probe = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(reference),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    try:
+        duration = float((probe.stdout or "").strip())
+    except ValueError:
+        duration = 0.0
+    if probe.returncode != 0 or duration <= 0:
+        raise TTSError("MIMO_TTS_REFERENCE_AUDIO is not decodable audio")
+    mime_type = "audio/mpeg" if reference.suffix.lower() == ".mp3" else "audio/wav"
+    return reference_bytes, mime_type
 
 
 def external_argv() -> list[str] | None:
@@ -334,7 +389,7 @@ def probe() -> dict[str, Any]:
     qwen = probe_qwen3_tts()
     higgs = probe_higgs_audio()
     backends: dict[str, bool] = {
-        "mimo": bool(mimo_api_key()),
+        "mimo": bool(mimo_api_key()) and _mimo_model_error(mimo_tts_model()) is None,
         "edge": True,
         "fish": bool(fish_api_key()),
         "minimax": bool(minimax_api_key()),
@@ -385,6 +440,7 @@ def probe() -> dict[str, Any]:
         "mimo_key_set": backends["mimo"],
         "mimo_model": mimo_tts_model() if backends["mimo"] else None,
         "mimo_voice": mimo_tts_voice() if backends["mimo"] else None,
+        "mimo_error": _mimo_model_error(mimo_tts_model()),
         "fish_voice_id": fish_voice_id(),
         "fish_model": fish_model(),
         "minimax_key_set": backends["minimax"],
@@ -592,14 +648,28 @@ def tts_mimo(
     key = mimo_api_key()
     if not key:
         raise TTSError("MIMO_API_KEY not set — create one at https://platform.xiaomimimo.com")
+    selected_model = (model or mimo_tts_model()).strip()
+    if error := _mimo_model_error(selected_model):
+        raise TTSError(error)
     voice = (voice_id or mimo_tts_voice()).strip() or "冰糖"
+    audio: dict[str, str] = {"format": "mp3"}
+    if selected_model == "mimo-v2.5-tts":
+        audio["voice"] = voice
+    elif selected_model == "mimo-v2.5-tts-voiceclone":
+        reference = mimo_tts_reference_audio()
+        if reference is None:
+            raise TTSError("MIMO_TTS_REFERENCE_AUDIO is required for MiMo voice cloning")
+        reference_bytes, mime_type = _validated_mimo_reference_audio(reference)
+        audio["voice"] = (
+            f"data:{mime_type};base64,{base64.b64encode(reference_bytes).decode('ascii')}"
+        )
     payload = {
-        "model": model or mimo_tts_model(),
+        "model": selected_model,
         "messages": [
             {"role": "user", "content": (style or mimo_tts_style()).strip()},
             {"role": "assistant", "content": text},
         ],
-        "audio": {"format": "mp3", "voice": voice},
+        "audio": audio,
     }
     req = urllib.request.Request(
         f"{mimo_api_base()}/chat/completions",
