@@ -48,8 +48,10 @@ def render_tts_events(root: Path) -> dict[str, Any]:
         validate_timeline(timeline)
     except Exception as exc:  # noqa: BLE001 - keep the renderer's public error boundary
         raise AudioTTSRenderError(f"invalid audio timeline: {exc}") from exc
-    expected_timeline_hash = manifest.get("timeline_sha256")
-    if expected_timeline_hash is not None and str(expected_timeline_hash) != timeline_hash(timeline):
+    expected_timeline_hash = str(manifest.get("timeline_sha256") or "")
+    if len(expected_timeline_hash) != 64:
+        raise AudioTTSRenderError("tts-manifest requires a 64-character timeline hash")
+    if expected_timeline_hash != timeline_hash(timeline):
         raise AudioTTSRenderError(
             "tts-manifest timeline hash does not match audio-timeline; rebuild the audio plan"
         )
@@ -136,5 +138,6 @@ def render_tts_events(root: Path) -> dict[str, Any]:
         raise AudioTTSRenderError(str(exc)) from exc
     write_json(audio_dir / "audio-timeline.json", updated)
     write_json(audio_dir / "caption-bindings.json", caption_bindings(updated))
+    manifest["timeline_sha256"] = timeline_hash(updated)
     write_json(audio_dir / "tts-manifest.json", manifest)
     return {"ok": True, "job_count": len(jobs), "actual_duration_sec": actual}

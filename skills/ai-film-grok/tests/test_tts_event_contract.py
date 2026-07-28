@@ -60,6 +60,30 @@ def test_timeline_allows_spoken_imperative_that_mentions_an_action():
     assert timeline["events"][0]["text"] == "快开门！"
 
 
+def test_timeline_allows_bracketed_dialogue_that_mentions_sound_or_subtitles():
+    timeline = compile_timeline(
+        {
+            "shots": [
+                {
+                    "id": "s1",
+                    "duration_sec": 2,
+                    "audio_cues": [
+                        {
+                            "kind": "voice",
+                            "line_type": "dialogue",
+                            "speaker": "hero",
+                            "spoken_text": "（脚步声太大了）我睡不着。",
+                            "start_offset_sec": 0,
+                            "duration_sec": 1,
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+    assert timeline["events"][0]["text"] == "（脚步声太大了）我睡不着。"
+
+
 @pytest.mark.parametrize(
     ("event", "expected"),
     [

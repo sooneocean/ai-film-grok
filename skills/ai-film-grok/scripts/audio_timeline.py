@@ -53,7 +53,13 @@ class AudioTimelineError(ValueError):
 # Only explicit bracketed production directions are rejected here; broader
 # script interpretation belongs in the authoring compiler, not the renderer.
 _STAGE_DIRECTION_RE = re.compile(
-    r"[（(【\[][^）)】\]]*(?:镜头|画面|特写|远景|脚步声|开门声|关门声|雷声|背景音(?:乐)?|音效|字幕)[^）)】\]]*[）)】\]]"
+    r"[（(【\[][^）)】\]]*(?:"
+    r"(?:镜头|画面)(?:切换|拉近|拉远|推进|转向)|"
+    r"(?:特写|远景)(?:切换|出现)|"
+    r"(?:脚步声|开门声|关门声|雷声)(?:渐近|传来|响起|渐强|渐弱)|"
+    r"(?:背景音(?:乐)?|音效)(?:响起|渐强|渐弱)|"
+    r"字幕(?:出现|显示)"
+    r")[^）)】\]]*[）)】\]]"
 )
 
 
@@ -251,6 +257,7 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
         if event_type in VOCAL_TYPES:
             if not str(event.get("speaker") or "") or not str(event.get("text") or "").strip():
                 raise AudioTimelineError(f"{prefix} vocal event needs speaker and text")
+            _validate_spoken_text(str(event["text"]), f"{prefix}.text")
             vocal.append({**event, "_start": start, "_end": start + duration})
         elif event_type == "silence":
             scope = str(event.get("silence_scope") or "bed")

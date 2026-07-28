@@ -9,7 +9,9 @@ from typing import Any
 
 ZH_POOL = ("zh-CN-XiaoxiaoNeural", "zh-CN-XiaoyiNeural", "zh-CN-YunxiNeural", "zh-CN-YunjianNeural")
 JA_POOL = ("ja-JP-NanamiNeural", "ja-JP-KeitaNeural", "ja-JP-AoiNeural", "ja-JP-DaichiNeural")
-NARRATOR_SPEAKERS = frozenset({"narrator", "storyteller", "broadcast", "announcer", "radio", "system"})
+NARRATOR_SPEAKERS = frozenset(
+    {"narrator", "storyteller", "broadcast", "announcer", "radio", "system"}
+)
 VOCAL_LANGUAGE = {"dialogue": "ja", "inner_voice": "ja", "media_voice": "ja", "narration": "zh"}
 
 
@@ -55,7 +57,12 @@ def assign_profiles(
         old = existing.get(speaker_id) if isinstance(existing.get(speaker_id), dict) else {}
         requested_language = str(item.get("language") or "").lower()
         old_language = str(old.get("language") or "").lower()
-        if bool(old.get("locked")) and requested_language and old_language and requested_language != old_language:
+        if (
+            bool(old.get("locked"))
+            and requested_language
+            and old_language
+            and requested_language != old_language
+        ):
             raise VoiceCastError(
                 f"{speaker_id} is locked to {old_language}; create a new voice profile before changing language"
             )

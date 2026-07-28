@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import audio_tts_render
-from audio_timeline import caption_bindings, compile_timeline
+from audio_timeline import caption_bindings, compile_timeline, timeline_hash
 
 
 def test_event_tts_renderer_writes_wav_and_measured_duration(tmp_path: Path, monkeypatch):
@@ -45,6 +45,7 @@ def test_event_tts_renderer_writes_wav_and_measured_duration(tmp_path: Path, mon
     (audio / "tts-manifest.json").write_text(
         json.dumps(
             {
+                "timeline_sha256": timeline_hash(timeline),
                 "jobs": [
                     {
                         "audio_event_id": event_id,
@@ -56,7 +57,7 @@ def test_event_tts_renderer_writes_wav_and_measured_duration(tmp_path: Path, mon
                         "pitch": "+0Hz",
                         "asset_path": f"audio/tts-events/{event_id}.wav",
                     }
-                ]
+                ],
             }
         ),
         encoding="utf-8",
@@ -81,7 +82,10 @@ def test_event_tts_renderer_writes_wav_and_measured_duration(tmp_path: Path, mon
     assert (tmp_path / manifest["jobs"][0]["asset_path"]).is_file()
 
 
-def test_event_tts_renderer_refuses_manifest_for_a_changed_timeline(tmp_path: Path):
+@pytest.mark.parametrize("manifest_hash", ["0" * 64, None])
+def test_event_tts_renderer_refuses_missing_or_changed_manifest_hash(
+    tmp_path: Path, manifest_hash: str | None
+):
     audio = tmp_path / "audio"
     audio.mkdir()
     timeline = compile_timeline(
@@ -89,7 +93,7 @@ def test_event_tts_renderer_refuses_manifest_for_a_changed_timeline(tmp_path: Pa
     )
     (audio / "audio-timeline.json").write_text(json.dumps(timeline), encoding="utf-8")
     (audio / "tts-manifest.json").write_text(
-        json.dumps({"timeline_sha256": "0" * 64, "jobs": []}), encoding="utf-8"
+        json.dumps({"timeline_sha256": manifest_hash, "jobs": []}), encoding="utf-8"
     )
 
     with pytest.raises(audio_tts_render.AudioTTSRenderError, match="timeline hash"):

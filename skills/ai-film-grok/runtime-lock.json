@@ -39,9 +39,9 @@
     "scripts/audio_plan.py": "eda264dc400ba6e7c0ee6c92b9ff9a06b1d003d01013c1d06e670bde13cab697",
     "scripts/audio_provenance.py": "2b8ba1aca66cb209dd7378294faf56fd4ffae6f551accdc0149626a0dc9447e5",
     "scripts/audio_recipe.py": "551542c4fae26510f77964f86178164d38ebcaf3e1b8cb031ae33e4ba5aa154c",
-    "scripts/audio_timeline.py": "ace70c0b780735735ace092f39cce3adb4f8c87191ec57f61cbed82f5f673b27",
+    "scripts/audio_timeline.py": "964532922c4311fd81a87ac7f54e11c5162e9b6d92dc12b036ce78613628fb30",
     "scripts/audio_tts_manifest.py": "d3a90f2d529e1e9190139571464f46238dc9bd34f954e0907580a14d2c47252d",
-    "scripts/audio_tts_render.py": "9cbc178585159d7f45ce9d2ce9f2822f8e89a7bbd6b2626b4f61d2a680e82c1b",
+    "scripts/audio_tts_render.py": "81bd34a0f3d3311233ce4b79ab9752430f204c5a038269292f198deb3f093aff",
     "scripts/audio_visual_alignment.py": "f4374ab9344a05d1c7760fb7b8c87418dcb7770b99df1c886629a9659dcbfcf7",
     "scripts/auto_cut.py": "186e87f796e6d33905746bc61aef0870d510fae416bdbdc04b6c7af50f7d9c4a",
     "scripts/automation_verify.py": "68e597c6f72906b4ac4b369c1789c1fa30946751b75a64736d0e27eabfc7fdb8",
@@ -220,7 +220,7 @@
     "scripts/visual_bible.py": "e4ea1357b8f842baed851e22bca9b82ae5a110382f312f1aeac31bb25f972b51",
     "scripts/vo_atempo.py": "73706c4c49ee78b86e115d94b1814c1533ed3de2e87fb8b843738ca0eb3f5207",
     "scripts/vo_lint.py": "473a31f266b1174186828eab2e80654817f901cc7c8f1322c1b37d81404cf777",
-    "scripts/voice_cast_profiles.py": "71712489d8c07ab9befe516cedff26b638aa83223b1bcf220e95e62ec09e1f51",
+    "scripts/voice_cast_profiles.py": "c0f7adea3e3161729c645d42a605567fc050864b5da9ee74618c23b28142776a",
     "scripts/voice_tracks.py": "e1966502340f87d39a55d0757b038bdca2c6992fd3c097215da7d5ab48d33724"
   },
   "requirements_sha256": "b0acb41843d88a97955a7f14a300c9f873957f3e7a6da00bc3343e178289728a"
