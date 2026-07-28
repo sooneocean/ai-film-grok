@@ -73,6 +73,43 @@ def native_stage_input_refs(root: Path | str, stage: str) -> dict[str, str]:
             refs[name] = selected
     if missing:
         raise StageGateError(f"native evidence missing for {stage}: " + ", ".join(missing))
+    if stage in {"bulk", "dailies_review", "selects_rough_cut"}:
+        if stage == "bulk":
+            manifest = read_json(base / "manifest.json") or {}
+            clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
+            selected = [
+                (str(shot_id), str(record.get("path") or ""))
+                for shot_id, record in clips.items()
+                if isinstance(record, dict) and record.get("status") == "approved"
+            ]
+        elif stage == "dailies_review":
+            ledger = read_json(base / "receipts" / "dailies.json") or {}
+            selected = [
+                (str(shot_id), str(item.get("candidate") or ""))
+                for shot_id, items in (ledger.get("shots") or {}).items()
+                for item in (items if isinstance(items, list) else [])
+                if isinstance(item, dict)
+            ]
+        else:
+            from dailies import dailies_status
+
+            selected = [
+                (str(item.get("shot_id") or ""), str(item.get("candidate") or ""))
+                for item in dailies_status(base).get("selections") or []
+            ]
+        for index, (shot_id, value) in enumerate(selected):
+            candidate = Path(value).expanduser()
+            if not candidate.is_absolute():
+                candidate = base / candidate
+            try:
+                relative = candidate.resolve().relative_to(base)
+            except ValueError as exc:
+                raise StageGateError(
+                    f"stage media must stay inside production root: {value}"
+                ) from exc
+            if not candidate.is_file():
+                raise StageGateError(f"stage media is missing: {relative}")
+            refs[f"media:{shot_id}:{index}"] = str(relative)
     return refs
 
 
@@ -80,7 +117,21 @@ def validate_native_stage_evidence(root: Path | str, stage: str) -> dict[str, st
     """Fail closed unless the stage's canonical evidence is semantically current."""
     base = Path(root).expanduser().resolve()
     refs = native_stage_input_refs(base, stage)
-    if stage == "script_lock":
+    if stage == "concept_lock":
+        from narrative_control import control_status
+
+        brief = read_json(base / refs["brief"]) or {}
+        status = control_status(base)
+        if (
+            not isinstance(brief, dict)
+            or not str(brief.get("title") or "").strip()
+            or status.get("canonical") is not True
+            or (status.get("semantic") or {}).get("ok") is not True
+        ):
+            raise ValueError(
+                "concept lock requires a titled brief and canonical semantic drama graph"
+            )
+    elif stage == "script_lock":
         from narrative_control import control_status
 
         status = control_status(base)
@@ -90,6 +141,33 @@ def validate_native_stage_evidence(root: Path | str, stage: str) -> dict[str, st
             or (status.get("projection") or {}).get("stale") is True
         ):
             raise ValueError("script lock requires current locked narrative scopes and projection")
+    elif stage == "department_look_lock":
+        style = read_json(base / refs["visual"]) or {}
+        if style.get("locked") is not True:
+            raise ValueError("department/look lock requires a locked visual bible")
+    elif stage == "shot_animatic_lock":
+        from film_spec import iter_film_spec_shots
+
+        spec = read_json(base / refs["shots"]) or {}
+        timeline = read_json(base / refs["timeline"]) or {}
+        planned = iter_film_spec_shots(spec)
+        timeline_shots = timeline.get("shots") if isinstance(timeline.get("shots"), list) else []
+        planned_ids = [str(shot.get("id") or shot.get("shot_id") or "") for shot in planned]
+        timeline_ids = [
+            str(shot.get("id") or shot.get("shot_id") or "")
+            for shot in timeline_shots
+            if isinstance(shot, dict)
+        ]
+        durations_ok = all(
+            isinstance(shot, dict)
+            and float(shot.get("duration_sec") or shot.get("duration") or 0) > 0
+            for shot in [*planned, *timeline_shots]
+        )
+        if not planned_ids or planned_ids != timeline_ids or not durations_ok:
+            raise ValueError(
+                "shot/animatic lock requires ordered shot ids and positive durations "
+                "in film-spec and timeline"
+            )
     elif stage == "pilot_approval":
         from production_gates import load_pilot_approval, pilot_is_user_approved
 
@@ -97,14 +175,13 @@ def validate_native_stage_evidence(root: Path | str, stage: str) -> dict[str, st
             raise ValueError("pilot stage requires current explicit user approval")
     elif stage == "bulk":
         from dailies import _sha
+        from film_spec import iter_film_spec_shots
 
         spec = read_json(base / "film-spec.json") or {}
         manifest = read_json(base / "manifest.json") or {}
         clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
         planned = [
-            str(shot.get("id") or shot.get("shot_id") or "")
-            for shot in (spec.get("shots") if isinstance(spec.get("shots"), list) else [])
-            if isinstance(shot, dict)
+            str(shot.get("id") or shot.get("shot_id") or "") for shot in iter_film_spec_shots(spec)
         ]
         for shot_id in planned:
             clip = clips.get(shot_id) if isinstance(clips.get(shot_id), dict) else {}
@@ -117,17 +194,28 @@ def validate_native_stage_evidence(root: Path | str, stage: str) -> dict[str, st
         if not planned:
             raise ValueError("bulk stage requires planned shots")
     elif stage == "dailies_review":
-        from dailies import dailies_status
+        from dailies import dailies_review_status
 
-        if dailies_status(base).get("ok") is not True:
+        if dailies_review_status(base).get("ok") is not True:
             raise ValueError("dailies stage requires complete canonical dailies evidence")
     elif stage == "selects_rough_cut":
+        from selects_report import build_selects_report
+
+        current_selects = build_selects_report(base, write_receipt=False)
         selects = read_json(base / "receipts" / "selects-report.json") or {}
         rough = read_json(base / refs["rough"]) or {}
-        if selects.get("complete") is not True or rough.get("ok") is not True:
+        if (
+            current_selects.get("complete") is not True
+            or current_selects.get("ok") is not True
+            or selects.get("complete") is not True
+            or rough.get("ok") is not True
+        ):
             raise ValueError("selects stage requires current selects and rough-cut receipts")
-        if selects.get("selected_set_sha256") and rough.get("selected_set_sha256") != selects.get(
-            "selected_set_sha256"
+        current_hash = current_selects.get("selected_set_sha256")
+        if (
+            not current_hash
+            or selects.get("selected_set_sha256") != current_hash
+            or rough.get("selected_set_sha256") != current_hash
         ):
             raise ValueError("rough cut is not bound to the ordered selected take set")
     elif stage == "picture_lock":
@@ -162,7 +250,12 @@ def lock_native_stage(
     from approval_ledger import append_approval
     from director_stage_gates import hash_input_refs, lock_stage, stage_status
 
-    refs = input_refs or native_stage_input_refs(root, stage)
+    native_refs = validate_native_stage_evidence(root, stage)
+    refs = dict(native_refs)
+    for name, relative in (input_refs or {}).items():
+        if name in refs and refs[name] != relative:
+            raise ValueError(f"custom input ref cannot replace native stage evidence: {name}")
+        refs[name] = relative
     hashes = hash_input_refs(root, refs)
     tx = transaction_id or f"tx-stage-{stage}-{stable_content_hash(hashes)[:16]}"
     approval = append_approval(

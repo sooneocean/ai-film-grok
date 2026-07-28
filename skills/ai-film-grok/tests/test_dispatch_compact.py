@@ -142,6 +142,20 @@ def test_full_packet_preserves_pre_compaction_golden_semantics(tmp_path: Path) -
     assert compact["hard_gate_codes"] == golden["hard_gate_codes"]
 
 
+def test_state_hash_ignores_manifest_observation_timestamp(tmp_path: Path) -> None:
+    (tmp_path / "manifest.json").write_text(
+        '{"updated_at":"2026-01-01T00:00:00Z","clips":{}}\n',
+        encoding="utf-8",
+    )
+    before = compute_state_hash(tmp_path)
+    (tmp_path / "manifest.json").write_text(
+        '{"updated_at":"2026-01-02T00:00:00Z","clips":{}}\n',
+        encoding="utf-8",
+    )
+
+    assert compute_state_hash(tmp_path) == before
+
+
 def test_state_hash_ignores_dispatch_telemetry_but_tracks_control_inputs(
     tmp_path: Path,
 ) -> None:
@@ -157,6 +171,21 @@ def test_state_hash_ignores_dispatch_telemetry_but_tracks_control_inputs(
     )
     assert compute_state_hash(tmp_path) == first
     (tmp_path / "film-spec.json").write_text('{"title":"changed"}\n', encoding="utf-8")
+    assert compute_state_hash(tmp_path) != first
+
+
+def test_state_hash_tracks_only_manifest_referenced_media(tmp_path: Path) -> None:
+    clip = tmp_path / "clips" / "s001.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"v1")
+    (tmp_path / "manifest.json").write_text(
+        '{"clips":{"s001":{"status":"approved","path":"clips/s001.mp4"}}}\n',
+        encoding="utf-8",
+    )
+    first = compute_state_hash(tmp_path)
+
+    clip.write_bytes(b"v2")
+
     assert compute_state_hash(tmp_path) != first
 
 

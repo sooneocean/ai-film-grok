@@ -11,21 +11,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from director_stage_gates import STAGE_ORDER
+from production_book import RIGOR_LEVELS
 from util import read_json
-
-STAGE_ORDER: tuple[str, ...] = (
-    "concept_lock",
-    "script_lock",
-    "department_look_lock",
-    "shot_animatic_lock",
-    "pilot_approval",
-    "bulk",
-    "dailies_review",
-    "selects_rough_cut",
-    "picture_lock",
-    "post_locks",
-    "master_lock",
-)
 
 STAGE_LABELS_ZH: dict[str, str] = {
     "concept_lock": "概念锁",
@@ -131,7 +119,7 @@ def _mode(root: Path) -> tuple[str, str | None]:
     if not isinstance(book, dict):
         return "legacy", None
     rigor = str(book.get("rigor") or "legacy")
-    return rigor if rigor in {"legacy", "guided", "professional"} else "legacy", rigor
+    return rigor if rigor in RIGOR_LEVELS else "legacy", rigor
 
 
 def _pilot_user_approved(root: Path) -> bool:
@@ -144,11 +132,26 @@ def _pilot_user_approved(root: Path) -> bool:
 
 
 def _selects_current(root: Path) -> bool:
-    receipt = read_json(root / "receipts" / "selects-report.json") or {}
-    return bool(receipt.get("complete") and receipt.get("ok"))
+    from selects_report import build_selects_report
+
+    report = build_selects_report(root, write_receipt=False)
+    return bool(report.get("complete") and report.get("ok"))
 
 
-def _rough_current(root: Path, manifest: dict[str, Any]) -> bool:
+def _rough_current(root: Path, manifest: dict[str, Any], *, professional: bool) -> bool:
+    if professional:
+        from editor_cut import build_editor_cut_report
+        from selects_report import build_selects_report
+
+        selects = build_selects_report(root, write_receipt=False)
+        rough = read_json(root / "receipts" / "rough-cut.json") or {}
+        if rough.get("ok") is True:
+            return bool(
+                selects.get("complete")
+                and rough.get("selected_set_sha256")
+                and rough.get("selected_set_sha256") == selects.get("selected_set_sha256")
+            )
+        return bool(build_editor_cut_report(root, write=False).get("ok"))
     if _present(root / "receipts" / "rough-cut.json"):
         return True
     editor_cut = read_json(root / "receipts" / "editor-cut.json") or {}
@@ -231,8 +234,13 @@ def build_workflow_status(
     )
     pilot_ok = bool(shot_ok and _pilot_user_approved(base))
     bulk_ok = bool(pilot_ok and gates.get("clips_complete"))
-    dailies_ok = bool(bulk_ok and _selects_current(base))
-    rough_ok = bool(dailies_ok and _rough_current(base, manifest))
+    from dailies import dailies_review_status
+
+    dailies_ok = bool(bulk_ok and dailies_review_status(base).get("ok"))
+    selects_ok = bool(dailies_ok and _selects_current(base))
+    rough_ok = bool(
+        selects_ok and _rough_current(base, manifest, professional=mode == "professional")
+    )
     picture_ok = bool(rough_ok and _review_stage_approved(base, "preview"))
     post_ok = bool(
         picture_ok
@@ -273,7 +281,7 @@ def build_workflow_status(
             "next_stage": None,
         }
 
-    if mode == "legacy":
+    if mode != "professional":
         checks = dict(readiness)
         current = next((stage for stage in STAGE_ORDER if not checks[stage]), "complete")
         completed = [stage for stage in STAGE_ORDER if checks[stage]]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shlex
 import sys
 from argparse import Namespace
@@ -23,6 +24,42 @@ from workflow_spine import (  # noqa: E402
     build_workflow_status,
     professional_stage_actions,
 )
+
+EXPECTED_PROFESSIONAL_STAGES = (
+    "concept_lock",
+    "script_lock",
+    "department_look_lock",
+    "shot_animatic_lock",
+    "pilot_approval",
+    "bulk",
+    "dailies_review",
+    "selects_rough_cut",
+    "picture_lock",
+    "post_locks",
+    "master_lock",
+)
+
+
+def _write_concept_evidence(root: Path) -> None:
+    (root / "brief.json").write_text('{"title":"t"}\n', encoding="utf-8")
+    (root / "drama-graph.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "story": {
+                    "premise": "p",
+                    "logline": "l",
+                    "protagonist_goal": "g",
+                    "opposition": "o",
+                    "stakes": "s",
+                    "climax_choice": "c",
+                    "ending_hook": "e",
+                    "emotional_arc": ["a", "b", "c"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def _lock(root: Path, stage: str) -> None:
@@ -90,6 +127,32 @@ def test_init_force_refuses_to_silently_upgrade_legacy_root(tmp_path: Path) -> N
     assert not (root / "production-book.json").exists()
 
 
+def test_new_root_init_does_not_publish_partial_project_on_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "film"
+
+    def fail_book(*_args, **_kwargs):
+        raise RuntimeError("injected production-book failure")
+
+    monkeypatch.setattr("production_book.init_production_book", fail_book)
+
+    with pytest.raises(RuntimeError, match="injected production-book failure"):
+        cmd_init(
+            Namespace(
+                title="雨夜",
+                theme="原子初始化",
+                aspect="9:16",
+                root=str(root),
+                force=False,
+            )
+        )
+
+    assert not root.exists()
+    assert not list(tmp_path.glob(".film.aifilm-init-*"))
+
+
 def test_professional_spine_never_advances_from_native_evidence_without_stage_lock(
     tmp_path: Path,
 ) -> None:
@@ -108,7 +171,9 @@ def test_professional_spine_never_advances_from_native_evidence_without_stage_lo
         narrative=narrative,
     )
 
-    assert status["stage_order"] == list(STAGE_ORDER)
+    assert STAGE_ORDER == EXPECTED_PROFESSIONAL_STAGES
+    assert status["stage_order"] == list(EXPECTED_PROFESSIONAL_STAGES)
+    assert status["stage_total"] == 11
     assert status["current_stage"] == "concept_lock"
     assert status["completed"] == []
     assert status["readiness"]["shot_animatic_lock"] is True
@@ -118,8 +183,7 @@ def test_professional_spine_never_advances_from_native_evidence_without_stage_lo
 
 def test_professional_spine_uses_director_stage_gate_next_stage(tmp_path: Path) -> None:
     init_production_book(tmp_path, rigor="professional")
-    (tmp_path / "brief.json").write_text('{"title":"t"}\n', encoding="utf-8")
-    (tmp_path / "drama-graph.json").write_text('{"schema_version":1}\n', encoding="utf-8")
+    _write_concept_evidence(tmp_path)
     lock_native_stage(
         tmp_path,
         stage="concept_lock",
@@ -136,11 +200,7 @@ def test_professional_spine_uses_director_stage_gate_next_stage(tmp_path: Path) 
 
 def test_native_stage_lock_routes_professional_workflow_forward(tmp_path: Path) -> None:
     init_production_book(tmp_path, rigor="professional")
-    (tmp_path / "brief.json").write_text('{"title":"t"}\n', encoding="utf-8")
-    (tmp_path / "drama-graph.json").write_text(
-        '{"schema_version":1,"title":"t"}\n',
-        encoding="utf-8",
-    )
+    _write_concept_evidence(tmp_path)
 
     report = lock_native_stage(
         tmp_path,
@@ -159,8 +219,7 @@ def test_native_stage_lock_routes_professional_workflow_forward(tmp_path: Path) 
 
 def test_review_ui_approval_writes_professional_stage_lock(tmp_path: Path) -> None:
     init_production_book(tmp_path, rigor="professional")
-    (tmp_path / "brief.json").write_text('{"title":"t"}\n', encoding="utf-8")
-    (tmp_path / "drama-graph.json").write_text('{"schema_version":1}\n', encoding="utf-8")
+    _write_concept_evidence(tmp_path)
     queue = review_queue(tmp_path)
 
     assert queue["items"][0]["id"] == "director:concept_lock"

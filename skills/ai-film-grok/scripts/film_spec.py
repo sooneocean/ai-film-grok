@@ -206,6 +206,23 @@ class FilmSpecError(ValueError):
     pass
 
 
+def iter_film_spec_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return shots from the canonical nested schema or the legacy flat projection."""
+    flat = spec.get("shots")
+    if isinstance(flat, list):
+        return [shot for shot in flat if isinstance(shot, dict)]
+    scenes = spec.get("scenes")
+    if not isinstance(scenes, list):
+        return []
+    return [
+        shot
+        for scene in scenes
+        if isinstance(scene, dict)
+        for shot in (scene.get("shots") if isinstance(scene.get("shots"), list) else [])
+        if isinstance(shot, dict)
+    ]
+
+
 def _required_text(value: object, *, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise FilmSpecError(f"film-spec requires non-empty {field}")
