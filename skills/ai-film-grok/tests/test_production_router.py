@@ -15,6 +15,7 @@ from production_router import (  # noqa: E402
     RouteExplainError,
     explain_route,
     plan_route,
+    preflight_route_plan,
 )
 
 NOW = "2026-07-28T12:00:00+00:00"
@@ -747,3 +748,69 @@ def test_cli_route_plan_write_is_explicit(
     assert code == 0
     assert output["written"] is True
     assert output["execution_plan"]["authorized"] is False
+
+
+def test_route_preflight_is_read_only_and_ready_for_human_authorization(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
+    capability = _capability(
+        "local",
+        provider="comfy-wan22",
+        model="wan22-i2v",
+        operations=["image_to_video"],
+        shot_roles=["hero"],
+        content_classes=["general", "restricted_local"],
+    )
+    capability["cost_state"] = "free_local"
+    _write_capabilities(tmp_path, [capability])
+    planned = plan_route(tmp_path, shot_id="shot01", now=NOW, write=True)
+    before = {
+        str(path.relative_to(tmp_path)): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+
+    report = preflight_route_plan(
+        tmp_path,
+        route_plan_path=Path(planned["receipts"]["route_plan"]),
+        execution_plan_path=Path(planned["receipts"]["execution_plan"]),
+        now=NOW,
+    )
+
+    after = {
+        str(path.relative_to(tmp_path)): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+    assert report["ok"] is True
+    assert report["read_only"] is True
+    assert report["authorized"] is False
+    assert report["ready_for_human_authorization"] is True
+    assert before == after
+
+
+def test_route_preflight_blocks_unknown_cost(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "local",
+                provider="comfy-wan22",
+                model="wan22-i2v",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                content_classes=["general", "restricted_local"],
+            )
+        ],
+    )
+    planned = plan_route(tmp_path, shot_id="shot01", now=NOW, write=True)
+
+    report = preflight_route_plan(
+        tmp_path,
+        route_plan_path=Path(planned["receipts"]["route_plan"]),
+        execution_plan_path=Path(planned["receipts"]["execution_plan"]),
+        now=NOW,
+    )
+
+    assert report["ok"] is False
+    assert "COST_STATE_UNKNOWN" in report["blockers"]

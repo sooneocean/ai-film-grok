@@ -436,3 +436,123 @@ def plan_route(
         }
     )
     return report
+
+
+def preflight_route_plan(
+    root: Path | str,
+    *,
+    route_plan_path: Path | str,
+    execution_plan_path: Path | str,
+    now: str | None = None,
+) -> dict[str, Any]:
+    """Read current evidence before a human may authorize a planned route."""
+    base = Path(root).expanduser().resolve()
+    route_path = Path(route_plan_path).expanduser().resolve()
+    execution_path = Path(execution_plan_path).expanduser().resolve()
+    route_plan = read_json(route_path)
+    execution_plan = read_json(execution_path)
+    blockers: list[str] = []
+    if not isinstance(route_plan, dict):
+        blockers.append("ROUTE_PLAN_MISSING")
+        route_plan = {}
+    else:
+        try:
+            _validate_contract(
+                route_plan, "route-plan.schema.json", error_code="INVALID_ROUTE_PLAN"
+            )
+        except RouteExplainError:
+            blockers.append("ROUTE_PLAN_INVALID")
+    if not isinstance(execution_plan, dict):
+        blockers.append("EXECUTION_PLAN_MISSING")
+        execution_plan = {}
+    else:
+        try:
+            _validate_contract(
+                execution_plan, "execution-plan.schema.json", error_code="INVALID_EXECUTION_PLAN"
+            )
+        except RouteExplainError:
+            blockers.append("EXECUTION_PLAN_INVALID")
+
+    if not blockers:
+        if execution_plan.get("route_plan_sha256") != sha256_file(route_path):
+            blockers.append("ROUTE_PLAN_HASH_MISMATCH")
+        if execution_plan.get("authorized") is not False:
+            blockers.append("EXECUTION_ALREADY_AUTHORIZED")
+        tasks = execution_plan.get("tasks") or []
+        if not tasks or any(
+            task.get("status") != "planned" for task in tasks if isinstance(task, dict)
+        ):
+            blockers.append("EXECUTION_NOT_PLANNED")
+        film_source = (
+            route_plan.get("film_spec") if isinstance(route_plan.get("film_spec"), dict) else {}
+        )
+        snapshot_source = (
+            route_plan.get("capability_snapshot")
+            if isinstance(route_plan.get("capability_snapshot"), dict)
+            else {}
+        )
+        film_path = Path(str(film_source.get("path") or "")).expanduser()
+        snapshot_path = Path(str(snapshot_source.get("path") or "")).expanduser()
+        if not film_path.is_file() or film_source.get("sha256") != sha256_file(film_path):
+            blockers.append("FILM_SPEC_CHANGED")
+        if not snapshot_path.is_file() or snapshot_source.get("sha256") != sha256_file(
+            snapshot_path
+        ):
+            blockers.append("CAPABILITY_SNAPSHOT_CHANGED")
+        if not blockers:
+            intent = route_plan["intent"]
+            current = explain_route(
+                base,
+                shot_id=str(intent["shot_id"]),
+                capabilities_path=snapshot_path,
+                quality_tier=str(intent["quality_tier"]),
+                now=now,
+            )
+            selected = route_plan.get("selected") or {}
+            latest = current.get("selected") or {}
+            if current.get("ok") is not True or latest.get("capability_id") != selected.get(
+                "capability_id"
+            ):
+                blockers.append("ROUTE_NO_LONGER_CURRENT")
+            snapshot = read_json(snapshot_path) or {}
+            capability = next(
+                (
+                    item
+                    for item in snapshot.get("capabilities") or []
+                    if isinstance(item, dict) and item.get("id") == selected.get("capability_id")
+                ),
+                {},
+            )
+            if capability.get("cost_state") not in {"known", "free_local"}:
+                blockers.append("COST_STATE_UNKNOWN")
+            queue = read_json(base / "receipts" / "media-queue.json") or {}
+            jobs = queue.get("jobs") if isinstance(queue.get("jobs"), list) else []
+            budget = int((queue.get("policy") or {}).get("budget_units") or 20)
+            if len(jobs) >= budget:
+                blockers.append("QUEUE_BUDGET_EXHAUSTED")
+            try:
+                from production_gates import assert_pilot_allows_add
+
+                assert_pilot_allows_add(
+                    base,
+                    shot_id=str(intent["shot_id"]),
+                    existing_shot_ids={
+                        str(item.get("shot_id")) for item in jobs if isinstance(item, dict)
+                    },
+                )
+            except Exception:
+                blockers.append("PILOT_GATE_BLOCKED")
+    blockers = sorted(set(blockers))
+    return {
+        "schema_version": 1,
+        "kind": "ai-film-route-preflight",
+        "ok": not blockers,
+        "read_only": True,
+        "auto_execute": False,
+        "authorized": False,
+        "requires_human_authorization": True,
+        "ready_for_human_authorization": not blockers,
+        "route_plan": str(route_path),
+        "execution_plan": str(execution_path),
+        "blockers": blockers,
+    }

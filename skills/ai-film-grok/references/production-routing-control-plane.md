@@ -61,6 +61,19 @@ hash 命名的收据；execution plan 绑定 route plan 的文件 SHA-256。无�
 
 后续真正的授权步骤必须重新验证当前能力、审批和预算，不能把这份 planned 收据当成授权凭证。
 
+在请求人类授权前，使用只读门禁复查 route/execution hash、film-spec 与 capability snapshot 是否漂移、
+pilot 窗口、队列容量与成本状态：
+
+```bash
+"$AIFILM" route preflight \
+  --root "<film-root>" \
+  --route-plan "<route-plan-receipt.json>" \
+  --execution-plan "<execution-plan-receipt.json>"
+```
+
+即使 `ready_for_human_authorization=true`，它仍不会签发授权或提交生成；`cost_state=unknown`
+会以 `COST_STATE_UNKNOWN` 阻断。
+
 ## 当前边界
 
 - 本增量不生成 capability snapshot；快照必须来自后续的无费用探针聚合器或人工导入。

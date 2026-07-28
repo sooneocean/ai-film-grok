@@ -50,6 +50,15 @@ def add_route_parsers(subparsers: Any) -> None:
         action="store_true",
         help="Write local planned receipts only; never authorizes or submits a provider request",
     )
+    preflight = actions.add_parser(
+        "preflight",
+        help="Read current route, pilot, capacity, and cost evidence before human authorization",
+    )
+    preflight.add_argument("--root", required=True)
+    preflight.add_argument("--route-plan", required=True)
+    preflight.add_argument("--execution-plan", required=True)
+    preflight.add_argument("--now", default=None)
+    preflight.set_defaults(no_write=True)
 
 
 def _routing_kwargs(args: Any) -> dict[str, Any]:
@@ -63,11 +72,18 @@ def _routing_kwargs(args: Any) -> dict[str, Any]:
 
 
 def run(args: Any) -> tuple[dict[str, Any], int]:
-    from production_router import explain_route, plan_route
+    from production_router import explain_route, plan_route, preflight_route_plan
 
     root = Path(args.root)
     if args.route_action == "plan":
         report = plan_route(root, write=bool(args.write), **_routing_kwargs(args))
+    elif args.route_action == "preflight":
+        report = preflight_route_plan(
+            root,
+            route_plan_path=Path(args.route_plan),
+            execution_plan_path=Path(args.execution_plan),
+            now=args.now,
+        )
     else:
         report = explain_route(root, **_routing_kwargs(args))
     return report, 0 if report.get("ok") else 2
