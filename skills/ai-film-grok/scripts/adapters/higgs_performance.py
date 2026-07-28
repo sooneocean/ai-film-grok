@@ -31,10 +31,12 @@ def _max_new_tokens(duration: float) -> int:
 
 def _system_prompt(cue: str) -> str:
     return (
-        "Generate a single adult non-verbal performance recorded in a quiet room. "
+        "Generate audio following instruction.\n\n"
+        "<|scene_desc_start|>\n"
+        "A single adult non-verbal performance is recorded in a quiet room. "
         "No intelligible words, no dialogue, no singing, no music, and no background effects. "
-        "The performance cue is:\n"
-        f"{cue}"
+        f"Performance cue: {cue}\n"
+        "<|scene_desc_end|>"
     )
 
 
