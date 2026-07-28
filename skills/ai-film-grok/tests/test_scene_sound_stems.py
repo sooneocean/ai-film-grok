@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 import sys
 import wave
@@ -10,6 +11,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+from audio_timeline import compile_timeline
+from scene_sound import reconcile
 from scene_sound_stems import _apply_event_controls, render_scene_sound_stem
 
 
@@ -138,3 +141,75 @@ def test_rendered_scene_stem_survives_a_real_mp4_audio_mix(tmp_path: Path):
         check=True,
     )
     assert np.max(np.abs(np.frombuffer(decoded.stdout, dtype=np.float32))) > 0.01
+
+
+def test_walk_open_door_and_ambience_complete_the_local_scene_sound_loop(tmp_path: Path):
+    asset = tmp_path / "assets" / "room-tone.wav"
+    asset.parent.mkdir()
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            str(asset),
+        ],
+        check=True,
+    )
+    checksum = hashlib.sha256(asset.read_bytes()).hexdigest()
+    spec = {
+        "shots": [
+            {
+                "id": "s1",
+                "duration_sec": 1,
+                "action": "她走到门边，推门进入。",
+                "floor_material": "wood",
+                "door_material": "wood",
+                "audio_cues": [
+                    {
+                        "kind": "ambience",
+                        "source": "local:assets/room-tone.wav",
+                        "source_sha256": checksum,
+                        "license": "test-local",
+                        "start_offset_sec": 0,
+                        "duration_sec": 1,
+                    },
+                    {
+                        "kind": "foley",
+                        "asset_hint": "footsteps",
+                        "material": "wood",
+                        "source": "local:assets/room-tone.wav",
+                        "source_sha256": checksum,
+                        "license": "test-local",
+                        "start_offset_sec": 0.1,
+                        "duration_sec": 0.1,
+                    },
+                    {
+                        "kind": "foley",
+                        "asset_hint": "door_open",
+                        "material": "wood",
+                        "source": "local:assets/room-tone.wav",
+                        "source_sha256": checksum,
+                        "license": "test-local",
+                        "start_offset_sec": 0.5,
+                        "duration_sec": 0.1,
+                    },
+                ],
+            }
+        ]
+    }
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+    assert reconcile(tmp_path, write=False)["status"] == "ok"
+    result = render_scene_sound_stem(
+        tmp_path,
+        compile_timeline(spec),
+        duration_sec=1,
+        out=tmp_path / "audio" / "scene.wav",
+        sample_rate=48000,
+    )
+    assert result["event_count"] == 3
+    assert Path(result["path"]).is_file()

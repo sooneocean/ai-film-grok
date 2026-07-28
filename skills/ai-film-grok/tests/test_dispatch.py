@@ -15,6 +15,22 @@ sys.path.insert(0, str(SCRIPTS))
 from dispatch import build_dispatch  # noqa: E402
 
 
+def test_dispatch_surfaces_scene_sound_backlog(tmp_path: Path) -> None:
+    (tmp_path / "brief.json").write_text('{"title":"t","theme":"x"}\n', encoding="utf-8")
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "title": "t",
+                "shots": [{"id": "shot01", "action": "她走到门边，推门进入。"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    packet = build_dispatch(tmp_path, gates={}, include_capability=False, write_receipt=False)
+    assert packet["scene_sound"]["status"] == "blocked"
+    assert any(action["id"] == "scene-sound-plan" for action in packet["next_actions"])
+
+
 @pytest.mark.slow
 class DispatchTests(unittest.TestCase):
     @pytest.mark.slow
