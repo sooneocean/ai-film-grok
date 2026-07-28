@@ -146,6 +146,23 @@ class MediaQATests(unittest.TestCase):
         self.assertTrue(with_audio["ok"], json.dumps(with_audio, indent=2))
 
     @pytest.mark.slow
+    def test_video_contract_gate_rejects_small_geometry_and_wrong_fps(self) -> None:
+        qa = analyze_media(
+            self.motion,
+            require_audio=False,
+            require_motion=True,
+            min_width=704,
+            min_height=1280,
+            expected_fps=30,
+        )
+        self.assertFalse(qa["ok"])
+        self.assertEqual(qa["width"], 160)
+        self.assertEqual(qa["height"], 90)
+        self.assertAlmostEqual(qa["fps"], 24.0, places=2)
+        self.assertTrue(any("minimum" in error for error in qa["errors"]))
+        self.assertTrue(any("fps" in error for error in qa["errors"]))
+
+    @pytest.mark.slow
     def test_clip_approval_requires_endpoint_manual_identity_and_technical_motion(self) -> None:
         qa = analyze_media(self.motion, require_audio=False, require_motion=True)
         valid = {

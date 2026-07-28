@@ -187,6 +187,9 @@ def analyze_media(
     *,
     require_audio: bool,
     require_motion: bool,
+    min_width: int | None = None,
+    min_height: int | None = None,
+    expected_fps: float | None = None,
 ) -> dict[str, Any]:
     source = Path(path).expanduser().resolve()
     errors: list[str] = []
@@ -209,6 +212,15 @@ def analyze_media(
         duration = 0.0
     if not video_stream:
         errors.append("video stream is missing")
+    width = int(video_stream.get("width") or 0) if video_stream else 0
+    height = int(video_stream.get("height") or 0) if video_stream else 0
+    fps = _rate(video_stream.get("avg_frame_rate")) if video_stream else 0.0
+    if min_width is not None and width < int(min_width):
+        errors.append(f"video width {width} is below required minimum {int(min_width)}")
+    if min_height is not None and height < int(min_height):
+        errors.append(f"video height {height} is below required minimum {int(min_height)}")
+    if expected_fps is not None and abs(fps - float(expected_fps)) > 0.05:
+        errors.append(f"video fps {fps:.3f} does not match required {float(expected_fps):.3f}")
     if duration < 0.5:
         errors.append("duration is shorter than 0.5 seconds")
     if require_audio and not has_audio:
@@ -269,8 +281,12 @@ def analyze_media(
         "motion_ok": motion_ok,
         "has_audio": has_audio,
         "video_codec": video_stream.get("codec_name") if video_stream else None,
-        "width": video_stream.get("width") if video_stream else None,
-        "height": video_stream.get("height") if video_stream else None,
+        "width": width or None,
+        "height": height or None,
+        "fps": round(fps, 6),
+        "min_width": min_width,
+        "min_height": min_height,
+        "expected_fps": expected_fps,
         "errors": errors,
     }
 
