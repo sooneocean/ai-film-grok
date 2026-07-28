@@ -30,6 +30,22 @@ def _probe(path: Path) -> dict[str, Any]:
     return {"ok": bool(audio), "audio_streams": audio}
 
 
+def _verify_rendered_tts_asset(root: Path, job: dict[str, Any]) -> str | None:
+    relative = Path(str(job.get("asset_path") or ""))
+    if not str(relative) or relative.is_absolute() or ".." in relative.parts:
+        return "rendered TTS asset path is missing or unsafe"
+    asset = (root / relative).resolve()
+    try:
+        asset.relative_to(root)
+    except ValueError:
+        return "rendered TTS asset escapes film root"
+    if not asset.is_file():
+        return "rendered TTS asset is missing"
+    if str(job.get("asset_sha256") or "") != _sha256(asset):
+        return "rendered TTS asset checksum changed"
+    return None
+
+
 def build_delivery_report(
     *,
     timeline: dict[str, Any],
@@ -37,6 +53,7 @@ def build_delivery_report(
     subtitle_bindings: list[dict[str, Any]],
     final_mp4: Path | None = None,
     previous_report: dict[str, Any] | None = None,
+    root: Path | None = None,
 ) -> dict[str, Any]:
     """Return auditable evidence; callers must treat ``ok=false`` as a hard failure."""
     errors: list[str] = []
@@ -73,6 +90,13 @@ def build_delivery_report(
             continue
         if job.get("status") not in {"ready", "rendered"}:
             errors.append(f"{job.get('audio_event_id')}: TTS asset is not ready")
+        elif job.get("status") == "rendered":
+            if root is None:
+                errors.append(f"{job.get('audio_event_id')}: rendered TTS requires film root")
+            else:
+                error = _verify_rendered_tts_asset(root, job)
+                if error:
+                    errors.append(f"{job.get('audio_event_id')}: {error}")
     probe: dict[str, Any] | None = None
     if final_mp4 is not None:
         if not final_mp4.is_file():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from hashlib import sha256
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -84,3 +85,37 @@ def test_delivery_gate_marks_existing_delivery_stale_when_timeline_changes():
     assert report["ok"] is False
     assert report["stale"] is True
     assert report["stale_reason"] == "audio_timeline_changed"
+
+
+def test_delivery_gate_requires_checksum_bound_rendered_tts_asset(tmp_path: Path):
+    timeline = _timeline()
+    asset = tmp_path / "audio" / "tts" / "line.wav"
+    asset.parent.mkdir(parents=True)
+    asset.write_bytes(b"rendered tts")
+    manifest = {
+        "jobs": [
+            {
+                "audio_event_id": timeline["events"][0]["id"],
+                "request_sha256": "x",
+                "status": "rendered",
+                "asset_path": "audio/tts/line.wav",
+                "asset_sha256": sha256(asset.read_bytes()).hexdigest(),
+            }
+        ]
+    }
+    report = build_delivery_report(
+        timeline=timeline,
+        tts_manifest=manifest,
+        subtitle_bindings=caption_bindings(timeline),
+        root=tmp_path,
+    )
+    assert report["ok"] is True
+    asset.write_bytes(b"tampered")
+    report = build_delivery_report(
+        timeline=timeline,
+        tts_manifest=manifest,
+        subtitle_bindings=caption_bindings(timeline),
+        root=tmp_path,
+    )
+    assert report["ok"] is False
+    assert any("checksum changed" in error for error in report["errors"])

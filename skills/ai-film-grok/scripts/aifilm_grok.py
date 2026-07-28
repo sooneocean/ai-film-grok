@@ -5467,6 +5467,7 @@ def cmd_audio_verify(args: argparse.Namespace) -> int:
         subtitle_bindings=bindings,
         final_mp4=final_path,
         previous_report=previous_report if isinstance(previous_report, dict) else None,
+        root=root,
     )
     write_json(out, report)
     emit({**report, "path": str(out)})
@@ -5496,6 +5497,57 @@ def cmd_audio_tts_render(args: argparse.Namespace) -> int:
         emit(render_tts_events(Path(args.root)))
     except AudioTTSRenderError as exc:
         raise FilmError(str(exc)) from exc
+    return 0
+
+
+def cmd_audio_event(args: argparse.Namespace) -> int:
+    from audio_event_editor import AudioEventEditError, edit_event
+    from util import read_json, write_json
+
+    root = Path(args.root).expanduser().resolve()
+    audio_dir = root / "audio"
+    timeline = read_json(audio_dir / "audio-timeline.json")
+    if not isinstance(timeline, dict):
+        raise FilmError("audio-event requires audio/audio-timeline.json")
+    updates = {
+        key: value
+        for key, value in {
+            "gain": args.gain,
+            "pan": args.pan,
+            "fade_in_sec": args.fade_in,
+            "fade_out_sec": args.fade_out,
+            "muted": args.muted,
+            "locked": args.locked,
+            "overlap_policy": args.overlap_policy,
+            "text": args.text,
+            "caption_text": args.caption_text,
+        }.items()
+        if value is not None
+    }
+    if args.performance_json is not None:
+        try:
+            updates["performance_cue"] = json.loads(args.performance_json)
+        except json.JSONDecodeError as exc:
+            raise FilmError("--performance-json must be valid JSON") from exc
+    if not updates:
+        raise FilmError("audio-event needs at least one control update")
+    manifest_path = audio_dir / "tts-manifest.json"
+    manifest = read_json(manifest_path) if manifest_path.is_file() else None
+    try:
+        edited, updated_manifest, bindings = edit_event(
+            timeline,
+            args.event,
+            updates,
+            force_locked=bool(args.force_locked),
+            tts_manifest=manifest,
+        )
+    except AudioEventEditError as exc:
+        raise FilmError(str(exc)) from exc
+    write_json(audio_dir / "audio-timeline.json", edited)
+    write_json(audio_dir / "caption-bindings.json", bindings)
+    if updated_manifest is not None:
+        write_json(manifest_path, updated_manifest)
+    emit({"ok": True, "audio_event_id": args.event, "updates": updates})
     return 0
 
 
@@ -5892,6 +5944,21 @@ def build_parser() -> argparse.ArgumentParser:
         "audio-tts-render", help="Render each event TTS asset and write actual durations"
     )
     atr.add_argument("--root", required=True)
+
+    ae = sub.add_parser("audio-event", help="Edit one auditable audio-timeline event")
+    ae.add_argument("--root", required=True)
+    ae.add_argument("--event", required=True)
+    ae.add_argument("--gain", type=float, default=None)
+    ae.add_argument("--pan", type=float, default=None)
+    ae.add_argument("--fade-in", type=float, default=None)
+    ae.add_argument("--fade-out", type=float, default=None)
+    ae.add_argument("--muted", action=argparse.BooleanOptionalAction, default=None)
+    ae.add_argument("--locked", action=argparse.BooleanOptionalAction, default=None)
+    ae.add_argument("--overlap-policy", choices=("interrupt", "cross_talk"), default=None)
+    ae.add_argument("--text", default=None)
+    ae.add_argument("--caption-text", default=None)
+    ae.add_argument("--performance-json", default=None)
+    ae.add_argument("--force-locked", action="store_true")
 
     lsc = sub.add_parser(
         "lipsync-canary",
@@ -7459,6 +7526,7 @@ def main(argv: list[str] | None = None) -> int:
             "audio-verify": cmd_audio_verify,
             "verify": cmd_verify,
             "audio-tts-render": cmd_audio_tts_render,
+            "audio-event": cmd_audio_event,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,
