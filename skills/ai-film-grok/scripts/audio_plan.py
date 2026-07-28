@@ -57,18 +57,19 @@ def build_audio_plan(
         if write_voice_cast:
             import json
 
-            from voice_cast_profiles import VOCAL_LANGUAGE, assign_profiles
+            from audio_timeline import VOCAL_TYPES
+            from voice_cast_profiles import assign_profiles, event_language
 
             old_path = root / "audio" / "voice-cast.json"
             old = read_json(old_path) if old_path.is_file() else {}
             old_profiles = old.get("profiles") if isinstance(old, dict) else {}
             speakers: dict[str, dict[str, str]] = {}
             for event in timeline["events"]:
-                if event.get("type") in VOCAL_LANGUAGE and event.get("speaker"):
+                if event.get("type") in VOCAL_TYPES and event.get("speaker"):
                     sid = str(event["speaker"])
                     speakers.setdefault(
                         sid,
-                        {"speaker_id": sid, "language": VOCAL_LANGUAGE[str(event["type"])]},
+                        {"speaker_id": sid, "language": event_language(event)},
                     )
             voice_cast = {
                 "schema_version": 1,
@@ -82,17 +83,18 @@ def build_audio_plan(
         if write_tts_manifest:
             import json
 
+            from audio_timeline import VOCAL_TYPES
             from audio_tts_manifest import build_tts_manifest
-            from voice_cast_profiles import VOCAL_LANGUAGE, assign_profiles
+            from voice_cast_profiles import assign_profiles, event_language
 
             if voice_cast is None:
                 speakers = {
                     str(event["speaker"]): {
                         "speaker_id": str(event["speaker"]),
-                        "language": VOCAL_LANGUAGE[str(event["type"])],
+                        "language": event_language(event),
                     }
                     for event in timeline["events"]
-                    if event.get("type") in VOCAL_LANGUAGE and event.get("speaker")
+                    if event.get("type") in VOCAL_TYPES and event.get("speaker")
                 }
                 voice_cast = {"profiles": assign_profiles(list(speakers.values()))}
             tts_manifest = build_tts_manifest(timeline, voice_cast)

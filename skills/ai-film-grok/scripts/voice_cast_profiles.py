@@ -9,11 +9,28 @@ from typing import Any
 
 ZH_POOL = ("zh-CN-XiaoxiaoNeural", "zh-CN-XiaoyiNeural", "zh-CN-YunxiNeural", "zh-CN-YunjianNeural")
 JA_POOL = ("ja-JP-NanamiNeural", "ja-JP-KeitaNeural", "ja-JP-AoiNeural", "ja-JP-DaichiNeural")
-VOCAL_LANGUAGE = {"dialogue": "ja", "inner_voice": "zh", "media_voice": "zh", "narration": "zh"}
+NARRATOR_SPEAKERS = frozenset({"narrator", "storyteller", "broadcast", "announcer", "radio", "system"})
+VOCAL_LANGUAGE = {"dialogue": "ja", "inner_voice": "ja", "media_voice": "ja", "narration": "zh"}
 
 
 class VoiceCastError(ValueError):
     pass
+
+
+def event_language(event: dict[str, Any]) -> str:
+    """Resolve language by speaker identity, not a phone/inner-voice effect.
+
+    Narration remains Chinese.  A named character keeps Japanese dialogue when
+    their line becomes inner voice, phone, off-screen, or voice message.
+    """
+    explicit = str(event.get("language") or "").strip().lower()
+    if explicit in {"ja", "zh"}:
+        return explicit
+    event_type = str(event.get("type") or "").strip().lower()
+    speaker = str(event.get("speaker") or event.get("speaker_id") or "").strip().lower()
+    if event_type == "narration" or speaker in NARRATOR_SPEAKERS:
+        return "zh"
+    return VOCAL_LANGUAGE.get(event_type, "ja")
 
 
 def profile_hash(profile: dict[str, Any]) -> str:
@@ -36,7 +53,13 @@ def assign_profiles(
         if not speaker_id:
             raise VoiceCastError("speaker_id is required")
         old = existing.get(speaker_id) if isinstance(existing.get(speaker_id), dict) else {}
-        language = str(item.get("language") or old.get("language") or "ja").lower()
+        requested_language = str(item.get("language") or "").lower()
+        old_language = str(old.get("language") or "").lower()
+        if bool(old.get("locked")) and requested_language and old_language and requested_language != old_language:
+            raise VoiceCastError(
+                f"{speaker_id} is locked to {old_language}; create a new voice profile before changing language"
+            )
+        language = requested_language or old_language or "ja"
         if language not in {"ja", "zh"}:
             raise VoiceCastError(f"{speaker_id}.language must be ja or zh")
         pool = JA_POOL if language == "ja" else ZH_POOL
@@ -74,7 +97,7 @@ def assign_profiles(
 
 
 def validate_event_language(event: dict[str, Any], profile: dict[str, Any]) -> None:
-    expected = VOCAL_LANGUAGE.get(str(event.get("type") or ""))
+    expected = event_language(event)
     if expected and profile.get("language") != expected:
         raise VoiceCastError(
             f"{event.get('id')} requires {expected} voice but {profile.get('speaker_id')} is {profile.get('language')}"

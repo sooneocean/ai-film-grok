@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from audio_timeline import caption_bindings
+from audio_timeline import caption_bindings, timeline_hash, validate_timeline
 from audio_tts_manifest import AudioTTSManifestError, apply_measured_durations
 from tts_backend import synthesize
 from util import read_json, write_json
@@ -44,6 +44,15 @@ def render_tts_events(root: Path) -> dict[str, Any]:
     manifest = read_json(audio_dir / "tts-manifest.json")
     if not isinstance(timeline, dict) or not isinstance(manifest, dict):
         raise AudioTTSRenderError("audio-timeline.json and tts-manifest.json are required")
+    try:
+        validate_timeline(timeline)
+    except Exception as exc:  # noqa: BLE001 - keep the renderer's public error boundary
+        raise AudioTTSRenderError(f"invalid audio timeline: {exc}") from exc
+    expected_timeline_hash = manifest.get("timeline_sha256")
+    if expected_timeline_hash is not None and str(expected_timeline_hash) != timeline_hash(timeline):
+        raise AudioTTSRenderError(
+            "tts-manifest timeline hash does not match audio-timeline; rebuild the audio plan"
+        )
     jobs = manifest.get("jobs")
     if not isinstance(jobs, list):
         raise AudioTTSRenderError("tts-manifest jobs are required")
@@ -112,6 +121,13 @@ def render_tts_events(root: Path) -> dict[str, Any]:
                 "actual_duration_sec": round(duration, 3),
                 "asset_sha256": hashlib.sha256(wav.read_bytes()).hexdigest(),
                 "tts": meta,
+                "render_receipt": {
+                    "provider": str(meta.get("backend") or "edge"),
+                    "model": meta.get("model"),
+                    "voice": meta.get("voice") or str(job["voice_id"]),
+                    "performance_hash": meta.get("performance_hash"),
+                    "performance_compile": meta.get("performance_compile"),
+                },
             }
         )
     try:

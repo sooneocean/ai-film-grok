@@ -8,7 +8,7 @@ import json
 from copy import deepcopy
 from typing import Any
 
-from audio_timeline import VOCAL_TYPES, AudioTimelineError, validate_timeline
+from audio_timeline import VOCAL_TYPES, AudioTimelineError, timeline_hash, validate_timeline
 from voice_cast_profiles import VoiceCastError, validate_event_language
 
 
@@ -75,9 +75,7 @@ def build_tts_manifest(timeline: dict[str, Any], voice_cast: dict[str, Any]) -> 
     return {
         "schema_version": 1,
         "kind": "audio-tts-manifest",
-        "timeline_sha256": hashlib.sha256(
-            json.dumps(timeline, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        ).hexdigest(),
+        "timeline_sha256": timeline_hash(timeline),
         "jobs": jobs,
     }
 

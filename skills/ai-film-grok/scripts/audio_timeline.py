@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
@@ -46,6 +47,21 @@ _CUE_MAP = {
 
 class AudioTimelineError(ValueError):
     pass
+
+
+# Keep this guard deliberately narrow: a character may naturally say "开门".
+# Only explicit bracketed production directions are rejected here; broader
+# script interpretation belongs in the authoring compiler, not the renderer.
+_STAGE_DIRECTION_RE = re.compile(
+    r"[（(【\[][^）)】\]]*(?:镜头|画面|特写|远景|脚步声|开门声|关门声|雷声|背景音(?:乐)?|音效|字幕)[^）)】\]]*[）)】\]]"
+)
+
+
+def _validate_spoken_text(text: str, field: str) -> None:
+    if _STAGE_DIRECTION_RE.search(text):
+        raise AudioTimelineError(
+            f"{field} contains an explicit stage direction; move it to an audio or visual event"
+        )
 
 
 def _number(value: object, field: str, low: float = 0.0) -> float:
@@ -114,6 +130,8 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                         f"{sid}.audio_cues[{cue_index}] exceeds shot duration_sec"
                     )
                 text = str(cue.get("spoken_text") or "").strip()
+                if event_type in VOCAL_TYPES:
+                    _validate_spoken_text(text, f"{sid}.audio_cues[{cue_index}].spoken_text")
                 event: dict[str, Any] = {
                     "id": _event_id(sid, cue_index, event_type, start, text),
                     "shot_id": sid,
@@ -161,6 +179,7 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                 shot.get("nar") or shot.get("narration") or shot.get("dialogue") or ""
             ).strip()
             if text:
+                _validate_spoken_text(text, f"{sid}.nar")
                 event_type = "dialogue" if shot.get("speaker") else "narration"
                 events.append(
                     {
