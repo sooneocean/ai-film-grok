@@ -361,9 +361,7 @@ def build_dispatch(
         and float(shot["duration_sec"]) > 0
         for shot in routed_shots
     )
-    scene_sound_is_due = bool(
-        shots_are_timed and isinstance(spec_for_routing.get("audio_timeline_v1"), dict)
-    )
+    scene_sound_is_due = bool(shots_are_timed and spec_for_routing.get("audio_timeline_v1"))
     if scene_sound_is_due and scene_sound.get("status") != "ok":
         summary = scene_sound.get("summary") or {}
         pre(

@@ -30,9 +30,10 @@ ADAPTER_EXPECTATIONS = {
     "cosyvoice_tts": {"class": "CosyVoiceTTSProvider", "methods": ["synthesize"]},
     "music_external": {"class": "MusicExternalProvider", "methods": ["resolve_bed"]},
 }
+ADAPTER_MODULES = tuple(ADAPTER_EXPECTATIONS)
 
 
-@pytest.mark.parametrize("module_name", sorted(ADAPTER_EXPECTATIONS.keys()))
+@pytest.mark.parametrize("module_name", ADAPTER_MODULES)
 def test_adapter_imports(module_name: str) -> None:
     """Each adapter module must import without error."""
     try:
@@ -41,7 +42,18 @@ def test_adapter_imports(module_name: str) -> None:
         pytest.skip(f"adapter {module_name} has missing optional deps: {exc}")
 
 
-@pytest.mark.parametrize("module_name", sorted(ADAPTER_EXPECTATIONS.keys()))
+@pytest.mark.parametrize("module_name", ADAPTER_MODULES)
+def test_adapter_exposes_callable_cli_entrypoint(module_name: str) -> None:
+    """Shipped adapters use the trusted argv contract and expose ``main``."""
+    try:
+        mod = importlib.import_module(module_name)
+    except ImportError as exc:
+        pytest.skip(f"adapter {module_name} has missing optional deps: {exc}")
+
+    assert callable(getattr(mod, "main", None)), f"{module_name} missing callable main"
+
+
+@pytest.mark.parametrize("module_name", ADAPTER_MODULES)
 def test_adapter_exposes_class(module_name: str) -> None:
     """Each adapter must expose its expected provider class."""
     try:
@@ -56,7 +68,7 @@ def test_adapter_exposes_class(module_name: str) -> None:
     assert inspect.isclass(cls), f"{module_name}.{cls_name} is not a class"
 
 
-@pytest.mark.parametrize("module_name", sorted(ADAPTER_EXPECTATIONS.keys()))
+@pytest.mark.parametrize("module_name", ADAPTER_MODULES)
 def test_adapter_exposes_methods(module_name: str) -> None:
     """Each adapter class must expose its expected methods."""
     try:

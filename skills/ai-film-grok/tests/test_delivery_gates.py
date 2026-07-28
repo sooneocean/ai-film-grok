@@ -148,6 +148,11 @@ class DeliveryGateTests(unittest.TestCase):
         values["review_receipt"] = review["path"]
         return argparse.Namespace(**values)
 
+    def test_write_spec_refreshes_manifest_truth_contract(self) -> None:
+        manifest = aifilm_grok.load_manifest(self.root)
+        summary = aifilm_grok.recompute_gates(self.root, manifest)
+        self.assertTrue(summary["gates"]["manifest_current"], summary["manifest_truth"])
+
     def screening_args(self) -> list[str]:
         return [
             "--screening-evidence",
