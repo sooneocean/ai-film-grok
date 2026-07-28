@@ -294,6 +294,16 @@ def create_shot_review(
         and required_ev.issubset(set(evidence))
         and performance["ok"]
     )
+    adult_evidence = None
+    if film_heat == "max" and heat_phase in {"act", "climax"}:
+        adult_evidence = {
+            "kind": "adult-max-shot-evidence",
+            "clip_sha256": _sha256(source),
+            "coitus_timestamp_sec": (evidence.get("coitus") or {}).get("timestamp_sec"),
+            "visual_coverage": ((shot or {}).get("sensory_cues") or {}).get("visual_coverage"),
+            "motion_beat": ((shot or {}).get("sensory_cues") or {}).get("motion_beat"),
+            "human_review_required": True,
+        }
     packet = {
         "schema_version": 5,
         "kind": "shot-review",
@@ -315,6 +325,8 @@ def create_shot_review(
         "performance_contract": performance,
         "continuity_packet": _continuity_packet(root, sid, source),
     }
+    if adult_evidence is not None:
+        packet["adult_performance_evidence"] = adult_evidence
     path = review_receipt_path(root, sid)
     write_json(path, packet)
     packet["path"] = str(path)

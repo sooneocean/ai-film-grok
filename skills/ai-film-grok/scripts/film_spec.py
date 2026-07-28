@@ -2201,4 +2201,22 @@ def validate_film_spec(
             + ",".join(mh["codes"] or ["MULTI"])
         )
 
+    # Adult max has a separate sensory contract.  This is intentionally a
+    # projection, not more prompt text: post/review can later bind it to media.
+    try:
+        from adult_max_director import apply_contract, validate_contract
+
+        projection = apply_contract(spec, shots)
+        sensory = validate_contract(spec, shots)
+        spec["_adult_max_director"] = {**projection, **sensory}
+        director = (
+            spec.get("adult_max_director")
+            if isinstance(spec.get("adult_max_director"), dict)
+            else {}
+        )
+        if projection["active"] and director.get("strict", True) and not sensory["ok"]:
+            raise FilmSpecError("adult max sensory contract failed: " + ",".join(sensory["codes"]))
+    except ImportError:  # pragma: no cover - compatibility for partial installations
+        pass
+
     return shots

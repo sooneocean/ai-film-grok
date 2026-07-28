@@ -105,6 +105,18 @@
       "enum": ["soft", "medium", "hot", "max"],
       "description": "Adult/ecchi heat. Default max for adult briefs. See ecchi-story.md"
     },
+    "adult_max_director": {
+      "type": "object",
+      "description": "Evidence-bearing sensory direction for explicit max projects. It is projected during write-spec and verified against current media before final review.",
+      "properties": {
+        "schema_version": { "type": "integer", "minimum": 1 },
+        "strict": { "type": "boolean" },
+        "require_media_evidence": { "type": "boolean" },
+        "require_human_final_review": { "type": "boolean" },
+        "minimum_av_alignment_score": { "type": "integer", "minimum": 0, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
     "intimacy_min_ratio": {
       "type": "number",
       "minimum": 0,
@@ -621,6 +633,24 @@
                   "type": "string",
                   "enum": ["entry", "undress", "union", "rhythm", "lock", "finish", "hook"],
                   "description": "Six-beat coitus grammar"
+                },
+                "sensory_cues": {
+                  "type": "object",
+                  "description": "Per-shot visual, motion, sound and edit intent. Required for act/climax after max projection.",
+                  "properties": {
+                    "visual_coverage": { "type": "string", "enum": ["establish", "escalation", "action_progress", "detail", "climax_reaction", "afterglow"] },
+                    "motion_beat": { "type": "string" },
+                    "sound_events": { "type": "array", "items": { "type": "string" } },
+                    "music_energy": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "cut_trigger": { "type": "string" },
+                    "require_timestamp_evidence": { "type": "boolean" }
+                  },
+                  "additionalProperties": false
+                },
+                "adult_performance_evidence": {
+                  "type": "object",
+                  "description": "Read-only review projection: current clip/review hashes and timestamp evidence for max act or climax shots.",
+                  "additionalProperties": true
                 },
                 "dsl": {
                   "type": "object",
