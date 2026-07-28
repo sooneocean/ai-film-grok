@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import io
 import json
 import os
 import re
@@ -12,6 +13,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -702,7 +704,7 @@ def _infer_medium_from_theme(theme: str, title: str) -> tuple[str, str, str]:
     return medium, rendering, sig
 
 
-def cmd_init(args: argparse.Namespace) -> int:
+def _cmd_init_in_place(args: argparse.Namespace) -> int:
     title = args.title.strip()
     theme = args.theme.strip()
     aspect = args.aspect
@@ -818,6 +820,44 @@ def cmd_init(args: argparse.Namespace) -> int:
         }
     )
     return 0
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    """Build a new root off-path, then publish the complete Professional project."""
+    destination = Path(args.root).expanduser().resolve()
+    if destination.exists() and any(destination.iterdir()):
+        return _cmd_init_in_place(args)
+    if destination.is_symlink():
+        raise FilmError(f"Refusing to initialize a symlink root: {destination}")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{destination.name}.aifilm-init-", dir=destination.parent)
+    )
+    staged_args = argparse.Namespace(**vars(args))
+    staged_args.root = str(staging)
+    captured = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(captured):
+            result = _cmd_init_in_place(staged_args)
+        if result != 0:
+            raise FilmError(f"staged init failed with status {result}")
+        (staging / "README.md").write_text(
+            f"# {args.title.strip()}\n\nTheme: {args.theme.strip()}\n\n"
+            f"Provider: Grok Imagine\nRoot: `{destination}`\n",
+            encoding="utf-8",
+        )
+        if destination.exists():
+            destination.rmdir()
+        os.replace(staging, destination)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+    payload = json.loads(captured.getvalue())
+    payload["root"] = str(destination)
+    emit(payload)
+    return result
 
 
 def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
