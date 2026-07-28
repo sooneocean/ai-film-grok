@@ -24,9 +24,7 @@ def _checkout(tmp_path: Path) -> tuple[Path, str]:
 def _pin_all_weights(monkeypatch: pytest.MonkeyPatch, checkpoint: str) -> None:
     monkeypatch.setenv("AIFILM_MMAUDIO_CHECKPOINT_SHA256", checkpoint)
     monkeypatch.setenv("AIFILM_MMAUDIO_VAE_SHA256", hashlib.sha256(b"vae").hexdigest())
-    monkeypatch.setenv(
-        "AIFILM_MMAUDIO_SYNCHFORMER_SHA256", hashlib.sha256(b"sync").hexdigest()
-    )
+    monkeypatch.setenv("AIFILM_MMAUDIO_SYNCHFORMER_SHA256", hashlib.sha256(b"sync").hexdigest())
 
 
 def test_requires_pinned_clean_checkout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -100,7 +98,7 @@ def test_run_rejects_symlink_checkout(monkeypatch: pytest.MonkeyPatch, tmp_path:
     monkeypatch.setenv("AIFILM_MMAUDIO_REPO_COMMIT", "a" * 40)
     _pin_all_weights(monkeypatch, checkpoint)
 
-    with pytest.raises(MMAudioAdapterError, match="symlinked"):
+    with pytest.raises(MMAudioAdapterError, match="symlink"):
         run(
             repo=linked,
             prompt="door closes",

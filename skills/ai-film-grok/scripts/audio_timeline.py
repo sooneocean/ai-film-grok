@@ -51,6 +51,11 @@ class AudioTimelineError(ValueError):
     pass
 
 
+def is_noncommercial_license(value: object) -> bool:
+    normalized = re.sub(r"[^A-Z0-9]+", "", str(value or "").upper())
+    return "CCBYNC" in normalized
+
+
 # Keep this guard deliberately narrow: a character may naturally say "开门".
 # Only explicit bracketed production directions are rejected here; broader
 # script interpretation belongs in the authoring compiler, not the renderer.
@@ -294,7 +299,7 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
             normalized_source = source.replace("\\", "/").lower()
             if event_type == "action_sfx" and (
                 "/audio/candidates/sfx/pending/" in f"/{normalized_source.removeprefix('local:')}"
-                or license_id.upper() == "CC-BY-NC-4.0"
+                or is_noncommercial_license(license_id)
                 or event.get("production_eligible") is False
                 or event.get("approval_status") == "pending_human_review"
             ):

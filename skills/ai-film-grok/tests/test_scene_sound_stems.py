@@ -8,12 +8,13 @@ import wave
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from audio_timeline import compile_timeline
 from scene_sound import reconcile
-from scene_sound_stems import _apply_event_controls, render_scene_sound_stem
+from scene_sound_stems import SceneSoundError, _apply_event_controls, render_scene_sound_stem
 
 
 def test_scene_stem_honors_event_pan_gain_and_fades():
@@ -57,6 +58,125 @@ def test_scene_stem_accepts_legacy_local_asset_field(tmp_path: Path):
     )
     assert Path(result["path"]).is_file()
     assert result["sha256"] == hashlib.sha256(Path(result["path"]).read_bytes()).hexdigest()
+
+
+def test_scene_stem_rejects_pending_noncommercial_sfx(tmp_path: Path):
+    asset = tmp_path / "audio" / "candidates" / "sfx" / "pending" / "take.wav"
+    asset.parent.mkdir(parents=True)
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+    with pytest.raises(SceneSoundError, match="cannot enter a formal stem"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "events": [
+                    {
+                        "id": "pending-sfx",
+                        "type": "action_sfx",
+                        "source": "local:audio/candidates/sfx/pending/take.wav",
+                        "license": "CC-BY-NC-4.0",
+                        "source_sha256": hashlib.sha256(asset.read_bytes()).hexdigest(),
+                        "approval_status": "pending_human_review",
+                        "production_eligible": False,
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ]
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "scene.wav",
+            sample_rate=8000,
+        )
+
+
+@pytest.mark.parametrize(
+    "license_id",
+    (
+        "CC-BY-NC-4.0",
+        "CC BY-NC 4.0",
+        "CC_BY_NC_4.0",
+        "Creative Commons CC BY-NC 4.0",
+    ),
+)
+def test_scene_stem_rejects_nc_license_family(tmp_path: Path, license_id: str):
+    asset = tmp_path / "audio" / "imports" / "take.wav"
+    asset.parent.mkdir(parents=True)
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+
+    with pytest.raises(SceneSoundError, match="cannot enter a formal stem"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "events": [
+                    {
+                        "id": "nc-sfx",
+                        "type": "action_sfx",
+                        "source": "local:audio/imports/take.wav",
+                        "license": license_id,
+                        "source_sha256": hashlib.sha256(asset.read_bytes()).hexdigest(),
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ]
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "scene-nc.wav",
+            sample_rate=8000,
+        )
+
+
+def test_scene_stem_rejects_copied_pending_sfx_by_hash(tmp_path: Path):
+    pending = tmp_path / "audio" / "candidates" / "sfx" / "pending"
+    pending.mkdir(parents=True)
+    original = pending / "take.wav"
+    with wave.open(str(original), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+    digest = hashlib.sha256(original.read_bytes()).hexdigest()
+    (pending / "take.json").write_text(
+        json.dumps(
+            {
+                "schema": "aifilm-sfx-candidate-v1",
+                "status": "pending_human_review",
+                "production_eligible": False,
+                "license": "CC-BY-NC-4.0",
+                "sha256": digest,
+            }
+        )
+    )
+    copied = tmp_path / "audio" / "imports" / "copied.wav"
+    copied.parent.mkdir()
+    copied.write_bytes(original.read_bytes())
+
+    with pytest.raises(SceneSoundError, match="known non-production SFX hash"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "events": [
+                    {
+                        "id": "renamed-sfx",
+                        "type": "action_sfx",
+                        "source": "local:audio/imports/copied.wav",
+                        "license": "commercial-owned",
+                        "source_sha256": digest,
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ]
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "scene-copied.wav",
+            sample_rate=8000,
+        )
 
 
 def test_rendered_scene_stem_survives_a_real_mp4_audio_mix(tmp_path: Path):

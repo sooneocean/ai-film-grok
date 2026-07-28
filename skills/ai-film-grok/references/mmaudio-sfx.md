@@ -42,8 +42,8 @@ process auto-download or silently update a model.
 
 The authenticated node and its administrator-controlled environment are the
 trust root; this is drift detection, not remote attestation against a malicious
-node administrator. The service caches one successful heavyweight probe per
-process, while every render rechecks the clean commit and all weight hashes.
+node administrator. Health and every submission rerun the heavyweight probe;
+every render also rechecks the clean commit and all weight hashes.
 
 ## Canary
 

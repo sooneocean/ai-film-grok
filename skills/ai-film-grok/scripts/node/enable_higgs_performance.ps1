@@ -76,6 +76,21 @@ function Test-NodeHealth([bool]$requirePerformance) {
     return $false
 }
 
+function Restart-AudioNode {
+    Stop-ScheduledTask -TaskName AiFilmAudioNode -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    $listeners = @(Get-NetTCPConnection -LocalAddress '192.168.88.52' -LocalPort 8788 -State Listen -ErrorAction SilentlyContinue)
+    foreach ($listener in $listeners) {
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction Stop
+        if ($process.Name -ne 'python.exe' -or $process.CommandLine -notmatch 'audio_node_service:app') {
+            throw "refusing to stop unexpected listener on 192.168.88.52:8788 (pid $($listener.OwningProcess))"
+        }
+        Stop-Process -Id $listener.OwningProcess -Force -ErrorAction Stop
+    }
+    Start-Sleep -Seconds 2
+    Start-ScheduledTask -TaskName AiFilmAudioNode
+}
+
 try {
     Copy-Item -LiteralPath $source -Destination $adapterTemporary -Force
     [System.IO.File]::WriteAllLines($envTemporary, [string[]]$output)
@@ -86,9 +101,7 @@ try {
     $adapterCommitted = $true
     Move-Item -LiteralPath $envTemporary -Destination $envPath -Force
     $envCommitted = $true
-    Stop-ScheduledTask -TaskName AiFilmAudioNode -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
-    Start-ScheduledTask -TaskName AiFilmAudioNode
+    Restart-AudioNode
     if (!(Test-NodeHealth $true)) { throw 'audio node did not report Higgs performance readiness' }
     $cleanupBackups = $true
 } catch {
@@ -110,9 +123,7 @@ try {
             Move-Item -LiteralPath $envBackup -Destination $envPath -Force
         }
         if ($adapterCommitted -or $envCommitted) {
-            Stop-ScheduledTask -TaskName AiFilmAudioNode -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 2
-            Start-ScheduledTask -TaskName AiFilmAudioNode
+            Restart-AudioNode
             if (!(Test-NodeHealth $false)) { throw 'prior node health did not recover' }
         }
     } catch {

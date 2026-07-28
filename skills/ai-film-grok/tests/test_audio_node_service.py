@@ -207,10 +207,31 @@ def test_sfx_health_rejects_missing_probe_executable(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(service, "SFX_CHECKPOINT_FINGERPRINT", "a" * 64)
     monkeypatch.setattr(service, "MMAUDIO_CHECKPOINT_SHA256", "a" * 64)
     monkeypatch.setattr(service, "MMAUDIO_REPO_COMMIT", "b" * 40)
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_SFX_ARGV", '["trusted-render-adapter"]')
     monkeypatch.setenv("AIFILM_AUDIO_NODE_SFX_PROBE_ARGV", '["missing-mmaudio-probe"]')
-    service._sfx_probe_ok.cache_clear()
     assert service._available("sfx") is False
-    service._sfx_probe_ok.cache_clear()
+
+
+def test_sfx_health_requires_render_adapter_even_after_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.delenv("AIFILM_AUDIO_NODE_SFX_ARGV", raising=False)
+    monkeypatch.setattr(service, "_sfx_probe_ok", lambda: True)
+    assert service._available("sfx") is False
+
+
+def test_sfx_health_rejects_missing_render_executable_even_after_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_SFX_ARGV", '["missing-render-adapter"]')
+    monkeypatch.setattr(service, "_sfx_probe_ok", lambda: True)
+    monkeypatch.setattr(service.shutil, "which", lambda _executable: None)
+
+    assert service._available("sfx") is False
 
 
 def test_reference_upload_rejects_wrong_delivery_format(
@@ -307,6 +328,7 @@ def test_sfx_submission_requires_license_provenance_and_ack(
     monkeypatch.setattr(service, "SFX_CHECKPOINT_FINGERPRINT", "a" * 64)
     monkeypatch.setattr(service, "MMAUDIO_CHECKPOINT_SHA256", "a" * 64)
     monkeypatch.setattr(service, "_sfx_probe_ok", lambda: True)
+    monkeypatch.setattr(service.shutil, "which", lambda executable: executable)
     monkeypatch.setattr(asyncio, "create_task", lambda coroutine: coroutine.close())
 
     with pytest.raises(Exception, match="non-commercial"):

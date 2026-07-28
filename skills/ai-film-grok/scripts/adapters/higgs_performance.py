@@ -33,11 +33,23 @@ def _system_prompt(cue: str) -> str:
     return (
         "Generate audio following instruction.\n\n"
         "<|scene_desc_start|>\n"
-        "A single adult non-verbal performance is recorded in a quiet room. "
-        "No intelligible words, no dialogue, no singing, no music, and no background effects. "
-        f"Performance cue: {cue}\n"
+        f"{_scene_text(cue)}\n"
         "<|scene_desc_end|>"
     )
+
+
+def _scene_text(cue: str) -> str:
+    return (
+        "A single adult non-verbal performance is recorded in a quiet room. "
+        "No intelligible words, no dialogue, no singing, no music, and no background effects. "
+        f"Performance cue: {cue}"
+    )
+
+
+def _require_files(root: Path, names: tuple[str, ...], label: str) -> None:
+    missing = [name for name in names if not (root / name).is_file()]
+    if missing:
+        raise SystemExit(f"{label} is incomplete: {', '.join(missing)}")
 
 
 def main() -> None:
@@ -56,50 +68,85 @@ def main() -> None:
             r"C:\\aifilm-audio-node\\models\\higgs-v2-generation",
         )
     ).resolve()
+    _require_files(
+        model_path,
+        (
+            "model.safetensors",
+            "config.json",
+            "processor_config.json",
+            "tokenizer_config.json",
+            "tokenizer.json",
+            "chat_template.jinja",
+        ),
+        "Higgs generation model",
+    )
     tokenizer_path = Path(
         os.environ.get(
             "HIGGS_PERFORMANCE_TOKENIZER_PATH",
             r"C:\\aifilm-audio-node\\models\\higgs-v2-tokenizer",
         )
     ).resolve()
-    if not (model_path / "model.safetensors").is_file():
-        raise SystemExit("Higgs generation checkpoint is unavailable")
-    if not (tokenizer_path / "model.safetensors").is_file():
-        raise SystemExit("Higgs audio tokenizer is unavailable")
+    _require_files(
+        tokenizer_path,
+        ("model.safetensors", "config.json", "preprocessor_config.json"),
+        "Higgs audio tokenizer",
+    )
 
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
     import numpy as np
     import soundfile as sf
     import torch
-    from boson_multimodal.data_types import ChatMLSample, Message
-    from boson_multimodal.serve.serve_engine import HiggsAudioServeEngine
+    from transformers import AutoProcessor, HiggsAudioV2ForConditionalGeneration
 
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
-    engine = HiggsAudioServeEngine(str(model_path), str(tokenizer_path), device="cuda")
-    result = engine.generate(
-        chat_ml_sample=ChatMLSample(
-            messages=[
-                Message(role="system", content=_system_prompt(cue)),
-                Message(role="user", content="Perform the requested non-verbal audio now."),
-            ]
-        ),
-        max_new_tokens=_max_new_tokens(args.duration),
-        temperature=0.45,
-        top_p=0.95,
-        top_k=50,
-        stop_strings=["<|end_of_text|>", "<|eot_id|>"],
-    )
-    audio = np.asarray(result.audio, dtype=np.float32)
-    maximum_samples = round(args.duration * result.sampling_rate)
+    processor = AutoProcessor.from_pretrained(str(model_path), local_files_only=True)
+    model = HiggsAudioV2ForConditionalGeneration.from_pretrained(
+        str(model_path),
+        torch_dtype=torch.bfloat16,
+        local_files_only=True,
+    ).to("cuda")
+    # The processor owns a separate DAC decoder; it must share the model device.
+    processor.audio_tokenizer.to(model.device)
+    conversation = [
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": "Generate audio following instruction."}],
+        },
+        {"role": "scene", "content": [{"type": "text", "text": _scene_text(cue)}]},
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "Perform the requested non-verbal audio now."}],
+        },
+    ]
+    inputs = processor.apply_chat_template(
+        conversation,
+        add_generation_prompt=True,
+        tokenize=True,
+        return_dict=True,
+        sampling_rate=24000,
+        return_tensors="pt",
+    ).to(model.device)
+    with torch.inference_mode():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=_max_new_tokens(args.duration),
+            do_sample=True,
+            temperature=0.45,
+            top_p=0.95,
+            top_k=50,
+        )
+    decoded = processor.batch_decode(outputs)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    processor.save_audio(decoded, str(args.out))
+    audio, sampling_rate = sf.read(args.out, dtype="float32")
+    maximum_samples = round(args.duration * sampling_rate)
     if audio.size <= 0:
         raise RuntimeError("Higgs generation did not return audio")
-    audio = audio[:maximum_samples]
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    sf.write(args.out, audio, result.sampling_rate, subtype="PCM_16")
+    sf.write(args.out, audio[:maximum_samples], sampling_rate, subtype="PCM_16")
 
 
 if __name__ == "__main__":

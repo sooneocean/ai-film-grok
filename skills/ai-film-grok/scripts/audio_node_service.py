@@ -13,11 +13,11 @@ import hashlib
 import hmac
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import uuid
 import wave
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +77,12 @@ def _available(kind: str) -> bool:
         except Exception:
             return False
     if kind == "sfx":
+        try:
+            command = _command_template(kind)
+        except RuntimeError:
+            return False
+        if shutil.which(command[0]) is None:
+            return False
         return _sfx_probe_ok()
     try:
         _command_template(kind)
@@ -85,7 +91,6 @@ def _available(kind: str) -> bool:
         return False
 
 
-@lru_cache(maxsize=1)
 def _sfx_probe_ok() -> bool:
     raw = os.environ.get("AIFILM_AUDIO_NODE_SFX_PROBE_ARGV", "")
     try:

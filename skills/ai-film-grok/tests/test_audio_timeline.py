@@ -16,6 +16,7 @@ from audio_timeline import (
     caption_bindings,
     compile_timeline,
     rebase_to_rendered_shots,
+    validate_timeline,
 )
 from voice_cast_profiles import VoiceCastError, assign_profiles, validate_event_language
 
@@ -90,6 +91,65 @@ def test_audio_types_are_compiled_and_non_voice_never_carries_tts_text():
         "silence",
     }
     assert all("text" not in event for event in timeline["events"] if event["type"] == "action_sfx")
+
+
+def test_pending_noncommercial_sfx_cannot_enter_formal_timeline():
+    with pytest.raises(AudioTimelineError, match="cannot enter a formal timeline"):
+        validate_timeline(
+            {
+                "schema_version": 1,
+                "kind": "audio-timeline",
+                "events": [
+                    {
+                        "id": "pending-sfx",
+                        "type": "action_sfx",
+                        "shot_id": "s1",
+                        "start_sec": 0,
+                        "duration_sec": 1,
+                        "gain": 1,
+                        "pan": 0,
+                        "source": "local:audio/candidates/sfx/pending/take.wav",
+                        "license": "CC-BY-NC-4.0",
+                        "source_sha256": "a" * 64,
+                        "approval_status": "pending_human_review",
+                        "production_eligible": False,
+                    }
+                ],
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "license_id",
+    (
+        "CC-BY-NC-4.0",
+        "CC BY-NC 4.0",
+        "CC_BY_NC_4.0",
+        "Creative Commons CC BY-NC 4.0",
+    ),
+)
+def test_nc_license_family_cannot_enter_formal_timeline(license_id: str):
+    with pytest.raises(AudioTimelineError, match="cannot enter a formal timeline"):
+        validate_timeline(
+            {
+                "schema_version": 1,
+                "kind": "audio-timeline",
+                "events": [
+                    {
+                        "id": "nc-sfx",
+                        "type": "action_sfx",
+                        "shot_id": "s1",
+                        "start_sec": 0,
+                        "duration_sec": 1,
+                        "gain": 1,
+                        "pan": 0,
+                        "source": "local:audio/imports/take.wav",
+                        "license": license_id,
+                        "source_sha256": "a" * 64,
+                    }
+                ],
+            }
+        )
 
 
 def test_vocal_overlap_requires_explicit_policy():

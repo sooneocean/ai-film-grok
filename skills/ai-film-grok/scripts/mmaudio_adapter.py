@@ -24,7 +24,21 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _resolve_checkout(path: Path) -> Path:
+    absolute = Path(os.path.abspath(path.expanduser()))
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current = current / part
+        if current.is_symlink():
+            raise MMAudioAdapterError("MMAudio checkout path must not contain symlinks")
+    resolved = absolute.resolve()
+    if not resolved.is_dir():
+        raise MMAudioAdapterError("MMAudio checkout is missing or symlinked")
+    return resolved
+
+
 def _require_checkout(repo: Path) -> tuple[str, str]:
+    repo = _resolve_checkout(repo)
     expected_commit = os.environ.get("AIFILM_MMAUDIO_REPO_COMMIT", "").strip().lower()
     expected_checkpoint = os.environ.get("AIFILM_MMAUDIO_CHECKPOINT_SHA256", "").strip().lower()
     expected_vae = os.environ.get("AIFILM_MMAUDIO_VAE_SHA256", "").strip().lower()
@@ -83,12 +97,7 @@ def run(
     out: Path,
     video: Path | None,
 ) -> None:
-    repo_input = repo.expanduser()
-    if repo_input.is_symlink():
-        raise MMAudioAdapterError("MMAudio checkout is missing or symlinked")
-    repo = repo_input.resolve()
-    if not repo.is_dir():
-        raise MMAudioAdapterError("MMAudio checkout is missing or symlinked")
+    repo = _resolve_checkout(repo)
     text = prompt.strip()
     if not 1 <= len(text) <= 512:
         raise MMAudioAdapterError("MMAudio prompt must contain 1-512 characters")
@@ -176,10 +185,7 @@ def main() -> int:
     parser.add_argument("--video", default="")
     args = parser.parse_args()
     if args.probe:
-        repo_input = Path(args.repo).expanduser()
-        if repo_input.is_symlink():
-            raise MMAudioAdapterError("MMAudio checkout is missing or symlinked")
-        repo = repo_input.resolve()
+        repo = _resolve_checkout(Path(args.repo))
         commit, checkpoint = _require_checkout(repo)
         print(
             json.dumps(
