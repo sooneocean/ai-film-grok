@@ -57,16 +57,20 @@ def test_dailies_budget_and_stale_candidate(tmp_path: Path) -> None:
     )
     assert report["ok"] is True
     assert dailies_status(tmp_path)["ok"] is True
+    alternate = tmp_path / "shot01-alt.mp4"
+    alternate.write_bytes(b"alternate")
     with pytest.raises(ValueError, match="budget exhausted"):
         update_dailies(
             tmp_path,
             shot_id="shot01",
-            candidate=str(media),
+            candidate=str(alternate),
             status="alternate",
             reviewer="dex",
             notes="",
             approved_budget=1,
         )
+    media.write_bytes(b"changed")
+    assert dailies_status(tmp_path)["ok"] is False
 
 
 def test_vfx_and_audio_fail_closed(tmp_path: Path) -> None:

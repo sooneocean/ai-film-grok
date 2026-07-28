@@ -9,10 +9,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](
 
 - Added an authenticated, single-GPU Windows/WSL lip-sync node with measured LatentSync 1.6 provenance, atomic artifacts, bounded uploads, and hash-bound receipts.
 - Added `aifilm lipsync-node health` plus remote LatentSync/MuseTalk routing for canary and final rendering.
+- Bounded `bgm-library canary` generation for one configurable 10–600 second ACE-Step batch, with pending-only status and checksum, fingerprint, duration, and technical acceptance checks.
+- Acceptance coverage for ten-cue within-film diversity, six-film rotation, and cropped or requantized near-duplicate rejection.
 
 ### Security
 
 - Restricted plaintext node traffic to loopback through an SSH tunnel, rejected redirects, authenticated before multipart parsing, and fail-closed on input, backend, or receipt mismatch.
+
+### Fixed
+
+- Empty BGM libraries now expose a stable catalog checksum, and duplicate audio/fingerprints are rejected before a batch mutates the catalog.
 
 ## [2.13.0] - 2026-07-28
 

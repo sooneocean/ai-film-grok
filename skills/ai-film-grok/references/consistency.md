@@ -18,7 +18,7 @@
 | 3 | **Lookbook（3 张）** | `canonical/lookbook/` | 近景脸 / 半身 / 情绪极端各 1，先批再量产 |
 | 3b | **状态照 State photos** | `canonical/cast-states/<id>/{full,partial,undressed,bare}.*` | **衣着状态索引**；keyframe 主 ref（见 [keyframe-first-state-index](keyframe-first-state-index.md)） |
 | 3c | **undress-anchor** | `canonical/wardrobe/undress-anchor.*` | 本片卸装峰值；≥partial 后可用 |
-| 4 | **Shot keyframes** | `keyframes/shotXX.*` | 本镜 t=0；**只** `image_edit(状态照/已脱 still)`，禁止纯文生角色；**≥720×1280 9:16 全分辨率**（禁压缩缩略图，见 §1e） |
+| 4 | **Shot keyframes** | `keyframes/shotXX.*` | 本镜 t=0；**只** `image_edit(状态照/已脱 still)`，禁止纯文生角色；**9:16 默认 ≥704×1280 全分辨率**（接受 provider 原生 704×1280；禁压缩缩略图，见 §1e） |
 | 5 | **I2V clips** | `clips/shotXX.mp4` | **只**以 keyframe 为 frame-1 |
 
 角色转面设定图（turnaround）**只能当参考**，不能直接当 `style-v1` 锁定成片画风。
@@ -77,7 +77,7 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 
 | 规则 | 要求 |
 |------|------|
-| **C0 交付分辨率** | 9:16 默认 keyframe **宽≥720 且 高≥1280** |
+| **C0 交付分辨率** | 9:16 默认 keyframe **宽≥704 且 高≥1280**；provider 原生 704×1280 不强制升到 720 |
 | **C1 画幅** | `w/h` ∈ 0.50–0.62；横图/方图 **禁 I2V** |
 | **C3 择优** | 同 stem `.png`/`.jpg` 并存 → **优先更高分辨率且过 C0/C1**（`pick_best_keyframe`） |
 | **C4/C5 硬闸** | `register-still approved` + `preflight` 跑 `analyze_still_geometry`；fail 禁 bulk I2V |

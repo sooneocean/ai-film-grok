@@ -181,6 +181,12 @@ def dailies_status(root: Path | str) -> dict[str, Any]:
     selected_set_sha256 = hashlib.sha256(
         json.dumps(selections, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+    professional = (read_json(base / "production-book.json") or {}).get("rigor") == "professional"
+    ok = (
+        bool(planned) and not issues
+        if planned or professional
+        else bool(report) and not stale and bool(report.get("ok"))
+    )
     return {
         **report,
         "planned_shot_ids": planned,
@@ -188,7 +194,7 @@ def dailies_status(root: Path | str) -> dict[str, Any]:
         "selected_set_sha256": selected_set_sha256,
         "issues": issues,
         "stale_candidates": stale,
-        "ok": bool(planned) and not issues,
+        "ok": ok,
     }
 
 

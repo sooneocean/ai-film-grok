@@ -78,9 +78,7 @@ def pick_pilot_shots(
             cb = str(shot.get("coitus_beat") or dsl.get("coitus_beat") or "").strip().lower()
             if cb:
                 by_coitus.setdefault(cb, []).append(str(shot["id"]))
-            role = str(
-                shot.get("coverage_role") or dsl.get("coverage_role") or ""
-            ).strip().lower()
+            role = str(shot.get("coverage_role") or dsl.get("coverage_role") or "").strip().lower()
             framing = str(shot.get("framing") or dsl.get("framing") or "").strip().lower()
             if role == "detail" or "union_closeup" in framing or "genital_lock" in framing:
                 detail_ids.append(str(shot["id"]))

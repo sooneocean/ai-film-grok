@@ -31,7 +31,12 @@ from i2v_motion_gate import (  # noqa: E402
     MEAN_MEAT_TARGET,
     MEAN_NORMAL_FLOOR,
 )
-from media_qa import STILL_MIN_HEIGHT_9_16, STILL_MIN_WIDTH_9_16  # noqa: E402
+from media_qa import (  # noqa: E402
+    STILL_ASPECT_9_16_MAX,
+    STILL_ASPECT_9_16_MIN,
+    STILL_MIN_HEIGHT_9_16,
+    STILL_MIN_WIDTH_9_16,
+)
 from state_index_gate import UNDRESS_STATES, WARDROBE_RANK  # noqa: E402
 
 
@@ -119,14 +124,15 @@ class HardDefaultsContractTests(unittest.TestCase):
 
     # --- §视觉: 静帧几何·禁压缩 ---
     def test_keyframe_min_dimensions(self) -> None:
-        """hard-defaults.md: 'keyframe ≥720×1280 且 9:16 竖比'."""
-        self.assertGreaterEqual(STILL_MIN_WIDTH_9_16, 720)
-        self.assertGreaterEqual(STILL_MIN_HEIGHT_9_16, 1280)
+        """hard-defaults.md: FRW native keyframes stay at 704×1280."""
+        self.assertEqual(STILL_MIN_WIDTH_9_16, 704)
+        self.assertEqual(STILL_MIN_HEIGHT_9_16, 1280)
 
     def test_keyframe_aspect_is_9_16(self) -> None:
-        """hard-defaults.md: '9:16 竖比' — 720×1280 == 9:16."""
+        """704×1280 is the accepted provider-native near-9:16 geometry."""
         ratio = STILL_MIN_WIDTH_9_16 / STILL_MIN_HEIGHT_9_16
-        self.assertAlmostEqual(ratio, 9 / 16, places=2)
+        self.assertGreaterEqual(ratio, STILL_ASPECT_9_16_MIN)
+        self.assertLessEqual(ratio, STILL_ASPECT_9_16_MAX)
 
     # --- §量产十条: pilot 用户批准才 bulk ---
     def test_pilot_gate_not_skipped_by_default(self) -> None:

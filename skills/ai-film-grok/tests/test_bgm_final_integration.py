@@ -6,11 +6,13 @@ import math
 import wave
 from argparse import Namespace
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 from aifilm_grok import _commit_selected_bgm_usage, build_parser, cmd_init
 from bgm_library import approve_candidate, stage_candidate
+from cli_bgm_library import cmd_bgm_library
 from render_final import RenderError, render_music_template_timeline
 
 
@@ -249,7 +251,86 @@ def test_cli_exposes_approved_library_contract() -> None:
     parser = build_parser()
     args = parser.parse_args(["bgm-library", "status", "--library-root", "/tmp/library"])
     assert args.cmd == "bgm-library"
+    canary = parser.parse_args(
+        [
+            "bgm-library",
+            "canary",
+            "--library-root",
+            "/tmp/library",
+            "--slot",
+            "baseline-v1-rnb-pad",
+            "--duration",
+            "30",
+            "--batch-size",
+            "4",
+        ]
+    )
+    assert canary.bgm_library_action == "canary"
+    assert canary.duration == 30
+    assert canary.batch_size == 4
     final = parser.parse_args(
         ["final", "--root", "/tmp/film", "--music-template", "approved_library"]
     )
     assert final.music_template == "approved_library"
+
+
+def test_canary_generates_one_bounded_pending_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidates = [
+        {
+            "asset_id": f"a-{index}",
+            "status": "pending_human_review",
+            "sha256": f"{index + 1:064x}",
+            "technical": {
+                "ok": True,
+                "duration_sec": 30.0,
+                "fingerprint": [float(index), 0.5],
+            },
+        }
+        for index in range(4)
+    ]
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_URL", "http://node")
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    emitted: list[dict[str, object]] = []
+    args = Namespace(
+        bgm_library_action="canary",
+        library_root=str(tmp_path / "library"),
+        slot="baseline-v1-rnb-pad",
+        duration=30.0,
+        batch_size=4,
+        seed_base=5900,
+    )
+
+    with patch(
+        "cli_bgm_library.generate_candidates",
+        return_value={
+            "ok": True,
+            "recipe_id": "baseline-v1-rnb-pad",
+            "node_job_id": "job",
+            "candidates": candidates,
+        },
+    ) as generate:
+        assert cmd_bgm_library(args, emit=emitted.append) == 0
+
+    payload = generate.call_args.kwargs["recipe"]
+    assert payload["duration"] == 30.0
+    assert generate.call_args.kwargs["seeds"] == [5900, 5901, 5902, 5903]
+    assert emitted[0]["ok"] is True
+    assert emitted[0]["status"] == "pending_human_review"
+
+    candidates[0]["technical"]["duration_sec"] = 20.0
+    emitted.clear()
+    with patch(
+        "cli_bgm_library.generate_candidates",
+        return_value={
+            "ok": True,
+            "recipe_id": "baseline-v1-rnb-pad",
+            "node_job_id": "job",
+            "candidates": candidates,
+        },
+    ):
+        assert cmd_bgm_library(args, emit=emitted.append) == 2
+    assert emitted[0]["ok"] is False
+    assert emitted[0]["checks"]["duration_ok"] is False
+    assert emitted[0]["checks"]["pending_only"] is True

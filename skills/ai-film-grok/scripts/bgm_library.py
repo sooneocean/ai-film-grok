@@ -51,7 +51,7 @@ def _empty_catalog() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
         "revision": 0,
-        "updated_at": _now(),
+        "updated_at": None,
         "assets": {},
     }
 
@@ -978,9 +978,21 @@ def generate_candidates(
     candidates = []
     try:
         # Preflight the entire downloaded batch before catalog mutation.
-        for artifact in node["artifacts"]:
-            _technical(Path(str(artifact["path"])))
-        for artifact in node["artifacts"]:
+        artifacts = node.get("artifacts")
+        if not isinstance(artifacts, list) or len(artifacts) != int(batch_size):
+            raise BGMLibraryError("ACE-Step batch did not return the requested candidate count")
+        checksums: list[str] = []
+        fingerprints: list[str] = []
+        for artifact in artifacts:
+            path = Path(str(artifact["path"]))
+            technical = _technical(path)
+            checksums.append(sha256_file(path))
+            fingerprints.append(canonical_json_sha256(technical["fingerprint"]))
+        if len(set(checksums)) != len(checksums) or len(set(fingerprints)) != len(fingerprints):
+            raise BGMLibraryError(
+                "ACE-Step batch candidates must have unique audio and fingerprints"
+            )
+        for artifact in artifacts:
             metadata = {
                 **public_recipe,
                 "recipe": public_recipe,
