@@ -87,3 +87,32 @@ def test_build_audit_rejects_final_that_drifted_from_delivery(tmp_path: Path) ->
     write_json(tmp_path / "out" / "final-delivery.json", {"output_sha256": "stale"})
     with pytest.raises(ValueError, match="no longer matches"):
         audit.build_transition_frame_audit(tmp_path)
+
+
+def test_transition_attestation_requires_current_complete_frames(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    final = tmp_path / "out" / "film_final.mp4"
+    final.parent.mkdir(parents=True)
+    final.write_bytes(b"final")
+    write_json(
+        tmp_path / "out" / "final-delivery.json",
+        {
+            "output_sha256": sha256_file(final),
+            "fps": 24,
+            "duration_sec": 8,
+            "transition": {"operations": [_operation()], "film_timeline": {"shot_starts": [0, 3]}},
+        },
+    )
+
+    def fake_run(command: list[str], **_: object) -> object:
+        Path(command[-1]).write_bytes(b"frame")
+        return type("Result", (), {"returncode": 0})()
+
+    monkeypatch.setattr(audit.subprocess, "run", fake_run)
+    audit.build_transition_frame_audit(tmp_path)
+    attestation = audit.attest_transition_review(tmp_path, user_phrase="所有转场通过")
+    assert attestation["state"] == "human_transition_review_approved"
+    assert audit.transition_review_evidence_status(tmp_path)["ok"] is True
+    with pytest.raises(ValueError, match="approval phrase"):
+        audit.attest_transition_review(tmp_path, user_phrase="不通过")

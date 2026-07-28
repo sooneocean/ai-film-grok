@@ -127,6 +127,12 @@ class PostAuditTests(unittest.TestCase):
                     for item in report["hard_failures"]
                 )
             )
+            self.assertTrue(
+                any(
+                    item["code"] == "TRANSITION_HUMAN_REVIEW_MISSING"
+                    for item in report["hard_failures"]
+                )
+            )
 
     def test_delivery_v1_emits_migration_warning_not_provenance_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

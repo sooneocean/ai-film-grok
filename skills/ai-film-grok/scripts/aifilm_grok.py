@@ -6263,6 +6263,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Extract final-MP4 frames around every planned shot transition for human review",
     )
     transition_audit.add_argument("--root", required=True)
+    transition_attest = sub.add_parser(
+        "transition-frame-attest",
+        help="Record human approval for current per-transition review frames",
+    )
+    transition_attest.add_argument("--root", required=True)
+    transition_attest.add_argument("--user-phrase", required=True)
     caption_attest = sub.add_parser(
         "caption-frame-attest",
         help="Record human readability approval for current caption review frames",
@@ -7913,6 +7919,11 @@ def main(argv: list[str] | None = None) -> int:
             from transition_frame_audit import build_transition_frame_audit
 
             emit(build_transition_frame_audit(Path(args.root)))
+            return 0
+        if args.cmd == "transition-frame-attest":
+            from transition_frame_audit import attest_transition_review
+
+            emit(attest_transition_review(Path(args.root), user_phrase=args.user_phrase))
             return 0
         if args.cmd == "caption-frame-attest":
             from caption_frame_audit import attest_caption_readability

@@ -504,6 +504,18 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
                 "message": "burned subtitles need current sampled frames and human readability approval",
             }
             (hard if delivery_version >= 2 else warnings).append(issue)
+    transition_frame_audit = None
+    if delivery_version >= 2:
+        from transition_frame_audit import transition_review_evidence_status
+
+        transition_frame_audit = transition_review_evidence_status(root)
+        if not transition_frame_audit["ok"]:
+            hard.append(
+                {
+                    "code": "TRANSITION_HUMAN_REVIEW_MISSING",
+                    "message": "every current transition needs sampled-frame evidence and human approval",
+                }
+            )
     title_spec = spec.get("title_sequence") if isinstance(spec, dict) else {}
     if (
         isinstance(title_spec, dict)
@@ -561,6 +573,7 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
             "schema_version": delivery_version if delivery else None,
         },
         "caption_frame_audit": caption_frame_audit,
+        "transition_frame_audit": transition_frame_audit,
         "open_reshoot_count": len(open_items),
         "performance_timeline": {
             "required": bool(performance_timeline.get("required")),

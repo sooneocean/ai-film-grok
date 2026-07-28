@@ -154,3 +154,116 @@ def build_transition_frame_audit(root: Path) -> dict[str, Any]:
     write_json(path, report)
     report["path"] = str(path)
     return report
+
+
+def transition_frame_audit_fresh(root: Path) -> dict[str, Any]:
+    """Check that every reviewed seam still belongs to the current final delivery."""
+    root = Path(root).expanduser().resolve()
+    audit_path = root / "receipts" / "transition-frame-audit.json"
+    audit = read_json(audit_path) or {}
+    final = _final_path(root)
+    delivery_path = root / "out" / "final-delivery.json"
+    current = {
+        "final": _sha256(final) if final else None,
+        "final_delivery": _sha256(delivery_path) if delivery_path.is_file() else None,
+    }
+    bound = {
+        "final": (audit.get("final") or {}).get("sha256"),
+        "final_delivery": (audit.get("final_delivery") or {}).get("sha256"),
+    }
+    transitions = audit.get("transitions") if isinstance(audit.get("transitions"), list) else []
+    frames_ok = bool(audit) and all(
+        isinstance(frame, dict)
+        and (path := Path(str(frame.get("path") or ""))).is_file()
+        and frame.get("sha256") == _sha256(path)
+        for transition in transitions
+        if isinstance(transition, dict)
+        for frame in (
+            transition.get("frames") if isinstance(transition.get("frames"), list) else []
+        )
+    )
+    has_all_frames = all(
+        isinstance(transition, dict)
+        and isinstance(transition.get("frames"), list)
+        and bool(transition["frames"])
+        for transition in transitions
+    )
+    stale = (
+        not audit
+        or current != bound
+        or not frames_ok
+        or not has_all_frames
+        or audit.get("transition_count") != len(transitions)
+    )
+    return {
+        "present": bool(audit),
+        "stale": stale,
+        "current": current,
+        "bound": bound,
+        "transition_count": len(transitions),
+        "audit_path": str(audit_path) if audit_path.is_file() else None,
+    }
+
+
+def _human_transition_phrase(phrase: str) -> bool:
+    text = (phrase or "").strip().lower()
+    if not text or any(marker in text for marker in ("不通过", "重做", "reject", "fail")):
+        return False
+    approved = ("通过", "批准", "approved", "pass")
+    subject = ("转场", "镜头", "transition", "seam")
+    return any(marker in text for marker in approved) and any(marker in text for marker in subject)
+
+
+def attest_transition_review(root: Path, *, user_phrase: str) -> dict[str, Any]:
+    """Record explicit human approval only for a complete, current seam audit."""
+    root = Path(root).expanduser().resolve()
+    freshness = transition_frame_audit_fresh(root)
+    audit_path = root / "receipts" / "transition-frame-audit.json"
+    audit = read_json(audit_path) or {}
+    if not freshness["present"] or freshness["stale"]:
+        raise ValueError("transition-frame audit is missing, incomplete, or stale")
+    if not _human_transition_phrase(user_phrase):
+        raise ValueError(
+            "transition attestation requires an explicit human transition approval phrase"
+        )
+    attestation = {
+        "kind": "transition-frame-attestation",
+        "schema_version": 1,
+        "audit_path": str(audit_path),
+        "audit_sha256": _sha256(audit_path),
+        "final": audit["final"],
+        "final_delivery": audit["final_delivery"],
+        "transition_count": audit["transition_count"],
+        "user_phrase": user_phrase.strip(),
+        "all_seams_reviewed": True,
+        "state": "human_transition_review_approved",
+    }
+    path = root / "receipts" / "transition-frame-attestation.json"
+    write_json(path, attestation)
+    attestation["path"] = str(path)
+    return attestation
+
+
+def transition_review_evidence_status(root: Path) -> dict[str, Any]:
+    root = Path(root).expanduser().resolve()
+    audit = transition_frame_audit_fresh(root)
+    attestation_path = root / "receipts" / "transition-frame-attestation.json"
+    attestation = read_json(attestation_path) or {}
+    approved = (
+        audit["present"]
+        and not audit["stale"]
+        and attestation.get("kind") == "transition-frame-attestation"
+        and attestation.get("state") == "human_transition_review_approved"
+        and attestation.get("all_seams_reviewed") is True
+        and attestation.get("transition_count") == audit["transition_count"]
+        and attestation.get("audit_sha256")
+        == _sha256(root / "receipts" / "transition-frame-audit.json")
+        and (attestation.get("final") or {}).get("sha256") == audit["current"]["final"]
+        and (attestation.get("final_delivery") or {}).get("sha256")
+        == audit["current"]["final_delivery"]
+    )
+    return {
+        "ok": approved,
+        "audit": audit,
+        "attestation_path": str(attestation_path) if attestation_path.is_file() else None,
+    }
