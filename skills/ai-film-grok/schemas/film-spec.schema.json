@@ -297,6 +297,18 @@
         "additionalProperties": false
       }
     },
+    "transition_ops": {
+      "type": "array",
+      "description": "One explicit editorial operation per inter-shot seam. Generated from edit_craft; author entries may add locked/reason.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "locked": { "type": "boolean" },
+          "reason": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
     "sound_plan": {
       "type": "object",
       "properties": {

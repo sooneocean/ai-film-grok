@@ -63,9 +63,12 @@ from sound_plan import (
     resolve_sidechain,
     validate_sound_plan,
 )
+from transition_ops import TransitionOperationError, build_transition_operations
 
 VO_MODES = frozenset({"storyteller", "character", "hybrid"})
-TTS_BACKENDS = frozenset({"auto", "minimax", "fish", "voicebox", "edge", "external", "grok"})
+TTS_BACKENDS = frozenset(
+    {"auto", "mimo", "minimax", "fish", "voicebox", "edge", "external", "grok"}
+)
 # Bulk motion provider profiles (see resolve_i2v_profile):
 # - seedance_first: FRW Seedance bulk when account open
 # - grok_primary: Seedance unavailable / 403 season — Grok image_to_video bulk
@@ -573,11 +576,11 @@ def validate_film_spec(
     if not isinstance(tts_backend, str) or tts_backend.lower() not in TTS_BACKENDS:
         raise FilmSpecError(f"film-spec tts_backend must be one of {sorted(TTS_BACKENDS)}")
     spec["tts_backend"] = tts_backend.lower()
-    # Phase F: 中文说书默认钉 edge（避免 auto→external/ElevenLabs + Neural 翻车）
+    # 中文说书默认钉 MiMo；缺 key 时显式失败，避免静默换声线或 provider。
     if mode in ("storyteller", "hybrid") and spec["tts_backend"] == "auto":
-        spec["tts_backend"] = "edge"
+        spec["tts_backend"] = "mimo"
         notes = list(spec.get("_tts_notes") or [])
-        notes.append("auto→edge for storyteller/hybrid (中文说书默认；显式 external/fish/… 可覆盖)")
+        notes.append("auto→mimo for storyteller/hybrid (中文说书默认；显式 edge/fish/… 可覆盖)")
         spec["_tts_notes"] = notes
     # I2V profile: grok_primary (Seedance outage) vs seedance_first
     i2v_profile = resolve_i2v_profile()
@@ -1316,6 +1319,34 @@ def validate_film_spec(
                 raise FilmSpecError(str(exc)) from exc
             spec["_transition_styles_source"] = "edit_craft" if crafts else "beat_suggest"
 
+    # Every seam is an explicit operation, including a hard cut.  This is the
+    # contract consumed by designed post and the final-delivery receipt.
+    raw_ops = spec.get("transition_ops")
+    if raw_ops is not None and not isinstance(raw_ops, list):
+        raise FilmSpecError("transition_ops must be an array")
+    try:
+        resolved_intents = [str(x) for x in spec.get("transition_intents") or []]
+        raw_join_secs = spec.get("join_transition_secs")
+        if isinstance(raw_join_secs, list):
+            operation_secs = list(raw_join_secs)
+        else:
+            # edit_strategy=off still receives a complete per-seam operation.
+            operation_secs = [
+                0.0 if intent == "hard" else float(spec["transition_sec"])
+                for intent in resolved_intents
+            ]
+        spec["transition_ops"] = build_transition_operations(
+            shots,
+            crafts=[str(x) for x in spec.get("edit_craft") or []],
+            intents=resolved_intents,
+            styles=[str(x) for x in spec.get("transition_styles") or []],
+            durations=operation_secs,
+            authored=list(raw_ops) if raw_ops is not None else None,
+        )
+        spec["_transition_ops_source"] = "author_overlay" if raw_ops is not None else "edit_craft"
+    except TransitionOperationError as exc:
+        raise FilmSpecError(str(exc)) from exc
+
     # Layer identity soft report: T2V/env beds must not claim hero face lock
     layer_issues: list[dict[str, Any]] = []
     hero_n = sum(1 for s in shots if s.get("shot_role") == "hero")
@@ -1505,9 +1536,7 @@ def validate_film_spec(
     try:
         from audio_cues import AudioCueError, validate_audio_cues
 
-        spec["_audio_cues"] = validate_audio_cues(
-            shots, strict=bool(spec.get("audio_cues_strict"))
-        )
+        spec["_audio_cues"] = validate_audio_cues(shots, strict=bool(spec.get("audio_cues_strict")))
     except AudioCueError as exc:
         raise FilmSpecError(str(exc)) from exc
 

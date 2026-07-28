@@ -64,6 +64,8 @@ write-spec **自动轮换**轴（避开最近 2 轴）；lint：`CAMERA_AXIS_FLA
 ## Agent 清单
 
 - [ ] write-spec 后看 `_vo_motion_link` / `transition_styles`  
+- [ ] 每条镜间缝都有 `transition_ops[i]`：hard cut 也必须是明确的剪辑操作，不是缺省值
+- [ ] `transition_ops[i].continuity_class == continue` 时：`picture.base=hard_cut`、`duration_sec=0`、HF overlay 保持 `none`
 - [ ] final 日志出现 `styles=[…]` 且不全是 fade  
 - [ ] 用户抱怨运镜没变 → 说明须 re-I2V；先交付转场新版  
 - [ ] 色气 60s：约每 2 soft 至少一个 hard；尾 1–2 hold  

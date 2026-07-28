@@ -32,6 +32,7 @@ from security_policy import (
     safe_workspace_directory,
 )
 from show_package import ShowPackageError, resolve_show_package
+from transition_ops import TransitionOperationError, assert_hyperframes_safe_operations
 from util import read_json as _util_read_json
 from util import utc_now, write_json
 
@@ -554,6 +555,7 @@ def build_timeline_package(
         "fps": fps,
         "transition_sec": transition_sec,
         "story_join_intents": story_intents,
+        "transition_ops": spec.get("transition_ops") or [],
         "film_timeline": {
             "shot_starts": film_tl.get("shot_starts"),
             "output_duration": film_tl.get("output_duration"),
@@ -1123,6 +1125,10 @@ def write_hyperframes(
     layout: str = "auto",
     compose_preset: str = "auto",
 ) -> dict[str, str]:
+    try:
+        assert_hyperframes_safe_operations(package.get("transition_ops") or [])
+    except TransitionOperationError as exc:
+        raise ComposeExportError(f"HyperFrames transition safety: {exc}") from exc
     hf_dir = compose_root / "hyperframes"
     hf_dir.mkdir(parents=True, exist_ok=True)
 

@@ -4068,6 +4068,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "default_intent": default_intent,
             "video": xfade_plan,
             "audio": afade_plan,
+            "operations": spec.get("transition_ops") or [],
             "film_timeline": {
                 "shot_starts": film_tl.get("shot_starts"),
                 "output_duration": film_tl.get("output_duration"),

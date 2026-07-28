@@ -11,6 +11,10 @@ sys.path.insert(0, str(SCRIPTS))
 
 import edit_policy  # noqa: E402
 from film_spec import validate_film_spec  # noqa: E402
+from transition_ops import (  # noqa: E402
+    TransitionOperationError,
+    assert_hyperframes_safe_operations,
+)
 
 
 class SmoothTransitionDefaultsTests(unittest.TestCase):
@@ -139,6 +143,11 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
         crafts = spec.get("edit_craft") or []
         self.assertEqual(len(intents), 4)
         self.assertEqual(len(crafts), 4)
+        ops = spec.get("transition_ops") or []
+        self.assertEqual(len(ops), 4)
+        self.assertEqual(ops[0]["from_shot"], "shot01")
+        self.assertEqual(ops[0]["to_shot"], "shot02")
+        self.assertIn(ops[0]["picture"]["base"], {"hard_cut", "xfade"})
         # action → reaction should be hard (smash / impact family)
         self.assertEqual(intents[2], "hard")
         # → afterglow: craft catalog may use contrast_cut (hard) rather than pure hold
@@ -147,6 +156,95 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
         # sensory composition filled
         self.assertTrue(shots[0]["dsl"]["camera"].get("angle"))
         self.assertTrue(shots[0]["dsl"].get("framing") or shots[0]["dsl"]["camera"].get("framing"))
+
+    def test_continue_operation_forces_hard_cut_and_preserves_reason(self) -> None:
+        spec = {
+            "title": "continue-op",
+            "vo_mode": "storyteller",
+            "director_intent": {
+                "logline": "连续动作的转场操作验证。",
+                "tone": "drama",
+                "emotional_arc": ["a", "b", "c"],
+            },
+            "scenes": [
+                {
+                    "shots": [
+                        {
+                            "id": "a",
+                            "dramatic_function": "approach",
+                            "nar": "抬手。",
+                            "dsl": {"subject": "hero", "motion": "pan, idle not speaking"},
+                        },
+                        {
+                            "id": "b",
+                            "dramatic_function": "action",
+                            "nar": "承接。",
+                            "dsl": {
+                                "subject": "hero",
+                                "motion": "track, idle not speaking",
+                                "chain_mode": "continue",
+                                "cut_on": "mid_motion",
+                            },
+                        },
+                    ]
+                }
+            ],
+            "transition_ops": [{"locked": True, "reason": "必须保持手势连续"}],
+        }
+        validate_film_spec(spec, assign_missing_ids=False)
+        op = spec["transition_ops"][0]
+        self.assertEqual(op["type"], "cut_on_action")
+        self.assertEqual(op["picture"]["base"], "hard_cut")
+        self.assertEqual(op["picture"]["duration_sec"], 0.0)
+        self.assertTrue(op["locked"])
+        self.assertEqual(op["reason"], "必须保持手势连续")
+
+    def test_transition_author_metadata_requires_declared_types(self) -> None:
+        spec = {
+            "title": "invalid-op-metadata",
+            "vo_mode": "storyteller",
+            "director_intent": {
+                "logline": "人工转场锁定字段型别验证。",
+                "tone": "drama",
+                "emotional_arc": ["a", "b", "c"],
+            },
+            "scenes": [
+                {
+                    "shots": [
+                        {
+                            "id": "a",
+                            "dramatic_function": "hook",
+                            "nar": "开始。",
+                            "dsl": {"subject": "hero", "motion": "hold, idle not speaking"},
+                        },
+                        {
+                            "id": "b",
+                            "dramatic_function": "reaction",
+                            "nar": "反应。",
+                            "dsl": {"subject": "hero", "motion": "hold, idle not speaking"},
+                        },
+                    ]
+                }
+            ],
+            "transition_ops": [{"locked": "false", "reason": 123}],
+        }
+        with self.assertRaisesRegex(Exception, "locked must be boolean"):
+            validate_film_spec(spec, assign_missing_ids=False)
+
+    def test_hyperframes_safety_rejects_continue_overlay(self) -> None:
+        with self.assertRaisesRegex(TransitionOperationError, "continue seam"):
+            assert_hyperframes_safe_operations(
+                [
+                    {
+                        "continuity_class": "continue",
+                        "picture": {
+                            "base": "hard_cut",
+                            "duration_sec": 0,
+                            "hyperframes_overlay": "light_leak",
+                        },
+                    }
+                ]
+            )
 
     def test_normalize_xfade_style(self) -> None:
         self.assertEqual(edit_policy.normalize_xfade_style(None), "fade")
