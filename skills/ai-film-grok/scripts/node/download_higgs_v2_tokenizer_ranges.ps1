@@ -1,22 +1,20 @@
 $ErrorActionPreference = 'Stop'
 
 $root = 'C:\aifilm-audio-node'
-$modelDir = Join-Path $root 'models\higgs-v2-generation'
+$modelDir = Join-Path $root 'models\higgs-v2-tokenizer'
 $target = Join-Path $modelDir 'model.safetensors'
 $partsDir = Join-Path $modelDir '.model.safetensors.parts'
-$expected = [int64]11542613696
-$firstChunkSize = [int64]536870912
+$expected = [int64]805665628
 $chunkSize = [int64]67108864
-$url = 'https://huggingface.co/bosonai/higgs-audio-v2-generation-3B-base/resolve/main/model.safetensors'
+$url = 'https://huggingface.co/bosonai/higgs-audio-v2-tokenizer/resolve/main/model.safetensors'
 
 New-Item -ItemType Directory -Force -Path $modelDir, $partsDir | Out-Null
 
 $offset = [int64]0
 $index = 0
 while ($offset -lt $expected) {
-    $size = if ($offset -eq 0) { $firstChunkSize } else { $chunkSize }
-    $end = [Math]::Min($offset + $size - 1, $expected - 1)
-    $want = $end - $offset + 1
+    $want = [Math]::Min($chunkSize, $expected - $offset)
+    $end = $offset + $want - 1
     $part = Join-Path $partsDir ('{0:D3}.part' -f $index)
     if ((Test-Path -LiteralPath $part) -and (Get-Item -LiteralPath $part).Length -eq $want) {
         $offset += $want
@@ -27,8 +25,6 @@ while ($offset -lt $expected) {
     $partial = "$part.partial"
     $attempt = 0
     while ($true) {
-        # Hugging Face redirect endpoints can ignore an append resume range.
-        # A verified standalone segment never promotes a duplicated response.
         Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue
         & curl.exe -L --fail --connect-timeout 30 --speed-limit 1024 --speed-time 90 `
             --range "$offset-$end" -o $partial $url
@@ -37,7 +33,7 @@ while ($offset -lt $expected) {
         }
         Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue
         $attempt++
-        if ($attempt -ge 100) { throw "Higgs range $index did not produce its expected $want bytes" }
+        if ($attempt -ge 100) { throw "Higgs tokenizer range $index did not produce its expected $want bytes" }
         Start-Sleep -Seconds 10
     }
     Move-Item -LiteralPath $partial -Destination $part -Force
@@ -52,8 +48,7 @@ try {
     $offset = [int64]0
     $index = 0
     while ($offset -lt $expected) {
-        $size = if ($offset -eq 0) { $firstChunkSize } else { $chunkSize }
-        $want = [Math]::Min($size, $expected - $offset)
+        $want = [Math]::Min($chunkSize, $expected - $offset)
         $part = Join-Path $partsDir ('{0:D3}.part' -f $index)
         $input = [System.IO.File]::OpenRead($part)
         try { $input.CopyTo($out) } finally { $input.Dispose() }
@@ -64,11 +59,6 @@ try {
     $out.Dispose()
 }
 if ((Get-Item -LiteralPath $assembled).Length -ne $expected) {
-    throw 'Higgs assembled checkpoint size is invalid'
+    throw 'Higgs tokenizer assembled checkpoint size is invalid'
 }
 Move-Item -LiteralPath $assembled -Destination $target -Force
-
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$root\download-higgs-v2-tokenizer-ranges.ps1"
-if ($LASTEXITCODE -ne 0) {
-    throw "Higgs tokenizer download failed with exit code $LASTEXITCODE"
-}
