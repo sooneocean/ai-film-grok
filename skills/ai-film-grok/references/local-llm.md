@@ -21,6 +21,7 @@ embedded credentials, and arbitrary paths are rejected.
 ```sh
 aifilm local-llm probe
 aifilm local-llm draft --prompt 'Draft two safe candidate shots for a courier in rain.'
+aifilm local-llm shot-draft --prompt 'A courier walks through rain, then delivers a parcel.'
 ```
 
 `probe` only calls `/models`; it never loads a model. `draft` calls the fixed,
@@ -33,3 +34,7 @@ into `drama-graph.json` or another authoring artifact.
 Any transport, model-list, empty-output, or timeout failure ends in an explicit
 error. The existing deterministic planning path remains the fallback; this
 adapter never retries through another model and never changes I2V routing.
+
+`shot-draft` is the preferred creative route: the provider requests strict JSON
+with exactly two `action` + `camera` objects, rejects truncated or malformed
+responses, and returns `schema_valid: true` only after local validation.

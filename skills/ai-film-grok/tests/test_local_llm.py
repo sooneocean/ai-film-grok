@@ -3,7 +3,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from local_llm import DEFAULT_MODEL, LocalLLMError, draft, normalize_base_url, probe
+from local_llm import DEFAULT_MODEL, LocalLLMError, draft, normalize_base_url, probe, shot_draft
 
 
 def test_normalize_base_url_requires_private_numeric_v1_host() -> None:
@@ -52,3 +52,38 @@ def test_draft_rejects_truncated_output(mock_request) -> None:
     }
     with pytest.raises(LocalLLMError, match="truncated"):
         draft("http://192.168.88.52:1234/v1", prompt="x")
+
+
+@patch("local_llm._request_json")
+def test_shot_draft_requires_exactly_two_schema_valid_shots(mock_request) -> None:
+    mock_request.return_value = {
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "message": {
+                    "content": (
+                        '{"shots":[{"action":"walk","camera":"wide"},'
+                        '{"action":"deliver","camera":"close"}]}'
+                    )
+                },
+            }
+        ],
+        "usage": {"total_tokens": 20},
+    }
+    report = shot_draft("http://192.168.88.52:1234/v1", prompt="Courier in rain, then delivery")
+    assert report["schema_valid"] is True
+    assert len(report["candidate"]["shots"]) == 2
+
+
+@patch("local_llm._request_json")
+def test_shot_draft_rejects_missing_shot(mock_request) -> None:
+    mock_request.return_value = {
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "message": {"content": '{"shots":[{"action":"walk","camera":"wide"}]}'},
+            }
+        ]
+    }
+    with pytest.raises(LocalLLMError, match="two usable shots"):
+        shot_draft("http://192.168.88.52:1234/v1", prompt="x")

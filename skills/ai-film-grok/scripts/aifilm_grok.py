@@ -7110,6 +7110,7 @@ def build_parser() -> argparse.ArgumentParser:
     for action, help_text in (
         ("probe", "Read the private model list without starting inference"),
         ("draft", "Generate one human-review-only creative candidate"),
+        ("shot-draft", "Generate exactly two schema-validated candidate shots"),
     ):
         action_parser = local_llm_sub.add_parser(action, help=help_text)
         action_parser.add_argument(
@@ -7122,7 +7123,7 @@ def build_parser() -> argparse.ArgumentParser:
             default="openai/gpt-oss-20b",
             help="Approved local model id; default openai/gpt-oss-20b",
         )
-        if action == "draft":
+        if action in {"draft", "shot-draft"}:
             action_parser.add_argument(
                 "--prompt", required=True, help="Draft request; never writes film files"
             )
@@ -7834,13 +7835,22 @@ def main(argv: list[str] | None = None) -> int:
             from local_llm import LocalLLMError
             from local_llm import draft as local_llm_draft
             from local_llm import probe as local_llm_probe
+            from local_llm import shot_draft as local_llm_shot_draft
 
             try:
                 token = os.environ.get("AIFILM_LOCAL_LLM_TOKEN") or None
                 if args.local_llm_action == "probe":
                     report = local_llm_probe(args.base_url, model=args.model, token=token)
-                else:
+                elif args.local_llm_action == "draft":
                     report = local_llm_draft(
+                        args.base_url,
+                        model=args.model,
+                        prompt=args.prompt,
+                        token=token,
+                        timeout=args.timeout,
+                    )
+                else:
+                    report = local_llm_shot_draft(
                         args.base_url,
                         model=args.model,
                         prompt=args.prompt,

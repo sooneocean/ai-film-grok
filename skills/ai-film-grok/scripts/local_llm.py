@@ -18,6 +18,27 @@ DEFAULT_MODEL = "openai/gpt-oss-20b"
 ALLOWED_MODELS = frozenset({DEFAULT_MODEL})
 _MAX_RESPONSE_BYTES = 1_048_576
 _MAX_PROMPT_CHARS = 12_000
+_TWO_SHOT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["shots"],
+    "properties": {
+        "shots": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["action", "camera"],
+                "properties": {
+                    "action": {"type": "string", "maxLength": 90},
+                    "camera": {"type": "string", "maxLength": 48},
+                },
+            },
+        }
+    },
+}
 
 
 class LocalLLMError(RuntimeError):
@@ -197,6 +218,103 @@ def draft(
         "candidate_sha256": hashlib.sha256(output.encode()).hexdigest(),
         "usage": usage,
         "finish_reason": finish_reason,
+        "status": "candidate_only",
+        "human_apply_required": True,
+        "may_modify_story_truth": False,
+        "may_approve_production": False,
+        "fallback": "existing deterministic planning; no automatic retry",
+    }
+
+
+def shot_draft(
+    base_url: str,
+    *,
+    prompt: str,
+    model: str = DEFAULT_MODEL,
+    token: str | None = None,
+    timeout: int = 45,
+) -> dict[str, Any]:
+    """Return an exactly-two-shot, schema-validated candidate for human review."""
+    normalized = normalize_base_url(base_url)
+    approved_model = _require_model(model)
+    clean_prompt = str(prompt).strip()
+    if not clean_prompt or len(clean_prompt) > _MAX_PROMPT_CHARS:
+        raise LocalLLMError(
+            "LOCAL_LLM_PROMPT_INVALID", f"prompt must contain 1-{_MAX_PROMPT_CHARS} characters"
+        )
+    if timeout < 1 or timeout > 120:
+        raise LocalLLMError(
+            "LOCAL_LLM_TIMEOUT_INVALID", "timeout must be between 1 and 120 seconds"
+        )
+    response = _request_json(
+        normalized,
+        "/chat/completions",
+        token=token,
+        timeout=timeout,
+        body={
+            "model": approved_model,
+            "temperature": 0,
+            "max_tokens": 320,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "two_shots", "strict": True, "schema": _TWO_SHOT_SCHEMA},
+            },
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Return exactly two concise, safe candidate shots. "
+                        "Do not claim approval, invent provenance, or add markdown."
+                    ),
+                },
+                {"role": "user", "content": clean_prompt},
+            ],
+        },
+    )
+    choices = response.get("choices")
+    choice = (
+        choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+    )
+    finish_reason = choice.get("finish_reason")
+    message = choice.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if finish_reason == "length":
+        raise LocalLLMError("LOCAL_LLM_TRUNCATED_OUTPUT", "local LLM shot candidate was truncated")
+    try:
+        candidate = json.loads(content) if isinstance(content, str) else None
+    except json.JSONDecodeError as exc:
+        raise LocalLLMError(
+            "LOCAL_LLM_INVALID_SHOT_JSON", "local LLM returned invalid shot JSON"
+        ) from exc
+    shots = candidate.get("shots") if isinstance(candidate, dict) else None
+    if (
+        not isinstance(shots, list)
+        or len(shots) != 2
+        or any(
+            not isinstance(shot, dict)
+            or not isinstance(shot.get("action"), str)
+            or not shot["action"].strip()
+            or not isinstance(shot.get("camera"), str)
+            or not shot["camera"].strip()
+            for shot in shots
+        )
+    ):
+        raise LocalLLMError(
+            "LOCAL_LLM_INVALID_SHOT_JSON", "local LLM did not return two usable shots"
+        )
+    canonical = json.dumps(candidate, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+    return {
+        "schema_version": 1,
+        "kind": "local-llm-shot-draft",
+        "base_url": normalized,
+        "model": approved_model,
+        "candidate": candidate,
+        "input_sha256": hashlib.sha256(clean_prompt.encode()).hexdigest(),
+        "candidate_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
+        "usage": usage,
+        "finish_reason": finish_reason,
+        "schema_valid": True,
         "status": "candidate_only",
         "human_apply_required": True,
         "may_modify_story_truth": False,
