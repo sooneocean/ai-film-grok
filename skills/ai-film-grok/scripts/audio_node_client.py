@@ -119,7 +119,9 @@ def render(
     out: Path,
     timeout: int = 900,
 ) -> dict[str, Any]:
-    if kind not in {"tts", "music", "sfx"} or not base_url.startswith(("http://", "https://")):
+    if kind not in {"tts", "music", "sfx", "performance"} or not base_url.startswith(
+        ("http://", "https://")
+    ):
         raise AudioNodeError("invalid private audio node request")
     if len(token) < 24:
         raise AudioNodeError("invalid private audio node request")

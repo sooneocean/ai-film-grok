@@ -36,6 +36,26 @@ def test_render_rejects_unknown_kind(tmp_path: Path) -> None:
         render("http://192.168.88.52:8788", "x" * 32, "video", {}, tmp_path / "x.wav")
 
 
+def test_render_allows_explicit_performance_track(tmp_path: Path) -> None:
+    wav = _delivery_wav()
+    replies = iter(
+        [
+            json.dumps({"job_id": "a"}).encode(),
+            json.dumps({"status": "completed", "sha256": hashlib.sha256(wav).hexdigest()}).encode(),
+            wav,
+        ]
+    )
+    with patch("audio_node_client._request", side_effect=lambda *args, **kwargs: next(replies)):
+        receipt = render(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            "performance",
+            {"prompt": "nonverbal performance"},
+            tmp_path / "performance.wav",
+        )
+    assert receipt["path"].endswith("performance.wav")
+
+
 def test_render_rejects_non_wav_result(tmp_path: Path) -> None:
     replies = iter(
         [

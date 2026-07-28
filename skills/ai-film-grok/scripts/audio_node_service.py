@@ -2,8 +2,8 @@
 """Private Windows/LAN audio-node service.
 
 Start with: uvicorn audio_node_service:app --host <LAN-IP> --port 8788
-Only Qwen TTS is built in. Music/SFX use explicit trusted argv adapters so the
-control plane never guesses model-specific CLIs.
+Only Qwen TTS is built in. Music, SFX, and performance tracks use explicit
+trusted argv adapters so the control plane never guesses model-specific CLIs.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ TOKEN = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "")
 MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign")
 MODEL_PATH = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL_PATH", MODEL_ID)
 jobs: dict[str, dict[str, Any]] = {}
+AUDIO_KINDS = ("tts", "music", "sfx", "performance")
 app = FastAPI(title="ai-film private audio node", docs_url=None, redoc_url=None, openapi_url=None)
 
 
@@ -50,7 +51,28 @@ def _available(kind: str) -> bool:
             return True
         except Exception:
             return False
-    return bool(os.environ.get(f"AIFILM_AUDIO_NODE_{kind.upper()}_ARGV"))
+    try:
+        _command_template(kind)
+        return True
+    except RuntimeError:
+        return False
+
+
+def _command_template(kind: str) -> list[str]:
+    raw = os.environ.get(f"AIFILM_AUDIO_NODE_{kind.upper()}_ARGV", "")
+    if not raw:
+        raise RuntimeError(f"{kind} model is not configured")
+    try:
+        template = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{kind} argv is invalid") from exc
+    if (
+        not isinstance(template, list)
+        or not template
+        or not all(isinstance(item, str) for item in template)
+    ):
+        raise RuntimeError(f"{kind} argv is invalid")
+    return template
 
 
 def _gpu_health() -> dict[str, Any]:
@@ -78,7 +100,7 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     return {
         "ok": True,
         "node": "private-lan",
-        "models": {kind: _available(kind) for kind in ("tts", "music", "sfx")},
+        "models": {kind: _available(kind) for kind in AUDIO_KINDS},
         "model": MODEL_ID,
         "gpu": _gpu_health(),
     }
@@ -132,12 +154,7 @@ def _run_tts(payload: dict[str, Any], out: Path) -> None:
 
 
 def _run_command(kind: str, payload: dict[str, Any], out: Path) -> None:
-    raw = os.environ.get(f"AIFILM_AUDIO_NODE_{kind.upper()}_ARGV", "")
-    if not raw:
-        raise RuntimeError(f"{kind} model is not configured")
-    template = json.loads(raw)
-    if not isinstance(template, list) or not all(isinstance(item, str) for item in template):
-        raise RuntimeError(f"{kind} argv is invalid")
+    template = _command_template(kind)
     source = out.with_suffix(".source.wav")
     values = {
         "out": str(source),
@@ -188,7 +205,7 @@ async def create(
     kind: str, payload: dict[str, Any], authorization: str | None = Header(default=None)
 ) -> dict[str, str]:
     _auth(authorization)
-    if kind not in {"tts", "music", "sfx"}:
+    if kind not in AUDIO_KINDS:
         raise HTTPException(404, "unknown audio kind")
     return _create(kind, payload)
 

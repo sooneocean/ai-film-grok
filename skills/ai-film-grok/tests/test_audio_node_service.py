@@ -38,6 +38,19 @@ def test_health_reports_capacity_without_private_payloads(monkeypatch: pytest.Mo
     assert "token" not in report
 
 
+def test_performance_adapter_is_reported_only_when_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.delenv("AIFILM_AUDIO_NODE_PERFORMANCE_ARGV", raising=False)
+    assert not service._available("performance")
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_PERFORMANCE_ARGV", '["trusted-adapter"]')
+    assert service._available("performance")
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_PERFORMANCE_ARGV", "not-json")
+    assert not service._available("performance")
+
+
 def test_private_service_exposes_no_schema_or_documentation_routes() -> None:
     pytest.importorskip("fastapi")
     service = importlib.import_module("audio_node_service")
