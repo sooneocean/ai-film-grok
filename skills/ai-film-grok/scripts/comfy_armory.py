@@ -9,7 +9,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from comfy_video import _json_request, normalize_base_url
+from comfy_video import _json_request, _model_sha256, normalize_base_url
 
 
 class ComfyArmoryError(RuntimeError):
@@ -25,6 +25,7 @@ _MODEL_ROUTES = {
     "loras": "/models/loras",
 }
 _SAFE_PREFIX = re.compile(r"[A-Za-z0-9_./-]+")
+_VERIFIED_STATUSES = frozenset({"verified", "verified-baseline"})
 
 
 def load_armory() -> dict[str, Any]:
@@ -61,6 +62,12 @@ def _select_candidates(
 ) -> list[dict[str, Any]]:
     candidates = []
     for weapon in load_armory()["weapons"]:
+        status = str(weapon.get("status") or "")
+        is_experimental = status == "experimental"
+        if status not in _VERIFIED_STATUSES and not (is_experimental and allow_experimental):
+            continue
+        if (weapon.get("verified") or {}).get("real_pilot") is not True:
+            continue
         if operation not in weapon.get("intents", []):
             continue
         if quality not in weapon.get("quality_tiers", []):
@@ -68,8 +75,6 @@ def _select_candidates(
         if identity_lock and not weapon.get("capabilities", {}).get(
             "identity_preserving_local_edit"
         ):
-            continue
-        if weapon.get("status") == "experimental" and not allow_experimental:
             continue
         if ready_ids is not None and weapon["id"] not in ready_ids:
             continue
@@ -128,6 +133,18 @@ def _template_path(weapon: dict[str, Any]) -> Path:
     return path
 
 
+def _validate_relative_media_name(value: str, *, label: str) -> str:
+    candidate = str(value).strip().replace("\\", "/")
+    if (
+        not candidate
+        or not _SAFE_PREFIX.fullmatch(candidate)
+        or candidate.startswith("/")
+        or any(part in {"", ".", ".."} for part in candidate.split("/"))
+    ):
+        raise ComfyArmoryError(f"{label} must be a safe relative ComfyUI media path")
+    return candidate
+
+
 def compile_weapon_workflow(
     weapon_id: str,
     *,
@@ -147,8 +164,7 @@ def compile_weapon_workflow(
     )
     if weapon is None:
         raise ComfyArmoryError(f"unknown verified weapon: {weapon_id}")
-    if not _SAFE_PREFIX.fullmatch(filename_prefix):
-        raise ComfyArmoryError("unsafe filename prefix")
+    filename_prefix = _validate_relative_media_name(filename_prefix, label="filename prefix")
     if not weapon.get("workflow_template"):
         raise ComfyArmoryError(
             f"workflow compiler is unavailable for weapon: {weapon_id}; use its provider"
@@ -164,6 +180,7 @@ def compile_weapon_workflow(
     if "input_node" in bindings:
         if not input_image_name:
             raise ComfyArmoryError("Qwen local edit requires an input image name")
+        input_image_name = _validate_relative_media_name(input_image_name, label="input image name")
         graph[bindings["input_node"]]["inputs"][bindings["input_image_input"]] = input_image_name
     return graph
 
@@ -180,9 +197,28 @@ def probe_armory(base_url: str | None = None) -> dict[str, Any]:
             for group, names in weapon.get("requirements", {}).items()
             if set(names) - installed[group]
         }
+        hash_mismatches: dict[str, dict[str, str]] = {}
+        hash_errors: dict[str, dict[str, str]] = {}
+        if not missing:
+            for group, expected in weapon.get("requirement_sha256", {}).items():
+                for filename, expected_hash in expected.items():
+                    try:
+                        actual_hash = _model_sha256(url, group, filename)
+                    except Exception as exc:
+                        hash_errors.setdefault(group, {})[filename] = str(exc)[:200]
+                        continue
+                    if actual_hash != expected_hash:
+                        hash_mismatches.setdefault(group, {})[filename] = actual_hash
         entry = {"id": weapon["id"], "status": weapon["status"]}
-        if missing:
-            blocked.append({**entry, "missing": missing})
+        if missing or hash_mismatches or hash_errors:
+            blocked.append(
+                {
+                    **entry,
+                    "missing": missing,
+                    "sha256_mismatches": hash_mismatches,
+                    "sha256_errors": hash_errors,
+                }
+            )
         else:
             ready.append(entry)
     return {

@@ -596,6 +596,14 @@ def validate_film_spec(
     spec["_i2v_profile"] = i2v_profile
     chain = frw_i2v_fallback_chain()
     raw_i2v = spec.get("i2v_provider", "auto")
+    raw_still = spec.get("still_provider", "auto")
+    if not isinstance(raw_still, str) or raw_still.lower() not in {
+        "auto",
+        "comfy_lan",
+        "grok",
+    }:
+        raise FilmSpecError("film-spec still_provider must be one of ['auto', 'comfy_lan', 'grok']")
+    spec["still_provider"] = raw_still.lower()
     if not isinstance(raw_i2v, str) or raw_i2v.lower() not in I2V_PROVIDERS:
         raise FilmSpecError(f"film-spec i2v_provider must be one of {sorted(I2V_PROVIDERS)}")
     i2v_provider = raw_i2v.lower()

@@ -166,6 +166,38 @@ class I2VProviderTests(unittest.TestCase):
                     subject_basis="fictional_adults",
                 )
 
+    def test_comfy_build_command_rejects_explicit_experimental_production_bypass(
+        self,
+    ) -> None:
+        from unittest import mock
+
+        provider = LocalComfyWan22Provider()
+        with mock.patch.object(
+            provider,
+            "_base_url",
+            return_value="http://192.168.88.52:8188",
+        ):
+            with self.assertRaisesRegex(I2VProviderError, "pilot-only"):
+                provider.build_command(
+                    keyframe=Path("/tmp/adult-keyframe.png"),
+                    prompt="Structured shot prompt.",
+                    out=Path("/tmp/out.mp4"),
+                    profile="adult-general-experimental",
+                    production_stage="production",
+                    allow_experimental=True,
+                    subject_basis="fictional_adults",
+                )
+            with self.assertRaisesRegex(I2VProviderError, "quarantined"):
+                provider.build_command(
+                    keyframe=Path("/tmp/adult-keyframe.png"),
+                    prompt="Structured shot prompt.",
+                    out=Path("/tmp/out.mp4"),
+                    profile="adult-action-experimental",
+                    production_stage="pilot",
+                    allow_experimental=True,
+                    subject_basis="fictional_adults",
+                )
+
     def test_comfy_generate_reads_hash_bound_receipt(self) -> None:
         import hashlib
         import json
@@ -362,6 +394,10 @@ class I2VProviderTests(unittest.TestCase):
                             "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
                         ],
                         "loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"],
+                        "lora_sha256": {
+                            "NSFW-22-H-e8.safetensors": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",
+                            "NSFW-22-L-e8.safetensors": "d6b783742f4d5fd63a0223ae1d5bf64fc995a6b408480ac2a00528ae0d4146db",
+                        },
                         "experimental_assets_promoted": True,
                         "subject_basis": "fictional_adults",
                         "adult_attestation": True,
@@ -384,6 +420,8 @@ class I2VProviderTests(unittest.TestCase):
                     prompt="adult pilot",
                     out=out,
                     profile="adult-general-experimental",
+                    production_stage="pilot",
+                    allow_experimental=True,
                     subject_basis="fictional_adults",
                 )
         self.assertFalse(result["ok"])

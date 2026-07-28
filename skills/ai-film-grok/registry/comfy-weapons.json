@@ -218,6 +218,12 @@
         "vae": ["wan_2.1_vae.safetensors"],
         "loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"]
       },
+      "requirement_sha256": {
+        "loras": {
+          "NSFW-22-H-e8.safetensors": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",
+          "NSFW-22-L-e8.safetensors": "d6b783742f4d5fd63a0223ae1d5bf64fc995a6b408480ac2a00528ae0d4146db"
+        }
+      },
       "capabilities": {
         "adult_attestation_required": true,
         "pilot_only": true,

@@ -419,17 +419,15 @@ class LocalComfyWan22Provider(I2VProvider):
 
     @staticmethod
     def _resolve_profile_name(kwargs: dict[str, Any]) -> str:
-        explicit = str(kwargs.get("profile") or "auto")
-        if explicit != "auto":
-            return explicit
-        from comfy_video import select_wan22_weapon
+        from comfy_video import resolve_wan22_profile
 
-        selection = select_wan22_weapon(
+        profile = resolve_wan22_profile(
+            str(kwargs.get("profile") or "auto"),
             intent=str(kwargs.get("weapon_intent") or "general"),
             stage=str(kwargs.get("production_stage") or "production"),
             allow_experimental=bool(kwargs.get("allow_experimental")),
         )
-        return str(selection["profile"]["name"])
+        return str(profile["name"])
 
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
         del root
@@ -574,6 +572,16 @@ class LocalComfyWan22Provider(I2VProvider):
                     verification_errors.append("model identity mismatch")
                 if list(detail.get("loras") or []) != expected_loras:
                     verification_errors.append("LoRA identity mismatch")
+                expected_lora_sha256 = {
+                    name: str(profile[hash_key])
+                    for name, hash_key in (
+                        (profile.get("high_lora"), "high_lora_sha256"),
+                        (profile.get("low_lora"), "low_lora_sha256"),
+                    )
+                    if name and hash_key in profile
+                }
+                if dict(detail.get("lora_sha256") or {}) != expected_lora_sha256:
+                    verification_errors.append("LoRA SHA-256 mismatch")
                 if (
                     profile_name.endswith("-experimental")
                     and detail.get("experimental_assets_promoted") is not False
