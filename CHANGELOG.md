@@ -3,6 +3,14 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.11.0] - 2026-07-28
+
+### Added
+
+- Explicit private-LAN `comfy-wan22` provider and `aifilm comfy` control plane for bounded inventory, input upload, typed workflow overrides, API-format submission, WebSocket/History completion, artifact download, targeted cancellation and memory release.
+- Local-only workflow validation blocks ComfyUI external API nodes unless the submitted workflow receives an explicit approval flag.
+- RTX 5090 capability reports bind installed Wan 2.2 model pairs, device VRAM and local output checksums without changing the `grok_primary` default.
+
 ## [2.8.0] - 2026-07-27
 
 ### Added

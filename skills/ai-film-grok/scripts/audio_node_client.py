@@ -157,3 +157,117 @@ def render(
             raise AudioNodeError("audio node job entered an unknown terminal state")
         time.sleep(0.5)
     raise AudioNodeError("audio node job timed out")
+
+
+def render_batch(
+    base_url: str,
+    token: str,
+    *,
+    payload: dict[str, Any],
+    out_dir: Path,
+    timeout: int = 1800,
+) -> dict[str, Any]:
+    """Render one hash-bound ACE-Step batch without exposing its prompt.
+
+    The node returns only indexes, seeds, hashes, and model provenance. Audio is
+    downloaded separately so a partial or mismatched batch can never be
+    promoted as a complete candidate set.
+    """
+    if not base_url.startswith(("http://", "https://")) or len(token) < 24:
+        raise AudioNodeError("invalid private audio node request")
+    try:
+        batch_size = int(payload.get("batch_size") or 0)
+        seeds = [int(seed) for seed in payload.get("seeds") or []]
+    except (TypeError, ValueError) as exc:
+        raise AudioNodeError("invalid ACE-Step batch request") from exc
+    if not 1 <= batch_size <= 8 or len(seeds) != batch_size or len(set(seeds)) != batch_size:
+        raise AudioNodeError("invalid ACE-Step batch request")
+
+    job_id = _json_response(
+        _request(base_url, token, "/v1/music-batch", body=payload), context="batch submission"
+    ).get("job_id")
+    if not isinstance(job_id, str) or not job_id:
+        raise AudioNodeError("audio node did not return batch job id")
+
+    status: dict[str, Any] = {}
+    for _ in range(timeout * 2):
+        status = _json_response(
+            _request(base_url, token, f"/v1/jobs/{job_id}"), context="batch job status"
+        )
+        state = status.get("status")
+        if state == "failed":
+            raise AudioNodeError("audio node batch job failed")
+        if state == "completed":
+            break
+        if state not in {"queued", "running"}:
+            raise AudioNodeError("audio node batch job entered an unknown terminal state")
+        time.sleep(0.5)
+    else:
+        raise AudioNodeError("audio node batch job timed out")
+
+    artifacts = status.get("artifacts")
+    if not isinstance(artifacts, list) or len(artifacts) != batch_size:
+        raise AudioNodeError("audio node returned incomplete batch receipt")
+    sanitized: list[dict[str, Any]] = []
+    indexes: set[int] = set()
+    receipt_seeds: set[int] = set()
+    created: list[Path] = []
+    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        for raw in artifacts:
+            if not isinstance(raw, dict):
+                raise AudioNodeError("audio node returned invalid batch artifact")
+            index = int(raw.get("index"))
+            seed = int(raw.get("seed"))
+            expected_hash = str(raw.get("sha256") or "")
+            if (
+                index < 0
+                or index >= batch_size
+                or index in indexes
+                or seed not in seeds
+                or seed in receipt_seeds
+                or len(expected_hash) != 64
+            ):
+                raise AudioNodeError("audio node returned invalid batch artifact")
+            wav = _request(
+                base_url,
+                token,
+                f"/v1/jobs/{job_id}/audio/{index}",
+                expect_wav=True,
+            )
+            if len(wav) < 512 or wav[:4] != b"RIFF":
+                raise AudioNodeError("audio node returned invalid batch wav")
+            target = out_dir / f"{job_id}-{index:02d}.wav"
+            if target.exists():
+                raise AudioNodeError("audio node batch output already exists")
+            temporary = out_dir / f".{job_id}-{index:02d}.partial.wav"
+            atomic_write_bytes(temporary, wav)
+            _validate_wav(temporary)
+            actual_hash = hashlib.sha256(temporary.read_bytes()).hexdigest()
+            if actual_hash != expected_hash:
+                raise AudioNodeError("audio node batch WAV hash does not match receipt")
+            temporary.replace(target)
+            created.append(target)
+            indexes.add(index)
+            receipt_seeds.add(seed)
+            sanitized.append(
+                {
+                    "index": index,
+                    "seed": seed,
+                    "sha256": actual_hash,
+                    "path": str(target),
+                }
+            )
+    except Exception:
+        for path in created:
+            path.unlink(missing_ok=True)
+        for path in out_dir.glob(f".{job_id}-*.partial.wav"):
+            path.unlink(missing_ok=True)
+        raise
+
+    return {
+        "job_id": job_id,
+        "model": str(status.get("model") or "ACE-Step-1.5"),
+        "checkpoint_fingerprint": str(status.get("checkpoint_fingerprint") or "unknown"),
+        "artifacts": sorted(sanitized, key=lambda item: int(item["index"])),
+    }

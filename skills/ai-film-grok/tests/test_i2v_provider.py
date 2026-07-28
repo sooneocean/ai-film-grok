@@ -12,22 +12,24 @@ sys.path.insert(0, str(SCRIPTS))
 from i2v_provider import (  # noqa: E402
     GrokI2VProvider,
     I2VProviderError,
+    LocalComfyWan22Provider,
     SeedanceProvider,
     all_providers,
     for_endpoint,
     get,
-    registry_report,
     is_technical_failure,
+    registry_report,
     route_after_failure,
 )
 
 
 class I2VProviderTests(unittest.TestCase):
     def test_registry_has_grok_and_seedance(self) -> None:
-        """DoD: both providers registered by default."""
+        """DoD: cloud and explicit local providers are registered."""
         names = all_providers()
         self.assertIn("grok", names)
         self.assertIn("seedance", names)
+        self.assertIn("comfy-wan22", names)
 
     def test_grok_probe_ok(self) -> None:
         """The in-session probe is available without a film root."""
@@ -56,6 +58,7 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIsInstance(for_endpoint("image_to_video"), GrokI2VProvider)
         self.assertIsInstance(for_endpoint("frw_seedance_i2v"), SeedanceProvider)
         self.assertIsInstance(for_endpoint("frw_seedance_flf"), SeedanceProvider)
+        self.assertIsInstance(for_endpoint("local_wan22_i2v"), LocalComfyWan22Provider)
         # unknown endpoint → None
         self.assertIsNone(for_endpoint("nonexistent"))
 
@@ -101,13 +104,74 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIn("--out", cmd)
         self.assertNotIn("--wait", cmd)
 
+    def test_comfy_build_command_uses_pinned_runtime_and_long_timeout(self) -> None:
+        import os
+        from unittest import mock
+
+        with mock.patch.dict(
+            os.environ,
+            {"AIFILM_COMFYUI_BASE_URL": "http://192.168.88.52:8188"},
+        ):
+            provider = get("comfy-wan22")
+            cmd = provider.build_command(
+                keyframe=Path("/tmp/kf.png"),
+                prompt="camera move",
+                out="/tmp/clip.mp4",
+            )
+        self.assertEqual(cmd[0], sys.executable)
+        self.assertIn("--timeout", cmd)
+        self.assertEqual(cmd[cmd.index("--timeout") + 1], "1800")
+        self.assertEqual(provider.command_timeout_sec, 1830)
+
+    def test_comfy_generate_reads_hash_bound_receipt(self) -> None:
+        import json
+        import os
+        from types import SimpleNamespace
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as raw:
+            out = Path(raw) / "clip.mp4"
+            receipt = out.with_suffix(".mp4.receipt.json")
+            receipt.write_text(
+                json.dumps(
+                    {
+                        "prompt_id": "p-1",
+                        "output": {"sha256": "abc123"},
+                        "models": ["wan-high", "wan-low"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"AIFILM_COMFYUI_BASE_URL": "http://192.168.88.52:8188"},
+                ),
+                mock.patch(
+                    "i2v_provider.subprocess.run",
+                    return_value=SimpleNamespace(returncode=0, stdout="{}", stderr=""),
+                ),
+            ):
+                result = get("comfy-wan22").generate(
+                    keyframe=Path(raw) / "keyframe.png",
+                    prompt="camera move",
+                    out=out,
+                )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["prompt_id"], "p-1")
+        self.assertEqual(result["output_sha256"], "abc123")
+
     def test_unknown_provider_raises(self) -> None:
         with self.assertRaises(I2VProviderError):
             get("nonexistent")
 
     def test_registry_report(self) -> None:
         """registry_report lists all providers + active one."""
-        report = registry_report()
+        import os
+        from unittest import mock
+
+        with mock.patch.dict(os.environ, {"AIFILM_COMFYUI_BASE_URL": ""}):
+            report = registry_report()
         self.assertEqual(report["kind"], "i2v-provider-registry")
         names = [p["name"] for p in report["providers"]]
         self.assertIn("grok", names)
@@ -125,7 +189,9 @@ class I2VProviderTests(unittest.TestCase):
     def test_only_technical_failure_routes_to_frw(self) -> None:
         self.assertTrue(is_technical_failure("HTTP 503 service unavailable"))
         self.assertFalse(is_technical_failure({"task_id": "ambiguous"}))
-        self.assertIsNone(route_after_failure(root=None, shot_id="s1", primary="grok", error="quality fail"))
+        self.assertIsNone(
+            route_after_failure(root=None, shot_id="s1", primary="grok", error="quality fail")
+        )
         selected = route_after_failure(root=None, shot_id="s1", primary="grok", error="HTTP 503")
         self.assertIsNotNone(selected)
         self.assertEqual(selected[0].name, "seedance")

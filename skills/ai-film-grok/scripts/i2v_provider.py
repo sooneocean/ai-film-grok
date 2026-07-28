@@ -20,7 +20,9 @@ instances rather than replacing them.
 
 from __future__ import annotations
 
+import json
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -155,6 +157,7 @@ class I2VProvider:
     """
 
     name: str = "base"
+    command_timeout_sec: int = 600
     # source_endpoint labels this provider owns (subset of ALLOWED_VIDEO_ENDPOINTS)
     endpoints: frozenset[str] = frozenset()
 
@@ -176,7 +179,13 @@ class I2VProvider:
         if not cmd:
             raise I2VProviderError(f"{self.name}: build_command returned empty")
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=600)
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=self.command_timeout_sec,
+            )
         except (OSError, subprocess.SubprocessError) as exc:
             raise I2VProviderError(f"{self.name}: subprocess failed: {exc}") from exc
         ok = proc.returncode == 0
@@ -396,6 +405,117 @@ class SeedanceProvider(I2VProvider):
         }
 
 
+class LocalComfyWan22Provider(I2VProvider):
+    """Explicit private-LAN Wan 2.2 I2V lane on the user's RTX 5090."""
+
+    name = "comfy-wan22"
+    command_timeout_sec = 1830
+    endpoints = frozenset({"local_wan22_i2v"})
+
+    def _base_url(self) -> str:
+        from config_loader import get_config
+
+        return get_config().comfyui_base_url.strip()
+
+    def probe(self, *, root: Path | None = None) -> CapabilityReport:
+        del root
+        base_url = self._base_url()
+        if not base_url:
+            return CapabilityReport(
+                provider=self.name,
+                ok=False,
+                available=False,
+                reason="AIFILM_COMFYUI_BASE_URL is not configured.",
+                models=[],
+                profile="explicit_local",
+            )
+        try:
+            from comfy_video import probe
+
+            detail = probe(base_url)
+        except Exception as exc:
+            return CapabilityReport(
+                provider=self.name,
+                ok=False,
+                available=False,
+                reason=f"private ComfyUI probe failed: {exc}",
+                models=[],
+                profile="explicit_local",
+            )
+        models = list((detail.get("models") or {}).get("official") or [])
+        return CapabilityReport(
+            provider=self.name,
+            ok=bool(detail.get("ok")),
+            available=bool(detail.get("ok")),
+            reason="Private RTX 5090 Wan 2.2 is ready."
+            if detail.get("ok")
+            else "Required Wan 2.2 assets are missing.",
+            models=models,
+            profile="explicit_local",
+            detail=detail,
+        )
+
+    def build_command(
+        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
+    ) -> list[str]:
+        base_url = self._base_url()
+        if not base_url:
+            raise I2VProviderError("AIFILM_COMFYUI_BASE_URL is required for comfy-wan22")
+        out = kwargs.get("out")
+        if not out:
+            raise I2VProviderError("comfy-wan22 requires an explicit output path")
+        script = Path(__file__).resolve().parent / "comfy_video.py"
+        command = [
+            sys.executable,
+            str(script),
+            "generate",
+            "--base-url",
+            base_url,
+            "--image",
+            str(Path(keyframe).expanduser().resolve()),
+            "--prompt",
+            prompt,
+            "--out",
+            str(Path(out).expanduser().resolve()),
+            "--duration",
+            str(duration_sec),
+            "--timeout",
+            str(kwargs.get("timeout_sec", 1800)),
+            "--width",
+            str(kwargs.get("width", 480)),
+            "--height",
+            str(kwargs.get("height", 704)),
+            "--seed",
+            str(kwargs.get("seed", 123456)),
+            "--profile",
+            str(kwargs.get("profile", "official")),
+        ]
+        if kwargs.get("turbo"):
+            command.append("--turbo")
+        if kwargs.get("subject_basis"):
+            command.extend(("--subject-basis", str(kwargs["subject_basis"])))
+        return command
+
+    def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        result = super().generate(keyframe=keyframe, prompt=prompt, **kwargs)
+        out = Path(kwargs["out"]).expanduser().resolve()
+        receipt = out.with_suffix(out.suffix + ".receipt.json")
+        result["receipt"] = str(receipt)
+        if result.get("ok") and receipt.is_file():
+            try:
+                detail = json.loads(receipt.read_text(encoding="utf-8"))
+                result["prompt_id"] = detail.get("prompt_id")
+                result["output_sha256"] = (detail.get("output") or {}).get("sha256")
+                result["models"] = detail.get("models") or []
+            except (OSError, ValueError):
+                result["ok"] = False
+                result["stderr"] = "comfy-wan22 receipt is unreadable"
+        elif result.get("ok"):
+            result["ok"] = False
+            result["stderr"] = "comfy-wan22 did not write a generation receipt"
+        return result
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -489,3 +609,4 @@ def registry_report(*, root: Path | None = None) -> dict[str, Any]:
 # Default registrations (importable side-effect)
 register(GrokI2VProvider())
 register(SeedanceProvider())
+register(LocalComfyWan22Provider())

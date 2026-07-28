@@ -196,6 +196,7 @@ class ConfigSchema:
     # ── I2V ─────────────────────────────────────────────────────────────
     i2v_profile: str = "grok_primary"
     seedance_available: bool = False
+    comfyui_base_url: str = ""
 
     # ── Lipsync ─────────────────────────────────────────────────────────
     lipsync_backend: str = "off"
@@ -302,6 +303,7 @@ def get_config() -> ConfigSchema:
         # I2V
         i2v_profile=_resolve("grok_primary", "AIFILM_I2V_PROFILE"),
         seedance_available=_resolve_bool("AIFILM_SEEDANCE_AVAILABLE", default=False),
+        comfyui_base_url=_env("AIFILM_COMFYUI_BASE_URL"),
         # Lipsync
         lipsync_backend=_resolve("off", "AIFILM_LIPSYNC_BACKEND"),
         lipsync_argv=_env("AIFILM_LIPSYNC_ARGV"),
@@ -340,6 +342,7 @@ _ENV_HELP: dict[str, str] = {
     "AIFILM_GROK_TTS_VOICE": "Grok TTS voice (eve | ara | leo | carina | zagan | …)",
     "AIFILM_GROK_TTS_LANGUAGE": "Grok TTS language (zh | en | …)",
     "AIFILM_GROK_PROBE_TTS": "Set to 1 to enable deep TTS voice list in doctor probe",
+    "AIFILM_COMFYUI_BASE_URL": "Private LAN ComfyUI base URL for explicit local video generation",
     "AIFILM_TTS_BACKEND": "Active TTS backend: mimo | auto | edge | fish | minimax | voicebox | grok | external",
     "AIFILM_TTS_STRICT_VOICE": "1 = fail on missing voice_id (default 1)",
     "AIFILM_TTS_VOICEBOX_FALLBACK": "0|1 — opt-in: try Voicebox when explicit backend fails",
