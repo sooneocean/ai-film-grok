@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCRIPTS))
 from dailies import update_dailies  # noqa: E402
 from next_actions import build_next_actions  # noqa: E402
 from quality_closure import (  # noqa: E402
+    _shot_quality_closure,
     build_benchmark_package,
     build_quality_report,
     record_blind_review,
@@ -141,6 +142,26 @@ def test_quality_report_blocks_current_contract_without_per_shot_evidence(tmp_pa
 
     assert report["evidence"]["shot_quality"]["ok"] is False
     assert "SHOT_QUALITY_EVIDENCE_MISSING" in report["blocking_codes"]
+
+
+def test_quality_closure_exposes_perceptual_i2v_duplicates(tmp_path: Path) -> None:
+    for shot_id in ("s001", "s002"):
+        clip = tmp_path / "clips" / f"{shot_id}.mp4"
+        clip.parent.mkdir(exist_ok=True)
+        clip.write_bytes(shot_id.encode("utf-8"))
+    (tmp_path / "manifest.json").write_text(
+        '{"quality_evidence_contract_version":1,"review_contract_version":2,"clips":'
+        '{"s001":{"status":"approved","path":"clips/s001.mp4","uniqueness":'
+        '{"sha256":"original","dhashes":["0","ffff"]}},'
+        '"s002":{"status":"approved","path":"clips/s002.mp4","uniqueness":'
+        '{"sha256":"reencoded","dhashes":["1","fffe"]}}}}',
+        encoding="utf-8",
+    )
+
+    report = _shot_quality_closure(tmp_path)
+
+    assert report["ok"] is False
+    assert report["perceptual_duplicates"] == [["s001", "s002"]]
 
 
 def test_repair_action_prefers_the_highest_priority_review_failure(tmp_path: Path) -> None:

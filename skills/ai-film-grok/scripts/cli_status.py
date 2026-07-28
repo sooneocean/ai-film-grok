@@ -31,6 +31,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     )
 
     root = Path(args.root).expanduser().resolve()
+    try:
+        from scene_sound import reconcile as reconcile_scene_sound
+
+        scene_sound = reconcile_scene_sound(root, write=True)
+    except Exception as exc:
+        scene_sound = {"status": "error", "error": str(exc)[:200]}
     manifest = load_manifest(root)
     summary = recompute_gates(root, manifest)
     save_manifest(root, manifest)
@@ -92,6 +98,7 @@ def cmd_status(args: argparse.Namespace) -> int:
                 "scorecard_present": pilot_score_path.is_file(),
             },
             "audio": _status_audio_summary(root),
+            "scene_sound": scene_sound,
             "inventory": _status_inventory(root, summary),
             "evidence": _status_evidence(root),
             "compose": {

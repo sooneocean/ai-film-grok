@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from itertools import combinations
 from pathlib import Path
 from typing import Any
 
@@ -116,8 +117,9 @@ def active_clip_reuse_report(
     approved shot, so old media needs explicit re-registration and review.
     """
     clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
+    strict_perceptual = int(manifest.get("review_contract_version") or 1) >= 2
     missing: list[str] = []
-    groups: dict[str, list[str]] = {}
+    fingerprints: list[tuple[str, dict[str, Any]]] = []
     for shot_id in required_shot_ids:
         record = clips.get(shot_id)
         if not isinstance(record, dict) or record.get("status") != "approved":
@@ -126,16 +128,32 @@ def active_clip_reuse_report(
         if not isinstance(fingerprint, dict) or not fingerprint.get("sha256"):
             missing.append(str(shot_id))
             continue
-        groups.setdefault(str(fingerprint["sha256"]), []).append(str(shot_id))
-    duplicates = [ids for ids in groups.values() if len(ids) > 1]
+        if strict_perceptual and (
+            not isinstance(fingerprint.get("dhashes"), list) or not fingerprint["dhashes"]
+        ):
+            missing.append(str(shot_id))
+            continue
+        fingerprints.append((str(shot_id), fingerprint))
+    exact_pairs: list[list[str]] = []
+    perceptual_pairs: list[list[str]] = []
+    for (left_id, left), (right_id, right) in combinations(fingerprints, 2):
+        pair = [left_id, right_id]
+        if left["sha256"] == right["sha256"]:
+            exact_pairs.append(pair)
+        elif _near_same(left, right):
+            # A normal transcode changes SHA-256 but must not become a new take.
+            perceptual_pairs.append(pair)
     return {
-        "ok": not missing and not duplicates,
+        "ok": not missing and not exact_pairs and not perceptual_pairs,
         "required_shot_count": len(required_shot_ids),
         "missing_fingerprint_shots": sorted(missing),
-        "duplicate_sha256_groups": sorted([sorted(ids) for ids in duplicates]),
+        "duplicate_sha256_pairs": sorted(exact_pairs),
+        # Kept for quality-closure consumers during the report schema migration.
+        "duplicate_sha256_groups": sorted(exact_pairs),
+        "perceptual_duplicate_pairs": sorted(perceptual_pairs),
         "reason": (
             "every approved active I2V clip has a unique persisted visual fingerprint"
-            if not missing and not duplicates
+            if not missing and not exact_pairs and not perceptual_pairs
             else "re-register and review the affected I2V clips; identical segments cannot be delivered"
         ),
     }
