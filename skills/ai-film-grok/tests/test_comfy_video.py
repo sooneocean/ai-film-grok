@@ -25,7 +25,9 @@ from comfy_video import (  # noqa: E402
     inventory,
     load_api_workflow,
     normalize_base_url,
+    probe,
     queue_status,
+    resolve_wan22_profile,
     select_wan22_weapon,
     submit,
     upload_image,
@@ -81,6 +83,66 @@ class ComfyVideoTests(unittest.TestCase):
                 selection["profile"]["name"],
                 "adult-action-experimental",
             )
+
+    def test_explicit_experimental_profiles_cannot_bypass_pilot_gate(self) -> None:
+        with self.assertRaisesRegex(ComfyVideoError, "quarantined"):
+            resolve_wan22_profile(
+                "adult-action-experimental",
+                stage="pilot",
+                allow_experimental=True,
+            )
+        with self.assertRaisesRegex(ComfyVideoError, "pilot-only"):
+            resolve_wan22_profile(
+                "adult-general-experimental",
+                stage="production",
+                allow_experimental=True,
+            )
+        with self.assertRaisesRegex(ComfyVideoError, "requires --allow-experimental"):
+            resolve_wan22_profile(
+                "adult-general-experimental",
+                stage="pilot",
+                allow_experimental=False,
+            )
+        selected = resolve_wan22_profile(
+            "adult-general-experimental",
+            stage="pilot",
+            allow_experimental=True,
+        )
+        self.assertEqual(selected["name"], "adult-general-experimental")
+
+    @patch("comfy_video._json_request")
+    def test_probe_requires_exact_general_experimental_lora_hashes(
+        self,
+        request: MagicMock,
+    ) -> None:
+        required_diffusion = [
+            WAN22_OFFICIAL_PROFILE["high"],
+            WAN22_OFFICIAL_PROFILE["low"],
+        ]
+        required_loras = [
+            WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["high_lora"],
+            WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["low_lora"],
+        ]
+
+        def response(_base_url: str, route: str, **_kwargs: object) -> object:
+            if route == "/system_stats":
+                return {"system": {"comfyui_version": "0.22.0"}, "devices": []}
+            if route == "/models/diffusion_models":
+                return required_diffusion
+            if route == "/models/loras":
+                return required_loras
+            if route == "/models/text_encoders":
+                return ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"]
+            if route == "/models/vae":
+                return ["wan_2.1_vae.safetensors"]
+            if route.startswith("/pysssss/metadata/"):
+                return {"pysssss.sha256": "0" * 64}
+            raise AssertionError(route)
+
+        request.side_effect = response
+        report = probe("http://192.168.88.52:8188")
+        self.assertFalse(report["profiles"]["adult_general_experimental"])
+        self.assertFalse(report["experimental_adult_assets"]["general_wan22_pair_hashes_verified"])
 
     @patch("comfy_video._OPENER.open")
     def test_json_request_accepts_empty_success_body(self, open_request: MagicMock) -> None:

@@ -44,6 +44,10 @@
       "additionalProperties": true
     },
     "tts_backend": { "enum": ["auto", "minimax", "fish", "voicebox", "edge", "external"] },
+    "still_provider": {
+      "enum": ["grok", "comfy_lan", "auto"],
+      "description": "Still-image provider lock. auto leaves per-demand armory selection unlocked."
+    },
     "i2v_provider": {
       "enum": ["frw", "grok", "auto"],
       "description": "Bulk motion provider. Default/auto→frw (Seedance). Grok for identity stills / I2V fallback."

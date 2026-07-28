@@ -16,16 +16,54 @@ _STILL_DEMAND_STAGES = frozenset(
         "pilot_approval",
     }
 )
-_STILL_PROVIDER_KEYS = ("still_provider", "image_provider", "keyframe_provider")
+_STILL_PROVIDER_KEYS = ("still_provider",)
 _I2V_PROVIDER_KEYS = ("i2v_provider", "video_provider")
+_EDIT_OPERATIONS = frozenset(
+    {
+        "image-edit",
+        "image_edit",
+        "local-image-edit",
+        "wardrobe-edit",
+        "color-edit",
+        "identity-preserving-edit",
+    }
+)
 
 
-def _locked_provider(root: Path, keys: tuple[str, ...]) -> str | None:
+def _locked_provider(
+    root: Path,
+    keys: tuple[str, ...],
+    *,
+    selected_local_provider: str | None = None,
+) -> str | None:
     spec = read_json(root / "film-spec.json") or {}
     for key in keys:
         value = str(spec.get(key) or "").strip()
-        if value and value not in {"auto", "default", "unlocked"}:
+        if value and value not in {
+            "auto",
+            "default",
+            "unlocked",
+            selected_local_provider,
+        }:
             return value
+    return None
+
+
+def _requested_operation(*items: dict[str, Any] | None) -> str | None:
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        nested = item.get("input")
+        values = (
+            item.get("operation"),
+            item.get("intent"),
+            nested.get("operation") if isinstance(nested, dict) else None,
+            nested.get("intent") if isinstance(nested, dict) else None,
+        )
+        for value in values:
+            normalized = str(value or "").strip().lower()
+            if normalized:
+                return normalized
     return None
 
 
@@ -49,6 +87,8 @@ def build_weapon_route(
     motion_demand = bool(
         stage == "bulk" or job_skill == "image.animate" or action_id == "grok-i2v-bulk"
     )
+    requested_operation = _requested_operation(primary_job, primary_action)
+    edit_demand = still_demand and requested_operation in _EDIT_OPERATIONS
     demand_detected = still_demand or motion_demand
     common = {
         "schema_version": 1,
@@ -64,7 +104,11 @@ def build_weapon_route(
         return {**common, "status": "not_required", "reason": "no current visual weapon demand"}
 
     provider_keys = _I2V_PROVIDER_KEYS if motion_demand else _STILL_PROVIDER_KEYS
-    locked_provider = _locked_provider(base, provider_keys)
+    locked_provider = _locked_provider(
+        base,
+        provider_keys,
+        selected_local_provider="comfy_lan" if still_demand else None,
+    )
     if locked_provider:
         return {
             **common,
@@ -78,11 +122,17 @@ def build_weapon_route(
     operation = (
         ("adult-meat-motion-i2v" if adult else "image-to-video")
         if motion_demand
+        else "local-image-edit"
+        if edit_demand
         else "text-to-image"
     )
     production_stage = "pilot" if stage == "pilot_approval" else "production"
     try:
-        route = select_weapon(operation, stage=production_stage)
+        route = select_weapon(
+            operation,
+            stage=production_stage,
+            identity_lock=edit_demand,
+        )
     except ComfyArmoryError as exc:
         return {
             **common,

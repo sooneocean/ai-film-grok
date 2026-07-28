@@ -56,6 +56,24 @@ def test_unavailable_layered_intent_fails_closed() -> None:
         select_weapon("layered-image")
 
 
+def test_unverified_high_priority_candidate_cannot_enter_armory() -> None:
+    forged = load_armory()
+    forged["weapons"].insert(
+        0,
+        {
+            "id": "forged",
+            "status": "unverified",
+            "priority": 999,
+            "intents": ["text-to-image"],
+            "quality_tiers": ["max_practical"],
+            "verified": {"real_pilot": False},
+        },
+    )
+    with patch("comfy_armory.load_armory", return_value=forged):
+        route = select_weapon("text-to-image")
+    assert route["weapon"]["id"] == "qwen-image-2512-quality"
+
+
 def test_adult_meat_motion_auto_route_is_pilot_only() -> None:
     route = select_weapon(
         "adult-meat-motion-i2v",
@@ -126,8 +144,34 @@ def test_compile_rejects_empty_prompt_and_unsafe_seed(prompt: str, seed: int) ->
         )
 
 
+@pytest.mark.parametrize(
+    "filename_prefix,input_name",
+    [
+        ("../../escape", None),
+        ("/absolute", None),
+        ("safe/output", "../../secret.png"),
+        ("safe/output", "/etc/passwd"),
+    ],
+)
+def test_compile_rejects_unsafe_relative_media_paths(
+    filename_prefix: str,
+    input_name: str | None,
+) -> None:
+    weapon = "qwen-image-edit-2511-local" if input_name is not None else "qwen-image-2512-quality"
+    with pytest.raises(ComfyArmoryError, match="safe relative"):
+        compile_weapon_workflow(
+            weapon,
+            prompt="safe prompt",
+            seed=7,
+            filename_prefix=filename_prefix,
+            input_image_name=input_name,
+        )
+
+
 @patch("comfy_armory._json_request")
-def test_live_probe_marks_only_fully_installed_weapons_ready(request: MagicMock) -> None:
+def test_live_probe_marks_only_fully_installed_weapons_ready(
+    request: MagicMock,
+) -> None:
     model_lists = {
         "/models/diffusion_models": [
             "qwen_image_2512_fp8_e4m3fn.safetensors",
@@ -149,3 +193,75 @@ def test_live_probe_marks_only_fully_installed_weapons_ready(request: MagicMock)
         "wan22-adult-intimacy-baseline",
         "wan22-adult-meat-pilot",
     }
+
+
+@patch("comfy_armory._model_sha256")
+@patch("comfy_armory._json_request")
+def test_live_probe_blocks_only_weapon_with_unreadable_required_hash(
+    request: MagicMock,
+    model_sha256: MagicMock,
+) -> None:
+    armory = load_armory()
+    installed = {
+        group: sorted(
+            {
+                name
+                for weapon in armory["weapons"]
+                for name in weapon.get("requirements", {}).get(group, [])
+            }
+        )
+        for group in ("diffusion_models", "text_encoders", "vae", "loras")
+    }
+    request.side_effect = lambda _url, route: installed[route.removeprefix("/models/")]
+    model_sha256.side_effect = ComfyArmoryError("metadata unavailable")
+
+    report = probe_armory("http://192.168.88.52:8188")
+
+    assert "wan22-i2v-quality" in report["ready_ids"]
+    assert "qwen-image-2512-quality" in report["ready_ids"]
+    assert {item["id"] for item in report["blocked"]} == {"wan22-adult-meat-pilot"}
+    assert report["blocked"][0]["sha256_errors"]["loras"]
+
+
+@patch("comfy_armory._model_sha256", return_value="0" * 64)
+@patch("comfy_armory._json_request")
+def test_live_probe_blocks_same_name_adult_lora_with_wrong_hash(
+    request: MagicMock,
+    _sha256: MagicMock,
+) -> None:
+    request.side_effect = lambda _url, route: {
+        "/models/diffusion_models": [
+            "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+            "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+        ],
+        "/models/text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+        "/models/vae": ["wan_2.1_vae.safetensors"],
+        "/models/loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"],
+    }[route]
+    report = probe_armory("http://192.168.88.52:8188")
+    blocked = {item["id"]: item for item in report["blocked"]}
+    assert "wan22-adult-meat-pilot" in blocked
+    assert blocked["wan22-adult-meat-pilot"]["sha256_mismatches"]
+
+
+@patch("comfy_armory._json_request")
+def test_live_probe_accepts_exact_adult_lora_hashes(request: MagicMock) -> None:
+    request.side_effect = lambda _url, route: {
+        "/models/diffusion_models": [
+            "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+            "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+        ],
+        "/models/text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+        "/models/vae": ["wan_2.1_vae.safetensors"],
+        "/models/loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"],
+    }[route]
+    hashes = {
+        "NSFW-22-H-e8.safetensors": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",
+        "NSFW-22-L-e8.safetensors": "d6b783742f4d5fd63a0223ae1d5bf64fc995a6b408480ac2a00528ae0d4146db",
+    }
+    with patch(
+        "comfy_armory._model_sha256",
+        side_effect=lambda _url, _group, filename: hashes[filename],
+    ):
+        report = probe_armory("http://192.168.88.52:8188")
+    assert "wan22-adult-meat-pilot" in report["ready_ids"]

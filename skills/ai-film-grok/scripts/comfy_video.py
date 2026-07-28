@@ -59,6 +59,8 @@ WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE: dict[str, Any] = {
     "low": WAN22_OFFICIAL_PROFILE["low"],
     "high_lora": "wan22-mouthfull-140epoc-high-k3nk.safetensors",
     "low_lora": "wan22-mouthfull-152epoc-low-k3nk.safetensors",
+    "high_lora_sha256": "f126c44c4c2905403479c21d406e8050bb4959e5befd169ab6c5935d797cf0b8",
+    "low_lora_sha256": "8ca209101d426ebf1e2f451b61e3f1cbd445e49cc16c1b71c3e5dd3ddf5d37ed",
 }
 
 WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE: dict[str, Any] = {
@@ -67,6 +69,8 @@ WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE: dict[str, Any] = {
     "low": WAN22_OFFICIAL_PROFILE["low"],
     "high_lora": "NSFW-22-H-e8.safetensors",
     "low_lora": "NSFW-22-L-e8.safetensors",
+    "high_lora_sha256": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",
+    "low_lora_sha256": "d6b783742f4d5fd63a0223ae1d5bf64fc995a6b408480ac2a00528ae0d4146db",
     "lora_strength": 0.9,
 }
 
@@ -127,6 +131,38 @@ def select_wan22_weapon(
         "requires_human_approval": True,
         "reason": "experimental assets were not authorized; use the official adult pilot control",
     }
+
+
+def resolve_wan22_profile(
+    profile_name: str,
+    *,
+    intent: str = "general",
+    stage: str = "production",
+    allow_experimental: bool = False,
+) -> Mapping[str, Any]:
+    """Resolve every explicit and automatic entry through one promotion gate."""
+    normalized = str(profile_name or "auto").strip().lower()
+    if normalized == "auto":
+        return select_wan22_weapon(
+            intent=intent,
+            stage=stage,
+            allow_experimental=allow_experimental,
+        )["profile"]
+    if normalized == WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE["name"]:
+        raise ComfyVideoError("adult-action-experimental is quarantined after failed A/B")
+    if normalized == WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["name"]:
+        if stage != "pilot" or not allow_experimental:
+            raise ComfyVideoError(
+                "adult-general-experimental is pilot-only and requires --allow-experimental"
+            )
+        return WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE
+    profiles = {
+        WAN22_OFFICIAL_PROFILE["name"]: WAN22_OFFICIAL_PROFILE,
+        WAN22_ADULT_PROFILE["name"]: WAN22_ADULT_PROFILE,
+    }
+    if normalized not in profiles:
+        raise ComfyVideoError(f"unknown Wan 2.2 profile: {profile_name}")
+    return profiles[normalized]
 
 
 WAN22_VAE = "wan_2.1_vae.safetensors"
@@ -455,6 +491,23 @@ def _model_list(base_url: str, folder: str) -> list[str]:
     return [str(item) for item in data] if isinstance(data, list) else []
 
 
+def _model_sha256(base_url: str, folder: str, filename: str) -> str:
+    encoded = urllib.parse.quote(f"{folder}/{filename}", safe="")
+    data = _json_request(base_url, f"/pysssss/metadata/{encoded}")
+    candidates = (
+        data.get("sha256"),
+        data.get("hash"),
+        data.get("pysssss.sha256"),
+        (data.get("metadata") or {}).get("sha256")
+        if isinstance(data.get("metadata"), Mapping)
+        else None,
+    )
+    value = next((str(item).lower() for item in candidates if item), "")
+    if not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise ComfyVideoError(f"ComfyUI metadata has no valid SHA-256 for {folder}/{filename}")
+    return value
+
+
 def _prompt_ids(items: object) -> list[str]:
     if not isinstance(items, list):
         return []
@@ -660,6 +713,23 @@ def probe(base_url: str) -> dict[str, Any]:
         WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["high_lora"],
         WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["low_lora"],
     }
+    general_hashes: dict[str, str] = {}
+    if general_experimental_loras.issubset(set(loras)):
+        # Optional experimental LoRAs: missing pysssss SHA must not block official/adult-motion.
+        for name in sorted(general_experimental_loras):
+            try:
+                general_hashes[name] = _model_sha256(base_url, "loras", name)
+            except ComfyVideoError:
+                general_hashes[name] = ""
+    expected_general_hashes = {
+        WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["high_lora"]: (
+            WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["high_lora_sha256"]
+        ),
+        WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["low_lora"]: (
+            WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["low_lora_sha256"]
+        ),
+    }
+    general_hashes_verified = general_hashes == expected_general_hashes
     return {
         "schema_version": 1,
         "kind": "comfy-video-capability",
@@ -687,7 +757,11 @@ def probe(base_url: str) -> dict[str, Any]:
             "adult_general_experimental": (
                 required_official.issubset(installed)
                 and general_experimental_loras.issubset(set(loras))
+                and general_hashes_verified
             ),
+        },
+        "profile_lora_sha256": {
+            "adult_general_experimental": general_hashes,
         },
         "models": {
             "official": [WAN22_OFFICIAL_PROFILE["high"], WAN22_OFFICIAL_PROFILE["low"]],
@@ -701,6 +775,7 @@ def probe(base_url: str) -> dict[str, Any]:
             "verified_wan22_pair_present": experimental_loras.issubset(set(loras)),
             "verified_wan22_pair_promoted": False,
             "general_wan22_pair_present": general_experimental_loras.issubset(set(loras)),
+            "general_wan22_pair_hashes_verified": general_hashes_verified,
             "general_wan22_pair_promoted": False,
         },
     }
@@ -1060,6 +1135,7 @@ def generate(
         "output": downloaded,
         "models": [profile["high"], profile["low"]],
         "loras": [name for name in (profile.get("high_lora"), profile.get("low_lora")) if name],
+        "lora_sha256": dict((capability.get("profile_lora_sha256") or {}).get(profile_key) or {}),
         "experimental_assets_promoted": False,
         "lora_strength": profile.get("lora_strength"),
         "turbo": turbo,
@@ -1127,18 +1203,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "probe":
         report = probe(args.base_url)
     else:
-        if args.profile == "auto":
-            profile = select_wan22_weapon(
-                intent=args.weapon_intent,
-                stage=args.production_stage,
-                allow_experimental=args.allow_experimental,
-            )["profile"]
-        else:
-            profile = {
-                "adult-motion": WAN22_ADULT_PROFILE,
-                "adult-action-experimental": WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
-                "adult-general-experimental": WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
-            }.get(args.profile, WAN22_OFFICIAL_PROFILE)
+        profile = resolve_wan22_profile(
+            args.profile,
+            intent=args.weapon_intent,
+            stage=args.production_stage,
+            allow_experimental=args.allow_experimental,
+        )
         report = generate(
             base_url=args.base_url,
             image=args.image,

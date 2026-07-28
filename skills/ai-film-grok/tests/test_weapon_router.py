@@ -40,6 +40,33 @@ def test_existing_still_provider_lock_wins_over_armory(tmp_path: Path) -> None:
     assert route["auto_select"] is False
 
 
+def test_explicit_local_still_provider_uses_armory(tmp_path: Path) -> None:
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps({"still_provider": "comfy_lan"}),
+        encoding="utf-8",
+    )
+
+    route = build_weapon_route(tmp_path, workflow=_workflow("pilot_approval"))
+
+    assert route["status"] == "ready"
+    assert route["provider"] == "comfy_lan"
+
+
+def test_edit_demand_auto_selects_qwen_edit_weapon(tmp_path: Path) -> None:
+    route = build_weapon_route(
+        tmp_path,
+        workflow=_workflow("shot_animatic_lock"),
+        primary_job={
+            "skillId": "keyframe.generate",
+            "input": {"operation": "image_edit"},
+        },
+    )
+
+    assert route["status"] == "ready"
+    assert route["operation"] == "local-image-edit"
+    assert route["weapon_id"] == "qwen-image-edit-2511-local"
+
+
 def test_non_visual_stage_does_not_route_weapon(tmp_path: Path) -> None:
     route = build_weapon_route(tmp_path, workflow=_workflow("post_locks"))
 

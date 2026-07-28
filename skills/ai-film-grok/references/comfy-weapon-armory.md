@@ -22,6 +22,12 @@ For a new still or edit request with no already-locked provider:
 6. Existing film provider locks, pilot approval, identity/style gates and bulk
    authorization still win. The armory never silently changes a locked film.
 
+`film-spec.json` can formally lock still routing with
+`"still_provider": "grok"` or select this local armory with
+`"still_provider": "comfy_lan"`; `"auto"` leaves demand routing unlocked.
+An explicit `image_edit` operation routes to Qwen Edit instead of being
+misclassified as text-to-image.
+
 `auto_select=true` means provider choice is automatic for an in-scope user
 request. It does not make the route `advance` eligible and does not write a
 Professional stage lock; generation and registration still need their normal
