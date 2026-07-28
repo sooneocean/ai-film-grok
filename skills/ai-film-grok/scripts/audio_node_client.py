@@ -255,17 +255,22 @@ def render_batch(
         raw_reference = reference_path.read_bytes()
         if len(raw_reference) > 64 * 1024 * 1024:
             raise AudioNodeError("ACE-Step reference audio exceeds 64 MiB")
-        reference_receipt = _json_response(
-            _request(
+        try:
+            reference_response = _request(
                 base_url,
                 token,
                 "/v1/music-reference",
                 raw_body=raw_reference,
                 content_type="audio/wav",
                 timeout=120,
-            ),
-            context="reference upload",
-        )
+            )
+        except AudioNodeError as exc:
+            if "HTTP 404" in str(exc):
+                raise AudioNodeError(
+                    "audio node upgrade required: /v1/music-reference unavailable"
+                ) from exc
+            raise
+        reference_receipt = _json_response(reference_response, context="reference upload")
         reference_id = str(reference_receipt.get("reference_id") or "")
         source_hash = hashlib.sha256(raw_reference).hexdigest()
         if len(reference_id) != 64 or reference_receipt.get("source_sha256") != source_hash:

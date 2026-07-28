@@ -14,6 +14,7 @@ from bgm_library import (
     baseline_recipes,
     default_library_root,
     generate_candidates,
+    get_approved_asset,
     library_status,
     record_gaps,
     reject_candidate,
@@ -22,6 +23,12 @@ from bgm_library import (
     write_review_pack,
 )
 from music_cue import build_music_timeline
+from music_editor import (
+    build_music_edit_plan,
+    edit_variant_recipes,
+    motif_development_recipes,
+    transition_bridge_recipe,
+)
 from util import read_json, write_json
 
 _NODE_MODEL_FIELDS = ("model", "music_model", "music_checkpoint_fingerprint")
@@ -45,6 +52,8 @@ def _public_node_health(raw: Any, *, token: str) -> dict[str, Any]:
             public["models"] = public_models
     if isinstance(raw.get("music_batch"), bool):
         public["music_batch"] = raw["music_batch"]
+    if isinstance(raw.get("music_reference_upload"), bool):
+        public["music_reference_upload"] = raw["music_reference_upload"]
     for field in _NODE_MODEL_FIELDS:
         value = raw.get(field)
         if isinstance(value, str) and len(value) <= 256 and token not in value:
@@ -118,7 +127,7 @@ def add_bgm_library_parsers(sub: argparse._SubParsersAction) -> None:
     reject.add_argument("--reviewer", required=True)
     reject.add_argument("--reason", required=True)
 
-    for name in ("plan", "select"):
+    for name in ("plan", "select", "edit-plan"):
         route = actions.add_parser(name, help=f"{name.title()} approved BGM for a film timeline")
         route.add_argument("--library-root", default="")
         route.add_argument("--root", required=True)
@@ -130,6 +139,42 @@ def add_bgm_library_parsers(sub: argparse._SubParsersAction) -> None:
     series.add_argument("--root", required=True)
     series.add_argument("--series-id", required=True)
     series.add_argument("--seed-base", type=int, default=9100)
+
+    edit = actions.add_parser(
+        "edit-pack",
+        help="Generate approval-gated exact, dialogue-safe, loop, or outro variants",
+    )
+    edit.add_argument("--library-root", default="")
+    edit.add_argument("--asset-id", required=True)
+    edit.add_argument("--duration", type=float, required=True)
+    edit.add_argument(
+        "--variant",
+        action="append",
+        choices=("exact", "dialogue-safe", "loop", "outro"),
+        required=True,
+    )
+    edit.add_argument("--batch-size", type=int, choices=range(1, 9), default=1)
+    edit.add_argument("--seed-base", type=int, default=10100)
+
+    development = actions.add_parser(
+        "motif-development",
+        help="Generate eight story-development covers from one approved series motif",
+    )
+    development.add_argument("--library-root", default="")
+    development.add_argument("--root", required=True)
+    development.add_argument("--asset-id", required=True)
+    development.add_argument("--seed-base", type=int, default=11100)
+
+    bridge = actions.add_parser(
+        "bridge-pack",
+        help="Generate an approval-gated transition bridge between two approved assets",
+    )
+    bridge.add_argument("--library-root", default="")
+    bridge.add_argument("--from-asset-id", required=True)
+    bridge.add_argument("--to-asset-id", required=True)
+    bridge.add_argument("--duration", type=float, default=10.0)
+    bridge.add_argument("--batch-size", type=int, choices=range(1, 9), default=1)
+    bridge.add_argument("--seed-base", type=int, default=12100)
 
 
 def _root(args: argparse.Namespace) -> Path:
@@ -317,7 +362,7 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
             "requested_duration_sec": duration,
             "checks": checks,
         }
-    elif action in {"plan", "select"}:
+    elif action in {"plan", "select", "edit-plan"}:
         film_root = Path(args.root).expanduser().resolve()
         film_id, spec_series_id, timeline = _film_timeline(film_root)
         report = select_timeline(
@@ -329,10 +374,22 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
         )
         if report["gaps"]:
             report["gap_queue"] = record_gaps(library, report)
+        edit_plan = build_music_edit_plan(report)
+        report["music_edit_plan"] = edit_plan
         if action == "select":
             receipt = film_root / "receipts" / "bgm-selection.json"
             write_json(receipt, report)
-            report = {**report, "receipt": str(receipt)}
+            edit_receipt = film_root / "receipts" / "music-edit-plan.json"
+            write_json(edit_receipt, edit_plan)
+            report = {
+                **report,
+                "receipt": str(receipt),
+                "music_edit_plan_receipt": str(edit_receipt),
+            }
+        elif action == "edit-plan":
+            receipt = film_root / "receipts" / "music-edit-plan.json"
+            write_json(receipt, edit_plan)
+            report = {**edit_plan, "receipt": str(receipt)}
     elif action == "series-pack":
         base, token = _node_credentials()
         recipes = series_recipes(library, series_id=args.series_id)
@@ -357,6 +414,86 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
         }
         write_json(receipt, report)
         report["receipt"] = str(receipt)
+    elif action == "edit-pack":
+        base, token = _node_credentials()
+        parent, parent_path = get_approved_asset(library, args.asset_id)
+        recipes = edit_variant_recipes(
+            parent,
+            parent_path=parent_path,
+            target_duration=float(args.duration),
+            variants=tuple(args.variant),
+        )
+        candidates = []
+        for index, recipe in enumerate(recipes):
+            seed_start = int(args.seed_base) + index * int(args.batch_size)
+            result = generate_candidates(
+                library,
+                base_url=base,
+                token=token,
+                recipe=recipe,
+                batch_size=int(args.batch_size),
+                seeds=list(range(seed_start, seed_start + int(args.batch_size))),
+            )
+            candidates.extend(result["candidates"])
+        report = {
+            "ok": True,
+            "asset_id": args.asset_id,
+            "status": "pending_human_review",
+            "candidate_count": len(candidates),
+            "candidates": candidates,
+        }
+    elif action == "motif-development":
+        base, token = _node_credentials()
+        parent, parent_path = get_approved_asset(library, args.asset_id)
+        recipes = motif_development_recipes(parent, parent_path=parent_path)
+        candidates = []
+        for index, recipe in enumerate(recipes):
+            result = generate_candidates(
+                library,
+                base_url=base,
+                token=token,
+                recipe=recipe,
+                batch_size=1,
+                seeds=[int(args.seed_base) + index],
+            )
+            candidates.extend(result["candidates"])
+        receipt = Path(args.root).expanduser().resolve() / "receipts" / "motif-development.json"
+        report = {
+            "ok": True,
+            "asset_id": args.asset_id,
+            "series_id": parent.get("series_id") or "",
+            "status": "pending_human_review",
+            "candidate_count": len(candidates),
+            "candidates": candidates,
+        }
+        write_json(receipt, report)
+        report["receipt"] = str(receipt)
+    elif action == "bridge-pack":
+        base, token = _node_credentials()
+        outgoing, outgoing_path = get_approved_asset(library, args.from_asset_id)
+        incoming, _ = get_approved_asset(library, args.to_asset_id)
+        recipe = transition_bridge_recipe(
+            outgoing,
+            incoming,
+            outgoing_path=outgoing_path,
+            duration=float(args.duration),
+        )
+        result = generate_candidates(
+            library,
+            base_url=base,
+            token=token,
+            recipe=recipe,
+            batch_size=int(args.batch_size),
+            seeds=list(range(int(args.seed_base), int(args.seed_base) + int(args.batch_size))),
+        )
+        report = {
+            "ok": True,
+            "from_asset_id": args.from_asset_id,
+            "to_asset_id": args.to_asset_id,
+            "status": "pending_human_review",
+            "candidate_count": len(result["candidates"]),
+            "candidates": result["candidates"],
+        }
     else:  # pragma: no cover
         raise BGMLibraryError(f"unknown BGM library action: {action}")
     emit(report)

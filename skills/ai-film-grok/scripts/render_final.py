@@ -1198,6 +1198,16 @@ def render_music_template_timeline(
             record_gaps(library_root, selection_receipt)
             missing = [f"{gap['shot_id']}:{gap['mood']}" for gap in selection_receipt["gaps"]]
             raise RenderError("approved_library missing approved BGM for: " + ", ".join(missing))
+        from music_editor import build_music_edit_plan
+
+        edit_plan = build_music_edit_plan(selection_receipt)
+        write_json(root / "receipts" / "music-edit-plan.json", edit_plan)
+        if not edit_plan["ready_for_final"]:
+            required = sorted({str(item["kind"]) for item in edit_plan["requirements"]})
+            raise RenderError(
+                "approved_library music edit plan requires offline approved assets: "
+                + ", ".join(required)
+            )
         selections = selection_receipt["selections"]
     else:
         selections = resolve_music_template_timeline(
@@ -1223,6 +1233,11 @@ def render_music_template_timeline(
         end = min(total_dur, float(selection.get("end_sec") or total_dur))
         if end <= start:
             continue
+        if approved_library:
+            selected_duration = float(selection.get("duration_sec") or 0.0)
+            cue_duration = end - start
+            if abs(selected_duration - cue_duration) > 0.001:
+                raise RenderError("approved_library asset duration does not exactly match its cue")
         next_transition = (
             str(timeline[index + 1].get("transition") or "crossfade").lower()
             if index < len(timeline) - 1
@@ -1272,6 +1287,65 @@ def render_music_template_timeline(
         out_start = int(start * SR)
         out_end = min(total, out_start + len(segment))
         bed[out_start:out_end] += segment[: out_end - out_start]
+    if approved_library:
+        for index, selection in enumerate(selections):
+            transition = selection.get("transition_plan")
+            if not (
+                index > 0
+                and isinstance(transition, dict)
+                and transition.get("mode") == "approved_bridge"
+            ):
+                continue
+            bridge_path = Path(str(transition.get("bridge_path") or "")).expanduser().resolve()
+            expected_sha = str(transition.get("bridge_sha256") or "")
+            if (
+                not bridge_path.is_file()
+                or bridge_path.is_symlink()
+                or len(expected_sha) != 64
+                or sha256(bridge_path) != expected_sha
+            ):
+                raise RenderError("approved transition bridge failed checksum binding")
+            duration = min(
+                float(transition.get("bridge_duration_sec") or 0.0),
+                float(transition.get("duration_sec") or 0.0),
+            )
+            if duration <= 0:
+                raise RenderError("approved transition bridge has invalid duration")
+            bridge_wav = work / f"bgm_bridge_{index:03d}.wav"
+            run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(bridge_path),
+                    "-t",
+                    f"{duration:.3f}",
+                    "-ar",
+                    str(SR),
+                    "-ac",
+                    "1",
+                    "-c:a",
+                    "pcm_s16le",
+                    str(bridge_wav),
+                ]
+            )
+            with wave.open(str(bridge_wav), "rb") as handle:
+                bridge = np.frombuffer(handle.readframes(handle.getnframes()), dtype=np.int16)
+            bridge = bridge.astype(np.float64) / 32767.0
+            boundary = float(selection.get("start_sec") or 0.0)
+            bridge_start = max(0, int((boundary - duration / 2.0) * SR))
+            bridge_end = min(total, bridge_start + len(bridge))
+            bridge = bridge[: bridge_end - bridge_start]
+            if not len(bridge):
+                continue
+            half = max(1, len(bridge) // 2)
+            envelope = np.ones(len(bridge), dtype=np.float64)
+            envelope[:half] = np.sin(0.5 * np.pi * np.linspace(0, 1, half, endpoint=False))
+            envelope[half:] = np.cos(
+                0.5 * np.pi * np.linspace(0, 1, len(bridge) - half, endpoint=False)
+            )
+            bed[bridge_start:bridge_end] *= 0.45
+            bed[bridge_start:bridge_end] += bridge * envelope * 0.9
     return np.clip(bed, -1.0, 1.0), selections
 
 

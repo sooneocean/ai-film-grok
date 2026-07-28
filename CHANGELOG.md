@@ -3,6 +3,19 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.15.0] - 2026-07-28
+
+### Added
+
+- Added approval-gated ACE-Step exact-duration, dialogue-safe, loop, repaired-outro, motif-development, and transition-bridge generation packs.
+- Added deterministic harmonic, tempo, motif-role, dialogue-safe, and exact-duration music routing with checksum-bound edit plans.
+- Added approved transition-bridge rendering and bridge usage accounting in the final mix ledger.
+
+### Changed
+
+- `approved_library` final rendering now blocks raw master truncation or unapproved music edits; every generated edit remains pending until a human approves it.
+- BGM technical review now exposes loop-seam, ending-activity, dialogue-band, and boundary-level measurements.
+
 ## [2.14.4] - 2026-07-28
 
 ### Added

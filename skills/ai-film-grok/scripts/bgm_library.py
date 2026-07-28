@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 from audio_node_client import AudioNodeError, render_batch
+from music_editor import harmonic_compatibility, plan_transition
 from util import canonical_json_sha256, exclusive_file_lock, read_json, sha256_file, write_json
 
 SCHEMA = "aifilm-bgm-library-v1"
@@ -186,6 +187,21 @@ def _technical(path: Path) -> dict[str, Any]:
         chunk = stereo[start : start + block]
         silence.append(math.sqrt(float(np.mean(chunk * chunk)) + 1e-12) < 0.001)
     duration = frames / sample_rate
+    mono = stereo.mean(axis=1)
+    edge_frames = min(len(mono), max(1, sample_rate // 4))
+    head = mono[:edge_frames]
+    tail = mono[-edge_frames:]
+    head_rms = math.sqrt(float(np.mean(head * head)) + 1e-12)
+    tail_rms = math.sqrt(float(np.mean(tail * tail)) + 1e-12)
+    seam_rms = math.sqrt(float(np.mean((head - tail) ** 2)) + 1e-12)
+    loop_seam_score = seam_rms / max(1e-6, (head_rms + tail_rms) / 2.0)
+    analysis = mono[: min(len(mono), sample_rate * 8) : 4]
+    if analysis.size < 2048:
+        analysis = np.pad(analysis, (0, 2048 - analysis.size))
+    spectrum = np.abs(np.fft.rfft(analysis * np.hanning(len(analysis)))) ** 2
+    freqs = np.fft.rfftfreq(len(analysis), d=4.0 / sample_rate)
+    total_energy = max(float(np.sum(spectrum)), 1e-12)
+    dialogue_band_ratio = float(np.sum(spectrum[(freqs >= 300) & (freqs <= 4000)])) / total_energy
     errors: list[str] = []
     if duration < 0.5:
         errors.append("duration_too_short")
@@ -203,6 +219,11 @@ def _technical(path: Path) -> dict[str, Any]:
         "peak": round(peak, 6),
         "rms": round(rms, 6),
         "silence_ratio": round(sum(silence) / max(1, len(silence)), 6),
+        "start_rms": round(head_rms, 6),
+        "end_rms": round(tail_rms, 6),
+        "ending_activity_ratio": round(tail_rms / max(rms, 1e-9), 6),
+        "loop_seam_score": round(loop_seam_score, 6),
+        "dialogue_band_ratio": round(dialogue_band_ratio, 6),
         "fingerprint": _audio_fingerprint(stereo, sample_rate),
     }
 
@@ -222,7 +243,21 @@ def stage_candidate(
     mood = str(metadata.get("mood") or "").strip().lower()
     if mood not in MOODS:
         raise BGMLibraryError(f"BGM mood must be one of {MOODS}")
+    recipe = metadata.get("recipe") if isinstance(metadata.get("recipe"), dict) else {}
     technical = _technical(source_path)
+    target_duration = metadata.get("duration") or recipe.get("duration")
+    edit_variant = str(metadata.get("edit_variant") or recipe.get("edit_variant") or "").strip()
+    if target_duration is not None and edit_variant:
+        expected = float(target_duration)
+        tolerance = 0.001
+        if abs(float(technical["duration_sec"]) - expected) > tolerance:
+            technical["errors"].append("target_duration_mismatch")
+    if (
+        bool(metadata.get("loopable") or recipe.get("loopable"))
+        and float(technical["loop_seam_score"]) > 1.0
+    ):
+        technical["errors"].append("loop_seam_risk")
+    technical["ok"] = not technical["errors"]
     if not technical["ok"]:
         raise BGMLibraryError(
             "BGM candidate failed technical checks: " + ", ".join(technical["errors"])
@@ -238,7 +273,6 @@ def stage_candidate(
         raise BGMLibraryError("BGM candidate changed while staging")
     temporary.replace(destination)
 
-    recipe = metadata.get("recipe") if isinstance(metadata.get("recipe"), dict) else {}
     recipe = {key: value for key, value in recipe.items() if key != "prompt"}
     record = {
         "schema": "aifilm-bgm-asset-v1",
@@ -272,6 +306,22 @@ def stage_candidate(
         ).strip(),
         "series_id": str(metadata.get("series_id") or recipe.get("series_id") or "").strip(),
         "parent_asset_id": metadata.get("parent_asset_id"),
+        "edit_variant": str(
+            metadata.get("edit_variant") or recipe.get("edit_variant") or ""
+        ).strip(),
+        "motif_role": str(metadata.get("motif_role") or recipe.get("motif_role") or "").strip(),
+        "dialogue_safe": bool(
+            metadata.get("dialogue_safe") or recipe.get("dialogue_safe") or False
+        ),
+        "loopable": bool(metadata.get("loopable") or recipe.get("loopable") or False),
+        "target_duration_sec": (
+            float(metadata.get("duration") or recipe.get("duration"))
+            if metadata.get("duration") or recipe.get("duration")
+            else None
+        ),
+        "transition_to_asset_id": str(
+            metadata.get("transition_to_asset_id") or recipe.get("transition_to_asset_id") or ""
+        ).strip(),
         "technical": technical,
         "instrumental": False,
         "similarity_cluster": None,
@@ -502,6 +552,21 @@ def audit_library(library_root: Path | str) -> dict[str, Any]:
     }
 
 
+def get_approved_asset(
+    library_root: Path | str,
+    asset_id: str,
+) -> tuple[dict[str, Any], Path]:
+    root = Path(library_root).expanduser().resolve()
+    catalog = _load_catalog(root)
+    record = catalog["assets"].get(str(asset_id))
+    if not isinstance(record, dict) or record.get("status") != "approved":
+        raise BGMLibraryError("music edit parent must be an approved asset")
+    path = _safe_asset_path(root, str(record.get("path") or ""))
+    if not path.is_file() or path.is_symlink() or sha256_file(path) != record.get("sha256"):
+        raise BGMLibraryError("approved music edit parent failed integrity check")
+    return dict(record), path
+
+
 def _recent_assets(events: list[dict[str, Any]], *, film_id: str) -> set[str]:
     cutoff = datetime.now(UTC) - timedelta(days=30)
     recent_films: list[str] = []
@@ -526,7 +591,12 @@ def _recent_assets(events: list[dict[str, Any]], *, film_id: str) -> set[str]:
 
 
 def _selection_score(
-    record: dict[str, Any], cue: dict[str, Any], *, series_id: str, recent: bool
+    record: dict[str, Any],
+    cue: dict[str, Any],
+    *,
+    series_id: str,
+    recent: bool,
+    previous_record: dict[str, Any] | None = None,
 ) -> tuple[float, list[str]]:
     score = 0.0
     reasons = ["approved", f"mood={record['mood']}"]
@@ -549,6 +619,49 @@ def _selection_score(
     if str(record.get("stem_profile") or "") == str(cue.get("stem_profile") or ""):
         score += 10
         reasons.append("stem_match")
+    motif_role = str(cue.get("motif_role") or "")
+    if motif_role and str(record.get("motif_role") or "") == motif_role:
+        score += 25
+        reasons.append("motif_role_match")
+    dialogue_requested = bool(cue.get("dialogue_present")) or float(cue.get("duck_db") or 0.0) <= -3
+    if dialogue_requested:
+        if record.get("dialogue_safe") is True:
+            score += 20
+            reasons.append("dialogue_safe")
+        else:
+            score -= 8
+    try:
+        cue_duration = float(cue.get("end_sec")) - float(cue.get("start_sec"))
+        asset_duration = float((record.get("technical") or {}).get("duration_sec") or 0.0)
+    except (TypeError, ValueError):
+        cue_duration = asset_duration = 0.0
+    if cue_duration > 0 and asset_duration > 0:
+        duration_delta = abs(asset_duration - cue_duration)
+        score += max(0.0, 20.0 * (1.0 - duration_delta / max(1.0, cue_duration)))
+        if duration_delta <= 0.001:
+            reasons.append("exact_duration")
+    if previous_record is not None:
+        harmonic = harmonic_compatibility(
+            previous_record.get("keyscale"),
+            record.get("keyscale"),
+        )
+        if harmonic["compatible"]:
+            score += 18.0 * float(harmonic["score"])
+            reasons.append("harmonic_continuity")
+        try:
+            previous_bpm = float(previous_record.get("bpm") or 0)
+            current_bpm = float(record.get("bpm") or 0)
+        except (TypeError, ValueError):
+            previous_bpm = current_bpm = 0.0
+        if previous_bpm > 0 and current_bpm > 0:
+            tempo_delta = min(
+                abs(current_bpm - previous_bpm) / previous_bpm,
+                abs(current_bpm * 2.0 - previous_bpm) / previous_bpm,
+                abs(current_bpm / 2.0 - previous_bpm) / previous_bpm,
+            )
+            score += max(0.0, 10.0 * (1.0 - tempo_delta / 0.25))
+            if tempo_delta <= 0.12:
+                reasons.append("tempo_continuity")
     score -= min(20, int(record.get("use_count") or 0)) * 1.5
     if recent:
         score -= 30
@@ -586,6 +699,7 @@ def select_timeline(
     recent_assets = _recent_assets(events, film_id=film_id)
     used_assets: set[str] = set()
     previous_cluster = ""
+    previous_record: dict[str, Any] | None = None
     selections: list[dict[str, Any]] = []
     gaps: list[dict[str, Any]] = []
     diversity_relaxed = False
@@ -595,6 +709,7 @@ def select_timeline(
             record
             for record in approved
             if record.get("mood") == mood
+            and record.get("edit_variant") != "bridge"
             and record.get("asset_id") not in used_assets
             and str(record.get("similarity_cluster") or "") != previous_cluster
         ]
@@ -607,6 +722,41 @@ def select_timeline(
             str(record.get("asset_id") or "") in recent_assets for record in eligible
         ):
             diversity_relaxed = True
+        preferred_asset_id = str(cue.get("preferred_asset_id") or "").strip()
+        if preferred_asset_id:
+            preferred = [
+                record
+                for record in eligible
+                if str(record.get("asset_id") or "") == preferred_asset_id
+            ]
+            if preferred:
+                eligible = preferred
+        cue_duration = float(cue.get("end_sec") or 0.0) - float(cue.get("start_sec") or 0.0)
+        if cue_duration > 0:
+            exact = [
+                record
+                for record in eligible
+                if abs(
+                    float((record.get("technical") or {}).get("duration_sec") or 0.0) - cue_duration
+                )
+                <= 0.001
+            ]
+            if exact:
+                eligible = exact
+        dialogue_requested = (
+            bool(cue.get("dialogue_present")) or float(cue.get("duck_db") or 0.0) <= -3
+        )
+        if dialogue_requested:
+            dialogue_safe = [record for record in eligible if record.get("dialogue_safe") is True]
+            if dialogue_safe:
+                eligible = dialogue_safe
+        motif_role = str(cue.get("motif_role") or "").strip()
+        if motif_role:
+            role_matches = [
+                record for record in eligible if str(record.get("motif_role") or "") == motif_role
+            ]
+            if role_matches:
+                eligible = role_matches
         if not eligible:
             gaps.append(
                 {
@@ -626,6 +776,7 @@ def select_timeline(
                 cue,
                 series_id=series_id,
                 recent=str(record.get("asset_id") or "") in recent_assets,
+                previous_record=previous_record,
             )
             ranked.append((score, str(record["asset_id"]), record, reasons))
         ranked.sort(key=lambda row: (-row[0], int(row[2].get("use_count") or 0), row[1]))
@@ -637,6 +788,38 @@ def select_timeline(
         score, asset_id, record, reasons = chosen
         used_assets.add(asset_id)
         previous_cluster = str(record.get("similarity_cluster") or asset_id)
+        transition_plan = plan_transition(
+            previous_record,
+            {
+                **record,
+                "transition": str(cue.get("transition") or "crossfade"),
+            },
+        )
+        if transition_plan.get("generation_required") and previous_record is not None:
+            bridges = sorted(
+                (
+                    bridge
+                    for bridge in approved
+                    if bridge.get("edit_variant") == "bridge"
+                    and str(bridge.get("parent_asset_id") or "")
+                    == str(previous_record.get("asset_id") or "")
+                    and str(bridge.get("transition_to_asset_id") or "") == asset_id
+                ),
+                key=lambda item: (int(item.get("use_count") or 0), str(item.get("asset_id") or "")),
+            )
+            if bridges:
+                bridge = bridges[0]
+                bridge_path = _safe_asset_path(root, str(bridge.get("path") or ""))
+                transition_plan = {
+                    **transition_plan,
+                    "mode": "approved_bridge",
+                    "generation_required": False,
+                    "reason": "approved_transition_bridge",
+                    "bridge_asset_id": bridge["asset_id"],
+                    "bridge_path": str(bridge_path.resolve()),
+                    "bridge_sha256": bridge["sha256"],
+                    "bridge_duration_sec": (bridge.get("technical") or {}).get("duration_sec"),
+                }
         selections.append(
             {
                 "shot_id": str(cue.get("shot_id") or ""),
@@ -649,6 +832,16 @@ def select_timeline(
                 "source": "approved_library",
                 "mode": "approved_library",
                 "mood": record["mood"],
+                "energy": record.get("energy"),
+                "stem_profile": record.get("stem_profile"),
+                "bpm": record.get("bpm"),
+                "keyscale": record.get("keyscale"),
+                "timesignature": record.get("timesignature") or "4/4",
+                "duration_sec": (record.get("technical") or {}).get("duration_sec"),
+                "dialogue_safe": bool(record.get("dialogue_safe")),
+                "loopable": bool(record.get("loopable")),
+                "edit_variant": record.get("edit_variant") or "",
+                "motif_role": record.get("motif_role") or "",
                 "motif_id": str(cue.get("motif_id") or ""),
                 "motif_family": record.get("motif_family") or "",
                 "parent_asset_id": record.get("parent_asset_id"),
@@ -657,11 +850,15 @@ def select_timeline(
                 "selection_score": round(score, 4),
                 "selection_reason": reasons,
                 "transition": str(cue.get("transition") or "crossfade"),
+                "transition_plan": transition_plan,
+                "duck_db": float(cue.get("duck_db") or 0.0),
+                "dialogue_present": bool(cue.get("dialogue_present")),
                 "take_seed": int(cue.get("seed") or 0),
                 "catalog_revision": status["catalog_revision"],
                 "catalog_sha256": status["catalog_sha256"],
             }
         )
+        previous_record = record
     receipt = {
         "schema": SELECTION_SCHEMA,
         "film_id": film_id,
@@ -705,36 +902,57 @@ def commit_usage(
         new_events = []
         film_id = str(selection_receipt.get("film_id") or "")
         for selection in selection_receipt.get("selections") or []:
-            asset_id = str(selection.get("asset_id") or "")
-            shot_id = str(selection.get("shot_id") or "")
-            event_id = _event_id(film_id, shot_id, asset_id, final_sha256)
-            if event_id in existing_ids:
-                continue
-            record = catalog["assets"].get(asset_id)
-            if not isinstance(record, dict) or record.get("status") != "approved":
-                raise BGMLibraryError(f"selected BGM asset is no longer approved: {asset_id}")
-            path = _safe_asset_path(root, str(record.get("path") or ""))
-            if (
-                selection.get("sha256") != record.get("sha256")
-                or not path.is_file()
-                or path.is_symlink()
-                or sha256_file(path) != record.get("sha256")
-            ):
-                raise BGMLibraryError(f"selected BGM asset failed checksum binding: {asset_id}")
-            event = {
-                "event_id": event_id,
-                "film_id": film_id,
-                "series_id": str(selection_receipt.get("series_id") or ""),
-                "shot_id": shot_id,
-                "asset_id": asset_id,
-                "asset_sha256": record["sha256"],
-                "final_sha256": final_sha256,
-                "used_at": _now(),
-            }
-            new_events.append(event)
-            record["use_count"] = int(record.get("use_count") or 0) + 1
-            record["last_used_at"] = event["used_at"]
-            record["last_used_film_id"] = film_id
+            usage_items = [
+                {
+                    "asset_id": str(selection.get("asset_id") or ""),
+                    "shot_id": str(selection.get("shot_id") or ""),
+                    "sha256": selection.get("sha256"),
+                    "usage_role": "cue",
+                }
+            ]
+            transition = selection.get("transition_plan")
+            if isinstance(transition, dict) and transition.get("mode") == "approved_bridge":
+                usage_items.append(
+                    {
+                        "asset_id": str(transition.get("bridge_asset_id") or ""),
+                        "shot_id": f"{selection.get('shot_id')}:transition",
+                        "sha256": transition.get("bridge_sha256"),
+                        "usage_role": "transition_bridge",
+                    }
+                )
+            for usage_item in usage_items:
+                asset_id = usage_item["asset_id"]
+                shot_id = usage_item["shot_id"]
+                event_id = _event_id(film_id, shot_id, asset_id, final_sha256)
+                if event_id in existing_ids:
+                    continue
+                record = catalog["assets"].get(asset_id)
+                if not isinstance(record, dict) or record.get("status") != "approved":
+                    raise BGMLibraryError(f"selected BGM asset is no longer approved: {asset_id}")
+                path = _safe_asset_path(root, str(record.get("path") or ""))
+                if (
+                    usage_item["sha256"] != record.get("sha256")
+                    or not path.is_file()
+                    or path.is_symlink()
+                    or sha256_file(path) != record.get("sha256")
+                ):
+                    raise BGMLibraryError(f"selected BGM asset failed checksum binding: {asset_id}")
+                event = {
+                    "event_id": event_id,
+                    "film_id": film_id,
+                    "series_id": str(selection_receipt.get("series_id") or ""),
+                    "shot_id": shot_id,
+                    "asset_id": asset_id,
+                    "asset_sha256": record["sha256"],
+                    "usage_role": usage_item["usage_role"],
+                    "final_sha256": final_sha256,
+                    "used_at": _now(),
+                }
+                new_events.append(event)
+                existing_ids.add(event_id)
+                record["use_count"] = int(record.get("use_count") or 0) + 1
+                record["last_used_at"] = event["used_at"]
+                record["last_used_film_id"] = film_id
         if new_events:
             with usage_path.open("a", encoding="utf-8") as handle:
                 for event in new_events:
@@ -766,8 +984,14 @@ def write_review_pack(library_root: Path | str) -> dict[str, Any]:
             f"<h2>{asset_id}</h2>"
             f"<p>{html.escape(str(record['mood']))} · energy {record['energy']} · "
             f"{html.escape(str(record['stem_profile']))} · seed {record['seed']}</p>"
+            f"<p>edit {html.escape(str(record.get('edit_variant') or 'master'))} · "
+            f"motif role {html.escape(str(record.get('motif_role') or 'none'))} · "
+            f"dialogue-safe {bool(record.get('dialogue_safe'))} · "
+            f"loopable {bool(record.get('loopable'))}</p>"
             f"<p>duration {technical.get('duration_sec')}s · peak {technical.get('peak')} · "
-            f"RMS {technical.get('rms')} · silence {technical.get('silence_ratio')}</p>"
+            f"RMS {technical.get('rms')} · silence {technical.get('silence_ratio')} · "
+            f"loop seam {technical.get('loop_seam_score')} · "
+            f"dialogue band {technical.get('dialogue_band_ratio')}</p>"
             f'<audio controls preload="none" src="{audio_rel}"></audio>'
             f"<details><summary>标准化配方</summary><pre>{recipe}</pre></details>"
             f"<pre>aifilm bgm-library approve --asset-id {asset_id} "
@@ -961,6 +1185,16 @@ def generate_candidates(
     if recipe.get("reference_audio"):
         payload["reference_audio"] = recipe["reference_audio"]
         payload["cover_strength"] = float(recipe.get("cover_strength") or 0.7)
+    if str(payload["task_type"]) == "repaint":
+        try:
+            repainting_start = float(recipe.get("repainting_start"))
+            repainting_end = float(recipe.get("repainting_end"))
+        except (TypeError, ValueError) as exc:
+            raise BGMLibraryError("repaint recipe requires numeric start and end") from exc
+        if repainting_start < 0 or repainting_end <= repainting_start:
+            raise BGMLibraryError("repaint recipe requires a bounded forward window")
+        payload["repainting_start"] = repainting_start
+        payload["repainting_end"] = repainting_end
     batch_dir = root / ".batch-downloads" / uuid.uuid4().hex
     try:
         node = render_batch(

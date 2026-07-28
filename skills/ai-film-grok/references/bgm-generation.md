@@ -122,6 +122,40 @@ ACE-Step 歌词侧可用：`[inst]` 或空结构标记（以官方/社区文档�
 canary 会回读候选数量、时长、技术检测、唯一 checksum 与唯一 PCM 指纹；任何候选
 仍保持 `pending_human_review`，不能替代人工完整听审。
 
+### ACE-Step Music Editor v2
+
+共享 master 不再由 `final` 直接截断。片级 `music_cue` 先生成 checksum 绑定的
+`receipts/music-edit-plan.json`；选择器优先匹配准确时长、对白安全版本、
+`motif_role`（动机在剧情中的作用）、相邻调性与 BPM。缺少已批准 edit 或转场桥时，
+`final --music-template approved_library` 会列出需求并阻塞，ACE 仍只在离线策展阶段运行。
+
+```bash
+# 查看本片每个 cue 需要哪种离线编辑
+"$AIFILM" bgm-library edit-plan --root "<film-root>"
+
+# 从已批准 master 生成准确时长／对白安全／无缝循环候选；全部保持 pending
+"$AIFILM" bgm-library edit-pack --asset-id "<approved-id>" \
+  --duration 18 --variant exact --variant dialogue-safe --variant loop
+
+# 修复尾奏（ACE repaint）；只重绘最后 8 秒
+"$AIFILM" bgm-library edit-pack --asset-id "<approved-id>" \
+  --duration 60 --variant outro
+
+# 把一个剧集主题发展为 statement/fragment/tender/corrupted/reveal/loss/reunion/climax
+"$AIFILM" bgm-library motif-development --root "<film-root>" \
+  --asset-id "<approved-series-motif-id>"
+
+# 为两首调性或速度不兼容的批准曲生成过桥；生成后仍须 review-pack 听审并批准
+"$AIFILM" bgm-library bridge-pack \
+  --from-asset-id "<approved-outgoing-id>" \
+  --to-asset-id "<approved-incoming-id>" --duration 10
+```
+
+所有 edit/bridge 会保存父资产、目标资产、配方、seed、checkpoint 和技术检测，但不保存
+剧情原始 prompt。审听页同时显示 loop seam、结尾活跃度、对白频段占比和目标时长。
+转场桥只有在批准、checksum 校验通过且父子绑定吻合时才实混；成片成功后，cue 和 bridge
+分别追加 usage 事件。`final` 不允许把“计划中会生成”当成“已经存在”。
+
 ## 三阶梯 · 立刻换口味（操作）
 
 ```text

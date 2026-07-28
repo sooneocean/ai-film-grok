@@ -16,9 +16,9 @@ from cli_bgm_library import cmd_bgm_library
 from render_final import RenderError, render_music_template_timeline
 
 
-def _wav(path: Path, frequency: float = 220.0) -> Path:
+def _wav(path: Path, frequency: float = 220.0, duration: float = 1.0) -> Path:
     rate = 44100
-    t = np.arange(rate, dtype=np.float64)
+    t = np.arange(int(rate * duration), dtype=np.float64)
     signal = np.sin(2.0 * math.pi * frequency * t / rate) * 0.25
     stereo = np.column_stack((signal, signal))
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -30,7 +30,27 @@ def _wav(path: Path, frequency: float = 220.0) -> Path:
     return path
 
 
-def _asset(library: Path, source: Path) -> dict[str, object]:
+def _asset(
+    library: Path,
+    source: Path,
+    *,
+    keyscale: str = "A minor",
+    bpm: int = 72,
+    edit_variant: str = "",
+    parent_asset_id: str | None = None,
+    transition_to_asset_id: str | None = None,
+) -> dict[str, object]:
+    recipe = {
+        "mood": "rnb",
+        "dramatic_tags": ["relationship"],
+        "energy": 0.5,
+        "stem_profile": "pad",
+        "keyscale": keyscale,
+        "bpm": bpm,
+        "edit_variant": edit_variant,
+        "parent_asset_id": parent_asset_id,
+        "transition_to_asset_id": transition_to_asset_id,
+    }
     staged = stage_candidate(
         library,
         source,
@@ -43,12 +63,12 @@ def _asset(library: Path, source: Path) -> dict[str, object]:
             "dramatic_tags": ["relationship"],
             "energy": 0.5,
             "stem_profile": "pad",
-            "recipe": {
-                "mood": "rnb",
-                "dramatic_tags": ["relationship"],
-                "energy": 0.5,
-                "stem_profile": "pad",
-            },
+            "keyscale": keyscale,
+            "bpm": bpm,
+            "edit_variant": edit_variant,
+            "parent_asset_id": parent_asset_id,
+            "transition_to_asset_id": transition_to_asset_id,
+            "recipe": recipe,
         },
     )
     return approve_candidate(
@@ -127,6 +147,145 @@ def test_approved_library_missing_mood_records_gap_and_blocks(
             series_id="",
         )
     assert (library / "gap-queue.jsonl").is_file()
+
+
+def test_approved_library_blocks_raw_master_truncation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    library = tmp_path / "library"
+    _asset(library, _wav(tmp_path / "long-master.wav", duration=10.0))
+    film = tmp_path / "film"
+    monkeypatch.setenv("AIFILM_BGM_LIBRARY_ROOT", str(library))
+
+    with pytest.raises(RenderError, match="music edit plan requires offline approved assets"):
+        render_music_template_timeline(
+            root=film,
+            work=film / "work",
+            timeline=[
+                {
+                    "shot_id": "s1",
+                    "start_sec": 0.0,
+                    "end_sec": 1.0,
+                    "mood": "rnb",
+                    "motif_id": "relationship",
+                    "energy": 0.5,
+                    "stem_profile": "pad",
+                    "transition": "cut",
+                    "seed": 3,
+                }
+            ],
+            plan=None,
+            music_license=None,
+            seed=3,
+            total_dur=1.0,
+            approved_library=True,
+            film_id="film",
+            series_id="",
+        )
+
+    plan = json.loads((film / "receipts/music-edit-plan.json").read_text())
+    assert plan["ready_for_final"] is False
+    assert plan["edits"][0]["strategy"] == "cover_cutdown"
+
+
+def test_approved_library_blocks_subsecond_raw_master_truncation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    library = tmp_path / "library"
+    _asset(library, _wav(tmp_path / "near-master.wav", duration=10.24))
+    film = tmp_path / "film"
+    monkeypatch.setenv("AIFILM_BGM_LIBRARY_ROOT", str(library))
+
+    with pytest.raises(RenderError, match="music edit plan requires offline approved assets"):
+        render_music_template_timeline(
+            root=film,
+            work=film / "work",
+            timeline=[
+                {
+                    "shot_id": "s1",
+                    "start_sec": 0.0,
+                    "end_sec": 10.0,
+                    "mood": "rnb",
+                    "transition": "cut",
+                }
+            ],
+            plan=None,
+            music_license=None,
+            seed=3,
+            total_dur=10.0,
+            approved_library=True,
+            film_id="near-truncation-film",
+            series_id="",
+        )
+
+    plan = json.loads((film / "receipts/music-edit-plan.json").read_text())
+    assert plan["ready_for_final"] is False
+    assert plan["edits"][0]["strategy"] == "repaint_outro"
+
+
+def test_approved_library_renders_checksum_bound_transition_bridge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    library = tmp_path / "library"
+    outgoing = _asset(
+        library,
+        _wav(tmp_path / "outgoing.wav", frequency=220),
+        keyscale="A minor",
+        bpm=72,
+    )
+    incoming = _asset(
+        library,
+        _wav(tmp_path / "incoming.wav", frequency=510),
+        keyscale="F# major",
+        bpm=110,
+    )
+    bridge = _asset(
+        library,
+        _wav(tmp_path / "bridge.wav", frequency=760),
+        keyscale="F# major",
+        bpm=110,
+        edit_variant="bridge",
+        parent_asset_id=str(outgoing["asset_id"]),
+        transition_to_asset_id=str(incoming["asset_id"]),
+    )
+    film = tmp_path / "film"
+    monkeypatch.setenv("AIFILM_BGM_LIBRARY_ROOT", str(library))
+
+    samples, selections = render_music_template_timeline(
+        root=film,
+        work=film / "work",
+        timeline=[
+            {
+                "shot_id": "s1",
+                "start_sec": 0.0,
+                "end_sec": 1.0,
+                "mood": "rnb",
+                "preferred_asset_id": outgoing["asset_id"],
+                "transition": "cut",
+            },
+            {
+                "shot_id": "s2",
+                "start_sec": 1.0,
+                "end_sec": 2.0,
+                "mood": "rnb",
+                "preferred_asset_id": incoming["asset_id"],
+                "transition": "crossfade",
+            },
+        ],
+        plan=None,
+        music_license=None,
+        seed=3,
+        total_dur=2.0,
+        approved_library=True,
+        film_id="bridge-film",
+        series_id="",
+    )
+
+    transition = selections[1]["transition_plan"]
+    assert transition["mode"] == "approved_bridge"
+    assert transition["bridge_asset_id"] == bridge["asset_id"]
+    assert np.max(np.abs(samples)) > 0.1
+    assert (film / "work/bgm_bridge_001.wav").is_file()
 
 
 def test_final_success_commits_usage_once_and_updates_mix_receipt(
@@ -268,6 +427,40 @@ def test_cli_exposes_approved_library_contract() -> None:
     assert canary.bgm_library_action == "canary"
     assert canary.duration == 30
     assert canary.batch_size == 4
+    edit = parser.parse_args(
+        [
+            "bgm-library",
+            "edit-pack",
+            "--library-root",
+            "/tmp/library",
+            "--asset-id",
+            "warm-1",
+            "--duration",
+            "20",
+            "--variant",
+            "exact",
+            "--variant",
+            "dialogue-safe",
+        ]
+    )
+    assert edit.bgm_library_action == "edit-pack"
+    assert edit.variant == ["exact", "dialogue-safe"]
+    bridge = parser.parse_args(
+        [
+            "bgm-library",
+            "bridge-pack",
+            "--library-root",
+            "/tmp/library",
+            "--from-asset-id",
+            "outgoing",
+            "--to-asset-id",
+            "incoming",
+        ]
+    )
+    assert bridge.bgm_library_action == "bridge-pack"
+    assert bridge.duration == 10.0
+    edit_plan = parser.parse_args(["bgm-library", "edit-plan", "--root", "/tmp/film"])
+    assert edit_plan.bgm_library_action == "edit-plan"
     final = parser.parse_args(
         ["final", "--root", "/tmp/film", "--music-template", "approved_library"]
     )

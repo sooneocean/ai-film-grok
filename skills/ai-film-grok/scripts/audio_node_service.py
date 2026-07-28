@@ -129,6 +129,7 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         "node": "private-lan",
         "models": {kind: _available(kind) for kind in AUDIO_KINDS},
         "music_batch": bool(os.environ.get("AIFILM_AUDIO_NODE_MUSIC_BATCH_ARGV", "").strip()),
+        "music_reference_upload": True,
         "model": MODEL_ID,
         "music_model": MUSIC_MODEL_ID,
         "music_checkpoint_fingerprint": MUSIC_CHECKPOINT_FINGERPRINT,
@@ -373,6 +374,19 @@ async def create_music_batch(
     if task_type not in {"text2music", "cover", "repaint"}:
         raise HTTPException(422, "invalid ACE-Step task type")
     payload = dict(payload)
+    if task_type == "repaint":
+        try:
+            repainting_start = float(payload.get("repainting_start"))
+            repainting_end = float(payload.get("repainting_end"))
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(422, "repaint requires numeric start and end") from exc
+        if repainting_start < 0 or repainting_end <= repainting_start or repainting_end > duration:
+            raise HTTPException(422, "repaint window must be within requested duration")
+        payload["repainting_start"] = repainting_start
+        payload["repainting_end"] = repainting_end
+    else:
+        payload.pop("repainting_start", None)
+        payload.pop("repainting_end", None)
     if task_type in {"cover", "repaint"}:
         reference_id = str(payload.pop("reference_audio_id", "") or "")
         reference_path = REFERENCES / f"{reference_id}.wav"

@@ -14,6 +14,9 @@ class MusicCueError(ValueError):
 
 _MOODS = frozenset({"rnb", "dark", "ambient", "warm", "playful"})
 _TRANSITIONS = frozenset({"crossfade", "cut", "stinger"})
+_MOTIF_ROLES = frozenset(
+    {"", "statement", "fragment", "tender", "corrupted", "reveal", "loss", "reunion", "climax"}
+)
 _PROFILES = frozenset({"full", "thin", "pulse", "pad", "bass", "silence"})
 
 # These are arrangement instructions, not sample-pack identifiers.  Keeping the
@@ -147,6 +150,18 @@ def normalize_music_cue(
         raise MusicCueError("music_cue.take_seed must be an integer") from exc
     if not 0 <= seed <= 0x7FFFFFFF:
         raise MusicCueError("music_cue.take_seed must be between 0 and 2147483647")
+    motif_role = str(cue.get("motif_role") or "").strip().lower()
+    if motif_role not in _MOTIF_ROLES:
+        raise MusicCueError(f"music_cue.motif_role must be one of {sorted(_MOTIF_ROLES)}")
+    preferred_asset_id = str(cue.get("preferred_asset_id") or "").strip()
+    if len(preferred_asset_id) > 128 or any(
+        character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
+        for character in preferred_asset_id
+    ):
+        raise MusicCueError("music_cue.preferred_asset_id is invalid")
+    dialogue_present = bool(
+        cue.get("dialogue_present") or shot.get("nar") or shot.get("nar_ja") or shot.get("dialogue")
+    )
     return {
         "mood": mood,
         "energy": _bounded(cue.get("energy"), "energy", 0.55),
@@ -158,7 +173,10 @@ def normalize_music_cue(
         "key_shift": key_shift,
         "stem_profile": profile,
         "motif_id": motif,
+        "motif_role": motif_role,
         "transition": transition,
+        "preferred_asset_id": preferred_asset_id,
+        "dialogue_present": dialogue_present,
         "seed": seed,
     }
 

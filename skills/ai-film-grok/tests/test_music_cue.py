@@ -158,6 +158,22 @@ def test_music_cue_is_deterministic_and_validates_bounds() -> None:
         normalize_music_cue({"brightness": 2})
     with pytest.raises(MusicCueError):
         normalize_music_cue({"take_seed": 2**31})
+    with pytest.raises(MusicCueError):
+        normalize_music_cue({"motif_role": "random"})
+
+
+def test_music_cue_marks_dialogue_and_authored_motif_development() -> None:
+    cue = normalize_music_cue(
+        {
+            "motif_role": "reveal",
+            "preferred_asset_id": "warm-asset-1",
+        },
+        shot={"nar": "角色说话"},
+    )
+
+    assert cue["dialogue_present"] is True
+    assert cue["motif_role"] == "reveal"
+    assert cue["preferred_asset_id"] == "warm-asset-1"
 
 
 def test_music_timeline_automates_supplied_audio() -> None:
