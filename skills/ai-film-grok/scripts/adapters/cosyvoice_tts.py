@@ -223,6 +223,13 @@ def synthesize(text: str, out: Path, voice: str) -> None:
     print(f"cosyvoice ok → {out} ({out.stat().st_size} B) speaker={speaker} ref={ref or '-'}")
 
 
+class CosyVoiceTTSProvider:
+    """Adapter-registry compatibility surface for the existing CosyVoice client."""
+
+    def synthesize(self, text: str, out: Path, voice: str = "") -> None:
+        synthesize(text, out, voice)
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description="CosyVoice HTTP TTS for ai-film-grok")
     p.add_argument("command", nargs="?", default="", help="doctor (optional)")
