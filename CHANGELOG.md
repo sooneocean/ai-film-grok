@@ -3,6 +3,17 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.14.0] - 2026-07-28
+
+### Added
+
+- Bounded `bgm-library canary` generation for one configurable 10–600 second ACE-Step batch, with pending-only status and checksum, fingerprint, duration, and technical acceptance checks.
+- Acceptance coverage for ten-cue within-film diversity, six-film rotation, and cropped or requantized near-duplicate rejection.
+
+### Fixed
+
+- Empty BGM libraries now expose a stable catalog checksum, and duplicate audio/fingerprints are rejected before a batch mutates the catalog.
+
 ## [2.13.0] - 2026-07-28
 
 ### Added

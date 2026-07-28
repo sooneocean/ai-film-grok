@@ -42,6 +42,20 @@ def add_bgm_library_parsers(sub: argparse._SubParsersAction) -> None:
     generate.add_argument("--batch-size", type=int, choices=range(1, 9), default=4)
     generate.add_argument("--seed-base", type=int, default=5100)
 
+    canary = actions.add_parser(
+        "canary",
+        help="Generate one bounded 30-second batch for real-node acceptance",
+    )
+    canary.add_argument("--library-root", default="")
+    canary.add_argument(
+        "--slot",
+        choices=tuple(recipe["recipe_id"] for recipe in baseline_recipes()),
+        default="baseline-v1-rnb-pad",
+    )
+    canary.add_argument("--duration", type=float, default=30.0)
+    canary.add_argument("--batch-size", type=int, choices=range(1, 9), default=4)
+    canary.add_argument("--seed-base", type=int, default=5900)
+
     review = actions.add_parser("review-pack", help="Write a local HTML listening pack")
     review.add_argument("--library-root", default="")
 
@@ -206,6 +220,51 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
                 )
             )
         report = {"ok": True, "recipe_pack": args.recipe_pack, "batches": batches}
+    elif action == "canary":
+        duration = float(args.duration)
+        if not 10.0 <= duration <= 600.0:
+            raise BGMLibraryError("canary duration must be between 10 and 600 seconds")
+        base, token = _node_credentials()
+        recipe = next(item for item in baseline_recipes() if item["recipe_id"] == str(args.slot))
+        recipe = {**recipe, "duration": duration}
+        seeds = list(range(int(args.seed_base), int(args.seed_base) + int(args.batch_size)))
+        batch = generate_candidates(
+            library,
+            base_url=base,
+            token=token,
+            recipe=recipe,
+            batch_size=int(args.batch_size),
+            seeds=seeds,
+        )
+        candidates = batch["candidates"]
+        checksums = [str(item["sha256"]) for item in candidates]
+        fingerprints = [
+            tuple((item.get("technical") or {}).get("fingerprint") or []) for item in candidates
+        ]
+        durations = [
+            float((item.get("technical") or {}).get("duration_sec") or 0.0) for item in candidates
+        ]
+        duration_tolerance = max(1.0, duration * 0.05)
+        checks = {
+            "candidate_count": len(candidates) == int(args.batch_size),
+            "unique_checksums": len(set(checksums)) == len(checksums),
+            "unique_fingerprints": len(set(fingerprints)) == len(fingerprints),
+            "duration_ok": all(abs(value - duration) <= duration_tolerance for value in durations),
+            "technical_pass": all(
+                bool((item.get("technical") or {}).get("ok")) for item in candidates
+            ),
+            "pending_only": all(
+                item.get("status") == "pending_human_review" for item in candidates
+            ),
+        }
+        report = {
+            **batch,
+            "ok": all(checks.values()),
+            "status": "pending_human_review",
+            "slot": args.slot,
+            "requested_duration_sec": duration,
+            "checks": checks,
+        }
     elif action in {"plan", "select"}:
         film_root = Path(args.root).expanduser().resolve()
         film_id, spec_series_id, timeline = _film_timeline(film_root)
@@ -249,4 +308,4 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
     else:  # pragma: no cover
         raise BGMLibraryError(f"unknown BGM library action: {action}")
     emit(report)
-    return 0
+    return 2 if action == "canary" and report.get("ok") is not True else 0

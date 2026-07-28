@@ -40,6 +40,25 @@ def _wav(path: Path, *, frequency: float, gain: float = 0.35, duration: float = 
     return path
 
 
+def _pcm_variant(source: Path, output: Path, *, crop_frames: int = 0, quantize: int = 1) -> Path:
+    with wave.open(str(source), "rb") as handle:
+        channels = handle.getnchannels()
+        sample_rate = handle.getframerate()
+        pcm = np.frombuffer(handle.readframes(handle.getnframes()), dtype="<i2").reshape(
+            -1, channels
+        )
+    pcm = pcm[crop_frames:]
+    if quantize > 1:
+        pcm = ((pcm.astype(np.int32) // quantize) * quantize).astype("<i2")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(output), "wb") as handle:
+        handle.setnchannels(channels)
+        handle.setsampwidth(2)
+        handle.setframerate(sample_rate)
+        handle.writeframes(pcm.astype("<i2").tobytes())
+    return output
+
+
 def _metadata(
     *,
     mood: str = "rnb",
@@ -129,6 +148,16 @@ def test_catalog_is_atomic_and_approval_keeps_reproducible_metadata(tmp_path: Pa
     assert (library / record["path"]).is_file()
 
 
+def test_empty_library_status_hash_is_stable(tmp_path: Path) -> None:
+    library = tmp_path / "library"
+
+    first = library_status(library)
+    second = library_status(library)
+
+    assert first["catalog_sha256"] == second["catalog_sha256"]
+    assert first["ready_for_default"] is False
+
+
 def test_candidate_source_symlink_is_rejected(tmp_path: Path) -> None:
     source = _wav(tmp_path / "source.wav", frequency=220)
     link = tmp_path / "linked.wav"
@@ -169,6 +198,35 @@ def test_approval_rejects_exact_and_perceptual_duplicates(tmp_path: Path) -> Non
             license_note="local",
             instrumental_confirmed=True,
         )
+
+
+def test_approval_rejects_cropped_and_requantized_near_duplicates(tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    original_path = _wav(tmp_path / "master.wav", frequency=293, duration=3.0)
+    _approved(library, original_path, mood="rnb", seed=1)
+    variants = (
+        _pcm_variant(
+            original_path,
+            tmp_path / "cropped.wav",
+            crop_frames=44100 // 4,
+        ),
+        _pcm_variant(
+            original_path,
+            tmp_path / "requantized.wav",
+            quantize=256,
+        ),
+    )
+
+    for seed, variant in enumerate(variants, start=2):
+        staged = stage_candidate(library, variant, _metadata(seed=seed))
+        with pytest.raises(BGMLibraryError, match="near duplicate"):
+            approve_candidate(
+                library,
+                str(staged["asset_id"]),
+                reviewer="dex",
+                license_note="local",
+                instrumental_confirmed=True,
+            )
 
 
 def test_same_motif_lineage_may_share_cluster_but_not_play_adjacent(tmp_path: Path) -> None:
@@ -295,6 +353,62 @@ def test_selector_avoids_asset_reuse_and_recent_films(tmp_path: Path) -> None:
     assert len(selected) == len(set(selected)) == 4
     assert assets[0]["asset_id"] not in selected
     assert all(item["selection_reason"] for item in receipt["selections"])
+
+
+def test_ten_cues_have_no_asset_or_adjacent_cluster_reuse(tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    frequencies = (110, 160, 230, 340, 500, 730, 1060, 1540, 2240, 3260)
+    for index, frequency in enumerate(frequencies):
+        _approved(
+            library,
+            _wav(tmp_path / f"ten-{index}.wav", frequency=frequency),
+            mood="playful",
+            seed=index + 1,
+            energy=index / 10,
+            stem_profile=("pad", "thin", "pulse", "full")[index % 4],
+        )
+
+    receipt = select_timeline(
+        library,
+        film_id="ten-cue-film",
+        timeline=[
+            {
+                "shot_id": f"s{index:02d}",
+                "mood": "playful",
+                "energy": index / 10,
+                "stem_profile": ("pad", "thin", "pulse", "full")[index % 4],
+            }
+            for index in range(10)
+        ],
+    )
+
+    asset_ids = [item["asset_id"] for item in receipt["selections"]]
+    clusters = [item["similarity_cluster"] for item in receipt["selections"]]
+    assert len(asset_ids) == len(set(asset_ids)) == 10
+    assert all(left != right for left, right in zip(clusters, clusters[1:], strict=False))
+
+
+def test_six_films_rotate_across_recent_assets(tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    for index in range(6):
+        _approved(
+            library,
+            _wav(tmp_path / f"film-{index}.wav", frequency=190 + index * 67),
+            mood="warm",
+            seed=index + 1,
+        )
+
+    chosen: list[str] = []
+    for index in range(6):
+        receipt = select_timeline(
+            library,
+            film_id=f"film-{index}",
+            timeline=[{"shot_id": "s1", "mood": "warm"}],
+        )
+        chosen.append(str(receipt["selections"][0]["asset_id"]))
+        commit_usage(library, receipt, final_sha256=f"{index + 1:064x}")
+
+    assert len(chosen) == len(set(chosen)) == 6
 
 
 def test_selection_fails_closed_when_approved_asset_is_replaced(tmp_path: Path) -> None:
@@ -438,6 +552,36 @@ def test_generate_candidates_leaves_no_partial_batch_on_bad_wav(tmp_path: Path) 
     with (
         patch("bgm_library.render_batch", return_value=node_receipt),
         pytest.raises(BGMLibraryError, match="technical"),
+    ):
+        generate_candidates(
+            library,
+            base_url="http://node",
+            token="x" * 32,
+            recipe=baseline_recipes()[0],
+            batch_size=2,
+            seeds=[1, 2],
+        )
+
+    assert library_status(library)["counts"]["pending_human_review"] == 0
+
+
+def test_generate_candidates_rejects_duplicate_batch_before_catalog(tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    duplicate = _wav(tmp_path / "duplicate.wav", frequency=220)
+    checksum = hashlib.sha256(duplicate.read_bytes()).hexdigest()
+    node_receipt = {
+        "job_id": "job-duplicate",
+        "model": "ACE-Step-1.5",
+        "checkpoint_fingerprint": "checkpoint",
+        "artifacts": [
+            {"path": str(duplicate), "sha256": checksum, "seed": 1},
+            {"path": str(duplicate), "sha256": checksum, "seed": 2},
+        ],
+    }
+
+    with (
+        patch("bgm_library.render_batch", return_value=node_receipt),
+        pytest.raises(BGMLibraryError, match="unique"),
     ):
         generate_candidates(
             library,

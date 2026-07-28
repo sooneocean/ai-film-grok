@@ -377,7 +377,7 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.13.0`
+- 插件版本：`2.14.0`
 - Published skills：`2`
 - Skill Registry：`31/33` 项标记为 `implemented`
 - Python 脚本：`222` 个

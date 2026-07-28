@@ -87,6 +87,10 @@ ACE-Step 歌词侧可用：`[inst]` 或空结构标记（以官方/社区文档�
 # 20 个基准配方槽，每槽默认批量 4 个 pending 候选
 "$AIFILM" bgm-library generate --recipe-pack baseline-v1 --batch-size 4
 
+# 首次接真实 5090 时只跑一个 4×30 秒 canary；仍只进入 pending
+"$AIFILM" bgm-library canary --slot baseline-v1-rnb-pad \
+  --duration 30 --batch-size 4
+
 # 生成本机 HTML 审听页；听完后逐首批准或拒绝
 "$AIFILM" bgm-library review-pack
 "$AIFILM" bgm-library approve --asset-id "<id>" \
@@ -114,6 +118,9 @@ ACE-Step 歌词侧可用：`[inst]` 或空结构标记（以官方/社区文档�
 `final` 不调用 ACE 临时生成；缺匹配曲会写入待生成队列并阻塞。成功完成混音后，
 才把资产 ID、checksum、catalog revision、motif lineage、声音簇与选择理由提交到
 `usage.jsonl` 和 `mix_report.json`。
+
+canary 会回读候选数量、时长、技术检测、唯一 checksum 与唯一 PCM 指纹；任何候选
+仍保持 `pending_human_review`，不能替代人工完整听审。
 
 ## 三阶梯 · 立刻换口味（操作）
 
