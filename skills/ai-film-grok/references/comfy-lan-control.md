@@ -10,6 +10,10 @@ external-provider approval flag.
 export AIFILM_COMFYUI_BASE_URL="http://192.168.88.52:8188"
 ```
 
+The verified 5090 armory also supplies this private URL when neither
+`--base-url` nor the environment variable is present. Use the environment
+variable to override the registered node, not to store credentials.
+
 Only `http(s)://localhost` or a literal private/loopback IP is accepted.
 Credentials, URL paths, public IPs, redirects and hostnames are rejected.
 Restrict Windows Firewall port `8188` to the controller machine; never expose
@@ -26,6 +30,10 @@ aifilm comfy queue
 `inventory` reads bounded system, GPU, feature, model-count and queue data. It
 does not request `/object_info` for every installed node and does not print
 prompt payloads.
+
+For demand-driven model selection, use
+[`comfy-weapon-armory.md`](comfy-weapon-armory.md). It routes only to retained
+real-pilot weapons and live-checks their required model folders.
 
 ## Run an API workflow
 

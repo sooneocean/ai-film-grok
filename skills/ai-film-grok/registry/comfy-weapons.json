@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-comfy-weapon-armory",
+  "updated_at": "2026-07-28",
+  "default_node": "rtx5090-main",
+  "nodes": {
+    "rtx5090-main": {
+      "base_url": "http://192.168.88.52:8188",
+      "transport": "private_lan",
+      "comfyui_root": "C:\\ComfyUI_windows_portable\\ComfyUI",
+      "gpu": "NVIDIA GeForce RTX 5090",
+      "vram_mib": 32607,
+      "verified": true,
+      "credentials_embedded": false
+    }
+  },
+  "weapons": [
+    {
+      "id": "qwen-image-2512-quality",
+      "display_name": "Qwen Image 2512 FP8 standard quality",
+      "status": "verified",
+      "priority": 100,
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": [
+        "text-to-image",
+        "keyframe",
+        "character-still",
+        "poster",
+        "chinese-text",
+        "photoreal-image"
+      ],
+      "quality_tiers": [
+        "max_practical",
+        "standard"
+      ],
+      "workflow_template": "templates/comfy/qwen-image-2512-api.json",
+      "bindings": {
+        "prompt_node": "positive",
+        "prompt_input": "text",
+        "sampler_node": "sampler",
+        "seed_input": "seed",
+        "save_node": "save",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "qwen_image_2512_fp8_e4m3fn.safetensors"
+        ],
+        "text_encoders": [
+          "qwen_2.5_vl_7b_fp8_scaled.safetensors"
+        ],
+        "vae": [
+          "qwen_image_vae.safetensors"
+        ]
+      },
+      "defaults": {
+        "width": 928,
+        "height": 1664,
+        "steps": 50,
+        "cfg": 4.0,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "shift": 3.1
+      },
+      "capabilities": {
+        "text_to_image": true,
+        "chinese_text_rendering": true,
+        "identity_preserving_local_edit": false,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "independent_verifier": "ACCEPT",
+        "model_sha256": "5dc80554d5d83390046a2f4a94ece06afb7700bf7b0aaf8bde9769793875876b",
+        "workflow_sha256": "6f9855d986e336f9317066dc0cf925062073ad151b95579b0409079fa47d9188",
+        "output_sha256": "1ba1b25b8ef46251caec371cb2bddd60b2c442f7809cc7cc649e95499e89ff30"
+      }
+    },
+    {
+      "id": "qwen-image-edit-2511-local",
+      "display_name": "Qwen Image Edit 2511 local identity edit",
+      "status": "verified",
+      "priority": 90,
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": [
+        "image-edit",
+        "local-image-edit",
+        "wardrobe-edit",
+        "color-edit",
+        "identity-preserving-edit"
+      ],
+      "quality_tiers": [
+        "fast",
+        "standard",
+        "max_practical"
+      ],
+      "workflow_template": "templates/comfy/qwen-image-edit-2511-api.json",
+      "bindings": {
+        "prompt_node": "positive_encode",
+        "prompt_input": "prompt",
+        "input_node": "load_image",
+        "input_image_input": "image",
+        "sampler_node": "sampler",
+        "seed_input": "seed",
+        "save_node": "save",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "qwen_image_edit_2511_fp8mixed.safetensors"
+        ],
+        "text_encoders": [
+          "qwen_2.5_vl_7b_fp8_scaled.safetensors"
+        ],
+        "vae": [
+          "qwen_image_vae.safetensors"
+        ],
+        "loras": [
+          "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"
+        ]
+      },
+      "defaults": {
+        "steps": 4,
+        "cfg": 1.0,
+        "sampler": "euler",
+        "scheduler": "simple",
+        "shift": 3.1
+      },
+      "capabilities": {
+        "text_to_image": false,
+        "chinese_text_rendering": false,
+        "identity_preserving_local_edit": true,
+        "large_viewpoint_identity_lock": false,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "independent_verifier": "ACCEPT",
+        "local_edit_identity_gate": true,
+        "large_viewpoint_identity_gate": false,
+        "output_sha256": "c3c865c1bad43e4a7dc7d5d764a61c73ed2d2cfdba0fd33e4dfa191209af860b"
+      }
+    },
+    {
+      "id": "wan22-i2v-quality",
+      "display_name": "Wan 2.2 I2V official quality",
+      "status": "verified",
+      "priority": 100,
+      "provider": "comfy-wan22",
+      "node": "rtx5090-main",
+      "intents": ["image-to-video", "i2v", "general-i2v"],
+      "quality_tiers": ["max_practical", "standard"],
+      "profile": "official",
+      "requirements": {
+        "diffusion_models": [
+          "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+          "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+        ],
+        "text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+        "vae": ["wan_2.1_vae.safetensors"]
+      },
+      "capabilities": {
+        "general_i2v": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "normal_motion_mean": 18.2497,
+        "normal_motion_gate": true,
+        "meat_motion_gate": false
+      }
+    },
+    {
+      "id": "wan22-adult-intimacy-baseline",
+      "display_name": "Wan 2.2 attested adult intimacy baseline",
+      "status": "verified-baseline",
+      "priority": 90,
+      "provider": "comfy-wan22",
+      "node": "rtx5090-main",
+      "intents": ["adult-intimacy-i2v"],
+      "quality_tiers": ["max_practical", "standard"],
+      "profile": "adult-motion",
+      "requirements": {
+        "diffusion_models": [
+          "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+          "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+        ],
+        "text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+        "vae": ["wan_2.1_vae.safetensors"]
+      },
+      "capabilities": {
+        "adult_attestation_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "meat_motion_gate": false
+      }
+    },
+    {
+      "id": "wan22-adult-meat-pilot",
+      "display_name": "Wan 2.2 CubeyAI adult motion pilot",
+      "status": "experimental",
+      "priority": 80,
+      "provider": "comfy-wan22",
+      "node": "rtx5090-main",
+      "intents": ["adult-meat-motion-i2v"],
+      "quality_tiers": ["max_practical", "standard"],
+      "profile": "adult-general-experimental",
+      "requirements": {
+        "diffusion_models": [
+          "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+          "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+        ],
+        "text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+        "vae": ["wan_2.1_vae.safetensors"],
+        "loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"]
+      },
+      "capabilities": {
+        "adult_attestation_required": true,
+        "pilot_only": true,
+        "human_approval_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "normal_motion_mean": 18.0956,
+        "normal_motion_gate": true,
+        "meat_motion_gate": false,
+        "seed_sensitive": true,
+        "promoted": false,
+        "source": "https://huggingface.co/lopi999/Wan2.2-I2V_General-NSFW-LoRA",
+        "upstream": "https://civitai.com/models/1307155",
+        "high_lora_sha256": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",
+        "low_lora_sha256": "d6b783742f4d5fd63a0223ae1d5bf64fc995a6b408480ac2a00528ae0d4146db",
+        "commercial_use": "restricted_rentcivit"
+      }
+    }
+  ],
+  "blocked_capabilities": [
+    {
+      "intent": "layered-image",
+      "reason": "Qwen Image Layered diffusion and VAE weights are not installed or pilot-verified"
+    },
+    {
+      "intent": "qwen-control",
+      "reason": "Qwen control weights are not installed or pilot-verified"
+    },
+    {
+      "intent": "large-viewpoint-identity-lock",
+      "reason": "The 2511 angle-change pilot did not pass the pixel identity gate"
+    },
+    {
+      "intent": "adult-meat-motion-production",
+      "reason": "No promoted local weapon meets the mean motion >=20 production gate"
+    }
+  ]
+}

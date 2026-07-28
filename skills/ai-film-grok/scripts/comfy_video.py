@@ -36,7 +36,7 @@ class _WebSocketUnavailable(RuntimeError):
     pass
 
 
-WAN22_OFFICIAL_PROFILE: dict[str, str] = {
+WAN22_OFFICIAL_PROFILE: dict[str, Any] = {
     "name": "official",
     "high": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
     "low": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
@@ -44,7 +44,7 @@ WAN22_OFFICIAL_PROFILE: dict[str, str] = {
     "low_lora": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
 }
 
-WAN22_ADULT_PROFILE: dict[str, str] = {
+WAN22_ADULT_PROFILE: dict[str, Any] = {
     "name": "adult-motion",
     "high": WAN22_OFFICIAL_PROFILE["high"],
     "low": WAN22_OFFICIAL_PROFILE["low"],
@@ -52,6 +52,82 @@ WAN22_ADULT_PROFILE: dict[str, str] = {
     "high_lora": "",
     "low_lora": "",
 }
+
+WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE: dict[str, Any] = {
+    "name": "adult-action-experimental",
+    "high": WAN22_OFFICIAL_PROFILE["high"],
+    "low": WAN22_OFFICIAL_PROFILE["low"],
+    "high_lora": "wan22-mouthfull-140epoc-high-k3nk.safetensors",
+    "low_lora": "wan22-mouthfull-152epoc-low-k3nk.safetensors",
+}
+
+WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE: dict[str, Any] = {
+    "name": "adult-general-experimental",
+    "high": WAN22_OFFICIAL_PROFILE["high"],
+    "low": WAN22_OFFICIAL_PROFILE["low"],
+    "high_lora": "NSFW-22-H-e8.safetensors",
+    "low_lora": "NSFW-22-L-e8.safetensors",
+    "lora_strength": 0.9,
+}
+
+_WAN22_WEAPON_INTENTS = frozenset({"general", "adult-intimacy", "adult-meat-motion"})
+_WAN22_PRODUCTION_STAGES = frozenset({"pilot", "production"})
+
+
+def select_wan22_weapon(
+    *,
+    intent: str,
+    stage: str,
+    allow_experimental: bool = False,
+) -> dict[str, Any]:
+    """Route a structured shot demand to a verified Wan 2.2 weapon.
+
+    Experimental assets may enter an explicitly opted-in pilot, but no current
+    local profile is allowed to claim production-grade adult meat motion.
+    """
+    normalized_intent = str(intent or "general").strip().lower()
+    normalized_stage = str(stage or "production").strip().lower()
+    if normalized_intent not in _WAN22_WEAPON_INTENTS:
+        raise ComfyVideoError(f"unsupported Wan 2.2 weapon intent: {intent}")
+    if normalized_stage not in _WAN22_PRODUCTION_STAGES:
+        raise ComfyVideoError(f"unsupported Wan 2.2 production stage: {stage}")
+
+    if normalized_intent == "general":
+        return {
+            "profile": WAN22_OFFICIAL_PROFILE,
+            "weapon_status": "promoted",
+            "requires_adult_attestation": False,
+            "requires_human_approval": normalized_stage == "pilot",
+            "reason": "official Wan 2.2 quality profile is the verified general I2V weapon",
+        }
+    if normalized_intent == "adult-intimacy":
+        return {
+            "profile": WAN22_ADULT_PROFILE,
+            "weapon_status": "promoted-baseline",
+            "requires_adult_attestation": True,
+            "requires_human_approval": normalized_stage == "pilot",
+            "reason": "official Wan 2.2 pair with adult attestation is the promoted intimacy baseline",
+        }
+    if normalized_stage == "production":
+        raise ComfyVideoError(
+            "no promoted Wan 2.2 weapon meets the adult meat-motion production gate"
+        )
+    if allow_experimental:
+        return {
+            "profile": WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
+            "weapon_status": "experimental",
+            "requires_adult_attestation": True,
+            "requires_human_approval": True,
+            "reason": "CubeyAI pair passed normal motion once but remains seed-sensitive and pilot-only",
+        }
+    return {
+        "profile": WAN22_ADULT_PROFILE,
+        "weapon_status": "control-baseline",
+        "requires_adult_attestation": True,
+        "requires_human_approval": True,
+        "reason": "experimental assets were not authorized; use the official adult pilot control",
+    }
+
 
 WAN22_VAE = "wan_2.1_vae.safetensors"
 WAN22_TEXT_ENCODER = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
@@ -182,7 +258,7 @@ def build_wan22_i2v_prompt(
     duration_sec: int,
     seed: int,
     turbo: bool,
-    profile: Mapping[str, str] = WAN22_OFFICIAL_PROFILE,
+    profile: Mapping[str, Any] = WAN22_OFFICIAL_PROFILE,
     filename_prefix: str = "video/aifilm_wan22",
     negative_prompt: str = DEFAULT_NEGATIVE,
 ) -> dict[str, dict[str, Any]]:
@@ -200,7 +276,7 @@ def build_wan22_i2v_prompt(
         raise ComfyVideoError("unsafe filename prefix")
     if not re.fullmatch(r"[A-Za-z0-9_./-]+", filename_prefix):
         raise ComfyVideoError("filename prefix contains unsupported characters")
-    if profile.get("name") == WAN22_ADULT_PROFILE["name"] and turbo:
+    if profile.get("name") != WAN22_OFFICIAL_PROFILE["name"] and turbo:
         raise ComfyVideoError("adult-motion turbo is not promoted; use quality mode")
 
     fps = 16
@@ -246,19 +322,21 @@ def build_wan22_i2v_prompt(
         ),
         "vae": _node("VAELoader", "Load Wan VAE", vae_name=WAN22_VAE),
     }
-    if turbo:
+    use_lora_pair = turbo or str(profile.get("name") or "").endswith("-experimental")
+    if use_lora_pair:
+        lora_strength = float(profile.get("lora_strength", 1.0))
         graph["lora_high"] = _node(
             "LoraLoaderModelOnly",
-            "Load high-noise Lightning LoRA",
+            "Load high-noise LoRA",
             lora_name=profile["high_lora"],
-            strength_model=1.0,
+            strength_model=lora_strength,
             model=["unet_high", 0],
         )
         graph["lora_low"] = _node(
             "LoraLoaderModelOnly",
-            "Load low-noise Lightning LoRA",
+            "Load low-noise LoRA",
             lora_name=profile["low_lora"],
-            strength_model=1.0,
+            strength_model=lora_strength,
             model=["unet_low", 0],
         )
         high_source = "lora_high"
@@ -574,6 +652,14 @@ def probe(base_url: str) -> dict[str, Any]:
     }
     installed = set(diffusion) | set(text_encoders) | set(vaes)
     adult_pair = {WAN22_ADULT_PROFILE["high"], WAN22_ADULT_PROFILE["low"]}
+    experimental_loras = {
+        WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE["high_lora"],
+        WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE["low_lora"],
+    }
+    general_experimental_loras = {
+        WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["high_lora"],
+        WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE["low_lora"],
+    }
     return {
         "schema_version": 1,
         "kind": "comfy-video-capability",
@@ -595,6 +681,13 @@ def probe(base_url: str) -> dict[str, Any]:
                 WAN22_OFFICIAL_PROFILE["low_lora"],
             }.issubset(set(loras)),
             "adult_motion": required_official.issubset(installed),
+            "adult_action_experimental": (
+                required_official.issubset(installed) and experimental_loras.issubset(set(loras))
+            ),
+            "adult_general_experimental": (
+                required_official.issubset(installed)
+                and general_experimental_loras.issubset(set(loras))
+            ),
         },
         "models": {
             "official": [WAN22_OFFICIAL_PROFILE["high"], WAN22_OFFICIAL_PROFILE["low"]],
@@ -605,6 +698,10 @@ def probe(base_url: str) -> dict[str, Any]:
             "merged_pair_load_verified": False,
             "act_lora_present": "wan_cumshot_i2v.safetensors" in set(loras),
             "act_lora_promoted": False,
+            "verified_wan22_pair_present": experimental_loras.issubset(set(loras)),
+            "verified_wan22_pair_promoted": False,
+            "general_wan22_pair_present": general_experimental_loras.issubset(set(loras)),
+            "general_wan22_pair_promoted": False,
         },
     }
 
@@ -918,14 +1015,18 @@ def generate(
     duration_sec: int,
     seed: int,
     turbo: bool,
-    profile: Mapping[str, str],
+    profile: Mapping[str, Any],
     subject_basis: str,
     timeout_sec: int = 1800,
 ) -> dict[str, Any]:
-    if profile.get("name") == WAN22_ADULT_PROFILE["name"]:
+    if str(profile.get("name") or "").startswith("adult-"):
         validate_adult_request(prompt=prompt, subject_basis=subject_basis)
     capability = probe(base_url)
-    profile_key = "adult_motion" if profile.get("name") == "adult-motion" else "official"
+    profile_key = {
+        "adult-motion": "adult_motion",
+        "adult-action-experimental": "adult_action_experimental",
+        "adult-general-experimental": "adult_general_experimental",
+    }.get(str(profile.get("name") or ""), "official")
     if not capability["profiles"].get(profile_key):
         raise ComfyVideoError(f"required Wan profile is not installed: {profile_key}")
     uploaded = upload_image(base_url, image)
@@ -958,12 +1059,15 @@ def generate(
         "input_sha256": uploaded["sha256"],
         "output": downloaded,
         "models": [profile["high"], profile["low"]],
+        "loras": [name for name in (profile.get("high_lora"), profile.get("low_lora")) if name],
+        "experimental_assets_promoted": False,
+        "lora_strength": profile.get("lora_strength"),
         "turbo": turbo,
         "width": width,
         "height": height,
         "duration_sec": duration_sec,
         "subject_basis": subject_basis or None,
-        "adult_attestation": profile.get("name") == WAN22_ADULT_PROFILE["name"],
+        "adult_attestation": str(profile.get("name") or "").startswith("adult-"),
     }
 
 
@@ -983,7 +1087,28 @@ def _parser() -> argparse.ArgumentParser:
     generate_cmd.add_argument("--duration", type=int, default=3)
     generate_cmd.add_argument("--timeout", type=int, default=1800)
     generate_cmd.add_argument("--seed", type=int, default=123456)
-    generate_cmd.add_argument("--profile", choices=("official", "adult-motion"), default="official")
+    generate_cmd.add_argument(
+        "--profile",
+        choices=(
+            "auto",
+            "official",
+            "adult-motion",
+            "adult-action-experimental",
+            "adult-general-experimental",
+        ),
+        default="auto",
+    )
+    generate_cmd.add_argument(
+        "--weapon-intent",
+        choices=sorted(_WAN22_WEAPON_INTENTS),
+        default="general",
+    )
+    generate_cmd.add_argument(
+        "--production-stage",
+        choices=sorted(_WAN22_PRODUCTION_STAGES),
+        default="production",
+    )
+    generate_cmd.add_argument("--allow-experimental", action="store_true")
     generate_cmd.add_argument(
         "--subject-basis", choices=sorted(_ALLOWED_SUBJECT_BASES), default=None
     )
@@ -1002,7 +1127,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "probe":
         report = probe(args.base_url)
     else:
-        profile = WAN22_ADULT_PROFILE if args.profile == "adult-motion" else WAN22_OFFICIAL_PROFILE
+        if args.profile == "auto":
+            profile = select_wan22_weapon(
+                intent=args.weapon_intent,
+                stage=args.production_stage,
+                allow_experimental=args.allow_experimental,
+            )["profile"]
+        else:
+            profile = {
+                "adult-motion": WAN22_ADULT_PROFILE,
+                "adult-action-experimental": WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
+                "adult-general-experimental": WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
+            }.get(args.profile, WAN22_OFFICIAL_PROFILE)
         report = generate(
             base_url=args.base_url,
             image=args.image,

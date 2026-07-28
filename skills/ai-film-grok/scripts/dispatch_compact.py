@@ -240,6 +240,9 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
         "next_action": dict(action),
         "responsibility": packet.get("responsibility"),
         "department_handoff": packet.get("department_handoff"),
+        # Weapon selection is also a bound orchestration contract. Keeping the
+        # same object prevents compact/full mode from choosing different tools.
+        "weapon_route": packet.get("weapon_route"),
         "workflow": {
             "public_entry": (packet.get("workflow") or {}).get("public_entry"),
             "mode": (packet.get("workflow") or {}).get("mode"),

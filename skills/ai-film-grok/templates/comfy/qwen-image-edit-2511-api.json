@@ -1,0 +1,188 @@
+{
+  "load_image": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "Replace through the verified armory compiler."
+    }
+  },
+  "scale_image": {
+    "class_type": "FluxKontextImageScale",
+    "inputs": {
+      "image": [
+        "load_image",
+        0
+      ]
+    }
+  },
+  "unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "qwen_image_edit_2511_fp8mixed.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    }
+  },
+  "vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    }
+  },
+  "sampling": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": [
+        "unet",
+        0
+      ],
+      "shift": 3.1
+    }
+  },
+  "cfg_norm": {
+    "class_type": "CFGNorm",
+    "inputs": {
+      "model": [
+        "sampling",
+        0
+      ],
+      "strength": 1.0
+    }
+  },
+  "lightning": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "cfg_norm",
+        0
+      ],
+      "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+      "strength_model": 1.0
+    }
+  },
+  "positive_encode": {
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "inputs": {
+      "clip": [
+        "clip",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "image1": [
+        "scale_image",
+        0
+      ],
+      "prompt": "Replace through the verified armory compiler."
+    }
+  },
+  "negative_encode": {
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "inputs": {
+      "clip": [
+        "clip",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "image1": [
+        "scale_image",
+        0
+      ],
+      "prompt": ""
+    }
+  },
+  "positive_reference": {
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "inputs": {
+      "conditioning": [
+        "positive_encode",
+        0
+      ],
+      "reference_latents_method": "index_timestep_zero"
+    }
+  },
+  "negative_reference": {
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "inputs": {
+      "conditioning": [
+        "negative_encode",
+        0
+      ],
+      "reference_latents_method": "index_timestep_zero"
+    }
+  },
+  "latent": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "scale_image",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "sampler": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "lightning",
+        0
+      ],
+      "seed": 1,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "positive_reference",
+        0
+      ],
+      "negative": [
+        "negative_reference",
+        0
+      ],
+      "latent_image": [
+        "latent",
+        0
+      ],
+      "denoise": 1.0
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "sampler",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "save": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "decode",
+        0
+      ],
+      "filename_prefix": "aifilm/qwen-edit-2511"
+    }
+  }
+}

@@ -10,7 +10,9 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from comfy_video import (  # noqa: E402
+    WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
     WAN22_ADULT_PROFILE,
+    WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
     WAN22_OFFICIAL_PROFILE,
     ComfyVideoError,
     _json_request,
@@ -24,6 +26,7 @@ from comfy_video import (  # noqa: E402
     load_api_workflow,
     normalize_base_url,
     queue_status,
+    select_wan22_weapon,
     submit,
     upload_image,
     validate_adult_request,
@@ -33,6 +36,52 @@ from comfy_video import (  # noqa: E402
 
 
 class ComfyVideoTests(unittest.TestCase):
+    def test_armory_auto_routes_general_i2v_to_official_quality(self) -> None:
+        selection = select_wan22_weapon(intent="general", stage="production")
+        self.assertEqual(selection["profile"]["name"], "official")
+        self.assertEqual(selection["weapon_status"], "promoted")
+        self.assertFalse(selection["requires_adult_attestation"])
+
+    def test_armory_auto_routes_adult_intimacy_to_attested_baseline(self) -> None:
+        selection = select_wan22_weapon(intent="adult-intimacy", stage="production")
+        self.assertEqual(selection["profile"]["name"], "adult-motion")
+        self.assertEqual(selection["weapon_status"], "promoted-baseline")
+        self.assertTrue(selection["requires_adult_attestation"])
+
+    def test_armory_auto_routes_meat_pilot_to_verified_experimental_pair(self) -> None:
+        selection = select_wan22_weapon(
+            intent="adult-meat-motion",
+            stage="pilot",
+            allow_experimental=True,
+        )
+        self.assertEqual(selection["profile"]["name"], "adult-general-experimental")
+        self.assertEqual(selection["weapon_status"], "experimental")
+        self.assertTrue(selection["requires_human_approval"])
+
+    def test_armory_refuses_unproven_meat_weapon_for_production(self) -> None:
+        with self.assertRaisesRegex(ComfyVideoError, "no promoted Wan 2.2 weapon"):
+            select_wan22_weapon(
+                intent="adult-meat-motion",
+                stage="production",
+                allow_experimental=True,
+            )
+
+    def test_armory_keeps_rejected_action_pair_out_of_auto_routing(self) -> None:
+        for intent, stage, allow_experimental in (
+            ("general", "production", False),
+            ("adult-intimacy", "production", False),
+            ("adult-meat-motion", "pilot", True),
+        ):
+            selection = select_wan22_weapon(
+                intent=intent,
+                stage=stage,
+                allow_experimental=allow_experimental,
+            )
+            self.assertNotEqual(
+                selection["profile"]["name"],
+                "adult-action-experimental",
+            )
+
     @patch("comfy_video._OPENER.open")
     def test_json_request_accepts_empty_success_body(self, open_request: MagicMock) -> None:
         response = MagicMock()
@@ -96,6 +145,22 @@ class ComfyVideoTests(unittest.TestCase):
         self.assertEqual(graph["sampler_high"]["inputs"]["steps"], 4)
         self.assertEqual(graph["sampler_high"]["inputs"]["end_at_step"], 2)
 
+    def test_official_quality_graph_does_not_load_lightning_loras(self) -> None:
+        graph = build_wan22_i2v_prompt(
+            image_name="canary.jpg",
+            prompt="Two clearly adult fictional performers move through a choreographed scene.",
+            width=480,
+            height=704,
+            duration_sec=1,
+            seed=1234,
+            turbo=False,
+            profile=WAN22_OFFICIAL_PROFILE,
+        )
+        self.assertNotIn("lora_high", graph)
+        self.assertNotIn("lora_low", graph)
+        self.assertEqual(graph["model_high"]["inputs"]["model"], ["unet_high", 0])
+        self.assertEqual(graph["model_low"]["inputs"]["model"], ["unet_low", 0])
+
     def test_adult_profile_uses_verified_official_pair_without_unverified_lora(
         self,
     ) -> None:
@@ -114,6 +179,45 @@ class ComfyVideoTests(unittest.TestCase):
         self.assertIn("wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors", serialized)
         self.assertNotIn("wan22Enhanced_NSFW_FastMove", serialized)
         self.assertNotIn("wan_cumshot_i2v.safetensors", serialized)
+
+    def test_experimental_adult_action_profile_loads_verified_noise_pair(self) -> None:
+        graph = build_wan22_i2v_prompt(
+            image_name="licensed.jpg",
+            prompt="Two consenting adult fictional performers in a choreographed dance.",
+            width=480,
+            height=704,
+            duration_sec=1,
+            seed=42,
+            turbo=False,
+            profile=WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
+        )
+        self.assertEqual(
+            graph["lora_high"]["inputs"]["lora_name"],
+            "wan22-mouthfull-140epoc-high-k3nk.safetensors",
+        )
+        self.assertEqual(
+            graph["lora_low"]["inputs"]["lora_name"],
+            "wan22-mouthfull-152epoc-low-k3nk.safetensors",
+        )
+        self.assertEqual(graph["model_high"]["inputs"]["model"], ["lora_high", 0])
+        self.assertEqual(graph["model_low"]["inputs"]["model"], ["lora_low", 0])
+        self.assertEqual(graph["sampler_high"]["inputs"]["steps"], 20)
+
+    def test_general_adult_experimental_profile_uses_recommended_strength(self) -> None:
+        graph = build_wan22_i2v_prompt(
+            image_name="licensed.jpg",
+            prompt="nsfwsks, two consenting adult fictional performers dance.",
+            width=480,
+            height=704,
+            duration_sec=1,
+            seed=42,
+            turbo=False,
+            profile=WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
+        )
+        self.assertEqual(graph["lora_high"]["inputs"]["lora_name"], "NSFW-22-H-e8.safetensors")
+        self.assertEqual(graph["lora_low"]["inputs"]["lora_name"], "NSFW-22-L-e8.safetensors")
+        self.assertEqual(graph["lora_high"]["inputs"]["strength_model"], 0.9)
+        self.assertEqual(graph["lora_low"]["inputs"]["strength_model"], 0.9)
 
     def test_adult_profile_requires_authorized_adult_attestation(self) -> None:
         with self.assertRaises(ComfyVideoError):

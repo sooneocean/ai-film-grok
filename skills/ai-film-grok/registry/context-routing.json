@@ -36,6 +36,11 @@
         "path": "references/stages/visual.md",
         "reason": "Verified still and motion generation",
         "required": true
+      },
+      {
+        "path": "references/comfy-weapon-armory.md",
+        "reason": "Live route verified 5090 still and edit weapons",
+        "required": false
       }
     ],
     "selects": [
@@ -133,6 +138,13 @@
       {
         "path": "references/stages/visual.md",
         "reason": "Paid motion generation boundary",
+        "required": true
+      }
+    ],
+    "keyframe.generate": [
+      {
+        "path": "references/comfy-weapon-armory.md",
+        "reason": "Route unlocked still generation to a live verified local weapon",
         "required": true
       }
     ],

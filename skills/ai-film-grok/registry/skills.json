@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "ai-film-skill-registry",
   "plugin": "ai-film-grok",
-  "updated": "2026-07-22",
+  "updated": "2026-07-28",
   "notes": "Phase 2–4: planning + asset registry (character/location/prop/state). Contracts are minimal envelopes.",
   "skills": [
     {
@@ -202,10 +202,13 @@
       "produces": ["Keyframe"],
       "dependsOnAssets": ["Panel", "Character"],
       "capabilities": ["image_gen", "image_edit"],
-      "providers": ["grok"],
+      "providers": ["grok", "comfy_lan"],
       "tags": ["visual"],
       "phases": ["0", "5"],
-      "cli": { "run": "image_gen|image_edit + aifilm register-still", "validate": "aifilm pilot report --root" }
+      "cli": {
+        "run": "aifilm comfy route --intent keyframe · aifilm comfy prepare · aifilm comfy run-workflow · aifilm register-still",
+        "validate": "aifilm comfy armory --live · aifilm pilot report --root"
+      }
     },
     {
       "id": "continuity.check",
@@ -228,10 +231,10 @@
       "produces": ["MotionClip"],
       "dependsOnAssets": ["Keyframe"],
       "capabilities": ["i2v"],
-      "providers": ["grok", "frw"],
+      "providers": ["grok", "frw", "comfy_lan"],
       "tags": ["motion"],
       "phases": ["0", "6"],
-      "cli": { "run": "media-queue image_to_video + aifilm register-clip", "validate": "aifilm selects --root" },
+      "cli": { "run": "aifilm comfy route --intent image-to-video · comfy-wan22 + aifilm register-clip", "validate": "aifilm comfy armory --live · aifilm selects --root" },
       "inputContract": "registry/contracts/skill-envelope.in.json",
       "outputContract": "registry/contracts/skill-envelope.out.json"
     },
