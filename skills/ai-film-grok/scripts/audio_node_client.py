@@ -40,19 +40,23 @@ def _request(
     path: str,
     *,
     body: dict[str, Any] | None = None,
+    raw_body: bytes | None = None,
+    content_type: str = "application/json",
     timeout: int = 30,
     expect_wav: bool = False,
 ) -> bytes:
     if len(token) < 24:
         raise AudioNodeError("AIFILM_AUDIO_NODE_TOKEN is too short")
-    data = json.dumps(body, ensure_ascii=False).encode() if body is not None else None
+    if body is not None and raw_body is not None:
+        raise AudioNodeError("audio node request has conflicting bodies")
+    data = json.dumps(body, ensure_ascii=False).encode() if body is not None else raw_body
     req = urllib.request.Request(
         _url(base_url, path),
         data=data,
-        method="POST" if body is not None else "GET",
+        method="POST" if data is not None else "GET",
         headers={
             "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
+            "Content-Type": content_type,
         },
     )
     try:
@@ -183,8 +187,39 @@ def render_batch(
     if not 1 <= batch_size <= 8 or len(seeds) != batch_size or len(set(seeds)) != batch_size:
         raise AudioNodeError("invalid ACE-Step batch request")
 
+    request_payload = dict(payload)
+    reference_audio = str(request_payload.pop("reference_audio", "") or "").strip()
+    if reference_audio:
+        reference_input = Path(reference_audio).expanduser()
+        if reference_input.is_symlink():
+            raise AudioNodeError("ACE-Step reference audio is missing or symlinked")
+        reference_path = reference_input.resolve()
+        if not reference_path.is_file():
+            raise AudioNodeError("ACE-Step reference audio is missing or symlinked")
+        _validate_wav(reference_path)
+        raw_reference = reference_path.read_bytes()
+        if len(raw_reference) > 64 * 1024 * 1024:
+            raise AudioNodeError("ACE-Step reference audio exceeds 64 MiB")
+        reference_receipt = _json_response(
+            _request(
+                base_url,
+                token,
+                "/v1/music-reference",
+                raw_body=raw_reference,
+                content_type="audio/wav",
+                timeout=120,
+            ),
+            context="reference upload",
+        )
+        reference_id = str(reference_receipt.get("reference_id") or "")
+        source_hash = hashlib.sha256(raw_reference).hexdigest()
+        if len(reference_id) != 64 or reference_receipt.get("source_sha256") != source_hash:
+            raise AudioNodeError("audio node returned invalid reference receipt")
+        request_payload["reference_audio_id"] = reference_id
+
     job_id = _json_response(
-        _request(base_url, token, "/v1/music-batch", body=payload), context="batch submission"
+        _request(base_url, token, "/v1/music-batch", body=request_payload),
+        context="batch submission",
     ).get("job_id")
     if not isinstance(job_id, str) or not job_id:
         raise AudioNodeError("audio node did not return batch job id")

@@ -4,6 +4,8 @@ import asyncio
 import hashlib
 import importlib
 import inspect
+import io
+import wave
 from pathlib import Path
 
 import pytest
@@ -155,3 +157,58 @@ def test_execute_music_batch_records_only_sanitized_artifacts(
     assert [item["seed"] for item in state["artifacts"]] == [11, 12]
     assert "prompt" not in state
     assert "path" not in state["artifacts"][0]
+
+
+def test_reference_upload_is_hash_named_and_batch_resolves_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    references = tmp_path / "refs"
+    monkeypatch.setattr(service, "REFERENCES", references)
+    monkeypatch.setattr(service, "TOKEN", "t" * 32)
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_MUSIC_BATCH_ARGV", '["trusted-batch-adapter"]')
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(2)
+        wav.setsampwidth(2)
+        wav.setframerate(44100)
+        wav.writeframes(b"\0\0\0\0" * 4410)
+    raw = buffer.getvalue()
+
+    receipt = service._store_music_reference(raw)
+    reference_id = receipt["reference_id"]
+    assert (references / f"{reference_id}.wav").is_file()
+
+    monkeypatch.setattr(asyncio, "create_task", lambda coroutine: coroutine.close())
+    result = asyncio.run(
+        service.create_music_batch(
+            {
+                "prompt": "abstract reusable recipe",
+                "duration": 30,
+                "batch_size": 1,
+                "seeds": [9],
+                "task_type": "cover",
+                "reference_audio_id": reference_id,
+            },
+            f"Bearer {'t' * 32}",
+        )
+    )
+    assert result["status"] == "queued"
+    assert service.jobs[result["job_id"]]["status"] == "queued"
+
+
+def test_reference_upload_rejects_wrong_delivery_format(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "REFERENCES", tmp_path / "refs")
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(48000)
+        wav.writeframes(b"\0\0" * 4410)
+    with pytest.raises(Exception, match="44.1kHz"):
+        service._store_music_reference(buffer.getvalue())

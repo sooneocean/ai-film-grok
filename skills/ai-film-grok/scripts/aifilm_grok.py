@@ -748,6 +748,17 @@ def cmd_init(args: argparse.Namespace) -> int:
         "aspect_ratio": aspect,
         "scenes": [],
     }
+    try:
+        from bgm_library import BGMLibraryError, default_library_root, library_status
+
+        if library_status(default_library_root()).get("ready_for_default"):
+            film_spec["audio_policy"] = {
+                "mode": "auto",
+                "bed_source": "approved_library",
+            }
+    except (BGMLibraryError, OSError, ValueError):
+        # A missing or corrupt optional shared library cannot make init unusable.
+        pass
     timeline = {
         "schema_version": 1,
         "fps": DEFAULT_FPS,
@@ -3186,6 +3197,77 @@ def cmd_reencode_clips(args: argparse.Namespace) -> int:
     return 0 if not failed else 2
 
 
+def _commit_selected_bgm_usage(
+    root: Path,
+    *,
+    output: str | None = None,
+    output_sha256: str | None = None,
+) -> dict[str, Any] | None:
+    """Commit approved-library use only after a successful final command."""
+    selection_path = root / "receipts" / "bgm-selection.json"
+    selection = _util_read_json(selection_path)
+    if not isinstance(selection, dict) or not selection.get("selections"):
+        return None
+    mix_path = root / "audio" / "mix_report.json"
+    mix = _util_read_json(mix_path)
+    music_template = (
+        mix.get("music_template")
+        if isinstance(mix, dict) and isinstance(mix.get("music_template"), dict)
+        else {}
+    )
+    if (
+        music_template.get("source") != "approved_library"
+        or music_template.get("mode") != "approved_library"
+    ):
+        # A stale selection receipt must not affect a procedural or legacy rerun.
+        return None
+    if not all(
+        isinstance(item, dict) and item.get("asset_id") and item.get("sha256")
+        for item in selection.get("selections") or []
+    ):
+        raise FilmError("approved-library selection receipt is not checksum-bound")
+    selected_bindings = [
+        (str(item.get("shot_id") or ""), str(item["asset_id"]), str(item["sha256"]))
+        for item in selection["selections"]
+    ]
+    mixed_bindings = [
+        (
+            str(item.get("shot_id") or ""),
+            str(item.get("asset_id") or ""),
+            str(item.get("sha256") or ""),
+        )
+        for item in music_template.get("selections") or []
+        if isinstance(item, dict)
+    ]
+    if (
+        selected_bindings != mixed_bindings
+        or selection.get("catalog_revision") != music_template.get("catalog_revision")
+        or selection.get("catalog_sha256") != music_template.get("catalog_sha256")
+    ):
+        raise FilmError("approved-library selection does not match this final mix")
+    checksum = str(output_sha256 or "")
+    if len(checksum) != 64 and output:
+        output_path = Path(output).expanduser()
+        if output_path.is_file():
+            checksum = sha256_file(output_path)
+    if len(checksum) != 64:
+        delivery = _util_read_json(root / "out" / "final-delivery.json") or {}
+        checksum = str(delivery.get("output_sha256") or "")
+    if len(checksum) != 64:
+        raise FilmError("cannot commit BGM usage without the successful final checksum")
+    from bgm_library import commit_usage, default_library_root
+
+    committed = commit_usage(default_library_root(), selection, final_sha256=checksum)
+    selection["usage_committed"] = True
+    selection["usage_commit"] = committed
+    write_json(selection_path, selection)
+    if isinstance(mix, dict):
+        music_template["usage_commit"] = committed
+        mix["music_template"] = music_template
+        write_json(mix_path, mix)
+    return committed
+
+
 def cmd_final(args: argparse.Namespace) -> int:
     """FFmpeg final, optionally followed by HyperFrames/Remotion designed-post compose-render."""
     skill_dir = Path(__file__).resolve().parents[1]
@@ -3424,6 +3506,13 @@ def cmd_final(args: argparse.Namespace) -> int:
                 "stages": stages_receipt,
                 "caption_owner": "ffmpeg_plate",
             }
+            bgm_usage = _commit_selected_bgm_usage(
+                root,
+                output=out_obj.get("output"),
+                output_sha256=out_obj.get("output_sha256"),
+            )
+            if bgm_usage is not None:
+                out_obj["bgm_usage"] = bgm_usage
             if preflight_report is not None:
                 out_obj["preflight"] = {
                     "hard_ok": preflight_report.get("hard_ok"),
@@ -3624,6 +3713,14 @@ def cmd_final(args: argparse.Namespace) -> int:
             "error": result.get("error"),
             "message": result.get("message"),
         }
+        if out_obj.get("ok"):
+            bgm_usage = _commit_selected_bgm_usage(
+                root,
+                output=out_obj.get("output"),
+                output_sha256=out_obj.get("output_sha256"),
+            )
+            if bgm_usage is not None:
+                out_obj["bgm_usage"] = bgm_usage
         if preflight_report is not None:
             out_obj["preflight"] = {
                 "hard_ok": preflight_report.get("hard_ok"),
@@ -3645,6 +3742,13 @@ def cmd_final(args: argparse.Namespace) -> int:
                 i.get("code") for i in (preflight_report.get("soft") or []) if isinstance(i, dict)
             ],
         }
+    bgm_usage = _commit_selected_bgm_usage(
+        root,
+        output=out_obj.get("output"),
+        output_sha256=out_obj.get("output_sha256"),
+    )
+    if bgm_usage is not None:
+        out_obj["bgm_usage"] = bgm_usage
     emit(out_obj)
     return 0
 
@@ -5805,6 +5909,48 @@ def cmd_bgm_candidate(args: argparse.Namespace) -> int:
             emit({"candidates": list_candidates(root)})
             return 0
         if args.bgm_candidate_action == "approve":
+            if str(getattr(args, "target", "film") or "film") == "shared":
+                from bgm_library import approve_candidate as approve_shared
+                from bgm_library import default_library_root, stage_candidate
+
+                candidates = {
+                    str(item.get("asset_id") or ""): item for item in list_candidates(root)
+                }
+                source_record = candidates.get(str(args.asset_id))
+                if not isinstance(source_record, dict):
+                    raise BGMCandidateError("BGM candidate receipt not found")
+                source = root / str(source_record.get("path") or "")
+                staged = stage_candidate(
+                    default_library_root(),
+                    source,
+                    {
+                        "mood": source_record.get("mood") or "rnb",
+                        "seed": source_record.get("seed") or 0,
+                        "model": source_record.get("model") or "ACE-Step-1.5",
+                        "checkpoint_fingerprint": source_record.get("checkpoint_fingerprint")
+                        or "unknown",
+                        "node_job_id": source_record.get("node_job_id") or "",
+                        "prompt_sha256": source_record.get("prompt_sha256") or "",
+                        "dramatic_tags": [],
+                        "energy": 0.5,
+                        "stem_profile": "pad",
+                        "recipe": {
+                            "mood": source_record.get("mood") or "rnb",
+                            "energy": 0.5,
+                            "stem_profile": "pad",
+                        },
+                    },
+                )
+                emit(
+                    approve_shared(
+                        default_library_root(),
+                        str(staged["asset_id"]),
+                        reviewer=str(getattr(args, "reviewer", "") or ""),
+                        license_note=str(getattr(args, "license_note", "") or ""),
+                        instrumental_confirmed=bool(getattr(args, "instrumental_confirmed", False)),
+                    )
+                )
+                return 0
             emit(approve(root, args.asset_id))
             return 0
         base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
@@ -5827,6 +5973,16 @@ def cmd_bgm_candidate(args: argparse.Namespace) -> int:
         )
         return 0
     except BGMCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
+def cmd_bgm_library(args: argparse.Namespace) -> int:
+    from bgm_library import BGMLibraryError
+    from cli_bgm_library import cmd_bgm_library as run_bgm_library
+
+    try:
+        return run_bgm_library(args, emit=emit)
+    except BGMLibraryError as exc:
         raise FilmError(str(exc)) from exc
 
 
@@ -6297,6 +6453,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bgm_approve.add_argument("--root", required=True)
     bgm_approve.add_argument("--asset-id", required=True)
+    bgm_approve.add_argument("--target", choices=("film", "shared"), default="film")
+    bgm_approve.add_argument("--reviewer", default="")
+    bgm_approve.add_argument("--license-note", default="")
+    bgm_approve.add_argument("--instrumental-confirmed", action="store_true")
 
     performance_candidate = sub.add_parser(
         "performance-candidate",
@@ -6859,8 +7019,11 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument(
         "--music-template",
         default=None,
-        choices=["off", "auto", "on"],
-        help="Local BGM: auto=use audio/bgm.wav or audio/templates/{mood}.* if present; on=require; off=procedural",
+        choices=["off", "auto", "on", "timeline", "approved_library"],
+        help=(
+            "BGM: auto/on/off retain legacy behavior; timeline uses film-local cue templates; "
+            "approved_library requires shared human-approved cue matches"
+        ),
     )
     fin.add_argument(
         "--music-volume",
@@ -7981,6 +8144,9 @@ def build_parser() -> argparse.ArgumentParser:
     from cli_comfy import add_comfy_parsers
 
     add_comfy_parsers(sub)
+    from cli_bgm_library import add_bgm_library_parsers
+
+    add_bgm_library_parsers(sub)
 
     return p
 
@@ -8020,6 +8186,7 @@ def main(argv: list[str] | None = None) -> int:
             "audio-tts-render": cmd_audio_tts_render,
             "audio-event": cmd_audio_event,
             "bgm-candidate": cmd_bgm_candidate,
+            "bgm-library": cmd_bgm_library,
             "performance-candidate": cmd_performance_candidate,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,

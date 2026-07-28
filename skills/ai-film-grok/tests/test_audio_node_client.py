@@ -206,3 +206,62 @@ def test_render_batch_removes_partial_outputs_on_hash_mismatch(tmp_path: Path) -
                 out_dir=output,
             )
     assert not list(output.glob("*.wav"))
+
+
+def test_render_batch_uploads_reference_without_sending_local_path(tmp_path: Path) -> None:
+    reference = tmp_path / "private-series-master.wav"
+    raw_reference = _delivery_wav()
+    reference.write_bytes(raw_reference)
+    generated = _delivery_wav()
+    captured: list[tuple[str, dict[str, object]]] = []
+    replies = iter(
+        [
+            json.dumps(
+                {
+                    "reference_id": hashlib.sha256(raw_reference).hexdigest(),
+                    "source_sha256": hashlib.sha256(raw_reference).hexdigest(),
+                }
+            ).encode(),
+            json.dumps({"job_id": "batch"}).encode(),
+            json.dumps(
+                {
+                    "status": "completed",
+                    "artifacts": [
+                        {
+                            "index": 0,
+                            "seed": 7,
+                            "sha256": hashlib.sha256(generated).hexdigest(),
+                        }
+                    ],
+                }
+            ).encode(),
+            generated,
+        ]
+    )
+
+    def fake_request(*args, **kwargs):
+        captured.append((args[2], kwargs))
+        return next(replies)
+
+    with (
+        patch("audio_node_client._request", side_effect=fake_request),
+        patch("audio_node_client._validate_wav"),
+    ):
+        render_batch(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            payload={
+                "prompt": "abstract reusable recipe",
+                "batch_size": 1,
+                "seeds": [7],
+                "task_type": "cover",
+                "reference_audio": str(reference),
+            },
+            out_dir=tmp_path / "batch",
+        )
+
+    assert captured[0][0] == "/v1/music-reference"
+    submitted = captured[1][1]["body"]
+    assert "reference_audio" not in submitted
+    assert submitted["reference_audio_id"] == hashlib.sha256(raw_reference).hexdigest()
+    assert str(reference) not in json.dumps(submitted)

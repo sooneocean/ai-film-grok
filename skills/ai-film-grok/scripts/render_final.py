@@ -1165,19 +1165,48 @@ def render_music_template_timeline(
     music_license: str | None,
     seed: int,
     total_dur: float,
+    approved_library: bool = False,
+    film_id: str = "",
+    series_id: str = "",
 ) -> tuple[np.ndarray, list[dict[str, Any]]]:
     """Render one licensed local template per cue into one mono BGM bed.
 
     A timeline choice is intentionally all-or-nothing: an absent mood-specific
     template blocks this mode rather than silently looping the film-wide bed.
     """
-    selections = resolve_music_template_timeline(
-        root,
-        timeline=timeline,
-        plan=plan,
-        music_license=music_license,
-        seed=seed,
-    )
+    if approved_library:
+        from bgm_library import (
+            BGMLibraryError,
+            default_library_root,
+            record_gaps,
+            select_timeline,
+        )
+
+        library_root = default_library_root()
+        try:
+            selection_receipt = select_timeline(
+                library_root,
+                film_id=film_id or root.name,
+                series_id=series_id,
+                timeline=timeline,
+                require_complete=False,
+            )
+        except BGMLibraryError as exc:
+            raise RenderError(str(exc)) from exc
+        write_json(root / "receipts" / "bgm-selection.json", selection_receipt)
+        if selection_receipt["gaps"]:
+            record_gaps(library_root, selection_receipt)
+            missing = [f"{gap['shot_id']}:{gap['mood']}" for gap in selection_receipt["gaps"]]
+            raise RenderError("approved_library missing approved BGM for: " + ", ".join(missing))
+        selections = selection_receipt["selections"]
+    else:
+        selections = resolve_music_template_timeline(
+            root,
+            timeline=timeline,
+            plan=plan,
+            music_license=music_license,
+            seed=seed,
+        )
     expected_ids = [str(item.get("shot_id") or "") for item in timeline]
     selected_ids = [str(item.get("shot_id") or "") for item in selections]
     if selected_ids != expected_ids:
@@ -3413,12 +3442,16 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
 
     # Phase H: local template pool. `timeline` is opt-in because it requires a
     # licensed mood-specific file for every cue; it never degrades to one loop.
+    bed_source = str(ap.get("bed_source") or "auto").lower()
     template_mode = str(
-        getattr(args, "music_template", None) or (sound_plan or {}).get("music_template") or "auto"
+        getattr(args, "music_template", None)
+        or ("approved_library" if bed_source == "approved_library" else None)
+        or (sound_plan or {}).get("music_template")
+        or "auto"
     ).lower()
     template_timeline_samples: np.ndarray | None = None
     template_timeline_selections: list[dict[str, Any]] = []
-    if template_mode == "timeline":
+    if template_mode in {"timeline", "approved_library"}:
         try:
             template_timeline_samples, template_timeline_selections = (
                 render_music_template_timeline(
@@ -3429,9 +3462,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                     music_license=getattr(args, "music_license", None),
                     seed=music_seed,
                     total_dur=total_dur,
+                    approved_library=template_mode == "approved_library",
+                    film_id=str(spec.get("id") or spec.get("title") or root.name),
+                    series_id=str(spec.get("series_id") or ""),
                 )
             )
-        except SoundPlanError as exc:
+        except (SoundPlanError, RenderError) as exc:
             raise RenderError(str(exc)) from exc
         music_resolved = None
     else:
@@ -3473,15 +3509,33 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     )
     if template_timeline_samples is not None:
         mix_spotting["music_template"] = {
-            "source": "timeline_templates",
-            "mode": "timeline",
+            "source": (
+                "approved_library" if template_mode == "approved_library" else "timeline_templates"
+            ),
+            "mode": template_mode,
             "cue_count": len(template_timeline_selections),
+            "catalog_revision": (
+                template_timeline_selections[0].get("catalog_revision")
+                if template_timeline_selections
+                else None
+            ),
+            "catalog_sha256": (
+                template_timeline_selections[0].get("catalog_sha256")
+                if template_timeline_selections
+                else None
+            ),
             "selections": [
                 {
                     "shot_id": item["shot_id"],
                     "path": item["relative"],
                     "mood": item["mood"],
                     "motif_id": item["motif_id"],
+                    "asset_id": item.get("asset_id"),
+                    "sha256": item.get("sha256"),
+                    "motif_family": item.get("motif_family"),
+                    "parent_asset_id": item.get("parent_asset_id"),
+                    "similarity_cluster": item.get("similarity_cluster"),
+                    "selection_reason": item.get("selection_reason"),
                     "take_seed": item["take_seed"],
                     "license_note": item["license_note"],
                 }
@@ -3492,14 +3546,18 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
 
     if template_timeline_samples is not None:
         license_note = (
-            "timeline of licensed local BGM templates; see mix_report music_template.selections"
+            "approved shared BGM library; see mix_report music_template.selections"
+            if template_mode == "approved_library"
+            else "timeline of licensed local BGM templates; see mix_report music_template.selections"
         )
         user_f, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(
             template_timeline_samples
         )
         mix_spotting = {**mix_spotting, **spotting_only}
         mix_spotting["mood"] = "timeline"
-        mix_spotting["bed_source"] = "timeline_templates"
+        mix_spotting["bed_source"] = (
+            "approved_library" if template_mode == "approved_library" else "timeline_templates"
+        )
         mix_spotting["music_seed"] = music_seed
         mix_spotting["note"] = "mood-routed local BGM templates — mute/duck on bgm, sfx separated"
         if sound_plan and sound_plan.get("bed") is False:
@@ -4264,10 +4322,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--music-template",
         default=None,
-        choices=["off", "auto", "on", "timeline"],
+        choices=["off", "auto", "on", "timeline", "approved_library"],
         help=(
             "Local BGM: auto=one film bed; on=require one local bed; off=procedural; "
-            "timeline=one mood-specific licensed template per music cue (missing mood blocks render)"
+            "timeline=one film-local template per cue; approved_library=shared human-approved "
+            "catalog per cue (missing mood blocks render)"
         ),
     )
     p.add_argument(

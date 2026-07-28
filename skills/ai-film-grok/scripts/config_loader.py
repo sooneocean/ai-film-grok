@@ -188,6 +188,7 @@ class ConfigSchema:
     music_timeout: int = 600
     music_require: bool = False
     music_license: str = ""
+    bgm_library_root: str = ""
 
     # ── FRW / Seedance ──────────────────────────────────────────────────
     frw_api_key: str = ""
@@ -297,6 +298,7 @@ def get_config() -> ConfigSchema:
         music_timeout=_resolve_int("AIFILM_MUSIC_TIMEOUT", default=600),
         music_require=_resolve_bool("AIFILM_MUSIC_REQUIRE", default=False),
         music_license=_env("AIFILM_MUSIC_LICENSE"),
+        bgm_library_root=_env("AIFILM_BGM_LIBRARY_ROOT"),
         # FRW
         frw_api_key=_env("FRW_API_KEY"),
         frwclaw_root=_env("FRWCLAW_ROOT"),
@@ -343,6 +345,7 @@ _ENV_HELP: dict[str, str] = {
     "AIFILM_GROK_TTS_LANGUAGE": "Grok TTS language (zh | en | …)",
     "AIFILM_GROK_PROBE_TTS": "Set to 1 to enable deep TTS voice list in doctor probe",
     "AIFILM_COMFYUI_BASE_URL": "Private LAN ComfyUI base URL for explicit local video generation",
+    "AIFILM_BGM_LIBRARY_ROOT": "Shared approved ACE-Step BGM library root",
     "AIFILM_TTS_BACKEND": "Active TTS backend: mimo | auto | edge | fish | minimax | voicebox | grok | external",
     "AIFILM_TTS_STRICT_VOICE": "1 = fail on missing voice_id (default 1)",
     "AIFILM_TTS_VOICEBOX_FALLBACK": "0|1 — opt-in: try Voicebox when explicit backend fails",

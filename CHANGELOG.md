@@ -3,6 +3,14 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.12.0] - 2026-07-28
+
+### Added
+
+- Approval-gated shared ACE-Step BGM catalog, batch generation, local review packs, series motif lineage, duplicate clustering, and deterministic anti-repeat selection.
+- `aifilm bgm-library` doctor, status, audit, generate, review, approval, planning, selection, and series-pack commands.
+- `approved_library` final routing with fail-closed gap queues, catalog-bound mix receipts, and post-render usage accounting.
+
 ## [2.11.0] - 2026-07-28
 
 ### Added

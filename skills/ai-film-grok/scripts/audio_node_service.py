@@ -16,14 +16,16 @@ import os
 import subprocess
 import tempfile
 import uuid
+import wave
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 
 ROOT = Path(os.environ.get("AIFILM_AUDIO_NODE_ROOT", r"C:\\aifilm-audio-node")).resolve()
 JOBS = ROOT / "jobs"
+REFERENCES = ROOT / "music-references"
 TOKEN = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "")
 MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign")
 MODEL_PATH = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL_PATH", MODEL_ID)
@@ -151,6 +153,40 @@ def _normalize(source: Path, out: Path) -> None:
         capture_output=True,
         timeout=180,
     )
+
+
+def _store_music_reference(raw: bytes) -> dict[str, str]:
+    if len(raw) < 512 or len(raw) > 64 * 1024 * 1024 or raw[:4] != b"RIFF":
+        raise HTTPException(422, "invalid music reference WAV")
+    source_hash = hashlib.sha256(raw).hexdigest()
+    REFERENCES.mkdir(parents=True, exist_ok=True)
+    source = REFERENCES / f".{uuid.uuid4().hex}.wav"
+    target = REFERENCES / f"{source_hash}.wav"
+    try:
+        source.write_bytes(raw)
+        with wave.open(str(source), "rb") as handle:
+            if (
+                handle.getnchannels() != 2
+                or handle.getsampwidth() != 2
+                or handle.getframerate() != 44100
+                or handle.getnframes() <= 0
+            ):
+                raise HTTPException(422, "music reference must be 44.1kHz stereo PCM s16le")
+        if not target.exists():
+            source.replace(target)
+    except Exception:
+        source.unlink(missing_ok=True)
+        raise
+    source.unlink(missing_ok=True)
+    return {"reference_id": source_hash, "source_sha256": source_hash}
+
+
+@app.post("/v1/music-reference")
+async def upload_music_reference(
+    request: Request, authorization: str | None = Header(default=None)
+) -> dict[str, str]:
+    _auth(authorization)
+    return _store_music_reference(await request.body())
 
 
 def _run_tts(payload: dict[str, Any], out: Path) -> None:
@@ -300,6 +336,8 @@ async def create(
     kind: str, payload: dict[str, Any], authorization: str | None = Header(default=None)
 ) -> dict[str, str]:
     _auth(authorization)
+    if kind == "music-batch":
+        return await create_music_batch(payload, authorization)
     if kind not in AUDIO_KINDS:
         raise HTTPException(404, "unknown audio kind")
     return _create(kind, payload)
@@ -325,6 +363,22 @@ async def create_music_batch(
         raise HTTPException(422, "seeds must contain one unique seed per batch item")
     if not 10 <= duration <= 600:
         raise HTTPException(422, "duration must be between 10 and 600 seconds")
+    task_type = str(payload.get("task_type") or "text2music")
+    if task_type not in {"text2music", "cover", "repaint"}:
+        raise HTTPException(422, "invalid ACE-Step task type")
+    payload = dict(payload)
+    if task_type in {"cover", "repaint"}:
+        reference_id = str(payload.pop("reference_audio_id", "") or "")
+        reference_path = REFERENCES / f"{reference_id}.wav"
+        if (
+            len(reference_id) != 64
+            or any(character not in "0123456789abcdef" for character in reference_id)
+            or not reference_path.is_file()
+        ):
+            raise HTTPException(422, "cover/repaint requires an uploaded reference")
+        payload["reference_audio"] = str(reference_path)
+    else:
+        payload.pop("reference_audio_id", None)
     try:
         _music_batch_template()
     except RuntimeError as exc:
