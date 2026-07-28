@@ -7102,6 +7102,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     brief_expand.add_argument("--language", default="zh", choices=["zh", "en"], help="VO language")
 
+    local_llm = sub.add_parser(
+        "local-llm",
+        help="Opt-in private LLM drafts; cannot modify story truth or approve production",
+    )
+    local_llm_sub = local_llm.add_subparsers(dest="local_llm_action", required=True)
+    for action, help_text in (
+        ("probe", "Read the private model list without starting inference"),
+        ("draft", "Generate one human-review-only creative candidate"),
+    ):
+        action_parser = local_llm_sub.add_parser(action, help=help_text)
+        action_parser.add_argument(
+            "--base-url",
+            default=os.environ.get("AIFILM_LOCAL_LLM_BASE_URL", ""),
+            help="Private OpenAI-compatible /v1 URL (or AIFILM_LOCAL_LLM_BASE_URL)",
+        )
+        action_parser.add_argument(
+            "--model",
+            default="openai/gpt-oss-20b",
+            help="Approved local model id; default openai/gpt-oss-20b",
+        )
+        if action == "draft":
+            action_parser.add_argument(
+                "--prompt", required=True, help="Draft request; never writes film files"
+            )
+            action_parser.add_argument(
+                "--timeout", type=int, default=45, help="1-120 seconds; default 45"
+            )
+
     ledger = sub.add_parser(
         "director-ledger", help="Build checksum-bound ledger of human-approved exceptions"
     )
@@ -7801,6 +7829,28 @@ def main(argv: list[str] | None = None) -> int:
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:
             return handler(args)
+
+        if args.cmd == "local-llm":
+            from local_llm import LocalLLMError
+            from local_llm import draft as local_llm_draft
+            from local_llm import probe as local_llm_probe
+
+            try:
+                token = os.environ.get("AIFILM_LOCAL_LLM_TOKEN") or None
+                if args.local_llm_action == "probe":
+                    report = local_llm_probe(args.base_url, model=args.model, token=token)
+                else:
+                    report = local_llm_draft(
+                        args.base_url,
+                        model=args.model,
+                        prompt=args.prompt,
+                        token=token,
+                        timeout=args.timeout,
+                    )
+            except LocalLLMError as exc:
+                raise FilmError(f"{exc.code}: {exc}") from exc
+            emit(report)
+            return 0 if report.get("ok", True) else 2
 
         if args.cmd == "narrative-evidence":
             from narrative_evidence import (
