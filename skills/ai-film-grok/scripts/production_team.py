@@ -8,6 +8,8 @@ any model is asked to make or modify media.
 
 from __future__ import annotations
 
+import shutil
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,7 @@ DIRECTORS: tuple[dict[str, Any], ...] = (
         "department": "story",
         "mandate": "Protect theme, character arc, scene objective, and script lock.",
         "model_jobs": ["local LLM critique", "continuity graph analysis"],
+        "domains": ["story"],
         "must_review": ["brief.json", "drama-graph.json", "film-spec.json"],
     },
     {
@@ -33,6 +36,7 @@ DIRECTORS: tuple[dict[str, Any], ...] = (
         "department": "visual",
         "mandate": "Protect style, framing, identity, lighting, and reachable shot endpoints.",
         "model_jobs": ["prompt critique", "still and motion generation"],
+        "domains": ["visual_still", "motion"],
         "must_review": ["style-bible.json", "shot visual direction", "review-shot receipt"],
     },
     {
@@ -40,6 +44,7 @@ DIRECTORS: tuple[dict[str, Any], ...] = (
         "department": "performance",
         "mandate": "Protect acting beats, dialogue timing, voice identity, and truthful lip sync.",
         "model_jobs": ["TTS rehearsal", "lip-sync pilot"],
+        "domains": ["voice", "lipsync"],
         "must_review": ["tts-rehearsal receipt", "shot performance", "lip-sync review"],
     },
     {
@@ -47,6 +52,7 @@ DIRECTORS: tuple[dict[str, Any], ...] = (
         "department": "sound",
         "mandate": "Protect intelligible dialogue, concrete foley, changing music, and final mix audibility.",
         "model_jobs": ["voice synthesis", "music and SFX generation"],
+        "domains": ["voice", "music"],
         "must_review": ["audio-bible.json", "mix report", "quiet-interval music check"],
     },
     {
@@ -54,6 +60,7 @@ DIRECTORS: tuple[dict[str, Any], ...] = (
         "department": "post",
         "mandate": "Protect shot selection, rhythm, subtitles, transitions, and picture lock.",
         "model_jobs": ["selects analysis", "deterministic finishing"],
+        "domains": ["post"],
         "must_review": ["dailies receipt", "rough-cut receipt", "post-bible.json"],
     },
     {
@@ -61,10 +68,193 @@ DIRECTORS: tuple[dict[str, Any], ...] = (
         "department": "delivery",
         "mandate": "Reject weak evidence; require decoded media, whole-film review, and current provenance.",
         "model_jobs": ["frame and audio QA", "delivery audit"],
+        "domains": ["qa"],
         "must_review": ["ffprobe", "full decode", "final human director review"],
     },
 )
 _DIRECTOR_IDS = frozenset(item["id"] for item in DIRECTORS)
+
+
+def _capability(
+    *,
+    capability_id: str,
+    provider: str,
+    model: str,
+    domains: list[str],
+    status: str,
+    pilot_verified: bool,
+    resource: str,
+    experimental: bool = False,
+) -> dict[str, Any]:
+    """Build one schema-compatible capability without overstating a pilot."""
+    now = datetime.now(UTC)
+    return {
+        "id": capability_id,
+        "provider": provider,
+        "model": model,
+        "domains": domains,
+        "operations": ["image_to_video" if "motion" in domains else "text_to_video"],
+        "shot_roles": ["hero", "env", "bridge", "insert"],
+        "content_classes": ["general"],
+        "status": status,
+        "verified_at": now.isoformat(),
+        "expires_at": (now + timedelta(hours=1)).isoformat(),
+        "authorization": "ready" if status == "ready" else "unknown",
+        "pilot_verified": pilot_verified,
+        "experimental": experimental,
+        "identity_lock_supported": "motion" in domains or "visual_still" in domains,
+        "quality_floor": 4 if pilot_verified else 0,
+        "quality_score": 4 if pilot_verified else 0,
+        "priority": 100 if pilot_verified else 0,
+        "resource": resource,
+        "concurrency": 1,
+        "cost_state": "free_local",
+    }
+
+
+def snapshot_capabilities(*, out: Path | str, base_url: str | None = None) -> dict[str, Any]:
+    """Read M1/5090 readiness into a short-lived, no-spend capability snapshot."""
+    from comfy_armory import load_armory, probe_armory
+    from compose_render import probe_designed_post_tooling
+    from lipsync_backend import probe as probe_lipsync
+    from tts_backend import probe as probe_tts
+
+    destination = Path(out).expanduser().resolve()
+    capabilities: list[dict[str, Any]] = []
+    observations: dict[str, Any] = {}
+    try:
+        armory = load_armory()
+        live_armory = probe_armory(base_url)
+        ready_ids = set(live_armory.get("ready_ids") or [])
+        observations["rtx5090_armory"] = {
+            "ok": bool(live_armory.get("ok")),
+            "ready_ids": sorted(ready_ids),
+        }
+        for weapon in armory.get("weapons") or []:
+            if not isinstance(weapon, dict) or not isinstance(weapon.get("id"), str):
+                continue
+            intents = {str(item) for item in weapon.get("intents") or []}
+            if any(item.startswith("talking-avatar") for item in intents):
+                domains = ["lipsync"]
+            elif {"image-to-video", "i2v"} & intents:
+                domains = ["motion"]
+            else:
+                domains = ["visual_still"]
+            capabilities.append(
+                _capability(
+                    capability_id=f"rtx5090-{weapon['id']}",
+                    provider=str(weapon.get("provider") or "comfy_lan"),
+                    model=str(weapon.get("display_name") or weapon["id"]),
+                    domains=domains,
+                    status="ready" if weapon["id"] in ready_ids else "blocked",
+                    pilot_verified=bool((weapon.get("verified") or {}).get("real_pilot")),
+                    resource="gpu:rtx5090",
+                    experimental=str(weapon.get("status")) == "experimental",
+                )
+            )
+    except Exception as exc:
+        observations["rtx5090_armory"] = {"ok": False, "error": type(exc).__name__}
+
+    tts = probe_tts()
+    audio_node = tts.get("audio_node") if isinstance(tts.get("audio_node"), dict) else {}
+    audio_detail = audio_node.get("detail") if isinstance(audio_node.get("detail"), dict) else {}
+    audio_models = (
+        audio_detail.get("models") if isinstance(audio_detail.get("models"), dict) else {}
+    )
+    observations["rtx5090_audio"] = {"ok": bool(audio_node.get("ok")), "models": audio_models}
+    for domain, model_flag, model_name in (
+        ("voice", "tts", "Qwen3-TTS"),
+        ("music", "music", "ACE-Step-1.5"),
+    ):
+        ready = bool(audio_node.get("ok") and audio_models.get(model_flag))
+        capabilities.append(
+            _capability(
+                capability_id=f"rtx5090-{domain}-{model_flag}",
+                provider="private-audio-node",
+                model=model_name,
+                domains=[domain],
+                status="ready" if ready else "blocked",
+                # Service health is not an audio acceptance canary.
+                pilot_verified=False,
+                resource="gpu:rtx5090-audio",
+            )
+        )
+
+    lipsync = probe_lipsync()
+    node = lipsync.get("node") if isinstance(lipsync.get("node"), dict) else {}
+    backend_rows = node.get("backends") if isinstance(node.get("backends"), dict) else {}
+    for backend_id, backend in backend_rows.items():
+        if not isinstance(backend, dict):
+            continue
+        ready = bool(backend.get("ready"))
+        capabilities.append(
+            _capability(
+                capability_id=f"rtx5090-lipsync-{backend_id}",
+                provider="private-lipsync-node",
+                model=str(backend.get("model") or backend_id),
+                domains=["lipsync"],
+                status="ready" if ready else "blocked",
+                pilot_verified=ready and backend.get("approved") is True,
+                resource="gpu:rtx5090-lipsync",
+            )
+        )
+    observations["rtx5090_lipsync"] = {
+        "ok": bool(node.get("ok")),
+        "ready": lipsync.get("ready") or [],
+    }
+
+    post = probe_designed_post_tooling()
+    ffmpeg_ready = bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
+    capabilities.extend(
+        [
+            _capability(
+                capability_id="m1-ffmpeg-quality",
+                provider="m1-local",
+                model="ffmpeg+ffprobe",
+                domains=["qa"],
+                status="ready" if ffmpeg_ready else "blocked",
+                pilot_verified=ffmpeg_ready,
+                resource="m1-local",
+            ),
+            _capability(
+                capability_id="m1-hyperframes-post",
+                provider="m1-local",
+                model="HyperFrames",
+                domains=["post"],
+                status="ready" if post.get("hyperframes_ok") else "blocked",
+                pilot_verified=False,
+                resource="m1-local",
+            ),
+            _capability(
+                capability_id="m1-story-reasoning",
+                provider="m1-local",
+                model="local-llm-unconfigured",
+                domains=["story"],
+                status="blocked",
+                pilot_verified=False,
+                resource="m1-local",
+            ),
+        ]
+    )
+    observations["m1"] = {
+        "ffmpeg_quality": ffmpeg_ready,
+        "hyperframes": bool(post.get("hyperframes_ok")),
+        "story_model": "unconfigured",
+    }
+    snapshot = {
+        "schema_version": 1,
+        "kind": "ai-film-capability-snapshot",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "capabilities": capabilities,
+    }
+    _validate_snapshot(snapshot)
+    write_json(destination, snapshot)
+    return {
+        "ok": True,
+        "written": str(destination),
+        "snapshot": snapshot,
+        "observations": observations,
+    }
 
 
 def _snapshot(path: Path | str) -> tuple[Path, dict[str, Any]]:
@@ -173,8 +363,9 @@ def validate_team(plan_path: Path | str, *, capabilities_path: Path | str) -> di
             blockers.append(f"ASSIGNMENT_FIELDS_INVALID:{director_id}")
             continue
         reasons: list[str] = []
-        if not capability_ids and not local_tools:
-            reasons.append("NO_MODEL_OR_TOOL_ASSIGNED")
+        if not capability_ids:
+            reasons.append("NO_MODEL_ASSIGNED")
+        supported_domains = set(director["domains"])
         for capability_id in capability_ids:
             capability = capabilities.get(str(capability_id))
             if capability is None:
@@ -183,6 +374,14 @@ def validate_team(plan_path: Path | str, *, capabilities_path: Path | str) -> di
                 capability.get("status") != "ready" or capability.get("pilot_verified") is not True
             ):
                 reasons.append(f"CAPABILITY_NOT_READY:{capability_id}")
+            elif capability.get("experimental") is True:
+                reasons.append(f"EXPERIMENTAL_CAPABILITY:{capability_id}")
+            elif (
+                isinstance(capability.get("domains"), list)
+                and capability["domains"]
+                and not (supported_domains & set(str(item) for item in capability["domains"]))
+            ):
+                reasons.append(f"CAPABILITY_DOMAIN_MISMATCH:{capability_id}")
         coverage.append({"director_id": director_id, "ok": not reasons, "blockers": reasons})
         blockers.extend(f"{reason}:{director_id}" for reason in reasons)
     blockers = sorted(set(blockers))

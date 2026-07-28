@@ -7,11 +7,12 @@
 先取得不花錢的能力快照，再建立作戰表：
 
 ```bash
+aifilm team snapshot --out artifacts/<film>/receipts/capability-snapshot.json
 aifilm team scaffold --root artifacts/<film> \
   --capabilities artifacts/<film>/receipts/capability-snapshot.json
 ```
 
-編輯 `production-team.json`：將每個 `model_capability_ids` 填入快照中的 ID，或在 `local_tools` 寫入該總監受控的 M1 工具。此檔只是責任與能力配置，不是授權。再在每次開始新階段前驗證：
+編輯 `production-team.json`：將每個 `model_capability_ids` 填入快照中屬於該總監專業領域的 ID；`local_tools` 僅是操作備註，不能取代可驗證模型。此檔只是責任與能力配置，不是授權。再在每次開始新階段前驗證：
 
 ```bash
 aifilm team validate \
@@ -19,4 +20,4 @@ aifilm team validate \
   --capabilities artifacts/<film>/receipts/capability-snapshot.json
 ```
 
-驗證會拒絕未配置總監、未知／失效／未 pilot 的模型，以及能力快照已變更的舊計畫。通過只代表「有合格的劇組配置」；故事鎖、pilot、付費生成、Picture Lock 與 Master Lock 仍由既有 Director Contract、部門 handoff 與人類核准門檻把關。
+`snapshot` 會即時讀取 M1 的 QA／後期工具，以及 SSH tunnel 後的 5090 Comfy armory、音訊節點與嘴型節點；它不會生成媒體、不會花錢。驗證會拒絕未配置總監、錯誤工種領域、未知／失效／未 pilot 的模型，以及能力快照已變更的舊計畫。通過只代表「有合格的劇組配置」；故事鎖、pilot、付費生成、Picture Lock 與 Master Lock 仍由既有 Director Contract、部門 handoff 與人類核准門檻把關。

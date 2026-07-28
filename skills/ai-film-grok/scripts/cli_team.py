@@ -11,6 +11,11 @@ def add_team_parsers(subparsers: Any) -> None:
         "team", help="Specialist director roster and evidence-bound model assignments"
     )
     actions = parser.add_subparsers(dest="team_action", required=True)
+    snapshot = actions.add_parser(
+        "snapshot", help="Probe M1 and private RTX capability evidence without generating media"
+    )
+    snapshot.add_argument("--out", required=True)
+    snapshot.add_argument("--base-url", default=None)
     scaffold = actions.add_parser("scaffold", help="Write a no-execution production-team template")
     scaffold.add_argument("--root", required=True)
     scaffold.add_argument("--capabilities", required=True)
@@ -23,9 +28,11 @@ def add_team_parsers(subparsers: Any) -> None:
 
 
 def run(args: Any) -> tuple[dict[str, Any], int]:
-    from production_team import scaffold_team, validate_team
+    from production_team import scaffold_team, snapshot_capabilities, validate_team
 
-    if args.team_action == "scaffold":
+    if args.team_action == "snapshot":
+        report = snapshot_capabilities(out=Path(args.out), base_url=args.base_url)
+    elif args.team_action == "scaffold":
         report = scaffold_team(
             Path(args.root),
             capabilities_path=Path(args.capabilities),

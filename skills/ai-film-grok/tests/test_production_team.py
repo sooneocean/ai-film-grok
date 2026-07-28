@@ -57,7 +57,7 @@ def test_scaffold_requires_explicit_assignments_before_ready(tmp_path: Path) -> 
     assert Path(written["written"]).is_file()
     result = validate_team(written["written"], capabilities_path=snapshot)
     assert result["ok"] is False
-    assert "NO_MODEL_OR_TOOL_ASSIGNED:cinematography" in result["blockers"]
+    assert "NO_MODEL_ASSIGNED:cinematography" in result["blockers"]
 
 
 def test_team_validation_accepts_complete_explicit_roster(tmp_path: Path) -> None:
@@ -66,8 +66,7 @@ def test_team_validation_accepts_complete_explicit_roster(tmp_path: Path) -> Non
     plan_path = Path(scaffold_team(tmp_path, capabilities_path=snapshot)["written"])
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     for assignment in plan["assignments"]:
-        assignment["local_tools"] = ["m1-controlled-tool"]
-    plan["assignments"][1]["model_capability_ids"] = ["rtx-motion"]
+        assignment["model_capability_ids"] = ["rtx-motion"]
     unsigned = {key: value for key, value in plan.items() if key != "content_sha256"}
     from util import canonical_json_sha256
 
@@ -75,6 +74,48 @@ def test_team_validation_accepts_complete_explicit_roster(tmp_path: Path) -> Non
     plan_path.write_text(json.dumps(plan), encoding="utf-8")
     result = validate_team(plan_path, capabilities_path=snapshot)
     assert result["ok"] is True
+
+
+def test_team_validation_rejects_wrong_director_domain(tmp_path: Path) -> None:
+    snapshot = tmp_path / "receipts" / "capabilities.json"
+    _snapshot(snapshot)
+    payload = json.loads(snapshot.read_text(encoding="utf-8"))
+    payload["capabilities"][0]["domains"] = ["visual_still"]
+    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    plan_path = Path(scaffold_team(tmp_path, capabilities_path=snapshot)["written"])
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    for assignment in plan["assignments"]:
+        assignment["model_capability_ids"] = ["rtx-motion"]
+    from util import canonical_json_sha256
+
+    plan["content_sha256"] = canonical_json_sha256(
+        {key: value for key, value in plan.items() if key != "content_sha256"}
+    )
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    result = validate_team(plan_path, capabilities_path=snapshot)
+    assert result["ok"] is False
+    assert "CAPABILITY_DOMAIN_MISMATCH:rtx-motion:showrunner" in result["blockers"]
+
+
+def test_team_validation_rejects_experimental_assignment(tmp_path: Path) -> None:
+    snapshot = tmp_path / "receipts" / "capabilities.json"
+    _snapshot(snapshot)
+    payload = json.loads(snapshot.read_text(encoding="utf-8"))
+    payload["capabilities"][0]["experimental"] = True
+    snapshot.write_text(json.dumps(payload), encoding="utf-8")
+    plan_path = Path(scaffold_team(tmp_path, capabilities_path=snapshot)["written"])
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    for assignment in plan["assignments"]:
+        assignment["model_capability_ids"] = ["rtx-motion"]
+    from util import canonical_json_sha256
+
+    plan["content_sha256"] = canonical_json_sha256(
+        {key: value for key, value in plan.items() if key != "content_sha256"}
+    )
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    result = validate_team(plan_path, capabilities_path=snapshot)
+    assert result["ok"] is False
+    assert "EXPERIMENTAL_CAPABILITY:rtx-motion:showrunner" in result["blockers"]
 
 
 def test_team_cli_validation_reports_changed_snapshot(
