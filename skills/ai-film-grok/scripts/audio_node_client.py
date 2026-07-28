@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import time
 import urllib.error
@@ -30,11 +31,12 @@ _PUBLIC_MODEL_FIELDS = (
     "model",
     "music_model",
     "music_checkpoint_fingerprint",
+    "performance_model",
     "sfx_model",
     "sfx_checkpoint_fingerprint",
     "sfx_license",
 )
-_PUBLIC_GPU_FIELDS = ("available", "name", "cuda", "free_vram_mib", "total_vram_mib")
+_PUBLIC_GPU_FIELDS = ("available", "name", "cuda", "driver", "free_vram_mib", "total_vram_mib")
 _PUBLIC_MODEL_KINDS = ("tts", "music", "sfx", "performance")
 
 
@@ -75,6 +77,11 @@ def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> di
                     and isinstance(value, str)
                     and len(value) <= 128
                     and not any(secret and secret in value for secret in secret_values)
+                )
+                or (
+                    field == "driver"
+                    and isinstance(value, str)
+                    and bool(re.fullmatch(r"[0-9][0-9.]{0,30}", value))
                 )
                 or field.endswith("_mib")
                 and isinstance(value, int)

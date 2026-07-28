@@ -72,7 +72,11 @@ def test_doctor_projects_only_public_node_health_fields(monkeypatch, tmp_path: P
         "model": "local-test-token-which-is-not-real",
         "music_model": "ACE-Step-1.5",
         "music_checkpoint_fingerprint": "unknown",
-        "gpu": {"name": "RTX 5090", "access_token": "doctor-raw-token-present"},
+        "gpu": {
+            "name": "RTX 5090",
+            "driver": "untrusted diagnostic text",
+            "access_token": "doctor-raw-token-present",
+        },
         "items": [{"api_key": "another-secret", "music": True}],
         "diagnostic": {"value": "unknown-field-secret"},
     }

@@ -50,7 +50,13 @@ def test_public_health_report_drops_unknown_fields_and_current_token() -> None:
             "models": {"tts": True, "music": False, "leak": token},
             "model": token,
             "music_model": "ACE-Step-1.5",
-            "gpu": {"available": True, "name": token, "free_vram_mib": 1234},
+            "performance_model": "bosonai/higgs-audio-v2-generation",
+            "gpu": {
+                "available": True,
+                "name": token,
+                "driver": "untrusted diagnostic text",
+                "free_vram_mib": 1234,
+            },
             "diagnostic": {"secret": token},
         },
         secret_values=(token,),
@@ -61,6 +67,7 @@ def test_public_health_report_drops_unknown_fields_and_current_token() -> None:
         "node": "private-lan",
         "models": {"tts": True, "music": False},
         "music_model": "ACE-Step-1.5",
+        "performance_model": "bosonai/higgs-audio-v2-generation",
         "gpu": {"available": True, "free_vram_mib": 1234},
     }
 

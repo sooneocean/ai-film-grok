@@ -13,6 +13,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -35,6 +36,7 @@ MUSIC_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_MUSIC_MODEL", "ACE-Step-1.5")
 MUSIC_CHECKPOINT_FINGERPRINT = os.environ.get(
     "AIFILM_AUDIO_NODE_MUSIC_CHECKPOINT_FINGERPRINT", "unknown"
 )
+PERFORMANCE_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_PERFORMANCE_MODEL", "")
 SFX_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_SFX_MODEL", "")
 SFX_CHECKPOINT_FINGERPRINT = os.environ.get("AIFILM_AUDIO_NODE_SFX_CHECKPOINT_FINGERPRINT", "")
 SFX_LICENSE = os.environ.get("AIFILM_AUDIO_NODE_SFX_LICENSE", "")
@@ -171,13 +173,26 @@ def _gpu_health() -> dict[str, Any]:
         if not torch.cuda.is_available():
             return {"available": False}
         free, total = torch.cuda.mem_get_info(0)
-        return {
+        report = {
             "available": True,
             "name": torch.cuda.get_device_name(0),
             "cuda": torch.version.cuda,
             "free_vram_mib": int(free // 1024**2),
             "total_vram_mib": int(total // 1024**2),
         }
+        try:
+            driver = subprocess.run(
+                ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            ).stdout.strip()
+            if re.fullmatch(r"[0-9][0-9.]{0,30}", driver):
+                report["driver"] = driver
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return report
     except Exception:
         return {"available": False}
 
@@ -185,7 +200,7 @@ def _gpu_health() -> dict[str, Any]:
 @app.get("/health")
 def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     _auth(authorization)
-    return {
+    report = {
         "ok": True,
         "node": "private-lan",
         "models": {kind: _available(kind) for kind in AUDIO_KINDS},
@@ -198,6 +213,9 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         "sfx_license": SFX_LICENSE,
         "gpu": _gpu_health(),
     }
+    if PERFORMANCE_MODEL_ID:
+        report["performance_model"] = PERFORMANCE_MODEL_ID
+    return report
 
 
 def _normalize(source: Path, out: Path) -> None:

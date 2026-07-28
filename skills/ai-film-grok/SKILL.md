@@ -46,7 +46,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 13. **安全**：凭据本机读；日志/manifest 禁 token/prompt；外部调用不自动重试花费。
 14. **高动态**：平常 mean≥18、肉戏≥20（目标≥24）；禁 KB/弱 raw；**桌面 final 仅** `i2v-final-gate.json` ok。[high-motion](references/lessons-2026-07-27-high-motion-style-lock-final.md)
 15. **I2V 画风锁**：源=style-locked still；首段 MEDIUM LOCK cel；禁以 mean 换 medium fail。
-16. **5090 武器库**：dispatch 为未锁 provider 的视觉需求写 `weapon_route`；只用实跑 Qwen/Wan，实验仅 pilot；锁与人审优先，未验 fail closed。[规则](references/comfy-weapon-armory.md)
+16. **5090 武器库**：未锁视觉用 `weapon_route`；仅实跑 Qwen/Wan；实验pilot；未验 fail closed。[规则](references/comfy-weapon-armory.md)
 
 ## 阶段
 

@@ -27,6 +27,7 @@ $argv = @(
 $updates = @{
     'HIGGS_PERFORMANCE_MODEL_PATH' = Split-Path -Parent $generation
     'HIGGS_PERFORMANCE_TOKENIZER_PATH' = Split-Path -Parent $tokenizer
+    'AIFILM_AUDIO_NODE_PERFORMANCE_MODEL' = 'bosonai/higgs-audio-v2-generation'
     'AIFILM_AUDIO_NODE_PERFORMANCE_ARGV' = $argv
 }
 $lines = @(Get-Content -LiteralPath $envPath)

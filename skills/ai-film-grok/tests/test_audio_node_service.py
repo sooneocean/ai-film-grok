@@ -33,13 +33,36 @@ def test_health_reports_capacity_without_private_payloads(monkeypatch: pytest.Mo
     monkeypatch.setattr(
         service,
         "_gpu_health",
-        lambda: {"available": True, "free_vram_mib": 1024, "total_vram_mib": 2048},
+        lambda: {
+            "available": True,
+            "driver": "580.12",
+            "free_vram_mib": 1024,
+            "total_vram_mib": 2048,
+        },
     )
 
     report = service.health(f"Bearer {'t' * 32}")
 
-    assert report["gpu"] == {"available": True, "free_vram_mib": 1024, "total_vram_mib": 2048}
+    assert report["gpu"] == {
+        "available": True,
+        "driver": "580.12",
+        "free_vram_mib": 1024,
+        "total_vram_mib": 2048,
+    }
     assert "token" not in report
+
+
+def test_health_identifies_the_configured_performance_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "TOKEN", "t" * 32)
+    monkeypatch.setattr(service, "PERFORMANCE_MODEL_ID", "bosonai/higgs-audio-v2-generation")
+
+    report = service.health(f"Bearer {'t' * 32}")
+
+    assert report["performance_model"] == "bosonai/higgs-audio-v2-generation"
 
 
 def test_performance_adapter_is_reported_only_when_configured(
