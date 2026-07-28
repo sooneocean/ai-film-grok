@@ -18,6 +18,59 @@ class AudioNodeError(RuntimeError):
     pass
 
 
+_PUBLIC_MODEL_FIELDS = ("model", "music_model", "music_checkpoint_fingerprint")
+_PUBLIC_GPU_FIELDS = ("available", "name", "cuda", "free_vram_mib", "total_vram_mib")
+_PUBLIC_MODEL_KINDS = ("tts", "music", "sfx", "performance")
+
+
+def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> dict[str, Any]:
+    """Project an untrusted node health response to public capability fields only."""
+    if not isinstance(raw, dict):
+        return {"ok": False}
+    public: dict[str, Any] = {"ok": raw.get("ok") is True}
+    if raw.get("node") == "private-lan":
+        public["node"] = "private-lan"
+    models = raw.get("models")
+    if isinstance(models, dict):
+        public_models = {
+            kind: models[kind] for kind in _PUBLIC_MODEL_KINDS if isinstance(models.get(kind), bool)
+        }
+        if public_models:
+            public["models"] = public_models
+    if isinstance(raw.get("music_batch"), bool):
+        public["music_batch"] = raw["music_batch"]
+    for field in _PUBLIC_MODEL_FIELDS:
+        value = raw.get(field)
+        if (
+            isinstance(value, str)
+            and len(value) <= 256
+            and not any(secret and secret in value for secret in secret_values)
+        ):
+            public[field] = value
+    gpu = raw.get("gpu")
+    if isinstance(gpu, dict):
+        public_gpu: dict[str, Any] = {}
+        for field in _PUBLIC_GPU_FIELDS:
+            value = gpu.get(field)
+            if (
+                field == "available"
+                and isinstance(value, bool)
+                or (
+                    field in {"name", "cuda"}
+                    and isinstance(value, str)
+                    and len(value) <= 128
+                    and not any(secret and secret in value for secret in secret_values)
+                )
+                or field.endswith("_mib")
+                and isinstance(value, int)
+                and value >= 0
+            ):
+                public_gpu[field] = value
+        if public_gpu:
+            public["gpu"] = public_gpu
+    return public
+
+
 def _json_response(payload: bytes, *, context: str) -> dict[str, Any]:
     try:
         data = json.loads(payload)

@@ -24,6 +24,52 @@ from bgm_library import (
 from music_cue import build_music_timeline
 from util import read_json, write_json
 
+_NODE_MODEL_FIELDS = ("model", "music_model", "music_checkpoint_fingerprint")
+_NODE_GPU_FIELDS = ("available", "name", "cuda", "free_vram_mib", "total_vram_mib")
+_NODE_MODEL_KINDS = ("tts", "music", "sfx", "performance")
+
+
+def _public_node_health(raw: Any, *, token: str) -> dict[str, Any]:
+    """Project an untrusted health response to the node's public capability schema."""
+    if not isinstance(raw, dict):
+        return {"ok": False}
+    public: dict[str, Any] = {"ok": raw.get("ok") is True}
+    if raw.get("node") == "private-lan":
+        public["node"] = "private-lan"
+    models = raw.get("models")
+    if isinstance(models, dict):
+        public_models = {
+            kind: models[kind] for kind in _NODE_MODEL_KINDS if isinstance(models.get(kind), bool)
+        }
+        if public_models:
+            public["models"] = public_models
+    if isinstance(raw.get("music_batch"), bool):
+        public["music_batch"] = raw["music_batch"]
+    for field in _NODE_MODEL_FIELDS:
+        value = raw.get(field)
+        if isinstance(value, str) and len(value) <= 256 and token not in value:
+            public[field] = value
+    gpu = raw.get("gpu")
+    if isinstance(gpu, dict):
+        public_gpu: dict[str, Any] = {}
+        for field in _NODE_GPU_FIELDS:
+            value = gpu.get(field)
+            if (
+                field == "available"
+                and isinstance(value, bool)
+                or field in {"name", "cuda"}
+                and isinstance(value, str)
+                and len(value) <= 128
+                and token not in value
+                or field.endswith("_mib")
+                and isinstance(value, int)
+                and value >= 0
+            ):
+                public_gpu[field] = value
+        if public_gpu:
+            public["gpu"] = public_gpu
+    return public
+
 
 def add_bgm_library_parsers(sub: argparse._SubParsersAction) -> None:
     parser = sub.add_parser(
@@ -135,6 +181,12 @@ def _film_timeline(film_root: Path) -> tuple[str, str, list[dict[str, Any]]]:
 
 
 def _node_credentials() -> tuple[str, str]:
+    # ``config.env`` is deliberately loaded by the central config loader so
+    # credentials remain out of command arguments and shell history.  Direct
+    # environment values still take precedence there.
+    from config_loader import get_config
+
+    get_config()
     base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
     token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
     if not base or not token:
@@ -146,18 +198,18 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
     action = str(args.bgm_library_action)
     library = _root(args)
     if action == "doctor":
-        from audio_node_client import AudioNodeError, health
+        from audio_node_client import health
 
-        base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
-        token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
         node: dict[str, Any]
-        if not base or not token:
+        try:
+            base, token = _node_credentials()
+        except BGMLibraryError:
             node = {"ok": False, "error": "AIFILM_AUDIO_NODE_URL/TOKEN not configured"}
         else:
             try:
-                node = health(base, token)
-            except AudioNodeError as exc:
-                node = {"ok": False, "error": str(exc)}
+                node = _public_node_health(health(base, token), token=token)
+            except Exception:
+                node = {"ok": False, "error": "audio node health check failed"}
         report = {"ok": bool(node.get("ok")), "node": node, "library": library_status(library)}
     elif action == "status":
         report = library_status(library)
