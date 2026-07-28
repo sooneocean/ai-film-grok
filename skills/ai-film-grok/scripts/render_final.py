@@ -78,6 +78,7 @@ from sound_plan import (
     sidechain_filter_fragment,
     validate_audio_tracks_contract,
 )
+from transition_ops import TransitionOperationError, bind_transition_operations_to_timeline
 from util import read_json as _util_read_json
 from util import utc_now, write_json
 
@@ -4048,6 +4049,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
 
     timeline_path = root / "timeline.json"
     mix_report_path = root / "audio" / "mix_report.json"
+    try:
+        bound_transition_ops = bind_transition_operations_to_timeline(
+            list(spec.get("transition_ops") or []), film_timeline=film_tl
+        )
+    except TransitionOperationError as exc:
+        raise RenderError(f"transition operation timing: {exc}") from exc
     report = {
         "schema_version": 2,
         "created_at": utc_now(),
@@ -4068,7 +4075,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "default_intent": default_intent,
             "video": xfade_plan,
             "audio": afade_plan,
-            "operations": spec.get("transition_ops") or [],
+            "operations": bound_transition_ops,
             "film_timeline": {
                 "shot_starts": film_tl.get("shot_starts"),
                 "output_duration": film_tl.get("output_duration"),
@@ -4257,8 +4264,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--music-template",
         default=None,
-        choices=["off", "auto", "on"],
-        help="Local BGM: auto=use audio/bgm.wav or audio/templates/{mood}.* if present; on=require; off=procedural",
+        choices=["off", "auto", "on", "timeline"],
+        help=(
+            "Local BGM: auto=one film bed; on=require one local bed; off=procedural; "
+            "timeline=one mood-specific licensed template per music cue (missing mood blocks render)"
+        ),
     )
     p.add_argument(
         "--music-volume",

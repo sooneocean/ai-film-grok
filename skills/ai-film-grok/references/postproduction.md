@@ -165,11 +165,15 @@ Skill **不附带**版权曲库。你把**自己有权使用**的 rnb/许可文�
 # 只要程序化 rnb
 "$AIFILM" final --root "<root>" --music-template off
 
+# 每镜按 music_cue.mood 选不同本地纯音乐，并实际混入同一条 BGM stem；任一 mood 缺曲即失败。
+# 例如 templates/ambient/arrival.wav、templates/dark/tension.wav、templates/rnb/climax.wav
+"$AIFILM" final --root "<root>" --music-template timeline
+
 # 显式路径
 "$AIFILM" final --root "<root>" --music "/path/to.rnb.wav" --music-license "Epidemic …"
 ```
 
-`status.audio.local_music_available` / `mix_report.music_template` 可查是否命中。  
+`status.audio.local_music_available` / `mix_report.music_template` 可查是否命中；`timeline` 收据会列出每镜的 mood、motif、take seed 与已去识别化的曲库路径。
 输出 `audio/mix_report.json` 列出 `applied_events`。
 
 `final` 结束后，`final_complete` 仍为 false。完整播放当前成片，并完成**导演评分卡**（**十一维**全 pass）：
