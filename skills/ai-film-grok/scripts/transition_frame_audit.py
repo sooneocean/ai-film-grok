@@ -235,7 +235,92 @@ def _human_transition_phrase(phrase: str) -> bool:
     return any(marker in text for marker in approved) and any(marker in text for marker in subject)
 
 
-def attest_transition_review(root: Path, *, user_phrase: str) -> dict[str, Any]:
+def build_transition_review_template(root: Path) -> dict[str, Any]:
+    """Write a non-destructive per-seam decision template for the current audit."""
+    root = Path(root).expanduser().resolve()
+    freshness = transition_frame_audit_fresh(root)
+    audit_path = root / "receipts" / "transition-frame-audit.json"
+    audit = read_json(audit_path) or {}
+    if not freshness["present"] or freshness["stale"]:
+        raise ValueError("transition-frame audit is missing, incomplete, or stale")
+    path = root / "receipts" / "transition-review-decisions.json"
+    if path.exists():
+        raise ValueError("transition review decisions already exist; do not overwrite human review")
+    transitions = audit.get("transitions") if isinstance(audit.get("transitions"), list) else []
+    decisions = []
+    for transition in transitions:
+        if not isinstance(transition, dict) or not isinstance(transition.get("join_id"), str):
+            raise ValueError("transition-frame audit has invalid transition identity")
+        decisions.append(
+            {
+                "join_id": transition["join_id"],
+                "join_index": transition.get("join_index"),
+                "status": "pending",
+                "note": "",
+            }
+        )
+    template = {
+        "kind": "transition-review-decisions",
+        "schema_version": 1,
+        "audit_path": str(audit_path),
+        "audit_sha256": _sha256(audit_path),
+        "transition_count": len(decisions),
+        "decisions": decisions,
+        "instructions": "Set every status to approved and add a reviewer note for every join. Any rejected or pending join blocks attestation.",
+    }
+    write_json(path, template)
+    template["path"] = str(path)
+    return template
+
+
+def _approved_transition_decisions(
+    audit: dict[str, Any], path: Path, *, audit_path: Path
+) -> list[dict[str, Any]]:
+    document = read_json(path)
+    if not isinstance(document, dict) or document.get("kind") != "transition-review-decisions":
+        raise ValueError("transition decisions must be a transition-review-decisions document")
+    bound_audit_path = Path(str(document.get("audit_path") or ""))
+    if bound_audit_path != audit_path or document.get("audit_sha256") != _sha256(audit_path):
+        raise ValueError("transition decisions are not bound to the current audit")
+    transitions = audit.get("transitions") if isinstance(audit.get("transitions"), list) else []
+    expected = {
+        (transition.get("join_id"), transition.get("join_index"))
+        for transition in transitions
+        if isinstance(transition, dict)
+    }
+    decisions = document.get("decisions")
+    if not isinstance(decisions, list) or document.get("transition_count") != len(expected):
+        raise ValueError("transition decisions have incomplete count")
+    approved: list[dict[str, Any]] = []
+    actual: set[tuple[object, object]] = set()
+    for decision in decisions:
+        if not isinstance(decision, dict):
+            raise ValueError("transition decision must be an object")
+        identity = (decision.get("join_id"), decision.get("join_index"))
+        note = decision.get("note")
+        if identity in actual or identity not in expected:
+            raise ValueError("transition decisions must contain each audit join exactly once")
+        actual.add(identity)
+        if decision.get("status") != "approved":
+            raise ValueError(f"transition decision {identity[0]} is not approved")
+        if not isinstance(note, str) or not note.strip():
+            raise ValueError(f"transition decision {identity[0]} requires a reviewer note")
+        approved.append(
+            {
+                "join_id": identity[0],
+                "join_index": identity[1],
+                "status": "approved",
+                "note": note.strip(),
+            }
+        )
+    if actual != expected:
+        raise ValueError("transition decisions must contain each audit join exactly once")
+    return approved
+
+
+def attest_transition_review(
+    root: Path, *, user_phrase: str, decisions_path: Path | None = None
+) -> dict[str, Any]:
     """Record explicit human approval only for a complete, current seam audit."""
     root = Path(root).expanduser().resolve()
     freshness = transition_frame_audit_fresh(root)
@@ -247,6 +332,16 @@ def attest_transition_review(root: Path, *, user_phrase: str) -> dict[str, Any]:
         raise ValueError(
             "transition attestation requires an explicit human transition approval phrase"
         )
+    transitions = audit.get("transitions") if isinstance(audit.get("transitions"), list) else []
+    if transitions and decisions_path is None:
+        raise ValueError("transition attestation requires per-seam decisions")
+    approved_decisions = (
+        _approved_transition_decisions(
+            audit, Path(decisions_path).expanduser().resolve(), audit_path=audit_path
+        )
+        if decisions_path is not None
+        else []
+    )
     attestation = {
         "kind": "transition-frame-attestation",
         "schema_version": 1,
@@ -255,6 +350,9 @@ def attest_transition_review(root: Path, *, user_phrase: str) -> dict[str, Any]:
         "final": audit["final"],
         "final_delivery": audit["final_delivery"],
         "transition_count": audit["transition_count"],
+        "decisions_path": str(decisions_path) if decisions_path is not None else None,
+        "decisions_sha256": _sha256(decisions_path) if decisions_path is not None else None,
+        "decisions": approved_decisions,
         "user_phrase": user_phrase.strip(),
         "all_seams_reviewed": True,
         "state": "human_transition_review_approved",
@@ -270,6 +368,7 @@ def transition_review_evidence_status(root: Path) -> dict[str, Any]:
     audit = transition_frame_audit_fresh(root)
     attestation_path = root / "receipts" / "transition-frame-attestation.json"
     attestation = read_json(attestation_path) or {}
+    decisions_path = Path(str(attestation.get("decisions_path") or ""))
     approved = (
         audit["present"]
         and not audit["stale"]
@@ -279,6 +378,14 @@ def transition_review_evidence_status(root: Path) -> dict[str, Any]:
         and attestation.get("transition_count") == audit["transition_count"]
         and attestation.get("audit_sha256")
         == _sha256(root / "receipts" / "transition-frame-audit.json")
+        and (
+            audit["transition_count"] == 0
+            or (
+                decisions_path.is_file()
+                and attestation.get("decisions_sha256") == _sha256(decisions_path)
+                and len(attestation.get("decisions") or []) == audit["transition_count"]
+            )
+        )
         and (attestation.get("final") or {}).get("sha256") == audit["current"]["final"]
         and (attestation.get("final_delivery") or {}).get("sha256")
         == audit["current"]["final_delivery"]

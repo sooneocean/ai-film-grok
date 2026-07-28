@@ -6302,12 +6302,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Extract final-MP4 frames around every planned shot transition for human review",
     )
     transition_audit.add_argument("--root", required=True)
+    transition_template = sub.add_parser(
+        "transition-frame-review-template",
+        help="Create a per-seam human decision template for the current transition audit",
+    )
+    transition_template.add_argument("--root", required=True)
     transition_attest = sub.add_parser(
         "transition-frame-attest",
         help="Record human approval for current per-transition review frames",
     )
     transition_attest.add_argument("--root", required=True)
     transition_attest.add_argument("--user-phrase", required=True)
+    transition_attest.add_argument(
+        "--decisions",
+        help="Path to completed transition-review-decisions JSON; required when the film has joins",
+    )
     caption_attest = sub.add_parser(
         "caption-frame-attest",
         help="Record human readability approval for current caption review frames",
@@ -8041,10 +8050,21 @@ def main(argv: list[str] | None = None) -> int:
 
             emit(build_transition_frame_audit(Path(args.root)))
             return 0
+        if args.cmd == "transition-frame-review-template":
+            from transition_frame_audit import build_transition_review_template
+
+            emit(build_transition_review_template(Path(args.root)))
+            return 0
         if args.cmd == "transition-frame-attest":
             from transition_frame_audit import attest_transition_review
 
-            emit(attest_transition_review(Path(args.root), user_phrase=args.user_phrase))
+            emit(
+                attest_transition_review(
+                    Path(args.root),
+                    user_phrase=args.user_phrase,
+                    decisions_path=Path(args.decisions) if args.decisions else None,
+                )
+            )
             return 0
         if args.cmd == "caption-frame-attest":
             from caption_frame_audit import attest_caption_readability

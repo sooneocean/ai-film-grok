@@ -24,6 +24,13 @@ def _operation() -> dict:
     }
 
 
+def _approve_template(template: dict) -> None:
+    for decision in template["decisions"]:
+        decision["status"] = "approved"
+        decision["note"] = "动作衔接与字幕均正常"
+    write_json(Path(template["path"]), template)
+
+
 def test_review_timestamps_are_final_clock_frame_offsets() -> None:
     operation = _operation() | {"timeline": {"at_sec": 3.0}}
     assert audit.review_timestamps(operation, fps=24, duration_sec=10) == [2.917, 3.0, 3.083]
@@ -111,7 +118,11 @@ def test_transition_attestation_requires_current_complete_frames(
 
     monkeypatch.setattr(audit.subprocess, "run", fake_run)
     audit.build_transition_frame_audit(tmp_path)
-    attestation = audit.attest_transition_review(tmp_path, user_phrase="所有转场通过")
+    template = audit.build_transition_review_template(tmp_path)
+    _approve_template(template)
+    attestation = audit.attest_transition_review(
+        tmp_path, user_phrase="所有转场通过", decisions_path=Path(template["path"])
+    )
     assert attestation["state"] == "human_transition_review_approved"
     assert audit.transition_review_evidence_status(tmp_path)["ok"] is True
     assert audit._human_transition_phrase("所有轉場通過") is True
@@ -146,7 +157,11 @@ def test_transition_attestation_invalidates_each_bound_evidence_file(
 
     monkeypatch.setattr(audit.subprocess, "run", fake_run)
     report = audit.build_transition_frame_audit(tmp_path)
-    audit.attest_transition_review(tmp_path, user_phrase="所有转场通过")
+    template = audit.build_transition_review_template(tmp_path)
+    _approve_template(template)
+    audit.attest_transition_review(
+        tmp_path, user_phrase="所有转场通过", decisions_path=Path(template["path"])
+    )
     if target == "final":
         final.write_bytes(b"changed-final")
     elif target == "delivery":
@@ -178,3 +193,43 @@ def test_zero_transition_audit_can_be_attested(
     assert report["transition_count"] == 0
     audit.attest_transition_review(tmp_path, user_phrase="所有转场通过")
     assert audit.transition_review_evidence_status(tmp_path)["ok"] is True
+
+
+def test_transition_attestation_requires_every_join_decision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    final = tmp_path / "out" / "film_final.mp4"
+    final.parent.mkdir(parents=True)
+    final.write_bytes(b"final")
+    write_json(
+        tmp_path / "out" / "final-delivery.json",
+        {
+            "output_sha256": sha256_file(final),
+            "fps": 24,
+            "duration_sec": 8,
+            "transition": {"operations": [_operation()], "film_timeline": {"shot_starts": [0, 3]}},
+        },
+    )
+
+    def fake_run(command: list[str], **_: object) -> object:
+        Path(command[-1]).write_bytes(b"frame")
+        return type("Result", (), {"returncode": 0})()
+
+    monkeypatch.setattr(audit.subprocess, "run", fake_run)
+    audit.build_transition_frame_audit(tmp_path)
+    template = audit.build_transition_review_template(tmp_path)
+    with pytest.raises(ValueError, match="not approved"):
+        audit.attest_transition_review(
+            tmp_path, user_phrase="所有转场通过", decisions_path=Path(template["path"])
+        )
+    template["decisions"][0]["status"] = "approved"
+    write_json(Path(template["path"]), template)
+    with pytest.raises(ValueError, match="reviewer note"):
+        audit.attest_transition_review(
+            tmp_path, user_phrase="所有转场通过", decisions_path=Path(template["path"])
+        )
+    _approve_template(template)
+    attestation = audit.attest_transition_review(
+        tmp_path, user_phrase="所有转场通过", decisions_path=Path(template["path"])
+    )
+    assert attestation["decisions"][0]["status"] == "approved"
