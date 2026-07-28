@@ -27,6 +27,12 @@ _JOB_ID = re.compile(r"^[A-Za-z0-9-]{1,80}$")
 _BACKENDS = {"latentsync", "musetalk"}
 _MAX_VIDEO_BYTES = 512 * 1024 * 1024
 _MAX_AUDIO_BYTES = 64 * 1024 * 1024
+_ALLOWED_NODE_NETWORKS = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("fc00::/7"),
+)
 
 
 def _sha256_file(path: Path) -> str:
@@ -68,7 +74,13 @@ def _url(base_url: str, path: str) -> str:
         address = ipaddress.ip_address(parsed.hostname)
     except ValueError as exc:
         raise LipsyncNodeError("lip-sync node host must be a private IP literal") from exc
-    if not (address.is_private or address.is_loopback):
+    if not (
+        address.is_loopback
+        or any(
+            address.version == network.version and address in network
+            for network in _ALLOWED_NODE_NETWORKS
+        )
+    ):
         raise LipsyncNodeError("lip-sync node host must be private or loopback")
     if parsed.scheme == "http" and not address.is_loopback:
         raise LipsyncNodeError("private-LAN lip-sync nodes require HTTPS or a loopback tunnel")

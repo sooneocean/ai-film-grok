@@ -32,6 +32,19 @@ _JOB_ID = re.compile(r"^[0-9a-f]{32}$")
 _MAX_VIDEO_BYTES = 512 * 1024 * 1024
 _MAX_AUDIO_BYTES = 64 * 1024 * 1024
 _MAX_REQUEST_BYTES = _MAX_VIDEO_BYTES + _MAX_AUDIO_BYTES + 1024 * 1024
+_PROBE_FIELDS = frozenset(
+    {
+        "repo_commit",
+        "repo_dirty",
+        "checkpoint_sha256",
+        "adapter_sha256",
+        "python",
+        "pytorch",
+        "cuda",
+        "gpu",
+        "compute_capability",
+    }
+)
 
 
 class BackendExecutionError(RuntimeError):
@@ -110,11 +123,20 @@ def _measure_backend(probe_argv: list[str] | None, *, force: bool = False) -> di
             text=True,
             timeout=330,
             check=True,
+            env={
+                key: os.environ[key]
+                for key in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP")
+                if os.environ.get(key)
+            },
         )
         measured = json.loads(proc.stdout)
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
         measured = None
-    result = measured if isinstance(measured, dict) else None
+    result = (
+        {key: measured[key] for key in _PROBE_FIELDS if key in measured}
+        if isinstance(measured, dict)
+        else None
+    )
     _backend_probe_cache[key] = (time.monotonic(), result)
     return result
 

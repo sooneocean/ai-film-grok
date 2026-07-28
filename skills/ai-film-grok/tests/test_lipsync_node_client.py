@@ -75,7 +75,19 @@ def test_url_requires_private_literal_host() -> None:
     with pytest.raises(LipsyncNodeError):
         _url("https://example.com", "/health")
     with pytest.raises(LipsyncNodeError):
+        _url("https://169.254.169.254", "/health")
+    with pytest.raises(LipsyncNodeError):
+        _url("https://198.18.0.1", "/health")
+    with pytest.raises(LipsyncNodeError):
         _url("ssh://192.168.88.52", "/health")
+    for unsafe in (
+        "https://169.254.169.254:8790",
+        "https://0.0.0.0:8790",
+        "https://192.0.2.1:8790",
+        "https://[fe80::1]:8790",
+    ):
+        with pytest.raises(LipsyncNodeError):
+            _url(unsafe, "/health")
 
 
 def test_health_requires_private_token() -> None:

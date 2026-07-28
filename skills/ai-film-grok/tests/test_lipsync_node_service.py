@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -67,6 +68,60 @@ def test_only_technical_failures_may_fallback() -> None:
     assert service._may_fallback("technical")
     assert not service._may_fallback("quality_rejected")
     assert not service._may_fallback("unknown")
+
+
+def test_backend_probe_drops_unexpected_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service()
+    monkeypatch.setattr(
+        service.subprocess,
+        "run",
+        lambda *_args, **_kwargs: type(
+            "Result",
+            (),
+            {
+                "stdout": json.dumps(
+                    {
+                        "repo_commit": "a" * 40,
+                        "checkpoint_sha256": "b" * 64,
+                        "unexpected_secret": "must-not-escape",
+                    }
+                )
+            },
+        )(),
+    )
+
+    measured = service._measure_backend(["trusted-probe"], force=True)
+
+    assert measured is not None
+    assert measured["repo_commit"] == "a" * 40
+    assert "unexpected_secret" not in measured
+
+
+def test_probe_does_not_inherit_or_return_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = _service()
+    monkeypatch.setenv("AIFILM_LIPSYNC_NODE_TOKEN", "x" * 32)
+    captured: dict[str, object] = {}
+
+    def fake_run(*_args, **kwargs):
+        captured["env"] = kwargs["env"]
+        return SimpleNamespace(
+            stdout=json.dumps(
+                {
+                    "repo_commit": "b" * 40,
+                    "checkpoint_sha256": "a" * 64,
+                    "repo_dirty": False,
+                    "node_token": "x" * 32,
+                }
+            )
+        )
+
+    monkeypatch.setattr(service.subprocess, "run", fake_run)
+    measured = service._measure_backend(["trusted-probe"], force=True)
+
+    assert "AIFILM_LIPSYNC_NODE_TOKEN" not in captured["env"]
+    assert "node_token" not in measured
 
 
 def test_execute_records_fallback_and_hash_bound_receipt(
