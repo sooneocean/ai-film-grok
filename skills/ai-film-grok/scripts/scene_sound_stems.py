@@ -9,10 +9,41 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from audio_timeline import is_noncommercial_license
 
 
 class SceneSoundError(ValueError):
     pass
+
+
+def _nonproduction_sfx_hashes(root: Path) -> set[str]:
+    """Deny known pending/NC candidate bytes even after copy or rename."""
+    pending = root / "audio" / "candidates" / "sfx" / "pending"
+    if not pending.is_dir() or pending.is_symlink():
+        return set()
+    blocked: set[str] = set()
+    for candidate in pending.glob("*.wav"):
+        if candidate.is_symlink() or not candidate.is_file():
+            continue
+        try:
+            blocked.add(hashlib.sha256(candidate.read_bytes()).hexdigest())
+        except OSError:
+            continue
+    for receipt in pending.glob("*.json"):
+        if receipt.is_symlink():
+            continue
+        try:
+            data = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict) or data.get("schema") != "aifilm-sfx-candidate-v1":
+            continue
+        digest = str(data.get("sha256") or "")
+        if len(digest) == 64 and all(
+            character in "0123456789abcdef" for character in digest.lower()
+        ):
+            blocked.add(digest.lower())
+    return blocked
 
 
 def _approved_performance(root: Path, event: dict[str, Any], asset: Path, actual: str) -> None:
@@ -100,7 +131,7 @@ def _local_asset(root: Path, event: dict[str, Any]) -> Path:
     normalized_raw = raw.replace("\\", "/").lower()
     if event.get("type") == "action_sfx" and (
         "/audio/candidates/sfx/pending/" in f"/{normalized_raw}"
-        or str(event.get("license") or "").strip().upper() == "CC-BY-NC-4.0"
+        or is_noncommercial_license(event.get("license"))
         or event.get("production_eligible") is False
         or event.get("approval_status") == "pending_human_review"
     ):
@@ -108,6 +139,10 @@ def _local_asset(root: Path, event: dict[str, Any]) -> Path:
             f"{event.get('id')}: non-commercial or pending SFX cannot enter a formal stem"
         )
     actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    if event.get("type") == "action_sfx" and actual in _nonproduction_sfx_hashes(root):
+        raise SceneSoundError(
+            f"{event.get('id')}: known non-production SFX hash cannot enter a formal stem"
+        )
     if actual != str(event.get("source_sha256") or ""):
         raise SceneSoundError(f"{event.get('id')}: asset checksum changed")
     if event.get("type") == "performance":

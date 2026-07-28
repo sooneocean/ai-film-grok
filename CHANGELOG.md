@@ -12,6 +12,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](
 ### Security
 
 - MMAudio checkpoints are restricted to explicit non-commercial research use; missing license acknowledgement, model fingerprint, clean commit, or offline weights fails closed.
+- Formal audio timelines and scene-sound stems reject pending or CC BY-NC MMAudio candidates, and the adapter verifies the clean repository plus all required weight hashes.
 
 ## [2.14.4] - 2026-07-28
 
