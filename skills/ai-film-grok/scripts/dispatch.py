@@ -303,11 +303,15 @@ def build_dispatch(
     )
     receipt_path = root / "receipts" / "dispatch.json"
     previous = read_json(receipt_path) if use_state_cache else None
-    if isinstance(previous, dict) and _cached_packet_is_reusable(
-        previous,
-        state_hash=state_hash,
-        include_capability=include_capability,
-        refresh_capability=refresh_capability,
+    if (
+        isinstance(previous, dict)
+        and _cached_packet_is_reusable(
+            previous,
+            state_hash=state_hash,
+            include_capability=include_capability,
+            refresh_capability=refresh_capability,
+        )
+        and "weapon_route" in previous
     ):
         packet = dict(previous)
         packet["scene_sound"] = scene_sound
@@ -837,6 +841,22 @@ def build_dispatch(
         if execution_plan_digest.get("graph_line"):
             agent_do.append(f"DramaGraph: {execution_plan_digest.get('graph_line')}")
 
+    from weapon_router import build_weapon_route
+
+    weapon_route = build_weapon_route(
+        root,
+        workflow=workflow,
+        primary_job=primary_job,
+        primary_action=primary,
+    )
+    if weapon_route.get("status") == "ready":
+        agent_do.append(
+            "检测到未锁定的静帧需求：按 weapon_route 自动使用已验证本地武器；"
+            "执行时先实时读取模型，失败即停止，不静默换供应商"
+        )
+    elif weapon_route.get("status") == "blocked":
+        agent_do.append(f"武器库阻断：{weapon_route.get('reason')}；未验证能力不得替代")
+
     context_digest: dict[str, Any] = {
         "rigor": None,
         "department_locks": {},
@@ -973,6 +993,7 @@ def build_dispatch(
         "agent_do": agent_do,
         "agent_instruction": "\n".join(f"- {x}" for x in agent_do),
         "routing": routing,
+        "weapon_route": weapon_route,
         "capability_summary": {
             "ok": (cap or {}).get("ok"),
             "tts_edge": ((cap or {}).get("tts") or {}).get("edge"),

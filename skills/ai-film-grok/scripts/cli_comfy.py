@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import secrets
@@ -53,6 +54,63 @@ def add_comfy_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
     )
     _add_base_url(inventory_parser)
     inventory_parser.add_argument("--receipt", type=Path, default=None)
+
+    armory_parser = actions.add_parser(
+        "armory",
+        help="List verified local GPU weapons and optionally live-check installed models",
+    )
+    _add_base_url(armory_parser)
+    armory_parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Read current ComfyUI model folders and report only truly ready weapons",
+    )
+    armory_parser.add_argument("--receipt", type=Path, default=None)
+
+    route_parser = actions.add_parser(
+        "route",
+        help="Select the highest-priority pilot-verified weapon for an image intent",
+    )
+    _add_base_url(route_parser)
+    route_parser.add_argument("--intent", required=True)
+    route_parser.add_argument("--quality", default="max_practical")
+    route_parser.add_argument("--identity-lock", action="store_true")
+    route_parser.add_argument(
+        "--production-stage",
+        choices=("pilot", "production"),
+        default="production",
+    )
+    route_parser.add_argument(
+        "--allow-experimental",
+        action="store_true",
+        help="Allow a verified experimental weapon for a pilot; never promotes it",
+    )
+    route_parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Skip current model read-back; live verification is the default",
+    )
+    route_parser.add_argument("--receipt", type=Path, default=None)
+
+    prepare_parser = actions.add_parser(
+        "prepare",
+        help="Route an intent and compile a local-only API workflow without submitting it",
+    )
+    _add_base_url(prepare_parser)
+    prepare_parser.add_argument("--intent", required=True)
+    prepare_parser.add_argument("--quality", default="max_practical")
+    prepare_parser.add_argument("--identity-lock", action="store_true")
+    prepare_parser.add_argument("--prompt-file", type=Path, required=True)
+    prepare_parser.add_argument("--seed", type=int, required=True)
+    prepare_parser.add_argument("--input-image-name", default=None)
+    prepare_parser.add_argument("--filename-prefix", default="aifilm/armory")
+    prepare_parser.add_argument("--out", type=Path, required=True)
+    prepare_parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Skip current model and node read-back; live verification is the default",
+    )
+    prepare_parser.add_argument("--receipt", type=Path, default=None)
 
     queue_parser = actions.add_parser("queue", help="Show prompt IDs without prompt payloads")
     _add_base_url(queue_parser)
@@ -109,7 +167,15 @@ def add_comfy_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
 def _base_url(args: argparse.Namespace) -> str:
     value = str(args.base_url or os.environ.get("AIFILM_COMFYUI_BASE_URL") or "").strip()
     if not value:
-        raise ComfyVideoError("ComfyUI URL is required via --base-url or AIFILM_COMFYUI_BASE_URL")
+        from comfy_armory import ComfyArmoryError, default_base_url
+
+        try:
+            value = default_base_url()
+        except ComfyArmoryError as exc:
+            raise ComfyVideoError(
+                "ComfyUI URL is required via --base-url, AIFILM_COMFYUI_BASE_URL, "
+                "or a verified armory default"
+            ) from exc
     return value
 
 
@@ -127,6 +193,68 @@ def run_comfy(args: argparse.Namespace) -> int:
             report = probe(base_url)
         elif action == "inventory":
             report = inventory(base_url)
+        elif action == "armory":
+            from comfy_armory import load_armory, probe_armory
+
+            report = probe_armory(base_url) if args.live else load_armory()
+        elif action in {"route", "prepare"}:
+            from comfy_armory import (
+                ComfyArmoryError,
+                compile_weapon_workflow,
+                probe_armory,
+                select_weapon,
+            )
+
+            try:
+                live = None if args.offline else probe_armory(base_url)
+                route = select_weapon(
+                    args.intent,
+                    quality=args.quality,
+                    identity_lock=bool(args.identity_lock),
+                    ready_ids=set(live["ready_ids"]) if live is not None else None,
+                    stage=str(getattr(args, "production_stage", "production")),
+                    allow_experimental=bool(getattr(args, "allow_experimental", False)),
+                )
+                if action == "route":
+                    report = route
+                    if live is not None:
+                        report["live_model_readback"] = True
+                else:
+                    try:
+                        prompt = (
+                            args.prompt_file.expanduser()
+                            .resolve()
+                            .read_text(encoding="utf-8")
+                            .strip()
+                        )
+                    except OSError as exc:
+                        raise ComfyArmoryError(f"cannot read prompt file: {exc}") from exc
+                    graph = compile_weapon_workflow(
+                        route["weapon"]["id"],
+                        prompt=prompt,
+                        seed=args.seed,
+                        input_image_name=args.input_image_name,
+                        filename_prefix=args.filename_prefix,
+                    )
+                    if not args.offline:
+                        assert_local_only_workflow(base_url, graph)
+                    output = args.out.expanduser().resolve()
+                    write_json(output, graph)
+                    report = {
+                        "schema_version": 1,
+                        "kind": "comfy-weapon-preparation",
+                        "ok": True,
+                        "weapon_id": route["weapon"]["id"],
+                        "intent": route["intent"],
+                        "quality": route["quality"],
+                        "workflow": str(output),
+                        "workflow_sha256": workflow_sha256(graph),
+                        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+                        "live_model_readback": not bool(args.offline),
+                        "external_api_nodes_allowed": False,
+                    }
+            except ComfyArmoryError as exc:
+                raise ComfyVideoError(str(exc)) from exc
         elif action == "queue":
             report = {"ok": True, "kind": "comfy-lan-queue", **queue_status(base_url)}
         elif action == "upload":

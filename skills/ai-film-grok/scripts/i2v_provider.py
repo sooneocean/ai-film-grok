@@ -417,6 +417,20 @@ class LocalComfyWan22Provider(I2VProvider):
 
         return get_config().comfyui_base_url.strip()
 
+    @staticmethod
+    def _resolve_profile_name(kwargs: dict[str, Any]) -> str:
+        explicit = str(kwargs.get("profile") or "auto")
+        if explicit != "auto":
+            return explicit
+        from comfy_video import select_wan22_weapon
+
+        selection = select_wan22_weapon(
+            intent=str(kwargs.get("weapon_intent") or "general"),
+            stage=str(kwargs.get("production_stage") or "production"),
+            allow_experimental=bool(kwargs.get("allow_experimental")),
+        )
+        return str(selection["profile"]["name"])
+
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
         del root
         base_url = self._base_url()
@@ -464,6 +478,10 @@ class LocalComfyWan22Provider(I2VProvider):
         out = kwargs.get("out")
         if not out:
             raise I2VProviderError("comfy-wan22 requires an explicit output path")
+        try:
+            profile_name = self._resolve_profile_name(kwargs)
+        except Exception as exc:
+            raise I2VProviderError(str(exc)) from exc
         script = Path(__file__).resolve().parent / "comfy_video.py"
         command = [
             sys.executable,
@@ -488,7 +506,7 @@ class LocalComfyWan22Provider(I2VProvider):
             "--seed",
             str(kwargs.get("seed", 123456)),
             "--profile",
-            str(kwargs.get("profile", "official")),
+            profile_name,
         ]
         if kwargs.get("turbo"):
             command.append("--turbo")
@@ -505,16 +523,30 @@ class LocalComfyWan22Provider(I2VProvider):
         result["receipt"] = str(receipt)
         if result.get("ok") and receipt.is_file():
             try:
-                from comfy_video import WAN22_ADULT_PROFILE, WAN22_OFFICIAL_PROFILE
+                from comfy_video import (
+                    WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
+                    WAN22_ADULT_PROFILE,
+                    WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
+                    WAN22_OFFICIAL_PROFILE,
+                )
 
                 detail = json.loads(receipt.read_text(encoding="utf-8"))
-                profile_name = str(kwargs.get("profile", "official"))
-                profile = (
-                    WAN22_ADULT_PROFILE
-                    if profile_name == WAN22_ADULT_PROFILE["name"]
-                    else WAN22_OFFICIAL_PROFILE
-                )
+                profile_name = self._resolve_profile_name(kwargs)
+                profile = {
+                    WAN22_ADULT_PROFILE["name"]: WAN22_ADULT_PROFILE,
+                    WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE[
+                        "name"
+                    ]: WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
+                    WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE[
+                        "name"
+                    ]: WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
+                }.get(profile_name, WAN22_OFFICIAL_PROFILE)
                 expected_models = [profile["high"], profile["low"]]
+                expected_loras = (
+                    [name for name in (profile.get("high_lora"), profile.get("low_lora")) if name]
+                    if kwargs.get("turbo") or profile_name.endswith("-experimental")
+                    else []
+                )
                 output_detail = detail.get("output") or {}
                 verification_errors: list[str] = []
                 if detail.get("schema_version") != 1:
@@ -540,9 +572,16 @@ class LocalComfyWan22Provider(I2VProvider):
                     verification_errors.append("profile mismatch")
                 if detail.get("models") != expected_models:
                     verification_errors.append("model identity mismatch")
+                if list(detail.get("loras") or []) != expected_loras:
+                    verification_errors.append("LoRA identity mismatch")
+                if (
+                    profile_name.endswith("-experimental")
+                    and detail.get("experimental_assets_promoted") is not False
+                ):
+                    verification_errors.append("experimental promotion state mismatch")
                 if not detail.get("prompt_id"):
                     verification_errors.append("prompt_id is missing")
-                if profile_name == WAN22_ADULT_PROFILE["name"]:
+                if profile_name.startswith("adult-"):
                     if detail.get("subject_basis") != kwargs.get("subject_basis"):
                         verification_errors.append("adult subject basis mismatch")
                     if detail.get("adult_attestation") is not True:
