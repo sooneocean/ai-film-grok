@@ -30,7 +30,10 @@ while ($offset -lt $expected) {
         # Hugging Face redirect endpoints can ignore an append resume range.
         # A verified standalone segment never promotes a duplicated response.
         Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue
-        & curl.exe -L --fail --connect-timeout 30 --speed-limit 1024 --speed-time 90 `
+        # Do not let an upstream connection hold this scheduled task forever.
+        # A verified segment normally completes well inside this ceiling and is
+        # retried as a fresh, length-checked request when it times out.
+        & curl.exe -L --fail --connect-timeout 30 --max-time 300 --speed-limit 1024 --speed-time 90 `
             --range "$offset-$end" -o $partial $url
         if ((Test-Path -LiteralPath $partial) -and (Get-Item -LiteralPath $partial).Length -eq $want) {
             break

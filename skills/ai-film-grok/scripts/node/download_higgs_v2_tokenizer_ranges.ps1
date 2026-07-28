@@ -26,7 +26,9 @@ while ($offset -lt $expected) {
     $attempt = 0
     while ($true) {
         Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue
-        & curl.exe -L --fail --connect-timeout 30 --speed-limit 1024 --speed-time 90 `
+        # Keep a stalled Hugging Face connection from pinning the task forever;
+        # an incomplete range is removed and retried before it can be promoted.
+        & curl.exe -L --fail --connect-timeout 30 --max-time 300 --speed-limit 1024 --speed-time 90 `
             --range "$offset-$end" -o $partial $url
         if ((Test-Path -LiteralPath $partial) -and (Get-Item -LiteralPath $partial).Length -eq $want) {
             break
