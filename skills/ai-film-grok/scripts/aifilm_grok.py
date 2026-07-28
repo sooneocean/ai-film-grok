@@ -6258,6 +6258,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     caption_audit.add_argument("--root", required=True)
     caption_audit.add_argument("--max-frames", type=int, default=5)
+    transition_audit = sub.add_parser(
+        "transition-frame-audit",
+        help="Extract final-MP4 frames around every planned shot transition for human review",
+    )
+    transition_audit.add_argument("--root", required=True)
     caption_attest = sub.add_parser(
         "caption-frame-attest",
         help="Record human readability approval for current caption review frames",
@@ -7903,6 +7908,11 @@ def main(argv: list[str] | None = None) -> int:
             from caption_frame_audit import build_caption_frame_audit
 
             emit(build_caption_frame_audit(Path(args.root), max_frames=args.max_frames))
+            return 0
+        if args.cmd == "transition-frame-audit":
+            from transition_frame_audit import build_transition_frame_audit
+
+            emit(build_transition_frame_audit(Path(args.root)))
             return 0
         if args.cmd == "caption-frame-attest":
             from caption_frame_audit import attest_caption_readability
