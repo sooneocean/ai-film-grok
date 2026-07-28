@@ -16,6 +16,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from grok_oauth import GrokOAuthError, images_generate, probe  # noqa: E402
 
 
+class GrokOAuthImageProvider:
+    """Registry-facing surface for Grok OAuth still generation."""
+
+    def generate(self, prompt: str, out: Path, **kwargs):
+        return images_generate(prompt, out=out, **kwargs)
+
+    def edit(self, prompt: str, image: str | Path, out: Path, **kwargs):
+        from grok_oauth import images_edit
+
+        return images_edit(prompt, image=str(image), out=out, **kwargs)
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description="Grok OAuth text-to-image")
     p.add_argument("--prompt", required=True)

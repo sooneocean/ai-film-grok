@@ -22,9 +22,14 @@ import argparse
 import contextlib
 import json
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+_SCRIPTS = Path(__file__).resolve().parents[1]
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
 
 from config_loader import get_config
 
@@ -142,6 +147,24 @@ def _http_generate(prompt: str, duration: float, mood: str, seed: int, out: Path
     tmp.unlink(missing_ok=True)
     if p.returncode != 0 or not out.is_file() or out.stat().st_size < MIN_BYTES:
         raise SystemExit(f"ffmpeg music normalize failed: {(p.stderr or '')[-300:]}")
+
+
+class MusicExternalProvider:
+    """Registry-facing surface for the optional external BGM backend."""
+
+    def resolve_bed(
+        self,
+        out: Path,
+        duration: float,
+        mood: str = "rnb",
+        seed: int = 0,
+        prompt: str = "",
+    ) -> Path:
+        chosen_prompt = prompt.strip() or (
+            f"instrumental {mood} background music, soft cinematic, no vocals"
+        )
+        _http_generate(chosen_prompt, float(duration), mood, int(seed), out)
+        return out
 
 
 def main() -> int:

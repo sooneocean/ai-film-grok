@@ -22,6 +22,13 @@ if str(_SCRIPTS) not in sys.path:
 from grok_oauth import GrokOAuthError, images_edit  # noqa: E402
 
 
+class GrokOAuthImageEditProvider:
+    """Registry-facing surface for Grok OAuth image editing."""
+
+    def edit(self, prompt: str, image: str | Path, out: Path, **kwargs):
+        return images_edit(prompt, image=str(image), out=out, **kwargs)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Grok OAuth image edit")
     p.add_argument("--image", required=True)

@@ -24,6 +24,17 @@ if str(_SCRIPTS) not in sys.path:
 from grok_oauth import GrokOAuthError, tts_speak  # noqa: E402
 
 
+class GrokOAuthTTSProvider:
+    """Registry-facing surface for the opt-in Grok OAuth TTS backend."""
+
+    def synthesize(self, text: str, out: Path, voice: str = "", **kwargs):
+        if voice:
+            if "voice_id" in kwargs:
+                raise ValueError("pass either voice or voice_id, not both")
+            kwargs["voice_id"] = voice
+        return tts_speak(text, out=out, **kwargs)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Grok OAuth TTS (opt-in)")
     p.add_argument("--text", default=None)
