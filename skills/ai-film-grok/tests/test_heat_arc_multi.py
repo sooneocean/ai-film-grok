@@ -28,7 +28,7 @@ from film_spec import validate_film_spec  # noqa: E402
 
 
 def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True) -> list[dict]:
-    """Build phase spine. wardrobe_ok + vo_spice fill max sex gates."""
+    """Build phase spine. wardrobe_ok + vo_spice fill max sex gates (incl. 2.9.0 impact)."""
     df_map = {
         "setup": "hook",
         "foreplay": "sensory",
@@ -47,25 +47,83 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True
     }
     shots = []
     undress_assigned = False
+    act_i = 0
+    detail_assigned = False
     for i, ph in enumerate(phases, 1):
         action = "body moves"
         wardrobe_state = None
         subject = "adult woman"
+        coitus_beat = None
+        coverage_role = None
+        framing = None
+        partner_ws = None
+        sex_pose = None
+        camera = {"shot_size": "medium", "angle": "eye level"}
         if wardrobe_ok:
             if ph == "foreplay" and not undress_assigned:
                 action = "removes armor and strips dress off shoulders"
                 wardrobe_state = "partial"
                 undress_assigned = True
+                coitus_beat = "undress"
             elif ph == "act":
-                action = "straddle hips-sink bare skin skin-to-skin"
-                wardrobe_state = "undressed"
-                subject = "adult woman undressed bare skin"
+                act_i += 1
+                partner_ws = "undressed"
+                if act_i == 1:
+                    action = "straddle-seat hips settle pelvis-lock bare skin skin-to-skin"
+                    wardrobe_state = "undressed"
+                    subject = "adult woman undressed bare skin"
+                    coitus_beat = "union"
+                    # size ladder: tighten only (no reopen) medium → CU → insert
+                    camera = {
+                        "shot_size": "medium",
+                        "angle": "slight low",
+                        "headroom": "full head with headroom",
+                    }
+                    sex_pose = "straddle"
+                else:
+                    action = "hips-sink grind thrust-rhythm bare skin"
+                    wardrobe_state = "undressed" if act_i < 3 else "bare"
+                    subject = "adult woman undressed bare skin"
+                    coitus_beat = "rhythm"
+                    sex_pose = "cowgirl" if act_i == 2 else "from_behind"
+                    camera = {
+                        "shot_size": "close-up",
+                        "angle": "slight low",
+                        "headroom": "full head with headroom",
+                    }
+                    if not detail_assigned:
+                        coverage_role = "detail"
+                        framing = "union_closeup face and pelvis same frame full head headroom"
+                        camera = {
+                            "shot_size": "close-up insert",
+                            "angle": "slight low",
+                            "headroom": "full head with headroom",
+                        }
+                        detail_assigned = True
             elif ph == "climax":
-                action = "arch-finish residual tremor bare shoulders"
+                action = "arch-finish residual tremor bare shoulders 高潮 射出"
                 wardrobe_state = "bare"
                 subject = "adult woman bare skin after peak"
+                coitus_beat = "finish"
+                partner_ws = "undressed"
+                sex_pose = "missionary_pin"
+                camera = {
+                    "shot_size": "close-up",
+                    "angle": "eye level",
+                    "headroom": "full head with headroom",
+                }
             elif ph == "setup":
                 wardrobe_state = "armored"
+                coitus_beat = "entry"
+                camera = {
+                    "shot_size": "wide",
+                    "angle": "eye level",
+                    "headroom": "full head with headroom",
+                }
+            elif ph == "afterglow":
+                wardrobe_state = "bare"
+                coitus_beat = "hook"
+                partner_ws = "undressed"
         dsl = {
             "subject": subject,
             "action": action,
@@ -73,9 +131,20 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True
             "story_beat": "beat",
             "visible_change": "A to B",
             "focal_character": "kei",
+            "camera": camera,
         }
         if wardrobe_state:
             dsl["wardrobe_state"] = wardrobe_state
+        if coitus_beat:
+            dsl["coitus_beat"] = coitus_beat
+        if partner_ws:
+            dsl["partner_wardrobe_state"] = partner_ws
+        if coverage_role:
+            dsl["coverage_role"] = coverage_role
+        if framing:
+            dsl["framing"] = framing
+        if sex_pose:
+            dsl["sex_pose"] = sex_pose
         nar = nar_map.get(ph, "短旁白测。") if vo_spice else "灯灭了。故事却刚好开始。"
         shot = {
             "id": f"shot{i:02d}",
@@ -88,7 +157,30 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True
         }
         if wardrobe_state:
             shot["wardrobe_state"] = wardrobe_state
+        if coitus_beat:
+            shot["coitus_beat"] = coitus_beat
+        if partner_ws:
+            shot["partner_wardrobe_state"] = partner_ws
+        if coverage_role:
+            shot["coverage_role"] = coverage_role
+        if framing:
+            shot["framing"] = framing
+        if sex_pose:
+            shot["sex_pose"] = sex_pose
         shots.append(shot)
+    # Single-act spines still need detail CU somewhere in meat
+    if wardrobe_ok and not detail_assigned:
+        for sh in shots:
+            if sh.get("heat_phase") in {"act", "climax"}:
+                sh["coverage_role"] = "detail"
+                sh["framing"] = "union_closeup"
+                sh["dsl"]["coverage_role"] = "detail"
+                sh["dsl"]["framing"] = "union_closeup"
+                sh["dsl"]["camera"] = {
+                    "shot_size": "close-up insert",
+                    "angle": "slight low",
+                }
+                break
     return shots
 
 
@@ -289,6 +381,16 @@ class HeatArcLintTests(unittest.TestCase):
             "sex_floor_strict": False,
             "sex_vo_strict": False,
             "heat_arc_strict": False,
+            "coitus_strict": False,
+            "size_ladder_strict": False,
+            "pose_strict": False,
+            "montage_strict": False,
+            "sex_detail_cu_strict": False,
+            "both_undress_strict": False,
+            "sex_arc_strict": False,
+            "sex_vo_motion_strict": False,
+            "framing_strict": False,
+            "composition_strict": False,
             "director_intent": {
                 "logline": "成人max卸装后回穿应被 clamp 到 peak",
                 "tone": "成人",
@@ -597,13 +699,25 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
             ["setup", "foreplay", "act", "act", "act", "act", "climax", "afterglow"]
         )
         for sh in shots:
-            sh["dsl"]["camera"] = {"shot_size": "medium full", "angle": "eye level"}
             sh["lipsync"] = False
+            # keep _spine size ladder (tighten only); do not reopen mid-act
+            cam = sh.get("dsl", {}).get("camera") or {}
+            if not cam.get("shot_size"):
+                sh["dsl"]["camera"] = {
+                    "shot_size": "medium",
+                    "angle": "eye level",
+                    "headroom": "full head with headroom",
+                }
+        # craft for montage_strict; size_ladder can soft-fail via false for this floor test
         spec = {
             "title": "测性爱时长过关",
             "vo_mode": "storyteller",
             "tts_backend": "edge",
             "heat_scale": "max",
+            "edit_craft": ["insert", "smash_cut", "match_cut", "montage"],
+            "size_ladder_strict": False,
+            "framing_strict": False,
+            "composition_strict": False,
             "director_intent": {
                 "logline": "成人max性爱够秒",
                 "tone": "成人",
@@ -691,6 +805,14 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
             "heat_arc_strict": False,
             "sex_floor_strict": False,
             "sex_vo_strict": False,
+            "coitus_strict": False,
+            "size_ladder_strict": False,
+            "pose_strict": False,
+            "montage_strict": False,
+            "sex_detail_cu_strict": False,
+            "both_undress_strict": False,
+            "sex_arc_strict": False,
+            "sex_vo_motion_strict": False,
             "director_intent": {
                 "logline": "成人max全装办事应被自动卸装",
                 "tone": "成人",

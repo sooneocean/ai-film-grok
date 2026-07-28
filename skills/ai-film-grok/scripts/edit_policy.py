@@ -4414,6 +4414,8 @@ def lint_both_undress(
                 and _shot_has_penetration_verb(sh)
             )
         )
+        # afterglow/bridge may inherit rhythm language — only lint act/entry meat
+        and infer_heat_phase(sh) in SEX_PHASES | {"foreplay"}
     ]
     if not pen_shots:
         return {
