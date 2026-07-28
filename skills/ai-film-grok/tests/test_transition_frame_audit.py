@@ -114,5 +114,67 @@ def test_transition_attestation_requires_current_complete_frames(
     attestation = audit.attest_transition_review(tmp_path, user_phrase="所有转场通过")
     assert attestation["state"] == "human_transition_review_approved"
     assert audit.transition_review_evidence_status(tmp_path)["ok"] is True
+    assert audit._human_transition_phrase("所有轉場通過") is True
+    assert audit._human_transition_phrase("所有转场未通过") is False
+    assert audit._human_transition_phrase("转场不能通过") is False
+    assert audit._human_transition_phrase("不是所有轉場通過") is False
     with pytest.raises(ValueError, match="approval phrase"):
         audit.attest_transition_review(tmp_path, user_phrase="不通过")
+
+
+@pytest.mark.parametrize("target", ("final", "delivery", "audit", "frame"))
+def test_transition_attestation_invalidates_each_bound_evidence_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str
+) -> None:
+    final = tmp_path / "out" / "film_final.mp4"
+    final.parent.mkdir(parents=True)
+    final.write_bytes(b"final")
+    delivery = tmp_path / "out" / "final-delivery.json"
+    write_json(
+        delivery,
+        {
+            "output_sha256": sha256_file(final),
+            "fps": 24,
+            "duration_sec": 8,
+            "transition": {"operations": [_operation()], "film_timeline": {"shot_starts": [0, 3]}},
+        },
+    )
+
+    def fake_run(command: list[str], **_: object) -> object:
+        Path(command[-1]).write_bytes(b"frame")
+        return type("Result", (), {"returncode": 0})()
+
+    monkeypatch.setattr(audit.subprocess, "run", fake_run)
+    report = audit.build_transition_frame_audit(tmp_path)
+    audit.attest_transition_review(tmp_path, user_phrase="所有转场通过")
+    if target == "final":
+        final.write_bytes(b"changed-final")
+    elif target == "delivery":
+        delivery.write_bytes(b"changed-delivery")
+    elif target == "audit":
+        Path(report["path"]).write_bytes(b"changed-audit")
+    else:
+        Path(report["transitions"][0]["frames"][0]["path"]).write_bytes(b"changed-frame")
+    assert audit.transition_review_evidence_status(tmp_path)["ok"] is False
+
+
+def test_zero_transition_audit_can_be_attested(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    final = tmp_path / "out" / "film_final.mp4"
+    final.parent.mkdir(parents=True)
+    final.write_bytes(b"final")
+    write_json(
+        tmp_path / "out" / "final-delivery.json",
+        {
+            "output_sha256": sha256_file(final),
+            "fps": 24,
+            "duration_sec": 8,
+            "transition": {"operations": [], "film_timeline": {"shot_starts": [0]}},
+        },
+    )
+    monkeypatch.setattr(audit.subprocess, "run", lambda *_args, **_kwargs: None)
+    report = audit.build_transition_frame_audit(tmp_path)
+    assert report["transition_count"] == 0
+    audit.attest_transition_review(tmp_path, user_phrase="所有转场通过")
+    assert audit.transition_review_evidence_status(tmp_path)["ok"] is True

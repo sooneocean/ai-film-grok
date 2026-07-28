@@ -207,10 +207,31 @@ def transition_frame_audit_fresh(root: Path) -> dict[str, Any]:
 
 def _human_transition_phrase(phrase: str) -> bool:
     text = (phrase or "").strip().lower()
-    if not text or any(marker in text for marker in ("不通过", "重做", "reject", "fail")):
+    rejected = (
+        "不通过",
+        "不通過",
+        "未通过",
+        "未通過",
+        "不能",
+        "没有",
+        "沒",
+        "不是",
+        "非",
+        "不予",
+        "重做",
+        "reject",
+        "fail",
+        "not approved",
+        "not pass",
+        "?",
+        "？",
+        "吗",
+        "嗎",
+    )
+    if not text or any(marker in text for marker in rejected):
         return False
-    approved = ("通过", "批准", "approved", "pass")
-    subject = ("转场", "镜头", "transition", "seam")
+    approved = ("通过", "通過", "批准", "approved", "pass")
+    subject = ("转场", "轉場", "镜头", "鏡頭", "transition", "seam")
     return any(marker in text for marker in approved) and any(marker in text for marker in subject)
 
 
