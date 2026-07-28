@@ -67,6 +67,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" semantic-index query --root "<film>" --query "红夹克快递员"
 "$AIFILM" comfy probe
 "$AIFILM" comfy inventory
+"$AIFILM" comfy capacity
 "$AIFILM" route explain --root "<film>" --shot-id "shot01"
 # 用户批准后才 pilot approve / bulk
 "$AIFILM" final --root "<film>" --post-engine hyperframes \

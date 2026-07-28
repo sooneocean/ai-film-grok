@@ -19,6 +19,7 @@ from comfy_video import (  # noqa: E402
     _wait_for_completion_ws,
     apply_workflow_overrides,
     assert_local_only_workflow,
+    assert_submission_capacity,
     build_wan22_i2v_prompt,
     cancel_prompt,
     download_result,
@@ -30,6 +31,7 @@ from comfy_video import (  # noqa: E402
     queue_status,
     resolve_wan22_profile,
     select_wan22_weapon,
+    submission_capacity,
     submit,
     upload_image,
     validate_adult_request,
@@ -460,10 +462,156 @@ class ComfyVideoTests(unittest.TestCase):
         self.assertNotIn("object_info", report)
 
     @patch("comfy_video._json_request")
+    def test_submission_capacity_accepts_idle_healthy_node(self, request: MagicMock) -> None:
+        request.side_effect = [
+            {
+                "system": {"ram_free": 16 * 1024**3},
+                "devices": [
+                    {
+                        "name": "RTX 5090",
+                        "type": "cuda",
+                        "vram_total": 32 * 1024**3,
+                        "vram_free": 28 * 1024**3,
+                    }
+                ],
+            },
+            {"queue_running": [], "queue_pending": []},
+        ]
+        report = submission_capacity("https://192.168.88.52:8188")
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["status"], "ready")
+        self.assertEqual(report["blockers"], [])
+
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_fails_closed_on_pressure_and_busy_queue(
+        self, request: MagicMock
+    ) -> None:
+        request.side_effect = [
+            {
+                "system": {"ram_free": 2 * 1024**3},
+                "devices": [{"name": "RTX 5090", "type": "cuda", "vram_free": 6 * 1024**3}],
+            },
+            {
+                "queue_running": [[1, "existing", {"prompt": "PRIVATE"}]],
+                "queue_pending": [],
+            },
+        ]
+        report = submission_capacity("https://192.168.88.52:8188")
+        self.assertFalse(report["ok"])
+        self.assertEqual(
+            {item["code"] for item in report["blockers"]},
+            {"RAM_BELOW_FLOOR", "VRAM_BELOW_FLOOR", "COMFY_QUEUE_BUSY"},
+        )
+        self.assertNotIn("existing", str(report))
+        self.assertNotIn("PRIVATE", str(report))
+
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_rejects_cpu_memory_as_gpu_capacity(
+        self, request: MagicMock
+    ) -> None:
+        request.side_effect = [
+            {
+                "system": {"ram_free": 16 * 1024**3},
+                "devices": [
+                    {"name": "RTX 5090", "type": "cuda", "vram_free": 6 * 1024**3},
+                    {"name": "CPU", "type": "cpu", "vram_free": 128 * 1024**3},
+                ],
+            },
+            {"queue_running": [], "queue_pending": []},
+        ]
+        report = submission_capacity("https://192.168.88.52:8188")
+        self.assertFalse(report["ok"])
+        self.assertEqual(
+            {item["code"] for item in report["blockers"]},
+            {"VRAM_BELOW_FLOOR"},
+        )
+        self.assertEqual(report["observed"]["device"]["name"], "RTX 5090")
+
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_rejects_ambiguous_cuda_target(self, request: MagicMock) -> None:
+        request.side_effect = [
+            {
+                "system": {"ram_free": 16 * 1024**3},
+                "devices": [
+                    {"name": "cuda:0", "type": "cuda", "vram_free": 28 * 1024**3},
+                    {"name": "cuda:1", "type": "cuda"},
+                ],
+            },
+            {"queue_running": [], "queue_pending": []},
+        ]
+        report = submission_capacity("https://192.168.88.52:8188")
+        self.assertFalse(report["ok"])
+        self.assertIsNone(report["observed"]["device"])
+        self.assertIn("RESOURCE_METRICS_UNAVAILABLE", str(report["blockers"]))
+
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_handles_malformed_system_without_raw_exception(
+        self, request: MagicMock
+    ) -> None:
+        request.side_effect = [
+            {"system": "invalid", "devices": "invalid"},
+            {"queue_running": [], "queue_pending": []},
+        ]
+        report = submission_capacity("https://192.168.88.52:8188")
+        self.assertFalse(report["ok"])
+        self.assertEqual(
+            {item["code"] for item in report["blockers"]},
+            {"RESOURCE_METRICS_UNAVAILABLE"},
+        )
+
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_rejects_incomplete_or_malformed_queue(
+        self, request: MagicMock
+    ) -> None:
+        for queue_payload in (
+            {},
+            {"queue_running": [], "queue_pending": [{"prompt_id": "busy"}]},
+        ):
+            with self.subTest(queue_payload=queue_payload):
+                request.reset_mock()
+                request.side_effect = [
+                    {
+                        "system": {"ram_free": 16 * 1024**3},
+                        "devices": [
+                            {
+                                "name": "RTX 5090",
+                                "type": "cuda",
+                                "vram_free": 28 * 1024**3,
+                            }
+                        ],
+                    },
+                    queue_payload,
+                ]
+                with self.assertRaises(ComfyVideoError):
+                    submission_capacity("https://192.168.88.52:8188")
+                self.assertNotIn("/prompt", [call.args[1] for call in request.call_args_list])
+
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_fails_closed_when_metrics_are_missing(
+        self, request: MagicMock
+    ) -> None:
+        request.side_effect = [
+            {"system": {}, "devices": []},
+            {"queue_running": [], "queue_pending": []},
+        ]
+        with self.assertRaisesRegex(
+            ComfyVideoError,
+            "RESOURCE_METRICS_UNAVAILABLE",
+        ):
+            assert_submission_capacity("https://192.168.88.52:8188")
+
+    @patch("comfy_video._json_request")
     def test_submit_uses_official_prompt_route_and_preserves_client_id(
         self, request: MagicMock
     ) -> None:
-        request.return_value = {"prompt_id": "p-123"}
+        request.side_effect = [
+            {
+                "system": {"ram_free": 16 * 1024**3},
+                "devices": [{"name": "RTX 5090", "type": "cuda", "vram_free": 28 * 1024**3}],
+            },
+            {"queue_running": [], "queue_pending": []},
+            {"prompt_id": "p-123"},
+        ]
         graph = {"1": {"class_type": "KSampler", "inputs": {}}}
         prompt_id = submit(
             "https://192.168.88.52:8188",
@@ -471,9 +619,31 @@ class ComfyVideoTests(unittest.TestCase):
             client_id="client-123",
         )
         self.assertEqual(prompt_id, "p-123")
-        args, kwargs = request.call_args
+        args, kwargs = request.call_args_list[-1]
         self.assertEqual(args[1], "/prompt")
         self.assertEqual(kwargs["payload"]["client_id"], "client-123")
+
+    @patch("comfy_video._json_request")
+    def test_submit_never_posts_when_resource_tower_blocks(self, request: MagicMock) -> None:
+        request.side_effect = [
+            {
+                "system": {"ram_free": 2 * 1024**3},
+                "devices": [{"name": "RTX 5090", "type": "cuda", "vram_free": 6 * 1024**3}],
+            },
+            {"queue_running": [], "queue_pending": []},
+        ]
+        with self.assertRaisesRegex(
+            ComfyVideoError,
+            "RAM_BELOW_FLOOR.*VRAM_BELOW_FLOOR",
+        ):
+            submit(
+                "https://192.168.88.52:8188",
+                {"1": {"class_type": "KSampler", "inputs": {}}},
+            )
+        self.assertEqual(
+            [call.args[1] for call in request.call_args_list],
+            ["/system_stats", "/queue"],
+        )
 
     @patch("comfy_video._wait_for_completion_ws")
     @patch("comfy_video._json_request")
@@ -622,7 +792,14 @@ class ComfyVideoTests(unittest.TestCase):
 
     @patch("comfy_video._json_request")
     def test_submit_does_not_reflect_node_payload(self, request: MagicMock) -> None:
-        request.return_value = {"error": "PRIVATE_PROMPT_MARKER"}
+        request.side_effect = [
+            {
+                "system": {"ram_free": 16 * 1024**3},
+                "devices": [{"name": "RTX 5090", "type": "cuda", "vram_free": 28 * 1024**3}],
+            },
+            {"queue_running": [], "queue_pending": []},
+            {"error": "PRIVATE_PROMPT_MARKER"},
+        ]
         with self.assertRaises(ComfyVideoError) as raised:
             submit("https://192.168.88.52:8188", {})
         self.assertNotIn("PRIVATE_PROMPT_MARKER", str(raised.exception))

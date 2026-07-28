@@ -14,8 +14,10 @@ import hashlib
 import ipaddress
 import json
 import mimetypes
+import os
 import re
 import secrets
+import tempfile
 import time
 import unicodedata
 import urllib.error
@@ -27,6 +29,11 @@ from typing import Any
 
 from util import write_json
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows is the remote executor, not orchestrator
+    fcntl = None  # type: ignore[assignment]
+
 
 class ComfyVideoError(RuntimeError):
     pass
@@ -34,6 +41,12 @@ class ComfyVideoError(RuntimeError):
 
 class _WebSocketUnavailable(RuntimeError):
     pass
+
+
+GIB = 1024**3
+DEFAULT_MIN_FREE_RAM_BYTES = 12 * GIB
+DEFAULT_MIN_FREE_VRAM_BYTES = 24 * GIB
+_SUBMISSION_LOCK_WAIT_SEC = 5.0
 
 
 WAN22_OFFICIAL_PROFILE: dict[str, Any] = {
@@ -511,15 +524,17 @@ def _model_sha256(base_url: str, folder: str, filename: str) -> str:
     return value
 
 
-def _prompt_ids(items: object) -> list[str]:
+def _prompt_ids(items: object, *, queue_name: str) -> list[str]:
     if not isinstance(items, list):
-        return []
+        raise ComfyVideoError(f"ComfyUI /queue has invalid {queue_name} telemetry")
     prompt_ids: list[str] = []
     for item in items:
-        if isinstance(item, (list, tuple)) and len(item) > 1:
-            prompt_id = str(item[1] or "")
-            if prompt_id:
-                prompt_ids.append(prompt_id)
+        if not isinstance(item, (list, tuple)) or len(item) <= 1:
+            raise ComfyVideoError(f"ComfyUI /queue has malformed {queue_name} item")
+        prompt_id = str(item[1] or "")
+        if not prompt_id:
+            raise ComfyVideoError(f"ComfyUI /queue has empty {queue_name} prompt id")
+        prompt_ids.append(prompt_id)
     return prompt_ids
 
 
@@ -527,14 +542,145 @@ def queue_status(base_url: str) -> dict[str, Any]:
     data = _json_request(base_url, "/queue")
     if not isinstance(data, dict):
         raise ComfyVideoError("ComfyUI /queue returned an invalid payload")
-    running = _prompt_ids(data.get("queue_running"))
-    pending = _prompt_ids(data.get("queue_pending"))
+    if "queue_running" not in data or "queue_pending" not in data:
+        raise ComfyVideoError("ComfyUI /queue telemetry is incomplete")
+    running = _prompt_ids(data["queue_running"], queue_name="running")
+    pending = _prompt_ids(data["queue_pending"], queue_name="pending")
     return {
         "running": len(running),
         "pending": len(pending),
         "running_prompt_ids": running,
         "pending_prompt_ids": pending,
     }
+
+
+def submission_capacity(base_url: str) -> dict[str, Any]:
+    system = _json_request(base_url, "/system_stats")
+    queue = queue_status(base_url)
+    system_info = (
+        system.get("system")
+        if isinstance(system, dict) and isinstance(system.get("system"), Mapping)
+        else {}
+    )
+    devices = (
+        system.get("devices")
+        if isinstance(system, dict) and isinstance(system.get("devices"), list)
+        else []
+    )
+    ram_free = (system_info or {}).get("ram_free")
+    cuda_devices = [
+        item
+        for item in devices or []
+        if isinstance(item, dict) and str(item.get("type") or "").lower() == "cuda"
+    ]
+    selected_device = cuda_devices[0] if len(cuda_devices) == 1 else None
+    reported_vram = selected_device.get("vram_free") if selected_device else None
+    vram_free = reported_vram if type(reported_vram) is int and reported_vram >= 0 else None
+    blockers: list[dict[str, str]] = []
+    if type(ram_free) is not int or ram_free < 0:
+        blockers.append(
+            {
+                "code": "RESOURCE_METRICS_UNAVAILABLE",
+                "message": "ComfyUI did not report valid free system memory",
+            }
+        )
+    elif ram_free < DEFAULT_MIN_FREE_RAM_BYTES:
+        blockers.append(
+            {
+                "code": "RAM_BELOW_FLOOR",
+                "message": "free system memory is below the 12 GiB submission floor",
+            }
+        )
+    if len(cuda_devices) != 1 or vram_free is None:
+        blockers.append(
+            {
+                "code": "RESOURCE_METRICS_UNAVAILABLE",
+                "message": (
+                    "ComfyUI must report exactly one CUDA execution device "
+                    "with valid free GPU memory"
+                ),
+            }
+        )
+    elif vram_free < DEFAULT_MIN_FREE_VRAM_BYTES:
+        blockers.append(
+            {
+                "code": "VRAM_BELOW_FLOOR",
+                "message": "free GPU memory is below the 24 GiB submission floor",
+            }
+        )
+    if queue["running"] or queue["pending"]:
+        blockers.append(
+            {
+                "code": "COMFY_QUEUE_BUSY",
+                "message": "another ComfyUI prompt is running or pending",
+            }
+        )
+    return {
+        "schema_version": 1,
+        "kind": "comfy-submission-capacity",
+        "ok": not blockers,
+        "status": "ready" if not blockers else "blocked",
+        "base_url": normalize_base_url(base_url),
+        "floors": {
+            "ram_free_bytes": DEFAULT_MIN_FREE_RAM_BYTES,
+            "vram_free_bytes": DEFAULT_MIN_FREE_VRAM_BYTES,
+            "queue_must_be_idle": True,
+        },
+        "observed": {
+            "ram_free_bytes": ram_free if type(ram_free) is int else None,
+            "device": {
+                "name": selected_device.get("name"),
+                "vram_total_bytes": selected_device.get("vram_total"),
+                "vram_free_bytes": vram_free,
+            }
+            if selected_device
+            else None,
+            "queue": {
+                "running": queue["running"],
+                "pending": queue["pending"],
+            },
+        },
+        "blockers": blockers,
+    }
+
+
+def assert_submission_capacity(base_url: str) -> dict[str, Any]:
+    report = submission_capacity(base_url)
+    if not report["ok"]:
+        codes = ",".join(item["code"] for item in report["blockers"])
+        raise ComfyVideoError(f"ComfyUI submission blocked by resource tower: {codes}")
+    return report
+
+
+@contextlib.contextmanager
+def _submission_admission_lock(base_url: str):
+    if fcntl is None:
+        raise ComfyVideoError("ComfyUI submission requires the POSIX Mac orchestrator")
+    lock_key = hashlib.sha256(normalize_base_url(base_url).encode("utf-8")).hexdigest()[:16]
+    lock_path = Path(tempfile.gettempdir()) / f"aifilm-comfy-submit-{lock_key}.lock"
+    deadline = time.monotonic() + _SUBMISSION_LOCK_WAIT_SEC
+    try:
+        descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    except OSError as exc:
+        raise ComfyVideoError("ComfyUI submission admission lock failed") from exc
+    locked = False
+    while not locked:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            locked = True
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                os.close(descriptor)
+                raise ComfyVideoError("ComfyUI submission blocked: local admission lock is busy")
+            time.sleep(0.05)
+        except OSError as exc:
+            os.close(descriptor)
+            raise ComfyVideoError("ComfyUI submission admission lock failed") from exc
+    try:
+        yield
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
 
 
 def inventory(base_url: str) -> dict[str, Any]:
@@ -842,14 +988,16 @@ def submit(
     *,
     client_id: str | None = None,
 ) -> str:
-    resolved_client_id = client_id or f"aifilm-{secrets.token_hex(8)}"
-    data = _json_request(
-        base_url,
-        "/prompt",
-        method="POST",
-        payload={"client_id": resolved_client_id, "prompt": graph},
-        timeout=30,
-    )
+    with _submission_admission_lock(base_url):
+        assert_submission_capacity(base_url)
+        resolved_client_id = client_id or f"aifilm-{secrets.token_hex(8)}"
+        data = _json_request(
+            base_url,
+            "/prompt",
+            method="POST",
+            payload={"client_id": resolved_client_id, "prompt": graph},
+            timeout=30,
+        )
     prompt_id = str(data.get("prompt_id") or "")
     if not prompt_id:
         raise ComfyVideoError("ComfyUI did not return a prompt id")

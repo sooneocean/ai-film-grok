@@ -3,6 +3,16 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.14.3] - 2026-07-28
+
+### Added
+
+- Added `aifilm comfy capacity`, a bounded read-only admission report for the private RTX 5090 node.
+
+### Fixed
+
+- ComfyUI submissions now fail closed unless the queue is idle with at least 12 GiB free system memory and 24 GiB free GPU memory; missing resource telemetry also blocks submission.
+
 ## [2.14.2] - 2026-07-28
 
 ### Added
