@@ -19,6 +19,7 @@ _STATE_IGNORES = {
     "capability-cache.json",
     "orchestration-usage.jsonl",
     "pipeline_stage.json",
+    "scene-sound-status.json",
 }
 HARD_GATE_CODES = [
     "WRITE_SPEC_REQUIRED",
@@ -207,9 +208,20 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
         "next_id": packet.get("next_id"),
         "next_cmd": _bounded_text(packet.get("next_cmd"), max_bytes=1536),
         "next_why": _bounded_text(packet.get("next_why"), max_bytes=768),
-        "next_action": _compact_action(action),
+        # The bound action is the execution contract. Compact mode may omit
+        # surrounding diagnostics, but it must never alter this contract.
+        "next_action": dict(action),
         "responsibility": packet.get("responsibility"),
         "department_handoff": packet.get("department_handoff"),
+        "workflow": {
+            "public_entry": (packet.get("workflow") or {}).get("public_entry"),
+            "mode": (packet.get("workflow") or {}).get("mode"),
+            "current_stage": (packet.get("workflow") or {}).get("current_stage"),
+            "current_label_zh": (packet.get("workflow") or {}).get("current_label_zh"),
+            "stage_index": (packet.get("workflow") or {}).get("stage_index"),
+            "stage_total": (packet.get("workflow") or {}).get("stage_total"),
+            "blocking": (packet.get("workflow") or {}).get("blocking"),
+        },
         "attention": attention,
         "hard_gate_codes": HARD_GATE_CODES,
         "context_refs": refs,

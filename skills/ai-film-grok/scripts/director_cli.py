@@ -25,6 +25,174 @@ from production_book import (
 from util import read_json
 
 _DEPARTMENT_SCHEMA_TARGETS = {"visual": 3, "audio": 1, "post": 1}
+_STAGE_INPUT_CANDIDATES: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
+    "concept_lock": (("brief", ("brief.json",)), ("story", ("drama-graph.json",))),
+    "script_lock": (("story", ("drama-graph.json",)), ("shots", ("film-spec.json",))),
+    "department_look_lock": (("visual", ("style-bible.json",)),),
+    "shot_animatic_lock": (
+        ("story", ("drama-graph.json",)),
+        ("shots", ("film-spec.json",)),
+        ("timeline", ("timeline.json",)),
+    ),
+    "pilot_approval": (("pilot", ("receipts/pilot-approval.json",)),),
+    "bulk": (("manifest", ("manifest.json",)),),
+    "dailies_review": (("dailies", ("receipts/dailies.json",)),),
+    "selects_rough_cut": (
+        ("dailies", ("receipts/dailies.json",)),
+        ("selects", ("receipts/selects-report.json",)),
+        ("rough", ("receipts/rough-cut.json", "receipts/editor-cut.json")),
+    ),
+    "picture_lock": (("picture", ("receipts/picture-lock.json",)),),
+    "post_locks": (
+        ("post", ("post-plan.json",)),
+        ("voice", ("receipts/tts-rehearsal.json", "audio/mix_report.json")),
+        ("review", ("receipts/review-control.json", "receipts/review-actions.json")),
+    ),
+    "master_lock": (
+        ("delivery", ("receipts/master-delivery.json",)),
+        ("review", ("out/final-review.json", "receipts/final-review.json")),
+        ("audit", ("receipts/post-audit.json",)),
+    ),
+}
+
+
+def native_stage_input_refs(root: Path | str, stage: str) -> dict[str, str]:
+    """Resolve exact native evidence files for one director lock."""
+    from director_stage_gates import STAGE_ORDER, StageGateError
+
+    if stage not in STAGE_ORDER:
+        raise StageGateError(f"unknown stage: {stage}")
+    base = Path(root).expanduser().resolve()
+    refs: dict[str, str] = {}
+    missing: list[str] = []
+    for name, candidates in _STAGE_INPUT_CANDIDATES[stage]:
+        selected = next((relative for relative in candidates if (base / relative).is_file()), None)
+        if selected is None:
+            missing.append(f"{name} ({' | '.join(candidates)})")
+        else:
+            refs[name] = selected
+    if missing:
+        raise StageGateError(f"native evidence missing for {stage}: " + ", ".join(missing))
+    return refs
+
+
+def validate_native_stage_evidence(root: Path | str, stage: str) -> dict[str, str]:
+    """Fail closed unless the stage's canonical evidence is semantically current."""
+    base = Path(root).expanduser().resolve()
+    refs = native_stage_input_refs(base, stage)
+    if stage == "script_lock":
+        from narrative_control import control_status
+
+        status = control_status(base)
+        if (
+            {"story", "beats", "shots", "panels"} - set(status.get("locked_scopes") or [])
+            or status.get("ready_for_media") is not True
+            or (status.get("projection") or {}).get("stale") is True
+        ):
+            raise ValueError("script lock requires current locked narrative scopes and projection")
+    elif stage == "pilot_approval":
+        from production_gates import load_pilot_approval, pilot_is_user_approved
+
+        if not pilot_is_user_approved(load_pilot_approval(base)):
+            raise ValueError("pilot stage requires current explicit user approval")
+    elif stage == "bulk":
+        from dailies import _sha
+
+        spec = read_json(base / "film-spec.json") or {}
+        manifest = read_json(base / "manifest.json") or {}
+        clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
+        planned = [
+            str(shot.get("id") or shot.get("shot_id") or "")
+            for shot in (spec.get("shots") if isinstance(spec.get("shots"), list) else [])
+            if isinstance(shot, dict)
+        ]
+        for shot_id in planned:
+            clip = clips.get(shot_id) if isinstance(clips.get(shot_id), dict) else {}
+            path = Path(str(clip.get("path") or ""))
+            if not path.is_absolute():
+                path = base / path
+            digest = str(clip.get("sha256") or clip.get("media_sha256") or "")
+            if clip.get("status") != "approved" or not path.is_file() or digest != _sha(path):
+                raise ValueError(f"bulk stage has no current approved clip for {shot_id}")
+        if not planned:
+            raise ValueError("bulk stage requires planned shots")
+    elif stage == "dailies_review":
+        from dailies import dailies_status
+
+        if dailies_status(base).get("ok") is not True:
+            raise ValueError("dailies stage requires complete canonical dailies evidence")
+    elif stage == "selects_rough_cut":
+        selects = read_json(base / "receipts" / "selects-report.json") or {}
+        rough = read_json(base / refs["rough"]) or {}
+        if selects.get("complete") is not True or rough.get("ok") is not True:
+            raise ValueError("selects stage requires current selects and rough-cut receipts")
+        if selects.get("selected_set_sha256") and rough.get("selected_set_sha256") != selects.get(
+            "selected_set_sha256"
+        ):
+            raise ValueError("rough cut is not bound to the ordered selected take set")
+    elif stage == "picture_lock":
+        from picture_lock import picture_lock_status
+
+        if picture_lock_status(base).get("ok") is not True:
+            raise ValueError("picture lock receipt is missing or stale")
+    elif stage == "post_locks":
+        if (read_json(base / "receipts" / "post-lock-staleness.json") or {}).get("affected_locks"):
+            raise ValueError("post locks are stale after picture changes")
+    elif stage == "master_lock":
+        from master_delivery import validate_master_delivery
+
+        delivery = read_json(base / refs["delivery"]) or {}
+        if validate_master_delivery(base, delivery=delivery).get("ok") is not True:
+            raise ValueError("master lock requires successful checksum, ffprobe and full read-back")
+    return refs
+
+
+def lock_native_stage(
+    root: Path | str,
+    *,
+    stage: str,
+    approver: str,
+    user_phrase: str | None = None,
+    authorization_event: str | None = None,
+    input_refs: dict[str, str] | None = None,
+    transaction_id: str | None = None,
+    expected_ledger_revision: int | None = None,
+) -> dict[str, Any]:
+    """Create one human approval and hash-bound lock over native evidence."""
+    from approval_ledger import append_approval
+    from director_stage_gates import hash_input_refs, lock_stage, stage_status
+
+    refs = input_refs or native_stage_input_refs(root, stage)
+    hashes = hash_input_refs(root, refs)
+    tx = transaction_id or f"tx-stage-{stage}-{stable_content_hash(hashes)[:16]}"
+    approval = append_approval(
+        root,
+        expected_revision=expected_ledger_revision,
+        scope=f"stage:{stage}",
+        approval_type="stage_lock",
+        approver_type="user",
+        approver=approver,
+        user_phrase=user_phrase,
+        authorization_event=authorization_event,
+        input_hashes=hashes,
+        evidence_refs=list(refs.values()),
+        transaction_id=tx,
+    )
+    locked = lock_stage(
+        root,
+        stage=stage,
+        input_refs=refs,
+        approval_id=approval["approval_id"],
+    )
+    return {
+        "ok": True,
+        "action": "lock-stage",
+        "stage": stage,
+        "input_refs": refs,
+        "approval_id": approval["approval_id"],
+        "lock": locked,
+        "stage_gates": stage_status(root),
+    }
 
 
 def director_init(

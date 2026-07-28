@@ -497,7 +497,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         "hard",
                         "tts_neural_on_external",
                         str(tts_exc)[:280],
-                        fix="final --tts-backend mimo（中文旁白）；或把 vo_voice 改成 provider voice id",
+                        fix="final --tts-backend edge（中文旁白）；或把 vo_voice 改成 provider voice id",
                     )
                 )
         except ImportError:
@@ -508,7 +508,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "soft",
                     "tts_external_risk",
                     f"tts_backend={tts!r} or AIFILM_TTS_ARGV set — 中文 Neural ID 勿塞 ElevenLabs",
-                    fix="final 时显式 --tts-backend mimo（中文说书默认）；本机克隆用 voicebox",
+                    fix="final 时显式 --tts-backend edge（中文说书默认）；本机克隆用 voicebox",
                 )
             )
         # 说书人优先 MiMo；其他显式 provider 仍允许，但保留可见提示。
@@ -519,7 +519,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "soft",
                     "tts_storyteller_not_mimo",
                     f"vo_mode={vo_mode} 但 tts_backend={tts!r} — 中文说书默认 MiMo",
-                    fix="write-spec 会把 auto 钉 mimo；或 final --tts-backend mimo",
+                    fix="write-spec 会按声线政策解析 auto；或 final --tts-backend edge",
                 )
             )
         if tts == "voicebox":
