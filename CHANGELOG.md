@@ -3,6 +3,12 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.14.2] - 2026-07-28
+
+### Added
+
+- Added fail-closed `aifilm route explain` for deterministic, read-only shot routing from versioned shot-intent, capability-snapshot, route-plan, and execution-plan contracts.
+
 ## [2.14.0] - 2026-07-28
 
 ### Added

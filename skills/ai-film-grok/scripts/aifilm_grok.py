@@ -6263,6 +6263,18 @@ def cmd_comfy(args: argparse.Namespace) -> int:
     return run_comfy(args)
 
 
+def cmd_route(args: argparse.Namespace) -> int:
+    from cli_route import run
+    from production_router import RouteExplainError
+
+    try:
+        report, code = run(args)
+    except RouteExplainError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return code
+
+
 def cmd_lipsync_node(args: argparse.Namespace) -> int:
     from config_loader import get_config
     from lipsync_node_client import LipsyncNodeError, health
@@ -8321,6 +8333,9 @@ def build_parser() -> argparse.ArgumentParser:
     from cli_bgm_library import add_bgm_library_parsers
 
     add_bgm_library_parsers(sub)
+    from cli_route import add_route_parsers
+
+    add_route_parsers(sub)
 
     return p
 
@@ -8423,6 +8438,7 @@ def main(argv: list[str] | None = None) -> int:
             "quality-ledger": cmd_quality_ledger,
             "production-report": cmd_production_report,
             "comfy": cmd_comfy,
+            "route": cmd_route,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:
