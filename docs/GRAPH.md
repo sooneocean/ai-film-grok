@@ -61,6 +61,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_audio_cues.py`
 - `skills/ai-film-grok/tests/test_audio_delivery_gate.py`
 - `skills/ai-film-grok/tests/test_audio_event_editor.py`
+- `skills/ai-film-grok/tests/test_audio_node_client.py`
 - `skills/ai-film-grok/tests/test_audio_plan.py`
 - `skills/ai-film-grok/tests/test_audio_provenance.py`
 - `skills/ai-film-grok/tests/test_audio_recipe.py`
