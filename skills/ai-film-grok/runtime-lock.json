@@ -127,7 +127,7 @@
     "scripts/intake.py": "bfec8ffb9db50244ecd23c5e08723d1f66ba98117afb5dc4809b10caea686c58",
     "scripts/lipsync_backend.py": "afccdbd52c3720b46533ec8243d3e3aab727eb286505d9260ca024a1b2632a63",
     "scripts/lipsync_canary.py": "cd3899cf2bd50a99e0fac1e57492c2a3c6828edbe12aa3872a2f6e0e726af0ba",
-    "scripts/local_llm.py": "923002fd63c852d1b3871e0e9cc2bc81fadcb515b92a53ee91b4c62cccf52873",
+    "scripts/local_llm.py": "c4ba7eef6eeb936abf49514aea4000dcff0b4e7bf749907c4ea5bc6546dde2ba",
     "scripts/logger.py": "28b69919dc327b2ba90d3c14fb53509054f5e7cfcbd30dd4cbbaa159afa4d12d",
     "scripts/make_sfx_bed.py": "146899887655f7eb8add75c7a96ce10dddc5ec8e8e46e4261b087b0533f0c233",
     "scripts/master_delivery.py": "000e51e46cec116a7751fdfb90cb0ec243cbda02642ce691abb25af7e0495b2f",

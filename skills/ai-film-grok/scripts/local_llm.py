@@ -14,6 +14,8 @@ import urllib.request
 from typing import Any
 from urllib.parse import urlsplit
 
+from jsonschema import Draft202012Validator, ValidationError
+
 DEFAULT_MODEL = "openai/gpt-oss-20b"
 ALLOWED_MODELS = frozenset({DEFAULT_MODEL})
 _MAX_RESPONSE_BYTES = 1_048_576
@@ -47,6 +49,14 @@ class LocalLLMError(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Keep an initial private endpoint from crossing a redirect boundary."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        del req, fp, code, msg, headers, newurl
+        return None
 
 
 def normalize_base_url(base_url: str) -> str:
@@ -112,7 +122,8 @@ def _request_json(
         headers=headers,
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 -- private URL is validated above
+        opener = urllib.request.build_opener(_NoRedirect())
+        with opener.open(request, timeout=timeout) as response:  # noqa: S310 -- private URL is validated above
             raw = response.read(_MAX_RESPONSE_BYTES + 1)
     except urllib.error.HTTPError as exc:
         raise LocalLLMError("LOCAL_LLM_HTTP_ERROR", f"local LLM returned HTTP {exc.code}") from exc
@@ -202,8 +213,10 @@ def draft(
     finish_reason = (
         choices[0].get("finish_reason") if isinstance(choices, list) and choices else None
     )
-    if finish_reason == "length":
-        raise LocalLLMError("LOCAL_LLM_TRUNCATED_OUTPUT", "local LLM candidate was truncated")
+    if finish_reason != "stop":
+        raise LocalLLMError(
+            "LOCAL_LLM_INCOMPLETE_OUTPUT", "local LLM candidate did not finish normally"
+        )
     if not isinstance(content, str) or not content.strip():
         raise LocalLLMError("LOCAL_LLM_EMPTY_OUTPUT", "local LLM returned no usable candidate")
     output = content.strip()
@@ -278,27 +291,24 @@ def shot_draft(
     finish_reason = choice.get("finish_reason")
     message = choice.get("message")
     content = message.get("content") if isinstance(message, dict) else None
-    if finish_reason == "length":
-        raise LocalLLMError("LOCAL_LLM_TRUNCATED_OUTPUT", "local LLM shot candidate was truncated")
+    if finish_reason != "stop":
+        raise LocalLLMError(
+            "LOCAL_LLM_INCOMPLETE_OUTPUT", "local LLM shot candidate did not finish normally"
+        )
     try:
         candidate = json.loads(content) if isinstance(content, str) else None
     except json.JSONDecodeError as exc:
         raise LocalLLMError(
             "LOCAL_LLM_INVALID_SHOT_JSON", "local LLM returned invalid shot JSON"
         ) from exc
-    shots = candidate.get("shots") if isinstance(candidate, dict) else None
-    if (
-        not isinstance(shots, list)
-        or len(shots) != 2
-        or any(
-            not isinstance(shot, dict)
-            or not isinstance(shot.get("action"), str)
-            or not shot["action"].strip()
-            or not isinstance(shot.get("camera"), str)
-            or not shot["camera"].strip()
-            for shot in shots
-        )
-    ):
+    try:
+        Draft202012Validator(_TWO_SHOT_SCHEMA).validate(candidate)
+    except ValidationError as exc:
+        raise LocalLLMError(
+            "LOCAL_LLM_INVALID_SHOT_JSON", "local LLM did not return a valid two-shot candidate"
+        ) from exc
+    shots = candidate["shots"]
+    if any(not shot["action"].strip() or not shot["camera"].strip() for shot in shots):
         raise LocalLLMError(
             "LOCAL_LLM_INVALID_SHOT_JSON", "local LLM did not return two usable shots"
         )
