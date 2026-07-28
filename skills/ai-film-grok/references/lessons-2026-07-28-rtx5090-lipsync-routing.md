@@ -1,7 +1,7 @@
 # Lessons · RTX 5090 剧情对白口型路由
 
 > 2026-07-28 · **P0 / Voice→Post**
-> 状态：**研究结论，尚未通过 RTX 5090 实片 canary**。
+> 状态：**PARTIAL：LatentSync 1.6 已通过 RTX 5090 技术 canary；尚未通过生产晋升矩阵与人工完整观看批准**。
 > 目标：让 Grok/I2V 已有剧情镜头中的角色按最终对白开口，同时尽量保留原表演、身份、背景与摄影运动。
 
 ## 一句话
@@ -17,7 +17,15 @@
   - MuseTalk 1.5：文档固定 PyTorch 2.0.1 / CUDA 11.8，脸区 256×256。
   - LatentSync 1.6：文档固定 PyTorch 2.5.1 / CUDA 12.1；推理最低显存 18GB，模型以 512×512 训练。
 - 因此“5090 显存够”不等于“上游环境直接可用”。5090 节点必须用隔离的 Python 环境、PyTorch 2.7+、CUDA 12.8，并重新验证 face detector、ONNX Runtime、xformers/attention 与 FFmpeg。
-- 本轮没有在 5090 上真实生成；未取得输出 MP4、耗时、峰值显存、SyncNet/音画偏移或人工完整观看证据。
+- 2026-07-28 已在私有 RTX 5090 节点真实运行 LatentSync 1.6（repo `a229c3948406bc2cf6eaf4873e662e70c6a04746`，PyTorch `2.7.1+cu128`）：
+  - 当前剧情 I2V 镜头 + 最终日语 TTS：输出 MP4 可解码，但原片是全身运动镜、脸太小，只能证明管线能跑，不能评价口型质量。
+  - 单人近景受控样本 + 同一条最终日语 TTS：输出 720×1280、25 fps、1.84 秒，嘴形有可见变化，脸外区域目视保持稳定。
+  - 受控样本 wall time 110 秒，峰值显存 **31,813 MiB / 32,607 MiB**；仅余约 794 MiB，属于能跑但余量危险，不能与 ComfyUI 或其他 GPU 工作并发。
+- 上述仍不是生产通过：尚缺微侧脸、遮挡、真实近景运动保留、自动同步辅助指标，以及使用者对完整视频的逐帧/逐句批准。
+- EchoMimicV3-Flash 官方权重已完整准备，但当前节点未进入推理：
+  - WSL 只有 15 GiB RAM + 8 GiB swap；最新版依赖令上游低内存 loader 失效，Python 在约 15.5 GiB RSS 被 OOM killer 杀死。
+  - 固定 Diffusers 0.33.1 / Transformers 4.48.3 后虽恢复旧 loader 符号，却出现 meta 参数复制 no-op 警告；进程随后退出，远端 output directory 快照为空。
+  - 因此“官方写 12GB VRAM”不能推出“这台 5090 节点可用”；主机 RAM、loader 与权重真正落入参数同样是硬门槛。
 
 ## 方案分层
 
@@ -92,6 +100,25 @@ Grok primary / 已批准 I2V clip
 - 当前 `auto` 有启发式补标行为；生产前必须审阅目标镜清单。要求“失败即停”时使用 `--lipsync require`，不能只靠显式 backend 名称。
 
 ## RTX 5090 canary
+
+### 2026-07-28 首轮实跑回执
+
+| 项目 | 结果 |
+|---|---|
+| 节点 | RTX 5090 32GB；driver 595.79 |
+| LatentSync | 1.6；repo `a229c3948406bc2cf6eaf4873e662e70c6a04746`；checkpoint SHA-256 `0a478e89eb660f82da4c35dbdde8a5adfb27f99d1b4e50edd03729e1e98316d3` |
+| Runtime | Python 3.10；PyTorch 2.7.1+cu128；CUDA runtime 12.8 |
+| 原剧情镜头输出 | SHA-256 `1d0d09a16cfa248067169d6dea474fff05ff28a3b84ef0948231dad99d478bc6`；1.84 秒；25 fps；峰值 29,493 MiB |
+| 受控近景输出 | SHA-256 `995a0bd32b67ea441533856bb195d3ccba76624595f76676544007f6ad82802f`；1.84 秒；25 fps；wall 110 秒；峰值 31,813 MiB |
+| 技术结论 | 两份 MP4 均通过 `ffmpeg -f null -` 完整解码；输入/输出 hash 与 GPU 采样已落回执 |
+| 质量结论 | 原剧情镜脸太小；受控近景可见嘴形变化，但不是原运动镜头。状态保持 PARTIAL |
+| EchoMimicV3-Flash | repo `7e89489ca51c0d008fc1963ec6c03fc5bd0b9397`；官方权重已下载；15 GiB WSL RAM 下装载失败，未取得输出 MP4，禁用 |
+
+首轮还暴露了三条生产风险：
+
+1. EP3 的 review contact 与当前 active clip hash 已漂移；选 canary 前必须对 review source hash 与实际 clip hash 做 read-back，不能只看旧缩略图。
+2. LatentSync 官方脚本依赖 `ffmpeg` 命令；隔离环境起初缺少命令而失败。已用隔离环境内 `imageio-ffmpeg` 二进制补齐，未改系统套件。
+3. EchoMimicV3 requirements 只有下限、没有兼容上限；2026-07-28 解析到 Diffusers 0.39 / Transformers 5.14 会让旧 loader 路径失效。盲目降版也可能产生 meta 参数 no-op，必须以真实首帧和输出 MP4 验证，不能以 import 成功算通过。
 
 同角色、同最终 TTS，选三段 4–8 秒镜头：
 
