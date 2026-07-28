@@ -41,14 +41,21 @@ music_template=on 且全无文件 → hard fail
 
 ```text
 off（默认；storyteller 强制 off）
-  → 用户要开口 + shot.lipsync=true + 近景
-  → 已 lock 的 MuseTalk → Wav2Lip → external argv
-  → auto 失败跳过写回执；require 失败停 final
-禁止：未 lock 当 ready；全片默认对口型
+  → 用户要开口 + shot.lipsync=true + speaker/face target + 正脸/微侧近景
+  → 已批准 RTX LatentSync 1.6
+  → 可分类技术失败才按显式策略回退 RTX MuseTalk 1.5
+  → 旧流程保留已 lock 本机 MuseTalk/Wav2Lip/external
+  → auto 未就绪或失败写回执；显式 backend/require 失败停 final
+禁止：未过 fingerprint+canary+人工审片当 ready；质量差时静默换后端；全片默认对口型
 ```
 
 ```bash
-# 用户审权重后（agent 不代 acknowledge）：
+# RTX 节点：
+"$AIFILM" lipsync-node health
+"$AIFILM" lipsync-canary --root "<film>" --shot shot03 --backend latentsync
+"$AIFILM" lipsync-canary --root "<film>" --shot shot03 --backend musetalk
+
+# 旧本机后端仍须用户审权重（agent 不代 acknowledge）：
 backend-lock inspect --backend wav2lip --root "$W2L"
 backend-lock lock --backend wav2lip --root "$W2L" --acknowledge-trusted-weights
 "$AIFILM" lipsync-canary --root "<film>" --shot shot03

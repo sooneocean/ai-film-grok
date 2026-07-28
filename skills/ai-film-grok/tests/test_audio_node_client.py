@@ -9,7 +9,16 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 
 import pytest
-from audio_node_client import AudioNodeError, _request, _url, health, render, render_batch
+from audio_node_client import (
+    AudioNodeError,
+    _request,
+    _url,
+    health,
+    public_health_report,
+    render,
+    render_batch,
+    render_sfx,
+)
 
 
 def _delivery_wav() -> bytes:
@@ -30,6 +39,30 @@ def test_rejects_non_http_node_url() -> None:
 def test_health_requires_private_token() -> None:
     with pytest.raises(AudioNodeError):
         health("http://192.168.88.52:8788", "short")
+
+
+def test_public_health_report_drops_unknown_fields_and_current_token() -> None:
+    token = "private-test-token"
+    report = public_health_report(
+        {
+            "ok": True,
+            "node": "private-lan",
+            "models": {"tts": True, "music": False, "leak": token},
+            "model": token,
+            "music_model": "ACE-Step-1.5",
+            "gpu": {"available": True, "name": token, "free_vram_mib": 1234},
+            "diagnostic": {"secret": token},
+        },
+        secret_values=(token,),
+    )
+
+    assert report == {
+        "ok": True,
+        "node": "private-lan",
+        "models": {"tts": True, "music": False},
+        "music_model": "ACE-Step-1.5",
+        "gpu": {"available": True, "free_vram_mib": 1234},
+    }
 
 
 def test_http_error_is_not_misreported_as_network_unreachable() -> None:
@@ -62,6 +95,107 @@ def test_render_allows_explicit_performance_track(tmp_path: Path) -> None:
             tmp_path / "performance.wav",
         )
     assert receipt["path"].endswith("performance.wav")
+
+
+def test_render_sfx_requires_noncommercial_ack(tmp_path: Path) -> None:
+    with pytest.raises(AudioNodeError, match="non-commercial"):
+        render_sfx(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            prompt="door closes",
+            duration=8,
+            seed=1,
+            out=tmp_path / "sfx.wav",
+        )
+
+
+def test_render_sfx_rejects_invalid_request_before_health_or_upload(tmp_path: Path) -> None:
+    with patch("audio_node_client.health") as node_health:
+        with pytest.raises(AudioNodeError, match="duration"):
+            render_sfx(
+                "http://192.168.88.52:8788",
+                "x" * 32,
+                prompt="door closes",
+                duration=31,
+                seed=1,
+                out=tmp_path / "sfx.wav",
+                noncommercial_research_ok=True,
+            )
+    node_health.assert_not_called()
+
+
+def test_render_sfx_fails_before_submission_when_capability_is_untrusted(
+    tmp_path: Path,
+) -> None:
+    with (
+        patch(
+            "audio_node_client.health",
+            return_value={
+                "ok": True,
+                "models": {"sfx": True},
+                "sfx_model": "unknown",
+                "sfx_license": "commercial",
+                "sfx_checkpoint_fingerprint": "a" * 64,
+            },
+        ),
+        patch("audio_node_client.render") as submit,
+    ):
+        with pytest.raises(AudioNodeError, match="unavailable"):
+            render_sfx(
+                "http://192.168.88.52:8788",
+                "x" * 32,
+                prompt="door closes",
+                duration=8,
+                seed=1,
+                out=tmp_path / "sfx.wav",
+                noncommercial_research_ok=True,
+            )
+    submit.assert_not_called()
+
+
+def test_render_sfx_uploads_hash_bound_video_without_local_path(tmp_path: Path) -> None:
+    source = tmp_path / "private-shot.mp4"
+    source.write_bytes(b"video" * 512)
+    source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    captured: list[tuple[str, dict[str, object]]] = []
+
+    def fake_request(*args, **kwargs):
+        captured.append((args[2], kwargs))
+        return json.dumps({"source_id": source_hash, "source_sha256": source_hash}).encode()
+
+    with (
+        patch(
+            "audio_node_client.health",
+            return_value={
+                "ok": True,
+                "models": {"sfx": True},
+                "sfx_model": "hkchengrex/MMAudio-large-44k-v2",
+                "sfx_license": "CC-BY-NC-4.0",
+                "sfx_checkpoint_fingerprint": "a" * 64,
+            },
+        ),
+        patch("audio_node_client._request", side_effect=fake_request),
+        patch(
+            "audio_node_client.render",
+            return_value={"job_id": "job", "sha256": "b" * 64, "path": "sfx.wav"},
+        ) as submit,
+    ):
+        result = render_sfx(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            prompt="door closes",
+            duration=8,
+            seed=1,
+            out=tmp_path / "sfx.wav",
+            source_video=source,
+            noncommercial_research_ok=True,
+        )
+
+    assert captured[0][0] == "/v1/sfx-source"
+    payload = submit.call_args.args[3]
+    assert payload["source_video_id"] == source_hash
+    assert str(source) not in json.dumps(payload)
+    assert result["source_video_sha256"] == source_hash
 
 
 def test_render_rejects_non_wav_result(tmp_path: Path) -> None:

@@ -45,6 +45,9 @@ def _asset_event(tmp_path: Path, *, kind: str = "door_open") -> dict:
         "kind": kind,
         "source": "local:audio/door.wav",
         "source_sha256": sha256(asset.read_bytes()).hexdigest(),
+        "license": "test-local",
+        "start_offset_sec": 0,
+        "duration_sec": 0.1,
     }
 
 
@@ -158,3 +161,42 @@ def test_unknown_material_requires_review_even_with_a_verified_local_asset(tmp_p
     assert footsteps["status"] == "needs_review"
     assert footsteps["needs_review"] is True
     assert report["status"] == "blocked"  # ambience and door events still need assets
+
+
+def test_muted_or_unrenderable_cues_do_not_clear_required_sound(tmp_path: Path):
+    cue = _asset_event(tmp_path, kind="ambience")
+    cue.pop("shot_id")
+    cue["muted"] = True
+    spec = {"shots": [{"id": "s1", "duration_sec": 1, "audio_cues": [cue]}]}
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+
+    report = reconcile(tmp_path, write=False)
+
+    ambience = next(item for item in report["events"] if item["kind"] == "ambience")
+    assert ambience["status"] == "blocked"
+
+
+def test_cue_without_timeline_license_does_not_clear_required_sound(tmp_path: Path):
+    cue = _asset_event(tmp_path, kind="ambience")
+    cue.pop("shot_id")
+    cue.pop("license")
+    spec = {"shots": [{"id": "s1", "duration_sec": 1, "audio_cues": [cue]}]}
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+
+    report = reconcile(tmp_path, write=False)
+
+    ambience = next(item for item in report["events"] if item["kind"] == "ambience")
+    assert ambience["status"] == "blocked"
+
+
+def test_cue_without_explicit_timeline_position_does_not_clear_required_sound(tmp_path: Path):
+    cue = _asset_event(tmp_path, kind="ambience")
+    cue.pop("shot_id")
+    cue.pop("start_offset_sec")
+    spec = {"shots": [{"id": "s1", "duration_sec": 1, "audio_cues": [cue]}]}
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+
+    report = reconcile(tmp_path, write=False)
+
+    ambience = next(item for item in report["events"] if item["kind"] == "ambience")
+    assert ambience["status"] == "blocked"

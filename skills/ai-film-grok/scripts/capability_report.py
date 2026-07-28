@@ -544,6 +544,7 @@ def build_capability_report(
             "env_backend": lipsync_info.get("env_backend"),
             "ready": lipsync_info.get("ready") or [],
             "default": lipsync_info.get("env_backend") or "off",
+            "node": lipsync_info.get("node"),
             "wav2lip_root": lipsync_info.get("wav2lip_root"),
             "musetalk_root": lipsync_info.get("musetalk_root"),
             "next_unlock": (

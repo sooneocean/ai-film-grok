@@ -3,12 +3,50 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.15.0] - 2026-07-28
+
+### Added
+
+- Added an authenticated MMAudio SFX canary with bounded video upload, pinned offline adapter provenance, hash-bound receipts, and pending-only human review.
+
+### Security
+
+- MMAudio checkpoints are restricted to explicit non-commercial research use; missing license acknowledgement, model fingerprint, clean commit, or offline weights fails closed.
+
+## [2.14.4] - 2026-07-28
+
+### Added
+
+- Added `aifilm route plan`: explicit local, hash-bound planned receipts derived from a viable route; it never authorizes, queues, or submits media work.
+
+## [2.14.3] - 2026-07-28
+
+### Added
+
+- Added `aifilm comfy capacity`, a bounded read-only admission report for the private RTX 5090 node.
+
+### Fixed
+
+- ComfyUI submissions now fail closed unless the queue is idle with at least 12 GiB free system memory and 24 GiB free GPU memory; missing resource telemetry also blocks submission.
+
+## [2.14.2] - 2026-07-28
+
+### Added
+
+- Added fail-closed `aifilm route explain` for deterministic, read-only shot routing from versioned shot-intent, capability-snapshot, route-plan, and execution-plan contracts.
+
 ## [2.14.0] - 2026-07-28
 
 ### Added
 
+- Added an authenticated, single-GPU Windows/WSL lip-sync node with measured LatentSync 1.6 provenance, atomic artifacts, bounded uploads, and hash-bound receipts.
+- Added `aifilm lipsync-node health` plus remote LatentSync/MuseTalk routing for canary and final rendering.
 - Bounded `bgm-library canary` generation for one configurable 10–600 second ACE-Step batch, with pending-only status and checksum, fingerprint, duration, and technical acceptance checks.
 - Acceptance coverage for ten-cue within-film diversity, six-film rotation, and cropped or requantized near-duplicate rejection.
+
+### Security
+
+- Restricted plaintext node traffic to loopback through an SSH tunnel, rejected redirects, authenticated before multipart parsing, and fail-closed on input, backend, or receipt mismatch.
 
 ### Fixed
 

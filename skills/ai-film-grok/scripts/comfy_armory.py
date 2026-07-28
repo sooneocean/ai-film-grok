@@ -43,9 +43,9 @@ def load_armory() -> dict[str, Any]:
 
 
 def default_base_url(armory: dict[str, Any] | None = None) -> str:
-    data = armory or load_armory()
+    data = armory if armory is not None else load_armory()
     node = data["nodes"].get(data["default_node"]) or {}
-    configured = os.environ.get("AIFILM_COMFYUI_BASE_URL", "").strip()
+    configured = os.environ.get("AIFILM_COMFYUI_BASE_URL", "").strip() if armory is None else ""
     value = configured or str(node.get("base_url") or "")
     if not value:
         raise ComfyArmoryError("verified armory node has no base URL")

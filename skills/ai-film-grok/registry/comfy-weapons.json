@@ -5,8 +5,8 @@
   "default_node": "rtx5090-main",
   "nodes": {
     "rtx5090-main": {
-      "base_url": "http://192.168.88.52:8188",
-      "transport": "private_lan",
+      "base_url": "http://127.0.0.1:18188",
+      "transport": "ssh_tunnel",
       "comfyui_root": "C:\\ComfyUI_windows_portable\\ComfyUI",
       "gpu": "NVIDIA GeForce RTX 5090",
       "vram_mib": 32607,

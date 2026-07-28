@@ -24,12 +24,38 @@ the server through router port forwarding.
 ```bash
 aifilm comfy probe
 aifilm comfy inventory
+aifilm comfy capacity
 aifilm comfy queue
 ```
 
 `inventory` reads bounded system, GPU, feature, model-count and queue data. It
 does not request `/object_info` for every installed node and does not print
 prompt payloads.
+
+`capacity` is the fail-closed admission check for a heavy workflow. Submission
+requires an idle queue, at least 12 GiB free system memory and at least 24 GiB
+free GPU memory. Missing telemetry also blocks submission. These floors are
+checked again inside the shared `submit()` primitive, so CLI and provider
+callers cannot bypass the tower. A short cross-process lock makes the capacity
+read and `/prompt` submission atomic among callers on this orchestrator.
+Unrelated ComfyUI UI/API clients do not share that local lock, so the node must
+still remain operationally reserved during a managed bulk run. Wait for an
+owned job to finish or explicitly use `free-memory --confirm` after the queue
+is idle; never interrupt an unknown running prompt.
+
+If the loopback tunnel or ComfyUI health probe fails, use the bounded recovery
+path:
+
+```bash
+aifilm comfy recover --confirm
+```
+
+It performs no mutation when the local health probe is already green. If the
+remote service is healthy, it repairs only the SSH tunnel. It runs the pinned
+remote stop/start scripts only when both the local and remote ComfyUI probes
+fail, then verifies local health again. Unknown local-port ownership, unsafe
+SSH targets, loose key permissions and failed read-back stop the recovery.
+The receipt never contains the SSH target, key path, command output or prompt.
 
 For demand-driven model selection, use
 [`comfy-weapon-armory.md`](comfy-weapon-armory.md). It routes only to retained

@@ -48,6 +48,7 @@
 | [film-spec.md](film-spec.md) | Film Spec 契约 |
 | [style-bible.md](style-bible.md) | Style Bible 全片视觉语法 |
 | [config-schema.md](config-schema.md) | config_loader.py 配置 schema |
+| [production-routing-control-plane.md](production-routing-control-plane.md) | 镜头意图 × 有时效能力快照 × 只读路线解释 |
 
 ## 工具栈 · Grok Build
 

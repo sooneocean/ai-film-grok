@@ -24,6 +24,8 @@ DEFAULT_SCRIPTS = (
     "edit_policy.py",
     "film_spec.py",
     "lipsync_backend.py",
+    "lipsync_node_client.py",
+    "lipsync_node_service.py",
     "make_sfx_bed.py",
     "media_qa.py",
     "media-queue",

@@ -89,6 +89,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_checkpoint.py`
 - `skills/ai-film-grok/tests/test_cinema_prompt.py`
 - `skills/ai-film-grok/tests/test_cinematic_color_grading.py`
+- `skills/ai-film-grok/tests/test_cli_bgm_library.py`
 - `skills/ai-film-grok/tests/test_cli_motion.py`
 - `skills/ai-film-grok/tests/test_cli_plan_mutation.py`
 - `skills/ai-film-grok/tests/test_cli_plan_project.py`
@@ -171,6 +172,9 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_jcut_lcut_editing.py`
 - `skills/ai-film-grok/tests/test_launchers.py`
 - `skills/ai-film-grok/tests/test_lipsync_canary.py`
+- `skills/ai-film-grok/tests/test_lipsync_node_client.py`
+- `skills/ai-film-grok/tests/test_lipsync_node_routing.py`
+- `skills/ai-film-grok/tests/test_lipsync_node_service.py`
 - `skills/ai-film-grok/tests/test_local_llm.py`
 - `skills/ai-film-grok/tests/test_lock_style_samefile.py`
 - `skills/ai-film-grok/tests/test_logger.py`

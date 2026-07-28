@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/execution-plan.schema.json",
+  "title": "ai-film-grok execution plan",
+  "type": "object",
+  "required": ["schema_version", "kind", "route_plan_sha256", "authorized", "tasks"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "ai-film-execution-plan" },
+    "route_plan_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "authorized": { "type": "boolean" },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "shot_id",
+          "capability_id",
+          "resource",
+          "depends_on",
+          "idempotency_key",
+          "status"
+        ],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "shot_id": { "type": "string", "minLength": 1 },
+          "capability_id": { "type": "string", "minLength": 1 },
+          "resource": { "type": "string", "minLength": 1 },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          },
+          "idempotency_key": { "type": "string", "minLength": 1 },
+          "status": {
+            "enum": ["planned", "authorized", "submitted", "running", "succeeded", "failed", "blocked"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -7,7 +7,6 @@ Previously had ZERO test coverage. Tests cover:
 
 from __future__ import annotations
 
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -119,6 +118,54 @@ class TestRunLipsyncCanary(unittest.TestCase):
                 with self.assertRaises(LipsyncCanaryError) as ctx:
                     run_lipsync_canary(root, shot_id="shot01", video=video, audio=audio)
                 self.assertIn("off", str(ctx.exception))
+
+    def test_explicit_node_canary_allows_technical_ready_before_approval(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            video = root / "shot.mp4"
+            audio = root / "shot.wav"
+            video.write_bytes(b"video")
+            audio.write_bytes(b"audio")
+
+            def fake_lipsync_one(**kwargs):
+                self.assertTrue(kwargs["allow_unapproved"])
+                kwargs["out"].write_bytes(b"candidate")
+                return {"ok": True, "chosen_backend": "latentsync"}
+
+            with mock.patch.dict(
+                sys.modules,
+                {
+                    "lipsync_backend": mock.MagicMock(
+                        probe=lambda: {
+                            "ready": [],
+                            "node": {
+                                "backends": {
+                                    "latentsync": {
+                                        "ready": False,
+                                        "technical_ready": True,
+                                    }
+                                }
+                            },
+                        },
+                        resolve_backend=mock.Mock(
+                            side_effect=AssertionError("must bypass production resolver")
+                        ),
+                        lipsync_one=fake_lipsync_one,
+                    ),
+                },
+            ):
+                report = run_lipsync_canary(
+                    root,
+                    shot_id="shot01",
+                    backend="latentsync",
+                    video=video,
+                    audio=audio,
+                )
+
+            self.assertTrue(report["ok"])
+            self.assertEqual(report["backend_used"], "latentsync")
 
 
 if __name__ == "__main__":

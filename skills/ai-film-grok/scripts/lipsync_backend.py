@@ -2,7 +2,7 @@
 """Pluggable lip-sync backends for ai-film-grok (post-VO face retime).
 
 Solves: silent Grok I2V + edge-tts overlay without mouth match.
-Industry path: video/image + audio → MuseTalk / Wav2Lip / external CLI.
+Industry path: video/image + audio → RTX LatentSync/MuseTalk node or locked local backend.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -31,7 +32,7 @@ class LipSyncError(RuntimeError):
     pass
 
 
-BACKEND_PRIORITY = ("musetalk", "wav2lip", "external")
+BACKEND_PRIORITY = ("latentsync", "musetalk", "wav2lip", "external")
 
 
 def emit(obj: dict[str, Any]) -> None:
@@ -110,9 +111,30 @@ def external_argv_template() -> list[str] | None:
     return None
 
 
+def node_health() -> dict[str, Any]:
+    cfg = get_config()
+    if not cfg.lipsync_node_base_url or not cfg.lipsync_node_token:
+        return {"ok": False, "configured": False, "backends": {}}
+    try:
+        from lipsync_node_client import health
+
+        report = health(cfg.lipsync_node_base_url, cfg.lipsync_node_token)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "configured": True,
+            "backends": {},
+            "error": str(exc),
+        }
+    report["configured"] = True
+    return report
+
+
 def probe() -> dict[str, Any]:
     mt = musetalk_root()
     w2 = wav2lip_root()
+    node = node_health()
+    node_backends = node.get("backends") if isinstance(node.get("backends"), dict) else {}
     mt_trust = backend_trust("musetalk", mt)
     w2_trust = backend_trust("wav2lip", w2)
     external_error = None
@@ -122,12 +144,17 @@ def probe() -> dict[str, Any]:
         ext = None
         external_error = str(exc)
     backends = {
+        "latentsync": bool((node_backends.get("latentsync") or {}).get("ready")),
         "external": bool(ext),
         "musetalk": bool(
-            mt
-            and mt_trust.get("ok")
-            and (
-                (mt / "aifilm_infer.py").is_file() or (mt / "scripts" / "aifilm_infer.py").is_file()
+            (node_backends.get("musetalk") or {}).get("ready")
+            or (
+                mt
+                and mt_trust.get("ok")
+                and (
+                    (mt / "aifilm_infer.py").is_file()
+                    or (mt / "scripts" / "aifilm_infer.py").is_file()
+                )
             )
         ),
         "wav2lip": bool(
@@ -149,7 +176,8 @@ def probe() -> dict[str, Any]:
         "backends": backends,
         "ready": ready,
         "default_choice": ready[0] if ready else None,
-        "policy": "explicitly locked MuseTalk/Wav2Lip, then structured external argv",
+        "policy": "RTX LatentSync→MuseTalk, then locked local Wav2Lip/external",
+        "node": node,
         "musetalk_root": str(mt) if mt else None,
         "wav2lip_root": str(w2) if w2 else None,
         "backend_lock": str(backend_lock_path()),
@@ -157,7 +185,8 @@ def probe() -> dict[str, Any]:
         "external_argv_set": bool(ext),
         "external_config_error": external_error,
         "note": (
-            "No local lipsync backend found. Install MuseTalk/Wav2Lip or set AIFILM_LIPSYNC_ARGV. "
+            "No lip-sync backend found. Configure the RTX node, lock MuseTalk/Wav2Lip, "
+            "or set AIFILM_LIPSYNC_ARGV. "
             "See references/lipsync.md"
             if not ready
             else "At least one lipsync backend is configured."
@@ -181,7 +210,7 @@ def resolve_backend(requested: str) -> str:
                 "lipsync required but no backend ready (see lipsync_backend.py doctor)"
             )
         return ready[0]
-    if req not in ("external", "musetalk", "wav2lip"):
+    if req not in ("latentsync", "external", "musetalk", "wav2lip"):
         raise LipSyncError(f"Unknown backend {req}")
     if req == "external" and info.get("external_config_error"):
         raise LipSyncError(str(info["external_config_error"]))
@@ -329,6 +358,7 @@ def lipsync_one(
     audio: Path,
     out: Path,
     backend: str = "auto",
+    allow_unapproved: bool = False,
 ) -> dict[str, Any]:
     video = video.expanduser().resolve()
     audio = audio.expanduser().resolve()
@@ -337,11 +367,51 @@ def lipsync_one(
         raise LipSyncError(f"video missing: {video}")
     if not audio.is_file():
         raise LipSyncError(f"audio missing: {audio}")
-    chosen = resolve_backend(backend)
+    requested = (backend or "auto").strip().lower()
+    initial_probe = probe()
+    node_backends = (initial_probe.get("node") or {}).get("backends") or {}
+    if (
+        allow_unapproved
+        and requested in {"latentsync", "musetalk"}
+        and (node_backends.get(requested) or {}).get("technical_ready")
+    ):
+        chosen = requested
+    else:
+        chosen = resolve_backend(backend)
     if chosen == "off":
         return {"ok": False, "skipped": True, "reason": "no backend / off", "backend": "off"}
 
     out.parent.mkdir(parents=True, exist_ok=True)
+    info = initial_probe
+    node_backends = (info.get("node") or {}).get("backends") or {}
+    use_node = bool(
+        chosen in {"latentsync", "musetalk"}
+        and (node_backends.get(chosen) or {}).get("technical_ready")
+    )
+    if use_node:
+        cfg = get_config()
+        from lipsync_node_client import LipsyncNodeError, render
+
+        configured_fallback = (
+            str(cfg.lipsync_fallback or "").strip().lower() if chosen == "latentsync" else ""
+        )
+        fallback = (
+            configured_fallback
+            if (node_backends.get(configured_fallback) or {}).get("ready")
+            else ""
+        )
+        try:
+            return render(
+                cfg.lipsync_node_base_url,
+                cfg.lipsync_node_token,
+                video=video,
+                audio=audio,
+                out=out,
+                backend=chosen,
+                fallback_backend=fallback,
+            )
+        except LipsyncNodeError as exc:
+            raise LipSyncError(str(exc)) from exc
     if chosen == "external":
         run_external(video, audio, out, external_argv_template() or [])
     elif chosen == "wav2lip":
@@ -368,15 +438,24 @@ def lipsync_one(
 
 
 def should_lipsync_shot(shot: dict[str, Any]) -> bool:
-    if "lipsync" in shot:
-        return bool(shot["lipsync"])
+    if shot.get("lipsync") is not True:
+        return False
     dsl = shot.get("dsl") or {}
+    voice = shot.get("voice") or {}
+    speaker = shot.get("speaker") or shot.get("speaker_id") or voice.get("speaker")
+    face_target = shot.get("face_target") or shot.get("lipsync_target") or voice.get("face_target")
+    if not speaker or not face_target:
+        return False
     cast = dsl.get("cast") or shot.get("cast") or []
-    if not cast:
+    if cast and str(face_target) not in {str(item) for item in cast}:
         return False
     cam = dsl.get("camera") or {}
-    size = str(cam.get("shot_size") or cam.get("size") or "").lower()
-    talking_sizes = (
+    size = re.sub(
+        r"[^a-z0-9\u4e00-\u9fff]+",
+        " ",
+        str(cam.get("shot_size") or cam.get("size") or "").lower(),
+    ).strip()
+    near_sizes = {
         "close-up",
         "closeup",
         "close up",
@@ -384,15 +463,23 @@ def should_lipsync_shot(shot: dict[str, Any]) -> bool:
         "medium closeup",
         "mcu",
         "cu",
-        "medium",
-        "medium shot",
-        "ms",
+    }
+    normalized_near_sizes = {value.replace("-", " ") for value in near_sizes}
+    if size not in normalized_near_sizes:
+        return False
+    angle = str(cam.get("angle") or shot.get("face_angle") or "").lower()
+    allowed_angles = (
+        "front",
+        "frontal",
+        "three-quarter",
+        "3/4",
+        "30",
+        "45",
+        "slight",
+        "微侧",
+        "正脸",
     )
-    if any(s in size for s in talking_sizes):
-        return True
-    # title keywords
-    title = str(shot.get("title") or "").lower()
-    return bool(any(k in title for k in ("joke", "punch", "talk", "讲", "口", "对镜")))
+    return any(value in angle for value in allowed_angles)
 
 
 def main(argv: list[str] | None = None) -> int:

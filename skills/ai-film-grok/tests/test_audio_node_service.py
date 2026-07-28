@@ -5,6 +5,7 @@ import hashlib
 import importlib
 import inspect
 import io
+import subprocess
 import wave
 from pathlib import Path
 
@@ -195,6 +196,20 @@ def test_reference_upload_is_hash_named_and_batch_resolves_it(
         )
     )
     assert result["status"] == "queued"
+
+
+def test_sfx_health_rejects_missing_probe_executable(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "SFX_MODEL_ID", "hkchengrex/MMAudio-large-44k-v2")
+    monkeypatch.setattr(service, "SFX_LICENSE", "CC-BY-NC-4.0")
+    monkeypatch.setattr(service, "SFX_CHECKPOINT_FINGERPRINT", "a" * 64)
+    monkeypatch.setattr(service, "MMAUDIO_CHECKPOINT_SHA256", "a" * 64)
+    monkeypatch.setattr(service, "MMAUDIO_REPO_COMMIT", "b" * 40)
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_SFX_PROBE_ARGV", '["missing-mmaudio-probe"]')
+    service._sfx_probe_ok.cache_clear()
+    assert service._available("sfx") is False
+    service._sfx_probe_ok.cache_clear()
     assert service.jobs[result["job_id"]]["status"] == "queued"
 
 
@@ -212,3 +227,107 @@ def test_reference_upload_rejects_wrong_delivery_format(
         wav.writeframes(b"\0\0" * 4410)
     with pytest.raises(Exception, match="44.1kHz"):
         service._store_music_reference(buffer.getvalue())
+
+
+def test_sfx_source_upload_is_hash_named_and_bounded(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "SFX_SOURCES", tmp_path / "sfx-sources")
+    raw = b"video" * 512
+    probe = subprocess.CompletedProcess(
+        args=["ffprobe"],
+        returncode=0,
+        stdout='{"streams":[{"codec_type":"video"}],"format":{"duration":"8.0"}}',
+        stderr="",
+    )
+    monkeypatch.setattr(service.subprocess, "run", lambda *args, **kwargs: probe)
+
+    receipt = service._store_sfx_source(raw)
+
+    source_hash = hashlib.sha256(raw).hexdigest()
+    assert receipt == {"source_id": source_hash, "source_sha256": source_hash}
+    assert (tmp_path / "sfx-sources" / f"{source_hash}.mp4").is_file()
+
+
+def test_sfx_source_upload_rejects_poisoned_existing_hash_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    sources = tmp_path / "sfx-sources"
+    sources.mkdir()
+    monkeypatch.setattr(service, "SFX_SOURCES", sources)
+    raw = b"video" * 512
+    source_hash = hashlib.sha256(raw).hexdigest()
+    (sources / f"{source_hash}.mp4").write_bytes(b"tampered")
+    probe = subprocess.CompletedProcess(
+        args=["ffprobe"],
+        returncode=0,
+        stdout='{"streams":[{"codec_type":"video"}],"format":{"duration":"8.0"}}',
+        stderr="",
+    )
+    monkeypatch.setattr(service.subprocess, "run", lambda *args, **kwargs: probe)
+
+    with pytest.raises(Exception, match="hash mismatch"):
+        service._store_sfx_source(raw)
+
+
+def test_sfx_upload_rejects_unbounded_body_before_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "TOKEN", "t" * 32)
+
+    class Request:
+        headers = {}
+        body_called = False
+
+        async def body(self):
+            self.body_called = True
+            return b"video"
+
+    request = Request()
+    with pytest.raises(Exception, match="content length"):
+        asyncio.run(service.upload_sfx_source(request, f"Bearer {'t' * 32}"))
+    assert request.body_called is False
+
+
+def test_sfx_submission_requires_license_provenance_and_ack(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "TOKEN", "t" * 32)
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_SFX_ARGV", '["trusted-adapter"]')
+    monkeypatch.setattr(service, "SFX_MODEL_ID", "hkchengrex/MMAudio-large-44k-v2")
+    monkeypatch.setattr(service, "SFX_LICENSE", "CC-BY-NC-4.0")
+    monkeypatch.setattr(service, "SFX_CHECKPOINT_FINGERPRINT", "a" * 64)
+    monkeypatch.setattr(service, "MMAUDIO_CHECKPOINT_SHA256", "a" * 64)
+    monkeypatch.setattr(service, "_sfx_probe_ok", lambda: True)
+    monkeypatch.setattr(asyncio, "create_task", lambda coroutine: coroutine.close())
+
+    with pytest.raises(Exception, match="non-commercial"):
+        asyncio.run(
+            service.create(
+                "sfx",
+                {"prompt": "door closes", "duration": 8, "seed": 1},
+                f"Bearer {'t' * 32}",
+            )
+        )
+
+    result = asyncio.run(
+        service.create(
+            "sfx",
+            {
+                "prompt": "door closes",
+                "duration": 8,
+                "seed": 1,
+                "noncommercial_research_ok": True,
+            },
+            f"Bearer {'t' * 32}",
+        )
+    )
+    assert result["status"] == "queued"

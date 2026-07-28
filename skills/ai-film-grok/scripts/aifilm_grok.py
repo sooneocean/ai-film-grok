@@ -6129,6 +6129,26 @@ def cmd_performance_candidate(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
 
 
+def cmd_sfx_canary(args: argparse.Namespace) -> int:
+    """Generate one non-commercial, pending MMAudio SFX candidate."""
+    from sfx_candidates import SFXCandidateError, generate
+
+    try:
+        emit(
+            generate(
+                Path(args.root),
+                prompt=args.prompt,
+                duration=args.duration,
+                seed=args.seed,
+                source_video=Path(args.video).expanduser() if args.video else None,
+                noncommercial_research_ok=bool(args.noncommercial_research_ok),
+            )
+        )
+        return 0
+    except SFXCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
 
@@ -6261,6 +6281,35 @@ def cmd_comfy(args: argparse.Namespace) -> int:
     from cli_comfy import run_comfy
 
     return run_comfy(args)
+
+
+def cmd_route(args: argparse.Namespace) -> int:
+    from cli_route import run
+    from production_router import RouteExplainError
+
+    try:
+        report, code = run(args)
+    except RouteExplainError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return code
+
+
+def cmd_lipsync_node(args: argparse.Namespace) -> int:
+    from config_loader import get_config
+    from lipsync_node_client import LipsyncNodeError, health
+
+    cfg = get_config()
+    if not cfg.lipsync_node_base_url or not cfg.lipsync_node_token:
+        raise FilmError(
+            "set AIFILM_LIPSYNC_NODE_BASE_URL and AIFILM_LIPSYNC_NODE_TOKEN in config.env"
+        )
+    try:
+        report = health(cfg.lipsync_node_base_url, cfg.lipsync_node_token)
+    except LipsyncNodeError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok") else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -6593,6 +6642,17 @@ def build_parser() -> argparse.ArgumentParser:
     performance_approve.add_argument("--root", required=True)
     performance_approve.add_argument("--asset-id", required=True)
 
+    sfx_canary = sub.add_parser(
+        "sfx-canary",
+        help="Generate one pending, non-commercial MMAudio SFX pilot on the private RTX node",
+    )
+    sfx_canary.add_argument("--root", required=True)
+    sfx_canary.add_argument("--prompt", required=True)
+    sfx_canary.add_argument("--duration", type=float, default=8.0)
+    sfx_canary.add_argument("--seed", type=int, required=True)
+    sfx_canary.add_argument("--video", default="")
+    sfx_canary.add_argument("--noncommercial-research-ok", action="store_true")
+
     lsc = sub.add_parser(
         "lipsync-canary",
         help="Single-shot lipsync probe → receipts/lipsync-canary/ (default final still lipsync off)",
@@ -6602,6 +6662,17 @@ def build_parser() -> argparse.ArgumentParser:
     lsc.add_argument("--backend", default="auto")
     lsc.add_argument("--video", default=None)
     lsc.add_argument("--audio", default=None)
+
+    lsn = sub.add_parser(
+        "lipsync-node",
+        help="Inspect the authenticated Windows RTX lip-sync node",
+    )
+    lsn.add_argument(
+        "lipsync_node_action",
+        nargs="?",
+        default="health",
+        choices=["health"],
+    )
 
     cap = sub.add_parser(
         "capability",
@@ -7196,8 +7267,8 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument(
         "--lipsync",
         default="off",
-        choices=["auto", "off", "require", "external", "musetalk", "wav2lip"],
-        help="Lip-sync OFF by default (Wav2Lip often warps faces). Use auto only when quality is acceptable.",
+        choices=["auto", "off", "require", "latentsync", "external", "musetalk", "wav2lip"],
+        help="Lip-sync OFF by default. RTX node priority: LatentSync 1.6 then MuseTalk 1.5.",
     )
     fin.add_argument("--sub-lead", type=float, default=0.08, help="Show subtitles early (seconds)")
     fin.add_argument(
@@ -8293,6 +8364,9 @@ def build_parser() -> argparse.ArgumentParser:
     from cli_bgm_library import add_bgm_library_parsers
 
     add_bgm_library_parsers(sub)
+    from cli_route import add_route_parsers
+
+    add_route_parsers(sub)
 
     return p
 
@@ -8334,6 +8408,8 @@ def main(argv: list[str] | None = None) -> int:
             "bgm-candidate": cmd_bgm_candidate,
             "bgm-library": cmd_bgm_library,
             "performance-candidate": cmd_performance_candidate,
+            "sfx-canary": cmd_sfx_canary,
+            "lipsync-node": cmd_lipsync_node,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,
@@ -8394,6 +8470,7 @@ def main(argv: list[str] | None = None) -> int:
             "quality-ledger": cmd_quality_ledger,
             "production-report": cmd_production_report,
             "comfy": cmd_comfy,
+            "route": cmd_route,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:

@@ -18,6 +18,74 @@ class AudioNodeError(RuntimeError):
     pass
 
 
+def _is_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value.lower())
+    )
+
+
+_PUBLIC_MODEL_FIELDS = (
+    "model",
+    "music_model",
+    "music_checkpoint_fingerprint",
+    "sfx_model",
+    "sfx_checkpoint_fingerprint",
+    "sfx_license",
+)
+_PUBLIC_GPU_FIELDS = ("available", "name", "cuda", "free_vram_mib", "total_vram_mib")
+_PUBLIC_MODEL_KINDS = ("tts", "music", "sfx", "performance")
+
+
+def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> dict[str, Any]:
+    """Project an untrusted node health response to public capability fields only."""
+    if not isinstance(raw, dict):
+        return {"ok": False}
+    public: dict[str, Any] = {"ok": raw.get("ok") is True}
+    if raw.get("node") == "private-lan":
+        public["node"] = "private-lan"
+    models = raw.get("models")
+    if isinstance(models, dict):
+        public_models = {
+            kind: models[kind] for kind in _PUBLIC_MODEL_KINDS if isinstance(models.get(kind), bool)
+        }
+        if public_models:
+            public["models"] = public_models
+    if isinstance(raw.get("music_batch"), bool):
+        public["music_batch"] = raw["music_batch"]
+    for field in _PUBLIC_MODEL_FIELDS:
+        value = raw.get(field)
+        if (
+            isinstance(value, str)
+            and len(value) <= 256
+            and not any(secret and secret in value for secret in secret_values)
+        ):
+            public[field] = value
+    gpu = raw.get("gpu")
+    if isinstance(gpu, dict):
+        public_gpu: dict[str, Any] = {}
+        for field in _PUBLIC_GPU_FIELDS:
+            value = gpu.get(field)
+            if (
+                field == "available"
+                and isinstance(value, bool)
+                or (
+                    field in {"name", "cuda"}
+                    and isinstance(value, str)
+                    and len(value) <= 128
+                    and not any(secret and secret in value for secret in secret_values)
+                )
+                or field.endswith("_mib")
+                and isinstance(value, int)
+                and value >= 0
+            ):
+                public_gpu[field] = value
+        if public_gpu:
+            public["gpu"] = public_gpu
+    return public
+
+
 def _json_response(payload: bytes, *, context: str) -> dict[str, Any]:
     try:
         data = json.loads(payload)
@@ -163,6 +231,78 @@ def render(
             raise AudioNodeError("audio node job entered an unknown terminal state")
         time.sleep(0.5)
     raise AudioNodeError("audio node job timed out")
+
+
+def render_sfx(
+    base_url: str,
+    token: str,
+    *,
+    prompt: str,
+    duration: float,
+    seed: int,
+    out: Path,
+    source_video: Path | None = None,
+    noncommercial_research_ok: bool = False,
+    timeout: int = 900,
+) -> dict[str, Any]:
+    """Render one provenance-bound, non-commercial MMAudio experiment."""
+    if noncommercial_research_ok is not True:
+        raise AudioNodeError("MMAudio requires explicit non-commercial research approval")
+    text = prompt.strip()
+    if not 1 <= len(text) <= 512:
+        raise AudioNodeError("MMAudio prompt must contain 1-512 characters")
+    if not 1 <= duration <= 30:
+        raise AudioNodeError("MMAudio duration must be between 1 and 30 seconds")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise AudioNodeError("MMAudio seed must be an integer")
+    node = public_health_report(health(base_url, token), secret_values=(token,))
+    models = node.get("models") if isinstance(node.get("models"), dict) else {}
+    if (
+        node.get("ok") is not True
+        or models.get("sfx") is not True
+        or node.get("sfx_model") != "hkchengrex/MMAudio-large-44k-v2"
+        or node.get("sfx_license") != "CC-BY-NC-4.0"
+        or not _is_sha256(node.get("sfx_checkpoint_fingerprint"))
+    ):
+        raise AudioNodeError("trusted non-commercial MMAudio capability is unavailable")
+    payload: dict[str, Any] = {
+        "prompt": text,
+        "duration": duration,
+        "seed": seed,
+        "noncommercial_research_ok": True,
+    }
+    source_hash: str | None = None
+    if source_video is not None:
+        source_input = source_video.expanduser()
+        if source_input.is_symlink():
+            raise AudioNodeError("MMAudio source video is missing or symlinked")
+        source = source_input.resolve()
+        if not source.is_file() or source.stat().st_size > 128 * 1024 * 1024:
+            raise AudioNodeError("MMAudio source video is missing, symlinked, or exceeds 128 MiB")
+        raw = source.read_bytes()
+        source_hash = hashlib.sha256(raw).hexdigest()
+        receipt = _json_response(
+            _request(
+                base_url,
+                token,
+                "/v1/sfx-source",
+                raw_body=raw,
+                content_type="video/mp4",
+                timeout=120,
+            ),
+            context="SFX source upload",
+        )
+        if receipt.get("source_id") != source_hash or receipt.get("source_sha256") != source_hash:
+            raise AudioNodeError("audio node returned invalid SFX source receipt")
+        payload["source_video_id"] = source_hash
+    result = render(base_url, token, "sfx", payload, out, timeout=timeout)
+    return {
+        **result,
+        "model": node["sfx_model"],
+        "checkpoint_fingerprint": node["sfx_checkpoint_fingerprint"],
+        "license": node["sfx_license"],
+        "source_video_sha256": source_hash,
+    }
 
 
 def render_batch(

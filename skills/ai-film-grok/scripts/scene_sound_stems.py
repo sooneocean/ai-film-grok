@@ -97,6 +97,16 @@ def _local_asset(root: Path, event: dict[str, Any]) -> Path:
         raise SceneSoundError(f"{event.get('id')}: asset escapes film root") from exc
     if not path.is_file():
         raise SceneSoundError(f"{event.get('id')}: asset not found: {raw}")
+    normalized_raw = raw.replace("\\", "/").lower()
+    if event.get("type") == "action_sfx" and (
+        "/audio/candidates/sfx/pending/" in f"/{normalized_raw}"
+        or str(event.get("license") or "").strip().upper() == "CC-BY-NC-4.0"
+        or event.get("production_eligible") is False
+        or event.get("approval_status") == "pending_human_review"
+    ):
+        raise SceneSoundError(
+            f"{event.get('id')}: non-commercial or pending SFX cannot enter a formal stem"
+        )
     actual = hashlib.sha256(path.read_bytes()).hexdigest()
     if actual != str(event.get("source_sha256") or ""):
         raise SceneSoundError(f"{event.get('id')}: asset checksum changed")

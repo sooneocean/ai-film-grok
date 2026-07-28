@@ -21,6 +21,7 @@ from comfy_video import (
     load_api_workflow,
     probe,
     queue_status,
+    submission_capacity,
     submit,
     upload_image,
     wait_for_result,
@@ -54,6 +55,25 @@ def add_comfy_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
     )
     _add_base_url(inventory_parser)
     inventory_parser.add_argument("--receipt", type=Path, default=None)
+
+    capacity_parser = actions.add_parser(
+        "capacity",
+        help="Fail-closed RAM, VRAM and queue admission check for a heavy workflow",
+    )
+    _add_base_url(capacity_parser)
+    capacity_parser.add_argument("--receipt", type=Path, default=None)
+
+    recovery_parser = actions.add_parser(
+        "recover",
+        help="Repair the verified SSH tunnel or restart only the remote ComfyUI service",
+    )
+    _add_base_url(recovery_parser)
+    recovery_parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Required because a failed remote service may be restarted",
+    )
+    recovery_parser.add_argument("--receipt", type=Path, default=None)
 
     armory_parser = actions.add_parser(
         "armory",
@@ -193,6 +213,15 @@ def run_comfy(args: argparse.Namespace) -> int:
             report = probe(base_url)
         elif action == "inventory":
             report = inventory(base_url)
+        elif action == "capacity":
+            report = submission_capacity(base_url)
+        elif action == "recover":
+            from comfy_recovery import ComfyRecoveryError, recover_comfy_from_env
+
+            try:
+                report = recover_comfy_from_env(confirm=bool(args.confirm))
+            except ComfyRecoveryError as exc:
+                raise ComfyVideoError(str(exc)) from exc
         elif action == "armory":
             from comfy_armory import load_armory, probe_armory
 

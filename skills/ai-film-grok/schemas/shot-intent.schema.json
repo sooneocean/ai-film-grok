@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/shot-intent.schema.json",
+  "title": "ai-film-grok shot intent",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "shot_id",
+    "shot_role",
+    "operation",
+    "content_class",
+    "identity_lock",
+    "continuity_required",
+    "quality_tier",
+    "provider_lock"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "ai-film-shot-intent" },
+    "shot_id": { "type": "string", "minLength": 1 },
+    "shot_role": { "enum": ["hero", "env", "bridge", "insert"] },
+    "operation": { "enum": ["image_to_video", "text_to_video"] },
+    "content_class": { "enum": ["general", "restricted_local"] },
+    "identity_lock": { "type": "boolean" },
+    "continuity_required": { "type": "boolean" },
+    "quality_tier": { "enum": ["draft", "select", "hero"] },
+    "provider_lock": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

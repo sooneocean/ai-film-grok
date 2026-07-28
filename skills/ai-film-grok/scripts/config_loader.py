@@ -201,6 +201,9 @@ class ConfigSchema:
 
     # ── Lipsync ─────────────────────────────────────────────────────────
     lipsync_backend: str = "off"
+    lipsync_fallback: str = ""
+    lipsync_node_base_url: str = ""
+    lipsync_node_token: str = ""
     lipsync_argv: str = ""
     musetalk_root: str = ""
     wav2lip_root: str = ""
@@ -308,6 +311,9 @@ def get_config() -> ConfigSchema:
         comfyui_base_url=_env("AIFILM_COMFYUI_BASE_URL"),
         # Lipsync
         lipsync_backend=_resolve("off", "AIFILM_LIPSYNC_BACKEND"),
+        lipsync_fallback=_env("AIFILM_LIPSYNC_FALLBACK"),
+        lipsync_node_base_url=_env("AIFILM_LIPSYNC_NODE_BASE_URL"),
+        lipsync_node_token=_env("AIFILM_LIPSYNC_NODE_TOKEN"),
         lipsync_argv=_env("AIFILM_LIPSYNC_ARGV"),
         musetalk_root=_env("AIFILM_MUSETALK_ROOT"),
         wav2lip_root=_env("AIFILM_WAV2LIP_ROOT"),
@@ -345,6 +351,9 @@ _ENV_HELP: dict[str, str] = {
     "AIFILM_GROK_TTS_LANGUAGE": "Grok TTS language (zh | en | …)",
     "AIFILM_GROK_PROBE_TTS": "Set to 1 to enable deep TTS voice list in doctor probe",
     "AIFILM_COMFYUI_BASE_URL": "Private LAN ComfyUI base URL for explicit local video generation",
+    "AIFILM_LIPSYNC_NODE_BASE_URL": "RTX lip-sync node HTTPS URL or loopback SSH tunnel",
+    "AIFILM_LIPSYNC_NODE_TOKEN": "Private RTX lip-sync node bearer token; never commit",
+    "AIFILM_LIPSYNC_FALLBACK": "Technical-failure fallback: musetalk or empty",
     "AIFILM_BGM_LIBRARY_ROOT": "Shared approved ACE-Step BGM library root",
     "AIFILM_TTS_BACKEND": "Active TTS backend: mimo | auto | edge | fish | minimax | voicebox | grok | external",
     "AIFILM_TTS_STRICT_VOICE": "1 = fail on missing voice_id (default 1)",

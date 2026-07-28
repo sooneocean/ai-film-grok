@@ -2906,7 +2906,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         if want_ls and lipsync_one is not None and lipsync_mode != "off":
             ls_out = work / f"v_{i:02d}_{item['id']}_lipsync.mp4"
             backend = "require" if lipsync_mode == "require" else lipsync_mode
-            # Prefer keyframe still for free Wav2Lip talking-head quality when available
+            # Only the legacy Wav2Lip path may use a still; RTX dubbing preserves the approved clip.
             face_src = out
             kf = keyframes_dir / f"{item['id']}.jpg"
             if not kf.is_file():
@@ -2915,7 +2915,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                     if alt.is_file():
                         kf = alt
                         break
-            if kf.is_file():
+            if lipsync_mode == "wav2lip" and kf.is_file():
                 face_src = kf
             try:
                 log(f"lipsync {item['id']} face={face_src.name} backend={backend}...")
@@ -2959,13 +2959,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                             "detail": result,
                         }
                     )
-                    if lipsync_mode == "require":
+                    if lipsync_mode != "auto":
                         raise RenderError(
                             f"lipsync required but skipped for {item['id']}: {result}"
                         )
             except Exception as exc:
                 lipsync_report.append({"id": item["id"], "ok": False, "error": str(exc)})
-                if lipsync_mode == "require":
+                if lipsync_mode != "auto":
                     raise RenderError(f"lipsync failed for {item['id']}: {exc}") from exc
                 log(f"lipsync skip {item['id']}: {exc}")
         stretched.append(out)
@@ -4389,8 +4389,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--lipsync",
         default="off",
-        choices=["auto", "off", "require", "external", "musetalk", "wav2lip"],
-        help="Lip-sync OFF by default to avoid face collapse; opt-in with auto/wav2lip",
+        choices=["auto", "off", "require", "latentsync", "external", "musetalk", "wav2lip"],
+        help="Lip-sync OFF by default; RTX node priority is LatentSync then MuseTalk",
     )
     p.add_argument(
         "--allow-loop-risk",
