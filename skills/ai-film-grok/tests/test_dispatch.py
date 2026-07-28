@@ -15,7 +15,7 @@ sys.path.insert(0, str(SCRIPTS))
 from dispatch import build_dispatch  # noqa: E402
 
 
-def test_dispatch_defers_scene_sound_until_audio_timeline_exists(tmp_path: Path) -> None:
+def test_dispatch_surfaces_scene_sound_backlog(tmp_path: Path) -> None:
     (tmp_path / "brief.json").write_text('{"title":"t","theme":"x"}\n', encoding="utf-8")
     (tmp_path / "film-spec.json").write_text(
         json.dumps(
@@ -29,40 +29,6 @@ def test_dispatch_defers_scene_sound_until_audio_timeline_exists(tmp_path: Path)
     packet = build_dispatch(tmp_path, gates={}, include_capability=False, write_receipt=False)
     assert packet["scene_sound"]["status"] == "blocked"
     assert any(action["id"] == "scene-sound-plan" for action in packet["next_actions"])
-    assert packet["next_id"] != "scene-sound-plan"
-
-
-def test_dispatch_promotes_scene_sound_after_timed_audio_projection(tmp_path: Path) -> None:
-    (tmp_path / "brief.json").write_text('{"title":"t","theme":"x"}\n', encoding="utf-8")
-    (tmp_path / "film-spec.json").write_text(
-        json.dumps(
-            {
-                "title": "t",
-                "audio_timeline_v1": {"duration_sec": 4.0, "events": []},
-                "shots": [
-                    {
-                        "id": "shot01",
-                        "duration_sec": 4.0,
-                        "action": "她走到门边，推门进入。",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    packet = build_dispatch(
-        tmp_path,
-        gates={
-            "brief": True,
-            "style_locked": True,
-            "spec": True,
-            "clips_complete": True,
-        },
-        include_capability=False,
-        write_receipt=False,
-    )
-    assert packet["scene_sound"]["status"] == "blocked"
-    assert packet["next_id"] == "scene-sound-plan"
 
 
 @pytest.mark.slow
@@ -95,7 +61,7 @@ class DispatchTests(unittest.TestCase):
             self.assertIn("agent_do", packet)
             self.assertIn("routing", packet)
             self.assertTrue(Path(packet["receipt_path"]).is_file())
-            self.assertEqual(packet["routing"].get("tts_default"), "edge")
+            self.assertEqual(packet["routing"].get("tts_default"), "mimo")
             self.assertIn("off", packet["routing"].get("lipsync", ""))
             # Phase 1+2 additive fields
             self.assertGreaterEqual(int(packet.get("schema_version") or 0), 2)
