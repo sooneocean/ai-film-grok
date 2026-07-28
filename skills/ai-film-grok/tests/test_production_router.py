@@ -11,7 +11,11 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from aifilm_grok import main  # noqa: E402
-from production_router import RouteExplainError, explain_route  # noqa: E402
+from production_router import (  # noqa: E402
+    RouteExplainError,
+    explain_route,
+    plan_route,
+)
 
 NOW = "2026-07-28T12:00:00+00:00"
 
@@ -588,3 +592,158 @@ def test_cli_route_explain_is_wired_and_preserves_workspace(
     assert code == 0
     assert output["selected"]["capability_id"] == "local"
     assert before == after
+
+
+def test_route_plan_preview_is_read_only_and_never_authorizes(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "local",
+                provider="comfy-wan22",
+                model="wan22-i2v",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                content_classes=["general", "restricted_local"],
+            )
+        ],
+    )
+    before = {
+        str(path.relative_to(tmp_path)): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+
+    report = plan_route(tmp_path, shot_id="shot01", now=NOW)
+
+    after = {
+        str(path.relative_to(tmp_path)): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+    execution = report["execution_plan"]
+    assert report["ok"] is True
+    assert report["read_only"] is True
+    assert report["written"] is False
+    assert execution["authorized"] is False
+    assert execution["tasks"][0]["status"] == "planned"
+    assert before == after
+
+
+def test_route_plan_write_persists_hash_bound_receipts(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "local",
+                provider="comfy-wan22",
+                model="wan22-i2v",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                content_classes=["general", "restricted_local"],
+            )
+        ],
+    )
+
+    report = plan_route(tmp_path, shot_id="shot01", now=NOW, write=True)
+
+    assert report["ok"] is True
+    assert report["read_only"] is False
+    assert report["written"] is True
+    route_path = Path(report["receipts"]["route_plan"])
+    execution_path = Path(report["receipts"]["execution_plan"])
+    assert route_path.is_file()
+    assert execution_path.is_file()
+    assert (
+        report["execution_plan"]["route_plan_sha256"]
+        == __import__("hashlib").sha256(route_path.read_bytes()).hexdigest()
+    )
+    jsonschema.Draft202012Validator(
+        json.loads((SCRIPTS.parent / "schemas" / "execution-plan.schema.json").read_text())
+    ).validate(json.loads(execution_path.read_text()))
+    assert not (tmp_path / "receipts" / "media-queue.json").exists()
+
+
+def test_route_plan_refuses_to_write_when_no_capability_is_viable(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "cloud-only",
+                provider="grok",
+                model="video-1.5",
+                operations=["text_to_video"],
+                shot_roles=["env"],
+            )
+        ],
+    )
+
+    report = plan_route(tmp_path, shot_id="shot01", now=NOW, write=True)
+
+    assert report["ok"] is False
+    assert report["written"] is False
+    assert report["blocked_reason"] == "NO_VIABLE_CAPABILITY"
+    assert not (tmp_path / "receipts" / "route-plans").exists()
+
+
+def test_route_plan_write_rejects_unsafe_shot_id(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "../escape", "shot_role": "hero"}])
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "local",
+                provider="comfy-wan22",
+                model="wan22-i2v",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                content_classes=["general", "restricted_local"],
+            )
+        ],
+    )
+
+    with pytest.raises(RouteExplainError, match="INVALID_ROUTE_PLAN"):
+        plan_route(tmp_path, shot_id="../escape", now=NOW, write=True)
+
+    assert not (tmp_path.parent / "escape").exists()
+
+
+def test_cli_route_plan_write_is_explicit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "local",
+                provider="comfy-wan22",
+                model="wan22-i2v",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                content_classes=["general", "restricted_local"],
+            )
+        ],
+    )
+
+    code = main(
+        [
+            "route",
+            "plan",
+            "--root",
+            str(tmp_path),
+            "--shot-id",
+            "shot01",
+            "--now",
+            NOW,
+            "--write",
+        ]
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert output["written"] is True
+    assert output["execution_plan"]["authorized"] is False

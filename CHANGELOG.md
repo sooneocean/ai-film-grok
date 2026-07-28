@@ -3,6 +3,12 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.14.4] - 2026-07-28
+
+### Added
+
+- Added `aifilm route plan`: explicit local, hash-bound planned receipts derived from a viable route; it never authorizes, queues, or submits media work.
+
 ## [2.14.3] - 2026-07-28
 
 ### Added

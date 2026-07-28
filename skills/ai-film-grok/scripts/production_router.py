@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import jsonschema
-from util import read_json, sha256_file
+from security_policy import SecurityPolicyError, validate_identifier
+from util import canonical_json_sha256, read_json, sha256_file, write_json
 
 
 class RouteExplainError(ValueError):
@@ -56,6 +57,19 @@ def _validate_snapshot(snapshot: dict[str, Any]) -> None:
     error = errors[0]
     field = ".".join(str(part) for part in error.absolute_path) or "$"
     raise RouteExplainError(f"INVALID_CAPABILITY_SNAPSHOT: {field}: {error.message}")
+
+
+def _validate_contract(value: dict[str, Any], schema_name: str, *, error_code: str) -> None:
+    schema = read_json(_SCHEMA_ROOT / schema_name)
+    if not isinstance(schema, dict):
+        raise RouteExplainError(f"{error_code}: schema is unavailable")
+    validator = jsonschema.Draft202012Validator(schema, format_checker=jsonschema.FormatChecker())
+    errors = sorted(validator.iter_errors(value), key=lambda item: list(item.path))
+    if not errors:
+        return
+    error = errors[0]
+    field = ".".join(str(part) for part in error.absolute_path) or "$"
+    raise RouteExplainError(f"{error_code}: {field}: {error.message}")
 
 
 def _film_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
@@ -274,7 +288,7 @@ def explain_route(
         }
 
     rejected.sort(key=lambda item: str(item.get("capability_id") or ""))
-    return {
+    report = {
         "schema_version": 1,
         "kind": "ai-film-route-plan",
         "ok": selected is not None,
@@ -302,3 +316,123 @@ def explain_route(
         "rejected": rejected,
         "blocked_reason": None if selected is not None else "NO_VIABLE_CAPABILITY",
     }
+    _validate_contract(report, "route-plan.schema.json", error_code="INVALID_ROUTE_PLAN")
+    return report
+
+
+def _execution_plan(route_plan: dict[str, Any], *, route_plan_sha256: str) -> dict[str, Any]:
+    selected = route_plan.get("selected")
+    if not isinstance(selected, dict):
+        plan = {
+            "schema_version": 1,
+            "kind": "ai-film-execution-plan",
+            "route_plan_sha256": route_plan_sha256,
+            "authorized": False,
+            "tasks": [],
+        }
+        _validate_contract(plan, "execution-plan.schema.json", error_code="INVALID_EXECUTION_PLAN")
+        return plan
+
+    intent = route_plan.get("intent")
+    if not isinstance(intent, dict):
+        raise RouteExplainError("INVALID_ROUTE_PLAN: intent is missing")
+    shot_id = str(intent.get("shot_id") or "").strip()
+    capability_id = str(selected.get("capability_id") or "").strip()
+    resource = str(selected.get("resource") or "").strip()
+    if not shot_id or not capability_id or not resource:
+        raise RouteExplainError("INVALID_ROUTE_PLAN: selected route is incomplete")
+    task_key = canonical_json_sha256(
+        {
+            "route_plan_sha256": route_plan_sha256,
+            "shot_id": shot_id,
+            "capability_id": capability_id,
+            "resource": resource,
+        }
+    )
+    plan = {
+        "schema_version": 1,
+        "kind": "ai-film-execution-plan",
+        "route_plan_sha256": route_plan_sha256,
+        "authorized": False,
+        "tasks": [
+            {
+                "id": f"route-{task_key[:16]}",
+                "shot_id": shot_id,
+                "capability_id": capability_id,
+                "resource": resource,
+                "depends_on": [],
+                "idempotency_key": task_key,
+                "status": "planned",
+            }
+        ],
+    }
+    _validate_contract(plan, "execution-plan.schema.json", error_code="INVALID_EXECUTION_PLAN")
+    return plan
+
+
+def plan_route(
+    root: Path | str,
+    *,
+    shot_id: str,
+    capabilities_path: Path | str | None = None,
+    quality_tier: str = "draft",
+    allow_experimental: bool = False,
+    now: str | None = None,
+    write: bool = False,
+) -> dict[str, Any]:
+    """Build a hash-bound, non-authorized execution plan without submitting work.
+
+    The default is a pure preview.  ``write=True`` persists immutable-by-hash
+    route/execution receipts, but never creates a media-queue job or authorizes
+    a provider request.
+    """
+    base = Path(root).expanduser().resolve()
+    route_plan = explain_route(
+        base,
+        shot_id=shot_id,
+        capabilities_path=capabilities_path,
+        quality_tier=quality_tier,
+        allow_experimental=allow_experimental,
+        now=now,
+    )
+    route_digest = canonical_json_sha256(route_plan)
+    execution_plan = _execution_plan(route_plan, route_plan_sha256=route_digest)
+    report: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "ai-film-route-planning",
+        "ok": route_plan["ok"],
+        "read_only": not write,
+        "auto_execute": False,
+        "written": False,
+        "route_plan": route_plan,
+        "execution_plan": execution_plan,
+        "receipts": None,
+        "blocked_reason": route_plan["blocked_reason"],
+    }
+    if not write or route_plan["ok"] is not True:
+        return report
+
+    try:
+        shot_component = validate_identifier(
+            str(route_plan["intent"]["shot_id"]), field="route plan shot id"
+        )
+    except SecurityPolicyError as exc:
+        raise RouteExplainError(f"INVALID_ROUTE_PLAN: {exc}") from exc
+    route_path = base / "receipts" / "route-plans" / f"{shot_component}-{route_digest[:16]}.json"
+    execution_path = (
+        base / "receipts" / "execution-plans" / f"{shot_component}-{route_digest[:16]}.json"
+    )
+    write_json(route_path, route_plan)
+    execution_plan = _execution_plan(route_plan, route_plan_sha256=sha256_file(route_path))
+    write_json(execution_path, execution_plan)
+    report.update(
+        {
+            "written": True,
+            "execution_plan": execution_plan,
+            "receipts": {
+                "route_plan": str(route_path),
+                "execution_plan": str(execution_path),
+            },
+        }
+    )
+    return report

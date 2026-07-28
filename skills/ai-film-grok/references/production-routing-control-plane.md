@@ -30,6 +30,12 @@ AIFILM="skills/ai-film-grok/scripts/aifilm"
   --shot-id "shot01" \
   --capabilities "<snapshot.json>" \
   --quality-tier select
+
+# 默认只预览；--write 只写本地 planned 收据，不会授权或提交生成。
+"$AIFILM" route plan \
+  --root "<film-root>" \
+  --shot-id "shot01" \
+  --write
 ```
 
 实验能力默认返回 `EXPERIMENTAL_NOT_ALLOWED`。`--allow-experimental` 只允许它进入
@@ -46,8 +52,17 @@ AIFILM="skills/ai-film-grok/scripts/aifilm"
 
 不以平均分覆盖硬失败；不存在合格能力时返回 `NO_VIABLE_CAPABILITY`。
 
+## 计划与授权边界
+
+`route plan` 将一份可用的 route plan 绑定为本地 execution plan。它的任务初始固定为
+`authorized=false` 与 `status=planned`；不会创建 `media-queue` job，也不会调用 provider。
+加上 `--write` 后只会在 `receipts/route-plans/` 和 `receipts/execution-plans/` 写入以内容
+hash 命名的收据；execution plan 绑定 route plan 的文件 SHA-256。无可用能力时不会写任何收据。
+
+后续真正的授权步骤必须重新验证当前能力、审批和预算，不能把这份 planned 收据当成授权凭证。
+
 ## 当前边界
 
 - 本增量不生成 capability snapshot；快照必须来自后续的无费用探针聚合器或人工导入。
-- 本增量不建立执行 DAG；`execution-plan.schema.json` 仅先固定未来授权、资源锁、依赖和幂等键的公开合约。
+- 本增量只建立单镜头的本地 planned 工单；不执行 DAG、不调度资源、不创建媒体队列工作。
 - `route explain` 的输出不等于 provider 授权、pilot 批准或最终成片证据。

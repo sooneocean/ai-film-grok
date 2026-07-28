@@ -69,6 +69,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" comfy inventory
 "$AIFILM" comfy capacity
 "$AIFILM" route explain --root "<film>" --shot-id "shot01"
+"$AIFILM" route plan --root "<film>" --shot-id "shot01" --write
 # 用户批准后才 pilot approve / bulk
 "$AIFILM" final --root "<film>" --post-engine hyperframes \
   --lipsync off --music-mood rnb --tts-backend edge --compose-preset auto
