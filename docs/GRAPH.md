@@ -266,6 +266,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_title_double_burn_docs.py`
 - `skills/ai-film-grok/tests/test_title_end_procedural.py`
 - `skills/ai-film-grok/tests/test_tts_ab.py`
+- `skills/ai-film-grok/tests/test_tts_event_contract.py`
 - `skills/ai-film-grok/tests/test_tts_rehearsal.py`
 - `skills/ai-film-grok/tests/test_uploaded_style_reference_gate.py`
 - `skills/ai-film-grok/tests/test_user_source_fidelity.py`
