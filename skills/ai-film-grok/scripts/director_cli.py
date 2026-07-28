@@ -250,7 +250,19 @@ def lock_native_stage(
     from approval_ledger import append_approval
     from director_stage_gates import hash_input_refs, lock_stage, stage_status
 
-    native_refs = validate_native_stage_evidence(root, stage)
+    base = Path(root).expanduser().resolve()
+    native_refs = validate_native_stage_evidence(base, stage)
+    team_gate: dict[str, Any] | None = None
+    team_plan = base / "production-team.json"
+    if team_plan.is_file():
+        from production_team import validate_team
+
+        snapshot = base / "receipts" / "capability-snapshot.json"
+        if not snapshot.is_file():
+            raise ValueError("production-team exists but capability snapshot is missing")
+        team_gate = validate_team(team_plan, capabilities_path=snapshot, stage=stage)
+        if team_gate.get("ok") is not True:
+            raise ValueError("production-team stage gate is not ready")
     refs = dict(native_refs)
     for name, relative in (input_refs or {}).items():
         if name in refs and refs[name] != relative:
@@ -285,6 +297,7 @@ def lock_native_stage(
         "approval_id": approval["approval_id"],
         "lock": locked,
         "stage_gates": stage_status(root),
+        "production_team": team_gate,
     }
 
 
