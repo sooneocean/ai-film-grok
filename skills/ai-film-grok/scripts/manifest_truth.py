@@ -78,8 +78,6 @@ def migrate_manifest(root: Path | str, *, write: bool = False) -> dict[str, Any]
     root = Path(root).expanduser().resolve()
     path = root / "manifest.json"
     manifest = read_json(path)
-    if int(manifest.get("schema_version") or 0) == CURRENT_SCHEMA_VERSION:
-        return {"ok": True, "changed": False, "path": str(path), "reason": "already-current"}
     candidate = dict(manifest)
     candidate["schema_version"] = CURRENT_SCHEMA_VERSION
     candidate["truth_contract"] = {
@@ -91,8 +89,15 @@ def migrate_manifest(root: Path | str, *, write: bool = False) -> dict[str, Any]
         else "",
     }
     check = preflight_manifest(root, candidate)
-    result = {"ok": check["ok"], "changed": False, "path": str(path), "preflight": check}
-    if write and check["ok"]:
+    needs_refresh = candidate != manifest
+    result = {
+        "ok": check["ok"],
+        "changed": False,
+        "path": str(path),
+        "preflight": check,
+        "reason": "already-current" if not needs_refresh else "refreshed-contract",
+    }
+    if write and check["ok"] and needs_refresh:
         write_json(path, candidate)
         result["changed"] = True
     return result
