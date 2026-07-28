@@ -198,7 +198,7 @@ def remotion_actionable_next_steps(root: Path, *, rem_dir: Path | None = None) -
     rem_s = str(rem)
     return [
         f'1. One-shot (network once): "$AIFILM" final --root "{root_s}" '
-        f"--post-engine remotion --npm-install --tts-backend mimo --music-mood rnb",
+        f"--post-engine remotion --npm-install --tts-backend edge --music-mood rnb",
         f'2. Or compose-render: "$AIFILM" compose-render --root "{root_s}" '
         f"--engine remotion --npm-install  # media-copy + npm install + remotion render + register",
         f'3. Deps already installed: "$AIFILM" compose-render --root "{root_s}" --engine remotion',

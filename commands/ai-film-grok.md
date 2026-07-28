@@ -17,6 +17,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 规则摘要：
 
 - `dispatch` 默认回 compact packet；完整审计包用 `--full`
+- Professional Director 11 阶段已内化为 dispatch 的内部顺序；不是另一套入口
 - 每步结束后再 `dispatch`，只执行结构化 `next_action`（`next_cmd` 兼容显示）
 - 可用 `advance --root …` 执行 allowlist 内本地步骤；human/paid/external 必停
 - pilot 须用户批准才 bulk；中文 final TTS 用 **edge**；BGM 默认 **rnb**（dark 仅恐怖）

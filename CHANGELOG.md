@@ -3,6 +3,19 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.13.0] - 2026-07-28
+
+### Added
+
+- Distilled the Professional Director 11-stage order into the single `/ai-film-grok` workflow, with new projects defaulting to professional control and legacy roots remaining compatible.
+- Added a compact/full shared workflow status that projects existing narrative, pilot, clip, selects, rough-cut, post, review, and delivery evidence onto the internal director spine.
+- Added `director lock-stage`, which records explicit human approval and hash-locks auto-resolved native evidence before advancing the professional stage.
+
+### Fixed
+
+- Deferred scene-sound work until its production stage so it cannot preempt story/spec routing.
+- Replaced invalid generated `mimo` final commands with the supported bilingual Edge route.
+
 ## [2.12.0] - 2026-07-28
 
 ### Added

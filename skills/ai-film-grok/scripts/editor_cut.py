@@ -15,6 +15,10 @@ def build_editor_cut_report(root: Path, *, write: bool = True) -> dict[str, Any]
     spec = read_json(root / "film-spec.json") or {}
     manifest = read_json(root / "manifest.json") or {}
     clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
+    from dailies import dailies_status
+
+    dailies = dailies_status(root)
+    selected_by_shot = {str(item.get("shot_id")): item for item in dailies.get("selections") or []}
     rows: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     previous_id: str | None = None
@@ -62,6 +66,22 @@ def build_editor_cut_report(root: Path, *, write: bool = True) -> dict[str, Any]
                         "message": "clip is not an approved active take",
                     }
                 )
+            selected = selected_by_shot.get(sid)
+            if dailies.get("planned_shot_ids") and (
+                not selected
+                or selected.get("media_sha256") != row.get("clip_sha256")
+                or (
+                    clip.get("take_id")
+                    and Path(str(selected.get("candidate") or "")).stem != clip.get("take_id")
+                )
+            ):
+                errors.append(
+                    {
+                        "code": "EDITOR_SELECT_BINDING_MISMATCH",
+                        "shot_id": sid,
+                        "message": "editor cut is not bound to the canonical selected take hash",
+                    }
+                )
             duration = float(row.get("duration_sec") or 0)
             if duration <= 0:
                 errors.append(
@@ -88,6 +108,7 @@ def build_editor_cut_report(root: Path, *, write: bool = True) -> dict[str, Any]
         "ok": not errors and bool(rows),
         "shot_count": len(rows),
         "shots": rows,
+        "selected_set_sha256": dailies.get("selected_set_sha256"),
         "errors": errors,
         "policy": {"approved_active_take_only": True, "continue_join": "byte-identical"},
     }

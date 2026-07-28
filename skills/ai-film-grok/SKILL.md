@@ -21,8 +21,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 每步后再 dispatch，只执行 `next_action`。读 `context_refs`（≤3），完整状态在 `receipts/dispatch.json`。
 
-工序：Idea→Story→Beats→Shots→Media→Selects→Rough→Verified。  
-工具：Agent→Visual→Voice→Design/Post→Deliver。
+内部导演骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture Lock→Post Locks→Master Lock；八环与工具层只是同一状态的精简投影，不是另一套 workflow。
 
 小说/剧本先 `story.receive` → [story-reception.md](references/story-reception.md) → `plan run --received-file`；原文不可覆盖，lock 前须用户确认。
 
@@ -70,7 +69,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" comfy inventory
 # 用户批准后才 pilot approve / bulk
 "$AIFILM" final --root "<film>" --post-engine hyperframes \
-  --lipsync off --music-mood rnb --tts-backend mimo --compose-preset auto
+  --lipsync off --music-mood rnb --tts-backend edge --compose-preset auto
 "$AIFILM" review-final --root "<film>"
 ```
 

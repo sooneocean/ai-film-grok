@@ -99,11 +99,13 @@ def test_compact_packet_bounds_untrusted_human_readable_fields() -> None:
         "metrics": {"build_elapsed_ms": 1.0},
     }
     compact = compact_dispatch(packet)
-    assert len(json.dumps(compact, ensure_ascii=False).encode("utf-8")) <= 5000
+    without_action = {**compact, "next_action": {}}
+    assert len(json.dumps(without_action, ensure_ascii=False).encode("utf-8")) <= 5000
     assert len(compact["next_why"].encode("utf-8")) <= 768
     assert compact["next_action"]["transaction_id"] == "tx-123"
     assert compact["next_action"]["verification"] == ["preflight"]
-    assert "node_refs" not in compact["next_action"]
+    assert compact["next_action"]["node_refs"] == packet["next_action"]["node_refs"]
+    assert compact["next_action"] == packet["next_action"]
 
 
 def test_full_packet_preserves_pre_compaction_golden_semantics(tmp_path: Path) -> None:

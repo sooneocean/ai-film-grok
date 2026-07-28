@@ -49,6 +49,7 @@ _COMMAND_POLICIES = {
     "media-queue": ("external", "human_required"),
     "pilot": ("local", "human_required"),
     "queue-run-oauth": ("paid", "human_required"),
+    "review-ui": ("local", "human_required"),
     "review-final": ("local", "human_required"),
     "tts-rehearse": ("external", "human_required"),
 }
@@ -465,6 +466,74 @@ def build_dispatch(
 
     # Merge: prepend craft items not already covered by same id
     narrative = control_status(root)
+    from workflow_spine import build_workflow_status
+
+    workflow = build_workflow_status(root, gates=gates, narrative=narrative)
+    professional_stage = str(workflow.get("current_stage") or "")
+    if workflow.get("mode") == "professional":
+        if professional_stage and workflow.get("readiness", {}).get(professional_stage):
+            pre(
+                "workflow-stage-lock",
+                (
+                    f'aifilm director lock-stage --root "{r}" --stage {professional_stage} '
+                    '--approver user --user-phrase "<VERBATIM_USER_APPROVAL>"'
+                ),
+                (
+                    "Professional：原生证据已齐；由使用者批准当前 hash 后锁定 "
+                    f"{professional_stage}，再进入下一阶段"
+                ),
+                "agent",
+            )
+        elif professional_stage == "concept_lock":
+            pre(
+                "workflow-concept",
+                "# StoryReception → aifilm plan run --received-file <receipt>",
+                "Professional 1/11：先接收并确认故事命题；未形成 canonical drama-graph 前不进入视觉",
+                "agent",
+            )
+        elif professional_stage == "dailies_review":
+            pre(
+                "selects-report",
+                f'aifilm selects --root "{r}"',
+                "Professional 7/11：逐镜 review 已齐，写入当前 Selects 证据后才能粗剪",
+                "visual",
+            )
+        elif professional_stage == "selects_rough_cut":
+            pre(
+                "rough-cut-review",
+                f'aifilm editor-cut --root "{r}"',
+                "Professional 8/11：检查 active take、时长与 Continue 接戏，形成粗剪证据",
+                "post",
+            )
+        elif professional_stage == "picture_lock":
+            pre(
+                "picture-lock-review",
+                f'aifilm review-ui serve --root "{r}"',
+                "Professional 9/11：在本机审核预览/粗剪，批准当前 hash 后锁定画面",
+                "post",
+            )
+        elif professional_stage == "post_locks":
+            if not (root / "post-plan.json").is_file():
+                pre(
+                    "post-plan-init",
+                    f'aifilm post-plan --root "{r}" init --owner hyperframes',
+                    "Professional 10/11：先固定唯一 post/caption owner",
+                    "post",
+                )
+            elif not (root / "receipts" / "tts-rehearsal.json").is_file():
+                pre(
+                    "tts-rehearse",
+                    f'aifilm tts-rehearse --root "{r}" --backend edge',
+                    "Professional 10/11：先锁定中文旁白/日文角色的实测声音时间",
+                    "voice",
+                )
+            else:
+                pre(
+                    "post-lock-review",
+                    f'aifilm review-ui serve --root "{r}"',
+                    "Professional 10/11：审核声音与后期输入 hash 后再渲染母版候选",
+                    "post",
+                )
     evidence = build_evidence(root)
     evidence_gate = bool(evidence.get("ready_for_bulk"))
     if craft_stage in {"media", "rough", "verified"} and not evidence_gate:
@@ -546,11 +615,18 @@ def build_dispatch(
             continue
         seen.add(aid)
         unique.append(a)
-    actions = unique[:10]
+    from workflow_spine import prioritize_actions, professional_stage_actions
 
-    provisional_primary = next(
-        (action for action in actions if structured_next_action(action) is not None),
-        None,
+    actions = prioritize_actions(workflow, unique)[:10]
+    actions = professional_stage_actions(root, workflow, actions)
+
+    provisional_primary = (
+        actions[0]
+        if workflow.get("mode") == "professional" and actions
+        else next(
+            (action for action in actions if structured_next_action(action) is not None),
+            None,
+        )
     )
     provisional_action = structured_next_action(provisional_primary)
     requires_live_capability = bool(
@@ -600,9 +676,13 @@ def build_dispatch(
                 "error": str(exc)[:200],
             }
 
-    primary = next(
-        (action for action in actions if structured_next_action(action) is not None),
-        None,
+    primary = (
+        actions[0]
+        if workflow.get("mode") == "professional" and actions
+        else next(
+            (action for action in actions if structured_next_action(action) is not None),
+            None,
+        )
     )
     next_cmd = (primary or {}).get("cmd")
     next_id = (primary or {}).get("id")
@@ -672,7 +752,7 @@ def build_dispatch(
     # Fallback routing summary for media + Grok Build native tools
     i2v_line = "grok_primary: still=image_edit(cast) · motion=image_to_video · FRW only after technical failure"
     routing = {
-        "tts_default": "mimo",
+        "tts_default": "edge",
         "tts_quality": "voicebox if app up",
         "bgm": "film audio → skill assets/bgm → procedural rnb",
         "lipsync": "off default; canary after backend-lock",
@@ -688,7 +768,7 @@ def build_dispatch(
             "tools": "web_search · x_* · shell/aifilm · optional MCP collections",
             "image": "image_gen · image_edit(cast); batch: grok-oauth image|image-edit",
             "video": "PRIMARY: image_to_video; batch OAuth: grok-oauth video --image kf --wait; FRW fallback-only",
-            "voice": "session chat ≠ VO; default MiMo (MIMO_API_KEY); opt-in: --tts-backend grok (speech tags)",
+            "voice": "session chat ≠ VO; default Edge（旁白中文、角色日文）；其他后端须显式选择并留回执",
             "memory": "film-root + receipts (project RAG default)",
             "sdk_optional": "OAuth first; XAI_API_KEY only if no auth.json",
             "matrix": "references/grok-build-sdk.md · references/grok-oauth.md",
@@ -925,6 +1005,7 @@ def build_dispatch(
         else None,
         "execution_plan_digest": execution_plan_digest,
         "context_digest": context_digest,
+        "workflow": workflow,
         "generation_usage": generation_usage,
         "state_hash": state_hash,
         "capability_cache": capability_cache,

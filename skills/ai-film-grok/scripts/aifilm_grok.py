@@ -707,8 +707,14 @@ def cmd_init(args: argparse.Namespace) -> int:
     theme = args.theme.strip()
     aspect = args.aspect
     root = Path(args.root).expanduser().resolve()
-    if root.exists() and any(root.iterdir()) and not args.force:
+    root_has_content = root.exists() and any(root.iterdir())
+    if root_has_content and not args.force:
         raise FilmError(f"Root not empty: {root} (pass --force to reuse)")
+    if root_has_content and args.force and not (root / "production-book.json").is_file():
+        raise FilmError(
+            "legacy root has no production-book.json; run "
+            f'aifilm director migrate-audit --root "{root}" before any explicit migration'
+        )
     ensure_tree(root)
     (root / "canonical" / "cast").mkdir(parents=True, exist_ok=True)
     (root / "canonical" / "lookbook").mkdir(parents=True, exist_ok=True)
@@ -776,6 +782,16 @@ def cmd_init(args: argparse.Namespace) -> int:
     manifest["review_contract_version"] = 2
     manifest["truth_contract"]["contract_sha256"] = sha256_file(root / "film-spec.json")
     save_manifest(root, manifest)
+    from production_book import init_production_book
+
+    init_production_book(
+        root,
+        title=title,
+        rigor="professional",
+        format_pack="vertical-short",
+        genre_pack="drama",
+        quality_target="standard",
+    )
     try:
         from pipeline_events import append_event
 
@@ -794,6 +810,11 @@ def cmd_init(args: argparse.Namespace) -> int:
             "aspect_ratio": aspect,
             "width": w,
             "height": h,
+            "workflow": {
+                "entry": "/ai-film-grok",
+                "mode": "professional",
+                "internal_stage_model": "professional-director-11",
+            },
         }
     )
     return 0
@@ -971,10 +992,30 @@ def _pipeline_bundle(
         persist_pipeline_stage,
     )
 
-    actions = build_next_actions(root, gates=gates, open_reshoot_count=open_n)
     pipeline = detect_pipeline_stage(root, gates=gates, open_reshoot_count=open_n)
-    next_cmd = actions[0]["cmd"] if actions else None
-    next_id = actions[0].get("id") if actions else None
+    book = read_json(root / "production-book.json") or {}
+    if book.get("rigor") == "professional":
+        from dispatch import build_dispatch
+
+        packet = build_dispatch(
+            root,
+            gates=gates,
+            open_reshoot_count=open_n,
+            include_capability=False,
+            write_receipt=persist,
+            use_state_cache=False,
+        )
+        actions = list(packet.get("next_actions") or [])
+        next_cmd = packet.get("next_cmd")
+        next_id = packet.get("next_id")
+        pipeline["workflow"] = packet.get("workflow")
+        pipeline["workflow_stage"] = (packet.get("workflow") or {}).get("current_stage")
+        pipeline["bound_next_action"] = packet.get("next_action")
+        pipeline["state_hash"] = packet.get("state_hash")
+    else:
+        actions = build_next_actions(root, gates=gates, open_reshoot_count=open_n)
+        next_cmd = actions[0]["cmd"] if actions else None
+        next_id = actions[0].get("id") if actions else None
     if persist:
         with contextlib.suppress(OSError):
             persist_pipeline_stage(
@@ -1023,6 +1064,8 @@ def cmd_next(args: argparse.Namespace) -> int:
                 "stage": pipeline.get("stage"),
                 "stage_label": pipeline.get("label_zh"),
                 "next_actions": actions,
+                "next_action": pipeline.get("bound_next_action"),
+                "state_hash": pipeline.get("state_hash"),
             }
         )
         return 0
@@ -1070,6 +1113,8 @@ def cmd_next(args: argparse.Namespace) -> int:
             "why": actions[0].get("why"),
             "id": next_id or actions[0].get("id"),
             "next_actions": actions,
+            "next_action": pipeline.get("bound_next_action"),
+            "state_hash": pipeline.get("state_hash"),
         }
     )
     return 0
@@ -1107,6 +1152,8 @@ def cmd_stage(args: argparse.Namespace) -> int:
                 "next_cmd": next_cmd,
                 "next_id": next_id,
                 "next_actions": actions[:3] if actions else [],
+                "next_action": pipeline.get("bound_next_action"),
+                "state_hash": pipeline.get("state_hash"),
             }
         )
         return 0
@@ -5387,6 +5434,7 @@ def cmd_director(args: argparse.Namespace) -> int:
         check,
         director_init,
         impact,
+        lock_native_stage,
         migrate,
         migrate_audit,
         rebuild,
@@ -5414,6 +5462,24 @@ def cmd_director(args: argparse.Namespace) -> int:
             report = status(root)
         elif action == "check":
             report = check(root)
+        elif action == "lock-stage":
+            input_refs: dict[str, str] | None = None
+            if args.input_ref:
+                input_refs = {}
+                for item in args.input_ref:
+                    name, separator, relative = str(item).partition("=")
+                    if not separator or not name.strip() or not relative.strip():
+                        raise FilmError("--input-ref must use NAME=RELATIVE_PATH")
+                    input_refs[name.strip()] = relative.strip()
+            report = lock_native_stage(
+                root,
+                stage=args.stage,
+                approver=args.approver,
+                user_phrase=args.user_phrase,
+                authorization_event=args.authorization_event,
+                input_refs=input_refs,
+                transaction_id=args.transaction_id,
+            )
         elif action == "impact":
             report = impact(root, changed_refs=args.changed_ref, reason=args.reason)
         elif action == "rebuild":
@@ -8040,7 +8106,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     director_p = sub.add_parser(
         "director",
-        help="Production book: init|migrate-audit|migrate|status|check|impact|rebuild|verify",
+        help=(
+            "Production book: init|migrate-audit|migrate|status|check|lock-stage|"
+            "impact|rebuild|verify"
+        ),
     )
     director_sub = director_p.add_subparsers(dest="director_action", required=True)
     d_init = director_sub.add_parser("init")
@@ -8065,6 +8134,40 @@ def build_parser() -> argparse.ArgumentParser:
     for director_action in ("status", "check", "verify"):
         action_parser = director_sub.add_parser(director_action)
         action_parser.add_argument("--root", required=True)
+    d_lock_stage = director_sub.add_parser(
+        "lock-stage",
+        help="Human-approve and hash-lock the current stage over native evidence",
+    )
+    d_lock_stage.add_argument("--root", required=True)
+    d_lock_stage.add_argument(
+        "--stage",
+        required=True,
+        choices=(
+            "concept_lock",
+            "script_lock",
+            "department_look_lock",
+            "shot_animatic_lock",
+            "pilot_approval",
+            "bulk",
+            "dailies_review",
+            "selects_rough_cut",
+            "picture_lock",
+            "post_locks",
+            "master_lock",
+        ),
+    )
+    d_lock_stage.add_argument("--approver", default="user")
+    lock_authorization = d_lock_stage.add_mutually_exclusive_group(required=True)
+    lock_authorization.add_argument("--user-phrase")
+    lock_authorization.add_argument("--authorization-event")
+    d_lock_stage.add_argument(
+        "--input-ref",
+        action="append",
+        default=[],
+        metavar="NAME=RELATIVE_PATH",
+        help="Override auto-resolved native evidence; repeat for multiple refs",
+    )
+    d_lock_stage.add_argument("--transaction-id", default=None)
     for director_action in ("impact", "rebuild"):
         action_parser = director_sub.add_parser(director_action)
         action_parser.add_argument("--root", required=True)

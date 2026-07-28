@@ -244,6 +244,10 @@ def lock_stage(
         raise StageGateError(f"unknown stage: {stage}")
     base = Path(root).expanduser().resolve()
     rigor = _rigor(base)
+    if rigor == "professional":
+        from director_cli import validate_native_stage_evidence
+
+        validate_native_stage_evidence(base, stage)
     if rigor == "professional" and not input_refs:
         raise StageGateError("professional stage locks require resolvable input refs")
     if stage in PAID_STAGES and not input_refs:

@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -29,8 +31,14 @@ def _approve(root: Path, stage: str, hashes: dict[str, str], *, approver_type: s
     )
 
 
-def test_professional_stage_order_and_current_human_approval_are_hard(tmp_path: Path) -> None:
+def test_professional_stage_order_and_current_human_approval_are_hard(
+    tmp_path: Path, monkeypatch
+) -> None:
     init_production_book(tmp_path, rigor="professional")
+    monkeypatch.setattr(
+        "director_cli.validate_native_stage_evidence",
+        lambda _root, _stage: {},
+    )
     concept = tmp_path / "concept.md"
     concept.write_text("locked concept", encoding="utf-8")
     script = tmp_path / "script.md"
@@ -88,3 +96,21 @@ def test_legacy_reports_warnings_and_stage_order_is_canonical(tmp_path: Path) ->
     assert report["ok"]
     assert not report["blocking"]
     assert len(report["warnings"]) == len(STAGE_ORDER)
+
+
+def test_professional_lock_rejects_arbitrary_file_without_native_stage_evidence(
+    tmp_path: Path,
+) -> None:
+    init_production_book(tmp_path, rigor="professional")
+    arbitrary = tmp_path / "looks-valid.json"
+    arbitrary.write_text('{"approved":true}\n', encoding="utf-8")
+    digest = __import__("hashlib").sha256(arbitrary.read_bytes()).hexdigest()
+    approval = _approve(tmp_path, "concept_lock", {"arbitrary": digest})
+
+    with pytest.raises(ValueError, match="native evidence missing"):
+        lock_stage(
+            tmp_path,
+            stage="concept_lock",
+            input_refs={"arbitrary": "looks-valid.json"},
+            approval_id=approval["approval_id"],
+        )

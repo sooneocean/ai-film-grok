@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import sys
 import tempfile
 import unittest
@@ -13,6 +14,8 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from aifilm_grok import build_parser  # noqa: E402
+from dispatch import structured_next_action  # noqa: E402
 from next_actions import (  # noqa: E402
     build_next_actions,
     detect_pipeline_stage,
@@ -52,6 +55,26 @@ def test_clips_complete_prompts_to_lock_post_owner_before_design(tmp_path: Path)
     )
     action = next(item for item in actions if item["id"] == "post-plan-init")
     assert "post-plan --root" in action["cmd"]
+
+
+def test_production_tts_actions_use_edge_and_roundtrip_parser(tmp_path: Path) -> None:
+    (tmp_path / "brief.json").write_text('{"title":"t"}', encoding="utf-8")
+    actions = build_next_actions(
+        tmp_path,
+        gates={"brief": True, "style_locked": True, "spec": True, "clips_complete": True},
+    )
+    production = [
+        action
+        for action in actions
+        if action["id"] in {"tts-rehearse", "final", "final-designed", "final-audio"}
+    ]
+    assert production
+    parser = build_parser()
+    for action in production:
+        assert "mimo" not in action["cmd"]
+        structured = structured_next_action(action)
+        assert structured is not None
+        parser.parse_args(shlex.split(action["cmd"])[1:])
 
 
 @pytest.mark.slow
