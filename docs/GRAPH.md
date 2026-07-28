@@ -89,6 +89,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_checkpoint.py`
 - `skills/ai-film-grok/tests/test_cinema_prompt.py`
 - `skills/ai-film-grok/tests/test_cinematic_color_grading.py`
+- `skills/ai-film-grok/tests/test_cli_bgm_library.py`
 - `skills/ai-film-grok/tests/test_cli_motion.py`
 - `skills/ai-film-grok/tests/test_cli_plan_mutation.py`
 - `skills/ai-film-grok/tests/test_cli_plan_project.py`
@@ -99,6 +100,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_closed_loop.py`
 - `skills/ai-film-grok/tests/test_color_grade.py`
 - `skills/ai-film-grok/tests/test_color_grading.py`
+- `skills/ai-film-grok/tests/test_comfy_armory.py`
 - `skills/ai-film-grok/tests/test_comfy_video.py`
 - `skills/ai-film-grok/tests/test_compose_preview.py`
 - `skills/ai-film-grok/tests/test_compose_render.py`
@@ -170,6 +172,9 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_jcut_lcut_editing.py`
 - `skills/ai-film-grok/tests/test_launchers.py`
 - `skills/ai-film-grok/tests/test_lipsync_canary.py`
+- `skills/ai-film-grok/tests/test_lipsync_node_client.py`
+- `skills/ai-film-grok/tests/test_lipsync_node_routing.py`
+- `skills/ai-film-grok/tests/test_lipsync_node_service.py`
 - `skills/ai-film-grok/tests/test_local_llm.py`
 - `skills/ai-film-grok/tests/test_lock_style_samefile.py`
 - `skills/ai-film-grok/tests/test_logger.py`
@@ -292,6 +297,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_vo_motion_link.py`
 - `skills/ai-film-grok/tests/test_voice_lang_and_srt_clamp.py`
 - `skills/ai-film-grok/tests/test_voice_tracks.py`
+- `skills/ai-film-grok/tests/test_weapon_router.py`
 - `skills/ai-film-grok/tests/test_workflow_spine.py`
 - `skills/ai-film-project/tests/test_validate_project_blueprint.py`
 - `tests/test_premium_pipeline_contracts.py`
