@@ -25,7 +25,7 @@ from typing import Any
 
 import numpy as np
 from audio_cues import AudioCueError, compile_audio_timeline, primary_voice_cue, strict_tts_text
-from audio_timeline import AudioTimelineError, build_mix_execution_plan
+from audio_timeline import AudioTimelineError, build_mix_execution_plan, rebase_to_rendered_shots
 from audio_timeline import caption_bindings as timeline_caption_bindings
 from audio_timeline import compile_timeline as compile_audio_timeline_v1
 from audio_timeline import timeline_hash as audio_timeline_hash
@@ -3166,20 +3166,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     if bool(spec.get("audio_timeline_v1", False)):
         try:
             formal_timeline = compile_audio_timeline_v1(spec)
-            legacy_cursor = 0.0
-            legacy_starts: dict[str, float] = {}
-            for shot in shots:
-                shot_id = str(shot.get("id") or "")
-                legacy_starts[shot_id] = legacy_cursor
-                legacy_cursor += float(shot.get("duration_sec") or 0.0)
-            for event in formal_timeline.get("events") or []:
-                if not isinstance(event, dict):
-                    continue
-                shot_id = str(event.get("shot_id") or "")
-                if shot_id not in shot_start_map or shot_id not in legacy_starts:
-                    raise RenderError(f"audio timeline event has unknown shot_id: {shot_id}")
-                offset = float(event.get("start_sec") or 0.0) - legacy_starts[shot_id]
-                event["start_sec"] = round(shot_start_map[shot_id] + offset, 3)
+            formal_timeline = rebase_to_rendered_shots(formal_timeline, shot_start_map)
             formal_timeline["duration_sec"] = round(float(total_dur), 3)
             execution_plan = build_mix_execution_plan(formal_timeline)
         except AudioTimelineError as exc:

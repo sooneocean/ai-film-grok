@@ -14,6 +14,7 @@ from audio_timeline import (
     build_mix_execution_plan,
     caption_bindings,
     compile_timeline,
+    rebase_to_rendered_shots,
 )
 from voice_cast_profiles import VoiceCastError, assign_profiles, validate_event_language
 
@@ -213,6 +214,27 @@ def test_mix_plan_has_inner_voice_filter_event_pan_fades_and_all_vocal_ducking()
     assert "highpass=f=250,lowpass=f=3200" in first["filters"]
     assert any(item.startswith("pan=stereo") for item in first["filters"])
     assert plan["ducking"]["trigger_event_ids"] == [event["id"] for event in timeline["events"]]
+
+
+def test_rebase_keeps_cue_offset_when_rendered_shot_start_changes():
+    timeline = compile_timeline(
+        _spec(
+            [
+                {
+                    "kind": "voice",
+                    "line_type": "dialogue",
+                    "speaker": "hero",
+                    "spoken_text": "行こう",
+                    "start_offset_sec": 1.2,
+                    "duration_sec": 1,
+                }
+            ]
+        )
+    )
+
+    rebased = rebase_to_rendered_shots(timeline, {"s1": 4.5})
+
+    assert rebased["events"][0]["start_sec"] == 5.7
 
 
 def test_audio_plan_writes_timeline_and_deterministic_voice_cast(tmp_path: Path):

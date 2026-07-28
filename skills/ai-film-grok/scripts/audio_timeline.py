@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -111,6 +112,8 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                 event: dict[str, Any] = {
                     "id": _event_id(sid, cue_index, event_type, start, text),
                     "shot_id": sid,
+                    "cue_index": cue_index,
+                    "start_offset_sec": round(start - cursor, 3),
                     "type": event_type,
                     "start_sec": round(start, 3),
                     "duration_sec": round(event_duration, 3),
@@ -156,6 +159,8 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                     {
                         "id": _event_id(sid, 0, event_type, cursor, text),
                         "shot_id": sid,
+                        "cue_index": 0,
+                        "start_offset_sec": 0.0,
                         "type": event_type,
                         "start_sec": round(cursor, 3),
                         "duration_sec": round(duration, 3),
@@ -266,6 +271,24 @@ def _validate_style(mode: str, vocal: Iterable[dict[str, Any]]) -> None:
 def timeline_hash(timeline: dict[str, Any]) -> str:
     canonical = json.dumps(timeline, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def rebase_to_rendered_shots(
+    timeline: dict[str, Any], shot_starts: dict[str, float]
+) -> dict[str, Any]:
+    """Return a copy whose event starts follow the rendered shot timeline."""
+    validate_timeline(timeline)
+    rebased = deepcopy(timeline)
+    for event in rebased["events"]:
+        shot_id = str(event.get("shot_id") or "")
+        if shot_id not in shot_starts:
+            raise AudioTimelineError(
+                f"event {event['id']} references unknown rendered shot {shot_id}"
+            )
+        event["start_sec"] = round(
+            float(shot_starts[shot_id]) + float(event.get("start_offset_sec", 0.0)), 3
+        )
+    return rebased
 
 
 def caption_bindings(timeline: dict[str, Any]) -> list[dict[str, Any]]:
