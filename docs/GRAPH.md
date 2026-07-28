@@ -99,6 +99,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_closed_loop.py`
 - `skills/ai-film-grok/tests/test_color_grade.py`
 - `skills/ai-film-grok/tests/test_color_grading.py`
+- `skills/ai-film-grok/tests/test_comfy_armory.py`
 - `skills/ai-film-grok/tests/test_comfy_video.py`
 - `skills/ai-film-grok/tests/test_compose_preview.py`
 - `skills/ai-film-grok/tests/test_compose_render.py`
@@ -292,6 +293,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_vo_motion_link.py`
 - `skills/ai-film-grok/tests/test_voice_lang_and_srt_clamp.py`
 - `skills/ai-film-grok/tests/test_voice_tracks.py`
+- `skills/ai-film-grok/tests/test_weapon_router.py`
 - `skills/ai-film-grok/tests/test_workflow_spine.py`
 - `skills/ai-film-project/tests/test_validate_project_blueprint.py`
 - `tests/test_premium_pipeline_contracts.py`
