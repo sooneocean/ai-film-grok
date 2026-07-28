@@ -6,9 +6,10 @@ import json
 import wave
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 import pytest
-from audio_node_client import AudioNodeError, _url, health, render, render_batch
+from audio_node_client import AudioNodeError, _request, _url, health, render, render_batch
 
 
 def _delivery_wav() -> bytes:
@@ -29,6 +30,13 @@ def test_rejects_non_http_node_url() -> None:
 def test_health_requires_private_token() -> None:
     with pytest.raises(AudioNodeError):
         health("http://192.168.88.52:8788", "short")
+
+
+def test_http_error_is_not_misreported_as_network_unreachable() -> None:
+    error = HTTPError("http://node/health", 404, "Not Found", {}, io.BytesIO())
+    with patch("audio_node_client.urllib.request.urlopen", side_effect=error):
+        with pytest.raises(AudioNodeError, match="HTTP 404"):
+            _request("http://192.168.88.52:8788", "x" * 32, "/health")
 
 
 def test_render_rejects_unknown_kind(tmp_path: Path) -> None:

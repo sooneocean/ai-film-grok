@@ -66,6 +66,8 @@ def _request(
                 if content_type not in {"audio/wav", "audio/x-wav"}:
                     raise AudioNodeError("audio node returned invalid MIME type")
             return response.read()
+    except urllib.error.HTTPError as exc:
+        raise AudioNodeError(f"audio node HTTP {exc.code}") from exc
     except urllib.error.URLError as exc:
         raise AudioNodeError("audio node unreachable") from exc
 
