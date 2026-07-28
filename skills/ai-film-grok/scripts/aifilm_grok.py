@@ -5473,6 +5473,22 @@ def cmd_audio_verify(args: argparse.Namespace) -> int:
     return 0 if report["ok"] else 1
 
 
+def cmd_verify(args: argparse.Namespace) -> int:
+    """Aggregate local automation gates without initiating generation or uploads."""
+    from automation_verify import build_verification_report
+    from util import write_json
+
+    root = Path(args.root).expanduser().resolve()
+    report = build_verification_report(root)
+    if not bool(getattr(args, "no_write", False)):
+        out = root / "receipts" / "automation-verify.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        write_json(out, report)
+        report["path"] = str(out)
+    emit(report)
+    return 0 if report["ok"] else 1
+
+
 def cmd_audio_tts_render(args: argparse.Namespace) -> int:
     from audio_tts_render import AudioTTSRenderError, render_tts_events
 
@@ -5863,6 +5879,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     av.add_argument("--root", required=True)
     av.add_argument("--final", default=None, help="Optional final MP4 to inspect with FFprobe")
+
+    verify = sub.add_parser(
+        "verify", help="Aggregate runtime, scene-sound, audio-delivery and production gates"
+    )
+    verify.add_argument("--root", required=True)
+    verify.add_argument(
+        "--no-write", action="store_true", help="Do not write a verification receipt"
+    )
 
     atr = sub.add_parser(
         "audio-tts-render", help="Render each event TTS asset and write actual durations"
@@ -7433,6 +7457,7 @@ def main(argv: list[str] | None = None) -> int:
             "selects": cmd_selects,
             "audio-plan": cmd_audio_plan,
             "audio-verify": cmd_audio_verify,
+            "verify": cmd_verify,
             "audio-tts-render": cmd_audio_tts_render,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
