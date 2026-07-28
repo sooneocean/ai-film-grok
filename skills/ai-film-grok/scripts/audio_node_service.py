@@ -17,6 +17,7 @@ import subprocess
 import tempfile
 import uuid
 import wave
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ from fastapi.responses import FileResponse
 ROOT = Path(os.environ.get("AIFILM_AUDIO_NODE_ROOT", r"C:\\aifilm-audio-node")).resolve()
 JOBS = ROOT / "jobs"
 REFERENCES = ROOT / "music-references"
+SFX_SOURCES = ROOT / "sfx-sources"
 TOKEN = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "")
 MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign")
 MODEL_PATH = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL_PATH", MODEL_ID)
@@ -33,12 +35,25 @@ MUSIC_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_MUSIC_MODEL", "ACE-Step-1.5")
 MUSIC_CHECKPOINT_FINGERPRINT = os.environ.get(
     "AIFILM_AUDIO_NODE_MUSIC_CHECKPOINT_FINGERPRINT", "unknown"
 )
+SFX_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_SFX_MODEL", "")
+SFX_CHECKPOINT_FINGERPRINT = os.environ.get("AIFILM_AUDIO_NODE_SFX_CHECKPOINT_FINGERPRINT", "")
+SFX_LICENSE = os.environ.get("AIFILM_AUDIO_NODE_SFX_LICENSE", "")
+MMAUDIO_CHECKPOINT_SHA256 = os.environ.get("AIFILM_MMAUDIO_CHECKPOINT_SHA256", "")
+MMAUDIO_REPO_COMMIT = os.environ.get("AIFILM_MMAUDIO_REPO_COMMIT", "")
 jobs: dict[str, dict[str, Any]] = {}
 AUDIO_KINDS = ("tts", "music", "sfx", "performance")
 # All configured renderers use the same 5090.  Serializing execution prevents
 # independently valid jobs from evicting each other's model weights or OOMing.
 GPU_GENERATION_LOCK = asyncio.Lock()
 app = FastAPI(title="ai-film private audio node", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+def _is_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value.lower())
+    )
 
 
 def _auth(value: str | None) -> None:
@@ -61,11 +76,52 @@ def _available(kind: str) -> bool:
             return True
         except Exception:
             return False
+    if kind == "sfx":
+        return _sfx_probe_ok()
     try:
         _command_template(kind)
         return True
     except RuntimeError:
         return False
+
+
+@lru_cache(maxsize=1)
+def _sfx_probe_ok() -> bool:
+    raw = os.environ.get("AIFILM_AUDIO_NODE_SFX_PROBE_ARGV", "")
+    try:
+        command = json.loads(raw)
+    except json.JSONDecodeError:
+        return False
+    if (
+        not isinstance(command, list)
+        or not command
+        or not all(isinstance(item, str) and item for item in command)
+        or SFX_MODEL_ID != "hkchengrex/MMAudio-large-44k-v2"
+        or SFX_LICENSE != "CC-BY-NC-4.0"
+        or not _is_sha256(SFX_CHECKPOINT_FINGERPRINT)
+        or SFX_CHECKPOINT_FINGERPRINT.lower() != MMAUDIO_CHECKPOINT_SHA256.lower()
+        or len(MMAUDIO_REPO_COMMIT) != 40
+    ):
+        return False
+    try:
+        proc = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        report = json.loads(proc.stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        return False
+    return bool(
+        isinstance(report, dict)
+        and report.get("ok") is True
+        and report.get("model") == SFX_MODEL_ID
+        and report.get("license") == SFX_LICENSE
+        and report.get("checkpoint_sha256") == SFX_CHECKPOINT_FINGERPRINT.lower()
+        and report.get("repo_commit") == MMAUDIO_REPO_COMMIT.lower()
+    )
 
 
 def _command_template(kind: str) -> list[str]:
@@ -132,6 +188,9 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         "model": MODEL_ID,
         "music_model": MUSIC_MODEL_ID,
         "music_checkpoint_fingerprint": MUSIC_CHECKPOINT_FINGERPRINT,
+        "sfx_model": SFX_MODEL_ID,
+        "sfx_checkpoint_fingerprint": SFX_CHECKPOINT_FINGERPRINT,
+        "sfx_license": SFX_LICENSE,
         "gpu": _gpu_health(),
     }
 
@@ -192,6 +251,76 @@ async def upload_music_reference(
     return _store_music_reference(await request.body())
 
 
+def _store_sfx_source(raw: bytes) -> dict[str, str]:
+    if len(raw) < 1024 or len(raw) > 128 * 1024 * 1024:
+        raise HTTPException(422, "invalid SFX source video")
+    source_hash = hashlib.sha256(raw).hexdigest()
+    SFX_SOURCES.mkdir(parents=True, exist_ok=True)
+    temporary = SFX_SOURCES / f".{uuid.uuid4().hex}.mp4"
+    target = SFX_SOURCES / f"{source_hash}.mp4"
+    try:
+        temporary.write_bytes(raw)
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=codec_type:format=duration",
+                "-of",
+                "json",
+                str(temporary),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        report = json.loads(probe.stdout)
+        streams = report.get("streams") if isinstance(report, dict) else None
+        duration = float((report.get("format") or {}).get("duration") or 0)
+        if (
+            not isinstance(streams, list)
+            or not streams
+            or streams[0].get("codec_type") != "video"
+            or not 0 < duration <= 30
+        ):
+            raise HTTPException(422, "SFX source must be a 0-30 second video")
+        if target.exists():
+            if (
+                target.is_symlink()
+                or not target.is_file()
+                or hashlib.sha256(target.read_bytes()).hexdigest() != source_hash
+            ):
+                raise HTTPException(409, "stored SFX source hash mismatch")
+        else:
+            temporary.replace(target)
+    except HTTPException:
+        temporary.unlink(missing_ok=True)
+        raise
+    except Exception as exc:
+        temporary.unlink(missing_ok=True)
+        raise HTTPException(422, "invalid SFX source video") from exc
+    temporary.unlink(missing_ok=True)
+    return {"source_id": source_hash, "source_sha256": source_hash}
+
+
+@app.post("/v1/sfx-source")
+async def upload_sfx_source(
+    request: Request, authorization: str | None = Header(default=None)
+) -> dict[str, str]:
+    _auth(authorization)
+    try:
+        content_length = int(request.headers.get("content-length") or 0)
+    except ValueError as exc:
+        raise HTTPException(413, "invalid SFX source content length") from exc
+    if not 1024 <= content_length <= 128 * 1024 * 1024:
+        raise HTTPException(413, "SFX source content length is required and bounded")
+    return _store_sfx_source(await request.body())
+
+
 def _run_tts(payload: dict[str, Any], out: Path) -> None:
     import soundfile as sf
     import torch
@@ -225,6 +354,7 @@ def _run_command(kind: str, payload: dict[str, Any], out: Path) -> None:
         "prompt": str(payload.get("prompt") or ""),
         "duration": str(payload.get("duration") or 5),
         "seed": str(payload.get("seed") or 0),
+        "video": str(payload.get("source_video") or ""),
     }
     command = [item.format(**values) for item in template]
     subprocess.run(command, check=True, capture_output=True, timeout=900)
@@ -346,6 +476,41 @@ async def create(
         return await create_music_batch(payload, authorization)
     if kind not in AUDIO_KINDS:
         raise HTTPException(404, "unknown audio kind")
+    if kind == "sfx":
+        try:
+            prompt = str(payload.get("prompt") or "").strip()
+            duration = float(payload.get("duration"))
+            seed = payload.get("seed")
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(422, "invalid SFX request") from exc
+        if not 1 <= len(prompt) <= 512:
+            raise HTTPException(422, "SFX prompt must contain 1-512 characters")
+        if not 1 <= duration <= 30:
+            raise HTTPException(422, "SFX duration must be between 1 and 30 seconds")
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise HTTPException(422, "SFX seed must be an integer")
+        if payload.get("noncommercial_research_ok") is not True:
+            raise HTTPException(422, "MMAudio requires explicit non-commercial research approval")
+        if (
+            SFX_MODEL_ID != "hkchengrex/MMAudio-large-44k-v2"
+            or SFX_LICENSE != "CC-BY-NC-4.0"
+            or not _is_sha256(SFX_CHECKPOINT_FINGERPRINT)
+            or SFX_CHECKPOINT_FINGERPRINT.lower() != MMAUDIO_CHECKPOINT_SHA256.lower()
+            or not _sfx_probe_ok()
+        ):
+            raise HTTPException(503, "MMAudio provenance is not configured")
+        source_id = str(payload.pop("source_video_id", "") or "")
+        if source_id:
+            source = SFX_SOURCES / f"{source_id}.mp4"
+            if (
+                not _is_sha256(source_id)
+                or source.is_symlink()
+                or not source.is_file()
+                or hashlib.sha256(source.read_bytes()).hexdigest() != source_id
+            ):
+                raise HTTPException(422, "SFX source video is unavailable")
+            payload = dict(payload)
+            payload["source_video"] = str(source)
     return _create(kind, payload)
 
 

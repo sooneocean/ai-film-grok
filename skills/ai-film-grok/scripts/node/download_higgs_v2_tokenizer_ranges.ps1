@@ -46,6 +46,7 @@ while ($offset -lt $expected) {
 $assembled = "$target.assembling"
 Remove-Item -LiteralPath $assembled -Force -ErrorAction SilentlyContinue
 $out = [System.IO.File]::Open($assembled, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write)
+$copyBufferSize = 4MB
 try {
     $offset = [int64]0
     $index = 0
@@ -53,7 +54,9 @@ try {
         $want = [Math]::Min($chunkSize, $expected - $offset)
         $part = Join-Path $partsDir ('{0:D3}.part' -f $index)
         $input = [System.IO.File]::OpenRead($part)
-        try { $input.CopyTo($out) } finally { $input.Dispose() }
+        # Use a large local buffer so checkpoint assembly does not dominate
+        # the download time; the exact-size gate below remains authoritative.
+        try { $input.CopyTo($out, $copyBufferSize) } finally { $input.Dispose() }
         $offset += $want
         $index++
     }

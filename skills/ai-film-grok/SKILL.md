@@ -68,13 +68,14 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" comfy probe
 "$AIFILM" comfy inventory
 "$AIFILM" comfy capacity
-"$AIFILM" comfy recover --confirm  # only after probe failure
 "$AIFILM" route explain --root "<film>" --shot-id "shot01"
 "$AIFILM" route plan --root "<film>" --shot-id "shot01" --write
+"$AIFILM" sfx-canary --root "<film>" --prompt "door closes in a quiet room" \
+  --duration 8 --seed 5100 --noncommercial-research-ok
 # 用户批准后才 pilot approve / bulk
 "$AIFILM" final --root "<film>" --post-engine hyperframes \
   --lipsync off --music-mood rnb --tts-backend edge --compose-preset auto
 "$AIFILM" review-final --root "<film>"
 ```
 
-按需：[production routing](references/production-routing-control-plane.md) · [semantic-index](references/semantic-index.md) · [Comfy LAN](references/comfy-lan-control.md) · [hard-defaults](references/hard-defaults.md) · [双语剪辑](references/lessons-2026-07-20-cut-silk-bilingual.md)（`caption_mode`、`transition_fluency`） · [防双烧](references/lessons-2026-07-20-title-double-burn.md) · [Directors Lens 课](references/directors-lens.md) · [INDEX](references/INDEX.md)
+按需：[production routing](references/production-routing-control-plane.md) · [semantic-index](references/semantic-index.md) · [Comfy LAN](references/comfy-lan-control.md) · [MMAudio SFX](references/mmaudio-sfx.md) · [hard-defaults](references/hard-defaults.md) · [双语剪辑](references/lessons-2026-07-20-cut-silk-bilingual.md)（`caption_mode`、`transition_fluency`） · [防双烧](references/lessons-2026-07-20-title-double-burn.md) · [Directors Lens 课](references/directors-lens.md) · [INDEX](references/INDEX.md)

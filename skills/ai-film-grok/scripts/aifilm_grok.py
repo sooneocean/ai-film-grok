@@ -6129,6 +6129,26 @@ def cmd_performance_candidate(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
 
 
+def cmd_sfx_canary(args: argparse.Namespace) -> int:
+    """Generate one non-commercial, pending MMAudio SFX candidate."""
+    from sfx_candidates import SFXCandidateError, generate
+
+    try:
+        emit(
+            generate(
+                Path(args.root),
+                prompt=args.prompt,
+                duration=args.duration,
+                seed=args.seed,
+                source_video=Path(args.video).expanduser() if args.video else None,
+                noncommercial_research_ok=bool(args.noncommercial_research_ok),
+            )
+        )
+        return 0
+    except SFXCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
 
@@ -6621,6 +6641,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     performance_approve.add_argument("--root", required=True)
     performance_approve.add_argument("--asset-id", required=True)
+
+    sfx_canary = sub.add_parser(
+        "sfx-canary",
+        help="Generate one pending, non-commercial MMAudio SFX pilot on the private RTX node",
+    )
+    sfx_canary.add_argument("--root", required=True)
+    sfx_canary.add_argument("--prompt", required=True)
+    sfx_canary.add_argument("--duration", type=float, default=8.0)
+    sfx_canary.add_argument("--seed", type=int, required=True)
+    sfx_canary.add_argument("--video", default="")
+    sfx_canary.add_argument("--noncommercial-research-ok", action="store_true")
 
     lsc = sub.add_parser(
         "lipsync-canary",
@@ -8377,6 +8408,7 @@ def main(argv: list[str] | None = None) -> int:
             "bgm-candidate": cmd_bgm_candidate,
             "bgm-library": cmd_bgm_library,
             "performance-candidate": cmd_performance_candidate,
+            "sfx-canary": cmd_sfx_canary,
             "lipsync-node": cmd_lipsync_node,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
