@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import sys
 import threading
@@ -93,6 +94,15 @@ def test_url_requires_private_literal_host() -> None:
 def test_health_requires_private_token() -> None:
     with pytest.raises(LipsyncNodeError):
         health("http://127.0.0.1:18790", "short")
+
+
+def test_request_normalizes_stale_tunnel_disconnect() -> None:
+    with patch(
+        "urllib.request.OpenerDirector.open",
+        side_effect=http.client.RemoteDisconnected("stale tunnel"),
+    ):
+        with pytest.raises(LipsyncNodeError, match="unreachable"):
+            health("http://127.0.0.1:18790", "x" * 32)
 
 
 def test_render_downloads_hash_bound_mp4_atomically(tmp_path: Path) -> None:

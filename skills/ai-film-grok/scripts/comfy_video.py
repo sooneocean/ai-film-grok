@@ -200,6 +200,7 @@ _ALLOWED_COMFY_NETWORKS = (
     ipaddress.ip_network("192.168.0.0/16"),
     ipaddress.ip_network("fc00::/7"),
 )
+_MAX_ARTIFACT_BYTES = 512 * 1024 * 1024
 _INVENTORY_MODEL_FOLDERS = frozenset(
     {
         "checkpoints",
@@ -267,6 +268,8 @@ def normalize_base_url(raw: str) -> str:
         )
     ):
         raise ComfyVideoError("ComfyUI host must be localhost or a private IP")
+    if parsed.scheme == "http" and not address.is_loopback:
+        raise ComfyVideoError("private-LAN ComfyUI requires HTTPS or a loopback SSH tunnel")
     return value
 
 
@@ -849,7 +852,7 @@ def submit(
     )
     prompt_id = str(data.get("prompt_id") or "")
     if not prompt_id:
-        raise ComfyVideoError(f"ComfyUI did not return prompt_id: {data}")
+        raise ComfyVideoError("ComfyUI did not return a prompt id")
     return prompt_id
 
 
@@ -970,12 +973,9 @@ def _raise_for_execution_error(record: Mapping[str, Any]) -> None:
     if status_str not in {"error", "failed"} and not error_details:
         return
     node_id = str(error_details.get("node_id") or "unknown node")
-    detail = str(
-        error_details.get("exception_message")
-        or error_details.get("exception_type")
-        or status_str
-        or "unknown error"
-    )
+    detail = str(error_details.get("exception_type") or status_str or "unknown error")
+    detail = re.sub(r"[^A-Za-z0-9_. -]", "_", detail)[:80]
+    node_id = re.sub(r"[^A-Za-z0-9_.-]", "_", node_id)[:80]
     raise ComfyVideoError(f"ComfyUI generation failed at {node_id}: {detail}")
 
 
@@ -1057,25 +1057,41 @@ def download_result(base_url: str, result: Mapping[str, str], out: Path) -> dict
         f"{normalize_base_url(base_url)}/view?{params}",
         headers={"Accept": "*/*"},
     )
-    try:
-        with _OPENER.open(request, timeout=180) as response:
-            content = response.read()
-    except (OSError, urllib.error.HTTPError) as exc:
-        raise ComfyVideoError(f"ComfyUI artifact download failed: {exc}") from exc
-    if not content:
-        raise ComfyVideoError("downloaded artifact is empty")
-    if (
-        Path(result["filename"]).suffix.lower() in {".mp4", ".webm", ".mov", ".mkv"}
-        and len(content) < 10_000
-    ):
-        raise ComfyVideoError("downloaded video is unexpectedly small")
     output = Path(out).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_bytes(content)
+    partial = output.with_name(f".{output.name}.{secrets.token_hex(8)}.partial")
+    digest = hashlib.sha256()
+    total = 0
+    try:
+        with _OPENER.open(request, timeout=180) as response:
+            declared = response.headers.get("Content-Length")
+            if declared and int(declared) > _MAX_ARTIFACT_BYTES:
+                raise ComfyVideoError("ComfyUI artifact exceeds size limit")
+            with partial.open("xb") as handle:
+                while chunk := response.read(1024 * 1024):
+                    total += len(chunk)
+                    if total > _MAX_ARTIFACT_BYTES:
+                        raise ComfyVideoError("ComfyUI artifact exceeds size limit")
+                    digest.update(chunk)
+                    handle.write(chunk)
+        if total == 0:
+            raise ComfyVideoError("downloaded artifact is empty")
+        if (
+            Path(result["filename"]).suffix.lower() in {".mp4", ".webm", ".mov", ".mkv"}
+            and total < 10_000
+        ):
+            raise ComfyVideoError("downloaded video is unexpectedly small")
+        partial.replace(output)
+    except (OSError, ValueError, urllib.error.HTTPError) as exc:
+        partial.unlink(missing_ok=True)
+        raise ComfyVideoError("ComfyUI artifact download failed") from exc
+    except Exception:
+        partial.unlink(missing_ok=True)
+        raise
     return {
         "path": str(output),
-        "bytes": len(content),
-        "sha256": hashlib.sha256(content).hexdigest(),
+        "bytes": total,
+        "sha256": digest.hexdigest(),
     }
 
 

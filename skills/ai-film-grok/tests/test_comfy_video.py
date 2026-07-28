@@ -21,6 +21,7 @@ from comfy_video import (  # noqa: E402
     assert_local_only_workflow,
     build_wan22_i2v_prompt,
     cancel_prompt,
+    download_result,
     free_memory,
     inventory,
     load_api_workflow,
@@ -140,7 +141,7 @@ class ComfyVideoTests(unittest.TestCase):
             raise AssertionError(route)
 
         request.side_effect = response
-        report = probe("http://192.168.88.52:8188")
+        report = probe("https://192.168.88.52:8188")
         self.assertFalse(report["profiles"]["adult_general_experimental"])
         self.assertFalse(report["experimental_adult_assets"]["general_wan22_pair_hashes_verified"])
 
@@ -151,7 +152,7 @@ class ComfyVideoTests(unittest.TestCase):
         open_request.return_value.__enter__.return_value = response
         self.assertEqual(
             _json_request(
-                "http://192.168.88.52:8188",
+                "https://192.168.88.52:8188",
                 "/free",
                 method="POST",
                 payload={"free_memory": True},
@@ -161,17 +162,19 @@ class ComfyVideoTests(unittest.TestCase):
 
     def test_private_comfyui_url_is_accepted(self) -> None:
         self.assertEqual(
-            normalize_base_url("http://192.168.88.52:8188/"),
-            "http://192.168.88.52:8188",
+            normalize_base_url("https://192.168.88.52:8188/"),
+            "https://192.168.88.52:8188",
         )
         self.assertEqual(normalize_base_url("http://127.0.0.1:8188"), "http://127.0.0.1:8188")
-        self.assertEqual(normalize_base_url("http://[fd00::1]:8188"), "http://[fd00::1]:8188")
+        self.assertEqual(normalize_base_url("https://[fd00::1]:8188"), "https://[fd00::1]:8188")
 
     def test_public_or_credentialed_url_is_rejected(self) -> None:
         with self.assertRaises(ComfyVideoError):
             normalize_base_url("https://example.com")
         with self.assertRaises(ComfyVideoError):
             normalize_base_url("http://user:pass@192.168.88.52:8188")
+        with self.assertRaisesRegex(ComfyVideoError, "HTTPS.*loopback"):
+            normalize_base_url("http://192.168.88.52:8188")
         with self.assertRaises(ComfyVideoError):
             normalize_base_url("http://0.0.0.0:8188")
         with self.assertRaises(ComfyVideoError):
@@ -181,9 +184,9 @@ class ComfyVideoTests(unittest.TestCase):
         with self.assertRaises(ComfyVideoError):
             normalize_base_url("http://[fe80::1]:8188")
         with self.assertRaises(ComfyVideoError):
-            normalize_base_url("http://192.168.88.52:8188?token=secret")
+            normalize_base_url("https://192.168.88.52:8188?token=secret")
         with self.assertRaises(ComfyVideoError):
-            normalize_base_url("http://192.168.88.52:8188/#fragment")
+            normalize_base_url("https://192.168.88.52:8188/#fragment")
 
     def test_official_turbo_graph_has_required_models_and_inputs(self) -> None:
         graph = build_wan22_i2v_prompt(
@@ -358,7 +361,7 @@ class ComfyVideoTests(unittest.TestCase):
             image = Path(tmp) / 'bad"name.png'
             image.write_bytes(b"not-an-image")
             with self.assertRaisesRegex(ComfyVideoError, "unsafe"):
-                upload_image("http://192.168.88.52:8188", image)
+                upload_image("https://192.168.88.52:8188", image)
 
     @patch("comfy_video._json_request")
     def test_local_only_validation_blocks_paid_api_nodes(self, request: MagicMock) -> None:
@@ -375,7 +378,7 @@ class ComfyVideoTests(unittest.TestCase):
             }
         }
         with self.assertRaisesRegex(ComfyVideoError, "external API node"):
-            assert_local_only_workflow("http://192.168.88.52:8188", graph)
+            assert_local_only_workflow("https://192.168.88.52:8188", graph)
 
     @patch("comfy_video._json_request")
     def test_local_only_validation_detects_credentialed_llm_helper(
@@ -396,7 +399,7 @@ class ComfyVideoTests(unittest.TestCase):
         }
         graph = {"1": {"class_type": "OpenAIHelper", "inputs": {}}}
         with self.assertRaisesRegex(ComfyVideoError, "external API node"):
-            assert_local_only_workflow("http://192.168.88.52:8188", graph)
+            assert_local_only_workflow("https://192.168.88.52:8188", graph)
 
     @patch("comfy_video._json_request")
     def test_local_only_validation_rejects_unknown_or_custom_nodes(
@@ -406,7 +409,7 @@ class ComfyVideoTests(unittest.TestCase):
         graph = {"1": {"class_type": "OpenAIImageNode", "inputs": {}}}
         request.return_value = {}
         with self.assertRaisesRegex(ComfyVideoError, "metadata unavailable"):
-            assert_local_only_workflow("http://192.168.88.52:8188", graph)
+            assert_local_only_workflow("https://192.168.88.52:8188", graph)
 
         request.return_value = {
             "OpenAIImageNode": {
@@ -415,7 +418,7 @@ class ComfyVideoTests(unittest.TestCase):
             }
         }
         with self.assertRaisesRegex(ComfyVideoError, "external API node"):
-            assert_local_only_workflow("http://192.168.88.52:8188", graph)
+            assert_local_only_workflow("https://192.168.88.52:8188", graph)
 
     @patch("comfy_video._json_request")
     def test_local_only_validation_accepts_core_local_node(self, request: MagicMock) -> None:
@@ -427,7 +430,7 @@ class ComfyVideoTests(unittest.TestCase):
             }
         }
         assert_local_only_workflow(
-            "http://192.168.88.52:8188",
+            "https://192.168.88.52:8188",
             {"1": {"class_type": "KSampler", "inputs": {}}},
         )
 
@@ -451,7 +454,7 @@ class ComfyVideoTests(unittest.TestCase):
             }[route]
 
         request.side_effect = response
-        report = inventory("http://192.168.88.52:8188")
+        report = inventory("https://192.168.88.52:8188")
         self.assertEqual(report["model_counts"]["diffusion_models"], 2)
         self.assertEqual(report["queue"]["pending"], 1)
         self.assertNotIn("object_info", report)
@@ -463,7 +466,7 @@ class ComfyVideoTests(unittest.TestCase):
         request.return_value = {"prompt_id": "p-123"}
         graph = {"1": {"class_type": "KSampler", "inputs": {}}}
         prompt_id = submit(
-            "http://192.168.88.52:8188",
+            "https://192.168.88.52:8188",
             graph,
             client_id="client-123",
         )
@@ -499,7 +502,7 @@ class ComfyVideoTests(unittest.TestCase):
             },
         ]
         result = wait_for_result(
-            "http://192.168.88.52:8188",
+            "https://192.168.88.52:8188",
             "p-1",
             client_id="client-1",
             timeout_sec=10,
@@ -532,7 +535,7 @@ class ComfyVideoTests(unittest.TestCase):
             }
         }
         result = wait_for_result(
-            "http://192.168.88.52:8188",
+            "https://192.168.88.52:8188",
             "p-1",
             client_id="client-1",
             timeout_sec=10,
@@ -554,7 +557,7 @@ class ComfyVideoTests(unittest.TestCase):
                             {
                                 "node_id": "unet_high",
                                 "exception_type": "RuntimeError",
-                                "exception_message": "invalid tensor shape",
+                                "exception_message": "PRIVATE_PROMPT_MARKER",
                             },
                         ]
                     ],
@@ -564,10 +567,10 @@ class ComfyVideoTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(
             ComfyVideoError,
-            "unet_high.*invalid tensor shape",
+            "unet_high.*RuntimeError",
         ):
             wait_for_result(
-                "http://192.168.88.52:8188",
+                "https://192.168.88.52:8188",
                 "p-1",
                 timeout_sec=10,
                 poll_sec=0,
@@ -596,7 +599,8 @@ class ComfyVideoTests(unittest.TestCase):
                             "execution_error",
                             {
                                 "node_id": "unet_high",
-                                "exception_message": "invalid tensor shape",
+                                "exception_type": "RuntimeError",
+                                "exception_message": "PRIVATE_PROMPT_MARKER",
                             },
                         ]
                     ],
@@ -606,15 +610,38 @@ class ComfyVideoTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(
             ComfyVideoError,
-            "unet_high.*invalid tensor shape",
+            "unet_high.*RuntimeError",
         ):
             _wait_for_completion_ws(
-                "http://192.168.88.52:8188",
+                "https://192.168.88.52:8188",
                 "p-1",
                 client_id="client-1",
                 timeout_sec=0.1,
             )
         self.assertEqual(create_connection.call_args.kwargs["redirect_limit"], 0)
+
+    @patch("comfy_video._json_request")
+    def test_submit_does_not_reflect_node_payload(self, request: MagicMock) -> None:
+        request.return_value = {"error": "PRIVATE_PROMPT_MARKER"}
+        with self.assertRaises(ComfyVideoError) as raised:
+            submit("https://192.168.88.52:8188", {})
+        self.assertNotIn("PRIVATE_PROMPT_MARKER", str(raised.exception))
+
+    @patch("comfy_video._OPENER.open")
+    def test_download_size_limit_preserves_existing_output(self, open_request: MagicMock) -> None:
+        response = MagicMock()
+        response.headers = {"Content-Length": str(513 * 1024 * 1024)}
+        open_request.return_value.__enter__.return_value = response
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "approved.mp4"
+            output.write_bytes(b"approved")
+            with self.assertRaisesRegex(ComfyVideoError, "size limit"):
+                download_result(
+                    "https://192.168.88.52:8188",
+                    {"filename": "artifact.mp4", "subfolder": "", "type": "output"},
+                    output,
+                )
+            self.assertEqual(output.read_bytes(), b"approved")
 
     @patch("comfy_video._json_request")
     def test_cancel_prompt_refuses_non_atomic_global_interrupt(self, request: MagicMock) -> None:
@@ -623,7 +650,7 @@ class ComfyVideoTests(unittest.TestCase):
             "queue_pending": [],
         }
         with self.assertRaisesRegex(ComfyVideoError, "not target-safe"):
-            cancel_prompt("http://192.168.88.52:8188", "p-1")
+            cancel_prompt("https://192.168.88.52:8188", "p-1")
         self.assertEqual(request.call_count, 1)
 
     @patch("comfy_video._json_request")
@@ -633,14 +660,14 @@ class ComfyVideoTests(unittest.TestCase):
             "queue_pending": [],
         }
         with self.assertRaisesRegex(ComfyVideoError, "not present"):
-            cancel_prompt("http://192.168.88.52:8188", "p-1")
+            cancel_prompt("https://192.168.88.52:8188", "p-1")
         self.assertEqual(request.call_count, 1)
 
     @patch("comfy_video._json_request")
     def test_free_memory_is_explicit_and_uses_official_route(self, request: MagicMock) -> None:
         request.return_value = {}
         self.assertEqual(
-            free_memory("http://192.168.88.52:8188"),
+            free_memory("https://192.168.88.52:8188"),
             {"ok": True, "action": "free_memory"},
         )
         self.assertEqual(request.call_args.args[1], "/free")
@@ -656,7 +683,7 @@ class ComfyVideoTests(unittest.TestCase):
             "queue_pending": [[2, "wait-1", {"secret": "prompt"}]],
         }
         self.assertEqual(
-            queue_status("http://192.168.88.52:8188"),
+            queue_status("https://192.168.88.52:8188"),
             {
                 "running": 1,
                 "pending": 1,

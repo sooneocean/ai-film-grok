@@ -24,7 +24,7 @@ from comfy_armory import (  # noqa: E402
 def test_armory_records_verified_private_node_without_credentials() -> None:
     armory = load_armory()
     assert armory["ok"] is True
-    assert default_base_url(armory) == "http://192.168.88.52:8188"
+    assert default_base_url(armory) == "http://127.0.0.1:18188"
     serialized = str(armory).lower()
     assert "private_key" not in serialized
     assert "password" not in serialized
@@ -33,7 +33,7 @@ def test_armory_records_verified_private_node_without_credentials() -> None:
 
 @patch.dict("os.environ", {}, clear=True)
 def test_comfy_cli_uses_verified_armory_node_without_env_configuration() -> None:
-    assert _base_url(Namespace(base_url=None)) == "http://192.168.88.52:8188"
+    assert _base_url(Namespace(base_url=None)) == "http://127.0.0.1:18188"
 
 
 def test_max_quality_text_to_image_routes_to_verified_qwen_2512() -> None:
@@ -182,7 +182,7 @@ def test_live_probe_marks_only_fully_installed_weapons_ready(
         "/models/loras": ["Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"],
     }
     request.side_effect = lambda _url, route: model_lists[route]
-    report = probe_armory("http://192.168.88.52:8188")
+    report = probe_armory("https://192.168.88.52:8188")
     assert report["ok"] is True
     assert {item["id"] for item in report["ready"]} == {
         "qwen-image-2512-quality",
@@ -215,7 +215,7 @@ def test_live_probe_blocks_only_weapon_with_unreadable_required_hash(
     request.side_effect = lambda _url, route: installed[route.removeprefix("/models/")]
     model_sha256.side_effect = ComfyArmoryError("metadata unavailable")
 
-    report = probe_armory("http://192.168.88.52:8188")
+    report = probe_armory("https://192.168.88.52:8188")
 
     assert "wan22-i2v-quality" in report["ready_ids"]
     assert "qwen-image-2512-quality" in report["ready_ids"]
@@ -238,7 +238,7 @@ def test_live_probe_blocks_same_name_adult_lora_with_wrong_hash(
         "/models/vae": ["wan_2.1_vae.safetensors"],
         "/models/loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"],
     }[route]
-    report = probe_armory("http://192.168.88.52:8188")
+    report = probe_armory("https://192.168.88.52:8188")
     blocked = {item["id"]: item for item in report["blocked"]}
     assert "wan22-adult-meat-pilot" in blocked
     assert blocked["wan22-adult-meat-pilot"]["sha256_mismatches"]
@@ -263,5 +263,5 @@ def test_live_probe_accepts_exact_adult_lora_hashes(request: MagicMock) -> None:
         "comfy_armory._model_sha256",
         side_effect=lambda _url, _group, filename: hashes[filename],
     ):
-        report = probe_armory("http://192.168.88.52:8188")
+        report = probe_armory("https://192.168.88.52:8188")
     assert "wan22-adult-meat-pilot" in report["ready_ids"]

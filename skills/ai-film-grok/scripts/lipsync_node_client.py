@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import ipaddress
 import json
 import mimetypes
@@ -183,7 +184,7 @@ def _request(
             return payload
     except urllib.error.HTTPError as exc:
         raise LipsyncNodeError(f"lip-sync node HTTP {exc.code}") from exc
-    except urllib.error.URLError as exc:
+    except (http.client.HTTPException, urllib.error.URLError) as exc:
         raise LipsyncNodeError("lip-sync node unreachable") from exc
 
 
@@ -224,7 +225,7 @@ def _download_artifact(
                 raise LipsyncNodeError("lip-sync node returned invalid MP4")
     except urllib.error.HTTPError as exc:
         raise LipsyncNodeError(f"lip-sync node HTTP {exc.code}") from exc
-    except urllib.error.URLError as exc:
+    except (http.client.HTTPException, urllib.error.URLError) as exc:
         raise LipsyncNodeError("lip-sync node unreachable") from exc
 
 

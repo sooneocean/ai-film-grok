@@ -89,7 +89,7 @@ filename through `--input-image-name`.
 
 ## Current verified node
 
-- API: `http://192.168.88.52:8188`
+- API: `http://127.0.0.1:18188` through an SSH tunnel to node loopback
 - GPU: RTX 5090, 32 GB class
 - ComfyUI root: `C:\ComfyUI_windows_portable\ComfyUI`
 - Default URL resolution order: explicit `--base-url`, then
