@@ -66,6 +66,8 @@ write-spec **自动轮换**轴（避开最近 2 轴）；lint：`CAMERA_AXIS_FLA
 - [ ] write-spec 后看 `_vo_motion_link` / `transition_styles`  
 - [ ] 每条镜间缝都有 `transition_ops[i]`：hard cut 也必须是明确的剪辑操作，不是缺省值
 - [ ] `transition_ops[i].continuity_class == continue` 时：`picture.base=hard_cut`、`duration_sec=0`、HF overlay 保持 `none`
+- [ ] `export-compose` 后确认 `transition_ops[i].timeline.at_sec` 按 final film clock 写入；只审查其 `review_window`，不可凭草稿镜头时长猜切点
+- [ ] HF 仅可消费 `directional_blur` / `light_leak` / `color_wash` 这类非 continue 视觉胶水；每个 overlay 都是独立、可 seek 的 clip
 - [ ] final 日志出现 `styles=[…]` 且不全是 fade  
 - [ ] 用户抱怨运镜没变 → 说明须 re-I2V；先交付转场新版  
 - [ ] 色气 60s：约每 2 soft 至少一个 hard；尾 1–2 hold  

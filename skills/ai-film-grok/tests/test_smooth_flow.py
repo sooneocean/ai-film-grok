@@ -14,6 +14,7 @@ from film_spec import validate_film_spec  # noqa: E402
 from transition_ops import (  # noqa: E402
     TransitionOperationError,
     assert_hyperframes_safe_operations,
+    bind_transition_operations_to_timeline,
 )
 
 
@@ -245,6 +246,55 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
                     }
                 ]
             )
+
+    def test_operations_bind_to_the_final_film_clock(self) -> None:
+        bound = bind_transition_operations_to_timeline(
+            [
+                {
+                    "picture": {"duration_sec": 0.18},
+                    "continuity_class": "cut",
+                }
+            ],
+            film_timeline={"shot_starts": [1.5, 6.32]},
+        )
+        self.assertEqual(bound[0]["timeline"]["at_sec"], 6.32)
+        self.assertEqual(bound[0]["timeline"]["end_sec"], 6.5)
+        self.assertEqual(bound[0]["timeline"]["review_window"]["start_sec"], 5.82)
+
+    def test_non_continue_craft_selects_safe_hyperframes_overlay(self) -> None:
+        spec = {
+            "title": "overlay-craft",
+            "vo_mode": "storyteller",
+            "director_intent": {
+                "logline": "换场视觉胶水验证。",
+                "tone": "drama",
+                "emotional_arc": ["a", "b", "c"],
+            },
+            "edit_craft": ["scene_bridge"],
+            "scenes": [
+                {
+                    "shots": [
+                        {
+                            "id": "a",
+                            "dramatic_function": "hook",
+                            "nar": "开始。",
+                            "dsl": {"subject": "hero", "motion": "hold, idle not speaking"},
+                        },
+                        {
+                            "id": "b",
+                            "dramatic_function": "approach",
+                            "nar": "转场。",
+                            "dsl": {"subject": "hero", "motion": "hold, idle not speaking"},
+                        },
+                    ]
+                }
+            ],
+        }
+        validate_film_spec(spec, assign_missing_ids=False)
+        self.assertIn(
+            spec["transition_ops"][0]["picture"]["hyperframes_overlay"],
+            {"directional_blur", "light_leak", "color_wash"},
+        )
 
     def test_normalize_xfade_style(self) -> None:
         self.assertEqual(edit_policy.normalize_xfade_style(None), "fade")

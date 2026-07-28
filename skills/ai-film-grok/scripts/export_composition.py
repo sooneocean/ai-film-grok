@@ -32,7 +32,11 @@ from security_policy import (
     safe_workspace_directory,
 )
 from show_package import ShowPackageError, resolve_show_package
-from transition_ops import TransitionOperationError, assert_hyperframes_safe_operations
+from transition_ops import (
+    TransitionOperationError,
+    assert_hyperframes_safe_operations,
+    bind_transition_operations_to_timeline,
+)
 from util import read_json as _util_read_json
 from util import utc_now, write_json
 
@@ -450,6 +454,12 @@ def build_timeline_package(
         )
     except PolicyError as exc:
         raise ComposeExportError(str(exc)) from exc
+    try:
+        transition_ops = bind_transition_operations_to_timeline(
+            list(spec.get("transition_ops") or []), film_timeline=film_tl
+        )
+    except TransitionOperationError as exc:
+        raise ComposeExportError(f"transition operation timing: {exc}") from exc
 
     # Captions: prefer final.srt timing (zh); merge nar_en for dual zh_en designed-post
     caption_mode = str(spec.get("caption_mode") or "zh").strip().lower()
@@ -555,7 +565,7 @@ def build_timeline_package(
         "fps": fps,
         "transition_sec": transition_sec,
         "story_join_intents": story_intents,
-        "transition_ops": spec.get("transition_ops") or [],
+        "transition_ops": transition_ops,
         "film_timeline": {
             "shot_starts": film_tl.get("shot_starts"),
             "output_duration": film_tl.get("output_duration"),
@@ -1164,6 +1174,7 @@ def write_hyperframes(
     video_tags: list[str] = []
     underlay = ""
     staged: list[dict[str, str]] = []
+    composition_shot_starts: dict[str, float] = {}
     # underlay: absolute film clock (offset 0); multiclip: subtract title pad
     if (
         resolved_layout == "underlay"
@@ -1182,6 +1193,10 @@ def write_hyperframes(
         # Underlay composition clock MUST match plate duration (not title+shots inflated total).
         # Mismatch causes HF frame coverage failure (expected frames >> extracted frames).
         total = max(plate_dur, 0.1)
+        for index, shot in enumerate(shots):
+            starts = film_tl.get("shot_starts") or []
+            if index < len(starts):
+                composition_shot_starts[str(shot.get("id") or "")] = float(starts[index])
         # Plate carries mixed VO/BGM — mark data-has-audio so HF check accepts non-muted video
         # (lint: video_missing_muted). Do NOT also burn captions into plate (subs off).
         underlay = (
@@ -1205,6 +1220,7 @@ def write_hyperframes(
         for i, shot in enumerate(shots):
             t0, dur = packed[i]
             sid = str(shot["id"])
+            composition_shot_starts[sid] = t0
             dest_name = f"{sid}{Path(shot['media_rel']).suffix or '.mp4'}"
             src = _stage_hf_media(hf_dir, film_root, shot["media_rel"], dest_name)
             staged.append({"from": str(shot["media_rel"]), "to": src})
@@ -1249,6 +1265,47 @@ def write_hyperframes(
 
     # Title / end / captions as overlays ON TOP of motion
     overlay_parts: list[str] = []
+    transition_gsap_lines: list[str] = []
+    for op_index, operation in enumerate(package.get("transition_ops") or []):
+        if not isinstance(operation, dict):
+            continue
+        picture = operation.get("picture")
+        timeline = operation.get("timeline")
+        if not isinstance(picture, dict) or not isinstance(timeline, dict):
+            continue
+        effect = str(picture.get("hyperframes_overlay") or "none")
+        if effect == "none":
+            continue
+        try:
+            # Underlay shares the final film clock. Multiclip is packed without
+            # title pads or xfade overlaps, so use the actual incoming clip edge.
+            target_shot = str(operation.get("to_shot") or "")
+            start = composition_shot_starts.get(
+                target_shot,
+                float(timeline.get("at_sec") or 0.0) - caption_clock_offset,
+            )
+            duration = float(picture.get("duration_sec") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        start = max(0.0, start)
+        duration = min(max(0.0, duration), max(0.0, total - start))
+        if duration < 0.04:
+            continue
+        overlay_id = f"transition-op-{op_index:03d}"
+        overlay_parts.append(
+            f'    <div id="{overlay_id}" class="clip transition-overlay transition-{html.escape(effect)}" '
+            f'data-transition-op="{html.escape(str(operation.get("join_id") or op_index))}" '
+            f'data-start="{start:.3f}" data-duration="{duration:.3f}" '
+            f'data-track-index="{200 + op_index}"><div class="transition-overlay-inner"></div></div>'
+        )
+        half = max(0.02, duration / 2)
+        transition_gsap_lines.append(
+            f'      tl.fromTo("#{overlay_id} .transition-overlay-inner", '
+            f"{{ opacity: 0, xPercent: -12 }}, "
+            f'{{ opacity: 0.46, xPercent: 12, duration: {half:.3f}, ease: "power2.out" }}, {start:.3f});\n'
+            f'      tl.to("#{overlay_id} .transition-overlay-inner", '
+            f'{{ opacity: 0, duration: {half:.3f}, ease: "power2.in" }}, {(start + half):.3f});'
+        )
     safe_title = html.escape(title)
     credits = package.get("credits") or {}
     title_sequence = package.get("title_sequence") or {}
@@ -1387,6 +1444,28 @@ def write_hyperframes(
         place-items: center;
         pointer-events: none;
         background: {styles["overlay_bg"]};
+      }}
+      .transition-overlay {{
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 40;
+      }}
+      .transition-overlay-inner {{
+        position: absolute;
+        inset: -12%;
+        opacity: 0;
+        filter: blur(14px);
+      }}
+      .transition-directional_blur .transition-overlay-inner {{
+        background: linear-gradient(90deg, rgba(214, 229, 255, 0), rgba(214, 229, 255, 0.34), rgba(214, 229, 255, 0));
+      }}
+      .transition-light_leak .transition-overlay-inner {{
+        background: radial-gradient(ellipse at 14% 50%, rgba(255, 202, 126, 0.68), rgba(255, 160, 98, 0.16) 32%, rgba(255, 160, 98, 0) 68%);
+      }}
+      .transition-color_wash .transition-overlay-inner {{
+        background: linear-gradient(115deg, rgba(65, 30, 93, 0.0), rgba(152, 88, 120, 0.38), rgba(255, 215, 169, 0.0));
       }}
       .card h1, .card p {{
         margin: 0;
@@ -1659,6 +1738,7 @@ def write_hyperframes(
       tl.from(".er-line", {{ x: -12, opacity: 0, duration: 0.35, stagger: 0.04, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.20:.3f});
       tl.from(".er-shot", {{ x: 10, opacity: 0, duration: 0.30, stagger: 0.03, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.28:.3f});
 {gsap_cap_block}
+{chr(10).join(transition_gsap_lines)}
       window.__timelines["main"] = tl;
     </script>
   </body>
@@ -1687,6 +1767,8 @@ def write_hyperframes(
             "compose_preset": resolved_preset,
             "caption_clock_offset": caption_clock_offset,
             "captions_placed": placed_captions,
+            "transition_operations": package.get("transition_ops") or [],
+            "transition_overlays_placed": len(transition_gsap_lines),
             "title_sequence": title_seq_html is not None,
             "end_roll": end_roll_html is not None,
             "platform_package": platform_package if platform_package.get("enabled") else None,

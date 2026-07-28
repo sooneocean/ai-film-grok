@@ -185,6 +185,37 @@ class ExportCompositionTests(unittest.TestCase):
             self.assertIn("skill_load", pkg.get("post_policy") or {})
 
     @pytest.mark.slow
+    def test_hyperframes_emits_timed_safe_transition_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            root.mkdir()
+            _seed_film_root(root, n_shots=2)
+            spec_path = root / "film-spec.json"
+            spec = json.loads(spec_path.read_text(encoding="utf-8"))
+            spec["edit_strategy"] = {"mode": "silk", "lock_craft": True}
+            spec["edit_craft"] = ["scene_bridge"]
+            spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+
+            export_composition(root, engine="hyperframes", force=True)
+
+            html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
+            receipt = json.loads(
+                (root / "compose" / "hyperframes" / "media-stage-receipt.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertIn('data-transition-op="shot01__shot02"', html)
+            # This fixture is multiclip: the incoming second 6s clip, not the
+            # final-clock xfade point, owns the visual overlay clock.
+            self.assertIn('data-transition-op="shot01__shot02" data-start="6.000"', html)
+            self.assertEqual(receipt["transition_overlays_placed"], 1)
+            op = receipt["transition_operations"][0]
+            self.assertIn("at_sec", op["timeline"])
+            effect = op["picture"]["hyperframes_overlay"]
+            self.assertIn(effect, {"directional_blur", "light_leak", "color_wash"})
+            self.assertIn(f"transition-{effect}", html)
+
+    @pytest.mark.slow
     def test_remotion_uses_platform_safe_area_and_frame_animations(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "film"

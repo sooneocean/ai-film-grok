@@ -17,6 +17,11 @@ class TransitionOperationError(ValueError):
 
 _CONTINUE_MODES = frozenset({"continue", "match", "match_cut", "byte"})
 _MID_ACTION_CUTS = frozenset({"action", "mid_action", "mid-action", "mid_motion"})
+_CRAFT_OVERLAYS = {
+    "whip_soft": "directional_blur",
+    "scene_bridge": "light_leak",
+    "mood_hold": "color_wash",
+}
 
 
 def _chain_mode(shot: dict[str, Any]) -> str:
@@ -106,7 +111,9 @@ def build_transition_operations(
                 "style": "none" if intent == "hard" else str(styles[index]),
                 "duration_sec": round(duration, 3),
                 # HyperFrames may decorate only a non-continuity scene/cut seam.
-                "hyperframes_overlay": "none",
+                "hyperframes_overlay": "none"
+                if continue_join
+                else _CRAFT_OVERLAYS.get(craft, "none"),
             },
             "audio": {"mode": _audio_mode(craft, intent), "duration_sec": round(duration, 3)},
             "anchors": {
@@ -139,6 +146,44 @@ def build_transition_operations(
                     op["reason"] = supplied["reason"].strip()
         operations.append(op)
     return operations
+
+
+def bind_transition_operations_to_timeline(
+    operations: list[dict[str, Any]], *, film_timeline: object
+) -> list[dict[str, Any]]:
+    """Attach absolute film-clock timing and review windows to transition operations."""
+    if not isinstance(film_timeline, dict):
+        raise TransitionOperationError("film_timeline must be an object")
+    starts = film_timeline.get("shot_starts")
+    if not isinstance(starts, list):
+        raise TransitionOperationError("film_timeline.shot_starts must be an array")
+    bound: list[dict[str, Any]] = []
+    for index, raw in enumerate(operations):
+        if not isinstance(raw, dict):
+            raise TransitionOperationError(f"transition_ops[{index}] must be an object")
+        if index + 1 >= len(starts):
+            raise TransitionOperationError(
+                f"film_timeline.shot_starts missing target for transition_ops[{index}]"
+            )
+        picture = raw.get("picture")
+        if not isinstance(picture, dict):
+            raise TransitionOperationError(f"transition_ops[{index}].picture must be an object")
+        try:
+            at_sec = float(starts[index + 1])
+            duration = max(0.0, float(picture.get("duration_sec") or 0.0))
+        except (TypeError, ValueError) as exc:
+            raise TransitionOperationError(f"transition_ops[{index}] has invalid timing") from exc
+        op = {**raw, "picture": dict(picture)}
+        op["timeline"] = {
+            "at_sec": round(at_sec, 3),
+            "end_sec": round(at_sec + duration, 3),
+            "review_window": {
+                "start_sec": round(max(0.0, at_sec - 0.5), 3),
+                "end_sec": round(at_sec + max(duration, 0.5), 3),
+            },
+        }
+        bound.append(op)
+    return bound
 
 
 def assert_hyperframes_safe_operations(operations: object) -> None:
