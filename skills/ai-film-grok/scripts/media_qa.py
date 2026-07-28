@@ -39,7 +39,7 @@ MOTION_SAMPLE_WIDTH = 64
 MOTION_SAMPLE_HEIGHT = 64
 # Public contract for vertical keyframes. Keep these aliases stable for
 # hard-defaults checks and downstream adapters.
-KEYFRAME_MIN_W = 720
+KEYFRAME_MIN_W = 704
 KEYFRAME_MIN_H = 1280
 # The 64x64 probe intentionally measures broad frame-to-frame change.  The
 # shipped testsrc2 motion plate scores ~3.6 after vertical downsampling, so a
@@ -91,7 +91,7 @@ def audit_motion_health(
 
 # Lesson 2026-07-22 · keyframe no-compress (vivian-ep01)
 # I2V inherits still geometry: low-res / wrong aspect / heavy compress → mushy clip.
-STILL_MIN_WIDTH_9_16 = 720
+STILL_MIN_WIDTH_9_16 = 704
 STILL_MIN_HEIGHT_9_16 = 1280
 STILL_ASPECT_9_16_MIN = 0.50  # width/height
 STILL_ASPECT_9_16_MAX = 0.62

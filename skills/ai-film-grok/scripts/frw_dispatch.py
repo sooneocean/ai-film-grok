@@ -26,6 +26,7 @@ Env:
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -47,6 +48,55 @@ def run_canary(argv: list[str]) -> int:
         timeout=120,
         check=False,
     )
+    return proc.returncode
+
+
+def run_upload_probe(argv: list[str]) -> int:
+    """Run the no-paid upload authorization canary and redact provider URLs."""
+    if "--file-path" not in argv:
+        print(json.dumps({"ok": False, "error": "upload-probe requires --file-path"}))
+        return 2
+    root = resolve_frw_root()
+    dispatch = root / "img-video-frw" / "scripts" / "dispatch.py"
+    py = resolve_python(root)
+    env = os.environ.copy()
+    load_dotenv(root, env)
+    env["PYTHONPATH"] = ""
+    cmd = [py, str(dispatch), "upload-canary", *argv]
+    try:
+        proc = subprocess.run(
+            cmd, env=env, cwd=str(root), timeout=120, capture_output=True, text=True
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(json.dumps({"ok": False, "error": f"upload-probe failed: {exc}"}))
+        return 1
+    payload: object = {}
+    for line in reversed((proc.stdout or "").splitlines()):
+        try:
+            payload = json.loads(line)
+            break
+        except json.JSONDecodeError:
+            continue
+    if isinstance(payload, dict):
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        print(
+            json.dumps(
+                {
+                    "ok": proc.returncode == 0
+                    and bool(payload.get("success", payload.get("ok", False))),
+                    "command": "upload-canary",
+                    "status": payload.get("success", payload.get("ok")),
+                    "error_code": data.get("error_code"),
+                },
+                ensure_ascii=False,
+            )
+        )
+    else:
+        print(
+            json.dumps(
+                {"ok": False, "command": "upload-canary", "error": "invalid provider response"}
+            )
+        )
     return proc.returncode
 
 
@@ -108,6 +158,8 @@ def main(argv: list[str] | None = None) -> int:
     # Local capability probe (stdlib) — before frwclaw resolve
     if argv and argv[0] == "canary":
         return run_canary(argv[1:])
+    if argv and argv[0] == "upload-probe":
+        return run_upload_probe(argv[1:])
 
     root = resolve_frw_root()
     dispatch = root / "img-video-frw" / "scripts" / "dispatch.py"

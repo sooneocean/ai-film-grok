@@ -113,20 +113,20 @@ Agent 写 still/I2V prompt 时：**motion 字符串以主动作为首**，微动
 
 路径：`receipts/pilot-approval.json`。
 
-## FRW Seedance 2V 优先（质量 + 无限配额 · 确定性 bulk）
+## Grok I2V 优先（FRW 技术备援）
 
 | 规则 | 要求 |
 |------|------|
-| 默认 | `i2v_provider: frw` + **`frw_video_model: seedance-2-fast-i2v`**（`auto` 钉此） |
+| 默认 | `i2v_provider: grok`；`auto` 永远解析 Grok primary |
 | Still | **Grok** `image_edit(cast)` 同源；禁止 FRW text2image 批量主角 |
 | Still 卸装后 | peak 后 **只** `image_edit(undress-anchor/已脱 still)`；**禁**全装 cast 重起（回穿 P0） |
 | 状态照索引 | `cast_state_masters` + keyframe-first；I2V 只吃 keyframe；坏了改 keyframe |
-| bulk 2V | **`"$AIFILM" frw newvideo --model seedance-2-fast-i2v`**（9:16 **720p 原生**） |
-| 有尾帧 | **`seedance-2-pro-flf`** |
-| 入组 | `reencode-clips`（**不放大**）→ `register-clip --source-endpoint frw_seedance_i2v\|frw_seedance_flf` |
-| **L1 人物** | Seedance i2v → LTX i2v → Grok 720p；`shot_role: hero` + cast still |
-| **L2 合成** | **`frw_env_model: ltx-t2v` 主力**；`shot_role: env\|bridge\|insert`；**禁**用 T2V 声称脸一致 |
-| LTX 参数 | dims/duration/fps **string**；竖屏 720×1280 |
+| bulk 2V | **Grok `image_to_video`**；FRW `newvideo` / `frw_seedance_i2v`（`seedance-2-fast-i2v`）仅 provider-switch 后执行 |
+| 有尾帧 | FRW first-last 仅 fallback；保留 pair checksum 与 Contract checksum |
+| 入组 | 下载 → ffprobe → 全解码 → perceptual/exact duplicate gate → 人工 review |
+| **L1 人物** | Grok I2V → FRW Seedance/LTX fallback；`shot_role: hero` + cast still |
+| **L2 合成** | Grok no-face motion；FRW `ltx-t2v` 仅 fallback；禁用 T2V 声称脸一致 |
+| LTX 参数 | dims/duration/fps **string**；FRW `720p` 档位下竖屏原生 704×1280 |
 | 禁止默认 | legacy img2video；T2V 当 A-roll 主角 |
 | 记账 | seedance-blocked / LTX 502；恢复后重烤 |
 

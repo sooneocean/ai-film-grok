@@ -17,6 +17,8 @@ from i2v_provider import (  # noqa: E402
     for_endpoint,
     get,
     registry_report,
+    is_technical_failure,
+    route_after_failure,
 )
 
 
@@ -112,6 +114,21 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIn("seedance", names)
         # active must be a registered provider
         self.assertIn(report["active"], report["registered"])
+
+    def test_legacy_seedance_profile_cannot_change_preferred_provider(self) -> None:
+        import os
+        from unittest import mock
+
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "seedance_first"}):
+            self.assertIsInstance(__import__("i2v_provider").preferred(), GrokI2VProvider)
+
+    def test_only_technical_failure_routes_to_frw(self) -> None:
+        self.assertTrue(is_technical_failure("HTTP 503 service unavailable"))
+        self.assertFalse(is_technical_failure({"task_id": "ambiguous"}))
+        self.assertIsNone(route_after_failure(root=None, shot_id="s1", primary="grok", error="quality fail"))
+        selected = route_after_failure(root=None, shot_id="s1", primary="grok", error="HTTP 503")
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected[0].name, "seedance")
 
     def test_preferred_returns_registered(self) -> None:
         """preferred() never raises and returns a registered provider."""

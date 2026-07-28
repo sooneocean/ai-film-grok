@@ -25,11 +25,113 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from util import write_json
+from util import sha256_file, write_json
 
 
 class I2VProviderError(RuntimeError):
     pass
+
+
+TECHNICAL_FAILURE_MARKERS = (
+    "timeout",
+    "timed out",
+    "connection reset",
+    "connection refused",
+    "temporary failure",
+    "service unavailable",
+    "bad gateway",
+    "gateway timeout",
+    "rate limit",
+    "http 429",
+    "http 500",
+    "http 502",
+    "http 503",
+    "http 504",
+)
+
+
+def is_technical_failure(error: object) -> bool:
+    """Return whether an error is safe to route from Grok to FRW.
+
+    Provider quality rejection, human review failure, and ambiguous task
+    creation are deliberately not classified as automatic fallback triggers.
+    """
+    if isinstance(error, dict):
+        if error.get("task_id") or error.get("generation_id"):
+            return False
+        status = str(error.get("status_code") or error.get("http_status") or "")
+        if status in {"408", "425", "429", "500", "502", "503", "504"}:
+            return True
+        error = error.get("error") or error.get("message") or ""
+    text = str(error).lower()
+    return any(marker in text for marker in TECHNICAL_FAILURE_MARKERS)
+
+
+def _write_switch_receipt(
+    root: Path | None,
+    *,
+    shot_id: str,
+    primary: str,
+    fallback: str,
+    error: object,
+) -> dict[str, Any]:
+    receipt = {
+        "schema_version": 1,
+        "kind": "provider-switch",
+        "shot_id": shot_id,
+        "primary_provider": primary,
+        "fallback_provider": fallback,
+        "reason_class": "technical_failure",
+        "error": str(error)[:500],
+        "fallback_fixed_for_shot": True,
+    }
+    if root is not None:
+        path = Path(root).expanduser().resolve() / "receipts" / f"provider-switch-{shot_id}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, receipt)
+        receipt["path"] = str(path)
+    return receipt
+
+
+def route_after_failure(
+    *, root: Path | None, shot_id: str, primary: str, error: object
+) -> tuple[I2VProvider, dict[str, Any]] | None:
+    """Select FRW only after a classified Grok technical failure."""
+    if primary != "grok" or not is_technical_failure(error):
+        return None
+    provider = get("seedance")
+    return provider, _write_switch_receipt(
+        root, shot_id=shot_id, primary=primary, fallback=provider.name, error=error
+    )
+
+
+def generate_with_fallback(
+    *,
+    root: Path | None,
+    shot_id: str,
+    keyframe: Path,
+    prompt: str,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Run Grok first and invoke FRW only for a classified technical failure."""
+    primary = preferred(root=root)
+    try:
+        result = primary.generate(keyframe=keyframe, prompt=prompt, **kwargs)
+        if not result.get("ok"):
+            raise I2VProviderError(
+                str(result.get("stderr") or result.get("error") or "Grok failed")
+            )
+        result["route"] = "grok_primary"
+        return result
+    except Exception as exc:
+        selected = route_after_failure(root=root, shot_id=shot_id, primary=primary.name, error=exc)
+        if selected is None:
+            raise
+        fallback, switch = selected
+        result = fallback.generate(keyframe=keyframe, prompt=prompt, **kwargs)
+        result["route"] = "frw_fallback"
+        result["provider_switch"] = switch
+        return result
 
 
 @dataclass
@@ -247,7 +349,7 @@ class SeedanceProvider(I2VProvider):
             "--model",
             model,
             "--img-url",
-            str(keyframe),
+            str(kwargs.get("img_url") or keyframe),
             "--prompt",
             prompt,
             "--aspect-ratio",
@@ -261,6 +363,37 @@ class SeedanceProvider(I2VProvider):
         if kwargs.get("img2_url"):
             cmd += ["--img2-url", str(kwargs["img2_url"])]
         return cmd
+
+    def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        """Upload local inputs before invoking FRW; never pass local paths as URLs."""
+        from frw_upload import upload_typed_inputs
+
+        params = dict(kwargs)
+        params.pop("out", None)
+        handoff = upload_typed_inputs(
+            keyframe,
+            end=Path(params.pop("img2_path")) if params.get("img2_path") else None,
+            category="image",
+        )
+        params["img_url"] = handoff["start_url"]
+        if handoff.get("end_url"):
+            params["img2_url"] = handoff["end_url"]
+        cmd = self.build_command(keyframe=keyframe, prompt=prompt, **params)
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=600)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise I2VProviderError(f"{self.name}: subprocess failed: {exc}") from exc
+        return {
+            "provider": self.name,
+            "ok": proc.returncode == 0,
+            "returncode": proc.returncode,
+            "stdout": (proc.stdout or "")[:500],
+            "stderr": (proc.stderr or "")[:500],
+            "input_sha256": sha256_file(keyframe),
+            "uploaded_input": True,
+            "input_mode": handoff["input_mode"],
+            "pair_checksum": handoff.get("pair_checksum"),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -295,10 +428,10 @@ def for_endpoint(source_endpoint: str) -> I2VProvider | None:
 
 
 def preferred(*, root: Path | None = None) -> I2VProvider:
-    """Resolve the active provider from the I2V profile env gate.
+    """Resolve Grok as the production primary provider.
 
-    Reads ``film_spec.resolve_i2v_profile`` so behavior matches the existing
-    AIFILM_I2V_PROFILE=grok_primary|seedance_first contract.
+    FRW is selected only through :func:`route_after_failure`, after a
+    classified technical failure and a checksum-bound switch receipt.
     """
     try:
         from film_spec import resolve_i2v_profile
@@ -307,26 +440,6 @@ def preferred(*, root: Path | None = None) -> I2VProvider:
     except Exception:
         profile = "grok_primary"
     requested = profile
-    fallback_reason: str | None = None
-    if profile == "seedance_first":
-        seedance = get("seedance")
-        report = seedance.probe(root=root)
-        if report.available:
-            if root is not None:
-                write_json(
-                    Path(root) / "receipts" / "i2v-routing.json",
-                    {
-                        "schema_version": 1,
-                        "requested_profile": requested,
-                        "selected_provider": seedance.name,
-                        "fallback": False,
-                        "reason": report.reason,
-                        "models": report.models,
-                    },
-                )
-            return seedance
-        fallback_reason = report.reason or "Seedance provider is not available"
-    # grok_primary OR seedance unavailable → grok fallback
     provider = get("grok")
     if root is not None:
         write_json(
@@ -335,10 +448,10 @@ def preferred(*, root: Path | None = None) -> I2VProvider:
                 "schema_version": 1,
                 "requested_profile": requested,
                 "selected_provider": provider.name,
-                "fallback": bool(fallback_reason),
-                "reason": fallback_reason or "grok_primary quality-first default",
+                "fallback": False,
+                "reason": "grok_primary production default; FRW requires technical-failure switch",
                 "models": list(provider.probe(root=root).models),
-                "requires_hero_repilot": bool(fallback_reason),
+                "requires_hero_repilot": False,
             },
         )
     return provider

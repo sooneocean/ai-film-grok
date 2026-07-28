@@ -235,7 +235,10 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         self.assertEqual(spec["scenes"][0]["shots"][0].get("shot_role"), "hero")
         self.assertEqual(spec["scenes"][0]["shots"][1].get("shot_role"), "env")
         self.assertIn("hero_motion_primary", (spec.get("_layer_routing") or {}))
-        self.assertEqual((spec.get("_layer_routing") or {}).get("env_synth_primary"), "ltx-t2v")
+        self.assertEqual(
+            (spec.get("_layer_routing") or {}).get("env_synth_primary"),
+            "grok_image_to_video_no_face",
+        )
 
 
 if __name__ == "__main__":

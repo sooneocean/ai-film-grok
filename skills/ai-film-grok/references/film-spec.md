@@ -15,7 +15,7 @@
   "vo_mode": "storyteller",
   "vo_voice": "zh-CN-YunxiNeural",
   "tts_backend": "auto",
-  "i2v_provider": "frw",
+  "i2v_provider": "grok",
   "frw_video_model": "seedance-2-fast-i2v",
   "frw_aspect_ratio": "9:16",
   "frw_resolution": "720p",
@@ -48,14 +48,14 @@
 }
 ```
 
-## I2V / FRW Seedance（顶层字段 · 2026-07-20 质量版）
+## I2V / Grok 主力（FRW 技术备援 · 顶层字段）
 
 | 字段 | 默认 | 说明 |
 |------|------|------|
-| `i2v_provider` | `frw` | `auto`→`frw`；显式 `grok` 才走 Imagine I2V |
-| `frw_video_model` | **`seedance-2-fast-i2v`** | bulk 质量默认；`legacy-img2video` 仅显式（write-spec WARN） |
+| `i2v_provider` | `grok` | `auto`→`grok`；FRW 仅在 Grok 明确技术失败且有 switch receipt 时启用 |
+| `frw_video_model` | **`seedance-2-fast-i2v`** | 仅 FRW fallback；`legacy-img2video` 仅显式（write-spec WARN） |
 | `frw_aspect_ratio` | 跟 `aspect_ratio` 或 `9:16` | 传给 `frw newvideo --aspect-ratio` |
-| `frw_resolution` | **`720p`** | **原生**；禁止 576 生成再放大 |
+| `frw_resolution` | **`720p`** | provider 档位；9:16 交付优先原生 **704×1280**，禁止 576 生成再放大 |
 | `frw_duration` | `"5"` | Seedance duration 字符串 |
 
 CLI 配方与入组纪律：[frw-degrade-dispatch.md](frw-degrade-dispatch.md)、[lessons-2026-07-20-seedance-quality.md](lessons-2026-07-20-seedance-quality.md)。
@@ -64,11 +64,11 @@ CLI 配方与入组纪律：[frw-degrade-dispatch.md](frw-degrade-dispatch.md)�
 
 | 层 | 字段 | 主力 → Fallback |
 |----|------|-----------------|
-| 人物 A-roll | `frw_video_model` + `shot_role: hero` | Seedance i2v → LTX i2v → Grok 720p；**禁** T2V 锁脸 |
-| 合成/空镜 | `frw_env_model` + `env\|bridge\|insert` | **LTX T2V** → Seedance t2v → classic t2v |
+| 人物 A-roll | `shot_role: hero` | **Grok image_to_video** → FRW Seedance/LTX（仅技术失败）→ 人工复核 |
+| 合成/空镜 | `frw_env_model` + `env\|bridge\|insert` | **Grok image_to_video**；无身份输入时才走 Grok no-face → FRW LTX T2V（仅技术失败） |
 | 身份静帧 | — | **Grok cast** |
 
-LTX 参数必须 **string** 宽高；竖屏 `720`×`1280`。[frw-ltx-probe.md](lessons-2026-07-20-frw-ltx-probe.md)。
+FRW LTX 参数必须 **string** 宽高；竖屏优先 `704`×`1280`。[frw-ltx-probe.md](lessons-2026-07-20-frw-ltx-probe.md)。
 
 ## 内容通道与场内触发（v1.11.1）
 

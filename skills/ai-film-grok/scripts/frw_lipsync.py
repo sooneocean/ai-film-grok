@@ -107,6 +107,8 @@ def _http_json(
 
 def _upload_via_frw(file_path: Path, category: str) -> str:
     """Use frw_dispatch upload; return public URL."""
+    from frw_upload import FrwUploadError, extract_upload_url
+
     frw = Path(__file__).resolve().parent / "frw_dispatch.py"
     proc = subprocess.run(
         [
@@ -132,19 +134,10 @@ def _upload_via_frw(file_path: Path, category: str) -> str:
         raise FrwLipsyncError(
             f"upload failed: {data.get('user_reply') or proc.stderr or out}"[:300]
         )
-    d = data.get("data") if isinstance(data.get("data"), dict) else {}
-    url = d.get("url") or d.get("file_url") or d.get("view_url")
-    # nested
-    if not url and isinstance(d.get("raw"), dict):
-        url = (d["raw"].get("data") or {}).get("url")
-    if not url:
-        # try common nests
-        raw = d.get("data") if isinstance(d.get("data"), dict) else d
-        if isinstance(raw, dict):
-            url = raw.get("url") or (raw.get("data") or {}).get("url")
-    if not url or not str(url).startswith("http"):
-        raise FrwLipsyncError(f"upload ok but no url: {data}")
-    return str(url)
+    try:
+        return extract_upload_url(data)
+    except FrwUploadError as exc:
+        raise FrwLipsyncError(str(exc)) from exc
 
 
 def build_parameters(model: str, *, img_url: str, audio_url: str, prompt: str) -> dict[str, Any]:

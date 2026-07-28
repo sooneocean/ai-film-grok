@@ -203,6 +203,7 @@ def test_gate_recompute_invalidates_locked_style_when_reference_is_tampered(
     (root / "film-spec.json").write_text(
         json.dumps({"scenes": [{"shots": [{"id": "shot01"}]}]}), encoding="utf-8"
     )
+    contract_sha = hashlib.sha256((root / "film-spec.json").read_bytes()).hexdigest()
     monkeypatch.setattr(
         aifilm_grok,
         "validate_film_spec",
@@ -217,9 +218,11 @@ def test_gate_recompute_invalidates_locked_style_when_reference_is_tampered(
         "stills": {},
         "clips": {
             "shot01": {
-                "status": "approved",
-                "path": str(clip),
-                "sha256": clip_sha,
+                    "status": "approved",
+                    "shot_id": "shot01",
+                    "path": str(clip),
+                    "sha256": clip_sha,
+                    "provider": "grok",
                 "source_endpoint": "reference_to_video",
                 "identity_approved": True,
                 "motion_approved": True,
@@ -231,6 +234,11 @@ def test_gate_recompute_invalidates_locked_style_when_reference_is_tampered(
             }
         },
         "outputs": {},
+        "schema_version": 2,
+        "truth_contract": {
+            "source_of_truth": "local-contract-and-receipts",
+            "contract_sha256": contract_sha,
+        },
     }
     report = recompute_gates(root, manifest)
     assert manifest["gates"]["style_locked"] is True

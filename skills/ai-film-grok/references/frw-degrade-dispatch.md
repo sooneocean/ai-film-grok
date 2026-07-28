@@ -10,7 +10,7 @@
 ## 一句话
 
 **Still → Grok 锁身份（始终）。**  
-**Clip（当前）→ Grok `image_to_video` bulk**；Seedance 恢复后：canary → Seedance → LTX → Grok。  
+**Clip → Grok `image_to_video` primary**；只有可判定技术失败才进入 FRW fallback。
 **禁止**默认 legacy `img2video`。  
 **403 ≠ 参数错**；**502 ≠ 没权限**。
 
@@ -57,14 +57,14 @@
 | 层 | 职责 | **主力**（权限开） | **Fallback** | 禁止 |
 |----|------|-------------------|--------------|------|
 | **L0** 身份静帧 | cast/style | **Grok** `image_edit(cast)` | FRW text2image（非身份）；img2image 慎 | 每镜纯 T2I 重抽脸 |
-| **L1** 人物 A-roll | 有脸 `hero` | **Seedance i2v** | LTX i2v → **Grok 720p** →（仅 FRW-only 显式）legacy img2video | **LTX T2V 当脸**；默认 legacy |
+| **L1** 人物 A-roll | 有脸 `hero` | **Grok image_to_video** | FRW Seedance/LTX（upload-probe 后） | **LTX T2V 当脸**；默认 legacy |
 | **L2** 合成/环境 | `env\|bridge\|insert` | **LTX T2V** | Seedance t2v → **classic t2v** | 用 T2V 声称人物一致 |
 | **L3** 设计后期 | 字幕/片头 | HyperFrames | Remotion | Ken Burns 当戏 |
 
 ```text
-# 人物动（权限已开）
-seedance-2-fast-i2v → (403) ltx-i2v → (502) grok 720p
-  → (Grok 也挂且必须 FRW) 显式 legacy-img2video + WARN + 账本
+# 人物动
+Grok image_to_video → (技术失败) FRW upload-probe → Seedance/LTX
+  → 失败 receipt + 停止；不得静默改用 legacy
 
 # 人物动（2026-07-21 样本：Seedance 403 + LTX i2v 502）
 grok 720p 优先

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from audio_recipe import (
@@ -70,18 +71,19 @@ VO_MODES = frozenset({"storyteller", "character", "hybrid"})
 TTS_BACKENDS = frozenset(
     {"auto", "mimo", "minimax", "fish", "voicebox", "edge", "external", "grok"}
 )
-# Bulk motion provider profiles (see resolve_i2v_profile):
-# - seedance_first: FRW Seedance bulk when account open
-# - grok_primary: Seedance unavailable / 403 season — Grok image_to_video bulk
+# Motion provider profile.  Grok is the production primary; FRW is a technical
+# fallback only.  ``seedance_first`` remains accepted as a legacy input so old
+# specs can be read, but it no longer changes the active provider.
 I2V_PROVIDERS = frozenset({"frw", "grok", "auto"})
 I2V_PROFILES = frozenset({"seedance_first", "grok_primary"})
-# Native resolution for 9:16 shorts — never generate 576 then upscale to 720
+# Native resolution for 9:16 shorts.  FRW fallback may return 704x1280 and must
+# preserve that native pair; conforming is a later delivery decision.
 DEFAULT_FRW_ASPECT = "9:16"
 DEFAULT_FRW_RESOLUTION = "720p"
 DEFAULT_FRW_DURATION = "5"
 DEFAULT_FRW_FPS = "24"
 # LTX preferred pixel size for vertical shorts (probe-validated 2026-07-20)
-DEFAULT_LTX_WIDTH = "720"
+DEFAULT_LTX_WIDTH = "704"
 DEFAULT_LTX_HEIGHT = "1280"
 # Explicit last-resort (never default; agent must set frw_video_model deliberately)
 FRW_I2V_FRW_ONLY_LIFEBOAT = "legacy-img2video"
@@ -92,7 +94,7 @@ DEFAULT_FRW_ENV_MODEL = "ltx-t2v"
 # NEVER default legacy img2video (胃镜室质量坑).
 FRW_VIDEO_MODELS = frozenset(
     {
-        "seedance-2-fast-i2v",  # FRW bulk when permission open
+        "seedance-2-fast-i2v",  # FRW fallback after a recorded technical switch
         "seedance-2-fast-t2v",
         "seedance-2-pro-flf",  # multi-ref / first-last style (pro)
         "seedance-2-pro-t2v",
@@ -113,21 +115,17 @@ FRW_VIDEO_MODELS = frozenset(
 def resolve_i2v_profile() -> str:
     """Operating profile for hero I2V bulk.
 
-    Env (first wins):
-      AIFILM_I2V_PROFILE=grok_primary|seedance_first
-      AIFILM_SEEDANCE_AVAILABLE=0|false|no → grok_primary
-    Default (2026-07-21 Seedance outage season): grok_primary.
-    Restore Seedance bulk: AIFILM_I2V_PROFILE=seedance_first and canary 201.
+    ``seedance_first`` is retained for backwards-compatible parsing but is no
+    longer allowed to promote FRW to the primary route.  FRW selection happens
+    only after a classified Grok technical failure.
     """
     from config_loader import get_config
 
     cfg = get_config()
     raw = cfg.i2v_profile.strip().lower()
-    if raw in I2V_PROFILES:
-        return raw
-    if not cfg.seedance_available:
+    if raw == "seedance_first":
         return "grok_primary"
-    return "seedance_first"
+    return "grok_primary"
 
 
 def default_i2v_provider() -> str:
@@ -140,16 +138,9 @@ def default_frw_video_model() -> str:
 
 
 def frw_i2v_fallback_chain() -> tuple[str, ...]:
-    if resolve_i2v_profile() == "grok_primary":
-        return (
-            "grok",  # i2v_provider=grok · image_to_video 720p
-            "ltx-i2v",  # only if canary 201
-            "seedance-2-fast-i2v",  # when permission returns
-        )
     return (
-        "seedance-2-fast-i2v",
-        "ltx-i2v",
-        "grok",
+        "frw:seedance-2-fast-i2v",
+        "frw:ltx-i2v",
     )
 
 
@@ -583,7 +574,7 @@ def validate_film_spec(
         notes = list(spec.get("_tts_notes") or [])
         notes.append("auto→mimo for storyteller/hybrid (中文说书默认；显式 edge/fish/… 可覆盖)")
         spec["_tts_notes"] = notes
-    # I2V profile: grok_primary (Seedance outage) vs seedance_first
+    # I2V profile: Grok primary; FRW is technical fallback only.
     i2v_profile = resolve_i2v_profile()
     spec["_i2v_profile"] = i2v_profile
     chain = frw_i2v_fallback_chain()
@@ -597,17 +588,18 @@ def validate_film_spec(
         if i2v_profile == "grok_primary":
             i2v_notes.append(
                 "auto→grok (AIFILM_I2V_PROFILE=grok_primary / Seedance unavailable: "
-                "bulk image_to_video 720p; still=image_edit cast; register image_to_video)"
+                "bulk image_to_video; still=image_edit cast; register image_to_video)"
             )
         else:
-            i2v_notes.append("auto→frw for bulk 2V (Seedance newvideo; Grok still for identity)")
+            i2v_notes.append("auto→grok (Grok primary; FRW is technical fallback only)")
         spec["_i2v_notes"] = i2v_notes
-    # Soft warn if profile is grok_primary but user left i2v_provider=frw + seedance model
+    # Explicit FRW remains readable for a deliberate fallback/recovery run,
+    # but is never selected by ``auto``.
     if i2v_profile == "grok_primary" and i2v_provider == "frw":
         i2v_notes = list(spec.get("_i2v_notes") or [])
         i2v_notes.append(
-            "WARN profile=grok_primary but i2v_provider=frw — Seedance may 403; "
-            "prefer i2v_provider=grok or set AIFILM_I2V_PROFILE=seedance_first when open"
+            "NOTE explicit i2v_provider=frw — allowed only for a recorded technical fallback; "
+            "auto always resolves to Grok primary"
         )
         spec["_i2v_notes"] = i2v_notes
     spec["i2v_provider"] = i2v_provider
@@ -630,14 +622,14 @@ def validate_film_spec(
             "WARN legacy-img2video: old FRW template 348771… quality floor; "
             "FRW-only lifeboat when Seedance 403 and Grok unavailable; "
             "register frw_img2video — never claim seedance (2026-07-21); "
-            "prefer grok 720p / ltx-i2v / seedance when open"
+            "prefer Grok primary; FRW is fallback only"
         )
         spec["_frw_video_notes"] = notes
     if fvm.startswith("ltx-"):
         notes = list(spec.get("_frw_video_notes") or [])
         notes.append(
             "LTX: width/height/duration/fps must be strings; "
-            "9:16 use 720×1280 (probe-validated); avoid 768×1344; "
+            "9:16 preserve native 704×1280; do not upscale or stretch; "
             "ltx-i2v/flf may 502 platform-side — fall back to grok"
         )
         spec["_frw_video_notes"] = notes
@@ -651,7 +643,8 @@ def validate_film_spec(
             else ("16:9" if ar in {"16:9", "16x9"} else DEFAULT_FRW_ASPECT)
         )
     if "frw_resolution" not in spec or not spec.get("frw_resolution"):
-        # fast-i2v template defaults 720p; do not invent 576
+        # FRW fallback may use a provider resolution label, but native LTX
+        # pixels remain 704x1280 for vertical generation.
         spec["frw_resolution"] = DEFAULT_FRW_RESOLUTION
     if "frw_duration" not in spec or not spec.get("frw_duration"):
         spec["frw_duration"] = DEFAULT_FRW_DURATION
@@ -678,7 +671,7 @@ def validate_film_spec(
         else:
             spec["frw_width"] = str(spec["frw_width"])
             spec["frw_height"] = str(spec["frw_height"])
-    # Fallback chain note for agents (not auto-executed) — always refresh to profile
+    # Fallback chain note for agents (not auto-executed).
     spec["_frw_fallback_chain"] = list(chain)
     # Env / synth layer model (LTX T2V beds — no face import)
     raw_env = spec.get("frw_env_model", DEFAULT_FRW_ENV_MODEL)
@@ -698,7 +691,7 @@ def validate_film_spec(
     if "_frw_t2v_fallback_chain" not in spec:
         spec["_frw_t2v_fallback_chain"] = list(FRW_T2V_FALLBACK_CHAIN)
     # Layer routing summary for agents (P1 hero vs P5 synth)
-    hero_primary = "grok_image_to_video_720p" if i2v_provider == "grok" else f"frw:{fvm}"
+    hero_primary = "grok_image_to_video" if i2v_provider == "grok" else f"frw:{fvm}"
     spec["_layer_routing"] = {
         "i2v_profile": i2v_profile,
         "hero_still": "grok_image_edit_cast",
@@ -706,13 +699,12 @@ def validate_film_spec(
         "hero_i2v_provider": i2v_provider,
         "hero_motion_fallback": list(chain),
         "hero_motion_frw_only_lifeboat": FRW_I2V_FRW_ONLY_LIFEBOAT,
-        "env_synth_primary": env_m,
+        "env_synth_primary": "grok_image_to_video_no_face",
         "env_synth_fallback": list(FRW_T2V_FALLBACK_CHAIN),
-        "env_plate_cli": "aifilm env-plate --model ltx-t2v (FRW unlimited no-face)",
+        "env_plate_cli": "grok image_to_video with no-face prompt; FRW env-plate only after technical failure",
         "env_register_endpoint": "frw_ltx_t2v",
         "key_canary": (
-            "optional while grok_primary; when reopening Seedance: "
-            "balance + seedance-2-fast-i2v smoke + ltx-t2v; 403≠502"
+            "FRW upload-probe is required only after a classified Grok technical failure"
         ),
         "register_endpoint_hero": (
             "image_to_video"
@@ -721,9 +713,8 @@ def validate_film_spec(
         ),
         "designed_post": "hyperframes|remotion",
         "note": (
-            "hero = face/identity via Grok only; env/bridge/insert → FRW ltx-t2v beds "
-            "(template ltx-文生视频, verified completed); never T2V a face as identity; "
-            "extract first frame from env plate for no-character keyframes"
+            "hero and environment motion use Grok primary; every FRW route is fallback only after "
+            "a classified technical failure; never T2V a face as identity"
         ),
     }
     # Caption language(s) for designed-post (HyperFrames/Remotion)
@@ -2122,12 +2113,10 @@ def validate_film_spec(
         )
 
     # Attach erotic impact scorecard (advisory)
-    try:
+    with contextlib.suppress(Exception):
         spec["_erotic_impact"] = compute_erotic_impact_score(
             shots, heat_scale=heat_scale, heat_rep=heat_rep
         )
-    except Exception:  # pragma: no cover
-        pass
 
     # Heroine cast mode: single (default) vs multi — elastic from prompt/images/fields
     cast_ids: list[str] = []

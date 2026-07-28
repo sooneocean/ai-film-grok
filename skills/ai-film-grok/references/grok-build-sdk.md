@@ -58,7 +58,7 @@ Grok 脑（推理+工具）→ Imagine 静帧/I2V（会话原生或 OAuth 批处
 | **Story** | 长上下文：premise/logline/theme；Structured 填 `director_intent` | receipts/directors-lens | 原文插图化 |
 | **Beats** | 拆 beat 四项；对 dramatic_function | write-spec lint | Beat=空走位 |
 | **Shots** | 每镜 Prompt 工程；Coverage；`image_edit` 构图预演 | film-spec · pilot | ECU 裁头、shot 水印进画面 |
-| **Media** | **Still**：`image_edit(cast)` / `image_gen` 空镜；**I2V 兜底** Grok | FRW Seedance bulk；edge TTS；BGM | 半片混 provider；并行多 I2V 429 |
+| **Media** | **Still**：`image_edit(cast)` / `image_gen` 空镜；**I2V primary** Grok | FRW Seedance/LTX 仅技术失败 fallback；edge TTS；BGM | 半片混 provider；并行多 I2V 429 |
 | **Selects** | 视觉审 identity/motion（读图） | register · selects report | 有文件=可选 |
 | **Rough** | 剪辑建议 Editor’s Cut | assemble · plate | continue 缝 dissolve |
 | **Verified** | 十一维人审措辞 | final · review-final · export | 技术 final 冒充交付 |
@@ -89,12 +89,12 @@ Grok 脑（推理+工具）→ Imagine 静帧/I2V（会话原生或 OAuth 批处
 | 任务 | 工具 | 何时用 |
 |------|------|--------|
 | 默认 bulk（当前） | **Grok** `image_to_video` / OAuth `video --wait` | `AIFILM_I2V_PROFILE=grok_primary` |
-| Seedance bulk | **FRW** `seedance-2-fast-i2v` | `seedance_first` + canary 201 |
+| FRW fallback | **FRW** `seedance-2-fast-i2v` / `ltx-i2v` | provider-switch receipt + upload-probe |
 | Grok I2V 会话 | `image_to_video` 6s/10s · 720p | pilot / 交互 |
 | Grok I2V 批处理 | `aifilm grok-oauth video --image … --wait` | 无会话 bulk、脚本队列 |
 | 多参考动 | 优先 edit 成单帧再 I2V；`reference_to_video` 少用 | 用户明确要求时 |
 | 接戏 | extract last → promote keyframe → **只对该图** I2V | 禁 cast 重起 |
-| T2V 环境床 | FRW `ltx-t2v` | 无脸 L2；**不**用 T2V 锁脸 |
+| T2V 环境床 fallback | FRW `ltx-t2v` | Grok no-face 技术失败后；**不**用 T2V 锁脸 |
 
 注册：Grok 动 → `--source-endpoint image_to_video`；FRW → `frw_seedance_*` 等。
 ---

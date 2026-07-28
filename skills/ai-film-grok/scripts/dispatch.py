@@ -291,8 +291,10 @@ def build_dispatch(
         sys.path.insert(0, str(scripts))
 
     from dispatch_compact import compute_state_hash
+    from scene_sound import reconcile as reconcile_scene_sound
 
     gates = gates or {}
+    scene_sound = reconcile_scene_sound(root, write=write_receipt)
     state_hash = compute_state_hash(
         root,
         gates=gates,
@@ -300,13 +302,18 @@ def build_dispatch(
     )
     receipt_path = root / "receipts" / "dispatch.json"
     previous = read_json(receipt_path) if use_state_cache else None
-    if isinstance(previous, dict) and _cached_packet_is_reusable(
-        previous,
-        state_hash=state_hash,
-        include_capability=include_capability,
-        refresh_capability=refresh_capability,
+    if (
+        scene_sound.get("status") == "ok"
+        and isinstance(previous, dict)
+        and _cached_packet_is_reusable(
+            previous,
+            state_hash=state_hash,
+            include_capability=include_capability,
+            refresh_capability=refresh_capability,
+        )
     ):
         packet = dict(previous)
+        packet["scene_sound"] = scene_sound
         packet["at"] = datetime.now(UTC).replace(microsecond=0).isoformat()
         packet["metrics"] = {
             "build_elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
@@ -345,7 +352,18 @@ def build_dispatch(
             }
         )
 
-    # I2V profile (Seedance outage → grok_primary)
+    if scene_sound.get("status") != "ok":
+        summary = scene_sound.get("summary") or {}
+        pre(
+            "scene-sound-plan",
+            f'aifilm audio-plan --root "{r}" --compile --validate',
+            "场景声音待办："
+            f"required={summary.get('required', 0)} / blocked={summary.get('blocked', 0)} / "
+            f"needs_review={summary.get('needs_review', 0)}；先补环境音、脚步、门或道具拟音",
+            "voice",
+        )
+
+    # I2V profile (Grok primary; every FRW route is fallback-only)
     i2v_profile = "grok_primary"
     try:
         from film_spec import resolve_i2v_profile
@@ -362,36 +380,17 @@ def build_dispatch(
                 pre(
                     "grok-i2v-bulk",
                     f"# Media: i2v_provider=grok · image_edit(cast) still → media-queue image_to_video 720p → register-clip --source-endpoint image_to_video  (profile={i2v_profile}; Seedance off)",
-                    "Seedance 暂不可用：人物动走 Grok Imagine Video，勿提交 seedance bulk",
-                    "visual",
-                )
-            # FRW canary optional — only for env LTX beds
-            if craft_stage in {"shots", "media"}:
-                pre(
-                    "env-ltx-t2v",
-                    f'aifilm env-plate --root "{r}" --shot-id <env_shot> --prompt "… no people no faces" --wait',
-                    "无角色/环境床：FRW ltx-t2v（无限额度，已验证 completed）→ clip+首帧；禁锁脸",
-                    "visual",
-                )
-                pre(
-                    "frw-lipsync-probe",
-                    "aifilm frw-lipsync probe  # then: frw-lipsync run --face kf.png --audio vo.wav --shot-id …",
-                    "对白近景可选 FRW 口型（probe 201 才 run）；说书默认 off；403/502 则跳过",
+                    "Grok 为人物动主力；FRW 仅在明确技术失败后 fallback，不提交默认 FRW bulk",
                     "visual",
                 )
         else:
-            if craft_stage in {"shots", "media"} and not canary.is_file():
+            # Never make an FRW canary a normal Grok-primary step.  A typed
+            # upload-probe is requested only after a provider-switch receipt.
+            if craft_stage == "media" and canary.is_file():
                 pre(
-                    "frw-canary",
-                    f'aifilm frw canary --root "{r}"',
-                    "Media 前缺 FRW key canary 回执 — 先探测 403/502 再 bulk",
-                    "visual",
-                )
-            elif craft_stage == "media" and canary.is_file():
-                pre(
-                    "i2v-suggest",
-                    f'aifilm capability --root "{r}" --suggest-i2v',
-                    "有 canary：核对 I2V 路由建议（改 spec 须显式 --apply）",
+                    "frw-fallback-review",
+                    f'aifilm manifest preflight --root "{r}"',
+                    "仅在已有 provider-switch receipt 时审计 FRW fallback 的输入/合同/媒体绑定",
                     "visual",
                 )
 
@@ -646,11 +645,7 @@ def build_dispatch(
     agent_do.append("用户说「可以/ok/一路做完」才 pilot approve / run_to_completion")
 
     # Fallback routing summary for media + Grok Build native tools
-    i2v_line = (
-        "grok_primary: still=image_edit(cast) · motion=image_to_video 720p · register image_to_video · env optional ltx-t2v"
-        if i2v_profile == "grok_primary"
-        else "seedance_first: canary → seedance i2v · else grok/ltx"
-    )
+    i2v_line = "grok_primary: still=image_edit(cast) · motion=image_to_video · FRW only after technical failure"
     routing = {
         "tts_default": "mimo",
         "tts_quality": "voicebox if app up",
@@ -658,8 +653,8 @@ def build_dispatch(
         "lipsync": "off default; canary after backend-lock",
         "i2v_profile": i2v_profile,
         "i2v": i2v_line,
-        "env_plate": "FRW ltx-t2v (ltx-文生视频) unlimited — aifilm env-plate; no faces",
-        "lipsync_frw": "opt-in CU dialogue: aifilm frw-lipsync probe → run face+audio (403/502 common)",
+        "env_plate": "Grok image_to_video no-face path; FRW env-plate only after technical failure",
+        "lipsync_frw": "FRW lipsync is fallback-only; upload-probe and new receipt required",
         "ref": "references/frw-lipsync.md · ltx-env-plate.md · i2v-grok-primary.md",
         "grok_build": {
             "host": "Grok Build session (native tools)",
@@ -667,11 +662,7 @@ def build_dispatch(
             "text": "Reasoning + structured JSON → brief / director_intent / beats / film-spec",
             "tools": "web_search · x_* · shell/aifilm · optional MCP collections",
             "image": "image_gen · image_edit(cast); batch: grok-oauth image|image-edit",
-            "video": (
-                "BULK: image_to_video; batch OAuth: grok-oauth video --image kf --wait"
-                if i2v_profile == "grok_primary"
-                else "bulk FRW Seedance; Grok I2V fallback; batch: grok-oauth video"
-            ),
+            "video": "PRIMARY: image_to_video; batch OAuth: grok-oauth video --image kf --wait; FRW fallback-only",
             "voice": "session chat ≠ VO; default MiMo (MIMO_API_KEY); opt-in: --tts-backend grok (speech tags)",
             "memory": "film-root + receipts (project RAG default)",
             "sdk_optional": "OAuth first; XAI_API_KEY only if no auth.json",
@@ -930,6 +921,7 @@ def build_dispatch(
             "warning_count": len(post_audit.get("warnings") or []),
             "freshness": freshness,
         },
+        "scene_sound": scene_sound,
         "hard_gates": [
             "write-spec before media-queue",
             "pilot user approve before bulk (>3 shots)",

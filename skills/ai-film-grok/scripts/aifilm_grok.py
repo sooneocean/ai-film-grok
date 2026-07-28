@@ -67,7 +67,7 @@ from util import sha256_file, utc_now, write_json
 from util.errors import FilmError  # noqa: E402 — re-exported for backward compat
 from visual_bible import load_bible
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MANIFEST_NAME = "manifest.json"
 DEFAULT_FPS = 30
 DEFAULT_WIDTH = 720
@@ -272,6 +272,10 @@ def empty_manifest(*, title: str, theme: str, aspect: str) -> dict[str, Any]:
         "height": h,
         "created_at": utc_now(),
         "updated_at": utc_now(),
+        "truth_contract": {
+            "source_of_truth": "local-contract-and-receipts",
+            "contract_sha256": "",
+        },
         "style_locked": False,
         "stills": {},
         "clips": {},
@@ -759,6 +763,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     # Existing projects and clients remain on v2 until they explicitly opt in
     # to v3; v3 changes the review input contract and must not be silent.
     manifest["review_contract_version"] = 2
+    manifest["truth_contract"]["contract_sha256"] = sha256_file(root / "film-spec.json")
     save_manifest(root, manifest)
     try:
         from pipeline_events import append_event
@@ -887,13 +892,18 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     from clip_uniqueness import active_clip_reuse_report
 
     uniqueness = active_clip_reuse_report(manifest, required_shot_ids=shot_ids)
+    from manifest_truth import preflight_manifest
+
+    manifest_truth = preflight_manifest(root, manifest)
     clips_complete = (
-        bool(shot_ids)
+        manifest_truth["ok"]
+        and bool(shot_ids)
         and all(sid in approved_clips for sid in shot_ids)
         and uniqueness["ok"]
         and style_reference_ok
     )
     gates = {
+        "manifest_current": manifest_truth["ok"],
         "brief": (root / "brief.json").is_file(),
         "style_locked": bool(style.get("locked")) and style_reference_ok,
         "spec": bool(shots) and spec_error is None,
@@ -903,7 +913,11 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         "assembled": assembled,
         "reshoots_clear": reshoots_clear(dnotes),
         "final_complete": bool(
-            clips_complete and final_technical_ok and review_ok and reshoots_clear(dnotes)
+            manifest_truth["ok"]
+            and clips_complete
+            and final_technical_ok
+            and review_ok
+            and reshoots_clear(dnotes)
         ),
         "desktop_exported": bool(
             outputs.get("desktop_dir") and Path(outputs["desktop_dir"]).is_dir()
@@ -922,6 +936,7 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         "final_review_ok": review_ok,
         "style_reference_ok": style_reference_ok,
         "clip_uniqueness": uniqueness,
+        "manifest_truth": manifest_truth,
         "open_reshoots": open_items,
         "open_reshoot_count": len(open_items),
         "director_notes_path": str(director_notes_path(root))
@@ -1513,6 +1528,14 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
     write_json(root / "timeline.json", timeline)
     cont = spec.get("_continuity_lint") or lint_continuity(shots)
     write_json(root / "continuity_lint.json", cont)
+    # Reconcile after writing the projection so the receipt binds the current
+    # shot actions instead of the stale pre-write spec.
+    try:
+        from scene_sound import reconcile as reconcile_scene_sound
+
+        scene_sound = reconcile_scene_sound(root, write=True)
+    except Exception as exc:
+        raise FilmError(f"scene-sound reconcile failed: {exc}") from exc
     emit(
         {
             "ok": True,
@@ -1525,6 +1548,7 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
             "long_form": is_long_form(spec, shots),
             "transition_intents": spec.get("transition_intents"),
             "sound_plan": spec.get("sound_plan"),
+            "scene_sound": scene_sound,
         }
     )
     return 0
@@ -4474,6 +4498,21 @@ def cmd_frw(args: argparse.Namespace) -> int:
     return proc.returncode
 
 
+def cmd_manifest(args: argparse.Namespace) -> int:
+    """Preflight or explicitly migrate a manifest before production use."""
+    from manifest_truth import migrate_manifest, preflight_manifest
+
+    root = Path(args.root).expanduser().resolve()
+    manifest = load_manifest(root)
+    if args.manifest_action == "preflight":
+        report = preflight_manifest(root, manifest)
+        emit(report)
+        return 0 if report["ok"] else 2
+    report = migrate_manifest(root, write=bool(args.write))
+    emit(report)
+    return 0 if report["ok"] else 2
+
+
 def cmd_export_desktop(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     desktop = Path.home() / "Desktop"
@@ -7142,6 +7181,38 @@ def build_parser() -> argparse.ArgumentParser:
                 "--timeout", type=int, default=45, help="1-120 seconds; default 45"
             )
 
+    semantic_index = sub.add_parser(
+        "semantic-index",
+        help="Opt-in private semantic retrieval; returns source-bound review candidates only",
+    )
+    semantic_index_sub = semantic_index.add_subparsers(dest="semantic_index_action", required=True)
+    for action, help_text in (
+        ("build", "Embed allowlisted local authoring records into a derived index"),
+        ("query", "Return ranked source-bound candidates from a fresh local index"),
+    ):
+        action_parser = semantic_index_sub.add_parser(action, help=help_text)
+        action_parser.add_argument("--root", required=True, help="Film root")
+        action_parser.add_argument(
+            "--base-url",
+            default=os.environ.get("AIFILM_LOCAL_EMBEDDING_BASE_URL", ""),
+            help="Private OpenAI-compatible /v1 URL (or AIFILM_LOCAL_EMBEDDING_BASE_URL)",
+        )
+        action_parser.add_argument(
+            "--model",
+            default="text-embedding-nomic-embed-text-v1.5",
+            help="Approved local embedding model; default text-embedding-nomic-embed-text-v1.5",
+        )
+        action_parser.add_argument(
+            "--timeout", type=int, default=45, help="1-120 seconds; default 45"
+        )
+        if action == "query":
+            action_parser.add_argument(
+                "--query", required=True, help="Question to retrieve local candidates"
+            )
+            action_parser.add_argument(
+                "--limit", type=int, default=5, help="1-20 results; default 5"
+            )
+
     ledger = sub.add_parser(
         "director-ledger", help="Build checksum-bound ledger of human-approved exceptions"
     )
@@ -7641,6 +7712,18 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    manifest_cmd = sub.add_parser(
+        "manifest", help="Preflight or explicitly migrate production manifest truth"
+    )
+    manifest_sub = manifest_cmd.add_subparsers(dest="manifest_action", required=True)
+    manifest_preflight = manifest_sub.add_parser("preflight")
+    manifest_preflight.add_argument("--root", required=True)
+    manifest_migrate = manifest_sub.add_parser("migrate")
+    manifest_migrate.add_argument("--root", required=True)
+    manifest_migrate.add_argument(
+        "--write", action="store_true", help="Persist only when migration preflight passes"
+    )
+
     from cli_graph import add_graph_parsers
 
     add_graph_parsers(sub)
@@ -7758,6 +7841,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        # Every film-root plugin command refreshes the lightweight scene-sound
+        # receipt before its own work. It never generates, downloads, or mutates
+        # film-spec; write-spec repeats it after writing the new projection.
+        if getattr(args, "root", None):
+            root = Path(args.root).expanduser().resolve()
+            if (root / "film-spec.json").is_file():
+                from scene_sound import reconcile as reconcile_scene_sound
+
+                reconcile_scene_sound(root, write=not bool(getattr(args, "no_write", False)))
         # Fast dispatch: simple one-command → one-handler (61 commands).
         # Inline branches below handle lazy imports / sub-actions.
         _SIMPLE_DISPATCH: dict[str, argparse.Namespace] = {
@@ -7824,6 +7916,7 @@ def main(argv: list[str] | None = None) -> int:
             "register-final": cmd_register_final,
             "export-desktop": cmd_export_desktop,
             "frw": cmd_frw,
+            "manifest": cmd_manifest,
             "director": cmd_director,
             "department": cmd_department,
             "plan": cmd_plan,
@@ -7872,6 +7965,34 @@ def main(argv: list[str] | None = None) -> int:
                 raise FilmError(f"{exc.code}: {exc}") from exc
             emit(report)
             return 0 if report.get("ok", True) else 2
+
+        if args.cmd == "semantic-index":
+            from semantic_index import SemanticIndexError, build_index, query_index
+
+            try:
+                token = os.environ.get("AIFILM_LOCAL_EMBEDDING_TOKEN") or None
+                if args.semantic_index_action == "build":
+                    report = build_index(
+                        args.root,
+                        args.base_url,
+                        model=args.model,
+                        token=token,
+                        timeout=args.timeout,
+                    )
+                else:
+                    report = query_index(
+                        args.root,
+                        args.base_url,
+                        model=args.model,
+                        query=args.query,
+                        limit=args.limit,
+                        token=token,
+                        timeout=args.timeout,
+                    )
+            except SemanticIndexError as exc:
+                raise FilmError(f"SEMANTIC_INDEX_ERROR: {exc}") from exc
+            emit(report)
+            return 0
 
         if args.cmd == "narrative-evidence":
             from narrative_evidence import (

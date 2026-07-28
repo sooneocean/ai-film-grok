@@ -73,21 +73,21 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 ## 技术栈（你实际在用什么）
 
-### 核心生成：Grok 身份 + FRW Seedance 动态
+### 核心生成：Grok primary + FRW fallback
 
 | 能力 | 在本 skill 中的角色 | 入口 |
 |------|---------------------|------|
 | **Grok Imagine（图像）** | 文生图 / 图生图：风格样张、定妆、每镜关键帧 | `image_gen`、`image_edit` |
 | **Grok Imagine Video** | 当前 `grok_primary` 默认 I2V | `image_to_video` |
-| **FRW Seedance（显式恢复）** | canary + pilot 通过后用于已批 keyframe；**9:16 720p 原生** | `"$AIFILM" frw newvideo --model seedance-2-fast-i2v` |
+| **FRW Seedance（技术备援）** | Grok 明确技术失败后，先 upload-probe 再使用；保留原生尺寸 | `"$AIFILM" frw newvideo --model seedance-2-fast-i2v` |
 
 要点：
 
-- **分层**：Still 锁身份用 Grok；bulk 动画当前默认 **Grok**。Seedance 仅在 canary + pilot 通过后显式恢复。
-- 恢复 Seedance 时，film-spec 使用 `i2v_provider: frw` + `frw_video_model: seedance-2-fast-i2v` + `frw_resolution: 720p`。
+- **分层**：静帧与 bulk 动画都默认 **Grok**；FRW 只能在可判定技术失败后自动备援，并写 provider-switch receipt。
+- FRW fallback 必须区分 `FRW_API_KEY`（任务 API）与 `FRW_TOKEN`（上传 JWT）；上传前执行 `upload-probe`。
 - **禁止** 默认 legacy `img2video`；**禁止** 576 生成再放大到 720 当高清。  
 - Python **不内嵌 key**：Grok 工具由 agent 调；FRW 经 `frw_dispatch` + frwclaw `.env`；本仓库负责 **规格、队列、QA、成片门禁**。  
-- **单 provider 原则**：同一角色禁止半片 Grok still + 半片 FRW still；2V 禁止半 Seedance 半 legacy。
+- **单镜头 provider 原则**：同一 shot 一旦切到 FRW fallback，后续重试固定 FRW；不得把切换隐藏在 manifest 中。
 ### 本地控制台与成片
 
 高质量竖屏项目可显式启用 authored creative gates：

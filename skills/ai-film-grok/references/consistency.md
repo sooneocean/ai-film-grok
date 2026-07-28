@@ -208,19 +208,19 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 4. 缺 `approved_by: user`（或会话中用户原话批准）→ **禁止**批量。  
 5. 全片 still **同一 img2img 锚**（cast master）。禁止「机构戏用 cast、色气戏用 naked 用户图」两套锚。用户高色气图只作 **style 参考/lookbook**，定妆锚用着衣 cast。
 
-## 3. Provider 路由（Grok 默认 + FRW Seedance 显式恢复）
+## 3. Provider 路由（Grok primary + FRW technical fallback）
 
 当前可复现默认是 `grok_primary`。Seedance 只有 provider canary 与当前项目 pilot 都通过后才能显式恢复；定妆 / still 仍使用 **Grok**。完整契约见 [hard-defaults.md](hard-defaults.md)、[frw-degrade-dispatch.md](frw-degrade-dispatch.md) 与历史 Seedance lessons。
 
 | 规则 | 要求 |
 |------|------|
-| **分层** | 创作/身份 → Grok still；bulk 默认 Grok；FRW Seedance `newvideo` 仅在 canary + pilot 通过后启用 |
-| **Key canary** | bulk 前 `balance` + Seedance 一枪 + `ltx-t2v`；**403**=未开通，**502**=平台挂 |
-| film-spec | 默认 `i2v_provider: grok`；显式恢复时使用 `frw` + `seedance-2-fast-i2v` |
-| Seedance 全 403 | L1→**Grok 720p**；L2→**`ltx-t2v`**→classic t2v；legacy I2V 仅显式救生艇 |
+| **分层** | 创作/身份/动画 → Grok；FRW 只在 Grok 技术失败后启用 |
+| **Key canary** | 仅 fallback 前执行 upload-probe；API key 与 upload JWT 分离 |
+| film-spec | 默认 `i2v_provider: grok`；FRW 仅写入 shot 级 fallback receipt |
+| 技术失败 | Grok timeout/429/5xx/连接失败 → FRW；质量拒绝、人工拒绝、未知错误不自动切换 |
 | 锚点（若 FRW still） | 必须先 `upload` cast；每镜 **img2image**（禁止 text2image 出主角） |
 | 模型 | FRW 侧 **整片固定同一 `frw_video_model`**；禁止半 Seedance 半 legacy 冒充 |
-| 尺寸 | 固定同一画幅；9:16 **原生 720p**（`frw_resolution: 720p`）；**禁止** 576 生成再放大到 720 |
+| 尺寸 | 保留 provider 原生画幅；9:16 的 FRW pair 可为 **704×1280**；禁止强制 720 或拉伸 |
 | Prompt | 每镜前缀同一 `identity_lock` + `signature_block`；场景句放后半；Seedance 用 `@Image1 …` |
 | **分镜动态** | 默认 **`newvideo --model seedance-2-fast-i2v`**；有明确尾帧 **`seedance-2-pro-flf`** |
 | **禁止默认** | legacy `img2video` / 旧 FLF 模板（须显式 `legacy-img2video`） |
@@ -229,7 +229,7 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 | 禁止 | 半片 Grok still + 半片 FRW still 混剪同一角色 |
 | 禁止 | 长期半片 Grok I2V + 半片 FRW I2V（单镜兜底后尽快统一） |
 | 禁止 | 错 poll 的 `frw_batch_flf`；把 Grok I2V 说成 FLF；403 后仍写 model=seedance |
-| 质检 | 每 5 镜抽 1 镜对照 cast；失败整批 pause；pilot 3 镜 Seedance 人审 fail → 不 bulk |
+| 质检 | 每 5 镜抽 1 镜对照 cast；失败整批 pause；pilot 3 镜 Grok 人审 fail → 不 bulk；FRW 只承接技术失败 |
 | 注册 | `--review-note` 写真实 `provider=` `model=` `fallback=` `res=` `identity_lock_ok` |
 
 ```bash

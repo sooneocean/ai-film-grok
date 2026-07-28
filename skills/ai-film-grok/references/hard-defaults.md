@@ -69,20 +69,20 @@
 
 | 规则 | 默认 |
 |---|---|
-| bulk 2V | **当前 `grok_primary`**：Grok `image_to_video` 720p 串行；Seedance 恢复后 `seedance_first` |
+| bulk 2V | **`grok_primary`**：Grok `image_to_video`；FRW Seedance/LTX 仅在技术失败后 fallback |
 | **高动态常态（P0 · 2026-07-27）** | **产品硬底**：平常 mean≥**18**；肉戏 act/climax mean≥**20**（目标≥24）；成片 1:00→片尾包络≥**18**。禁止 Ken Burns/仅微呼吸/弱 raw 装片；多 take 取 mean 最高且时长≥镜长；肉戏 10s 优先 **6s×2 hybrid**。交付前写 `i2v-high-motion-audit` + `i2v-final-gate`；**仅 gate ok 才拷桌面 film_final**。**代码入口**：`scripts/i2v_motion_gate.py`（`MEAN_NORMAL_FLOOR=18` / `MEAN_MEAT_FLOOR=20`）· CLI `aifilm i2v-motion-gate --rows …`。见 [high-motion-style-lock](lessons-2026-07-27-high-motion-style-lock-final.md) |
 | **I2V 画风锁 MEDIUM（P0 · 同案）** | 源图= style-locked still/keyframe；prompt 首段 **MEDIUM LOCK cel anime**（match style-v1；禁 photoreal/3D/半写实油光）；高动重跑与 last-frame 连戏 **不得** 用 mean 换 medium fail；交付前 style audit 抽帧。见同上 lesson |
 | **vocal_color 默认** | **never**（2026-07-27 用户永久禁娇喘轨除非显式恢复）；`forbid_vocal_color` / gain=0 |
-| I2V profile | `AIFILM_I2V_PROFILE=grok_primary\|seedance_first`；`write-spec` auto 跟 profile |
-| FRW key canary | Seedance 季：bulk 前必 canary；**grok_primary 季可选**（仅 env LTX） |
+| I2V profile | `AIFILM_I2V_PROFILE` 仅兼容读取；`write-spec` 的 `auto` 永远是 Grok primary |
+| FRW key canary | 仅在 provider-switch 后执行 `upload-probe`；不会作为 Grok primary 的前置步骤 |
 | 403 / 502 | **403**=未开通；**502**=平台挂；勿混淆 |
-| Seedance 不可用 | L1→**Grok I2V**；L2/无角色→**FRW `ltx-t2v`**（`env-plate`，无限额度）；禁默认 legacy |
-| env 无脸 | `shot_role=env\|bridge\|insert` → `aifilm env-plate` · register `frw_ltx_t2v`；禁 T2V 锁脸 |
+| FRW fallback | Grok timeout/429/5xx/连接失败后才进入 typed FRW upload/I2I/FLF；质量/人工拒绝不切换 |
+| env 无脸 | 默认仍走 Grok no-face motion；FRW `env-plate` 只有 provider-switch receipt 后可用 |
 | 口型 | 默认 off（说书）；对白近景 opt-in `frw-lipsync probe`→run；403/502 跳过勿硬上 |
 | 静帧 | 主角 Grok **`image_edit(cast)`**；禁反复纯 `image_gen`；加载 `/imagine` |
-| **静帧几何·禁压缩** | **P0**（2026-07-22）：I2V 前 keyframe **≥720×1280 且 9:16 竖比**；禁横图/缩略图/缩水 jpg；`register-still`+`preflight` 硬闸；同 stem 优先全分辨率 png。见 [keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md) |
+| **静帧几何·禁压缩** | **P0**：I2V 前 keyframe **≥704×1280 且 9:16 竖比**；FRW 原生 704×1280 不强制升到 720；禁横图/缩略图/缩水 jpg。 |
 | **先验后生·算力刀口** | **P0**（2026-07-22）：**验证通过才烧下一级**（still 先验→I2V；ref 先验→image_edit bulk）。禁止未验批量 I2V/出图；坏了只修上游。见 [verify-before-generate](lessons-2026-07-22-verify-before-generate.md) |
-| Grok Build | 推理+Imagine 优先；无原生 T2V；bulk 动默认 FRW；会话外 xai-sdk 可选非默认 |
+| Grok Build | 推理+Imagine 优先；静帧与 bulk 动默认 Grok；会话外 OAuth 仅批处理入口 |
 | 构图 | 禁裁头（P0·2026-07-27 强化）：主戏镜 full head+headroom；**裁脚优先于裁头**；定器特写=「脸+结合同镜」或短 insert，禁无头主镜；打包慎用 increase+crop 切顶。见 [headroom-no-crop-heads](lessons-2026-07-27-headroom-no-crop-heads.md) |
 | 库存 | film-spec 镜数 = approved clips |
 | 同源 | 禁止半 Grok 半 FRW still/2V |
