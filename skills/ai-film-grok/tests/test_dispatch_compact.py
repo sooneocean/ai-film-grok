@@ -149,6 +149,10 @@ def test_state_hash_ignores_dispatch_telemetry_but_tracks_control_inputs(
     receipts.mkdir()
     (receipts / "dispatch.json").write_text('{"noise":1}', encoding="utf-8")
     (receipts / "orchestration-usage.jsonl").write_text("{}\n", encoding="utf-8")
+    (receipts / "scene-sound-status.json").write_text(
+        '{"checked_at":"2026-07-28T00:00:00Z"}\n',
+        encoding="utf-8",
+    )
     assert compute_state_hash(tmp_path) == first
     (tmp_path / "film-spec.json").write_text('{"title":"changed"}\n', encoding="utf-8")
     assert compute_state_hash(tmp_path) != first
@@ -196,6 +200,10 @@ def test_capability_cache_reuses_safe_projection(tmp_path: Path) -> None:
 def test_unchanged_local_dispatch_uses_state_cache(tmp_path: Path) -> None:
     _film(tmp_path)
     build_dispatch(tmp_path, include_capability=False, write_receipt=True)
+    scene_sound_receipt = tmp_path / "receipts" / "scene-sound-status.json"
+    scene_sound_status = json.loads(scene_sound_receipt.read_text(encoding="utf-8"))
+    scene_sound_status["checked_at"] = "2099-01-01T00:00:00+00:00"
+    scene_sound_receipt.write_text(json.dumps(scene_sound_status) + "\n", encoding="utf-8")
     build_dispatch(tmp_path, include_capability=False, write_receipt=True)
     cached = build_dispatch(tmp_path, include_capability=False, write_receipt=True)
     assert cached["metrics"]["state_cache_hit"] is True
@@ -212,6 +220,27 @@ def test_dispatch_does_not_derive_graph_as_a_read_side_effect(tmp_path: Path) ->
     )
     assert packet["next_id"] == "write-spec"
     assert not (tmp_path / "drama-graph.json").exists()
+
+
+def test_scene_sound_preempts_only_after_timing_and_audio_timeline_are_ready(
+    tmp_path: Path,
+) -> None:
+    _film(tmp_path)
+    spec_path = tmp_path / "film-spec.json"
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    spec["shots"][0]["duration_sec"] = 4.0
+    spec["audio_timeline_v1"] = True
+    spec_path.write_text(json.dumps(spec) + "\n", encoding="utf-8")
+
+    packet = build_dispatch(
+        tmp_path,
+        include_capability=False,
+        write_receipt=False,
+        use_state_cache=False,
+    )
+
+    assert packet["scene_sound"]["status"] == "blocked"
+    assert packet["next_id"] == "scene-sound-plan"
 
 
 def test_orchestration_metrics_are_separate_from_generation_usage(tmp_path: Path) -> None:

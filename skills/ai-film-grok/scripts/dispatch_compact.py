@@ -19,6 +19,7 @@ _STATE_IGNORES = {
     "capability-cache.json",
     "orchestration-usage.jsonl",
     "pipeline_stage.json",
+    "scene-sound-status.json",
 }
 HARD_GATE_CODES = [
     "WRITE_SPEC_REQUIRED",

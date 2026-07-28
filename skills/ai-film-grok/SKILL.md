@@ -35,7 +35,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 1. **故事真相**：`drama-graph.json` 真相，`film-spec.json` 投影；locks + projection hash 齐再进媒体；先 Director’s Lens（[directors-lens.md](references/directors-lens.md)）。
 2. **用户原文保真**：用户剧本/对白/主题是脊柱，模板禁整句覆盖。
 3. **身份与介质**：先锁 medium/cast/face；角色 still 只编辑已批来源；moderated 禁 `image_gen` 绕脸；漫剧默认 manhua。
-4. **先验后生**：still 过身份/结构/画风/几何（≥720×1280 9:16）才 I2V。
+4. **先验后生**：still 过身份/结构/画风/几何（9:16 默认 ≥704×1280；接受 provider 原生 704×1280，不强制放大）才 I2V。
 5. **连续性**：`state-index check|plan` 先于 bulk；衣着只前进；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 须用户批；付费绑 hash/预算；`generation-usage.json`；`advance` 遇 human/paid/external 暂停。
 7. **供应商**：I2V 默认 `grok_primary`；恢复路径才用 `frw_video_model=seedance-2-fast-i2v`（见 [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)），禁静默 bulk。

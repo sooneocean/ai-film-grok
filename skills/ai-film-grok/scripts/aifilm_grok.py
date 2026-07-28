@@ -1519,6 +1519,9 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
         }
     write_json(root / "film-spec.json", spec)
     manifest = load_manifest(root)
+    truth = manifest.get("truth_contract")
+    if isinstance(truth, dict):
+        truth["contract_sha256"] = sha256_file(root / "film-spec.json")
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
     # seed timeline placeholders

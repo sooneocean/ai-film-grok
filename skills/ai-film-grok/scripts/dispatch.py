@@ -302,15 +302,11 @@ def build_dispatch(
     )
     receipt_path = root / "receipts" / "dispatch.json"
     previous = read_json(receipt_path) if use_state_cache else None
-    if (
-        scene_sound.get("status") == "ok"
-        and isinstance(previous, dict)
-        and _cached_packet_is_reusable(
-            previous,
-            state_hash=state_hash,
-            include_capability=include_capability,
-            refresh_capability=refresh_capability,
-        )
+    if isinstance(previous, dict) and _cached_packet_is_reusable(
+        previous,
+        state_hash=state_hash,
+        include_capability=include_capability,
+        refresh_capability=refresh_capability,
     ):
         packet = dict(previous)
         packet["scene_sound"] = scene_sound
@@ -352,7 +348,20 @@ def build_dispatch(
             }
         )
 
-    if scene_sound.get("status") != "ok":
+    spec_for_routing = read_json(root / "film-spec.json") or {}
+    routed_shots = (
+        spec_for_routing.get("shots") if isinstance(spec_for_routing.get("shots"), list) else []
+    )
+    shots_are_timed = bool(routed_shots) and all(
+        isinstance(shot, dict)
+        and str(shot.get("id") or shot.get("shot_id") or "").strip()
+        and isinstance(shot.get("duration_sec"), (int, float))
+        and not isinstance(shot.get("duration_sec"), bool)
+        and float(shot["duration_sec"]) > 0
+        for shot in routed_shots
+    )
+    scene_sound_is_due = bool(shots_are_timed and spec_for_routing.get("audio_timeline_v1"))
+    if scene_sound_is_due and scene_sound.get("status") != "ok":
         summary = scene_sound.get("summary") or {}
         pre(
             "scene-sound-plan",
@@ -361,6 +370,22 @@ def build_dispatch(
             f"required={summary.get('required', 0)} / blocked={summary.get('blocked', 0)} / "
             f"needs_review={summary.get('needs_review', 0)}；先补环境音、脚步、门或道具拟音",
             "voice",
+        )
+    elif scene_sound.get("status") != "ok":
+        summary = scene_sound.get("summary") or {}
+        actions.append(
+            {
+                "id": "scene-sound-plan",
+                "cmd": f'aifilm audio-plan --root "{r}" --compile --validate',
+                "why": (
+                    "场景声音已发现但尚未到声音阶段："
+                    f"required={summary.get('required', 0)} / "
+                    f"blocked={summary.get('blocked', 0)}；先完成故事、镜头与投影"
+                ),
+                "stage": "voice",
+                "stage_label": "voice",
+                "source": "deferred_scene_sound",
+            }
         )
 
     # I2V profile (Grok primary; every FRW route is fallback-only)
