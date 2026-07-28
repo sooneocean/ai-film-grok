@@ -81,7 +81,7 @@
     "scripts/cli_workshop.py": "1709c864f0520f67ae6a7d5b327b49b8e537a293d8074adb9af274db4a0ec192",
     "scripts/clip_uniqueness.py": "6172ddc41749385b9b513cb933063a072ee5ba0a9efd8ec69a4734fb462b4375",
     "scripts/color_grade.py": "9491a3edeab9246208f0c1dd49b930ae7eae07919f55df56dd198469c62ed1dc",
-    "scripts/comfy_video.py": "04dcb644e6a1c2f1b3a03ffcc8facadf20c06db338dd90d5b96f4385d2939f77",
+    "scripts/comfy_video.py": "9430a7756d980335bfdd1140dab6364b7f5f1f753bc8890d0fa0ea4b18e03821",
     "scripts/compose_preview.py": "e2c42fb8af65a21301ca6e89c2bdc6f5332301b0b5fc0b07b420ce4ffb46cf0a",
     "scripts/compose_render.py": "66ce5f7a3efaa7af55316525687c85a7ad62c644bb953438ee004db714a8482e",
     "scripts/config_loader.py": "570ecbbdf15e44d9010193fca344de8a0720f003228a9d310192c4eaf79db76e",
