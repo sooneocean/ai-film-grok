@@ -45,7 +45,7 @@
     "scripts/audio_timeline.py": "964532922c4311fd81a87ac7f54e11c5162e9b6d92dc12b036ce78613628fb30",
     "scripts/audio_tts_manifest.py": "d3a90f2d529e1e9190139571464f46238dc9bd34f954e0907580a14d2c47252d",
     "scripts/audio_tts_render.py": "81bd34a0f3d3311233ce4b79ab9752430f204c5a038269292f198deb3f093aff",
-    "scripts/audio_visual_alignment.py": "f4374ab9344a05d1c7760fb7b8c87418dcb7770b99df1c886629a9659dcbfcf7",
+    "scripts/audio_visual_alignment.py": "13f20f59df5acded9d0a8423b97b8cdf006f64960c7c44007314bbef537a8ef1",
     "scripts/auto_cut.py": "186e87f796e6d33905746bc61aef0870d510fae416bdbdc04b6c7af50f7d9c4a",
     "scripts/automation_verify.py": "68e597c6f72906b4ac4b369c1789c1fa30946751b75a64736d0e27eabfc7fdb8",
     "scripts/backend-lock": "60b86b253cb393b587af4ca6e63a2403daa42b515f7501fffe407e2b8e257f25",

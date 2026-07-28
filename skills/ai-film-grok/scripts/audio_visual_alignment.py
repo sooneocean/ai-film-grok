@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from subtitle_dialogue_alignment import build_subtitle_dialogue_alignment
-from util import read_json, write_json
+from util import read_json, sha256_file, write_json
 
 # Tolerance: BGM cue points should land within this many seconds of a shot boundary
 CUE_TOLERANCE_SEC = 0.5
@@ -135,21 +135,42 @@ def compute_av_alignment_score(
     return score
 
 
+def _load_verified_mix(root: Path) -> tuple[Path | None, dict[str, Any], str | None]:
+    """Resolve the renderer's canonical mix report and bind its local artifacts."""
+    path = root / "audio" / "mix_report.json"
+    if not path.is_file():
+        return None, {}, "AUDIO_MIX_REPORT_MISSING"
+    report = read_json(path) or {}
+    artifacts = report.get("artifacts") if isinstance(report.get("artifacts"), dict) else {}
+    for name in ("bgm", "sfx", "mixed"):
+        item = artifacts.get(name) if isinstance(artifacts, dict) else None
+        artifact = Path(str((item or {}).get("path") or "")).expanduser()
+        if not artifact.is_file() or not str((item or {}).get("sha256") or ""):
+            return path, report, "AUDIO_MIX_EVIDENCE_INVALID"
+        try:
+            artifact.resolve().relative_to(root)
+        except ValueError:
+            return path, report, "AUDIO_MIX_EVIDENCE_INVALID"
+        if sha256_file(artifact) != item["sha256"]:
+            return path, report, "AUDIO_MIX_EVIDENCE_INVALID"
+    return path, report, None
+
+
 def build_audio_visual_alignment(root: Path, *, write: bool = True) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
     subtitle = build_subtitle_dialogue_alignment(root, write=False)
     receipts = root / "receipts"
-    mix = read_json(receipts / "mix_report.json") or {}
+    mix_path, mix, mix_error = _load_verified_mix(root)
     tts = read_json(receipts / "tts-rehearsal.json") or {}
     errors: list[dict[str, str]] = list(subtitle.get("errors") or [])
     timeline = read_json(root / "timeline.json") or {}
     spec = read_json(root / "film-spec.json") or {}
     has_shots = bool(timeline.get("shots"))
-    if has_shots and not mix:
+    if has_shots and mix_error:
         errors.append(
             {
-                "code": "AUDIO_MIX_REPORT_MISSING",
-                "message": "timeline exists but receipts/mix_report.json is missing",
+                "code": mix_error,
+                "message": "timeline exists but mix report is missing or its artifacts are stale",
             }
         )
     if tts and tts.get("ok") is False:
@@ -201,8 +222,8 @@ def build_audio_visual_alignment(root: Path, *, write: bool = True) -> dict[str,
         "vo_cut_issues": vo_issues,
         "subtitle_alignment": subtitle,
         "audio": {
-            "mix_report_present": bool(mix),
-            "mix_report_path": str(receipts / "mix_report.json") if mix else None,
+            "mix_report_present": bool(mix) and mix_error is None,
+            "mix_report_path": str(mix_path) if mix_path else None,
             "tts_rehearsal_present": bool(tts),
         },
         "errors": errors,
