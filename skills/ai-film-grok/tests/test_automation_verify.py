@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from automation_verify import build_verification_report
 
 

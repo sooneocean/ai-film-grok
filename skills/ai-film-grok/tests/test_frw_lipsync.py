@@ -22,8 +22,8 @@ sys.path.insert(0, str(SCRIPTS))
 
 from frw_lipsync import (  # noqa: E402
     DEFAULT_HOST,
-    FrwLipsyncError,
     LIPSYNC_MODELS,
+    FrwLipsyncError,
     _http_json,
     _load_frw_key,
     build_parameters,
@@ -125,8 +125,8 @@ class TestHttpJson(unittest.TestCase):
 
     def test_success_response(self):
         """200 response → returns (200, parsed_body)."""
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         mock_resp = mock.MagicMock()
         mock_resp.status = 200
@@ -141,8 +141,8 @@ class TestHttpJson(unittest.TestCase):
 
     def test_http_error_response(self):
         """HTTPError → returns (code, parsed_error_body)."""
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         exc = urllib.error.HTTPError(
             url="http://test", code=403,

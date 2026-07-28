@@ -20,8 +20,8 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from logger import (  # noqa: E402
-    LogLevel,
     Logger,
+    LogLevel,
     get_logger,
     log,
     set_level,

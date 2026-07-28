@@ -168,8 +168,9 @@ class TestBurnEndToEnd(unittest.TestCase):
         The subtitle overlay adds white text glyphs to the bottom band,
         so the pixel variance should be higher than a plain black frame.
         """
-        from PIL import Image
         import subprocess
+
+        from PIL import Image
 
         # Extract a frame from the middle of the burned video
         frame = Path(self.tmpdir) / "frame_burned.png"
