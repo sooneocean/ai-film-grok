@@ -170,7 +170,7 @@
     "scripts/quality_ledger.py": "a4913d60d3a705b104a011644bbae4a5de3ea86a2f322f4cbfab89bc996faeca",
     "scripts/real_footage.py": "39a81df151af196cce711e10a2df64bf7859cddabeabb8ee84b98e2b92ea4f08",
     "scripts/reference_audit.py": "09e7bf0abdeaa60f14abb3436052dcf5d0636f1214bf27a2a80bc045773251d2",
-    "scripts/render_final.py": "133df084ac930f93e9e7f95d1edb390cdab5c36cb513b5dc01e2d2b0fed44662",
+    "scripts/render_final.py": "f7c9bcec5e93a3fcf83e1a60f3224bafbc17bc67728eecd44ed11d1471b93ab6",
     "scripts/render_workspace.py": "b0d7bc1184d96a45cd1b3f2e0327478cb74ed63c0c5664841e5052f95ac6c84b",
     "scripts/review_control.py": "7b30fa5facf10a0a8b45a89cf4545fab16e4fdeb1755c14e50f0c7388a33fee0",
     "scripts/review_ui.py": "97877f0eac5a7cc23899dd4f94092d52ef8a469db130d8cc5ea73d4d525e4731",
