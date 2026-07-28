@@ -20,11 +20,27 @@ for ($offset = [int64]0; $offset -lt $expected; $offset += $chunkSize) {
     }
 
     $partial = "$part.partial"
-    Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue
-    & curl.exe -L --fail --retry 100 --retry-all-errors --retry-delay 10 --connect-timeout 30 `
-        --range "$offset-$end" -o $partial $url
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $partial) -or (Get-Item -LiteralPath $partial).Length -ne $want) {
-        throw "Higgs range $index did not produce its expected $want bytes"
+    $attempt = 0
+    while ($true) {
+        $have = if (Test-Path -LiteralPath $partial) { (Get-Item -LiteralPath $partial).Length } else { [int64]0 }
+        if ($have -gt $want) {
+            Remove-Item -LiteralPath $partial -Force
+            $have = [int64]0
+        }
+        $rangeStart = $offset + $have
+        if ($have -gt 0) {
+            & curl.exe -L --fail --connect-timeout 30 --speed-limit 1024 --speed-time 90 `
+                --range "$rangeStart-$end" --append -o $partial $url
+        } else {
+            & curl.exe -L --fail --connect-timeout 30 --speed-limit 1024 --speed-time 90 `
+                --range "$rangeStart-$end" -o $partial $url
+        }
+        if ((Test-Path -LiteralPath $partial) -and (Get-Item -LiteralPath $partial).Length -eq $want) {
+            break
+        }
+        $attempt++
+        if ($attempt -ge 100) { throw "Higgs range $index did not produce its expected $want bytes" }
+        Start-Sleep -Seconds 10
     }
     Move-Item -LiteralPath $partial -Destination $part -Force
 }
