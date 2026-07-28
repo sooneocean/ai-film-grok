@@ -8,6 +8,7 @@ any model is asked to make or modify media.
 
 from __future__ import annotations
 
+import os
 import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -125,7 +126,9 @@ def _capability(
     }
 
 
-def snapshot_capabilities(*, out: Path | str, base_url: str | None = None) -> dict[str, Any]:
+def snapshot_capabilities(
+    *, out: Path | str, base_url: str | None = None, verify_story: bool = False
+) -> dict[str, Any]:
     """Read M1/5090 readiness into a short-lived, no-spend capability snapshot."""
     from comfy_armory import load_armory, probe_armory
     from compose_render import probe_designed_post_tooling
@@ -218,6 +221,36 @@ def snapshot_capabilities(*, out: Path | str, base_url: str | None = None) -> di
 
     post = probe_designed_post_tooling()
     ffmpeg_ready = bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
+    story_available = False
+    story_verified = False
+    story_model = "local-llm-unconfigured"
+    story_observation: dict[str, Any] = {"configured": False, "verified": False}
+    story_base_url = os.environ.get("AIFILM_LOCAL_LLM_BASE_URL", "").strip()
+    if story_base_url:
+        story_observation["configured"] = True
+        try:
+            from local_llm import DEFAULT_MODEL, LocalLLMError, shot_draft
+            from local_llm import probe as probe_local_llm
+
+            token = os.environ.get("AIFILM_LOCAL_LLM_TOKEN") or None
+            local_probe = probe_local_llm(story_base_url, token=token)
+            story_available = local_probe.get("ok") is True
+            story_model = str(local_probe.get("model") or DEFAULT_MODEL)
+            if verify_story and story_available:
+                canary = shot_draft(
+                    story_base_url,
+                    token=token,
+                    prompt=(
+                        "Return two concise safe film-shot candidates as JSON. "
+                        "Shot one: a courier notices rain. Shot two: the courier protects a parcel."
+                    ),
+                )
+                story_verified = canary.get("status") == "candidate_only"
+            story_observation.update({"available": story_available, "verified": story_verified})
+        except LocalLLMError as exc:
+            story_observation.update({"available": False, "error": exc.code})
+        except Exception as exc:
+            story_observation.update({"available": False, "error": type(exc).__name__})
     capabilities.extend(
         [
             _capability(
@@ -241,10 +274,11 @@ def snapshot_capabilities(*, out: Path | str, base_url: str | None = None) -> di
             _capability(
                 capability_id="m1-story-reasoning",
                 provider="m1-local",
-                model="local-llm-unconfigured",
+                model=story_model,
                 domains=["story"],
-                status="blocked",
-                pilot_verified=False,
+                status="ready" if story_available else "blocked",
+                # A models-list response is not enough to bless story advice.
+                pilot_verified=story_verified,
                 resource="m1-local",
             ),
         ]
@@ -252,7 +286,7 @@ def snapshot_capabilities(*, out: Path | str, base_url: str | None = None) -> di
     observations["m1"] = {
         "ffmpeg_quality": ffmpeg_ready,
         "hyperframes": bool(post.get("hyperframes_ok")),
-        "story_model": "unconfigured",
+        "story_model": story_observation,
     }
     snapshot = {
         "schema_version": 1,

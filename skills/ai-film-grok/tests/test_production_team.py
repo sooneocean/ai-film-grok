@@ -10,7 +10,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from aifilm_grok import main  # noqa: E402
-from production_team import scaffold_team, validate_team  # noqa: E402
+from production_team import scaffold_team, snapshot_capabilities, validate_team  # noqa: E402
 
 
 def _snapshot(path: Path) -> None:
@@ -152,3 +152,36 @@ def test_team_cli_validation_reports_changed_snapshot(
         main(["team", "validate", "--plan", str(plan_path), "--capabilities", str(snapshot)]) == 2
     )
     assert "CAPABILITY_SNAPSHOT_CHANGED" in capsys.readouterr().out
+
+
+def test_snapshot_only_promotes_story_model_after_explicit_canary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import comfy_armory
+    import compose_render
+    import lipsync_backend
+    import local_llm
+    import tts_backend
+
+    monkeypatch.setenv("AIFILM_LOCAL_LLM_BASE_URL", "http://127.0.0.1:1234/v1")
+    monkeypatch.setattr(comfy_armory, "load_armory", lambda: {"weapons": []})
+    monkeypatch.setattr(comfy_armory, "probe_armory", lambda _url: {"ok": True, "ready_ids": []})
+    monkeypatch.setattr(compose_render, "probe_designed_post_tooling", lambda: {})
+    monkeypatch.setattr(lipsync_backend, "probe", lambda: {})
+    monkeypatch.setattr(tts_backend, "probe", lambda: {})
+    monkeypatch.setattr(
+        local_llm,
+        "probe",
+        lambda *_args, **_kwargs: {"ok": True, "model": "openai/gpt-oss-20b"},
+    )
+    monkeypatch.setattr(
+        local_llm, "shot_draft", lambda *_args, **_kwargs: {"status": "candidate_only"}
+    )
+
+    result = snapshot_capabilities(out=tmp_path / "capabilities.json", verify_story=True)
+    story = next(
+        item for item in result["snapshot"]["capabilities"] if item["id"] == "m1-story-reasoning"
+    )
+    assert story["status"] == "ready"
+    assert story["pilot_verified"] is True
+    assert result["observations"]["m1"]["story_model"]["verified"] is True

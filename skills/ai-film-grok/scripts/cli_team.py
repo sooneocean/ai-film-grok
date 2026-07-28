@@ -16,6 +16,11 @@ def add_team_parsers(subparsers: Any) -> None:
     )
     snapshot.add_argument("--out", required=True)
     snapshot.add_argument("--base-url", default=None)
+    snapshot.add_argument(
+        "--verify-story",
+        action="store_true",
+        help="Run one private local-LLM candidate check; default only probes configured models",
+    )
     scaffold = actions.add_parser("scaffold", help="Write a no-execution production-team template")
     scaffold.add_argument("--root", required=True)
     scaffold.add_argument("--capabilities", required=True)
@@ -49,7 +54,9 @@ def run(args: Any) -> tuple[dict[str, Any], int]:
     from production_team import scaffold_team, snapshot_capabilities, validate_team
 
     if args.team_action == "snapshot":
-        report = snapshot_capabilities(out=Path(args.out), base_url=args.base_url)
+        report = snapshot_capabilities(
+            out=Path(args.out), base_url=args.base_url, verify_story=bool(args.verify_story)
+        )
     elif args.team_action == "scaffold":
         report = scaffold_team(
             Path(args.root),

@@ -12,6 +12,13 @@ aifilm team scaffold --root artifacts/<film> \
   --capabilities artifacts/<film>/receipts/capability-snapshot.json
 ```
 
+若 M1 已在 `AIFILM_LOCAL_LLM_BASE_URL` 設定私網模型服務，預設 snapshot 只讀取模型清單；加入 `--verify-story` 才會跑一次固定、無法寫入故事真相的兩鏡頭候選測試，讓故事總監取得 pilot 證據：
+
+```bash
+aifilm team snapshot --verify-story \
+  --out artifacts/<film>/receipts/capability-snapshot.json
+```
+
 編輯 `production-team.json`：將每個 `model_capability_ids` 填入快照中屬於該總監專業領域的 ID；`local_tools` 僅是操作備註，不能取代可驗證模型。此檔只是責任與能力配置，不是授權。再在每次開始新階段前驗證：
 
 ```bash
