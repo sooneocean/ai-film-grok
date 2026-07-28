@@ -5,7 +5,7 @@ description: Grok Build 专用 AI 短片 skill：Idea→Verified 导演工序、
 
 # AI Film Grok
 
-把想法收成可恢复、可验收的 9:16 动态成片。真实 I2V/footage、混音、像素字幕与人工审片缺一不可；静图轮播、Ken Burns 或只有关键帧不算成片。
+把想法收成可恢复、可验收的 9:16 动态成片。真实 I2V/footage、混音、字幕与人工审片缺一不可；静图轮播或只有关键帧不算成片。
 
 ## 单一入口
 
@@ -19,9 +19,9 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" advance --root "<film>"
 ```
 
-每步后再 dispatch，只执行 `next_action`；读 `context_refs`（≤3）与 `weapon_route`。路由 ready、已授权且未锁 provider 就 live probe 后直用，失败即停。状态在 `receipts/dispatch.json`。
+每步后 dispatch，只执行 `next_action`；读 `context_refs`（≤3）与 `weapon_route`。路由 ready、已授权且未锁 provider 就 probe 后直用，失败即停。状态在 `receipts/dispatch.json`。
 
-导演骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture→Post→Master；八环与工具层只是投影。
+导演骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture→Post→Master。
 
 小说/剧本先 [story.receive](references/story-reception.md) → `plan run --received-file`；原文不可覆盖，lock 前须用户确认。
 
@@ -78,4 +78,4 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" review-final --root "<film>"
 ```
 
-按需：[production routing](references/production-routing-control-plane.md) · [semantic-index](references/semantic-index.md) · [Comfy LAN](references/comfy-lan-control.md) · [MMAudio SFX](references/mmaudio-sfx.md) · [hard-defaults](references/hard-defaults.md) · [双语剪辑](references/lessons-2026-07-20-cut-silk-bilingual.md)（`caption_mode`、`transition_fluency`） · [防双烧](references/lessons-2026-07-20-title-double-burn.md) · [Directors Lens 课](references/directors-lens.md) · [INDEX](references/INDEX.md)
+按需：[路由](references/production-routing-control-plane.md) · [索引](references/semantic-index.md) · [Comfy LAN](references/comfy-lan-control.md) · [MMAudio](references/mmaudio-sfx.md) · [硬规则](references/hard-defaults.md) · [双语剪辑](references/lessons-2026-07-20-cut-silk-bilingual.md)（`caption_mode`、`transition_fluency`） · [防双烧](references/lessons-2026-07-20-title-double-burn.md) · [导演课](references/directors-lens.md) · [INDEX](references/INDEX.md)
