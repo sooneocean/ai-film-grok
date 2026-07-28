@@ -101,6 +101,40 @@ class PromptInjector:
         )
 
     @staticmethod
+    def _get_heat_escalation_tokens(heat_phase: str, coitus_beat: str) -> str:
+        """Return intensity-boosting descriptors based on the erotic arc.
+
+        Arc: Setup -> Build-up -> Act (Piston) -> Climax (Release)
+        """
+        # Intensity levels: 1 (mild) to 4 (extreme)
+        # Mapping: heat_phase + coitus_beat -> descriptors
+        escalation_map = {
+            "setup": {
+                "default": "tense atmosphere, heavy breathing, lingering gaze",
+                "approach": "trembling anticipation, electric skin contact",
+            },
+            "foreplay": {
+                "default": "aroused skin, moisture, desperate touch, soft moans",
+                "entry": "edge of climax, urgent desire, slow spreading",
+            },
+            "act": {
+                "default": "deep rhythmic thrusting, skin slapping, wet friction, heavy panting",
+                "union": "tight lock, deep pelvis sink, rhythmic grinding",
+                "rhythm": "rapid piston motion, vigorous thrusting, sweat-slicked skin, intense hip travel",
+                "lock": "clutching tight, deep penetration, trembling thighs",
+            },
+            "climax": {
+                "default": "extreme ecstasy, back arching, uncontrollable shaking, blurred vision",
+                "finish": "explosive release, peak orgasm, fluid exchange, total surrender",
+                "release": "shuddering release, heavy gasping, peak pleasure",
+            },
+        }
+
+        phase_data = escalation_map.get(heat_phase, {})
+        # Prefer specific coitus_beat over default for that phase
+        return phase_data.get(coitus_beat, phase_data.get("default", ""))
+
+    @staticmethod
     def _identity_for_wardrobe(
         identity: str, wardrobe_state: str, shot: dict[str, Any] | None = None
     ) -> str:
@@ -381,13 +415,18 @@ class PromptInjector:
             .lower()
         )
         coitus_line = ""
-        if heat_phase in {"act", "climax"} or coitus_beat in {
-            "entry",
-            "union",
-            "rhythm",
-            "lock",
-            "finish",
-        } or sex_arc_beat in {"penetration", "climax_release", "entry"}:
+        if (
+            heat_phase in {"act", "climax"}
+            or coitus_beat
+            in {
+                "entry",
+                "union",
+                "rhythm",
+                "lock",
+                "finish",
+            }
+            or sex_arc_beat in {"penetration", "climax_release", "entry"}
+        ):
             coitus_line = (
                 "Coitus readability HARD: pelvis contact / hips-sink / straddle-seat "
                 "or grind must be visible in frame; NOT soft hug or eye-contact only; "
@@ -395,6 +434,12 @@ class PromptInjector:
                 f"sex_arc_beat={sex_arc_beat or 'n/a'}; weight down, thighs readable; "
                 "do NOT put clothes back on"
             )
+
+            # Add Dynamic Escalation Tokens based on the erotic arc
+            escalation_tokens = self._get_heat_escalation_tokens(heat_phase, coitus_beat)
+            if escalation_tokens:
+                coitus_line += f" | Intensity: {escalation_tokens}"
+
             parts.append(coitus_line)
             # Motion template bind by sex_arc / coitus (I2V thrust readability)
             motion_bind = {
@@ -412,9 +457,8 @@ class PromptInjector:
                     f"I2V motion HARD bind: {motion_bind[bind_key]}; "
                     "no soft lean / Ken Burns only; visible hip travel"
                 )
-            pw = (
-                shot.get("partner_wardrobe_state")
-                or (shot.get("dsl") or {}).get("partner_wardrobe_state")
+            pw = shot.get("partner_wardrobe_state") or (shot.get("dsl") or {}).get(
+                "partner_wardrobe_state"
             )
             if pw:
                 parts.append(
@@ -422,14 +466,16 @@ class PromptInjector:
                     "male/partner bottoms discarded when undressed|bare; "
                     "no pants/underwear during penetration"
                 )
-            cov = str(
-                shot.get("coverage_role")
-                or (shot.get("dsl") or {}).get("coverage_role")
-                or ""
-            ).strip().lower()
-            framing = str(
-                shot.get("framing") or (shot.get("dsl") or {}).get("framing") or ""
-            ).strip().lower()
+            cov = (
+                str(shot.get("coverage_role") or (shot.get("dsl") or {}).get("coverage_role") or "")
+                .strip()
+                .lower()
+            )
+            framing = (
+                str(shot.get("framing") or (shot.get("dsl") or {}).get("framing") or "")
+                .strip()
+                .lower()
+            )
             if cov == "detail" or any(
                 x in framing for x in ("union_closeup", "genital_lock", "waist_lock")
             ):

@@ -8,10 +8,11 @@ Backends (human-likeness roughly ↑):
   voicebox  — local open-source studio (https://github.com/jamiepine/voicebox) on :17493
   mimo      — Xiaomi MiMo V2.5 TTS (limited-time free; built-in Chinese voices) **film default**
   edge      — Microsoft Edge Neural (free explicit fallback; more synthetic)
-  external  — local CosyVoice / IndexTTS / 火山豆包 CLI via AIFILM_TTS_ARGV
+  cosyvoice-local — explicit local CosyVoice adapter (never selected automatically)
+  external  — arbitrary approved CLI via AIFILM_TTS_ARGV
 
 Env / config.env:
-  AIFILM_TTS_BACKEND=mimo|auto|minimax|fish|voicebox|edge|external|grok
+  AIFILM_TTS_BACKEND=mimo|auto|minimax|fish|voicebox|edge|external|cosyvoice-local|grok
   MIMO_API_KEY=...  MIMO_TTS_VOICE=冰糖  MIMO_TTS_MODEL=mimo-v2.5-tts
   AIFILM_GROK_TTS_VOICE=eve   # or ara, leo, carina, zagan, …
   AIFILM_GROK_TTS_LANGUAGE=zh
@@ -73,6 +74,7 @@ TTS_BACKENDS = frozenset(
         "voicebox",
         "edge",
         "external",
+        "cosyvoice-local",
         "grok",
         "qwen3",
         "higgs",
@@ -217,6 +219,28 @@ def external_argv() -> list[str] | None:
             "AIFILM_TTS_CMD is disabled because shell templates are unsafe; use AIFILM_TTS_ARGV JSON"
         )
     return None
+
+
+def cosyvoice_local_argv_configured() -> bool:
+    """Whether the explicit external argv points to our local-only adapter."""
+    argv = external_argv()
+    return bool(argv and any(Path(part).name == "cosyvoice_local_tts.py" for part in argv))
+
+
+def external_tts_subprocess_env() -> dict[str, str]:
+    """Pass CosyVoice's non-secret local render settings only to its own adapter."""
+    env = minimal_subprocess_env()
+    if cosyvoice_local_argv_configured():
+        for name in (
+            "COSYVOICE_ROOT",
+            "COSYVOICE_MODEL_DIR",
+            "COSYVOICE_REF_WAV",
+            "COSYVOICE_PROMPT_TEXT",
+        ):
+            value = os.environ.get(name)
+            if value:
+                env[name] = value
+    return env
 
 
 def strict_voice_enabled() -> bool:
@@ -942,7 +966,7 @@ def tts_external(text: str, out_mp3: Path, voice: str = "") -> Path:
             capture_output=True,
             text=True,
             timeout=300,
-            env=minimal_subprocess_env(),
+            env=external_tts_subprocess_env(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise TTSError(f"external TTS could not run: {exc}") from exc
@@ -1066,7 +1090,7 @@ def assert_voice_backend_compatible(backend: str, voice: str | None) -> None:
         "audio_node",
     }:
         return
-    if choice == "external" or external_tts_argv_hints_provider("eleven"):
+    if choice in {"external", "cosyvoice-local"} or external_tts_argv_hints_provider("eleven"):
         raise TTSError(
             f"TTS voice {voice!r} looks like Microsoft Edge Neural — cannot use with "
             "external/ElevenLabs (AIFILM_TTS_ARGV). "
@@ -1318,6 +1342,20 @@ def synthesize(
             _tracked("audio_node", "qwen3-tts-5090", local_zero=True, call=_node_call)
             voice_used = "designed" if _is_edge_voice_name(voice) else (voice or "designed")
             model_used = "qwen3-tts-5090"
+        elif choice == "cosyvoice-local":
+            if not cosyvoice_local_argv_configured():
+                raise TTSError(
+                    "cosyvoice-local requires AIFILM_TTS_ARGV to invoke "
+                    "adapters/cosyvoice_local_tts.py"
+                )
+            _tracked(
+                "cosyvoice-local",
+                "Fun-CosyVoice3-local",
+                local_zero=True,
+                call=lambda: tts_external(text, out_mp3, voice=voice),
+            )
+            voice_used = voice or "cosyvoice-local"
+            model_used = "Fun-CosyVoice3-local"
         elif choice == "external":
             _tracked(
                 "external",

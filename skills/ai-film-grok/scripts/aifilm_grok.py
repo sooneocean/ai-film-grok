@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import io
 import json
 import os
 import re
@@ -12,6 +13,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -702,13 +704,19 @@ def _infer_medium_from_theme(theme: str, title: str) -> tuple[str, str, str]:
     return medium, rendering, sig
 
 
-def cmd_init(args: argparse.Namespace) -> int:
+def _cmd_init_in_place(args: argparse.Namespace) -> int:
     title = args.title.strip()
     theme = args.theme.strip()
     aspect = args.aspect
     root = Path(args.root).expanduser().resolve()
-    if root.exists() and any(root.iterdir()) and not args.force:
+    root_has_content = root.exists() and any(root.iterdir())
+    if root_has_content and not args.force:
         raise FilmError(f"Root not empty: {root} (pass --force to reuse)")
+    if root_has_content and args.force and not (root / "production-book.json").is_file():
+        raise FilmError(
+            "legacy root has no production-book.json; run "
+            f'aifilm director migrate-audit --root "{root}" before any explicit migration'
+        )
     ensure_tree(root)
     (root / "canonical" / "cast").mkdir(parents=True, exist_ok=True)
     (root / "canonical" / "lookbook").mkdir(parents=True, exist_ok=True)
@@ -748,6 +756,17 @@ def cmd_init(args: argparse.Namespace) -> int:
         "aspect_ratio": aspect,
         "scenes": [],
     }
+    try:
+        from bgm_library import BGMLibraryError, default_library_root, library_status
+
+        if library_status(default_library_root()).get("ready_for_default"):
+            film_spec["audio_policy"] = {
+                "mode": "auto",
+                "bed_source": "approved_library",
+            }
+    except (BGMLibraryError, OSError, ValueError):
+        # A missing or corrupt optional shared library cannot make init unusable.
+        pass
     timeline = {
         "schema_version": 1,
         "fps": DEFAULT_FPS,
@@ -765,6 +784,16 @@ def cmd_init(args: argparse.Namespace) -> int:
     manifest["review_contract_version"] = 2
     manifest["truth_contract"]["contract_sha256"] = sha256_file(root / "film-spec.json")
     save_manifest(root, manifest)
+    from production_book import init_production_book
+
+    init_production_book(
+        root,
+        title=title,
+        rigor="professional",
+        format_pack="vertical-short",
+        genre_pack="drama",
+        quality_target="standard",
+    )
     try:
         from pipeline_events import append_event
 
@@ -783,9 +812,52 @@ def cmd_init(args: argparse.Namespace) -> int:
             "aspect_ratio": aspect,
             "width": w,
             "height": h,
+            "workflow": {
+                "entry": "/ai-film-grok",
+                "mode": "professional",
+                "internal_stage_model": "professional-director-11",
+            },
         }
     )
     return 0
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    """Build a new root off-path, then publish the complete Professional project."""
+    destination = Path(args.root).expanduser().resolve()
+    if destination.exists() and any(destination.iterdir()):
+        return _cmd_init_in_place(args)
+    if destination.is_symlink():
+        raise FilmError(f"Refusing to initialize a symlink root: {destination}")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{destination.name}.aifilm-init-", dir=destination.parent)
+    )
+    staged_args = argparse.Namespace(**vars(args))
+    staged_args.root = str(staging)
+    captured = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(captured):
+            result = _cmd_init_in_place(staged_args)
+        if result != 0:
+            raise FilmError(f"staged init failed with status {result}")
+        (staging / "README.md").write_text(
+            f"# {args.title.strip()}\n\nTheme: {args.theme.strip()}\n\n"
+            f"Provider: Grok Imagine\nRoot: `{destination}`\n",
+            encoding="utf-8",
+        )
+        if destination.exists():
+            destination.rmdir()
+        os.replace(staging, destination)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+    payload = json.loads(captured.getvalue())
+    payload["root"] = str(destination)
+    emit(payload)
+    return result
 
 
 def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
@@ -960,10 +1032,30 @@ def _pipeline_bundle(
         persist_pipeline_stage,
     )
 
-    actions = build_next_actions(root, gates=gates, open_reshoot_count=open_n)
     pipeline = detect_pipeline_stage(root, gates=gates, open_reshoot_count=open_n)
-    next_cmd = actions[0]["cmd"] if actions else None
-    next_id = actions[0].get("id") if actions else None
+    book = read_json(root / "production-book.json") or {}
+    if book.get("rigor") == "professional":
+        from dispatch import build_dispatch
+
+        packet = build_dispatch(
+            root,
+            gates=gates,
+            open_reshoot_count=open_n,
+            include_capability=False,
+            write_receipt=persist,
+            use_state_cache=False,
+        )
+        actions = list(packet.get("next_actions") or [])
+        next_cmd = packet.get("next_cmd")
+        next_id = packet.get("next_id")
+        pipeline["workflow"] = packet.get("workflow")
+        pipeline["workflow_stage"] = (packet.get("workflow") or {}).get("current_stage")
+        pipeline["bound_next_action"] = packet.get("next_action")
+        pipeline["state_hash"] = packet.get("state_hash")
+    else:
+        actions = build_next_actions(root, gates=gates, open_reshoot_count=open_n)
+        next_cmd = actions[0]["cmd"] if actions else None
+        next_id = actions[0].get("id") if actions else None
     if persist:
         with contextlib.suppress(OSError):
             persist_pipeline_stage(
@@ -1012,6 +1104,8 @@ def cmd_next(args: argparse.Namespace) -> int:
                 "stage": pipeline.get("stage"),
                 "stage_label": pipeline.get("label_zh"),
                 "next_actions": actions,
+                "next_action": pipeline.get("bound_next_action"),
+                "state_hash": pipeline.get("state_hash"),
             }
         )
         return 0
@@ -1059,6 +1153,8 @@ def cmd_next(args: argparse.Namespace) -> int:
             "why": actions[0].get("why"),
             "id": next_id or actions[0].get("id"),
             "next_actions": actions,
+            "next_action": pipeline.get("bound_next_action"),
+            "state_hash": pipeline.get("state_hash"),
         }
     )
     return 0
@@ -1096,6 +1192,8 @@ def cmd_stage(args: argparse.Namespace) -> int:
                 "next_cmd": next_cmd,
                 "next_id": next_id,
                 "next_actions": actions[:3] if actions else [],
+                "next_action": pipeline.get("bound_next_action"),
+                "state_hash": pipeline.get("state_hash"),
             }
         )
         return 0
@@ -1508,6 +1606,9 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
         }
     write_json(root / "film-spec.json", spec)
     manifest = load_manifest(root)
+    truth = manifest.get("truth_contract")
+    if isinstance(truth, dict):
+        truth["contract_sha256"] = sha256_file(root / "film-spec.json")
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
     # seed timeline placeholders
@@ -3186,6 +3287,77 @@ def cmd_reencode_clips(args: argparse.Namespace) -> int:
     return 0 if not failed else 2
 
 
+def _commit_selected_bgm_usage(
+    root: Path,
+    *,
+    output: str | None = None,
+    output_sha256: str | None = None,
+) -> dict[str, Any] | None:
+    """Commit approved-library use only after a successful final command."""
+    selection_path = root / "receipts" / "bgm-selection.json"
+    selection = _util_read_json(selection_path)
+    if not isinstance(selection, dict) or not selection.get("selections"):
+        return None
+    mix_path = root / "audio" / "mix_report.json"
+    mix = _util_read_json(mix_path)
+    music_template = (
+        mix.get("music_template")
+        if isinstance(mix, dict) and isinstance(mix.get("music_template"), dict)
+        else {}
+    )
+    if (
+        music_template.get("source") != "approved_library"
+        or music_template.get("mode") != "approved_library"
+    ):
+        # A stale selection receipt must not affect a procedural or legacy rerun.
+        return None
+    if not all(
+        isinstance(item, dict) and item.get("asset_id") and item.get("sha256")
+        for item in selection.get("selections") or []
+    ):
+        raise FilmError("approved-library selection receipt is not checksum-bound")
+    selected_bindings = [
+        (str(item.get("shot_id") or ""), str(item["asset_id"]), str(item["sha256"]))
+        for item in selection["selections"]
+    ]
+    mixed_bindings = [
+        (
+            str(item.get("shot_id") or ""),
+            str(item.get("asset_id") or ""),
+            str(item.get("sha256") or ""),
+        )
+        for item in music_template.get("selections") or []
+        if isinstance(item, dict)
+    ]
+    if (
+        selected_bindings != mixed_bindings
+        or selection.get("catalog_revision") != music_template.get("catalog_revision")
+        or selection.get("catalog_sha256") != music_template.get("catalog_sha256")
+    ):
+        raise FilmError("approved-library selection does not match this final mix")
+    checksum = str(output_sha256 or "")
+    if len(checksum) != 64 and output:
+        output_path = Path(output).expanduser()
+        if output_path.is_file():
+            checksum = sha256_file(output_path)
+    if len(checksum) != 64:
+        delivery = _util_read_json(root / "out" / "final-delivery.json") or {}
+        checksum = str(delivery.get("output_sha256") or "")
+    if len(checksum) != 64:
+        raise FilmError("cannot commit BGM usage without the successful final checksum")
+    from bgm_library import commit_usage, default_library_root
+
+    committed = commit_usage(default_library_root(), selection, final_sha256=checksum)
+    selection["usage_committed"] = True
+    selection["usage_commit"] = committed
+    write_json(selection_path, selection)
+    if isinstance(mix, dict):
+        music_template["usage_commit"] = committed
+        mix["music_template"] = music_template
+        write_json(mix_path, mix)
+    return committed
+
+
 def cmd_final(args: argparse.Namespace) -> int:
     """FFmpeg final, optionally followed by HyperFrames/Remotion designed-post compose-render."""
     skill_dir = Path(__file__).resolve().parents[1]
@@ -3424,6 +3596,13 @@ def cmd_final(args: argparse.Namespace) -> int:
                 "stages": stages_receipt,
                 "caption_owner": "ffmpeg_plate",
             }
+            bgm_usage = _commit_selected_bgm_usage(
+                root,
+                output=out_obj.get("output"),
+                output_sha256=out_obj.get("output_sha256"),
+            )
+            if bgm_usage is not None:
+                out_obj["bgm_usage"] = bgm_usage
             if preflight_report is not None:
                 out_obj["preflight"] = {
                     "hard_ok": preflight_report.get("hard_ok"),
@@ -3624,6 +3803,14 @@ def cmd_final(args: argparse.Namespace) -> int:
             "error": result.get("error"),
             "message": result.get("message"),
         }
+        if out_obj.get("ok"):
+            bgm_usage = _commit_selected_bgm_usage(
+                root,
+                output=out_obj.get("output"),
+                output_sha256=out_obj.get("output_sha256"),
+            )
+            if bgm_usage is not None:
+                out_obj["bgm_usage"] = bgm_usage
         if preflight_report is not None:
             out_obj["preflight"] = {
                 "hard_ok": preflight_report.get("hard_ok"),
@@ -3645,6 +3832,13 @@ def cmd_final(args: argparse.Namespace) -> int:
                 i.get("code") for i in (preflight_report.get("soft") or []) if isinstance(i, dict)
             ],
         }
+    bgm_usage = _commit_selected_bgm_usage(
+        root,
+        output=out_obj.get("output"),
+        output_sha256=out_obj.get("output_sha256"),
+    )
+    if bgm_usage is not None:
+        out_obj["bgm_usage"] = bgm_usage
     emit(out_obj)
     return 0
 
@@ -3719,6 +3913,20 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             f"Cannot approve final: delivery quality hard-fail on {', '.join(failed_gates)} "
             f"(score={quality_report.get('score')}/100). "
             "Fix the technical issue then re-run review-final."
+        )
+    # Adult max cannot inherit a plan-only score.  The receipt binds each
+    # reviewed act/climax clip and the current audio/timeline evidence.
+    try:
+        from adult_max_director import build_evidence
+
+        adult_sensory = build_evidence(root, write=True)
+    except (OSError, ValueError) as exc:
+        raise FilmError(f"Cannot approve final: adult max sensory evidence failed: {exc}") from exc
+    if adult_sensory.get("active") and not adult_sensory.get("ok"):
+        raise FilmError(
+            "Cannot approve final: adult max sensory evidence is incomplete ["
+            + ", ".join(adult_sensory.get("codes") or [])
+            + "]"
         )
     reviewer = str(args.reviewer or "").strip()
     notes = str(args.notes or "").strip()
@@ -3871,6 +4079,7 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         "subtitle_cut_boundaries": subtitle_cut_boundaries,
         "director_ledger": director_ledger,
         "narrative_evidence": narrative_evidence,
+        "adult_max_sensory": adult_sensory,
     }
     review_path = out_dir / "final-review.json"
     write_json(review_path, review)
@@ -5265,6 +5474,7 @@ def cmd_director(args: argparse.Namespace) -> int:
         check,
         director_init,
         impact,
+        lock_native_stage,
         migrate,
         migrate_audit,
         rebuild,
@@ -5292,6 +5502,24 @@ def cmd_director(args: argparse.Namespace) -> int:
             report = status(root)
         elif action == "check":
             report = check(root)
+        elif action == "lock-stage":
+            input_refs: dict[str, str] | None = None
+            if args.input_ref:
+                input_refs = {}
+                for item in args.input_ref:
+                    name, separator, relative = str(item).partition("=")
+                    if not separator or not name.strip() or not relative.strip():
+                        raise FilmError("--input-ref must use NAME=RELATIVE_PATH")
+                    input_refs[name.strip()] = relative.strip()
+            report = lock_native_stage(
+                root,
+                stage=args.stage,
+                approver=args.approver,
+                user_phrase=args.user_phrase,
+                authorization_event=args.authorization_event,
+                input_refs=input_refs,
+                transaction_id=args.transaction_id,
+            )
         elif action == "impact":
             report = impact(root, changed_refs=args.changed_ref, reason=args.reason)
         elif action == "rebuild":
@@ -5780,6 +6008,127 @@ def cmd_audio_event(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bgm_candidate(args: argparse.Namespace) -> int:
+    """Create/list/approve locally rendered ACE-Step BGM candidates."""
+    from bgm_candidates import BGMCandidateError, approve, generate, list_candidates
+
+    root = Path(args.root).expanduser().resolve()
+    try:
+        if args.bgm_candidate_action == "list":
+            emit({"candidates": list_candidates(root)})
+            return 0
+        if args.bgm_candidate_action == "approve":
+            if str(getattr(args, "target", "film") or "film") == "shared":
+                from bgm_library import approve_candidate as approve_shared
+                from bgm_library import default_library_root, stage_candidate
+
+                candidates = {
+                    str(item.get("asset_id") or ""): item for item in list_candidates(root)
+                }
+                source_record = candidates.get(str(args.asset_id))
+                if not isinstance(source_record, dict):
+                    raise BGMCandidateError("BGM candidate receipt not found")
+                source = root / str(source_record.get("path") or "")
+                staged = stage_candidate(
+                    default_library_root(),
+                    source,
+                    {
+                        "mood": source_record.get("mood") or "rnb",
+                        "seed": source_record.get("seed") or 0,
+                        "model": source_record.get("model") or "ACE-Step-1.5",
+                        "checkpoint_fingerprint": source_record.get("checkpoint_fingerprint")
+                        or "unknown",
+                        "node_job_id": source_record.get("node_job_id") or "",
+                        "prompt_sha256": source_record.get("prompt_sha256") or "",
+                        "dramatic_tags": [],
+                        "energy": 0.5,
+                        "stem_profile": "pad",
+                        "recipe": {
+                            "mood": source_record.get("mood") or "rnb",
+                            "energy": 0.5,
+                            "stem_profile": "pad",
+                        },
+                    },
+                )
+                emit(
+                    approve_shared(
+                        default_library_root(),
+                        str(staged["asset_id"]),
+                        reviewer=str(getattr(args, "reviewer", "") or ""),
+                        license_note=str(getattr(args, "license_note", "") or ""),
+                        instrumental_confirmed=bool(getattr(args, "instrumental_confirmed", False)),
+                    )
+                )
+                return 0
+            emit(approve(root, args.asset_id))
+            return 0
+        base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
+        token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
+        if not base or not token:
+            raise BGMCandidateError("AIFILM_AUDIO_NODE_URL/TOKEN are required for ACE-Step BGM")
+        prompt = (args.prompt or "").strip() or (
+            f"instrumental {args.mood} background music, cinematic underscore, no vocals"
+        )
+        emit(
+            generate(
+                root,
+                base_url=base,
+                token=token,
+                prompt=prompt,
+                mood=args.mood,
+                duration=args.duration,
+                seed=args.seed,
+            )
+        )
+        return 0
+    except BGMCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
+def cmd_bgm_library(args: argparse.Namespace) -> int:
+    from bgm_library import BGMLibraryError
+    from cli_bgm_library import cmd_bgm_library as run_bgm_library
+
+    try:
+        return run_bgm_library(args, emit=emit)
+    except BGMLibraryError as exc:
+        raise FilmError(str(exc)) from exc
+
+
+def cmd_performance_candidate(args: argparse.Namespace) -> int:
+    """Create/list/approve private non-verbal performance candidates."""
+    from performance_candidates import PerformanceCandidateError, approve, generate
+
+    root = Path(args.root).expanduser().resolve()
+    try:
+        if args.performance_candidate_action == "approve":
+            emit(approve(root, args.asset_id))
+            return 0
+        base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
+        token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
+        if not base or not token:
+            raise PerformanceCandidateError(
+                "AIFILM_AUDIO_NODE_URL/TOKEN are required for performance generation"
+            )
+        emit(
+            generate(
+                root,
+                base_url=base,
+                token=token,
+                cue=args.cue,
+                duration=args.duration,
+                seed=args.seed,
+                character_id=args.character_id,
+                source_authorization=args.source_authorization,
+                adult_confirmed=bool(args.adult_confirmed),
+                model_version=args.model_version,
+            )
+        )
+        return 0
+    except PerformanceCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
 
@@ -5906,6 +6255,12 @@ def cmd_tts_rehearse(args: argparse.Namespace) -> int:
 
     emit(receipt)
     return 0 if receipt.get("ok") else 1
+
+
+def cmd_comfy(args: argparse.Namespace) -> int:
+    from cli_comfy import run_comfy
+
+    return run_comfy(args)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -6188,6 +6543,55 @@ def build_parser() -> argparse.ArgumentParser:
     ae.add_argument("--caption-text", default=None)
     ae.add_argument("--performance-json", default=None)
     ae.add_argument("--force-locked", action="store_true")
+
+    bgm_candidate = sub.add_parser(
+        "bgm-candidate",
+        help="Generate ACE-Step BGM candidates, then explicitly approve them into the local pool",
+    )
+    bgm_candidate_sub = bgm_candidate.add_subparsers(dest="bgm_candidate_action", required=True)
+    bgm_generate = bgm_candidate_sub.add_parser("generate", help="Create one pending BGM candidate")
+    bgm_generate.add_argument("--root", required=True)
+    bgm_generate.add_argument("--prompt", default="")
+    bgm_generate.add_argument("--mood", default="rnb")
+    bgm_generate.add_argument("--duration", type=float, default=30.0)
+    bgm_generate.add_argument("--seed", type=int, required=True)
+    bgm_list = bgm_candidate_sub.add_parser("list", help="List pending and approved BGM candidates")
+    bgm_list.add_argument("--root", required=True)
+    bgm_approve = bgm_candidate_sub.add_parser(
+        "approve", help="Promote one heard candidate to audio/templates/<mood>/"
+    )
+    bgm_approve.add_argument("--root", required=True)
+    bgm_approve.add_argument("--asset-id", required=True)
+    bgm_approve.add_argument("--target", choices=("film", "shared"), default="film")
+    bgm_approve.add_argument("--reviewer", default="")
+    bgm_approve.add_argument("--license-note", default="")
+    bgm_approve.add_argument("--instrumental-confirmed", action="store_true")
+
+    performance_candidate = sub.add_parser(
+        "performance-candidate",
+        help="Generate private non-verbal performance candidates with explicit adult and source authorization",
+    )
+    performance_candidate_sub = performance_candidate.add_subparsers(
+        dest="performance_candidate_action", required=True
+    )
+    performance_generate = performance_candidate_sub.add_parser(
+        "generate", help="Create one pending performance candidate"
+    )
+    performance_generate.add_argument("--root", required=True)
+    performance_generate.add_argument("--cue", required=True)
+    performance_generate.add_argument("--duration", type=float, default=3.0)
+    performance_generate.add_argument("--seed", type=int, required=True)
+    performance_generate.add_argument("--character-id", required=True)
+    performance_generate.add_argument(
+        "--source-authorization", choices=("original", "authorized_reference"), required=True
+    )
+    performance_generate.add_argument("--adult-confirmed", action="store_true")
+    performance_generate.add_argument("--model-version", default="higgs-audio-v2")
+    performance_approve = performance_candidate_sub.add_parser(
+        "approve", help="Promote one human-heard performance candidate"
+    )
+    performance_approve.add_argument("--root", required=True)
+    performance_approve.add_argument("--asset-id", required=True)
 
     lsc = sub.add_parser(
         "lipsync-canary",
@@ -6724,8 +7128,11 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument(
         "--music-template",
         default=None,
-        choices=["off", "auto", "on"],
-        help="Local BGM: auto=use audio/bgm.wav or audio/templates/{mood}.* if present; on=require; off=procedural",
+        choices=["off", "auto", "on", "timeline", "approved_library"],
+        help=(
+            "BGM: auto/on/off retain legacy behavior; timeline uses film-local cue templates; "
+            "approved_library requires shared human-approved cue matches"
+        ),
     )
     fin.add_argument(
         "--music-volume",
@@ -7739,7 +8146,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     director_p = sub.add_parser(
         "director",
-        help="Production book: init|migrate-audit|migrate|status|check|impact|rebuild|verify",
+        help=(
+            "Production book: init|migrate-audit|migrate|status|check|lock-stage|"
+            "impact|rebuild|verify"
+        ),
     )
     director_sub = director_p.add_subparsers(dest="director_action", required=True)
     d_init = director_sub.add_parser("init")
@@ -7764,6 +8174,40 @@ def build_parser() -> argparse.ArgumentParser:
     for director_action in ("status", "check", "verify"):
         action_parser = director_sub.add_parser(director_action)
         action_parser.add_argument("--root", required=True)
+    d_lock_stage = director_sub.add_parser(
+        "lock-stage",
+        help="Human-approve and hash-lock the current stage over native evidence",
+    )
+    d_lock_stage.add_argument("--root", required=True)
+    d_lock_stage.add_argument(
+        "--stage",
+        required=True,
+        choices=(
+            "concept_lock",
+            "script_lock",
+            "department_look_lock",
+            "shot_animatic_lock",
+            "pilot_approval",
+            "bulk",
+            "dailies_review",
+            "selects_rough_cut",
+            "picture_lock",
+            "post_locks",
+            "master_lock",
+        ),
+    )
+    d_lock_stage.add_argument("--approver", default="user")
+    lock_authorization = d_lock_stage.add_mutually_exclusive_group(required=True)
+    lock_authorization.add_argument("--user-phrase")
+    lock_authorization.add_argument("--authorization-event")
+    d_lock_stage.add_argument(
+        "--input-ref",
+        action="append",
+        default=[],
+        metavar="NAME=RELATIVE_PATH",
+        help="Override auto-resolved native evidence; repeat for multiple refs",
+    )
+    d_lock_stage.add_argument("--transaction-id", default=None)
     for director_action in ("impact", "rebuild"):
         action_parser = director_sub.add_parser(director_action)
         action_parser.add_argument("--root", required=True)
@@ -7843,6 +8287,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_review_ui_parsers(sub)
 
+    from cli_comfy import add_comfy_parsers
+
+    add_comfy_parsers(sub)
+    from cli_bgm_library import add_bgm_library_parsers
+
+    add_bgm_library_parsers(sub)
+
     return p
 
 
@@ -7880,6 +8331,9 @@ def main(argv: list[str] | None = None) -> int:
             "verify": cmd_verify,
             "audio-tts-render": cmd_audio_tts_render,
             "audio-event": cmd_audio_event,
+            "bgm-candidate": cmd_bgm_candidate,
+            "bgm-library": cmd_bgm_library,
+            "performance-candidate": cmd_performance_candidate,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,
@@ -7939,6 +8393,7 @@ def main(argv: list[str] | None = None) -> int:
             "dashboard": cmd_dashboard,
             "quality-ledger": cmd_quality_ledger,
             "production-report": cmd_production_report,
+            "comfy": cmd_comfy,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:

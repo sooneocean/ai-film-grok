@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
+
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from approval_ledger import append_approval  # noqa: E402
+from approval_ledger import (
+    append_approval,  # noqa: E402
+    read_approval_ledger,  # noqa: E402
+)
+from director_cli import (  # noqa: E402
+    lock_native_stage,
+    native_stage_input_refs,
+    validate_native_stage_evidence,
+)
 from director_stage_gates import (  # noqa: E402
     STAGE_ORDER,
     lock_stage,
@@ -29,8 +40,14 @@ def _approve(root: Path, stage: str, hashes: dict[str, str], *, approver_type: s
     )
 
 
-def test_professional_stage_order_and_current_human_approval_are_hard(tmp_path: Path) -> None:
+def test_professional_stage_order_and_current_human_approval_are_hard(
+    tmp_path: Path, monkeypatch
+) -> None:
     init_production_book(tmp_path, rigor="professional")
+    monkeypatch.setattr(
+        "director_cli.validate_native_stage_evidence",
+        lambda _root, _stage: {},
+    )
     concept = tmp_path / "concept.md"
     concept.write_text("locked concept", encoding="utf-8")
     script = tmp_path / "script.md"
@@ -88,3 +105,165 @@ def test_legacy_reports_warnings_and_stage_order_is_canonical(tmp_path: Path) ->
     assert report["ok"]
     assert not report["blocking"]
     assert len(report["warnings"]) == len(STAGE_ORDER)
+
+
+def test_professional_lock_rejects_arbitrary_file_without_native_stage_evidence(
+    tmp_path: Path,
+) -> None:
+    init_production_book(tmp_path, rigor="professional")
+    arbitrary = tmp_path / "looks-valid.json"
+    arbitrary.write_text('{"approved":true}\n', encoding="utf-8")
+    digest = __import__("hashlib").sha256(arbitrary.read_bytes()).hexdigest()
+    approval = _approve(tmp_path, "concept_lock", {"arbitrary": digest})
+
+    with pytest.raises(ValueError, match="native evidence missing"):
+        lock_stage(
+            tmp_path,
+            stage="concept_lock",
+            input_refs={"arbitrary": "looks-valid.json"},
+            approval_id=approval["approval_id"],
+        )
+
+
+def test_failed_native_stage_validation_does_not_leave_orphan_approval(
+    tmp_path: Path,
+) -> None:
+    init_production_book(tmp_path, rigor="professional")
+
+    with pytest.raises(ValueError, match="native evidence missing"):
+        lock_native_stage(
+            tmp_path,
+            stage="concept_lock",
+            approver="dex",
+            user_phrase="批准",
+        )
+
+    assert read_approval_ledger(tmp_path)["approvals"] == []
+
+
+def test_bulk_native_refs_bind_each_approved_clip_file(tmp_path: Path) -> None:
+    clip = tmp_path / "clips" / "s001.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"clip")
+    digest = __import__("hashlib").sha256(clip.read_bytes()).hexdigest()
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "clips": {
+                    "s001": {
+                        "status": "approved",
+                        "path": "clips/s001.mp4",
+                        "sha256": digest,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    refs = native_stage_input_refs(tmp_path, "bulk")
+
+    assert refs["media:s001:0"] == "clips/s001.mp4"
+
+
+def test_custom_refs_cannot_detach_lock_from_native_stage_evidence(tmp_path: Path) -> None:
+    init_production_book(tmp_path, rigor="professional")
+    (tmp_path / "brief.json").write_text('{"title":"t"}\n', encoding="utf-8")
+    story = tmp_path / "drama-graph.json"
+    story.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "story": {
+                    "premise": "p",
+                    "logline": "l",
+                    "protagonist_goal": "g",
+                    "opposition": "o",
+                    "stakes": "s",
+                    "climax_choice": "c",
+                    "ending_hook": "e",
+                    "emotional_arc": ["a", "b", "c"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "marker.txt").write_text("marker\n", encoding="utf-8")
+
+    report = lock_native_stage(
+        tmp_path,
+        stage="concept_lock",
+        approver="dex",
+        user_phrase="批准",
+        input_refs={"marker": "marker.txt"},
+    )
+    assert {"brief", "story", "marker"} <= set(report["input_refs"])
+
+    story.write_text('{"schema_version":2}\n', encoding="utf-8")
+
+    assert stage_status(tmp_path, target_stage="concept_lock")["ok"] is False
+
+
+def test_bulk_validation_accepts_canonical_nested_scene_shots(tmp_path: Path) -> None:
+    clip = tmp_path / "clips" / "s001.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"clip")
+    digest = __import__("hashlib").sha256(clip.read_bytes()).hexdigest()
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps({"scenes": [{"shots": [{"id": "s001"}]}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "clips": {
+                    "s001": {
+                        "status": "approved",
+                        "path": "clips/s001.mp4",
+                        "sha256": digest,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    refs = validate_native_stage_evidence(tmp_path, "bulk")
+
+    assert refs["media:s001:0"] == "clips/s001.mp4"
+
+
+def test_concept_lock_rejects_noncanonical_drama_graph(tmp_path: Path) -> None:
+    (tmp_path / "brief.json").write_text('{"title":"t"}\n', encoding="utf-8")
+    (tmp_path / "drama-graph.json").write_text(
+        '{"schema_version":1}\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="canonical semantic drama graph"):
+        validate_native_stage_evidence(tmp_path, "concept_lock")
+
+
+def test_department_lock_requires_locked_visual_bible(tmp_path: Path) -> None:
+    (tmp_path / "style-bible.json").write_text(
+        '{"locked":false}\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="locked visual bible"):
+        validate_native_stage_evidence(tmp_path, "department_look_lock")
+
+
+def test_shot_animatic_lock_requires_matching_ids_and_durations(tmp_path: Path) -> None:
+    (tmp_path / "drama-graph.json").write_text('{"schema_version":2}\n', encoding="utf-8")
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps({"scenes": [{"shots": [{"id": "s001", "duration_sec": 4}]}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "timeline.json").write_text(
+        json.dumps({"shots": [{"id": "s002", "duration_sec": 4}]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="ordered shot ids"):
+        validate_native_stage_evidence(tmp_path, "shot_animatic_lock")

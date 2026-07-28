@@ -31,7 +31,7 @@ AUDIO_RECIPES = frozenset(
     }
 )
 AUDIO_POLICY_MODES = frozenset({"auto", "storyteller_only", "musical_hybrid"})
-BED_SOURCES = frozenset({"auto", "library_only", "procedural_only"})
+BED_SOURCES = frozenset({"auto", "library_only", "approved_library", "procedural_only"})
 
 # Near-ish sizes that may justify lipsync / sung (mouth readable)
 _NEAR_SIZES = frozenset(

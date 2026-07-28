@@ -16,9 +16,14 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+_SCRIPTS = Path(__file__).resolve().parents[1]
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
 
 from config_loader import get_config
 
@@ -87,6 +92,27 @@ def _mp3_to_wav(mp3: Path, wav: Path) -> None:
         raise SystemExit(f"ffmpeg mp3→wav failed: {p.stderr[-300:]}")
 
 
+class ElevenLabsTTSProvider:
+    """Adapter-registry compatibility surface for the ElevenLabs CLI client."""
+
+    def synthesize(self, text: str, out: Path, voice: str = "", model: str = "") -> None:
+        text = text.strip()
+        if not text:
+            raise SystemExit("empty text")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        selected_voice = (voice or _CFG.elevenlabs_voice_id or DEFAULT_VOICE).strip()
+        selected_model = (model or _CFG.elevenlabs_model or DEFAULT_MODEL).strip()
+        audio = _synthesize(text, selected_voice, selected_model)
+        if out.suffix.lower() == ".wav":
+            mp3 = out.with_suffix(".mp3")
+            mp3.write_bytes(audio)
+            _mp3_to_wav(mp3, out)
+        else:
+            out.write_bytes(audio)
+            if out.suffix.lower() == ".mp3":
+                _mp3_to_wav(out, out.with_suffix(".wav"))
+
+
 def main() -> int:
     cfg = get_config()
     ap = argparse.ArgumentParser(description="ElevenLabs TTS for ai-film-grok")
@@ -104,17 +130,7 @@ def main() -> int:
     voice = (args.voice or cfg.elevenlabs_voice_id or DEFAULT_VOICE).strip()
     model = (args.model or cfg.elevenlabs_model or DEFAULT_MODEL).strip()
 
-    audio = _synthesize(text, voice, model)
-    # Always land a wav for render_final (it converts mp3→wav already, but wav is safest)
-    if out.suffix.lower() == ".wav":
-        mp3 = out.with_suffix(".mp3")
-        mp3.write_bytes(audio)
-        _mp3_to_wav(mp3, out)
-    else:
-        out.write_bytes(audio)
-        if out.suffix.lower() == ".mp3":
-            wav = out.with_suffix(".wav")
-            _mp3_to_wav(out, wav)
+    ElevenLabsTTSProvider().synthesize(text, out, voice, model)
     print(
         json.dumps(
             {"ok": True, "voice": voice, "model": model, "out": str(out), "chars": len(text)}

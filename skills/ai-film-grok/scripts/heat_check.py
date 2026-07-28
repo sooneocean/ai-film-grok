@@ -60,6 +60,21 @@ def heat_check(root: Path) -> dict[str, Any]:
         heat_scale=str(heat_scale) if heat_scale else None,
         heat_rep=rep,
     )
+    sensory: dict[str, Any] | None = None
+    if str(heat_scale or "").lower() == "max":
+        try:
+            from adult_max_director import build_evidence
+
+            sensory = build_evidence(root, write=False)
+            media_ok = bool(sensory.get("ok"))
+            impact["spec_score"] = impact.get("score")
+            impact["media_score"] = 100 if media_ok else 0
+            impact["score"] = round(
+                (int(impact.get("spec_score") or 0) + impact["media_score"]) / 2
+            )
+            impact["grade"] = "S" if media_ok and impact["score"] >= 90 else impact.get("grade")
+        except (OSError, ValueError):
+            sensory = {"ok": False, "codes": ["ADULT_MAX_EVIDENCE_UNAVAILABLE"]}
     gates = {
         "sex_duration": {
             "ratio": rep.get("sex_duration_ratio"),
@@ -84,6 +99,7 @@ def heat_check(root: Path) -> dict[str, Any]:
         "detail_cu": rep.get("detail_cu") or {},
         "both_undress": rep.get("both_undress") or {},
         "size_ladder": rep.get("size_ladder") or {},
+        "adult_max_sensory": sensory,
         "erotic_impact": impact,
         "sfx_shots": sfx_n,
         "sound_plan_accents": plan_sfx,
@@ -101,10 +117,12 @@ def heat_check(root: Path) -> dict[str, Any]:
         or c.startswith("MONTAGE_")
         or c == "SEX_POSE_STALE"
     ]
+    if sensory and not sensory.get("ok"):
+        hard_codes.extend(str(code) for code in sensory.get("codes") or [])
     sex_arc = rep.get("sex_arc") or {}
     detail = rep.get("detail_cu") or {}
     return {
-        "ok": bool(rep.get("ok")),
+        "ok": bool(rep.get("ok")) and (sensory is None or bool(sensory.get("ok"))),
         "root": str(root),
         "heat_scale": heat_scale,
         "audience_profile": audience,
@@ -115,6 +133,7 @@ def heat_check(root: Path) -> dict[str, Any]:
         "gates": gates,
         "hard_relevant_codes": hard_codes,
         "erotic_impact": impact,
+        "adult_max_sensory": sensory,
         "strict_flags": {
             "sex_floor_strict": spec.get("sex_floor_strict"),
             "sex_wardrobe_strict": spec.get("sex_wardrobe_strict"),

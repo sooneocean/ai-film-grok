@@ -1,7 +1,7 @@
 # References 索引
 
-> 106 个 reference 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
-> 踩坑 lessons（54 个）见末节,按日期归档;新规则须标 P 码 + 层。
+> 123 个 reference Markdown 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
+> 踩坑 lessons（61 个）见末节,按日期归档;新规则须标 P 码 + 层。
 
 ---
 
@@ -64,6 +64,7 @@
 | 文件 | 主题 |
 |---|---|
 | [i2v-grok-primary.md](i2v-grok-primary.md) | I2V grok_primary 运营模式 |
+| [comfy-lan-control.md](comfy-lan-control.md) | 私有区网 ComfyUI 5090 控制、API 工作流与安全门禁 |
 | [frw-degrade-dispatch.md](frw-degrade-dispatch.md) | FRW Seedance/LTX/经典 dispatch |
 | [ltx-env-plate.md](ltx-env-plate.md) | FRW LTX T2V 无角色环境床 |
 | [frw-lipsync.md](frw-lipsync.md) | FRW 口型音画同步 |
@@ -123,6 +124,12 @@
 ## 踩坑 Lessons（按日期）
 
 > 新规则须标 P 码 + 层。验证稳定后可晋升到上方稳定 references。
+
+### 2026-07-28
+
+| 文件 | 主题 |
+|---|---|
+| **[rtx5090-lipsync-routing](lessons-2026-07-28-rtx5090-lipsync-routing.md)** | **P0 Voice→Post**：Wav2Lip 只作基线；LatentSync/MuseTalk 目标梯队；5090 CUDA 12.8 与实片 canary 门 |
 
 ### 2026-07-24
 

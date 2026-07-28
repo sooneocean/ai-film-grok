@@ -34,6 +34,15 @@ class CliSmokeTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertIn("image.animate", {item["id"] for item in payload["skills"]})
 
+    def test_comfy_lan_control_help(self) -> None:
+        result = self.run_cli("comfy", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("inventory", result.stdout)
+        self.assertIn("upload", result.stdout)
+        self.assertIn("run-workflow", result.stdout)
+        self.assertIn("cancel", result.stdout)
+        self.assertIn("free-memory", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

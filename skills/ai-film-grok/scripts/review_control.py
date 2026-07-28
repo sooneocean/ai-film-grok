@@ -47,7 +47,12 @@ VALID_ISSUES = frozenset(
         "other",
     }
 )
-_STAGE_RE = re.compile(r"^(?:story|design|budget|pilot|audio|preview|final|shot:[A-Za-z0-9_.-]+)$")
+_STAGE_RE = re.compile(
+    r"^(?:story|design|budget|pilot|audio|preview|final|"
+    r"director:(?:concept_lock|script_lock|department_look_lock|shot_animatic_lock|"
+    r"pilot_approval|bulk|dailies_review|selects_rough_cut|picture_lock|post_locks|"
+    r"master_lock)|shot:[A-Za-z0-9_.-]+)$"
+)
 _SHOT_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
@@ -217,6 +222,33 @@ def review_queue(root: Path | str) -> dict[str, Any]:
                 ],
             }
         )
+    book = read_json(base / "production-book.json") or {}
+    if book.get("rigor") == "professional":
+        from director_cli import validate_native_stage_evidence
+        from director_stage_gates import STAGE_ORDER, stage_status
+
+        director = stage_status(base)
+        current = director.get("next_stage")
+        if current in STAGE_ORDER:
+            try:
+                refs = validate_native_stage_evidence(base, str(current))
+                hashes = _hashes(base, tuple(refs.values()))
+                state = "pending_review"
+            except ValueError:
+                refs, hashes, state = {}, {}, "blocked"
+            items.insert(
+                0,
+                {
+                    "id": f"director:{current}",
+                    "title": f"Professional stage: {current}",
+                    "state": state,
+                    "approval_id": None,
+                    "input_hashes": hashes,
+                    "evidence_refs": sorted(hashes),
+                    "recent_actions": _recent_actions(actions, f"director:{current}"),
+                    "media": [],
+                },
+            )
     return {
         "kind": "review-queue",
         "ledger_revision": ledger["revision"],
@@ -378,22 +410,44 @@ def record_action(
         "recorded_at": utc_now(),
     }
     if action == "approve":
-        try:
-            approval = append_approval(
-                base,
-                expected_revision=expected_ledger_revision,
-                scope=f"review:{stage}",
-                approval_type="review_gate",
-                approver_type="human",
-                approver=load_settings(base)["reviewer"],
-                authorization_event={"source": "review-ui", "action": "approve", "stage": stage},
-                input_hashes=item["input_hashes"],
-                evidence_refs=item["evidence_refs"],
-                transaction_id=f"review-ui:{stage}:{item['input_hashes']}",
-            )
-        except ApprovalLedgerConflict as exc:
-            raise ReviewControlConflict(str(exc)) from exc
-        event["approval_id"] = approval["approval_id"]
+        if stage.startswith("director:"):
+            director_stage = stage.split(":", 1)[1]
+            try:
+                from director_cli import lock_native_stage
+
+                locked = lock_native_stage(
+                    base,
+                    stage=director_stage,
+                    approver=load_settings(base)["reviewer"],
+                    user_phrase=note,
+                    expected_ledger_revision=expected_ledger_revision,
+                    transaction_id=f"review-ui:{stage}:{item['input_hashes']}",
+                )
+            except (ApprovalLedgerConflict, ValueError) as exc:
+                raise ReviewControlConflict(str(exc)) from exc
+            event["approval_id"] = locked["approval_id"]
+            event["stage_lock"] = locked["lock"]
+        else:
+            try:
+                approval = append_approval(
+                    base,
+                    expected_revision=expected_ledger_revision,
+                    scope=f"review:{stage}",
+                    approval_type="review_gate",
+                    approver_type="human",
+                    approver=load_settings(base)["reviewer"],
+                    authorization_event={
+                        "source": "review-ui",
+                        "action": "approve",
+                        "stage": stage,
+                    },
+                    input_hashes=item["input_hashes"],
+                    evidence_refs=item["evidence_refs"],
+                    transaction_id=f"review-ui:{stage}:{item['input_hashes']}",
+                )
+            except ApprovalLedgerConflict as exc:
+                raise ReviewControlConflict(str(exc)) from exc
+            event["approval_id"] = approval["approval_id"]
     path = _actions_path(base)
     with exclusive_file_lock(path):
         actions = _load_actions(base)

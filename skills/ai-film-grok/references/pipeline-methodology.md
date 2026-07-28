@@ -110,8 +110,8 @@ FFmpeg 服务后处理层，也会先做设计 underlay；**交付默认仍是 H
 | 层 | 主力 | Fallback |
 |---|---|---|
 | L0 身份静帧 | Grok `image_edit(cast)` | FRW i2i（慎） |
-| L1 人物 A-roll | Seedance i2v | Grok I2V 720p；禁 legacy 默认 |
-| L2 环境床 | LTX T2V | Seedance t2v |
+| L1 人物 A-roll | Grok I2V 720p | FRW Seedance/LTX 仅在明确技术失败且有 provider-switch receipt 后使用 |
+| L2 环境床 | Grok video | FRW LTX/Seedance 仅技术故障 fallback |
 | L3 设计 | HyperFrames | Remotion |
 
 ---

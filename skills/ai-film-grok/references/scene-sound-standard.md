@@ -25,9 +25,9 @@
 
 ### 2.1 适用命令
 
-下列任何带 `--root <film>` 的命令开始时，必须运行**只读**
-`scene-sound reconcile`：`dispatch`、`advance`、`craft`、`write-spec`、
-`audio-plan`、`final`、`status`。
+任何带 `--root <film>` 的影片命令开始时，必须运行**只读**
+`scene-sound reconcile`；包括 `dispatch`、`advance`、`craft`、`write-spec`、
+`audio-plan`、`final`、`status` 以及后续新增的影片根目录命令。
 
 它必须：
 
@@ -59,8 +59,8 @@
 
 ## 3. 事件契约
 
-所有运行时事件使用下列最小形状，并保留在 `sound_plan.scene_events`；现有
-`sound_plan.events` 继续承载 BGM mute/duck 和叙事 `sfx_accent`，保持兼容。
+所有运行时事件以镜头的 `audio_cues` 编译为可执行的 audio timeline；`sound_plan` 只
+保留 BGM mute/duck 和叙事 `sfx_accent`，不得把未编译的 metadata 当作声音交付。
 
 ```json
 {

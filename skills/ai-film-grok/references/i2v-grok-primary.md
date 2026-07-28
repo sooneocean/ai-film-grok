@@ -72,7 +72,7 @@ aifilm write-spec --root "<film>"   # auto→grok
 | 并发 | **一次一件** image_to_video（429） |
 | 时长 | 6s 优先（或 10s）；film-spec duration_sec 对齐 VO |
 | 接戏 | promote 末帧 SHA；禁 cast 重起 |
-| **静帧几何** | **I2V 输入 keyframe ≥720×1280 9:16**；禁横图/缩略图/压缩糊图（2026-07-22 · [keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md)）；`pick_best_keyframe` |
+| **静帧几何** | **I2V 输入 keyframe 9:16 默认 ≥704×1280**；接受 provider 原生 704×1280，不强制升到 720；禁横图/缩略图/压缩糊图（2026-07-22 · [keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md)）；`pick_best_keyframe` |
 | **先验后生** | **验证完再 video**；图同理；算力放在过闸输入上（[verify-before-generate](lessons-2026-07-22-verify-before-generate.md)） |
 | 同源 | 整片 hero still 都 Grok；勿半 FRW still |
 | 环境床 | 可选 FRW `ltx-t2v`；失败则 hero 镜盖全片 |

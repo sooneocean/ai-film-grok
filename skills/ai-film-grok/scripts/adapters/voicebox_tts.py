@@ -30,11 +30,16 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+_SCRIPTS = Path(__file__).resolve().parents[1]
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
 
 from config_loader import get_config
 
@@ -380,6 +385,13 @@ def doctor() -> dict[str, Any]:
         "language": default_language(),
         "engine": default_engine(),
     }
+
+
+class VoiceboxTTSProvider:
+    """Adapter-registry compatibility surface for the Voicebox client."""
+
+    def synthesize(self, text: str, out: Path, voice: str = "", **kwargs: Any) -> dict[str, Any]:
+        return synthesize(text, out, voice=voice, **kwargs)
 
 
 def main() -> int:

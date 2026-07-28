@@ -49,6 +49,7 @@ _COMMAND_POLICIES = {
     "media-queue": ("external", "human_required"),
     "pilot": ("local", "human_required"),
     "queue-run-oauth": ("paid", "human_required"),
+    "review-ui": ("local", "human_required"),
     "review-final": ("local", "human_required"),
     "tts-rehearse": ("external", "human_required"),
 }
@@ -303,14 +304,14 @@ def build_dispatch(
     receipt_path = root / "receipts" / "dispatch.json"
     previous = read_json(receipt_path) if use_state_cache else None
     if (
-        scene_sound.get("status") == "ok"
-        and isinstance(previous, dict)
+        isinstance(previous, dict)
         and _cached_packet_is_reusable(
             previous,
             state_hash=state_hash,
             include_capability=include_capability,
             refresh_capability=refresh_capability,
         )
+        and "weapon_route" in previous
     ):
         packet = dict(previous)
         packet["scene_sound"] = scene_sound
@@ -352,7 +353,20 @@ def build_dispatch(
             }
         )
 
-    if scene_sound.get("status") != "ok":
+    spec_for_routing = read_json(root / "film-spec.json") or {}
+    routed_shots = (
+        spec_for_routing.get("shots") if isinstance(spec_for_routing.get("shots"), list) else []
+    )
+    shots_are_timed = bool(routed_shots) and all(
+        isinstance(shot, dict)
+        and str(shot.get("id") or shot.get("shot_id") or "").strip()
+        and isinstance(shot.get("duration_sec"), (int, float))
+        and not isinstance(shot.get("duration_sec"), bool)
+        and float(shot["duration_sec"]) > 0
+        for shot in routed_shots
+    )
+    scene_sound_is_due = bool(shots_are_timed and spec_for_routing.get("audio_timeline_v1"))
+    if scene_sound_is_due and scene_sound.get("status") != "ok":
         summary = scene_sound.get("summary") or {}
         pre(
             "scene-sound-plan",
@@ -361,6 +375,22 @@ def build_dispatch(
             f"required={summary.get('required', 0)} / blocked={summary.get('blocked', 0)} / "
             f"needs_review={summary.get('needs_review', 0)}；先补环境音、脚步、门或道具拟音",
             "voice",
+        )
+    elif scene_sound.get("status") != "ok":
+        summary = scene_sound.get("summary") or {}
+        actions.append(
+            {
+                "id": "scene-sound-plan",
+                "cmd": f'aifilm audio-plan --root "{r}" --compile --validate',
+                "why": (
+                    "场景声音已发现但尚未到声音阶段："
+                    f"required={summary.get('required', 0)} / "
+                    f"blocked={summary.get('blocked', 0)}；先完成故事、镜头与投影"
+                ),
+                "stage": "voice",
+                "stage_label": "voice",
+                "source": "deferred_scene_sound",
+            }
         )
 
     # I2V profile (Grok primary; every FRW route is fallback-only)
@@ -440,6 +470,74 @@ def build_dispatch(
 
     # Merge: prepend craft items not already covered by same id
     narrative = control_status(root)
+    from workflow_spine import build_workflow_status
+
+    workflow = build_workflow_status(root, gates=gates, narrative=narrative)
+    professional_stage = str(workflow.get("current_stage") or "")
+    if workflow.get("mode") == "professional":
+        if professional_stage and workflow.get("readiness", {}).get(professional_stage):
+            pre(
+                "workflow-stage-lock",
+                (
+                    f'aifilm director lock-stage --root "{r}" --stage {professional_stage} '
+                    '--approver user --user-phrase "<VERBATIM_USER_APPROVAL>"'
+                ),
+                (
+                    "Professional：原生证据已齐；由使用者批准当前 hash 后锁定 "
+                    f"{professional_stage}，再进入下一阶段"
+                ),
+                "agent",
+            )
+        elif professional_stage == "concept_lock":
+            pre(
+                "workflow-concept",
+                "# StoryReception → aifilm plan run --received-file <receipt>",
+                "Professional 1/11：先接收并确认故事命题；未形成 canonical drama-graph 前不进入视觉",
+                "agent",
+            )
+        elif professional_stage == "dailies_review":
+            pre(
+                "selects-report",
+                f'aifilm selects --root "{r}"',
+                "Professional 7/11：逐镜 review 已齐，写入当前 Selects 证据后才能粗剪",
+                "visual",
+            )
+        elif professional_stage == "selects_rough_cut":
+            pre(
+                "rough-cut-review",
+                f'aifilm editor-cut --root "{r}"',
+                "Professional 8/11：检查 active take、时长与 Continue 接戏，形成粗剪证据",
+                "post",
+            )
+        elif professional_stage == "picture_lock":
+            pre(
+                "picture-lock-review",
+                f'aifilm review-ui serve --root "{r}"',
+                "Professional 9/11：在本机审核预览/粗剪，批准当前 hash 后锁定画面",
+                "post",
+            )
+        elif professional_stage == "post_locks":
+            if not (root / "post-plan.json").is_file():
+                pre(
+                    "post-plan-init",
+                    f'aifilm post-plan --root "{r}" init --owner hyperframes',
+                    "Professional 10/11：先固定唯一 post/caption owner",
+                    "post",
+                )
+            elif not (root / "receipts" / "tts-rehearsal.json").is_file():
+                pre(
+                    "tts-rehearse",
+                    f'aifilm tts-rehearse --root "{r}" --backend edge',
+                    "Professional 10/11：先锁定中文旁白/日文角色的实测声音时间",
+                    "voice",
+                )
+            else:
+                pre(
+                    "post-lock-review",
+                    f'aifilm review-ui serve --root "{r}"',
+                    "Professional 10/11：审核声音与后期输入 hash 后再渲染母版候选",
+                    "post",
+                )
     evidence = build_evidence(root)
     evidence_gate = bool(evidence.get("ready_for_bulk"))
     if craft_stage in {"media", "rough", "verified"} and not evidence_gate:
@@ -521,11 +619,18 @@ def build_dispatch(
             continue
         seen.add(aid)
         unique.append(a)
-    actions = unique[:10]
+    from workflow_spine import prioritize_actions, professional_stage_actions
 
-    provisional_primary = next(
-        (action for action in actions if structured_next_action(action) is not None),
-        None,
+    actions = prioritize_actions(workflow, unique)[:10]
+    actions = professional_stage_actions(root, workflow, actions)
+
+    provisional_primary = (
+        actions[0]
+        if workflow.get("mode") == "professional" and actions
+        else next(
+            (action for action in actions if structured_next_action(action) is not None),
+            None,
+        )
     )
     provisional_action = structured_next_action(provisional_primary)
     requires_live_capability = bool(
@@ -575,9 +680,13 @@ def build_dispatch(
                 "error": str(exc)[:200],
             }
 
-    primary = next(
-        (action for action in actions if structured_next_action(action) is not None),
-        None,
+    primary = (
+        actions[0]
+        if workflow.get("mode") == "professional" and actions
+        else next(
+            (action for action in actions if structured_next_action(action) is not None),
+            None,
+        )
     )
     next_cmd = (primary or {}).get("cmd")
     next_id = (primary or {}).get("id")
@@ -647,7 +756,7 @@ def build_dispatch(
     # Fallback routing summary for media + Grok Build native tools
     i2v_line = "grok_primary: still=image_edit(cast) · motion=image_to_video · FRW only after technical failure"
     routing = {
-        "tts_default": "mimo",
+        "tts_default": "edge",
         "tts_quality": "voicebox if app up",
         "bgm": "film audio → skill assets/bgm → procedural rnb",
         "lipsync": "off default; canary after backend-lock",
@@ -663,7 +772,7 @@ def build_dispatch(
             "tools": "web_search · x_* · shell/aifilm · optional MCP collections",
             "image": "image_gen · image_edit(cast); batch: grok-oauth image|image-edit",
             "video": "PRIMARY: image_to_video; batch OAuth: grok-oauth video --image kf --wait; FRW fallback-only",
-            "voice": "session chat ≠ VO; default MiMo (MIMO_API_KEY); opt-in: --tts-backend grok (speech tags)",
+            "voice": "session chat ≠ VO; default Edge（旁白中文、角色日文）；其他后端须显式选择并留回执",
             "memory": "film-root + receipts (project RAG default)",
             "sdk_optional": "OAuth first; XAI_API_KEY only if no auth.json",
             "matrix": "references/grok-build-sdk.md · references/grok-oauth.md",
@@ -731,6 +840,22 @@ def build_dispatch(
         )
         if execution_plan_digest.get("graph_line"):
             agent_do.append(f"DramaGraph: {execution_plan_digest.get('graph_line')}")
+
+    from weapon_router import build_weapon_route
+
+    weapon_route = build_weapon_route(
+        root,
+        workflow=workflow,
+        primary_job=primary_job,
+        primary_action=primary,
+    )
+    if weapon_route.get("status") == "ready":
+        agent_do.append(
+            "检测到未锁定的静帧需求：按 weapon_route 自动使用已验证本地武器；"
+            "执行时先实时读取模型，失败即停止，不静默换供应商"
+        )
+    elif weapon_route.get("status") == "blocked":
+        agent_do.append(f"武器库阻断：{weapon_route.get('reason')}；未验证能力不得替代")
 
     context_digest: dict[str, Any] = {
         "rigor": None,
@@ -868,6 +993,7 @@ def build_dispatch(
         "agent_do": agent_do,
         "agent_instruction": "\n".join(f"- {x}" for x in agent_do),
         "routing": routing,
+        "weapon_route": weapon_route,
         "capability_summary": {
             "ok": (cap or {}).get("ok"),
             "tts_edge": ((cap or {}).get("tts") or {}).get("edge"),
@@ -900,6 +1026,7 @@ def build_dispatch(
         else None,
         "execution_plan_digest": execution_plan_digest,
         "context_digest": context_digest,
+        "workflow": workflow,
         "generation_usage": generation_usage,
         "state_hash": state_hash,
         "capability_cache": capability_cache,

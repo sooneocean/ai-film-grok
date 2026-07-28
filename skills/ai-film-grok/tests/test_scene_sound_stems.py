@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 import sys
 import wave
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from scene_sound_stems import _apply_event_controls, render_scene_sound_stem
+from audio_timeline import compile_timeline
+from scene_sound import reconcile
+from scene_sound_stems import SceneSoundError, _apply_event_controls, render_scene_sound_stem
 
 
 def test_scene_stem_honors_event_pan_gain_and_fades():
@@ -54,6 +58,123 @@ def test_scene_stem_accepts_legacy_local_asset_field(tmp_path: Path):
     )
     assert Path(result["path"]).is_file()
     assert result["sha256"] == hashlib.sha256(Path(result["path"]).read_bytes()).hexdigest()
+
+
+def test_scene_stem_requires_receipt_bound_performance_asset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("AIFILM_AUDIO_RECEIPT_KEY", "x" * 24)
+    from performance_candidates import sign_receipt
+
+    asset = tmp_path / "audio" / "candidates" / "performance" / "approved" / "take.wav"
+    asset.parent.mkdir(parents=True)
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+    digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+    receipt = asset.with_suffix(".receipt.json")
+    record = {
+        "schema": "aifilm-performance-candidate-v1",
+        "status": "approved",
+        "approved_path": "audio/candidates/performance/approved/take.wav",
+        "sha256": digest,
+        "character_id": "adult_a",
+        "language": "nonverbal",
+        "node_job_id": "job-42",
+        "adult_confirmed": True,
+        "source_authorization": "original",
+        "take_seed": 42,
+        "model_version": "higgs-audio-v2",
+    }
+    receipt.write_text(json.dumps(sign_receipt(record)))
+    result = render_scene_sound_stem(
+        tmp_path,
+        {
+            "events": [
+                {
+                    "id": "performance",
+                    "type": "performance",
+                    "source": "local:audio/candidates/performance/approved/take.wav",
+                    "approval_receipt": "local:audio/candidates/performance/approved/take.receipt.json",
+                    "source_sha256": digest,
+                    "character_id": "adult_a",
+                    "language": "nonverbal",
+                    "node_job_id": "job-42",
+                    "adult_confirmed": True,
+                    "source_authorization": "original",
+                    "take_seed": 42,
+                    "model_version": "higgs-audio-v2",
+                    "start_sec": 0,
+                    "duration_sec": 0.1,
+                }
+            ]
+        },
+        duration_sec=1,
+        out=tmp_path / "audio" / "scene.wav",
+        sample_rate=8000,
+    )
+    assert result["event_count"] == 1
+
+    with pytest.raises(SceneSoundError, match="does not bind asset"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "events": [
+                    {
+                        "id": "performance-wrong-language",
+                        "type": "performance",
+                        "source": "local:audio/candidates/performance/approved/take.wav",
+                        "approval_receipt": "local:audio/candidates/performance/approved/take.receipt.json",
+                        "source_sha256": digest,
+                        "character_id": "adult_a",
+                        "language": "ja",
+                        "node_job_id": "job-42",
+                        "adult_confirmed": True,
+                        "source_authorization": "original",
+                        "take_seed": 42,
+                        "model_version": "higgs-audio-v2",
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ]
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "wrong-language.wav",
+            sample_rate=8000,
+        )
+
+    data = json.loads(receipt.read_text())
+    data["node_job_id"] = "wrong-job"
+    receipt.write_text(json.dumps(data))
+    with pytest.raises(SceneSoundError, match="does not bind asset"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "events": [
+                    {
+                        "id": "performance",
+                        "type": "performance",
+                        "source": "local:audio/candidates/performance/approved/take.wav",
+                        "approval_receipt": "local:audio/candidates/performance/approved/take.receipt.json",
+                        "source_sha256": digest,
+                        "character_id": "adult_a",
+                        "language": "nonverbal",
+                        "node_job_id": "job-42",
+                        "adult_confirmed": True,
+                        "source_authorization": "original",
+                        "take_seed": 42,
+                        "model_version": "higgs-audio-v2",
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ]
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "bad-scene.wav",
+            sample_rate=8000,
+        )
 
 
 def test_rendered_scene_stem_survives_a_real_mp4_audio_mix(tmp_path: Path):
@@ -138,3 +259,75 @@ def test_rendered_scene_stem_survives_a_real_mp4_audio_mix(tmp_path: Path):
         check=True,
     )
     assert np.max(np.abs(np.frombuffer(decoded.stdout, dtype=np.float32))) > 0.01
+
+
+def test_walk_open_door_and_ambience_complete_the_local_scene_sound_loop(tmp_path: Path):
+    asset = tmp_path / "assets" / "room-tone.wav"
+    asset.parent.mkdir()
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            str(asset),
+        ],
+        check=True,
+    )
+    checksum = hashlib.sha256(asset.read_bytes()).hexdigest()
+    spec = {
+        "shots": [
+            {
+                "id": "s1",
+                "duration_sec": 1,
+                "action": "她走到门边，推门进入。",
+                "floor_material": "wood",
+                "door_material": "wood",
+                "audio_cues": [
+                    {
+                        "kind": "ambience",
+                        "source": "local:assets/room-tone.wav",
+                        "source_sha256": checksum,
+                        "license": "test-local",
+                        "start_offset_sec": 0,
+                        "duration_sec": 1,
+                    },
+                    {
+                        "kind": "foley",
+                        "asset_hint": "footsteps",
+                        "material": "wood",
+                        "source": "local:assets/room-tone.wav",
+                        "source_sha256": checksum,
+                        "license": "test-local",
+                        "start_offset_sec": 0.1,
+                        "duration_sec": 0.1,
+                    },
+                    {
+                        "kind": "foley",
+                        "asset_hint": "door_open",
+                        "material": "wood",
+                        "source": "local:assets/room-tone.wav",
+                        "source_sha256": checksum,
+                        "license": "test-local",
+                        "start_offset_sec": 0.5,
+                        "duration_sec": 0.1,
+                    },
+                ],
+            }
+        ]
+    }
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+    assert reconcile(tmp_path, write=False)["status"] == "ok"
+    result = render_scene_sound_stem(
+        tmp_path,
+        compile_timeline(spec),
+        duration_sec=1,
+        out=tmp_path / "audio" / "scene.wav",
+        sample_rate=48000,
+    )
+    assert result["event_count"] == 3
+    assert Path(result["path"]).is_file()

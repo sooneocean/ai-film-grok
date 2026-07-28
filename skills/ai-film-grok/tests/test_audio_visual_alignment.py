@@ -6,8 +6,10 @@ Previously this module was a 49-line stub that only checked file presence.
 
 from __future__ import annotations
 
+import json
 import sys
 import unittest
+from hashlib import sha256
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
@@ -177,6 +179,40 @@ class TestBuildAlignmentReport(unittest.TestCase):
         bgm_issues = rep.get("bgm_cue_issues") or []
         self.assertEqual(bgm_issues, [])
         self.assertEqual(rep["av_alignment_score"], 100)
+
+    def test_canonical_renderer_mix_report_is_hash_verified(self):
+        root = self._make_root(timeline={"shots": [{"id": "s1", "start_sec": 0, "end_sec": 1}]})
+        audio = root / "audio"
+        audio.mkdir()
+        artifacts = {}
+        for name in ("bgm", "sfx", "mixed"):
+            path = audio / f"{name}.wav"
+            path.write_bytes(name.encode())
+            artifacts[name] = {"path": str(path), "sha256": sha256(path.read_bytes()).hexdigest()}
+        (audio / "mix_report.json").write_text(
+            json.dumps({"artifacts": artifacts}), encoding="utf-8"
+        )
+        from audio_visual_alignment import build_audio_visual_alignment
+
+        report = build_audio_visual_alignment(root, write=False)
+        self.assertTrue(report["audio"]["mix_report_present"])
+        artifacts["mixed"]["sha256"] = "bogus"
+        (audio / "mix_report.json").write_text(
+            json.dumps({"artifacts": artifacts}), encoding="utf-8"
+        )
+        report = build_audio_visual_alignment(root, write=False)
+        self.assertIn("AUDIO_MIX_EVIDENCE_INVALID", [item["code"] for item in report["errors"]])
+
+    def test_legacy_receipt_mix_report_cannot_replace_renderer_output(self):
+        root = self._make_root(timeline={"shots": [{"id": "s1", "start_sec": 0, "end_sec": 1}]})
+        receipts = root / "receipts"
+        receipts.mkdir()
+        (receipts / "mix_report.json").write_text(json.dumps({"artifacts": {}}), encoding="utf-8")
+        from audio_visual_alignment import build_audio_visual_alignment
+
+        report = build_audio_visual_alignment(root, write=False)
+        self.assertFalse(report["ok"])
+        self.assertIn("AUDIO_MIX_REPORT_MISSING", [item["code"] for item in report["errors"]])
 
 
 if __name__ == "__main__":

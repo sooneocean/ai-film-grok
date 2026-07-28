@@ -17,7 +17,9 @@ class AudioCueError(ValueError):
 VOICE_TYPES = frozenset({"dialogue", "inner_monologue", "phone_broadcast", "narration"})
 NON_VOICE_KINDS = frozenset({"foley", "sfx", "ambience", "music", "silence"})
 ALL_KINDS = frozenset({"voice", *NON_VOICE_KINDS})
-_STAGE_DIRECTION = re.compile(r"(?:^|\s)[\[\(（](?:sfx|foley|ambience|sound|脚步|开门|关门|雨声|风声|环境音)", re.I)
+_STAGE_DIRECTION = re.compile(
+    r"(?:^|\s)[\[\(（](?:sfx|foley|ambience|sound|脚步|开门|关门|雨声|风声|环境音)", re.I
+)
 
 
 def _number(value: object, *, field: str, minimum: float = 0.0) -> float:
@@ -71,9 +73,7 @@ def validate_audio_cues(shots: list[dict[str, Any]], *, strict: bool) -> dict[st
                     raise AudioCueError(f"{prefix}.speaker is required for voice")
                 line_type = str(cue.get("line_type") or "").strip().lower()
                 if line_type not in VOICE_TYPES:
-                    raise AudioCueError(
-                        f"{prefix}.line_type must be one of {sorted(VOICE_TYPES)}"
-                    )
+                    raise AudioCueError(f"{prefix}.line_type must be one of {sorted(VOICE_TYPES)}")
                 if cue.get("asset_hint") is not None or cue.get("action_hint") is not None:
                     raise AudioCueError(f"{prefix} voice cannot carry action or asset hints")
             elif spoken is not None:
@@ -126,7 +126,15 @@ def compile_audio_timeline(
                 "start_sec": round(start, 3),
                 "end_sec": round(start + duration, 3),
             }
-            for key in ("speaker", "line_type", "spoken_text", "emotion", "performance", "asset_hint", "purpose"):
+            for key in (
+                "speaker",
+                "line_type",
+                "spoken_text",
+                "emotion",
+                "performance",
+                "asset_hint",
+                "purpose",
+            ):
                 if cue.get(key) is not None:
                     row[key] = cue[key]
             rows.append(row)

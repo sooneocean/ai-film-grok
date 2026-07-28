@@ -27,6 +27,13 @@ if str(_SCRIPTS) not in sys.path:
 from grok_oauth import GrokOAuthError, video_generate  # noqa: E402
 
 
+class GrokOAuthVideoProvider:
+    """Registry-facing surface for Grok OAuth image-to-video generation."""
+
+    def image_to_video(self, prompt: str, image: str | Path, out: Path, **kwargs):
+        return _retry_video_generate(prompt, image=str(image), out=out, **kwargs)
+
+
 def _retry_video_generate(prompt, **kwargs):
     """Retry video_generate with exponential backoff on 429 rate limits."""
     max_attempts = 3

@@ -66,17 +66,44 @@ def test_delivery_gate_rejects_manifest_injected_duplicate_or_missing_fingerprin
     duplicate = active_clip_reuse_report(
         {
             "clips": {
-                "shot01": {"status": "approved", "uniqueness": {"sha256": "same"}},
-                "shot02": {"status": "approved", "uniqueness": {"sha256": "same"}},
+                "shot01": {
+                    "status": "approved",
+                    "uniqueness": {"sha256": "same", "dhashes": ["0"]},
+                },
+                "shot02": {
+                    "status": "approved",
+                    "uniqueness": {"sha256": "same", "dhashes": ["0"]},
+                },
             }
         },
         required_shot_ids=["shot01", "shot02"],
     )
     assert duplicate["ok"] is False
-    assert duplicate["duplicate_sha256_groups"] == [["shot01", "shot02"]]
+    assert duplicate["duplicate_sha256_pairs"] == [["shot01", "shot02"]]
 
     missing = active_clip_reuse_report(
         {"clips": {"shot01": {"status": "approved"}}}, required_shot_ids=["shot01"]
     )
     assert missing["ok"] is False
     assert missing["missing_fingerprint_shots"] == ["shot01"]
+
+
+def test_delivery_gate_rejects_reencoded_perceptual_duplicate() -> None:
+    report = active_clip_reuse_report(
+        {
+            "review_contract_version": 2,
+            "clips": {
+                "shot01": {
+                    "status": "approved",
+                    "uniqueness": {"sha256": "original", "dhashes": ["0", "ffff"]},
+                },
+                "shot02": {
+                    "status": "approved",
+                    "uniqueness": {"sha256": "reencoded", "dhashes": ["1", "fffe"]},
+                },
+            },
+        },
+        required_shot_ids=["shot01", "shot02"],
+    )
+    assert report["ok"] is False
+    assert report["perceptual_duplicate_pairs"] == [["shot01", "shot02"]]

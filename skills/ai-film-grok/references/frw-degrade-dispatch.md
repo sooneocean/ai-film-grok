@@ -193,7 +193,7 @@ AIFILM="$HOME/.grok/skills/ai-film-grok/scripts/aifilm"
 
 | key | 说明 |
 |-----|------|
-| `seedance-2-fast-i2v` | **默认** bulk 质量（**需权限**） |
+| `seedance-2-fast-i2v` | FRW 技术故障 fallback 的优先质量档（需权限与 provider-switch receipt） |
 | `seedance-2-pro-flf` | 首尾帧高档（**需权限**） |
 | `byteplus-seedance-2-*` | 字节渠道（**需权限**） |
 | `ltx-i2v` / `ltx-t2v` / `ltx-flf` / `ltx-lipsync` | 精确宽高；i2v 常 502 |

@@ -1,5 +1,8 @@
 # Professional Director System
 
+> 本模型已蒸馏进 `/ai-film-grok` 的内部 workflow spine；它不再是第二套用户入口。新项目由 `aifilm init` 建立 professional control book，用户只需重复 `dispatch`。旧项目无 control book 时保持 legacy，须显式迁移。
+> 当前阶段证据齐全后，dispatch 会停在人类边界；使用者以 `aifilm director lock-stage --root <film> --stage <stage> --user-phrase "<原话>"` 将自动解析的原生证据写入 approval ledger 与 hash-bound stage lock。
+
 The director system compiles creative intent into independent, hash-bound department contracts.
 
 Canonical truth is split by ownership: `drama-graph.json` for story and performance intent, `style-bible.json` v3 for visual departments, `audio-bible.json` for sound and music, `post-bible.json` for editorial and finishing, and `production-book.json` for dependencies, rigor, stages, approvals, and stale propagation. `film-spec.json` and Shot Packages are derived execution projections.

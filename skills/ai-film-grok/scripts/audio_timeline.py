@@ -26,17 +26,19 @@ EVENT_TYPES = frozenset(
         "action_sfx",
         "ambience",
         "music",
+        "performance",
         "silence",
     }
 )
 VOCAL_TYPES = frozenset({"dialogue", "inner_voice", "media_voice", "narration"})
-ASSET_TYPES = frozenset({"action_sfx", "ambience", "music"})
+ASSET_TYPES = frozenset({"action_sfx", "ambience", "music", "performance"})
 SILENCE_SCOPES = frozenset({"bed", "music", "native", "sfx", "scene_sound"})
 _CUE_MAP = {
     "foley": "action_sfx",
     "sfx": "action_sfx",
     "ambience": "ambience",
     "music": "music",
+    "performance": "performance",
     "silence": "silence",
     "dialogue": "dialogue",
     "inner_monologue": "inner_voice",
@@ -174,6 +176,20 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                             "source_sha256": str(cue.get("source_sha256") or ""),
                         }
                     )
+                if event_type == "performance":
+                    event.update(
+                        {
+                            "approval_status": str(cue.get("approval_status") or ""),
+                            "approval_receipt": str(cue.get("approval_receipt") or ""),
+                            "character_id": str(cue.get("character_id") or ""),
+                            "language": str(cue.get("language") or ""),
+                            "node_job_id": str(cue.get("node_job_id") or ""),
+                            "adult_confirmed": cue.get("adult_confirmed") is True,
+                            "source_authorization": str(cue.get("source_authorization") or ""),
+                            "take_seed": cue.get("take_seed"),
+                            "model_version": str(cue.get("model_version") or ""),
+                        }
+                    )
                 if event_type == "silence":
                     event["silence_scope"] = str(cue.get("silence_scope") or "bed")
                 if cue.get("overlap_policy") is not None:
@@ -274,6 +290,35 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
                 raise AudioTimelineError(f"{prefix} asset license is required")
             if not str(event.get("source_sha256") or "").strip():
                 raise AudioTimelineError(f"{prefix} asset source_sha256 is required")
+        if event_type == "performance" and not bool(event.get("muted")):
+            if not str(event.get("source") or "").startswith("local:"):
+                raise AudioTimelineError(f"{prefix} performance asset must be local:")
+            if event.get("approval_status") != "approved":
+                raise AudioTimelineError(f"{prefix} performance asset requires human approval")
+            if not str(event.get("approval_receipt") or "").startswith("local:"):
+                raise AudioTimelineError(
+                    f"{prefix} performance asset requires local approval_receipt"
+                )
+            if event.get("adult_confirmed") is not True:
+                raise AudioTimelineError(
+                    f"{prefix} performance asset requires adult_confirmed=true"
+                )
+            if event.get("source_authorization") not in {"original", "authorized_reference"}:
+                raise AudioTimelineError(f"{prefix} performance source authorization is invalid")
+            if not str(event.get("character_id") or "").strip():
+                raise AudioTimelineError(f"{prefix} performance asset requires character_id")
+            if event.get("language") != "nonverbal":
+                raise AudioTimelineError(f"{prefix} performance asset requires language=nonverbal")
+            if not str(event.get("node_job_id") or "").strip():
+                raise AudioTimelineError(f"{prefix} performance asset requires node_job_id")
+            if isinstance(event.get("take_seed"), bool) or not isinstance(
+                event.get("take_seed"), int
+            ):
+                raise AudioTimelineError(f"{prefix} performance asset requires integer take_seed")
+            if not str(event.get("model_version") or "").strip():
+                raise AudioTimelineError(f"{prefix} performance asset requires model_version")
+            if not re.fullmatch(r"[0-9a-f]{64}", str(event.get("source_sha256") or "")):
+                raise AudioTimelineError(f"{prefix} performance asset source_sha256 is invalid")
     for i, left in enumerate(vocal):
         for right in vocal[i + 1 :]:
             if left["_start"] < right["_end"] and right["_start"] < left["_end"]:

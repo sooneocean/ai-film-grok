@@ -3,6 +3,46 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.14.0] - 2026-07-28
+
+### Added
+
+- Bounded `bgm-library canary` generation for one configurable 10–600 second ACE-Step batch, with pending-only status and checksum, fingerprint, duration, and technical acceptance checks.
+- Acceptance coverage for ten-cue within-film diversity, six-film rotation, and cropped or requantized near-duplicate rejection.
+
+### Fixed
+
+- Empty BGM libraries now expose a stable catalog checksum, and duplicate audio/fingerprints are rejected before a batch mutates the catalog.
+
+## [2.13.0] - 2026-07-28
+
+### Added
+
+- Distilled the Professional Director 11-stage order into the single `/ai-film-grok` workflow, with new projects defaulting to professional control and legacy roots remaining compatible.
+- Added a compact/full shared workflow status that projects existing narrative, pilot, clip, selects, rough-cut, post, review, and delivery evidence onto the internal director spine.
+- Added `director lock-stage`, which records explicit human approval and hash-locks auto-resolved native evidence before advancing the professional stage.
+
+### Fixed
+
+- Deferred scene-sound work until its production stage so it cannot preempt story/spec routing.
+- Replaced invalid generated `mimo` final commands with the supported bilingual Edge route.
+
+## [2.12.0] - 2026-07-28
+
+### Added
+
+- Approval-gated shared ACE-Step BGM catalog, batch generation, local review packs, series motif lineage, duplicate clustering, and deterministic anti-repeat selection.
+- `aifilm bgm-library` doctor, status, audit, generate, review, approval, planning, selection, and series-pack commands.
+- `approved_library` final routing with fail-closed gap queues, catalog-bound mix receipts, and post-render usage accounting.
+
+## [2.11.0] - 2026-07-28
+
+### Added
+
+- Explicit private-LAN `comfy-wan22` provider and `aifilm comfy` control plane for bounded inventory, input upload, typed workflow overrides, API-format submission, WebSocket/History completion, artifact download, targeted cancellation and memory release.
+- Local-only workflow validation blocks ComfyUI external API nodes unless the submitted workflow receives an explicit approval flag.
+- RTX 5090 capability reports bind installed Wan 2.2 model pairs, device VRAM and local output checksums without changing the `grok_primary` default.
+
 ## [2.8.0] - 2026-07-27
 
 ### Added

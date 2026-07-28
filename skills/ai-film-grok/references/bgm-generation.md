@@ -51,6 +51,77 @@ slow groove 72 bpm, no vocals, no singing, background for narration
 
 ACE-Step 歌词侧可用：`[inst]` 或空结构标记（以官方/社区文档为准，出库前听审）。
 
+### 5090 私有 ACE-Step 候选曲库（正式插件选项）
+
+`aifilm bgm-candidate` 是 5090 局域网节点的离线灌库入口，可在开拍前建立曲库，
+也可在剪辑或混音阶段按实际镜头补一首；两种时机的产物完全相同。它绝不在
+`final` 热路径现生成，也不会自动替换既有 BGM。
+
+```bash
+# 生成：只写入 pending，保留 seed、模型/node job、hash；不会进入 final
+"$AIFILM" bgm-candidate generate --root "<film-root>" \
+  --mood rnb --duration 30 --seed 5101 \
+  --prompt "late-night neo-soul instrumental, no vocals"
+
+# 人工完整听审后才批准；批准后才进入 audio/templates/<mood>/
+"$AIFILM" bgm-candidate approve --root "<film-root>" --asset-id "<candidate-id>"
+```
+
+候选必须是无歌词/无演唱的 WAV，插件会核验 MIME、WAV、44.1 kHz、时长与 SHA-256。
+节点不可用、超时、坏档或 hash 不符均失败关闭；已批准曲库和程序化 rnb 维持原有可用性，
+不会静默换源。每首进入曲库前仍须记录实际模型版本与权利/许可，私有本地推理不自动取得公开发行授权。
+
+### 共享批准库（library-first）
+
+新片的正式路径是 `aifilm bgm-library`。共享资产默认落在
+`~/.grok/ai-film-grok/bgm-library/`，不进入插件 Git；`catalog.json` 原子更新，
+`usage.jsonl` 只在成片成功后追加。节点 receipt 只保留抽象配方、prompt hash、seed、
+模型与 checkpoint 指纹，不保留剧情 prompt 或 token。
+
+```bash
+# 只读检查节点与曲库；输出不会显示 token
+"$AIFILM" bgm-library doctor
+"$AIFILM" bgm-library status
+"$AIFILM" bgm-library audit
+
+# 20 个基准配方槽，每槽默认批量 4 个 pending 候选
+"$AIFILM" bgm-library generate --recipe-pack baseline-v1 --batch-size 4
+
+# 首次接真实 5090 时只跑一个 4×30 秒 canary；仍只进入 pending
+"$AIFILM" bgm-library canary --slot baseline-v1-rnb-pad \
+  --duration 30 --batch-size 4
+
+# 生成本机 HTML 审听页；听完后逐首批准或拒绝
+"$AIFILM" bgm-library review-pack
+"$AIFILM" bgm-library approve --asset-id "<id>" \
+  --reviewer dex --license-note "local ACE-Step generation; release rights reviewed" \
+  --instrumental-confirmed
+"$AIFILM" bgm-library reject --asset-id "<id>" \
+  --reviewer dex --reason "melody too close to an approved asset"
+
+# 先预演，再把确定性选曲写入片级 receipt
+"$AIFILM" bgm-library plan --root "<film-root>"
+"$AIFILM" bgm-library select --root "<film-root>"
+
+# 从已批准主题 master 派生主角/关系/威胁 low-mid-high，共 9 个 pending
+"$AIFILM" bgm-library series-pack --root "<film-root>" --series-id "<series-id>"
+```
+
+批准时会拒绝完全相同 SHA-256；标准化 PCM 相似度 `>=0.98` 也拒绝，只有明确的
+同 motif 父子变奏可保留 lineage。`0.90–0.98` 会归入同一声音簇，因此相邻 cue
+仍不能连续使用。选择器硬过滤批准、纯器乐、许可、mood 与技术检测；同片不重复资产，
+相邻不重复声音簇。存在替代时避开最近 5 部或 30 天用过的曲；候选不足只放宽跨片窗口，
+并把 `diversity_relaxed` 和原因写入 receipt。
+
+曲库达到 20 首且五类 mood 各至少 4 首后，新项目才默认
+`audio_policy.bed_source=approved_library`。旧项目继续保持原来的 `auto` 逻辑。
+`final` 不调用 ACE 临时生成；缺匹配曲会写入待生成队列并阻塞。成功完成混音后，
+才把资产 ID、checksum、catalog revision、motif lineage、声音簇与选择理由提交到
+`usage.jsonl` 和 `mix_report.json`。
+
+canary 会回读候选数量、时长、技术检测、唯一 checksum 与唯一 PCM 指纹；任何候选
+仍保持 `pending_human_review`，不能替代人工完整听审。
+
 ## 三阶梯 · 立刻换口味（操作）
 
 ```text

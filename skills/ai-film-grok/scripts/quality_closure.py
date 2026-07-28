@@ -254,7 +254,13 @@ def _shot_quality_closure(root: Path) -> dict[str, Any]:
     """Validate every current-contract approved shot before master claims."""
     manifest = read_json(root / "manifest.json") or {}
     if int(manifest.get("quality_evidence_contract_version") or 0) < 1:
-        return {"required": False, "ok": True, "missing": [], "duplicates": []}
+        return {
+            "required": False,
+            "ok": True,
+            "missing": [],
+            "duplicates": [],
+            "perceptual_duplicates": [],
+        }
     clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
     required = [
         str(sid)
@@ -265,7 +271,13 @@ def _shot_quality_closure(root: Path) -> dict[str, Any]:
         from clip_uniqueness import active_clip_reuse_report
         from quality_evidence import quality_evidence_is_current
     except ImportError:
-        return {"required": True, "ok": False, "missing": required, "duplicates": []}
+        return {
+            "required": True,
+            "ok": False,
+            "missing": required,
+            "duplicates": [],
+            "perceptual_duplicates": [],
+        }
     missing: list[str] = []
     for shot_id in required:
         record = clips[shot_id]
@@ -280,6 +292,7 @@ def _shot_quality_closure(root: Path) -> dict[str, Any]:
         "approved_shot_count": len(required),
         "missing": sorted(missing),
         "duplicates": uniqueness["duplicate_sha256_groups"],
+        "perceptual_duplicates": uniqueness["perceptual_duplicate_pairs"],
         "missing_fingerprints": uniqueness["missing_fingerprint_shots"],
     }
 
@@ -321,6 +334,8 @@ def build_quality_report(root: Path | str) -> dict[str, Any]:
         blocking_codes.append("INDEPENDENT_BLIND_REVIEW_MISSING")
     if not shot_quality["ok"]:
         blocking_codes.append("SHOT_QUALITY_EVIDENCE_MISSING")
+    if shot_quality.get("duplicates") or shot_quality.get("perceptual_duplicates"):
+        blocking_codes.append("I2V_SEGMENT_DUPLICATE")
     blocking_codes.extend(
         item["code"] for item in review.get("reshoot_queue", []) if item.get("code")
     )

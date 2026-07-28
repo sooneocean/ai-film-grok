@@ -6,9 +6,10 @@ import json
 import wave
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 import pytest
-from audio_node_client import AudioNodeError, _url, health, render
+from audio_node_client import AudioNodeError, _request, _url, health, render, render_batch
 
 
 def _delivery_wav() -> bytes:
@@ -31,9 +32,36 @@ def test_health_requires_private_token() -> None:
         health("http://192.168.88.52:8788", "short")
 
 
+def test_http_error_is_not_misreported_as_network_unreachable() -> None:
+    error = HTTPError("http://node/health", 404, "Not Found", {}, io.BytesIO())
+    with patch("audio_node_client.urllib.request.urlopen", side_effect=error):
+        with pytest.raises(AudioNodeError, match="HTTP 404"):
+            _request("http://192.168.88.52:8788", "x" * 32, "/health")
+
+
 def test_render_rejects_unknown_kind(tmp_path: Path) -> None:
     with pytest.raises(AudioNodeError):
         render("http://192.168.88.52:8788", "x" * 32, "video", {}, tmp_path / "x.wav")
+
+
+def test_render_allows_explicit_performance_track(tmp_path: Path) -> None:
+    wav = _delivery_wav()
+    replies = iter(
+        [
+            json.dumps({"job_id": "a"}).encode(),
+            json.dumps({"status": "completed", "sha256": hashlib.sha256(wav).hexdigest()}).encode(),
+            wav,
+        ]
+    )
+    with patch("audio_node_client._request", side_effect=lambda *args, **kwargs: next(replies)):
+        receipt = render(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            "performance",
+            {"prompt": "nonverbal performance"},
+            tmp_path / "performance.wav",
+        )
+    assert receipt["path"].endswith("performance.wav")
 
 
 def test_render_rejects_non_wav_result(tmp_path: Path) -> None:
@@ -124,3 +152,124 @@ def test_render_wraps_invalid_submission_json(tmp_path: Path) -> None:
     with patch("audio_node_client._request", return_value=b"not-json"):
         with pytest.raises(AudioNodeError, match="submission JSON"):
             render("http://192.168.88.52:8788", "x" * 32, "tts", {"text": "x"}, tmp_path / "x.wav")
+
+
+def test_render_batch_downloads_every_hash_bound_artifact(tmp_path: Path) -> None:
+    wav_a = _delivery_wav()
+    wav_b = _delivery_wav() + b"distinct"
+    replies = iter(
+        [
+            json.dumps({"job_id": "batch"}).encode(),
+            json.dumps(
+                {
+                    "status": "completed",
+                    "model": "ACE-Step-1.5",
+                    "checkpoint_fingerprint": "checkpoint",
+                    "artifacts": [
+                        {"index": 0, "seed": 1, "sha256": hashlib.sha256(wav_a).hexdigest()},
+                        {"index": 1, "seed": 2, "sha256": hashlib.sha256(wav_b).hexdigest()},
+                    ],
+                }
+            ).encode(),
+            wav_a,
+            wav_b,
+        ]
+    )
+    with (
+        patch("audio_node_client._request", side_effect=lambda *args, **kwargs: next(replies)),
+        patch("audio_node_client._validate_wav"),
+    ):
+        receipt = render_batch(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            payload={"prompt": "instrumental", "batch_size": 2, "seeds": [1, 2]},
+            out_dir=tmp_path / "batch",
+        )
+
+    assert [item["seed"] for item in receipt["artifacts"]] == [1, 2]
+    assert all(Path(item["path"]).is_file() for item in receipt["artifacts"])
+
+
+def test_render_batch_removes_partial_outputs_on_hash_mismatch(tmp_path: Path) -> None:
+    wav = _delivery_wav()
+    replies = iter(
+        [
+            json.dumps({"job_id": "batch"}).encode(),
+            json.dumps(
+                {
+                    "status": "completed",
+                    "artifacts": [{"index": 0, "seed": 1, "sha256": "0" * 64}],
+                }
+            ).encode(),
+            wav,
+        ]
+    )
+    output = tmp_path / "batch"
+    with patch("audio_node_client._request", side_effect=lambda *args, **kwargs: next(replies)):
+        with pytest.raises(AudioNodeError, match="hash"):
+            render_batch(
+                "http://192.168.88.52:8788",
+                "x" * 32,
+                payload={"prompt": "instrumental", "batch_size": 1, "seeds": [1]},
+                out_dir=output,
+            )
+    assert not list(output.glob("*.wav"))
+
+
+def test_render_batch_uploads_reference_without_sending_local_path(tmp_path: Path) -> None:
+    reference = tmp_path / "private-series-master.wav"
+    raw_reference = _delivery_wav()
+    reference.write_bytes(raw_reference)
+    generated = _delivery_wav()
+    captured: list[tuple[str, dict[str, object]]] = []
+    replies = iter(
+        [
+            json.dumps(
+                {
+                    "reference_id": hashlib.sha256(raw_reference).hexdigest(),
+                    "source_sha256": hashlib.sha256(raw_reference).hexdigest(),
+                }
+            ).encode(),
+            json.dumps({"job_id": "batch"}).encode(),
+            json.dumps(
+                {
+                    "status": "completed",
+                    "artifacts": [
+                        {
+                            "index": 0,
+                            "seed": 7,
+                            "sha256": hashlib.sha256(generated).hexdigest(),
+                        }
+                    ],
+                }
+            ).encode(),
+            generated,
+        ]
+    )
+
+    def fake_request(*args, **kwargs):
+        captured.append((args[2], kwargs))
+        return next(replies)
+
+    with (
+        patch("audio_node_client._request", side_effect=fake_request),
+        patch("audio_node_client._validate_wav"),
+    ):
+        render_batch(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            payload={
+                "prompt": "abstract reusable recipe",
+                "batch_size": 1,
+                "seeds": [7],
+                "task_type": "cover",
+                "reference_audio": str(reference),
+            },
+            out_dir=tmp_path / "batch",
+        )
+
+    assert captured[0][0] == "/v1/music-reference"
+    submitted = captured[1][1]["body"]
+    assert "reference_audio" not in submitted
+    assert submitted["reference_audio_id"] == hashlib.sha256(raw_reference).hexdigest()
+    assert str(reference) not in json.dumps(submitted)

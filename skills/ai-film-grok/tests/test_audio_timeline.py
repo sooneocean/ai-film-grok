@@ -4,6 +4,7 @@ import json
 import sys
 from pathlib import Path
 
+import jsonschema
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -23,7 +24,7 @@ def _spec(cues, *, mode="drama_radio"):
     return {"audio_style": mode, "shots": [{"id": "s1", "duration_sec": 4, "audio_cues": cues}]}
 
 
-def test_eight_types_are_compiled_and_non_voice_never_carries_tts_text():
+def test_audio_types_are_compiled_and_non_voice_never_carries_tts_text():
     cues = [
         {
             "kind": "voice",
@@ -180,6 +181,143 @@ def test_asset_requires_hash_and_license_in_v1():
                 ]
             )
         )
+
+
+def test_performance_is_an_approval_gated_local_asset_type():
+    cue = {
+        "kind": "performance",
+        "source": "local:audio/candidates/performance/approved/take.wav",
+        "license": "original authorized performance",
+        "source_sha256": "a" * 64,
+        "approval_status": "approved",
+        "approval_receipt": "local:audio/candidates/performance/approved/take.receipt.json",
+        "character_id": "adult_a",
+        "language": "nonverbal",
+        "node_job_id": "job-42",
+        "adult_confirmed": True,
+        "source_authorization": "original",
+        "take_seed": 42,
+        "model_version": "higgs-audio-v2",
+        "start_offset_sec": 0,
+        "duration_sec": 1,
+    }
+    timeline = compile_timeline(_spec([cue]))
+    assert timeline["events"][0]["type"] == "performance"
+    cue["approval_status"] = "pending_human_review"
+    with pytest.raises(AudioTimelineError, match="human approval"):
+        compile_timeline(_spec([cue]))
+    cue["approval_status"] = "approved"
+    cue["take_seed"] = True
+    with pytest.raises(AudioTimelineError, match="integer take_seed"):
+        compile_timeline(_spec([cue]))
+    cue["take_seed"] = 42
+    cue["approval_receipt"] = "not-local"
+    with pytest.raises(AudioTimelineError, match="approval_receipt"):
+        compile_timeline(_spec([cue]))
+
+
+def test_audio_timeline_schema_accepts_approved_performance_event() -> None:
+    cue = {
+        "kind": "performance",
+        "source": "local:audio/candidates/performance/approved/take.wav",
+        "license": "original authorized performance",
+        "source_sha256": "a" * 64,
+        "approval_status": "approved",
+        "approval_receipt": "local:audio/candidates/performance/approved/take.receipt.json",
+        "character_id": "adult_a",
+        "language": "nonverbal",
+        "node_job_id": "job-42",
+        "adult_confirmed": True,
+        "source_authorization": "original",
+        "take_seed": 42,
+        "model_version": "higgs-audio-v2",
+        "start_offset_sec": 0,
+        "duration_sec": 1,
+    }
+    schema_path = Path(__file__).resolve().parent.parent / "schemas" / "audio-timeline.schema.json"
+    jsonschema.validate(compile_timeline(_spec([cue])), json.loads(schema_path.read_text()))
+
+
+def test_performance_schemas_require_approval_provenance() -> None:
+    schema_dir = Path(__file__).resolve().parent.parent / "schemas"
+    timeline_schema = json.loads((schema_dir / "audio-timeline.schema.json").read_text())
+    with pytest.raises(jsonschema.ValidationError, match="approval_receipt"):
+        jsonschema.validate(
+            {
+                "schema_version": 1,
+                "kind": "audio-timeline",
+                "mode": "drama_radio",
+                "duration_sec": 1,
+                "events": [
+                    {
+                        "id": "p1",
+                        "shot_id": "s1",
+                        "type": "performance",
+                        "start_sec": 0,
+                        "duration_sec": 1,
+                    }
+                ],
+            },
+            timeline_schema,
+        )
+    film_schema = json.loads((schema_dir / "film-spec.schema.json").read_text())
+    with pytest.raises(jsonschema.ValidationError, match="approval_receipt"):
+        jsonschema.validate(
+            {
+                "schema_version": 2,
+                "title": "schema-test",
+                "shots": [
+                    {
+                        "id": "s1",
+                        "nar": "旁白",
+                        "dramatic_function": "reaction",
+                        "dsl": {},
+                        "audio_cues": [
+                            {
+                                "kind": "performance",
+                                "start_offset_sec": 0,
+                                "duration_sec": 1,
+                            }
+                        ],
+                    }
+                ],
+            },
+            film_schema,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("adult_confirmed", False, "adult_confirmed"),
+        ("source_authorization", "unknown", "authorization"),
+        ("model_version", "", "model_version"),
+        ("source_sha256", "not-a-hash", "source_sha256"),
+    ],
+)
+def test_performance_contract_rejects_missing_provenance(
+    field: str, value: object, message: str
+) -> None:
+    cue = {
+        "kind": "performance",
+        "source": "local:audio/candidates/performance/approved/take.wav",
+        "license": "original authorized performance",
+        "source_sha256": "a" * 64,
+        "approval_status": "approved",
+        "approval_receipt": "local:audio/candidates/performance/approved/take.receipt.json",
+        "character_id": "adult_a",
+        "language": "nonverbal",
+        "node_job_id": "job-42",
+        "adult_confirmed": True,
+        "source_authorization": "original",
+        "take_seed": 42,
+        "model_version": "higgs-audio-v2",
+        "start_offset_sec": 0,
+        "duration_sec": 1,
+    }
+    cue[field] = value
+    with pytest.raises(AudioTimelineError, match=message):
+        compile_timeline(_spec([cue]))
 
 
 def test_mix_plan_has_inner_voice_filter_event_pan_fades_and_all_vocal_ducking():

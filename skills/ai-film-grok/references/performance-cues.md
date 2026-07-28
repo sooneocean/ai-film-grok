@@ -33,3 +33,25 @@
 ## BGM 响应
 
 `write-spec` 会写入 `_performance_bgm`，`final` 会把平均表演强度转换为可解释的 BGM gain、VO duck 和尾部余韵参数，并写入 `audio/mix_report.json` 的 `performance_bgm`。
+
+## 5090 非语言表演候选（Higgs）
+
+非语言反应是独立 `performance` stem，不是循环 `sfx`，也不是 TTS 的隐藏 fallback。
+它只能由私有节点的 Higgs adapter 生成并经过完整听审；当前 adapter 不接受参考音档，
+因此不会把原始人声跨 API 传输。角色必须是成年人，声音来源仅可标记为 `original`
+或 `authorized_reference`。
+
+```bash
+# AIFILM_AUDIO_NODE_URL/TOKEN 指向私网节点；key 优先独立设置，也可回退到 node token。
+# AIFILM_AUDIO_RECEIPT_KEY=<至少24字符、本机环境变量、绝不写入项目>
+"$AIFILM" performance-candidate generate --root "<film-root>" \
+  --cue "brief nonverbal startled breath" --duration 3 --seed 4201 \
+  --character-id "adult_a" --source-authorization original --adult-confirmed
+
+# 先完整听审；批准才会写入 approved 资产与签名回执。
+"$AIFILM" performance-candidate approve --root "<film-root>" --asset-id "<candidate-id>"
+```
+
+final 的 `performance` event 必须同时包含已批准本地 WAV、签名回执、角色、`language=nonverbal`、
+node job、授权/成人确认、seed、模型和 SHA-256。任何字段、签名或 WAV hash 变动都会失败关闭；
+final 不会实时生成或静默替换这条轨。

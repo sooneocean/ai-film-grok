@@ -38,6 +38,11 @@ class AdvancePolicy:
 
 
 ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
+    "concept_lock-evidence": AdvancePolicy(
+        ("dispatch.orchestrate",),
+        ("plan", "status"),
+        verifier=("plan", "status"),
+    ),
     "write-spec": AdvancePolicy(
         ("dispatch.orchestrate", "shot.plan"),
         ("write-spec",),
@@ -78,7 +83,23 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
     "selects-report": AdvancePolicy(
         ("projection.verify",),
         ("selects",),
+        bool_flags=("--no-write",),
         verifier=("selects",),
+    ),
+    "dailies_review-evidence": AdvancePolicy(
+        ("dispatch.orchestrate",),
+        ("dailies", "status"),
+        verifier=("dailies", "status"),
+    ),
+    "rough-cut-review": AdvancePolicy(
+        ("dispatch.orchestrate",),
+        ("editor-cut",),
+        verifier=("editor-cut",),
+    ),
+    "department_look_lock-evidence": AdvancePolicy(
+        ("dispatch.orchestrate",),
+        ("director", "status"),
+        verifier=("director", "status"),
     ),
     "audio-plan": AdvancePolicy(
         ("sound.design",),

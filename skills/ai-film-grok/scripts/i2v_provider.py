@@ -20,7 +20,9 @@ instances rather than replacing them.
 
 from __future__ import annotations
 
+import json
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -155,6 +157,7 @@ class I2VProvider:
     """
 
     name: str = "base"
+    command_timeout_sec: int = 600
     # source_endpoint labels this provider owns (subset of ALLOWED_VIDEO_ENDPOINTS)
     endpoints: frozenset[str] = frozenset()
 
@@ -176,7 +179,13 @@ class I2VProvider:
         if not cmd:
             raise I2VProviderError(f"{self.name}: build_command returned empty")
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=600)
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=self.command_timeout_sec,
+            )
         except (OSError, subprocess.SubprocessError) as exc:
             raise I2VProviderError(f"{self.name}: subprocess failed: {exc}") from exc
         ok = proc.returncode == 0
@@ -396,6 +405,210 @@ class SeedanceProvider(I2VProvider):
         }
 
 
+class LocalComfyWan22Provider(I2VProvider):
+    """Explicit private-LAN Wan 2.2 I2V lane on the user's RTX 5090."""
+
+    name = "comfy-wan22"
+    command_timeout_sec = 1830
+    endpoints = frozenset({"local_wan22_i2v"})
+
+    def _base_url(self) -> str:
+        from config_loader import get_config
+
+        return get_config().comfyui_base_url.strip()
+
+    @staticmethod
+    def _resolve_profile_name(kwargs: dict[str, Any]) -> str:
+        from comfy_video import resolve_wan22_profile
+
+        profile = resolve_wan22_profile(
+            str(kwargs.get("profile") or "auto"),
+            intent=str(kwargs.get("weapon_intent") or "general"),
+            stage=str(kwargs.get("production_stage") or "production"),
+            allow_experimental=bool(kwargs.get("allow_experimental")),
+        )
+        return str(profile["name"])
+
+    def probe(self, *, root: Path | None = None) -> CapabilityReport:
+        del root
+        base_url = self._base_url()
+        if not base_url:
+            return CapabilityReport(
+                provider=self.name,
+                ok=False,
+                available=False,
+                reason="AIFILM_COMFYUI_BASE_URL is not configured.",
+                models=[],
+                profile="explicit_local",
+            )
+        try:
+            from comfy_video import probe
+
+            detail = probe(base_url)
+        except Exception as exc:
+            return CapabilityReport(
+                provider=self.name,
+                ok=False,
+                available=False,
+                reason=f"private ComfyUI probe failed: {exc}",
+                models=[],
+                profile="explicit_local",
+            )
+        models = list((detail.get("models") or {}).get("official") or [])
+        return CapabilityReport(
+            provider=self.name,
+            ok=bool(detail.get("ok")),
+            available=bool(detail.get("ok")),
+            reason="Private RTX 5090 Wan 2.2 is ready."
+            if detail.get("ok")
+            else "Required Wan 2.2 assets are missing.",
+            models=models,
+            profile="explicit_local",
+            detail=detail,
+        )
+
+    def build_command(
+        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
+    ) -> list[str]:
+        base_url = self._base_url()
+        if not base_url:
+            raise I2VProviderError("AIFILM_COMFYUI_BASE_URL is required for comfy-wan22")
+        out = kwargs.get("out")
+        if not out:
+            raise I2VProviderError("comfy-wan22 requires an explicit output path")
+        try:
+            profile_name = self._resolve_profile_name(kwargs)
+        except Exception as exc:
+            raise I2VProviderError(str(exc)) from exc
+        script = Path(__file__).resolve().parent / "comfy_video.py"
+        command = [
+            sys.executable,
+            str(script),
+            "generate",
+            "--base-url",
+            base_url,
+            "--image",
+            str(Path(keyframe).expanduser().resolve()),
+            "--prompt",
+            prompt,
+            "--out",
+            str(Path(out).expanduser().resolve()),
+            "--duration",
+            str(duration_sec),
+            "--timeout",
+            str(kwargs.get("timeout_sec", 1800)),
+            "--width",
+            str(kwargs.get("width", 480)),
+            "--height",
+            str(kwargs.get("height", 704)),
+            "--seed",
+            str(kwargs.get("seed", 123456)),
+            "--profile",
+            profile_name,
+        ]
+        if kwargs.get("turbo"):
+            command.append("--turbo")
+        if kwargs.get("subject_basis"):
+            command.extend(("--subject-basis", str(kwargs["subject_basis"])))
+        return command
+
+    def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        input_path = Path(keyframe).expanduser().resolve()
+        expected_input_sha = sha256_file(input_path) if input_path.is_file() else None
+        result = super().generate(keyframe=keyframe, prompt=prompt, **kwargs)
+        out = Path(kwargs["out"]).expanduser().resolve()
+        receipt = out.with_suffix(out.suffix + ".receipt.json")
+        result["receipt"] = str(receipt)
+        if result.get("ok") and receipt.is_file():
+            try:
+                from comfy_video import (
+                    WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
+                    WAN22_ADULT_PROFILE,
+                    WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
+                    WAN22_OFFICIAL_PROFILE,
+                )
+
+                detail = json.loads(receipt.read_text(encoding="utf-8"))
+                profile_name = self._resolve_profile_name(kwargs)
+                profile = {
+                    WAN22_ADULT_PROFILE["name"]: WAN22_ADULT_PROFILE,
+                    WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE[
+                        "name"
+                    ]: WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
+                    WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE[
+                        "name"
+                    ]: WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
+                }.get(profile_name, WAN22_OFFICIAL_PROFILE)
+                expected_models = [profile["high"], profile["low"]]
+                expected_loras = (
+                    [name for name in (profile.get("high_lora"), profile.get("low_lora")) if name]
+                    if kwargs.get("turbo") or profile_name.endswith("-experimental")
+                    else []
+                )
+                output_detail = detail.get("output") or {}
+                verification_errors: list[str] = []
+                if detail.get("schema_version") != 1:
+                    verification_errors.append("schema version mismatch")
+                if detail.get("kind") != "local-wan22-generation":
+                    verification_errors.append("receipt kind mismatch")
+                if expected_input_sha is None:
+                    verification_errors.append("input file was missing before launch")
+                elif detail.get("input_sha256") != expected_input_sha:
+                    verification_errors.append("input SHA-256 mismatch")
+                if not out.is_file():
+                    verification_errors.append("output file is missing")
+                else:
+                    if output_detail.get("sha256") != sha256_file(out):
+                        verification_errors.append("output SHA-256 mismatch")
+                    if output_detail.get("bytes") != out.stat().st_size:
+                        verification_errors.append("output byte count mismatch")
+                if Path(str(output_detail.get("path") or "")).expanduser().resolve() != out:
+                    verification_errors.append("output path mismatch")
+                if detail.get("provider") != self.name or detail.get("ok") is not True:
+                    verification_errors.append("provider receipt identity mismatch")
+                if detail.get("profile") != profile_name:
+                    verification_errors.append("profile mismatch")
+                if detail.get("models") != expected_models:
+                    verification_errors.append("model identity mismatch")
+                if list(detail.get("loras") or []) != expected_loras:
+                    verification_errors.append("LoRA identity mismatch")
+                expected_lora_sha256 = {
+                    name: str(profile[hash_key])
+                    for name, hash_key in (
+                        (profile.get("high_lora"), "high_lora_sha256"),
+                        (profile.get("low_lora"), "low_lora_sha256"),
+                    )
+                    if name and hash_key in profile
+                }
+                if dict(detail.get("lora_sha256") or {}) != expected_lora_sha256:
+                    verification_errors.append("LoRA SHA-256 mismatch")
+                if (
+                    profile_name.endswith("-experimental")
+                    and detail.get("experimental_assets_promoted") is not False
+                ):
+                    verification_errors.append("experimental promotion state mismatch")
+                if not detail.get("prompt_id"):
+                    verification_errors.append("prompt_id is missing")
+                if profile_name.startswith("adult-"):
+                    if detail.get("subject_basis") != kwargs.get("subject_basis"):
+                        verification_errors.append("adult subject basis mismatch")
+                    if detail.get("adult_attestation") is not True:
+                        verification_errors.append("adult attestation is missing")
+                if verification_errors:
+                    raise ValueError("; ".join(verification_errors))
+                result["prompt_id"] = detail.get("prompt_id")
+                result["input_sha256"] = detail.get("input_sha256")
+                result["output_sha256"] = output_detail.get("sha256")
+                result["models"] = detail.get("models") or []
+            except (OSError, ValueError) as exc:
+                result["ok"] = False
+                result["stderr"] = f"comfy-wan22 receipt verification failed: {exc}"
+        elif result.get("ok"):
+            result["ok"] = False
+            result["stderr"] = "comfy-wan22 did not write a generation receipt"
+        return result
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -489,3 +702,4 @@ def registry_report(*, root: Path | None = None) -> dict[str, Any]:
 # Default registrations (importable side-effect)
 register(GrokI2VProvider())
 register(SeedanceProvider())
+register(LocalComfyWan22Provider())

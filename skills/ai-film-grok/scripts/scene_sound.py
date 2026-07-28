@@ -11,9 +11,28 @@ from util import read_json, utc_now, write_json
 _ACTION_RULES = (
     (("走", "跑", "进入", "离开", "walk", "run"), "foley", "footsteps"),
     (("门把", "door handle"), "foley", "door_handle"),
-    (("开门", "推门", "拉门", "open door"), "foley", "door_open"),
+    (
+        (
+            "开门",
+            "推门",
+            "拉门",
+            "open door",
+            "opens door",
+            "opens the door",
+            "opened door",
+            "opened the door",
+            "door opens",
+        ),
+        "foley",
+        "door_open",
+    ),
     (("关门", "close door"), "foley", "door_close"),
     (("坐下", "起身", "sit", "stand"), "foley", "seat_contact"),
+    (
+        ("杯", "手机", "钥匙", "抽屉", "拿起", "放下", "cup", "phone", "key", "drawer"),
+        "foley",
+        "prop_contact",
+    ),
 )
 
 
@@ -60,22 +79,86 @@ def _matches_required(event: dict[str, Any], shot_id: str, kind: str) -> bool:
 
 
 def _source_event(
-    candidates: list[dict[str, Any]], root: Path, shot_id: str, kind: str
+    candidates: list[dict[str, Any]],
+    root: Path,
+    shot_id: str,
+    kind: str,
+    *,
+    expected_material: str | None = None,
 ) -> dict[str, Any] | None:
-    return next(
-        (
-            event
-            for event in candidates
-            if _matches_required(event, shot_id, kind) and _local_asset_ok(root, event)
-        ),
-        None,
-    )
+    verified = [
+        event
+        for event in candidates
+        if _matches_required(event, shot_id, kind) and _local_asset_ok(root, event)
+    ]
+    if expected_material is not None:
+        matching = next(
+            (event for event in verified if _event_material(event) == expected_material), None
+        )
+        if matching is not None:
+            return matching
+    return verified[0] if verified else None
+
+
+def _material_value(shot: dict[str, Any], *fields: str) -> str | None:
+    """Read a declared production material without guessing from prose."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    for source in (shot, dsl):
+        for field in fields:
+            value = source.get(field)
+            if isinstance(value, str) and value.strip():
+                return value.strip().lower()
+    return None
+
+
+def _expected_material(shot: dict[str, Any], kind: str) -> str | None:
+    if kind == "footsteps":
+        return _material_value(shot, "floor_material", "floor", "ground_material", "ground")
+    if kind in {"door_handle", "door_open", "door_close"}:
+        return _material_value(shot, "door_material")
+    if kind == "prop_contact":
+        return _material_value(shot, "prop_material")
+    return None
+
+
+def _event_material(event: dict[str, Any]) -> str | None:
+    for field in ("material", "surface_material"):
+        value = event.get(field)
+        if isinstance(value, str) and value.strip():
+            return value.strip().lower()
+    return None
+
+
+def _event_status(
+    source_event: dict[str, Any] | None,
+    *,
+    expected_material: str | None,
+) -> tuple[str, bool, str | None]:
+    if source_event is None:
+        return "blocked", True, "missing verified local scene-sound asset"
+    if expected_material is None:
+        return "needs_review", True, "material is unknown; verify neutral or selected asset"
+    actual_material = _event_material(source_event)
+    if actual_material is None:
+        return "blocked", True, f"asset material missing; expected {expected_material}"
+    if actual_material != expected_material:
+        return (
+            "blocked",
+            True,
+            f"asset material {actual_material} does not match {expected_material}",
+        )
+    return "ok", False, None
 
 
 def _projection_hash(spec: dict[str, Any]) -> str:
     import json
 
     return hashlib.sha256(json.dumps(spec, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
+def _explicit_true(shot: dict[str, Any], *fields: str) -> bool:
+    """Only an actual boolean true opts a scene out of required ambience."""
+    return any(shot.get(field) is True for field in fields)
 
 
 def reconcile(root: Path, *, write: bool = True) -> dict[str, Any]:
@@ -87,6 +170,8 @@ def reconcile(root: Path, *, write: bool = True) -> dict[str, Any]:
     events: list[dict[str, Any]] = []
     for shot in _shots(spec):
         sid = str(shot.get("id") or "")
+        if not sid:
+            continue
         raw_cues = shot.get("audio_cues") if isinstance(shot.get("audio_cues"), list) else []
         # Only formal audio cues enter the renderer's scene stem. Legacy scene_events
         # are metadata, not proof that a sound reaches the final mix.
@@ -94,11 +179,29 @@ def reconcile(root: Path, *, write: bool = True) -> dict[str, Any]:
         text = " ".join(
             str(shot.get(key) or "") for key in ("action", "visible_change", "sound_cues")
         )
+        # A scene without a deliberate narrative silence still needs a continuous
+        # acoustic space. This is separate from short foley hits and cannot be
+        # satisfied by a generic SFX accent.
+        if not _explicit_true(shot, "scene_silent", "narrative_silence"):
+            ambience = _source_event(cues, root, sid, "ambience")
+            events.append(
+                {
+                    "shot_id": sid,
+                    "track": "ambience",
+                    "kind": "ambience",
+                    "priority": "required",
+                    "source": "audio_cues" if ambience else "inferred",
+                    "status": "ok" if ambience else "blocked",
+                    "needs_review": not bool(ambience),
+                    "reason": None if ambience else "missing verified local ambience asset",
+                }
+            )
         for words, track, kind in _ACTION_RULES:
             if not any(word.lower() in text.lower() for word in words):
                 continue
-            source_event = _source_event(cues, root, sid, kind)
-            status = "ok" if source_event else "blocked"
+            material = _expected_material(shot, kind)
+            source_event = _source_event(cues, root, sid, kind, expected_material=material)
+            status, needs_review, reason = _event_status(source_event, expected_material=material)
             origin = "audio_cues" if source_event in cues else "inferred"
             events.append(
                 {
@@ -108,10 +211,10 @@ def reconcile(root: Path, *, write: bool = True) -> dict[str, Any]:
                     "priority": "required",
                     "source": origin,
                     "status": status,
-                    "needs_review": not bool(source_event),
-                    "reason": "missing verified local scene-sound asset"
-                    if status == "blocked"
-                    else None,
+                    "expected_material": material,
+                    "actual_material": _event_material(source_event) if source_event else None,
+                    "needs_review": needs_review,
+                    "reason": reason,
                 }
             )
     blocked = sorted({item["shot_id"] for item in events if item["status"] == "blocked"})

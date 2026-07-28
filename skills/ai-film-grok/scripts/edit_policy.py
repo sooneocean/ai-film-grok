@@ -4186,9 +4186,7 @@ def resolve_sex_arc_beat(shot: dict[str, Any]) -> str | None:
         ):
             return "foreplay"
     # climax phase alone is NOT climax_release — need explicit release markers
-    if any(m in blob for m in _SEX_ARC_RELEASE_MARKERS) or (
-        resolve_coitus_beat(shot) == "finish"
-    ):
+    if any(m in blob for m in _SEX_ARC_RELEASE_MARKERS) or (resolve_coitus_beat(shot) == "finish"):
         return "climax_release"
     if ph in SEX_PHASES:
         if any(m in blob for m in _SEX_ARC_PENETRATION_MARKERS):
@@ -4216,11 +4214,11 @@ def _shot_has_penetration_verb(shot: dict[str, Any]) -> bool:
 def _shot_has_release_marker(shot: dict[str, Any]) -> bool:
     if resolve_coitus_beat(shot) == "finish":
         return True
-    raw = str(
-        shot.get("sex_arc_beat")
-        or (shot.get("dsl") or {}).get("sex_arc_beat")
-        or ""
-    ).strip().lower()
+    raw = (
+        str(shot.get("sex_arc_beat") or (shot.get("dsl") or {}).get("sex_arc_beat") or "")
+        .strip()
+        .lower()
+    )
     if raw in {"climax_release", "resolve"}:
         return True
     blob = _shot_visual_pose_blob(shot)
@@ -4253,15 +4251,19 @@ def _is_detail_cu_shot(shot: dict[str, Any]) -> bool:
     """Union/genital/waist lock close-up or coverage_role=detail."""
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
     cam = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
-    role = str(
-        shot.get("coverage_role") or dsl.get("coverage_role") or shot.get("shot_role") or ""
-    ).strip().lower()
-    framing = str(
-        shot.get("framing") or dsl.get("framing") or cam.get("framing") or ""
-    ).strip().lower()
-    size = str(
-        cam.get("shot_size") or dsl.get("shot_size") or shot.get("shot_size") or ""
-    ).strip().lower()
+    role = (
+        str(shot.get("coverage_role") or dsl.get("coverage_role") or shot.get("shot_role") or "")
+        .strip()
+        .lower()
+    )
+    framing = (
+        str(shot.get("framing") or dsl.get("framing") or cam.get("framing") or "").strip().lower()
+    )
+    size = (
+        str(cam.get("shot_size") or dsl.get("shot_size") or shot.get("shot_size") or "")
+        .strip()
+        .lower()
+    )
     blob = f"{role} {framing} {size} {_shot_visual_pose_blob(shot)}"
     if role in {"detail", "insert", "ecu", "cu_insert"}:
         return True
@@ -4409,10 +4411,7 @@ def lint_both_undress(
         if isinstance(sh, dict)
         and (
             resolve_sex_arc_beat(sh) == "penetration"
-            or (
-                infer_heat_phase(sh) == "act"
-                and _shot_has_penetration_verb(sh)
-            )
+            or (infer_heat_phase(sh) == "act" and _shot_has_penetration_verb(sh))
         )
         # afterglow/bridge may inherit rhythm language — only lint act/entry meat
         and infer_heat_phase(sh) in SEX_PHASES | {"foreplay"}
@@ -4520,16 +4519,14 @@ def compute_erotic_impact_score(
         )
         sex_ratio = sex / total
     intimacy = float(rep.get("intimacy_ratio") or rep.get("intimacy_duration_ratio") or 0.0)
-    bare_ok = bool((rep.get("wardrobe") or {}).get("bare_peak_ok")) if rep.get("wardrobe") else any(
-        resolve_wardrobe_state(sh) == "bare" for sh in shots if isinstance(sh, dict)
+    bare_ok = (
+        bool((rep.get("wardrobe") or {}).get("bare_peak_ok"))
+        if rep.get("wardrobe")
+        else any(resolve_wardrobe_state(sh) == "bare" for sh in shots if isinstance(sh, dict))
     )
     arc = lint_sex_arc(shots, heat_scale=scale) if scale == "max" else {"ok": True}
     detail = lint_sex_detail_cu(shots, heat_scale=scale)
-    pen_n = sum(
-        1
-        for sh in shots
-        if isinstance(sh, dict) and _shot_has_penetration_verb(sh)
-    )
+    pen_n = sum(1 for sh in shots if isinstance(sh, dict) and _shot_has_penetration_verb(sh))
     bands = {
         "sex_duration": min(25.0, sex_ratio / 0.50 * 25.0),
         "intimacy": min(15.0, (intimacy or sex_ratio) / 0.60 * 15.0),
@@ -4644,15 +4641,13 @@ def lint_sex_arc(
             if infer_heat_phase(sh) == "climax" and _shot_has_release_marker(sh):
                 has_release = True
                 beats_present.setdefault("climax_release", []).append(str(sh.get("id") or "?"))
-                beat_dur["climax_release"] = beat_dur.get("climax_release", 0.0) + _shot_duration_sec(
-                    sh
-                )
+                beat_dur["climax_release"] = beat_dur.get(
+                    "climax_release", 0.0
+                ) + _shot_duration_sec(sh)
                 break
 
     # Weak verb diagnostics on act block
-    act_shots = [
-        sh for sh in shots if isinstance(sh, dict) and infer_heat_phase(sh) == "act"
-    ]
+    act_shots = [sh for sh in shots if isinstance(sh, dict) and infer_heat_phase(sh) == "act"]
     if act_shots and has_penetration is False:
         if any(resolve_wardrobe_state(sh) in {"undressed", "bare"} for sh in act_shots):
             _issue(
@@ -4661,9 +4656,7 @@ def lint_sex_arc(
                 "act is undressed/bare but lacks penetration verbs "
                 "(hips-sink/thrust/straddle/union) — 裸抱不算插入。",
             )
-    climax_shots = [
-        sh for sh in shots if isinstance(sh, dict) and infer_heat_phase(sh) == "climax"
-    ]
+    climax_shots = [sh for sh in shots if isinstance(sh, dict) and infer_heat_phase(sh) == "climax"]
     if climax_shots and not has_release:
         _issue(
             "SEX_ARC_RELEASE_MARKER_WEAK",
@@ -4714,12 +4707,16 @@ def lint_sex_arc(
                 continue
             if beat == "foreplay" and infer_heat_phase(sh) == "foreplay":
                 return i
-            if beat == "penetration" and infer_heat_phase(sh) == "act" and _shot_has_penetration_verb(
-                sh
+            if (
+                beat == "penetration"
+                and infer_heat_phase(sh) == "act"
+                and _shot_has_penetration_verb(sh)
             ):
                 return i
-            if beat == "climax_release" and infer_heat_phase(sh) == "climax" and _shot_has_release_marker(
-                sh
+            if (
+                beat == "climax_release"
+                and infer_heat_phase(sh) == "climax"
+                and _shot_has_release_marker(sh)
             ):
                 return i
         return None
@@ -4742,8 +4739,7 @@ def lint_sex_arc(
     meat_sec = sum(
         _shot_duration_sec(sh)
         for sh in shots
-        if isinstance(sh, dict)
-        and infer_heat_phase(sh) in SEX_PHASES | {"foreplay"}
+        if isinstance(sh, dict) and infer_heat_phase(sh) in SEX_PHASES | {"foreplay"}
     )
     pen_sec = beat_dur.get("penetration", 0.0)
     if meat_sec > 0 and has_penetration and (pen_sec / meat_sec) < 0.25:

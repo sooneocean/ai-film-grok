@@ -27,13 +27,18 @@ def test_reconcile_infers_required_actions_and_blocks_missing_assets(tmp_path: P
     _write_spec(tmp_path)
     report = reconcile(tmp_path)
     assert report["status"] == "blocked"
-    assert {item["kind"] for item in report["events"]} >= {"footsteps", "door_handle", "door_open"}
+    assert {item["kind"] for item in report["events"]} >= {
+        "ambience",
+        "footsteps",
+        "door_handle",
+        "door_open",
+    }
     assert (tmp_path / "receipts" / "scene-sound-status.json").is_file()
 
 
 def _asset_event(tmp_path: Path, *, kind: str = "door_open") -> dict:
     asset = tmp_path / "audio" / "door.wav"
-    asset.parent.mkdir()
+    asset.parent.mkdir(exist_ok=True)
     asset.write_bytes(b"door sound")
     return {
         "shot_id": "s1",
@@ -62,23 +67,94 @@ def test_top_level_shots_are_reconciled(tmp_path: Path):
     _write_spec(tmp_path, top_level=True)
     report = reconcile(tmp_path, write=False)
     assert report["status"] == "blocked"
-    assert report["summary"]["required"] == 3
+    assert report["summary"]["required"] == 4
 
 
-def test_verified_audio_cue_satisfies_matching_required_event(tmp_path: Path):
+def test_verified_audio_cue_with_unknown_material_requires_review(tmp_path: Path):
     cue = _asset_event(tmp_path, kind="foley")
     cue.pop("shot_id")
     cue["asset_hint"] = "door_open"
     _write_spec(tmp_path, audio_cues=[cue])
     report = reconcile(tmp_path, write=False)
     door = next(item for item in report["events"] if item["kind"] == "door_open")
-    assert door["status"] == "ok"
+    assert door["status"] == "needs_review"
+    assert door["needs_review"] is True
     assert door["source"] == "audio_cues"
 
 
 def test_summary_counts_blocked_events_not_unique_shots(tmp_path: Path):
     _write_spec(tmp_path, top_level=True)
     report = reconcile(tmp_path, write=False)
-    assert report["summary"]["required"] == 3
-    assert report["summary"]["blocked"] == 3
+    assert report["summary"]["required"] == 4
+    assert report["summary"]["blocked"] == 4
     assert report["summary"]["ok"] == 0
+
+
+def test_narrative_silence_explicitly_exempts_ambience(tmp_path: Path):
+    _write_spec(tmp_path, top_level=True)
+    spec_path = tmp_path / "film-spec.json"
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    spec["shots"][0]["scene_silent"] = True
+    spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+    report = reconcile(tmp_path, write=False)
+    assert "ambience" not in {item["kind"] for item in report["events"]}
+
+
+def test_english_door_verb_and_string_false_do_not_hide_required_sound(tmp_path: Path):
+    spec = {
+        "shots": [
+            {
+                "id": "s1",
+                "visible_change": "She opens the door and enters.",
+                "scene_silent": "false",
+            }
+        ]
+    }
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+    report = reconcile(tmp_path, write=False)
+    assert {item["kind"] for item in report["events"]} == {"ambience", "door_open"}
+
+
+def test_known_foley_material_must_match_the_shot(tmp_path: Path):
+    cue = _asset_event(tmp_path, kind="foley")
+    cue.pop("shot_id")
+    cue.update({"asset_hint": "footsteps", "material": "tile"})
+    _write_spec(tmp_path, top_level=True, audio_cues=[cue])
+    spec_path = tmp_path / "film-spec.json"
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    spec["shots"][0]["floor_material"] = "wood"
+    spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+    report = reconcile(tmp_path, write=False)
+    footsteps = next(item for item in report["events"] if item["kind"] == "footsteps")
+    assert footsteps["status"] == "blocked"
+    assert footsteps["expected_material"] == "wood"
+    assert footsteps["actual_material"] == "tile"
+
+
+def test_matching_material_wins_over_an_earlier_mismatched_candidate(tmp_path: Path):
+    wrong = _asset_event(tmp_path, kind="foley")
+    right = _asset_event(tmp_path, kind="foley")
+    for cue, material in ((wrong, "tile"), (right, "wood")):
+        cue.pop("shot_id")
+        cue.update({"asset_hint": "footsteps", "material": material})
+    _write_spec(tmp_path, top_level=True, audio_cues=[wrong, right])
+    spec_path = tmp_path / "film-spec.json"
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    spec["shots"][0]["floor_material"] = "wood"
+    spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
+    report = reconcile(tmp_path, write=False)
+    footsteps = next(item for item in report["events"] if item["kind"] == "footsteps")
+    assert footsteps["status"] == "ok"
+    assert footsteps["actual_material"] == "wood"
+
+
+def test_unknown_material_requires_review_even_with_a_verified_local_asset(tmp_path: Path):
+    cue = _asset_event(tmp_path, kind="foley")
+    cue.pop("shot_id")
+    cue.update({"asset_hint": "footsteps", "material": "neutral"})
+    _write_spec(tmp_path, top_level=True, audio_cues=[cue])
+    report = reconcile(tmp_path, write=False)
+    footsteps = next(item for item in report["events"] if item["kind"] == "footsteps")
+    assert footsteps["status"] == "needs_review"
+    assert footsteps["needs_review"] is True
+    assert report["status"] == "blocked"  # ambience and door events still need assets

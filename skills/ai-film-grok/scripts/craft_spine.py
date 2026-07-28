@@ -105,6 +105,48 @@ def detect_craft_stage(
     """Infer craft_stage from film-root artifacts."""
     root = Path(root).expanduser().resolve()
     gates = gates or {}
+    book = read_json(root / "production-book.json") or {}
+    if book.get("rigor") == "professional":
+        from workflow_spine import STAGE_ORDER, build_workflow_status
+
+        workflow = build_workflow_status(root, gates=gates)
+        stage = str(workflow["craft_projection"])
+        current = str(workflow["current_stage"])
+        completed = set(workflow["completed"])
+        craft_completion = {
+            "idea": {"concept_lock"},
+            "story": {"script_lock"},
+            "beats": {"department_look_lock"},
+            "shots": {"shot_animatic_lock", "pilot_approval"},
+            "media": {"bulk"},
+            "selects": {"dailies_review"},
+            "rough": {"selects_rough_cut", "picture_lock", "post_locks"},
+            "verified": {"master_lock"},
+        }
+        checklist = {
+            ring: required.issubset(completed) for ring, required in craft_completion.items()
+        }
+        idx = CRAFT_STAGES.index(stage)
+        return {
+            "craft_stage": stage,
+            "stage": stage,
+            "stage_index": idx + 1,
+            "stage_total": len(CRAFT_STAGES),
+            "label_zh": CRAFT_LABELS_ZH[stage],
+            "question": CRAFT_QUESTIONS[stage],
+            "detail": "complete" if current == "complete" else current,
+            "blockers": [] if current == "complete" else [f"stage_lock:{current}"],
+            "checklist": checklist,
+            "flags": {
+                "professional": True,
+                "director_stage": current,
+                "ready_for_lock": workflow["ready_for_lock"],
+            },
+            "professional_stage_order": list(STAGE_ORDER),
+            "spine": " → ".join(CRAFT_STAGES),
+            "ref": "references/craft-spine.md",
+            "rings": list(CRAFT_STAGES),
+        }
     receipts = root / "receipts"
     spec = read_json(root / "film-spec.json") or {}
     man = read_json(root / "manifest.json") or {}

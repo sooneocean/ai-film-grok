@@ -199,9 +199,7 @@ class HeatArcLintTests(unittest.TestCase):
     @pytest.mark.slow
     def test_max_mid_ratio_no_forced_warning(self) -> None:
         # 4/8 act+climax by duration = 50% ≥ 50% IRON floor.
-        shots = _spine(
-            ["setup", "foreplay", "act", "act", "act", "climax", "afterglow", "bridge"]
-        )
+        shots = _spine(["setup", "foreplay", "act", "act", "act", "climax", "afterglow", "bridge"])
         rep = lint_heat_arc(shots, heat_scale="max", advise=False)
         self.assertTrue(rep["ok"], rep)
         self.assertNotIn("HEAT_ADVISORY_INTIMACY", rep["codes"])
@@ -695,9 +693,7 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
     @pytest.mark.slow
     def test_write_spec_max_sex_floor_pass_with_enough_act(self) -> None:
         # 6/8 intimacy (foreplay+act×4+climax), 5/8 sex duration ≥50%
-        shots = _spine(
-            ["setup", "foreplay", "act", "act", "act", "act", "climax", "afterglow"]
-        )
+        shots = _spine(["setup", "foreplay", "act", "act", "act", "act", "climax", "afterglow"])
         for sh in shots:
             sh["lipsync"] = False
             # keep _spine size ladder (tighten only); do not reopen mid-act
@@ -813,6 +809,7 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
             "both_undress_strict": False,
             "sex_arc_strict": False,
             "sex_vo_motion_strict": False,
+            "adult_max_director": {"strict": False},
             "director_intent": {
                 "logline": "成人max全装办事应被自动卸装",
                 "tone": "成人",

@@ -19,6 +19,7 @@ _STATE_IGNORES = {
     "capability-cache.json",
     "orchestration-usage.jsonl",
     "pipeline_stage.json",
+    "scene-sound-status.json",
 }
 HARD_GATE_CODES = [
     "WRITE_SPEC_REQUIRED",
@@ -58,27 +59,6 @@ def _bounded_text(value: object, *, max_bytes: int) -> str | None:
         except UnicodeDecodeError:
             prefix = prefix[:-1]
     return suffix
-
-
-def _compact_action(action: dict[str, Any]) -> dict[str, Any] | None:
-    if not action:
-        return None
-    # The terminal packet needs the executable contract, approval boundary,
-    # verifier and transaction binding—not the full job/evidence context.
-    return {
-        key: action.get(key)
-        for key in (
-            "skill_id",
-            "operation",
-            "argv",
-            "spend_class",
-            "approval_class",
-            "responsibility",
-            "verification",
-            "transaction_id",
-            "state_hash",
-        )
-    }
 
 
 def compute_state_hash(
@@ -123,10 +103,58 @@ def compute_state_hash(
                 continue
             digest.update(str(rel).encode("utf-8"))
             digest.update(b"\0")
-            digest.update(path.read_bytes())
+            if path.name == "manifest.json":
+                manifest = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(manifest, dict):
+                    manifest.pop("updated_at", None)
+                digest.update(
+                    json.dumps(
+                        manifest,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                )
+            else:
+                digest.update(path.read_bytes())
             digest.update(b"\0")
-        except OSError:
+        except (OSError, ValueError, json.JSONDecodeError):
             continue
+    referenced_media: set[str] = set()
+    try:
+        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
+        referenced_media.update(
+            str(item.get("path") or "")
+            for item in clips.values()
+            if isinstance(item, dict) and item.get("status") == "approved"
+        )
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
+    try:
+        dailies = json.loads((root / "receipts" / "dailies.json").read_text(encoding="utf-8"))
+        referenced_media.update(
+            str(item.get("candidate") or "")
+            for items in (dailies.get("shots") or {}).values()
+            for item in (items if isinstance(items, list) else [])
+            if isinstance(item, dict)
+        )
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
+    for value in sorted(item for item in referenced_media if item):
+        media = Path(value).expanduser()
+        if not media.is_absolute():
+            media = root / media
+        try:
+            relative = media.resolve().relative_to(root)
+            digest.update(str(relative).encode("utf-8"))
+            digest.update(b"\0")
+            with media.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            digest.update(b"\0")
+        except (OSError, ValueError):
+            digest.update(f"missing:{value}".encode())
     return digest.hexdigest()
 
 
@@ -207,9 +235,23 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
         "next_id": packet.get("next_id"),
         "next_cmd": _bounded_text(packet.get("next_cmd"), max_bytes=1536),
         "next_why": _bounded_text(packet.get("next_why"), max_bytes=768),
-        "next_action": _compact_action(action),
+        # The bound action is the execution contract. Compact mode may omit
+        # surrounding diagnostics, but it must never alter this contract.
+        "next_action": dict(action),
         "responsibility": packet.get("responsibility"),
         "department_handoff": packet.get("department_handoff"),
+        # Weapon selection is also a bound orchestration contract. Keeping the
+        # same object prevents compact/full mode from choosing different tools.
+        "weapon_route": packet.get("weapon_route"),
+        "workflow": {
+            "public_entry": (packet.get("workflow") or {}).get("public_entry"),
+            "mode": (packet.get("workflow") or {}).get("mode"),
+            "current_stage": (packet.get("workflow") or {}).get("current_stage"),
+            "current_label_zh": (packet.get("workflow") or {}).get("current_label_zh"),
+            "stage_index": (packet.get("workflow") or {}).get("stage_index"),
+            "stage_total": (packet.get("workflow") or {}).get("stage_total"),
+            "blocking": (packet.get("workflow") or {}).get("blocking"),
+        },
         "attention": attention,
         "hard_gate_codes": HARD_GATE_CODES,
         "context_refs": refs,
@@ -229,13 +271,11 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
     }
     compact["metrics"]["output_bytes"] = _json_bytes(compact)
     compact["metrics"]["estimated_tokens"] = estimated_tokens(compact)
-    compact["metrics"]["output_bytes"] = _json_bytes(compact)
     if compact["metrics"]["output_bytes"] > 5000:
         compact["next_cmd"] = _bounded_text(compact.get("next_cmd"), max_bytes=512)
         compact["next_why"] = "内容过长；详见完整回执。"
         compact["metrics"]["output_bytes"] = _json_bytes(compact)
         compact["metrics"]["estimated_tokens"] = estimated_tokens(compact)
-        compact["metrics"]["output_bytes"] = _json_bytes(compact)
     return compact
 
 

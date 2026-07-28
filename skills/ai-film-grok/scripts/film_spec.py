@@ -206,6 +206,23 @@ class FilmSpecError(ValueError):
     pass
 
 
+def iter_film_spec_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return shots from the canonical nested schema or the legacy flat projection."""
+    flat = spec.get("shots")
+    if isinstance(flat, list):
+        return [shot for shot in flat if isinstance(shot, dict)]
+    scenes = spec.get("scenes")
+    if not isinstance(scenes, list):
+        return []
+    return [
+        shot
+        for scene in scenes
+        if isinstance(scene, dict)
+        for shot in (scene.get("shots") if isinstance(scene.get("shots"), list) else [])
+        if isinstance(shot, dict)
+    ]
+
+
 def _required_text(value: object, *, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise FilmSpecError(f"film-spec requires non-empty {field}")
@@ -579,6 +596,14 @@ def validate_film_spec(
     spec["_i2v_profile"] = i2v_profile
     chain = frw_i2v_fallback_chain()
     raw_i2v = spec.get("i2v_provider", "auto")
+    raw_still = spec.get("still_provider", "auto")
+    if not isinstance(raw_still, str) or raw_still.lower() not in {
+        "auto",
+        "comfy_lan",
+        "grok",
+    }:
+        raise FilmSpecError("film-spec still_provider must be one of ['auto', 'comfy_lan', 'grok']")
+    spec["still_provider"] = raw_still.lower()
     if not isinstance(raw_i2v, str) or raw_i2v.lower() not in I2V_PROVIDERS:
         raise FilmSpecError(f"film-spec i2v_provider must be one of {sorted(I2V_PROVIDERS)}")
     i2v_provider = raw_i2v.lower()
@@ -2200,5 +2225,23 @@ def validate_film_spec(
             "multi-heroine lint failed (multi_heroine_strict): "
             + ",".join(mh["codes"] or ["MULTI"])
         )
+
+    # Adult max has a separate sensory contract.  This is intentionally a
+    # projection, not more prompt text: post/review can later bind it to media.
+    try:
+        from adult_max_director import apply_contract, validate_contract
+
+        projection = apply_contract(spec, shots)
+        sensory = validate_contract(spec, shots)
+        spec["_adult_max_director"] = {**projection, **sensory}
+        director = (
+            spec.get("adult_max_director")
+            if isinstance(spec.get("adult_max_director"), dict)
+            else {}
+        )
+        if projection["active"] and director.get("strict", True) and not sensory["ok"]:
+            raise FilmSpecError("adult max sensory contract failed: " + ",".join(sensory["codes"]))
+    except ImportError:  # pragma: no cover - compatibility for partial installations
+        pass
 
     return shots
