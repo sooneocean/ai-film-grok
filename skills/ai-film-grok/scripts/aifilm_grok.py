@@ -5432,6 +5432,7 @@ def cmd_audio_plan(args: argparse.Namespace) -> int:
         compile_timeline=bool(getattr(args, "compile", False) or getattr(args, "validate", False)),
         write_timeline=bool(getattr(args, "write_timeline", False)),
         write_voice_cast=bool(getattr(args, "write_voice_cast", False)),
+        write_tts_manifest=bool(getattr(args, "write_tts_manifest", False)),
     )
     emit(report)
     return (
@@ -5807,6 +5808,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--write-voice-cast",
         action="store_true",
         help="Write deterministic audio/voice-cast.json from compiled speakers",
+    )
+    ap.add_argument(
+        "--write-tts-manifest",
+        action="store_true",
+        help="Write audio/tts-manifest.json with one provenance-bound job per vocal event",
     )
 
     lsc = sub.add_parser(

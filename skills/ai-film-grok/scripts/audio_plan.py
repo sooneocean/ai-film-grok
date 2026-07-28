@@ -20,6 +20,7 @@ def build_audio_plan(
     compile_timeline: bool = False,
     write_timeline: bool = False,
     write_voice_cast: bool = False,
+    write_tts_manifest: bool = False,
 ) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
     scripts = skill_dir() / "scripts"
@@ -30,6 +31,7 @@ def build_audio_plan(
     timeline: dict[str, Any] | None = None
     timeline_error: str | None = None
     voice_cast: dict[str, Any] | None = None
+    tts_manifest: dict[str, Any] | None = None
     try:
         from audio_timeline import build_mix_execution_plan, caption_bindings, validate_timeline
         from audio_timeline import compile_timeline as compile_audio_timeline
@@ -68,6 +70,28 @@ def build_audio_plan(
             old_path.parent.mkdir(parents=True, exist_ok=True)
             old_path.write_text(
                 json.dumps(voice_cast, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+        if write_tts_manifest:
+            import json
+
+            from audio_tts_manifest import build_tts_manifest
+            from voice_cast_profiles import VOCAL_LANGUAGE, assign_profiles
+
+            if voice_cast is None:
+                speakers = {
+                    str(event["speaker"]): {
+                        "speaker_id": str(event["speaker"]),
+                        "language": VOCAL_LANGUAGE[str(event["type"])],
+                    }
+                    for event in timeline["events"]
+                    if event.get("type") in VOCAL_LANGUAGE and event.get("speaker")
+                }
+                voice_cast = {"profiles": assign_profiles(list(speakers.values()))}
+            tts_manifest = build_tts_manifest(timeline, voice_cast)
+            manifest_path = root / "audio" / "tts-manifest.json"
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.write_text(
+                json.dumps(tts_manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
             )
     except Exception as exc:  # noqa: BLE001 - report compiler blockers in dry-run
         timeline_error = str(exc)
@@ -219,6 +243,7 @@ def build_audio_plan(
             "error": timeline_error,
         },
         "voice_cast": voice_cast,
+        "tts_manifest": tts_manifest,
         "lipsync": {
             "env_backend": lipsync_info.get("env_backend"),
             "ready": lipsync_info.get("ready") or [],
