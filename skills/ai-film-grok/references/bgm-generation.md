@@ -51,6 +51,26 @@ slow groove 72 bpm, no vocals, no singing, background for narration
 
 ACE-Step 歌词侧可用：`[inst]` 或空结构标记（以官方/社区文档为准，出库前听审）。
 
+### 5090 私有 ACE-Step 候选曲库（正式插件选项）
+
+`aifilm bgm-candidate` 是 5090 局域网节点的离线灌库入口，可在开拍前建立曲库，
+也可在剪辑或混音阶段按实际镜头补一首；两种时机的产物完全相同。它绝不在
+`final` 热路径现生成，也不会自动替换既有 BGM。
+
+```bash
+# 生成：只写入 pending，保留 seed、模型/node job、hash；不会进入 final
+"$AIFILM" bgm-candidate generate --root "<film-root>" \
+  --mood rnb --duration 30 --seed 5101 \
+  --prompt "late-night neo-soul instrumental, no vocals"
+
+# 人工完整听审后才批准；批准后才进入 audio/templates/<mood>/
+"$AIFILM" bgm-candidate approve --root "<film-root>" --asset-id "<candidate-id>"
+```
+
+候选必须是无歌词/无演唱的 WAV，插件会核验 MIME、WAV、44.1 kHz、时长与 SHA-256。
+节点不可用、超时、坏档或 hash 不符均失败关闭；已批准曲库和程序化 rnb 维持原有可用性，
+不会静默换源。每首进入曲库前仍须记录实际模型版本与权利/许可，私有本地推理不自动取得公开发行授权。
+
 ## 三阶梯 · 立刻换口味（操作）
 
 ```text

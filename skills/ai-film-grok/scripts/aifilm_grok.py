@@ -5830,6 +5830,40 @@ def cmd_bgm_candidate(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
 
 
+def cmd_performance_candidate(args: argparse.Namespace) -> int:
+    """Create/list/approve private non-verbal performance candidates."""
+    from performance_candidates import PerformanceCandidateError, approve, generate
+
+    root = Path(args.root).expanduser().resolve()
+    try:
+        if args.performance_candidate_action == "approve":
+            emit(approve(root, args.asset_id))
+            return 0
+        base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
+        token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
+        if not base or not token:
+            raise PerformanceCandidateError(
+                "AIFILM_AUDIO_NODE_URL/TOKEN are required for performance generation"
+            )
+        emit(
+            generate(
+                root,
+                base_url=base,
+                token=token,
+                cue=args.cue,
+                duration=args.duration,
+                seed=args.seed,
+                character_id=args.character_id,
+                source_authorization=args.source_authorization,
+                adult_confirmed=bool(args.adult_confirmed),
+                model_version=args.model_version,
+            )
+        )
+        return 0
+    except PerformanceCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
 
@@ -5956,6 +5990,12 @@ def cmd_tts_rehearse(args: argparse.Namespace) -> int:
 
     emit(receipt)
     return 0 if receipt.get("ok") else 1
+
+
+def cmd_comfy(args: argparse.Namespace) -> int:
+    from cli_comfy import run_comfy
+
+    return run_comfy(args)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -6257,6 +6297,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bgm_approve.add_argument("--root", required=True)
     bgm_approve.add_argument("--asset-id", required=True)
+
+    performance_candidate = sub.add_parser(
+        "performance-candidate",
+        help="Generate private non-verbal performance candidates with explicit adult and source authorization",
+    )
+    performance_candidate_sub = performance_candidate.add_subparsers(
+        dest="performance_candidate_action", required=True
+    )
+    performance_generate = performance_candidate_sub.add_parser(
+        "generate", help="Create one pending performance candidate"
+    )
+    performance_generate.add_argument("--root", required=True)
+    performance_generate.add_argument("--cue", required=True)
+    performance_generate.add_argument("--duration", type=float, default=3.0)
+    performance_generate.add_argument("--seed", type=int, required=True)
+    performance_generate.add_argument("--character-id", required=True)
+    performance_generate.add_argument(
+        "--source-authorization", choices=("original", "authorized_reference"), required=True
+    )
+    performance_generate.add_argument("--adult-confirmed", action="store_true")
+    performance_generate.add_argument("--model-version", default="higgs-audio-v2")
+    performance_approve = performance_candidate_sub.add_parser(
+        "approve", help="Promote one human-heard performance candidate"
+    )
+    performance_approve.add_argument("--root", required=True)
+    performance_approve.add_argument("--asset-id", required=True)
 
     lsc = sub.add_parser(
         "lipsync-canary",
@@ -7912,6 +7978,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_review_ui_parsers(sub)
 
+    from cli_comfy import add_comfy_parsers
+
+    add_comfy_parsers(sub)
+
     return p
 
 
@@ -7950,6 +8020,7 @@ def main(argv: list[str] | None = None) -> int:
             "audio-tts-render": cmd_audio_tts_render,
             "audio-event": cmd_audio_event,
             "bgm-candidate": cmd_bgm_candidate,
+            "performance-candidate": cmd_performance_candidate,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,
@@ -8009,6 +8080,7 @@ def main(argv: list[str] | None = None) -> int:
             "dashboard": cmd_dashboard,
             "quality-ledger": cmd_quality_ledger,
             "production-report": cmd_production_report,
+            "comfy": cmd_comfy,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:

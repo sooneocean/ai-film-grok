@@ -59,6 +59,54 @@ def test_scene_stem_accepts_legacy_local_asset_field(tmp_path: Path):
     assert result["sha256"] == hashlib.sha256(Path(result["path"]).read_bytes()).hexdigest()
 
 
+def test_scene_stem_requires_receipt_bound_performance_asset(tmp_path: Path):
+    asset = tmp_path / "audio" / "candidates" / "performance" / "approved" / "take.wav"
+    asset.parent.mkdir(parents=True)
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+    digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+    receipt = asset.with_suffix(".receipt.json")
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema": "aifilm-performance-candidate-v1",
+                "status": "approved",
+                "approved_path": "audio/candidates/performance/approved/take.wav",
+                "sha256": digest,
+                "adult_confirmed": True,
+                "source_authorization": "original",
+                "take_seed": 42,
+                "model_version": "higgs-audio-v2",
+            }
+        )
+    )
+    result = render_scene_sound_stem(
+        tmp_path,
+        {
+            "events": [
+                {
+                    "id": "performance",
+                    "type": "performance",
+                    "source": "local:audio/candidates/performance/approved/take.wav",
+                    "approval_receipt": "local:audio/candidates/performance/approved/take.receipt.json",
+                    "source_sha256": digest,
+                    "take_seed": 42,
+                    "model_version": "higgs-audio-v2",
+                    "start_sec": 0,
+                    "duration_sec": 0.1,
+                }
+            ]
+        },
+        duration_sec=1,
+        out=tmp_path / "audio" / "scene.wav",
+        sample_rate=8000,
+    )
+    assert result["event_count"] == 1
+
+
 def test_rendered_scene_stem_survives_a_real_mp4_audio_mix(tmp_path: Path):
     asset = tmp_path / "assets" / "tone.wav"
     asset.parent.mkdir()

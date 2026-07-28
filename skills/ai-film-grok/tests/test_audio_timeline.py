@@ -182,6 +182,67 @@ def test_asset_requires_hash_and_license_in_v1():
         )
 
 
+def test_performance_is_an_approval_gated_local_asset_type():
+    cue = {
+        "kind": "performance",
+        "source": "local:audio/candidates/performance/approved/take.wav",
+        "license": "original authorized performance",
+        "source_sha256": "a" * 64,
+        "approval_status": "approved",
+        "approval_receipt": "local:audio/candidates/performance/approved/take.receipt.json",
+        "adult_confirmed": True,
+        "source_authorization": "original",
+        "take_seed": 42,
+        "model_version": "higgs-audio-v2",
+        "start_offset_sec": 0,
+        "duration_sec": 1,
+    }
+    timeline = compile_timeline(_spec([cue]))
+    assert timeline["events"][0]["type"] == "performance"
+    cue["approval_status"] = "pending_human_review"
+    with pytest.raises(AudioTimelineError, match="human approval"):
+        compile_timeline(_spec([cue]))
+    cue["approval_status"] = "approved"
+    cue["take_seed"] = True
+    with pytest.raises(AudioTimelineError, match="integer take_seed"):
+        compile_timeline(_spec([cue]))
+    cue["take_seed"] = 42
+    cue["approval_receipt"] = "not-local"
+    with pytest.raises(AudioTimelineError, match="approval_receipt"):
+        compile_timeline(_spec([cue]))
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("adult_confirmed", False, "adult_confirmed"),
+        ("source_authorization", "unknown", "authorization"),
+        ("model_version", "", "model_version"),
+        ("source_sha256", "not-a-hash", "source_sha256"),
+    ],
+)
+def test_performance_contract_rejects_missing_provenance(
+    field: str, value: object, message: str
+) -> None:
+    cue = {
+        "kind": "performance",
+        "source": "local:audio/candidates/performance/approved/take.wav",
+        "license": "original authorized performance",
+        "source_sha256": "a" * 64,
+        "approval_status": "approved",
+        "approval_receipt": "local:audio/candidates/performance/approved/take.receipt.json",
+        "adult_confirmed": True,
+        "source_authorization": "original",
+        "take_seed": 42,
+        "model_version": "higgs-audio-v2",
+        "start_offset_sec": 0,
+        "duration_sec": 1,
+    }
+    cue[field] = value
+    with pytest.raises(AudioTimelineError, match=message):
+        compile_timeline(_spec([cue]))
+
+
 def test_mix_plan_has_inner_voice_filter_event_pan_fades_and_all_vocal_ducking():
     timeline = compile_timeline(
         _spec(
