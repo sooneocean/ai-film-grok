@@ -57,7 +57,8 @@ That flag is approval for the submitted workflow only; it does not change the
 global provider default.
 
 Completion uses the matching `client_id` on `/ws`, with `/history/{prompt_id}`
-as the authoritative read-back. Returned artifacts can be fetched explicitly:
+as the authoritative read-back. The receipt records a canonical workflow
+SHA-256 without logging the workflow prompt. Returned artifacts can be fetched explicitly:
 
 ```bash
 aifilm comfy download \

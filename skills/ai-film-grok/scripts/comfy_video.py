@@ -113,8 +113,16 @@ def normalize_base_url(raw: str) -> str:
         raise ComfyVideoError(f"invalid ComfyUI URL: {exc}") from exc
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise ComfyVideoError("ComfyUI URL must be absolute http(s)")
-    if parsed.username or parsed.password or parsed.path not in {"", "/"}:
-        raise ComfyVideoError("ComfyUI base URL cannot contain credentials or a path")
+    if (
+        parsed.username
+        or parsed.password
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ComfyVideoError(
+            "ComfyUI base URL cannot contain credentials, a path, query or fragment"
+        )
     host = parsed.hostname
     if host == "localhost":
         return value
@@ -122,7 +130,7 @@ def normalize_base_url(raw: str) -> str:
         address = ipaddress.ip_address(host)
     except ValueError as exc:
         raise ComfyVideoError("ComfyUI host must be localhost or a private IP") from exc
-    if not (address.is_private or address.is_loopback):
+    if address.is_unspecified or not (address.is_private or address.is_loopback):
         raise ComfyVideoError("ComfyUI host must be localhost or a private IP")
     return value
 
@@ -453,6 +461,16 @@ def apply_workflow_overrides(
     return updated
 
 
+def workflow_sha256(graph: Mapping[str, Any]) -> str:
+    canonical = json.dumps(
+        graph,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def assert_local_only_workflow(base_url: str, graph: Mapping[str, Any]) -> None:
     class_types = sorted(
         {
@@ -529,13 +547,21 @@ def upload_image(base_url: str, image_path: Path) -> dict[str, str]:
     path = Path(image_path).expanduser().resolve()
     if not path.is_file():
         raise ComfyVideoError(f"input image not found: {path}")
+    if (
+        '"' in path.name
+        or "\r" in path.name
+        or "\n" in path.name
+        or any(ord(char) < 32 for char in path.name)
+    ):
+        raise ComfyVideoError("unsafe upload filename")
     boundary = f"aifilm-{secrets.token_hex(12)}"
     content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    content = path.read_bytes()
     parts = [
         f"--{boundary}\r\n"
         f'Content-Disposition: form-data; name="image"; filename="{path.name}"\r\n'
         f"Content-Type: {content_type}\r\n\r\n".encode(),
-        path.read_bytes(),
+        content,
         (
             f"\r\n--{boundary}\r\n"
             'Content-Disposition: form-data; name="type"\r\n\r\n'
@@ -565,6 +591,7 @@ def upload_image(base_url: str, image_path: Path) -> dict[str, str]:
         "name": str(data["name"]),
         "subfolder": str(data.get("subfolder") or ""),
         "type": str(data.get("type") or "input"),
+        "sha256": hashlib.sha256(content).hexdigest(),
     }
 
 

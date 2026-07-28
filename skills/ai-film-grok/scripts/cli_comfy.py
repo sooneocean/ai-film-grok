@@ -23,6 +23,7 @@ from comfy_video import (
     submit,
     upload_image,
     wait_for_result,
+    workflow_sha256,
 )
 from util import write_json
 
@@ -161,6 +162,7 @@ def run_comfy(args: argparse.Namespace) -> int:
                 "kind": "comfy-lan-workflow",
                 "ok": True,
                 "prompt_id": prompt_id,
+                "workflow_sha256": workflow_sha256(graph),
                 "artifacts": result.get("artifacts") or [],
                 "external_api_nodes_allowed": bool(args.allow_external_api_nodes),
             }

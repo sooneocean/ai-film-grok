@@ -23,8 +23,10 @@ from comfy_video import (  # noqa: E402
     normalize_base_url,
     queue_status,
     submit,
+    upload_image,
     validate_adult_request,
     wait_for_result,
+    workflow_sha256,
 )
 
 
@@ -40,6 +42,12 @@ class ComfyVideoTests(unittest.TestCase):
             normalize_base_url("https://example.com")
         with self.assertRaises(ComfyVideoError):
             normalize_base_url("http://user:pass@192.168.88.52:8188")
+        with self.assertRaises(ComfyVideoError):
+            normalize_base_url("http://0.0.0.0:8188")
+        with self.assertRaises(ComfyVideoError):
+            normalize_base_url("http://192.168.88.52:8188?token=secret")
+        with self.assertRaises(ComfyVideoError):
+            normalize_base_url("http://192.168.88.52:8188/#fragment")
 
     def test_official_turbo_graph_has_required_models_and_inputs(self) -> None:
         graph = build_wan22_i2v_prompt(
@@ -137,6 +145,18 @@ class ComfyVideoTests(unittest.TestCase):
         self.assertEqual(graph["1"]["inputs"]["seed"], 1)
         with self.assertRaisesRegex(ComfyVideoError, "unknown input"):
             apply_workflow_overrides(graph, {"1": {"surprise": True}})
+
+    def test_workflow_hash_is_canonical(self) -> None:
+        first = {"2": {"inputs": {"b": 2, "a": 1}, "class_type": "Node"}}
+        second = {"2": {"class_type": "Node", "inputs": {"a": 1, "b": 2}}}
+        self.assertEqual(workflow_sha256(first), workflow_sha256(second))
+
+    def test_upload_rejects_multipart_header_injection_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / 'bad"name.png'
+            image.write_bytes(b"not-an-image")
+            with self.assertRaisesRegex(ComfyVideoError, "unsafe"):
+                upload_image("http://192.168.88.52:8188", image)
 
     @patch("comfy_video._json_request")
     def test_local_only_validation_blocks_paid_api_nodes(self, request: MagicMock) -> None:
