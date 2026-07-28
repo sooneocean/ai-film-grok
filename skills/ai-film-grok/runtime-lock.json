@@ -27,7 +27,7 @@
     "scripts/adapters/qwen3_tts.py": "2c730ce2dc2d2e2578a8f6f76ae6923551ae01af220d623afac0e0b8c832dc52",
     "scripts/adapters/voicebox_tts.py": "e01bef488fbf7151297112a5997b5a6af07c6e7e51fc90abc09577771d553395",
     "scripts/adapters/xai_openai_compat.example.py": "633049115376a7604c7b51cf636681871b5181f30039fae67febef667b08d1a3",
-    "scripts/adult_max_director.py": "f1375c3dcfea33f27711f1dc0857133aa9628ddeeb60ec3f4f1d061f05043905",
+    "scripts/adult_max_director.py": "8bcca32840dd58d7dae631bccf36cf58af2e50029641dca8e0d82198ea675e80",
     "scripts/advance.py": "846278164c294c9a81d287392440d9805b4f68407a8f2fdc227d97425a35ac85",
     "scripts/aifilm": "97f131b75cd6954e6aed0c8a7a05387bd45499e110226dd13df8cb6af4f996e9",
     "scripts/aifilm_grok.py": "f14e81e8d65910086ffa5b91f2e6b6dfeb2af0d5bce593e7811ee811fdf7f730",

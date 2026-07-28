@@ -8,11 +8,17 @@ import tempfile
 import unittest
 from hashlib import sha256
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from adult_max_director import apply_contract, build_evidence, validate_contract  # noqa: E402
+from adult_max_director import (  # noqa: E402
+    _verified_mix,
+    apply_contract,
+    build_evidence,
+    validate_contract,
+)
 from heat_check import heat_check  # noqa: E402
 
 
@@ -91,9 +97,25 @@ class AdultMaxDirectorTests(unittest.TestCase):
             (receipts / "audio-visual-alignment.json").write_text(
                 json.dumps({"av_alignment_score": 90}), encoding="utf-8"
             )
-            report = build_evidence(root, write=False)
+            with patch("adult_max_director._current_quality_evidence", return_value=True):
+                report = build_evidence(root, write=False)
         self.assertFalse(report["ok"])
         self.assertIn("ADULT_MAX_PERFORMANCE_EVIDENCE_MISSING:a1", report["codes"])
+
+    def test_evidence_requires_current_quality_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            spec = _spec()
+            shots = spec["scenes"][0]["shots"]
+            apply_contract(spec, shots)
+            clip = root / "a1.mp4"
+            clip.write_bytes(b"hashable test media")
+            (root / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+            (root / "manifest.json").write_text(
+                json.dumps({"clips": {"a1": {"path": str(clip)}}}), encoding="utf-8"
+            )
+            report = build_evidence(root, write=False)
+        self.assertIn("ADULT_MAX_QUALITY_EVIDENCE_MISSING:a1", report["codes"])
 
     def test_heat_check_fails_closed_when_max_media_evidence_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -106,3 +128,26 @@ class AdultMaxDirectorTests(unittest.TestCase):
             report = heat_check(root)
         self.assertFalse(report["ok"])
         self.assertIn("ADULT_MAX_AV_ALIGNMENT_MISSING", report["hard_relevant_codes"])
+
+    def test_mix_evidence_uses_renderer_path_and_checks_artifact_hashes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            audio = root / "audio"
+            audio.mkdir()
+            artifacts = {}
+            for name in ("bgm", "sfx", "mixed"):
+                path = audio / f"{name}.wav"
+                path.write_bytes(name.encode())
+                artifacts[name] = {
+                    "path": str(path),
+                    "sha256": sha256(path.read_bytes()).hexdigest(),
+                }
+            report_path = audio / "mix_report.json"
+            report_path.write_text(json.dumps({"artifacts": artifacts}), encoding="utf-8")
+            path, ok = _verified_mix(root)
+            self.assertEqual(path, report_path.resolve())
+            self.assertTrue(ok)
+            artifacts["mixed"]["sha256"] = "bogus"
+            report_path.write_text(json.dumps({"artifacts": artifacts}), encoding="utf-8")
+            _, ok = _verified_mix(root)
+        self.assertFalse(ok)

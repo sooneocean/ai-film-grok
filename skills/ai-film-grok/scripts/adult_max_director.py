@@ -128,6 +128,8 @@ def build_evidence(root: Path | str, *, write: bool = True) -> dict[str, Any]:
     contract = validate_contract(spec, shots)
     manifest = read_json(base / "manifest.json") or {}
     clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
+    sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else {}
+    sound_events = sound_plan.get("events") if isinstance(sound_plan.get("events"), list) else []
     codes = list(contract["codes"])
     evidence_shots: list[dict[str, Any]] = []
     for shot in shots:
@@ -141,6 +143,8 @@ def build_evidence(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         item: dict[str, Any] = {"shot_id": sid, "ok": False}
         if not source.is_file():
             codes.append(f"ADULT_MAX_MEDIA_MISSING:{sid}")
+        elif not _current_quality_evidence(base, clip, source):
+            codes.append(f"ADULT_MAX_QUALITY_EVIDENCE_MISSING:{sid}")
         elif not review_path.is_file():
             codes.append(f"ADULT_MAX_REVIEW_MISSING:{sid}")
         else:
@@ -180,6 +184,14 @@ def build_evidence(root: Path | str, *, write: bool = True) -> dict[str, Any]:
                     }
                 )
         evidence_shots.append(item)
+        if not any(
+            isinstance(event, dict)
+            and event.get("type") == "sfx_accent"
+            and event.get("sex_sfx") is True
+            and str(event.get("shot_id") or "") == sid
+            for event in sound_events
+        ):
+            codes.append(f"ADULT_MAX_FOLEY_MISSING:{sid}")
     alignment_path = base / "receipts" / "audio-visual-alignment.json"
     alignment = read_json(alignment_path) or {}
     minimum = int((spec.get("adult_max_director") or {}).get("minimum_av_alignment_score") or 90)
@@ -187,6 +199,9 @@ def build_evidence(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         codes.append("ADULT_MAX_AV_ALIGNMENT_MISSING")
     elif int(alignment.get("av_alignment_score") or 0) < minimum:
         codes.append("ADULT_MAX_AV_ALIGNMENT_LOW")
+    mix_path, mix_ok = _verified_mix(base)
+    if not mix_ok:
+        codes.append("ADULT_MAX_MIX_EVIDENCE_MISSING")
     result = {
         "schema_version": 1,
         "kind": "adult-max-sensory-evidence",
@@ -202,6 +217,7 @@ def build_evidence(root: Path | str, *, write: bool = True) -> dict[str, Any]:
             "score": alignment.get("av_alignment_score"),
             "minimum": minimum,
         },
+        "mix": {"path": str(mix_path) if mix_path else None, "ok": mix_ok},
     }
     if write:
         path = receipt_path(base)
@@ -209,3 +225,46 @@ def build_evidence(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         result["path"] = str(path)
         result["sha256"] = sha256_file(path)
     return result
+
+
+def _current_quality_evidence(root: Path, record: dict[str, Any], source: Path) -> bool:
+    """Reuse the delivery contract; a sensory approval cannot bypass clip QA."""
+    evidence = record.get("quality_evidence") if isinstance(record, dict) else None
+    if not isinstance(evidence, dict):
+        return False
+    try:
+        from quality_evidence import quality_evidence_is_current
+
+        return quality_evidence_is_current(evidence, clip=source)
+    except (OSError, ValueError):
+        return False
+
+
+def _verified_mix(root: Path) -> tuple[Path | None, bool]:
+    """Accept only the renderer's hash-bound mix report and local artifacts."""
+    root = root.expanduser().resolve()
+    candidates = (root / "audio" / "mix_report.json", root / "receipts" / "mix_report.json")
+    for report_path in candidates:
+        if not report_path.is_file():
+            continue
+        report = read_json(report_path) or {}
+        artifacts = report.get("artifacts") if isinstance(report.get("artifacts"), dict) else {}
+        valid = True
+        for name in ("bgm", "sfx", "mixed"):
+            item = artifacts.get(name) if isinstance(artifacts, dict) else None
+            path = Path(str((item or {}).get("path") or "")).expanduser()
+            if not path.is_file() or not str((item or {}).get("sha256") or ""):
+                valid = False
+                break
+            try:
+                path.resolve().relative_to(root)
+            except ValueError:
+                valid = False
+                break
+            if sha256_file(path) != item["sha256"]:
+                valid = False
+                break
+        if valid:
+            return report_path, True
+        return report_path, False
+    return None, False
