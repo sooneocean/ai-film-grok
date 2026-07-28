@@ -79,10 +79,10 @@ def apply_contract(spec: dict[str, Any], shots: list[dict[str, Any]]) -> dict[st
         (s.get("sensory_cues") or {}).get("visual_coverage") == "detail" for s in act_shots
     ):
         detail = next((s for s in act_shots if s.get("coverage_role") == "detail"), None)
-        # Existing max projects may predate coverage_role.  Project the late
-        # action beat as the planned detail; the older detail-CU gate still
-        # independently verifies framing before approval.
-        (detail or act_shots[-1])["sensory_cues"]["visual_coverage"] = "detail"
+        # A detail may be projected only onto a shot explicitly authored as an
+        # insert.  Re-labelling an action beat would hide missing progression.
+        if detail is not None:
+            detail["sensory_cues"]["visual_coverage"] = "detail"
     return {"active": True, "projected": projected}
 
 
@@ -160,25 +160,32 @@ def build_evidence(root: Path | str, *, write: bool = True) -> dict[str, Any]:
                 if isinstance(packet.get("adult_performance_evidence"), dict)
                 else None
             )
-            if packet.get("approved") is not True or source_rec.get("sha256") != sha256_file(
-                source
-            ):
+            valid = True
+            source_sha = sha256_file(source)
+            if packet.get("approved") is not True or source_rec.get("sha256") != source_sha:
                 codes.append(f"ADULT_MAX_REVIEW_STALE:{sid}")
-            elif not isinstance(coitus, dict) or coitus.get("timestamp_sec") is None:
+                valid = False
+            if not isinstance(coitus, dict) or coitus.get("timestamp_sec") is None:
                 codes.append(f"ADULT_MAX_TIMESTAMP_EVIDENCE_MISSING:{sid}")
-            elif not performance:
+                valid = False
+            if not performance:
                 codes.append(f"ADULT_MAX_PERFORMANCE_EVIDENCE_MISSING:{sid}")
+                valid = False
             elif (
-                performance.get("clip_sha256") != sha256_file(source)
+                performance.get("clip_sha256") != source_sha
                 or performance.get("coitus_timestamp_sec") != coitus.get("timestamp_sec")
                 or performance.get("human_review_required") is not True
             ):
                 codes.append(f"ADULT_MAX_PERFORMANCE_EVIDENCE_STALE:{sid}")
-            else:
+                valid = False
+            if not isinstance(packet.get("reviewer"), str) or not packet["reviewer"].strip():
+                codes.append(f"ADULT_MAX_HUMAN_REVIEW_MISSING:{sid}")
+                valid = False
+            if valid:
                 item.update(
                     {
                         "ok": True,
-                        "clip_sha256": sha256_file(source),
+                        "clip_sha256": source_sha,
                         "review_sha256": sha256_file(review_path),
                         "timestamp_sec": coitus["timestamp_sec"],
                     }
@@ -243,28 +250,20 @@ def _current_quality_evidence(root: Path, record: dict[str, Any], source: Path) 
 def _verified_mix(root: Path) -> tuple[Path | None, bool]:
     """Accept only the renderer's hash-bound mix report and local artifacts."""
     root = root.expanduser().resolve()
-    candidates = (root / "audio" / "mix_report.json", root / "receipts" / "mix_report.json")
-    for report_path in candidates:
-        if not report_path.is_file():
-            continue
-        report = read_json(report_path) or {}
-        artifacts = report.get("artifacts") if isinstance(report.get("artifacts"), dict) else {}
-        valid = True
-        for name in ("bgm", "sfx", "mixed"):
-            item = artifacts.get(name) if isinstance(artifacts, dict) else None
-            path = Path(str((item or {}).get("path") or "")).expanduser()
-            if not path.is_file() or not str((item or {}).get("sha256") or ""):
-                valid = False
-                break
-            try:
-                path.resolve().relative_to(root)
-            except ValueError:
-                valid = False
-                break
-            if sha256_file(path) != item["sha256"]:
-                valid = False
-                break
-        if valid:
-            return report_path, True
-        return report_path, False
-    return None, False
+    report_path = root / "audio" / "mix_report.json"
+    if not report_path.is_file():
+        return None, False
+    report = read_json(report_path) or {}
+    artifacts = report.get("artifacts") if isinstance(report.get("artifacts"), dict) else {}
+    for name in ("bgm", "sfx", "mixed"):
+        item = artifacts.get(name) if isinstance(artifacts, dict) else None
+        path = Path(str((item or {}).get("path") or "")).expanduser()
+        if not path.is_file() or not str((item or {}).get("sha256") or ""):
+            return report_path, False
+        try:
+            path.resolve().relative_to(root)
+        except ValueError:
+            return report_path, False
+        if sha256_file(path) != item["sha256"]:
+            return report_path, False
+    return report_path, True

@@ -183,9 +183,7 @@ class AdultMaxIronContinuousChallenge(unittest.TestCase):
     def test_foreplay_stall(self) -> None:
         from edit_policy import lint_heat_escalation_challenge
 
-        shots = [
-            {"id": f"f{i}", "heat_phase": "foreplay", "duration_sec": 6} for i in range(4)
-        ]
+        shots = [{"id": f"f{i}", "heat_phase": "foreplay", "duration_sec": 6} for i in range(4)]
         shots.append({"id": "a", "heat_phase": "act", "duration_sec": 6})
         rep = lint_heat_escalation_challenge(shots, heat_scale="max")
         self.assertIn("HEAT_ESCALATION_STALL", rep.get("codes", []))
@@ -193,9 +191,7 @@ class AdultMaxIronContinuousChallenge(unittest.TestCase):
     def test_act_without_climax(self) -> None:
         from edit_policy import lint_heat_escalation_challenge
 
-        shots = [
-            {"id": f"a{i}", "heat_phase": "act", "duration_sec": 6} for i in range(6)
-        ]
+        shots = [{"id": f"a{i}", "heat_phase": "act", "duration_sec": 6} for i in range(6)]
         rep = lint_heat_escalation_challenge(shots, heat_scale="max")
         self.assertIn("HEAT_ESCALATION_NO_PEAK", rep.get("codes", []))
 
@@ -203,7 +199,12 @@ class AdultMaxIronContinuousChallenge(unittest.TestCase):
 class AdultMaxIronSexArc(unittest.TestCase):
     def test_missing_penetration_flags(self) -> None:
         shots = [
-            {"id": "f1", "heat_phase": "foreplay", "duration_sec": 6, "dsl": {"action": "kiss caress"}},
+            {
+                "id": "f1",
+                "heat_phase": "foreplay",
+                "duration_sec": 6,
+                "dsl": {"action": "kiss caress"},
+            },
             {
                 "id": "a1",
                 "heat_phase": "act",
@@ -251,8 +252,7 @@ class AdultMaxIronSexArc(unittest.TestCase):
         self.assertIn("SEX_ARC_PENETRATION_VERB_WEAK", rep.get("codes", []))
         codes = set(rep.get("codes") or [])
         self.assertTrue(
-            "SEX_ARC_RELEASE_MARKER_WEAK" in codes
-            or "SEX_ARC_CLIMAX_RELEASE_MISSING" in codes,
+            "SEX_ARC_RELEASE_MARKER_WEAK" in codes or "SEX_ARC_CLIMAX_RELEASE_MISSING" in codes,
             codes,
         )
         self.assertFalse(rep.get("has_climax_release"))
@@ -477,6 +477,9 @@ class AdultMaxIronStillSource(unittest.TestCase):
             self._base_shot("g01", "afterglow", "bare", still_source="prior undressed still"),
             self._base_shot("b01", "bridge", "bare"),
         ]
+        # Detail coverage is authored explicitly; it cannot be inferred by
+        # relabelling an action-progress shot during projection.
+        shots[4]["coverage_role"] = "detail"
         spec = {
             "title": "still-source-ok",
             "vo_mode": "storyteller",
@@ -511,24 +514,16 @@ class AdultMaxIronStillSource(unittest.TestCase):
 
 class AdultMaxIronDuration(unittest.TestCase):
     def test_below_50_flags(self) -> None:
-        shots = [
-            {"id": f"s{i}", "heat_phase": "setup", "duration_sec": 6} for i in range(6)
-        ]
-        shots += [
-            {"id": f"a{i}", "heat_phase": "act", "duration_sec": 6} for i in range(2)
-        ]
+        shots = [{"id": f"s{i}", "heat_phase": "setup", "duration_sec": 6} for i in range(6)]
+        shots += [{"id": f"a{i}", "heat_phase": "act", "duration_sec": 6} for i in range(2)]
         # 12/48 = 0.25 < 0.50
         rep = lint_heat_arc(shots, heat_scale="max", advise=True)
         self.assertIn("HEAT_SEX_DURATION_LOW", rep.get("codes", []))
         self.assertAlmostEqual(rep["sex_duration_floor"], 0.50, places=2)
 
     def test_at_50_ok(self) -> None:
-        shots = [
-            {"id": f"s{i}", "heat_phase": "setup", "duration_sec": 6} for i in range(4)
-        ]
-        shots += [
-            {"id": f"a{i}", "heat_phase": "act", "duration_sec": 6} for i in range(4)
-        ]
+        shots = [{"id": f"s{i}", "heat_phase": "setup", "duration_sec": 6} for i in range(4)]
+        shots += [{"id": f"a{i}", "heat_phase": "act", "duration_sec": 6} for i in range(4)]
         rep = lint_heat_arc(shots, heat_scale="max", advise=True)
         self.assertNotIn("HEAT_SEX_DURATION_LOW", rep.get("codes", []))
 

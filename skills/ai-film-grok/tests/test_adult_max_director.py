@@ -45,6 +45,14 @@ class AdultMaxDirectorTests(unittest.TestCase):
         self.assertEqual(shots[0]["sensory_cues"]["visual_coverage"], "detail")
         self.assertTrue(validate_contract(spec, shots)["ok"])
 
+    def test_projection_never_relabels_action_as_detail(self) -> None:
+        spec = _spec()
+        shots = spec["scenes"][0]["shots"]
+        shots[0]["coverage_role"] = "action"
+        apply_contract(spec, shots)
+        self.assertEqual(shots[0]["sensory_cues"]["visual_coverage"], "action_progress")
+        self.assertIn("ADULT_MAX_DETAIL_COVERAGE_MISSING", validate_contract(spec, shots)["codes"])
+
     def test_non_max_is_unchanged(self) -> None:
         spec = _spec()
         spec["heat_scale"] = "hot"
@@ -101,6 +109,7 @@ class AdultMaxDirectorTests(unittest.TestCase):
                 report = build_evidence(root, write=False)
         self.assertFalse(report["ok"])
         self.assertIn("ADULT_MAX_PERFORMANCE_EVIDENCE_MISSING:a1", report["codes"])
+        self.assertIn("ADULT_MAX_HUMAN_REVIEW_MISSING:a1", report["codes"])
 
     def test_evidence_requires_current_quality_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -150,4 +159,14 @@ class AdultMaxDirectorTests(unittest.TestCase):
             artifacts["mixed"]["sha256"] = "bogus"
             report_path.write_text(json.dumps({"artifacts": artifacts}), encoding="utf-8")
             _, ok = _verified_mix(root)
+        self.assertFalse(ok)
+
+    def test_mix_evidence_rejects_legacy_receipt_without_renderer_report(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            legacy = root / "receipts"
+            legacy.mkdir()
+            (legacy / "mix_report.json").write_text(json.dumps({"artifacts": {}}), encoding="utf-8")
+            path, ok = _verified_mix(root)
+        self.assertIsNone(path)
         self.assertFalse(ok)
