@@ -6295,6 +6295,18 @@ def cmd_route(args: argparse.Namespace) -> int:
     return code
 
 
+def cmd_team(args: argparse.Namespace) -> int:
+    from cli_team import run
+    from production_team import ProductionTeamError
+
+    try:
+        report, code = run(args)
+    except ProductionTeamError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return code
+
+
 def cmd_lipsync_node(args: argparse.Namespace) -> int:
     from config_loader import get_config
     from lipsync_node_client import LipsyncNodeError, health
@@ -8325,6 +8337,10 @@ def build_parser() -> argparse.ArgumentParser:
     dept_unlock.add_argument("--reason", required=True)
     dept_unlock.add_argument("--expected-revision", type=int, required=True)
 
+    from cli_team import add_team_parsers
+
+    add_team_parsers(sub)
+
     # Phase 2: Skill Registry shell
     skill_p = sub.add_parser("skill", help="Skill Registry: list|show|validate|run")
     skill_sub = skill_p.add_subparsers(dest="skill_action", required=True)
@@ -8471,6 +8487,7 @@ def main(argv: list[str] | None = None) -> int:
             "production-report": cmd_production_report,
             "comfy": cmd_comfy,
             "route": cmd_route,
+            "team": cmd_team,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:
