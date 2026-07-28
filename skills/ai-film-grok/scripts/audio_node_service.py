@@ -30,7 +30,12 @@ app = FastAPI(title="ai-film private audio node", docs_url=None, redoc_url=None)
 
 
 def _auth(value: str | None) -> None:
-    if not TOKEN or not value or not value.startswith("Bearer ") or not hmac.compare_digest(value[7:], TOKEN):
+    if (
+        not TOKEN
+        or not value
+        or not value.startswith("Bearer ")
+        or not hmac.compare_digest(value[7:], TOKEN)
+    ):
         raise HTTPException(401, "unauthorized")
 
 
@@ -40,6 +45,7 @@ def _available(kind: str) -> bool:
             import qwen_tts  # noqa: F401
             import soundfile  # noqa: F401
             import torch  # noqa: F401
+
             return True
         except ImportError:
             return False
@@ -49,12 +55,34 @@ def _available(kind: str) -> bool:
 @app.get("/health")
 def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     _auth(authorization)
-    return {"ok": True, "node": "private-lan", "models": {kind: _available(kind) for kind in ("tts", "music", "sfx")}, "model": MODEL}
+    return {
+        "ok": True,
+        "node": "private-lan",
+        "models": {kind: _available(kind) for kind in ("tts", "music", "sfx")},
+        "model": MODEL,
+    }
 
 
 def _normalize(source: Path, out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["ffmpeg", "-y", "-i", str(source), "-ar", "44100", "-ac", "2", "-c:a", "pcm_s16le", str(out)], check=True, capture_output=True, timeout=180)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(source),
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-c:a",
+            "pcm_s16le",
+            str(out),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=180,
+    )
 
 
 def _run_tts(payload: dict[str, Any], out: Path) -> None:
@@ -69,7 +97,13 @@ def _run_tts(payload: dict[str, Any], out: Path) -> None:
     language = str(payload.get("language") or "Chinese")
     instruction = str((payload.get("performance") or {}).get("instruction") or "")[:1000]
     model = Qwen3TTSModel.from_pretrained(MODEL, device_map="cuda:0", dtype=torch.bfloat16)
-    wavs, sr = model.generate_voice_design(text=text, language=language, instruct=instruction) if "VoiceDesign" in MODEL else model.generate_custom_voice(text=text, language=language, speaker=voice, instruct=instruction)
+    wavs, sr = (
+        model.generate_voice_design(text=text, language=language, instruct=instruction)
+        if "VoiceDesign" in MODEL
+        else model.generate_custom_voice(
+            text=text, language=language, speaker=voice, instruct=instruction
+        )
+    )
     raw = out.with_suffix(".raw.wav")
     sf.write(raw, wavs[0], sr)
     _normalize(raw, out)
@@ -84,7 +118,12 @@ def _run_command(kind: str, payload: dict[str, Any], out: Path) -> None:
     if not isinstance(template, list) or not all(isinstance(item, str) for item in template):
         raise RuntimeError(f"{kind} argv is invalid")
     source = out.with_suffix(".source.wav")
-    values = {"out": str(source), "prompt": str(payload.get("prompt") or ""), "duration": str(payload.get("duration") or 5), "seed": str(payload.get("seed") or 0)}
+    values = {
+        "out": str(source),
+        "prompt": str(payload.get("prompt") or ""),
+        "duration": str(payload.get("duration") or 5),
+        "seed": str(payload.get("seed") or 0),
+    }
     command = [item.format(**values) for item in template]
     subprocess.run(command, check=True, capture_output=True, timeout=900)
     _normalize(source, out)
@@ -99,7 +138,13 @@ async def _execute(job_id: str, kind: str, payload: dict[str, Any]) -> None:
             await asyncio.to_thread(_run_tts, payload, target)
         else:
             await asyncio.to_thread(_run_command, kind, payload, target)
-        job.update({"status": "completed", "sha256": hashlib.sha256(target.read_bytes()).hexdigest(), "path": str(target)})
+        job.update(
+            {
+                "status": "completed",
+                "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
+                "path": str(target),
+            }
+        )
     except Exception as exc:
         job.update({"status": "failed", "error": type(exc).__name__})
 
@@ -114,7 +159,9 @@ def _create(kind: str, payload: dict[str, Any]) -> dict[str, str]:
 
 
 @app.post("/v1/{kind}")
-def create(kind: str, payload: dict[str, Any], authorization: str | None = Header(default=None)) -> dict[str, str]:
+def create(
+    kind: str, payload: dict[str, Any], authorization: str | None = Header(default=None)
+) -> dict[str, str]:
     _auth(authorization)
     if kind not in {"tts", "music", "sfx"}:
         raise HTTPException(404, "unknown audio kind")
@@ -137,4 +184,3 @@ def audio(job_id: str, authorization: str | None = Header(default=None)) -> File
     if job.get("status") != "completed" or not path.is_file():
         raise HTTPException(409, "audio is not ready")
     return FileResponse(path, media_type="audio/wav", filename=f"{job_id}.wav")
-
