@@ -5471,6 +5471,16 @@ def cmd_audio_verify(args: argparse.Namespace) -> int:
     return 0 if report["ok"] else 1
 
 
+def cmd_audio_tts_render(args: argparse.Namespace) -> int:
+    from audio_tts_render import AudioTTSRenderError, render_tts_events
+
+    try:
+        emit(render_tts_events(Path(args.root)))
+    except AudioTTSRenderError as exc:
+        raise FilmError(str(exc)) from exc
+    return 0
+
+
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
 
@@ -5851,6 +5861,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     av.add_argument("--root", required=True)
     av.add_argument("--final", default=None, help="Optional final MP4 to inspect with FFprobe")
+
+    atr = sub.add_parser(
+        "audio-tts-render", help="Render each event TTS asset and write actual durations"
+    )
+    atr.add_argument("--root", required=True)
 
     lsc = sub.add_parser(
         "lipsync-canary",
@@ -7416,6 +7431,7 @@ def main(argv: list[str] | None = None) -> int:
             "selects": cmd_selects,
             "audio-plan": cmd_audio_plan,
             "audio-verify": cmd_audio_verify,
+            "audio-tts-render": cmd_audio_tts_render,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,
