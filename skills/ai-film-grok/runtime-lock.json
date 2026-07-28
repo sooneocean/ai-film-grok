@@ -131,7 +131,7 @@
     "scripts/grok_oauth.py": "8e74d66cc81f587a36730c7faf1692ab388150e33bbec3c442f5f279e67bfb97",
     "scripts/heat_check.py": "56dbf409a3f4a1c0b2a74f03f86a6aceb818505cfefe3ad044b5f4c8a1e08d23",
     "scripts/i2v_motion_gate.py": "ef3ff0de70af2a95d683f5882c7f09352e3f023b8206bf67e69d8549f2852030",
-    "scripts/i2v_provider.py": "69438c9a65ef882f1f91b8bbad0f75f89b82330fa5b54b89ca9ecd22c4e00ec",
+    "scripts/i2v_provider.py": "69438c9a65ef882f1f91b8bbad0f75f89b82330fa5b54b89ca9ecd22c4e00ec9",
     "scripts/intake.py": "bfec8ffb9db50244ecd23c5e08723d1f66ba98117afb5dc4809b10caea686c58",
     "scripts/lipsync_backend.py": "afccdbd52c3720b46533ec8243d3e3aab727eb286505d9260ca024a1b2632a63",
     "scripts/lipsync_canary.py": "cd3899cf2bd50a99e0fac1e57492c2a3c6828edbe12aa3872a2f6e0e726af0ba",
