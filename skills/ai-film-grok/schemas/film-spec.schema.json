@@ -304,7 +304,7 @@
         "allow_sung": { "type": "boolean" },
         "allow_lipsync": { "type": "boolean" },
         "bed_source": {
-          "enum": ["auto", "library_only", "procedural_only"]
+          "enum": ["auto", "library_only", "approved_library", "procedural_only"]
         },
         "max_sung_shots": { "type": "integer", "minimum": 0 },
         "music_seed": { "type": "integer" }
@@ -557,7 +557,7 @@
                     "type": "object",
                     "required": ["kind", "start_offset_sec", "duration_sec"],
                     "properties": {
-                      "kind": {"enum": ["voice", "foley", "sfx", "ambience", "music", "silence"]},
+                      "kind": {"enum": ["voice", "foley", "sfx", "ambience", "music", "performance", "silence"]},
                       "start_offset_sec": {"type": "number", "minimum": 0},
                       "duration_sec": {"type": "number", "exclusiveMinimum": 0},
                       "speaker": {"type": "string"},
@@ -566,8 +566,24 @@
                       "emotion": {"type": "string"},
                       "performance": {"type": "object"},
                       "asset_hint": {"type": "string"},
+                      "source": {"type": "string"},
+                      "license": {"type": "string"},
+                      "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                      "character_id": {"type": "string"},
+                      "language": {"type": "string"},
+                      "node_job_id": {"type": "string"},
+                      "approval_status": {"type": "string"},
+                      "approval_receipt": {"type": "string"},
+                      "adult_confirmed": {"type": "boolean"},
+                      "source_authorization": {"enum": ["original", "authorized_reference"]},
+                      "take_seed": {"type": "integer"},
+                      "model_version": {"type": "string"},
                       "purpose": {"type": "string"}
                     },
+                    "allOf": [{
+                      "if": {"properties": {"kind": {"const": "performance"}}},
+                      "then": {"required": ["source", "license", "source_sha256", "character_id", "language", "node_job_id", "approval_status", "approval_receipt", "adult_confirmed", "source_authorization", "take_seed", "model_version"]}
+                    }],
                     "additionalProperties": true
                   }
                 },

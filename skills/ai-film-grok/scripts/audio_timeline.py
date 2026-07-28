@@ -181,6 +181,9 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                         {
                             "approval_status": str(cue.get("approval_status") or ""),
                             "approval_receipt": str(cue.get("approval_receipt") or ""),
+                            "character_id": str(cue.get("character_id") or ""),
+                            "language": str(cue.get("language") or ""),
+                            "node_job_id": str(cue.get("node_job_id") or ""),
                             "adult_confirmed": cue.get("adult_confirmed") is True,
                             "source_authorization": str(cue.get("source_authorization") or ""),
                             "take_seed": cue.get("take_seed"),
@@ -302,6 +305,12 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
                 )
             if event.get("source_authorization") not in {"original", "authorized_reference"}:
                 raise AudioTimelineError(f"{prefix} performance source authorization is invalid")
+            if not str(event.get("character_id") or "").strip():
+                raise AudioTimelineError(f"{prefix} performance asset requires character_id")
+            if event.get("language") != "nonverbal":
+                raise AudioTimelineError(f"{prefix} performance asset requires language=nonverbal")
+            if not str(event.get("node_job_id") or "").strip():
+                raise AudioTimelineError(f"{prefix} performance asset requires node_job_id")
             if isinstance(event.get("take_seed"), bool) or not isinstance(
                 event.get("take_seed"), int
             ):

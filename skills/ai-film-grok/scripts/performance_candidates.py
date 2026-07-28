@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
+import json
+import os
 import re
 import shutil
 import uuid
@@ -16,6 +19,7 @@ from util import read_json, write_json
 
 _SAFE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,79}$")
 _AUTHORIZATIONS = frozenset({"original", "authorized_reference"})
+_SIGNATURE_FIELD = "receipt_hmac_sha256"
 
 
 class PerformanceCandidateError(RuntimeError):
@@ -28,6 +32,47 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _receipt_key() -> bytes:
+    """Use a local-only key; never persist it with candidate metadata."""
+    value = (
+        os.environ.get("AIFILM_AUDIO_RECEIPT_KEY", "").strip()
+        or os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
+    )
+    if len(value) < 24:
+        raise PerformanceCandidateError(
+            "AIFILM_AUDIO_RECEIPT_KEY or AIFILM_AUDIO_NODE_TOKEN is required to sign receipts"
+        )
+    return value.encode("utf-8")
+
+
+def _receipt_bytes(record: dict[str, Any]) -> bytes:
+    return json.dumps(
+        {key: value for key, value in record.items() if key != _SIGNATURE_FIELD},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def sign_receipt(record: dict[str, Any]) -> dict[str, Any]:
+    """Attach a deterministic local HMAC without persisting the signing secret."""
+    record[_SIGNATURE_FIELD] = hmac.new(
+        _receipt_key(), _receipt_bytes(record), hashlib.sha256
+    ).hexdigest()
+    return record
+
+
+def receipt_is_signed(record: dict[str, Any]) -> bool:
+    signature = record.get(_SIGNATURE_FIELD)
+    if not isinstance(signature, str) or not re.fullmatch(r"[0-9a-f]{64}", signature):
+        return False
+    try:
+        expected = hmac.new(_receipt_key(), _receipt_bytes(record), hashlib.sha256).hexdigest()
+    except PerformanceCandidateError:
+        return False
+    return hmac.compare_digest(signature, expected)
 
 
 def _pending_dir(root: Path) -> Path:
@@ -126,6 +171,7 @@ def generate(
         "status": "pending_human_review",
         "kind": "performance",
         "character_id": character_id,
+        "language": "nonverbal",
         "adult_confirmed": True,
         "source_authorization": source_authorization,
         "model_version": model_version,
@@ -138,6 +184,7 @@ def generate(
         "created_at": datetime.now(UTC).isoformat(),
     }
     receipt = _pending_dir(root) / f"{asset_id}.json"
+    sign_receipt(record)
     write_json(receipt, record)
     return {**record, "receipt": str(receipt)}
 
@@ -150,9 +197,13 @@ def approve(root: Path, asset_id: str) -> dict[str, Any]:
     if (
         record.get("schema") != "aifilm-performance-candidate-v1"
         or record.get("status") != "pending_human_review"
+        or not receipt_is_signed(record)
         or record.get("adult_confirmed") is not True
         or record.get("source_authorization") not in _AUTHORIZATIONS
+        or record.get("language") != "nonverbal"
+        or not str(record.get("character_id") or "").strip()
         or not str(record.get("model_version") or "").strip()
+        or not str(record.get("node_job_id") or "").strip()
         or str(record.get("path") or "") != str(expected)
         or isinstance(record.get("take_seed"), bool)
         or not isinstance(record.get("take_seed"), int)
@@ -189,6 +240,7 @@ def approve(root: Path, asset_id: str) -> dict[str, Any]:
             "approved_path": str(destination.relative_to(root)),
         }
     )
+    sign_receipt(record)
     write_json(receipt, record)
     approved_receipt = destination.with_suffix(".receipt.json")
     write_json(approved_receipt, record)

@@ -34,13 +34,27 @@ def _approved_performance(root: Path, event: dict[str, Any], asset: Path, actual
         source_rel = str(asset.relative_to(root))
     except ValueError as exc:
         raise SceneSoundError(f"{event.get('id')}: performance asset escapes film root") from exc
+    try:
+        from performance_candidates import receipt_is_signed
+
+        signed = receipt_is_signed(data)
+    except Exception:
+        signed = False
     if (
         data.get("schema") != "aifilm-performance-candidate-v1"
         or data.get("status") != "approved"
+        or not signed
         or data.get("approved_path") != source_rel
         or data.get("sha256") != actual
         or data.get("adult_confirmed") is not True
+        or event.get("adult_confirmed") is not True
         or data.get("source_authorization") not in {"original", "authorized_reference"}
+        or data.get("source_authorization") != event.get("source_authorization")
+        or data.get("character_id") != event.get("character_id")
+        or data.get("language") != "nonverbal"
+        or event.get("language") != "nonverbal"
+        or data.get("language") != event.get("language")
+        or data.get("node_job_id") != event.get("node_job_id")
         or data.get("take_seed") != event.get("take_seed")
         or data.get("model_version") != event.get("model_version")
     ):

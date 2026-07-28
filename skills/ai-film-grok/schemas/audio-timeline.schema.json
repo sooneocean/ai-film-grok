@@ -12,11 +12,14 @@
   },
   "$defs": {"event": {"type": "object", "required": ["id", "shot_id", "type", "start_sec", "duration_sec"], "properties": {
     "id": {"type": "string"}, "shot_id": {"type": "string"},
-    "type": {"enum": ["dialogue", "inner_voice", "media_voice", "narration", "action_sfx", "ambience", "music", "silence"]},
+    "type": {"enum": ["dialogue", "inner_voice", "media_voice", "narration", "action_sfx", "ambience", "music", "performance", "silence"]},
     "start_sec": {"type": "number", "minimum": 0}, "duration_sec": {"type": "number", "exclusiveMinimum": 0},
     "gain": {"type": "number"}, "pan": {"type": "number", "minimum": -1, "maximum": 1},
     "fade_in_sec": {"type": "number", "minimum": 0}, "fade_out_sec": {"type": "number", "minimum": 0},
     "speaker": {"type": "string"}, "text": {"type": "string"}, "caption_text": {"type": "string"},
     "asset": {"type": "string"}, "source": {"type": "string"}, "license": {"type": "string"}, "source_sha256": {"type": "string"},
+    "character_id": {"type": "string"}, "language": {"type": "string"}, "node_job_id": {"type": "string"},
+    "approval_status": {"type": "string"}, "approval_receipt": {"type": "string"}, "adult_confirmed": {"type": "boolean"},
+    "source_authorization": {"enum": ["original", "authorized_reference"]}, "take_seed": {"type": "integer"}, "model_version": {"type": "string"},
     "overlap_policy": {"enum": ["interrupt", "cross_talk"]}
-  }, "additionalProperties": true}}}
+  }, "allOf": [{"if": {"properties": {"type": {"const": "performance"}}}, "then": {"required": ["source", "license", "source_sha256", "character_id", "language", "node_job_id", "approval_status", "approval_receipt", "adult_confirmed", "source_authorization", "take_seed", "model_version"]}}], "additionalProperties": true}}}
