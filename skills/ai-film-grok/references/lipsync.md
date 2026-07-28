@@ -22,22 +22,40 @@ RTX 5090 方案研究与 canary 门槛见
 
 | 顺序 | 后端 | 说明 |
 |------|------|------|
-| 1 | 锁定 MuseTalk | `backend-lock` + final `--lipsync auto` |
-| 2 | 锁定 Wav2Lip | 仅基线/应急；先确认权重许可 |
-| 3 | external argv | RTX 5090 canary 或其他已审计本地客户端 |
-| 4 | **FRW** `ltx-lipsync` / `wan-lipsync` / `seedance-2-pro-lipsync` | 仅明确技术失败后的显式 fallback；register `frw_*_lipsync` |
+| 1 | RTX LatentSync 1.6 | 已批准 fingerprint + 实片 canary 后进入 `auto` |
+| 2 | RTX MuseTalk 1.5 | 仅 LatentSync 可分类技术失败时按显式配置回退 |
+| 3 | 锁定本机 MuseTalk / Wav2Lip / external argv | 兼容旧流程，不进入 5090 自动路由 |
+| 4 | **FRW** `ltx-lipsync` / `wan-lipsync` / `seedance-2-pro-lipsync` | 仅本地明确技术失败后的显式 fallback；register `frw_*_lipsync` |
 
-`final --lipsync auto` 仍只走**本地已 lock** 后端（历史路径）。  
+`final --lipsync auto` 优先走已配置且 health/fingerprint 就绪的 RTX 节点。
 若显式使用 FRW，生产阶段直接 register 成 clip，final 保持 `--lipsync off`，避免双处理。
 
-目标优先级是 `LatentSync 1.6 → MuseTalk 1.5 → Wav2Lip`，但 LatentSync 尚未接入 registry；
-在接线、5090 canary、fingerprint receipt 和人工完整观看通过前，当前执行顺序不冒充目标顺序。
+目标优先级是 `LatentSync 1.6 → MuseTalk 1.5`；节点接线完成不等于生产批准。
+在 5090 canary、fingerprint receipt 和人工完整观看通过前，后端不得写成 ready。
+节点的 `technical_ready` 只表示代码、GPU 与实测 fingerprint 可运行；
+只有人工批准后将对应 `AIFILM_LIPSYNC_NODE_<BACKEND>_APPROVED=1`，`ready` 才会进入 `auto`。
 
 质量差、人工拒绝或未知错误不算 provider 技术失败，禁止静默切 FRW。
 
 上游 MuseTalk 泛用入口若使用 `os.system`，已被拒绝。不得仅因为文件存在就认定后端“ready”。
 
 ## 检查与锁定
+
+RTX 节点：
+
+```bash
+# Windows 服务只绑定 loopback；Mac 通过认证 SSH 隧道传输影片与 Bearer。
+ssh -N -L 18790:127.0.0.1:8790 user@192.168.88.52
+export AIFILM_LIPSYNC_NODE_BASE_URL=http://127.0.0.1:18790
+export AIFILM_LIPSYNC_NODE_TOKEN=...  # 仅放 config.env
+aifilm lipsync-node health
+aifilm lipsync-canary --root "<film>" --shot "<shot>" --backend latentsync
+aifilm lipsync-canary --root "<film>" --shot "<shot>" --backend musetalk
+```
+
+节点回执必须绑定 repo commit、checkpoint SHA-256、输入/输出 SHA-256、
+Python/PyTorch/CUDA/FFmpeg、ffprobe、耗时与峰值显存。人工审片仍是晋升条件。
+客户端拒绝 HTTP 私网直连与所有重定向；若不用 SSH 隧道，节点必须提供 HTTPS。
 
 ```bash
 SKILL_DIR="$HOME/.grok/skills/ai-film-grok"
@@ -74,8 +92,8 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 ```
 
 - `off`：永远不对口型（默认）。
-- `auto`：优先尊重 film-spec 的显式 `lipsync`；字段缺失时，当前实现仍会按景别/标题启发式推断。生产前必须审阅目标镜清单；没有后端则跳过。
+- `auto`：只处理显式 `lipsync:true`、有 speaker/face target 的正脸或微侧近景；没有批准后端则跳过。
 - `require`：有任一目标镜头失败就终止成片。
-- `external | musetalk | wav2lip`：显式指定后端；当前逐镜失败仍会记录并跳过，只有配合 `require` 语义才是硬闭锁。此处是待修实现缺口。
+- `latentsync | external | musetalk | wav2lip`：显式指定后端；任一目标镜失败即终止成片。
 
 Lip-sync 输出仍必须走最终 `review-final`，不得只信技术成功码。

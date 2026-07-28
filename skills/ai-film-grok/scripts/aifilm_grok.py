@@ -6260,6 +6260,23 @@ def cmd_comfy(args: argparse.Namespace) -> int:
     return run_comfy(args)
 
 
+def cmd_lipsync_node(args: argparse.Namespace) -> int:
+    from config_loader import get_config
+    from lipsync_node_client import LipsyncNodeError, health
+
+    cfg = get_config()
+    if not cfg.lipsync_node_base_url or not cfg.lipsync_node_token:
+        raise FilmError(
+            "set AIFILM_LIPSYNC_NODE_BASE_URL and AIFILM_LIPSYNC_NODE_TOKEN in config.env"
+        )
+    try:
+        report = health(cfg.lipsync_node_base_url, cfg.lipsync_node_token)
+    except LipsyncNodeError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok") else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="aifilm_grok", description="ai-film-grok local control plane")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -6599,6 +6616,17 @@ def build_parser() -> argparse.ArgumentParser:
     lsc.add_argument("--backend", default="auto")
     lsc.add_argument("--video", default=None)
     lsc.add_argument("--audio", default=None)
+
+    lsn = sub.add_parser(
+        "lipsync-node",
+        help="Inspect the authenticated Windows RTX lip-sync node",
+    )
+    lsn.add_argument(
+        "lipsync_node_action",
+        nargs="?",
+        default="health",
+        choices=["health"],
+    )
 
     cap = sub.add_parser(
         "capability",
@@ -7193,8 +7221,8 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument(
         "--lipsync",
         default="off",
-        choices=["auto", "off", "require", "external", "musetalk", "wav2lip"],
-        help="Lip-sync OFF by default (Wav2Lip often warps faces). Use auto only when quality is acceptable.",
+        choices=["auto", "off", "require", "latentsync", "external", "musetalk", "wav2lip"],
+        help="Lip-sync OFF by default. RTX node priority: LatentSync 1.6 then MuseTalk 1.5.",
     )
     fin.add_argument("--sub-lead", type=float, default=0.08, help="Show subtitles early (seconds)")
     fin.add_argument(
@@ -8331,6 +8359,7 @@ def main(argv: list[str] | None = None) -> int:
             "bgm-candidate": cmd_bgm_candidate,
             "bgm-library": cmd_bgm_library,
             "performance-candidate": cmd_performance_candidate,
+            "lipsync-node": cmd_lipsync_node,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,

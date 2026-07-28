@@ -3,6 +3,17 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.14.0] - 2026-07-28
+
+### Added
+
+- Added an authenticated, single-GPU Windows/WSL lip-sync node with measured LatentSync 1.6 provenance, atomic artifacts, bounded uploads, and hash-bound receipts.
+- Added `aifilm lipsync-node health` plus remote LatentSync/MuseTalk routing for canary and final rendering.
+
+### Security
+
+- Restricted plaintext node traffic to loopback through an SSH tunnel, rejected redirects, authenticated before multipart parsing, and fail-closed on input, backend, or receipt mismatch.
+
 ## [2.13.0] - 2026-07-28
 
 ### Added
