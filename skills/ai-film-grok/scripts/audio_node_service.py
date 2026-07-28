@@ -35,6 +35,9 @@ MUSIC_CHECKPOINT_FINGERPRINT = os.environ.get(
 )
 jobs: dict[str, dict[str, Any]] = {}
 AUDIO_KINDS = ("tts", "music", "sfx", "performance")
+# All configured renderers use the same 5090.  Serializing execution prevents
+# independently valid jobs from evicting each other's model weights or OOMing.
+GPU_GENERATION_LOCK = asyncio.Lock()
 app = FastAPI(title="ai-film private audio node", docs_url=None, redoc_url=None, openapi_url=None)
 
 
@@ -271,10 +274,12 @@ async def _execute(job_id: str, kind: str, payload: dict[str, Any]) -> None:
     target = JOBS / f"{job_id}.wav"
     try:
         JOBS.mkdir(parents=True, exist_ok=True)
-        if kind == "tts":
-            await asyncio.to_thread(_run_tts, payload, target)
-        else:
-            await asyncio.to_thread(_run_command, kind, payload, target)
+        async with GPU_GENERATION_LOCK:
+            job["status"] = "running"
+            if kind == "tts":
+                await asyncio.to_thread(_run_tts, payload, target)
+            else:
+                await asyncio.to_thread(_run_command, kind, payload, target)
         job.update(
             {
                 "status": "completed",
@@ -294,8 +299,9 @@ async def _execute_music_batch(job_id: str, payload: dict[str, Any]) -> None:
     target_dir = JOBS / job_id
     try:
         JOBS.mkdir(parents=True, exist_ok=True)
-        job["status"] = "running"
-        paths = await asyncio.to_thread(_run_music_batch, payload, target_dir)
+        async with GPU_GENERATION_LOCK:
+            job["status"] = "running"
+            paths = await asyncio.to_thread(_run_music_batch, payload, target_dir)
         seeds = [int(seed) for seed in payload["seeds"]]
         artifacts = [
             {
