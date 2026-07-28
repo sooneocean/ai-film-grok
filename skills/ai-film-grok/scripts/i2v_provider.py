@@ -497,19 +497,65 @@ class LocalComfyWan22Provider(I2VProvider):
         return command
 
     def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        input_path = Path(keyframe).expanduser().resolve()
+        expected_input_sha = sha256_file(input_path) if input_path.is_file() else None
         result = super().generate(keyframe=keyframe, prompt=prompt, **kwargs)
         out = Path(kwargs["out"]).expanduser().resolve()
         receipt = out.with_suffix(out.suffix + ".receipt.json")
         result["receipt"] = str(receipt)
         if result.get("ok") and receipt.is_file():
             try:
+                from comfy_video import WAN22_ADULT_PROFILE, WAN22_OFFICIAL_PROFILE
+
                 detail = json.loads(receipt.read_text(encoding="utf-8"))
+                profile_name = str(kwargs.get("profile", "official"))
+                profile = (
+                    WAN22_ADULT_PROFILE
+                    if profile_name == WAN22_ADULT_PROFILE["name"]
+                    else WAN22_OFFICIAL_PROFILE
+                )
+                expected_models = [profile["high"], profile["low"]]
+                output_detail = detail.get("output") or {}
+                verification_errors: list[str] = []
+                if detail.get("schema_version") != 1:
+                    verification_errors.append("schema version mismatch")
+                if detail.get("kind") != "local-wan22-generation":
+                    verification_errors.append("receipt kind mismatch")
+                if expected_input_sha is None:
+                    verification_errors.append("input file was missing before launch")
+                elif detail.get("input_sha256") != expected_input_sha:
+                    verification_errors.append("input SHA-256 mismatch")
+                if not out.is_file():
+                    verification_errors.append("output file is missing")
+                else:
+                    if output_detail.get("sha256") != sha256_file(out):
+                        verification_errors.append("output SHA-256 mismatch")
+                    if output_detail.get("bytes") != out.stat().st_size:
+                        verification_errors.append("output byte count mismatch")
+                if Path(str(output_detail.get("path") or "")).expanduser().resolve() != out:
+                    verification_errors.append("output path mismatch")
+                if detail.get("provider") != self.name or detail.get("ok") is not True:
+                    verification_errors.append("provider receipt identity mismatch")
+                if detail.get("profile") != profile_name:
+                    verification_errors.append("profile mismatch")
+                if detail.get("models") != expected_models:
+                    verification_errors.append("model identity mismatch")
+                if not detail.get("prompt_id"):
+                    verification_errors.append("prompt_id is missing")
+                if profile_name == WAN22_ADULT_PROFILE["name"]:
+                    if detail.get("subject_basis") != kwargs.get("subject_basis"):
+                        verification_errors.append("adult subject basis mismatch")
+                    if detail.get("adult_attestation") is not True:
+                        verification_errors.append("adult attestation is missing")
+                if verification_errors:
+                    raise ValueError("; ".join(verification_errors))
                 result["prompt_id"] = detail.get("prompt_id")
-                result["output_sha256"] = (detail.get("output") or {}).get("sha256")
+                result["input_sha256"] = detail.get("input_sha256")
+                result["output_sha256"] = output_detail.get("sha256")
                 result["models"] = detail.get("models") or []
-            except (OSError, ValueError):
+            except (OSError, ValueError) as exc:
                 result["ok"] = False
-                result["stderr"] = "comfy-wan22 receipt is unreadable"
+                result["stderr"] = f"comfy-wan22 receipt verification failed: {exc}"
         elif result.get("ok"):
             result["ok"] = False
             result["stderr"] = "comfy-wan22 did not write a generation receipt"

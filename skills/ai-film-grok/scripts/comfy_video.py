@@ -17,6 +17,7 @@ import mimetypes
 import re
 import secrets
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -69,8 +70,24 @@ _DISALLOWED_MINOR_SIGNALS = (
     re.compile(r"\bloli(?:con)?\b", re.I),
     re.compile(r"\bshota(?:con)?\b", re.I),
     re.compile(r"\bchild(?:ren)?\b", re.I),
+    re.compile(r"\byoung[\s-]+(?:girl|boy)\b", re.I),
+    re.compile(
+        r"(?<!\d)(?:[0-9]|1[0-7])\s*(?:[-‐‑–—]\s*)?"
+        r"(?:years?[-\s]*old|y\s*/?\s*o|歲|岁|歳|才)\b",
+        re.I,
+    ),
+    re.compile(r"未成年|未滿\s*18|未满\s*18"),
+    re.compile(r"女子高生|男子高生|高校生|中学生|中學生|小学生|小學生"),
+    re.compile(r"高中生|初中生|國中生|国中生"),
+    re.compile(r"少女|少年|兒童|儿童|小孩|孩童"),
 )
 _ALLOWED_SUBJECT_BASES = frozenset({"fictional_adults", "licensed_adults"})
+_ALLOWED_COMFY_NETWORKS = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("fc00::/7"),
+)
 _INVENTORY_MODEL_FOLDERS = frozenset(
     {
         "checkpoints",
@@ -130,7 +147,13 @@ def normalize_base_url(raw: str) -> str:
         address = ipaddress.ip_address(host)
     except ValueError as exc:
         raise ComfyVideoError("ComfyUI host must be localhost or a private IP") from exc
-    if address.is_unspecified or not (address.is_private or address.is_loopback):
+    if not (
+        address.is_loopback
+        or any(
+            address.version == network.version and address in network
+            for network in _ALLOWED_COMFY_NETWORKS
+        )
+    ):
         raise ComfyVideoError("ComfyUI host must be localhost or a private IP")
     return value
 
@@ -140,8 +163,9 @@ def validate_adult_request(*, prompt: str, subject_basis: str) -> None:
         raise ComfyVideoError(
             "adult profile requires --subject-basis fictional_adults or licensed_adults"
         )
+    normalized_prompt = unicodedata.normalize("NFKC", prompt).casefold()
     for pattern in _DISALLOWED_MINOR_SIGNALS:
-        if pattern.search(prompt):
+        if pattern.search(normalized_prompt):
             raise ComfyVideoError("adult request rejected: minor or young-looking signal")
 
 
@@ -457,6 +481,17 @@ def apply_workflow_overrides(
                 raise ComfyVideoError(
                     f"workflow override references unknown input {node_id}.{input_name}"
                 )
+            current = node_inputs[input_name]
+            compatible = (
+                (type(current) is bool and type(value) is bool)
+                or (type(current) is int and type(value) is int)
+                or (type(current) is float and type(value) in {int, float})
+                or (isinstance(current, str) and isinstance(value, str))
+                or (isinstance(current, list) and isinstance(value, list))
+                or (isinstance(current, Mapping) and isinstance(value, Mapping))
+            )
+            if current is None or not compatible:
+                raise ComfyVideoError(f"workflow override type mismatch for {node_id}.{input_name}")
             node_inputs[str(input_name)] = value
     return updated
 
@@ -485,11 +520,41 @@ def assert_local_only_workflow(base_url: str, graph: Mapping[str, Any]) -> None:
             f"/object_info/{urllib.parse.quote(class_type, safe='')}",
         )
         info = data.get(class_type, data) if isinstance(data, dict) else {}
+        if not isinstance(info, Mapping) or not info:
+            raise ComfyVideoError(f"workflow node metadata unavailable: {class_type}")
         category = str((info or {}).get("category") or "").lower()
-        if bool((info or {}).get("api_node")) or category.startswith("api node"):
+        input_info = (info or {}).get("input") if isinstance(info, Mapping) else {}
+        declared_inputs: set[str] = set()
+        if isinstance(input_info, Mapping):
+            for section in ("required", "optional", "hidden"):
+                values = input_info.get(section)
+                if isinstance(values, Mapping):
+                    declared_inputs.update(str(name).lower() for name in values)
+        external_name = re.search(
+            r"(?:openai|anthropic|gemini|replicate|falai|fal_ai|stabilityai|"
+            r"bytedance|kling|runway|luma|cloud)",
+            class_type,
+            re.I,
+        )
+        credentialed_endpoint = bool(
+            {"api_key", "apikey", "access_token", "secret_key"} & declared_inputs
+            and {"endpoint", "base_url", "api_url", "model_name"} & declared_inputs
+        )
+        if (
+            bool((info or {}).get("api_node"))
+            or category.startswith("api node")
+            or external_name
+            or credentialed_endpoint
+        ):
             raise ComfyVideoError(
                 f"workflow contains external API node {class_type}; "
                 "explicit external-provider approval is required"
+            )
+        python_module = str(info.get("python_module") or "")
+        if python_module != "nodes" and not python_module.startswith("comfy_extras."):
+            raise ComfyVideoError(
+                f"workflow contains untrusted custom node {class_type} "
+                f"from {python_module or 'unknown module'}; explicit approval is required"
             )
 
 
@@ -639,6 +704,7 @@ def _wait_for_completion_ws(
             websocket_url,
             timeout=min(5.0, max(timeout_sec, 0.1)),
             suppress_origin=True,
+            redirect_limit=0,
         )
         while time.monotonic() < deadline:
             try:
@@ -649,8 +715,10 @@ def _wait_for_completion_ws(
                     f"/history/{urllib.parse.quote(prompt_id)}",
                 )
                 record = history.get(prompt_id) if isinstance(history, dict) else None
-                if record and _completed_result(prompt_id, record) is not None:
-                    return
+                if record:
+                    _raise_for_execution_error(record)
+                    if _completed_result(prompt_id, record) is not None:
+                        return
                 continue
             if not isinstance(raw, str):
                 continue
@@ -787,10 +855,10 @@ def cancel_prompt(base_url: str, prompt_id: str) -> dict[str, Any]:
         )
         return {"ok": True, "prompt_id": prompt_id, "action": "delete_pending"}
     if prompt_id in status["running_prompt_ids"]:
-        if len(status["running_prompt_ids"]) != 1:
-            raise ComfyVideoError("refusing global interrupt while multiple prompts are running")
-        _json_request(base_url, "/interrupt", method="POST", payload={})
-        return {"ok": True, "prompt_id": prompt_id, "action": "interrupt"}
+        raise ComfyVideoError(
+            "ComfyUI /interrupt is global and not target-safe; "
+            "refusing to interrupt a running prompt"
+        )
     raise ComfyVideoError(f"prompt {prompt_id} is not present in the active queue")
 
 
@@ -886,13 +954,15 @@ def generate(
         "provider": "comfy-wan22",
         "profile": profile["name"],
         "prompt_id": prompt_id,
-        "input_sha256": hashlib.sha256(Path(image).read_bytes()).hexdigest(),
+        "input_sha256": uploaded["sha256"],
         "output": downloaded,
         "models": [profile["high"], profile["low"]],
         "turbo": turbo,
         "width": width,
         "height": height,
         "duration_sec": duration_sec,
+        "subject_basis": subject_basis or None,
+        "adult_attestation": profile.get("name") == WAN22_ADULT_PROFILE["name"],
     }
 
 

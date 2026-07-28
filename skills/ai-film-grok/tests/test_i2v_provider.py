@@ -124,6 +124,7 @@ class I2VProviderTests(unittest.TestCase):
         self.assertEqual(provider.command_timeout_sec, 1830)
 
     def test_comfy_generate_reads_hash_bound_receipt(self) -> None:
+        import hashlib
         import json
         import os
         from types import SimpleNamespace
@@ -131,13 +132,31 @@ class I2VProviderTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as raw:
             out = Path(raw) / "clip.mp4"
+            keyframe = Path(raw) / "keyframe.png"
+            keyframe.write_bytes(b"keyframe")
+            out.write_bytes(b"generated-video")
+            input_sha = hashlib.sha256(keyframe.read_bytes()).hexdigest()
+            output_sha = hashlib.sha256(out.read_bytes()).hexdigest()
             receipt = out.with_suffix(".mp4.receipt.json")
             receipt.write_text(
                 json.dumps(
                     {
+                        "schema_version": 1,
+                        "kind": "local-wan22-generation",
+                        "ok": True,
+                        "provider": "comfy-wan22",
+                        "profile": "official",
                         "prompt_id": "p-1",
-                        "output": {"sha256": "abc123"},
-                        "models": ["wan-high", "wan-low"],
+                        "input_sha256": input_sha,
+                        "output": {
+                            "path": str(out),
+                            "bytes": out.stat().st_size,
+                            "sha256": output_sha,
+                        },
+                        "models": [
+                            "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+                            "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+                        ],
                     }
                 ),
                 encoding="utf-8",
@@ -153,13 +172,119 @@ class I2VProviderTests(unittest.TestCase):
                 ),
             ):
                 result = get("comfy-wan22").generate(
-                    keyframe=Path(raw) / "keyframe.png",
+                    keyframe=keyframe,
                     prompt="camera move",
                     out=out,
                 )
         self.assertTrue(result["ok"])
         self.assertEqual(result["prompt_id"], "p-1")
-        self.assertEqual(result["output_sha256"], "abc123")
+        self.assertEqual(result["output_sha256"], output_sha)
+
+    def test_comfy_generate_binds_receipt_to_prelaunch_input_bytes(self) -> None:
+        import hashlib
+        import json
+        import os
+        from types import SimpleNamespace
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as raw:
+            out = Path(raw) / "clip.mp4"
+            keyframe = Path(raw) / "keyframe.png"
+            original = b"uploaded-keyframe"
+            keyframe.write_bytes(original)
+            out.write_bytes(b"generated-video")
+            input_sha = hashlib.sha256(original).hexdigest()
+            output_sha = hashlib.sha256(out.read_bytes()).hexdigest()
+            receipt = out.with_suffix(".mp4.receipt.json")
+
+            def mutate_after_launch(*_args: object, **_kwargs: object) -> SimpleNamespace:
+                receipt.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "kind": "local-wan22-generation",
+                            "ok": True,
+                            "provider": "comfy-wan22",
+                            "profile": "official",
+                            "prompt_id": "p-1",
+                            "input_sha256": input_sha,
+                            "output": {
+                                "path": str(out),
+                                "bytes": out.stat().st_size,
+                                "sha256": output_sha,
+                            },
+                            "models": [
+                                "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+                                "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+                            ],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                keyframe.write_bytes(b"changed-after-upload")
+                return SimpleNamespace(returncode=0, stdout="{}", stderr="")
+
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"AIFILM_COMFYUI_BASE_URL": "http://192.168.88.52:8188"},
+                ),
+                mock.patch("i2v_provider.subprocess.run", side_effect=mutate_after_launch),
+            ):
+                result = get("comfy-wan22").generate(
+                    keyframe=keyframe,
+                    prompt="camera move",
+                    out=out,
+                )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["input_sha256"], input_sha)
+
+    def test_comfy_generate_rejects_forged_receipt(self) -> None:
+        import json
+        import os
+        from types import SimpleNamespace
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as raw:
+            out = Path(raw) / "missing.mp4"
+            receipt = out.with_suffix(".mp4.receipt.json")
+            receipt.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "local-wan22-generation",
+                        "ok": True,
+                        "provider": "comfy-wan22",
+                        "profile": "official",
+                        "prompt_id": "p-forged",
+                        "input_sha256": "forged-input",
+                        "output": {
+                            "path": str(out),
+                            "bytes": 123,
+                            "sha256": "forged-output",
+                        },
+                        "models": ["fake"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"AIFILM_COMFYUI_BASE_URL": "http://192.168.88.52:8188"},
+                ),
+                mock.patch(
+                    "i2v_provider.subprocess.run",
+                    return_value=SimpleNamespace(returncode=0, stdout="{}", stderr=""),
+                ),
+            ):
+                result = get("comfy-wan22").generate(
+                    keyframe=Path(raw) / "missing-keyframe.png",
+                    prompt="camera move",
+                    out=out,
+                )
+        self.assertFalse(result["ok"])
+        self.assertIn("verification failed", result["stderr"])
 
     def test_unknown_provider_raises(self) -> None:
         with self.assertRaises(I2VProviderError):
