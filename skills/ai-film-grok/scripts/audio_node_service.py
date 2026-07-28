@@ -24,9 +24,10 @@ from fastapi.responses import FileResponse
 ROOT = Path(os.environ.get("AIFILM_AUDIO_NODE_ROOT", r"C:\\aifilm-audio-node")).resolve()
 JOBS = ROOT / "jobs"
 TOKEN = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "")
-MODEL = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign")
+MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign")
+MODEL_PATH = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL_PATH", MODEL_ID)
 jobs: dict[str, dict[str, Any]] = {}
-app = FastAPI(title="ai-film private audio node", docs_url=None, redoc_url=None)
+app = FastAPI(title="ai-film private audio node", docs_url=None, redoc_url=None, openapi_url=None)
 
 
 def _auth(value: str | None) -> None:
@@ -47,9 +48,28 @@ def _available(kind: str) -> bool:
             import torch  # noqa: F401
 
             return True
-        except ImportError:
+        except Exception:
             return False
     return bool(os.environ.get(f"AIFILM_AUDIO_NODE_{kind.upper()}_ARGV"))
+
+
+def _gpu_health() -> dict[str, Any]:
+    """Report capacity only; never expose inputs, tokens, or filesystem paths."""
+    try:
+        import torch
+
+        if not torch.cuda.is_available():
+            return {"available": False}
+        free, total = torch.cuda.mem_get_info(0)
+        return {
+            "available": True,
+            "name": torch.cuda.get_device_name(0),
+            "cuda": torch.version.cuda,
+            "free_vram_mib": int(free // 1024**2),
+            "total_vram_mib": int(total // 1024**2),
+        }
+    except Exception:
+        return {"available": False}
 
 
 @app.get("/health")
@@ -59,7 +79,8 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         "ok": True,
         "node": "private-lan",
         "models": {kind: _available(kind) for kind in ("tts", "music", "sfx")},
-        "model": MODEL,
+        "model": MODEL_ID,
+        "gpu": _gpu_health(),
     }
 
 
@@ -96,10 +117,10 @@ def _run_tts(payload: dict[str, Any], out: Path) -> None:
     voice = str(payload.get("voice_profile_id") or "Vivian")
     language = str(payload.get("language") or "Chinese")
     instruction = str((payload.get("performance") or {}).get("instruction") or "")[:1000]
-    model = Qwen3TTSModel.from_pretrained(MODEL, device_map="cuda:0", dtype=torch.bfloat16)
+    model = Qwen3TTSModel.from_pretrained(MODEL_PATH, device_map="cuda:0", dtype=torch.bfloat16)
     wavs, sr = (
         model.generate_voice_design(text=text, language=language, instruct=instruction)
-        if "VoiceDesign" in MODEL
+        if "VoiceDesign" in MODEL_ID
         else model.generate_custom_voice(
             text=text, language=language, speaker=voice, instruct=instruction
         )
@@ -132,8 +153,9 @@ def _run_command(kind: str, payload: dict[str, Any], out: Path) -> None:
 
 async def _execute(job_id: str, kind: str, payload: dict[str, Any]) -> None:
     job = jobs[job_id]
+    target = JOBS / f"{job_id}.wav"
     try:
-        target = JOBS / f"{job_id}.wav"
+        JOBS.mkdir(parents=True, exist_ok=True)
         if kind == "tts":
             await asyncio.to_thread(_run_tts, payload, target)
         else:
@@ -146,6 +168,9 @@ async def _execute(job_id: str, kind: str, payload: dict[str, Any]) -> None:
             }
         )
     except Exception as exc:
+        target.unlink(missing_ok=True)
+        target.with_suffix(".raw.wav").unlink(missing_ok=True)
+        target.with_suffix(".source.wav").unlink(missing_ok=True)
         job.update({"status": "failed", "error": type(exc).__name__})
 
 
@@ -159,7 +184,7 @@ def _create(kind: str, payload: dict[str, Any]) -> dict[str, str]:
 
 
 @app.post("/v1/{kind}")
-def create(
+async def create(
     kind: str, payload: dict[str, Any], authorization: str | None = Header(default=None)
 ) -> dict[str, str]:
     _auth(authorization)
