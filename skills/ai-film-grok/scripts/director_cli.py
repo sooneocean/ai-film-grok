@@ -25,6 +25,11 @@ from production_book import (
 from util import read_json
 
 _DEPARTMENT_SCHEMA_TARGETS = {"visual": 3, "audio": 1, "post": 1}
+_BOOK_DEPARTMENT_KEYS = {
+    "visual": ("visual", "style-bible"),
+    "audio": ("sound", "audio", "audio-bible"),
+    "post": ("post", "post-bible"),
+}
 _STAGE_INPUT_CANDIDATES: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
     "concept_lock": (("brief", ("brief.json",)), ("story", ("drama-graph.json",))),
     "script_lock": (("story", ("drama-graph.json",)), ("shots", ("film-spec.json",))),
@@ -331,11 +336,29 @@ def director_init(
 
 def migrate_audit(root: Path | str) -> dict[str, Any]:
     base = Path(root).expanduser().resolve()
+    book = read_json(base / "production-book.json") or {}
+    records = book.get("departments") if isinstance(book, dict) else {}
+    records = records if isinstance(records, dict) else {}
     items = []
     for department, filename in DEPARTMENT_FILES.items():
         if department == "sound":
             continue
+        source_file = None
+        for key in _BOOK_DEPARTMENT_KEYS[department]:
+            record = records.get(key)
+            candidate_source = record.get("source_file") if isinstance(record, dict) else None
+            if isinstance(candidate_source, str) and candidate_source.strip():
+                source_file = candidate_source
+                break
         path = base / filename
+        source = "default"
+        if isinstance(source_file, str) and source_file.strip():
+            candidate = Path(source_file).expanduser()
+            candidate = candidate if candidate.is_absolute() else base / candidate
+            candidate = candidate.resolve()
+            if candidate.is_relative_to(base):
+                path = candidate
+                source = "production_book"
         value = read_json(path) if path.is_file() else None
         current_version = value.get("schema_version") if isinstance(value, dict) else None
         target_version = _DEPARTMENT_SCHEMA_TARGETS[department]
@@ -343,6 +366,7 @@ def migrate_audit(root: Path | str) -> dict[str, Any]:
             {
                 "department": department,
                 "path": str(path),
+                "path_source": source,
                 "exists": path.is_file(),
                 "from_version": current_version,
                 "to_version": target_version,
