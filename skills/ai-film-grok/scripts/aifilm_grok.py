@@ -3720,6 +3720,20 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             f"(score={quality_report.get('score')}/100). "
             "Fix the technical issue then re-run review-final."
         )
+    # Adult max cannot inherit a plan-only score.  The receipt binds each
+    # reviewed act/climax clip and the current audio/timeline evidence.
+    try:
+        from adult_max_director import build_evidence
+
+        adult_sensory = build_evidence(root, write=True)
+    except (OSError, ValueError) as exc:
+        raise FilmError(f"Cannot approve final: adult max sensory evidence failed: {exc}") from exc
+    if adult_sensory.get("active") and not adult_sensory.get("ok"):
+        raise FilmError(
+            "Cannot approve final: adult max sensory evidence is incomplete ["
+            + ", ".join(adult_sensory.get("codes") or [])
+            + "]"
+        )
     reviewer = str(args.reviewer or "").strip()
     notes = str(args.notes or "").strip()
     if not args.approve:
@@ -3871,6 +3885,7 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         "subtitle_cut_boundaries": subtitle_cut_boundaries,
         "director_ledger": director_ledger,
         "narrative_evidence": narrative_evidence,
+        "adult_max_sensory": adult_sensory,
     }
     review_path = out_dir / "final-review.json"
     write_json(review_path, review)
@@ -5780,6 +5795,41 @@ def cmd_audio_event(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bgm_candidate(args: argparse.Namespace) -> int:
+    """Create/list/approve locally rendered ACE-Step BGM candidates."""
+    from bgm_candidates import BGMCandidateError, approve, generate, list_candidates
+
+    root = Path(args.root).expanduser().resolve()
+    try:
+        if args.bgm_candidate_action == "list":
+            emit({"candidates": list_candidates(root)})
+            return 0
+        if args.bgm_candidate_action == "approve":
+            emit(approve(root, args.asset_id))
+            return 0
+        base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
+        token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
+        if not base or not token:
+            raise BGMCandidateError("AIFILM_AUDIO_NODE_URL/TOKEN are required for ACE-Step BGM")
+        prompt = (args.prompt or "").strip() or (
+            f"instrumental {args.mood} background music, cinematic underscore, no vocals"
+        )
+        emit(
+            generate(
+                root,
+                base_url=base,
+                token=token,
+                prompt=prompt,
+                mood=args.mood,
+                duration=args.duration,
+                seed=args.seed,
+            )
+        )
+        return 0
+    except BGMCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
 
@@ -6188,6 +6238,25 @@ def build_parser() -> argparse.ArgumentParser:
     ae.add_argument("--caption-text", default=None)
     ae.add_argument("--performance-json", default=None)
     ae.add_argument("--force-locked", action="store_true")
+
+    bgm_candidate = sub.add_parser(
+        "bgm-candidate",
+        help="Generate ACE-Step BGM candidates, then explicitly approve them into the local pool",
+    )
+    bgm_candidate_sub = bgm_candidate.add_subparsers(dest="bgm_candidate_action", required=True)
+    bgm_generate = bgm_candidate_sub.add_parser("generate", help="Create one pending BGM candidate")
+    bgm_generate.add_argument("--root", required=True)
+    bgm_generate.add_argument("--prompt", default="")
+    bgm_generate.add_argument("--mood", default="rnb")
+    bgm_generate.add_argument("--duration", type=float, default=30.0)
+    bgm_generate.add_argument("--seed", type=int, required=True)
+    bgm_list = bgm_candidate_sub.add_parser("list", help="List pending and approved BGM candidates")
+    bgm_list.add_argument("--root", required=True)
+    bgm_approve = bgm_candidate_sub.add_parser(
+        "approve", help="Promote one heard candidate to audio/templates/<mood>/"
+    )
+    bgm_approve.add_argument("--root", required=True)
+    bgm_approve.add_argument("--asset-id", required=True)
 
     lsc = sub.add_parser(
         "lipsync-canary",
@@ -7880,6 +7949,7 @@ def main(argv: list[str] | None = None) -> int:
             "verify": cmd_verify,
             "audio-tts-render": cmd_audio_tts_render,
             "audio-event": cmd_audio_event,
+            "bgm-candidate": cmd_bgm_candidate,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,
