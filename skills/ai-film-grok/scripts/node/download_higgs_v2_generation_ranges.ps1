@@ -22,6 +22,7 @@ for ($offset = [int64]0; $offset -lt $expected; $offset += $chunkSize) {
     $partial = "$part.partial"
     Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue
     & curl.exe -L --fail --retry 100 --retry-all-errors --retry-delay 10 --connect-timeout 30 `
+        --speed-limit 1024 --speed-time 90 `
         --range "$offset-$end" -o $partial $url
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $partial) -or (Get-Item -LiteralPath $partial).Length -ne $want) {
         throw "Higgs range $index did not produce its expected $want bytes"
