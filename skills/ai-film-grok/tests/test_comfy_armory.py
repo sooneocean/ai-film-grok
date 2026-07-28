@@ -31,6 +31,14 @@ def test_armory_records_verified_private_node_without_credentials() -> None:
     assert "token" not in serialized
 
 
+@patch.dict(
+    "os.environ",
+    {"AIFILM_COMFYUI_BASE_URL": "http://192.168.88.52:8188"},
+)
+def test_explicit_armory_ignores_inherited_environment_override() -> None:
+    assert default_base_url(load_armory()) == "http://127.0.0.1:18188"
+
+
 @patch.dict("os.environ", {}, clear=True)
 def test_comfy_cli_uses_verified_armory_node_without_env_configuration() -> None:
     assert _base_url(Namespace(base_url=None)) == "http://127.0.0.1:18188"
