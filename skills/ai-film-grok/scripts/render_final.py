@@ -2280,7 +2280,7 @@ def build_subtitle_cues_for_shots(
     return clamped, film_tl
 
 
-def write_srt(path: Path, cues: list[dict[str, Any]]) -> None:
+def write_srt(path: Path, cues: list[dict[str, Any]], *, preserve_overlaps: bool = False) -> None:
     """Write an SRT sidecar file. Delegates to the shared subtitle_srt module.
 
     v1.23: extracted to subtitle_srt.write_srt_file so all post-engines
@@ -2291,6 +2291,11 @@ def write_srt(path: Path, cues: list[dict[str, Any]]) -> None:
     """
     from subtitle_srt import write_srt_file
 
+    if preserve_overlaps:
+        from subtitle_srt import write_srt_file
+
+        write_srt_file(path, cues, allow_overlaps=True)
+        return
     fixed: list[dict[str, Any]] = []
     prev_end = 0.0
     for cue in cues:
@@ -3165,6 +3170,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         str(item["id"]): float(spot_tl["shot_starts"][i] + spot_shot_targets[i])
         for i, item in enumerate(shot_audio)
     }
+    shot_duration_map = {str(item["id"]): float(item["target"]) for item in shot_audio}
     # Legacy cue sidecar remains byte-compatible.  v1 is opt-in and carries
     # all eight event types plus source/license/overlap validation.
     audio_timeline = compile_audio_timeline(shots, shot_starts=shot_start_map)
@@ -3172,6 +3178,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     # renderer-local cue receipt, distinct from the production audio timeline.
     audio_timeline_path = audio_dir / "audio-cues-timeline.json"
     formal_timeline: dict[str, Any] | None = None
+    formal_silence_windows: list[dict[str, Any]] = []
     event_voice_stem: dict[str, Any] | None = None
     use_event_tts = bool(spec.get("audio_timeline_v1_event_tts", False))
     if bool(spec.get("audio_timeline_v1", False)):
@@ -3184,9 +3191,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 if isinstance(stored_timeline, dict)
                 else compile_audio_timeline_v1(spec)
             )
-            formal_timeline = rebase_to_rendered_shots(formal_timeline, shot_start_map)
+            formal_timeline = rebase_to_rendered_shots(
+                formal_timeline, shot_start_map, shot_durations=shot_duration_map
+            )
             formal_timeline["duration_sec"] = round(float(total_dur), 3)
             execution_plan = build_mix_execution_plan(formal_timeline)
+            formal_silence_windows = list(execution_plan.get("silence_windows") or [])
         except AudioTimelineError as exc:
             raise RenderError(str(exc)) from exc
         write_json(audio_timeline_path, formal_timeline)
@@ -3204,6 +3214,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         if formal_timeline
         else None,
     }
+    mix_spotting["formal_silence_windows"] = formal_silence_windows
     if use_event_tts:
         if formal_timeline is None:
             raise RenderError("audio_timeline_v1_event_tts requires audio_timeline_v1")
@@ -3687,12 +3698,33 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             f"[5:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[color]"
         )
 
+    controlled_labels = {
+        "music": "mus",
+        "native": "native",
+        "sfx": "sfx",
+        "scene_sound": "scene",
+    }
+    for window_index, window in enumerate(formal_silence_windows):
+        scope = str(window.get("scope") or "bed")
+        targets = ("music", "native", "sfx", "scene_sound") if scope == "bed" else (scope,)
+        for target in targets:
+            incoming = controlled_labels[target]
+            outgoing = f"{target}_silence_{window_index}"
+            fc_parts.append(
+                f"[{incoming}]volume=0:enable='between(t,{float(window['start_sec']):.3f},{float(window['end_sec']):.3f})'[{outgoing}]"
+            )
+            controlled_labels[target] = outgoing
+    music_label = controlled_labels["music"]
+    native_label = controlled_labels["native"]
+    sfx_label = controlled_labels["sfx"]
+    scene_label = controlled_labels["scene_sound"]
+
     if "sidechaincompress" in filters_help and "acrossover" in filters_help:
         # Native I2V audio is the main picture sound.  Route it through the
         # same narration sidechain as BGM, so that it returns to full level in
         # gaps but does not bury narration or character dialogue.
         fc_parts.append(
-            "[mus][native][scene]amix=inputs=3:duration=longest:normalize=0[picture_bed]"
+            f"[{music_label}][{native_label}][{scene_label}]amix=inputs=3:duration=longest:normalize=0[picture_bed]"
         )
         fc_parts.append("[picture_bed]acrossover=split=300 4000[mus_l][mus_m][mus_h]")
         fc_parts.append("[narr]asplit[narr_main][narr_sc]")
@@ -3700,7 +3732,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         fc_parts.append(
             "[mus_l][mus_m_ducked][mus_h]amix=inputs=3:duration=longest:normalize=0[mus_ducked]"
         )
-        fc_parts.append("[mus_ducked][sfx]amix=inputs=2:duration=longest:normalize=0[bed]")
+        fc_parts.append(f"[mus_ducked][{sfx_label}]amix=inputs=2:duration=longest:normalize=0[bed]")
         final_amix_count = 2 + (1 if use_color else 0)
         color_in = "[color]" if use_color else ""
         fc_parts.append(
@@ -3709,9 +3741,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         mix_spotting["sidechain_applied"] = "dynamic_eq"
     elif "sidechaincompress" in filters_help:
         fc_parts.append(
-            "[mus][native][scene]amix=inputs=3:duration=longest:normalize=0[picture_bed]"
+            f"[{music_label}][{native_label}][{scene_label}]amix=inputs=3:duration=longest:normalize=0[picture_bed]"
         )
-        fc_parts.append("[picture_bed][sfx]amix=inputs=2:duration=longest:normalize=0[bed]")
+        fc_parts.append(
+            f"[picture_bed][{sfx_label}]amix=inputs=2:duration=longest:normalize=0[bed]"
+        )
         fc_parts.append(f"[bed][narr]{sc_frag}[ducked]")
         final_amix_count = 2 + (1 if use_color else 0)
         color_in = "[color]" if use_color else ""
@@ -3723,7 +3757,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         final_amix_count = 5 + (1 if use_color else 0)
         color_in = "[color]" if use_color else ""
         fc_parts.append(
-            f"[narr][mus][native][sfx][scene]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
+            f"[narr][{music_label}][{native_label}][{sfx_label}][{scene_label}]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
         )
         mix_spotting["sidechain_applied"] = False
 
@@ -3881,6 +3915,19 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         story_join_intents=list(story_intents) if story_intents is not None else None,
         default_intent=default_intent if active_transition > 0 else "hard",
     )
+    event_caption_bindings: list[dict[str, Any]] | None = None
+    if use_event_tts and formal_timeline is not None:
+        event_caption_bindings = timeline_caption_bindings(formal_timeline)
+        cues = [
+            {
+                "start": row["start_sec"],
+                "end": row["end_sec"],
+                "text": row["caption_text"],
+                "audio_event_id": row["audio_event_id"],
+            }
+            for row in event_caption_bindings
+        ]
+        write_json(audio_dir / "event-subtitle-bindings.json", event_caption_bindings)
 
     try:
         srt_path = safe_output_path(
@@ -3888,7 +3935,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
     except SecurityPolicyError as exc:
         raise RenderError(str(exc)) from exc
-    write_srt(srt_path, cues)
+    write_srt(srt_path, cues, preserve_overlaps=use_event_tts)
 
     # Burn subs with PIL overlays (no drawtext dependency).
     # --subs off keeps SRT only (for HyperFrames designed captions underlay path).

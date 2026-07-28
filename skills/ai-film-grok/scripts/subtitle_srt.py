@@ -34,7 +34,9 @@ def timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{ms:03d}"
 
 
-def validate_segments(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def validate_segments(
+    segments: list[dict[str, Any]], *, allow_overlaps: bool = False
+) -> list[dict[str, Any]]:
     """Validate a list of ``{start, end, text}`` segments for SRT correctness.
 
     Raises :class:`SrtError` on:
@@ -61,16 +63,16 @@ def validate_segments(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
             raise SrtError(f"segment {index} has empty text")
         if end <= start:
             raise SrtError(f"segment {index} end must be after start")
-        if start < previous_end - 0.001:
+        if not allow_overlaps and start < previous_end - 0.001:
             raise SrtError(f"segment {index} starts before previous segment ends")
         cleaned.append({"start": start, "end": end, "text": text})
         previous_end = end
     return cleaned
 
 
-def segments_to_srt_text(segments: list[dict[str, Any]]) -> str:
+def segments_to_srt_text(segments: list[dict[str, Any]], *, allow_overlaps: bool = False) -> str:
     """Render validated segments into SRT subtitle text."""
-    cleaned = validate_segments(segments)
+    cleaned = validate_segments(segments, allow_overlaps=allow_overlaps)
     blocks: list[str] = []
     for index, cue in enumerate(cleaned, start=1):
         blocks.append(
@@ -79,7 +81,9 @@ def segments_to_srt_text(segments: list[dict[str, Any]]) -> str:
     return "\n\n".join(blocks) + "\n"
 
 
-def write_srt_file(path: Path | str, cues: list[dict[str, Any]]) -> Path:
+def write_srt_file(
+    path: Path | str, cues: list[dict[str, Any]], *, allow_overlaps: bool = False
+) -> Path:
     """Write an SRT file from a list of ``{start, end, text}`` dicts.
 
     This replaces the inline ``write_srt`` in ``render_final.py`` and adds
@@ -98,7 +102,7 @@ def write_srt_file(path: Path | str, cues: list[dict[str, Any]]) -> Path:
     import os
     import tempfile
 
-    content = segments_to_srt_text(cues)
+    content = segments_to_srt_text(cues, allow_overlaps=allow_overlaps)
     with tempfile.NamedTemporaryFile(
         "w", encoding="utf-8", dir=target.parent, prefix=f".{target.name}.", delete=False
     ) as handle:

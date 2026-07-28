@@ -30,6 +30,7 @@ EVENT_TYPES = frozenset(
 )
 VOCAL_TYPES = frozenset({"dialogue", "inner_voice", "media_voice", "narration"})
 ASSET_TYPES = frozenset({"action_sfx", "ambience", "music"})
+SILENCE_SCOPES = frozenset({"bed", "music", "native", "sfx", "scene_sound"})
 _CUE_MAP = {
     "foley": "action_sfx",
     "sfx": "action_sfx",
@@ -108,6 +109,10 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                 event_duration = _number(
                     cue.get("duration_sec", 0), f"{sid}.audio_cues[{cue_index}].duration_sec", 0.001
                 )
+                if start - cursor + event_duration > duration + 1e-6:
+                    raise AudioTimelineError(
+                        f"{sid}.audio_cues[{cue_index}] exceeds shot duration_sec"
+                    )
                 text = str(cue.get("spoken_text") or "").strip()
                 event: dict[str, Any] = {
                     "id": _event_id(sid, cue_index, event_type, start, text),
@@ -145,6 +150,8 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                             "source_sha256": str(cue.get("source_sha256") or ""),
                         }
                     )
+                if event_type == "silence":
+                    event["silence_scope"] = str(cue.get("silence_scope") or "bed")
                 if cue.get("overlap_policy") is not None:
                     event["overlap_policy"] = str(cue["overlap_policy"])
                 events.append(event)
@@ -198,6 +205,7 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
         raise AudioTimelineError("audio-timeline.events must be an array")
     seen: set[str] = set()
     vocal: list[dict[str, Any]] = []
+    silences: list[dict[str, Any]] = []
     for index, event in enumerate(events):
         prefix = f"audio-timeline.events[{index}]"
         if not isinstance(event, dict):
@@ -217,13 +225,19 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
         _number(event.get("gain", 0), f"{prefix}.gain")
         _number(event.get("pan", 0), f"{prefix}.pan", -1.0)
         for field in ("fade_in_sec", "fade_out_sec"):
-            _number(event.get(field, 0), f"{prefix}.{field}")
+            if _number(event.get(field, 0), f"{prefix}.{field}") > duration + 1e-6:
+                raise AudioTimelineError(f"{prefix}.{field} cannot exceed duration_sec")
         if abs(float(event.get("pan", 0))) > 1:
             raise AudioTimelineError(f"{prefix}.pan must be between -1 and 1")
         if event_type in VOCAL_TYPES:
             if not str(event.get("speaker") or "") or not str(event.get("text") or "").strip():
                 raise AudioTimelineError(f"{prefix} vocal event needs speaker and text")
             vocal.append({**event, "_start": start, "_end": start + duration})
+        elif event_type == "silence":
+            scope = str(event.get("silence_scope") or "bed")
+            if scope not in SILENCE_SCOPES:
+                raise AudioTimelineError(f"{prefix}.silence_scope is invalid")
+            silences.append({**event, "_start": start, "_end": start + duration})
         elif event.get("text") or event.get("spoken_text"):
             raise AudioTimelineError(f"{prefix} non-vocal event must not contain TTS text")
         if event_type in ASSET_TYPES and not bool(event.get("muted")):
@@ -245,6 +259,12 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
                     raise AudioTimelineError(
                         f"vocal overlap {left['id']} / {right['id']} requires interrupt or cross_talk"
                     )
+    for silence in silences:
+        for voice in vocal:
+            if silence["_start"] < voice["_end"] and voice["_start"] < silence["_end"]:
+                raise AudioTimelineError(
+                    f"silence event {silence['id']} overlaps vocal event {voice['id']}"
+                )
     _validate_style(str(timeline.get("mode") or "drama_radio"), vocal)
     return {
         "ok": True,
@@ -274,7 +294,10 @@ def timeline_hash(timeline: dict[str, Any]) -> str:
 
 
 def rebase_to_rendered_shots(
-    timeline: dict[str, Any], shot_starts: dict[str, float]
+    timeline: dict[str, Any],
+    shot_starts: dict[str, float],
+    *,
+    shot_durations: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """Return a copy whose event starts follow the rendered shot timeline."""
     validate_timeline(timeline)
@@ -285,6 +308,21 @@ def rebase_to_rendered_shots(
             raise AudioTimelineError(
                 f"event {event['id']} references unknown rendered shot {shot_id}"
             )
+        if shot_durations is not None:
+            if shot_id not in shot_durations:
+                raise AudioTimelineError(
+                    f"event {event['id']} references unknown rendered shot duration {shot_id}"
+                )
+            offset = _number(
+                event.get("start_offset_sec", 0), f"event {event['id']}.start_offset_sec"
+            )
+            duration = _number(
+                event.get("duration_sec"), f"event {event['id']}.duration_sec", 0.001
+            )
+            if offset + duration > float(shot_durations[shot_id]) + 1e-6:
+                raise AudioTimelineError(
+                    f"event {event['id']} exceeds rendered shot duration {shot_id}"
+                )
         event["start_sec"] = round(
             float(shot_starts[shot_id]) + float(event.get("start_offset_sec", 0.0)), 3
         )
@@ -366,6 +404,16 @@ def build_mix_execution_plan(
         "voice_peak_db": -2.0,
         "final_limiter": 0.95,
         "ducking": {"trigger_event_ids": duck_triggers, "release_ms": 550},
+        "silence_windows": [
+            {
+                "audio_event_id": event["id"],
+                "start_sec": event["start_sec"],
+                "end_sec": round(float(event["start_sec"]) + float(event["duration_sec"]), 3),
+                "scope": event.get("silence_scope") or "bed",
+            }
+            for event in timeline["events"]
+            if event.get("type") == "silence" and not event.get("muted")
+        ],
         "lanes": lanes,
     }
 

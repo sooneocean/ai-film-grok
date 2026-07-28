@@ -237,6 +237,65 @@ def test_rebase_keeps_cue_offset_when_rendered_shot_start_changes():
     assert rebased["events"][0]["start_sec"] == 5.7
 
 
+def test_rebase_rejects_tampered_stored_event_that_exceeds_rendered_shot():
+    timeline = compile_timeline(
+        _spec([{"kind": "silence", "start_offset_sec": 3.9, "duration_sec": 0.05}])
+    )
+    timeline["events"][0]["duration_sec"] = 0.2
+    with pytest.raises(AudioTimelineError, match="exceeds rendered shot duration"):
+        rebase_to_rendered_shots(timeline, {"s1": 0.0}, shot_durations={"s1": 4.0})
+
+
+def test_silence_is_a_bed_control_and_cannot_overlap_vocal_or_escape_shot():
+    timeline = compile_timeline(
+        _spec(
+            [
+                {
+                    "kind": "voice",
+                    "line_type": "dialogue",
+                    "speaker": "hero",
+                    "spoken_text": "先别出声",
+                    "start_offset_sec": 0,
+                    "duration_sec": 1,
+                },
+                {
+                    "kind": "silence",
+                    "start_offset_sec": 2,
+                    "duration_sec": 0.5,
+                    "silence_scope": "bed",
+                },
+            ]
+        )
+    )
+    plan = build_mix_execution_plan(timeline)
+    assert plan["silence_windows"] == [
+        {
+            "audio_event_id": timeline["events"][1]["id"],
+            "start_sec": 2.0,
+            "end_sec": 2.5,
+            "scope": "bed",
+        }
+    ]
+    overlapping = _spec(
+        [
+            {
+                "kind": "voice",
+                "line_type": "dialogue",
+                "speaker": "hero",
+                "spoken_text": "别动",
+                "start_offset_sec": 0,
+                "duration_sec": 1,
+            },
+            {"kind": "silence", "start_offset_sec": 0.5, "duration_sec": 0.5},
+        ]
+    )
+    with pytest.raises(AudioTimelineError, match="overlaps vocal"):
+        compile_timeline(overlapping)
+    escaped = _spec([{"kind": "silence", "start_offset_sec": 3.9, "duration_sec": 0.2}])
+    with pytest.raises(AudioTimelineError, match="exceeds shot"):
+        compile_timeline(escaped)
+
+
 def test_audio_plan_writes_timeline_and_deterministic_voice_cast(tmp_path: Path):
     spec = _spec(
         [
