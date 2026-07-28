@@ -17,7 +17,10 @@ aifilm team scaffold --root artifacts/<film> \
 ```bash
 aifilm team validate \
   --plan artifacts/<film>/production-team.json \
-  --capabilities artifacts/<film>/receipts/capability-snapshot.json
+  --capabilities artifacts/<film>/receipts/capability-snapshot.json \
+  --stage pilot_approval
 ```
 
 `snapshot` 會即時讀取 M1 的 QA／後期工具，以及 SSH tunnel 後的 5090 Comfy armory、音訊節點與嘴型節點；它不會生成媒體、不會花錢。驗證會拒絕未配置總監、錯誤工種領域、未知／失效／未 pilot 的模型，以及能力快照已變更的舊計畫。通過只代表「有合格的劇組配置」；故事鎖、pilot、付費生成、Picture Lock 與 Master Lock 仍由既有 Director Contract、部門 handoff 與人類核准門檻把關。
+
+不帶 `--stage` 時是整部作品的完整劇組驗收。帶上專業階段時只驗證該階段真正有責任的總監，例如 `script_lock` 只需故事總監，`pilot_approval` 需要視覺、表演與聲音，`master_lock` 需要聲音、剪輯與品質交付。這不會放寬既有階段證據或任何人類核准；只是避免尚未輪到的模型錯誤地阻塞前一工序。

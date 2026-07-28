@@ -25,6 +25,24 @@ def add_team_parsers(subparsers: Any) -> None:
     )
     validate.add_argument("--plan", required=True)
     validate.add_argument("--capabilities", required=True)
+    validate.add_argument(
+        "--stage",
+        choices=(
+            "concept_lock",
+            "script_lock",
+            "department_look_lock",
+            "shot_animatic_lock",
+            "pilot_approval",
+            "bulk",
+            "dailies_review",
+            "selects_rough_cut",
+            "picture_lock",
+            "post_locks",
+            "master_lock",
+        ),
+        default=None,
+        help="Check only the directors who own the requested professional stage",
+    )
 
 
 def run(args: Any) -> tuple[dict[str, Any], int]:
@@ -39,5 +57,7 @@ def run(args: Any) -> tuple[dict[str, Any], int]:
             out=Path(args.out) if args.out else None,
         )
     else:
-        report = validate_team(Path(args.plan), capabilities_path=Path(args.capabilities))
+        report = validate_team(
+            Path(args.plan), capabilities_path=Path(args.capabilities), stage=args.stage
+        )
     return report, 0 if report.get("ok") else 2

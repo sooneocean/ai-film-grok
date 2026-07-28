@@ -73,6 +73,19 @@ DIRECTORS: tuple[dict[str, Any], ...] = (
     },
 )
 _DIRECTOR_IDS = frozenset(item["id"] for item in DIRECTORS)
+STAGE_DIRECTORS: dict[str, tuple[str, ...]] = {
+    "concept_lock": ("showrunner",),
+    "script_lock": ("showrunner",),
+    "department_look_lock": ("cinematography", "sound"),
+    "shot_animatic_lock": ("showrunner", "cinematography", "performance", "editor"),
+    "pilot_approval": ("cinematography", "performance", "sound"),
+    "bulk": ("cinematography", "performance", "sound"),
+    "dailies_review": ("cinematography", "performance", "quality"),
+    "selects_rough_cut": ("editor", "quality"),
+    "picture_lock": ("editor", "quality"),
+    "post_locks": ("sound", "editor", "quality"),
+    "master_lock": ("sound", "editor", "quality"),
+}
 
 
 def _capability(
@@ -313,7 +326,12 @@ def scaffold_team(
     return {"ok": True, "written": str(destination), "plan": plan}
 
 
-def validate_team(plan_path: Path | str, *, capabilities_path: Path | str) -> dict[str, Any]:
+def validate_team(
+    plan_path: Path | str,
+    *,
+    capabilities_path: Path | str,
+    stage: str | None = None,
+) -> dict[str, Any]:
     """Fail closed when a specialist lacks an owner or references stale model evidence."""
     plan_file = Path(plan_path).expanduser().resolve()
     plan = read_json(plan_file)
@@ -330,6 +348,12 @@ def validate_team(plan_path: Path | str, *, capabilities_path: Path | str) -> di
     blockers: list[str] = []
     if snapshot_ref.get("sha256") != sha256_file(snapshot_path):
         blockers.append("CAPABILITY_SNAPSHOT_CHANGED")
+    normalized_stage = str(stage or "").strip() or None
+    if normalized_stage is not None and normalized_stage not in STAGE_DIRECTORS:
+        raise ProductionTeamError(f"UNKNOWN_PRODUCTION_STAGE: {normalized_stage}")
+    required_directors = (
+        set(STAGE_DIRECTORS[normalized_stage]) if normalized_stage else _DIRECTOR_IDS
+    )
     assignments = plan.get("assignments")
     if not isinstance(assignments, list):
         raise ProductionTeamError("TEAM_ASSIGNMENTS_INVALID")
@@ -347,20 +371,38 @@ def validate_team(plan_path: Path | str, *, capabilities_path: Path | str) -> di
     coverage: list[dict[str, Any]] = []
     for director in DIRECTORS:
         director_id = director["id"]
+        required = director_id in required_directors
         assignment = by_director.get(director_id)
         if assignment is None:
             coverage.append(
-                {"director_id": director_id, "ok": False, "blockers": ["DIRECTOR_UNASSIGNED"]}
+                {
+                    "director_id": director_id,
+                    "required": required,
+                    "ok": not required,
+                    "blockers": ["DIRECTOR_UNASSIGNED"] if required else [],
+                }
             )
-            blockers.append(f"DIRECTOR_UNASSIGNED:{director_id}")
+            if required:
+                blockers.append(f"DIRECTOR_UNASSIGNED:{director_id}")
             continue
         capability_ids = assignment.get("model_capability_ids")
         local_tools = assignment.get("local_tools")
         if not isinstance(capability_ids, list) or not isinstance(local_tools, list):
             coverage.append(
-                {"director_id": director_id, "ok": False, "blockers": ["ASSIGNMENT_FIELDS_INVALID"]}
+                {
+                    "director_id": director_id,
+                    "required": required,
+                    "ok": not required,
+                    "blockers": ["ASSIGNMENT_FIELDS_INVALID"] if required else [],
+                }
             )
-            blockers.append(f"ASSIGNMENT_FIELDS_INVALID:{director_id}")
+            if required:
+                blockers.append(f"ASSIGNMENT_FIELDS_INVALID:{director_id}")
+            continue
+        if not required:
+            coverage.append(
+                {"director_id": director_id, "required": False, "ok": True, "blockers": []}
+            )
             continue
         reasons: list[str] = []
         if not capability_ids:
@@ -382,7 +424,9 @@ def validate_team(plan_path: Path | str, *, capabilities_path: Path | str) -> di
                 and not (supported_domains & set(str(item) for item in capability["domains"]))
             ):
                 reasons.append(f"CAPABILITY_DOMAIN_MISMATCH:{capability_id}")
-        coverage.append({"director_id": director_id, "ok": not reasons, "blockers": reasons})
+        coverage.append(
+            {"director_id": director_id, "required": True, "ok": not reasons, "blockers": reasons}
+        )
         blockers.extend(f"{reason}:{director_id}" for reason in reasons)
     blockers = sorted(set(blockers))
     return {
@@ -392,6 +436,8 @@ def validate_team(plan_path: Path | str, *, capabilities_path: Path | str) -> di
         "auto_execute": False,
         "plan": str(plan_file),
         "capability_snapshot": str(snapshot_path),
+        "stage": normalized_stage,
+        "required_directors": sorted(required_directors),
         "coverage": coverage,
         "blockers": blockers,
     }

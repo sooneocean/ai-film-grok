@@ -118,6 +118,27 @@ def test_team_validation_rejects_experimental_assignment(tmp_path: Path) -> None
     assert "EXPERIMENTAL_CAPABILITY:rtx-motion:showrunner" in result["blockers"]
 
 
+def test_stage_validation_only_checks_owning_directors(tmp_path: Path) -> None:
+    snapshot = tmp_path / "receipts" / "capabilities.json"
+    _snapshot(snapshot)
+    plan_path = Path(scaffold_team(tmp_path, capabilities_path=snapshot)["written"])
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    plan["assignments"][0]["model_capability_ids"] = ["rtx-motion"]
+    from util import canonical_json_sha256
+
+    plan["content_sha256"] = canonical_json_sha256(
+        {key: value for key, value in plan.items() if key != "content_sha256"}
+    )
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    result = validate_team(plan_path, capabilities_path=snapshot, stage="script_lock")
+    assert result["ok"] is True
+    assert result["required_directors"] == ["showrunner"]
+    assert (
+        next(item for item in result["coverage"] if item["director_id"] == "sound")["required"]
+        is False
+    )
+
+
 def test_team_cli_validation_reports_changed_snapshot(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
