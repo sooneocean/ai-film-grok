@@ -83,7 +83,7 @@
     "scripts/cli_workshop.py": "1709c864f0520f67ae6a7d5b327b49b8e537a293d8074adb9af274db4a0ec192",
     "scripts/clip_uniqueness.py": "6172ddc41749385b9b513cb933063a072ee5ba0a9efd8ec69a4734fb462b4375",
     "scripts/color_grade.py": "9491a3edeab9246208f0c1dd49b930ae7eae07919f55df56dd198469c62ed1dc",
-    "scripts/comfy_armory.py": "c1a85983274d48056a1754da02a33cba4a9fc3f0cccc9f6bde3b16667513288c",
+    "scripts/comfy_armory.py": "7ed4983b55e44ef70e77f97aea4b4f1f58348eafe54aac1ae50530e9aa15bfd1",
     "scripts/comfy_video.py": "8f2115a8b432dcf5249ed59315d58e921e7068c91dfcb9502413fee58529b118",
     "scripts/compose_preview.py": "e2c42fb8af65a21301ca6e89c2bdc6f5332301b0b5fc0b07b420ce4ffb46cf0a",
     "scripts/compose_render.py": "e27abbfadeeb46416b1591c78b39419e62035831b3355b3aab67d03be381b269",
@@ -121,7 +121,7 @@
     "scripts/export_composition.py": "1aecda0d7db1bba72a35f313d964851c3b54e56cae29aa9a944c22ec11120fd6",
     "scripts/face_identity.py": "4922b1593d21a099df152359434fc7780754993d7e607e0d2b55ff39889ebcae",
     "scripts/face_identity_hash.py": "f1d4161b873593a82ca8ad5620601d7bd6cb37bfeaeed7547aacce641ab9ce13",
-    "scripts/film_spec.py": "a30102fb03a16d656d259c077aa9b741ca5e7f39413bd592280521bb8015c84e",
+    "scripts/film_spec.py": "a56ec3511ebc4b376b481a0c32707cf49e22d7852682b1fb278fa5a5fefa9dd3",
     "scripts/final_stages.py": "1f2261d8cd3af47491ad3ed9f808736761f6d7bb2d1a533a10987a1a457e636d",
     "scripts/framing_lint.py": "85e56ac52942372b7f55c3d6c2795c90420ff4126939b5f78c124a3ab3adb652",
     "scripts/frw_canary.py": "b2bc7916b57f76ad21614608c55392cc18b6425b680f50469948948f3ed7849a",
@@ -237,7 +237,7 @@
     "scripts/vo_lint.py": "473a31f266b1174186828eab2e80654817f901cc7c8f1322c1b37d81404cf777",
     "scripts/voice_cast_profiles.py": "c0f7adea3e3161729c645d42a605567fc050864b5da9ee74618c23b28142776a",
     "scripts/voice_tracks.py": "e1966502340f87d39a55d0757b038bdca2c6992fd3c097215da7d5ab48d33724",
-    "scripts/weapon_router.py": "e9ccad3ff80c9dff97da10fbb38c9862d2b618c839cf2640f70d4acf7dace7c4",
+    "scripts/weapon_router.py": "5675ad888a58d3aaed98cc13254c8a2a8f74536c780fde13d0684ce52bf22d20",
     "scripts/workflow_spine.py": "afbf3b3f8c57211a82a91381c4f0f3ca52219efdc36646123a5019b5bba1e27e"
   },
   "requirements_sha256": "b0acb41843d88a97955a7f14a300c9f873957f3e7a6da00bc3343e178289728a"
