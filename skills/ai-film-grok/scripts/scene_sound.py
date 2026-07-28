@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from pathlib import Path
 from typing import Any
 
@@ -78,6 +79,44 @@ def _matches_required(event: dict[str, Any], shot_id: str, kind: str) -> bool:
     return kind in hint
 
 
+def _timeline_number(value: object, *, low: float = 0.0) -> float | None:
+    """Mirror the formal timeline's numeric floor without compiling unrelated cues."""
+    if isinstance(value, bool):
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return result if math.isfinite(result) and result >= low else None
+
+
+def _reaches_scene_stem(event: dict[str, Any]) -> bool:
+    """Require the fields that make a verified cue executable in the final stem."""
+    if str(event.get("kind") or "").lower() not in {"foley", "sfx", "ambience"}:
+        return False
+    # This deliberately matches audio_timeline's bool() conversion: a malformed
+    # string such as "false" is currently muted by the compiler and must not pass here.
+    if bool(event.get("muted", False)):
+        return False
+    if not str(event.get("license") or "").strip():
+        return False
+    if "start_offset_sec" not in event:
+        return False
+    duration = _timeline_number(event.get("duration_sec"), low=0.001)
+    start = _timeline_number(event.get("start_offset_sec"))
+    if duration is None or start is None:
+        return False
+    gain = _timeline_number(event.get("gain", 1.0))
+    pan = _timeline_number(event.get("pan", 0.0), low=-1.0)
+    if gain is None or pan is None or abs(pan) > 1:
+        return False
+    for field in ("fade_in_sec", "fade_out_sec"):
+        fade = _timeline_number(event.get(field, 0))
+        if fade is None or fade > duration:
+            return False
+    return True
+
+
 def _source_event(
     candidates: list[dict[str, Any]],
     root: Path,
@@ -89,7 +128,9 @@ def _source_event(
     verified = [
         event
         for event in candidates
-        if _matches_required(event, shot_id, kind) and _local_asset_ok(root, event)
+        if _matches_required(event, shot_id, kind)
+        and _local_asset_ok(root, event)
+        and _reaches_scene_stem(event)
     ]
     if expected_material is not None:
         matching = next(
@@ -135,7 +176,7 @@ def _event_status(
     expected_material: str | None,
 ) -> tuple[str, bool, str | None]:
     if source_event is None:
-        return "blocked", True, "missing verified local scene-sound asset"
+        return "blocked", True, "missing verified executable local scene-sound asset"
     if expected_material is None:
         return "needs_review", True, "material is unknown; verify neutral or selected asset"
     actual_material = _event_material(source_event)
@@ -193,7 +234,9 @@ def reconcile(root: Path, *, write: bool = True) -> dict[str, Any]:
                     "source": "audio_cues" if ambience else "inferred",
                     "status": "ok" if ambience else "blocked",
                     "needs_review": not bool(ambience),
-                    "reason": None if ambience else "missing verified local ambience asset",
+                    "reason": (
+                        None if ambience else "missing verified executable local ambience asset"
+                    ),
                 }
             )
         for words, track, kind in _ACTION_RULES:
