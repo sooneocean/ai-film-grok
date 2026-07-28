@@ -46,8 +46,10 @@ The optional overrides file is a typed node-input mapping, for example
 existing inputs but cannot add nodes, change node classes or invent inputs.
 
 The default gate checks every referenced node through
-`/object_info/{class_type}` and rejects ComfyUI external API nodes. A workflow
-that intentionally invokes an external provider requires:
+`/object_info/{class_type}`. Missing metadata, external API nodes and untrusted
+custom-node modules are rejected; only Comfy core modules are accepted without
+an override. A workflow that intentionally invokes an external provider or an
+operator-reviewed custom node requires:
 
 ```bash
 --allow-external-api-nodes
@@ -100,3 +102,5 @@ attested quality lane that currently uses the same verified official Wan 2.2
 high/low experts at 20 steps. It does not auto-load renamed merged weights or
 act-specific LoRAs merely because files exist. Those assets require traceable
 provenance, a successful load canary and human A/B approval before promotion.
+Adult prompts are Unicode-normalized and reject explicit minor, school-age,
+young-looking and under-18 age signals in English, Chinese and Japanese.
