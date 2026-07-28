@@ -9,7 +9,7 @@ from typing import Any
 
 from approval_ledger import approval_is_current, read_approval_ledger
 from production_book import read_production_book, stable_content_hash
-from util import read_json, sha256_file, write_json
+from util import exclusive_file_lock, read_json, sha256_file, write_json
 
 STAGE_ORDER = (
     "concept_lock",
@@ -261,13 +261,6 @@ def lock_stage(
     if not hashes:
         raise StageGateError("stage lock requires exact input hashes")
     approval = _validate_approval(base, stage=stage, approval_id=approval_id, input_hashes=hashes)
-    if (enforce_order or rigor == "professional") and STAGE_ORDER.index(stage):
-        previous = STAGE_ORDER[STAGE_ORDER.index(stage) - 1]
-        prior = stage_status(base, target_stage=previous)
-        if not prior["ok"]:
-            raise StageGateError(f"prior stage gates are not satisfied before {stage}")
-
-    ledger = read_stage_locks(base)
     event = {
         "stage": stage,
         "input_refs": dict(input_refs or {}),
@@ -278,9 +271,17 @@ def lock_stage(
         "approver_type": approval.get("approver_type"),
     }
     event["lock_sha256"] = stable_content_hash(event)
-    ledger["events"].append(dict(event))
-    ledger["locks"][stage] = event
-    ledger["revision"] = int(ledger.get("revision") or 0) + 1
-    ledger["content_sha256"] = stable_content_hash(ledger)
-    write_json(_ledger_path(base), ledger)
+    ledger_path = _ledger_path(base)
+    with exclusive_file_lock(ledger_path):
+        if (enforce_order or rigor == "professional") and STAGE_ORDER.index(stage):
+            previous = STAGE_ORDER[STAGE_ORDER.index(stage) - 1]
+            prior = stage_status(base, target_stage=previous)
+            if not prior["ok"]:
+                raise StageGateError(f"prior stage gates are not satisfied before {stage}")
+        ledger = read_stage_locks(base)
+        ledger["events"].append(dict(event))
+        ledger["locks"][stage] = event
+        ledger["revision"] = int(ledger.get("revision") or 0) + 1
+        ledger["content_sha256"] = stable_content_hash(ledger)
+        write_json(ledger_path, ledger)
     return event

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from film_spec import iter_film_spec_shots
 from util import read_json, write_json
 
 STATUSES = {"select", "alternate", "reject", "reshoot"}
@@ -20,6 +21,18 @@ def _sha(path: Path) -> str | None:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _current_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Project an append-only decision log to the latest decision per take path."""
+    latest: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for item in items:
+        key = str(item.get("candidate") or "")
+        if key not in latest:
+            order.append(key)
+        latest[key] = item
+    return [latest[key] for key in order]
 
 
 def update_dailies(
@@ -60,15 +73,18 @@ def update_dailies(
     report = read_json(path) or {"schema_version": 1, "kind": "dailies", "shots": {}}
     shots = report.setdefault("shots", {})
     entries = shots.setdefault(shot_id, [])
-    if approved_budget is not None:
-        current = len(entries)
-        if current >= int(approved_budget):
-            raise ValueError(
-                "approved candidate budget exhausted; request an explicit budget change"
-            )
     media = Path(candidate).expanduser()
     if not media.is_absolute():
         media = base / media
+    media = media.resolve()
+    if approved_budget is not None:
+        current = len(_current_items(entries))
+        media_key = str(media)
+        existing_keys = {str(item.get("candidate") or "") for item in entries}
+        if media_key not in existing_keys and current >= int(approved_budget):
+            raise ValueError(
+                "approved candidate budget exhausted; request an explicit budget change"
+            )
     entry = {
         "candidate": str(media),
         "media_sha256": _sha(media),
@@ -106,15 +122,16 @@ def dailies_status(root: Path | str) -> dict[str, Any]:
     manifest_clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
     planned = [
         str(shot.get("id") or shot.get("shot_id") or "").strip()
-        for shot in (spec.get("shots") if isinstance(spec.get("shots"), list) else [])
-        if isinstance(shot, dict) and str(shot.get("id") or shot.get("shot_id") or "").strip()
+        for shot in iter_film_spec_shots(spec)
+        if str(shot.get("id") or shot.get("shot_id") or "").strip()
     ]
     stale: list[str] = []
     issues: list[dict[str, str]] = []
     selections: list[dict[str, str]] = []
     shots = report.get("shots") if isinstance(report.get("shots"), dict) else {}
     for shot_id in planned:
-        items = shots.get(shot_id) if isinstance(shots.get(shot_id), list) else []
+        raw_items = shots.get(shot_id) if isinstance(shots.get(shot_id), list) else []
+        items = _current_items(raw_items)
         if not items:
             issues.append({"shot_id": shot_id, "code": "DAILIES_SHOT_MISSING"})
             continue
@@ -151,7 +168,7 @@ def dailies_status(root: Path | str) -> dict[str, Any]:
                 }
             )
     for shot_id, items in shots.items():
-        for item in items if isinstance(items, list) else []:
+        for item in _current_items(items) if isinstance(items, list) else []:
             candidate = Path(str(item.get("candidate") or ""))
             if not candidate.is_absolute():
                 candidate = base / candidate
@@ -171,5 +188,43 @@ def dailies_status(root: Path | str) -> dict[str, Any]:
         "selected_set_sha256": selected_set_sha256,
         "issues": issues,
         "stale_candidates": stale,
+        "ok": bool(planned) and not issues,
+    }
+
+
+def dailies_review_status(root: Path | str) -> dict[str, Any]:
+    """Validate Stage 7 review coverage without requiring Stage 8 selects."""
+    base = Path(root).expanduser().resolve()
+    report = read_json(base / "receipts" / "dailies.json") or {}
+    spec = read_json(base / "film-spec.json") or {}
+    planned = [
+        str(shot.get("id") or shot.get("shot_id") or "").strip()
+        for shot in iter_film_spec_shots(spec)
+        if str(shot.get("id") or shot.get("shot_id") or "").strip()
+    ]
+    shots = report.get("shots") if isinstance(report.get("shots"), dict) else {}
+    issues: list[dict[str, str]] = []
+    for shot_id in planned:
+        items = _current_items(shots.get(shot_id) if isinstance(shots.get(shot_id), list) else [])
+        if not items:
+            issues.append({"shot_id": shot_id, "code": "DAILIES_SHOT_MISSING"})
+            continue
+        for item in items:
+            status = str(item.get("status") or "")
+            candidate = Path(str(item.get("candidate") or ""))
+            if not candidate.is_absolute():
+                candidate = base / candidate
+            if status not in STATUSES:
+                issues.append({"shot_id": shot_id, "code": "DAILIES_TAKE_UNCLASSIFIED"})
+            if not str(item.get("reviewer") or "").strip():
+                issues.append({"shot_id": shot_id, "code": "DAILIES_REVIEWER_MISSING"})
+            if status == "reject" and not str(item.get("notes") or "").strip():
+                issues.append({"shot_id": shot_id, "code": "DAILIES_REJECT_REASON_MISSING"})
+            if not candidate.is_file() or item.get("media_sha256") != _sha(candidate):
+                issues.append({"shot_id": shot_id, "code": "DAILIES_MEDIA_STALE"})
+    return {
+        "kind": "dailies-review-status",
+        "planned_shot_ids": planned,
+        "issues": issues,
         "ok": bool(planned) and not issues,
     }

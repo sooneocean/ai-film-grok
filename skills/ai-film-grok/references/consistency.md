@@ -235,7 +235,7 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 ```bash
 AIFILM="$HOME/.grok/skills/ai-film-grok/scripts/aifilm"
 
-# bulk 2V：上传已批 keyframe → Seedance newvideo（禁止默认 img2video）
+# FRW fallback：仅技术故障后上传已批 keyframe → Seedance newvideo
 "$AIFILM" frw upload --file-path "<root>/keyframes/shot01.png" --category image
 "$AIFILM" frw newvideo \
   --model seedance-2-fast-i2v \

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from film_spec import iter_film_spec_shots
 from util import read_json
 
 
@@ -19,7 +20,7 @@ def build_selects_report(root: Path, *, write_receipt: bool = True) -> dict[str,
     man = read_json(root / "manifest.json") or {}
     clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
     stills = man.get("stills") if isinstance(man.get("stills"), dict) else {}
-    shots = spec.get("shots") if isinstance(spec.get("shots"), list) else []
+    shots = iter_film_spec_shots(spec)
 
     dailies = dailies_status(root)
     professional = (read_json(root / "production-book.json") or {}).get("rigor") == "professional"

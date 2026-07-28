@@ -224,14 +224,14 @@ def review_queue(root: Path | str) -> dict[str, Any]:
         )
     book = read_json(base / "production-book.json") or {}
     if book.get("rigor") == "professional":
-        from director_cli import native_stage_input_refs
+        from director_cli import validate_native_stage_evidence
         from director_stage_gates import STAGE_ORDER, stage_status
 
         director = stage_status(base)
         current = director.get("next_stage")
         if current in STAGE_ORDER:
             try:
-                refs = native_stage_input_refs(base, str(current))
+                refs = validate_native_stage_evidence(base, str(current))
                 hashes = _hashes(base, tuple(refs.values()))
                 state = "pending_review"
             except ValueError:
