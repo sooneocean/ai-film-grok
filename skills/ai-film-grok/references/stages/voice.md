@@ -16,8 +16,10 @@
 色气或亲密段落 BGM 默认 rnb；dark 只用于恐怖，曲库缺失才走程序生成。  
 dialogue、SFX、BGM 与 mixed 各自保留来源、hash 和 mix evidence。  
 外部 TTS、克隆声线与 lipsync 不静默启用，也不把普通 I2V 口部运动宣称为真实口型同步。
+RTX 5090 口型仍须逐镜 canary；Wav2Lip 只作应急基线，候选目标为 LatentSync 1.6 → MuseTalk 1.5。
 
 深入资料：  
 [voices.md](../voices.md) · [audio-recipe.md](../audio-recipe.md) ·  
-[character-dialogue-ja](../lessons-2026-07-23-character-dialogue-ja.md) ·  
-**[ep2-voice-heat-final（今天全量坑）](../lessons-2026-07-24-ep2-voice-heat-final.md)**
+[character-dialogue-ja](../lessons-2026-07-23-character-dialogue-ja.md) ·
+**[ep2-voice-heat-final（今天全量坑）](../lessons-2026-07-24-ep2-voice-heat-final.md)** ·
+[RTX 5090 lip-sync routing](../lessons-2026-07-28-rtx5090-lipsync-routing.md)
