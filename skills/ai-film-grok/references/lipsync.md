@@ -39,6 +39,29 @@ RTX 5090 方案研究与 canary 门槛见
 
 上游 MuseTalk 泛用入口若使用 `os.system`，已被拒绝。不得仅因为文件存在就认定后端“ready”。
 
+## 整段表演生成（不是后期补嘴）
+
+InfiniteTalk 与 FantasyTalking 已进入 Comfy armory，但只允许显式 pilot：
+
+```bash
+aifilm comfy route \
+  --intent talking-avatar-stable-pilot \
+  --production-stage pilot \
+  --allow-experimental
+
+aifilm comfy route \
+  --intent talking-avatar-expressive-pilot \
+  --production-stage pilot \
+  --allow-experimental
+```
+
+它们的登记端点分别是 `local_infinite_talk` 与
+`local_fantasy_talking`，真实方法是 `face_animation_to_audio`。两者都会
+重新生成整张画面，不能宣称保留原片像素，也不进入
+`final --lipsync auto`。InfiniteTalk 的 5090 实片较稳但日文口型驱动仍
+偏弱；FantasyTalking 仅完成 6 步技术 canary，存在脸型、颜色、衣物与
+背景漂移。两者在生产登记前都需要完整人工观看与逐句批准。
+
 ## 检查与锁定
 
 RTX 节点：

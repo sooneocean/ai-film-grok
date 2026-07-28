@@ -46,6 +46,8 @@ generation.
 | General local I2V | `image-to-video`, `i2v`, `general-i2v` | `wan22-i2v-quality` | Official Wan 2.2 high/low pair, 20 steps |
 | Adult intimacy I2V | `adult-intimacy-i2v` | `wan22-adult-intimacy-baseline` | Adult attestation required |
 | Adult meat-motion pilot | `adult-meat-motion-i2v` | `wan22-adult-meat-pilot` | Experimental opt-in, pilot only, human approval required |
+| Stable talking-avatar pilot | `talking-avatar-stable-pilot` | `infinite-talk-stable-pilot` | 640², 20 steps, audio scale 1; identity stable but Japanese mouth articulation still needs review |
+| Expressive talking-avatar pilot | `talking-avatar-expressive-pilot` | `fantasy-talking-6step-pilot` | 640², 6-step technical canary; strong motion with known identity/color drift |
 
 Large viewpoint changes are not identity-locked: the 2511 angle-change pilot
 did not pass the pixel identity gate. Qwen Layered and Qwen Control remain
@@ -82,10 +84,34 @@ aifilm comfy prepare \
 aifilm comfy run-workflow \
   --workflow receipts/shot01-comfy-api.json \
   --receipt receipts/shot01-run.json
+
+# Talking-avatar routes are never production-auto. Both inputs must already
+# exist in ComfyUI input storage and the experimental pilot gate is explicit.
+aifilm comfy prepare \
+  --intent talking-avatar-stable-pilot \
+  --production-stage pilot \
+  --allow-experimental \
+  --prompt-file performance-prompt.txt \
+  --seed 20260729 \
+  --input-image-name approved/hero.png \
+  --input-audio-name approved/hero-ja.wav \
+  --filename-prefix aifilm/talking/hero \
+  --out receipts/hero-infinite-api.json \
+  --receipt receipts/hero-infinite-prepare.json
+
+aifilm comfy run-workflow \
+  --workflow receipts/hero-infinite-api.json \
+  --weapon-id infinite-talk-stable-pilot \
+  --production-stage pilot \
+  --allow-experimental \
+  --receipt receipts/hero-infinite-run.json
 ```
 
-For edit preparation, upload the source first and pass the returned remote
-filename through `--input-image-name`.
+For edit or talking-avatar preparation, upload the sources first and pass the
+returned remote filenames through `--input-image-name` and
+`--input-audio-name`. Generic custom-node approval is not used: registered
+workflows permit only compiler binding changes and exact versioned Python
+module identities.
 
 ## Current verified node
 

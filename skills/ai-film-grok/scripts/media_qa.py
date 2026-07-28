@@ -32,6 +32,9 @@ ALLOWED_VIDEO_ENDPOINTS = frozenset(
         "frw_text2video",  # classic T2V
         "frw_first_last_frame",  # legacy FLF template
         "frw_video_continue",  # FRW video-continue
+        "local_wan22_i2v",  # verified private RTX 5090 Wan 2.2 I2V
+        "local_infinite_talk",  # pilot-only private RTX talking-avatar generation
+        "local_fantasy_talking",  # pilot-only private RTX expressive avatar generation
         "external",  # generic offline/external clip (must reencode)
     }
 )

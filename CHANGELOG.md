@@ -3,6 +3,18 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.16.0] - 2026-07-29
+
+### Added
+
+- Added pilot-only InfiniteTalk and FantasyTalking armory routes with versioned API workflows, exact model hashes, typed image/audio bindings, and evidence-bound source endpoints.
+- Added registered custom-node validation: only the exact template node set and exact WanVideoWrapper/VideoHelperSuite module identities may execute.
+
+### Fixed
+
+- Added `local_wan22_i2v`, `local_infinite_talk`, and `local_fantasy_talking` to the explicit video registration contract.
+- Comfy armory preparation and execution now preserve experimental, pilot-only, and human-approval gates instead of requiring the broad unknown-node bypass.
+
 ## [2.15.0] - 2026-07-28
 
 ### Added

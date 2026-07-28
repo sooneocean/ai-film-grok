@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from argparse import Namespace
 from pathlib import Path
@@ -10,15 +11,17 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from cli_comfy import _base_url  # noqa: E402
+from cli_comfy import _base_url, run_comfy  # noqa: E402
 from comfy_armory import (  # noqa: E402
     ComfyArmoryError,
+    assert_registered_weapon_workflow,
     compile_weapon_workflow,
     default_base_url,
     load_armory,
     probe_armory,
     select_weapon,
 )
+from comfy_video import workflow_sha256  # noqa: E402
 
 
 def test_armory_records_verified_private_node_without_credentials() -> None:
@@ -29,6 +32,19 @@ def test_armory_records_verified_private_node_without_credentials() -> None:
     assert "private_key" not in serialized
     assert "password" not in serialized
     assert "token" not in serialized
+
+
+def test_talking_avatar_template_hashes_are_registry_bound() -> None:
+    armory = load_armory()
+    by_id = {weapon["id"]: weapon for weapon in armory["weapons"]}
+    root = Path(__file__).resolve().parents[1]
+    for weapon_id in (
+        "infinite-talk-stable-pilot",
+        "fantasy-talking-6step-pilot",
+    ):
+        weapon = by_id[weapon_id]
+        graph = json.loads((root / weapon["workflow_template"]).read_text(encoding="utf-8"))
+        assert workflow_sha256(graph) == weapon["verified"]["workflow_template_sha256"]
 
 
 @patch.dict(
@@ -104,6 +120,199 @@ def test_adult_meat_motion_production_fails_closed() -> None:
             "adult-meat-motion-i2v",
             stage="production",
             allow_experimental=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("intent", "weapon_id"),
+    [
+        ("talking-avatar-stable-pilot", "infinite-talk-stable-pilot"),
+        ("talking-avatar-expressive-pilot", "fantasy-talking-6step-pilot"),
+    ],
+)
+def test_talking_avatar_routes_are_explicit_pilot_only(
+    intent: str,
+    weapon_id: str,
+) -> None:
+    route = select_weapon(
+        intent,
+        stage="pilot",
+        allow_experimental=True,
+    )
+    assert route["weapon"]["id"] == weapon_id
+    assert route["weapon"]["status"] == "experimental"
+    assert route["weapon"]["capabilities"]["pilot_only"] is True
+    assert route["weapon"]["capabilities"]["human_approval_required"] is True
+    with pytest.raises(ComfyArmoryError, match="pilot"):
+        select_weapon(
+            intent,
+            stage="production",
+            allow_experimental=True,
+        )
+
+
+def test_talking_avatar_pilot_requires_explicit_experimental_authorization() -> None:
+    with pytest.raises(ComfyArmoryError, match="experimental authorization"):
+        select_weapon("talking-avatar-stable-pilot", stage="pilot")
+
+
+def test_run_workflow_cannot_bypass_experimental_gate_by_omitting_weapon_id(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    weapon = next(
+        item for item in load_armory()["weapons"] if item["id"] == "infinite-talk-stable-pilot"
+    )
+    workflow = Path(__file__).resolve().parents[1] / weapon["workflow_template"]
+    args = Namespace(
+        base_url="http://127.0.0.1:18188",
+        comfy_action="run-workflow",
+        workflow=workflow,
+        overrides=None,
+        timeout=1,
+        allow_external_api_nodes=False,
+        weapon_id=None,
+        production_stage="production",
+        allow_experimental=False,
+        receipt=None,
+    )
+    with patch("cli_comfy.submit") as submit:
+        assert run_comfy(args) == 2
+    submit.assert_not_called()
+    report = json.loads(capsys.readouterr().out)
+    assert "pilot-only" in report["error"]
+
+
+def test_modified_experimental_workflow_cannot_escape_through_generic_bypass(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    weapon = next(
+        item for item in load_armory()["weapons"] if item["id"] == "infinite-talk-stable-pilot"
+    )
+    template = Path(__file__).resolve().parents[1] / weapon["workflow_template"]
+    graph = json.loads(template.read_text(encoding="utf-8"))
+    graph["4"]["inputs"]["audio_scale"] = 4.0
+    workflow = tmp_path / "tampered.json"
+    workflow.write_text(json.dumps(graph), encoding="utf-8")
+    args = Namespace(
+        base_url="http://127.0.0.1:18188",
+        comfy_action="run-workflow",
+        workflow=workflow,
+        overrides=None,
+        timeout=1,
+        allow_external_api_nodes=True,
+        weapon_id=None,
+        production_stage="pilot",
+        allow_experimental=True,
+        receipt=None,
+    )
+    with patch("cli_comfy.submit") as submit:
+        assert run_comfy(args) == 2
+    submit.assert_not_called()
+    report = json.loads(capsys.readouterr().out)
+    assert "--weapon-id required" in report["error"]
+
+
+def test_compile_infinite_talk_binds_image_audio_prompt_seed_and_stable_scale() -> None:
+    graph = compile_weapon_workflow(
+        "infinite-talk-stable-pilot",
+        prompt="The adult character speaks calmly with restrained head motion.",
+        seed=20260729,
+        input_image_name="approved/hero.png",
+        input_audio_name="approved/hero-ja.wav",
+        filename_prefix="aifilm/talking/infinite-stable",
+    )
+    assert graph["1"]["inputs"]["image"] == "approved/hero.png"
+    assert graph["2"]["inputs"]["audio"] == "approved/hero-ja.wav"
+    assert graph["4"]["inputs"]["audio_scale"] == 1.0
+    assert graph["9"]["inputs"]["positive_prompt"].startswith("The adult character")
+    assert graph["11"]["inputs"]["seed"] == 20260729
+    assert graph["13"]["inputs"]["filename_prefix"] == "aifilm/talking/infinite-stable"
+
+
+def test_compile_talking_avatar_requires_uploaded_audio_name() -> None:
+    with pytest.raises(ComfyArmoryError, match="audio"):
+        compile_weapon_workflow(
+            "infinite-talk-stable-pilot",
+            prompt="The character speaks.",
+            seed=7,
+            input_image_name="approved/hero.png",
+        )
+
+
+@patch("comfy_armory._json_request")
+def test_registered_talking_workflow_accepts_only_exact_custom_node_modules(
+    request: MagicMock,
+) -> None:
+    graph = compile_weapon_workflow(
+        "infinite-talk-stable-pilot",
+        prompt="The character speaks.",
+        seed=7,
+        input_image_name="approved/hero.png",
+        input_audio_name="approved/hero.wav",
+    )
+
+    def node_info(_url: str, route: str) -> dict[str, object]:
+        class_type = route.rsplit("/", 1)[-1]
+        trusted = {
+            "LoadImage": "nodes",
+            "LoadAudio": "comfy_extras.nodes_audio",
+            "DownloadAndLoadWav2VecModel": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "MultiTalkWav2VecEmbeds": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "MultiTalkModelLoader": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "WanVideoBlockSwap": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "WanVideoModelLoader": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "WanVideoVAELoader": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "WanVideoTextEncodeCached": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "WanVideoImageToVideoMultiTalk": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "WanVideoSampler": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "WanVideoPassImagesFromSamples": "custom_nodes.ComfyUI-WanVideoWrapper",
+            "VHS_VideoCombine": "custom_nodes.comfyui-videohelpersuite",
+        }
+        return {
+            class_type: {
+                "python_module": trusted[class_type],
+                "category": "local",
+                "api_node": False,
+            }
+        }
+
+    request.side_effect = node_info
+    assert_registered_weapon_workflow(
+        "https://192.168.88.52:8188",
+        "infinite-talk-stable-pilot",
+        graph,
+    )
+
+    request.side_effect = lambda _url, route: {
+        route.rsplit("/", 1)[-1]: {
+            "python_module": "custom_nodes.untrusted-fork",
+            "category": "local",
+            "api_node": False,
+        }
+    }
+    with pytest.raises(ComfyArmoryError, match="untrusted node module"):
+        assert_registered_weapon_workflow(
+            "https://192.168.88.52:8188",
+            "infinite-talk-stable-pilot",
+            graph,
+        )
+
+
+def test_registered_talking_workflow_rejects_nonbinding_tampering() -> None:
+    graph = compile_weapon_workflow(
+        "infinite-talk-stable-pilot",
+        prompt="The character speaks.",
+        seed=7,
+        input_image_name="approved/hero.png",
+        input_audio_name="approved/hero.wav",
+    )
+    graph["4"]["inputs"]["audio_scale"] = 4.0
+    with pytest.raises(ComfyArmoryError, match="unapproved workflow mutation"):
+        assert_registered_weapon_workflow(
+            "https://192.168.88.52:8188",
+            "infinite-talk-stable-pilot",
+            graph,
         )
 
 
@@ -188,6 +397,7 @@ def test_live_probe_marks_only_fully_installed_weapons_ready(
         "/models/text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
         "/models/vae": ["qwen_image_vae.safetensors"],
         "/models/loras": ["Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"],
+        "/models/clip_vision": [],
     }
     request.side_effect = lambda _url, route: model_lists[route]
     report = probe_armory("https://192.168.88.52:8188")
@@ -200,6 +410,8 @@ def test_live_probe_marks_only_fully_installed_weapons_ready(
         "wan22-i2v-quality",
         "wan22-adult-intimacy-baseline",
         "wan22-adult-meat-pilot",
+        "infinite-talk-stable-pilot",
+        "fantasy-talking-6step-pilot",
     }
 
 
@@ -218,7 +430,7 @@ def test_live_probe_blocks_only_weapon_with_unreadable_required_hash(
                 for name in weapon.get("requirements", {}).get(group, [])
             }
         )
-        for group in ("diffusion_models", "text_encoders", "vae", "loras")
+        for group in ("diffusion_models", "text_encoders", "vae", "loras", "clip_vision")
     }
     request.side_effect = lambda _url, route: installed[route.removeprefix("/models/")]
     model_sha256.side_effect = ComfyArmoryError("metadata unavailable")
@@ -227,8 +439,13 @@ def test_live_probe_blocks_only_weapon_with_unreadable_required_hash(
 
     assert "wan22-i2v-quality" in report["ready_ids"]
     assert "qwen-image-2512-quality" in report["ready_ids"]
-    assert {item["id"] for item in report["blocked"]} == {"wan22-adult-meat-pilot"}
-    assert report["blocked"][0]["sha256_errors"]["loras"]
+    blocked = {item["id"]: item for item in report["blocked"]}
+    assert set(blocked) == {
+        "wan22-adult-meat-pilot",
+        "infinite-talk-stable-pilot",
+        "fantasy-talking-6step-pilot",
+    }
+    assert blocked["wan22-adult-meat-pilot"]["sha256_errors"]["loras"]
 
 
 @patch("comfy_armory._model_sha256", return_value="0" * 64)
@@ -245,6 +462,7 @@ def test_live_probe_blocks_same_name_adult_lora_with_wrong_hash(
         "/models/text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
         "/models/vae": ["wan_2.1_vae.safetensors"],
         "/models/loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"],
+        "/models/clip_vision": [],
     }[route]
     report = probe_armory("https://192.168.88.52:8188")
     blocked = {item["id"]: item for item in report["blocked"]}
@@ -262,6 +480,7 @@ def test_live_probe_accepts_exact_adult_lora_hashes(request: MagicMock) -> None:
         "/models/text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
         "/models/vae": ["wan_2.1_vae.safetensors"],
         "/models/loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"],
+        "/models/clip_vision": [],
     }[route]
     hashes = {
         "NSFW-22-H-e8.safetensors": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",

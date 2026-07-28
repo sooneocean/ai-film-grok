@@ -73,12 +73,12 @@ LivePortrait、AniPortrait 主要吃 driving video / landmark，不是“最终�
 
 ## 当前 plugin 真相
 
-1. `lipsync_backend.py` 现有可执行 registry 只有 `musetalk → wav2lip → external`；**没有 LatentSync provider**。
-2. 当前 `AIFILM_LIPSYNC_BACKEND=off`，capability probe 的 `ready=[]`。
-3. 本机已有 Wav2Lip repo 与权重，但 repo 有未提交兼容补丁且尚未 backend lock；不能称为 production ready。
+1. `lipsync_backend.py` 已接入认证的 RTX LatentSync/MuseTalk 节点；2026-07-29 live read-back 为 LatentSync `technical_ready=true`、`approved=true`，可进入生产 `auto`。
+2. `AIFILM_LIPSYNC_BACKEND=latentsync` 只表达目标后端；只有节点同时回报已量测 fingerprint 与 `ready=true` 才会执行，任一项漂移仍会 fail closed。
+3. InfiniteTalk 与 FantasyTalking 已登记为 Comfy armory 的显式实验 pilot，分别使用 `local_infinite_talk` 与 `local_fantasy_talking`；它们是整段 `face_animation_to_audio`，不是原片补嘴。
 4. Grok OAuth 的 I2V 是静音视频，`native_lipsync=false`；后贴 VO 不能冒充原生音画同步。
 5. FRW 口型有独立 `frw-lipsync` 接口，但历史 403/502 不是当前 live 证据；每次使用前都要 probe。
-6. `should_lipsync_shot()` 对未写 `lipsync` 的镜头仍会按景别/标题启发式推断；`render_final.py` 也只有 `--lipsync require` 才在逐镜失败时中止。稳定政策要求显式标记，但当前实现尚未完全兑现。
+6. `should_lipsync_shot()` 已收敛为显式 `lipsync:true`，并要求 speaker、face target、正脸/微侧近景；显式后端或 `require` 的逐镜失败都会终止。
 
 ## 稳定路由
 
