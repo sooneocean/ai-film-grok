@@ -65,7 +65,19 @@ class TTSError(RuntimeError):
 
 
 TTS_BACKENDS = frozenset(
-    {"auto", "mimo", "minimax", "fish", "voicebox", "edge", "external", "grok", "qwen3", "higgs"}
+    {
+        "auto",
+        "mimo",
+        "minimax",
+        "fish",
+        "voicebox",
+        "edge",
+        "external",
+        "grok",
+        "qwen3",
+        "higgs",
+        "audio_node",
+    }
 )
 MIMO_TTS_MODELS = frozenset(
     {"mimo-v2.5-tts", "mimo-v2.5-tts-voicedesign", "mimo-v2.5-tts-voiceclone"}
@@ -377,6 +389,23 @@ def probe_higgs_audio() -> dict[str, Any]:
     }
 
 
+def probe_audio_node() -> dict[str, Any]:
+    base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
+    token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
+    if not base or not token:
+        return {"ok": False, "error": "AIFILM_AUDIO_NODE_URL/TOKEN not configured"}
+    try:
+        from audio_node_client import health
+
+        result = health(base, token)
+        return {
+            "ok": bool(result.get("ok") and result.get("models", {}).get("tts")),
+            "detail": result,
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:240]}
+
+
 def probe() -> dict[str, Any]:
     external_error = None
     try:
@@ -388,6 +417,7 @@ def probe() -> dict[str, Any]:
     grok = probe_grok_tts()
     qwen = probe_qwen3_tts()
     higgs = probe_higgs_audio()
+    node = probe_audio_node()
     backends: dict[str, bool] = {
         "mimo": bool(mimo_api_key()) and _mimo_model_error(mimo_tts_model()) is None,
         "edge": True,
@@ -398,6 +428,7 @@ def probe() -> dict[str, Any]:
         "grok": bool(grok.get("ok")),
         "qwen3": bool(qwen.get("ok")),
         "higgs": bool(higgs.get("ok")),
+        "audio_node": bool(node.get("ok")),
     }
     try:
         import edge_tts  # noqa: F401
@@ -452,6 +483,7 @@ def probe() -> dict[str, Any]:
         "grok_error": grok.get("error"),
         "qwen3": qwen,
         "higgs": higgs,
+        "audio_node": node,
         "voicebox_ok": backends["voicebox"],
         "voicebox_base_url": voicebox_base_url(),
         "voicebox_profile": vb.get("profile_name") or voicebox_profile(),
@@ -1022,7 +1054,17 @@ def assert_voice_backend_compatible(backend: str, voice: str | None) -> None:
     if not is_edge_neural_voice_id(voice):
         return
     # Neural id only safe on explicit edge (fish/minimax/voicebox/grok strip Neural themselves)
-    if choice in {"edge", "mimo", "fish", "minimax", "voicebox", "grok", "qwen3", "higgs"}:
+    if choice in {
+        "edge",
+        "mimo",
+        "fish",
+        "minimax",
+        "voicebox",
+        "grok",
+        "qwen3",
+        "higgs",
+        "audio_node",
+    }:
         return
     if choice == "external" or external_tts_argv_hints_provider("eleven"):
         raise TTSError(
@@ -1229,6 +1271,53 @@ def synthesize(
             )
             voice_used = voice or "higgs-reference"
             model_used = get_config().higgs_audio_model
+        elif choice == "audio_node":
+            from audio_node_client import AudioNodeError, render
+
+            base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
+            token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
+            rendered: dict[str, Any] = {}
+
+            def _node_call() -> None:
+                nonlocal rendered
+                temp_wav = out_mp3.with_suffix(".node.wav")
+                try:
+                    rendered = render(
+                        base,
+                        token,
+                        "tts",
+                        {
+                            "text": text,
+                            "voice_profile_id": "" if _is_edge_voice_name(voice) else voice,
+                            "language": cue.get("language") or "Chinese",
+                            "performance": {"instruction": compile_instruction(cue)},
+                        },
+                        temp_wav,
+                    )
+                    subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            str(temp_wav),
+                            "-ar",
+                            "44100",
+                            "-ac",
+                            "2",
+                            str(out_mp3),
+                        ],
+                        check=True,
+                        capture_output=True,
+                        timeout=180,
+                    )
+                except (AudioNodeError, OSError, subprocess.SubprocessError) as exc:
+                    raise TTSError(f"private audio node failed: {exc}") from exc
+                finally:
+                    temp_wav.unlink(missing_ok=True)
+
+            _tracked("audio_node", "qwen3-tts-5090", local_zero=True, call=_node_call)
+            voice_used = "designed" if _is_edge_voice_name(voice) else (voice or "designed")
+            model_used = "qwen3-tts-5090"
         elif choice == "external":
             _tracked(
                 "external",
