@@ -137,4 +137,9 @@ def render_scene_sound_stem(
     )
     if proc.returncode:
         raise SceneSoundError("cannot write scene-sound stem")
-    return {"path": str(out), "event_count": len(executed), "events": executed}
+    return {
+        "path": str(out),
+        "sha256": hashlib.sha256(out.read_bytes()).hexdigest(),
+        "event_count": len(executed),
+        "events": executed,
+    }

@@ -41,6 +41,7 @@ from edit_policy import (
     normalize_transition_sec,
     plan_stretch,
 )
+from event_voice_stem import EventVoiceStemError, render_event_voice_stem
 from film_spec import FilmSpecError, validate_film_spec
 from media_qa import MediaQAError, analyze_media, approved_clip_record
 from narrative_timeline import (
@@ -53,6 +54,7 @@ from narrative_timeline import (
 from PIL import Image, ImageDraw, ImageFont
 from render_workspace import RenderWorkspaceError, prepare_render_workspace, resolve_render_paths
 from runtime_policy import sha256
+from scene_sound import reconcile as reconcile_scene_sound
 from scene_sound_stems import SceneSoundError, render_scene_sound_stem
 from security_policy import (
     SecurityPolicyError,
@@ -2322,6 +2324,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
 
     manifest = read_json(root / "manifest.json")
     spec = read_json(root / "film-spec.json")
+    scene_sound_report = reconcile_scene_sound(root, write=True)
+    if bool(spec.get("audio_timeline_v1", False)) and scene_sound_report["status"] == "blocked":
+        raise RenderError(
+            "scene-sound required assets missing: "
+            + ", ".join(scene_sound_report["blocking_shot_ids"])
+        )
     audio_contract = validate_audio_tracks_contract(spec)
     for warning in audio_contract.get("warnings") or []:
         log(f"audio contract warning: {warning}")
@@ -3137,6 +3145,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "native_audio_volume": native_audio_volume,
             "policy": voice_policy,
         },
+        "scene_sound_reconcile": scene_sound_report,
     }
     # Spotting map shared by procedural + user music (mute/duck/sfx on bed)
     spot_shot_targets = [float(item["target"]) for item in shot_audio]
@@ -3163,9 +3172,18 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     # renderer-local cue receipt, distinct from the production audio timeline.
     audio_timeline_path = audio_dir / "audio-cues-timeline.json"
     formal_timeline: dict[str, Any] | None = None
+    event_voice_stem: dict[str, Any] | None = None
+    use_event_tts = bool(spec.get("audio_timeline_v1_event_tts", False))
     if bool(spec.get("audio_timeline_v1", False)):
         try:
-            formal_timeline = compile_audio_timeline_v1(spec)
+            stored_timeline = (
+                read_json(audio_dir / "audio-timeline.json") if use_event_tts else None
+            )
+            formal_timeline = (
+                stored_timeline
+                if isinstance(stored_timeline, dict)
+                else compile_audio_timeline_v1(spec)
+            )
             formal_timeline = rebase_to_rendered_shots(formal_timeline, shot_start_map)
             formal_timeline["duration_sec"] = round(float(total_dur), 3)
             execution_plan = build_mix_execution_plan(formal_timeline)
@@ -3186,6 +3204,25 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         if formal_timeline
         else None,
     }
+    if use_event_tts:
+        if formal_timeline is None:
+            raise RenderError("audio_timeline_v1_event_tts requires audio_timeline_v1")
+        event_voice_path = audio_dir / "event-voices.wav"
+        event_manifest = read_json(audio_dir / "tts-manifest.json")
+        if not isinstance(event_manifest, dict):
+            raise RenderError("audio_timeline_v1_event_tts requires audio/tts-manifest.json")
+        try:
+            event_voice_stem = render_event_voice_stem(
+                root,
+                formal_timeline,
+                event_manifest,
+                duration_sec=float(total_dur),
+                out=event_voice_path,
+            )
+        except EventVoiceStemError as exc:
+            raise RenderError(str(exc)) from exc
+        voice_cat = event_voice_path
+        mix_spotting["event_voice_stem"] = event_voice_stem
     scene_sound_path = audio_dir / "scene_sound_stereo.wav"
     if formal_timeline is not None:
         try:

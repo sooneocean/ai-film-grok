@@ -5459,13 +5459,15 @@ def cmd_audio_verify(args: argparse.Namespace) -> int:
             "audio-verify requires audio-timeline.json, tts-manifest.json, caption-bindings.json"
         )
     final_path = Path(args.final).expanduser().resolve() if args.final else None
+    out = audio_dir / "audio-delivery-report.json"
+    previous_report = read_json(out) if out.is_file() else None
     report = build_delivery_report(
         timeline=timeline,
         tts_manifest=manifest,
         subtitle_bindings=bindings,
         final_mp4=final_path,
+        previous_report=previous_report if isinstance(previous_report, dict) else None,
     )
-    out = audio_dir / "audio-delivery-report.json"
     write_json(out, report)
     emit({**report, "path": str(out)})
     return 0 if report["ok"] else 1

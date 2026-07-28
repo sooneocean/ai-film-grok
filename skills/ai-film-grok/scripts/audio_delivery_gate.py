@@ -36,6 +36,7 @@ def build_delivery_report(
     tts_manifest: dict[str, Any],
     subtitle_bindings: list[dict[str, Any]],
     final_mp4: Path | None = None,
+    previous_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return auditable evidence; callers must treat ``ok=false`` as a hard failure."""
     errors: list[str] = []
@@ -80,12 +81,24 @@ def build_delivery_report(
             probe = _probe(final_mp4)
             if not probe.get("ok"):
                 errors.append("final MP4 has no valid audio stream")
+    current_timeline_sha256 = timeline_hash(timeline) if not errors else None
+    previous_final = (previous_report or {}).get("final_mp4")
+    previous_timeline_sha256 = (previous_report or {}).get("timeline_sha256")
+    delivery_stale = bool(
+        isinstance(previous_final, dict)
+        and previous_final.get("sha256")
+        and previous_timeline_sha256
+        and current_timeline_sha256
+        and previous_timeline_sha256 != current_timeline_sha256
+    )
+    if delivery_stale:
+        errors.append("existing final delivery is stale because audio timeline changed")
     return {
         "schema_version": 1,
         "kind": "audio-delivery-report",
         "ok": not errors,
         "errors": errors,
-        "timeline_sha256": timeline_hash(timeline) if not errors else None,
+        "timeline_sha256": current_timeline_sha256,
         "tts_job_count": len(jobs),
         "subtitle_binding_count": len(subtitle_bindings),
         "final_mp4": {
@@ -93,4 +106,6 @@ def build_delivery_report(
             "sha256": _sha256(final_mp4) if final_mp4 and final_mp4.is_file() else None,
             "ffprobe": probe,
         },
+        "stale": delivery_stale,
+        "stale_reason": "audio_timeline_changed" if delivery_stale else None,
     }
