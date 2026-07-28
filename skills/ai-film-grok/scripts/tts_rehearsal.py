@@ -203,9 +203,9 @@ def run_rehearsal(
     audio_dir.mkdir(parents=True, exist_ok=True)
     measurements: list[dict[str, Any]] = []
 
-    used_backend = backend or str(spec.get("tts_backend") or "edge")
+    used_backend = backend or str(spec.get("tts_backend") or "mimo")
     if used_backend == "auto":
-        used_backend = "edge"
+        used_backend = "mimo"
 
     for shot in shots:
         sid = str(shot["id"])

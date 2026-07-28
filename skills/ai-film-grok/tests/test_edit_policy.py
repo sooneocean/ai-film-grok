@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import subprocess
 import sys
 import tempfile
@@ -280,6 +282,108 @@ class StretchAndTransitionIntegrationTests(unittest.TestCase):
 
 @pytest.mark.slow
 class TTSVoiceLockTests(unittest.TestCase):
+    @pytest.mark.slow
+    def test_mimo_uses_openai_compatible_request_and_writes_audio(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "mimo.mp3"
+            audio = b"ID3" + b"mimo-test-audio" * 40
+            response = mock.MagicMock()
+            response.read.return_value = json.dumps(
+                {
+                    "choices": [
+                        {"message": {"audio": {"data": base64.b64encode(audio).decode("ascii")}}}
+                    ]
+                }
+            ).encode("utf-8")
+            cm = mock.MagicMock()
+            cm.__enter__.return_value = response
+            with (
+                mock.patch.object(tts_backend, "mimo_api_key", return_value="test-key"),
+                mock.patch.object(
+                    tts_backend, "mimo_api_base", return_value="https://mimo.test/v1"
+                ),
+                mock.patch.object(tts_backend, "mimo_tts_model", return_value="mimo-v2.5-tts"),
+                mock.patch.object(tts_backend, "mimo_tts_voice", return_value="冰糖"),
+                mock.patch.object(
+                    tts_backend.urllib.request, "urlopen", return_value=cm
+                ) as urlopen,
+                mock.patch.object(
+                    tts_backend.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 0, stdout="1.0\n"),
+                ),
+            ):
+                result = tts_backend.tts_mimo("测试旁白", out)
+
+            self.assertEqual(result, out)
+            self.assertEqual(out.read_bytes(), audio)
+            request = urlopen.call_args.args[0]
+            self.assertEqual(request.full_url, "https://mimo.test/v1/chat/completions")
+            self.assertEqual(request.get_header("Api-key"), "test-key")
+            payload = json.loads(request.data.decode("utf-8"))
+            self.assertEqual(payload["model"], "mimo-v2.5-tts")
+            self.assertEqual(payload["audio"], {"format": "mp3", "voice": "冰糖"})
+            self.assertEqual(payload["messages"][1], {"role": "assistant", "content": "测试旁白"})
+
+    @pytest.mark.slow
+    def test_mimo_bad_audio_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "mimo.mp3"
+            response = mock.MagicMock()
+            response.read.return_value = (
+                b'{"choices":[{"message":{"audio":{"data":"not base64"}}}]}'
+            )
+            cm = mock.MagicMock()
+            cm.__enter__.return_value = response
+            with (
+                mock.patch.object(tts_backend, "mimo_api_key", return_value="test-key"),
+                mock.patch.object(tts_backend.urllib.request, "urlopen", return_value=cm),
+                self.assertRaisesRegex(tts_backend.TTSError, "missing valid base64 audio"),
+            ):
+                tts_backend.tts_mimo("测试旁白", out)
+            self.assertFalse(out.exists())
+
+    @pytest.mark.slow
+    def test_mimo_empty_text_fails_before_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "mimo.mp3"
+            with (
+                mock.patch.object(tts_backend, "mimo_api_key", return_value="test-key"),
+                mock.patch.object(tts_backend.urllib.request, "urlopen") as urlopen,
+                self.assertRaisesRegex(tts_backend.TTSError, "non-empty text"),
+            ):
+                tts_backend.tts_mimo("  ", out)
+            urlopen.assert_not_called()
+            self.assertFalse(out.exists())
+
+    @pytest.mark.slow
+    def test_mimo_undecodable_audio_is_deleted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "mimo.mp3"
+            audio = b"ID3" + b"mimo-test-audio" * 40
+            response = mock.MagicMock()
+            response.read.return_value = json.dumps(
+                {
+                    "choices": [
+                        {"message": {"audio": {"data": base64.b64encode(audio).decode("ascii")}}}
+                    ]
+                }
+            ).encode("utf-8")
+            cm = mock.MagicMock()
+            cm.__enter__.return_value = response
+            with (
+                mock.patch.object(tts_backend, "mimo_api_key", return_value="test-key"),
+                mock.patch.object(tts_backend.urllib.request, "urlopen", return_value=cm),
+                mock.patch.object(
+                    tts_backend.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess([], 1, stdout=""),
+                ),
+                self.assertRaisesRegex(tts_backend.TTSError, "not decodable audio"),
+            ):
+                tts_backend.tts_mimo("测试旁白", out)
+            self.assertFalse(out.exists())
+
     @pytest.mark.slow
     def test_fish_without_voice_id_fails_closed_unless_fallback_is_opted_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

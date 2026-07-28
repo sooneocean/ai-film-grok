@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A/B TTS rehearse: same nar line through multiple backends → receipts/tts-ab/.
 
-  aifilm tts-ab --root <film> --shot shot01 --backends edge,voicebox
+  aifilm tts-ab --root <film> --shot shot01 --backends mimo,edge
 
 Does not change film-spec tts_backend. Skips unready backends with status=skip.
 """
@@ -130,7 +130,7 @@ def run_tts_ab(
 
         out_path = out_dir / f"{_safe_name(shot_id)}-{_safe_name(be_l)}.wav"
         # edge writes mp3 often — keep extension flexible via synthesize path
-        if be_l == "edge":
+        if be_l in {"mimo", "edge"}:
             out_path = out_dir / f"{_safe_name(shot_id)}-{_safe_name(be_l)}.mp3"
         try:
             # voicebox rejects Neural names — synthesize handles strip
@@ -189,8 +189,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--shot", "--shot-id", dest="shot_id", required=True)
     p.add_argument(
         "--backends",
-        default="edge,voicebox",
-        help="Comma-separated backends (default edge,voicebox)",
+        default="mimo,edge",
+        help="Comma-separated backends (default mimo,edge)",
     )
     p.add_argument("--voice", default=None)
     p.add_argument("--text", default=None, help="Override nar text")

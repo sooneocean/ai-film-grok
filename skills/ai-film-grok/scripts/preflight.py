@@ -469,7 +469,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         "hard",
                         "tts_neural_on_external",
                         str(tts_exc)[:280],
-                        fix="final --tts-backend edge（中文旁白）；或把 vo_voice 改成 provider voice id",
+                        fix="final --tts-backend mimo（中文旁白）；或把 vo_voice 改成 provider voice id",
                     )
                 )
         except ImportError:
@@ -480,18 +480,18 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "soft",
                     "tts_external_risk",
                     f"tts_backend={tts!r} or AIFILM_TTS_ARGV set — 中文 Neural ID 勿塞 ElevenLabs",
-                    fix="final 时显式 --tts-backend edge（中文说书默认）；本机克隆用 voicebox",
+                    fix="final 时显式 --tts-backend mimo（中文说书默认）；本机克隆用 voicebox",
                 )
             )
-        # Phase F: 说书人 + 非 edge → soft 提示（minimax/fish 可做但中文短片默认 edge）
+        # 说书人优先 MiMo；其他显式 provider 仍允许，但保留可见提示。
         vo_mode = str(spec.get("vo_mode") or "").lower()
-        if vo_mode in {"storyteller", "hybrid"} and tts not in {"edge", ""}:
+        if vo_mode in {"storyteller", "hybrid"} and tts not in {"mimo", "edge", ""}:
             soft.append(
                 _issue(
                     "soft",
-                    "tts_storyteller_not_edge",
-                    f"vo_mode={vo_mode} 但 tts_backend={tts!r} — 中文说书默认 edge 更稳",
-                    fix="write-spec 会把 auto 钉 edge；或 final --tts-backend edge",
+                    "tts_storyteller_not_mimo",
+                    f"vo_mode={vo_mode} 但 tts_backend={tts!r} — 中文说书默认 MiMo",
+                    fix="write-spec 会把 auto 钉 mimo；或 final --tts-backend mimo",
                 )
             )
         if tts == "voicebox":
@@ -507,7 +507,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         "soft",
                         "tts_voicebox_not_ready",
                         f"tts_backend=voicebox but local studio not ready: {vb.get('error') or 'unknown'}",
-                        fix="启动 Voicebox App；设 VOICEBOX_PROFILE；或改 tts_backend=edge",
+                        fix="启动 Voicebox App；设 VOICEBOX_PROFILE；或改 tts_backend=mimo",
                     )
                 )
 

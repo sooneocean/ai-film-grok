@@ -2821,7 +2821,7 @@ def project_graph_to_film_spec(
         "aspect_ratio": "9:16",
         "genre": story.get("genre") or (normalized or {}).get("genre") or "adult",
         "vo_mode": vo_mode,
-        "tts_backend": base.get("tts_backend") or "edge",
+        "tts_backend": base.get("tts_backend") or "mimo",
         "i2v_provider": base.get("i2v_provider") or "grok",
         "caption_mode": base.get("caption_mode") or "zh",
         "director_intent": di,

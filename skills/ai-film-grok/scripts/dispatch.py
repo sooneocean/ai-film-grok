@@ -652,7 +652,7 @@ def build_dispatch(
         else "seedance_first: canary → seedance i2v · else grok/ltx"
     )
     routing = {
-        "tts_default": "edge",
+        "tts_default": "mimo",
         "tts_quality": "voicebox if app up",
         "bgm": "film audio → skill assets/bgm → procedural rnb",
         "lipsync": "off default; canary after backend-lock",
@@ -672,7 +672,7 @@ def build_dispatch(
                 if i2v_profile == "grok_primary"
                 else "bulk FRW Seedance; Grok I2V fallback; batch: grok-oauth video"
             ),
-            "voice": "session chat ≠ VO; default edge; opt-in: --tts-backend grok (speech tags)",
+            "voice": "session chat ≠ VO; default MiMo (MIMO_API_KEY); opt-in: --tts-backend grok (speech tags)",
             "memory": "film-root + receipts (project RAG default)",
             "sdk_optional": "OAuth first; XAI_API_KEY only if no auth.json",
             "matrix": "references/grok-build-sdk.md · references/grok-oauth.md",

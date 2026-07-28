@@ -581,7 +581,7 @@ def build_capability_report(
             "canary": "aifilm frw canary --root FILM",
             "suggest": "aifilm capability --root FILM --suggest-i2v",
             "apply": "aifilm capability --root FILM --suggest-i2v --apply",
-            "tts_ab": "aifilm tts-ab --root FILM --shot SHOT01 --backends edge,voicebox",
+            "tts_ab": "aifilm tts-ab --root FILM --shot SHOT01 --backends mimo,edge",
             "audio_plan": "aifilm audio-plan --root FILM",
             "craft": "aifilm craft status --root FILM",
             "lipsync_canary": "aifilm lipsync-canary --root FILM --shot SHOT",

@@ -97,6 +97,7 @@ def _config_env_fingerprint() -> tuple[tuple[str, str], ...]:
         "COSYVOICE_",
         "QWEN3_",
         "HIGGS_",
+        "MIMO_",
         "ELEVENLABS_",
         "MUSIC_",
         "ACESTEP_",
@@ -126,10 +127,15 @@ class ConfigSchema:
     grok_probe_tts: bool = False
 
     # ── TTS ─────────────────────────────────────────────────────────────
-    tts_backend: str = "edge"
+    tts_backend: str = "mimo"
     tts_strict_voice: bool = True
     tts_voicebox_fallback: bool = False
     tts_argv: str = ""
+    mimo_api_key: str = ""
+    mimo_api_base: str = "https://api.xiaomimimo.com/v1"
+    mimo_tts_model: str = "mimo-v2.5-tts"
+    mimo_tts_voice: str = "冰糖"
+    mimo_tts_style: str = "自然、电影感的中文旁白；保持原文，不改写。"
     qwen3_tts_model: str = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
     qwen3_tts_ref_audio: str = ""
     qwen3_tts_ref_text: str = ""
@@ -222,10 +228,15 @@ def get_config() -> ConfigSchema:
         grok_tts_language=_resolve("zh", "AIFILM_GROK_TTS_LANGUAGE"),
         grok_probe_tts=_resolve_bool("AIFILM_GROK_PROBE_TTS", default=False),
         # TTS
-        tts_backend=_resolve("edge", "AIFILM_TTS_BACKEND"),
+        tts_backend=_resolve("mimo", "AIFILM_TTS_BACKEND"),
         tts_strict_voice=_resolve_bool("AIFILM_TTS_STRICT_VOICE", default=True),
         tts_voicebox_fallback=_resolve_bool("AIFILM_TTS_VOICEBOX_FALLBACK", default=False),
         tts_argv=_env("AIFILM_TTS_ARGV"),
+        mimo_api_key=_env("MIMO_API_KEY", "AIFILM_MIMO_API_KEY"),
+        mimo_api_base=_resolve("https://api.xiaomimimo.com/v1", "MIMO_API_BASE"),
+        mimo_tts_model=_resolve("mimo-v2.5-tts", "MIMO_TTS_MODEL"),
+        mimo_tts_voice=_resolve("冰糖", "MIMO_TTS_VOICE"),
+        mimo_tts_style=_resolve("自然、电影感的中文旁白；保持原文，不改写。", "MIMO_TTS_STYLE"),
         qwen3_tts_model=_resolve(
             "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", "QWEN3_TTS_MODEL", "AIFILM_QWEN3_TTS_MODEL"
         ),
@@ -327,10 +338,15 @@ _ENV_HELP: dict[str, str] = {
     "AIFILM_GROK_TTS_VOICE": "Grok TTS voice (eve | ara | leo | carina | zagan | …)",
     "AIFILM_GROK_TTS_LANGUAGE": "Grok TTS language (zh | en | …)",
     "AIFILM_GROK_PROBE_TTS": "Set to 1 to enable deep TTS voice list in doctor probe",
-    "AIFILM_TTS_BACKEND": "Active TTS backend: auto | edge | fish | minimax | voicebox | grok | external",
+    "AIFILM_TTS_BACKEND": "Active TTS backend: mimo | auto | edge | fish | minimax | voicebox | grok | external",
     "AIFILM_TTS_STRICT_VOICE": "1 = fail on missing voice_id (default 1)",
     "AIFILM_TTS_VOICEBOX_FALLBACK": "0|1 — opt-in: try Voicebox when explicit backend fails",
     "AIFILM_TTS_ARGV": "External TTS command as JSON argv array",
+    "MIMO_API_KEY": "Xiaomi MiMo API key (alias: AIFILM_MIMO_API_KEY; never commit)",
+    "MIMO_API_BASE": "MiMo OpenAI-compatible API base; default https://api.xiaomimimo.com/v1",
+    "MIMO_TTS_MODEL": "MiMo TTS model; default mimo-v2.5-tts",
+    "MIMO_TTS_VOICE": "MiMo built-in voice; default 冰糖",
+    "MIMO_TTS_STYLE": "MiMo style instruction for the user message",
     "FISH_API_KEY": "Fish Audio API key (aliases: FISH_AUDIO_API_KEY, AIFILM_FISH_API_KEY)",
     "FISH_VOICE_ID": "Fish Audio reference/voice id (aliases: AIFILM_FISH_VOICE_ID, FISH_REFERENCE_ID)",
     "FISH_MODEL": "Fish Audio model (aliases: AIFILM_FISH_MODEL); default s2.1-pro-free",
@@ -397,7 +413,10 @@ def generate_example() -> str:
 
 
 _DEFAULT_EXAMPLES: dict[str, tuple[str, str]] = {
-    "AIFILM_TTS_BACKEND": ("edge", "edge | fish | minimax | voicebox | grok | external"),
+    "AIFILM_TTS_BACKEND": ("mimo", "mimo | edge | fish | minimax | voicebox | grok | external"),
+    "MIMO_API_BASE": ("https://api.xiaomimimo.com/v1", "OpenAI-compatible base URL"),
+    "MIMO_TTS_MODEL": ("mimo-v2.5-tts", "built-in voices; free for a limited time"),
+    "MIMO_TTS_VOICE": ("冰糖", "Chinese female built-in voice"),
     "AIFILM_TTS_STRICT_VOICE": ("1", ""),
     "AIFILM_LIPSYNC_BACKEND": ("off", "off | auto | musetalk | wav2lip | external"),
     "AIFILM_GROK_AUTH": ("auto", "auto | oauth | api_key"),

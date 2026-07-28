@@ -103,7 +103,7 @@ def build_audio_plan(
             )
     except Exception as exc:  # noqa: BLE001 - report compiler blockers in dry-run
         timeline_error = str(exc)
-    tts_backend = str(spec.get("tts_backend") or "edge").lower()
+    tts_backend = str(spec.get("tts_backend") or "mimo").lower()
     vo_voice = spec.get("vo_voice")
     mood = "rnb"
     sp = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else {}
@@ -151,7 +151,7 @@ def build_audio_plan(
 
     vo_mode = str(spec.get("vo_mode") or "storyteller")
     recommendations: list[str] = []
-    if tts_backend in {"auto", "edge"} and tts_info.get("backends", {}).get("edge"):
+    if tts_backend in {"auto", "mimo"} and tts_info.get("backends", {}).get("mimo"):
         recommendations.append("TTS: edge ready (default for Chinese storyteller)")
     if not tts_info.get("voicebox_ok"):
         recommendations.append("TTS quality: start Voicebox + VOICEBOX_PROFILE")

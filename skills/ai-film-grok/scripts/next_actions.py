@@ -417,7 +417,7 @@ def build_next_actions(
         if not final_rec and not rehearse_ok:
             add(
                 "tts-rehearse",
-                f'aifilm tts-rehearse --root "{r}" --backend edge',
+                f'aifilm tts-rehearse --root "{r}" --backend mimo',
                 (
                     "[层2·语音] final 前真测旁白秒数（receipts/tts-rehearsal.json）；"
                     + (
@@ -437,13 +437,13 @@ def build_next_actions(
                 )
                 add(
                     "final",
-                    f'aifilm final --root "{r}" --lipsync off --music-mood rnb --tts-backend edge',
+                    f'aifilm final --root "{r}" --lipsync off --music-mood rnb --tts-backend mimo',
                     "[层4·后处理] 或直接 FFmpeg 成片；设计字幕：--post-engine hyperframes（建议先 preview）",
                 )
                 add(
                     "final-designed",
                     f'aifilm final --root "{r}" --post-engine hyperframes '
-                    f"--lipsync off --music-mood rnb --tts-backend edge --compose-preset auto "
+                    f"--lipsync off --music-mood rnb --tts-backend mimo --compose-preset auto "
                     f"--title-sequence auto --end-roll auto",
                     "[层3·设计] 跳过预览一键设计成片（排版风险更高；可用 --require-preview 强制先预览）",
                 )
@@ -451,7 +451,7 @@ def build_next_actions(
                 add(
                     "final-designed",
                     f'aifilm final --root "{r}" --post-engine hyperframes '
-                    f"--lipsync off --music-mood rnb --tts-backend edge --compose-preset auto "
+                    f"--lipsync off --music-mood rnb --tts-backend mimo --compose-preset auto "
                     f"--title-sequence auto --end-roll auto",
                     "[层3·设计] 已 compose-preview → 推荐 HyperFrames 设计字幕成片",
                 )
@@ -465,7 +465,7 @@ def build_next_actions(
                     )
                 add(
                     "final",
-                    f'aifilm final --root "{r}" --lipsync off --music-mood rnb --tts-backend edge',
+                    f'aifilm final --root "{r}" --lipsync off --music-mood rnb --tts-backend mimo',
                     "[层4·后处理] 或 FFmpeg 烧字幕成片",
                 )
         else:
@@ -490,7 +490,7 @@ def build_next_actions(
             ):
                 add(
                     "final-audio",
-                    f'aifilm final --root "{r}" --lipsync off --music-mood rnb --tts-backend edge',
+                    f'aifilm final --root "{r}" --lipsync off --music-mood rnb --tts-backend mimo',
                     "sound_plan 仍是 intent — 需 final/混音才算 executed",
                 )
         except Exception:

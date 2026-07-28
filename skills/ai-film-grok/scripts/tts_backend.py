@@ -6,11 +6,13 @@ Backends (human-likeness roughly ↑):
   fish      — Fish Audio API (s2.1-pro / free tier)
   grok      — Grok TTS via OAuth (api.x.ai /v1/tts; speech tags; opt-in, SuperGrok)
   voicebox  — local open-source studio (https://github.com/jamiepine/voicebox) on :17493
-  edge      — Microsoft Edge Neural (free explicit backend; more synthetic) **film default**
+  mimo      — Xiaomi MiMo V2.5 TTS (limited-time free; built-in Chinese voices) **film default**
+  edge      — Microsoft Edge Neural (free explicit fallback; more synthetic)
   external  — local CosyVoice / IndexTTS / 火山豆包 CLI via AIFILM_TTS_ARGV
 
 Env / config.env:
-  AIFILM_TTS_BACKEND=auto|minimax|fish|voicebox|edge|external|grok
+  AIFILM_TTS_BACKEND=mimo|auto|minimax|fish|voicebox|edge|external|grok
+  MIMO_API_KEY=...  MIMO_TTS_VOICE=冰糖  MIMO_TTS_MODEL=mimo-v2.5-tts
   AIFILM_GROK_TTS_VOICE=eve   # or ara, leo, carina, zagan, …
   AIFILM_GROK_TTS_LANGUAGE=zh
   FISH_API_KEY=...  FISH_VOICE_ID=...  FISH_MODEL=s2.1-pro-free
@@ -26,12 +28,13 @@ Fallback (opt-in only; never silent cross-provider):
     primary fail → voicebox (if ready) → edge
   AIFILM_TTS_VOICEBOX_FALLBACK=1: even explicit edge/minimax/fish may try voicebox once.
 
-Note: auto never picks grok (keeps edge/local defaults for reproducible 中文说书).
+Note: auto never picks grok (keeps MiMo/local defaults for reproducible 中文说书).
 Use --tts-backend grok or AIFILM_TTS_BACKEND=grok explicitly.
 """
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import json
 import os
@@ -61,7 +64,7 @@ class TTSError(RuntimeError):
 
 
 TTS_BACKENDS = frozenset(
-    {"auto", "minimax", "fish", "voicebox", "edge", "external", "grok", "qwen3", "higgs"}
+    {"auto", "mimo", "minimax", "fish", "voicebox", "edge", "external", "grok", "qwen3", "higgs"}
 )
 DEFAULT_VOICEBOX_URL = "http://127.0.0.1:17493"
 # Built-in Grok voices (subset; full list via aifilm grok-oauth voices)
@@ -113,6 +116,26 @@ def minimax_model() -> str:
 
 def minimax_group_id() -> str | None:
     return get_config().minimax_group_id or None
+
+
+def mimo_api_key() -> str | None:
+    return get_config().mimo_api_key or None
+
+
+def mimo_api_base() -> str:
+    return (get_config().mimo_api_base or "https://api.xiaomimimo.com/v1").rstrip("/")
+
+
+def mimo_tts_model() -> str:
+    return get_config().mimo_tts_model or "mimo-v2.5-tts"
+
+
+def mimo_tts_voice() -> str:
+    return get_config().mimo_tts_voice or "冰糖"
+
+
+def mimo_tts_style() -> str:
+    return get_config().mimo_tts_style or "自然、电影感的中文旁白；保持原文，不改写。"
 
 
 def external_argv() -> list[str] | None:
@@ -311,6 +334,7 @@ def probe() -> dict[str, Any]:
     qwen = probe_qwen3_tts()
     higgs = probe_higgs_audio()
     backends: dict[str, bool] = {
+        "mimo": bool(mimo_api_key()),
         "edge": True,
         "fish": bool(fish_api_key()),
         "minimax": bool(minimax_api_key()),
@@ -334,7 +358,9 @@ def probe() -> dict[str, Any]:
         # Prefer local execution, then expressive APIs with stable voice identity.
         # Voicebox is local-first quality when the app is up + profile exists.
         # Never auto-pick grok (opt-in only for SuperGrok OAuth path).
-        if backends["external"]:
+        if backends["mimo"]:
+            choice = "mimo"
+        elif backends["external"]:
             choice = "external"
         elif backends["voicebox"]:
             choice = "voicebox"
@@ -356,6 +382,9 @@ def probe() -> dict[str, Any]:
         "backends": backends,
         "ready": ready,
         "fish_key_set": backends["fish"],
+        "mimo_key_set": backends["mimo"],
+        "mimo_model": mimo_tts_model() if backends["mimo"] else None,
+        "mimo_voice": mimo_tts_voice() if backends["mimo"] else None,
         "fish_voice_id": fish_voice_id(),
         "fish_model": fish_model(),
         "minimax_key_set": backends["minimax"],
@@ -377,14 +406,14 @@ def probe() -> dict[str, Any]:
         "external_config_error": external_error,
         "strict_voice_lock": strict_voice,
         "locked_speaker_policy": (
-            "fish without FISH_VOICE_ID fails closed when strict; "
+            "MiMo uses one fixed MIMO_TTS_VOICE per film; fish without FISH_VOICE_ID fails closed when strict; "
             "minimax uses fixed MINIMAX_VOICE_ID; voicebox locks VOICEBOX_PROFILE; "
             "grok uses AIFILM_GROK_TTS_VOICE (default eve); "
             "edge uses fixed vo_voice/cast_voices"
         ),
         "note": (
-            "一角一声: set FISH_VOICE_ID / MINIMAX_VOICE_ID / VOICEBOX_PROFILE / AIFILM_GROK_TTS_VOICE; "
-            "strict lock defaults ON. Local quality: voicebox (app :17493) or external. "
+            "一角一声: set MIMO_TTS_VOICE / FISH_VOICE_ID / MINIMAX_VOICE_ID / VOICEBOX_PROFILE / AIFILM_GROK_TTS_VOICE; "
+            "strict lock defaults ON. MiMo is the film default when MIMO_API_KEY is set. Local quality: voicebox (app :17493) or external. "
             "Grok TTS is opt-in (never auto). Fallback: auto+tts_allow_network_fallback → voicebox then edge; "
             "AIFILM_TTS_VOICEBOX_FALLBACK=1 also covers explicit edge/minimax/fish fails."
         ),
@@ -546,6 +575,79 @@ def tts_edge(
         )
     out_mp3.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_bytes(out_mp3, data)
+    return out_mp3
+
+
+def tts_mimo(
+    text: str,
+    out_mp3: Path,
+    *,
+    voice_id: str | None = None,
+    style: str | None = None,
+    model: str | None = None,
+) -> Path:
+    """MiMo OpenAI-compatible TTS with a fixed built-in voice per film."""
+    if not text or not text.strip():
+        raise TTSError("MiMo TTS requires non-empty text")
+    key = mimo_api_key()
+    if not key:
+        raise TTSError("MIMO_API_KEY not set — create one at https://platform.xiaomimimo.com")
+    voice = (voice_id or mimo_tts_voice()).strip() or "冰糖"
+    payload = {
+        "model": model or mimo_tts_model(),
+        "messages": [
+            {"role": "user", "content": (style or mimo_tts_style()).strip()},
+            {"role": "assistant", "content": text},
+        ],
+        "audio": {"format": "mp3", "voice": voice},
+    }
+    req = urllib.request.Request(
+        f"{mimo_api_base()}/chat/completions",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers={"api-key": key, "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as exc:
+        err = exc.read().decode("utf-8", errors="replace")[:800]
+        raise TTSError(f"MiMo TTS HTTP {exc.code}: {err}") from exc
+    except Exception as exc:
+        raise TTSError(f"MiMo TTS request failed: {exc}") from exc
+    try:
+        response = json.loads(raw.decode("utf-8"))
+        audio_data = response["choices"][0]["message"]["audio"]["data"]
+        audio_bytes = base64.b64decode(audio_data, validate=True)
+    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise TTSError("MiMo TTS response missing valid base64 audio") from exc
+    if len(audio_bytes) < 200:
+        raise TTSError(f"MiMo TTS returned empty/tiny audio ({len(audio_bytes)} bytes)")
+    out_mp3.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_bytes(out_mp3, audio_bytes)
+    probe = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(out_mp3),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    try:
+        duration = float((probe.stdout or "").strip())
+    except ValueError:
+        duration = 0.0
+    if probe.returncode != 0 or duration <= 0:
+        out_mp3.unlink(missing_ok=True)
+        raise TTSError("MiMo TTS response is not decodable audio")
     return out_mp3
 
 
@@ -850,7 +952,7 @@ def assert_voice_backend_compatible(backend: str, voice: str | None) -> None:
     if not is_edge_neural_voice_id(voice):
         return
     # Neural id only safe on explicit edge (fish/minimax/voicebox/grok strip Neural themselves)
-    if choice in {"edge", "fish", "minimax", "voicebox", "grok", "qwen3", "higgs"}:
+    if choice in {"edge", "mimo", "fish", "minimax", "voicebox", "grok", "qwen3", "higgs"}:
         return
     if choice == "external" or external_tts_argv_hints_provider("eleven"):
         raise TTSError(
@@ -956,7 +1058,18 @@ def synthesize(
     model_used = None
     primary_error: TTSError | None = None
     try:
-        if choice == "minimax":
+        if choice == "mimo":
+            # Edge Neural identifiers are not MiMo voices — use the locked MiMo built-in voice.
+            m_voice = "" if _is_edge_voice_name(voice) else (voice or "")
+            _tracked(
+                "mimo",
+                mimo_tts_model(),
+                local_zero=False,
+                call=lambda: tts_mimo(text, out_mp3, voice_id=m_voice or None),
+            )
+            voice_used = m_voice or mimo_tts_voice()
+            model_used = mimo_tts_model()
+        elif choice == "minimax":
             sp = _speed_from_rate()
             # If --voice looks like MiniMax id (not edge zh-CN-*), use it
             vid = voice if voice and not voice.startswith("zh-") else None

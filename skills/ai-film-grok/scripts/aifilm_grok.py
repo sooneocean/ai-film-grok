@@ -470,7 +470,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "still_edit": "image_edit (agent tool)",
             "motion": "image_to_video (agent tool)",
             "motion_multi_ref": "reference_to_video (agent tool)",
-            "vo": "MiniMax/Fish/edge or structured AIFILM_TTS_ARGV (cross-provider fallback is opt-in)",
+            "vo": "MiMo (default; limited-time free), MiniMax/Fish/edge, or structured AIFILM_TTS_ARGV (cross-provider fallback is opt-in)",
             "lipsync": "locked MuseTalk/Wav2Lip or structured AIFILM_LIPSYNC_ARGV (optional post)",
             "bgm": "numpy procedural R&B (default) or user music file",
             "post": "render_final.py (FFmpeg + PIL subs + optional lipsync)",
@@ -5598,7 +5598,7 @@ def cmd_tts_ab(args: argparse.Namespace) -> int:
     from tts_ab import TTSAbError, run_tts_ab
 
     backends = [
-        b.strip() for b in str(getattr(args, "backends", "edge,voicebox")).split(",") if b.strip()
+        b.strip() for b in str(getattr(args, "backends", "mimo,edge")).split(",") if b.strip()
     ]
     try:
         man = run_tts_ab(
@@ -6005,8 +6005,8 @@ def build_parser() -> argparse.ArgumentParser:
     tab.add_argument("--shot", "--shot-id", dest="shot_id", required=True)
     tab.add_argument(
         "--backends",
-        default="edge,voicebox",
-        help="Comma-separated backends (default: edge,voicebox)",
+        default="mimo,edge",
+        help="Comma-separated backends (default: mimo,edge)",
     )
     tab.add_argument("--voice", default=None)
     tab.add_argument("--text", default=None, help="Override shot nar")

@@ -67,7 +67,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" usage status --root "<film>"
 # 用户批准后才 pilot approve / bulk
 "$AIFILM" final --root "<film>" --post-engine hyperframes \
-  --lipsync off --music-mood rnb --tts-backend edge --compose-preset auto
+  --lipsync off --music-mood rnb --tts-backend mimo --compose-preset auto
 "$AIFILM" review-final --root "<film>"
 ```
 

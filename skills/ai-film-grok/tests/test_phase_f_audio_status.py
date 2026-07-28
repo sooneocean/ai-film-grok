@@ -52,11 +52,11 @@ def _minimal_spec(*, tts: str = "auto", tone: str = "色气·诱惑") -> dict:
 @pytest.mark.slow
 class WriteSpecPinTests(unittest.TestCase):
     @pytest.mark.slow
-    def test_storyteller_auto_becomes_edge(self) -> None:
+    def test_storyteller_auto_becomes_mimo(self) -> None:
         spec = _minimal_spec(tts="auto")
         validate_film_spec(spec, assign_missing_ids=False)
-        self.assertEqual(spec["tts_backend"], "edge")
-        self.assertTrue(any("edge" in n for n in (spec.get("_tts_notes") or [])))
+        self.assertEqual(spec["tts_backend"], "mimo")
+        self.assertTrue(any("mimo" in n for n in (spec.get("_tts_notes") or [])))
 
     @pytest.mark.slow
     def test_explicit_minimax_kept(self) -> None:
@@ -141,7 +141,7 @@ class PreflightStorytellerSoftTests(unittest.TestCase):
             )
             report = run_preflight(root)
             soft = {i["code"] for i in report["soft"]}
-            self.assertIn("tts_storyteller_not_edge", soft)
+            self.assertIn("tts_storyteller_not_mimo", soft)
 
 
 @pytest.mark.slow
