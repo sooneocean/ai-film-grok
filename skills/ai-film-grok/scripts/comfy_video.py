@@ -366,7 +366,8 @@ def _json_request(
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
         with _OPENER.open(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
+            raw = response.read()
+            return json.loads(raw.decode("utf-8")) if raw else {}
     except (OSError, ValueError, urllib.error.HTTPError) as exc:
         raise ComfyVideoError(f"ComfyUI {path} failed: {exc}") from exc
 

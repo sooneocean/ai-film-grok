@@ -13,6 +13,7 @@ from comfy_video import (  # noqa: E402
     WAN22_ADULT_PROFILE,
     WAN22_OFFICIAL_PROFILE,
     ComfyVideoError,
+    _json_request,
     _wait_for_completion_ws,
     apply_workflow_overrides,
     assert_local_only_workflow,
@@ -32,6 +33,21 @@ from comfy_video import (  # noqa: E402
 
 
 class ComfyVideoTests(unittest.TestCase):
+    @patch("comfy_video._OPENER.open")
+    def test_json_request_accepts_empty_success_body(self, open_request: MagicMock) -> None:
+        response = MagicMock()
+        response.read.return_value = b""
+        open_request.return_value.__enter__.return_value = response
+        self.assertEqual(
+            _json_request(
+                "http://192.168.88.52:8188",
+                "/free",
+                method="POST",
+                payload={"free_memory": True},
+            ),
+            {},
+        )
+
     def test_private_comfyui_url_is_accepted(self) -> None:
         self.assertEqual(
             normalize_base_url("http://192.168.88.52:8188/"),
