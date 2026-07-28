@@ -128,9 +128,10 @@ class HardDefaultsContractTests(unittest.TestCase):
         self.assertEqual(STILL_MIN_WIDTH_9_16, 704)
         self.assertEqual(STILL_MIN_HEIGHT_9_16, 1280)
 
-    def test_keyframe_aspect_is_9_16(self) -> None:
+    def test_keyframe_aspect_allows_provider_native_vertical_geometry(self) -> None:
         """704×1280 is the accepted provider-native near-9:16 geometry."""
         ratio = STILL_MIN_WIDTH_9_16 / STILL_MIN_HEIGHT_9_16
+        self.assertAlmostEqual(ratio, 704 / 1280, places=2)
         self.assertGreaterEqual(ratio, STILL_ASPECT_9_16_MIN)
         self.assertLessEqual(ratio, STILL_ASPECT_9_16_MAX)
 

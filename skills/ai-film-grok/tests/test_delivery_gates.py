@@ -18,6 +18,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import aifilm_grok  # noqa: E402
+from manifest_truth import migrate_manifest  # noqa: E402
 from media_qa import analyze_media  # noqa: E402
 from shot_review import create_shot_review  # noqa: E402
 
@@ -71,6 +72,8 @@ class DeliveryGateTests(unittest.TestCase):
                 ),
                 0,
             )
+        migration = migrate_manifest(self.root, write=True)
+        self.assertTrue(migration["ok"], migration)
         self.motion = self.base / "motion.mp4"
         self.final_source = self.base / "final-source.mp4"
         subprocess.run(
@@ -238,6 +241,7 @@ class DeliveryGateTests(unittest.TestCase):
     def test_final_is_incomplete_until_explicit_full_film_review(self) -> None:
         with contextlib.redirect_stdout(StringIO()):
             aifilm_grok.cmd_register_clip(self.register_args())
+        self.assertTrue(migrate_manifest(self.root, write=True)["ok"])
         final_path = self.root / "out" / "film_final.mp4"
         shutil.copy2(self.final_source, final_path)
         (self.root / "out" / "final.srt").write_text(
@@ -348,6 +352,7 @@ class DeliveryGateTests(unittest.TestCase):
     def test_review_final_rejects_incomplete_or_failing_scorecard(self) -> None:
         with contextlib.redirect_stdout(StringIO()):
             aifilm_grok.cmd_register_clip(self.register_args())
+        self.assertTrue(migrate_manifest(self.root, write=True)["ok"])
         final_path = self.root / "out" / "film_final.mp4"
         shutil.copy2(self.final_source, final_path)
         (self.root / "out" / "final.srt").write_text(

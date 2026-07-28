@@ -23,3 +23,28 @@ def test_migration_is_explicit_and_dry_by_default(tmp_path: Path) -> None:
     assert result["ok"]
     assert not result["changed"]
     assert json.loads((tmp_path / "manifest.json").read_text())["schema_version"] == 1
+
+
+def test_current_manifest_refreshes_stale_contract_only_when_written(tmp_path: Path) -> None:
+    spec = tmp_path / "film-spec.json"
+    spec.write_text('{"title":"first"}', encoding="utf-8")
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "stills": {},
+                "clips": {},
+                "truth_contract": {
+                    "source_of_truth": "local-contract-and-receipts",
+                    "contract_sha256": "stale",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    dry = migrate_manifest(tmp_path, write=False)
+    assert dry["ok"] and not dry["changed"]
+    applied = migrate_manifest(tmp_path, write=True)
+    assert applied["ok"] and applied["changed"]
+    assert preflight_manifest(tmp_path, json.loads((tmp_path / "manifest.json").read_text()))["ok"]

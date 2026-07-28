@@ -97,3 +97,26 @@ def test_generate_discards_wrong_duration(monkeypatch: pytest.MonkeyPatch, tmp_p
             )
 
     assert not list((tmp_path / "audio" / "candidates" / "sfx").rglob("*.wav"))
+
+
+def test_generate_rejects_symlinked_pending_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_URL", "http://node")
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    candidates = tmp_path / "film" / "audio" / "candidates" / "sfx"
+    candidates.mkdir(parents=True)
+    (candidates / "pending").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(SFXCandidateError, match="symlinks"):
+        generate(
+            tmp_path / "film",
+            prompt="door closes",
+            duration=1,
+            seed=1,
+            source_video=None,
+            noncommercial_research_ok=True,
+        )
+    assert not list(outside.iterdir())
