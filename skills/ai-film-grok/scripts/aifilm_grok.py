@@ -5440,6 +5440,37 @@ def cmd_audio_plan(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_audio_verify(args: argparse.Namespace) -> int:
+    """Run the fail-closed audio delivery evidence gate for one film root."""
+    from audio_delivery_gate import build_delivery_report
+    from util import read_json, write_json
+
+    root = Path(args.root).expanduser().resolve()
+    audio_dir = root / "audio"
+    timeline = read_json(audio_dir / "audio-timeline.json")
+    manifest = read_json(audio_dir / "tts-manifest.json")
+    bindings = read_json(audio_dir / "caption-bindings.json")
+    if (
+        not isinstance(timeline, dict)
+        or not isinstance(manifest, dict)
+        or not isinstance(bindings, list)
+    ):
+        raise FilmError(
+            "audio-verify requires audio-timeline.json, tts-manifest.json, caption-bindings.json"
+        )
+    final_path = Path(args.final).expanduser().resolve() if args.final else None
+    report = build_delivery_report(
+        timeline=timeline,
+        tts_manifest=manifest,
+        subtitle_bindings=bindings,
+        final_mp4=final_path,
+    )
+    out = audio_dir / "audio-delivery-report.json"
+    write_json(out, report)
+    emit({**report, "path": str(out)})
+    return 0 if report["ok"] else 1
+
+
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
 
@@ -5814,6 +5845,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write audio/tts-manifest.json with one provenance-bound job per vocal event",
     )
+
+    av = sub.add_parser(
+        "audio-verify", help="Fail closed on missing audio, TTS, or subtitle evidence"
+    )
+    av.add_argument("--root", required=True)
+    av.add_argument("--final", default=None, help="Optional final MP4 to inspect with FFprobe")
 
     lsc = sub.add_parser(
         "lipsync-canary",
@@ -7378,6 +7415,7 @@ def main(argv: list[str] | None = None) -> int:
             "craft": cmd_craft,
             "selects": cmd_selects,
             "audio-plan": cmd_audio_plan,
+            "audio-verify": cmd_audio_verify,
             "lipsync-canary": cmd_lipsync_canary,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,

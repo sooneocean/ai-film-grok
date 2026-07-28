@@ -43,6 +43,14 @@ def build_audio_plan(
             path = persist_timeline(root, timeline)
             timeline["path"] = str(path)
         timeline["caption_bindings"] = caption_bindings(timeline)
+        if write_timeline:
+            import json
+
+            bindings_path = root / "audio" / "caption-bindings.json"
+            bindings_path.write_text(
+                json.dumps(timeline["caption_bindings"], ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
         timeline["mix_execution"] = build_mix_execution_plan(
             timeline, sample_rate=48000 if spec.get("audio_timeline_v1") else 44100
         )

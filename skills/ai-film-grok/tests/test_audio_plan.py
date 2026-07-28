@@ -40,11 +40,16 @@ class TestBuildAudioPlan(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             # Mock all probes to avoid real deps
-            with mock.patch.dict(sys.modules, {
-                "tts_backend": mock.MagicMock(probe=lambda: {"ok": True, "active": "edge", "backends": {"edge": True}}),
-                "sound_plan": mock.MagicMock(resolve_music_template=lambda *a, **kw: None),
-                "lipsync_backend": mock.MagicMock(probe=lambda: {"ok": True, "ready": []}),
-            }):
+            with mock.patch.dict(
+                sys.modules,
+                {
+                    "tts_backend": mock.MagicMock(
+                        probe=lambda: {"ok": True, "active": "edge", "backends": {"edge": True}}
+                    ),
+                    "sound_plan": mock.MagicMock(resolve_music_template=lambda *a, **kw: None),
+                    "lipsync_backend": mock.MagicMock(probe=lambda: {"ok": True, "ready": []}),
+                },
+            ):
                 plan = build_audio_plan(root)
             self.assertTrue(plan["ok"])
             self.assertEqual(plan["vo_mode"], "storyteller")
@@ -64,19 +69,29 @@ class TestBuildAudioPlan(unittest.TestCase):
             }
             (root / "film-spec.json").write_text(json.dumps(spec))
 
-            with mock.patch.dict(sys.modules, {
-                "tts_backend": mock.MagicMock(probe=lambda: {
-                    "ok": True, "active": "edge",
-                    "backends": {"edge": True},
-                    "voicebox_ok": False,
-                }),
-                "sound_plan": mock.MagicMock(resolve_music_template=lambda *a, **kw: None),
-                "lipsync_backend": mock.MagicMock(probe=lambda: {"ok": True, "ready": []}),
-                "audio_recipe": mock.MagicMock(
-                    apply_audio_recipes_to_spec=lambda *a, **kw: {"counts": {"sfx": 3}},
-                    probe_caps_for_root=lambda r: {"lipsync_ready": False, "music_library": False, "sung_provider_ready": False},
-                ),
-            }):
+            with mock.patch.dict(
+                sys.modules,
+                {
+                    "tts_backend": mock.MagicMock(
+                        probe=lambda: {
+                            "ok": True,
+                            "active": "edge",
+                            "backends": {"edge": True},
+                            "voicebox_ok": False,
+                        }
+                    ),
+                    "sound_plan": mock.MagicMock(resolve_music_template=lambda *a, **kw: None),
+                    "lipsync_backend": mock.MagicMock(probe=lambda: {"ok": True, "ready": []}),
+                    "audio_recipe": mock.MagicMock(
+                        apply_audio_recipes_to_spec=lambda *a, **kw: {"counts": {"sfx": 3}},
+                        probe_caps_for_root=lambda r: {
+                            "lipsync_ready": False,
+                            "music_library": False,
+                            "sung_provider_ready": False,
+                        },
+                    ),
+                },
+            ):
                 plan = build_audio_plan(root)
 
             self.assertTrue(plan["ok"])
@@ -99,11 +114,16 @@ class TestBuildAudioPlan(unittest.TestCase):
             }
             (root / "film-spec.json").write_text(json.dumps(spec))
 
-            with mock.patch.dict(sys.modules, {
-                "tts_backend": mock.MagicMock(probe=lambda: {"ok": True, "active": "edge", "backends": {"edge": True}}),
-                "sound_plan": mock.MagicMock(resolve_music_template=lambda *a, **kw: None),
-                "lipsync_backend": mock.MagicMock(probe=lambda: {"ok": True, "ready": []}),
-            }):
+            with mock.patch.dict(
+                sys.modules,
+                {
+                    "tts_backend": mock.MagicMock(
+                        probe=lambda: {"ok": True, "active": "edge", "backends": {"edge": True}}
+                    ),
+                    "sound_plan": mock.MagicMock(resolve_music_template=lambda *a, **kw: None),
+                    "lipsync_backend": mock.MagicMock(probe=lambda: {"ok": True, "ready": []}),
+                },
+            ):
                 plan = build_audio_plan(root)
             self.assertEqual(plan["music"]["mood"], "dark")
 
@@ -117,14 +137,51 @@ class TestBuildAudioPlan(unittest.TestCase):
             def raise_err():
                 raise RuntimeError("probe failed")
 
-            with mock.patch.dict(sys.modules, {
-                "tts_backend": mock.MagicMock(probe=raise_err),
-                "sound_plan": mock.MagicMock(resolve_music_template=lambda *a, **kw: None),
-                "lipsync_backend": mock.MagicMock(probe=lambda: {"ok": True, "ready": []}),
-            }):
+            with mock.patch.dict(
+                sys.modules,
+                {
+                    "tts_backend": mock.MagicMock(probe=raise_err),
+                    "sound_plan": mock.MagicMock(resolve_music_template=lambda *a, **kw: None),
+                    "lipsync_backend": mock.MagicMock(probe=lambda: {"ok": True, "ready": []}),
+                },
+            ):
                 plan = build_audio_plan(root)
             # Should not crash; plan still ok
             self.assertTrue(plan["ok"])
+
+    def test_write_timeline_also_persists_caption_bindings_and_tts_manifest(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            spec = {
+                "audio_style": "audiobook",
+                "shots": [
+                    {
+                        "id": "s1",
+                        "duration_sec": 2,
+                        "audio_cues": [
+                            {
+                                "kind": "voice",
+                                "line_type": "narration",
+                                "speaker": "narrator",
+                                "spoken_text": "测试旁白",
+                                "start_offset_sec": 0,
+                                "duration_sec": 1,
+                            }
+                        ],
+                    }
+                ],
+            }
+            (root / "film-spec.json").write_text(json.dumps(spec))
+            plan = build_audio_plan(
+                root, compile_timeline=True, write_timeline=True, write_tts_manifest=True
+            )
+
+            self.assertTrue(plan["audio_timeline"]["compiled"])
+            self.assertTrue((root / "audio" / "audio-timeline.json").is_file())
+            self.assertTrue((root / "audio" / "caption-bindings.json").is_file())
+            self.assertTrue((root / "audio" / "tts-manifest.json").is_file())
 
 
 if __name__ == "__main__":
