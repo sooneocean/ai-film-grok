@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -16,6 +17,17 @@ sys.path.insert(0, str(SCRIPTS))
 def _service():
     pytest.importorskip("fastapi")
     return importlib.import_module("lipsync_node_service")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_service_globals(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = _service()
+    for name in list(os.environ):
+        if name.startswith("AIFILM_LIPSYNC_NODE_"):
+            monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(service, "jobs", {})
+    monkeypatch.setattr(service, "_backend_probe_cache", {})
+    monkeypatch.setattr(service, "gpu_lock", asyncio.Lock())
 
 
 def test_backend_ready_requires_measured_clean_checkout_and_fingerprint(
