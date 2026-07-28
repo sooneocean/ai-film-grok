@@ -3,6 +3,16 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.14.5] - 2026-07-28
+
+### Added
+
+- Added bounded ComfyUI SSH recovery: healthy nodes are untouched, tunnel-only repair is preferred, and remote restart requires confirmed consecutive failures.
+
+### Security
+
+- Recovery accepts only the pinned RFC1918 host shape, owner-only non-symlink SSH keys, fixed remote scripts, and sanitized receipts.
+
 ## [2.14.4] - 2026-07-28
 
 ### Added

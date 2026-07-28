@@ -68,6 +68,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" comfy probe
 "$AIFILM" comfy inventory
 "$AIFILM" comfy capacity
+"$AIFILM" comfy recover --confirm  # only after probe failure
 "$AIFILM" route explain --root "<film>" --shot-id "shot01"
 "$AIFILM" route plan --root "<film>" --shot-id "shot01" --write
 # 用户批准后才 pilot approve / bulk

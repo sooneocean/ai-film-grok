@@ -65,7 +65,7 @@
     "scripts/cli/review.py": "5e0c03f44732ae14df79614b7e7da7ad57513f8a6fefa2bbe01e29e7c0076c4d",
     "scripts/cli_assets.py": "de30bff087307ccd2c735663519a8c3b8110442290d59d7c65c65b622f73b645",
     "scripts/cli_bgm_library.py": "b07c2e184821f50ec0b12763dce0ffac90614a45ac84506f08c09e6d539c375c",
-    "scripts/cli_comfy.py": "7bc6643937750b5020ac06f04cd187097c77febf84c3bcb26be15c798a2a7707",
+    "scripts/cli_comfy.py": "a5dac6eca88b6fe1097225bfb6d261d9a08e3d8a67dbde4a709e524f47d4e43f",
     "scripts/cli_graph.py": "512ddfa1d83b0590f2f0ee433d52181527f0687993edf03647e1c08d9d04e086",
     "scripts/cli_graph_mutation.py": "368557e7f99ab083d3ece4b2aeb735ab5bd22d54c9051b2879b096fc7f799dbb",
     "scripts/cli_motion.py": "161d33bbb26c4996659d789b8d95ba9d484481c05331ae4266dd20d342c1962f",
@@ -245,7 +245,8 @@
     "scripts/voice_cast_profiles.py": "c0f7adea3e3161729c645d42a605567fc050864b5da9ee74618c23b28142776a",
     "scripts/voice_tracks.py": "e1966502340f87d39a55d0757b038bdca2c6992fd3c097215da7d5ab48d33724",
     "scripts/weapon_router.py": "5675ad888a58d3aaed98cc13254c8a2a8f74536c780fde13d0684ce52bf22d20",
-    "scripts/workflow_spine.py": "afbf3b3f8c57211a82a91381c4f0f3ca52219efdc36646123a5019b5bba1e27e"
+    "scripts/workflow_spine.py": "afbf3b3f8c57211a82a91381c4f0f3ca52219efdc36646123a5019b5bba1e27e",
+    "scripts/comfy_recovery.py": "dcd650cfee8bf5b5f2185bbb795f9ecc14d5122642e7d9f0a8105ceb65830f02"
   },
   "requirements_sha256": "b0acb41843d88a97955a7f14a300c9f873957f3e7a6da00bc3343e178289728a"
 }

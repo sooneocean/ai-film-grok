@@ -43,6 +43,20 @@ still remain operationally reserved during a managed bulk run. Wait for an
 owned job to finish or explicitly use `free-memory --confirm` after the queue
 is idle; never interrupt an unknown running prompt.
 
+If the loopback tunnel or ComfyUI health probe fails, use the bounded recovery
+path:
+
+```bash
+aifilm comfy recover --confirm
+```
+
+It performs no mutation when the local health probe is already green. If the
+remote service is healthy, it repairs only the SSH tunnel. It runs the pinned
+remote stop/start scripts only when both the local and remote ComfyUI probes
+fail, then verifies local health again. Unknown local-port ownership, unsafe
+SSH targets, loose key permissions and failed read-back stop the recovery.
+The receipt never contains the SSH target, key path, command output or prompt.
+
 For demand-driven model selection, use
 [`comfy-weapon-armory.md`](comfy-weapon-armory.md). It routes only to retained
 real-pilot weapons and live-checks their required model folders.
