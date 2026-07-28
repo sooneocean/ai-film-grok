@@ -68,7 +68,7 @@ if ((Get-Item -LiteralPath $assembled).Length -ne $expected) {
 }
 Move-Item -LiteralPath $assembled -Destination $target -Force
 
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$root\download-higgs-v2-tokenizer-ranges.ps1"
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$root\download_higgs_v2_tokenizer_ranges.ps1"
 if ($LASTEXITCODE -ne 0) {
     throw "Higgs tokenizer download failed with exit code $LASTEXITCODE"
 }

@@ -1,3 +1,3 @@
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\aifilm-audio-node\download-higgs-v2-tokenizer-ranges.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\aifilm-audio-node\download_higgs_v2_tokenizer_ranges.ps1
 exit /b %errorlevel%
