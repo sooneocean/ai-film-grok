@@ -34,8 +34,7 @@ def _require_checkout(repo: Path) -> tuple[str, str]:
         len(expected_commit) != 40
         or any(character not in "0123456789abcdef" for character in expected_commit)
         or any(
-            len(value) != 64
-            or any(character not in "0123456789abcdef" for character in value)
+            len(value) != 64 or any(character not in "0123456789abcdef" for character in value)
             for value in expected_values
         )
     ):

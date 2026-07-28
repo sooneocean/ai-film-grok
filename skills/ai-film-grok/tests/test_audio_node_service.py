@@ -196,6 +196,7 @@ def test_reference_upload_is_hash_named_and_batch_resolves_it(
         )
     )
     assert result["status"] == "queued"
+    assert service.jobs[result["job_id"]]["status"] == "queued"
 
 
 def test_sfx_health_rejects_missing_probe_executable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -210,7 +211,6 @@ def test_sfx_health_rejects_missing_probe_executable(monkeypatch: pytest.MonkeyP
     service._sfx_probe_ok.cache_clear()
     assert service._available("sfx") is False
     service._sfx_probe_ok.cache_clear()
-    assert service.jobs[result["job_id"]]["status"] == "queued"
 
 
 def test_reference_upload_rejects_wrong_delivery_format(
