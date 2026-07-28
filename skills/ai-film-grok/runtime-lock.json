@@ -140,7 +140,7 @@
     "scripts/intake.py": "bfec8ffb9db50244ecd23c5e08723d1f66ba98117afb5dc4809b10caea686c58",
     "scripts/lipsync_backend.py": "67615252c757ee1a11c21992f531c86d9227d9b730a8cc79338cf7b229548aa5",
     "scripts/lipsync_canary.py": "8b7878d449a8fb8b596fb7d121cfb42a91e7584bf81468eb6cefcb37faeddba0",
-    "scripts/lipsync_node_client.py": "2ea547b10ecfe9465adcf8702b20d628b668a0fb738e78325be2ecb656150dbd",
+    "scripts/lipsync_node_client.py": "1d33d49eb4472c87168a46e30b33f28c220fa219255ded13136cc161a6e1a8fb",
     "scripts/lipsync_node_service.py": "3249aa331f2b3cf2f1fc0ce344ae0b3c9852fca03329f223a929eb23e0786c5b",
     "scripts/local_llm.py": "c4ba7eef6eeb936abf49514aea4000dcff0b4e7bf749907c4ea5bc6546dde2ba",
     "scripts/logger.py": "28b69919dc327b2ba90d3c14fb53509054f5e7cfcbd30dd4cbbaa159afa4d12d",
