@@ -9,7 +9,15 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 
 import pytest
-from audio_node_client import AudioNodeError, _request, _url, health, render, render_batch
+from audio_node_client import (
+    AudioNodeError,
+    _request,
+    _url,
+    health,
+    public_health_report,
+    render,
+    render_batch,
+)
 
 
 def _delivery_wav() -> bytes:
@@ -30,6 +38,30 @@ def test_rejects_non_http_node_url() -> None:
 def test_health_requires_private_token() -> None:
     with pytest.raises(AudioNodeError):
         health("http://192.168.88.52:8788", "short")
+
+
+def test_public_health_report_drops_unknown_fields_and_current_token() -> None:
+    token = "private-test-token"
+    report = public_health_report(
+        {
+            "ok": True,
+            "node": "private-lan",
+            "models": {"tts": True, "music": False, "leak": token},
+            "model": token,
+            "music_model": "ACE-Step-1.5",
+            "gpu": {"available": True, "name": token, "free_vram_mib": 1234},
+            "diagnostic": {"secret": token},
+        },
+        secret_values=(token,),
+    )
+
+    assert report == {
+        "ok": True,
+        "node": "private-lan",
+        "models": {"tts": True, "music": False},
+        "music_model": "ACE-Step-1.5",
+        "gpu": {"available": True, "free_vram_mib": 1234},
+    }
 
 
 def test_http_error_is_not_misreported_as_network_unreachable() -> None:

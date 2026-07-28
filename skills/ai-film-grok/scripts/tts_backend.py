@@ -419,15 +419,15 @@ def probe_audio_node() -> dict[str, Any]:
     if not base or not token:
         return {"ok": False, "error": "AIFILM_AUDIO_NODE_URL/TOKEN not configured"}
     try:
-        from audio_node_client import health
+        from audio_node_client import health, public_health_report
 
-        result = health(base, token)
+        result = public_health_report(health(base, token), secret_values=(token,))
         return {
             "ok": bool(result.get("ok") and result.get("models", {}).get("tts")),
             "detail": result,
         }
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:240]}
+    except Exception:
+        return {"ok": False, "error": "audio node health check failed"}
 
 
 def probe() -> dict[str, Any]:
