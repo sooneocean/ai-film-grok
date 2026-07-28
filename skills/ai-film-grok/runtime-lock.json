@@ -184,7 +184,7 @@
     "scripts/production_evidence.py": "616e5fadd740ae496886add45bddebaa06bf9e12de754385839c51d3fca11851",
     "scripts/production_gates.py": "b653c605d10d31dbf038bb378b11ecc6542d1ea12e33c78a68cd6761f57ccbbd",
     "scripts/production_report.py": "4cf52c0cbd9095dafbb194f4ac8725e656a11f48ce69f2994c7355de822dbbd2",
-    "scripts/production_router.py": "1fe2abdf9f1414a709ca77d527b503f19107f4e6ffbba7d41f8bf93f25ca12d6",
+    "scripts/production_router.py": "5c2d855dc31a825abeb16d74eea6d748e17eae96ef73d15e1c943b0c4243248b",
     "scripts/prompt_budget.py": "81b51101cc3bd0a2289c56e21728ad18ec17d21f63775a84aad2d70613258057",
     "scripts/prompt_compression_pilot.py": "eae92697d87b8b16409fefc9ab9d2a2efc631e68acbf8ce0d81bfe3ab4c4c82c",
     "scripts/prompt_injector.py": "3e9dd391bc98f9e00feb709b8cfc5aecc03ac17272ae7ae23cb13210c3009651",
