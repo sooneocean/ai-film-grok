@@ -82,6 +82,8 @@ def reconcile(root: Path, *, write: bool = True) -> dict[str, Any]:
     """Infer required scene sound without mutating film-spec or buying assets."""
     root = Path(root).expanduser().resolve()
     spec = read_json(root / "film-spec.json")
+    if not isinstance(spec, dict):
+        spec = {}
     events: list[dict[str, Any]] = []
     for shot in _shots(spec):
         sid = str(shot.get("id") or "")
