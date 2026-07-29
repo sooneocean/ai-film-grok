@@ -1737,15 +1737,32 @@ def i2v_motion_templates() -> dict[str, str]:
         ),
         "union_settle": (
             "primary: straddle-seat hips settle into pelvis-lock, weight fully down once, "
-            "thighs clamp, camera locked slight low, breath hitch, idle not speaking"
+            "thighs clamp, hair-pull anchor, body-weight grind, skin-to-skin friction, "
+            "camera locked slight low, breath hitch, idle not speaking"
         ),
         "rhythm_hips": (
             "primary: hips-sink twice with grind-forward thrust-rhythm, pelvis readable, "
-            "locked camera or micro rock with body, clutch fabric, breath, idle not speaking"
+            "deep penetrating thrusts, locked camera or micro rock with body, "
+            "clutch fabric, wet skin friction, breath, idle not speaking"
         ),
         "lock_clutch": (
             "primary: leg-wrap-waist lock, fingers clutch sheets/flesh, micro-tremor squeeze, "
-            "ecu_hold on hands or hip line, idle not speaking"
+            "ecu_hold on hands or hip line, body trembling, idle not speaking"
+        ),
+        "deep_thrust": (
+            "primary: deep penetrating thrust, pelvis bottoming out repeatedly, "
+            "skin-to-skin friction impact, heavy breath hitch, body-weight drive, "
+            "locked low angle, idle not speaking"
+        ),
+        "internal_peak": (
+            "primary: internal ejaculation peak, body overflow, trembling climax, "
+            "bare skin contact, heavy pelvic thrust, wet vocalization, "
+            "camera locked close, idle not speaking"
+        ),
+        "creampie_release": (
+            "primary: creampie release, internal overflow, biological fluid leak, "
+            "bare skin friction, residual throbbing, heavy breath, "
+            "close-up on contact, idle not speaking"
         ),
         "finish_arch": (
             "primary: arch-finish spine curve, residual-tremor, wet eyes, body softens after peak, "
@@ -1767,6 +1784,9 @@ COITUS_BEAT_MOTION_KEY: dict[str, str] = {
     "finish": "finish_arch",
     "hook": "hook_whisper",
     "undress": "undress_slide",
+    "deep_thrust": "deep_thrust",
+    "internal_peak": "internal_peak",
+    "creampie_release": "creampie_release",
 }
 
 # Act-phase pose verbs that pass Mute Frame / coitus readability (X4)
