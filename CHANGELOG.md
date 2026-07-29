@@ -3,6 +3,12 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.15.1] - 2026-07-29
+
+### Fixed
+
+- ACE-Step cover/repaint edits now prepare a temporary, faded target-duration reference before upload. This preserves the approved master and prevents cover mode from silently returning the source duration instead of the requested edit duration.
+
 ## [2.15.0] - 2026-07-28
 
 ### Added

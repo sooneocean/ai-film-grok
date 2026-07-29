@@ -6,7 +6,12 @@ from unittest.mock import patch
 
 import config_loader
 import pytest
-from cli_bgm_library import BGMLibraryError, _node_credentials, cmd_bgm_library
+from cli_bgm_library import (
+    BGMLibraryError,
+    _node_credentials,
+    _prepare_edit_reference,
+    cmd_bgm_library,
+)
 
 
 def test_node_credentials_loads_private_config_env_before_reading_environment(
@@ -111,3 +116,28 @@ def test_doctor_uses_fixed_error_for_untrusted_health_exception(
 
     assert token not in repr(emitted)
     assert emitted[0]["node"] == {"ok": False, "error": "audio node health check failed"}
+
+
+def test_prepare_edit_reference_uses_faded_cutdown_without_touching_master(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "approved.wav"
+    source.write_bytes(b"approved-master")
+    prepared = tmp_path / "prepared-edit-reference.wav"
+
+    def fake_run(command, **_kwargs):
+        assert "-stream_loop" not in command
+        assert "afade=t=out:st=18.500:d=1.500" in command
+        prepared.write_bytes(b"temporary-reference")
+
+    with patch("cli_bgm_library.subprocess.run", side_effect=fake_run):
+        result, preparation = _prepare_edit_reference(
+            source,
+            source_duration=30.0,
+            target_duration=20.0,
+            directory=tmp_path,
+        )
+
+    assert result == prepared
+    assert preparation == "faded_cutdown"
+    assert source.read_bytes() == b"approved-master"

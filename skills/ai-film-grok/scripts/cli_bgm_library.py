@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -253,6 +255,49 @@ def _node_credentials() -> tuple[str, str]:
     return base, token
 
 
+def _prepare_edit_reference(
+    source: Path,
+    *,
+    source_duration: float,
+    target_duration: float,
+    directory: Path,
+) -> tuple[Path, str]:
+    """Make a temporary, target-length ACE cover reference without altering the master."""
+    if abs(source_duration - target_duration) <= 0.001:
+        return source, "approved_master"
+    output = directory / "prepared-edit-reference.wav"
+    fade_duration = min(1.5, max(0.25, target_duration / 4.0))
+    fade_start = max(0.0, target_duration - fade_duration)
+    command = ["ffmpeg", "-y"]
+    preparation = "faded_cutdown" if target_duration < source_duration else "looped_fade"
+    if target_duration > source_duration:
+        command.extend(["-stream_loop", "-1"])
+    command.extend(
+        [
+            "-i",
+            str(source),
+            "-t",
+            f"{target_duration:.3f}",
+            "-af",
+            f"afade=t=out:st={fade_start:.3f}:d={fade_duration:.3f}",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-c:a",
+            "pcm_s16le",
+            str(output),
+        ]
+    )
+    try:
+        subprocess.run(command, check=True, capture_output=True, timeout=180)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise BGMLibraryError("could not prepare ACE edit reference") from exc
+    if not output.is_file() or output.is_symlink():
+        raise BGMLibraryError("prepared ACE edit reference is missing")
+    return output, preparation
+
+
 def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
     action = str(args.bgm_library_action)
     library = _root(args)
@@ -417,24 +462,34 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
     elif action == "edit-pack":
         base, token = _node_credentials()
         parent, parent_path = get_approved_asset(library, args.asset_id)
-        recipes = edit_variant_recipes(
-            parent,
-            parent_path=parent_path,
-            target_duration=float(args.duration),
-            variants=tuple(args.variant),
-        )
-        candidates = []
-        for index, recipe in enumerate(recipes):
-            seed_start = int(args.seed_base) + index * int(args.batch_size)
-            result = generate_candidates(
-                library,
-                base_url=base,
-                token=token,
-                recipe=recipe,
-                batch_size=int(args.batch_size),
-                seeds=list(range(seed_start, seed_start + int(args.batch_size))),
+        target_duration = float(args.duration)
+        source_duration = float((parent.get("technical") or {}).get("duration_sec") or 0.0)
+        with tempfile.TemporaryDirectory(prefix="aifilm-ace-edit-") as temporary:
+            prepared_path, preparation = _prepare_edit_reference(
+                parent_path,
+                source_duration=source_duration,
+                target_duration=target_duration,
+                directory=Path(temporary),
             )
-            candidates.extend(result["candidates"])
+            recipes = edit_variant_recipes(
+                parent,
+                parent_path=prepared_path,
+                target_duration=target_duration,
+                variants=tuple(args.variant),
+            )
+            candidates = []
+            for index, recipe in enumerate(recipes):
+                recipe["reference_preparation"] = preparation
+                seed_start = int(args.seed_base) + index * int(args.batch_size)
+                result = generate_candidates(
+                    library,
+                    base_url=base,
+                    token=token,
+                    recipe=recipe,
+                    batch_size=int(args.batch_size),
+                    seeds=list(range(seed_start, seed_start + int(args.batch_size))),
+                )
+                candidates.extend(result["candidates"])
         report = {
             "ok": True,
             "asset_id": args.asset_id,

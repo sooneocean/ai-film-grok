@@ -64,7 +64,7 @@
     "scripts/cli/__init__.py": "95e4301bc9910914b62f49cfa402f3e7ea22ea888f8f78bcde4debc9ed205677",
     "scripts/cli/review.py": "5e0c03f44732ae14df79614b7e7da7ad57513f8a6fefa2bbe01e29e7c0076c4d",
     "scripts/cli_assets.py": "de30bff087307ccd2c735663519a8c3b8110442290d59d7c65c65b622f73b645",
-    "scripts/cli_bgm_library.py": "41eca8b047a5ee4d1d7e21ef2cf1735d7304194dcd14e343531ba609e756c472",
+    "scripts/cli_bgm_library.py": "563e42924e2843cc47b4a88c1be38ff78c60a92e4380e7dce1244deb863c6919",
     "scripts/cli_comfy.py": "7bc6643937750b5020ac06f04cd187097c77febf84c3bcb26be15c798a2a7707",
     "scripts/cli_graph.py": "512ddfa1d83b0590f2f0ee433d52181527f0687993edf03647e1c08d9d04e086",
     "scripts/cli_graph_mutation.py": "368557e7f99ab083d3ece4b2aeb735ab5bd22d54c9051b2879b096fc7f799dbb",

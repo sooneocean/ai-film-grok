@@ -156,6 +156,10 @@ canary 会回读候选数量、时长、技术检测、唯一 checksum 与唯一
 转场桥只有在批准、checksum 校验通过且父子绑定吻合时才实混；成片成功后，cue 和 bridge
 分别追加 usage 事件。`final` 不允许把“计划中会生成”当成“已经存在”。
 
+ACE-Step cover 会以参考音长度为准。因此当 edit 目标时长不同于批准 master，客户端只会在
+临时目录制作带淡出的 target-length reference 并上传给节点；批准 master 从不改写，临时参考
+不进 catalog，最终仍只允许人工批准的 ACE 输出进入 final。
+
 ## 三阶梯 · 立刻换口味（操作）
 
 ```text
