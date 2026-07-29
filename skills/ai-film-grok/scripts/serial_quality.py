@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,19 @@ def _issue(code: str, message: str, ref: str) -> dict[str, str]:
 def serial_enabled(spec: dict[str, Any]) -> bool:
     serial = spec.get("serial")
     return serial is True or (isinstance(serial, dict) and serial.get("enabled") is True)
+
+
+def _duration(shot: dict[str, Any], *, ref: str, errors: list[dict[str, str]]) -> float:
+    raw = shot.get("duration_sec", shot.get("duration", 0))
+    try:
+        value = float(raw or 0)
+    except (TypeError, ValueError):
+        errors.append(_issue("SHOT_DURATION_INVALID", "shot duration must be numeric", ref))
+        return 0.0
+    if not math.isfinite(value) or value <= 0:
+        errors.append(_issue("SHOT_DURATION_INVALID", "shot duration must be positive", ref))
+        return 0.0
+    return value
 
 
 def _beats(graph: dict[str, Any]) -> list[dict[str, Any]]:
@@ -61,6 +75,15 @@ def _contains(text: str, markers: tuple[str, ...]) -> bool:
     return any(marker.casefold() in value for marker in markers)
 
 
+def _episode_number(value: Any, *, ref: str, errors: list[dict[str, str]]) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        errors.append(
+            _issue("EPISODE_NUMBER_INVALID", "episode_number must be a positive integer", ref)
+        )
+        return None
+    return value
+
+
 def validate_serial(root: Path | str, *, write_receipt: bool = False) -> dict[str, Any]:
     """Validate serial mode without inferring creative intent or rights."""
     base = Path(root).expanduser().resolve()
@@ -84,6 +107,18 @@ def validate_serial(root: Path | str, *, write_receipt: bool = False) -> dict[st
         spec.get("episode_contract") if isinstance(spec.get("episode_contract"), dict) else {}
     )
     serial = spec.get("serial") if isinstance(spec.get("serial"), dict) else {}
+    if not isinstance(spec.get("serial"), dict) or serial.get("enabled") is not True:
+        errors.append(
+            _issue(
+                "SERIAL_CONFIG_INVALID",
+                "serial mode must use an object with enabled=true and series_id",
+                "serial",
+            )
+        )
+    if not _authored(serial.get("series_id")):
+        errors.append(
+            _issue("SERIES_ID_MISSING", "serial.series_id is required", "serial.series_id")
+        )
 
     for field in ("series_id", "title", "season_arc", "release_cadence"):
         if not _authored(bible.get(field)):
@@ -207,12 +242,16 @@ def validate_serial(root: Path | str, *, write_receipt: bool = False) -> dict[st
                 "episode_contract.opening_promise.evidence_shot_ids",
             )
         )
-    total = sum(float(shot.get("duration_sec") or shot.get("duration") or 0) for shot in shots)
+    durations = [
+        _duration(shot, ref=f"shot[{index}].duration_sec", errors=errors)
+        for index, shot in enumerate(shots)
+    ]
+    total = sum(durations)
     window = min(30.0, total)
     elapsed = 0.0
     opening_ids: set[str] = set()
-    for shot in shots:
-        elapsed += float(shot.get("duration_sec") or shot.get("duration") or 0)
+    for shot, duration in zip(shots, durations, strict=True):
+        elapsed += duration
         opening_ids.add(str(shot.get("id") or shot.get("shot_id") or ""))
         if elapsed >= window:
             break
@@ -241,6 +280,32 @@ def validate_serial(root: Path | str, *, write_receipt: bool = False) -> dict[st
             )
 
     episodes = bible.get("episodes") if isinstance(bible.get("episodes"), list) else []
+    episode_numbers: set[int] = set()
+    for index, episode in enumerate(episodes):
+        if not isinstance(episode, dict):
+            errors.append(
+                _issue(
+                    "SERIES_EPISODE_INVALID",
+                    "episode ledger item must be an object",
+                    f"series-bible.episodes[{index}]",
+                )
+            )
+            continue
+        number = _episode_number(
+            episode.get("episode_number"),
+            ref=f"series-bible.episodes[{index}].episode_number",
+            errors=errors,
+        )
+        if number is not None:
+            if number in episode_numbers:
+                errors.append(
+                    _issue(
+                        "EPISODE_NUMBER_DUPLICATE",
+                        "episode_number must be unique",
+                        "series-bible.episodes",
+                    )
+                )
+            episode_numbers.add(number)
     current = next(
         (
             item
@@ -257,16 +322,30 @@ def validate_serial(root: Path | str, *, write_receipt: bool = False) -> dict[st
                 "series-bible.episodes",
             )
         )
-    elif int(current.get("episode_number") or 1) > 1 and not _authored(
-        current.get("responds_to_hook_id")
-    ):
-        errors.append(
-            _issue(
-                "PREVIOUS_HOOK_UNRESOLVED",
-                "later episodes must declare the prior hook they answer",
-                "series-bible.episodes",
-            )
+    elif (
+        current_number := _episode_number(
+            current.get("episode_number"), ref="series-bible.current.episode_number", errors=errors
         )
+    ) is not None and current_number > 1:
+        prior_number = current_number - 1
+        prior = next(
+            (
+                item
+                for item in episodes
+                if isinstance(item, dict) and item.get("episode_number") == prior_number
+            ),
+            None,
+        )
+        response = current.get("responds_to_hook_id")
+        prior_hook = prior.get("ending_hook_id") if isinstance(prior, dict) else None
+        if not _authored(response) or not _authored(prior_hook) or response != prior_hook:
+            errors.append(
+                _issue(
+                    "PREVIOUS_HOOK_UNRESOLVED",
+                    "later episodes must reference the immediate prior episode ending_hook_id",
+                    "series-bible.episodes",
+                )
+            )
     novelty = contract.get("novelty") if isinstance(contract.get("novelty"), dict) else {}
     for field in ("genre_tags", "setting", "differentiator", "signature"):
         if not _authored(novelty.get(field)):
@@ -300,6 +379,33 @@ def validate_serial(root: Path | str, *, write_receipt: bool = False) -> dict[st
                 "SERIAL_MINOR_INTIMACY_CONFLICT",
                 "minor and intimacy signals cannot coexist",
                 "series-bible/episode-contract",
+            )
+        )
+    show = (
+        spec.get("show_package")
+        if isinstance(spec.get("show_package"), dict)
+        else read_json(base / "show-package.json") or {}
+    )
+    ending = (
+        show.get("ending")
+        if isinstance(show, dict) and isinstance(show.get("ending"), dict)
+        else {}
+    )
+    end_roll = spec.get("end_roll") if isinstance(spec.get("end_roll"), dict) else {}
+    if not ending:
+        errors.append(
+            _issue(
+                "SERIAL_ENDING_CARD_MISSING",
+                "serial delivery requires a show-package ending card",
+                "show-package.ending",
+            )
+        )
+    if str(end_roll.get("mode") or "").strip().lower() == "none":
+        errors.append(
+            _issue(
+                "SERIAL_ENDING_CARD_SUPPRESSED",
+                "serial delivery cannot suppress the ending card",
+                "end_roll.mode",
             )
         )
     report = {

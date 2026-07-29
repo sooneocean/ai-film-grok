@@ -9,7 +9,7 @@
     "description": { "type": "string" },
     "serial": {
       "oneOf": [
-        { "type": "boolean" },
+        { "const": false },
         { "type": "object", "properties": { "enabled": { "const": true }, "series_id": { "type": "string", "minLength": 1 } }, "required": ["enabled", "series_id"], "additionalProperties": true }
       ],
       "description": "Optional serial-drama mode. Enabled projects require series-bible.json and episode_contract at concept/script lock."

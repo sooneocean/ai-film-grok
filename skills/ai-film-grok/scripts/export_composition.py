@@ -587,6 +587,7 @@ def build_timeline_package(
         },
         "final_film": final_film,
         "director_intent": spec.get("director_intent"),
+        "serial": spec.get("serial"),
         "episode_contract": spec.get("episode_contract")
         if isinstance(spec.get("episode_contract"), dict)
         else None,
@@ -1080,8 +1081,14 @@ def build_platform_ending_html(
     output_duration = float(timeline.get("output_duration") or duration)
     start = max(0.0, output_duration - duration)
     cta = str(ending.get("cta") or "")
+    serial = package.get("serial")
     contract = (
-        package.get("episode_contract") if isinstance(package.get("episode_contract"), dict) else {}
+        package.get("episode_contract")
+        if (
+            (serial is True or (isinstance(serial, dict) and serial.get("enabled") is True))
+            and isinstance(package.get("episode_contract"), dict)
+        )
+        else {}
     )
     hook = str(contract.get("ending_question") or ending.get("next_episode_hook") or "")
     brand = show_package.get("brand") if isinstance(show_package.get("brand"), dict) else {}

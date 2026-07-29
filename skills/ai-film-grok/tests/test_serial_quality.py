@@ -4,9 +4,12 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from director_cli import validate_native_stage_evidence  # noqa: E402
 from export_composition import build_platform_ending_html  # noqa: E402
 from serial_quality import validate_serial  # noqa: E402
 
@@ -36,7 +39,12 @@ def _valid(root: Path, *, duplicate: bool = False) -> None:
                 }
             ],
             "episodes": [
-                {"episode_id": "ep01", "episode_number": 1, "novelty_signature": "office-secret"},
+                {
+                    "episode_id": "ep01",
+                    "episode_number": 1,
+                    "ending_hook_id": "ep01-ending",
+                    "novelty_signature": "office-secret",
+                },
                 {
                     "episode_id": "ep02",
                     "episode_number": 2,
@@ -55,6 +63,11 @@ def _valid(root: Path, *, duplicate: bool = False) -> None:
                 {"id": "b2", "event_relation": "complicates"},
             ]
         },
+    )
+    _write(
+        root,
+        "show-package.json",
+        {"id": "night.v1", "version": "1", "ending": {"cta": "追更"}},
     )
     _write(
         root,
@@ -119,10 +132,53 @@ def test_serial_reports_duplicate_signature_without_blocking(tmp_path: Path) -> 
     assert report["warnings"][0]["code"] == "NOVELTY_SIGNATURE_COLLISION"
 
 
+def test_serial_rejects_unbound_series_and_invented_prior_hook(tmp_path: Path) -> None:
+    _valid(tmp_path)
+    spec = json.loads((tmp_path / "film-spec.json").read_text())
+    spec["serial"] = True
+    _write(tmp_path, "film-spec.json", spec)
+    bible = json.loads((tmp_path / "series-bible.json").read_text())
+    bible["episodes"][1]["responds_to_hook_id"] = "invented-hook"
+    _write(tmp_path, "series-bible.json", bible)
+    codes = {item["code"] for item in validate_serial(tmp_path)["errors"]}
+    assert {"SERIAL_CONFIG_INVALID", "SERIES_ID_MISSING", "PREVIOUS_HOOK_UNRESOLVED"} <= codes
+
+
+def test_serial_rejects_suppressed_ending_and_bad_duration(tmp_path: Path) -> None:
+    _valid(tmp_path)
+    spec = json.loads((tmp_path / "film-spec.json").read_text())
+    spec["end_roll"] = {"mode": "none"}
+    spec["scenes"][0]["shots"][0]["duration_sec"] = "not-a-number"
+    _write(tmp_path, "film-spec.json", spec)
+    codes = {item["code"] for item in validate_serial(tmp_path)["errors"]}
+    assert {"SERIAL_ENDING_CARD_SUPPRESSED", "SHOT_DURATION_INVALID"} <= codes
+
+
+@pytest.mark.parametrize("bad_duration", ["NaN", "inf"])
+def test_serial_rejects_nonfinite_duration(tmp_path: Path, bad_duration: str) -> None:
+    _valid(tmp_path)
+    spec = json.loads((tmp_path / "film-spec.json").read_text())
+    spec["scenes"][0]["shots"][0]["duration_sec"] = bad_duration
+    _write(tmp_path, "film-spec.json", spec)
+    assert "SHOT_DURATION_INVALID" in {item["code"] for item in validate_serial(tmp_path)["errors"]}
+
+
+@pytest.mark.parametrize("bad_number", [None, False, 1.5, "bad"])
+def test_serial_rejects_invalid_episode_number(tmp_path: Path, bad_number: object) -> None:
+    _valid(tmp_path)
+    bible = json.loads((tmp_path / "series-bible.json").read_text())
+    bible["episodes"][1]["episode_number"] = bad_number
+    _write(tmp_path, "series-bible.json", bible)
+    assert "EPISODE_NUMBER_INVALID" in {
+        item["code"] for item in validate_serial(tmp_path)["errors"]
+    }
+
+
 def test_show_ending_prefers_verified_episode_question() -> None:
     html = build_platform_ending_html(
         {
             "film_timeline": {"output_duration": 10},
+            "serial": {"enabled": True, "series_id": "night"},
             "episode_contract": {"ending_question": "谁换走了证据？"},
         },
         {"ending": {"duration_sec": 1, "next_episode_hook": "旧钩子", "cta": "追更"}},
@@ -130,3 +186,29 @@ def test_show_ending_prefers_verified_episode_question() -> None:
     )
     assert "谁换走了证据？" in html
     assert "旧钩子" not in html
+
+
+def test_non_serial_show_ending_keeps_show_package_hook() -> None:
+    html = build_platform_ending_html(
+        {"film_timeline": {"output_duration": 10}, "episode_contract": {"ending_question": "草稿"}},
+        {"ending": {"duration_sec": 1, "next_episode_hook": "标准钩子", "cta": "追更"}},
+        end_dur=1,
+    )
+    assert "标准钩子" in html
+    assert "草稿" not in html
+
+
+def test_concept_lock_rejects_invalid_serial_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _valid(tmp_path)
+    _write(tmp_path, "brief.json", {"title": "夜航"})
+    bible = json.loads((tmp_path / "series-bible.json").read_text())
+    bible["characters"][0]["adult_confirmed"] = False
+    _write(tmp_path, "series-bible.json", bible)
+    monkeypatch.setattr(
+        "narrative_control.control_status",
+        lambda _root: {"canonical": True, "semantic": {"ok": True}},
+    )
+    with pytest.raises(ValueError, match="serial quality gate failed"):
+        validate_native_stage_evidence(tmp_path, "concept_lock")
