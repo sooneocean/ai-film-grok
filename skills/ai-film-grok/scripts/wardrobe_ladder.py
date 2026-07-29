@@ -46,7 +46,9 @@ def state_for_id(bible: dict[str, Any], character_id: str, state_id: str) -> dic
     ladders = (
         bible.get("wardrobe_ladders") if isinstance(bible.get("wardrobe_ladders"), dict) else {}
     )
-    for key in (character_id, "hero"):
+    # Exact state IDs are character-owned pixel contracts.  Falling back to
+    # hero would put another person's undress state on this character.
+    for key in (character_id,):
         ladder = ladders.get(key)
         if not isinstance(ladder, dict):
             continue
@@ -78,7 +80,7 @@ def resolve_state_photo_for_category(
         bible.get("wardrobe_ladders") if isinstance(bible.get("wardrobe_ladders"), dict) else {}
     )
     wanted = str(wardrobe_state or "full").strip().lower()
-    for key in (character_id, "hero"):
+    for key in (character_id,):
         ladder = ladders.get(key)
         if not isinstance(ladder, dict):
             continue

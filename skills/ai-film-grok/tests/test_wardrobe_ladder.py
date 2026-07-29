@@ -114,6 +114,49 @@ def test_state_index_blocks_missing_or_drifted_ladder_states(tmp_path: Path) -> 
     assert "WARDROBE_STATE_HASH_DRIFT" in {issue["code"] for issue in report["hard"]}
 
 
+def test_exact_state_never_falls_back_to_another_characters_hero_state(tmp_path: Path) -> None:
+    hero_ladder = _ladder(tmp_path, approved=True)
+    villain_ladder = _ladder(tmp_path, approved=True)
+    old_to_new = {"full": "v-full", "coat-off": "v-coat-off", "top-off": "v-top-off"}
+    for state in villain_ladder["hero"]["states"]:
+        old_id = state["id"]
+        state["id"] = old_to_new[old_id]
+        if state["parent_state_id"]:
+            state["parent_state_id"] = old_to_new[state["parent_state_id"]]
+        state["path"] = state["path"].replace("hero/", "villain/")
+        image = _write_image(tmp_path, state["path"], f"villain-{old_id}".encode())
+        state["sha256"] = hashlib.sha256(image.read_bytes()).hexdigest()
+    villain_ladder["villain"] = villain_ladder.pop("hero")
+    bible = {"wardrobe_ladders": {**hero_ladder, **villain_ladder}}
+
+    assert (
+        resolve_state_photo(
+            bible, "villain", "undressed", root=tmp_path, wardrobe_state_id="top-off"
+        )
+        is None
+    )
+
+
+def test_enabled_ladder_requires_exact_state_id_for_non_full_shot(tmp_path: Path) -> None:
+    bible = {"wardrobe_ladders": _ladder(tmp_path, approved=True)}
+    (tmp_path / "style-bible.json").write_text(json.dumps(bible), encoding="utf-8")
+    (tmp_path / "film-spec.json").write_text(json.dumps(_spec()), encoding="utf-8")
+
+    report = run_state_index_check(tmp_path)
+    assert not report["ok"]
+    assert "WARDROBE_STATE_ID_REQUIRED" in {issue["code"] for issue in report["hard"]}
+
+
+def test_exact_state_must_match_the_shots_wardrobe_category(tmp_path: Path) -> None:
+    bible = {"wardrobe_ladders": _ladder(tmp_path, approved=True)}
+    (tmp_path / "style-bible.json").write_text(json.dumps(bible), encoding="utf-8")
+    (tmp_path / "film-spec.json").write_text(json.dumps(_spec("full")), encoding="utf-8")
+
+    report = run_state_index_check(tmp_path)
+    assert not report["ok"]
+    assert "WARDROBE_STATE_ID_MISMATCH" in {issue["code"] for issue in report["hard"]}
+
+
 def test_approve_state_requires_approved_parent(tmp_path: Path) -> None:
     bible = {"wardrobe_ladders": _ladder(tmp_path, approved=False)}
     with pytest.raises(ValueError, match="parent state full"):

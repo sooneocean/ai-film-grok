@@ -194,6 +194,22 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                         }
                     )
                 ladder_plan.extend(steps)
+                for shot in shots:
+                    if not isinstance(shot, dict) or hid not in _hero_ids(shot):
+                        continue
+                    if _wardrobe_of(shot) not in {
+                        "full",
+                        "default",
+                        "armored",
+                    } and not _wardrobe_state_id(shot):
+                        ladder_hard.append(
+                            {
+                                "level": "hard",
+                                "code": "WARDROBE_STATE_ID_REQUIRED",
+                                "message": f"state-ladder character {hid} has a non-full shot without wardrobe_state_id",
+                                "fix": "bind each non-full shot to one approved wardrobe_ladder state ID",
+                            }
+                        )
                 for state_id in sorted(exact_state_ids.get(hid) or []):
                     state = state_for_id(bible, hid, state_id)
                     if not state or state.get("status") != "approved":
@@ -203,6 +219,24 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                                 "code": "EXACT_WARDROBE_STATE_UNAVAILABLE",
                                 "message": f"shot requests unapproved exact wardrobe state {hid}:{state_id}",
                                 "fix": "complete and approve the requested wardrobe_ladder state before I2I/I2V",
+                            }
+                        )
+                for shot in shots:
+                    if not isinstance(shot, dict) or hid not in _hero_ids(shot):
+                        continue
+                    state_id = _wardrobe_state_id(shot)
+                    if not state_id:
+                        continue
+                    state = state_for_id(bible, hid, state_id)
+                    if state and str(state.get("wardrobe_state") or "").lower() != _wardrobe_of(
+                        shot
+                    ):
+                        ladder_hard.append(
+                            {
+                                "level": "hard",
+                                "code": "WARDROBE_STATE_ID_MISMATCH",
+                                "message": f"shot wardrobe_state={_wardrobe_of(shot)} does not match {hid}:{state_id}",
+                                "fix": "use the exact approved wardrobe_ladder state with the same wardrobe_state",
                             }
                         )
     except ImportError:

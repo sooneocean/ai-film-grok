@@ -92,9 +92,9 @@ def resolve_state_photo(
         try:
             from wardrobe_ladder import resolve_exact_state_photo
 
-            exact = resolve_exact_state_photo(bible, hid, wardrobe_state_id, root=root)
-            if exact:
-                return exact
+            # An explicit ID is a fail-closed pixel contract.  Never degrade it
+            # to a category match, which could select a different garment step.
+            return resolve_exact_state_photo(bible, hid, wardrobe_state_id, root=root)
         except ImportError:
             pass
     try:
