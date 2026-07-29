@@ -25,6 +25,7 @@ def _load_env_file() -> None:
     cfg = _find_config_env()
     if cfg is None:
         return
+    file_values: dict[str, str] = {}
     for line in cfg.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -32,7 +33,10 @@ def _load_env_file() -> None:
         key, _, value = line.partition("=")
         key = key.strip()
         value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
+        if key and value:
+            file_values[key] = value
+    for key, value in file_values.items():
+        if key not in os.environ:
             os.environ[key] = value
 
 
