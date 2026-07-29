@@ -115,6 +115,8 @@ def _dc_spec(shots):
         "schema_version": 1,
         "title": "dc-test",
         "vo_mode": "storyteller",
+        "dialogue_spoken_lang": "ja",
+        "narration_spoken_lang": "zh",
         "aspect": "9:16",
         "director_intent": {
             "logline": "Test dialogue contracts.",
@@ -206,6 +208,76 @@ class TestWriteSpecDialogueContractGate:
         spec = _dc_spec([_dc_shot(contracts=[None])])
         spec["dialogue_contract_strict"] = True
         with pytest.raises(FilmSpecError, match="dialogue_contract_strict"):
+            validate_film_spec(spec, assign_missing_ids=False)
+
+    def test_dialogue_drama_rejects_unbound_or_implicit_voice(self):
+        from film_spec import FilmSpecError, validate_film_spec
+
+        spec = _dc_spec([_dc_shot()])
+        spec["vo_mode"] = "dialogue_drama"
+        spec["dialogue_spoken_lang"] = "ja"
+        spec["narration_spoken_lang"] = "zh"
+        spec["scenes"][0]["shots"][0].pop("nar")
+        spec["scenes"][0]["shots"][0]["screen_mode"] = "on_camera"
+        with pytest.raises(FilmSpecError, match="audio_cues"):
+            validate_film_spec(spec, assign_missing_ids=False)
+
+    def test_dialogue_drama_narration_budget_is_optional_but_enforceable(self):
+        from film_spec import FilmSpecError, validate_film_spec
+
+        spec = _dc_spec(
+            [
+                {
+                    **_dc_shot("talk01"),
+                    "screen_mode": "on_camera",
+                    "dialogue_line_id": "dlg_01",
+                    "speaker": "hero",
+                    "speaker_on_camera": True,
+                    "lipsync": True,
+                    "audio_cues": [
+                        {
+                            "kind": "voice",
+                            "line_type": "dialogue",
+                            "speaker": "hero",
+                            "spoken_text": "别走。",
+                            "start_offset_sec": 0,
+                            "duration_sec": 1,
+                        }
+                    ],
+                },
+                {
+                    **_dc_shot("bridge01"),
+                    "screen_mode": "narration",
+                    "narration_reason": "time jump",
+                    "audio_cues": [
+                        {
+                            "kind": "voice",
+                            "line_type": "narration",
+                            "speaker": "narrator",
+                            "spoken_text": "三天后。",
+                            "start_offset_sec": 0,
+                            "duration_sec": 3,
+                        }
+                    ],
+                },
+                {
+                    **_dc_shot("cover01"),
+                    "screen_mode": "action_cover",
+                    "audio_cues": [{"kind": "silence", "start_offset_sec": 0, "duration_sec": 1}],
+                },
+            ]
+        )
+        spec["vo_mode"] = "dialogue_drama"
+        spec["dialogue_spoken_lang"] = "ja"
+        spec["narration_spoken_lang"] = "zh"
+        spec["scenes"][0]["shots"][0].update(
+            {"dialogue_ja": "行かないで。", "caption_text": "别走。", "translation_status": "ready"}
+        )
+        spec["scenes"][0]["shots"][0]["audio_cues"][0]["spoken_text"] = "行かないで。"
+        spec["scenes"][0]["shots"][0]["audio_cues"][0]["language"] = "ja"
+        for shot in spec["scenes"][0]["shots"]:
+            shot.pop("nar", None)
+        with pytest.raises(FilmSpecError, match="narration budget"):
             validate_film_spec(spec, assign_missing_ids=False)
 
 

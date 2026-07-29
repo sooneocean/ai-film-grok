@@ -185,6 +185,57 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                     }
                 )
 
+    # Dialogue-first scenes need a reviewed performance-state photo before a
+    # talking close-up is generated.  Wardrobe state alone cannot preserve the
+    # emotional expression, gaze, prop hand and body orientation that make a
+    # dialogue cut look like the same performance.
+    dialogue_state_index: dict[str, Any] = {}
+    missing_dialogue_states: list[str] = []
+    dialogue_mode = str(spec.get("vo_mode") or "").strip().lower() == "dialogue_drama"
+    if dialogue_mode:
+        for shot in shots:
+            if not isinstance(shot, dict) or shot.get("screen_mode") != "on_camera":
+                continue
+            sid = str(shot.get("id") or "")
+            hero_id = str(shot.get("speaker") or "hero")
+            state_id = str(shot.get("performance_state_id") or "").strip()
+            if not state_id:
+                missing_dialogue_states.append(f"{sid}:missing-performance-state-id")
+                continue
+            path = root / "canonical" / "performance-states" / hero_id / f"{state_id}.png"
+            exists = path.is_file()
+            dialogue_state_index[sid] = {
+                "hero_id": hero_id,
+                "performance_state_id": state_id,
+                "path": str(path),
+                "exists": exists,
+            }
+            if not exists:
+                missing_dialogue_states.append(f"{sid}:{state_id}")
+                gen_plan.append(
+                    {
+                        "action": "generate_dialogue_state_photo",
+                        "shot_id": sid,
+                        "hero_id": hero_id,
+                        "performance_state_id": state_id,
+                        "out": str(path.relative_to(root)),
+                        "why": "talking close-up requires a state-locked i2i performance reference",
+                        "agent_hint": (
+                            "Qwen i2i from the matching wardrobe state; preserve face/outfit, "
+                            "then set emotion, gaze, hand/prop and camera-facing pose before lipsync"
+                        ),
+                    }
+                )
+    if missing_dialogue_states:
+        issue = {
+            "level": "hard" if spec.get("dialogue_state_strict") is True else "soft",
+            "code": "MISSING_DIALOGUE_PERFORMANCE_STATE",
+            "message": "talking shots missing i2i performance state photos: "
+            + ", ".join(missing_dialogue_states[:12]),
+            "fix": "generate canonical/performance-states/<speaker>/<state>.png before talking I2V",
+        }
+        (hard if issue["level"] == "hard" else soft).append(issue)
+
     # undress-anchor when any undressed/bare shot
     needs_anchor = any(_wardrobe_of(s) in {"undressed", "bare"} for s in shots)
     anchor = root / "canonical" / "wardrobe" / "undress-anchor.png"
@@ -441,6 +492,8 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
         "states_needed": sorted(states_needed, key=lambda s: WARDROBE_RANK.get(s, 0)),
         "heroes": sorted(heroes),
         "state_index": state_index,
+        "dialogue_state_index": dialogue_state_index,
+        "missing_dialogue_performance_states": missing_dialogue_states,
         "undress_anchor": {"path": str(anchor), "exists": anchor_ok, "required": needs_anchor},
         "shots": shot_rows,
         "missing_state_photos": missing_states,

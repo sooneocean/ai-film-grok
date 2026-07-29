@@ -154,19 +154,31 @@ class UserSourceFidelityTests(unittest.TestCase):
             )
             self.assertTrue(report.get("ok"), report)
             spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
-            nars = []
+            texts: list[str] = []
             for sc in spec.get("scenes") or []:
                 for sh in sc.get("shots") or []:
-                    nars.append(str(sh.get("nar") or ""))
-            self.assertGreaterEqual(len(nars), 3)
-            polluted = sum(1 for n in nars if is_template_nar(n) or "展厅落锁" in n)
+                    if not isinstance(sh, dict):
+                        continue
+                    # dialogue_drama stores source speech in caption/dialogue; legacy in nar
+                    for key in ("nar", "caption_text", "dialogue"):
+                        val = str(sh.get(key) or "").strip()
+                        if val:
+                            texts.append(val)
+                    for cue in sh.get("audio_cues") or []:
+                        if isinstance(cue, dict):
+                            for key in ("spoken_text", "caption_text"):
+                                val = str(cue.get(key) or "").strip()
+                                if val:
+                                    texts.append(val)
+            self.assertGreaterEqual(len(texts), 3)
+            polluted = sum(1 for n in texts if is_template_nar(n) or "展厅落锁" in n)
             # majority must be user-faithful, not template
             self.assertLess(
-                polluted / max(1, len(nars)),
+                polluted / max(1, len(texts)),
                 0.40,
-                f"too many template nars: {nars}",
+                f"too many template texts: {texts}",
             )
-            joined = " ".join(nars)
+            joined = " ".join(texts)
             # at least one user token survives
             self.assertTrue(
                 any(

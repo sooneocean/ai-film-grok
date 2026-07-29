@@ -69,6 +69,8 @@ def _shot_size(shot: dict[str, Any]) -> str:
 
 
 def is_near_shot(shot: dict[str, Any]) -> bool:
+    if shot.get("screen_mode") == "on_camera" and shot.get("lipsync") is True:
+        return True
     size = _shot_size(shot)
     if not size:
         return False
@@ -79,7 +81,13 @@ def is_near_shot(shot: dict[str, Any]) -> bool:
 
 
 def nar_char_count(shot: dict[str, Any]) -> int:
-    return len(str(shot.get("nar") or "").strip())
+    nar = str(shot.get("nar") or "").strip()
+    if nar:
+        return len(nar)
+    for cue in shot.get("audio_cues") or []:
+        if isinstance(cue, dict) and cue.get("kind") == "voice":
+            return len(str(cue.get("spoken_text") or "").strip())
+    return len(str(shot.get("dialogue") or "").strip())
 
 
 def default_audio_policy(
@@ -285,7 +293,7 @@ def suggest_recipe_for_shot(
     # Author explicit lipsync request on character/hybrid
     if (
         shot.get("lipsync") is True
-        and vo_mode in {"character", "hybrid"}
+        and vo_mode in {"character", "hybrid", "dialogue_drama"}
         and near
         and (policy.get("allow_lipsync") or mode == "musical_hybrid")
     ):

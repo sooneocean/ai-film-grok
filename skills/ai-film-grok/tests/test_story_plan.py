@@ -138,6 +138,63 @@ class StoryPlanTests(unittest.TestCase):
             spec = project_graph_to_film_spec(graph)
             self.assertTrue(spec["scenes"][0]["shots"])
 
+    def test_named_dialogue_projects_to_dialogue_drama_without_default_narration(self) -> None:
+        raw = """阿澄：你为什么还没下车？
+乘客：因为照片背后写着你的名字。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = run_plan(root, raw, title="末班车", target_duration=24, force=True)
+            self.assertTrue(report["ok"], report)
+            graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(graph.get("dialogue_ledger") or []), 2)
+            spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+            self.assertEqual(spec["vo_mode"], "dialogue_drama")
+            shots = [shot for scene in spec["scenes"] for shot in scene["shots"]]
+            speaking = [shot for shot in shots if shot.get("screen_mode") == "on_camera"]
+            self.assertEqual(len(speaking), 2)
+            self.assertTrue(all(not shot.get("nar") for shot in shots))
+            self.assertTrue(all(shot["audio_cues"] for shot in shots))
+            self.assertTrue(all(shot["translation_status"] == "pending" for shot in speaking))
+            for shot, japanese in zip(
+                speaking, ("まだ降りないの？", "写真の裏に君の名前がある。"), strict=True
+            ):
+                shot["dialogue_ja"] = japanese
+                shot["dialogue"] = japanese
+                shot["translation_status"] = "ready"
+                shot["audio_cues"][0]["spoken_text"] = japanese
+                shot["audio_cues"][0]["translation_status"] = "ready"
+            validate_film_spec(spec, assign_missing_ids=False)
+            self.assertGreater((spec.get("_dialogue_drama") or {}).get("coverage_shots", 0), 0)
+            self.assertEqual(speaking[0]["_recommended_engine"]["lipsync"], "rtx_latentsync_1_6")
+            self.assertEqual(speaking[0]["audio_recipe"]["recipe"], "dialogue_lipsync")
+            self.assertTrue(speaking[0]["audio_recipe"]["lipsync"])
+
+    def test_dialogue_projection_never_collapses_extra_lines_onto_one_shot(self) -> None:
+        raw = "\n".join(f"阿澄：第{i}句。" for i in range(1, 13))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_plan(root, raw, title="十二句", target_duration=24, force=True)
+            graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
+            ledger = graph.get("dialogue_ledger") or []
+            self.assertEqual(len(ledger), 12)
+            self.assertEqual(len({line["shot_ref"] for line in ledger}), 12)
+            spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+            speaking = [
+                shot
+                for scene in spec["scenes"]
+                for shot in scene["shots"]
+                if shot.get("screen_mode") == "on_camera"
+            ]
+            self.assertEqual(len(speaking), 12)
+
+    def test_chinese_dialogue_blocks_tts_until_japanese_script_is_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_plan(root, "阿澄：别回头。", title="停", target_duration=12, force=True)
+            spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+            with self.assertRaisesRegex(Exception, "translation is pending"):
+                validate_film_spec(spec, assign_missing_ids=False)
+
     def test_source_to_graph_to_film_spec_passes_shared_story_timeline_guard(self) -> None:
         raw = (
             "阿澄推开车门，雨水打湿她的袖口。"

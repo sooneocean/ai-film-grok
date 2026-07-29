@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 from typing import Any
 
 from audio_recipe import (
@@ -68,7 +69,7 @@ from sound_plan import (
 )
 from transition_ops import TransitionOperationError, build_transition_operations
 
-VO_MODES = frozenset({"storyteller", "character", "hybrid"})
+VO_MODES = frozenset({"storyteller", "character", "hybrid", "dialogue_drama"})
 TTS_BACKENDS = frozenset(
     {"auto", "mimo", "minimax", "fish", "voicebox", "edge", "external", "grok"}
 )
@@ -248,6 +249,55 @@ def validate_nar_budget(nar: object, *, field: str) -> str:
             f"(recommended ≤{RECOMMENDED_NAR_CHARS}; split the shot or cut sensory clauses)"
         )
     return text
+
+
+def _validate_dialogue_drama_shot(shot: dict[str, Any], *, shot_id: str) -> None:
+    """Require an explicit, single-purpose audio contract for dialogue-first shots."""
+    screen_mode = str(shot.get("screen_mode") or "").strip().lower()
+    valid_modes = {"on_camera", "off_camera", "reaction", "action_cover", "silence", "narration"}
+    if screen_mode not in valid_modes:
+        raise FilmSpecError(f"{shot_id}.screen_mode must be one of {sorted(valid_modes)}")
+    cues = shot.get("audio_cues")
+    if not isinstance(cues, list) or not cues:
+        raise FilmSpecError(f"{shot_id}: dialogue_drama requires explicit audio_cues")
+    voices = [cue for cue in cues if isinstance(cue, dict) and cue.get("kind") == "voice"]
+    if screen_mode == "on_camera":
+        if len(voices) != 1:
+            raise FilmSpecError(f"{shot_id}: on_camera dialogue requires exactly one voice cue")
+        voice = voices[0]
+        if voice.get("line_type") != "dialogue" or not str(voice.get("spoken_text") or "").strip():
+            raise FilmSpecError(
+                f"{shot_id}: on_camera voice must be a dialogue cue with spoken_text"
+            )
+        if str(voice.get("language") or "").lower() != "ja":
+            raise FilmSpecError(f"{shot_id}: character dialogue voice language must be ja")
+        if str(shot.get("translation_status") or "").lower() != "ready":
+            raise FilmSpecError(
+                f"{shot_id}: Japanese dialogue translation is pending; fill dialogue_ja before TTS/lipsync"
+            )
+        if not re.search(r"[\u3040-\u30ff]", str(shot.get("dialogue_ja") or "")):
+            raise FilmSpecError(f"{shot_id}: dialogue_ja must contain Japanese kana")
+        if not str(shot.get("caption_text") or "").strip():
+            raise FilmSpecError(f"{shot_id}: dialogue requires Chinese caption_text")
+        if not str(shot.get("dialogue_line_id") or "").strip():
+            raise FilmSpecError(f"{shot_id}: on_camera dialogue requires dialogue_line_id")
+        if not bool(shot.get("speaker_on_camera")) or shot.get("lipsync") is not True:
+            raise FilmSpecError(
+                f"{shot_id}: on_camera dialogue requires speaker_on_camera and lipsync"
+            )
+        if str(voice.get("speaker") or "") != str(shot.get("speaker") or ""):
+            raise FilmSpecError(f"{shot_id}: dialogue speaker must match voice cue speaker")
+    elif screen_mode == "narration":
+        if len(voices) != 1 or voices[0].get("line_type") != "narration":
+            raise FilmSpecError(
+                f"{shot_id}: narration screen_mode requires one narration voice cue"
+            )
+        if not str(shot.get("narration_reason") or "").strip():
+            raise FilmSpecError(f"{shot_id}: narration requires narration_reason")
+    elif voices:
+        raise FilmSpecError(
+            f"{shot_id}: {screen_mode} cannot carry voice; use on_camera/off_camera/narration"
+        )
 
 
 def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
@@ -581,6 +631,11 @@ def validate_film_spec(
     if mode not in VO_MODES:
         raise FilmSpecError(f"film-spec vo_mode must be one of {sorted(VO_MODES)}")
     spec["vo_mode"] = mode
+    if mode == "dialogue_drama":
+        if str(spec.get("dialogue_spoken_lang") or "").lower() != "ja":
+            raise FilmSpecError("dialogue_drama requires dialogue_spoken_lang=ja")
+        if str(spec.get("narration_spoken_lang") or "").lower() != "zh":
+            raise FilmSpecError("dialogue_drama requires narration_spoken_lang=zh")
     validate_director_intent(spec)
     tts_backend = spec.get("tts_backend", "auto")
     if not isinstance(tts_backend, str) or tts_backend.lower() not in TTS_BACKENDS:
@@ -916,12 +971,20 @@ def validate_film_spec(
             if shot_id in seen:
                 raise FilmSpecError(f"duplicate shot id: {shot_id}")
             seen.add(shot_id)
-            shot["nar"] = validate_nar_budget(shot.get("nar"), field=f"{shot_id}.nar")
+            if mode == "dialogue_drama":
+                _validate_dialogue_drama_shot(shot, shot_id=shot_id)
+                nar = shot.get("nar")
+                if nar is not None:
+                    shot["nar"] = validate_nar_budget(nar, field=f"{shot_id}.nar")
+                else:
+                    shot["est_vo_sec"] = 0.0
+            else:
+                shot["nar"] = validate_nar_budget(shot.get("nar"), field=f"{shot_id}.nar")
             # v1.23: VO script lint — brochure phrase / AI-cadence / long-sentence warnings.
             # Advisory only (warnings); genre=product can elevate to hard gate.
             from vo_lint import lint_nar_text
 
-            _vo_warnings = lint_nar_text(shot["nar"], shot_id=shot_id)
+            _vo_warnings = lint_nar_text(str(shot.get("nar") or ""), shot_id=shot_id)
             if _vo_warnings:
                 shot.setdefault("_vo_lint_warnings", [w.to_dict() for w in _vo_warnings])
                 for w in _vo_warnings:
@@ -934,7 +997,7 @@ def validate_film_spec(
                 if not isinstance(nar_en, str):
                     raise FilmSpecError(f"{shot_id}.nar_en must be a string")
                 shot["nar_en"] = nar_en.strip()
-            shot["est_vo_sec"] = estimate_nar_vo_sec(shot["nar"])
+            shot["est_vo_sec"] = estimate_nar_vo_sec(str(shot.get("nar") or ""))
             shot["dramatic_function"] = validate_dramatic_function(
                 shot.get("dramatic_function"),
                 field=f"{shot_id}.dramatic_function",
@@ -973,6 +1036,19 @@ def validate_film_spec(
                     "frw_model_field": "frw_env_model",
                     "primary": DEFAULT_FRW_ENV_MODEL,
                     "forbid": ["claim_identity_lock_from_t2v"],
+                }
+            if mode == "dialogue_drama" and shot.get("screen_mode") == "on_camera":
+                shot["_recommended_engine"] = {
+                    "state_still": "comfy_qwen_i2i_performance_state",
+                    "keyframe": "comfy_qwen_i2i_from_performance_state",
+                    "motion": "comfy_wan22_i2v",
+                    "lipsync": "rtx_latentsync_1_6",
+                    "fallback": "musetalk_only_after_classified_latentsync_failure",
+                    "forbid": [
+                        "whole_frame_talking_avatar_as_production_default",
+                        "unreviewed_lipsync",
+                        "full_cast_reference_when_state_photo_exists",
+                    ],
                 }
             # B1: motion/size/axis + character stance (focal/viewpoint/look_axis)
             try:
@@ -1052,6 +1128,46 @@ def validate_film_spec(
         "note": "VO de-AI lint: brochure phrase / AI cadence / long sentence. "
         "Soft by default; vo_lint_strict raises.",
     }
+
+    if mode == "dialogue_drama":
+        on_camera = [s for s in shots if s.get("screen_mode") == "on_camera"]
+        coverage = [
+            s for s in shots if s.get("screen_mode") in {"reaction", "action_cover", "silence"}
+        ]
+        if len(on_camera) >= 2 and not coverage:
+            raise FilmSpecError(
+                "dialogue_drama requires a reaction/action_cover/silence shot; "
+                "do not cut consecutive speaking close-ups only"
+            )
+        dialogue_sec = sum(
+            float(cue.get("duration_sec") or 0)
+            for shot in shots
+            for cue in (shot.get("audio_cues") or [])
+            if isinstance(cue, dict)
+            and cue.get("kind") == "voice"
+            and cue.get("line_type") == "dialogue"
+        )
+        narration_sec = sum(
+            float(cue.get("duration_sec") or 0)
+            for shot in shots
+            for cue in (shot.get("audio_cues") or [])
+            if isinstance(cue, dict)
+            and cue.get("kind") == "voice"
+            and cue.get("line_type") == "narration"
+        )
+        narration_ratio = narration_sec / max(dialogue_sec + narration_sec, 1.0)
+        spec["_dialogue_drama"] = {
+            "on_camera_shots": len(on_camera),
+            "coverage_shots": len(coverage),
+            "dialogue_sec": round(dialogue_sec, 3),
+            "narration_sec": round(narration_sec, 3),
+            "narration_ratio": round(narration_ratio, 4),
+            "note": "Narration is gap-only; target is <= 15% of voiced duration.",
+        }
+        if spec.get("narration_budget_strict") is not False and narration_ratio > 0.15:
+            raise FilmSpecError(
+                f"dialogue_drama narration budget exceeded: {narration_ratio:.0%} > 15%"
+            )
 
     # Aggregate VO budget report (non-blocking summary for agents / status)
     total_est = sum(float(s.get("est_vo_sec") or 0) for s in shots)
@@ -1555,7 +1671,9 @@ def validate_film_spec(
     try:
         from audio_cues import AudioCueError, validate_audio_cues
 
-        spec["_audio_cues"] = validate_audio_cues(shots, strict=bool(spec.get("audio_cues_strict")))
+        spec["_audio_cues"] = validate_audio_cues(
+            shots, strict=bool(spec.get("audio_cues_strict")) or mode == "dialogue_drama"
+        )
     except AudioCueError as exc:
         raise FilmSpecError(str(exc)) from exc
 

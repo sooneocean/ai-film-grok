@@ -148,5 +148,82 @@ class AssetsCheckStateRegressionTests(unittest.TestCase):
             self.assertIn(axis, cs)
 
 
+class DialoguePerformanceStateGateTests(unittest.TestCase):
+    def test_dialogue_shot_requests_i2i_performance_state_photo(self) -> None:
+        import json
+        import tempfile
+
+        from state_index_gate import run_state_index_check
+
+        with tempfile.TemporaryDirectory(prefix="aifilm_dialogue_state_") as tmp:
+            root = Path(tmp)
+            spec = {
+                "title": "dialogue state",
+                "vo_mode": "dialogue_drama",
+                "director_intent": {
+                    "logline": "A character makes a short decisive statement.",
+                    "tone": "tense",
+                    "emotional_arc": ["wait", "turn", "act"],
+                },
+                "scenes": [
+                    {
+                        "shots": [
+                            {
+                                "id": "talk01",
+                                "dramatic_function": "action",
+                                "duration_sec": 3,
+                                "screen_mode": "on_camera",
+                                "dialogue_line_id": "dlg_01",
+                                "speaker": "hero",
+                                "speaker_on_camera": True,
+                                "lipsync": True,
+                                "performance_state_id": "hero-dlg_01-defiant",
+                                "audio_cues": [
+                                    {
+                                        "kind": "voice",
+                                        "line_type": "dialogue",
+                                        "speaker": "hero",
+                                        "spoken_text": "我不会走。",
+                                        "start_offset_sec": 0,
+                                        "duration_sec": 3,
+                                    }
+                                ],
+                                "dsl": {
+                                    "subject": "hero",
+                                    "cast": ["hero"],
+                                    "action": "holds the door",
+                                    "motion": "subtle breath",
+                                },
+                            },
+                            {
+                                "id": "cover01",
+                                "dramatic_function": "reaction",
+                                "duration_sec": 2,
+                                "screen_mode": "reaction",
+                                "audio_cues": [
+                                    {"kind": "silence", "start_offset_sec": 0, "duration_sec": 2}
+                                ],
+                                "dsl": {
+                                    "subject": "listener",
+                                    "cast": ["hero"],
+                                    "action": "listens",
+                                    "motion": "still reaction",
+                                },
+                            },
+                        ]
+                    }
+                ],
+            }
+            (root / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+            report = run_state_index_check(root)
+            self.assertIn(
+                "talk01:hero-dlg_01-defiant", report["missing_dialogue_performance_states"]
+            )
+            self.assertIn(
+                "generate_dialogue_state_photo",
+                {step["action"] for step in report["generate_plan"]},
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

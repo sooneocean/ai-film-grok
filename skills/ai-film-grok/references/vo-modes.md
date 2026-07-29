@@ -27,6 +27,7 @@ Set top-level:
 | **`storyteller`（默认推荐）** | 说书人讲故事；角色在「演」不在「念」 | **Always off** | 第三人称 / 「话说…」 | 色气短片、完播优先 |
 | **`character`** | 角色本人在说话 | Need MuseTalk / careful CU Wav2Lip | 第一人称对白 | 用户明确要「她在讲」且接受嘴型风险 |
 | **`hybrid`** | 说书人主导；1–2 镜角色金句 | Only shots with `"lipsync": true` | 说书句 + 少量对白 | 偶尔要「亲口说」的钩子 |
+| **`dialogue_drama`** | 角色对白驱动；旁白仅补叙事空窗 | `on_camera` 台词镜必须真实口型 | `nar` 非默认；使用 `audio_cues.voice` | 漫剧、关系戏、办事有明确互动 |
 
 ## Storyteller rules (default for 色气成片)
 
@@ -48,6 +49,17 @@ Set top-level:
 2. I2V may add mild mouth motion; true sync only via MuseTalk when ready.
 3. Wide / full-body shots remain storyteller or silent action.
 4. Report honestly if lipsync skipped/failed.
+
+## Dialogue drama rules
+
+1. 每句可见讲话必须有 `dialogue_line_id`、角色、实际 TTS 时长和 `on_camera` 近景；同一镜不得塞多句不同角色台词。
+   角色 `spoken_text` / `dialogue_ja` 必须是日文，字幕 `caption_text` 必须是中文；`translation_status=pending` 时禁止 TTS、I2V 讲话镜与口型。
+2. 每个对白节拍必须穿插 `reaction`、`action_cover` 或 `silence`，禁止连续大脸轮流念台词。
+3. 先由角色状态照 i2i 生成表演状态（表情、视线、手势、道具、衣着），再生成 keyframe/I2V；讲话近景最后才跑 LatentSync。
+4. 旁白只允许 `screen_mode: narration`，且必须填写 `narration_reason`（时空跳转、无法用动作/对白表达的因果、章节桥接或结尾余韵）。
+5. `dialogue_state_strict: true` 时，缺少 `canonical/performance-states/<speaker>/<state>.png` 会阻挡生产；不要用全装 cast 图代替表演状态照。
+
+目标武器链：`Qwen i2i performance state → Qwen i2i keyframe → Wan 2.2 I2V → LatentSync 1.6 → per-shot human review`。InfiniteTalk/FantasyTalking 仍是显式 pilot，不能作为量产讲话镜默认。
 
 ## Decision tree (agent must follow)
 
