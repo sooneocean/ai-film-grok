@@ -107,7 +107,7 @@
     "scripts/department_contracts.py": "eabe0e6412a0edd8c90ad3fcaf01fbdd775ef18ac5b0a9636e8df638bd0890db",
     "scripts/dialogue_contract.py": "2f1f4adfd95ffec06450094e678cadbde91af551216535afb99ad04160e2bc2a",
     "scripts/dialogue_contracts.py": "9f5c7df1ad308576a5632d2085a7090efb65667b8e76818de09ee98361ba3bb5",
-    "scripts/director_cli.py": "e5f660594ea5c2fa7387336c9ee780e134d9f7c9e170573fe23c877c63d099fa",
+    "scripts/director_cli.py": "6db3f60b683be1c85b610a40e59a35de674749a86e5903428cb31a51cdcd01aa",
     "scripts/director_ledger.py": "b77db32e54f716eb97927829775aa506a684a98e5252098e0711976d1402a0fc",
     "scripts/director_review.py": "4c2e6b61d9bd1e78a3a2bddee89942dc12c34f1e1b4664ee0672b57849ee5793",
     "scripts/director_stage_gates.py": "6e99de924a20c3d6e1bb659801547a0a95d50447813f6979fb111aebedca5999",
