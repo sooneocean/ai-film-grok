@@ -39,15 +39,15 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 6. **审批/用量**：pilot 须用户批；付费绑 hash/预算；`generation-usage.json`；`advance` 遇 human/paid/external 暂停。
 7. **供应商**：I2V 默认 `grok_primary`；恢复路径才用 `frw_video_model=seedance-2-fast-i2v`（见 [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)），禁静默 bulk。
 8. **声音分轨**：口白中文 Edge；角色日文 Edge；字幕中文 `nar`。禁无 speaker 中日乒乓、说书填 `nar_ja`、清空日文轨。亲密 BGM=rnb。[voice lesson](references/lessons-2026-07-24-ep2-voice-heat-final.md)
-9. **成人尺度 MAX**：act+climax≥50%、亲密≥60%、setup≤20%；spice=extreme、phase 只升；关键动作与特写须完整，禁静默降 heat。见 [sex-arc](references/lessons-2026-07-27-adult-scale-max-sex-arc.md) · [hard-defaults](references/hard-defaults.md) · [playbook](references/adult-max-playbook.md)
-9b. **毒镜·解剖 IRON**：禁 futa/女体阴茎、喷奶乳汁、霓虹生殖器符号；中英硬 NEG + dry nipples；毒 still 禁 I2V、毒 clip 禁 register/final。见 [anatomy lesson](references/lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md) · [memory](memory/2026-07-29-poison-shot-anatomy-iron.md)
-10. **字幕像素门**：成片须可见中文字幕；HF 失字须 recovery，禁清空 SRT；`sub_lead=0`；长片可直调 `render_final.py`。
+9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；spice=extreme；四拍弧+bare；impact≥A；禁静默降 heat。[sex-arc](references/lessons-2026-07-27-adult-scale-max-sex-arc.md)·[hard-defaults](references/hard-defaults.md)·[playbook](references/adult-max-playbook.md)
+9b. **毒镜解剖**：禁 futa/喷奶/霓虹生殖器；中英 NEG + dry nipples；毒 still 禁 I2V、毒 clip 禁 final。[anatomy](references/lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md)
+10. **字幕像素门**：成片须可见中文字幕；HF 失字须 recovery；`sub_lead=0`；禁清空 SRT。
 11. **后期单一责任**：title/subtitle/end card 单引擎；`plate-cards blank`、plate `subs=off` 防双烧。
-12. **完成定义**：`final` 技术成功 ≠ `final_complete`；review/post audit/字幕 attestation/export 回读须齐。
-13. **安全**：凭据本机读；日志/manifest 禁 token/prompt；外部调用不自动重试花费。
-14. **高动态**：平常 mean≥18、肉戏≥20（目标≥24）；禁 KB/弱 raw；**桌面 final 仅** `i2v-final-gate.json` ok。[high-motion](references/lessons-2026-07-27-high-motion-style-lock-final.md)
-15. **I2V 画风锁**：源=style-locked still；首段 MEDIUM LOCK cel；禁以 mean 换 medium fail。
-16. **5090 武器库**：未锁视觉用 `weapon_route`；仅实跑 Qwen/Wan；实验pilot；未验 fail closed。[规则](references/comfy-weapon-armory.md)
+12. **完成定义**：`final` 技术成功 ≠ `final_complete`；review/audit/字幕/export 须齐。
+13. **安全**：凭据本机读；日志禁 token/prompt；外部调用不自动重试花费。
+14. **高动态**：平常 mean≥18、肉戏≥20；禁 KB/弱 raw；桌面 final 仅 `i2v-final-gate` ok。[high-motion](references/lessons-2026-07-27-high-motion-style-lock-final.md)
+15. **I2V 画风锁**：源=style-locked still；首段 MEDIUM LOCK cel。
+16. **5090 武器库**：未锁视觉用 `weapon_route`；仅实跑 Qwen/Wan；未验 fail closed。[规则](references/comfy-weapon-armory.md)
 
 ## 阶段
 
