@@ -274,7 +274,7 @@
     "scripts/visual_bible.py": "af138fd5aadc295a06c889eb2cbe9357750ed9780b763539258b74398f816cbd",
     "scripts/vo_atempo.py": "73706c4c49ee78b86e115d94b1814c1533ed3de2e87fb8b843738ca0eb3f5207",
     "scripts/vo_lint.py": "473a31f266b1174186828eab2e80654817f901cc7c8f1322c1b37d81404cf777",
-    "scripts/voice_armory.py": "b564524514c70b6e484a538d41bf1b0b90bf255100b6456e5832da50cbfaf0d2",
+    "scripts/voice_armory.py": "4bd5d47cf8fcbdbb2546f6a07a26ef879c4f0e73cf673cb429a4e924c12c384a",
     "scripts/voice_cast_profiles.py": "c0f7adea3e3161729c645d42a605567fc050864b5da9ee74618c23b28142776a",
     "scripts/voice_tracks.py": "e1966502340f87d39a55d0757b038bdca2c6992fd3c097215da7d5ab48d33724",
     "scripts/wardrobe_ladder.py": "c4e44797eab8109f3a38505c2fc5c9fb28f56533bb64640db2feed004b3342c0",
