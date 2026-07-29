@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -14,6 +15,32 @@ from generation_usage import finish_generation, start_generation  # noqa: E402
 from production_book import new_production_book, write_production_book  # noqa: E402
 from production_report import emit_production_report  # noqa: E402
 from quality_ledger import emit_quality_ledger  # noqa: E402
+
+
+def _make_reviewable_mp4(path: Path) -> None:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=64x96:d=0.2",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=48000:cl=stereo",
+            "-shortest",
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+            str(path),
+        ],
+        check=True,
+    )
 
 
 def _film(root: Path, *, cost_ticks: int = 100, template_id: str = "vertical-v1") -> None:
@@ -116,7 +143,7 @@ def test_desktop_export_copies_production_report_artifacts(tmp_path: Path) -> No
     (dirs["out"] / "production-report.html").write_text("<h1>report</h1>")
     (root / "receipts" / "production-report.json").write_text('{"kind":"production-report"}')
     final = dirs["out"] / "custom-final.mp4"
-    final.write_bytes(b"reviewed-final")
+    _make_reviewable_mp4(final)
     manifest = {
         "title": "film",
         "gates": {"final_complete": True},

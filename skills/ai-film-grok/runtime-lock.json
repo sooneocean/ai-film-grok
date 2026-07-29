@@ -112,7 +112,7 @@
     "scripts/delivery_package.py": "9fbf321dc618f920871d2726ed94c7b935075868d230224b34a0fe5314d8e68f",
     "scripts/department_cli.py": "0087be3954723fdf2fdb2ef2024dd1b88132c52e67a958e76a99f34e30f46b2a",
     "scripts/department_contracts.py": "eabe0e6412a0edd8c90ad3fcaf01fbdd775ef18ac5b0a9636e8df638bd0890db",
-    "scripts/dialogue_broll.py": "2699db603152d0010c3592b89d9bbd4c4b648c4be2354dc2a73be53780c9dc9d",
+    "scripts/dialogue_broll.py": "3f7ba07a4157baae901037f1ab7dfa21f4a8ca1e69eb2d3a0dbe832d061c7b9b",
     "scripts/dialogue_competition.py": "21af5a1d40b496d5b17810a7d1e5ce30650ce18347329ac289e316c4157f4c1b",
     "scripts/dialogue_contract.py": "2f1f4adfd95ffec06450094e678cadbde91af551216535afb99ad04160e2bc2a",
     "scripts/dialogue_contracts.py": "9f5c7df1ad308576a5632d2085a7090efb65667b8e76818de09ee98361ba3bb5",

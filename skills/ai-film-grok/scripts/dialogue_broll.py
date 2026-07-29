@@ -41,7 +41,7 @@ def score_dialogue_broll_value(shot: dict[str, Any], entry: dict[str, Any]) -> d
         kind == "reaction" and bool((shot.get("performance_state") or {}).get("emotion"))
     )
     repetition_risk = int("story-relevant" not in purpose and "emotional turn" not in purpose)
-    score = information_gain * 2 + emotional_turn * 2 - repetition_risk * 2
+    score = information_gain * 3 + emotional_turn * 2 - repetition_risk * 2
     return {
         "score": score,
         "information_gain": information_gain,

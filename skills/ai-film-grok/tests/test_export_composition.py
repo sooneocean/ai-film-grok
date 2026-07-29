@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -22,6 +23,27 @@ from export_composition import (  # noqa: E402
     remotion_captions,
     resolve_compose_preset,
 )
+
+
+def _make_final_mp4(path: Path, *, duration_sec: float) -> None:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=black:s=64x96:d={duration_sec}",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            str(path),
+        ],
+        check=True,
+    )
 
 
 def _minimal_spec(n_shots: int = 2) -> dict:
@@ -436,7 +458,7 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
             root.mkdir()
             _seed_film_root(root, n_shots=1)
             # fake final film + SRT on absolute film clock
-            (root / "out" / "film_final.mp4").write_bytes(b"\x00fake-final")
+            _make_final_mp4(root / "out" / "film_final.mp4", duration_sec=8.0)
             (root / "out" / "final.srt").write_text(
                 "1\n00:00:00,200 --> 00:00:01,200\n开场旁白\n",
                 encoding="utf-8",
@@ -473,7 +495,7 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
             root = Path(tmp) / "film"
             root.mkdir()
             _seed_film_root(root, n_shots=1)
-            (root / "out" / "film_final.mp4").write_bytes(b"\x00fake-final")
+            _make_final_mp4(root / "out" / "film_final.mp4", duration_sec=8.0)
             (root / "out" / "final-delivery.json").write_text(
                 json.dumps({"subtitles": {"burned_in": True}}), encoding="utf-8"
             )
@@ -493,7 +515,7 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
             root = Path(tmp) / "film"
             root.mkdir()
             _seed_film_root(root, n_shots=1)
-            (root / "out" / "film_final.mp4").write_bytes(b"\x00fake-final")
+            _make_final_mp4(root / "out" / "film_final.mp4", duration_sec=8.0)
             (root / "post-package.json").write_text(
                 json.dumps(
                     {
@@ -524,7 +546,7 @@ class ComposePresetAndCaptionClockTests(unittest.TestCase):
             root = Path(tmp) / "film"
             root.mkdir()
             _seed_film_root(root, n_shots=1)
-            (root / "out" / "film_final.mp4").write_bytes(b"\x00fake-final")
+            _make_final_mp4(root / "out" / "film_final.mp4", duration_sec=1.0)
             (root / "post-package.json").write_text(
                 json.dumps(
                     {
