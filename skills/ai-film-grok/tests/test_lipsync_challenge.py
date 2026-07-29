@@ -173,30 +173,38 @@ def _register_all(
         "musetalk-1.5",
         "ltx-2.3-lipdub",
     ),
+    fixture_ids: tuple[str, ...] = FIXTURE_IDS,
 ) -> None:
     monkeypatch.setattr("lipsync_challenge._probe_video", _probe_video)
     monkeypatch.setattr("lipsync_challenge._verify_full_decode", lambda _path: None)
-    registered_hashes: dict[str, str] = {}
-    for fixture_index, fixture_id in enumerate(FIXTURE_IDS):
+    registered_hashes: dict[str, str] = {"challenge.json": "c" * 64}
+    for fixture_index, fixture_id in enumerate(fixture_ids):
         for backend_index, backend_id in enumerate(backends):
             output = root / f"{fixture_id}-{backend_id}.mp4"
             output.write_bytes(f"{fixture_id}:{backend_id}".encode())
             output_hash = f"{fixture_index + backend_index + 5:x}"[-1] * 64
             registered_hashes[output.name] = output_hash
-            monkeypatch.setattr("lipsync_challenge.sha256", lambda _path, h=output_hash: h)
+            metrics_path = root / f"{fixture_id}-{backend_id}-metrics.json"
+            runtime_path = root / f"{fixture_id}-{backend_id}-runtime.json"
+            registered_hashes[metrics_path.name] = "d" * 64
+            registered_hashes[runtime_path.name] = "b" * 64
+            monkeypatch.setattr(
+                "lipsync_challenge.sha256",
+                lambda path, hashes=registered_hashes: hashes.get(path.name, "f" * 64),
+            )
             register_result(
                 root,
                 fixture_id=fixture_id,
                 backend_id=backend_id,
                 output=output,
                 metrics_receipt=_metrics(
-                    root / f"{fixture_id}-{backend_id}-metrics.json",
+                    metrics_path,
                     output_hash=output_hash,
                     source_hash=HASHES[fixture_id],
                     backend_id=backend_id,
                 ),
                 runtime_receipt=_runtime(
-                    root / f"{fixture_id}-{backend_id}-runtime.json",
+                    runtime_path,
                     output_hash=output_hash,
                     backend_id=backend_id,
                 ),
@@ -375,6 +383,61 @@ def test_result_rejects_metric_receipt_for_different_output(
         )
 
 
+def test_result_rejects_fake_evaluator_and_gpu_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _create(tmp_path, monkeypatch)
+    output = tmp_path / "output.mp4"
+    output.write_bytes(b"output")
+    output_hash = "9" * 64
+    monkeypatch.setattr("lipsync_challenge.sha256", lambda _path: output_hash)
+    monkeypatch.setattr("lipsync_challenge._probe_video", _probe_video)
+    monkeypatch.setattr("lipsync_challenge._verify_full_decode", lambda _path: None)
+    metrics = _metrics(
+        tmp_path / "metrics.json",
+        output_hash=output_hash,
+        source_hash=HASHES["front_closeup"],
+        backend_id="musetalk-1.5",
+    )
+    metrics_payload = json.loads(metrics.read_text())
+    metrics_payload["evaluator"]["model_sha256"] = "x"
+    metrics.write_text(json.dumps(metrics_payload))
+
+    with pytest.raises(LipsyncChallengeError, match="model SHA-256"):
+        register_result(
+            tmp_path,
+            fixture_id="front_closeup",
+            backend_id="musetalk-1.5",
+            output=output,
+            metrics_receipt=metrics,
+            runtime_receipt=_runtime(
+                tmp_path / "runtime.json",
+                output_hash=output_hash,
+                backend_id="musetalk-1.5",
+            ),
+        )
+
+    metrics_payload["evaluator"]["model_sha256"] = "e" * 64
+    metrics.write_text(json.dumps(metrics_payload))
+    runtime = _runtime(
+        tmp_path / "runtime.json",
+        output_hash=output_hash,
+        backend_id="musetalk-1.5",
+    )
+    runtime_payload = json.loads(runtime.read_text())
+    runtime_payload["gpu_model"] = "not-a-5090-proof"
+    runtime.write_text(json.dumps(runtime_payload))
+    with pytest.raises(LipsyncChallengeError, match="NVIDIA GeForce RTX 5090"):
+        register_result(
+            tmp_path,
+            fixture_id="front_closeup",
+            backend_id="musetalk-1.5",
+            output=output,
+            metrics_receipt=metrics,
+            runtime_receipt=runtime,
+        )
+
+
 def test_geometry_mismatch_is_recorded_as_a_hard_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -431,6 +494,21 @@ def test_blind_package_public_template_does_not_reveal_backends(
     assert Path(str(package["private_mapping_path"])).is_file()
 
 
+def test_blind_template_does_not_leak_backend_from_root_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "latentsync-secret-challenge"
+    root.mkdir()
+    _create(root, monkeypatch)
+    _register_all(root, monkeypatch)
+
+    package = create_blind_package(root)
+    public = Path(str(package["public_template_path"])).read_text().lower()
+
+    assert "latentsync" not in public
+    assert str(root).lower() not in public
+
+
 def test_blind_package_keeps_whole_frame_lane_independent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -449,6 +527,72 @@ def test_blind_package_keeps_whole_frame_lane_independent(
         assert len(mapping["fixtures"][fixture_id]["whole_frame_generation"]) == 2
     serialized = json.dumps(public).lower()
     assert all(backend_id not in serialized for backend_id in BACKEND_IDS)
+
+
+def test_partial_whole_frame_lane_cannot_be_blind_packaged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _create(tmp_path, monkeypatch)
+    _register_all(tmp_path, monkeypatch)
+    _register_all(
+        tmp_path,
+        monkeypatch,
+        backends=("echomimic-v3-flash", "longcat-video-avatar-1.5"),
+        fixture_ids=("front_closeup",),
+    )
+
+    with pytest.raises(LipsyncChallengeError, match="all eight"):
+        create_blind_package(tmp_path)
+
+
+def test_two_blind_lanes_are_counted_independently(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _create(tmp_path, monkeypatch)
+    _register_all(tmp_path, monkeypatch, backends=BACKEND_IDS)
+    package = create_blind_package(tmp_path)
+    mapping = json.loads(Path(str(package["private_mapping_path"])).read_text())
+    decisions: dict[str, object] = {}
+    for fixture_id in FIXTURE_IDS:
+        fixture_decisions: dict[str, object] = {}
+        for lane_name, winner in (
+            ("preservation", "ltx-2.3-lipdub"),
+            ("whole_frame_generation", "echomimic-v3-flash"),
+        ):
+            labels = mapping["fixtures"][fixture_id][lane_name]
+            winner_label = next(
+                label for label, backend_id in labels.items() if backend_id == winner
+            )
+            fixture_decisions[lane_name] = {
+                "winner_label": winner_label,
+                "watched_original_resolution": True,
+                "hard_failures": {label: [] for label in labels},
+            }
+        decisions[fixture_id] = fixture_decisions
+    record_blind_review(
+        tmp_path,
+        reviewer="director",
+        review={"mapping_sha256": package["mapping_sha256"], "decisions": decisions},
+    )
+    license_receipt = tmp_path / "license.json"
+    license_receipt.write_text(
+        json.dumps(
+            {
+                "approved": True,
+                "backend_id": "ltx-2.3-lipdub",
+                "license_id": "reviewed-license",
+                "commercial_scope_reviewed": True,
+                "reviewer": "license-reviewer",
+            }
+        )
+    )
+
+    report = build_challenge_report(tmp_path, license_receipt=license_receipt)
+
+    assert report["backends"]["ltx-2.3-lipdub"]["human_wins"] == 4
+    assert report["backends"]["ltx-2.3-lipdub"]["state"] == "production_candidate"
+    assert report["backends"]["echomimic-v3-flash"]["human_wins"] == 4
+    assert report["backends"]["echomimic-v3-flash"]["state"] == "pilot_only"
 
 
 def test_ltx_needs_three_wins_license_and_single_gpu_evidence(
@@ -488,6 +632,39 @@ def test_ltx_needs_three_wins_license_and_single_gpu_evidence(
     assert promoted["backends"]["ltx-2.3-lipdub"]["single_gpu_fixture_count"] == 4
     assert promoted["route_change_submission_ready"] is True
     assert promoted["default_route_change_authorized"] is False
+
+
+def test_report_revalidates_result_and_review_bindings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _create(tmp_path, monkeypatch)
+    _register_all(tmp_path, monkeypatch)
+    package = create_blind_package(tmp_path)
+    record_blind_review(
+        tmp_path,
+        reviewer="director",
+        review=_review_payload(package, winner_backend="ltx-2.3-lipdub", wins=4),
+    )
+    result_path = tmp_path / "results" / "front_closeup" / "ltx-2.3-lipdub.json"
+    result = json.loads(result_path.read_text())
+    result["source_video_sha256"] = "0" * 64
+    result_path.write_text(json.dumps(result))
+
+    tampered_result_report = build_challenge_report(tmp_path)
+
+    assert tampered_result_report["backends"]["ltx-2.3-lipdub"]["state"] == "blocked_evidence"
+    assert tampered_result_report["backends"]["ltx-2.3-lipdub"]["evidence_errors"]
+
+    result["source_video_sha256"] = HASHES["front_closeup"]
+    result_path.write_text(json.dumps(result))
+    review_path = tmp_path / "reviews" / "director.json"
+    review = json.loads(review_path.read_text())
+    review["mapping_sha256"] = "0" * 64
+    review_path.write_text(json.dumps(review))
+
+    tampered_review_report = build_challenge_report(tmp_path)
+
+    assert tampered_review_report["backends"]["ltx-2.3-lipdub"]["state"] == "blocked_evidence"
 
 
 def test_human_hard_failure_blocks_even_four_of_four_wins(

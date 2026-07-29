@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import random
+import re
 import shutil
 from fractions import Fraction
 from pathlib import Path
@@ -32,6 +33,10 @@ BACKEND_IDS = (
 PRESERVATION_BACKENDS = BACKEND_IDS[:3]
 GENERATIVE_BACKENDS = BACKEND_IDS[3:]
 PRODUCTION_DEFAULT = "latentsync-1.6"
+BACKEND_REVIEW_LANES = {
+    **{backend_id: "preservation" for backend_id in PRESERVATION_BACKENDS},
+    **{backend_id: "whole_frame_generation" for backend_id in GENERATIVE_BACKENDS},
+}
 HARD_FAILURES = {
     "geometry_distortion",
     "square_force",
@@ -315,10 +320,12 @@ def _validate_metrics(
         raise LipsyncChallengeError("metrics receipt does not bind this result")
     evaluator = payload.get("evaluator")
     if not isinstance(evaluator, dict) or not all(
-        isinstance(evaluator.get(key), str) and evaluator[key]
-        for key in ("name", "version", "model_sha256")
+        isinstance(evaluator.get(key), str) and evaluator[key] for key in ("name", "version")
     ):
         raise LipsyncChallengeError("metrics receipt evaluator fingerprint is incomplete")
+    model_hash = evaluator.get("model_sha256")
+    if not isinstance(model_hash, str) or re.fullmatch(r"[0-9a-f]{64}", model_hash) is None:
+        raise LipsyncChallengeError("metrics receipt evaluator model SHA-256 is invalid")
     metrics = payload.get("metrics")
     if not isinstance(metrics, dict) or not metrics.keys() >= REQUIRED_METRICS:
         raise LipsyncChallengeError("metrics receipt is incomplete")
@@ -346,6 +353,18 @@ def _validate_runtime(
     required = ("executor", "gpu_model", "gpu_count", "peak_vram_mb", "elapsed_sec")
     if payload.get("completed") is not True or any(payload.get(key) is None for key in required):
         raise LipsyncChallengeError("runtime receipt is incomplete")
+    if not isinstance(payload["executor"], str) or not payload["executor"].strip():
+        raise LipsyncChallengeError("runtime receipt executor is invalid")
+    if (
+        not isinstance(payload["gpu_model"], str)
+        or re.fullmatch(
+            r"NVIDIA\s+GeForce\s+RTX\s+5090", payload["gpu_model"].strip(), re.IGNORECASE
+        )
+        is None
+    ):
+        raise LipsyncChallengeError("runtime receipt GPU must be NVIDIA GeForce RTX 5090")
+    if isinstance(payload["gpu_count"], bool):
+        raise LipsyncChallengeError("runtime receipt GPU count is invalid")
     try:
         gpu_count = int(payload["gpu_count"])
         peak_vram = float(payload["peak_vram_mb"])
@@ -435,6 +454,84 @@ def _result(root: Path, fixture_id: str, backend_id: str) -> dict[str, Any] | No
     return payload if isinstance(payload, dict) else None
 
 
+def _verified_result(
+    base: Path,
+    challenge_path: Path,
+    challenge: dict[str, Any],
+    fixture_id: str,
+    backend_id: str,
+) -> dict[str, Any] | None:
+    payload = _result(base, fixture_id, backend_id)
+    if payload is None:
+        return None
+    if (
+        payload.get("kind") != "ai-film-lipsync-challenge-result"
+        or payload.get("fixture_id") != fixture_id
+        or payload.get("backend_id") != backend_id
+        or payload.get("challenge_manifest_sha256") != sha256(challenge_path)
+    ):
+        raise LipsyncChallengeError(
+            f"result receipt identity binding is invalid: {fixture_id}/{backend_id}"
+        )
+    source = challenge["fixtures"][fixture_id]["source_media"]
+    if (
+        payload.get("source_video_sha256") != source["sha256"]
+        or payload.get("audio_sha256") != challenge["audio"]["sha256"]
+    ):
+        raise LipsyncChallengeError(
+            f"result receipt input binding is invalid: {fixture_id}/{backend_id}"
+        )
+    output = _regular_file(payload.get("output_path", ""), "registered challenge output")
+    output_hash = sha256(output)
+    if output_hash != payload.get("output_sha256"):
+        raise LipsyncChallengeError(f"registered output hash changed: {fixture_id}/{backend_id}")
+    metrics_reference = payload.get("metrics_receipt")
+    runtime_reference = payload.get("runtime_receipt")
+    if not isinstance(metrics_reference, dict) or not isinstance(runtime_reference, dict):
+        raise LipsyncChallengeError(
+            f"result sidecar references are invalid: {fixture_id}/{backend_id}"
+        )
+    metrics_path, metrics_payload = _json_object(
+        metrics_reference.get("path", ""), "metrics receipt"
+    )
+    runtime_path, runtime_payload = _json_object(
+        runtime_reference.get("path", ""), "runtime receipt"
+    )
+    if sha256(metrics_path) != metrics_reference.get("sha256") or sha256(
+        runtime_path
+    ) != runtime_reference.get("sha256"):
+        raise LipsyncChallengeError(f"result sidecar hash changed: {fixture_id}/{backend_id}")
+    metrics = _validate_metrics(
+        metrics_payload,
+        backend_id=backend_id,
+        output_hash=output_hash,
+        source_hash=source["sha256"],
+        audio_hash=challenge["audio"]["sha256"],
+    )
+    runtime = _validate_runtime(runtime_payload, backend_id=backend_id, output_hash=output_hash)
+    probe = _probe_video(output)
+    _verify_full_decode(output)
+    tolerance = max(0.08, 1.0 / float(source["fps"]))
+    checks = {
+        "full_decode": True,
+        "geometry_match": int(probe["width"]) == int(source["width"])
+        and int(probe["height"]) == int(source["height"]),
+        "fps_match": abs(float(probe["fps"]) - float(source["fps"])) <= 0.01,
+        "duration_match": abs(float(probe["duration_sec"]) - float(source["duration_sec"]))
+        <= tolerance,
+    }
+    return {
+        **payload,
+        "ok": all(checks.values()),
+        "output_path": str(output),
+        "output_sha256": output_hash,
+        "output_media": probe,
+        "automatic_hard_checks": checks,
+        "metrics": metrics,
+        "runtime": runtime,
+    }
+
+
 def create_blind_package(root: Path | str) -> dict[str, Any]:
     """Build original-resolution neutral media names plus a private mapping."""
     base = Path(root).expanduser().resolve()
@@ -444,24 +541,37 @@ def create_blind_package(root: Path | str) -> dict[str, Any]:
     private_fixtures: dict[str, Any] = {}
     public_fixtures: dict[str, Any] = {}
     media_root = base / "blind" / "media"
+    generative_passing = sum(
+        1
+        for fixture_id in FIXTURE_IDS
+        for backend_id in GENERATIVE_BACKENDS
+        if (result := _verified_result(base, challenge_path, challenge, fixture_id, backend_id))
+        and result.get("ok") is True
+    )
+    if generative_passing not in {0, len(FIXTURE_IDS) * len(GENERATIVE_BACKENDS)}:
+        raise LipsyncChallengeError(
+            "whole-frame blind lane requires all eight passing fixture/backend results"
+        )
     lane_backends = {
         "preservation": PRESERVATION_BACKENDS,
-        "whole_frame_generation": GENERATIVE_BACKENDS,
     }
+    if generative_passing:
+        lane_backends["whole_frame_generation"] = GENERATIVE_BACKENDS
     for fixture_id in FIXTURE_IDS:
         private_fixtures[fixture_id] = {}
         public_fixtures[fixture_id] = {}
         for lane_name, backend_ids in lane_backends.items():
             lane_results = {
-                backend_id: _result(base, fixture_id, backend_id) for backend_id in backend_ids
+                backend_id: _verified_result(
+                    base, challenge_path, challenge, fixture_id, backend_id
+                )
+                for backend_id in backend_ids
             }
             available = [
                 backend_id
                 for backend_id, result in lane_results.items()
                 if result and result.get("ok") is True
             ]
-            if not available and lane_name == "whole_frame_generation":
-                continue
             if len(available) != len(backend_ids):
                 raise LipsyncChallengeError(
                     f"complete passing lane required before blind packaging: "
@@ -486,7 +596,7 @@ def create_blind_package(root: Path | str) -> dict[str, Any]:
                 public_candidates.append(
                     {
                         "label": label,
-                        "path": str(target),
+                        "path": str(target.relative_to(base / "blind")),
                         "sha256": result["output_sha256"],
                     }
                 )
@@ -610,43 +720,117 @@ def _license_approved(path: Path | None) -> bool:
     )
 
 
+def _validated_reviews(base: Path, challenge_path: Path) -> list[dict[str, Any]]:
+    review_paths = sorted((base / "reviews").glob("*.json"))
+    if not review_paths:
+        return []
+    mapping_path, mapping = _json_object(
+        base / "blind" / "private-mapping.json", "private blind mapping"
+    )
+    mapping_hash = sha256(mapping_path)
+    if (
+        mapping.get("kind") != "ai-film-lipsync-challenge-private-mapping"
+        or mapping.get("challenge_manifest_sha256") != sha256(challenge_path)
+        or set(mapping.get("fixtures", {})) != set(FIXTURE_IDS)
+    ):
+        raise LipsyncChallengeError("private blind mapping binding is invalid")
+    validated: list[dict[str, Any]] = []
+    for path in review_paths:
+        payload = read_json(path)
+        if (
+            not isinstance(payload, dict)
+            or payload.get("kind") != "ai-film-lipsync-challenge-review"
+            or payload.get("mapping_sha256") != mapping_hash
+            or set(payload.get("decisions", {})) != set(FIXTURE_IDS)
+        ):
+            raise LipsyncChallengeError(f"blind review binding is invalid: {path}")
+        for fixture_id in FIXTURE_IDS:
+            fixture_mapping = mapping["fixtures"][fixture_id]
+            fixture_decision = payload["decisions"][fixture_id]
+            if not isinstance(fixture_decision, dict) or set(fixture_decision) != set(
+                fixture_mapping
+            ):
+                raise LipsyncChallengeError(
+                    f"blind review lane binding is invalid: {path}/{fixture_id}"
+                )
+            for lane_name, labels in fixture_mapping.items():
+                lane = fixture_decision[lane_name]
+                allowed_backends = set(labels.values())
+                if (
+                    not isinstance(lane, dict)
+                    or lane.get("watched_original_resolution") is not True
+                    or lane.get("winner_backend_id") not in allowed_backends
+                    or not isinstance(lane.get("hard_failures"), dict)
+                    or not set(lane["hard_failures"]) <= allowed_backends
+                ):
+                    raise LipsyncChallengeError(
+                        f"blind review decision is invalid: {path}/{fixture_id}/{lane_name}"
+                    )
+                for failures in lane["hard_failures"].values():
+                    if not isinstance(failures, list) or set(failures) - HARD_FAILURES:
+                        raise LipsyncChallengeError(
+                            f"blind review hard failures are invalid: "
+                            f"{path}/{fixture_id}/{lane_name}"
+                        )
+        validated.append(payload)
+    return validated
+
+
 def build_challenge_report(
     root: Path | str, *, license_receipt: Path | None = None
 ) -> dict[str, Any]:
     """Aggregate receipts without ever authorizing a production default change."""
     base = Path(root).expanduser().resolve()
-    _manifest(base)
+    challenge_path, challenge = _manifest(base)
     registry, by_id = _registry()
-    reviews = [
-        payload
-        for path in sorted((base / "reviews").glob("*.json"))
-        if isinstance((payload := read_json(path)), dict)
-        and payload.get("kind") == "ai-film-lipsync-challenge-review"
-    ]
-    fixture_winners: dict[str, str | None] = {}
+    review_errors: list[str] = []
+    try:
+        reviews = _validated_reviews(base, challenge_path)
+    except LipsyncChallengeError as exc:
+        reviews = []
+        review_errors.append(str(exc))
+    fixture_winners: dict[tuple[str, str], str | None] = {}
+    lane_backends = {
+        "preservation": PRESERVATION_BACKENDS,
+        "whole_frame_generation": GENERATIVE_BACKENDS,
+    }
     for fixture_id in FIXTURE_IDS:
-        counts = {
-            backend_id: sum(
-                1
-                for review in reviews
-                for lane in review.get("decisions", {}).get(fixture_id, {}).values()
-                if lane.get("winner_backend_id") == backend_id
+        for lane_name, backend_ids in lane_backends.items():
+            counts = {
+                backend_id: sum(
+                    1
+                    for review in reviews
+                    if review.get("decisions", {})
+                    .get(fixture_id, {})
+                    .get(lane_name, {})
+                    .get("winner_backend_id")
+                    == backend_id
+                )
+                for backend_id in backend_ids
+            }
+            highest = max(counts.values(), default=0)
+            leaders = [backend_id for backend_id, count in counts.items() if count == highest]
+            fixture_winners[(fixture_id, lane_name)] = (
+                leaders[0] if highest > 0 and len(leaders) == 1 else None
             )
-            for backend_id in BACKEND_IDS
-        }
-        highest = max(counts.values(), default=0)
-        leaders = [backend_id for backend_id, count in counts.items() if count == highest]
-        fixture_winners[fixture_id] = leaders[0] if highest > 0 and len(leaders) == 1 else None
     backend_report: dict[str, Any] = {}
     for backend_id in BACKEND_IDS:
         registration = by_id[backend_id]
-        all_results = [
-            result
-            for fixture_id in FIXTURE_IDS
-            if (result := _result(base, fixture_id, backend_id)) is not None
-        ]
+        all_results: list[dict[str, Any]] = []
+        evidence_errors: list[str] = []
+        for fixture_id in FIXTURE_IDS:
+            try:
+                result = _verified_result(base, challenge_path, challenge, fixture_id, backend_id)
+            except LipsyncChallengeError as exc:
+                evidence_errors.append(str(exc))
+                continue
+            if result is not None:
+                all_results.append(result)
         results = [result for result in all_results if result.get("ok") is True]
-        wins = sum(winner == backend_id for winner in fixture_winners.values())
+        review_lane = BACKEND_REVIEW_LANES[backend_id]
+        wins = sum(
+            fixture_winners[(fixture_id, review_lane)] == backend_id for fixture_id in FIXTURE_IDS
+        )
         human_hard_failures = [
             failure
             for review in reviews
@@ -673,6 +857,8 @@ def build_challenge_report(
             state = "production_default"
         elif backend_id in GENERATIVE_BACKENDS:
             state = "pilot_only"
+        elif evidence_errors or review_errors:
+            state = "blocked_evidence"
         elif hard_failures:
             state = "blocked_hard_failure"
         elif len(results) < 4 or not reviews:
@@ -703,6 +889,7 @@ def build_challenge_report(
             "failure_rate": (4 - len(results)) / 4,
             "human_wins": wins,
             "hard_failures": hard_failures,
+            "evidence_errors": evidence_errors + review_errors,
             "single_gpu_fixture_count": single_gpu_count,
             "metric_averages": metric_averages,
             "peak_vram_mb_max": max(

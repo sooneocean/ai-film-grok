@@ -155,7 +155,7 @@
     "scripts/intake.py": "bfec8ffb9db50244ecd23c5e08723d1f66ba98117afb5dc4809b10caea686c58",
     "scripts/lipsync_backend.py": "e8030f5968f22cd3d97bfd6a02f6982657e0c28a0d95d9eea62d9403c21f31b2",
     "scripts/lipsync_canary.py": "3a8b9ca1ae6ce62ab8d84807c2d46afe69ad22ac935b775ee05362dd002e5153",
-    "scripts/lipsync_challenge.py": "a6d03462f6eaa7117160109754319b9f270d202fbf093d3a496d00b1170c3141",
+    "scripts/lipsync_challenge.py": "b374a98bd9ff8794024c5019a862ffb263d78369b0e916e1a4eab44f08cd79ab",
     "scripts/lipsync_node_client.py": "307e470de5d302a0eb7940eadc807b1fe67a0ded6d0e5000851fc5041c4c8e59",
     "scripts/lipsync_node_service.py": "3249aa331f2b3cf2f1fc0ce344ae0b3c9852fca03329f223a929eb23e0786c5b",
     "scripts/lipsync_pilot.py": "267a8ff814462cb64406bb9ed620d06deb333fda44bf5f1bf5d248795b1d0301",
