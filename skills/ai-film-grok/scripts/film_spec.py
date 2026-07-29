@@ -24,6 +24,7 @@ from continuity import (
 from continuity_chain import (
     is_long_form,
 )
+from dialogue_broll import DialogueBrollError, iter_dialogue_broll, validate_dialogue_broll
 from dialogue_contracts import summarize_dialogue_contracts
 from edit_policy import (
     _CRAFT_WHY,
@@ -631,6 +632,8 @@ def validate_film_spec(
     if mode not in VO_MODES:
         raise FilmSpecError(f"film-spec vo_mode must be one of {sorted(VO_MODES)}")
     spec["vo_mode"] = mode
+    if mode != "dialogue_drama" and iter_dialogue_broll(spec):
+        raise FilmSpecError("dialogue_broll is only supported when vo_mode=dialogue_drama")
     if mode == "dialogue_drama":
         if str(spec.get("dialogue_spoken_lang") or "").lower() != "ja":
             raise FilmSpecError("dialogue_drama requires dialogue_spoken_lang=ja")
@@ -971,6 +974,11 @@ def validate_film_spec(
             if shot_id in seen:
                 raise FilmSpecError(f"duplicate shot id: {shot_id}")
             seen.add(shot_id)
+            if shot.get("dialogue_broll") is not None:
+                try:
+                    validate_dialogue_broll(shot, shot_id=shot_id)
+                except DialogueBrollError as exc:
+                    raise FilmSpecError(str(exc)) from exc
             if mode == "dialogue_drama":
                 _validate_dialogue_drama_shot(shot, shot_id=shot_id)
                 nar = shot.get("nar")
@@ -1163,6 +1171,14 @@ def validate_film_spec(
             "narration_sec": round(narration_sec, 3),
             "narration_ratio": round(narration_ratio, 4),
             "note": "Narration is gap-only; target is <= 15% of voiced duration.",
+        }
+        broll = iter_dialogue_broll(spec)
+        spec["_dialogue_broll"] = {
+            "enabled": bool(broll),
+            "count": len(broll),
+            "parent_shot_ids": [str(item.get("parent_shot_id") or "") for item in broll],
+            "audio_policy": "carry_parent_dialogue",
+            "note": "B-roll replaces only parent picture inside bounded cuts; dialogue/subtitle clocks stay on A-roll.",
         }
         if spec.get("narration_budget_strict") is not False and narration_ratio > 0.15:
             raise FilmSpecError(

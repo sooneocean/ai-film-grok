@@ -2153,6 +2153,77 @@ def concat_videos(
     return {**plan, "method": plan.get("method") or "xfade"}
 
 
+def apply_dialogue_broll_visual(
+    parent: Path,
+    *,
+    parent_id: str,
+    parent_duration: float,
+    entries: list[dict[str, Any]],
+    work: Path,
+    width: int,
+    height: int,
+    fps: int,
+) -> tuple[Path, list[dict[str, Any]]]:
+    """Replace bounded picture ranges while preserving the parent audio clock."""
+    if not entries:
+        return parent, []
+    parts: list[Path] = []
+    report: list[dict[str, Any]] = []
+    cursor = 0.0
+    for index, entry in enumerate(entries):
+        start = max(cursor, float(entry["start_sec"]))
+        end = min(parent_duration, float(entry["end_sec"]))
+        if start - cursor > 0.02:
+            prefix = work / f"{parent_id}_aroll_{index:02d}.mp4"
+            stretch_clip(
+                parent,
+                prefix,
+                target=start - cursor,
+                width=width,
+                height=height,
+                fps=fps,
+                in_point_sec=cursor,
+                out_point_sec=start,
+            )
+            parts.append(prefix)
+        cover = work / f"{parent_id}_broll_{index:02d}.mp4"
+        stretch_clip(
+            Path(entry["clip"]), cover, target=end - start, width=width, height=height, fps=fps
+        )
+        parts.append(cover)
+        report.append(
+            {
+                "id": entry["id"],
+                "parent_shot_id": parent_id,
+                "source_clip": str(entry["clip"]),
+                "source_sha256": sha256(Path(entry["clip"])),
+                "kind": entry["kind"],
+                "cut_trigger": entry["cut_trigger"],
+                "narrative_purpose": entry["narrative_purpose"],
+                "actual_start_sec": round(start, 3),
+                "actual_end_sec": round(end, 3),
+                "audio_policy": "carry_parent_dialogue",
+            }
+        )
+        cursor = end
+    if parent_duration - cursor > 0.02:
+        suffix = work / f"{parent_id}_aroll_tail.mp4"
+        stretch_clip(
+            parent,
+            suffix,
+            target=parent_duration - cursor,
+            width=width,
+            height=height,
+            fps=fps,
+            in_point_sec=cursor,
+            out_point_sec=parent_duration,
+        )
+        parts.append(suffix)
+    out = work / f"{parent_id}_dialogue_broll.mp4"
+    concat_videos(parts, out, transition_sec=0.0, fps=fps)
+    return out, report
+
+
 def concat_audio_segments(
     parts: list[Path],
     out: Path,
@@ -2533,6 +2604,23 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             clip_path = safe_existing_file(clips_dir, rec["path"], field=f"clip path for {sid}")
         except (KeyError, SecurityPolicyError) as exc:
             raise RenderError(str(exc)) from exc
+        broll_sources: list[dict[str, Any]] = []
+        for entry in shot.get("dialogue_broll") or []:
+            if not isinstance(entry, dict):
+                continue
+            bid = str(entry.get("id") or "")
+            broll_rec = clips_map.get(bid)
+            if not approved_clip_record(broll_rec):
+                raise RenderError(
+                    f"Dialogue B-roll {bid} lacks approved checksum, review, identity, motion, or decode QA evidence"
+                )
+            try:
+                broll_clip = safe_existing_file(
+                    clips_dir, broll_rec["path"], field=f"B-roll clip path for {bid}"
+                )
+            except (KeyError, SecurityPolicyError) as exc:
+                raise RenderError(str(exc)) from exc
+            broll_sources.append({**entry, "clip": broll_clip})
         native_audio = None
         native_audio_audible: bool | None = None
         native_audio_gain = 1.0
@@ -2805,6 +2893,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 "audio_cue": voice_cue,
                 "target": target,
                 "clip": clip_path,
+                "dialogue_broll": broll_sources,
                 "title": shot.get("title") or sid,
                 "tts": tts_meta,
                 "tts_backend_lock": shot_tts_backend,
@@ -2983,6 +3072,31 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 ),
             },
         )
+
+    broll_edit_entries: list[dict[str, Any]] = []
+    for index, item in enumerate(shot_audio):
+        entries = item.get("dialogue_broll") or []
+        if not entries:
+            continue
+        composite, entries_report = apply_dialogue_broll_visual(
+            stretched[index],
+            parent_id=str(item["id"]),
+            parent_duration=float(item["target"]),
+            entries=entries,
+            work=work,
+            width=width,
+            height=height,
+            fps=fps,
+        )
+        stretched[index] = composite
+        broll_edit_entries.extend(entries_report)
+    broll_edit_report = {
+        "schema_version": 1,
+        "audio_policy": "carry_parent_dialogue",
+        "entries": broll_edit_entries,
+    }
+    if broll_edit_entries:
+        write_json(root / "receipts" / "broll-edit-report.json", broll_edit_report)
 
     # 3) Title / end cards
     # plate_cards=blank: keep pad duration for VO/SRT clock, no burned glyphs
@@ -4143,6 +4257,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             },
         },
         "sound_spotting": mix_spotting,
+        "dialogue_broll": broll_edit_report,
         "tts": {
             "backend_requested": tts_backend,
             "cast_tts_backends": cast_tts_backends,

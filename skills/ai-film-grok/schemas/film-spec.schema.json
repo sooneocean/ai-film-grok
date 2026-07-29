@@ -632,6 +632,30 @@
                   "additionalProperties": false
                 },
                 "speaker_on_camera": { "type": "boolean" },
+                "dialogue_broll": {
+                  "type": "array",
+                  "maxItems": 1,
+                  "description": "Visual cutaway nested under a dialogue A-roll; it carries the parent dialogue audio and does not add timeline duration.",
+                  "items": {
+                    "type": "object",
+                    "required": ["id", "kind", "parent_shot_id", "start_sec", "end_sec", "cut_trigger", "narrative_purpose", "audio_policy", "shot_role", "speaker_on_camera", "lipsync", "dsl"],
+                    "properties": {
+                      "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+                      "kind": {"enum": ["env", "insert", "reaction"]},
+                      "parent_shot_id": {"type": "string"},
+                      "start_sec": {"type": "number", "minimum": 0},
+                      "end_sec": {"type": "number", "exclusiveMinimum": 0},
+                      "cut_trigger": {"type": "string", "minLength": 1},
+                      "narrative_purpose": {"type": "string", "minLength": 1},
+                      "audio_policy": {"const": "carry_parent_dialogue"},
+                      "shot_role": {"enum": ["hero", "env", "insert"]},
+                      "speaker_on_camera": {"const": false},
+                      "lipsync": {"const": false},
+                      "dsl": {"type": "object", "minProperties": 1}
+                    },
+                    "additionalProperties": true
+                  }
+                },
                 "scene_trigger": { "type": "string" },
                 "content_channels": {
                   "type": "object",

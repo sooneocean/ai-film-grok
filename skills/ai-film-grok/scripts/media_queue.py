@@ -400,10 +400,13 @@ class MediaQueue:
             known_ids: set[str] = set()
             if isinstance(raw_spec, dict):
                 try:
+                    from dialogue_broll import iter_dialogue_broll
                     from film_spec import validate_film_spec
 
-                    for s in validate_film_spec(raw_spec, assign_missing_ids=False):
+                    validated = validate_film_spec(raw_spec, assign_missing_ids=False)
+                    for s in validated:
                         known_ids.add(str(s["id"]))
+                    known_ids.update(str(s.get("id")) for s in iter_dialogue_broll(raw_spec))
                 except Exception:
                     for scene in raw_spec.get("scenes") or []:
                         if not isinstance(scene, dict):

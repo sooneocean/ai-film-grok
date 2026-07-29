@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from dialogue_broll import default_dialogue_broll
 from narrative_control import (
     GRAPH_SCHEMA_VERSION,
     draft_director_board,
@@ -3148,6 +3149,7 @@ def project_graph_to_film_spec(
                                 },
                             }
                         )
+                        shot_obj["dialogue_broll"] = default_dialogue_broll(shot_obj)
                     elif vo_mode == "dialogue_drama":
                         # Coverage remains visual/silent unless an editor adds
                         # a justified narration cue later.  Silence makes the
