@@ -121,9 +121,10 @@ def run(
     )
     with tempfile.TemporaryDirectory(prefix="aifilm-mmaudio-", dir=out.parent) as temporary:
         output_dir = Path(temporary)
+        runner = os.environ.get("AIFILM_MMAUDIO_RUNNER", "").strip()
         command = [
             os.environ.get("AIFILM_MMAUDIO_PYTHON", "python"),
-            str(repo / "demo.py"),
+            *([runner, str(repo / "demo.py")] if runner else [str(repo / "demo.py")]),
             "--variant",
             "large_44k_v2",
             "--prompt",
