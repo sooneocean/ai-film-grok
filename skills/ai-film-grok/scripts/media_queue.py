@@ -16,7 +16,11 @@ from typing import Any
 
 from cache import ContentCache
 from media_qa import ALLOWED_VIDEO_ENDPOINTS, MediaQAError, analyze_media
-from production_gates import ProductionGateError, assert_pilot_allows_add
+from production_gates import (
+    ProductionGateError,
+    assert_heat_allows_media,
+    assert_pilot_allows_add,
+)
 from runtime_policy import sha256
 from security_policy import (
     SecurityPolicyError,
@@ -462,6 +466,11 @@ class MediaQueue:
                     existing_shot_ids=existing_shot_ids,
                     force=allow_without_pilot,
                 )
+            except ProductionGateError as exc:
+                raise QueueError(str(exc)) from exc
+            # Wave 5: adult-max heat hard_fail blocks all queue adds (not pilot-skippable)
+            try:
+                assert_heat_allows_media(self.root)
             except ProductionGateError as exc:
                 raise QueueError(str(exc)) from exc
             effective_budget = int(

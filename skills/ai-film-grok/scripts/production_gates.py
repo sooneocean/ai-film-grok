@@ -233,6 +233,59 @@ def assert_pilot_allows_add(
     )
 
 
+def assert_heat_allows_media(
+    root: Path,
+    *,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """Wave 5: fail-closed bulk when adult-max heat_agent_status is hard_fail.
+
+    Pilot skip (allow_without_pilot) does **not** bypass this — scale is orthogonal
+    to pilot approval. Emergency: force=True or AIFILM_SKIP_HEAT_QUEUE_GATE=1.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_HEAT_QUEUE_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    try:
+        from heat_check import heat_agent_status
+    except ImportError as exc:
+        raise ProductionGateError(
+            "heat queue gate: heat_check unavailable — cannot verify adult max scale"
+        ) from exc
+    try:
+        hs = heat_agent_status(root)
+    except Exception as exc:  # noqa: BLE001
+        raise ProductionGateError(
+            f"heat queue gate: heat_agent_status failed ({exc!s:.160}); "
+            "fix heat / film-spec before media-queue add"
+        ) from exc
+    if not hs.get("active"):
+        return {"ok": True, "active": False, "reason": hs.get("reason")}
+    if not hs.get("hard_fail"):
+        return {
+            "ok": True,
+            "active": True,
+            "hard_fail": False,
+            "needs_boost": bool(hs.get("needs_boost")),
+            "score": hs.get("score"),
+            "grade": hs.get("grade"),
+        }
+    root_s = str(Path(root).expanduser().resolve())
+    boost = hs.get("next_cmd") or f'aifilm heat boost --root "{root_s}" --apply'
+    why = hs.get("why") or (f"adult max heat hard_fail impact={hs.get('grade')}:{hs.get('score')}")
+    raise ProductionGateError(
+        f"heat queue gate: HARD block media-queue add — {why}. "
+        f"Run {boost} first (scale before bulk). "
+        "Emergency: AIFILM_SKIP_HEAT_QUEUE_GATE=1 (not recommended)."
+    )
+
+
 def _flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     scenes = spec.get("scenes") or []

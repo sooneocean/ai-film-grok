@@ -41,5 +41,13 @@
 | preflight max hard | duration/wardrobe/arc/impact&lt;A |
 | write-spec 收据 | 自动 `receipts/heat-boost.json`；`auto_heat_boost:true` 才自动 patch |
 
+## Wave 5 已做（同日 · fail-closed bulk）
+| 项 | 入口 |
+|----|------|
+| media-queue 硬拦 | `assert_heat_allows_media` — `heat_agent_status.hard_fail` 时 `QueueError`（**不**被 `--allow-without-pilot` 绕过） |
+| 逃生 | `AIFILM_SKIP_HEAT_QUEUE_GATE=1` |
+| craft 露出 | `detect_craft_stage.heat` + blocker `heat_agent_hard_fail`；`next_hint` 优先 heat boost |
+| dispatch/compact | packet.`heat`；`HEAT_AGENT_HARD_FAIL` attention + hard_gate_codes；primary 选 heat-boost 先于 bulk |
+
 ## 未做（刻意）
 真·肤色/暴露像素 CV（产品诚实：人眼 mute-frame 保留）

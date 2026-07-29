@@ -31,6 +31,7 @@ HARD_GATE_CODES = [
     "PRODUCTION_EVIDENCE_REQUIRED",
     "HERO_QUALITY_RECEIPT_REQUIRED",
     "PROVIDER_FALLBACK_REPILOT_REQUIRED",
+    "HEAT_AGENT_HARD_FAIL",
 ]
 
 
@@ -198,6 +199,28 @@ def _attention(packet: dict[str, Any]) -> list[dict[str, str]]:
                 "summary": "后期审计存在硬失败，禁止宣称 final_complete。",
             }
         )
+    heat = packet.get("heat") if isinstance(packet.get("heat"), dict) else {}
+    if heat.get("active") and heat.get("hard_fail"):
+        attention.append(
+            {
+                "code": "HEAT_AGENT_HARD_FAIL",
+                "severity": "block",
+                "summary": _bounded_text(
+                    heat.get("why")
+                    or "成人 max 尺度未达标 — 先 heat boost 再 bulk/final（media-queue 硬拦）",
+                    max_bytes=240,
+                )
+                or "成人 max 尺度未达标",
+            }
+        )
+    elif heat.get("active") and heat.get("needs_boost"):
+        attention.append(
+            {
+                "code": "HEAT_NEEDS_BOOST",
+                "severity": "info",
+                "summary": "成人 max impact/ecchi 未拉满 S 档 — 建议 heat boost。",
+            }
+        )
     if not packet.get("next_action"):
         attention.append(
             {
@@ -269,6 +292,20 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
             "estimator": "utf8_bytes_div_4",
         },
     }
+    # Wave 5: slim heat surface for agent loops (only when adult-max active)
+    heat = packet.get("heat") if isinstance(packet.get("heat"), dict) else None
+    if heat and heat.get("active"):
+        compact["heat"] = {
+            "active": True,
+            "hard_fail": bool(heat.get("hard_fail")),
+            "needs_boost": bool(heat.get("needs_boost")),
+            "score": heat.get("score"),
+            "grade": heat.get("grade"),
+            "ecchi_score": heat.get("ecchi_score"),
+            "next_cmd": _bounded_text(heat.get("next_cmd"), max_bytes=512),
+        }
+        compact["metrics"]["heat_score"] = heat.get("score")
+        compact["metrics"]["heat_hard_fail"] = bool(heat.get("hard_fail"))
     compact["metrics"]["output_bytes"] = _json_bytes(compact)
     compact["metrics"]["estimated_tokens"] = estimated_tokens(compact)
     if compact["metrics"]["output_bytes"] > 5000:

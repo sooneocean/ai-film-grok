@@ -293,6 +293,33 @@ def detect_craft_stage(
     if clips_ok and stage == "selects":
         stage, detail = "rough", "assemble"
 
+    # Wave 5: surface adult-max heat as craft blocker (scale before bulk/final)
+    heat: dict[str, Any] | None = None
+    try:
+        from heat_check import heat_agent_status
+
+        hs = heat_agent_status(root)
+        if hs.get("active"):
+            heat = {
+                "active": True,
+                "hard_fail": bool(hs.get("hard_fail")),
+                "needs_boost": bool(hs.get("needs_boost")),
+                "score": hs.get("score"),
+                "grade": hs.get("grade"),
+                "ecchi_score": hs.get("ecchi_score"),
+                "next_cmd": hs.get("next_cmd"),
+                "why": hs.get("why"),
+            }
+            if hs.get("hard_fail"):
+                # Any stage with adult-max hard_fail must surface — not only media
+                blockers.append("heat_agent_hard_fail")
+                if stage in {"shots", "media", "selects", "rough", "verified"}:
+                    detail = "heat-boost-before-bulk"
+            elif hs.get("needs_boost") and stage in {"beats", "shots", "media"}:
+                blockers.append("heat_needs_boost")
+    except Exception:
+        heat = None
+
     checklist = {
         "idea": bool(has_init or has_brief),
         "story": story_ok or spec_ok,
@@ -316,6 +343,7 @@ def detect_craft_stage(
         "blockers": blockers,
         "checklist": checklist,
         "flags": flags,
+        "heat": heat,
         "spine": " → ".join(CRAFT_STAGES),
         "ref": "references/craft-spine.md",
         "rings": list(CRAFT_STAGES),
@@ -350,13 +378,18 @@ def craft_status_report(
         "verified": "final · review-final 十一维 · export-desktop",
     }
     stage = craft.get("craft_stage") or "idea"
+    hint = next_hint.get(str(stage), "aifilm next --root …")
+    heat = craft.get("heat") if isinstance(craft.get("heat"), dict) else None
+    if heat and (heat.get("hard_fail") or heat.get("needs_boost")) and heat.get("next_cmd"):
+        hint = f"{heat['next_cmd']}  # adult max scale first — then {hint}"
     return {
         "ok": True,
         "root": str(root),
         "craft": craft,
         "line": format_craft_line(craft, compact=True),
         "line_full": format_craft_line(craft, compact=False),
-        "next_hint": next_hint.get(str(stage), "aifilm next --root …"),
+        "next_hint": hint,
+        "heat": heat,
         "usage": {
             "capability": "aifilm capability --root <film>",
             "audio_plan": "aifilm audio-plan --root <film>",

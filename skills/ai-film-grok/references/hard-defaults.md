@@ -40,6 +40,7 @@
 | **adult 默认钉 max + 交付 impact 底（P0 · 2026-07-29）** | `genre=adult`（默认）→ **强制** `heat_scale=max` + `spice=extreme` + `ADULT_MAX` 脊柱（仅显式 soft/medium / 非成人 genre 退出）。plan 写全 `sex_arc_beat`/`coitus`/`wardrobe`。`SEX_ARC_RATIO_SKEW`（转≥25% 肉戏窗）与 `SEX_ARC_RELEASE_RATIO_LOW`（合≥12%）**hard**。弱 nar **auto-apply**（`sex_vo_auto_apply`，用户句只追加）。**erotic impact ≥75 (A)** 才过 write-spec / review-final。state-index：undress-anchor + undressed/bare 状态照 **hard**。 |
 | **Wave 3 冲分/色气 checklist（P1 · 同日）** | `aifilm heat boost --apply` 把 impact 冲向 **S≥90**（加长 meat/bare/定器/动词/VO）；`lint_ecchi_checklist` 6 项（距离/失序/感官/权力/双关/完成）；mute-frame advisory 只列 act/climax 须人工 coitus 分（**无假 CV**）。`ecchi_checklist_strict:true` 才 hard。 |
 | **Wave 4 agent 回路（P0 · 同日）** | `dispatch`/`next` 优先 `heat boost --apply`；`preflight` max 对时长/回穿/四拍/impact&lt;A **hard**；write-spec 自动写 `receipts/heat-boost.json`；`auto_heat_boost:true` 才自动字段 patch。 |
+| **Wave 5 fail-closed bulk（P0 · 同日）** | `media-queue add` 遇 `heat_agent_status.hard_fail` **硬拦**（`assert_heat_allows_media`；pilot skip 不绕过）；craft/dispatch compact 露出 heat；逃生 `AIFILM_SKIP_HEAT_QUEUE_GATE=1`。 |
 | **Wave 2 强制拉满（P0 · 同日）** | plan **秒数预分配** meat≥50%；multi-scene compact 含 **climax bare**；`aifilm heat soften-compensate --apply`（VO+SFX+energy，禁降 heat）；promote **回穿 rank 硬拦**；`music_spotting` 跟 phase energy；pilot 批准须 **undress+union/rhythm** 三拍证据才 bulk。 |
 | **首帧结构** | **致命**（P0）：keyframe 解剖/融合 fail → 禁 I2V；I2V 后必抽 t=0；坏首帧=整段废（2026-07-21 33s 案） |
 | **景别堆叠** | 成人 60s：宽≥1·中≥2·近≥2·局部≥2；act→climax 收紧不回退全景；连续 3 镜同 size fail（2026-07-21） |

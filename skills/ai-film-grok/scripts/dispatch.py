@@ -624,6 +624,31 @@ def build_dispatch(
     actions = prioritize_actions(workflow, unique)[:10]
     actions = professional_stage_actions(root, workflow, actions)
 
+    # Wave 5: heat status before primary selection so next_cmd can be heat-boost
+    heat_status: dict[str, Any] | None = None
+    try:
+        from heat_check import heat_agent_status
+
+        heat_status = heat_agent_status(root)
+        if (
+            heat_status.get("active")
+            and (heat_status.get("hard_fail") or heat_status.get("needs_boost"))
+            and heat_status.get("next_cmd")
+        ):
+            heat_action = {
+                "id": "heat-boost",
+                "cmd": heat_status["next_cmd"],
+                "why": heat_status.get("why") or "adult max impact/ecchi 未拉满 — 先 heat boost",
+                "stage": "agent",
+                "stage_label": "0·叙事尺度",
+                "source": "heat_agent_status",
+            }
+            # Prefer heat over bulk when hard_fail; still surface when only needs_boost
+            actions = [a for a in actions if a.get("id") != "heat-boost"]
+            actions.insert(0, heat_action)
+    except Exception:
+        heat_status = None
+
     provisional_primary = (
         actions[0]
         if workflow.get("mode") == "professional" and actions
@@ -746,35 +771,22 @@ def build_dispatch(
                 )
         except Exception:
             pass
-        # Wave 4: adult max heat boost before bulk/final (scale first)
-        try:
-            from heat_check import heat_agent_status
-
-            hs = heat_agent_status(root)
-            if hs.get("active") and (hs.get("hard_fail") or hs.get("needs_boost")) and hs.get(
-                "next_cmd"
-            ):
-                actions.insert(
-                    0,
-                    {
-                        "id": "heat-boost",
-                        "cmd": hs["next_cmd"],
-                        "why": hs.get("why") or "adult max impact/ecchi 未拉满 — 先 heat boost",
-                        "stage": "agent",
-                        "stage_label": "0·叙事尺度",
-                        "source": "heat_agent_status",
-                    },
-                )
-                agent_do.insert(
-                    0,
-                    f"优先尺度：{hs['next_cmd']}  # impact={hs.get('grade')}:{hs.get('score')}",
-                )
-                agent_do.insert(
-                    1,
-                    "成人 MAX：尺度+完整办事弧 ＞ 一切装饰；禁静默降 heat_scale",
-                )
-        except Exception:
-            pass
+        # Wave 4/5: surface heat boost already selected as primary (see pre-primary insert)
+        if (
+            heat_status
+            and heat_status.get("active")
+            and (heat_status.get("hard_fail") or heat_status.get("needs_boost"))
+            and heat_status.get("next_cmd")
+        ):
+            agent_do.insert(
+                0,
+                f"优先尺度：{heat_status['next_cmd']}  # impact={heat_status.get('grade')}:{heat_status.get('score')}",
+            )
+            agent_do.insert(
+                1,
+                "成人 MAX：尺度+完整办事弧 ＞ 一切装饰；禁静默降 heat_scale；"
+                "heat hard_fail 时 media-queue 硬拦",
+            )
     if quality["failed_count"]:
         agent_do.append(
             "质量硬拦：先修复 quality receipt 中的 hero/keyframe 阻塞，再允许该镜头重新 I2V"
@@ -1077,6 +1089,26 @@ def build_dispatch(
             "warning_count": len(post_audit.get("warnings") or []),
             "freshness": freshness,
         },
+        "heat": (
+            {
+                "active": True,
+                "hard_fail": bool(heat_status.get("hard_fail")),
+                "needs_boost": bool(heat_status.get("needs_boost")),
+                "score": heat_status.get("score"),
+                "grade": heat_status.get("grade"),
+                "floor": heat_status.get("floor"),
+                "ecchi_score": heat_status.get("ecchi_score"),
+                "ecchi_need": heat_status.get("ecchi_need"),
+                "codes": heat_status.get("codes") or [],
+                "next_cmd": heat_status.get("next_cmd"),
+                "why": heat_status.get("why"),
+                "line": heat_status.get("line"),
+            }
+            if heat_status and heat_status.get("active")
+            else {"active": False, "reason": (heat_status or {}).get("reason")}
+            if heat_status is not None
+            else None
+        ),
         "scene_sound": scene_sound,
         "hard_gates": [
             "write-spec before media-queue",
@@ -1088,6 +1120,7 @@ def build_dispatch(
             "production evidence ready before bulk motion",
             "hero quality receipt pass before clip promote",
             "provider fallback writes routing receipt and requires hero re-pilot",
+            "adult max heat_agent hard_fail blocks media-queue add (Wave 5)",
         ],
         "ref": (
             "references/craft-spine.md · references/keyframe-first-state-index.md · "
