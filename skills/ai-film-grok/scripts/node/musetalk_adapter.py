@@ -17,9 +17,14 @@ def main() -> int:
     parser.add_argument("--video", required=True)
     parser.add_argument("--audio", required=True)
     parser.add_argument("--out", required=True)
+    parser.add_argument(
+        "--root",
+        default=os.environ.get("MUSETALK_ROOT", "/home/user/MuseTalk"),
+        help="clean, hash-pinned MuseTalk checkout",
+    )
     args = parser.parse_args()
 
-    root = Path(os.environ.get("MUSETALK_ROOT", "/home/user/MuseTalk")).resolve()
+    root = Path(args.root).resolve()
     video = Path(args.video).resolve()
     audio = Path(args.audio).resolve()
     out = Path(args.out).resolve()

@@ -164,7 +164,7 @@
     "scripts/next_actions.py": "2fc5122392f05aa1d81fb787edab34c64aa2da220893ad77183367fb641a3ed1",
     "scripts/node/backend_probe.py": "ec3e4c74e618a7b1a7a1232937449344fd54702370cd995358d7c10f5f7b0ffc",
     "scripts/node/latentsync_adapter.py": "d395a3137a7beeb15646e6f295a268193ad0313e15db84eca0bc9dc010a0f6a4",
-    "scripts/node/musetalk_adapter.py": "b3715ec53fb3ea1b3b3a0fabdeddbed00d8980dcd910a0b677cc8b171605cc85",
+    "scripts/node/musetalk_adapter.py": "7c92cb2abe20443478b6e6a1412d30624ab6e6edd4f6eb1b74125830bc135534",
     "scripts/node/stable_audio_probe.py": "1ca50e90267fcfaa4e80e9e4163e53f975102096f519b3350f3f2b21d4f02ba1",
     "scripts/optimization_dashboard.py": "4a069b036d76ebeb29eee8991ef94ddeb86baa1185c83ae282621eecb437a364",
     "scripts/optimization_experiments.py": "c948985b0d94824e57f9748d84fce2a9f3950904269cfe9ef2ffe7fc789772a2",
