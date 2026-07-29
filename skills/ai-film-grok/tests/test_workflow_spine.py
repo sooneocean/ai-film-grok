@@ -294,6 +294,30 @@ def test_complete_professional_workflow_is_done_after_desktop_export(
     ]
 
 
+@pytest.mark.parametrize("stage", ("script_lock", "bulk", "dailies_review"))
+def test_professional_workflow_preserves_dialogue_candidate_review_gap(
+    tmp_path: Path, stage: str
+) -> None:
+    review = {
+        "id": "dialogue-candidate-review",
+        "cmd": f'aifilm review-ui --root "{tmp_path.resolve()}"',
+        "why": "provisional winner requires full viewing",
+        "stage": "visual",
+    }
+
+    actions = professional_stage_actions(
+        tmp_path,
+        {
+            "mode": "professional",
+            "current_stage": stage,
+            "ready_for_lock": False,
+        },
+        [review],
+    )
+
+    assert actions == [review]
+
+
 def test_complete_professional_workflow_never_routes_back_to_heat(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

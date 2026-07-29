@@ -36,6 +36,7 @@ def _dialogue_competition(
     capabilities: list[dict[str, Any]],
     *,
     current: datetime,
+    stage: str,
 ) -> dict[str, Any] | None:
     if not (
         shot.get("lipsync") is True
@@ -103,7 +104,7 @@ def _dialogue_competition(
         adapted,
         capabilities=competition_capabilities,
         gpu_state=gpu_state,
-        stage="pilot",
+        stage=stage,
         now=current.isoformat(),
     )
 
@@ -396,6 +397,7 @@ def explain_route(
         shot,
         capabilities,
         current=current,
+        stage={"draft": "pilot", "select": "production", "hero": "final"}[quality_tier],
     )
     route_ok = selected is not None and (competition is None or competition.get("ok") is True)
     report = {

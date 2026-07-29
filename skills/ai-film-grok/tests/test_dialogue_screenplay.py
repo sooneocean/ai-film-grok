@@ -221,6 +221,31 @@ def test_strict_rejects_repeated_and_over_budget_narration():
     assert report["metrics"]["narration_ratio"] == 0.2
 
 
+def test_strict_rejects_empty_or_zero_duration_narration():
+    screenplay = _approved_screenplay()
+    gap = {
+        "gap_id": "nar_01",
+        "text_zh": "",
+        "narration_reason": "time_jump",
+        "uncovered_information": "三天时间已经过去",
+        "duration_sec": 0,
+        "source_evidence": {
+            "source_refs": ["source:story.txt"],
+            "source_excerpt": "三天后",
+            "provenance": "source_supported",
+        },
+        "duplicates_dialogue_or_visual": False,
+        "visual_information": "",
+        "review_status": "approved",
+    }
+    screenplay["narration_gaps"] = [gap]
+
+    report = validate_dialogue_screenplay(screenplay, strict=True)
+    codes = {issue["code"] for issue in report["issues"]}
+
+    assert {"NARRATION_TEXT_REQUIRED", "NARRATION_DURATION_REQUIRED"} <= codes
+
+
 def test_documentary_and_explicit_monologue_are_mode_exceptions():
     documentary = build_dialogue_screenplay(_normalized(genre="documentary"))
     monologue = build_dialogue_screenplay(

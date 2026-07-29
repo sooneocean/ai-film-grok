@@ -409,6 +409,15 @@ def professional_stage_actions(
             }
         ]
 
+    review_gaps = [
+        action
+        for action in actions
+        if str(action.get("id") or "") == "dialogue-candidate-review"
+        and str(action.get("cmd") or "").startswith("aifilm ")
+    ]
+    if review_gaps:
+        return review_gaps
+
     allowed = set(_ACTION_PRIORITY.get(stage, ()))
     selected = []
     for action in actions:

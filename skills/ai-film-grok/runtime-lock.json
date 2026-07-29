@@ -117,7 +117,7 @@
     "scripts/dialogue_contract.py": "2f1f4adfd95ffec06450094e678cadbde91af551216535afb99ad04160e2bc2a",
     "scripts/dialogue_contracts.py": "9f5c7df1ad308576a5632d2085a7090efb65667b8e76818de09ee98361ba3bb5",
     "scripts/dialogue_i2i_route.py": "53c2f0884db40af2616221b20cd89b7b76bbfed200fa13edc46fe851be5d2973",
-    "scripts/dialogue_screenplay.py": "7603983f20bfd8166d457a28e4171a8f9919dd43109787a8e910bb36074b0ce5",
+    "scripts/dialogue_screenplay.py": "833520296246f81c346559db4191ca05ab03624cb29de14c39b8cf3afa44b532",
     "scripts/director_cli.py": "2716c5daac58454ac2396ea76a8783d2a6a6fdde9742cfcfa53ccb86fd122598",
     "scripts/director_ledger.py": "b77db32e54f716eb97927829775aa506a684a98e5252098e0711976d1402a0fc",
     "scripts/director_review.py": "4c2e6b61d9bd1e78a3a2bddee89942dc12c34f1e1b4664ee0672b57849ee5793",
@@ -204,7 +204,7 @@
     "scripts/production_evidence.py": "616e5fadd740ae496886add45bddebaa06bf9e12de754385839c51d3fca11851",
     "scripts/production_gates.py": "9c3959e521eb008bd586bcf6086ea255831e41d4191e7196dfb0333e6f361b2e",
     "scripts/production_report.py": "4cf52c0cbd9095dafbb194f4ac8725e656a11f48ce69f2994c7355de822dbbd2",
-    "scripts/production_router.py": "28c69b7ce1f164c3d5ebcdd1f269c9e83a82205e95246416c60c47bdb92d5c60",
+    "scripts/production_router.py": "43af91dc83cb7903b949ad00104f8e0fdda0f0cfa12b7da7edc6434e452239e2",
     "scripts/production_team.py": "72c30782cf2b92d7b2804cdd2de877b9a37c870d9e111d5c680d103171f6555e",
     "scripts/promotion_report.py": "b5afcb2f0ea63cec59372edc33de7c8ccfe4aa4da7f0199bc36a022313be759c",
     "scripts/prompt_budget.py": "81b51101cc3bd0a2289c56e21728ad18ec17d21f63775a84aad2d70613258057",
@@ -274,7 +274,7 @@
     "scripts/voice_tracks.py": "e1966502340f87d39a55d0757b038bdca2c6992fd3c097215da7d5ab48d33724",
     "scripts/wardrobe_ladder.py": "c4e44797eab8109f3a38505c2fc5c9fb28f56533bb64640db2feed004b3342c0",
     "scripts/weapon_router.py": "5675ad888a58d3aaed98cc13254c8a2a8f74536c780fde13d0684ce52bf22d20",
-    "scripts/workflow_spine.py": "8b8efdedd63f1366cdacd2dcffa15e2731b5a1097c0a97a93f046457d76e8339"
+    "scripts/workflow_spine.py": "d78ddeec94d246b3e65ba1ca345cf5379367e7397bd384e68ac3157706fc211e"
   },
   "requirements_sha256": "b0acb41843d88a97955a7f14a300c9f873957f3e7a6da00bc3343e178289728a"
 }

@@ -193,6 +193,16 @@ def test_speaking_shot_route_exposes_serial_competition_dag_and_fails_closed(
     assert all(task["status"] == "blocked" for task in report["execution_plan"]["tasks"])
     assert report["execution_plan"]["authorized"] is False
 
+    production_report = plan_route(
+        tmp_path,
+        shot_id="line01",
+        quality_tier="select",
+        now=NOW,
+    )
+    assert "GENERATIVE_NOT_PROMOTED" in {
+        issue["code"] for issue in production_report["route_plan"]["dialogue_competition"]["issues"]
+    }
+
 
 def test_dialogue_broll_routes_as_a_timed_editorial_child(tmp_path: Path) -> None:
     _write_spec(

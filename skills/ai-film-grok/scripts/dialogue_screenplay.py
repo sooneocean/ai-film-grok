@@ -438,14 +438,26 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
     narration_duration = 0.0
     gaps = _gaps(screenplay)
     for gap_ref, gap in gaps:
+        gap_duration = 0.0
         try:
-            narration_duration += max(0.0, float(gap.get("duration_sec") or 0))
+            gap_duration = float(gap.get("duration_sec") or 0)
+            narration_duration += max(0.0, gap_duration)
         except (TypeError, ValueError):
             issues.append(_issue("NARRATION_DURATION_INVALID", "invalid duration", gap_ref))
         if strict and mode == "dialogue_drama":
             reason = _text(gap.get("narration_reason"))
             narration = re.sub(r"\s+", "", _text(gap.get("text_zh")))
             visual = re.sub(r"\s+", "", _text(gap.get("visual_information")))
+            if not narration:
+                issues.append(_issue("NARRATION_TEXT_REQUIRED", "text_zh is required", gap_ref))
+            if gap_duration <= 0:
+                issues.append(
+                    _issue(
+                        "NARRATION_DURATION_REQUIRED",
+                        "duration_sec must be greater than zero",
+                        gap_ref,
+                    )
+                )
             if reason not in NARRATION_REASONS:
                 issues.append(_issue("NARRATION_REASON_REQUIRED", "invalid reason", gap_ref))
             if not _text(gap.get("uncovered_information")):
