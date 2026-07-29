@@ -162,6 +162,24 @@ VOICE_ARMORY: dict[str, dict[str, Any]] = {
         "instruction_prefix": "成年中文女声，标准普通话，讲故事感强、画面感自然、节奏舒缓。",
         "label": "设计女声：故事讲述（非固定角色）",
     },
+    "qwen_zh_male_narrator": {
+        "kind": "tts",
+        "status": "candidate_canary_pending",
+        "variant": "voice_design",
+        "speaker": "",
+        "language": "Chinese",
+        "instruction_prefix": "成年中文男声，标准普通话，叙述感稳定、自然、吐字清晰。",
+        "label": "设计男声：稳定旁白（非固定角色，待实测）",
+    },
+    "qwen_zh_male_warm": {
+        "kind": "tts",
+        "status": "candidate_canary_pending",
+        "variant": "voice_design",
+        "speaker": "",
+        "language": "Chinese",
+        "instruction_prefix": "成年中文男声，标准普通话，温暖、沉稳、亲近。",
+        "label": "设计男声：温暖沉稳（非固定角色，待实测）",
+    },
     "qwen_zh_female_vivian": {
         "kind": "tts",
         "status": "requires_node_variant",
@@ -270,6 +288,24 @@ VOICE_ARMORY: dict[str, dict[str, Any]] = {
         "instruction_prefix": "Adult Japanese female voice, cool, restrained, and articulate.",
         "label": "设计女声：日文清冷克制（非固定角色）",
     },
+    "qwen_ja_male_gentle": {
+        "kind": "tts",
+        "status": "candidate_canary_pending",
+        "variant": "voice_design",
+        "speaker": "",
+        "language": "Japanese",
+        "instruction_prefix": "成人日本語男性、自然で優しく、明瞭に話す。",
+        "label": "设计男声：日文温柔自然（非固定角色，待实测）",
+    },
+    "qwen_ja_male_cool": {
+        "kind": "tts",
+        "status": "candidate_canary_pending",
+        "variant": "voice_design",
+        "speaker": "",
+        "language": "Japanese",
+        "instruction_prefix": "成人日本語男性、落ち着いて、低めで明瞭に話す。",
+        "label": "设计男声：日文清冷沉稳（非固定角色，待实测）",
+    },
     "qwen_ko_female_gentle": {
         "kind": "tts",
         "status": "ready",
@@ -297,6 +333,54 @@ VOICE_ARMORY: dict[str, dict[str, Any]] = {
         "kind": "tts",
         "status": "needs_authorized_reference",
         "label": "Qwen Base：已备好模型，等待授权成年中文女声参考音克隆",
+    },
+}
+
+
+# Models are catalogued separately from voice profiles.  A candidate never becomes
+# routable until its local service, license, and decoded-audio canary are verified.
+TTS_MODEL_ARMORY: dict[str, dict[str, Any]] = {
+    "qwen3_tts_5090": {
+        "status": "ready",
+        "route": "audio_node",
+        "license": "Apache-2.0",
+        "production_eligible": True,
+        "label": "Qwen3-TTS：私有 5090 设计声线与内置角色声线",
+    },
+    "cosyvoice3_local": {
+        "status": "install_required",
+        "route": "cosyvoice-local",
+        "license": "Apache-2.0",
+        "production_eligible": False,
+        "label": "CosyVoice 3：本地中文自然度候选，需服务与授权参考音频",
+    },
+    "kokoro_82m_zh": {
+        "status": "install_required",
+        "route": "external",
+        "license": "Apache-2.0",
+        "production_eligible": False,
+        "label": "Kokoro-82M 中文：轻量离线备选，需本机听审",
+    },
+    "higgs_audio_v2_5": {
+        "status": "license_review_required",
+        "route": "higgs",
+        "license": "Boson Community License for model weights",
+        "production_eligible": False,
+        "label": "Higgs Audio V2.5：高情感研究候选，先核模型权重条款",
+    },
+    "f5_tts": {
+        "status": "noncommercial_research_only",
+        "route": "external",
+        "license": "MIT code; CC-BY-NC pretrained weights",
+        "production_eligible": False,
+        "label": "F5-TTS：研究候选，预训练权重不可作为商业默认",
+    },
+    "index_tts2": {
+        "status": "license_review_required",
+        "route": "external",
+        "license": "bilibili Model Use License Agreement",
+        "production_eligible": False,
+        "label": "IndexTTS2：可控情感研究候选，须逐条确认使用条款",
     },
 }
 
@@ -340,3 +424,8 @@ def render_ready_tts_profile(
 
 def catalog() -> Mapping[str, dict[str, Any]]:
     return {profile_id: dict(profile) for profile_id, profile in VOICE_ARMORY.items()}
+
+
+def tts_model_catalog() -> Mapping[str, dict[str, Any]]:
+    """Return the non-routable model inventory without exposing mutable state."""
+    return {model_id: dict(model) for model_id, model in TTS_MODEL_ARMORY.items()}
