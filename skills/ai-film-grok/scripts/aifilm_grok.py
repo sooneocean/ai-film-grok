@@ -6265,6 +6265,37 @@ def cmd_performance_candidate(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
 
 
+def cmd_ambience_candidate(args: argparse.Namespace) -> int:
+    from ambience_candidates import AmbienceCandidateError, approve, generate, list_candidates
+
+    root = Path(args.root).expanduser().resolve()
+    try:
+        if args.ambience_candidate_action == "list":
+            emit({"candidates": list_candidates(root)})
+        elif args.ambience_candidate_action == "approve":
+            emit(approve(root, args.asset_id, reviewer=args.reviewer))
+        else:
+            base, token = (
+                os.environ.get("AIFILM_AUDIO_NODE_URL", ""),
+                os.environ.get("AIFILM_AUDIO_NODE_TOKEN", ""),
+            )
+            if not base or not token:
+                raise AmbienceCandidateError("AIFILM_AUDIO_NODE_URL/TOKEN are required")
+            emit(
+                generate(
+                    root,
+                    base_url=base,
+                    token=token,
+                    prompt=args.prompt,
+                    duration=args.duration,
+                    seed=args.seed,
+                )
+            )
+        return 0
+    except AmbienceCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
 def cmd_sfx_canary(args: argparse.Namespace) -> int:
     """Generate one non-commercial, pending MMAudio SFX candidate."""
     from sfx_candidates import SFXCandidateError, generate
@@ -6821,6 +6852,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     performance_approve.add_argument("--root", required=True)
     performance_approve.add_argument("--asset-id", required=True)
+
+    ambience_candidate = sub.add_parser(
+        "ambience-candidate", help="Generate and human-approve Stable Audio ambience candidates"
+    )
+    ambience_sub = ambience_candidate.add_subparsers(
+        dest="ambience_candidate_action", required=True
+    )
+    ambience_generate = ambience_sub.add_parser("generate")
+    ambience_generate.add_argument("--root", required=True)
+    ambience_generate.add_argument("--prompt", required=True)
+    ambience_generate.add_argument("--duration", type=float, default=10.0)
+    ambience_generate.add_argument("--seed", type=int, required=True)
+    ambience_list = ambience_sub.add_parser("list")
+    ambience_list.add_argument("--root", required=True)
+    ambience_approve = ambience_sub.add_parser("approve")
+    ambience_approve.add_argument("--root", required=True)
+    ambience_approve.add_argument("--asset-id", required=True)
+    ambience_approve.add_argument("--reviewer", required=True)
 
     sfx_canary = sub.add_parser(
         "sfx-canary",
@@ -8704,6 +8753,7 @@ def main(argv: list[str] | None = None) -> int:
             "bgm-candidate": cmd_bgm_candidate,
             "bgm-library": cmd_bgm_library,
             "performance-candidate": cmd_performance_candidate,
+            "ambience-candidate": cmd_ambience_candidate,
             "sfx-canary": cmd_sfx_canary,
             "lipsync-node": cmd_lipsync_node,
             "lipsync-canary": cmd_lipsync_canary,
