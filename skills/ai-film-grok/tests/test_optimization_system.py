@@ -23,7 +23,12 @@ from optimization_metrics import emit_metrics
 from pipeline_events import append_event
 
 
-def _root(path: Path, *, cost_ticks: int | None = 1000000000) -> None:
+def _root(
+    path: Path,
+    *,
+    cost_ticks: int | None = 1000000000,
+    include_human_time: bool = True,
+) -> None:
     (path / "receipts").mkdir(parents=True)
     (path / "film-spec.json").write_text('{"shots":[{"id":"s1"}]}')
     (path / "manifest.json").write_text(
@@ -102,6 +107,14 @@ def _root(path: Path, *, cost_ticks: int | None = 1000000000) -> None:
         path, stage="i2v", phase="registered", shot_id="s1", occurred_at="2026-01-01T00:00:12Z"
     )
     append_event(path, stage="review-final", phase="completed", occurred_at="2026-01-01T00:01:00Z")
+    if include_human_time:
+        append_event(
+            path,
+            stage="review-final",
+            phase="human_time",
+            occurred_at="2026-01-01T00:01:00Z",
+            human_minutes=1.0,
+        )
 
 
 def test_metrics_preserve_unknown_cost_and_event_time(tmp_path: Path) -> None:
@@ -113,7 +126,7 @@ def test_metrics_preserve_unknown_cost_and_event_time(tmp_path: Path) -> None:
 
 
 def test_metrics_never_turn_missing_production_evidence_into_zero(tmp_path: Path) -> None:
-    _root(tmp_path, cost_ticks=None)
+    _root(tmp_path, cost_ticks=None, include_human_time=False)
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
     manifest["gates"]["assembled"] = False
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -193,6 +206,61 @@ def test_experiment_requires_identical_contract_and_never_auto_spends(tmp_path: 
         is False
     )
     assert decide(tmp_path, experiment_id="e1", decision="ship")["automatic_apply"] is False
+
+
+def test_experiment_never_ships_partial_metrics(tmp_path: Path) -> None:
+    baseline, treatment = tmp_path / "baseline", tmp_path / "treatment"
+    _root(baseline)
+    _root(treatment, cost_ticks=800000000)
+    for root in (baseline, treatment):
+        events = root / "receipts" / "pipeline-events.jsonl"
+        rows = [
+            line
+            for line in events.read_text(encoding="utf-8").splitlines()
+            if json.loads(line).get("phase") != "human_time"
+        ]
+        events.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        assert emit_metrics(root)["data_quality"]["state"] == "partial"
+    init_experiment(
+        tmp_path,
+        experiment_id="partial",
+        hypothesis="cost down",
+        treatment_axis="model",
+        primary_metric="cost_usd",
+        min_effect=0.1,
+        fixtures=["C-motion"],
+        seed="1",
+        shot_count=2,
+        aspect="9:16",
+        duration_budget_sec=20,
+    )
+    config = {
+        "fixtures": ["C-motion"],
+        "seed": "1",
+        "shot_count": 2,
+        "aspect": "9:16",
+        "duration_budget_sec": 20,
+    }
+    import_arm(
+        tmp_path,
+        experiment_id="partial",
+        arm="baseline",
+        metrics_root=baseline,
+        config=config,
+    )
+    import_arm(
+        tmp_path,
+        experiment_id="partial",
+        arm="treatment",
+        metrics_root=treatment,
+        config=config,
+    )
+
+    report = diff_experiment(tmp_path, experiment_id="partial")
+
+    assert report["unknown"] is True
+    with pytest.raises(ValueError, match="adoption evidence"):
+        decide(tmp_path, experiment_id="partial", decision="ship")
 
 
 def test_gold_needs_twenty_hash_bound_double_reviews(tmp_path: Path) -> None:

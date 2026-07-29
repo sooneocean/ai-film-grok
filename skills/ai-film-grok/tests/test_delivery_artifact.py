@@ -153,10 +153,12 @@ def test_export_writes_hash_bound_decode_readback(tmp_path: Path) -> None:
 
 
 def test_desktop_delivery_gate_requires_current_manifest_and_readback(tmp_path: Path) -> None:
-    final_sha256 = "a" * 64
     delivery = tmp_path / "delivery"
     (delivery / "成片").mkdir(parents=True)
     (delivery / "项目状态").mkdir()
+    copied_final = delivery / "成片" / "film_final.mp4"
+    _make_mp4(copied_final)
+    final_sha256 = _sha256(copied_final)
     readback = delivery / "成片" / "delivery-readback.json"
     readback.write_text(
         json.dumps(
@@ -198,5 +200,10 @@ def test_desktop_delivery_gate_requires_current_manifest_and_readback(tmp_path: 
     }
 
     assert desktop_delivery_is_current(outputs, {"sha256": final_sha256}) is True
+    copied_final.write_bytes(b"tampered")
+    assert desktop_delivery_is_current(outputs, {"sha256": final_sha256}) is False
+    copied_final.unlink()
+    assert desktop_delivery_is_current(outputs, {"sha256": final_sha256}) is False
+    _make_mp4(copied_final)
     readback.write_text("{}\n", encoding="utf-8")
     assert desktop_delivery_is_current(outputs, {"sha256": final_sha256}) is False

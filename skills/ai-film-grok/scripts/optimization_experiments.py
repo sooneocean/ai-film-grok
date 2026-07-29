@@ -172,7 +172,7 @@ def _value(metrics: dict[str, Any], metric: str) -> float | None:
 
 
 def _metric_evidence_known(metrics: dict[str, Any], metric: str) -> bool:
-    if metrics.get("data_quality", {}).get("state") == "invalid":
+    if metrics.get("data_quality", {}).get("state") != "known":
         return False
     if metric == "cost_usd":
         return metrics.get("l3", {}).get("i2v_cost_state") == "known"

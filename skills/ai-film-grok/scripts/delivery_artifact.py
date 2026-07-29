@@ -70,17 +70,30 @@ def desktop_delivery_is_current(
     ):
         return False
     artifacts = readback.get("artifacts")
-    return bool(
-        isinstance(artifacts, list)
-        and any(
+    if not isinstance(artifacts, list):
+        return False
+    for item in artifacts:
+        if not (
             isinstance(item, dict)
             and item.get("source_sha256") == final_hash
             and item.get("copied_sha256") == final_hash
             and item.get("hash_match") is True
             and (item.get("decode") or {}).get("ok") is True
-            for item in artifacts
-        )
-    )
+        ):
+            continue
+        relative = Path(str(item.get("path") or ""))
+        if relative.is_absolute() or len(relative.parts) != 1 or relative.name in {"", ".", ".."}:
+            return False
+        copied_final = directory / "成片" / relative
+        try:
+            return bool(
+                copied_final.is_file()
+                and not copied_final.is_symlink()
+                and sha256_file(copied_final) == final_hash
+            )
+        except OSError:
+            return False
+    return False
 
 
 def _run_media_readback(path: Path, *, require_audio: bool) -> dict[str, JsonValue]:
