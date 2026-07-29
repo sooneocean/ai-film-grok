@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 import unittest
@@ -161,6 +162,38 @@ class ComfyVideoTests(unittest.TestCase):
             ),
             {},
         )
+
+    @patch("comfy_video._OPENER.open")
+    def test_json_request_adds_broker_auth_without_echoing_it(
+        self, open_request: MagicMock
+    ) -> None:
+        response = MagicMock()
+        response.read.return_value = b"{}"
+        open_request.return_value.__enter__.return_value = response
+        previous = os.environ.get("AIFILM_COMFY_BROKER_TOKEN")
+        os.environ["AIFILM_COMFY_BROKER_TOKEN"] = "t" * 32
+        try:
+            _json_request("http://127.0.0.1:18188", "/system_stats")
+        finally:
+            if previous is None:
+                os.environ.pop("AIFILM_COMFY_BROKER_TOKEN", None)
+            else:
+                os.environ["AIFILM_COMFY_BROKER_TOKEN"] = previous
+        request = open_request.call_args.args[0]
+        self.assertEqual(request.get_header("Authorization"), "Bearer " + "t" * 32)
+
+    @patch("comfy_video._json_request")
+    def test_submit_binds_registered_weapon_checksum(self, request: MagicMock) -> None:
+        request.return_value = {"prompt_id": "prompt-1"}
+        graph = {"1": {"class_type": "LoadImage", "inputs": {"image": "x.png"}}}
+        with patch("comfy_video.assert_submission_capacity"):
+            with patch("comfy_video._submission_admission_lock") as lock:
+                lock.return_value.__enter__.return_value = None
+                lock.return_value.__exit__.return_value = False
+                submit("http://127.0.0.1:18188", graph, weapon_id="fantasy-talking-6step-pilot")
+        headers = request.call_args.kwargs["extra_headers"]
+        self.assertEqual(headers["X-AIFilm-Weapon-ID"], "fantasy-talking-6step-pilot")
+        self.assertEqual(headers["X-AIFilm-Workflow-SHA256"], workflow_sha256(graph))
 
     def test_private_comfyui_url_is_accepted(self) -> None:
         self.assertEqual(

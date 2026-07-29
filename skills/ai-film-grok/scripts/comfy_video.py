@@ -485,11 +485,19 @@ def _json_request(
     *,
     method: str = "GET",
     payload: Mapping[str, Any] | None = None,
+    extra_headers: Mapping[str, str] | None = None,
     timeout: float = 15,
 ) -> Any:
     url = f"{normalize_base_url(base_url)}{path}"
     body = None
     headers = {"Accept": "application/json"}
+    broker_token = str(os.environ.get("AIFILM_COMFY_BROKER_TOKEN") or "")
+    if broker_token:
+        if len(broker_token) < 32:
+            raise ComfyVideoError("AIFILM_COMFY_BROKER_TOKEN must be at least 32 characters")
+        headers["Authorization"] = f"Bearer {broker_token}"
+    if extra_headers:
+        headers.update(extra_headers)
     if payload is not None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -960,13 +968,19 @@ def upload_image(base_url: str, image_path: Path) -> dict[str, str]:
         ).encode(),
     ]
     body = b"".join(parts)
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+    }
+    broker_token = str(os.environ.get("AIFILM_COMFY_BROKER_TOKEN") or "")
+    if broker_token:
+        if len(broker_token) < 32:
+            raise ComfyVideoError("AIFILM_COMFY_BROKER_TOKEN must be at least 32 characters")
+        headers["Authorization"] = f"Bearer {broker_token}"
     request = urllib.request.Request(
         f"{normalize_base_url(base_url)}/upload/image",
         data=body,
-        headers={
-            "Accept": "application/json",
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
-        },
+        headers=headers,
         method="POST",
     )
     try:
@@ -987,6 +1001,7 @@ def submit(
     graph: Mapping[str, Any],
     *,
     client_id: str | None = None,
+    weapon_id: str | None = None,
 ) -> str:
     with _submission_admission_lock(base_url):
         assert_submission_capacity(base_url)
@@ -996,6 +1011,14 @@ def submit(
             "/prompt",
             method="POST",
             payload={"client_id": resolved_client_id, "prompt": graph},
+            extra_headers=(
+                {
+                    "X-AIFilm-Weapon-ID": weapon_id,
+                    "X-AIFilm-Workflow-SHA256": workflow_sha256(graph),
+                }
+                if weapon_id
+                else None
+            ),
             timeout=30,
         )
     prompt_id = str(data.get("prompt_id") or "")
@@ -1201,9 +1224,15 @@ def download_result(base_url: str, result: Mapping[str, str], out: Path) -> dict
             "type": result.get("type", "output"),
         }
     )
+    headers = {"Accept": "*/*"}
+    broker_token = str(os.environ.get("AIFILM_COMFY_BROKER_TOKEN") or "")
+    if broker_token:
+        if len(broker_token) < 32:
+            raise ComfyVideoError("AIFILM_COMFY_BROKER_TOKEN must be at least 32 characters")
+        headers["Authorization"] = f"Bearer {broker_token}"
     request = urllib.request.Request(
         f"{normalize_base_url(base_url)}/view?{params}",
-        headers={"Accept": "*/*"},
+        headers=headers,
     )
     output = Path(out).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
