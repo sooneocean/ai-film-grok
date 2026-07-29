@@ -287,13 +287,13 @@ def _validate_dialogue_drama_shot(shot: dict[str, Any], *, shot_id: str) -> None
             )
         if str(voice.get("speaker") or "") != str(shot.get("speaker") or ""):
             raise FilmSpecError(f"{shot_id}: dialogue speaker must match voice cue speaker")
-    elif screen_mode == "narration":
+    elif screen_mode in {"narration", "action_cover"} and voices:
         if len(voices) != 1 or voices[0].get("line_type") != "narration":
             raise FilmSpecError(
-                f"{shot_id}: narration screen_mode requires one narration voice cue"
+                f"{shot_id}: {screen_mode} narration requires one narration voice cue"
             )
         if not str(shot.get("narration_reason") or "").strip():
-            raise FilmSpecError(f"{shot_id}: narration requires narration_reason")
+            raise FilmSpecError(f"{shot_id}: {screen_mode} narration requires narration_reason")
     elif voices:
         raise FilmSpecError(
             f"{shot_id}: {screen_mode} cannot carry voice; use on_camera/off_camera/narration"
