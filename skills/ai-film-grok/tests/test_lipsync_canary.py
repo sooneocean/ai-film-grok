@@ -239,6 +239,48 @@ class TestRunLipsyncCanary(unittest.TestCase):
             self.assertTrue(report["ok"])
             self.assertEqual(report["human_review"]["status"], "pending")
 
+    def test_failed_node_receipt_never_promotes_an_output_file(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            video = root / "shot.mp4"
+            audio = root / "shot.wav"
+            video.write_bytes(b"video")
+            audio.write_bytes(b"audio")
+
+            def fake_lipsync_one(**kwargs):
+                kwargs["out"].write_bytes(b"stale candidate")
+                return {"status": "failed", "chosen_backend": "musetalk"}
+
+            with mock.patch.dict(
+                sys.modules,
+                {
+                    "lipsync_backend": mock.MagicMock(
+                        probe=lambda: {
+                            "ready": [],
+                            "node": {
+                                "backends": {"musetalk": {"ready": False, "technical_ready": True}}
+                            },
+                        },
+                        resolve_backend=mock.Mock(
+                            side_effect=AssertionError("must bypass production resolver")
+                        ),
+                        lipsync_one=fake_lipsync_one,
+                    ),
+                },
+            ):
+                report = run_lipsync_canary(
+                    root,
+                    shot_id="shot01",
+                    backend="musetalk",
+                    video=video,
+                    audio=audio,
+                )
+
+            self.assertFalse(report["ok"])
+            self.assertNotIn("human_review", report)
+
 
 if __name__ == "__main__":
     unittest.main()

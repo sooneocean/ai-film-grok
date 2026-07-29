@@ -137,8 +137,9 @@ def run_lipsync_canary(
         )
         report["result"] = result
         # Node-backed renders return a completed job receipt rather than a local
-        # ``ok`` flag. The downloaded, hash-verified artifact is the success proof.
-        report["ok"] = not bool(result.get("skipped")) and out_mp4.is_file()
+        # ``ok`` flag. Never promote an artifact left behind by a failed job.
+        completed = result.get("ok") is True or result.get("status") == "completed"
+        report["ok"] = completed and out_mp4.is_file()
         report["backend_used"] = result.get("chosen_backend") or result.get("backend") or be
         report["output"] = str(out_mp4) if out_mp4.is_file() else result.get("out")
         if report["ok"] and out_mp4.is_file():
