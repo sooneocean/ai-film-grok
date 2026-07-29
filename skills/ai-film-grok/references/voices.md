@@ -225,6 +225,29 @@ AIFILM_TTS_ARGV=["python3","$HOME/.grok/skills/ai-film-grok/scripts/adapters/ele
 | 必须 ElevenLabs 中文 | Creator 档以上 + **中文 library voice_id**；试听通过再锁 | 共享库声线在 free 会 402；edge Neural 名塞进 EL → 400（**preflight hard / synthesize 直接失败**） |
 
 **Hard gate（2026-07-20）**：`tts_backend=external|auto` + `AIFILM_TTS_ARGV`（ElevenLabs 等）时，`vo_voice` 不得为 `zh-CN-…Neural`。中文说书请用 `--tts-backend edge`。
+
+### ElevenLabs 双语 Canary 与声库准入
+
+Key 只从本机 `ELEVENLABS_API_KEY` 读取，不能放到对话、命令列、收据或
+manifest。先列出帐户声线（零合成），再用两个明确 provider voice ID 做受限试听：
+
+```bash
+"$AIFILM" elevenlabs-canary --root "<film>" --list-voices
+"$AIFILM" elevenlabs-canary --root "<film>" \
+  --zh-voice "<provider-id>" --ja-voice "<provider-id>" \
+  --confirm-cost --max-paid-calls 2
+```
+
+每种语言最多一条，任一失败不会重试或再扣费。可解码性、时长、响度、静音率、
+语速、SHA-256 与安全收据写进 `receipts/elevenlabs-canary/`；技术合格只会进入
+`receipts/voice-armory/elevenlabs.json` 的 `candidate`，必须耳审：
+
+```bash
+"$AIFILM" elevenlabs-canary --root "<film>" --review-language zh --decision approve
+```
+
+只有 `ready` 条目能作为角色对白候选；中文旁白继续固定 Edge，且不会自动切换到
+ElevenLabs。
 | film-spec | `"tts_backend": "edge"` 或 `"voicebox"` + 上表 voice | `"tts_backend": "auto"` 且全局 `AIFILM_TTS_ARGV` 指向 EL |
 
 **密钥**：只进 `config.env`（chmod 600）；禁止贴聊天/写进 film-spec/commit。Voicebox 本地无需 API key。

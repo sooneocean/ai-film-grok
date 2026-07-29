@@ -87,6 +87,7 @@
 | [vo-modes.md](vo-modes.md) | VO Modes 口白策略 |
 | [opensource-tts.md](opensource-tts.md) | 开源 TTS 与一角一声 |
 | [lipsync.md](lipsync.md) | Lip-sync 后端政策 |
+| [lipsync-challenge.md](lipsync-challenge.md) | 五后端开源唇同步挑战赛、盲测与晋级规则 |
 
 ## 工具栈 · 后期
 

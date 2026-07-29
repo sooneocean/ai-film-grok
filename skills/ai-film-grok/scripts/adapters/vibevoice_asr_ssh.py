@@ -21,10 +21,14 @@ class RemoteASRError(ValueError):
     pass
 
 
-_SSH_TARGET_RE = re.compile(r"(?:[A-Za-z0-9_.-]+@)?[A-Za-z0-9][A-Za-z0-9.-]{0,252}$")
+_SSH_TARGET_RE = re.compile(
+    r"(?:(?:[A-Za-z0-9_.-]+\\{1,2})?[A-Za-z0-9_.-]+@)?"
+    r"[A-Za-z0-9][A-Za-z0-9.-]{0,252}$"
+)
 _HOSTKEY_ALIAS_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,252}$")
 _REMOTE_ROOT = PureWindowsPath(r"C:\\aifilm-vibevoice")
 _REMOTE_MODEL_ROOT = PureWindowsPath(r"C:\\AI_Models\\VibeVoice-ASR")
+_MAX_AUDIO_BYTES = 256 * 1024 * 1024
 
 
 def _env(name: str) -> str:
@@ -62,7 +66,12 @@ def _windows_path(value: str, *, allowed_root: PureWindowsPath, name: str) -> st
 
 def _ssh_options() -> list[str]:
     key = _env("AIFILM_VIBEVOICE_ASR_SSH_KEY")
-    alias = _env("AIFILM_VIBEVOICE_ASR_SSH_HOSTKEY_ALIAS")
+    alias = (
+        os.environ.get("AIFILM_VIBEVOICE_ASR_SSH_HOSTKEY_ALIAS", "").strip()
+        or os.environ.get("AIFILM_VIBEVOICE_ASR_SSH_HOSTKEY", "").strip()
+    )
+    if not alias:
+        raise RemoteASRError("AIFILM_VIBEVOICE_ASR_SSH_HOSTKEY_ALIAS is required")
     if not Path(key).expanduser().is_file():
         raise RemoteASRError("AIFILM_VIBEVOICE_ASR_SSH_KEY must name an existing key")
     if not _HOSTKEY_ALIAS_RE.fullmatch(alias):
@@ -83,10 +92,26 @@ def _ssh_options() -> list[str]:
     ]
 
 
-def _run(command: list[str]) -> None:
+def _run(command: list[str], *, stage: str) -> None:
     completed = subprocess.run(command, capture_output=True, timeout=1_100, check=False)
     if completed.returncode:
-        raise RemoteASRError("VibeVoice-ASR remote transfer or inference failed")
+        detail = completed.stderr.decode("utf-8", errors="replace").strip().splitlines()
+        tail = detail[-1][:240] if detail else "no diagnostic"
+        tail = re.sub(r"[0-9a-f]{32}", "<job>", tail, flags=re.IGNORECASE)
+        raise RemoteASRError(
+            f"VibeVoice-ASR remote {stage} failed (rc={completed.returncode}): {tail}"
+        )
+
+
+def _cleanup_command(
+    *, options: list[str], target: str, remote_audio: str, remote_out: str
+) -> list[str]:
+    script = (
+        "$ErrorActionPreference = 'Stop'\n"
+        f"Remove-Item -LiteralPath {_ps_quote(remote_audio)}, {_ps_quote(remote_out)} -Force -ErrorAction SilentlyContinue"
+    )
+    encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+    return ["ssh", *options, "--", target, "powershell", "-NoProfile", "-EncodedCommand", encoded]
 
 
 def main() -> int:
@@ -94,11 +119,18 @@ def main() -> int:
     parser.add_argument("--audio", required=True)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
-    audio, out = Path(args.audio).resolve(), Path(args.out).resolve()
-    if audio.is_symlink() or not audio.is_file():
+    audio_input = Path(args.audio).expanduser()
+    out_input = Path(args.out).expanduser()
+    if audio_input.is_symlink() or not audio_input.is_file():
         raise RemoteASRError("audio must be a regular file")
-    if out.is_symlink() or out.suffix.lower() != ".json":
+    audio = audio_input.resolve()
+    if audio.stat().st_size > _MAX_AUDIO_BYTES:
+        raise RemoteASRError("audio exceeds the 256 MiB upload limit")
+    if out_input.is_symlink() or out_input.suffix.lower() != ".json":
         raise RemoteASRError("out must be a non-symlink JSON path")
+    out = out_input.resolve(strict=False)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    local_download = out.with_name(f".{out.name}.{uuid.uuid4().hex}.partial")
 
     target = _ssh_target()
     remote_root = _windows_path(
@@ -127,19 +159,6 @@ def main() -> int:
         f"New-Item -ItemType Directory -Force -Path {_ps_quote(remote_jobs)} | Out-Null"
     )
     mkdir_encoded = base64.b64encode(mkdir_script.encode("utf-16le")).decode("ascii")
-    _run(
-        [
-            "ssh",
-            *options,
-            "--",
-            target,
-            "powershell",
-            "-NoProfile",
-            "-EncodedCommand",
-            mkdir_encoded,
-        ]
-    )
-    _run(["scp", *options, "--", str(audio), f"{target}:{scp_audio}"])
     script = "\n".join(
         [
             "$ErrorActionPreference = 'Stop'",
@@ -147,14 +166,60 @@ def main() -> int:
         ]
     )
     encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
-    _run(["ssh", *options, "--", target, "powershell", "-NoProfile", "-EncodedCommand", encoded])
-    _run(["scp", *options, "--", f"{target}:{scp_out}", str(out)])
+    primary_error: BaseException | None = None
     try:
-        payload = json.loads(out.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RemoteASRError("VibeVoice-ASR remote transcript is invalid") from exc
-    if not isinstance(payload, dict) or not isinstance(payload.get("segments"), list):
-        raise RemoteASRError("VibeVoice-ASR remote transcript has no segments")
+        _run(
+            [
+                "ssh",
+                *options,
+                "--",
+                target,
+                "powershell",
+                "-NoProfile",
+                "-EncodedCommand",
+                mkdir_encoded,
+            ],
+            stage="workspace preparation",
+        )
+        _run(
+            ["scp", *options, "--", str(audio), f"{target}:{scp_audio}"],
+            stage="audio upload",
+        )
+        _run(
+            ["ssh", *options, "--", target, "powershell", "-NoProfile", "-EncodedCommand", encoded],
+            stage="inference",
+        )
+        _run(
+            ["scp", *options, "--", f"{target}:{scp_out}", str(local_download)],
+            stage="transcript download",
+        )
+    except BaseException as exc:
+        primary_error = exc
+        raise
+    finally:
+        try:
+            _run(
+                _cleanup_command(
+                    options=options,
+                    target=target,
+                    remote_audio=remote_audio,
+                    remote_out=remote_out,
+                ),
+                stage="cleanup",
+            )
+        except RemoteASRError:
+            if primary_error is None:
+                raise
+    try:
+        try:
+            payload = json.loads(local_download.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RemoteASRError("VibeVoice-ASR remote transcript is invalid") from exc
+        if not isinstance(payload, dict) or not isinstance(payload.get("segments"), list):
+            raise RemoteASRError("VibeVoice-ASR remote transcript has no segments")
+        os.replace(local_download, out)
+    finally:
+        local_download.unlink(missing_ok=True)
     return 0
 
 

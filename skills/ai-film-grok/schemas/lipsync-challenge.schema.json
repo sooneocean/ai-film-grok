@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-film-grok.local/schemas/lipsync-challenge.schema.json",
+  "title": "AI Film Lip-sync Challenge Manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "ok",
+    "auto_execute",
+    "gpu_work_authorized",
+    "production_default",
+    "fixtures",
+    "audio",
+    "planned_cells",
+    "promotion_rules"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "ai-film-lipsync-challenge"},
+    "ok": {"const": true},
+    "auto_execute": {"const": false},
+    "gpu_work_authorized": {"const": false},
+    "production_default": {"const": "latentsync-1.6"},
+    "registry": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "fixtures": {
+      "type": "object",
+      "required": ["front_closeup", "three_quarter", "occlusion_motion", "anime"],
+      "additionalProperties": false,
+      "properties": {
+        "front_closeup": {"$ref": "#/$defs/fixture"},
+        "three_quarter": {"$ref": "#/$defs/fixture"},
+        "occlusion_motion": {"$ref": "#/$defs/fixture"},
+        "anime": {"$ref": "#/$defs/fixture"}
+      }
+    },
+    "audio": {"$ref": "#/$defs/media"},
+    "planned_cells": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["fixture_id", "backend_id", "lane", "state"],
+        "properties": {
+          "fixture_id": {"type": "string"},
+          "backend_id": {"type": "string"},
+          "lane": {"type": "string"},
+          "state": {"const": "awaiting_external_result"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "promotion_rules": {"type": "object"}
+  },
+  "$defs": {
+    "media": {
+      "type": "object",
+      "required": ["path", "sha256", "duration_sec"],
+      "properties": {
+        "path": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "duration_sec": {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "fixture": {
+      "type": "object",
+      "required": ["fixture_id", "source_media"],
+      "properties": {
+        "fixture_id": {"type": "string"},
+        "source_media": {"$ref": "#/$defs/media"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

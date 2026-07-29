@@ -34,6 +34,24 @@ def test_armory_records_verified_private_node_without_credentials() -> None:
     assert "token" not in serialized
 
 
+def test_audio_research_weapons_bind_versioned_evidence() -> None:
+    armory = load_armory()
+    root = Path(__file__).resolve().parents[1]
+    research = {
+        weapon["id"]: weapon
+        for weapon in armory["research_weapons"]
+        if weapon["id"] in {"mmaudio-video-foley-pilot", "vibevoice-asr-review-5090"}
+    }
+
+    assert set(research) == {"mmaudio-video-foley-pilot", "vibevoice-asr-review-5090"}
+    for weapon_id, weapon in research.items():
+        relative = Path(weapon["latest_canary_receipt_path"])
+        assert relative.parts[:2] == ("registry", "evidence")
+        evidence = json.loads((root / relative).read_text(encoding="utf-8"))
+        assert evidence["weapon_id"] == weapon_id
+        assert evidence["production_eligible"] is False
+
+
 def test_talking_avatar_template_hashes_are_registry_bound() -> None:
     armory = load_armory()
     by_id = {weapon["id"]: weapon for weapon in armory["weapons"]}

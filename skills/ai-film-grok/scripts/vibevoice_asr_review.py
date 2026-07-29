@@ -7,8 +7,10 @@ delivery, change a provider, or submit any generation work.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import subprocess
 import tempfile
 from datetime import UTC, datetime
@@ -16,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from external_review import compare_word_timing, parse_srt
+from media_probe import MediaProbeError, verify_full_decode
 from media_qa import MediaQAError, analyze_media
 from security_policy import (
     SecurityPolicyError,
@@ -33,6 +36,7 @@ REMOTE_ADAPTER_ENV_KEYS = (
     "AIFILM_VIBEVOICE_ASR_SSH_TARGET",
     "AIFILM_VIBEVOICE_ASR_SSH_KEY",
     "AIFILM_VIBEVOICE_ASR_SSH_HOSTKEY_ALIAS",
+    "AIFILM_VIBEVOICE_ASR_SSH_HOSTKEY",
     "AIFILM_VIBEVOICE_ASR_REMOTE_ROOT",
     "AIFILM_VIBEVOICE_ASR_REMOTE_MODEL_PATH",
 )
@@ -151,6 +155,12 @@ def create_report(
         media_qa = analyze_media(source, require_audio=True, require_motion=False)
     except MediaQAError as exc:
         raise VibeVoiceASRError("audio must pass local technical media verification") from exc
+    if media_qa.get("has_audio") is True and media_qa.get("errors") == ["video stream is missing"]:
+        try:
+            verify_full_decode(source)
+        except MediaProbeError as exc:
+            raise VibeVoiceASRError("audio must pass local technical media verification") from exc
+        media_qa.update({"ok": True, "decode_ok": True, "errors": []})
     if media_qa.get("ok") is not True:
         raise VibeVoiceASRError("audio must pass local technical media verification")
     subtitle_path = _root_file(base, subtitles, label="subtitles") if subtitles else None
@@ -187,7 +197,12 @@ def create_report(
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise VibeVoiceASRError("VibeVoice-ASR adapter did not complete") from exc
         if completed.returncode != 0:
-            raise VibeVoiceASRError(f"VibeVoice-ASR adapter failed (rc={completed.returncode})")
+            detail = str(getattr(completed, "stderr", "") or "").strip().splitlines()
+            tail = detail[-1][:240] if detail else "no diagnostic"
+            tail = re.sub(r"[0-9a-f]{32}", "<job>", tail, flags=re.IGNORECASE)
+            raise VibeVoiceASRError(
+                f"VibeVoice-ASR adapter failed (rc={completed.returncode}): {tail}"
+            )
         if not transcript_path.is_file() or transcript_path.is_symlink():
             raise VibeVoiceASRError("VibeVoice-ASR adapter did not write transcript JSON")
         try:
@@ -195,6 +210,12 @@ def create_report(
         except (OSError, json.JSONDecodeError) as exc:
             raise VibeVoiceASRError("VibeVoice-ASR adapter wrote invalid transcript JSON") from exc
     segments, words = _segments(raw)
+    transcript_sha256 = hashlib.sha256(
+        json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    adapter_contract_sha256 = hashlib.sha256(
+        json.dumps(template, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     cues = parse_srt(subtitle_path) if subtitle_path else []
     findings = compare_word_timing(cues, words)
     speakers = sorted({item["speaker"] for item in segments})
@@ -203,7 +224,13 @@ def create_report(
         "kind": "vibevoice-asr-review",
         "at": _utc_now(),
         "status": "candidate_only",
-        "provider": {"name": "vibevoice-asr", "local_only": True, "status": "completed"},
+        "provider": {
+            "name": "vibevoice-asr",
+            "local_only": True,
+            "status": "completed",
+            "adapter_contract_sha256": adapter_contract_sha256,
+            "transcript_sha256": transcript_sha256,
+        },
         "inputs": {
             "audio": {
                 "path": str(source.relative_to(base)),

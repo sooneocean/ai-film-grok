@@ -439,6 +439,56 @@
   ],
   "research_weapons": [
     {
+      "id": "mmaudio-video-foley-pilot",
+      "display_name": "MMAudio video-bound foley pilot",
+      "status": "experimental",
+      "readiness": "real_canary_pending_human_listening_asr_flag",
+      "provider": "audio_node",
+      "node": "rtx5090-main",
+      "intents": ["video-bound-foley", "text-to-sfx"],
+      "allowed_stages": ["research", "pilot"],
+      "license_scope": "CC-BY-NC-4.0_noncommercial_internal_only",
+      "latest_canary_receipt_path": "registry/evidence/audio-canaries/mmaudio-video-foley-20260729.json",
+      "restrictions": [
+        "not_commercial",
+        "not_final_without_full_listening",
+        "no_auto_approval",
+        "no_speech_or_music_leakage"
+      ],
+      "execution_cli": "aifilm sfx-candidate generate",
+      "promotion_requirements": [
+        "source_video_sha256",
+        "model_checkpoint_sha256",
+        "terminal_audio_decode",
+        "synchronization_review",
+        "full_human_listening"
+      ]
+    },
+    {
+      "id": "vibevoice-asr-review-5090",
+      "display_name": "VibeVoice-ASR dialogue review sidecar",
+      "status": "experimental",
+      "readiness": "real_canary_verified_candidate_only",
+      "provider": "ssh_adapter",
+      "node": "rtx5090-main",
+      "intents": ["dialogue-asr-review", "speaker-segmentation", "subtitle-mismatch-review"],
+      "allowed_stages": ["review"],
+      "license_scope": "local_review_only_verify_upstream_before_distribution",
+      "latest_canary_receipt_path": "registry/evidence/audio-canaries/vibevoice-asr-review-20260729.json",
+      "restrictions": [
+        "never_script_truth",
+        "never_auto_rewrite_subtitles",
+        "candidate_mismatches_require_listening"
+      ],
+      "execution_cli": "aifilm vibevoice-asr run",
+      "promotion_requirements": [
+        "adapter_sha256",
+        "audio_sha256",
+        "transcript_sha256",
+        "human_dialogue_review"
+      ]
+    },
+    {
       "id": "hunyuanvideo-1.5-shot-pilot",
       "display_name": "HunyuanVideo 1.5 short-shot pilot",
       "status": "experimental",
@@ -466,6 +516,48 @@
       "latest_canary_receipt_path": null,
       "requirements": {"minimum_vram_mib": 32607, "quantization": "low_vram_int8_or_equivalent"},
       "promotion_requirements": ["model_fingerprint", "terminal_media_decode", "audio_review", "human_review"]
+    },
+    {
+      "id": "ltx-2.3-lipdub-challenge",
+      "display_name": "LTX-2.3 LipDub challenge",
+      "status": "experimental",
+      "readiness": "not_installed_or_unverified",
+      "provider": "external_result_import",
+      "node": "rtx5090-main",
+      "intents": ["video-lip-sync-challenge"],
+      "allowed_stages": ["research"],
+      "license_scope": "review_required_before_promotion",
+      "latest_canary_receipt_path": null,
+      "restrictions": ["no_auto_execute", "not_final", "not_final_lipsync_auto"],
+      "promotion_requirements": ["license_review", "single_gpu_rtx5090_evidence", "four_fixture_blind_review", "zero_hard_failures"]
+    },
+    {
+      "id": "echomimic-v3-flash-challenge",
+      "display_name": "EchoMimicV3 Flash whole-frame challenge",
+      "status": "experimental",
+      "readiness": "not_installed_or_unverified",
+      "provider": "external_result_import",
+      "node": "rtx5090-main",
+      "intents": ["face-animation-to-audio-challenge"],
+      "allowed_stages": ["research", "pilot"],
+      "license_scope": "verify_before_pilot",
+      "latest_canary_receipt_path": null,
+      "restrictions": ["whole_frame_generation", "no_pixel_preservation_claim", "not_final_lipsync_auto"],
+      "promotion_requirements": ["model_fingerprint", "single_gpu_evidence", "terminal_media_decode", "human_review"]
+    },
+    {
+      "id": "longcat-video-avatar-1.5-challenge",
+      "display_name": "LongCat-Video-Avatar 1.5 whole-frame challenge",
+      "status": "experimental",
+      "readiness": "blocked_single_gpu_feasibility",
+      "provider": "external_result_import",
+      "node": "rtx5090-main",
+      "intents": ["face-animation-to-audio-challenge"],
+      "allowed_stages": ["research"],
+      "license_scope": "verify_before_pilot",
+      "latest_canary_receipt_path": null,
+      "restrictions": ["whole_frame_generation", "no_pixel_preservation_claim", "single_gpu_required", "not_final_lipsync_auto"],
+      "promotion_requirements": ["single_gpu_feasibility", "model_fingerprint", "terminal_media_decode", "human_review"]
     },
     {
       "id": "hunyuanvideo-foley-evaluation",

@@ -8,6 +8,8 @@ FRW 仅作显式 fallback；**历史 key 常见 403/502 不代表当前 live 状
 RTX 5090 方案研究与 canary 门槛见
 [lessons-2026-07-28-rtx5090-lipsync-routing.md](lessons-2026-07-28-rtx5090-lipsync-routing.md)。
 该文中的新增方案都是**候选**，未接线或未通过实片 canary 前不得写成 ready。
+五后端的独立、无执行评测流程见
+[lipsync-challenge.md](lipsync-challenge.md)。挑战报告不会改动本页的生产路由。
 
 ## 何时可用
 
