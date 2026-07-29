@@ -12,6 +12,7 @@ E病毒 ch4 批跑 / 解剖修毒 / Comfy 5090 / **收尾门禁** 时先扫本�
 | **Comfy 隧道 8188 非 8189 + 队列空档 + bare 霓虹（P0 · 后面不要再犯）** | [comfy-tunnel-queue-neon](2026-07-29-comfy-tunnel-queue-neon-canary.md) · [lesson](../references/lessons-2026-07-29-comfy-tunnel-8188-not-8189.md) | 18188→**8188** only；→8189=401；idle 立刻 submit；neon 结合符禁 register |
 | **Comfy 批跑 + 解剖铁律** | [evirus-ch04-comfy-anatomy-batch](2026-07-29-evirus-ch04-comfy-anatomy-batch.md) | free-memory --confirm；禁并行 5090；fix 不挡 bulk |
 | **多片抢 5090 + 本机 OOM IRON（P0 · 后面不要再犯）** | [comfy-multifilm-contention-oom](2026-07-29-comfy-multifilm-contention-oom.md) · [lesson](../references/lessons-2026-07-29-comfy-multifilm-contention-oom.md) | 单 client；禁 pgrep 自杀；禁 09 八进制；邻镜 meat 禁静默顶替 |
+| **pilot I2V 独占 + 禁误 interrupt IRON（P0 · 后面不要再犯）** | [comfy-gpu-priority-pilot-i2v](2026-07-29-comfy-gpu-priority-pilot-i2v.md) · [lesson](../references/lessons-2026-07-29-comfy-gpu-priority-pilot-i2v.md) | GO 优先=独占；running 本片禁 interrupt；TN→CONT；experimental=stage pilot；clips 文件数才算 |
 | 色情冲击全闸 | [adult-impact-max-gates](2026-07-28-adult-impact-max-gates.md) | coitus/size/pose/sex_arc 等 strict |
 | 成人尺度 + 肉戏弧 | [07-27 adult-scale](2026-07-27-adult-scale-max-sex-arc.md) | 前戏→插入→射出 |
 | 高动态 + 画风锁 | [07-27 high-motion](2026-07-27-high-motion-style-final.md) | mean≥18/20；gate 才桌面 |
@@ -23,6 +24,7 @@ E病毒 ch4 批跑 / 解剖修毒 / Comfy 5090 / **收尾门禁** 时先扫本�
 - `AI FILM SPACE/0729/e-virus-ch04-shelter`：14 镜 bulk；Imagine bare I2V moderated → undress 续接；motion retake；简化混音 + PIL 字幕；`out/film_final.mp4` PARTIAL
 - `AI FILM SPACE/0729/chaebol-cast-rule-max`：10 镜 adult-max；双轨 still；motion retake；简化 final + 破冻；**官方 closeout 全绿** + Desktop 包；delivery **PARTIAL**（非真 bare）
 - `AI FILM SPACE/0729/night-lock-encore-max`：Qwen bare stills + Wan meat 04–08/10；**shot09 FALLBACK08**；多片抢 5090 + 本机 16GB 双 client OOM；delivery **bare-comfy-v2 PARTIAL**
+- `AI FILM SPACE/0729/e-virus-ch05-sensory-rebuild`：pilot still/kf/approve OK；**I2V clips=0 PARTIAL**（btc/night-lock 互抢+STOP+误 interrupt；见 pilot I2V 独占 IRON）
 
 ## 出货前 15 秒（改代码 / push）
 1. `wc -c SKILL.md` ≤6000；文档锚点未裁掉

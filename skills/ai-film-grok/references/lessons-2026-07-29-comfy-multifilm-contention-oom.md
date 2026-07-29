@@ -13,6 +13,8 @@
 **5090 是共享闸门，不是你的专机；本机 Mac 16GB 同时只能跑一个 `comfy_video.py` client。**  
 抢不到窗口就 **PARTIAL 诚实**，禁用邻镜 meat **静默冒充**真 reshoot。
 
+**补课（ch05 pilot 同日）**：用户 **GO 优先片** 时改「一机一 owner」；**running 本片禁 interrupt**；`TN`→CONT；experimental 要 `stage=pilot`。见 `lessons-2026-07-29-comfy-gpu-priority-pilot-i2v.md`。
+
 ## 绝对禁止
 
 | 坑 | 为啥会犯 | 正确做法 |

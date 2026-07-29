@@ -85,3 +85,21 @@ def test_fast_and_multilingual_profiles_require_the_small_custom_variant() -> No
         assert profile is not None
         assert profile["variant"] == "custom_0_6b"
         assert profile["status"] == "requires_node_variant"
+
+
+def test_multilingual_design_profiles_are_explicitly_bound_to_their_language() -> None:
+    expected_languages = {
+        "qwen_en_female_design": "English",
+        "qwen_en_female_warm": "English",
+        "qwen_en_female_confident": "English",
+        "qwen_en_female_storyteller": "English",
+        "qwen_ja_female_gentle": "Japanese",
+        "qwen_ja_female_cool": "Japanese",
+        "qwen_ko_female_gentle": "Korean",
+        "qwen_ko_female_confident": "Korean",
+    }
+    for profile_id, language in expected_languages.items():
+        profile = ready_tts_profile(profile_id)
+        assert profile is not None
+        assert profile["language"] == language
+        assert profile["variant"] == "voice_design"

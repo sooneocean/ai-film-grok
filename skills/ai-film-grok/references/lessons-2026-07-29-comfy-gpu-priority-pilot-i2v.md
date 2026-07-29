@@ -88,6 +88,7 @@ adult-general-experimental  → 必须同时：
 
 ## 关联
 
+- **多片抢占 + 本机 OOM（同日总课）**：`lessons-2026-07-29-comfy-multifilm-contention-oom.md`（单 client、禁 pgrep 自杀、禁假 meat）  
 - capacity / free：`memory/2026-07-29-evirus-ch04-comfy-anatomy-batch.md`  
+- 隧道 18188→8188：`lessons-2026-07-29-comfy-tunnel-8188-not-8189.md`  
 - 混合火力：`lessons-2026-07-28-hybrid-api-local-max-firepower.md`  
-- 毒镜：`lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md`  
