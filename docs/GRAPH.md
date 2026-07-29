@@ -56,6 +56,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_adult_max_iron.py`
 - `skills/ai-film-grok/tests/test_advance.py`
 - `skills/ai-film-grok/tests/test_advanced_audio_optimizations.py`
+- `skills/ai-film-grok/tests/test_anatomy_safety.py`
 - `skills/ai-film-grok/tests/test_approval_ledger.py`
 - `skills/ai-film-grok/tests/test_asset_registry.py`
 - `skills/ai-film-grok/tests/test_audio_bible.py`
