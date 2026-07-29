@@ -514,11 +514,11 @@ MIT © [dex](https://github.com/sooneocean)
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.17.5`
+- 插件版本：`2.17.6`
 - Published skills：`2`
 - Skill Registry：`31/33` 项标记为 `implemented`
 - Python 脚本：`240` 个
-- pytest 文件：`266` 个
+- pytest 文件：`267` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

@@ -313,6 +313,88 @@ def heat_vo_suggest(
     }
 
 
+def heat_agent_status(root: Path) -> dict[str, Any]:
+    """Compact adult-max gate for dispatch / next / preflight (Wave 4).
+
+    Returns ready-to-inject next action when heat needs work before bulk/final.
+    """
+    root = Path(root).expanduser().resolve()
+    spec = read_json(root / "film-spec.json") or {}
+    if not spec:
+        return {"active": False, "ok": True, "reason": "no_spec"}
+    heat = str(spec.get("heat_scale") or "").strip().lower()
+    if heat not in {"max", "hot"}:
+        return {"active": False, "ok": True, "reason": "not_adult_max"}
+    if spec.get("adult_max_iron") is False:
+        return {"active": False, "ok": True, "reason": "adult_max_iron_false"}
+
+    # Prefer cached write-spec scorecard; fall back to full heat_check (may be heavy)
+    impact = spec.get("_erotic_impact") if isinstance(spec.get("_erotic_impact"), dict) else None
+    heat_arc = spec.get("_heat_arc") if isinstance(spec.get("_heat_arc"), dict) else None
+    boost_receipt = read_json(root / "receipts" / "heat-boost.json") or {}
+    try:
+        full = heat_check(root)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "active": True,
+            "ok": False,
+            "error": str(exc)[:200],
+            "next_cmd": f'aifilm heat check --root "{root}"',
+            "why": "heat check failed to run",
+        }
+    impact = full.get("erotic_impact") or impact or {}
+    boost = (
+        full.get("impact_boost")
+        or (boost_receipt.get("plan") if isinstance(boost_receipt, dict) else {})
+        or {}
+    )
+    ecchi = full.get("ecchi_checklist") or {}
+    # Prefer field/spec score — media sensory often fails pre-bulk and must not block planning
+    score = float(impact.get("spec_score") or impact.get("score") or 0.0)
+    floor = float(spec.get("erotic_impact_floor") or 75.0)
+    target_s = 90.0
+    raw_codes = list(full.get("hard_relevant_codes") or full.get("codes") or [])
+    # Ignore media-only adult_max evidence until clips exist
+    codes = [c for c in raw_codes if not str(c).startswith("ADULT_MAX_")]
+    needs_boost = bool(boost.get("needed")) or score + 1e-9 < target_s
+    below_a = score + 1e-9 < floor
+    field_ok = bool((full.get("gates") or {}).get("sex_duration", {}).get("ok", True))
+    # hard when below A or field heat codes remain (not media-only)
+    hard_fail = below_a or bool(codes)
+    next_cmd = None
+    why = None
+    if hard_fail or needs_boost:
+        next_cmd = f'aifilm heat boost --root "{root}" --apply'
+        why = (
+            f"adult max heat: impact={impact.get('grade')}:{score} "
+            f"(A≥{floor} S≥{target_s}) ecchi={ecchi.get('score')}/{ecchi.get('need')} "
+            f"actions={len(boost.get('actions') or [])} "
+            f"codes={','.join(codes[:6]) or 'none'}"
+        )
+        if hard_fail:
+            why = "HARD " + why
+    return {
+        "active": True,
+        "ok": not hard_fail and field_ok,
+        "needs_boost": needs_boost,
+        "hard_fail": hard_fail,
+        "score": score,
+        "grade": impact.get("grade"),
+        "floor": floor,
+        "ecchi_score": ecchi.get("score"),
+        "ecchi_need": ecchi.get("need"),
+        "boost_actions": len(boost.get("actions") or []),
+        "codes": codes[:12],
+        "heat_arc_ok": bool(
+            (heat_arc or (full.get("gates") or {}).get("sex_arc") or {}).get("ok", True)
+        ),
+        "next_cmd": next_cmd,
+        "why": why,
+        "mute_frame_n": (full.get("mute_frame_advisory") or {}).get("count"),
+        "line": full.get("line"),
+    }
+
+
 def heat_boost(
     root: Path,
     *,

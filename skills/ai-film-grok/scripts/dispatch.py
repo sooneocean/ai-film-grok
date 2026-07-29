@@ -746,6 +746,35 @@ def build_dispatch(
                 )
         except Exception:
             pass
+        # Wave 4: adult max heat boost before bulk/final (scale first)
+        try:
+            from heat_check import heat_agent_status
+
+            hs = heat_agent_status(root)
+            if hs.get("active") and (hs.get("hard_fail") or hs.get("needs_boost")) and hs.get(
+                "next_cmd"
+            ):
+                actions.insert(
+                    0,
+                    {
+                        "id": "heat-boost",
+                        "cmd": hs["next_cmd"],
+                        "why": hs.get("why") or "adult max impact/ecchi 未拉满 — 先 heat boost",
+                        "stage": "agent",
+                        "stage_label": "0·叙事尺度",
+                        "source": "heat_agent_status",
+                    },
+                )
+                agent_do.insert(
+                    0,
+                    f"优先尺度：{hs['next_cmd']}  # impact={hs.get('grade')}:{hs.get('score')}",
+                )
+                agent_do.insert(
+                    1,
+                    "成人 MAX：尺度+完整办事弧 ＞ 一切装饰；禁静默降 heat_scale",
+                )
+        except Exception:
+            pass
     if quality["failed_count"]:
         agent_do.append(
             "质量硬拦：先修复 quality receipt 中的 hero/keyframe 阻塞，再允许该镜头重新 I2V"

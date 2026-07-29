@@ -33,5 +33,13 @@
 | 色气 6 项 | `lint_ecchi_checklist`；`heat check` 输出；`ecchi_checklist_strict:true` 才 hard |
 | mute-frame advisory | 诚实列表 act/climax 须人工 `--score-coitus`（**无假 CV**） |
 
+## Wave 4 已做（同日 · agent 回路）
+| 项 | 入口 |
+|----|------|
+| dispatch 优先 heat-boost | `heat_agent_status` → next_action 插队 |
+| next_actions | clips 前/final 前注入 heat boost |
+| preflight max hard | duration/wardrobe/arc/impact&lt;A |
+| write-spec 收据 | 自动 `receipts/heat-boost.json`；`auto_heat_boost:true` 才自动 patch |
+
 ## 未做（刻意）
 真·肤色/暴露像素 CV（产品诚实：人眼 mute-frame 保留）

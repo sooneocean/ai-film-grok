@@ -426,6 +426,62 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             ),
                         )
                     )
+                # Wave 4: max IRON — duration/wardrobe/arc codes hard-block preflight
+                max_hard_codes = {
+                    "HEAT_SEX_DURATION_LOW",
+                    "HEAT_SEX_WARDROBE_DRESSED",
+                    "HEAT_BARE_PEAK_MISSING",
+                    "HEAT_WARDROBE_RE_DRESS",
+                    "SEX_ARC_FOREPLAY_MISSING",
+                    "SEX_ARC_PENETRATION_MISSING",
+                    "SEX_ARC_CLIMAX_RELEASE_MISSING",
+                    "SEX_ARC_HUG_AS_SEX",
+                    "SEX_DETAIL_CU_MISSING",
+                }
+                for code in max_hard_codes:
+                    if code in heat_codes and spec.get("adult_max_iron") is not False:
+                        hard.append(
+                            _issue(
+                                "hard",
+                                code,
+                                f"adult max IRON preflight: {code}",
+                                fix=(
+                                    f'aifilm heat boost --root "{root}" --apply && '
+                                    f'aifilm heat check --root "{root}"'
+                                ),
+                            )
+                        )
+                # Erotic impact A floor
+                impact = (
+                    spec.get("_erotic_impact")
+                    if isinstance(spec.get("_erotic_impact"), dict)
+                    else {}
+                )
+                score = impact.get("score")
+                floor = float(spec.get("erotic_impact_floor") or 75.0)
+                if (
+                    score is not None
+                    and spec.get("erotic_impact_strict") is not False
+                    and spec.get("adult_max_iron") is not False
+                    and float(score) + 1e-9 < floor
+                ):
+                    hard.append(
+                        _issue(
+                            "hard",
+                            "EROTIC_IMPACT_BELOW_A",
+                            f"erotic impact {score} < A floor {floor} (grade {impact.get('grade')})",
+                            fix=f'aifilm heat boost --root "{root}" --apply  # target S≥90',
+                        )
+                    )
+                elif score is not None and float(score) + 1e-9 < 90.0:
+                    soft.append(
+                        _issue(
+                            "soft",
+                            "EROTIC_IMPACT_BELOW_S",
+                            f"erotic impact {score} < S target 90 (grade {impact.get('grade')})",
+                            fix=f'aifilm heat boost --root "{root}" --apply',
+                        )
+                    )
         except Exception:
             pass
 

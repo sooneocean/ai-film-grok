@@ -2193,6 +2193,63 @@ def validate_film_spec(
     if impact_strict is None:
         impact_strict = _max_iron
     impact_floor = float(spec.get("erotic_impact_floor") or 75.0)
+    # Wave 4: always write heat-boost receipt when below S (agent loop)
+    if impact is not None and heat_scale == "max" and film_root is not None:
+        with contextlib.suppress(Exception):
+            from pathlib import Path as _Path
+
+            from edit_policy import suggest_impact_boost_actions
+            from util import write_json as _write_json
+
+            boost_plan = suggest_impact_boost_actions(
+                shots,
+                heat_scale=heat_scale,
+                heat_rep=heat_rep,
+                impact=impact,
+                target_score=90.0,
+            )
+            rec_dir = _Path(film_root) / "receipts"
+            rec_dir.mkdir(parents=True, exist_ok=True)
+            _write_json(
+                rec_dir / "heat-boost.json",
+                {
+                    "ok": True,
+                    "kind": "heat-impact-boost",
+                    "source": "write-spec",
+                    "apply": False,
+                    "heat_scale": heat_scale,
+                    "plan": boost_plan,
+                    "hint": "aifilm heat boost --root … --apply  # field patches toward S≥90",
+                },
+            )
+            if boost_plan.get("needed"):
+                notes = list(spec.get("_heat_notes") or [])
+                notes.append(
+                    f"heat-boost plan written (score={boost_plan.get('score')} "
+                    f"gap={boost_plan.get('gap')} actions={len(boost_plan.get('actions') or [])}); "
+                    "run heat boost --apply before bulk if below S"
+                )
+                spec["_heat_notes"] = notes
+            # Optional auto field-patch (off by default)
+            if (
+                spec.get("auto_heat_boost") is True
+                and boost_plan.get("needed")
+                and float(impact.get("score") or 0) + 1e-9 < 90.0
+            ):
+                from edit_policy import apply_impact_boost_patches, apply_vo_spice_auto
+
+                applied = apply_impact_boost_patches(shots, list(boost_plan.get("actions") or []))
+                vo = apply_vo_spice_auto(shots, spice_level=str(spice_level or "extreme"))
+                impact = compute_erotic_impact_score(
+                    shots, heat_scale=heat_scale, heat_rep=heat_rep
+                )
+                spec["_erotic_impact"] = impact
+                notes = list(spec.get("_heat_notes") or [])
+                notes.append(
+                    f"auto_heat_boost applied patches={applied.get('changed')} "
+                    f"vo={vo.get('fixed')} → impact={impact.get('score')}"
+                )
+                spec["_heat_notes"] = notes
     if impact_strict is True and impact is not None:
         score = float(impact.get("score") or 0.0)
         if score + 1e-9 < impact_floor:
@@ -2201,6 +2258,7 @@ def validate_film_spec(
                 f"< floor={impact_floor} (grade {impact.get('grade')}) — "
                 "need sex≥50% + bare peak + 四拍弧 + 定器 CU + penetration verbs. "
                 "Target grade A (≥75) / S (≥90). "
+                "Run: aifilm heat boost --apply. "
                 "Override: erotic_impact_strict:false or erotic_impact_floor."
             )
 

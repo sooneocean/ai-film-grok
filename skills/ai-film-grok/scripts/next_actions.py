@@ -402,6 +402,25 @@ def build_next_actions(
             f"仍有 {open_reshoot_count} 条开放重拍",
         )
 
+    # Wave 4: adult max heat before bulk/final
+    if gates.get("spec"):
+        try:
+            from heat_check import heat_agent_status
+
+            hs = heat_agent_status(root)
+            if hs.get("active") and (hs.get("hard_fail") or hs.get("needs_boost")):
+                add(
+                    "heat-boost",
+                    hs.get("next_cmd") or f'aifilm heat boost --root "{r}" --apply',
+                    hs.get("why")
+                    or "成人 max：impact/ecchi 未拉满 — 先 heat boost 再 bulk/final",
+                )
+                if hs.get("hard_fail"):
+                    # Prefer heat over more I2V when scale is failing
+                    pass
+        except Exception:
+            pass
+
     if not gates.get("clips_complete"):
         if pilot_ok or not gates.get("spec"):
             add(
