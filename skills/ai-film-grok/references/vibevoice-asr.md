@@ -27,3 +27,10 @@ emits only candidate subtitle/timing mismatches. Treat every mismatch as a cue
 to listen, not evidence that the authored subtitle is wrong. No model is
 downloaded or started by `probe`; installing a model or allowing a new runtime
 remains a separately scoped pilot.
+
+The 2026-07-29 RTX 5090 canary transcribed a real 3.96-second Japanese dialogue
+clip and produced a signed candidate-only receipt. It also demonstrated the
+reason for the boundary: authored `なぜ、渡したメモリーカードは空だったの？`
+was recognized as `なぜ、私とメモリーカードは、からだったの？`. Use this
+weapon to reveal possible pronunciation, speaker, timing and subtitle problems;
+never use it to silently rewrite protected dialogue.

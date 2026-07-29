@@ -281,16 +281,29 @@
     },
     {
       "id": "sound.design",
-      "version": "1.0.0",
-      "summary": "SFX bed + accents from sound_plan / audio_recipe",
+      "version": "1.1.0",
+      "summary": "Licensed SFX bed plus review-gated video-bound MMAudio foley candidates",
       "status": "implemented",
       "produces": ["SoundCue"],
       "dependsOnAssets": ["Shot"],
       "capabilities": ["sfx"],
-      "providers": ["local"],
+      "providers": ["local", "mmaudio_noncommercial_research"],
       "tags": ["audio"],
       "phases": ["0", "7"],
-      "cli": { "run": "aifilm audio-plan --root", "validate": "aifilm final --root" }
+      "cli": { "run": "aifilm sfx-candidate generate --root", "validate": "aifilm sfx-candidate list --root" }
+    },
+    {
+      "id": "audio.asr-review",
+      "version": "1.0.0",
+      "summary": "VibeVoice-ASR speaker and subtitle mismatch review without replacing script truth",
+      "status": "implemented",
+      "produces": ["ASRReviewReceipt"],
+      "dependsOnAssets": ["VoiceClip", "SubtitleCue"],
+      "capabilities": ["asr", "speaker-segmentation", "subtitle-review"],
+      "providers": ["vibevoice_asr_5090"],
+      "tags": ["audio", "qa"],
+      "phases": ["7"],
+      "cli": { "run": "aifilm vibevoice-asr run --root --audio", "validate": "aifilm vibevoice-asr probe" }
     },
     {
       "id": "music.plan",

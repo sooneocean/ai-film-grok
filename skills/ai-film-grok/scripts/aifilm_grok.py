@@ -5524,8 +5524,10 @@ def cmd_external_review(args: argparse.Namespace) -> int:
 
 
 def cmd_vibevoice_asr(args: argparse.Namespace) -> int:
+    from config_loader import get_config
     from vibevoice_asr_review import VibeVoiceASRError, capability_probe, create_report
 
+    get_config()
     try:
         if args.vibevoice_asr_action == "probe":
             report = capability_probe()
@@ -6633,6 +6635,58 @@ def cmd_lipsync_pilot(args: argparse.Namespace) -> int:
     return 0 if report.get("ok", True) else 1
 
 
+def cmd_lipsync_challenge(args: argparse.Namespace) -> int:
+    from lipsync_challenge import (
+        LipsyncChallengeError,
+        build_challenge_report,
+        create_blind_package,
+        create_challenge,
+        record_blind_review,
+        register_result,
+    )
+
+    try:
+        action = str(args.lipsync_challenge_action)
+        if action == "create":
+            report = create_challenge(
+                args.root,
+                fixtures={
+                    "front_closeup": Path(args.front_closeup),
+                    "three_quarter": Path(args.three_quarter),
+                    "occlusion_motion": Path(args.occlusion_motion),
+                    "anime": Path(args.anime),
+                },
+                japanese_audio=Path(args.japanese_audio),
+                approval_receipt=Path(args.approval_receipt),
+            )
+        elif action == "register-result":
+            report = register_result(
+                args.root,
+                fixture_id=args.fixture_id,
+                backend_id=args.backend_id,
+                output=Path(args.output),
+                metrics_receipt=Path(args.metrics_receipt),
+                runtime_receipt=Path(args.runtime_receipt),
+            )
+        elif action == "blind-package":
+            report = create_blind_package(args.root)
+        elif action == "review":
+            report = record_blind_review(
+                args.root,
+                reviewer=args.reviewer,
+                review=read_json(Path(args.review_json)),
+            )
+        else:
+            report = build_challenge_report(
+                args.root,
+                license_receipt=Path(args.license_receipt) if args.license_receipt else None,
+            )
+    except LipsyncChallengeError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok", True) else 1
+
+
 def cmd_capability(args: argparse.Namespace) -> int:
     """One-page readiness: TTS / FRW canary summary / optional i2v suggest+apply."""
     from capability_report import CapabilityError, build_capability_report
@@ -6678,6 +6732,36 @@ def cmd_tts_ab(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
     emit(man)
     return 0 if man.get("ok") else 1
+
+
+def cmd_elevenlabs_canary(args: argparse.Namespace) -> int:
+    """Run a capped bilingual paid canary, or record its human review."""
+    from elevenlabs_canary import ElevenLabsCanaryError, list_voices, review_candidate, run_canary
+
+    try:
+        if args.list_voices:
+            result = list_voices()
+        elif args.review_language or args.decision:
+            if not args.review_language or not args.decision:
+                raise ElevenLabsCanaryError("review requires --review-language and --decision")
+            result = review_candidate(
+                Path(args.root), language=args.review_language, decision=args.decision
+            )
+        else:
+            if not args.zh_voice or not args.ja_voice:
+                raise ElevenLabsCanaryError("run requires --zh-voice and --ja-voice")
+            result = run_canary(
+                Path(args.root),
+                zh_voice=args.zh_voice,
+                ja_voice=args.ja_voice,
+                model=args.model,
+                confirm_cost=bool(args.confirm_cost),
+                max_paid_calls=int(args.max_paid_calls),
+            )
+    except ElevenLabsCanaryError as exc:
+        result = {"ok": False, "status": "blocked", "reason": str(exc)}
+    emit(result)
+    return 0 if result.get("ok") else 2
 
 
 def cmd_tts_rehearse(args: argparse.Namespace) -> int:
@@ -7272,6 +7356,50 @@ def build_parser() -> argparse.ArgumentParser:
     )
     lsp_review.add_argument("--root", required=True)
 
+    lsch = sub.add_parser(
+        "lipsync-challenge",
+        help="Plan and evaluate the five-backend lip-sync challenge without running GPU work",
+    )
+    lsch_sub = lsch.add_subparsers(dest="lipsync_challenge_action", required=True)
+    lsch_create = lsch_sub.add_parser("create")
+    lsch_create.add_argument("--root", required=True)
+    lsch_create.add_argument("--front-closeup", required=True)
+    lsch_create.add_argument("--three-quarter", required=True)
+    lsch_create.add_argument("--occlusion-motion", required=True)
+    lsch_create.add_argument("--anime", required=True)
+    lsch_create.add_argument("--japanese-audio", required=True)
+    lsch_create.add_argument("--approval-receipt", required=True)
+    lsch_register = lsch_sub.add_parser("register-result")
+    lsch_register.add_argument("--root", required=True)
+    lsch_register.add_argument(
+        "--fixture-id",
+        required=True,
+        choices=("front_closeup", "three_quarter", "occlusion_motion", "anime"),
+    )
+    lsch_register.add_argument(
+        "--backend-id",
+        required=True,
+        choices=(
+            "latentsync-1.6",
+            "musetalk-1.5",
+            "ltx-2.3-lipdub",
+            "echomimic-v3-flash",
+            "longcat-video-avatar-1.5",
+        ),
+    )
+    lsch_register.add_argument("--output", required=True)
+    lsch_register.add_argument("--metrics-receipt", required=True)
+    lsch_register.add_argument("--runtime-receipt", required=True)
+    lsch_package = lsch_sub.add_parser("blind-package")
+    lsch_package.add_argument("--root", required=True)
+    lsch_review = lsch_sub.add_parser("review")
+    lsch_review.add_argument("--root", required=True)
+    lsch_review.add_argument("--reviewer", required=True)
+    lsch_review.add_argument("--review-json", required=True)
+    lsch_report = lsch_sub.add_parser("report")
+    lsch_report.add_argument("--root", required=True)
+    lsch_report.add_argument("--license-receipt", default="")
+
     lsn = sub.add_parser(
         "lipsync-node",
         help="Inspect the authenticated Windows RTX lip-sync node",
@@ -7324,6 +7452,22 @@ def build_parser() -> argparse.ArgumentParser:
     tab.add_argument("--voice", default=None)
     tab.add_argument("--text", default=None, help="Override shot nar")
     tab.add_argument("--spec", default=None)
+
+    el_canary = sub.add_parser(
+        "elevenlabs-canary",
+        help="Bounded Chinese+Japanese ElevenLabs TTS canary; candidates need human review",
+    )
+    el_canary.add_argument("--root", required=True)
+    el_canary.add_argument("--zh-voice", default="", help="ElevenLabs provider voice ID")
+    el_canary.add_argument("--ja-voice", default="", help="ElevenLabs provider voice ID")
+    el_canary.add_argument("--model", default="eleven_multilingual_v2")
+    el_canary.add_argument("--confirm-cost", action="store_true")
+    el_canary.add_argument("--max-paid-calls", type=int, default=0)
+    el_canary.add_argument(
+        "--list-voices", action="store_true", help="List account voices; no synthesis"
+    )
+    el_canary.add_argument("--review-language", choices=("zh", "ja"))
+    el_canary.add_argument("--decision", choices=("approve", "reject"))
 
     init_p = sub.add_parser("init", help="Create film root")
     init_p.add_argument("--theme", required=True)
@@ -9185,8 +9329,10 @@ def main(argv: list[str] | None = None) -> int:
             "lipsync-node": cmd_lipsync_node,
             "lipsync-canary": cmd_lipsync_canary,
             "lipsync-pilot": cmd_lipsync_pilot,
+            "lipsync-challenge": cmd_lipsync_challenge,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,
+            "elevenlabs-canary": cmd_elevenlabs_canary,
             "init": cmd_init,
             "status": cmd_status,
             "quality-status": cmd_quality_status,

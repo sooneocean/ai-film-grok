@@ -56,6 +56,8 @@ def test_report_is_candidate_only_and_hash_bound(
     assert report["status"] == "candidate_only"
     assert report["may_approve_production"] is False
     assert report["transcript"]["speakers"] == ["nar"]
+    assert len(report["provider"]["adapter_contract_sha256"]) == 64
+    assert len(report["provider"]["transcript_sha256"]) == 64
     assert Path(report["path"]).is_file()
 
 

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "kind": "audio-weapon-canary",
+  "weapon_id": "mmaudio-video-foley-pilot",
+  "at": "2026-07-29T10:59:15.966136+00:00",
+  "status": "generated_pending_human_review",
+  "node": "rtx5090-main",
+  "model": "hkchengrex/MMAudio-large-44k-v2",
+  "license": "CC-BY-NC-4.0",
+  "delivery_scope": "noncommercial_internal_research",
+  "checkpoint_sha256": "a6bf693424fbd4ce0244fff8c412347714d5ac586e28dbeffadfa0f2b647af74",
+  "source_video_sha256": "0d7d5e1a9194143ac5a2457071fd4ba3a7b735f7f341cb8893c930601816ce05",
+  "output_sha256": "78c6c06879c8192091260697d0fb542f10d4aefafec95850fe6b42c7f83cd71b",
+  "requested_duration_sec": 5.0,
+  "actual_duration_sec": 5.01551,
+  "format": {
+    "codec": "pcm_s16le",
+    "sample_rate": 44100,
+    "channels": 2,
+    "full_decode": true
+  },
+  "levels": {
+    "peak_db": -4.209019,
+    "rms_db": -20.772498
+  },
+  "production_eligible": false,
+  "asr_speech_leakage_screen": {
+    "status": "requires_human_listening",
+    "transcript_sha256": "a98d5ffd01deb7aa9ec8b1323f960968ff71001a6c2d107d62d21e1a774044a8",
+    "segment_count": 2,
+    "candidate_text": [
+      "[Silence]",
+      "Y las ondas y a cabeza a la altura de las tejas."
+    ],
+    "interpretation": "ASR may be hallucinating or detecting speech-like audio; do not approve automatically."
+  },
+  "human_review": {
+    "status": "pending",
+    "required": [
+      "heard_full",
+      "sync_confirmed",
+      "no_speech_confirmed",
+      "no_music_confirmed",
+      "artifact_free_confirmed"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "audio-weapon-canary",
+  "weapon_id": "vibevoice-asr-review-5090",
+  "at": "2026-07-29T10:00:00+00:00",
+  "status": "candidate_only",
+  "node": "rtx5090-main",
+  "audio_sha256": "4c104e258acb95d6f774c1bed410376dd1bca030ebc5b5818f1395c30666b5f3",
+  "adapter_contract_sha256": "917a877c140d06f5560bf58e969708766bd1548872d0ad6e4d1bfcaf20dae139",
+  "transcript_sha256": "e447164c98a5d15d9bd710a68239701d98cec4cd1912e773c13c2a9e2c45dad4",
+  "receipt_sha256": "e9a5e1b8648d8d4530564f93ac03f20ae5fb02cca906625dd84a1eada9b47f0f",
+  "duration_sec": 3.96,
+  "segment_count": 1,
+  "speaker": "unknown",
+  "authored_dialogue_ja": "なぜ、渡したメモリーカードは空だったの？",
+  "candidate_transcript_ja": "なぜ、私とメモリーカードは、からだったの？",
+  "script_truth_mutated": false,
+  "production_eligible": false,
+  "human_review_required": true
+}
