@@ -11,7 +11,7 @@
 | `VRAM_BELOW_FLOOR` / `RAM_BELOW_FLOOR` | Wan/i2i 卸不干净或竞态 | `aifilm comfy free-memory --base-url $URL --confirm`（**必须 --confirm**） |
 | `COMFY_QUEUE_BUSY` 但 free 高 | 幽灵队列 | interrupt + clear queue；`wait_capacity` 后再 submit |
 | free 显示 32GB 仍被拦 | 提交瞬间竞态 | 脚本内 retry 3 次 + 每次 free |
-| SSH 隧道 | aifilm **禁纯 HTTP LAN** | `AIFILM_COMFYUI_BASE_URL=http://127.0.0.1:18188`（转发到 `192.168.88.52:8188`） |
+| SSH 隧道 | aifilm **禁纯 HTTP LAN** | `AIFILM_COMFYUI_BASE_URL=http://127.0.0.1:18188` → 远程 **`8188` only**（**禁 8189**；401=`unauthorized` 多半指错端口，见 [tunnel-8188](../references/lessons-2026-07-29-comfy-tunnel-8188-not-8189.md)） |
 
 **铁律**：不要与 Wan 并行占 5090（ACE-Step BGM / lipsync / 第二 Comfy 任务互斥）。先通片 480 turbo，再升。
 

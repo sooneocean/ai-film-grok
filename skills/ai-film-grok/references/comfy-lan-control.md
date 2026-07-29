@@ -57,6 +57,23 @@ fail, then verifies local health again. Unknown local-port ownership, unsafe
 SSH targets, loose key permissions and failed read-back stop the recovery.
 The receipt never contains the SSH target, key path, command output or prompt.
 
+### Tunnel port map (IRON · 2026-07-29)
+
+| Local | Remote | Service | Healthy when |
+|---|---|---|---|
+| **18188** | **8188** | ComfyUI | `/system_stats` → 200 + Comfy JSON |
+| 18790 | 8790 | lipsync / audio node | token auth (not Comfy) |
+
+**Wrong:** `-L 18188:127.0.0.1:8189` → `{"detail":"unauthorized"}` 401.  
+That is **not** Comfy downtime. Kill the bad ssh and recreate  
+`-L 18188:127.0.0.1:8188`. Env defaults: `AIFILM_COMFY_REMOTE_PORT=8188`.  
+Full lesson: [`lessons-2026-07-29-comfy-tunnel-8188-not-8189.md`](lessons-2026-07-29-comfy-tunnel-8188-not-8189.md).
+
+When another bulk owns the GPU, submit on the first idle tick — do **not**
+spend the window on a second queue assert + `free-memory` before
+`run-workflow` (race → `COMFY_QUEUE_BUSY`). Never cancel an unknown running
+prompt without operator `go`.
+
 For demand-driven model selection, use
 [`comfy-weapon-armory.md`](comfy-weapon-armory.md). It routes only to retained
 real-pilot weapons and live-checks their required model folders.

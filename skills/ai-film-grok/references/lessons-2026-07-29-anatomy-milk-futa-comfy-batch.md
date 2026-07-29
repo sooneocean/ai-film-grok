@@ -21,7 +21,8 @@
 1. `aifilm comfy free-memory … --confirm` — 无 confirm 等于没卸
 2. 单卡串行；Wan 进行时禁 ACE/lipsync/第二任务抢卡
 3. `wait_capacity` + submit 失败 3 次 retry；幽灵 busy → clear queue
-4. 隧道：`127.0.0.1:18188`（aifilm 拒裸 HTTP LAN）
+4. 隧道：`127.0.0.1:18188` → 远程 **8188 only**（aifilm 拒裸 HTTP LAN）；**禁止** 18188→8189（401 unauthorized）；见 [tunnel-8188](lessons-2026-07-29-comfy-tunnel-8188-not-8189.md)
+5. bare-union still 结合处 **霓虹光/球** 同霓虹器毒：禁 register/I2V，硬 NEG 去 glow
 5. `register-still` timeout ≥300s
 6. **fix 失败退出码不得 `set -e` 杀死 bulk**（`go_fix_then_bulk` 用 `set +e`）
 7. 吞吐：通片 single-seed；毒镜再 multi-seed

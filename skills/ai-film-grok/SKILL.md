@@ -44,9 +44,11 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 14. **高动**：平常 mean≥18、肉戏≥20；禁 KB；桌面 final 仅 motion-gate ok。
 15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
 16. **5090**：未锁视觉走 `weapon_route`；未验 fail closed。
+16b. **多片抢 5090 + 本机 OOM**：**本机同时只 1 个** `comfy_video.py`；禁 `pgrep -f comfy_video` 自杀；邻镜 meat 禁静默顶替（须 FALLBACK+PARTIAL）。[lesson](references/lessons-2026-07-29-comfy-multifilm-contention-oom.md)
 17. **bulk→final**：[evirus ch04](references/lessons-2026-07-29-evirus-ch04-bulk-final-iron.md) — bare 续接、双轮 register、长超时 final、禁内衣装插入。
 18. **收尾门**：[closeout](references/lessons-2026-07-29-closeout-gates-chaebol.md) — heat codes、sensory、truth_contract、真 concat 钟、清 quality 缓存、review→audit→export。
 19. **抗重复·抗无聊**：[shot-variety](references/lessons-2026-07-29-shot-variety-anti-boring.md) — 门绿≠好看；motion 禁复制；景别真变；主戏≥4.5s；contact 可读差。
+20. **5090 独占 / pilot I2V**：[gpu-priority](references/lessons-2026-07-29-comfy-gpu-priority-pilot-i2v.md) — 一机一 owner；禁误 interrupt/误杀 zsh；`TN`→CONT；experimental=`stage=pilot`+`--allow-experimental`；clips 文件数才算。
 
 ## 阶段
 

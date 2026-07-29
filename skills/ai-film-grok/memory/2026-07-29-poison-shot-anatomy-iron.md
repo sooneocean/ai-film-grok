@@ -15,13 +15,13 @@
 |------|------|------|
 | **futa / 女体阴茎** | 女角色下体长出阴茎、双性器叠画 | archive → i2i 解剖安全 → 重 I2V |
 | **泌乳 / 乳汁** | 乳头白液、奶柱、喷奶、母乳流 | 同上；POS 写 **dry nipples** |
-| **错器 / 霓虹符号** | 错性别器、霓虹 dick 图标、乱码生殖器 | 同上 |
+| **错器 / 霓虹符号** | 错性别器、霓虹 dick 图标、乱码生殖器、**结合处青/红霓虹光爆/光球/spark**（wave3 canary） | 同上；Qwen re-edit 硬 NEG 见 tunnel lesson |
 | **弱负向残留** | 只写 soft NEG 仍 futa | **中英双写 + 显式 DELETE** |
 
 ## 生成时必须写进 prompt
 
 **NEG（中英都要）**
-`futa, hermaphrodite, penis on woman, woman with penis, lactation, breast milk, milk streams, squirting milk, neon penis glyph, dick emoji, 扶他, 女体阴茎, 喷奶, 母乳, 乳汁`
+`futa, hermaphrodite, penis on woman, woman with penis, lactation, breast milk, milk streams, squirting milk, neon penis glyph, dick emoji, neon genital glow, spark, orb, lens flare on genitals, blue energy at pelvis, red ball censor, glowing genitals, 扶他, 女体阴茎, 喷奶, 母乳, 乳汁, 霓虹生殖器, 光球挡下体`
 
 **POS**
 `anatomically correct cis female and male genitals only; penis only on the man; DELETE any penis on the woman; vagina only on woman; dry nipples (sweat OK, milk forbidden); no lactation`

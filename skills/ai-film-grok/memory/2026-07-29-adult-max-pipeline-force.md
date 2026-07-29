@@ -62,3 +62,6 @@
 ## 闭环状态
 **plan → write-spec → pilot → bulk → final → review → export** 尺度只升不降已 fail-closed。  
 刻意不做：真·肤色/暴露像素 CV（mute-frame 人眼保留）。
+
+## 工程纪律（同日续 · 与尺度并列）
+出货卡点见 [agent-ship-discipline-iron](2026-07-29-agent-ship-discipline-iron.md)：SKILL 预算、runtime-lock、干净 push、queue=A / final=S。
