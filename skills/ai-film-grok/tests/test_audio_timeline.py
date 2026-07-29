@@ -276,6 +276,22 @@ def test_performance_is_an_approval_gated_local_asset_type():
         compile_timeline(_spec([cue]))
 
 
+def test_pending_ambient_candidate_cannot_enter_formal_timeline():
+    cue = {
+        "kind": "ambience",
+        "source": "local:audio/candidates/ambient/pending/rain.wav",
+        "license": "Stability AI Community License",
+        "source_sha256": "a" * 64,
+        "approval_status": "pending_human_review",
+        "production_eligible": False,
+        "start_offset_sec": 0,
+        "duration_sec": 1,
+    }
+
+    with pytest.raises(AudioTimelineError, match="pending candidate"):
+        compile_timeline(_spec([cue]))
+
+
 def test_audio_timeline_schema_accepts_approved_performance_event() -> None:
     cue = {
         "kind": "performance",

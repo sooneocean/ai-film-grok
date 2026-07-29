@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import re
 import subprocess
@@ -11,6 +12,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from security_policy import atomic_write_bytes
 
@@ -35,9 +37,21 @@ _PUBLIC_MODEL_FIELDS = (
     "sfx_model",
     "sfx_checkpoint_fingerprint",
     "sfx_license",
+    "ambient_model",
+    "ambient_license",
+    "ambient_checkpoint_sha256",
+    "ambient_adapter_sha256",
 )
 _PUBLIC_GPU_FIELDS = ("available", "name", "cuda", "driver", "free_vram_mib", "total_vram_mib")
-_PUBLIC_MODEL_KINDS = ("tts", "music", "sfx", "performance")
+_PUBLIC_MODEL_KINDS = ("tts", "music", "sfx", "performance", "ambient")
+_STABLE_AUDIO_MODEL = "stabilityai/stable-audio-open-1.0"
+_STABLE_AUDIO_LICENSE = "Stability AI Community License"
+_ALLOWED_NODE_NETWORKS = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("fc00::/7"),
+)
 
 
 def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> dict[str, Any]:
@@ -103,10 +117,30 @@ def _json_response(payload: bytes, *, context: str) -> dict[str, Any]:
     return data
 
 
+class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def _url(base_url: str, path: str) -> str:
-    if not base_url.startswith(("http://", "https://")):
+    parsed = urlsplit(str(base_url).strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise AudioNodeError("audio node URL must use http(s)")
-    return base_url.rstrip("/") + path
+    try:
+        address = ipaddress.ip_address(parsed.hostname)
+    except ValueError as exc:
+        raise AudioNodeError("audio node host must be a private IP literal") from exc
+    if not (
+        address.is_loopback
+        or any(
+            address.version == network.version and address in network
+            for network in _ALLOWED_NODE_NETWORKS
+        )
+    ):
+        raise AudioNodeError("audio node host must be private or loopback")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise AudioNodeError("audio node URL must not contain credentials or query data")
+    return urlunsplit((parsed.scheme, parsed.netloc, "/" + path.lstrip("/"), "", ""))
 
 
 def _request(
@@ -134,8 +168,9 @@ def _request(
             "Content-Type": content_type,
         },
     )
+    opener = urllib.request.build_opener(_RejectRedirects)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
+        with opener.open(req, timeout=timeout) as response:
             if expect_wav:
                 content_type = response.headers.get_content_type()
                 if content_type not in {"audio/wav", "audio/x-wav"}:
@@ -200,7 +235,7 @@ def render(
     out: Path,
     timeout: int = 900,
 ) -> dict[str, Any]:
-    if kind not in {"tts", "music", "sfx", "performance"} or not base_url.startswith(
+    if kind not in {"tts", "music", "sfx", "performance", "ambient"} or not base_url.startswith(
         ("http://", "https://")
     ):
         raise AudioNodeError("invalid private audio node request")
@@ -309,6 +344,55 @@ def render_sfx(
         "checkpoint_fingerprint": node["sfx_checkpoint_fingerprint"],
         "license": node["sfx_license"],
         "source_video_sha256": source_hash,
+    }
+
+
+def render_ambient(
+    base_url: str,
+    token: str,
+    *,
+    prompt: str,
+    duration: float,
+    seed: int,
+    out: Path,
+    timeout: int = 900,
+) -> dict[str, Any]:
+    """Render a Stable Audio ambience candidate; never a production-ready asset."""
+    text = prompt.strip()
+    if not 1 <= len(text) <= 512:
+        raise AudioNodeError("Stable Audio prompt must contain 1-512 characters")
+    if not 1 <= duration <= 47:
+        raise AudioNodeError("Stable Audio duration must be between 1 and 47 seconds")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise AudioNodeError("Stable Audio seed must be an integer")
+    node = public_health_report(health(base_url, token), secret_values=(token,))
+    models = node.get("models") if isinstance(node.get("models"), dict) else {}
+    if (
+        node.get("ok") is not True
+        or models.get("ambient") is not True
+        or node.get("ambient_model") != _STABLE_AUDIO_MODEL
+        or node.get("ambient_license") != _STABLE_AUDIO_LICENSE
+        or not _is_sha256(node.get("ambient_checkpoint_sha256"))
+        or not _is_sha256(node.get("ambient_adapter_sha256"))
+    ):
+        raise AudioNodeError("trusted Stable Audio candidate capability is unavailable")
+    result = render(
+        base_url,
+        token,
+        "ambient",
+        {"prompt": text, "duration": duration, "seed": seed, "stable_audio_candidate_only": True},
+        out,
+        timeout=timeout,
+    )
+    return {
+        **result,
+        "status": "pending_human_review",
+        "production_eligible": False,
+        "usage_scope": "stable_audio_community_license_candidate",
+        "model": node["ambient_model"],
+        "license": node["ambient_license"],
+        "checkpoint_sha256": node["ambient_checkpoint_sha256"],
+        "adapter_sha256": node["ambient_adapter_sha256"],
     }
 
 

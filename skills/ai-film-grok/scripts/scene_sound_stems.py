@@ -129,14 +129,17 @@ def _local_asset(root: Path, event: dict[str, Any]) -> Path:
     if not path.is_file():
         raise SceneSoundError(f"{event.get('id')}: asset not found: {raw}")
     normalized_raw = raw.replace("\\", "/").lower()
-    if event.get("type") == "action_sfx" and (
-        "/audio/candidates/sfx/pending/" in f"/{normalized_raw}"
+    pending_candidate = (
+        "/audio/candidates/" in f"/{normalized_raw}" and "/pending/" in f"/{normalized_raw}"
+    )
+    if (
+        pending_candidate
         or is_noncommercial_license(event.get("license"))
         or event.get("production_eligible") is False
         or event.get("approval_status") == "pending_human_review"
     ):
         raise SceneSoundError(
-            f"{event.get('id')}: non-commercial or pending SFX cannot enter a formal stem"
+            f"{event.get('id')}: non-commercial or pending candidate cannot enter a formal stem"
         )
     actual = hashlib.sha256(path.read_bytes()).hexdigest()
     if event.get("type") == "action_sfx" and actual in _nonproduction_sfx_hashes(root):

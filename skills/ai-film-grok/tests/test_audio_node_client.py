@@ -16,6 +16,7 @@ from audio_node_client import (
     health,
     public_health_report,
     render,
+    render_ambient,
     render_batch,
     render_sfx,
 )
@@ -34,6 +35,12 @@ def _delivery_wav() -> bytes:
 def test_rejects_non_http_node_url() -> None:
     with pytest.raises(AudioNodeError):
         _url("ssh://host", "/health")
+    with pytest.raises(AudioNodeError):
+        _url("https://example.com", "/health")
+    with pytest.raises(AudioNodeError):
+        _url("https://169.254.169.254", "/health")
+    with pytest.raises(AudioNodeError):
+        _url("http://192.168.88.52:8788?token=leak", "/health")
 
 
 def test_health_requires_private_token() -> None:
@@ -74,8 +81,21 @@ def test_public_health_report_drops_unknown_fields_and_current_token() -> None:
 
 def test_http_error_is_not_misreported_as_network_unreachable() -> None:
     error = HTTPError("http://node/health", 404, "Not Found", {}, io.BytesIO())
-    with patch("audio_node_client.urllib.request.urlopen", side_effect=error):
+    with patch("urllib.request.OpenerDirector.open", side_effect=error):
         with pytest.raises(AudioNodeError, match="HTTP 404"):
+            _request("http://192.168.88.52:8788", "x" * 32, "/health")
+
+
+def test_cross_origin_redirect_is_rejected_without_forwarding_token() -> None:
+    error = HTTPError(
+        "http://192.168.88.52:8788/health",
+        302,
+        "Found",
+        {"Location": "http://192.168.88.53:8788/steal"},
+        io.BytesIO(),
+    )
+    with patch("urllib.request.OpenerDirector.open", side_effect=error):
+        with pytest.raises(AudioNodeError, match="HTTP 302"):
             _request("http://192.168.88.52:8788", "x" * 32, "/health")
 
 
@@ -114,6 +134,67 @@ def test_render_sfx_requires_noncommercial_ack(tmp_path: Path) -> None:
             seed=1,
             out=tmp_path / "sfx.wav",
         )
+
+
+def test_render_ambient_requires_trusted_candidate_capability(tmp_path: Path) -> None:
+    with (
+        patch(
+            "audio_node_client.health",
+            return_value={
+                "ok": True,
+                "models": {"ambient": True},
+                "ambient_model": "stabilityai/stable-audio-open-1.0",
+                "ambient_license": "Stability AI Community License",
+                "ambient_checkpoint_sha256": "c" * 64,
+                "ambient_adapter_sha256": "d" * 64,
+            },
+        ),
+        patch(
+            "audio_node_client.render",
+            return_value={"job_id": "job", "sha256": "b" * 64, "path": "ambient.wav"},
+        ) as submit,
+    ):
+        result = render_ambient(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            prompt="rain on glass",
+            duration=8,
+            seed=9,
+            out=tmp_path / "ambient.wav",
+        )
+    assert result["model"] == "stabilityai/stable-audio-open-1.0"
+    assert result["status"] == "pending_human_review"
+    assert result["production_eligible"] is False
+    assert result["usage_scope"] == "stable_audio_community_license_candidate"
+    assert result["checkpoint_sha256"] == "c" * 64
+    assert result["adapter_sha256"] == "d" * 64
+    assert submit.call_args.args[2] == "ambient"
+    assert submit.call_args.args[3]["stable_audio_candidate_only"] is True
+
+
+def test_render_ambient_rejects_wrong_license_provenance(tmp_path: Path) -> None:
+    with (
+        patch(
+            "audio_node_client.health",
+            return_value={
+                "ok": True,
+                "models": {"ambient": True},
+                "ambient_model": "stabilityai/stable-audio-open-1.0",
+                "ambient_license": "MIT",
+            },
+        ),
+        patch("audio_node_client.render") as submit,
+        pytest.raises(AudioNodeError, match="capability"),
+    ):
+        render_ambient(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            prompt="rain on glass",
+            duration=8,
+            seed=9,
+            out=tmp_path / "ambient.wav",
+        )
+    submit.assert_not_called()
 
 
 def test_render_sfx_rejects_invalid_request_before_health_or_upload(tmp_path: Path) -> None:
