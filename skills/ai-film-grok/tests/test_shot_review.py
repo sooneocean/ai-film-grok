@@ -13,7 +13,12 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from shot_review import ShotReviewError, approved_review_for_clip, create_shot_review  # noqa: E402
+from shot_review import (  # noqa: E402
+    ShotReviewError,
+    _extract_frames,
+    approved_review_for_clip,
+    create_shot_review,
+)
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg required")
@@ -91,6 +96,33 @@ class ShotReviewTests(unittest.TestCase):
         self.assertEqual(set(review["artifacts"]["frames"]), {"first", "middle", "last"})
         bound = approved_review_for_clip(self.root, shot_id="shot01", clip=self.clip)
         self.assertEqual(bound["path"], review["path"])
+
+    @pytest.mark.slow
+    def test_last_review_frame_keeps_a_safe_margin_for_short_h264_clip(self) -> None:
+        # 5.0625s matches the Wan pilot's decoded duration that previously
+        # failed when ``-ss`` targeted duration-0.05 seconds.
+        wan_like = self.root / "wan-like.mp4"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=s=160x90:r=16:d=5.0625",
+                "-an",
+                "-c:v",
+                "libx264",
+                str(wan_like),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        review_dir = self.root / "review"
+        review_dir.mkdir()
+        artifacts = _extract_frames(wan_like, review_dir, duration_sec=5.0625)
+        self.assertEqual(artifacts["frames"]["last"]["timestamp_sec"], 4.812)
+        self.assertTrue(Path(artifacts["frames"]["last"]["path"]).is_file())
 
     @pytest.mark.slow
     def test_approval_rejects_missing_timestamp_evidence(self) -> None:

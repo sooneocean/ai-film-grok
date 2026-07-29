@@ -77,7 +77,10 @@ def _extract_frames(source: Path, destination: Path, duration_sec: float) -> dic
     stamps = {
         "first": 0.0,
         "middle": round(duration_sec / 2, 3),
-        "last": round(max(0.0, duration_sec - 0.05), 3),
+        # Seeking to the final decoded frame is fragile for short H.264 clips:
+        # ffmpeg can land after the last keyframe and emit nothing.  Keep a
+        # small, deterministic safety margin inside the actual media span.
+        "last": round(max(0.0, duration_sec - 0.25), 3),
     }
     frames: dict[str, dict[str, Any]] = {}
     for label, stamp in stamps.items():
