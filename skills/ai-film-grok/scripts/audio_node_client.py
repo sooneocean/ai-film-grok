@@ -54,6 +54,24 @@ _ALLOWED_NODE_NETWORKS = (
 )
 
 
+def _public_text(field: str, value: object, secret_values: tuple[str, ...]) -> str | None:
+    if (
+        not isinstance(value, str)
+        or len(value) > 256
+        or any(secret and secret in value for secret in secret_values)
+    ):
+        return None
+    # Health is an untrusted boundary: model labels may use one slash, but no
+    # filesystem/URI syntax can cross into receipts or CLI output.
+    if "\\" in value or ":" in value or ".." in value or value.startswith("/"):
+        return None
+    if field.endswith("_model") and not re.fullmatch(
+        r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?", value
+    ):
+        return None
+    return value
+
+
 def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> dict[str, Any]:
     """Project an untrusted node health response to public capability fields only."""
     if not isinstance(raw, dict):
@@ -72,12 +90,9 @@ def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> di
         public["music_batch"] = raw["music_batch"]
     for field in _PUBLIC_MODEL_FIELDS:
         value = raw.get(field)
-        if (
-            isinstance(value, str)
-            and len(value) <= 256
-            and not any(secret and secret in value for secret in secret_values)
-        ):
-            public[field] = value
+        safe_value = _public_text(field, value, secret_values)
+        if safe_value is not None:
+            public[field] = safe_value
     gpu = raw.get("gpu")
     if isinstance(gpu, dict):
         public_gpu: dict[str, Any] = {}
@@ -88,9 +103,7 @@ def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> di
                 and isinstance(value, bool)
                 or (
                     field in {"name", "cuda"}
-                    and isinstance(value, str)
-                    and len(value) <= 128
-                    and not any(secret and secret in value for secret in secret_values)
+                    and _public_text(field, value, secret_values) is not None
                 )
                 or (
                     field == "driver"
@@ -101,7 +114,11 @@ def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> di
                 and isinstance(value, int)
                 and value >= 0
             ):
-                public_gpu[field] = value
+                public_gpu[field] = (
+                    _public_text(field, value, secret_values)
+                    if field in {"name", "cuda"}
+                    else value
+                )
         if public_gpu:
             public["gpu"] = public_gpu
     return public

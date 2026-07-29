@@ -430,6 +430,24 @@ def test_mix_plan_has_inner_voice_filter_event_pan_fades_and_all_vocal_ducking()
     assert plan["ducking"]["trigger_event_ids"] == [event["id"] for event in timeline["events"]]
 
 
+def test_stable_audio_license_cannot_enter_formal_timeline_after_metadata_stripping():
+    with pytest.raises(AudioTimelineError, match="candidate"):
+        compile_timeline(
+            _spec(
+                [
+                    {
+                        "kind": "ambience",
+                        "source": "local:assets/rain.wav",
+                        "source_sha256": "a" * 64,
+                        "license": "Stability AI Community License",
+                        "start_offset_sec": 0,
+                        "duration_sec": 1,
+                    }
+                ]
+            )
+        )
+
+
 def test_rebase_keeps_cue_offset_when_rendered_shot_start_changes():
     timeline = compile_timeline(
         _spec(

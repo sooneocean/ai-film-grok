@@ -56,6 +56,11 @@ def is_noncommercial_license(value: object) -> bool:
     return "CCBYNC" in normalized
 
 
+def is_candidate_only_license(value: object) -> bool:
+    """Stable Audio Open is not cleared for formal production by its download gate."""
+    return str(value or "").strip() == "Stability AI Community License"
+
+
 # Keep this guard deliberately narrow: a character may naturally say "开门".
 # Only explicit bracketed production directions are rejected here; broader
 # script interpretation belongs in the authoring compiler, not the renderer.
@@ -304,6 +309,7 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
             if event_type != "performance" and (
                 pending_candidate
                 or is_noncommercial_license(license_id)
+                or is_candidate_only_license(license_id)
                 or event.get("production_eligible") is False
                 or event.get("approval_status") == "pending_human_review"
             ):

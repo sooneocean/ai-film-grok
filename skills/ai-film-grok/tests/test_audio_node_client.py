@@ -79,6 +79,20 @@ def test_public_health_report_drops_unknown_fields_and_current_token() -> None:
     }
 
 
+def test_public_health_report_drops_allowlisted_windows_path() -> None:
+    report = public_health_report(
+        {"ok": True, "ambient_model": r"C:\\AI_Models\\stable-audio-open-1.0\\model.safetensors"}
+    )
+    assert "ambient_model" not in report
+
+
+def test_public_health_report_drops_filesystem_like_gpu_strings() -> None:
+    report = public_health_report(
+        {"ok": True, "gpu": {"name": r"C:\\private\\gpu", "cuda": "/private/cuda"}}
+    )
+    assert "gpu" not in report
+
+
 def test_http_error_is_not_misreported_as_network_unreachable() -> None:
     error = HTTPError("http://node/health", 404, "Not Found", {}, io.BytesIO())
     with patch("urllib.request.OpenerDirector.open", side_effect=error):

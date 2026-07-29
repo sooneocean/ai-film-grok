@@ -153,6 +153,7 @@ def test_scene_stem_rejects_copied_pending_sfx_by_hash(tmp_path: Path):
             }
         )
     )
+
     copied = tmp_path / "audio" / "imports" / "copied.wav"
     copied.parent.mkdir()
     copied.write_bytes(original.read_bytes())
@@ -175,6 +176,36 @@ def test_scene_stem_rejects_copied_pending_sfx_by_hash(tmp_path: Path):
             },
             duration_sec=1,
             out=tmp_path / "audio" / "scene-copied.wav",
+            sample_rate=8000,
+        )
+
+
+def test_scene_stem_rejects_metadata_stripped_stable_audio(tmp_path: Path):
+    asset = tmp_path / "assets" / "rain.wav"
+    asset.parent.mkdir()
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+    with pytest.raises(SceneSoundError, match="candidate"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "events": [
+                    {
+                        "id": "stable",
+                        "type": "ambience",
+                        "source": "local:assets/rain.wav",
+                        "source_sha256": hashlib.sha256(asset.read_bytes()).hexdigest(),
+                        "license": "Stability AI Community License",
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ]
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "scene.wav",
             sample_rate=8000,
         )
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from audio_timeline import is_noncommercial_license
+from audio_timeline import is_candidate_only_license, is_noncommercial_license
 
 
 class SceneSoundError(ValueError):
@@ -135,6 +135,7 @@ def _local_asset(root: Path, event: dict[str, Any]) -> Path:
     if (
         pending_candidate
         or is_noncommercial_license(event.get("license"))
+        or is_candidate_only_license(event.get("license"))
         or event.get("production_eligible") is False
         or event.get("approval_status") == "pending_human_review"
     ):
