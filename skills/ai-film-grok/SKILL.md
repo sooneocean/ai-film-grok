@@ -33,7 +33,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
 7. **供应商**：I2V=`grok_primary`；恢复路径才 `frw_video_model=seedance-2-fast-i2v`（[frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)），禁静默 bulk。
-8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM 亲密=rnb；批准库缺 edit/bridge 时 `final` 阻塞，禁热生成。[BGM editor](references/bgm-generation.md#ace-step-music-editor-v2)
+8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM=rnb；缺已批 edit/bridge 则 `final` 阻塞。[BGM](references/bgm-generation.md)
 8b. **对白 i2i**：先做 performance-state；FRW 有精确 I2I receipt 才优先，否则查 `comfy capacity`；忙就等，禁抢队列。[lesson](references/lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 final。

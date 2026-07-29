@@ -3,6 +3,18 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.22.0] - 2026-07-29
+
+### Added
+
+- Added material-aware scene-sound defaults with explicit surface and environment evidence.
+- Added the approval-gated ACE music editor, audio armory, exact-duration edits, motif development, and transition bridges.
+- Added a local ComfyUI broker with bounded queue admission, ownership receipts, and fail-closed VRAM checks.
+
+### Changed
+
+- Final music rendering now requires approved edits or bridges instead of generating unreviewed replacements during delivery.
+
 ## [2.17.1] - 2026-07-29
 
 ### Added
