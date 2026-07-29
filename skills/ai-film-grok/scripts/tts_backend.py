@@ -1297,10 +1297,27 @@ def synthesize(
             model_used = get_config().higgs_audio_model
         elif choice == "audio_node":
             from audio_node_client import AudioNodeError, render
+            from voice_armory import get_voice_profile, ready_tts_profile
 
             base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
             token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
             rendered: dict[str, Any] = {}
+            profile_id = "" if _is_edge_voice_name(voice) else voice
+            profile = get_voice_profile(profile_id) if profile_id else None
+            if profile is not None and ready_tts_profile(profile_id) is None:
+                raise TTSError(
+                    f"voice profile {profile_id!r} is not render-ready: "
+                    f"{profile.get('status', 'unknown')}"
+                )
+            node_variant = str(profile.get("variant")) if profile else "voice_design"
+            node_voice = str(profile.get("speaker", "")) if profile else profile_id
+            node_language = (
+                str(profile.get("language")) if profile else (cue.get("language") or "Chinese")
+            )
+            prefix = str(profile.get("instruction_prefix", "")).strip() if profile else ""
+            instruction = compile_instruction(cue)
+            if prefix:
+                instruction = f"{prefix} {instruction}"
 
             def _node_call() -> None:
                 nonlocal rendered
@@ -1312,9 +1329,10 @@ def synthesize(
                         "tts",
                         {
                             "text": text,
-                            "voice_profile_id": "" if _is_edge_voice_name(voice) else voice,
-                            "language": cue.get("language") or "Chinese",
-                            "performance": {"instruction": compile_instruction(cue)},
+                            "model_variant": node_variant,
+                            "voice_profile_id": node_voice,
+                            "language": node_language,
+                            "performance": {"instruction": instruction},
                         },
                         temp_wav,
                     )
@@ -1340,8 +1358,8 @@ def synthesize(
                     temp_wav.unlink(missing_ok=True)
 
             _tracked("audio_node", "qwen3-tts-5090", local_zero=True, call=_node_call)
-            voice_used = "designed" if _is_edge_voice_name(voice) else (voice or "designed")
-            model_used = "qwen3-tts-5090"
+            voice_used = profile_id or "qwen_zh_female_design"
+            model_used = f"qwen3-tts-5090/{node_variant}"
         elif choice == "cosyvoice-local":
             if not cosyvoice_local_argv_configured():
                 raise TTSError(

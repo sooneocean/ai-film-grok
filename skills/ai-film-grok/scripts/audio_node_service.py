@@ -34,6 +34,8 @@ SFX_SOURCES = ROOT / "sfx-sources"
 TOKEN = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "")
 MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign")
 MODEL_PATH = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL_PATH", MODEL_ID)
+CUSTOM_1_7B_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_QWEN_CUSTOM_1_7B_MODEL", "")
+CUSTOM_1_7B_MODEL_PATH = os.environ.get("AIFILM_AUDIO_NODE_QWEN_CUSTOM_1_7B_MODEL_PATH", "")
 MUSIC_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_MUSIC_MODEL", "ACE-Step-1.5")
 MUSIC_CHECKPOINT_FINGERPRINT = os.environ.get(
     "AIFILM_AUDIO_NODE_MUSIC_CHECKPOINT_FINGERPRINT", "unknown"
@@ -48,6 +50,7 @@ AMBIENT_CHECKPOINT_SHA256 = os.environ.get("AIFILM_AUDIO_NODE_AMBIENT_CHECKPOINT
 AMBIENT_ADAPTER_SHA256 = os.environ.get("AIFILM_AUDIO_NODE_AMBIENT_ADAPTER_SHA256", "")
 MMAUDIO_CHECKPOINT_SHA256 = os.environ.get("AIFILM_MMAUDIO_CHECKPOINT_SHA256", "")
 MMAUDIO_REPO_COMMIT = os.environ.get("AIFILM_MMAUDIO_REPO_COMMIT", "")
+FFMPEG = os.environ.get("AIFILM_AUDIO_NODE_FFMPEG", "ffmpeg")
 jobs: dict[str, dict[str, Any]] = {}
 # ``ambient`` is deliberately separate from ``sfx``.  MMAudio SFX is
 # video-bound and CC-BY-NC; Stable Audio is text-only ambience/transition
@@ -382,7 +385,7 @@ def _normalize(source: Path, out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
-            "ffmpeg",
+            FFMPEG,
             "-y",
             "-i",
             str(source),
@@ -512,13 +515,20 @@ def _run_tts(payload: dict[str, Any], out: Path) -> None:
     text = str(payload.get("text") or "").strip()
     if not text or len(text) > 10000:
         raise ValueError("text must contain 1-10000 characters")
+    variant = str(payload.get("model_variant") or "voice_design")
+    if variant == "voice_design":
+        model_id, model_path = MODEL_ID, MODEL_PATH
+    elif variant == "custom_1_7b" and CUSTOM_1_7B_MODEL_ID and CUSTOM_1_7B_MODEL_PATH:
+        model_id, model_path = CUSTOM_1_7B_MODEL_ID, CUSTOM_1_7B_MODEL_PATH
+    else:
+        raise ValueError("requested Qwen model variant is unavailable")
     voice = str(payload.get("voice_profile_id") or "Vivian")
     language = str(payload.get("language") or "Chinese")
     instruction = str((payload.get("performance") or {}).get("instruction") or "")[:1000]
-    model = Qwen3TTSModel.from_pretrained(MODEL_PATH, device_map="cuda:0", dtype=torch.bfloat16)
+    model = Qwen3TTSModel.from_pretrained(model_path, device_map="cuda:0", dtype=torch.bfloat16)
     wavs, sr = (
         model.generate_voice_design(text=text, language=language, instruct=instruction)
-        if "VoiceDesign" in MODEL_ID
+        if "VoiceDesign" in model_id
         else model.generate_custom_voice(
             text=text, language=language, speaker=voice, instruct=instruction
         )
