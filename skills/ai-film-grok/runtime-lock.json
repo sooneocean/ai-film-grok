@@ -184,7 +184,7 @@
     "scripts/review_ui.py": "97877f0eac5a7cc23899dd4f94092d52ef8a469db130d8cc5ea73d4d525e4731",
     "scripts/rhythm.py": "0061fada678244dc898502de6eb9befc2d363118e5f99e16f5ded5101eb330de",
     "scripts/runtime_policy.py": "705411aa5c11dd857c7858c7020edd5dacad9992ffcbc65ca414943d30423b12",
-    "scripts/scene_sound.py": "7dfa76253b6e7b8981cf8f7a0a1e6d8e26e84e7e68f692f129135982e97a5b7c",
+    "scripts/scene_sound.py": "9db4b79678e9bcb465524f26289292278cf7f905756e9e5264160e5a8151699b",
     "scripts/scene_sound_stems.py": "a05d59e6949b921e67b3ae03a297129d2a29f5d90bc2486eab0c3315df97bdc0",
     "scripts/security_policy.py": "a25d5c352f263b2c5e8037309dc0cafec50e515f9277591f3b169993b49be1e8",
     "scripts/seedance_bridge.py": "b8bb4fe8e1b526076346591de22bcee895c9189244a2128fcf26366cd1fe6aaa",

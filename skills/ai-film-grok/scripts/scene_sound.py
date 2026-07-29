@@ -124,6 +124,7 @@ def _source_event(
     kind: str,
     *,
     expected_material: str | None = None,
+    shot_duration_sec: float | None = None,
 ) -> dict[str, Any] | None:
     verified = [
         event
@@ -131,6 +132,8 @@ def _source_event(
         if _matches_required(event, shot_id, kind)
         and _local_asset_ok(root, event)
         and _reaches_scene_stem(event)
+        and shot_duration_sec is not None
+        and float(event["start_offset_sec"]) + float(event["duration_sec"]) <= shot_duration_sec
     ]
     if expected_material is not None:
         matching = next(
@@ -217,6 +220,7 @@ def reconcile(root: Path, *, write: bool = True) -> dict[str, Any]:
         # Only formal audio cues enter the renderer's scene stem. Legacy scene_events
         # are metadata, not proof that a sound reaches the final mix.
         cues = [{**item, "shot_id": sid} for item in raw_cues if isinstance(item, dict)]
+        shot_duration_sec = _timeline_number(shot.get("duration_sec"), low=0.001)
         text = " ".join(
             str(shot.get(key) or "") for key in ("action", "visible_change", "sound_cues")
         )
@@ -224,7 +228,9 @@ def reconcile(root: Path, *, write: bool = True) -> dict[str, Any]:
         # acoustic space. This is separate from short foley hits and cannot be
         # satisfied by a generic SFX accent.
         if not _explicit_true(shot, "scene_silent", "narrative_silence"):
-            ambience = _source_event(cues, root, sid, "ambience")
+            ambience = _source_event(
+                cues, root, sid, "ambience", shot_duration_sec=shot_duration_sec
+            )
             events.append(
                 {
                     "shot_id": sid,
@@ -243,7 +249,14 @@ def reconcile(root: Path, *, write: bool = True) -> dict[str, Any]:
             if not any(word.lower() in text.lower() for word in words):
                 continue
             material = _expected_material(shot, kind)
-            source_event = _source_event(cues, root, sid, kind, expected_material=material)
+            source_event = _source_event(
+                cues,
+                root,
+                sid,
+                kind,
+                expected_material=material,
+                shot_duration_sec=shot_duration_sec,
+            )
             status, needs_review, reason = _event_status(source_event, expected_material=material)
             origin = "audio_cues" if source_event in cues else "inferred"
             events.append(
