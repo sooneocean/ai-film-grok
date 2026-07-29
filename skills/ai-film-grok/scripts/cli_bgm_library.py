@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -24,8 +25,8 @@ from bgm_library import (
 from music_cue import build_music_timeline
 from util import read_json, write_json
 
-_NODE_MODEL_FIELDS = ("model", "music_model", "music_checkpoint_fingerprint")
-_NODE_GPU_FIELDS = ("available", "name", "cuda", "free_vram_mib", "total_vram_mib")
+_NODE_MODEL_FIELDS = ("model", "music_model", "music_checkpoint_fingerprint", "performance_model")
+_NODE_GPU_FIELDS = ("available", "name", "cuda", "driver", "free_vram_mib", "total_vram_mib")
 _NODE_MODEL_KINDS = ("tts", "music", "sfx", "performance")
 
 
@@ -61,6 +62,9 @@ def _public_node_health(raw: Any, *, token: str) -> dict[str, Any]:
                 and isinstance(value, str)
                 and len(value) <= 128
                 and token not in value
+                or field == "driver"
+                and isinstance(value, str)
+                and bool(re.fullmatch(r"[0-9][0-9.]{0,30}", value))
                 or field.endswith("_mib")
                 and isinstance(value, int)
                 and value >= 0

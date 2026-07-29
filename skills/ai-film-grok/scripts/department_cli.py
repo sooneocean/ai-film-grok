@@ -26,6 +26,11 @@ DEPARTMENT_FILES = {
     "post": "post-bible.json",
 }
 _CANONICAL_DEPARTMENTS = {"visual", "audio", "post"}
+_BOOK_PATH_KEYS = {
+    "visual": ("visual", "style-bible"),
+    "audio": ("sound", "audio", "audio-bible"),
+    "post": ("post", "post-bible"),
+}
 
 # A handoff names the department that may start work next.  It is deliberately
 # read-only: ownership changes only through the existing human-approved locks.
@@ -56,10 +61,24 @@ def department_path(root: Path | str, department: str) -> Path:
     if department not in DEPARTMENT_FILES:
         raise DepartmentCliError(f"unknown department: {department}")
     base = Path(root).expanduser().resolve()
-    candidate = (base / DEPARTMENT_FILES[department]).resolve()
-    if not candidate.is_relative_to(base):
-        raise DepartmentCliError("department path escapes production root")
-    return candidate
+    canonical = _canonical_department(department)
+    try:
+        book = read_production_book(base)
+    except FileNotFoundError:
+        book = {}
+    records = book.get("departments") if isinstance(book, dict) else {}
+    records = records if isinstance(records, dict) else {}
+    for key in _BOOK_PATH_KEYS[canonical]:
+        record = records.get(key)
+        source_file = record.get("source_file") if isinstance(record, dict) else None
+        if not isinstance(source_file, str) or not source_file.strip():
+            continue
+        candidate = Path(source_file).expanduser()
+        candidate = candidate if candidate.is_absolute() else base / candidate
+        candidate = candidate.resolve()
+        if candidate.is_relative_to(base):
+            return candidate
+    return (base / DEPARTMENT_FILES[department]).resolve()
 
 
 def _canonical_department(department: str) -> str:

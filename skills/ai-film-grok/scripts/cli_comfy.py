@@ -123,7 +123,18 @@ def add_comfy_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
     prepare_parser.add_argument("--prompt-file", type=Path, required=True)
     prepare_parser.add_argument("--seed", type=int, required=True)
     prepare_parser.add_argument("--input-image-name", default=None)
+    prepare_parser.add_argument("--input-audio-name", default=None)
     prepare_parser.add_argument("--filename-prefix", default="aifilm/armory")
+    prepare_parser.add_argument(
+        "--production-stage",
+        choices=("pilot", "production"),
+        default="production",
+    )
+    prepare_parser.add_argument(
+        "--allow-experimental",
+        action="store_true",
+        help="Allow a pilot-verified experimental weapon; never promotes it",
+    )
     prepare_parser.add_argument("--out", type=Path, required=True)
     prepare_parser.add_argument(
         "--offline",
@@ -156,6 +167,21 @@ def add_comfy_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
         "--allow-external-api-nodes",
         action="store_true",
         help="Allow workflow nodes that may call paid external providers",
+    )
+    run_parser.add_argument(
+        "--weapon-id",
+        default=None,
+        help="Validate against one registered armory template, including exact custom-node modules",
+    )
+    run_parser.add_argument(
+        "--production-stage",
+        choices=("pilot", "production"),
+        default="production",
+    )
+    run_parser.add_argument(
+        "--allow-experimental",
+        action="store_true",
+        help="Required with an experimental --weapon-id; pilot-only",
     )
     run_parser.add_argument("--receipt", type=Path, default=None)
 
@@ -263,10 +289,17 @@ def run_comfy(args: argparse.Namespace) -> int:
                         prompt=prompt,
                         seed=args.seed,
                         input_image_name=args.input_image_name,
+                        input_audio_name=args.input_audio_name,
                         filename_prefix=args.filename_prefix,
                     )
                     if not args.offline:
-                        assert_local_only_workflow(base_url, graph)
+                        from comfy_armory import assert_registered_weapon_workflow
+
+                        assert_registered_weapon_workflow(
+                            base_url,
+                            route["weapon"]["id"],
+                            graph,
+                        )
                     output = args.out.expanduser().resolve()
                     write_json(output, graph)
                     report = {
@@ -281,6 +314,10 @@ def run_comfy(args: argparse.Namespace) -> int:
                         "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
                         "live_model_readback": not bool(args.offline),
                         "external_api_nodes_allowed": False,
+                        "source_endpoint": route["weapon"].get("source_endpoint"),
+                        "pilot_only": bool(
+                            (route["weapon"].get("capabilities") or {}).get("pilot_only")
+                        ),
                     }
             except ComfyArmoryError as exc:
                 raise ComfyVideoError(str(exc)) from exc
@@ -304,7 +341,45 @@ def run_comfy(args: argparse.Namespace) -> int:
                 if not isinstance(overrides, dict):
                     raise ComfyVideoError("workflow overrides must be a JSON object")
                 graph = apply_workflow_overrides(graph, overrides)
-            if not args.allow_external_api_nodes:
+            registered_weapon = None
+            effective_weapon_id = args.weapon_id
+            if not effective_weapon_id:
+                from comfy_armory import (
+                    ComfyArmoryError,
+                    identify_registered_weapon_workflow,
+                )
+
+                try:
+                    identified = identify_registered_weapon_workflow(graph)
+                except ComfyArmoryError as exc:
+                    raise ComfyVideoError(str(exc)) from exc
+                if identified is not None:
+                    effective_weapon_id = str(identified["id"])
+            if effective_weapon_id:
+                if args.allow_external_api_nodes:
+                    raise ComfyVideoError(
+                        "--weapon-id cannot be combined with --allow-external-api-nodes"
+                    )
+                from comfy_armory import (
+                    ComfyArmoryError,
+                    assert_registered_weapon_workflow,
+                    authorize_weapon_execution,
+                )
+
+                try:
+                    registered_weapon = authorize_weapon_execution(
+                        effective_weapon_id,
+                        stage=args.production_stage,
+                        allow_experimental=bool(args.allow_experimental),
+                    )
+                    assert_registered_weapon_workflow(
+                        base_url,
+                        effective_weapon_id,
+                        graph,
+                    )
+                except ComfyArmoryError as exc:
+                    raise ComfyVideoError(str(exc)) from exc
+            elif not args.allow_external_api_nodes:
                 assert_local_only_workflow(base_url, graph)
             client_id = f"aifilm-{secrets.token_hex(8)}"
             prompt_id = submit(base_url, graph, client_id=client_id)
@@ -322,6 +397,13 @@ def run_comfy(args: argparse.Namespace) -> int:
                 "workflow_sha256": workflow_sha256(graph),
                 "artifacts": result.get("artifacts") or [],
                 "external_api_nodes_allowed": bool(args.allow_external_api_nodes),
+                "weapon_id": effective_weapon_id,
+                "source_endpoint": (
+                    registered_weapon.get("source_endpoint") if registered_weapon else None
+                ),
+                "pilot_only": bool(
+                    ((registered_weapon or {}).get("capabilities") or {}).get("pilot_only")
+                ),
             }
         elif action == "download":
             report = {

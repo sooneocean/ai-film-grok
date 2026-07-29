@@ -96,12 +96,12 @@ def test_health_requires_private_token() -> None:
         health("http://127.0.0.1:18790", "short")
 
 
-def test_health_uses_short_bounded_timeout() -> None:
+def test_health_uses_bounded_probe_timeout() -> None:
     base_url = "http://127.0.0.1:18790"
     token = "x" * 32
     with patch("lipsync_node_client._request", return_value=b'{"ok":true}') as request:
         assert health(base_url, token) == {"ok": True}
-    request.assert_called_once_with(base_url, token, "/health", timeout=5)
+    request.assert_called_once_with(base_url, token, "/health", timeout=30)
 
 
 def test_request_normalizes_stale_tunnel_disconnect() -> None:

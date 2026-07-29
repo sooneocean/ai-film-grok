@@ -37,6 +37,13 @@
           "id": { "type": "string", "minLength": 1 },
           "provider": { "type": "string", "minLength": 1 },
           "model": { "type": "string", "minLength": 1 },
+          "domains": {
+            "type": "array",
+            "items": {
+              "enum": ["story", "visual_still", "motion", "voice", "lipsync", "music", "post", "qa"]
+            },
+            "uniqueItems": true
+          },
           "operations": {
             "type": "array",
             "minItems": 1,

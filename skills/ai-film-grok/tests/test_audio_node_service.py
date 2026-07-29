@@ -5,6 +5,7 @@ import hashlib
 import importlib
 import inspect
 import io
+import json
 import subprocess
 import wave
 from pathlib import Path
@@ -33,13 +34,36 @@ def test_health_reports_capacity_without_private_payloads(monkeypatch: pytest.Mo
     monkeypatch.setattr(
         service,
         "_gpu_health",
-        lambda: {"available": True, "free_vram_mib": 1024, "total_vram_mib": 2048},
+        lambda: {
+            "available": True,
+            "driver": "580.12",
+            "free_vram_mib": 1024,
+            "total_vram_mib": 2048,
+        },
     )
 
     report = service.health(f"Bearer {'t' * 32}")
 
-    assert report["gpu"] == {"available": True, "free_vram_mib": 1024, "total_vram_mib": 2048}
+    assert report["gpu"] == {
+        "available": True,
+        "driver": "580.12",
+        "free_vram_mib": 1024,
+        "total_vram_mib": 2048,
+    }
     assert "token" not in report
+
+
+def test_health_identifies_the_configured_performance_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "TOKEN", "t" * 32)
+    monkeypatch.setattr(service, "PERFORMANCE_MODEL_ID", "bosonai/higgs-audio-v2-generation")
+
+    report = service.health(f"Bearer {'t' * 32}")
+
+    assert report["performance_model"] == "bosonai/higgs-audio-v2-generation"
 
 
 def test_performance_adapter_is_reported_only_when_configured(
@@ -353,3 +377,200 @@ def test_sfx_submission_requires_license_provenance_and_ack(
         )
     )
     assert result["status"] == "queued"
+
+
+def test_ambient_submission_requires_candidate_ack_and_model_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "TOKEN", "t" * 32)
+    monkeypatch.setattr(service, "AMBIENT_MODEL_ID", "stabilityai/stable-audio-open-1.0")
+    monkeypatch.setattr(service, "AMBIENT_LICENSE", "Stability AI Community License")
+    monkeypatch.setattr(service, "AMBIENT_CHECKPOINT_SHA256", "c" * 64)
+    monkeypatch.setattr(service, "AMBIENT_ADAPTER_SHA256", "d" * 64)
+    renderer = [
+        "python",
+        "stable_audio_adapter.py",
+        "--model-root",
+        "model-root",
+        "--checkpoint",
+        "model-root/model.safetensors",
+        "--expected-checkpoint-sha256",
+        "c" * 64,
+        "--expected-adapter-sha256",
+        "d" * 64,
+        "--prompt",
+        "{prompt}",
+        "--duration",
+        "{duration}",
+        "--seed",
+        "{seed}",
+        "--out",
+        "{out}",
+    ]
+    probe = [
+        "python",
+        "stable_audio_probe.py",
+        "--model-root",
+        "model-root",
+        "--checkpoint",
+        "model-root/model.safetensors",
+        "--adapter",
+        "stable_audio_adapter.py",
+        "--model",
+        "stabilityai/stable-audio-open-1.0",
+        "--license",
+        "Stability AI Community License",
+    ]
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_AMBIENT_ARGV", json.dumps(renderer))
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_AMBIENT_PROBE_ARGV", json.dumps(probe))
+    monkeypatch.setattr(service.shutil, "which", lambda executable: executable)
+    monkeypatch.setattr(service, "_ambient_probe_ok", lambda: True)
+    monkeypatch.setattr(asyncio, "create_task", lambda coroutine: coroutine.close())
+    with pytest.raises(Exception, match="candidate-only"):
+        asyncio.run(
+            service.create(
+                "ambient", {"prompt": "rain", "duration": 8, "seed": 1}, f"Bearer {'t' * 32}"
+            )
+        )
+    result = asyncio.run(
+        service.create(
+            "ambient",
+            {"prompt": "rain", "duration": 8, "seed": 1, "stable_audio_candidate_only": True},
+            f"Bearer {'t' * 32}",
+        )
+    )
+    assert result["status"] == "queued"
+    job = service.jobs[result["job_id"]]
+    assert job["production_eligible"] is False
+    assert job["usage_scope"] == "stable_audio_community_license_candidate"
+    assert job["checkpoint_sha256"] == "c" * 64
+    assert job["adapter_sha256"] == "d" * 64
+
+
+def test_ambient_health_rejects_wrong_license_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "AMBIENT_MODEL_ID", "stabilityai/stable-audio-open-1.0")
+    monkeypatch.setattr(service, "AMBIENT_LICENSE", "MIT")
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_AMBIENT_ARGV", '["trusted-ambient-adapter"]')
+    monkeypatch.setattr(service.shutil, "which", lambda executable: executable)
+
+    assert service._available("ambient") is False
+
+
+def test_ambient_health_rejects_renderer_without_provenance_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "AMBIENT_MODEL_ID", "stabilityai/stable-audio-open-1.0")
+    monkeypatch.setattr(service, "AMBIENT_LICENSE", "Stability AI Community License")
+    monkeypatch.setattr(service, "AMBIENT_CHECKPOINT_SHA256", "c" * 64)
+    monkeypatch.setattr(service, "AMBIENT_ADAPTER_SHA256", "d" * 64)
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_AMBIENT_ARGV", '["/usr/bin/true"]')
+    monkeypatch.delenv("AIFILM_AUDIO_NODE_AMBIENT_PROBE_ARGV", raising=False)
+
+    assert service._available("ambient") is False
+
+
+def test_ambient_health_rejects_renderer_not_bound_to_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "AMBIENT_MODEL_ID", "stabilityai/stable-audio-open-1.0")
+    monkeypatch.setattr(service, "AMBIENT_LICENSE", "Stability AI Community License")
+    monkeypatch.setattr(service, "AMBIENT_CHECKPOINT_SHA256", "c" * 64)
+    monkeypatch.setattr(service, "AMBIENT_ADAPTER_SHA256", "d" * 64)
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_AMBIENT_ARGV", '["/usr/bin/true"]')
+    monkeypatch.setenv(
+        "AIFILM_AUDIO_NODE_AMBIENT_PROBE_ARGV",
+        json.dumps(
+            [
+                "/usr/bin/true",
+                "stable_audio_probe.py",
+                "--model-root",
+                "model-root",
+                "--checkpoint",
+                "model-root/model.safetensors",
+                "--adapter",
+                "stable_audio_adapter.py",
+                "--model",
+                "stabilityai/stable-audio-open-1.0",
+                "--license",
+                "Stability AI Community License",
+            ]
+        ),
+    )
+    monkeypatch.setattr(service, "_ambient_probe_ok", lambda: True)
+
+    assert service._available("ambient") is False
+
+
+def test_ambient_binding_rejects_abbreviated_override_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "AMBIENT_CHECKPOINT_SHA256", "c" * 64)
+    monkeypatch.setattr(service, "AMBIENT_ADAPTER_SHA256", "d" * 64)
+    probe = [
+        "python",
+        "stable_audio_probe.py",
+        "--model-root",
+        "good",
+        "--checkpoint",
+        "good/model.safetensors",
+        "--adapter",
+        "stable_audio_adapter.py",
+        "--model",
+        "stabilityai/stable-audio-open-1.0",
+        "--license",
+        "Stability AI Community License",
+    ]
+    renderer = [
+        "python",
+        "stable_audio_adapter.py",
+        "--model-root",
+        "good",
+        "--checkpoint",
+        "good/model.safetensors",
+        "--expected-checkpoint-sha256",
+        "c" * 64,
+        "--expected-adapter-sha256",
+        "d" * 64,
+        "--prompt",
+        "{prompt}",
+        "--duration",
+        "{duration}",
+        "--seed",
+        "{seed}",
+        "--out",
+        "{out}",
+        "--checkp",
+        "evil/model.safetensors",
+    ]
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_AMBIENT_PROBE_ARGV", json.dumps(probe))
+
+    assert service._ambient_renderer_bound(renderer) is False
+
+
+def test_http_auth_rejects_before_json_parsing(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "TOKEN", "t" * 32)
+
+    response = TestClient(service.app).post(
+        "/v1/ambient",
+        content=b"{",
+        headers={"Authorization": f"Bearer {'x' * 32}", "Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "unauthorized"}

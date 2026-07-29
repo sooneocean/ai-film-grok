@@ -20,7 +20,11 @@ from department_cli import (  # noqa: E402
     migrate_department,
     show_department,
 )
-from production_book import init_production_book, read_production_book  # noqa: E402
+from production_book import (  # noqa: E402
+    init_production_book,
+    read_production_book,
+    write_production_book,
+)
 
 
 def test_cli_department_edit_dry_run_roundtrip(tmp_path: Path, capsys) -> None:
@@ -176,6 +180,28 @@ def test_department_lock_updates_production_book(tmp_path: Path) -> None:
 def test_unknown_department_cannot_escape_project_root(tmp_path: Path) -> None:
     with pytest.raises(DepartmentCliError, match="unknown department"):
         department_path(tmp_path, "../outside")
+
+
+def test_department_path_uses_in_root_legacy_book_source_file(tmp_path: Path) -> None:
+    init_production_book(tmp_path)
+    bible = tmp_path / "bible"
+    bible.mkdir()
+    expected = bible / "style-bible.json"
+    expected.write_text("{}", encoding="utf-8")
+    book = read_production_book(tmp_path)
+    book["departments"]["visual"]["source_file"] = "bible/style-bible.json"
+    write_production_book(tmp_path, book)
+
+    assert department_path(tmp_path, "visual") == expected
+
+
+def test_department_path_ignores_book_source_file_outside_root(tmp_path: Path) -> None:
+    init_production_book(tmp_path)
+    book = read_production_book(tmp_path)
+    book["departments"]["visual"]["source_file"] = "/tmp/outside-style-bible.json"
+    write_production_book(tmp_path, book)
+
+    assert department_path(tmp_path, "visual") == tmp_path / "style-bible.json"
 
 
 def _lock_current_department(root: Path, department: str) -> None:

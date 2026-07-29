@@ -1,0 +1,230 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "replace-through-armory.png"
+    }
+  },
+  "2": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "replace-through-armory.wav"
+    }
+  },
+  "3": {
+    "class_type": "DownloadAndLoadWav2VecModel",
+    "inputs": {
+      "model": "facebook/wav2vec2-base-960h",
+      "base_precision": "fp16",
+      "load_device": "main_device"
+    }
+  },
+  "4": {
+    "class_type": "FantasyTalkingModelLoader",
+    "inputs": {
+      "model": "WanVideo\\fantasytalking_fp16.safetensors",
+      "base_precision": "fp16"
+    }
+  },
+  "5": {
+    "class_type": "FantasyTalkingWav2VecEmbeds",
+    "inputs": {
+      "wav2vec_model": [
+        "3",
+        0
+      ],
+      "fantasytalking_model": [
+        "4",
+        0
+      ],
+      "audio": [
+        "2",
+        0
+      ],
+      "num_frames": 45,
+      "fps": 23.0,
+      "audio_scale": 1.0,
+      "audio_cfg_scale": 1.0
+    }
+  },
+  "6": {
+    "class_type": "WanVideoBlockSwap",
+    "inputs": {
+      "blocks_to_swap": 20,
+      "offload_img_emb": false,
+      "offload_txt_emb": false,
+      "use_non_blocking": true,
+      "vace_blocks_to_swap": 0,
+      "prefetch_blocks": 1,
+      "block_swap_debug": false
+    }
+  },
+  "7": {
+    "class_type": "WanVideoModelLoader",
+    "inputs": {
+      "model": "WanVideo\\Wan2_1-I2V-14B-720p_fp8_e4m3fn_scaled_KJ.safetensors",
+      "base_precision": "fp16_fast",
+      "quantization": "disabled",
+      "load_device": "offload_device",
+      "attention_mode": "sageattn",
+      "block_swap_args": [
+        "6",
+        0
+      ],
+      "fantasytalking_model": [
+        "4",
+        0
+      ],
+      "rms_norm_function": "default"
+    }
+  },
+  "8": {
+    "class_type": "WanVideoVAELoader",
+    "inputs": {
+      "model_name": "Wan2_1_VAE_bf16.safetensors",
+      "precision": "bf16",
+      "use_cpu_cache": false,
+      "verbose": false
+    }
+  },
+  "9": {
+    "class_type": "CLIPVisionLoader",
+    "inputs": {
+      "clip_name": "clip_vision_h.safetensors"
+    }
+  },
+  "10": {
+    "class_type": "WanVideoClipVisionEncode",
+    "inputs": {
+      "clip_vision": [
+        "9",
+        0
+      ],
+      "image_1": [
+        "1",
+        0
+      ],
+      "strength_1": 1.0,
+      "strength_2": 1.0,
+      "crop": "center",
+      "combine_embeds": "average",
+      "force_offload": true,
+      "tiles": 0,
+      "ratio": 0.5
+    }
+  },
+  "11": {
+    "class_type": "WanVideoTextEncodeCached",
+    "inputs": {
+      "model_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "precision": "bf16",
+      "positive_prompt": "Replace through the verified armory compiler.",
+      "negative_prompt": "blurred mouth, distorted face, deformed teeth, identity drift, excessive motion, camera movement, subtitles, low quality",
+      "quantization": "fp8_e4m3fn",
+      "use_disk_cache": true,
+      "device": "cpu"
+    }
+  },
+  "12": {
+    "class_type": "WanVideoImageToVideoEncode",
+    "inputs": {
+      "width": 640,
+      "height": 640,
+      "num_frames": 45,
+      "noise_aug_strength": 0.03,
+      "start_latent_strength": 1.0,
+      "end_latent_strength": 1.0,
+      "force_offload": true,
+      "vae": [
+        "8",
+        0
+      ],
+      "clip_embeds": [
+        "10",
+        0
+      ],
+      "start_image": [
+        "1",
+        0
+      ],
+      "fun_or_fl2v_model": false,
+      "tiled_vae": true,
+      "augment_empty_frames": 0.0
+    }
+  },
+  "13": {
+    "class_type": "WanVideoSampler",
+    "inputs": {
+      "model": [
+        "7",
+        0
+      ],
+      "image_embeds": [
+        "12",
+        0
+      ],
+      "steps": 6,
+      "cfg": 5.0,
+      "shift": 5.0,
+      "seed": 1,
+      "force_offload": true,
+      "scheduler": "unipc",
+      "riflex_freq_index": 0,
+      "text_embeds": [
+        "11",
+        0
+      ],
+      "batched_cfg": false,
+      "rope_function": "comfy",
+      "fantasytalking_embeds": [
+        "5",
+        0
+      ],
+      "start_step": 0,
+      "end_step": -1,
+      "add_noise_to_samples": false
+    }
+  },
+  "14": {
+    "class_type": "WanVideoDecode",
+    "inputs": {
+      "vae": [
+        "8",
+        0
+      ],
+      "samples": [
+        "13",
+        0
+      ],
+      "enable_vae_tiling": true,
+      "tile_x": 320,
+      "tile_y": 320,
+      "tile_stride_x": 160,
+      "tile_stride_y": 160,
+      "normalization": "default"
+    }
+  },
+  "15": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": [
+        "14",
+        0
+      ],
+      "frame_rate": 23.0,
+      "loop_count": 0,
+      "filename_prefix": "aifilm/talking/fantasy-6step",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": true,
+      "pingpong": false,
+      "save_output": true,
+      "audio": [
+        "2",
+        0
+      ]
+    }
+  }
+}

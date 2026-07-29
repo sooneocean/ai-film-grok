@@ -230,7 +230,7 @@ def _download_artifact(
 
 
 def health(base_url: str, token: str) -> dict[str, Any]:
-    return _json(_request(base_url, token, "/health", timeout=5), context="health")
+    return _json(_request(base_url, token, "/health", timeout=30), context="health")
 
 
 def _validate_input(path: Path, *, limit: int, label: str) -> Path:

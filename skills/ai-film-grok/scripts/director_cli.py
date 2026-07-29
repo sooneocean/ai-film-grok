@@ -8,6 +8,7 @@ from typing import Any
 
 from department_cli import (
     DEPARTMENT_FILES,
+    department_path,
     mark_department_stale,
     migrate_department,
     show_department,
@@ -25,6 +26,11 @@ from production_book import (
 from util import read_json
 
 _DEPARTMENT_SCHEMA_TARGETS = {"visual": 3, "audio": 1, "post": 1}
+_BOOK_DEPARTMENT_KEYS = {
+    "visual": ("visual", "style-bible"),
+    "audio": ("sound", "audio", "audio-bible"),
+    "post": ("post", "post-bible"),
+}
 _STAGE_INPUT_CANDIDATES: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
     "concept_lock": (("brief", ("brief.json",)), ("story", ("drama-graph.json",))),
     "script_lock": (("story", ("drama-graph.json",)), ("shots", ("film-spec.json",))),
@@ -250,7 +256,19 @@ def lock_native_stage(
     from approval_ledger import append_approval
     from director_stage_gates import hash_input_refs, lock_stage, stage_status
 
-    native_refs = validate_native_stage_evidence(root, stage)
+    base = Path(root).expanduser().resolve()
+    native_refs = validate_native_stage_evidence(base, stage)
+    team_gate: dict[str, Any] | None = None
+    team_plan = base / "production-team.json"
+    if team_plan.is_file():
+        from production_team import validate_team
+
+        snapshot = base / "receipts" / "capability-snapshot.json"
+        if not snapshot.is_file():
+            raise ValueError("production-team exists but capability snapshot is missing")
+        team_gate = validate_team(team_plan, capabilities_path=snapshot, stage=stage)
+        if team_gate.get("ok") is not True:
+            raise ValueError("production-team stage gate is not ready")
     refs = dict(native_refs)
     for name, relative in (input_refs or {}).items():
         if name in refs and refs[name] != relative:
@@ -285,6 +303,7 @@ def lock_native_stage(
         "approval_id": approval["approval_id"],
         "lock": locked,
         "stage_gates": stage_status(root),
+        "production_team": team_gate,
     }
 
 
@@ -318,11 +337,29 @@ def director_init(
 
 def migrate_audit(root: Path | str) -> dict[str, Any]:
     base = Path(root).expanduser().resolve()
+    book = read_json(base / "production-book.json") or {}
+    records = book.get("departments") if isinstance(book, dict) else {}
+    records = records if isinstance(records, dict) else {}
     items = []
     for department, filename in DEPARTMENT_FILES.items():
         if department == "sound":
             continue
+        source_file = None
+        for key in _BOOK_DEPARTMENT_KEYS[department]:
+            record = records.get(key)
+            candidate_source = record.get("source_file") if isinstance(record, dict) else None
+            if isinstance(candidate_source, str) and candidate_source.strip():
+                source_file = candidate_source
+                break
         path = base / filename
+        source = "default"
+        if isinstance(source_file, str) and source_file.strip():
+            candidate = Path(source_file).expanduser()
+            candidate = candidate if candidate.is_absolute() else base / candidate
+            candidate = candidate.resolve()
+            if candidate.is_relative_to(base):
+                path = candidate
+                source = "production_book"
         value = read_json(path) if path.is_file() else None
         current_version = value.get("schema_version") if isinstance(value, dict) else None
         target_version = _DEPARTMENT_SCHEMA_TARGETS[department]
@@ -330,6 +367,7 @@ def migrate_audit(root: Path | str) -> dict[str, Any]:
             {
                 "department": department,
                 "path": str(path),
+                "path_source": source,
                 "exists": path.is_file(),
                 "from_version": current_version,
                 "to_version": target_version,
@@ -352,6 +390,10 @@ def migrate_audit(root: Path | str) -> dict[str, Any]:
 
 def migrate(root: Path | str, *, title: str = "Untitled") -> dict[str, Any]:
     base = Path(root).expanduser().resolve()
+    raw_book = read_json(base / "production-book.json")
+    if isinstance(raw_book, dict) and int(raw_book.get("revision") or 0) < 1:
+        normalized_book = read_production_book(base)
+        write_production_book(base, normalized_book, expected_revision=0)
     init_production_book(base, title=title, rigor="legacy")
     migrated = []
     for item in migrate_audit(base)["departments"]:
@@ -407,14 +449,15 @@ def check(root: Path | str) -> dict[str, Any]:
         for required in ("drama-graph.json", "film-spec.json"):
             if not (Path(root) / required).is_file():
                 errors.append(f"story: required canonical file is missing: {required}")
-    for department, filename in DEPARTMENT_FILES.items():
+    for department in DEPARTMENT_FILES:
         if department == "sound":
             continue
-        if (Path(root) / filename).is_file():
+        path = department_path(root, department)
+        if path.is_file():
             report = validate_department(root, department)
             departments.append(report)
             errors.extend(f"{department}: {item}" for item in report["errors"])
-            bible = read_json(Path(root) / filename) or {}
+            bible = read_json(path) or {}
             if department == "audio":
                 from audio_bible import validate_audio_bible
 

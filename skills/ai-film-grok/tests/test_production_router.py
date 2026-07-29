@@ -505,6 +505,22 @@ def test_generated_contracts_validate_against_public_schemas(tmp_path: Path) -> 
     )
 
 
+def test_non_motion_domain_is_not_eligible_for_shot_routing(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
+    capability = _capability(
+        "still-only",
+        provider="comfy-lan",
+        model="qwen-image",
+        operations=["image_to_video"],
+        shot_roles=["hero"],
+    )
+    capability["domains"] = ["visual_still"]
+    _write_capabilities(tmp_path, [capability])
+    report = explain_route(tmp_path, shot_id="shot01", now=NOW)
+    assert report["ok"] is False
+    assert report["rejected"][0]["reasons"] == ["CAPABILITY_NOT_MOTION_ROUTE"]
+
+
 @pytest.mark.parametrize(
     ("patch", "error"),
     [

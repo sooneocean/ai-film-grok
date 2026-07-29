@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "ai-film-comfy-weapon-armory",
-  "updated_at": "2026-07-28",
+  "updated_at": "2026-07-29",
   "default_node": "rtx5090-main",
   "nodes": {
     "rtx5090-main": {
@@ -242,6 +242,185 @@
         "high_lora_sha256": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",
         "low_lora_sha256": "d6b783742f4d5fd63a0223ae1d5bf64fc995a6b408480ac2a00528ae0d4146db",
         "commercial_use": "restricted_rentcivit"
+      }
+    },
+    {
+      "id": "infinite-talk-stable-pilot",
+      "display_name": "InfiniteTalk stable audio-scale-1 pilot",
+      "status": "experimental",
+      "priority": 90,
+      "provider": "comfy_lan",
+      "source_endpoint": "local_infinite_talk",
+      "node": "rtx5090-main",
+      "intents": [
+        "talking-avatar-stable-pilot"
+      ],
+      "quality_tiers": [
+        "max_practical",
+        "standard"
+      ],
+      "workflow_template": "templates/comfy/infinite-talk-stable-pilot-api.json",
+      "bindings": {
+        "prompt_node": "9",
+        "prompt_input": "positive_prompt",
+        "input_node": "1",
+        "input_image_input": "image",
+        "audio_node": "2",
+        "audio_input": "audio",
+        "sampler_node": "11",
+        "seed_input": "seed",
+        "save_node": "13",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "trusted_custom_nodes": {
+        "DownloadAndLoadWav2VecModel": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "MultiTalkWav2VecEmbeds": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "MultiTalkModelLoader": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoBlockSwap": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoModelLoader": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoVAELoader": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoTextEncodeCached": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoImageToVideoMultiTalk": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoSampler": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoPassImagesFromSamples": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "VHS_VideoCombine": "custom_nodes.comfyui-videohelpersuite"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "WanVideo\\Wan2_1-I2V-14B-480p_fp8_e4m3fn_scaled_KJ.safetensors",
+          "WanVideo\\InfiniteTalk\\Wan2_1-InfiniteTalk-Single_fp8_e4m3fn_scaled_KJ.safetensors"
+        ],
+        "text_encoders": [
+          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        ],
+        "vae": [
+          "Wan2_1_VAE_bf16.safetensors"
+        ]
+      },
+      "requirement_sha256": {
+        "diffusion_models": {
+          "WanVideo\\Wan2_1-I2V-14B-480p_fp8_e4m3fn_scaled_KJ.safetensors": "2ff922282cd84589702e6e8c26e083d1160bfc2b217dd44e1ae2688441dc495d",
+          "WanVideo\\InfiniteTalk\\Wan2_1-InfiniteTalk-Single_fp8_e4m3fn_scaled_KJ.safetensors": "bd6e0e6feab8c22a482b1c4dd7c0504c215c35b507ddc3b4dcaa5d3ef539879e"
+        }
+      },
+      "defaults": {
+        "width": 640,
+        "height": 640,
+        "steps": 20,
+        "fps": 25,
+        "audio_scale": 1.0
+      },
+      "capabilities": {
+        "face_animation_to_audio": true,
+        "still_to_talking_avatar": true,
+        "original_video_pixel_preservation": false,
+        "pilot_only": true,
+        "human_approval_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "independent_verifier": "ACCEPT",
+        "production_promoted": false,
+        "workflow_template_sha256": "2baa73729dda575b02048e4b5a07c012db03cf5f437261d81d87e9ed3d22677e",
+        "input_image_sha256": "8fe0f38c07a0c5cb9013ab0884743367052a3059d053f1aee7eb3212e5d70a85",
+        "input_audio_sha256": "3461a8893e465fd3da65a2bc6a13fac1d60a8c047127778615497ee7cc0d34c0",
+        "output_sha256": "465050253678bf9f55542af12f5013808e2c5c5baec56d9410833785d0f0ca57",
+        "integrated_canary_prompt_id": "599372e6-df22-4f10-a0f9-c5d34a55f4ea",
+        "integrated_canary_output_sha256": "02450e8404ac580d85b325f127eb2e8e364f0a59aba7cc372f4228cdbba7f190",
+        "decode_ok": true,
+        "quality_note": "identity and background stable; Japanese mouth articulation weak"
+      }
+    },
+    {
+      "id": "fantasy-talking-6step-pilot",
+      "display_name": "FantasyTalking 6-step technical pilot",
+      "status": "experimental",
+      "priority": 80,
+      "provider": "comfy_lan",
+      "source_endpoint": "local_fantasy_talking",
+      "node": "rtx5090-main",
+      "intents": [
+        "talking-avatar-expressive-pilot"
+      ],
+      "quality_tiers": [
+        "standard",
+        "max_practical"
+      ],
+      "workflow_template": "templates/comfy/fantasy-talking-6step-pilot-api.json",
+      "bindings": {
+        "prompt_node": "11",
+        "prompt_input": "positive_prompt",
+        "input_node": "1",
+        "input_image_input": "image",
+        "audio_node": "2",
+        "audio_input": "audio",
+        "sampler_node": "13",
+        "seed_input": "seed",
+        "save_node": "15",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "trusted_custom_nodes": {
+        "DownloadAndLoadWav2VecModel": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "FantasyTalkingModelLoader": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "FantasyTalkingWav2VecEmbeds": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoBlockSwap": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoModelLoader": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoVAELoader": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoClipVisionEncode": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoTextEncodeCached": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoImageToVideoEncode": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoSampler": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "WanVideoDecode": "custom_nodes.ComfyUI-WanVideoWrapper",
+        "VHS_VideoCombine": "custom_nodes.comfyui-videohelpersuite"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "WanVideo\\Wan2_1-I2V-14B-720p_fp8_e4m3fn_scaled_KJ.safetensors",
+          "WanVideo\\fantasytalking_fp16.safetensors"
+        ],
+        "text_encoders": [
+          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        ],
+        "vae": [
+          "Wan2_1_VAE_bf16.safetensors"
+        ],
+        "clip_vision": [
+          "clip_vision_h.safetensors"
+        ]
+      },
+      "requirement_sha256": {
+        "diffusion_models": {
+          "WanVideo\\Wan2_1-I2V-14B-720p_fp8_e4m3fn_scaled_KJ.safetensors": "3cb562e176874cce0b7a059dbd90a400e4dca3ba24de925acd4704ff70a20f57",
+          "WanVideo\\fantasytalking_fp16.safetensors": "7eb1edf107bd36de13efb35f3b0198111f48d1f57127cb54e2e6cf07bc2c8add"
+        }
+      },
+      "defaults": {
+        "width": 640,
+        "height": 640,
+        "steps": 6,
+        "fps": 23,
+        "audio_scale": 1.0
+      },
+      "capabilities": {
+        "face_animation_to_audio": true,
+        "still_to_talking_avatar": true,
+        "expressive_motion": true,
+        "original_video_pixel_preservation": false,
+        "pilot_only": true,
+        "human_approval_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "independent_verifier": "ACCEPT",
+        "production_promoted": false,
+        "workflow_template_sha256": "5febc68181b8e457f5053ce341ad0f0f1d9cc8abebf4dad000ff6b0a5fa87e46",
+        "input_image_sha256": "8fe0f38c07a0c5cb9013ab0884743367052a3059d053f1aee7eb3212e5d70a85",
+        "input_audio_sha256": "3461a8893e465fd3da65a2bc6a13fac1d60a8c047127778615497ee7cc0d34c0",
+        "output_sha256": "088a1ab9b71dd33b7333c1e4379a886f7b413a5ea457a0005fa291f34710832c",
+        "decode_ok": true,
+        "quality_note": "strong mouth motion; face, color, clothing and background drift at 6 steps"
       }
     }
   ],

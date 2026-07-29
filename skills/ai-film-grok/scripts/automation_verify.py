@@ -21,8 +21,13 @@ def build_verification_report(root: Path) -> dict[str, Any]:
     runtime = verify_runtime_lock(skill_dir, skill_dir / "runtime-lock.json")
     checks.append({"name": "runtime_lock", "required": True, "ok": bool(runtime.get("ok"))})
 
-    if timeline_enabled:
-        scene_sound = reconcile_scene_sound(root, write=False)
+    shots = spec.get("shots")
+    if timeline_enabled and shots != []:
+        scene_sound = (
+            reconcile_scene_sound(root, write=False)
+            if isinstance(shots, list)
+            else {"status": "blocked", "blocking_shot_ids": []}
+        )
         checks.append(
             {
                 "name": "scene_sound",
@@ -32,6 +37,7 @@ def build_verification_report(root: Path) -> dict[str, Any]:
                 "blocking_shot_ids": scene_sound.get("blocking_shot_ids") or [],
             }
         )
+    if timeline_enabled:
         delivery = read_json(root / "audio" / "audio-delivery-report.json")
         checks.append(
             {

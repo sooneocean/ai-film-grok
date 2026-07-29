@@ -297,14 +297,18 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
             if not str(event.get("source_sha256") or "").strip():
                 raise AudioTimelineError(f"{prefix} asset source_sha256 is required")
             normalized_source = source.replace("\\", "/").lower()
-            if event_type == "action_sfx" and (
-                "/audio/candidates/sfx/pending/" in f"/{normalized_source.removeprefix('local:')}"
+            pending_candidate = (
+                "/audio/candidates/" in f"/{normalized_source.removeprefix('local:')}"
+                and "/pending/" in f"/{normalized_source.removeprefix('local:')}"
+            )
+            if event_type != "performance" and (
+                pending_candidate
                 or is_noncommercial_license(license_id)
                 or event.get("production_eligible") is False
                 or event.get("approval_status") == "pending_human_review"
             ):
                 raise AudioTimelineError(
-                    f"{prefix} non-commercial or pending SFX cannot enter a formal timeline"
+                    f"{prefix} non-commercial or pending candidate cannot enter a formal timeline"
                 )
         if event_type == "performance" and not bool(event.get("muted")):
             if not str(event.get("source") or "").startswith("local:"):

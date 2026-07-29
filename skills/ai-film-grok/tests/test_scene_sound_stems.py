@@ -179,6 +179,39 @@ def test_scene_stem_rejects_copied_pending_sfx_by_hash(tmp_path: Path):
         )
 
 
+def test_scene_stem_rejects_pending_ambient_candidate(tmp_path: Path):
+    asset = tmp_path / "audio" / "candidates" / "ambient" / "pending" / "rain.wav"
+    asset.parent.mkdir(parents=True)
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+
+    with pytest.raises(SceneSoundError, match="pending candidate"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "events": [
+                    {
+                        "id": "ambient-candidate",
+                        "type": "ambience",
+                        "source": "local:audio/candidates/ambient/pending/rain.wav",
+                        "license": "Stability AI Community License",
+                        "source_sha256": hashlib.sha256(asset.read_bytes()).hexdigest(),
+                        "approval_status": "pending_human_review",
+                        "production_eligible": False,
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ]
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "ambient.wav",
+            sample_rate=8000,
+        )
+
+
 def test_rendered_scene_stem_survives_a_real_mp4_audio_mix(tmp_path: Path):
     asset = tmp_path / "assets" / "tone.wav"
     asset.parent.mkdir()

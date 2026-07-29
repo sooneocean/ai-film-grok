@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.parse
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -23,6 +25,7 @@ _MODEL_ROUTES = {
     "text_encoders": "/models/text_encoders",
     "vae": "/models/vae",
     "loras": "/models/loras",
+    "clip_vision": "/models/clip_vision",
 }
 _SAFE_PREFIX = re.compile(r"[A-Za-z0-9_./-]+")
 _VERIFIED_STATUSES = frozenset({"verified", "verified-baseline"})
@@ -93,10 +96,10 @@ def select_weapon(
 ) -> dict[str, Any]:
     """Select from structured intent; free-form prompt guessing is forbidden."""
     normalized = str(operation).strip().lower()
+    normalized_stage = str(stage).strip().lower()
+    if normalized_stage not in {"pilot", "production"}:
+        raise ComfyArmoryError(f"unsupported production stage: {stage}")
     if normalized == "adult-meat-motion-i2v":
-        normalized_stage = str(stage).strip().lower()
-        if normalized_stage not in {"pilot", "production"}:
-            raise ComfyArmoryError(f"unsupported production stage: {stage}")
         if normalized_stage == "production":
             raise ComfyArmoryError(
                 "no promoted Wan 2.2 weapon meets the adult meat-motion production gate"
@@ -104,6 +107,16 @@ def select_weapon(
         if not allow_experimental:
             raise ComfyArmoryError(
                 "adult meat-motion pilot requires explicit experimental authorization"
+            )
+    if normalized in {
+        "talking-avatar-stable-pilot",
+        "talking-avatar-expressive-pilot",
+    }:
+        if normalized_stage != "pilot":
+            raise ComfyArmoryError("talking-avatar armory routes are pilot-only")
+        if not allow_experimental:
+            raise ComfyArmoryError(
+                "talking-avatar pilot requires explicit experimental authorization"
             )
     candidates = _select_candidates(
         normalized,
@@ -133,6 +146,38 @@ def _template_path(weapon: dict[str, Any]) -> Path:
     return path
 
 
+def _weapon(weapon_id: str) -> dict[str, Any]:
+    weapon = next(
+        (item for item in load_armory()["weapons"] if item["id"] == weapon_id),
+        None,
+    )
+    if weapon is None:
+        raise ComfyArmoryError(f"unknown verified weapon: {weapon_id}")
+    return weapon
+
+
+def authorize_weapon_execution(
+    weapon_id: str,
+    *,
+    stage: str,
+    allow_experimental: bool,
+) -> dict[str, Any]:
+    weapon = _weapon(weapon_id)
+    normalized_stage = str(stage).strip().lower()
+    if normalized_stage not in {"pilot", "production"}:
+        raise ComfyArmoryError(f"unsupported production stage: {stage}")
+    if weapon.get("status") == "experimental":
+        if normalized_stage != "pilot":
+            raise ComfyArmoryError(f"experimental weapon {weapon_id} is pilot-only")
+        if not allow_experimental:
+            raise ComfyArmoryError(
+                f"experimental weapon {weapon_id} requires explicit authorization"
+            )
+    elif weapon.get("status") not in _VERIFIED_STATUSES:
+        raise ComfyArmoryError(f"weapon {weapon_id} is not eligible for execution")
+    return weapon
+
+
 def _validate_relative_media_name(value: str, *, label: str) -> str:
     candidate = str(value).strip().replace("\\", "/")
     if (
@@ -145,12 +190,178 @@ def _validate_relative_media_name(value: str, *, label: str) -> str:
     return candidate
 
 
+def _allowed_binding_slots(bindings: Mapping[str, Any]) -> set[tuple[str, str]]:
+    pairs = (
+        ("prompt_node", "prompt_input"),
+        ("sampler_node", "seed_input"),
+        ("save_node", "filename_prefix_input"),
+        ("input_node", "input_image_input"),
+        ("audio_node", "audio_input"),
+    )
+    return {
+        (str(bindings[node_key]), str(bindings[input_key]))
+        for node_key, input_key in pairs
+        if node_key in bindings and input_key in bindings
+    }
+
+
+def _matches_registered_template(
+    graph: Mapping[str, Any],
+    weapon: Mapping[str, Any],
+) -> bool:
+    try:
+        template = json.loads(_template_path(dict(weapon)).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if set(graph) != set(template):
+        return False
+    allowed_slots = _allowed_binding_slots(weapon.get("bindings") or {})
+    for node_id, expected_node in template.items():
+        actual_node = graph.get(node_id)
+        if (
+            not isinstance(actual_node, Mapping)
+            or set(actual_node) != set(expected_node)
+            or actual_node.get("class_type") != expected_node.get("class_type")
+        ):
+            return False
+        actual_inputs = actual_node.get("inputs")
+        expected_inputs = expected_node.get("inputs")
+        if (
+            not isinstance(actual_inputs, Mapping)
+            or not isinstance(expected_inputs, Mapping)
+            or set(actual_inputs) != set(expected_inputs)
+        ):
+            return False
+        if any(
+            actual_inputs[input_name] != expected_value
+            and (str(node_id), str(input_name)) not in allowed_slots
+            for input_name, expected_value in expected_inputs.items()
+        ):
+            return False
+    return True
+
+
+def identify_registered_weapon_workflow(
+    graph: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Recognize registered templates even when the caller omits --weapon-id."""
+    weapons = [weapon for weapon in load_armory()["weapons"] if weapon.get("workflow_template")]
+    matches = [weapon for weapon in weapons if _matches_registered_template(graph, weapon)]
+    if len(matches) > 1:
+        raise ComfyArmoryError("workflow matches multiple registered weapons; --weapon-id required")
+    if matches:
+        return deepcopy(matches[0])
+
+    class_types = {
+        str(node.get("class_type"))
+        for node in graph.values()
+        if isinstance(node, Mapping) and node.get("class_type")
+    }
+    protected = sorted(
+        weapon["id"]
+        for weapon in weapons
+        if weapon.get("status") == "experimental"
+        and class_types.intersection((weapon.get("trusted_custom_nodes") or {}).keys())
+    )
+    if protected:
+        raise ComfyArmoryError(
+            "workflow uses nodes reserved for registered experimental weapons; "
+            f"--weapon-id required ({', '.join(protected)})"
+        )
+    return None
+
+
+def assert_registered_weapon_workflow(
+    base_url: str,
+    weapon_id: str,
+    graph: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Allow exact registered templates with changes only at typed compiler bindings."""
+    weapon = _weapon(weapon_id)
+    try:
+        template = json.loads(_template_path(weapon).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ComfyArmoryError(f"cannot read workflow template: {exc}") from exc
+    if set(graph) != set(template):
+        raise ComfyArmoryError("unapproved workflow mutation: node set changed")
+    bindings = weapon.get("bindings") or {}
+    allowed_slots = _allowed_binding_slots(bindings)
+    for node_id, expected_node in template.items():
+        actual_node = graph.get(node_id)
+        if not isinstance(actual_node, Mapping) or set(actual_node) != set(expected_node):
+            raise ComfyArmoryError(f"unapproved workflow mutation at node {node_id}")
+        if actual_node.get("class_type") != expected_node.get("class_type"):
+            raise ComfyArmoryError(f"unapproved workflow mutation at node {node_id}")
+        actual_inputs = actual_node.get("inputs")
+        expected_inputs = expected_node.get("inputs")
+        if (
+            not isinstance(actual_inputs, Mapping)
+            or not isinstance(expected_inputs, Mapping)
+            or set(actual_inputs) != set(expected_inputs)
+        ):
+            raise ComfyArmoryError(f"unapproved workflow mutation at node {node_id}")
+        for input_name, expected_value in expected_inputs.items():
+            if (
+                actual_inputs[input_name] != expected_value
+                and (str(node_id), str(input_name)) not in allowed_slots
+            ):
+                raise ComfyArmoryError(f"unapproved workflow mutation at {node_id}.{input_name}")
+
+    prompt = graph[str(bindings["prompt_node"])]["inputs"][str(bindings["prompt_input"])]
+    seed = graph[str(bindings["sampler_node"])]["inputs"][str(bindings["seed_input"])]
+    filename_prefix = graph[str(bindings["save_node"])]["inputs"][
+        str(bindings["filename_prefix_input"])
+    ]
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise ComfyArmoryError("compiled workflow prompt must not be empty")
+    if not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed < 2**64:
+        raise ComfyArmoryError("compiled workflow seed is invalid")
+    _validate_relative_media_name(str(filename_prefix), label="filename prefix")
+    if "input_node" in bindings:
+        _validate_relative_media_name(
+            str(graph[str(bindings["input_node"])]["inputs"][str(bindings["input_image_input"])]),
+            label="input image name",
+        )
+    if "audio_node" in bindings:
+        _validate_relative_media_name(
+            str(graph[str(bindings["audio_node"])]["inputs"][str(bindings["audio_input"])]),
+            label="input audio name",
+        )
+
+    trusted_custom_nodes = weapon.get("trusted_custom_nodes") or {}
+    for class_type in sorted(
+        {
+            str(node["class_type"])
+            for node in graph.values()
+            if isinstance(node, Mapping) and node.get("class_type")
+        }
+    ):
+        data = _json_request(
+            base_url,
+            f"/object_info/{urllib.parse.quote(class_type, safe='')}",
+        )
+        info = data.get(class_type, data) if isinstance(data, dict) else {}
+        if not isinstance(info, Mapping) or not info:
+            raise ComfyArmoryError(f"workflow node metadata unavailable: {class_type}")
+        if info.get("api_node") or str(info.get("category") or "").lower().startswith("api node"):
+            raise ComfyArmoryError(f"registered workflow contains external API node: {class_type}")
+        python_module = str(info.get("python_module") or "")
+        if python_module == "nodes" or python_module.startswith("comfy_extras."):
+            continue
+        if trusted_custom_nodes.get(class_type) != python_module:
+            raise ComfyArmoryError(
+                f"untrusted node module for {class_type}: {python_module or 'unknown'}"
+            )
+    return weapon
+
+
 def compile_weapon_workflow(
     weapon_id: str,
     *,
     prompt: str,
     seed: int,
     input_image_name: str | None = None,
+    input_audio_name: str | None = None,
     filename_prefix: str = "aifilm/armory",
 ) -> dict[str, dict[str, Any]]:
     """Bind a verified image workflow template without submitting it."""
@@ -158,12 +369,7 @@ def compile_weapon_workflow(
         raise ComfyArmoryError("prompt must not be empty")
     if not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed < 2**64:
         raise ComfyArmoryError("seed must be an integer from 0 through 2^64-1")
-    weapon = next(
-        (item for item in load_armory()["weapons"] if item["id"] == weapon_id),
-        None,
-    )
-    if weapon is None:
-        raise ComfyArmoryError(f"unknown verified weapon: {weapon_id}")
+    weapon = _weapon(weapon_id)
     filename_prefix = _validate_relative_media_name(filename_prefix, label="filename prefix")
     if not weapon.get("workflow_template"):
         raise ComfyArmoryError(
@@ -182,6 +388,14 @@ def compile_weapon_workflow(
             raise ComfyArmoryError("Qwen local edit requires an input image name")
         input_image_name = _validate_relative_media_name(input_image_name, label="input image name")
         graph[bindings["input_node"]]["inputs"][bindings["input_image_input"]] = input_image_name
+    if "audio_node" in bindings:
+        if not input_audio_name:
+            raise ComfyArmoryError("talking-avatar workflow requires an uploaded audio name")
+        input_audio_name = _validate_relative_media_name(
+            input_audio_name,
+            label="input audio name",
+        )
+        graph[bindings["audio_node"]]["inputs"][bindings["audio_input"]] = input_audio_name
     return graph
 
 

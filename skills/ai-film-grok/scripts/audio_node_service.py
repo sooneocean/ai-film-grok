@@ -13,16 +13,19 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 import uuid
 import wave
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 ROOT = Path(os.environ.get("AIFILM_AUDIO_NODE_ROOT", r"C:\\aifilm-audio-node")).resolve()
 JOBS = ROOT / "jobs"
@@ -35,16 +38,30 @@ MUSIC_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_MUSIC_MODEL", "ACE-Step-1.5")
 MUSIC_CHECKPOINT_FINGERPRINT = os.environ.get(
     "AIFILM_AUDIO_NODE_MUSIC_CHECKPOINT_FINGERPRINT", "unknown"
 )
+PERFORMANCE_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_PERFORMANCE_MODEL", "")
 SFX_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_SFX_MODEL", "")
 SFX_CHECKPOINT_FINGERPRINT = os.environ.get("AIFILM_AUDIO_NODE_SFX_CHECKPOINT_FINGERPRINT", "")
 SFX_LICENSE = os.environ.get("AIFILM_AUDIO_NODE_SFX_LICENSE", "")
+AMBIENT_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_AMBIENT_MODEL", "")
+AMBIENT_LICENSE = os.environ.get("AIFILM_AUDIO_NODE_AMBIENT_LICENSE", "")
+AMBIENT_CHECKPOINT_SHA256 = os.environ.get("AIFILM_AUDIO_NODE_AMBIENT_CHECKPOINT_SHA256", "")
+AMBIENT_ADAPTER_SHA256 = os.environ.get("AIFILM_AUDIO_NODE_AMBIENT_ADAPTER_SHA256", "")
 MMAUDIO_CHECKPOINT_SHA256 = os.environ.get("AIFILM_MMAUDIO_CHECKPOINT_SHA256", "")
 MMAUDIO_REPO_COMMIT = os.environ.get("AIFILM_MMAUDIO_REPO_COMMIT", "")
 jobs: dict[str, dict[str, Any]] = {}
-AUDIO_KINDS = ("tts", "music", "sfx", "performance")
+# ``ambient`` is deliberately separate from ``sfx``.  MMAudio SFX is
+# video-bound and CC-BY-NC; Stable Audio is text-only ambience/transition
+# material and must never inherit MMAudio's provenance claim.
+AUDIO_KINDS = ("tts", "music", "sfx", "performance", "ambient")
+STABLE_AUDIO_MODEL = "stabilityai/stable-audio-open-1.0"
+STABLE_AUDIO_LICENSE = "Stability AI Community License"
 # All configured renderers use the same 5090.  Serializing execution prevents
 # independently valid jobs from evicting each other's model weights or OOMing.
 GPU_GENERATION_LOCK = asyncio.Lock()
+_PROBE_LOCK = threading.Lock()
+_PROBE_CACHE: dict[str, tuple[float, tuple[str, ...], dict[str, Any] | None]] = {}
+_PROBE_CACHE_TTL_SEC = 300
+_MAX_JSON_BYTES = 129 * 1024 * 1024
 app = FastAPI(title="ai-film private audio node", docs_url=None, redoc_url=None, openapi_url=None)
 
 
@@ -66,6 +83,27 @@ def _auth(value: str | None) -> None:
         raise HTTPException(401, "unauthorized")
 
 
+@app.middleware("http")
+async def authenticate_before_body_parsing(request: Request, call_next):
+    try:
+        _auth(request.headers.get("authorization"))
+    except HTTPException:
+        return JSONResponse({"detail": "unauthorized"}, status_code=401)
+    if request.method in {"POST", "PUT", "PATCH"}:
+        if request.headers.get("transfer-encoding"):
+            return JSONResponse({"detail": "content-length required"}, status_code=411)
+        raw_length = request.headers.get("content-length")
+        try:
+            content_length = int(raw_length or "")
+        except ValueError:
+            return JSONResponse({"detail": "valid content-length required"}, status_code=411)
+        if content_length <= 0:
+            return JSONResponse({"detail": "non-empty body required"}, status_code=411)
+        if content_length > _MAX_JSON_BYTES:
+            return JSONResponse({"detail": "request body too large"}, status_code=413)
+    return await call_next(request)
+
+
 def _available(kind: str) -> bool:
     if kind == "tts":
         try:
@@ -84,6 +122,18 @@ def _available(kind: str) -> bool:
         if shutil.which(command[0]) is None:
             return False
         return _sfx_probe_ok()
+    if kind == "ambient":
+        try:
+            command = _command_template(kind)
+        except RuntimeError:
+            return False
+        return bool(
+            shutil.which(command[0])
+            and AMBIENT_MODEL_ID == STABLE_AUDIO_MODEL
+            and AMBIENT_LICENSE == STABLE_AUDIO_LICENSE
+            and _ambient_renderer_bound(command)
+            and _ambient_probe_ok()
+        )
     try:
         _command_template(kind)
         return True
@@ -91,16 +141,97 @@ def _available(kind: str) -> bool:
         return False
 
 
-def _sfx_probe_ok() -> bool:
-    raw = os.environ.get("AIFILM_AUDIO_NODE_SFX_PROBE_ARGV", "")
+def _cached_probe(
+    name: str, command: list[str], fingerprint: tuple[str, ...], *, timeout: int
+) -> dict[str, Any] | None:
+    now = time.monotonic()
+    with _PROBE_LOCK:
+        cached = _PROBE_CACHE.get(name)
+        if cached and cached[1] == fingerprint and now - cached[0] < _PROBE_CACHE_TTL_SEC:
+            return cached[2]
+        try:
+            proc = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            report = json.loads(proc.stdout)
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+            report = None
+        valid_report = report if isinstance(report, dict) else None
+        _PROBE_CACHE[name] = (time.monotonic(), fingerprint, valid_report)
+        return valid_report
+
+
+def _probe_command(env_name: str) -> list[str] | None:
+    raw = os.environ.get(env_name, "")
     try:
         command = json.loads(raw)
     except json.JSONDecodeError:
-        return False
+        return None
     if (
         not isinstance(command, list)
         or not command
         or not all(isinstance(item, str) and item for item in command)
+        or shutil.which(command[0]) is None
+    ):
+        return None
+    return command
+
+
+def _ambient_renderer_bound(renderer: list[str]) -> bool:
+    probe = _probe_command("AIFILM_AUDIO_NODE_AMBIENT_PROBE_ARGV")
+    if probe is None or len(renderer) != 18 or len(probe) != 12:
+        return False
+    model_root, checkpoint, adapter = probe[3], probe[5], probe[7]
+    expected_renderer = [
+        probe[0],
+        adapter,
+        "--model-root",
+        model_root,
+        "--checkpoint",
+        checkpoint,
+        "--expected-checkpoint-sha256",
+        AMBIENT_CHECKPOINT_SHA256.lower(),
+        "--expected-adapter-sha256",
+        AMBIENT_ADAPTER_SHA256.lower(),
+        "--prompt",
+        "{prompt}",
+        "--duration",
+        "{duration}",
+        "--seed",
+        "{seed}",
+        "--out",
+        "{out}",
+    ]
+    expected_probe = [
+        probe[0],
+        probe[1],
+        "--model-root",
+        model_root,
+        "--checkpoint",
+        checkpoint,
+        "--adapter",
+        adapter,
+        "--model",
+        STABLE_AUDIO_MODEL,
+        "--license",
+        STABLE_AUDIO_LICENSE,
+    ]
+    return bool(
+        renderer == expected_renderer
+        and probe == expected_probe
+        and adapter.replace("\\", "/").rsplit("/", 1)[-1] == "stable_audio_adapter.py"
+        and probe[1].replace("\\", "/").rsplit("/", 1)[-1] == "stable_audio_probe.py"
+    )
+
+
+def _sfx_probe_ok() -> bool:
+    command = _probe_command("AIFILM_AUDIO_NODE_SFX_PROBE_ARGV")
+    if (
+        command is None
         or SFX_MODEL_ID != "hkchengrex/MMAudio-large-44k-v2"
         or SFX_LICENSE != "CC-BY-NC-4.0"
         or not _is_sha256(SFX_CHECKPOINT_FINGERPRINT)
@@ -108,18 +239,15 @@ def _sfx_probe_ok() -> bool:
         or len(MMAUDIO_REPO_COMMIT) != 40
     ):
         return False
-    try:
-        proc = subprocess.run(
-            command,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-        report = json.loads(proc.stdout)
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-        return False
-    return bool(
+    fingerprint = (
+        *command,
+        SFX_MODEL_ID,
+        SFX_LICENSE,
+        SFX_CHECKPOINT_FINGERPRINT.lower(),
+        MMAUDIO_REPO_COMMIT.lower(),
+    )
+    report = _cached_probe("sfx", command, fingerprint, timeout=60)
+    valid = bool(
         isinstance(report, dict)
         and report.get("ok") is True
         and report.get("model") == SFX_MODEL_ID
@@ -127,6 +255,36 @@ def _sfx_probe_ok() -> bool:
         and report.get("checkpoint_sha256") == SFX_CHECKPOINT_FINGERPRINT.lower()
         and report.get("repo_commit") == MMAUDIO_REPO_COMMIT.lower()
     )
+    return valid
+
+
+def _ambient_probe_ok() -> bool:
+    command = _probe_command("AIFILM_AUDIO_NODE_AMBIENT_PROBE_ARGV")
+    if (
+        command is None
+        or AMBIENT_MODEL_ID != STABLE_AUDIO_MODEL
+        or AMBIENT_LICENSE != STABLE_AUDIO_LICENSE
+        or not _is_sha256(AMBIENT_CHECKPOINT_SHA256)
+        or not _is_sha256(AMBIENT_ADAPTER_SHA256)
+    ):
+        return False
+    fingerprint = (
+        *command,
+        AMBIENT_MODEL_ID,
+        AMBIENT_LICENSE,
+        AMBIENT_CHECKPOINT_SHA256.lower(),
+        AMBIENT_ADAPTER_SHA256.lower(),
+    )
+    report = _cached_probe("ambient", command, fingerprint, timeout=60)
+    valid = bool(
+        isinstance(report, dict)
+        and report.get("ok") is True
+        and report.get("model") == AMBIENT_MODEL_ID
+        and report.get("license") == AMBIENT_LICENSE
+        and report.get("checkpoint_sha256") == AMBIENT_CHECKPOINT_SHA256.lower()
+        and report.get("adapter_sha256") == AMBIENT_ADAPTER_SHA256.lower()
+    )
+    return valid
 
 
 def _command_template(kind: str) -> list[str]:
@@ -171,13 +329,26 @@ def _gpu_health() -> dict[str, Any]:
         if not torch.cuda.is_available():
             return {"available": False}
         free, total = torch.cuda.mem_get_info(0)
-        return {
+        report = {
             "available": True,
             "name": torch.cuda.get_device_name(0),
             "cuda": torch.version.cuda,
             "free_vram_mib": int(free // 1024**2),
             "total_vram_mib": int(total // 1024**2),
         }
+        try:
+            driver = subprocess.run(
+                ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            ).stdout.strip()
+            if re.fullmatch(r"[0-9][0-9.]{0,30}", driver):
+                report["driver"] = driver
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return report
     except Exception:
         return {"available": False}
 
@@ -185,7 +356,7 @@ def _gpu_health() -> dict[str, Any]:
 @app.get("/health")
 def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     _auth(authorization)
-    return {
+    report = {
         "ok": True,
         "node": "private-lan",
         "models": {kind: _available(kind) for kind in AUDIO_KINDS},
@@ -196,8 +367,15 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         "sfx_model": SFX_MODEL_ID,
         "sfx_checkpoint_fingerprint": SFX_CHECKPOINT_FINGERPRINT,
         "sfx_license": SFX_LICENSE,
+        "ambient_model": AMBIENT_MODEL_ID,
+        "ambient_license": AMBIENT_LICENSE,
+        "ambient_checkpoint_sha256": AMBIENT_CHECKPOINT_SHA256,
+        "ambient_adapter_sha256": AMBIENT_ADAPTER_SHA256,
         "gpu": _gpu_health(),
     }
+    if PERFORMANCE_MODEL_ID:
+        report["performance_model"] = PERFORMANCE_MODEL_ID
+    return report
 
 
 def _normalize(source: Path, out: Path) -> None:
@@ -468,6 +646,17 @@ def _create(kind: str, payload: dict[str, Any]) -> dict[str, str]:
         raise HTTPException(503, f"{kind} model is unavailable")
     job_id = uuid.uuid4().hex
     jobs[job_id] = {"status": "queued", "kind": kind, "node": "private-lan"}
+    if kind == "ambient":
+        jobs[job_id].update(
+            {
+                "production_eligible": False,
+                "usage_scope": "stable_audio_community_license_candidate",
+                "model": AMBIENT_MODEL_ID,
+                "license": AMBIENT_LICENSE,
+                "checkpoint_sha256": AMBIENT_CHECKPOINT_SHA256.lower(),
+                "adapter_sha256": AMBIENT_ADAPTER_SHA256.lower(),
+            }
+        )
     asyncio.create_task(_execute(job_id, kind, payload))
     return {"job_id": job_id, "status": "queued"}
 
@@ -516,6 +705,27 @@ async def create(
                 raise HTTPException(422, "SFX source video is unavailable")
             payload = dict(payload)
             payload["source_video"] = str(source)
+    if kind == "ambient":
+        try:
+            prompt = str(payload.get("prompt") or "").strip()
+            duration = float(payload.get("duration"))
+            seed = payload.get("seed")
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(422, "invalid ambient request") from exc
+        if not 1 <= len(prompt) <= 512:
+            raise HTTPException(422, "ambient prompt must contain 1-512 characters")
+        if not 1 <= duration <= 47:
+            raise HTTPException(422, "ambient duration must be between 1 and 47 seconds")
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise HTTPException(422, "ambient seed must be an integer")
+        # The caller must explicitly acknowledge the model-card use boundary.
+        # Acceptance of a gated download is not evidence of commercial rights.
+        if payload.get("stable_audio_candidate_only") is not True:
+            raise HTTPException(
+                422, "Stable Audio output is candidate-only pending human/license review"
+            )
+        if AMBIENT_MODEL_ID != STABLE_AUDIO_MODEL or AMBIENT_LICENSE != STABLE_AUDIO_LICENSE:
+            raise HTTPException(503, "Stable Audio provenance is not configured")
     return _create(kind, payload)
 
 

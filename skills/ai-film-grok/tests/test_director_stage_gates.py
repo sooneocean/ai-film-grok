@@ -141,6 +141,36 @@ def test_failed_native_stage_validation_does_not_leave_orphan_approval(
     assert read_approval_ledger(tmp_path)["approvals"] == []
 
 
+def test_team_gate_blocks_stage_lock_before_approval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import director_cli
+    import production_team
+
+    (tmp_path / "production-team.json").write_text("{}\n", encoding="utf-8")
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "capability-snapshot.json").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(
+        director_cli, "validate_native_stage_evidence", lambda *_args: {"brief": "brief.json"}
+    )
+    monkeypatch.setattr(
+        production_team,
+        "validate_team",
+        lambda *_args, **_kwargs: {"ok": False, "blockers": ["NO_MODEL_ASSIGNED:showrunner"]},
+    )
+
+    with pytest.raises(ValueError, match="production-team stage gate"):
+        lock_native_stage(
+            tmp_path,
+            stage="concept_lock",
+            approver="dex",
+            user_phrase="批准",
+        )
+
+    assert read_approval_ledger(tmp_path)["approvals"] == []
+
+
 def test_bulk_native_refs_bind_each_approved_clip_file(tmp_path: Path) -> None:
     clip = tmp_path / "clips" / "s001.mp4"
     clip.parent.mkdir(parents=True)

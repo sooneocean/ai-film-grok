@@ -167,6 +167,9 @@ def _hard_rejections(
         reasons.append("PILOT_NOT_VERIFIED")
     if capability.get("experimental") is True and not allow_experimental:
         reasons.append("EXPERIMENTAL_NOT_ALLOWED")
+    domains = capability.get("domains")
+    if isinstance(domains, list) and domains and "motion" not in domains:
+        reasons.append("CAPABILITY_NOT_MOTION_ROUTE")
     if intent["operation"] not in set(capability.get("operations") or []):
         reasons.append("OPERATION_UNSUPPORTED")
     if intent["shot_role"] not in set(capability.get("shot_roles") or []):

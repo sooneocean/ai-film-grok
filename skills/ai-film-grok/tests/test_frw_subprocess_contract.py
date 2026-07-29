@@ -32,7 +32,7 @@ class FrwDispatchSubprocessTests(unittest.TestCase):
 
     def test_dispatch_returns_child_exit_code_and_timeout(self) -> None:
         root = Path("/tmp/frw-root")
-        dispatch = root / "img-video-frw" / "scripts" / "dispatch.py"
+        root / "img-video-frw" / "scripts" / "dispatch.py"
         with mock.patch.object(frw_dispatch, "resolve_frw_root", return_value=root):
             with mock.patch.object(frw_dispatch, "resolve_python", return_value="python"):
                 with mock.patch.object(frw_dispatch, "load_dotenv"):
