@@ -49,5 +49,16 @@
 | craft 露出 | `detect_craft_stage.heat` + blocker `heat_agent_hard_fail`；`next_hint` 优先 heat boost |
 | dispatch/compact | packet.`heat`；`HEAT_AGENT_HARD_FAIL` attention + hard_gate_codes；primary 选 heat-boost 先于 bulk |
 
-## 未做（刻意）
-真·肤色/暴露像素 CV（产品诚实：人眼 mute-frame 保留）
+## Wave 6 已做（同日 · final 闭环 · **链路终点**）
+| 项 | 入口 |
+|----|------|
+| `final_ok` | heat_agent：非 hard + 非 needs_boost（≥S 默认 90）+ field/arc ok |
+| final 硬拦 | `assert_heat_allows_final` 绑 `aifilm final`（`--skip-heat-gate` / `AIFILM_SKIP_HEAT_FINAL_GATE=1`） |
+| review-final | 同 gate，禁 A 档冒充 final_complete |
+| export-desktop | 再验 heat final_ok，禁凉尺度出桌面 |
+| compact | `HEAT_FINAL_NOT_OK` block attention |
+| 分层 | **queue=A 硬拦**；**final/export=S 硬拦**（bulk 可 A+，成片必须 S） |
+
+## 闭环状态
+**plan → write-spec → pilot → bulk → final → review → export** 尺度只升不降已 fail-closed。  
+刻意不做：真·肤色/暴露像素 CV（mute-frame 人眼保留）。

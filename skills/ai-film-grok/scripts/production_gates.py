@@ -286,6 +286,88 @@ def assert_heat_allows_media(
     )
 
 
+def assert_heat_allows_final(
+    root: Path,
+    *,
+    force: bool = False,
+    env_skip: bool = True,
+    require_s: bool = True,
+    write_receipt: bool = True,
+) -> dict[str, Any]:
+    """Wave 6: fail-closed final/export when adult-max heat is not final_ok.
+
+    - hard_fail (below A / field codes) always blocks
+    - needs_boost (below S target, default 90) blocks when require_s=True
+    Emergency: force=True or AIFILM_SKIP_HEAT_FINAL_GATE=1
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_HEAT_FINAL_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    try:
+        from heat_check import heat_agent_status
+    except ImportError as exc:
+        raise ProductionGateError(
+            "heat final gate: heat_check unavailable — cannot verify adult max scale"
+        ) from exc
+    try:
+        hs = heat_agent_status(root)
+    except Exception as exc:  # noqa: BLE001
+        raise ProductionGateError(
+            f"heat final gate: heat_agent_status failed ({exc!s:.160}); "
+            "fix heat / film-spec before final"
+        ) from exc
+    if not hs.get("active"):
+        return {"ok": True, "active": False, "reason": hs.get("reason")}
+    final_ok = bool(hs.get("final_ok"))
+    if not require_s:
+        final_ok = not bool(hs.get("hard_fail")) and bool(hs.get("field_ok", True))
+    if final_ok:
+        out = {
+            "ok": True,
+            "active": True,
+            "final_ok": True,
+            "score": hs.get("score"),
+            "grade": hs.get("grade"),
+            "target_s": hs.get("target_s"),
+        }
+        if write_receipt:
+            try:
+                from util import utc_now, write_json
+
+                write_json(
+                    Path(root).expanduser().resolve() / "receipts" / "heat-final-gate.json",
+                    {
+                        "ok": True,
+                        "at": utc_now(),
+                        "score": hs.get("score"),
+                        "grade": hs.get("grade"),
+                        "floor": hs.get("floor"),
+                        "target_s": hs.get("target_s"),
+                        "final_ok": True,
+                        "source": "assert_heat_allows_final",
+                    },
+                )
+            except (OSError, ValueError):
+                pass
+        return out
+    root_s = str(Path(root).expanduser().resolve())
+    boost = hs.get("next_cmd") or f'aifilm heat boost --root "{root_s}" --apply'
+    why = hs.get("why") or (
+        f"adult max heat not final_ok impact={hs.get('grade')}:{hs.get('score')} "
+        f"(need S≥{hs.get('target_s') or 90})"
+    )
+    raise ProductionGateError(
+        f"heat final gate: HARD block final/export — {why}. "
+        f"Run {boost} until impact ≥S and heat arc/duration ok. "
+        "Emergency: AIFILM_SKIP_HEAT_FINAL_GATE=1 or --skip-heat-gate (not recommended)."
+    )
+
+
 def _flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     scenes = spec.get("scenes") or []

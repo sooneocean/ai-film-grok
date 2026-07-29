@@ -3488,13 +3488,26 @@ def cmd_final(args: argparse.Namespace) -> int:
 
     # Fail early before TTS if loop-risk VO would force boring stream_loop.
     # When receipts/tts-rehearsal.json present, measured_duration_sec preferred over estimate.
-    from production_gates import ProductionGateError, assert_no_loop_risk
+    from production_gates import (
+        ProductionGateError,
+        assert_heat_allows_final,
+        assert_no_loop_risk,
+    )
 
     try:
         assert_no_loop_risk(
             root,
             force=bool(getattr(args, "allow_loop_risk", False)),
             strict_tts_rehearsal=bool(getattr(args, "strict_tts_rehearsal", False)),
+        )
+    except ProductionGateError as exc:
+        raise FilmError(str(exc)) from exc
+
+    # Wave 6: adult-max final requires heat final_ok (S-grade), not only A
+    try:
+        assert_heat_allows_final(
+            root,
+            force=bool(getattr(args, "skip_heat_gate", False)),
         )
     except ProductionGateError as exc:
         raise FilmError(str(exc)) from exc
@@ -3993,56 +4006,36 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             + ", ".join(adult_sensory.get("codes") or [])
             + "]"
         )
-    # P0 · 2026-07-29: heat check + erotic impact A floor before final_complete
+    # P0 · Wave 6: heat final_ok (S-grade + arc) before final_complete
+    try:
+        from production_gates import ProductionGateError, assert_heat_allows_final
+
+        heat_gate = assert_heat_allows_final(root, write_receipt=True)
+    except ProductionGateError as exc:
+        raise FilmError(f"Cannot approve final: {exc}") from exc
+    except Exception as exc:  # pragma: no cover
+        raise FilmError(f"Cannot approve final: heat final gate failed: {exc}") from exc
+    if heat_gate.get("active") is False and heat_gate.get("skipped"):
+        pass
+    # Keep full heat receipt for audit (scorecard body)
     try:
         from heat_check import heat_check as _heat_check
 
         heat_rep_final = _heat_check(root)
     except Exception as exc:  # pragma: no cover
-        heat_rep_final = {"ok": False, "error": str(exc), "erotic_impact": {}}
-    heat_scale_final = (
-        str((read_json(root / "film-spec.json") or {}).get("heat_scale") or "").strip().lower()
-    )
-    if heat_scale_final == "max":
-        impact_final = (
-            heat_rep_final.get("erotic_impact")
-            if isinstance(heat_rep_final.get("erotic_impact"), dict)
-            else {}
+        heat_rep_final = {"ok": False, "error": str(exc)}
+    with contextlib.suppress(OSError):
+        write_json(
+            root / "receipts" / "heat-final-gate.json",
+            {
+                "ok": True,
+                "at": utc_now(),
+                "gate": heat_gate,
+                "impact_score": heat_gate.get("score"),
+                "target_s": heat_gate.get("target_s"),
+                "heat_line": (heat_rep_final or {}).get("line"),
+            },
         )
-        impact_score = float(impact_final.get("score") or 0.0)
-        impact_floor = 75.0
-        try:
-            fs = read_json(root / "film-spec.json") or {}
-            if fs.get("erotic_impact_floor") is not None:
-                impact_floor = float(fs["erotic_impact_floor"])
-            if fs.get("erotic_impact_strict") is False or fs.get("adult_max_iron") is False:
-                impact_floor = 0.0
-        except (TypeError, ValueError):
-            pass
-        hard_codes = list(heat_rep_final.get("hard_relevant_codes") or [])
-        if impact_floor > 0 and (
-            not heat_rep_final.get("ok") or impact_score + 1e-9 < impact_floor
-        ):
-            raise FilmError(
-                "Cannot approve final: adult heat gate failed — "
-                f"heat_ok={heat_rep_final.get('ok')} impact={impact_score}/"
-                f"{impact_floor} grade={impact_final.get('grade')} "
-                f"codes={','.join(hard_codes[:10]) or 'none'}. "
-                "Run `aifilm heat check --root …`; need impact ≥A (75), 四拍弧, bare peak. "
-                "Override: erotic_impact_strict:false / adult_max_iron:false."
-            )
-        # Persist receipt for dispatch / audit
-        with contextlib.suppress(OSError):
-            write_json(
-                root / "receipts" / "heat-final-gate.json",
-                {
-                    "ok": True,
-                    "at": utc_now(),
-                    "impact_score": impact_score,
-                    "impact_floor": impact_floor,
-                    "heat": heat_rep_final,
-                },
-            )
     reviewer = str(args.reviewer or "").strip()
     notes = str(args.notes or "").strip()
     if not args.approve:
@@ -4855,6 +4848,13 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
         raise FilmError(
             "Desktop export requires completed technical QA and explicit full-film final review"
         )
+    # Wave 6: re-check adult-max heat before shipping desktop (no silent cool export)
+    try:
+        from production_gates import ProductionGateError, assert_heat_allows_final
+
+        assert_heat_allows_final(root, write_receipt=False)
+    except ProductionGateError as exc:
+        raise FilmError(str(exc)) from exc
     post_receipt = read_json(root / "receipts" / "post-audit.json") or {}
     from post_audit import audit_freshness
 
@@ -7527,6 +7527,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-preflight",
         action="store_true",
         help="Skip lesson preflight hard gates before final (not recommended)",
+    )
+    fin.add_argument(
+        "--skip-heat-gate",
+        action="store_true",
+        help="Skip adult-max heat final_ok (S-grade) gate before final (not recommended)",
     )
     fin.add_argument(
         "--preflight-strict",

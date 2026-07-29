@@ -46,7 +46,8 @@
     "production evidence ready before bulk motion",
     "hero quality receipt pass before clip promote",
     "provider fallback writes routing receipt and requires hero re-pilot",
-    "adult max heat_agent hard_fail blocks media-queue add (Wave 5)"
+    "adult max heat_agent hard_fail blocks media-queue add (Wave 5)",
+    "adult max heat final_ok (S-grade) required before final/export (Wave 6)"
   ],
   "hard_gate_codes": [
     "WRITE_SPEC_REQUIRED",
@@ -58,6 +59,7 @@
     "PRODUCTION_EVIDENCE_REQUIRED",
     "HERO_QUALITY_RECEIPT_REQUIRED",
     "PROVIDER_FALLBACK_REPILOT_REQUIRED",
-    "HEAT_AGENT_HARD_FAIL"
+    "HEAT_AGENT_HARD_FAIL",
+    "HEAT_FINAL_NOT_OK"
   ]
 }

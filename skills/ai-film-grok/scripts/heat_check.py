@@ -352,18 +352,24 @@ def heat_agent_status(root: Path) -> dict[str, Any]:
     # Prefer field/spec score — media sensory often fails pre-bulk and must not block planning
     score = float(impact.get("spec_score") or impact.get("score") or 0.0)
     floor = float(spec.get("erotic_impact_floor") or 75.0)
-    target_s = 90.0
+    try:
+        target_s = float(spec.get("erotic_impact_target_s") or 90.0)
+    except (TypeError, ValueError):
+        target_s = 90.0
     raw_codes = list(full.get("hard_relevant_codes") or full.get("codes") or [])
     # Ignore media-only adult_max evidence until clips exist
     codes = [c for c in raw_codes if not str(c).startswith("ADULT_MAX_")]
     needs_boost = bool(boost.get("needed")) or score + 1e-9 < target_s
     below_a = score + 1e-9 < floor
     field_ok = bool((full.get("gates") or {}).get("sex_duration", {}).get("ok", True))
+    heat_arc_ok = bool((heat_arc or (full.get("gates") or {}).get("sex_arc") or {}).get("ok", True))
     # hard when below A or field heat codes remain (not media-only)
     hard_fail = below_a or bool(codes)
+    # Wave 6: final needs S-grade scale (not only A) + field/arc ok
+    final_ok = (not hard_fail) and (not needs_boost) and field_ok and heat_arc_ok
     next_cmd = None
     why = None
-    if hard_fail or needs_boost:
+    if hard_fail or needs_boost or not final_ok:
         next_cmd = f'aifilm heat boost --root "{root}" --apply'
         why = (
             f"adult max heat: impact={impact.get('grade')}:{score} "
@@ -373,21 +379,24 @@ def heat_agent_status(root: Path) -> dict[str, Any]:
         )
         if hard_fail:
             why = "HARD " + why
+        elif not final_ok and not needs_boost:
+            why = "FINAL " + why
     return {
         "active": True,
         "ok": not hard_fail and field_ok,
         "needs_boost": needs_boost,
         "hard_fail": hard_fail,
+        "final_ok": final_ok,
         "score": score,
         "grade": impact.get("grade"),
         "floor": floor,
+        "target_s": target_s,
         "ecchi_score": ecchi.get("score"),
         "ecchi_need": ecchi.get("need"),
         "boost_actions": len(boost.get("actions") or []),
         "codes": codes[:12],
-        "heat_arc_ok": bool(
-            (heat_arc or (full.get("gates") or {}).get("sex_arc") or {}).get("ok", True)
-        ),
+        "heat_arc_ok": heat_arc_ok,
+        "field_ok": field_ok,
         "next_cmd": next_cmd,
         "why": why,
         "mute_frame_n": (full.get("mute_frame_advisory") or {}).get("count"),

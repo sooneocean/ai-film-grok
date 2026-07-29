@@ -32,6 +32,7 @@ HARD_GATE_CODES = [
     "HERO_QUALITY_RECEIPT_REQUIRED",
     "PROVIDER_FALLBACK_REPILOT_REQUIRED",
     "HEAT_AGENT_HARD_FAIL",
+    "HEAT_FINAL_NOT_OK",
 ]
 
 
@@ -213,12 +214,25 @@ def _attention(packet: dict[str, Any]) -> list[dict[str, str]]:
                 or "成人 max 尺度未达标",
             }
         )
+    elif heat.get("active") and heat.get("final_ok") is False:
+        attention.append(
+            {
+                "code": "HEAT_FINAL_NOT_OK",
+                "severity": "block",
+                "summary": _bounded_text(
+                    heat.get("why")
+                    or "成人 max 未达 final_ok（需 impact≥S）— 先 heat boost 再 final/export",
+                    max_bytes=240,
+                )
+                or "成人 max final 尺度未满",
+            }
+        )
     elif heat.get("active") and heat.get("needs_boost"):
         attention.append(
             {
                 "code": "HEAT_NEEDS_BOOST",
                 "severity": "info",
-                "summary": "成人 max impact/ecchi 未拉满 S 档 — 建议 heat boost。",
+                "summary": "成人 max impact/ecchi 未拉满 S 档 — bulk 前建议 heat boost；final 硬拦。",
             }
         )
     if not packet.get("next_action"):
@@ -299,13 +313,16 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
             "active": True,
             "hard_fail": bool(heat.get("hard_fail")),
             "needs_boost": bool(heat.get("needs_boost")),
+            "final_ok": bool(heat.get("final_ok")),
             "score": heat.get("score"),
             "grade": heat.get("grade"),
+            "target_s": heat.get("target_s"),
             "ecchi_score": heat.get("ecchi_score"),
             "next_cmd": _bounded_text(heat.get("next_cmd"), max_bytes=512),
         }
         compact["metrics"]["heat_score"] = heat.get("score")
         compact["metrics"]["heat_hard_fail"] = bool(heat.get("hard_fail"))
+        compact["metrics"]["heat_final_ok"] = bool(heat.get("final_ok"))
     compact["metrics"]["output_bytes"] = _json_bytes(compact)
     compact["metrics"]["estimated_tokens"] = estimated_tokens(compact)
     if compact["metrics"]["output_bytes"] > 5000:

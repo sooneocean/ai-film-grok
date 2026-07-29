@@ -41,6 +41,7 @@
 | **Wave 3 冲分/色气 checklist（P1 · 同日）** | `aifilm heat boost --apply` 把 impact 冲向 **S≥90**（加长 meat/bare/定器/动词/VO）；`lint_ecchi_checklist` 6 项（距离/失序/感官/权力/双关/完成）；mute-frame advisory 只列 act/climax 须人工 coitus 分（**无假 CV**）。`ecchi_checklist_strict:true` 才 hard。 |
 | **Wave 4 agent 回路（P0 · 同日）** | `dispatch`/`next` 优先 `heat boost --apply`；`preflight` max 对时长/回穿/四拍/impact&lt;A **hard**；write-spec 自动写 `receipts/heat-boost.json`；`auto_heat_boost:true` 才自动字段 patch。 |
 | **Wave 5 fail-closed bulk（P0 · 同日）** | `media-queue add` 遇 `heat_agent_status.hard_fail` **硬拦**（`assert_heat_allows_media`；pilot skip 不绕过）；craft/dispatch compact 露出 heat；逃生 `AIFILM_SKIP_HEAT_QUEUE_GATE=1`。 |
+| **Wave 6 final 闭环（P0 · 同日）** | `final_ok`=impact≥S(默认90)+弧/时长；`aifilm final` / `review-final` / `export-desktop` 绑 `assert_heat_allows_final`；逃生 `--skip-heat-gate` / `AIFILM_SKIP_HEAT_FINAL_GATE=1`。queue 仍只硬拦 A 以下。 |
 | **Wave 2 强制拉满（P0 · 同日）** | plan **秒数预分配** meat≥50%；multi-scene compact 含 **climax bare**；`aifilm heat soften-compensate --apply`（VO+SFX+energy，禁降 heat）；promote **回穿 rank 硬拦**；`music_spotting` 跟 phase energy；pilot 批准须 **undress+union/rhythm** 三拍证据才 bulk。 |
 | **首帧结构** | **致命**（P0）：keyframe 解剖/融合 fail → 禁 I2V；I2V 后必抽 t=0；坏首帧=整段废（2026-07-21 33s 案） |
 | **景别堆叠** | 成人 60s：宽≥1·中≥2·近≥2·局部≥2；act→climax 收紧不回退全景；连续 3 镜同 size fail（2026-07-21） |

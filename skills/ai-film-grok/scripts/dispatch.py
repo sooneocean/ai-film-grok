@@ -1094,9 +1094,11 @@ def build_dispatch(
                 "active": True,
                 "hard_fail": bool(heat_status.get("hard_fail")),
                 "needs_boost": bool(heat_status.get("needs_boost")),
+                "final_ok": bool(heat_status.get("final_ok")),
                 "score": heat_status.get("score"),
                 "grade": heat_status.get("grade"),
                 "floor": heat_status.get("floor"),
+                "target_s": heat_status.get("target_s"),
                 "ecchi_score": heat_status.get("ecchi_score"),
                 "ecchi_need": heat_status.get("ecchi_need"),
                 "codes": heat_status.get("codes") or [],
@@ -1121,6 +1123,7 @@ def build_dispatch(
             "hero quality receipt pass before clip promote",
             "provider fallback writes routing receipt and requires hero re-pilot",
             "adult max heat_agent hard_fail blocks media-queue add (Wave 5)",
+            "adult max heat final_ok (S-grade) required before final/export (Wave 6)",
         ],
         "ref": (
             "references/craft-spine.md · references/keyframe-first-state-index.md · "
