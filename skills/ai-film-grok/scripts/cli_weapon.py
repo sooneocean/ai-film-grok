@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -131,26 +133,35 @@ def run_weapon(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], Non
 
                 from cli_comfy import run_comfy
 
-                code = run_comfy(
-                    Namespace(
-                        base_url=args.base_url,
-                        comfy_action="run-workflow",
-                        workflow=args.workflow,
-                        overrides=None,
-                        timeout=args.timeout,
-                        allow_external_api_nodes=False,
-                        weapon_id=args.weapon_id,
-                        production_stage="pilot",
-                        allow_experimental=True,
-                        receipt=None,
+                with contextlib.redirect_stdout(io.StringIO()) as captured:
+                    code = run_comfy(
+                        Namespace(
+                            base_url=args.base_url,
+                            comfy_action="run-workflow",
+                            workflow=args.workflow,
+                            overrides=None,
+                            timeout=args.timeout,
+                            allow_external_api_nodes=False,
+                            weapon_id=args.weapon_id,
+                            production_stage="pilot",
+                            allow_experimental=True,
+                            receipt=None,
+                        )
                     )
-                )
                 if code != 0:
                     raise WeaponControlError(
                         "canary execution failed; inspect its guarded Comfy receipt"
                     )
-                report["status"] = "completed"
-                report["execution"] = "submitted_via_guarded_comfy_path"
+                try:
+                    report["submission"] = json.loads(captured.getvalue())
+                except json.JSONDecodeError as exc:
+                    raise WeaponControlError(
+                        "guarded Comfy submission returned invalid evidence"
+                    ) from exc
+                report["status"] = "submitted"
+                report["next_step"] = (
+                    "Download, full-decode, and human-review the returned media before promotion."
+                )
         else:
             report = promotion_packet(args.weapon_id, args.canary_receipt, args.review_receipt)
     except (WeaponControlError, ComfyArmoryError, ComfyVideoError) as exc:
@@ -161,6 +172,6 @@ def run_weapon(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], Non
     emit(report)
     return (
         0
-        if report.get("ok", report.get("status") in {"planned", "completed", "promotion_ready"})
+        if report.get("ok", report.get("status") in {"planned", "submitted", "promotion_ready"})
         else 2
     )

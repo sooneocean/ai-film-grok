@@ -69,6 +69,17 @@ def cmd_status(args: argparse.Namespace) -> int:
         next_actions = []
         pipeline_stage = {"stage": "unknown", "label_zh": "未知", "error": "detect_failed"}
         next_cmd = None
+    try:
+        from promotion_report import build_promotion_report
+
+        promotion = build_promotion_report(root)
+        promotion_summary = {
+            **promotion["summary"],
+            "final_state": promotion["final"]["state"],
+            "highest_roi_actions": promotion["highest_roi_actions"],
+        }
+    except Exception as exc:
+        promotion_summary = {"error": str(exc)[:200], "report_only": True}
     emit(
         {
             "ok": True,
@@ -99,6 +110,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             },
             "audio": _status_audio_summary(root),
             "scene_sound": scene_sound,
+            "promotion_report": promotion_summary,
             "inventory": _status_inventory(root, summary),
             "evidence": _status_evidence(root),
             "compose": {

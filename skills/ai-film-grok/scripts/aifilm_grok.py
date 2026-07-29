@@ -1522,6 +1522,22 @@ def cmd_state_index(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_promotion_report(args: argparse.Namespace) -> int:
+    from promotion_report import build_promotion_report, write_promotion_report
+
+    root = Path(args.root).expanduser().resolve()
+    try:
+        report = (
+            write_promotion_report(root, args.out)
+            if getattr(args, "out", None)
+            else build_promotion_report(root)
+        )
+    except (OSError, ValueError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0
+
+
 from cli_status import (  # noqa: E402, F401
     _status_audio_summary,
     _status_evidence,
@@ -7911,6 +7927,15 @@ def build_parser() -> argparse.ArgumentParser:
     closure_review.add_argument("--scores-json", required=True)
     closure_review.add_argument("--notes", default="")
 
+    promotion = sub.add_parser(
+        "promotion-report",
+        help="Read-only candidate-to-promotion quality report",
+    )
+    promotion.add_argument("--root", required=True)
+    promotion.add_argument(
+        "--out", default=None, help="Explicit JSON report path inside the film root"
+    )
+
     # v1.23: reference video audit — reverse-engineer shot grammar
     refaudit = sub.add_parser(
         "analyze-reference",
@@ -8843,6 +8868,7 @@ def main(argv: list[str] | None = None) -> int:
             "provider-canary": cmd_provider_canary,
             "delivery-package": cmd_delivery_package,
             "quality-closure": cmd_quality_closure,
+            "promotion-report": cmd_promotion_report,
             "director-notes": cmd_director_notes,
             "next": cmd_next,
             "preflight": cmd_preflight,
