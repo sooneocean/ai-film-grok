@@ -224,7 +224,7 @@
     "scripts/sound_plan.py": "98863ce9a851ee962b0ab5caf116fb4ff820e05149ec1f3be81b765013661475",
     "scripts/source_chain.py": "a87d3eea3899939a08e5cd9f067408a5ed91b5566fe94b4b52116e6b45534718",
     "scripts/speech_performance_timing.py": "7894d3434165b9c5829e93c6a000f5dbb8c4a7fa3e0dd5eaf25ba13c89188503",
-    "scripts/stable_audio_adapter.py": "28bcec998e1382c8dc9bebd70fc1f9b3532982d080b01395e30aa9da243d487c",
+    "scripts/stable_audio_adapter.py": "bae35a15a9f2a2a9f0a27bd5ec8ef9bba18100582386ec4c9f20964589fac0fe",
     "scripts/state_index_gate.py": "838b6a0f6dd5c3d27e0cc81b0e96496f5030f018da39e25c4d65b2c2d147c181",
     "scripts/still_uniqueness.py": "3b4f73f4a93717d9da315360926204ac6d36f53b6a1901ed935c09e4d1e3fb47",
     "scripts/story_plan.py": "25ab67a88c9da542ea713cc4835ec131b3f57bbc94386360f03643d3c6ee7c47",
