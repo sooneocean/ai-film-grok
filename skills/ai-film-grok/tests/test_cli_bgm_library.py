@@ -118,6 +118,28 @@ def test_doctor_uses_fixed_error_for_untrusted_health_exception(
     assert emitted[0]["node"] == {"ok": False, "error": "audio node health check failed"}
 
 
+@pytest.mark.parametrize("duration", (0.0, -1.0, float("nan"), float("inf")))
+def test_armory_cli_rejects_invalid_explicit_duration(
+    monkeypatch, tmp_path: Path, duration: float
+) -> None:
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_URL", "http://node")
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "local-test-token-which-is-not-real")
+    args = argparse.Namespace(
+        bgm_library_action="armory",
+        library_root=str(tmp_path / "library"),
+        intent="score_master",
+        asset_id="",
+        to_asset_id="",
+        root="",
+        series_id="",
+        duration=duration,
+    )
+
+    with patch("audio_node_client.health", return_value={"ok": True, "models": {"music": True}}):
+        with pytest.raises(BGMLibraryError, match="duration"):
+            cmd_bgm_library(args, emit=lambda _report: None)
+
+
 def test_prepare_edit_reference_uses_faded_cutdown_without_touching_master(
     tmp_path: Path,
 ) -> None:

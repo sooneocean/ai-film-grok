@@ -171,6 +171,23 @@ checksum 绑定、技术通过的真实候选时，才把 `scene_edit`（对白�
 `motif_development` 在有剧集主题母带和真实候选前保持 `conditional`；Foley／逐帧 SFX 与无缝
 循环不属于 ACE 的自动武器，后者在 live seam 测试通过前也不会自动路由。
 
+`armory` 是只读路线规划器：它不会连线生成、写 catalog 或批准候选，只列出已证实能力、缺的
+前置条件与待人工执行的命令模板。先用它确认路线，再单独执行命令并用 `review-pack` 听审：
+
+```bash
+# 给对白镜准备 18 秒候选；仅在 asset 已批准且节点有真实证据时才 ready_to_stage
+"$AIFILM" bgm-library armory --intent scene_edit --asset-id "<approved-id>" --duration 18
+
+# 剧集主题始终是两段：series-pack -> 人审批准一首主题母带 -> motif-development
+"$AIFILM" bgm-library armory --intent motif_development \
+  --root "<film-root>" --series-id "<series-id>"
+```
+
+`motif_development` 的 `--asset-id` 必须是**同一个 series_id**、已经人工批准、并且来自
+`series-pack` 的 motif 资产；一般共享 master 不能越过这道门。首次满足该前置条件但还没有
+真实 variation canary 时，规划结果会是 `canary_required`，不会假称 `verified`。明确提供的
+`--duration` 则一律要求 10–600 秒的有限数值。
+
 ## 三阶梯 · 立刻换口味（操作）
 
 ```text

@@ -92,6 +92,25 @@ def add_bgm_library_parsers(sub: argparse._SubParsersAction) -> None:
         command = actions.add_parser(name)
         command.add_argument("--library-root", default="")
 
+    armory = actions.add_parser("armory", help="Plan one approval-gated ACE music curation route")
+    armory.add_argument("--library-root", default="")
+    armory.add_argument(
+        "--intent",
+        required=True,
+        choices=(
+            "score_master",
+            "scene_edit",
+            "transition_bridge",
+            "motif_development",
+            "trailer_bumper",
+        ),
+    )
+    armory.add_argument("--asset-id", default="")
+    armory.add_argument("--to-asset-id", default="")
+    armory.add_argument("--root", default="")
+    armory.add_argument("--series-id", default="")
+    armory.add_argument("--duration", type=float, default=None)
+
     generate = actions.add_parser("generate", help="Generate pending candidates offline on 5090")
     generate.add_argument("--library-root", default="")
     generate.add_argument("--recipe-pack", choices=("baseline-v1",), default="baseline-v1")
@@ -301,7 +320,7 @@ def _prepare_edit_reference(
 def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
     action = str(args.bgm_library_action)
     library = _root(args)
-    if action == "doctor":
+    if action in {"doctor", "armory"}:
         from audio_node_client import health
 
         node: dict[str, Any]
@@ -314,14 +333,29 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
                 node = _public_node_health(health(base, token), token=token)
             except Exception:
                 node = {"ok": False, "error": "audio node health check failed"}
-        from audio_armory import inspect_audio_armory
+        from audio_armory import inspect_audio_armory, plan_audio_weapon
 
-        report = {
-            "ok": bool(node.get("ok")),
-            "node": node,
-            "library": library_status(library),
-            "audio_armory": inspect_audio_armory(library, node=node),
-        }
+        if action == "doctor":
+            report = {
+                "ok": bool(node.get("ok")),
+                "node": node,
+                "library": library_status(library),
+                "audio_armory": inspect_audio_armory(library, node=node),
+            }
+        else:
+            requested_duration = args.duration
+            if requested_duration is not None and not 10.0 <= requested_duration <= 600.0:
+                raise BGMLibraryError("armory duration must be between 10 and 600 seconds")
+            report = plan_audio_weapon(
+                library,
+                node=node,
+                intent=str(args.intent),
+                asset_id=str(args.asset_id),
+                to_asset_id=str(args.to_asset_id),
+                film_root=str(args.root),
+                series_id=str(args.series_id),
+                duration_sec=requested_duration,
+            )
     elif action == "status":
         from audio_armory import inspect_audio_armory
 

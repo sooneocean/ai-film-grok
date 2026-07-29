@@ -3,6 +3,12 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.16.2] - 2026-07-29
+
+### Added
+
+- Added `bgm-library armory`: a read-only, receipt-backed ACE curation router. It reports prerequisites and command templates without generating, approving, writing the catalog, or allowing direct final use; motif development is explicitly staged through a same-series, human-approved `series-pack` motif master, and invalid explicit durations fail closed.
+
 ## [2.16.1] - 2026-07-29
 
 ### Added
