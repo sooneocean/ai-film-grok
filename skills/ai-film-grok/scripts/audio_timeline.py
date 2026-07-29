@@ -61,6 +61,23 @@ def is_candidate_only_license(value: object) -> bool:
     return str(value or "").strip() == "Stability AI Community License"
 
 
+def is_approved_internal_sfx(event: dict[str, Any], delivery_scope: str) -> bool:
+    source = str(event.get("source") or event.get("asset") or "").replace("\\", "/")
+    receipt = str(event.get("approval_receipt") or "").replace("\\", "/")
+    return bool(
+        event.get("type") == "action_sfx"
+        and delivery_scope == "noncommercial_internal"
+        and event.get("approval_status") == "approved_noncommercial"
+        and event.get("production_eligible") is False
+        and event.get("usage_scope") == "noncommercial_internal"
+        and is_noncommercial_license(event.get("license"))
+        and source.startswith("local:audio/candidates/sfx/approved-noncommercial/")
+        and receipt.startswith("local:audio/candidates/sfx/approved-noncommercial/")
+        and receipt.endswith(".receipt.json")
+        and re.fullmatch(r"[0-9a-f]{64}", str(event.get("source_sha256") or ""))
+    )
+
+
 # Keep this guard deliberately narrow: a character may naturally say "开门".
 # Only explicit bracketed production directions are rejected here; broader
 # script interpretation belongs in the authoring compiler, not the renderer.
@@ -116,7 +133,7 @@ def _source_ok(source: str) -> bool:
     return source.startswith("https://") or source.startswith("local:") or "://" not in source
 
 
-def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
+def compile_timeline(spec: dict[str, Any], *, root: Path | None = None) -> dict[str, Any]:
     """Compile the v1 timeline without mutating the film spec."""
     events: list[dict[str, Any]] = []
     cursor = 0.0
@@ -184,6 +201,14 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
                             "source": str(cue.get("source") or ""),
                             "license": str(cue.get("license") or ""),
                             "source_sha256": str(cue.get("source_sha256") or ""),
+                            "approval_status": str(cue.get("approval_status") or ""),
+                            "approval_receipt": str(cue.get("approval_receipt") or ""),
+                            "production_eligible": cue.get("production_eligible"),
+                            "usage_scope": str(cue.get("usage_scope") or ""),
+                            "model": str(cue.get("model") or ""),
+                            "checkpoint_fingerprint": str(cue.get("checkpoint_fingerprint") or ""),
+                            "node_job_id": str(cue.get("node_job_id") or ""),
+                            "material": str(cue.get("material") or ""),
                         }
                     )
                 if event_type == "performance":
@@ -239,10 +264,25 @@ def compile_timeline(spec: dict[str, Any]) -> dict[str, Any]:
         "schema_version": SCHEMA_VERSION,
         "kind": "audio-timeline",
         "mode": str(spec.get("audio_style") or "drama_radio"),
+        "delivery_scope": str(spec.get("delivery_scope") or "commercial"),
         "events": events,
         "duration_sec": round(cursor, 3),
     }
     validate_timeline(timeline)
+    approved_internal = [
+        event for event in events if is_approved_internal_sfx(event, timeline["delivery_scope"])
+    ]
+    if approved_internal:
+        if root is None:
+            raise AudioTimelineError(
+                "approved non-commercial SFX compilation requires the film root"
+            )
+        from sfx_candidates import approved_event_receipt_valid
+
+        if any(not approved_event_receipt_valid(root, event) for event in approved_internal):
+            raise AudioTimelineError(
+                "approved non-commercial SFX receipt does not bind signed local audio"
+            )
     return timeline
 
 
@@ -255,6 +295,9 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(events, list):
         raise AudioTimelineError("audio-timeline.events must be an array")
     seen: set[str] = set()
+    delivery_scope = str(timeline.get("delivery_scope") or "commercial")
+    if delivery_scope not in {"commercial", "noncommercial_internal"}:
+        raise AudioTimelineError("audio-timeline.delivery_scope is invalid")
     vocal: list[dict[str, Any]] = []
     silences: list[dict[str, Any]] = []
     for index, event in enumerate(events):
@@ -306,13 +349,14 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
                 "/audio/candidates/" in f"/{normalized_source.removeprefix('local:')}"
                 and "/pending/" in f"/{normalized_source.removeprefix('local:')}"
             )
-            if event_type != "performance" and (
+            restricted_candidate = event_type != "performance" and (
                 pending_candidate
                 or is_noncommercial_license(license_id)
                 or is_candidate_only_license(license_id)
                 or event.get("production_eligible") is False
                 or event.get("approval_status") == "pending_human_review"
-            ):
+            )
+            if restricted_candidate and not is_approved_internal_sfx(event, delivery_scope):
                 raise AudioTimelineError(
                     f"{prefix} non-commercial or pending candidate cannot enter a formal timeline"
                 )

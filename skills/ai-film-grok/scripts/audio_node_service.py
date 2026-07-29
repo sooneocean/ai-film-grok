@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -53,6 +54,10 @@ AMBIENT_ADAPTER_SHA256 = os.environ.get("AIFILM_AUDIO_NODE_AMBIENT_ADAPTER_SHA25
 MMAUDIO_CHECKPOINT_SHA256 = os.environ.get("AIFILM_MMAUDIO_CHECKPOINT_SHA256", "")
 MMAUDIO_REPO_COMMIT = os.environ.get("AIFILM_MMAUDIO_REPO_COMMIT", "")
 FFMPEG = os.environ.get("AIFILM_AUDIO_NODE_FFMPEG", "ffmpeg")
+FFPROBE = os.environ.get(
+    "AIFILM_AUDIO_NODE_FFPROBE",
+    str(Path(FFMPEG).with_name("ffprobe.exe")) if Path(FFMPEG).suffix else "ffprobe",
+)
 jobs: dict[str, dict[str, Any]] = {}
 # ``ambient`` is deliberately separate from ``sfx``.  MMAudio SFX is
 # video-bound and CC-BY-NC; Stable Audio is text-only ambience/transition
@@ -68,6 +73,40 @@ _PROBE_CACHE: dict[str, tuple[float, tuple[str, ...], dict[str, Any] | None]] = 
 _PROBE_CACHE_TTL_SEC = 300
 _MAX_JSON_BYTES = 129 * 1024 * 1024
 app = FastAPI(title="ai-film private audio node", docs_url=None, redoc_url=None, openapi_url=None)
+_SAFE_SUBPROCESS_ENV_NAMES = frozenset(
+    {
+        "APPDATA",
+        "COMSPEC",
+        "CUDA_PATH",
+        "HF_HOME",
+        "HF_HUB_CACHE",
+        "LOCALAPPDATA",
+        "NUMBER_OF_PROCESSORS",
+        "PATH",
+        "PATHEXT",
+        "PROGRAMDATA",
+        "SYSTEMDRIVE",
+        "SYSTEMROOT",
+        "TEMP",
+        "TMP",
+        "USERNAME",
+        "USERPROFILE",
+        "WINDIR",
+    }
+)
+_SAFE_MMAUDIO_ENV_NAMES = frozenset(
+    {
+        "AIFILM_MMAUDIO_CHECKPOINT_SHA256",
+        "AIFILM_MMAUDIO_PYTHON",
+        "AIFILM_MMAUDIO_REPO_COMMIT",
+        "AIFILM_MMAUDIO_RUNNER",
+        "AIFILM_MMAUDIO_SYNCHFORMER_SHA256",
+        "AIFILM_MMAUDIO_VAE_SHA256",
+    }
+)
+_SHELL_EXECUTABLES = frozenset(
+    {"bash", "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "sh", "zsh"}
+)
 
 
 def _is_sha256(value: Any) -> bool:
@@ -78,9 +117,50 @@ def _is_sha256(value: Any) -> bool:
     )
 
 
+def _adapter_environment() -> dict[str, str]:
+    """Keep node credentials out of model adapters and their dependencies."""
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key.upper() in _SAFE_SUBPROCESS_ENV_NAMES
+        or key.upper() in _SAFE_MMAUDIO_ENV_NAMES
+        or key.upper().startswith(("CUDA_", "NVIDIA_"))
+    }
+    environment.update(
+        {
+            "HF_HUB_OFFLINE": "1",
+            "TRANSFORMERS_OFFLINE": "1",
+            "PYTHONNOUSERSITE": "1",
+        }
+    )
+    if not environment.get("USERNAME") and environment.get("USERPROFILE"):
+        environment["USERNAME"] = (
+            environment["USERPROFILE"].replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+        )
+    return environment
+
+
+def _adapter_failure_code(output: str | bytes | None, returncode: int) -> str:
+    """Extract only a fixed adapter error code; never expose prompts or command lines."""
+    text = (
+        output.decode("utf-8", errors="replace") if isinstance(output, bytes) else str(output or "")
+    )
+    for line in reversed(text.splitlines()):
+        try:
+            report = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        error = report.get("error") if isinstance(report, dict) else None
+        if isinstance(error, str):
+            match = re.fullmatch(r"[a-z_]+ failed: ([a-z0-9_]+)", error)
+            if match:
+                return match.group(1)
+    return f"adapter_exit_{returncode}"
+
+
 def _auth(value: str | None) -> None:
     if (
-        not TOKEN
+        len(TOKEN) < 24
         or not value
         or not value.startswith("Bearer ")
         or not hmac.compare_digest(value[7:], TOKEN)
@@ -126,7 +206,7 @@ def _available(kind: str) -> bool:
             return False
         if shutil.which(command[0]) is None:
             return False
-        return _sfx_probe_ok()
+        return _sfx_renderer_bound(command) and _sfx_probe_ok()
     if kind == "ambient":
         try:
             command = _command_template(kind)
@@ -173,6 +253,7 @@ def _cached_probe(
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                env=_adapter_environment(),
             )
             report = json.loads(proc.stdout)
         except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
@@ -196,6 +277,49 @@ def _probe_command(env_name: str) -> list[str] | None:
     ):
         return None
     return command
+
+
+def _trusted_argv(command: list[str], *, required_placeholders: set[str]) -> bool:
+    executable = command[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
+    if executable in _SHELL_EXECUTABLES:
+        return False
+    placeholders = {
+        item
+        for item in command
+        if item.startswith("{") and item.endswith("}") and item.count("{") == 1
+    }
+    return required_placeholders.issubset(placeholders)
+
+
+def _sfx_renderer_bound(renderer: list[str]) -> bool:
+    probe = _probe_command("AIFILM_AUDIO_NODE_SFX_PROBE_ARGV")
+    if probe is None or len(probe) != 5 or len(renderer) != 14:
+        return False
+    expected_renderer = [
+        probe[0],
+        probe[1],
+        "--repo",
+        probe[3],
+        "--prompt",
+        "{prompt}",
+        "--duration",
+        "{duration}",
+        "--seed",
+        "{seed}",
+        "--out",
+        "{out}",
+        "--video",
+        "{video}",
+    ]
+    return bool(
+        probe[2:] == ["--repo", probe[3], "--probe"]
+        and renderer == expected_renderer
+        and probe[1].replace("\\", "/").rsplit("/", 1)[-1] == "mmaudio_adapter.py"
+        and _trusted_argv(
+            renderer,
+            required_placeholders={"{prompt}", "{duration}", "{seed}", "{out}", "{video}"},
+        )
+    )
 
 
 def _ambient_renderer_bound(renderer: list[str]) -> bool:
@@ -439,7 +563,14 @@ def _store_music_reference(raw: bytes) -> dict[str, str]:
                 or handle.getnframes() <= 0
             ):
                 raise HTTPException(422, "music reference must be 44.1kHz stereo PCM s16le")
-        if not target.exists():
+        if target.exists():
+            if (
+                target.is_symlink()
+                or not target.is_file()
+                or hashlib.sha256(target.read_bytes()).hexdigest() != source_hash
+            ):
+                raise HTTPException(409, "stored music reference hash mismatch")
+        else:
             source.replace(target)
     except Exception:
         source.unlink(missing_ok=True)
@@ -467,7 +598,7 @@ def _store_sfx_source(raw: bytes) -> dict[str, str]:
         temporary.write_bytes(raw)
         probe = subprocess.run(
             [
-                "ffprobe",
+                FFPROBE,
                 "-v",
                 "error",
                 "-select_streams",
@@ -571,7 +702,18 @@ def _run_command(kind: str, payload: dict[str, Any], out: Path) -> None:
         "video": str(payload.get("source_video") or ""),
     }
     command = [item.format(**values) for item in template]
-    subprocess.run(command, check=True, capture_output=True, timeout=900)
+    try:
+        subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            timeout=900,
+            env=_adapter_environment(),
+        )
+    except subprocess.CalledProcessError as exc:
+        code = _adapter_failure_code(exc.stderr, exc.returncode)
+        print(f"{kind} adapter failed: {code}", file=sys.stderr)
+        raise
     _normalize(source, out)
     source.unlink(missing_ok=True)
 
@@ -594,7 +736,13 @@ def _run_music_batch(payload: dict[str, Any], out_dir: Path) -> list[Path]:
             request_path = Path(handle.name)
         values = {"request_json": str(request_path), "out_dir": str(out_dir)}
         command = [item.format(**values) for item in template]
-        subprocess.run(command, check=True, capture_output=True, timeout=1800)
+        subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            timeout=1800,
+            env=_adapter_environment(),
+        )
     finally:
         if request_path is not None:
             request_path.unlink(missing_ok=True)
@@ -686,6 +834,16 @@ def _create(kind: str, payload: dict[str, Any]) -> dict[str, str]:
                 "license": AMBIENT_LICENSE,
                 "checkpoint_sha256": AMBIENT_CHECKPOINT_SHA256.lower(),
                 "adapter_sha256": AMBIENT_ADAPTER_SHA256.lower(),
+            }
+        )
+    if kind == "sfx":
+        jobs[job_id].update(
+            {
+                "production_eligible": False,
+                "usage_scope": "noncommercial_internal_research",
+                "model": SFX_MODEL_ID,
+                "license": SFX_LICENSE,
+                "checkpoint_fingerprint": SFX_CHECKPOINT_FINGERPRINT.lower(),
             }
         )
     asyncio.create_task(_execute(job_id, kind, payload))

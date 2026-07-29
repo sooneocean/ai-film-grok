@@ -6,7 +6,44 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from mmaudio_adapter import MMAudioAdapterError, _require_checkout, run
+from mmaudio_adapter import (
+    MMAudioAdapterError,
+    _adapter_environment,
+    _failure_code,
+    _require_checkout,
+    run,
+)
+
+
+def test_adapter_environment_excludes_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "secret-node-token")
+    monkeypatch.setenv("HF_TOKEN", "secret-hf-token")
+    monkeypatch.setenv("SSH_AUTH_SOCK", "/tmp/agent.sock")
+    monkeypatch.setenv("PATH", "/trusted/bin")
+    monkeypatch.setenv("CUDA_PATH", r"C:\CUDA")
+    monkeypatch.setenv("USERNAME", "scheduled-user")
+
+    environment = _adapter_environment()
+
+    assert environment["PATH"] == "/trusted/bin"
+    assert environment["CUDA_PATH"] == r"C:\CUDA"
+    assert environment["USERNAME"] == "scheduled-user"
+    assert environment["HF_HUB_OFFLINE"] == "1"
+    assert "AIFILM_AUDIO_NODE_TOKEN" not in environment
+    assert "HF_TOKEN" not in environment
+    assert "SSH_AUTH_SOCK" not in environment
+
+
+def test_failure_code_is_bounded_and_does_not_return_subprocess_output() -> None:
+    secret_prompt = "secret prompt that must not be returned"
+
+    assert _failure_code(f"SoX could not be found! {secret_prompt}", 1) == "sox_unavailable"
+    assert _failure_code(f"CUDA out of memory {secret_prompt}", 9) == "cuda_out_of_memory"
+    assert (
+        _failure_code(f"No module named 'av.audio' {secret_prompt}", 1)
+        == "python_dependency_missing_av_audio"
+    )
+    assert _failure_code(secret_prompt, 7) == "subprocess_exit_7"
 
 
 def _checkout(tmp_path: Path) -> tuple[Path, str]:

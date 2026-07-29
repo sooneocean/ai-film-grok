@@ -6519,6 +6519,69 @@ def cmd_sfx_canary(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
 
 
+def cmd_sfx_candidate(args: argparse.Namespace) -> int:
+    """Generate, review, and attach non-commercial MMAudio SFX."""
+    from sfx_candidates import (
+        SFXCandidateError,
+        approve,
+        attach_to_shot,
+        generate,
+        reject,
+    )
+
+    root = Path(args.root).expanduser().resolve()
+    try:
+        if args.sfx_candidate_action == "approve":
+            emit(
+                approve(
+                    root,
+                    args.asset_id,
+                    reviewer=args.reviewer,
+                    heard_full=bool(args.heard_full),
+                    sync_confirmed=bool(args.sync_confirmed),
+                    no_speech_confirmed=bool(args.no_speech_confirmed),
+                    no_music_confirmed=bool(args.no_music_confirmed),
+                    artifact_free_confirmed=bool(args.artifact_free_confirmed),
+                )
+            )
+        elif args.sfx_candidate_action == "reject":
+            emit(
+                reject(
+                    root,
+                    args.asset_id,
+                    reviewer=args.reviewer,
+                    reason=args.reason,
+                )
+            )
+        elif args.sfx_candidate_action == "attach":
+            emit(
+                attach_to_shot(
+                    root,
+                    args.asset_id,
+                    shot_id=args.shot_id,
+                    kind=args.kind,
+                    start_offset_sec=args.start_offset_sec,
+                    duration_sec=args.duration,
+                    material=args.material,
+                    noncommercial_internal_ok=bool(args.noncommercial_internal_ok),
+                )
+            )
+        else:
+            emit(
+                generate(
+                    root,
+                    prompt=args.prompt,
+                    duration=args.duration,
+                    seed=args.seed,
+                    source_video=Path(args.video).expanduser() if args.video else None,
+                    noncommercial_research_ok=bool(args.noncommercial_research_ok),
+                )
+            )
+        return 0
+    except SFXCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
 
@@ -7129,6 +7192,42 @@ def build_parser() -> argparse.ArgumentParser:
     sfx_canary.add_argument("--seed", type=int, required=True)
     sfx_canary.add_argument("--video", default="")
     sfx_canary.add_argument("--noncommercial-research-ok", action="store_true")
+
+    sfx_candidate = sub.add_parser(
+        "sfx-candidate",
+        help="Generate, human-review, and attach internal non-commercial MMAudio SFX",
+    )
+    sfx_candidate_sub = sfx_candidate.add_subparsers(dest="sfx_candidate_action", required=True)
+    sfx_generate = sfx_candidate_sub.add_parser("generate")
+    sfx_generate.add_argument("--root", required=True)
+    sfx_generate.add_argument("--prompt", required=True)
+    sfx_generate.add_argument("--duration", type=float, default=8.0)
+    sfx_generate.add_argument("--seed", type=int, required=True)
+    sfx_generate.add_argument("--video", default="")
+    sfx_generate.add_argument("--noncommercial-research-ok", action="store_true")
+    sfx_approve = sfx_candidate_sub.add_parser("approve")
+    sfx_approve.add_argument("--root", required=True)
+    sfx_approve.add_argument("--asset-id", required=True)
+    sfx_approve.add_argument("--reviewer", required=True)
+    sfx_approve.add_argument("--heard-full", action="store_true")
+    sfx_approve.add_argument("--sync-confirmed", action="store_true")
+    sfx_approve.add_argument("--no-speech-confirmed", action="store_true")
+    sfx_approve.add_argument("--no-music-confirmed", action="store_true")
+    sfx_approve.add_argument("--artifact-free-confirmed", action="store_true")
+    sfx_reject = sfx_candidate_sub.add_parser("reject")
+    sfx_reject.add_argument("--root", required=True)
+    sfx_reject.add_argument("--asset-id", required=True)
+    sfx_reject.add_argument("--reviewer", required=True)
+    sfx_reject.add_argument("--reason", required=True)
+    sfx_attach = sfx_candidate_sub.add_parser("attach")
+    sfx_attach.add_argument("--root", required=True)
+    sfx_attach.add_argument("--asset-id", required=True)
+    sfx_attach.add_argument("--shot-id", required=True)
+    sfx_attach.add_argument("--kind", choices=("foley", "sfx"), required=True)
+    sfx_attach.add_argument("--start-offset-sec", type=float, required=True)
+    sfx_attach.add_argument("--duration", type=float, required=True)
+    sfx_attach.add_argument("--material", required=True)
+    sfx_attach.add_argument("--noncommercial-internal-ok", action="store_true")
 
     lsc = sub.add_parser(
         "lipsync-canary",
@@ -9082,6 +9181,7 @@ def main(argv: list[str] | None = None) -> int:
             "adult-female-voice-pack": cmd_adult_female_voice_pack,
             "ambience-candidate": cmd_ambience_candidate,
             "sfx-canary": cmd_sfx_canary,
+            "sfx-candidate": cmd_sfx_candidate,
             "lipsync-node": cmd_lipsync_node,
             "lipsync-canary": cmd_lipsync_canary,
             "lipsync-pilot": cmd_lipsync_pilot,

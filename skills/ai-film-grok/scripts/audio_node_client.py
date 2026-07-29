@@ -164,6 +164,8 @@ def _url(base_url: str, path: str) -> str:
         )
     ):
         raise AudioNodeError("audio node host must be private or loopback")
+    if parsed.scheme == "http" and not address.is_loopback:
+        raise AudioNodeError("plain HTTP audio node access is loopback-only; use an SSH tunnel")
     if parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise AudioNodeError("audio node URL must not contain credentials or query data")
     return urlunsplit((parsed.scheme, parsed.netloc, "/" + path.lstrip("/"), "", ""))
@@ -209,7 +211,9 @@ def _request(
 
 
 def health(base_url: str, token: str) -> dict[str, Any]:
-    return _json_response(_request(base_url, token, "/health", timeout=15), context="health")
+    # SFX readiness re-hashes the pinned MMAudio checkout and three offline
+    # checkpoints. A cold Windows filesystem can legitimately exceed 15 seconds.
+    return _json_response(_request(base_url, token, "/health", timeout=180), context="health")
 
 
 def _validate_wav(path: Path) -> None:

@@ -13,6 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from audio_timeline import compile_timeline
+from performance_candidates import sign_receipt
 from scene_sound import reconcile
 from scene_sound_stems import SceneSoundError, _apply_event_controls, render_scene_sound_stem
 
@@ -88,6 +89,103 @@ def test_scene_stem_rejects_pending_noncommercial_sfx(tmp_path: Path):
             },
             duration_sec=1,
             out=tmp_path / "audio" / "scene.wav",
+            sample_rate=8000,
+        )
+
+
+def test_scene_stem_accepts_signed_human_approved_internal_sfx(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    approved = tmp_path / "audio" / "candidates" / "sfx" / "approved-noncommercial"
+    approved.mkdir(parents=True)
+    asset = approved / "take.wav"
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+    digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+    record = {
+        "schema": "aifilm-sfx-candidate-v1",
+        "asset_id": "mmaudio-sfx-1-test",
+        "status": "approved_noncommercial",
+        "production_eligible": False,
+        "usage_scope": "noncommercial_internal_research",
+        "delivery_eligible_scopes": ["noncommercial_internal"],
+        "approved_path": str(asset.relative_to(tmp_path)),
+        "sha256": digest,
+        "license": "CC-BY-NC-4.0",
+        "model": "hkchengrex/MMAudio-large-44k-v2",
+        "checkpoint_fingerprint": "a" * 64,
+        "node_job_id": "job-1",
+        "human_review": {
+            "reviewer": "dex",
+            "heard_full": True,
+            "sync_confirmed": True,
+            "no_speech_confirmed": True,
+            "no_music_confirmed": True,
+            "artifact_free_confirmed": True,
+        },
+    }
+    sign_receipt(record)
+    receipt = approved / "take.receipt.json"
+    receipt.write_text(json.dumps(record), encoding="utf-8")
+    result = render_scene_sound_stem(
+        tmp_path,
+        {
+            "delivery_scope": "noncommercial_internal",
+            "events": [
+                {
+                    "id": "approved-sfx",
+                    "type": "action_sfx",
+                    "source": f"local:{asset.relative_to(tmp_path)}",
+                    "license": record["license"],
+                    "source_sha256": digest,
+                    "approval_status": "approved_noncommercial",
+                    "approval_receipt": f"local:{receipt.relative_to(tmp_path)}",
+                    "production_eligible": False,
+                    "usage_scope": "noncommercial_internal",
+                    "model": record["model"],
+                    "checkpoint_fingerprint": record["checkpoint_fingerprint"],
+                    "node_job_id": record["node_job_id"],
+                    "start_sec": 0,
+                    "duration_sec": 0.1,
+                }
+            ],
+        },
+        duration_sec=1,
+        out=tmp_path / "audio" / "scene-approved.wav",
+        sample_rate=8000,
+    )
+    assert result["event_count"] == 1
+
+    with pytest.raises(SceneSoundError, match="cannot enter a formal stem"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "delivery_scope": "commercial",
+                "events": [
+                    {
+                        "id": "approved-sfx",
+                        "type": "action_sfx",
+                        "source": f"local:{asset.relative_to(tmp_path)}",
+                        "license": record["license"],
+                        "source_sha256": digest,
+                        "approval_status": "approved_noncommercial",
+                        "approval_receipt": f"local:{receipt.relative_to(tmp_path)}",
+                        "production_eligible": False,
+                        "usage_scope": "noncommercial_internal",
+                        "model": record["model"],
+                        "checkpoint_fingerprint": record["checkpoint_fingerprint"],
+                        "node_job_id": record["node_job_id"],
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ],
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "scene-commercial.wav",
             sample_rate=8000,
         )
 
