@@ -67,7 +67,7 @@ def main() -> int:
     with config_path.open(encoding="utf-8") as source:
         config = json.load(source)
     model = create_model_from_config(config)
-    model.load_state_dict(load_ckpt_state_dict(Path(args.checkpoint)))
+    model.load_state_dict(load_ckpt_state_dict(str(Path(args.checkpoint))))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device).eval().requires_grad_(False)
     sample_rate = int(config["sample_rate"])
