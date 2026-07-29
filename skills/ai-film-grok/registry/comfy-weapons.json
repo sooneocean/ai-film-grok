@@ -11,6 +11,7 @@
       "gpu": "NVIDIA GeForce RTX 5090",
       "vram_mib": 32607,
       "verified": true,
+      "readiness": "requires_live_probe",
       "credentials_embedded": false
     }
   },
@@ -434,6 +435,51 @@
         "decode_ok": true,
         "quality_note": "strong mouth motion; face, color, clothing and background drift at 6 steps"
       }
+    }
+  ],
+  "research_weapons": [
+    {
+      "id": "hunyuanvideo-1.5-shot-pilot",
+      "display_name": "HunyuanVideo 1.5 short-shot pilot",
+      "status": "experimental",
+      "readiness": "not_installed_or_unverified",
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": ["short-shot-i2v", "short-shot-t2v"],
+      "allowed_stages": ["pilot"],
+      "license_scope": "verify_before_install_and_release",
+      "latest_canary_receipt_path": null,
+      "requirements": {"minimum_vram_mib": 14336},
+      "promotion_requirements": ["model_fingerprint", "terminal_media_decode", "continuity_review", "human_review"]
+    },
+    {
+      "id": "ltx2-broll-pilot",
+      "display_name": "LTX-2 synchronized audio-video B-roll pilot",
+      "status": "experimental",
+      "readiness": "not_installed_or_unverified",
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": ["broll-audiovideo"],
+      "allowed_stages": ["pilot"],
+      "restrictions": ["no_dialogue", "no_continuous_drama", "not_final"],
+      "license_scope": "verify_before_install_and_release",
+      "latest_canary_receipt_path": null,
+      "requirements": {"minimum_vram_mib": 32607, "quantization": "low_vram_int8_or_equivalent"},
+      "promotion_requirements": ["model_fingerprint", "terminal_media_decode", "audio_review", "human_review"]
+    },
+    {
+      "id": "hunyuanvideo-foley-evaluation",
+      "display_name": "HunyuanVideo Foley evaluation",
+      "status": "experimental",
+      "readiness": "research_only",
+      "provider": "audio_node",
+      "node": "rtx5090-main",
+      "intents": ["video-bound-foley"],
+      "allowed_stages": ["research"],
+      "license_scope": "verify_before_install_and_release",
+      "latest_canary_receipt_path": null,
+      "restrictions": ["not_production", "license_review_required"],
+      "promotion_requirements": ["license_review", "windows_cuda_probe", "single_shot_listening_review", "human_review"]
     }
   ],
   "blocked_capabilities": [

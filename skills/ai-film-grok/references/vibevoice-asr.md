@@ -4,12 +4,14 @@
 replaces the dialogue manifest, subtitle truth, human final review, or any
 provider routing decision.
 
-Configure an already-installed local adapter with a JSON argv template. The
-adapter receives the in-workspace verified audio path and must write the
-normalized transcript JSON to the requested output path:
+The included `scripts/adapters/vibevoice_asr.py` is the official-model adapter.
+Run it only in a Python environment where the official VibeVoice checkout and a
+local ASR model directory are already installed. Configure it with a JSON argv
+template; it receives the in-workspace verified audio path and writes normalized
+transcript JSON to the requested output path:
 
 ```bash
-export AIFILM_VIBEVOICE_ASR_ARGV='["/trusted/python", "/trusted/vibevoice_adapter.py", "--audio", "{audio}", "--out", "{out}"]'
+export AIFILM_VIBEVOICE_ASR_ARGV='["/trusted/vibevoice-venv/bin/python", "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/scripts/adapters/vibevoice_asr.py", "--audio", "{audio}", "--out", "{out}", "--model-path", "/trusted/VibeVoice-ASR", "--device", "cuda"]'
 aifilm vibevoice-asr probe
 aifilm vibevoice-asr run --root artifacts/film --audio audio/final-mix.wav --subtitles subtitles/final.srt
 ```

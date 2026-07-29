@@ -98,11 +98,13 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_cinematic_color_grading.py`
 - `skills/ai-film-grok/tests/test_cli_bgm_library.py`
 - `skills/ai-film-grok/tests/test_cli_motion.py`
+- `skills/ai-film-grok/tests/test_cli_node.py`
 - `skills/ai-film-grok/tests/test_cli_plan_mutation.py`
 - `skills/ai-film-grok/tests/test_cli_plan_project.py`
 - `skills/ai-film-grok/tests/test_cli_plan_run.py`
 - `skills/ai-film-grok/tests/test_cli_roundtrip.py`
 - `skills/ai-film-grok/tests/test_cli_smoke.py`
+- `skills/ai-film-grok/tests/test_cli_weapon.py`
 - `skills/ai-film-grok/tests/test_clip_uniqueness.py`
 - `skills/ai-film-grok/tests/test_closed_loop.py`
 - `skills/ai-film-grok/tests/test_color_grade.py`

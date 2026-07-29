@@ -6497,6 +6497,18 @@ def cmd_comfy(args: argparse.Namespace) -> int:
     return run_comfy(args)
 
 
+def cmd_node(args: argparse.Namespace) -> int:
+    from cli_node import run_node
+
+    return run_node(args, emit=emit)
+
+
+def cmd_weapon(args: argparse.Namespace) -> int:
+    from cli_weapon import run_weapon
+
+    return run_weapon(args, emit=emit)
+
+
 def cmd_route(args: argparse.Namespace) -> int:
     from cli_route import run
     from production_router import RouteExplainError
@@ -8743,6 +8755,12 @@ def build_parser() -> argparse.ArgumentParser:
     from cli_comfy import add_comfy_parsers
 
     add_comfy_parsers(sub)
+    from cli_node import add_node_parsers
+
+    add_node_parsers(sub)
+    from cli_weapon import add_weapon_parsers
+
+    add_weapon_parsers(sub)
     from cli_bgm_library import add_bgm_library_parsers
 
     add_bgm_library_parsers(sub)
@@ -8856,6 +8874,8 @@ def main(argv: list[str] | None = None) -> int:
             "external-review": cmd_external_review,
             "vibevoice-asr": cmd_vibevoice_asr,
             "comfy": cmd_comfy,
+            "node": cmd_node,
+            "weapon": cmd_weapon,
             "route": cmd_route,
             "team": cmd_team,
         }

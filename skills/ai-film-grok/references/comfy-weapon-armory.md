@@ -77,6 +77,17 @@ timeline or final stem.
 
 ## Commands
 
+`aifilm node status` is the only concise live readiness report for the private
+5090. It reports `reachable`, `busy`, `degraded`, or `unavailable`; a registry
+entry marked verified is historical evidence, never a claim that the node is
+online now. `node recover --confirm` first proves that the queue is idle and
+then delegates only to the allowlisted Comfy recovery route.
+
+`aifilm weapon probe` checks registered requirements live. `weapon canary`
+plans a bounded pilot by default; `--execute --confirm` is required before a
+submission. `weapon promote` only creates a hash-bound, human-approved
+promotion packet. It never edits the registry or changes the default provider.
+
 ```bash
 # Static registry or live readiness
 aifilm comfy armory

@@ -69,6 +69,8 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" comfy probe
 "$AIFILM" comfy inventory
 "$AIFILM" comfy capacity
+"$AIFILM" node status
+"$AIFILM" weapon probe
 "$AIFILM" route explain --root "<film>" --shot-id "shot01"
 "$AIFILM" route plan --root "<film>" --shot-id "shot01" --write
 "$AIFILM" sfx-canary --root "<film>" --prompt "door closes in a quiet room" \
