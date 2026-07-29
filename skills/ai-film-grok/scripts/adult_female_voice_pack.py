@@ -129,9 +129,9 @@ def initialize(root: Path) -> dict[str, Any]:
     path = _pack_path(root)
     if path.exists():
         data = read_json(path)
-        if isinstance(data, dict) and data.get("schema") == SCHEMA:
+        if _is_fixed_plan(data):
             return data
-        raise AdultFemaleVoicePackError("existing voice-pack manifest has an unexpected schema")
+        raise AdultFemaleVoicePackError("existing voice-pack manifest is not the fixed v1 plan")
     data = {
         "schema": SCHEMA,
         "pack_id": PACK_ID,
@@ -148,9 +148,25 @@ def initialize(root: Path) -> dict[str, Any]:
     return data
 
 
+def _is_fixed_plan(data: object) -> bool:
+    """Do not let a mutable JSON manifest change the locked v1 voice inventory."""
+    if not isinstance(data, dict):
+        return False
+    expected = [{**item, "status": "planned"} for item in _items()]
+    return (
+        data.get("schema") == SCHEMA
+        and data.get("pack_id") == PACK_ID
+        and data.get("language") == "zh-CN"
+        and data.get("adult_only") is True
+        and data.get("source_authorization") == "original"
+        and data.get("render_backend") == "audio_node/qwen3-tts-5090"
+        and data.get("items") == expected
+    )
+
+
 def _load_pack(root: Path) -> dict[str, Any]:
     data = initialize(root)
-    if not isinstance(data, dict) or data.get("schema") != SCHEMA or data.get("pack_id") != PACK_ID:
+    if not _is_fixed_plan(data):
         raise AdultFemaleVoicePackError("voice-pack manifest is invalid")
     return data
 

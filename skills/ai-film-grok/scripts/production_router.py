@@ -88,11 +88,27 @@ def _film_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _find_shot(spec: dict[str, Any], shot_id: str) -> dict[str, Any]:
     matches = [shot for shot in _film_shots(spec) if str(shot.get("id") or "") == shot_id]
-    if not matches:
+    if matches:
+        if len(matches) > 1:
+            raise RouteExplainError(f"SHOT_ID_AMBIGUOUS: {shot_id}")
+        return matches[0]
+    broll_matches: list[dict[str, Any]] = []
+    for parent in _film_shots(spec):
+        for entry in parent.get("dialogue_broll") or []:
+            if isinstance(entry, dict) and str(entry.get("id") or "") == shot_id:
+                broll_matches.append(
+                    {
+                        **entry,
+                        "_dialogue_broll_parent": str(parent.get("id") or ""),
+                        "heat_phase": parent.get("heat_phase"),
+                        "wardrobe_state": parent.get("wardrobe_state"),
+                    }
+                )
+    if not broll_matches:
         raise RouteExplainError(f"SHOT_NOT_FOUND: {shot_id}")
-    if len(matches) > 1:
+    if len(broll_matches) > 1:
         raise RouteExplainError(f"SHOT_ID_AMBIGUOUS: {shot_id}")
-    return matches[0]
+    return broll_matches[0]
 
 
 def build_shot_intent(
@@ -127,6 +143,8 @@ def build_shot_intent(
         if film_lock not in unlocked_values
         else ""
     )
+    parent_shot_id = str(shot.get("_dialogue_broll_parent") or "").strip() or None
+    broll_kind = str(shot.get("kind") or "").strip().lower() or None
     return {
         "schema_version": 1,
         "kind": "ai-film-shot-intent",
@@ -138,6 +156,10 @@ def build_shot_intent(
         "continuity_required": str(dsl.get("chain_mode") or "").lower() == "continue",
         "quality_tier": tier,
         "provider_lock": provider_lock or None,
+        "parent_shot_id": parent_shot_id,
+        "broll_kind": broll_kind,
+        "editorial_only": parent_shot_id is not None,
+        "audio_policy": "carry_parent_dialogue" if parent_shot_id is not None else None,
     }
 
 

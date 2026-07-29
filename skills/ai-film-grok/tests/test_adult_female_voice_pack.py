@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,6 +22,19 @@ def test_initialize_creates_fixed_16_item_pack(tmp_path: Path) -> None:
     assert len(pack["items"]) == 16
     assert {item["kind"] for item in pack["items"]} == {"dialogue", "breath"}
     assert all(item["voice_profile"].startswith("qwen_zh_female_") for item in pack["items"])
+
+
+@pytest.mark.parametrize("mutation", ("empty", "voice"))
+def test_initialize_rejects_a_tampered_fixed_plan(tmp_path: Path, mutation: str) -> None:
+    pack = copy.deepcopy(initialize(tmp_path))
+    if mutation == "empty":
+        pack["items"] = []
+    else:
+        pack["items"][0]["voice_profile"] = "qwen_zh_female_mature"
+    path = tmp_path / "dialogue-packs" / f"{PACK_ID}.json"
+    path.write_text(json.dumps(pack), encoding="utf-8")
+    with pytest.raises(AdultFemaleVoicePackError, match="fixed v1 plan"):
+        initialize(tmp_path)
 
 
 def test_render_creates_pending_signed_candidates(

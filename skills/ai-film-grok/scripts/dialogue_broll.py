@@ -8,7 +8,11 @@ interval while the parent dialogue, captions, and audio clock continue.
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from typing import Any
+
+from runtime_policy import sha256
+from util import write_json
 
 
 class DialogueBrollError(ValueError):
@@ -133,3 +137,17 @@ def validate_dialogue_broll(shot: dict[str, Any], *, shot_id: str) -> list[dict[
                 raise DialogueBrollError(f"{bid} reaction B-roll must use shot_role=hero")
         validated.append(entry)
     return validated
+
+
+def write_broll_edit_report(
+    root: Path, entries: list[dict[str, Any]]
+) -> tuple[dict[str, Any], Path, str]:
+    """Persist the exact visual replacements and return their delivery binding."""
+    report = {
+        "schema_version": 1,
+        "audio_policy": "carry_parent_dialogue",
+        "entries": entries,
+    }
+    path = Path(root).expanduser().resolve() / "receipts" / "broll-edit-report.json"
+    write_json(path, report)
+    return report, path, sha256(path)

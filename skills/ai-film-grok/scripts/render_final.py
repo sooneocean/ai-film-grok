@@ -30,6 +30,7 @@ from audio_timeline import caption_bindings as timeline_caption_bindings
 from audio_timeline import compile_timeline as compile_audio_timeline_v1
 from audio_timeline import timeline_hash as audio_timeline_hash
 from checkpoint import CheckpointManager
+from dialogue_broll import write_broll_edit_report
 from edit_policy import (
     DEFAULT_TRANSITION_SEC,
     PolicyError,
@@ -3093,10 +3094,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     broll_edit_report = {
         "schema_version": 1,
         "audio_policy": "carry_parent_dialogue",
-        "entries": broll_edit_entries,
+        "entries": [],
     }
+    broll_edit_report_sha256: str | None = None
     if broll_edit_entries:
-        write_json(root / "receipts" / "broll-edit-report.json", broll_edit_report)
+        broll_edit_report, _broll_report_path, broll_edit_report_sha256 = write_broll_edit_report(
+            root, broll_edit_entries
+        )
 
     # 3) Title / end cards
     # plate_cards=blank: keep pad duration for VO/SRT clock, no burned glyphs
@@ -4258,6 +4262,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         },
         "sound_spotting": mix_spotting,
         "dialogue_broll": broll_edit_report,
+        "dialogue_broll_report_sha256": broll_edit_report_sha256,
         "tts": {
             "backend_requested": tts_backend,
             "cast_tts_backends": cast_tts_backends,

@@ -135,6 +135,51 @@ def test_env_shot_selects_specialized_cloud_t2v_and_explains_rejections(
     ]
 
 
+def test_dialogue_broll_routes_as_a_timed_editorial_child(tmp_path: Path) -> None:
+    _write_spec(
+        tmp_path,
+        [
+            {
+                "id": "line01",
+                "shot_role": "hero",
+                "dsl": {"motion": "locked close-up"},
+                "dialogue_broll": [
+                    {
+                        "id": "line01__broll01",
+                        "kind": "insert",
+                        "parent_shot_id": "line01",
+                        "shot_role": "insert",
+                        "audio_policy": "carry_parent_dialogue",
+                        "speaker_on_camera": False,
+                        "lipsync": False,
+                        "dsl": {"motion": "small object movement"},
+                    }
+                ],
+            }
+        ],
+    )
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "t2v-insert",
+                provider="grok",
+                model="image-to-video",
+                operations=["text_to_video"],
+                shot_roles=["env", "insert"],
+            )
+        ],
+    )
+
+    report = explain_route(tmp_path, shot_id="line01__broll01", now=NOW)
+
+    assert report["ok"] is True
+    assert report["selected"]["capability_id"] == "t2v-insert"
+    assert report["intent"]["parent_shot_id"] == "line01"
+    assert report["intent"]["editorial_only"] is True
+    assert report["intent"]["audio_policy"] == "carry_parent_dialogue"
+
+
 def test_restricted_identity_shot_routes_local_and_rejects_cloud(
     tmp_path: Path,
 ) -> None:

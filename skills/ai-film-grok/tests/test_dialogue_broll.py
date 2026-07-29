@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import subprocess
 import sys
 import tempfile
@@ -13,6 +15,7 @@ from dialogue_broll import (  # noqa: E402
     DialogueBrollError,
     default_dialogue_broll,
     validate_dialogue_broll,
+    write_broll_edit_report,
 )
 from film_spec import FilmSpecError, validate_film_spec  # noqa: E402
 from render_final import apply_dialogue_broll_visual, pdur  # noqa: E402
@@ -92,6 +95,16 @@ class TestDialogueBroll(unittest.TestCase):
         }
         with self.assertRaisesRegex(FilmSpecError, "dialogue_drama"):
             validate_film_spec(spec, assign_missing_ids=False)
+
+    def test_edit_receipt_hash_binds_written_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            report, path, digest = write_broll_edit_report(
+                Path(tmp), [{"id": "line01__broll01", "actual_start_sec": 2.0}]
+            )
+            self.assertEqual(digest, hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertEqual(
+                json.loads(path.read_text(encoding="utf-8"))["entries"], report["entries"]
+            )
 
     @unittest.skipUnless(__import__("shutil").which("ffmpeg"), "ffmpeg required")
     def test_visual_cutaway_preserves_parent_duration(self) -> None:
