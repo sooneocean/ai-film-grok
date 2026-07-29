@@ -1248,12 +1248,11 @@ def cmd_quality_status(args: argparse.Namespace) -> int:
 
 
 def cmd_heat(args: argparse.Namespace) -> int:
-    """Adult heat gates: check | vo-suggest | soften-log."""
+    """Adult heat gates: check | vo-suggest | soften-log | soften-compensate."""
     root = Path(str(args.root)).expanduser().resolve()
     action = str(getattr(args, "heat_action", None) or "check")
     try:
-        from heat_check import heat_check, heat_vo_suggest
-        from util import write_json
+        from heat_check import heat_check, heat_soften_compensate, heat_vo_suggest
     except Exception as exc:  # noqa: BLE001
         raise FilmError(f"Cannot import heat_check: {exc}") from exc
     if action in {"check", ""}:
@@ -1264,34 +1263,13 @@ def cmd_heat(args: argparse.Namespace) -> int:
         report = heat_vo_suggest(root, shot_id=getattr(args, "shot", None))
         emit(report)
         return 0
-    if action == "soften-log":
-        # Dual-track moderation compensation receipt (never lower heat_scale)
+    if action in {"soften-log", "soften-compensate"}:
         note = str(getattr(args, "note", "") or "moderation softed still/I2V")
-        payload = {
-            "ok": True,
-            "at": __import__("datetime")
-            .datetime.now(__import__("datetime").timezone.utc)
-            .replace(microsecond=0)
-            .isoformat(),
-            "note": note,
-            "heat_scale_must_stay": True,
-            "compensation": {
-                "vo_spice_up": True,
-                "insert_l4": True,
-                "sfx_flesh": True,
-                "checklist": [
-                    "Rewrite act nar with denser sex verbs",
-                    "Add insert_cut craft or L4 body/fabric still",
-                    "Ensure sound_cues impact/breath on act",
-                    "Do NOT set heat_scale to medium/soft",
-                ],
-            },
-        }
-        path = root / "receipts" / "moderation_soften.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        write_json(path, payload)
-        emit({"ok": True, "path": str(path), "receipt": payload})
-        return 0
+        # soften-log is receipt-only; soften-compensate needs --apply to mutate film-spec
+        apply = action == "soften-compensate" and bool(getattr(args, "apply", False))
+        report = heat_soften_compensate(root, note=note, apply=apply)
+        emit(report)
+        return 0 if report.get("ok") else 1
     raise FilmError(f"unknown heat action: {action}")
 
 
@@ -8047,7 +8025,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     heat_p = sub.add_parser(
         "heat",
-        help="Adult heat: check | vo-suggest | soften-log",
+        help="Adult heat: check | vo-suggest | soften-log | soften-compensate",
     )
     heat_sub = heat_p.add_subparsers(dest="heat_action", required=True)
     heat_ck = heat_sub.add_parser(
@@ -8067,6 +8045,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     heat_sf.add_argument("--root", required=True)
     heat_sf.add_argument("--note", default="", help="What was soft-moderated")
+    heat_sc = heat_sub.add_parser(
+        "soften-compensate",
+        help="Dual-track compensate: checklist + optional --apply VO/SFX/music_energy (never lower heat)",
+    )
+    heat_sc.add_argument("--root", required=True)
+    heat_sc.add_argument("--note", default="", help="What was soft-moderated")
+    heat_sc.add_argument(
+        "--apply",
+        action="store_true",
+        help="Write VO spice + sex SFX + music_energy into film-spec (still no still gen)",
+    )
 
     si = sub.add_parser(
         "state-index",

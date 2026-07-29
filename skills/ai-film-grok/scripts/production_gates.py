@@ -104,8 +104,64 @@ def assert_pilot_user_approved(
     )
 
 
+def _assert_pilot_adult_three_beat(root: Path, approval: dict[str, Any]) -> None:
+    """max heat bulk requires pilot cover undress + union/rhythm impact trio.
+
+    Wave 2 · 2026-07-29: pick_pilot already prefers these beats; approval must
+    not silently approve only hook/setup.
+    """
+    base = Path(root).expanduser().resolve()
+    spec = read_json(base / "film-spec.json") or {}
+    heat = str(spec.get("heat_scale") or "").strip().lower()
+    if heat not in {"max", "hot"}:
+        return
+    if spec.get("adult_max_iron") is False:
+        return
+    if approval.get("skip_adult_pilot_beats") is True:
+        return
+    pilot_shots = {str(s) for s in (approval.get("shots") or []) if s}
+    if not pilot_shots:
+        return
+    covered: set[str] = set()
+    film_has_coitus = False
+    for scene in spec.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        for sh in scene.get("shots") or []:
+            if not isinstance(sh, dict):
+                continue
+            dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+            cb = str(sh.get("coitus_beat") or dsl.get("coitus_beat") or "").strip().lower()
+            if cb in {"undress", "union", "rhythm", "entry", "lock", "finish"}:
+                film_has_coitus = True
+            sid = str(sh.get("id") or "")
+            if sid not in pilot_shots:
+                continue
+            ph = str(sh.get("heat_phase") or dsl.get("heat_phase") or "").strip().lower()
+            if cb:
+                covered.add(cb)
+            if ph in {"act", "climax", "foreplay"}:
+                covered.add(ph)
+    if not film_has_coitus:
+        return
+    has_undress = bool(covered & {"undress", "foreplay"})
+    has_union = bool(covered & {"union", "entry", "lock"})
+    has_rhythm = bool(covered & {"rhythm", "act", "finish", "climax"})
+    # require undress ladder evidence + at least one meat beat
+    if not has_undress or not (has_union or has_rhythm):
+        raise ProductionGateError(
+            "pilot gate (adult max): approval shots must cover undress ladder + "
+            "union/rhythm impact (pick undress + union + rhythm). "
+            f"covered={sorted(covered) or 'none'} pilot={sorted(pilot_shots)}. "
+            "Re-run: aifilm pilot report / pick → score → approve with those shot ids. "
+            "Override: pilot-approval skip_adult_pilot_beats:true (not recommended)."
+        )
+
+
 def _assert_pilot_quality_evidence(root: Path, approval: dict[str, Any]) -> None:
     """New evidence-contract projects cannot bulk from stale pilot approvals."""
+    # Adult three-beat is always-on for max heat (Wave 2); quality evidence stays contract-gated
+    _assert_pilot_adult_three_beat(root, approval)
     manifest = read_json(Path(root).expanduser().resolve() / "manifest.json") or {}
     if int(manifest.get("quality_evidence_contract_version") or 0) < 1:
         return

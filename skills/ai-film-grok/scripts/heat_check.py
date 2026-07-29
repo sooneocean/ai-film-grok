@@ -222,3 +222,117 @@ def heat_vo_suggest(
         "shots": out,
         "note": "Copy a suggestion into film-spec nar; re-run write-spec / heat check",
     }
+
+
+def heat_soften_compensate(
+    root: Path,
+    *,
+    note: str = "",
+    apply: bool = False,
+) -> dict[str, Any]:
+    """Dual-track moderation compensation: VO + SFX + L4 insert checklist.
+
+    Never lowers heat_scale. When apply=True, rewrites weak nar + injects sex SFX
+    into film-spec sound_plan (still does not invent stills).
+    """
+    from edit_policy import apply_vo_spice_auto
+    from util import write_json
+
+    root = Path(root).expanduser().resolve()
+    spec_path = root / "film-spec.json"
+    spec = read_json(spec_path) or {}
+    if not spec:
+        return {"ok": False, "error": "missing film-spec.json", "root": str(root)}
+    heat = str(spec.get("heat_scale") or "").strip().lower()
+    shots = _flat_shots(spec)
+    checklist = [
+        "Rewrite act/climax nar with denser sex verbs (沉腰/吃进/办穿)",
+        "Add insert_cut craft or L4 body/fabric still (coverage_role=detail)",
+        "Ensure sound_cues impact/breath on act; sex_sfx accents present",
+        "Top-shelf suggestive pelvis contact when true bare is blocked",
+        "Do NOT set heat_scale to medium/soft",
+        "Do NOT fake penetration with hug-only stills",
+    ]
+    applied: dict[str, Any] = {"vo": None, "sfx": None, "music_energy": None}
+    if apply and heat in {"max", "hot"}:
+        spice = str(spec.get("spice_level") or "extreme")
+        vo_fix = apply_vo_spice_auto(shots, spice_level=spice)
+        applied["vo"] = vo_fix
+        try:
+            from sound_plan import (
+                default_sound_plan_for_film,
+                inject_music_energy_spotting,
+                inject_sex_sfx_from_shots,
+            )
+
+            sp = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
+            if sp is None:
+                sp = default_sound_plan_for_film(
+                    vo_mode=str(spec.get("vo_mode") or "storyteller"),
+                    tone=str((spec.get("director_intent") or {}).get("tone") or ""),
+                    title=str(spec.get("title") or ""),
+                )
+            sp = inject_sex_sfx_from_shots(sp, shots, heat_scale=heat)
+            sp = inject_music_energy_spotting(sp, shots, heat_scale=heat)
+            spec["sound_plan"] = sp
+            applied["sfx"] = {
+                "sex_notes": list(sp.get("_notes") or [])[-2:],
+                "music_spotting_n": len(sp.get("music_spotting") or []),
+            }
+            applied["music_energy"] = applied["sfx"]
+        except Exception as exc:  # noqa: BLE001
+            applied["sfx"] = {"error": str(exc)}
+        # ensure heat stays max
+        if heat == "max":
+            spec["heat_scale"] = "max"
+            spec.setdefault("spice_level", "extreme")
+        write_json(spec_path, spec)
+    # detail coverage advisory
+    detail_ids = [
+        str(sh.get("id") or "?")
+        for sh in shots
+        if str(sh.get("coverage_role") or (sh.get("dsl") or {}).get("coverage_role") or "").lower()
+        == "detail"
+        or "insert"
+        in str(
+            sh.get("shot_size")
+            or ((sh.get("dsl") or {}).get("camera") or {}).get("shot_size")
+            or ""
+        ).lower()
+    ]
+    receipt = {
+        "ok": True,
+        "kind": "moderation-soften-compensate",
+        "at": __import__("datetime")
+        .datetime.now(__import__("datetime").UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z"),
+        "note": note or "moderation softed still/I2V",
+        "heat_scale": heat or None,
+        "heat_scale_must_stay": True,
+        "apply": apply,
+        "applied": applied,
+        "detail_shots": detail_ids,
+        "checklist": checklist,
+        "compensation": {
+            "vo_spice_up": True,
+            "insert_l4": True,
+            "sfx_flesh": True,
+            "music_energy_follow": True,
+        },
+    }
+    path = root / "receipts" / "moderation_soften.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(path, receipt)
+    return {
+        "ok": True,
+        "root": str(root),
+        "path": str(path),
+        "receipt": receipt,
+        "line": (
+            f"soften-compensate apply={apply} heat={heat} "
+            f"vo_fixed={(applied.get('vo') or {}).get('fixed')} "
+            f"detail={','.join(detail_ids[:4]) or 'none'}"
+        ),
+    }

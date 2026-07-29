@@ -907,6 +907,76 @@ def suggest_auto_sfx_events(
     return events
 
 
+# Phase → BGM energy (adult max music follow · Wave 2)
+_PHASE_MUSIC_ENERGY: dict[str, float] = {
+    "setup": 0.35,
+    "foreplay": 0.55,
+    "act": 0.82,
+    "climax": 1.0,
+    "afterglow": 0.4,
+    "bridge": 0.3,
+}
+
+
+def inject_music_energy_spotting(
+    plan: dict[str, Any] | None,
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+) -> dict[str, Any] | None:
+    """Write music_spotting energy curve from heat_phase (rnb bed follows meat peak).
+
+    Does not change mood (stays rnb); only stamps per-shot energy for mixers/final.
+    """
+    if not plan or not isinstance(plan, dict):
+        return plan
+    if plan.get("auto_music_energy") is False:
+        return plan
+    heat = (heat_scale or "").strip().lower()
+    if heat not in {"max", "hot"}:
+        return plan
+    spotting: list[dict[str, Any]] = []
+    existing = plan.get("music_spotting")
+    if isinstance(existing, list) and existing and plan.get("lock_music_spotting"):
+        return plan
+    for shot in shots:
+        if not isinstance(shot, dict) or not shot.get("id"):
+            continue
+        ph = _shot_heat_phase(shot)
+        energy = _PHASE_MUSIC_ENERGY.get(ph)
+        if energy is None:
+            cues = shot.get("sensory_cues") if isinstance(shot.get("sensory_cues"), dict) else {}
+            if cues.get("music_energy") is not None:
+                try:
+                    energy = float(cues["music_energy"])
+                except (TypeError, ValueError):
+                    energy = 0.5
+            else:
+                energy = 0.5
+        # also mirror into sensory_cues for adult_max_director parity
+        cues = shot.get("sensory_cues")
+        if not isinstance(cues, dict):
+            cues = {}
+            shot["sensory_cues"] = cues
+        cues.setdefault("music_energy", energy)
+        spotting.append(
+            {
+                "shot_id": str(shot["id"]),
+                "heat_phase": ph,
+                "energy": energy,
+                "bed_gain": round(0.42 + 0.28 * float(energy), 3),
+                "auto": True,
+            }
+        )
+    if not spotting:
+        return plan
+    plan = {**plan, "music_spotting": spotting}
+    notes = list(plan.get("_notes") or [])
+    notes.append(f"music_energy: injected {len(spotting)} phase-linked spotting row(s)")
+    plan["_notes"] = notes
+    return plan
+
+
 def inject_sex_sfx_from_shots(
     plan: dict[str, Any] | None,
     shots: list[dict[str, Any]],

@@ -61,6 +61,7 @@ from sound_plan import (
     SoundPlanError,
     default_sound_plan_for_film,
     inject_auto_sfx_if_empty,
+    inject_music_energy_spotting,
     inject_sex_sfx_from_shots,
     resolve_sidechain,
     validate_sound_plan,
@@ -1096,6 +1097,7 @@ def validate_film_spec(
         if isinstance(sp, dict):
             sp = inject_auto_sfx_if_empty(sp, shots, heat_scale=heat_for_sfx)
             sp = inject_sex_sfx_from_shots(sp, shots, heat_scale=heat_for_sfx)
+            sp = inject_music_energy_spotting(sp, shots, heat_scale=heat_for_sfx)
             spec["sound_plan"] = sp
             if sp.get("_notes"):
                 notes = list(spec.get("_sound_plan_notes") or [])

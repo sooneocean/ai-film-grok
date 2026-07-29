@@ -1729,17 +1729,32 @@ def _compact_adult_spine_for_scene(body: str) -> list[dict[str, Any]]:
         }
     )
     if has_sex:
+        # Multi-scene must still carry 转→合 (penetration + climax bare) — not act-only
         spine.append(
             {
                 "key": "act",
                 "dramatic_function": "action",
-                "objective": "section peak action",
+                "objective": "section peak action: 沉腰抽送",
                 "importance": "high",
-                "weight": 0.35,
-                "shots_n": 2,
+                "weight": 0.28,
+                "shots_n": 1,
                 "heat_phase": "act",
                 "coitus_beat": "rhythm",
                 "wardrobe_state": "undressed",
+                "duration_boost": 8.0,
+            }
+        )
+        spine.append(
+            {
+                "key": "climax",
+                "dramatic_function": "action",
+                "objective": "section climax: 办穿/射出",
+                "importance": "climax",
+                "weight": 0.22,
+                "shots_n": 1,
+                "heat_phase": "climax",
+                "coitus_beat": "finish",
+                "wardrobe_state": "bare",
                 "duration_boost": 6.0,
             }
         )
@@ -1749,11 +1764,11 @@ def _compact_adult_spine_for_scene(body: str) -> list[dict[str, Any]]:
                 "dramatic_function": "afterglow",
                 "objective": "section exit / hook out",
                 "importance": "med",
-                "weight": 0.2,
+                "weight": 0.15,
                 "shots_n": 1,
                 "heat_phase": "afterglow",
                 "coitus_beat": "hook",
-                "wardrobe_state": "partial",
+                "wardrobe_state": "bare",
             }
         )
     else:
@@ -1774,6 +1789,65 @@ def _compact_adult_spine_for_scene(body: str) -> list[dict[str, Any]]:
         if sp.get("coitus_beat") is None:
             sp.pop("coitus_beat", None)
     return spine
+
+
+def rebalance_adult_beat_durations(
+    beats: list[dict[str, Any]],
+    *,
+    scene_budget_sec: float,
+    sex_floor: float = 0.50,
+) -> list[dict[str, Any]]:
+    """Ensure act+climax share of beat duration ≥ sex_floor (adult max plan-time).
+
+    Extends meat beats first; does not invent new beats.
+    """
+    if not beats or scene_budget_sec <= 0:
+        return beats
+    meat_keys = {"act", "climax"}
+    total = sum(float(b.get("targetDuration") or 0) for b in beats) or 0.0
+    if total <= 0:
+        return beats
+    meat = sum(
+        float(b.get("targetDuration") or 0)
+        for b in beats
+        if str(b.get("heat_phase") or "").lower() in meat_keys
+    )
+    ratio = meat / total
+    if ratio + 1e-9 >= sex_floor:
+        return beats
+    need = sex_floor * total - meat
+    meat_beats = [b for b in beats if str(b.get("heat_phase") or "").lower() in meat_keys]
+    if not meat_beats:
+        return beats
+    # Prefer lengthening rhythm/climax over union
+    meat_beats_sorted = sorted(
+        meat_beats,
+        key=lambda b: (
+            0 if str(b.get("coitus_beat") or "") in {"rhythm", "finish"} else 1,
+            -float(b.get("targetDuration") or 0),
+        ),
+    )
+    each = need / len(meat_beats_sorted)
+    for b in meat_beats_sorted:
+        b["targetDuration"] = round(float(b.get("targetDuration") or 0) + each, 1)
+        b["_duration_rebalanced"] = True
+    # Cap total near scene budget by shrinking setup only
+    new_total = sum(float(b.get("targetDuration") or 0) for b in beats)
+    if new_total > scene_budget_sec * 1.15:
+        setup_beats = [
+            b
+            for b in beats
+            if str(b.get("heat_phase") or "").lower() in {"setup", "afterglow", "bridge"}
+        ]
+        overflow = new_total - scene_budget_sec
+        for b in setup_beats:
+            if overflow <= 0:
+                break
+            cur = float(b.get("targetDuration") or 0)
+            cut = min(overflow, max(0.0, cur - 2.5))
+            b["targetDuration"] = round(cur - cut, 1)
+            overflow -= cut
+    return beats
 
 
 def extract_beats(
@@ -1846,6 +1920,8 @@ def extract_beats(
             "emotionalShift": {"from": "", "to": ""},
             "importance": sp["importance"],
             "dramatic_function": sp["dramatic_function"],
+            "heat_phase": sp.get("heat_phase"),
+            "coitus_beat": sp.get("coitus_beat"),
             "targetDuration": dur,
             # Do not manufacture a second spoken take from the same source
             # sentence. Additional coverage needs its own authored beat.
@@ -1870,6 +1946,12 @@ def extract_beats(
         if sp.get("wardrobe_state"):
             beat_obj["wardrobe_state"] = sp["wardrobe_state"]
         beats.append(beat_obj)
+    # Adult max: pre-allocate meat seconds before write-spec fails (Wave 2)
+    if adult:
+        floor = 0.55 if heat.get("hardcore") else 0.50
+        beats = rebalance_adult_beat_durations(
+            beats, scene_budget_sec=scene_budget_sec, sex_floor=floor
+        )
     return beats
 
 

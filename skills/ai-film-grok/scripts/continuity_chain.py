@@ -78,6 +78,37 @@ _WARDROBE_RANK = {
 }
 
 
+def promote_wardrobe_ok(
+    prev: dict[str, Any] | None,
+    nxt: dict[str, Any] | None,
+    *,
+    heat_scale: str | None = None,
+) -> tuple[bool, str]:
+    """Hard ban promote when next wardrobe rank drops (re-dress risk · Wave 2).
+
+    Field-level gate: endframe carries prev costume; promoting into a lower-rank
+    next still would bake re-dress into the next I2V first frame.
+    """
+    if not prev or not nxt:
+        return True, "no pair"
+    pw = wardrobe_state_of(prev)
+    nw = wardrobe_state_of(nxt)
+    pr = _WARDROBE_RANK.get(pw)
+    nr = _WARDROBE_RANK.get(nw)
+    scale = (heat_scale or "").strip().lower()
+    if pr is None or nr is None:
+        return True, "wardrobe unstated"
+    if nr < pr:
+        # max/hot always hard-block; others soft-block undress ladder only
+        if scale in {"max", "hot"} or pr >= 2:
+            return (
+                False,
+                f"HEAT_WARDROBE_RE_DRESS promote blocked: prev={pw}(rank{pr}) "
+                f"→ next={nw}(rank{nr}); clamp next wardrobe ≥ prev or cut join",
+            )
+    return True, f"wardrobe ok {pw}→{nw}"
+
+
 def should_auto_promote_next(
     prev: dict[str, Any] | None,
     nxt: dict[str, Any] | None,
@@ -88,9 +119,14 @@ def should_auto_promote_next(
 
     Product (2026-07-21 教训): 生成时必须按剧情实际 first/last 接戏，
     禁止每镜从 cast 全装重起（回穿 / 姿势断）。
+    P0 · 2026-07-29 Wave 2: wardrobe rank drop hard-blocks promote on max/hot.
     """
     if not prev or not nxt:
         return False, "no next shot"
+    # Wardrobe re-dress gate first (even when chain continues)
+    ok_w, why_w = promote_wardrobe_ok(prev, nxt, heat_scale=heat_scale)
+    if not ok_w:
+        return False, why_w
     mode = shot_chain_mode(prev) or shot_chain_mode(nxt)
     if mode in {"cut", "bridge", "hard_cut"}:
         return False, f"chain_mode={mode} (no byte promote)"
