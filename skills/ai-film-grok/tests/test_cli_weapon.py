@@ -94,3 +94,22 @@ def test_promotion_rejects_review_bound_to_other_bytes(tmp_path: Path) -> None:
     )
     with pytest.raises(WeaponControlError, match="approved human review"):
         promotion_packet("ltx2-broll-pilot", canary, review)
+
+
+def test_research_weapon_canary_is_plannable(capsys) -> None:
+    args = Namespace(
+        weapon_action="canary",
+        weapon_id="ltx2-broll-pilot",
+        base_url=None,
+        execute=False,
+        complete=False,
+        confirm=False,
+        workflow=None,
+        timeout=60,
+        receipt=None,
+        submission_receipt=None,
+        media=None,
+        review_receipt=None,
+    )
+    assert run_weapon(args, emit=lambda payload: print(json.dumps(payload))) == 0
+    assert json.loads(capsys.readouterr().out)["allowed_stage"] == "pilot"

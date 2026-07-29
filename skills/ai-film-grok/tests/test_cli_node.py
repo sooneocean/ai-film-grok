@@ -10,6 +10,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from cli_node import node_status, run_node  # noqa: E402
+from comfy_recovery import ComfyRecoveryConfig  # noqa: E402
 
 
 def test_status_marks_unreachable_comfy_as_unavailable_without_raw_error() -> None:
@@ -54,3 +55,19 @@ def test_recover_requires_confirmation_before_any_remote_operation(capsys) -> No
         assert run_node(args, emit=lambda payload: print(json.dumps(payload))) == 2
     recover.assert_not_called()
     assert "--confirm" in capsys.readouterr().out
+
+
+def test_recover_rejects_queue_check_on_a_different_endpoint() -> None:
+    args = Namespace(
+        node_action="recover", base_url="http://192.168.88.52:8188", confirm=True, receipt=None
+    )
+    config = ComfyRecoveryConfig(
+        "user@192.168.88.52", Path("/key"), 18188, 8188, r"C:\\ComfyUI_windows_portable"
+    )
+    with (
+        patch("comfy_recovery.config_from_env", return_value=config),
+        patch("comfy_recovery.validate_recovery_config", return_value=config),
+        patch("cli_node.queue_status") as queue,
+    ):
+        assert run_node(args, emit=lambda _payload: None) == 2
+    queue.assert_not_called()
