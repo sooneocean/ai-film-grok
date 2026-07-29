@@ -61,7 +61,7 @@ class DispatchTests(unittest.TestCase):
             self.assertIn("agent_do", packet)
             self.assertIn("routing", packet)
             self.assertTrue(Path(packet["receipt_path"]).is_file())
-            self.assertEqual(packet["routing"].get("tts_default"), "mimo")
+            self.assertEqual(packet["routing"].get("tts_default"), "edge")
             self.assertIn("off", packet["routing"].get("lipsync", ""))
             # Phase 1+2 additive fields
             self.assertGreaterEqual(int(packet.get("schema_version") or 0), 2)
