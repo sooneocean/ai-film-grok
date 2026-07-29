@@ -41,6 +41,7 @@ def migrate_to_v2(bible: dict[str, Any]) -> dict[str, Any]:
     for field in [
         "characters",
         "wardrobe_variants",
+        "wardrobe_ladders",
         "cast_state_masters",
         "locations",
         "props",
@@ -75,6 +76,7 @@ def resolve_state_photo(
     wardrobe_state: str,
     *,
     root: Path | None = None,
+    wardrobe_state_id: str | None = None,
 ) -> str | None:
     """Return relative or absolute path for a character wardrobe state photo.
 
@@ -86,6 +88,23 @@ def resolve_state_photo(
     """
     state = (wardrobe_state or "full").strip().lower() or "full"
     hid = (heroine_id or "hero").strip() or "hero"
+    if wardrobe_state_id:
+        try:
+            from wardrobe_ladder import resolve_exact_state_photo
+
+            exact = resolve_exact_state_photo(bible, hid, wardrobe_state_id, root=root)
+            if exact:
+                return exact
+        except ImportError:
+            pass
+    try:
+        from wardrobe_ladder import resolve_state_photo_for_category
+
+        ladder_path = resolve_state_photo_for_category(bible, hid, state, root=root)
+        if ladder_path:
+            return ladder_path
+    except ImportError:
+        pass
     csm = (
         bible.get("cast_state_masters") if isinstance(bible.get("cast_state_masters"), dict) else {}
     )

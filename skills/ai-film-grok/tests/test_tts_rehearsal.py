@@ -16,11 +16,37 @@ sys.path.insert(0, str(SCRIPTS))
 
 from tts_rehearsal import (  # noqa: E402
     TTSRehearsalError,
+    _voice_script_for_shot,
     load_rehearsal_receipt,
     measured_vo_by_shot,
     register_measured_durations,
     run_rehearsal,
 )
+
+
+def test_dialogue_rehearsal_uses_japanese_voice_cue_not_chinese_caption():
+    script = _voice_script_for_shot(
+        {
+            "nar": "你为什么还没下车？",
+            "audio_cues": [
+                {
+                    "kind": "voice",
+                    "line_type": "dialogue",
+                    "language": "ja",
+                    "voice": "ja-JP-NanamiNeural",
+                    "spoken_text": "まだ降りないの？",
+                    "caption_text": "你为什么还没下车？",
+                }
+            ],
+        },
+        fallback_voice="zh-CN-XiaoxiaoNeural",
+    )
+    assert script == {
+        "text": "まだ降りないの？",
+        "text_kind": "dialogue",
+        "language": "ja",
+        "voice": "ja-JP-NanamiNeural",
+    }
 
 
 def _minimal_spec() -> dict:

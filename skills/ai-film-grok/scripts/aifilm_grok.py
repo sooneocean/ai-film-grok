@@ -1487,10 +1487,35 @@ def cmd_state_index(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise FilmError(f"Cannot import state_index_gate: {exc}") from exc
     root = Path(args.root).expanduser().resolve()
+    action = getattr(args, "state_index_action", None) or "check"
+    if action == "approve-state":
+        from visual_bible import load_bible, save_bible
+        from wardrobe_ladder import approve_state
+
+        bible = load_bible(root)
+        try:
+            state = approve_state(
+                bible,
+                str(args.character_id),
+                str(args.wardrobe_state_id),
+                Path(args.image),
+                root=root,
+            )
+        except ValueError as exc:
+            raise FilmError(str(exc)) from exc
+        save_bible(root, bible)
+        emit(
+            {
+                "ok": True,
+                "kind": "wardrobe-state-approved",
+                "character_id": args.character_id,
+                "state": state,
+            }
+        )
+        return 0
     report = run_state_index_check(root)
     path = write_state_index_receipt(root, report)
     report["receipt_path"] = str(path)
-    action = getattr(args, "state_index_action", None) or "check"
     if action == "plan":
         # plan = full report + human-readable generate_plan first
         plan_view = {
@@ -1504,6 +1529,7 @@ def cmd_state_index(args: argparse.Namespace) -> int:
             "fluency_issues": report.get("fluency_issues") or [],
             "undress_anchor": report.get("undress_anchor"),
             "missing_state_photos": report.get("missing_state_photos"),
+            "exact_state_ids": report.get("exact_state_ids") or {},
             "missing_keyframes": report.get("missing_keyframes"),
             "receipt_path": str(path),
             "ref": report.get("ref"),
@@ -8353,6 +8379,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sip.add_argument("--root", required=True)
     sip.add_argument("--strict", action="store_true")
+    sia = si_sub.add_parser(
+        "approve-state",
+        help="Register a human-approved local I2I wardrobe-state image; never calls a provider",
+    )
+    sia.add_argument("--root", required=True)
+    sia.add_argument("--character-id", required=True)
+    sia.add_argument("--wardrobe-state-id", required=True)
+    sia.add_argument("--image", required=True)
 
     pilot = sub.add_parser(
         "pilot",

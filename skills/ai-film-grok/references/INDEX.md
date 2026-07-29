@@ -120,6 +120,7 @@
 | [ecchi-story.md](ecchi-story.md) | 色气叙事规范 |
 | [adult-max-playbook.md](adult-max-playbook.md) | 办事剧单入口 sex≥30% |
 | **[anatomy-milk-futa-comfy-batch](lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md)** | **P0 毒镜解剖**：禁 futa/喷奶/霓虹器；尺度≠畸形 |
+| **[evirus-ch04-bulk-final-iron](lessons-2026-07-29-evirus-ch04-bulk-final-iron.md)** | **P0 bulk→final**：moderated bare I2V / 高动 / evidence 双轮 / final 混音字幕坑 |
 
 ---
 
@@ -131,6 +132,8 @@
 
 | 文件 | 主题 |
 |---|---|
+| **[closeout-gates-chaebol](lessons-2026-07-29-closeout-gates-chaebol.md)** | **P0 收尾门禁**：plate≠完；heat codes / partner_wardrobe；sensory；truth_contract；字幕真钟；quality 缓存；narrative 重绑；export 链（财阀案） |
+| **[evirus-ch04-bulk-final-iron](lessons-2026-07-29-evirus-ch04-bulk-final-iron.md)** | **P0 bulk→final**：Imagine bare 拦 → undress 续接+高动；evidence 双轮；final 超时/sidechain 假死；字幕无空格或 PIL |
 | **[anatomy-milk-futa-comfy-batch](lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md)** | **P0 毒镜**：禁 futa/女体阴茎、喷奶乳汁、霓虹生殖器；中英硬 NEG；毒 still 禁 I2V；+ Comfy 5090 批跑资源塔 |
 
 ### 2026-07-28

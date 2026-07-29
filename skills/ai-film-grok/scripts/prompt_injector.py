@@ -245,8 +245,11 @@ class PromptInjector:
         characters = self.bible.get("characters", {})
 
         wardrobe_state = self._wardrobe_state_of(shot) or "default"
+        wardrobe_state_id = shot.get("wardrobe_state_id") or dsl0.get("wardrobe_state_id")
+        wardrobe_state_id = str(wardrobe_state_id).strip() if wardrobe_state_id else None
         char_locks = []
         state_photo_paths: list[str] = []
+        state_photo_records: list[dict[str, Any]] = []
         try:
             from visual_bible import resolve_state_photo
         except Exception:
@@ -333,9 +336,31 @@ class PromptInjector:
                 )
 
             if resolve_state_photo is not None:
-                sp = resolve_state_photo(self.bible, str(hid), wardrobe_state, root=root)
+                sp = resolve_state_photo(
+                    self.bible,
+                    str(hid),
+                    wardrobe_state,
+                    root=root,
+                    wardrobe_state_id=wardrobe_state_id,
+                )
                 if sp:
                     state_photo_paths.append(sp)
+                    if wardrobe_state_id:
+                        try:
+                            from wardrobe_ladder import state_for_id
+
+                            state = state_for_id(self.bible, str(hid), wardrobe_state_id) or {}
+                            state_photo_records.append(
+                                {
+                                    "character_id": str(hid),
+                                    "wardrobe_state_id": wardrobe_state_id,
+                                    "parent_state_id": state.get("parent_state_id"),
+                                    "removed_garment_ids": state.get("removed_garment_ids") or [],
+                                    "state_photo_sha256": state.get("sha256"),
+                                }
+                            )
+                        except ImportError:
+                            pass
 
         if char_locks:
             parts.append(" | ".join(char_locks))
@@ -368,7 +393,8 @@ class PromptInjector:
                 )
             state_instruction = (
                 f"State photo ref: {primary} — image_edit MUST use this state photo as the PRIMARY pixel reference "
-                f"(or undress-anchor / prior undressed still) for wardrobe_state={wardrobe_state}; "
+                f"(or undress-anchor / prior undressed still) for wardrobe_state={wardrobe_state}"
+                f" state_id={wardrobe_state_id or 'legacy'}; "
                 f"do NOT restart from full cast master unless state=full"
             )
             reference_instruction += state_instruction
@@ -646,8 +672,10 @@ class PromptInjector:
             "bible_version": self.bible.get("schema_version"),
             "bible_state": self.bible.get("state"),
             "wardrobe_state": wardrobe_state,
+            "wardrobe_state_id": wardrobe_state_id,
             "state_photo_paths": state_photo_paths,
             "state_photo_primary": state_photo_paths[0] if state_photo_paths else None,
+            "state_photo_records": state_photo_records,
             "style_reference": style_reference or None,
             "reference_instruction": reference_instruction or None,
             "prompt_text": final_prompt,

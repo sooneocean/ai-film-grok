@@ -81,6 +81,29 @@ def _load_spec(root: Path, spec_path: Path | None) -> dict[str, Any]:
     return raw
 
 
+def _voice_script_for_shot(shot: dict[str, Any], *, fallback_voice: str) -> dict[str, str]:
+    """Resolve rehearsal speech from the executable voice cue, never captions."""
+    for cue in shot.get("audio_cues") or []:
+        if not isinstance(cue, dict) or cue.get("kind") != "voice":
+            continue
+        text = str(cue.get("spoken_text") or "").strip()
+        if not text:
+            continue
+        return {
+            "text": text,
+            "text_kind": str(cue.get("line_type") or "voice").strip().lower(),
+            "language": str(cue.get("language") or "").strip().lower(),
+            "voice": str(cue.get("voice") or fallback_voice).strip() or fallback_voice,
+        }
+    voice_channel = resolve_content_channels(shot)["voice"]
+    return {
+        "text": str(voice_channel["text"] or "").strip(),
+        "text_kind": str(voice_channel["kind"] or "voice").strip().lower(),
+        "language": "",
+        "voice": fallback_voice,
+    }
+
+
 def register_measured_durations(
     root: Path,
     measurements: list[dict[str, Any]],
@@ -150,6 +173,8 @@ def register_measured_durations(
                 "nar": item.get("nar"),
                 "text_kind": item.get("text_kind"),
                 "text": item.get("text"),
+                "language": item.get("language"),
+                "voice": item.get("voice"),
             }
         )
 
@@ -209,9 +234,10 @@ def run_rehearsal(
 
     for shot in shots:
         sid = str(shot["id"])
-        voice_channel = resolve_content_channels(shot)["voice"]
-        text_kind = str(voice_channel["kind"])
-        nar = str(voice_channel["text"] or "").strip()
+        script = _voice_script_for_shot(shot, fallback_voice=voice)
+        text_kind = script["text_kind"]
+        nar = script["text"]
+        cue_voice = script["voice"]
         plate = float(shot.get("duration_sec") or 6.0)
         est = float(shot.get("est_vo_sec") or estimate_nar_vo_sec(nar))
         reg_path = (register_map or {}).get(sid)
@@ -226,6 +252,8 @@ def run_rehearsal(
                     "nar": nar,
                     "text_kind": text_kind,
                     "text": nar,
+                    "language": script["language"],
+                    "voice": cue_voice,
                 }
             )
             continue
@@ -243,7 +271,7 @@ def run_rehearsal(
                 nar,
                 out_mp3,
                 backend=used_backend,
-                voice=voice,
+                voice=cue_voice,
                 usage_root=root,
                 shot_id=sid,
             )
@@ -259,6 +287,8 @@ def run_rehearsal(
                 "nar": nar,
                 "text_kind": text_kind,
                 "text": nar,
+                "language": script["language"],
+                "voice": cue_voice,
             }
         )
 

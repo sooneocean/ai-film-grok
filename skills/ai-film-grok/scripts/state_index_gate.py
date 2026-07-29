@@ -53,6 +53,12 @@ def _wardrobe_of(shot: dict[str, Any]) -> str:
     return str(w).strip().lower() or "full"
 
 
+def _wardrobe_state_id(shot: dict[str, Any]) -> str | None:
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    value = shot.get("wardrobe_state_id") or dsl.get("wardrobe_state_id")
+    return str(value).strip() if value else None
+
+
 def _chain_mode(shot: dict[str, Any]) -> str:
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
     return str(dsl.get("chain_mode") or "continue").strip().lower()
@@ -120,6 +126,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
     shots = _shots_from_spec(spec) if spec else []
     shot_rows: list[dict[str, Any]] = []
     states_needed: set[str] = set()
+    exact_state_ids: dict[str, set[str]] = {}
     heroes: set[str] = set()
 
     for sh in shots:
@@ -129,12 +136,15 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
         hids = _hero_ids(sh)
         for h in hids:
             heroes.add(h)
+            if _wardrobe_state_id(sh):
+                exact_state_ids.setdefault(h, set()).add(str(_wardrobe_state_id(sh)))
         kf = _find_keyframe(root, sid) if sid else None
         clip = _approved_clip(man, sid) if sid else None
         shot_rows.append(
             {
                 "id": sid,
                 "wardrobe_state": w,
+                "wardrobe_state_id": _wardrobe_state_id(sh),
                 "chain_mode": _chain_mode(sh),
                 "hero_ids": hids,
                 "keyframe": str(kf) if kf else None,
@@ -156,6 +166,49 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
     )
     missing_states: list[str] = []
     state_index: dict[str, Any] = {}
+
+    # A gradual wardrobe story must own an explicit garment-by-garment ladder.
+    # This is intentionally independent of heat_scale: it prevents a normal
+    # dramatic costume change from silently falling back to the full cast image.
+    ladder_hard: list[dict[str, Any]] = []
+    ladder_plan: list[dict[str, Any]] = []
+    try:
+        from wardrobe_ladder import (
+            ladder_plan as build_ladder_plan,
+        )
+        from wardrobe_ladder import (
+            needs_ladder,
+            state_for_id,
+        )
+
+        if needs_ladder(states_needed):
+            for hid in sorted(heroes) or ["hero"]:
+                issues, steps = build_ladder_plan(bible, hid, root=root)
+                for issue in issues:
+                    ladder_hard.append(
+                        {
+                            "level": "hard",
+                            "code": str(issue.get("code") or "WARDROBE_LADDER_INVALID"),
+                            "message": f"wardrobe ladder invalid for {hid}: {issue.get('code')}",
+                            "fix": "fill wardrobe_ladders garment list, approve full state, then complete serial state I2I",
+                        }
+                    )
+                ladder_plan.extend(steps)
+                for state_id in sorted(exact_state_ids.get(hid) or []):
+                    state = state_for_id(bible, hid, state_id)
+                    if not state or state.get("status") != "approved":
+                        ladder_hard.append(
+                            {
+                                "level": "hard",
+                                "code": "EXACT_WARDROBE_STATE_UNAVAILABLE",
+                                "message": f"shot requests unapproved exact wardrobe state {hid}:{state_id}",
+                                "fix": "complete and approve the requested wardrobe_ladder state before I2I/I2V",
+                            }
+                        )
+    except ImportError:
+        pass
+    hard.extend(ladder_hard)
+    gen_plan.extend(ladder_plan)
 
     for hid in sorted(heroes) or ["hero"]:
         state_index[hid] = {}
@@ -265,7 +318,17 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
             }
         )
 
-    if missing_states and heat_maxish:
+    if missing_states and needs_ladder(states_needed):
+        hard.append(
+            {
+                "level": "hard",
+                "code": "MISSING_REQUIRED_STATE_PHOTOS",
+                "message": "story uses non-full wardrobe states but canonical state photos are missing: "
+                + ", ".join(missing_states[:12]),
+                "fix": "complete the wardrobe_ladder serial I2I plan before still/I2V generation",
+            }
+        )
+    elif missing_states and heat_maxish:
         # bare/undressed state photos hard on max; partial stays soft
         meat_missing = [
             m for m in missing_states if m.endswith(":bare") or m.endswith(":undressed")
@@ -490,6 +553,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
         "purpose": "check state photos + keyframes + join promote so I2V transitions stay fluid; regenerate gaps here",
         "shot_count": len(shot_rows),
         "states_needed": sorted(states_needed, key=lambda s: WARDROBE_RANK.get(s, 0)),
+        "exact_state_ids": {key: sorted(value) for key, value in exact_state_ids.items()},
         "heroes": sorted(heroes),
         "state_index": state_index,
         "dialogue_state_index": dialogue_state_index,

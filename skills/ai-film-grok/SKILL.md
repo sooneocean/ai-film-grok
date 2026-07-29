@@ -48,6 +48,8 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 14. **高动态**：平常 mean≥18、肉戏≥20；禁 KB/弱 raw；桌面 final 仅 `i2v-final-gate` ok。[high-motion](references/lessons-2026-07-27-high-motion-style-lock-final.md)
 15. **I2V 画风锁**：源=style-locked still；首段 MEDIUM LOCK cel。
 16. **5090 武器库**：未锁视觉用 `weapon_route`；仅实跑 Qwen/Wan；未验 fail closed。[规则](references/comfy-weapon-armory.md)
+17. **bulk→final 出片（P0 · 2026-07-29）**：Imagine 拦 bare → undress 续接+高动软词+MEDIUM LOCK cel，禁内衣冒充插入；重拍后 review+register 两轮；orphan 清 manifest；final 直调长超时；sidechain 假死改 amix；字幕无空格路径或 PIL 烧。[lesson](references/lessons-2026-07-29-evirus-ch04-bulk-final-iron.md)
+18. **收尾门禁（P0 · 2026-07-29）**：plate≠完。heat 看 codes（`partner_wardrobe_state`）；adult sensory（sex_sfx+mix artifacts+AV）；改 spec 刷 truth_contract；字幕用真 concat 钟；改 final 删 quality-report 并重绑 narrative；review-final→post-audit→export-desktop。[lesson](references/lessons-2026-07-29-closeout-gates-chaebol.md)·[memory](memory/2026-07-29-closeout-gates-iron.md)
 
 ## 阶段
 

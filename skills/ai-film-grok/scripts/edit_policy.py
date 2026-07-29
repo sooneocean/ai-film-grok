@@ -4230,6 +4230,12 @@ _SEX_ARC_PENETRATION_MARKERS: tuple[str, ...] = (
     "hip-sink",
     "grind",
     "thrust",
+    "deep thrust",
+    "deep-thrust",
+    "penetrating thrust",
+    "penetrating-thrust",
+    "bottoming out",
+    "bottoming-out",
     "straddle",
     "mount",
     "pelvis",
@@ -4246,6 +4252,7 @@ _SEX_ARC_PENETRATION_MARKERS: tuple[str, ...] = (
     "吃进",
     "跨坐",
     "结合",
+    "体内",
 )
 _SEX_ARC_RELEASE_MARKERS: tuple[str, ...] = (
     "climax",
@@ -4255,6 +4262,17 @@ _SEX_ARC_RELEASE_MARKERS: tuple[str, ...] = (
     "ejaculat",
     "cum",
     "orgasm",
+    "internal ejaculation",
+    "internal-ejaculation",
+    "internal peak",
+    "internal-peak",
+    "creampie",
+    "creampie release",
+    "creampie-release",
+    "overflow",
+    "overflowing",
+    "biological fluid",
+    "biological release",
     "高潮",
     "射出",
     "失声",
@@ -4262,6 +4280,10 @@ _SEX_ARC_RELEASE_MARKERS: tuple[str, ...] = (
     "办穿",
     "residual",
     "tremor",
+    "体内",
+    "残留",
+    "溢出",
+    "渗",
 )
 _SEX_ARC_FOREPLAY_MARKERS: tuple[str, ...] = (
     "undress",
@@ -4308,9 +4330,9 @@ def resolve_sex_arc_beat(shot: dict[str, Any]) -> str | None:
         return "foreplay"
     if cb in {"entry", "hook"}:
         return "entry" if cb == "entry" else "afterglow"
-    if cb in {"union", "rhythm", "lock"}:
+    if cb in {"union", "rhythm", "lock", "entry", "deep_thrust"}:
         return "penetration"
-    if cb == "finish":
+    if cb in {"finish", "internal_peak", "creampie_release"}:
         return "climax_release"
     ph = infer_heat_phase(shot)
     blob = _shot_visual_pose_blob(shot)

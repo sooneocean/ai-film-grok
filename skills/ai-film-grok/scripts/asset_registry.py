@@ -250,6 +250,18 @@ def _ensure_cast_state_slots(
     return slots
 
 
+def _ensure_wardrobe_ladder(
+    root: Path, bible: dict[str, Any], character_id: str, states_used: set[str]
+) -> dict[str, Any] | None:
+    """Add an editable, fail-closed ladder skeleton when this story needs undress states."""
+    try:
+        from wardrobe_ladder import ensure_ladder
+
+        return ensure_ladder(bible, character_id, states_used, root=root)
+    except ImportError:
+        return None
+
+
 def _structure_locations(bible: dict[str, Any], *, force: bool = False) -> list[dict[str, Any]]:
     locs = bible.get("locations")
     if not isinstance(locs, dict):
@@ -478,6 +490,16 @@ def sync_assets(
         used = used_by_char.get(cid) or {"full"}
         variants = _ensure_wardrobe_variants(bible, cid, used, force=False)
         slots = _ensure_cast_state_slots(root, bible, cid, used, write=write)
+        ladder = _ensure_wardrobe_ladder(root, bible, cid, used)
+        ladder_issues: list[dict[str, Any]] = []
+        ladder_steps: list[dict[str, Any]] = []
+        if ladder is not None:
+            try:
+                from wardrobe_ladder import ladder_plan
+
+                ladder_issues, ladder_steps = ladder_plan(bible, cid, root=root)
+            except ImportError:
+                pass
         # forbid drift defaults
         forbid = (
             body.get("forbid_drift")
@@ -496,6 +518,9 @@ def sync_assets(
                 "castMaster": body.get("cast_master") or (bible.get("cast_masters") or {}).get(cid),
                 "states": slots,
                 "wardrobeVariants": variants,
+                "wardrobeLadder": ladder,
+                "wardrobeStateChainPlan": ladder_steps,
+                "wardrobeLadderIssues": ladder_issues,
                 "forbidDrift": list(forbid) if isinstance(forbid, list) else [str(forbid)],
                 "statesUsed": sorted(used, key=lambda s: WARDROBE_RANK.get(s, 0)),
             }
