@@ -34,6 +34,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
 7. **供应商**：I2V=`grok_primary`；恢复路径才 `frw_video_model=seedance-2-fast-i2v`（[frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)），禁静默 bulk。
 8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM 亲密=rnb。
+8b. **对白 i2i**：讲话镜头先做角色 performance-state 静帧；FRW 只有“上传凭据+精确 img2image 模板”receipt=`available` 才优先。否则先 `comfy capacity`；忙就等，禁抢队列／interrupt／删外部任务／busy 时 free-memory。[lesson](references/lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 final。
 10. **字幕**：像素内中文；HF 失字 recovery；`sub_lead=0`；禁空 SRT。`caption_mode`/`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)。

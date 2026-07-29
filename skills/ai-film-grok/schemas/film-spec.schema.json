@@ -47,6 +47,18 @@
       "type": "boolean",
       "description": "Require every shot to declare its timed audio cues. Legacy projects remain compatible when false."
     },
+    "dialogue_state_strict": {
+      "type": "boolean",
+      "description": "For dialogue_drama, require a hash-bound, human-approved I2I performance-state still before motion generation."
+    },
+    "narration_budget_strict": {
+      "type": "boolean",
+      "description": "For dialogue_drama, reject narration above 15 percent of voiced duration."
+    },
+    "narration_gap_strict": {
+      "type": "boolean",
+      "description": "Require reasoned, non-duplicative gap evidence for any narration in dialogue_drama."
+    },
     "audio_tracks": {
       "type": "object",
       "properties": {
@@ -559,8 +571,34 @@
                 "dialogue_ja": { "type": "string" },
                 "caption_text": { "type": "string", "minLength": 1 },
                 "translation_status": { "enum": ["pending", "ready"] },
+                "performance_state_id": { "type": "string", "minLength": 1 },
+                "performance_state": {
+                  "type": "object",
+                  "properties": {
+                    "emotion": { "type": "string" },
+                    "subtext": { "type": "string" },
+                    "gaze_target": { "type": "string" },
+                    "head_angle": { "type": "string" },
+                    "body_orientation": { "type": "string" },
+                    "gesture": { "type": "string" },
+                    "props": { "type": "array", "items": { "type": "string" } },
+                    "lighting": { "type": "string" },
+                    "continuity_parent": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                },
                 "screen_mode": { "enum": ["on_camera", "off_camera", "reaction", "action_cover", "silence", "narration"] },
                 "narration_reason": { "type": "string", "minLength": 1 },
+                "narration_gap": {
+                  "type": "object",
+                  "required": ["reason", "uncovered_information"],
+                  "properties": {
+                    "reason": { "enum": ["time_jump", "location_context", "offscreen_fact", "inner_context"] },
+                    "uncovered_information": { "type": "string", "minLength": 1 },
+                    "source_refs": { "type": "array", "items": { "type": "string" } }
+                  },
+                  "additionalProperties": false
+                },
                 "dramatic_function": {
                   "type": "string",
                   "enum": [

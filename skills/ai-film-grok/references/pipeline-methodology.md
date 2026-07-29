@@ -13,7 +13,17 @@
 
 ## 轴 A · 电影工序（逐层减模糊）
 
-**产品八环主脊**（agent 调度优先 · `aifilm craft`）：
+**对外唯一进度：Professional 11 阶段**（`dispatch.workflow`）：
+
+```text
+概念锁 → 剧本锁 → 部门与视觉锁 → 镜头与动态分镜锁 → Pilot 批准
+→ 批量生成 → 每日样片审核 → 选片与粗剪 → 画面锁定 → 后期锁定 → 母版锁定
+```
+
+`agent → visual → voice → design → post → deliver → done` 仅是兼容旧
+receipt、HUD 与路由的**内部执行层**，不得作为第二套用户进度。
+
+**创作八环检查表**（`aifilm craft`，不是项目进度）：
 
 ```text
 Idea → Story → Beats → Shots → Media → Selects → Rough Cut → Verified MP4
@@ -77,7 +87,7 @@ Grok Agent（規劃 + Prompt 優化 + 角色一致性 + Imagine）
 
 ## 两轴对照（agent 调度用）
 
-| 八环 | 工序位置 | 工具层 / 命令 |
+| 创作检查表 | 工序位置 | 工具层 / 命令 |
 |---|---|---|
 | Idea–Story | Development | `init` · Lens · `director_intent` · `craft` |
 | Beats–Shots | Pre | `write-spec` · pilot · `tts-rehearse` |

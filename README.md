@@ -92,7 +92,8 @@ chmod 600 ~/.grok/plugins/ai-film-grok/skills/ai-film-grok/config.env
 
 | 轴 | 解决什么 | 入口 |
 |---|---|---|
-| **电影工序八环** | 叙事模糊（想到哪拍到哪） | Idea → Story → Beats → Shots → Media → Selects → Rough → **Verified MP4** |
+| **Professional 11 阶段** | 项目进度与验收模糊 | Concept Lock → Script Lock → Look/Shot/Pilot → Bulk/Dailies/Selects → Picture/Post/Master Lock |
+| **创作八环检查表** | 叙事模糊（想到哪拍到哪） | Idea → Story → Beats → Shots → Media → Selects → Rough → **Verified MP4** |
 | **工具四层** | 实现模糊（不知道用哪个模型） | Agent → 视觉 → 语音 → 设计(HF) → FFmpeg → 交付 |
 
 ### 自动调配（每回合主入口）
@@ -112,7 +113,8 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 | 字段 | 含义 |
 |------|------|
-| `craft_stage` | 八环当前位置 |
+| `workflow.current_stage` | 对外唯一的 11 阶段当前位置 |
+| `craft_stage` | 创作检查表位置（不是项目进度） |
 | `next_cmd` | **唯一**推荐命令 |
 | `agent_do` / `agent_instruction` | 本回合 checklist |
 | `routing` | TTS / BGM / I2V 兜底策略摘要 |
@@ -157,9 +159,9 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 ## 架构图
 
-### 总览（工具四层 + 八环）
+### 总览（工具四层 + 11 阶段）
 
-![ai-film-grok 架构：Prompt → Agent 八环 → 视觉/语音/设计/FFmpeg → 交付；侧栏可插拔模型](skills/ai-film-grok/docs/architecture.png)
+![ai-film-grok 架构：Prompt → Professional 11 阶段 → 视觉/语音/设计/FFmpeg → 交付；侧栏可插拔模型](skills/ai-film-grok/docs/architecture.png)
 
 矢量源：[`skills/ai-film-grok/docs/architecture.svg`](./skills/ai-film-grok/docs/architecture.svg) · PNG：[`architecture.png`](./skills/ai-film-grok/docs/architecture.png)
 

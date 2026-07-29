@@ -112,6 +112,53 @@ def test_metrics_preserve_unknown_cost_and_event_time(tmp_path: Path) -> None:
     assert report["l3"]["sec_per_shot_i2v"]["p50"] == 10
 
 
+def test_metrics_never_turn_missing_production_evidence_into_zero(tmp_path: Path) -> None:
+    _root(tmp_path, cost_ticks=None)
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest["gates"]["assembled"] = False
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    append_event(
+        tmp_path,
+        stage="i2v",
+        phase="registered",
+        shot_id="s1",
+        occurred_at="2026-01-01T00:00:20Z",
+    )
+    append_event(
+        tmp_path,
+        stage="i2v",
+        phase="registered",
+        shot_id="s1",
+        occurred_at="2026-01-01T00:00:30Z",
+    )
+
+    report = emit_metrics(tmp_path)
+
+    assert report["l0"]["all_pass"] is False
+    assert report["l3"]["human_minutes"] is None
+    assert report["l3"]["human_time_state"] == "unknown"
+    assert report["l3"]["cost_usd"] is None
+    assert report["l3"]["i2v_cost_state"] == "unknown"
+    assert report["l3"]["registered_event_count"] == 3
+    assert report["l3"]["unique_registered_shots"] == 1
+    assert report["l3"]["registration_rework_count"] == 2
+    assert report["l3"]["stage_yield"] == pytest.approx(1 / 3, abs=0.0001)
+    assert report["data_quality"]["state"] == "partial"
+    assert "human_time" in report["data_quality"]["missing_evidence"]
+    assert "i2v_cost" in report["data_quality"]["missing_evidence"]
+
+
+def test_metrics_reads_current_plugin_version(tmp_path: Path) -> None:
+    _root(tmp_path)
+    expected = json.loads((SCRIPTS.parents[2] / "plugin.json").read_text(encoding="utf-8"))[
+        "version"
+    ]
+
+    report = emit_metrics(tmp_path)
+
+    assert report["metadata"]["plugin_version"] == expected
+
+
 def test_experiment_requires_identical_contract_and_never_auto_spends(tmp_path: Path) -> None:
     baseline, treatment = tmp_path / "baseline", tmp_path / "treatment"
     _root(baseline)

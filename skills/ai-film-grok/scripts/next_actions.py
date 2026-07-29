@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Suggest the next production commands from film root state (status / agent routing).
 
-Pipeline stages (product spine — see references/pipeline-methodology.md):
+Internal execution layers (not the canonical production workflow):
 
   agent → visual → voice → design → post → deliver → done
+
+The public workflow is the 11-stage status returned by workflow_spine.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from typing import Any
 
 from util import read_json
 
-# Product methodology stages (Grok Agent + layers 1–4 + delivery).
+# Backward-compatible internal projection (Grok Agent + layers 1–4 + delivery).
 PIPELINE_STAGES: tuple[str, ...] = (
     "agent",
     "visual",
@@ -164,10 +166,11 @@ def detect_pipeline_stage(
     gates: dict[str, Any] | None = None,
     open_reshoot_count: int = 0,
 ) -> dict[str, Any]:
-    """Classify film-root into product pipeline stage (agent → … → done).
+    """Classify film-root into the internal execution layer (agent → … → done).
 
-    Returns a stable dict for `aifilm status` / `aifilm next` so agents can say
-    「当前在第几层」 without re-deriving from raw gates.
+    The authoritative public progress is `canonical_workflow`, which uses the
+    professional 11-stage contract. Existing `stage` fields remain stable for
+    routing, HUD, and old project receipts.
     """
     root = Path(root).expanduser().resolve()
     gates = gates or {}
@@ -270,6 +273,7 @@ def detect_pipeline_stage(
         workflow = {}
 
     return {
+        "axis": "internal_execution_layer",
         "stage": stage,
         "stage_index": stage_index,
         "stage_total": len(PIPELINE_STAGES),
@@ -299,6 +303,12 @@ def detect_pipeline_stage(
         "craft_spine": "idea → story → beats → shots → media → selects → rough → verified",
         "workflow": workflow,
         "workflow_stage": workflow.get("current_stage"),
+        "canonical_workflow": {
+            "stage": workflow.get("current_stage"),
+            "stage_index": workflow.get("stage_index"),
+            "stage_total": workflow.get("stage_total"),
+            "label_zh": workflow.get("current_label_zh"),
+        },
         "ref": "references/pipeline-methodology.md · references/craft-spine.md",
     }
 

@@ -631,7 +631,8 @@ def build_dispatch(
 
         heat_status = heat_agent_status(root)
         if (
-            heat_status.get("active")
+            workflow.get("current_stage") != "complete"
+            and heat_status.get("active")
             and (heat_status.get("hard_fail") or heat_status.get("needs_boost"))
             and heat_status.get("next_cmd")
         ):

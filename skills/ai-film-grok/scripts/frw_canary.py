@@ -9,7 +9,7 @@ Probes (cheap by default):
 
 Optional:
   --wait     poll ltx-t2v until completed/failed (costs credits if accepted)
-  --full     also classic text2image + classic img2video + ltx-i2v
+  --full     also classic text2image + exact classic img2image + classic img2video + ltx-i2v
   --root     write receipts/frw-key-capability.json under film root
 
 Exit codes:
@@ -42,6 +42,9 @@ TEMPLATES = {
     "ltx-t2v": "3507313183813537792",
     "ltx-i2v": "3507007578464849920",
     "classic-text2image": "3487741729447088128",
+    # This is a still-to-still template.  An I2V/T2V success is not evidence
+    # that FRW can accept a canonical performance-state source image.
+    "classic-img2image": "3487780244406931456",
     "classic-img2video": "3487718692404334592",
 }
 
@@ -220,11 +223,13 @@ def _classify(probes: dict[str, Any]) -> dict[str, str]:
     ltx_t2v = str(probes.get("ltx_t2v", ""))
     ltx_i2v = str(probes.get("ltx_i2v", ""))
     classic_i2v = str(probes.get("classic_img2video", ""))
+    classic_i2i = str(probes.get("classic_img2image", ""))
 
     seedance_ok = seedance.startswith("201")
     ltx_t2v_ok = ltx_t2v.startswith("201") or ltx_t2v == "completed"
     ltx_i2v_ok = ltx_i2v.startswith("201") or ltx_i2v == "completed"
     classic_i2v_ok = classic_i2v.startswith("201") or classic_i2v == "completed"
+    classic_i2i_ok = classic_i2i.startswith("201") or classic_i2i == "completed"
 
     if seedance_ok:
         l1 = "seedance-2-fast-i2v"
@@ -255,7 +260,33 @@ def _classify(probes: dict[str, Any]) -> dict[str, str]:
         "classic_img2video_usable": "yes"
         if classic_i2v_ok
         else ("untested" if not classic_i2v else "no"),
+        # Keep this deliberately stricter than general FRW health: a dialogue
+        # performance state needs both an upload credential and the exact i2i
+        # template permission, not merely an adjacent video/template success.
+        "i2i_capability": (
+            "available"
+            if classic_i2i_ok and probes.get("upload_token") == "ok"
+            else (
+                "blocked"
+                if "403" in classic_i2i
+                else ("untested" if not classic_i2i else "unusable")
+            )
+        ),
     }
+
+
+def frw_i2i_capability(receipt: dict[str, Any] | None) -> str:
+    """Return a fail-closed FRW i2i capability label from a canary receipt.
+
+    Old receipts lack the exact still-to-still probe, so they stay ``untested``
+    even if they prove FRW T2V or I2V works.
+    """
+    if not isinstance(receipt, dict):
+        return "untested"
+    declared = str(receipt.get("i2i_capability") or "").strip().lower()
+    if declared in {"available", "blocked", "unusable", "untested"}:
+        return declared
+    return _classify(receipt).get("i2i_capability", "untested")
 
 
 def run_canary(
@@ -282,12 +313,14 @@ def run_canary(
         "ltx_t2v": None,
         "ltx_i2v": None,
         "classic_text2image": None,
+        "classic_img2image": None,
         "classic_img2video": None,
         "upload_token": None,
         "tasks": {},
         "recommended_l1": None,
         "recommended_l2": None,
         "seedance_permission": None,
+        "i2i_capability": None,
         "notes": None,
         "ok": False,
     }
@@ -380,6 +413,28 @@ def run_canary(
             },
         )
         report["classic_text2image"] = _status_label(http, body)
+
+        http, body = _submit(
+            host,
+            api_key,
+            TEMPLATES["classic-img2image"],
+            {
+                "imageUrl": img_url,
+                "prompt": "canary identity-preserving portrait turn",
+                "negativePrompt": "",
+                "model": "qwen",
+                "width": "1024",
+                "height": "1024",
+                "n": "1",
+                "seed": "0",
+                "steps": "30",
+                "cfgScale": "7.5",
+                "sampler": "",
+            },
+        )
+        report["classic_img2image"] = _status_label(http, body)
+        if http == 201 and isinstance(body, dict):
+            report["tasks"]["classic_img2image"] = (body.get("data") or {}).get("taskId")
 
         http, body = _submit(
             host,

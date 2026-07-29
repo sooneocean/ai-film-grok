@@ -171,6 +171,20 @@ def _value(metrics: dict[str, Any], metric: str) -> float | None:
         return None
 
 
+def _metric_evidence_known(metrics: dict[str, Any], metric: str) -> bool:
+    if metrics.get("data_quality", {}).get("state") == "invalid":
+        return False
+    if metric == "cost_usd":
+        return metrics.get("l3", {}).get("i2v_cost_state") == "known"
+    if metric == "wall_sec":
+        return metrics.get("l3", {}).get("wall_sec_init_to_verified") is not None
+    if metric == "grade_p50":
+        return metrics.get("l2", {}).get("grade_summary", {}).get("state") == "known"
+    if metric == "motion_p10":
+        return metrics.get("l1", {}).get("motion_score", {}).get("state") == "known"
+    return False
+
+
 def diff_experiment(root: Path | str, *, experiment_id: str) -> dict[str, Any]:
     target, experiment = _read(root, experiment_id)
     arms = experiment.get("arms") or {}
@@ -182,8 +196,8 @@ def diff_experiment(root: Path | str, *, experiment_id: str) -> dict[str, Any]:
     unknown = (
         before is None
         or after is None
-        or baseline.get("data_quality", {}).get("state") != "known"
-        or treatment.get("data_quality", {}).get("state") != "known"
+        or not _metric_evidence_known(baseline, metric)
+        or not _metric_evidence_known(treatment, metric)
     )
     change = None if unknown or before == 0 else (after - before) / abs(before)
     l0_ok = bool(baseline.get("l0", {}).get("all_pass")) and bool(

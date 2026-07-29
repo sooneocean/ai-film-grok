@@ -959,6 +959,9 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         and scorecard_is_complete_and_passing(review)
         and screening_evidence_ok
     )
+    from delivery_artifact import desktop_delivery_is_current
+
+    desktop_exported = desktop_delivery_is_current(outputs, final_record)
     dnotes = load_director_notes(root)
     open_items = open_reshoot_items(dnotes)
     from anatomy_safety import anatomy_safety_report, requires_anatomy_safety
@@ -1004,9 +1007,7 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
             and review_ok
             and reshoots_clear(dnotes)
         ),
-        "desktop_exported": bool(
-            outputs.get("desktop_dir") and Path(outputs["desktop_dir"]).is_dir()
-        ),
+        "desktop_exported": desktop_exported,
     }
     if anatomy_required:
         gates["stills_complete"] = gates["stills_complete"] and still_anatomy["ok"]
@@ -1488,6 +1489,23 @@ def cmd_state_index(args: argparse.Namespace) -> int:
         raise FilmError(f"Cannot import state_index_gate: {exc}") from exc
     root = Path(args.root).expanduser().resolve()
     action = getattr(args, "state_index_action", None) or "check"
+    if action == "approve-performance-state":
+        from performance_state import approve_performance_state
+
+        try:
+            receipt = approve_performance_state(
+                root,
+                speaker=str(args.speaker),
+                state_id=str(args.performance_state_id),
+                image=Path(args.image),
+                generation_receipt=Path(args.generation_receipt),
+                reviewer=str(args.reviewer),
+                review_note=str(args.review_note),
+            )
+        except ValueError as exc:
+            raise FilmError(str(exc)) from exc
+        emit({"ok": True, **receipt})
+        return 0
     if action == "approve-state":
         from visual_bible import load_bible, save_bible
         from wardrobe_ladder import approve_state
@@ -3994,6 +4012,14 @@ def which_npx_safe() -> str | None:
 def cmd_review_final(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     manifest = load_manifest(root)
+    review_input = None
+    if getattr(args, "review_file", None):
+        try:
+            from final_review_input import FinalReviewInputError, apply_review_input
+
+            review_input = apply_review_input(args, root=root, path=args.review_file)
+        except FinalReviewInputError as exc:
+            raise FilmError(str(exc)) from exc
     summary = recompute_gates(root, manifest)
     if not summary["gates"]["clips_complete"]:
         raise FilmError(
@@ -4263,6 +4289,15 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         from pipeline_events import append_event
 
         append_event(root, stage="review-final", phase="completed")
+        if review_input is not None:
+            append_event(
+                root,
+                stage="review-final",
+                phase="human_time",
+                human_minutes=float(review_input["human_minutes"]),
+                actor=str(review_input["reviewer"]),
+                note="review-file",
+            )
     except OSError:
         pass
     try:
@@ -4281,6 +4316,12 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         raise FilmError(
             f"final review succeeded but production report could not be written: {exc}"
         ) from exc
+    try:
+        from optimization_metrics import emit_metrics
+
+        optimization_metrics = emit_metrics(root)
+    except (OSError, ValueError) as exc:
+        optimization_metrics = {"ok": False, "error": str(exc)}
     emit(
         {
             "ok": True,
@@ -4289,6 +4330,7 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             "quality_ledger": str(root / "receipts" / "quality-ledger.json"),
             "retrospective_complete": quality_ledger["retrospective_complete"],
             "production_report": production_report["paths"],
+            "optimization_metrics": optimization_metrics,
         }
     )
     return 0
@@ -5016,13 +5058,19 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
         "source_root": str(root),
         "files": {},
     }
+    readback_path = dest / "成片" / "delivery-readback.json"
+    readback = _util_read_json(readback_path)
+    if not isinstance(readback, dict) or readback.get("ok") is not True:
+        raise FilmError("Desktop export requires successful hash and decode read-back")
+    delivery_manifest["readback"] = readback
     for exported in sorted((dest / "成片").iterdir()):
         if exported.is_file():
             delivery_manifest["files"][f"成片/{exported.name}"] = {
                 "sha256": sha256(exported),
                 "size": exported.stat().st_size,
             }
-    write_json(dest / "项目状态" / "delivery-manifest.json", delivery_manifest)
+    delivery_manifest_path = dest / "项目状态" / "delivery-manifest.json"
+    write_json(delivery_manifest_path, delivery_manifest)
 
     readme = dest / "README.txt"
     silent = (manifest.get("outputs") or {}).get("silent_film") or {}
@@ -5052,10 +5100,26 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
         ),
         encoding="utf-8",
     )
-    manifest.setdefault("outputs", {})["desktop_dir"] = str(dest)
+    outputs = manifest.setdefault("outputs", {})
+    outputs["desktop_dir"] = str(dest)
+    outputs["desktop_delivery"] = {
+        "directory": str(dest),
+        "path": str(delivery_manifest_path),
+        "sha256": sha256(delivery_manifest_path),
+        "readback_path": str(readback_path),
+        "readback_sha256": sha256(readback_path),
+        "final_output_sha256": str(final.get("sha256") or ""),
+    }
     recompute_gates(root, manifest)
     save_manifest(root, manifest)
-    emit({"ok": True, "desktop_dir": str(dest), "main_film_dir": str(dest / "成片")})
+    emit(
+        {
+            "ok": True,
+            "desktop_dir": str(dest),
+            "main_film_dir": str(dest / "成片"),
+            "readback": readback,
+        }
+    )
     return 0
 
 
@@ -7863,9 +7927,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Record explicit end-to-end final-film approval with director scorecard",
     )
     review.add_argument("--root", required=True)
+    review.add_argument(
+        "--review-file",
+        help="Hash-bound JSON emitted by review-ui; replaces reviewer/notes/score/grade/evidence flags",
+    )
     review.add_argument("--approve", action="store_true")
-    review.add_argument("--reviewer", required=True)
-    review.add_argument("--notes", required=True)
+    review.add_argument("--reviewer")
+    review.add_argument("--notes")
     review.add_argument(
         "--watched-full", action="store_true", help="Required by review contract v3"
     )
@@ -8508,6 +8576,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--generation-receipt",
         help="JSON receipt for this I2I generation; required for non-full states",
     )
+    sipf = si_sub.add_parser(
+        "approve-performance-state",
+        help="Register a human-approved, hash-bound dialogue performance I2I still",
+    )
+    sipf.add_argument("--root", required=True)
+    sipf.add_argument("--speaker", required=True)
+    sipf.add_argument("--performance-state-id", required=True)
+    sipf.add_argument("--image", required=True)
+    sipf.add_argument("--generation-receipt", required=True)
+    sipf.add_argument("--reviewer", required=True)
+    sipf.add_argument("--review-note", required=True)
     sis = si_sub.add_parser(
         "contact-sheet",
         help="Render an offline visual review sheet for one wardrobe ladder; never calls a provider",

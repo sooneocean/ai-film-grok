@@ -2,7 +2,7 @@
 
 > **安装 / 使用逻辑 / 架构图 / 可插拔模型** → 仓库根 [README.md](../../README.md)（对外主文档）。
 
-**一句话**：把「从灵感到可发布的 AI 动态短片」收成**可恢复、可验收**流水线——八环 dispatch + **视觉**（Grok still + 默认 `grok_primary` I2V）+ **语音**（Edge TTS）+ **设计**（HyperFrames / Remotion）+ **FFmpeg** → 交付。
+**一句话**：把「从灵感到可发布的 AI 动态短片」收成**可恢复、可验收**流水线——Professional 11 阶段 dispatch + **视觉**（Grok still + 默认 `grok_primary` I2V）+ **语音**（Edge TTS）+ **设计**（HyperFrames / Remotion）+ **FFmpeg** → 交付。
 
 正式交付必须是**真实动态成片**（I2V 验收），不是静图轮播、Ken Burns 或只有关键帧。
 

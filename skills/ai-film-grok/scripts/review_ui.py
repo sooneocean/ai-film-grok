@@ -15,6 +15,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
+from final_review_input import review_input_template, write_review_input
 from review_control import (
     ReviewControlConflict,
     ReviewControlError,
@@ -33,8 +34,8 @@ MEDIA_SUFFIXES = frozenset(
 
 _PAGE = r"""<!doctype html><meta charset=utf-8><title>AI Film 审核控制台</title><style>
 body{font:15px system-ui;margin:2rem;background:#111827;color:#e5e7eb;max-width:1100px}.panel,.item{border:1px solid #374151;padding:1rem;margin:.7rem 0;border-radius:.4rem}.approved{border-color:#15803d}.stale,.blocked,.notice-error{border-color:#dc2626}.notice-success{border-color:#15803d}button{margin:.2rem;padding:.4rem}textarea{width:100%;min-height:4rem}code{word-break:break-all;white-space:pre-wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem}.media{max-width:360px;max-height:280px;margin:.5rem .5rem .2rem 0;background:#000}label{display:block}.muted{color:#9ca3af}
- </style><h1>AI Film 审核控制台</h1><p id=summary>载入中…</p><p id=notice class="panel muted" role=status aria-live=polite>等待操作。</p><section class=panel><b>自动推进</b><p class=muted id=runtime></p><button id=advance>自动推进至下一审核关</button></section><section class=panel><b>预算与审核者</b><div class=grid id=budgets></div><label>审核者 <input id=reviewer maxlength=80></label><button id=save-settings>保存设置</button></section><div id=items></div><script>
-const token=new URLSearchParams(location.search).get('token');const h={'X-Review-Token':token};const reviewActions=new Set(['approve','reject','reshoot','needs_changes']);let rev=0,settingsRev=0,renderedStages=new Set();
+ </style><h1>AI Film 审核控制台</h1><p id=summary>载入中…</p><p id=notice class="panel muted" role=status aria-live=polite>等待操作。</p><section class=panel><b>自动推进</b><p class=muted id=runtime></p><button id=advance>自动推进至下一审核关</button></section><section class=panel><b>预算与审核者</b><div class=grid id=budgets></div><label>审核者 <input id=reviewer maxlength=80></label><button id=save-settings>保存设置</button></section><section class=panel id=final-review-form hidden><b>终片完整审核</b><p class=muted>完整播放后逐项填入时间码、证据与 1–5 分；这里只写审核输入，不会自动批准成片。</p><label><input id=watched-full type=checkbox> 已完整观看</label><label>审核说明<textarea id=final-notes></textarea></label><div id=final-dimensions></div><button id=save-final-review>保存终片审核输入</button></section><div id=items></div><script>
+const token=new URLSearchParams(location.search).get('token');const h={'X-Review-Token':token};const reviewActions=new Set(['approve','reject','reshoot','needs_changes']);let rev=0,settingsRev=0,renderedStages=new Set(),finalTemplate=null,reviewStartedAt=Date.now();
 async function api(p,o={}){o.headers={...h,...(o.headers||{})};let r=await fetch(p,o),j=await r.json();if(!r.ok)throw Error(j.error||r.status);return j}
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}function mediaUrl(p){return '/media/'+p.split('/').map(encodeURIComponent).join('/')}
 function notice(message,isError=false){let node=document.getElementById('notice');node.textContent=message;node.className=`panel ${isError?'notice-error':'notice-success'}`}
@@ -45,7 +46,9 @@ async function load(){let d=await api('/api/status');rev=d.queue.ledger_revision
 async function act(stage,action){let note=document.getElementById('n-'+stage).value,timestamp_sec=document.getElementById('t-'+stage).value;try{await api('/api/action',{method:'POST',headers:{'Content-Type':'application/json',Origin:location.origin},body:JSON.stringify({stage,action,note,issue:document.getElementById('i-'+stage).value,timestamp_sec:timestamp_sec?Number(timestamp_sec):null,expected_ledger_revision:rev})});notice(`已记录 ${action}：${stage}`);await load()}catch(e){notice(e.message,true)}}
 async function saveSettings(){let budget_envelopes={};for(let k of ['still','motion','audio','post'])budget_envelopes[k]=Number(document.getElementById('b-'+k).value);try{await api('/api/settings',{method:'POST',headers:{'Content-Type':'application/json',Origin:location.origin},body:JSON.stringify({reviewer:document.getElementById('reviewer').value,budget_envelopes,expected_revision:settingsRev})});notice('审核者与预算已保存。');await load()}catch(e){notice(e.message,true)}}
 async function advance(){try{await api('/api/advance',{method:'POST',headers:{'Content-Type':'application/json',Origin:location.origin},body:JSON.stringify({expected_ledger_revision:rev})});notice('本地步骤已执行，审核队列已刷新。');await load()}catch(e){notice(e.message,true)}}
-document.getElementById('advance').addEventListener('click',advance);document.getElementById('save-settings').addEventListener('click',saveSettings);document.getElementById('items').addEventListener('click',event=>{let button=event.target.closest('button[data-review-action]');if(button){let stage=button.closest('[data-stage]').dataset.stage,action=button.dataset.reviewAction;if(renderedStages.has(stage)&&reviewActions.has(action))act(stage,action)}});load()
+async function loadFinal(){try{finalTemplate=await api('/api/final-review-template');let box=document.getElementById('final-review-form');box.hidden=false;document.getElementById('final-dimensions').innerHTML=finalTemplate.dimensions.map((d,i)=>`<fieldset><legend>${esc(d)}</legend><select id="fs-${d}"><option value=pass>pass</option><option value=fail>fail</option></select><input id="fg-${d}" type=number min=1 max=5 value=4 aria-label="${esc(d)} grade"><input id="ft-${d}" type=number min=0 step=.1 value="${i}" aria-label="${esc(d)} timestamp"><input id="fn-${d}" value="checked ${esc(d)}" aria-label="${esc(d)} evidence"></fieldset>`).join('')}catch(e){document.getElementById('final-review-form').hidden=true}}
+async function saveFinal(){let scorecard={},grades={},screening_evidence={};for(let d of finalTemplate.dimensions){scorecard[d]=document.getElementById('fs-'+d).value;grades[d]=Number(document.getElementById('fg-'+d).value);screening_evidence[d]={timestamp_sec:Number(document.getElementById('ft-'+d).value),note:document.getElementById('fn-'+d).value}}let body={schema_version:1,kind:'final-review-input',approve:true,reviewer:document.getElementById('reviewer').value,notes:document.getElementById('final-notes').value,watched_full:document.getElementById('watched-full').checked,final_output_sha256:finalTemplate.final_output_sha256,human_minutes:Math.max(.1,(Date.now()-reviewStartedAt)/60000),scorecard,grades,screening_evidence,fail_reasons:{},reshoot_shots:[]};try{let result=await api('/api/final-review-input',{method:'POST',headers:{'Content-Type':'application/json',Origin:location.origin},body:JSON.stringify(body)});notice(`审核输入已保存：${result.path}`)}catch(e){notice(e.message,true)}}
+document.getElementById('advance').addEventListener('click',advance);document.getElementById('save-settings').addEventListener('click',saveSettings);document.getElementById('save-final-review').addEventListener('click',saveFinal);document.getElementById('items').addEventListener('click',event=>{let button=event.target.closest('button[data-review-action]');if(button){let stage=button.closest('[data-stage]').dataset.stage,action=button.dataset.reviewAction;if(renderedStages.has(stage)&&reviewActions.has(action))act(stage,action)}});load();loadFinal()
 </script>"""
 
 
@@ -115,6 +118,12 @@ def make_handler(root: Path, token: str):
             if parsed.path == "/api/status":
                 self._json(200, {"queue": review_queue(root), "settings": load_settings(root)})
                 return
+            if parsed.path == "/api/final-review-template":
+                try:
+                    self._json(200, review_input_template(root))
+                except ValueError as exc:
+                    self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+                return
             if parsed.path.startswith("/media/"):
                 try:
                     self._media(_safe_media(root, unquote(parsed.path.removeprefix("/media/"))))
@@ -174,6 +183,8 @@ def make_handler(root: Path, token: str):
                     report = update_settings(root, **body)
                 elif self.path == "/api/advance":
                     report = advance_to_next_review(root, **body)
+                elif self.path == "/api/final-review-input":
+                    report = write_review_input(root, body)
                 elif self.path == "/api/stop":
                     report = {"ok": True, "stopping": True}
                     threading.Thread(target=self.server.shutdown, daemon=True).start()

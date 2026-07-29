@@ -29,6 +29,13 @@ from util import sha256_file, write_json
 
 REPORT_NAME = "vibevoice-asr-review.json"
 ARGV_ENV = "AIFILM_VIBEVOICE_ASR_ARGV"
+REMOTE_ADAPTER_ENV_KEYS = (
+    "AIFILM_VIBEVOICE_ASR_SSH_TARGET",
+    "AIFILM_VIBEVOICE_ASR_SSH_KEY",
+    "AIFILM_VIBEVOICE_ASR_SSH_HOSTKEY_ALIAS",
+    "AIFILM_VIBEVOICE_ASR_REMOTE_ROOT",
+    "AIFILM_VIBEVOICE_ASR_REMOTE_MODEL_PATH",
+)
 
 
 class VibeVoiceASRError(ValueError):
@@ -164,13 +171,18 @@ def create_report(
         except SecurityPolicyError as exc:
             raise VibeVoiceASRError(str(exc)) from exc
         try:
+            adapter_env = minimal_subprocess_env()
+            # These are connection coordinates only; credentials remain in the SSH key file.
+            adapter_env.update(
+                {key: os.environ[key] for key in REMOTE_ADAPTER_ENV_KEYS if os.environ.get(key)}
+            )
             completed = subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
                 timeout=1_200,
                 check=False,
-                env=minimal_subprocess_env(),
+                env=adapter_env,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise VibeVoiceASRError("VibeVoice-ASR adapter did not complete") from exc

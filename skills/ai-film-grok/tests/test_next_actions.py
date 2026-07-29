@@ -202,7 +202,7 @@ class NextActionsTests(unittest.TestCase):
 
 
 class PipelineStageTests(unittest.TestCase):
-    """Product spine: agent → visual → voice → design → post → deliver → done."""
+    """The 7-layer projection stays explicit and subordinate to the 11-stage workflow."""
 
     @pytest.mark.slow
     def test_agent_when_spec_missing(self) -> None:
@@ -215,6 +215,8 @@ class PipelineStageTests(unittest.TestCase):
             self.assertEqual(stage["stage"], "agent")
             self.assertIn("write-spec", stage["detail"])
             self.assertEqual(stage["stage_total"], 7)
+            self.assertEqual(stage["axis"], "internal_execution_layer")
+            self.assertEqual(stage["canonical_workflow"]["stage_total"], 11)
 
     @pytest.mark.slow
     def test_voice_when_clips_complete_no_rehearse(self) -> None:

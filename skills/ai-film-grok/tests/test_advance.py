@@ -11,7 +11,14 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from advance import AdvanceError, _redact, _validate_argv, advance_local  # noqa: E402
+from advance import (  # noqa: E402
+    ADVANCE_ACTIONS,
+    AdvanceError,
+    _redact,
+    _validate_argv,
+    _verify_action,
+    advance_local,
+)
 
 
 def _action(
@@ -275,3 +282,40 @@ def test_advance_receipt_never_contains_raw_runner_secret(tmp_path: Path) -> Non
 def test_max_local_has_hard_upper_bound(tmp_path: Path) -> None:
     with pytest.raises(AdvanceError, match="between 1 and 10"):
         advance_local(tmp_path, max_local=11)
+
+
+def test_advance_uses_local_dispatch_without_live_capability_probe(tmp_path: Path) -> None:
+    packet = {
+        "ok": True,
+        "root": str(tmp_path),
+        "schema_version": 2,
+        "next_id": "pilot-approve",
+        "next_action": _action(
+            ["pilot-approve", "--root", str(tmp_path)],
+            approval="human_required",
+        ),
+    }
+    with patch("advance.build_dispatch", return_value=packet) as build:
+        report = advance_local(tmp_path, max_local=1)
+
+    assert report["stop_reason"] == "human_approval_required"
+    assert build.call_count == 2
+    assert all(call.kwargs["include_capability"] is False for call in build.call_args_list)
+
+
+def test_advance_reuses_success_when_action_is_its_fixed_verifier(tmp_path: Path) -> None:
+    root = tmp_path.resolve()
+    argv = ["production-evidence", "--root", str(root)]
+    calls: list[list[str]] = []
+    action_result = {"ok": True, "returncode": 0, "stdout": "ok", "stderr": ""}
+
+    verified = _verify_action(
+        policy=ADVANCE_ACTIONS["production-evidence-gate"],
+        root=root,
+        argv=argv,
+        action_result=action_result,
+        run=lambda command: calls.append(command) or {"ok": False},
+    )
+
+    assert verified == action_result
+    assert calls == []

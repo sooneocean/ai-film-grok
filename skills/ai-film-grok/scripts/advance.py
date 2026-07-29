@@ -212,6 +212,21 @@ def _verification_argv(policy: AdvancePolicy, root: Path) -> list[str]:
     return [*policy.verifier, "--root", str(root)]
 
 
+def _verify_action(
+    *,
+    policy: AdvancePolicy,
+    root: Path,
+    argv: list[str],
+    action_result: dict[str, Any],
+    run: Callable[[list[str]], dict[str, Any]],
+) -> dict[str, Any]:
+    """Run the fixed verifier unless the successful action already was that check."""
+    verifier_argv = _verification_argv(policy, root)
+    if argv == verifier_argv:
+        return action_result
+    return _sanitize_result(run(verifier_argv))
+
+
 def _expected_transaction(
     *,
     root: Path,
@@ -276,7 +291,7 @@ def advance_local(
                 root,
                 gates=gates,
                 open_reshoot_count=open_reshoot_count,
-                include_capability=True,
+                include_capability=False,
                 write_receipt=True,
                 use_state_cache=False,
             )
@@ -361,7 +376,13 @@ def advance_local(
                 executed.append({"next_id": next_id, "transaction_id": expected_tx, **result})
                 stop_reason = "action_failed"
                 break
-            verification = _sanitize_result(run(_verification_argv(policy, root)))
+            verification = _verify_action(
+                policy=policy,
+                root=root,
+                argv=argv,
+                action_result=result,
+                run=run,
+            )
             combined = {
                 "ok": bool(verification.get("ok")),
                 "action": {
@@ -388,7 +409,7 @@ def advance_local(
             root,
             gates=gates,
             open_reshoot_count=open_reshoot_count,
-            include_capability=True,
+            include_capability=False,
             write_receipt=True,
         )
         return {

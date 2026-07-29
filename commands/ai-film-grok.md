@@ -1,6 +1,6 @@
 ---
 name: ai-film-grok
-description: 启动 AI 短片/漫剧成片管线（dispatch 八环 + Imagine I2V + edge TTS + final）
+description: 启动 AI 短片/漫剧成片管线（Professional 11 阶段 + Imagine I2V + edge TTS + final）
 ---
 
 # /ai-film-grok

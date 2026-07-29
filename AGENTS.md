@@ -2,10 +2,10 @@
 
 > Coding agent 入口。人读 README；agent 先读本档再改代码。
 
-## Absolute path（本机开发真相）
+## Source checkout（本机开发真相）
 
 ```text
-/Users/asd/YOLO/ai-film-grok
+/Users/dex/.grok/plugins/ai-film-grok
 ```
 
 - **只改这里**（plugin 源码）。
@@ -49,7 +49,7 @@ ai-film-grok/                    ← plugin root / git root
 ## 迭代循环（agent 默认）
 
 ```bash
-ROOT="/Users/asd/YOLO/ai-film-grok"
+ROOT="$(git rev-parse --show-toplevel)"
 SKILL="$ROOT/skills/ai-film-grok"
 AIFILM="$SKILL/scripts/aifilm"
 

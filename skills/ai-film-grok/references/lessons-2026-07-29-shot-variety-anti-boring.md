@@ -1,15 +1,19 @@
-# P0 · 画面抗重复 · 抗无聊（2026-07-29 · E病毒 ch04 避难所）
+# P0 · 画面抗重复 · 抗无聊 · 体位/特写/运镜（2026-07-29 · E病毒 ch04 避难所）
 
-> **用户原话**：很多画面是重复的而且很无聊。  
-> **片根**：`AI FILM SPACE/0729/e-virus-ch04-shelter` · 14 镜 · final 已批但仍 **观感 PARTIAL**。  
+> **用户原话（两轮）**：  
+> 1）很多画面是重复的而且很无聊。  
+> 2）**肉戏太单调了啊 都是重复镜头 需要有不同体位 不同特写镜头还有运镜**。  
+> **片根**：`AI FILM SPACE/0729/e-virus-ch04-shelter` · 14 镜 · final 门绿仍 **观感 PARTIAL**。  
 > **关联**：[still-unique-no-reuse](lessons-2026-07-29-still-unique-no-reuse.md) · [high-motion-style-lock](lessons-2026-07-27-high-motion-style-lock-final.md) · [size-ladder](lessons-2026-07-21-size-ladder-hardcore-stack.md) · [evirus bulk→final](lessons-2026-07-29-evirus-ch04-bulk-final-iron.md)
 
 ## 现象（观众读到什么）
 
 - 肉戏块 **像同一姿势 loop**：抽送节奏、构图、景别观感连着撞。
-- 景别表上写了 insert/close-up，成片仍像 **中景幻灯片**。
-- 剪完后 **短、碎、平**——没有呼吸、没有机位事件、没有反应镜。
-- 门禁可全绿（clip sha 不同、mean 达标、review 过）→ **仍无聊**。绿灯 ≠ 好看。
+- 景别表上写了 insert/close-up，成片仍像 **中景拥抱幻灯片**（体位字段写了 doggy/straddle，像素仍是站抱）。
+- **无真运镜**：整段 locked 脸/肩，没有 push-in / 侧移 / 环绕 / 抬头跟。
+- **无真特写阶梯**：缺「脸反应 ↔ 结合/腰腹定器 ↔ 手/腿局部」跳切。
+- 剪完后 **短、碎、平**——没有呼吸、没有机位事件。
+- 门禁可全绿（clip sha 不同、mean 达标、review 过）→ **仍单调**。绿灯 ≠ 好看。
 
 ## 根因（ch04 实证）
 
@@ -42,15 +46,39 @@
 2. 禁止「只改 pose 字段、still 仍像上一张」：须 `image_edit` 出 **可见** 相位差再 I2V。
 3. promote 末帧若与下一镜 still 观感≈同一构图 → **edit 再 register**，勿直接 bulk。
 
+### F · 体位像素差（P0 · 用户 2026-07-29 强化）
+1. 肉戏块 **≥4 种可读体位**（静帧 mid 一眼认得出），推荐池：骑乘 straddle · 传教 missionary · 后入 doggy · 侧位 side · 站抱 standing · 桌边 edge（可替换，禁名义换、像素不换）。
+2. `sex_pose` / `dsl.sex_pose` **必须与 still 像素一致**；agent 验收：对 contact 说「这是后入」而非「这是又一个拥抱」。
+3. 相邻 act 镜 **禁止** 同一体位连用 ≥2（可被反应 CU / 定器 insert 打断，但打断后主戏体位须变）。
+4. 仅改 hair/光/脸角度 **不算** 换体位。
+
+### G · 特写镜头配额（P0 · 同日）
+肉戏窗（foreplay+act+climax）强制可读三类，缺一不可：
+| 类型 | 最少 | 构图硬要求 |
+|---|---|---|
+| **脸/反应 CU** | ≥2 | 头肩在框；情绪可读（喘/咬唇/失神） |
+| **定器 L4 insert** | ≥2 | 腰腹/结合/手/腿局部；**禁止**满头肩套话 |
+| **关系/体位 MS–MFS** | ≥2 | 能读出谁在上/前后/侧位 |
+
+禁止 7 镜全是「半身拥抱特写」。
+
+### H · 运镜一镜一法（P0 · 同日）
+1. I2V 每镜须写明 **唯一 camera 主句**，且相邻镜 **禁止** 同 camera：
+   - 池：`locked static` · `slow push-in` · `slow pull-back` · `gentle orbit L/R` · `tilt-up follow` · `low-angle hold` · `handheld micro-shake`（一次只选一个主动）。
+2. **禁止** 全段只有 `camera locked` + 同一身体动词。
+3. 运镜与体位绑定写进 prompt 首句：`MEDIUM LOCK cel. Camera: slow push-in. Pose: doggy side…`
+4. mean 高但运镜/体位撞车 → **仍 fail 观感**（重拍优先换 camera 或 pose，不单刷 mean）。
+
 ### D · 剪辑时间与事件（plate）
 1. 办事主镜 **目标在片上 ≥4.5–6s**（VO 可垫，勿把视频压成 2.5–3.5s 连珠炮）。VO 过长用 pad/气口，**禁** setpts 把信息镜压碎。
 2. 60s 级成人片：蒙太奇事件配额（与 hard-defaults 资深剪辑对齐）——**insert≥2 · 反应/空镜≥1 · smash 或轴跳≥1**；禁纯顺序幻灯片。
-3. 连续 `chain_mode=continue` 时仍须 **机位/景别事件**；continue ≠ 同一构图续命。
+3. 连续 `chain_mode=continue` 时仍须 **机位/景别/体位事件**；continue ≠ 同一构图续命。
 
 ### E · 无聊预检（bulk 前 / selects）
 成片前人工 10 秒扫 contact-sheet 或每镜 mid 帧：
-- [ ] 相邻两镜能否 **一句话** 说出不同（「这是脸」「这是结合部」「这是侧位」）？
-- [ ] 肉戏段有无 **至少 1 次** 真 L4 定器 + **至少 1 次** 反应近景？
+- [ ] 相邻两镜能否 **一句话** 说出不同（「骑乘」「后入侧」「脸」「腰特写」）？
+- [ ] 肉戏段 **≥4 体位** + **≥2 真 L4** + **≥2 反应 CU**？
+- [ ] 相邻 I2V camera 主句不撞？
 - [ ] 有无 ≥2 镜 motion 主句撞车？
 - [ ] 有无 ≥3 镜连续同 size rank？
 
@@ -93,14 +121,32 @@ plate
 
 不得以「mean 过了」交差重复镜；也不得以「砍肉戏换花样」降尺度。
 
-## 本片若返工（可选）
+## 本片返工交付（2026-07-29 第二轮 · pose-camera rework）
 
-优先重做 act 链：  
-`s06_sh01…sh07` + `s07` —— 各写独立 motion；补真 L4 定器 still；plate 主戏 ≥5s；砍掉 motion 撞车的 take。  
-setup/afterglow 可保留节奏锚。
+**状态**：观感 **PARTIAL 改善**（体位/特写/运镜差已进片）· 尺度 **仍 PARTIAL**（软词亲密，非真 bare 插入）。
+
+| shot | 可读体位/构图（contact） | 景别 | camera 主句 |
+|---|---|---|---|
+| s06_sh01 | 体检台贴脸 | CU | slow push-in |
+| s06_sh02 | 床沿骑坐 | MS | gentle orbit right |
+| s06_sh03 | 脸反应失声 | face CU | locked static |
+| s06_sh04 | 双层床抱坐 | MFS | low-angle hold |
+| s06_sh05 | 桌边后倾 | MFS | locked side hold |
+| s06_sh06 | 腰手扣带定器 | insert L4 | locked insert |
+| s06_sh07 | 侧卧贴紧 | MS | slow tilt-up |
+| s07_sh01 | 舱壁墙抱托举 | MFS | handheld micro-shake |
+| s07_sh02 | 高潮脸泪 | face CU | slow pull-back |
+
+**工程落地**：
+1. `film-spec`：`sex_pose` / `shot_size` / `dsl.camera.move` **与 still 像素对齐**（禁名义 doggy 实为站抱）。  
+2. still + I2V 全 unique sha；register 双轮；gates `spec/stills/clips` 绿。  
+3. plate：**固定 6s 槽** 手拼（`out/_pose_plate`），禁 VO-stretch 压碎；成片 `out/film_final.mp4` 84s → Desktop 同步。  
+4. HEAD_CROP：insert 用 `dramatic_function=sensory` + 去 `ecu` / `push-in on face` 字样；主戏反应镜保留 full head + headroom。
+
+**再进阶（若用户要真办事像素）**：undress-anchor `image_edit` 分体位 bare → 过审再 I2V；过不了 → 诚实 PARTIAL，禁内衣冒充插入。
 
 ## 记忆入口
 
 - Memory：[2026-07-29-shot-variety-anti-boring](../memory/2026-07-29-shot-variety-anti-boring.md)  
-- hard-defaults 行：画面抗重复·抗无聊  
-- session-index 2026-07-29 表行
+- hard-defaults 行：画面抗重复·抗无聊 · 肉戏体位·特写·运镜  
+- Agents IRON 同题两条 · session-index 2026-07-29 表行

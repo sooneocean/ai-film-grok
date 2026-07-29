@@ -106,3 +106,92 @@ def test_page_exposes_media_preview_and_budget_controls() -> None:
     assert "function history(actions)" in _PAGE
     assert "role=status" in _PAGE
     assert "alert(" not in _PAGE
+    assert "final-review-form" in _PAGE
+    assert "/api/final-review-input" in _PAGE
+
+
+def test_review_ui_writes_hash_bound_final_review_input(tmp_path: Path) -> None:
+    final_sha256 = "a" * 64
+    (tmp_path / "receipts").mkdir()
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "review_contract_version": 3,
+                "outputs": {"final_film": {"sha256": final_sha256}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    body = {
+        "schema_version": 1,
+        "kind": "final-review-input",
+        "approve": True,
+        "reviewer": "dex",
+        "notes": "完整观看并核对。",
+        "watched_full": True,
+        "final_output_sha256": final_sha256,
+        "human_minutes": 2,
+        "scorecard": {
+            dimension: "pass"
+            for dimension in (
+                "identity",
+                "style",
+                "motion",
+                "escalation",
+                "audio",
+                "subs",
+                "dead_air",
+                "rhythm",
+                "emotion",
+                "theme",
+                "performance",
+            )
+        },
+        "grades": {
+            dimension: 4
+            for dimension in (
+                "identity",
+                "style",
+                "motion",
+                "escalation",
+                "audio",
+                "subs",
+                "dead_air",
+                "rhythm",
+                "emotion",
+                "theme",
+                "performance",
+            )
+        },
+        "screening_evidence": {
+            dimension: {"timestamp_sec": index + 0.1, "note": "checked"}
+            for index, dimension in enumerate(
+                (
+                    "identity",
+                    "style",
+                    "motion",
+                    "escalation",
+                    "audio",
+                    "subs",
+                    "dead_air",
+                    "rhythm",
+                    "emotion",
+                    "theme",
+                    "performance",
+                )
+            )
+        },
+        "fail_reasons": {},
+        "reshoot_shots": [],
+    }
+    server = _server(tmp_path)
+    try:
+        status, payload = _request(server, "POST", "/api/final-review-input", body=body)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert status == 200, payload
+    report = json.loads(payload)
+    assert report["ok"] is True
+    assert Path(report["path"]).is_file()

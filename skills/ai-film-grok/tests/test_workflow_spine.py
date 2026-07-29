@@ -268,6 +268,67 @@ def test_master_lock_completes_spine_before_desktop_export(
     assert status["delivery_pending"] is True
 
 
+def test_complete_professional_workflow_is_done_after_desktop_export(
+    tmp_path: Path,
+) -> None:
+    actions = professional_stage_actions(
+        tmp_path,
+        {
+            "mode": "professional",
+            "current_stage": "complete",
+            "ready_for_lock": False,
+            "delivery_pending": False,
+        },
+        [],
+    )
+
+    assert actions == [
+        {
+            "id": "done",
+            "cmd": f'aifilm status --root "{tmp_path.resolve()}"',
+            "why": "母版与 Desktop 交付副本均已验证；流程已收敛",
+            "stage": "deliver",
+            "stage_label": "deliver",
+            "source": "professional_workflow",
+        }
+    ]
+
+
+def test_complete_professional_workflow_never_routes_back_to_heat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_production_book(tmp_path, rigor="professional")
+    monkeypatch.setattr(
+        "director_cli.validate_native_stage_evidence",
+        lambda _root, _stage: {},
+    )
+    for stage in STAGE_ORDER:
+        _lock(tmp_path, stage)
+    monkeypatch.setattr(
+        "heat_check.heat_agent_status",
+        lambda _root: {
+            "active": True,
+            "hard_fail": True,
+            "needs_boost": True,
+            "next_cmd": f'aifilm heat boost --root "{tmp_path}" --apply',
+        },
+    )
+
+    packet = build_dispatch(
+        tmp_path,
+        gates={"desktop_exported": True},
+        include_capability=False,
+        write_receipt=False,
+        use_state_cache=False,
+    )
+
+    assert packet["workflow"]["current_stage"] == "complete"
+    assert packet["next_id"] == "done"
+    assert packet["next_action"]["argv"][:1] == ["status"]
+    assert all(action["id"] != "heat-boost" for action in packet["next_actions"])
+
+
 def test_dispatch_compact_and_full_share_unified_workflow(tmp_path: Path) -> None:
     (tmp_path / "brief.json").write_text('{"title":"t"}\n', encoding="utf-8")
     (tmp_path / "film-spec.json").write_text('{"title":"t","shots":[]}\n', encoding="utf-8")

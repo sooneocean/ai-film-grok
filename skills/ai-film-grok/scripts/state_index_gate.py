@@ -293,7 +293,22 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
     dialogue_state_index: dict[str, Any] = {}
     missing_dialogue_states: list[str] = []
     dialogue_mode = str(spec.get("vo_mode") or "").strip().lower() == "dialogue_drama"
+    dialogue_i2i_route: dict[str, Any] | None = None
     if dialogue_mode:
+        from performance_state import validate_performance_state
+
+        try:
+            from dialogue_i2i_route import route_dialogue_i2i
+
+            dialogue_i2i_route = route_dialogue_i2i(
+                frw_receipt=read_json(root / "receipts" / "frw-key-capability.json"),
+            )
+        except Exception:  # fail closed even when a plugin installation is partial
+            dialogue_i2i_route = {
+                "status": "local_preflight_required",
+                "selected_provider": None,
+                "reason": "dialogue i2i route unavailable; do not submit until capability preflight",
+            }
         for shot in shots:
             if not isinstance(shot, dict) or shot.get("screen_mode") != "on_camera":
                 continue
@@ -304,12 +319,18 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                 missing_dialogue_states.append(f"{sid}:missing-performance-state-id")
                 continue
             path = root / "canonical" / "performance-states" / hero_id / f"{state_id}.png"
-            exists = path.is_file()
+            approval = validate_performance_state(
+                root,
+                speaker=hero_id,
+                state_id=state_id,
+            )
+            exists = bool(approval.get("ok"))
             dialogue_state_index[sid] = {
                 "hero_id": hero_id,
                 "performance_state_id": state_id,
                 "path": str(path),
                 "exists": exists,
+                "approval": approval,
             }
             if not exists:
                 missing_dialogue_states.append(f"{sid}:{state_id}")
@@ -321,15 +342,18 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                         "performance_state_id": state_id,
                         "out": str(path.relative_to(root)),
                         "why": "talking close-up requires a state-locked i2i performance reference",
+                        "i2i_route": dialogue_i2i_route,
                         "agent_hint": (
-                            "Qwen i2i from the matching wardrobe state; preserve face/outfit, "
-                            "then set emotion, gaze, hand/prop and camera-facing pose before lipsync"
+                            "Follow i2i_route: FRW only when exact img2image capability is proven; "
+                            "otherwise run local capacity preflight and wait if occupied. From the "
+                            "matching wardrobe state preserve face/outfit, then set emotion, gaze, "
+                            "hand/prop and camera-facing pose before lipsync"
                         ),
                     }
                 )
     if missing_dialogue_states:
         issue = {
-            "level": "hard" if spec.get("dialogue_state_strict") is True else "soft",
+            "level": "hard" if spec.get("dialogue_state_strict") is not False else "soft",
             "code": "MISSING_DIALOGUE_PERFORMANCE_STATE",
             "message": "talking shots missing i2i performance state photos: "
             + ", ".join(missing_dialogue_states[:12]),
@@ -605,6 +629,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
         "heroes": sorted(heroes),
         "state_index": state_index,
         "dialogue_state_index": dialogue_state_index,
+        "dialogue_i2i_route": dialogue_i2i_route,
         "missing_dialogue_performance_states": missing_dialogue_states,
         "undress_anchor": {"path": str(anchor), "exists": anchor_ok, "required": needs_anchor},
         "shots": shot_rows,

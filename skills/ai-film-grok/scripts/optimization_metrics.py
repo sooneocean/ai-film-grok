@@ -13,7 +13,7 @@ from optimization_taxonomy import UNCLASSIFIED, normalize_code
 from pipeline_events import load_events
 from util import canonical_json_sha256, read_json, sha256_file, write_json
 
-METRICS_VERSION = 1
+METRICS_VERSION = 2
 PREMIUM_CROSSWALK = {
     "narrative_rhythm": "rhythm",
     "identity_continuity": "identity",
@@ -27,6 +27,17 @@ PREMIUM_CROSSWALK = {
 
 def _root(root: Path | str) -> Path:
     return Path(root).expanduser().resolve()
+
+
+def _plugin_version() -> str | None:
+    for parent in Path(__file__).resolve().parents:
+        manifest = parent / "plugin.json"
+        if not manifest.is_file():
+            continue
+        value = read_json(manifest)
+        if isinstance(value, dict) and str(value.get("version") or "").strip():
+            return str(value["version"])
+    return None
 
 
 def _load(base: Path, relative: str, sources: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -173,10 +184,12 @@ def emit_metrics(root: Path | str, *, run_id: str = "default") -> dict[str, Any]
         if qa.get("motion_ok") is False:
             motion_fail += 1
     gates = manifest.get("gates") if isinstance(manifest.get("gates"), dict) else {}
+    boolean_gates = [value for value in gates.values() if isinstance(value, bool)]
     l0 = {
         "state": "known" if manifest else "unknown",
         "hard_gates": gates,
-        "all_pass": bool(gates.get("final_complete")),
+        "all_pass": bool(boolean_gates) and all(boolean_gates),
+        "final_complete": bool(gates.get("final_complete")),
         "clip_count": clip_count,
         "errors": l0_errors,
         "failed_gate_count": sum(1 for value in gates.values() if value is False),
@@ -212,18 +225,18 @@ def emit_metrics(root: Path | str, *, run_id: str = "default") -> dict[str, Any]
     )
     i2v: list[float] = []
     claimed: dict[str, datetime] = {}
+    registered_events: list[dict[str, Any]] = []
     for item in events:
         if item.get("shot_id") and item.get("stage") == "i2v":
             timestamp = _parse_time(item.get("occurred_at"))
             if timestamp and item.get("phase") == "claimed":
                 claimed[str(item["shot_id"])] = timestamp
-            if timestamp and item.get("phase") == "registered" and str(item["shot_id"]) in claimed:
-                i2v.append((timestamp - claimed[str(item["shot_id"])]).total_seconds())
-    human = sum(
-        float(item.get("human_minutes") or 0)
-        for item in events
-        if item.get("phase") == "human_time"
-    )
+            if item.get("phase") == "registered":
+                registered_events.append(item)
+                if timestamp and str(item["shot_id"]) in claimed:
+                    i2v.append((timestamp - claimed[str(item["shot_id"])]).total_seconds())
+    human_events = [item for item in events if item.get("phase") == "human_time"]
+    human = sum(float(item.get("human_minutes") or 0) for item in human_events)
     errors = [
         str((item.get("error") or {}).get("code") or UNCLASSIFIED)
         for item in events
@@ -231,35 +244,62 @@ def emit_metrics(root: Path | str, *, run_id: str = "default") -> dict[str, Any]
     ]
     errors.extend(normalize_code(item) for item in l0_errors)
     final_duration = _duration_from_manifest(manifest)
-    cost = usage.get("cost_usd") if records and usage.get("unknown_cost_requests", 0) == 0 else None
+    i2v_records = [record for record in records if record.get("operation") == "i2v"]
+    i2v_cost_known = bool(i2v_records) and all(
+        record.get("measurement") in {"provider_exact", "manual_exact", "local_zero"}
+        and "cost_in_usd_ticks"
+        in (record.get("usage") if isinstance(record.get("usage"), dict) else {})
+        for record in i2v_records
+    )
+    all_cost_known = bool(records) and usage.get("unknown_cost_requests", 0) == 0
+    cost_known = all_cost_known and (not clip_count or i2v_cost_known)
+    cost = usage.get("cost_usd") if cost_known else None
+    registered_shots = {
+        str(item.get("shot_id"))
+        for item in registered_events
+        if str(item.get("shot_id") or "").strip()
+    }
+    registered_count = len(registered_events)
+    approved_count = sum(
+        1 for item in clips.values() if isinstance(item, dict) and item.get("status") == "approved"
+    )
+    jobs = queue.get("jobs") if isinstance(queue.get("jobs"), list) else []
+    retry_count = (
+        sum(
+            max(0, int(record.get("attempts") or 1) - 1)
+            for record in jobs
+            if isinstance(record, dict)
+        )
+        if jobs
+        else None
+    )
     l3 = {
         "state": "known" if events or records else "unknown",
         "wall_sec_init_to_verified": wall,
         "sec_per_shot_i2v": _quantiles(i2v),
-        "human_minutes": human if events else None,
-        "retry_count": sum(
-            max(0, int(record.get("attempts") or 1) - 1)
-            for record in queue.get("jobs") or []
-            if isinstance(record, dict)
-        ),
+        "human_minutes": human if human_events else None,
+        "human_time_state": "known" if human_events else "unknown",
+        "retry_count": retry_count,
+        "registered_event_count": registered_count,
+        "unique_registered_shots": len(registered_shots),
+        "registration_rework_count": max(0, registered_count - len(registered_shots)),
         "generation_usage": usage,
         "cost_usd": cost,
+        "i2v_cost_state": "known" if i2v_cost_known else "unknown",
         "usd_per_pass_min": round(float(cost) / (final_duration / 60), 6)
         if cost is not None and final_duration and l2.get("approved")
         else None,
-        "stage_yield": round(
-            sum(
-                1
-                for item in clips.values()
-                if isinstance(item, dict) and item.get("status") == "approved"
-            )
-            / clip_count,
-            4,
-        )
-        if clip_count
+        "stage_yield": round(min(approved_count, registered_count) / registered_count, 4)
+        if registered_count
         else None,
     }
-    jobs = queue.get("jobs") if isinstance(queue.get("jobs"), list) else []
+    missing_evidence: list[str] = []
+    if clip_count and not i2v:
+        missing_evidence.append("i2v_timing")
+    if clip_count and not i2v_cost_known:
+        missing_evidence.append("i2v_cost")
+    if (review or finals) and not human_events:
+        missing_evidence.append("human_time")
     funnel = {
         "queued": len(jobs),
         "registered_clips": clip_count,
@@ -278,12 +318,17 @@ def emit_metrics(root: Path | str, *, run_id: str = "default") -> dict[str, Any]
             "final_output_sha256": ((manifest.get("outputs") or {}).get("final_film") or {}).get(
                 "sha256"
             ),
-            "plugin_version": "2.3.0",
+            "plugin_version": _plugin_version(),
         },
         "data_quality": {
-            "state": "invalid" if event_invalid else ("known" if manifest else "unknown"),
+            "state": (
+                "invalid"
+                if event_invalid
+                else ("partial" if missing_evidence else ("known" if manifest else "unknown"))
+            ),
             "sources": sources,
             "invalid_events": event_invalid,
+            "missing_evidence": missing_evidence,
         },
         "l0": l0,
         "l1": l1,

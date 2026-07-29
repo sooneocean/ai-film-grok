@@ -252,7 +252,9 @@ def validate_nar_budget(nar: object, *, field: str) -> str:
     return text
 
 
-def _validate_dialogue_drama_shot(shot: dict[str, Any], *, shot_id: str) -> None:
+def _validate_dialogue_drama_shot(
+    shot: dict[str, Any], *, shot_id: str, narration_gap_strict: bool = False
+) -> None:
     """Require an explicit, single-purpose audio contract for dialogue-first shots."""
     screen_mode = str(shot.get("screen_mode") or "").strip().lower()
     valid_modes = {"on_camera", "off_camera", "reaction", "action_cover", "silence", "narration"}
@@ -295,6 +297,42 @@ def _validate_dialogue_drama_shot(shot: dict[str, Any], *, shot_id: str) -> None
             )
         if not str(shot.get("narration_reason") or "").strip():
             raise FilmSpecError(f"{shot_id}: {screen_mode} narration requires narration_reason")
+        if narration_gap_strict:
+            gap = shot.get("narration_gap")
+            if not isinstance(gap, dict):
+                raise FilmSpecError(
+                    f"{shot_id}: {screen_mode} narration requires narration_gap evidence"
+                )
+            allowed = {"time_jump", "location_context", "offscreen_fact", "inner_context"}
+            if str(gap.get("reason") or "") not in allowed:
+                raise FilmSpecError(
+                    f"{shot_id}: narration_gap.reason must be one of {sorted(allowed)}"
+                )
+            uncovered = str(gap.get("uncovered_information") or "").strip()
+            if not uncovered:
+                raise FilmSpecError(f"{shot_id}: narration_gap.uncovered_information is required")
+            voice_text = str(voices[0].get("spoken_text") or "").strip()
+            visible = " ".join(
+                str(value or "").strip()
+                for value in (
+                    shot.get("must_show"),
+                    shot.get("visible_change"),
+                    (shot.get("dsl") or {}).get("action")
+                    if isinstance(shot.get("dsl"), dict)
+                    else "",
+                )
+                if str(value or "").strip()
+            )
+            compact_voice = re.sub(r"[\W_]+", "", voice_text)
+            compact_visible = re.sub(r"[\W_]+", "", visible)
+            if (
+                compact_voice
+                and compact_visible
+                and (compact_voice in compact_visible or compact_visible in compact_voice)
+            ):
+                raise FilmSpecError(
+                    f"{shot_id}: narration duplicates visible information; use silence/ambience"
+                )
     elif voices:
         raise FilmSpecError(
             f"{shot_id}: {screen_mode} cannot carry voice; use on_camera/off_camera/narration"
@@ -980,7 +1018,11 @@ def validate_film_spec(
                 except DialogueBrollError as exc:
                     raise FilmSpecError(str(exc)) from exc
             if mode == "dialogue_drama":
-                _validate_dialogue_drama_shot(shot, shot_id=shot_id)
+                _validate_dialogue_drama_shot(
+                    shot,
+                    shot_id=shot_id,
+                    narration_gap_strict=spec.get("narration_gap_strict") is True,
+                )
                 nar = shot.get("nar")
                 if nar is not None:
                     shot["nar"] = validate_nar_budget(nar, field=f"{shot_id}.nar")

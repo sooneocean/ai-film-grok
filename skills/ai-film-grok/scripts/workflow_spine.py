@@ -373,6 +373,17 @@ def professional_stage_actions(
     base = Path(root).expanduser().resolve()
     stage = str(workflow.get("current_stage") or "")
     if stage == "complete":
+        if not workflow.get("delivery_pending", True):
+            return [
+                {
+                    "id": "done",
+                    "cmd": f'aifilm status --root "{base}"',
+                    "why": "母版与 Desktop 交付副本均已验证；流程已收敛",
+                    "stage": "deliver",
+                    "stage_label": "deliver",
+                    "source": "professional_workflow",
+                }
+            ]
         return [
             {
                 "id": "export-desktop",
