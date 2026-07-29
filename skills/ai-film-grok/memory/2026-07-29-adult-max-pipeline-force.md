@@ -26,5 +26,12 @@
 | music_energy 跟 phase | `inject_music_energy_spotting` → sound_plan.music_spotting |
 | pilot 三拍绑 bulk | `_assert_pilot_adult_three_beat`（undress + union/rhythm） |
 
-## 未做（Wave 3 可选）
-像素 CV 肤色 advisory · impact S 自动冲分模板 · 色气 checklist 半自动抽帧
+## Wave 3 已做（同日）
+| 项 | 入口 |
+|----|------|
+| impact S 冲分 | `aifilm heat boost [--apply] [--target-score 90]` · `suggest_impact_boost_actions` |
+| 色气 6 项 | `lint_ecchi_checklist`；`heat check` 输出；`ecchi_checklist_strict:true` 才 hard |
+| mute-frame advisory | 诚实列表 act/climax 须人工 `--score-coitus`（**无假 CV**） |
+
+## 未做（刻意）
+真·肤色/暴露像素 CV（产品诚实：人眼 mute-frame 保留）

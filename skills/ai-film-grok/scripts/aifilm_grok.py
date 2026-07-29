@@ -1248,11 +1248,16 @@ def cmd_quality_status(args: argparse.Namespace) -> int:
 
 
 def cmd_heat(args: argparse.Namespace) -> int:
-    """Adult heat gates: check | vo-suggest | soften-log | soften-compensate."""
+    """Adult heat gates: check | vo-suggest | boost | soften-log | soften-compensate."""
     root = Path(str(args.root)).expanduser().resolve()
     action = str(getattr(args, "heat_action", None) or "check")
     try:
-        from heat_check import heat_check, heat_soften_compensate, heat_vo_suggest
+        from heat_check import (
+            heat_boost,
+            heat_check,
+            heat_soften_compensate,
+            heat_vo_suggest,
+        )
     except Exception as exc:  # noqa: BLE001
         raise FilmError(f"Cannot import heat_check: {exc}") from exc
     if action in {"check", ""}:
@@ -1263,6 +1268,14 @@ def cmd_heat(args: argparse.Namespace) -> int:
         report = heat_vo_suggest(root, shot_id=getattr(args, "shot", None))
         emit(report)
         return 0
+    if action == "boost":
+        report = heat_boost(
+            root,
+            apply=bool(getattr(args, "apply", False)),
+            target_score=float(getattr(args, "target_score", 90.0) or 90.0),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
     if action in {"soften-log", "soften-compensate"}:
         note = str(getattr(args, "note", "") or "moderation softed still/I2V")
         # soften-log is receipt-only; soften-compensate needs --apply to mutate film-spec
@@ -8025,7 +8038,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     heat_p = sub.add_parser(
         "heat",
-        help="Adult heat: check | vo-suggest | soften-log | soften-compensate",
+        help="Adult heat: check | vo-suggest | boost | soften-log | soften-compensate",
     )
     heat_sub = heat_p.add_subparsers(dest="heat_action", required=True)
     heat_ck = heat_sub.add_parser(
@@ -8039,6 +8052,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     heat_vo.add_argument("--root", required=True)
     heat_vo.add_argument("--shot", default=None, help="Optional shot id")
+    heat_boost_p = heat_sub.add_parser(
+        "boost",
+        help="Impact S boost plan; --apply patches duration/bare/detail/verbs/VO (never lower heat)",
+    )
+    heat_boost_p.add_argument("--root", required=True)
+    heat_boost_p.add_argument(
+        "--apply",
+        action="store_true",
+        help="Write field patches into film-spec + receipts/heat-boost.json",
+    )
+    heat_boost_p.add_argument(
+        "--target-score",
+        type=float,
+        default=90.0,
+        help="Target erotic impact score (default 90 = grade S)",
+    )
     heat_sf = heat_sub.add_parser(
         "soften-log",
         help="Write receipts/moderation_soften.json dual-track compensation (never lower heat)",

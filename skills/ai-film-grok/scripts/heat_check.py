@@ -6,7 +6,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from edit_policy import compute_erotic_impact_score, lint_heat_arc
+from edit_policy import (
+    apply_impact_boost_patches,
+    apply_vo_spice_auto,
+    compute_erotic_impact_score,
+    lint_ecchi_checklist,
+    lint_heat_arc,
+    suggest_impact_boost_actions,
+)
 from util import read_json
 
 
@@ -75,6 +82,22 @@ def heat_check(root: Path) -> dict[str, Any]:
             impact["grade"] = "S" if media_ok and impact["score"] >= 90 else impact.get("grade")
         except (OSError, ValueError):
             sensory = {"ok": False, "codes": ["ADULT_MAX_EVIDENCE_UNAVAILABLE"]}
+    # Wave 3: S-boost plan + 色气 checklist + mute-frame advisory (no fake pixel CV)
+    # Prefer field/spec score for boost planning when media halves the grade
+    boost_impact = {
+        "score": impact.get("spec_score", impact.get("score")),
+        "bands": impact.get("bands") or {},
+        "grade": impact.get("grade"),
+    }
+    boost = suggest_impact_boost_actions(
+        shots,
+        heat_scale=str(heat_scale) if heat_scale else None,
+        heat_rep=rep,
+        impact=boost_impact,
+        target_score=90.0,
+    )
+    ecchi = lint_ecchi_checklist(shots, heat_scale=str(heat_scale) if heat_scale else None)
+    mute_adv = mute_frame_advisory(shots, heat_scale=str(heat_scale) if heat_scale else None)
     gates = {
         "sex_duration": {
             "ratio": rep.get("sex_duration_ratio"),
@@ -101,6 +124,9 @@ def heat_check(root: Path) -> dict[str, Any]:
         "size_ladder": rep.get("size_ladder") or {},
         "adult_max_sensory": sensory,
         "erotic_impact": impact,
+        "impact_boost": boost,
+        "ecchi_checklist": ecchi,
+        "mute_frame_advisory": mute_adv,
         "sfx_shots": sfx_n,
         "sound_plan_accents": plan_sfx,
         "sex_sfx_accents": sex_sfx,
@@ -119,20 +145,38 @@ def heat_check(root: Path) -> dict[str, Any]:
     ]
     if sensory and not sensory.get("ok"):
         hard_codes.extend(str(code) for code in sensory.get("codes") or [])
+    # max + ecchi_checklist_strict: thin checklist hard-fails heat check
+    if (
+        str(heat_scale or "").lower() == "max"
+        and spec.get("ecchi_checklist_strict") is True
+        and not ecchi.get("ok")
+    ):
+        hard_codes.extend(str(c) for c in (ecchi.get("codes") or []))
     sex_arc = rep.get("sex_arc") or {}
     detail = rep.get("detail_cu") or {}
+    codes_all = list(rep.get("codes") or [])
+    codes_all.extend(ecchi.get("codes") or [])
     return {
-        "ok": bool(rep.get("ok")) and (sensory is None or bool(sensory.get("ok"))),
+        "ok": bool(rep.get("ok"))
+        and (sensory is None or bool(sensory.get("ok")))
+        and (
+            spec.get("ecchi_checklist_strict") is not True
+            or bool(ecchi.get("ok"))
+            or str(heat_scale or "").lower() != "max"
+        ),
         "root": str(root),
         "heat_scale": heat_scale,
         "audience_profile": audience,
         "shot_count": len(shots),
         "sex_duration_ratio": rep.get("sex_duration_ratio"),
-        "codes": rep.get("codes"),
+        "codes": codes_all,
         "warning_count": rep.get("warning_count"),
         "gates": gates,
         "hard_relevant_codes": hard_codes,
         "erotic_impact": impact,
+        "impact_boost": boost,
+        "ecchi_checklist": ecchi,
+        "mute_frame_advisory": mute_adv,
         "adult_max_sensory": sensory,
         "strict_flags": {
             "sex_floor_strict": spec.get("sex_floor_strict"),
@@ -145,6 +189,7 @@ def heat_check(root: Path) -> dict[str, Any]:
             "sex_detail_cu_strict": spec.get("sex_detail_cu_strict"),
             "both_undress_strict": spec.get("both_undress_strict"),
             "pose_strict": spec.get("pose_strict"),
+            "ecchi_checklist_strict": spec.get("ecchi_checklist_strict"),
         },
         "spice_level": rep.get("spice_level") or spec.get("spice_level"),
         "sex_duration_floor": rep.get("sex_duration_floor"),
@@ -158,13 +203,57 @@ def heat_check(root: Path) -> dict[str, Any]:
             f"arc_ok={sex_arc.get('ok')} pen_ratio={sex_arc.get('penetration_duration_ratio')} "
             f"detail_cu={','.join(detail.get('detail_shots') or []) or 'none'} "
             f"impact={impact.get('grade')}:{impact.get('score')} "
+            f"ecchi={ecchi.get('score')}/{ecchi.get('need')} "
+            f"boost_actions={len(boost.get('actions') or [])} "
             f"wardrobe_ok={(rep.get('wardrobe') or {}).get('ok')} "
             f"vo_ok={(rep.get('vo_spice') or {}).get('ok')} "
             f"coitus_ok={(rep.get('coitus') or {}).get('ok')} "
             f"size_ok={(rep.get('size_ladder') or {}).get('ok')} "
             f"pose_u={(rep.get('poses') or {}).get('unique')} "
             f"sfx={sfx_n}/{plan_sfx}sex={sex_sfx} "
-            f"codes={','.join((rep.get('codes') or [])[:8]) or 'none'}"
+            f"codes={','.join(codes_all[:8]) or 'none'}"
+        ),
+    }
+
+
+def mute_frame_advisory(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+) -> dict[str, Any]:
+    """List act/climax shots that still need human mute-frame coitus evidence.
+
+    Honest: no skin-tone CV. Agent must score --score-coitus on review-shot.
+    """
+    from edit_policy import infer_heat_phase
+
+    scale = (heat_scale or "").strip().lower()
+    if scale not in {"max", "hot"}:
+        return {"ok": True, "enabled": False, "shots": [], "note": "not max/hot"}
+    need: list[dict[str, Any]] = []
+    for sh in shots:
+        if not isinstance(sh, dict):
+            continue
+        ph = infer_heat_phase(sh)
+        if ph not in {"act", "climax"}:
+            continue
+        sid = str(sh.get("id") or "?")
+        need.append(
+            {
+                "shot_id": sid,
+                "heat_phase": ph,
+                "action": "review-shot --score-coitus 4..5 (mute-frame 办事可读)",
+                "hint": "静音一帧能读结合/抽送才算；拥抱=fail",
+            }
+        )
+    return {
+        "ok": True,
+        "enabled": True,
+        "count": len(need),
+        "shots": need,
+        "note": (
+            "pixel advisory only — human mute-frame required; "
+            "no automated genital/skin CV in this build"
         ),
     }
 
@@ -224,6 +313,86 @@ def heat_vo_suggest(
     }
 
 
+def heat_boost(
+    root: Path,
+    *,
+    apply: bool = False,
+    target_score: float = 90.0,
+) -> dict[str, Any]:
+    """Impact S boost plan; optional field patches (duration/bare/detail/verbs/VO).
+
+    Writes receipts/heat-boost.json. Never lowers heat_scale.
+    """
+    from util import write_json
+
+    root = Path(root).expanduser().resolve()
+    spec_path = root / "film-spec.json"
+    spec = read_json(spec_path) or {}
+    if not spec:
+        return {"ok": False, "error": "missing film-spec.json", "root": str(root)}
+    heat = str(spec.get("heat_scale") or "").strip().lower()
+    shots = _flat_shots(spec)
+    rep = lint_heat_arc(
+        shots,
+        heat_scale=heat or None,
+        sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
+        advise=True,
+        spice_level=spec.get("spice_level"),
+    )
+    impact = compute_erotic_impact_score(shots, heat_scale=heat or None, heat_rep=rep)
+    plan = suggest_impact_boost_actions(
+        shots,
+        heat_scale=heat or None,
+        heat_rep=rep,
+        impact=impact,
+        target_score=target_score,
+    )
+    applied: dict[str, Any] = {"patches": None, "vo": None}
+    if apply and heat in {"max", "hot"}:
+        patches = apply_impact_boost_patches(shots, list(plan.get("actions") or []))
+        applied["patches"] = patches
+        vo = apply_vo_spice_auto(shots, spice_level=str(spec.get("spice_level") or "extreme"))
+        applied["vo"] = vo
+        # re-score after patches
+        rep2 = lint_heat_arc(
+            shots,
+            heat_scale=heat or None,
+            sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
+            advise=True,
+            spice_level=spec.get("spice_level"),
+        )
+        impact_after = compute_erotic_impact_score(shots, heat_scale=heat or None, heat_rep=rep2)
+        plan["score_after"] = impact_after.get("score")
+        plan["grade_after"] = impact_after.get("grade")
+        write_json(spec_path, spec)
+    path = root / "receipts" / "heat-boost.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    receipt = {
+        "ok": True,
+        "kind": "heat-impact-boost",
+        "apply": apply,
+        "heat_scale": heat or None,
+        "plan": plan,
+        "applied": applied,
+        "ecchi": lint_ecchi_checklist(shots, heat_scale=heat or None),
+        "mute_frame_advisory": mute_frame_advisory(shots, heat_scale=heat or None),
+    }
+    write_json(path, receipt)
+    return {
+        "ok": True,
+        "root": str(root),
+        "path": str(path),
+        "plan": plan,
+        "applied": applied,
+        "line": (
+            f"heat-boost apply={apply} score={plan.get('score')}→"
+            f"{plan.get('score_after', plan.get('score'))} "
+            f"actions={len(plan.get('actions') or [])} "
+            f"patched={(applied.get('patches') or {}).get('changed')}"
+        ),
+    }
+
+
 def heat_soften_compensate(
     root: Path,
     *,
@@ -235,7 +404,6 @@ def heat_soften_compensate(
     Never lowers heat_scale. When apply=True, rewrites weak nar + injects sex SFX
     into film-spec sound_plan (still does not invent stills).
     """
-    from edit_policy import apply_vo_spice_auto
     from util import write_json
 
     root = Path(root).expanduser().resolve()

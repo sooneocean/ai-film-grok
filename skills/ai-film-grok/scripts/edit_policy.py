@@ -4495,6 +4495,268 @@ def lint_both_undress(
     }
 
 
+# 色气 6 项 checklist（ecchi-story · Wave 3）
+ECCHI_CHECKLIST_ITEMS: tuple[str, ...] = (
+    "distance_ladder",  # 身体距离阶梯
+    "wardrobe_disorder",  # 服装失序
+    "sensory_words",  # 感官词
+    "power_gap",  # 权力差
+    "double_entendre",  # 双关金句
+    "completion_beat",  # 办事完成拍
+)
+_ECCHI_DISTANCE = ("贴", "跨坐", "耳语", "靠近", "距离", "压近", "贴身", "close", "straddle")
+_ECCHI_WARDROBE = ("滑肩", "卸", "半裸", "失序", "扣", "湿", "bare", "undress", "partial", "strap")
+_ECCHI_SENSORY = ("热", "潮", "喘", "香", "心跳", "指尖", "腿软", "汗", "湿", "breath", "sweat")
+_ECCHI_POWER = ("教", "规矩", "落锁", "加演", "主导", "不许", "命令", "pin", "lock")
+_ECCHI_DOUBLE = ("双关", "加练", "续借", "未完", "下回", "换你", "办")
+_ECCHI_COMPLETE = ("办穿", "办完", "高潮", "射出", "腿软", "finish", "climax", "arch-finish")
+
+
+def lint_ecchi_checklist(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+    min_items: int | None = None,
+) -> dict[str, Any]:
+    """色气升级清单：max 须 ≥6 项全占；hot 建议 ≥4。字段+文案启发式，非像素 CV。"""
+    scale = (heat_scale or "").strip().lower() or None
+    if scale not in {"max", "hot"}:
+        return {
+            "ok": True,
+            "enabled": False,
+            "score": 0,
+            "items": {},
+            "missing": [],
+            "codes": [],
+            "note": "ecchi checklist skipped (not max/hot)",
+        }
+    need = int(min_items) if min_items is not None else (6 if scale == "max" else 4)
+    blobs: list[str] = []
+    wardrobe_states: list[str] = []
+    phases: list[str] = []
+    for sh in shots:
+        if not isinstance(sh, dict):
+            continue
+        phases.append(infer_heat_phase(sh))
+        wardrobe_states.append(str(resolve_wardrobe_state(sh) or ""))
+        dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+        parts = [
+            str(sh.get("nar") or ""),
+            str(dsl.get("action") or ""),
+            str(dsl.get("subject") or ""),
+            str(sh.get("must_show") or ""),
+            str(sh.get("title") or ""),
+        ]
+        blobs.append(" ".join(parts).lower())
+    text = " ".join(blobs)
+    items = {
+        "distance_ladder": any(m in text for m in _ECCHI_DISTANCE)
+        or any(p in {"foreplay", "act"} for p in phases),
+        "wardrobe_disorder": any(m in text for m in _ECCHI_WARDROBE)
+        or any(w in {"partial", "undressed", "bare"} for w in wardrobe_states),
+        "sensory_words": any(m in text for m in _ECCHI_SENSORY),
+        "power_gap": any(m in text for m in _ECCHI_POWER),
+        "double_entendre": any(m in text for m in _ECCHI_DOUBLE),
+        "completion_beat": any(m in text for m in _ECCHI_COMPLETE)
+        or any(p == "climax" for p in phases),
+    }
+    present = [k for k, v in items.items() if v]
+    missing = [k for k, v in items.items() if not v]
+    score = len(present)
+    codes: list[str] = []
+    issues: list[dict[str, Any]] = []
+    if score < need:
+        codes.append("ECCHI_CHECKLIST_THIN")
+        issues.append(
+            {
+                "code": "ECCHI_CHECKLIST_THIN",
+                "severity": "warning" if scale == "max" else "info",
+                "message": (
+                    f"色气 checklist {score}/{need} — missing: {', '.join(missing) or 'none'}. "
+                    "max 须 6 项全占（距离/失序/感官/权力/双关/完成拍）。"
+                ),
+            }
+        )
+    return {
+        "ok": score >= need,
+        "enabled": True,
+        "score": score,
+        "need": need,
+        "items": items,
+        "present": present,
+        "missing": missing,
+        "codes": codes,
+        "issues": issues,
+        "note": "ecchi-story 6-item checklist; field+nar heuristic (not pixel CV)",
+    }
+
+
+def suggest_impact_boost_actions(
+    shots: list[dict[str, Any]],
+    *,
+    heat_scale: str | None = None,
+    heat_rep: dict[str, Any] | None = None,
+    impact: dict[str, Any] | None = None,
+    target_score: float = 90.0,
+) -> dict[str, Any]:
+    """Concrete patch list to push erotic impact toward S (≥90)."""
+    scale = (heat_scale or "").strip().lower() or "max"
+    impact = impact or compute_erotic_impact_score(shots, heat_scale=scale, heat_rep=heat_rep)
+    score = float(impact.get("score") or 0.0)
+    bands = impact.get("bands") if isinstance(impact.get("bands"), dict) else {}
+    actions: list[dict[str, Any]] = []
+    if score + 1e-9 >= target_score:
+        return {
+            "ok": True,
+            "needed": False,
+            "score": score,
+            "target": target_score,
+            "actions": [],
+            "note": f"impact {score} already ≥ S target {target_score}",
+        }
+
+    def _add(kind: str, message: str, **extra: Any) -> None:
+        actions.append({"kind": kind, "message": message, **extra})
+
+    if float(bands.get("sex_duration") or 0) < 25:
+        _add(
+            "lengthen_meat",
+            "加长 act/climax duration_sec（目标 sex≥50%，建议≥55%）",
+            boost_sec=4.0,
+            phases=["act", "climax"],
+        )
+    if float(bands.get("bare_peak") or 0) < 15:
+        _add(
+            "set_bare_peak",
+            "climax 至少 1 镜 wardrobe_state=bare（能露就露）",
+            wardrobe_state="bare",
+            phases=["climax"],
+        )
+    if float(bands.get("detail_cu") or 0) < 15:
+        _add(
+            "add_detail_cu",
+            "肉戏块加 1 镜 coverage_role=detail / close-up insert（定器特写）",
+            coverage_role="detail",
+            phases=["act"],
+        )
+    if float(bands.get("sex_arc") or 0) < 20:
+        _add(
+            "fix_sex_arc",
+            "补齐 前戏→插入→射出：sex_arc_beat + penetration/release 动词",
+            phases=["foreplay", "act", "climax"],
+        )
+    if float(bands.get("penetration_verbs") or 0) < 10:
+        _add(
+            "penetration_verbs",
+            "act 镜 dsl.action/nar 写入 hips-sink/thrust/straddle/沉腰",
+            phases=["act"],
+        )
+    if float(bands.get("intimacy") or 0) < 15:
+        _add(
+            "raise_intimacy",
+            "压缩 setup，增加 foreplay+act+climax 镜比（亲密≥60%）",
+            phases=["setup"],
+        )
+    # Always suggest mute-frame human evidence for act/climax when below S
+    meat_ids = [
+        str(sh.get("id") or "?")
+        for sh in shots
+        if isinstance(sh, dict) and infer_heat_phase(sh) in SEX_PHASES
+    ]
+    if meat_ids:
+        _add(
+            "mute_frame_review",
+            "act/climax 人工 mute-frame coitus≥4（像素办事可读，非字段绿）",
+            shot_ids=meat_ids[:12],
+        )
+    return {
+        "ok": True,
+        "needed": True,
+        "score": score,
+        "target": target_score,
+        "gap": round(target_score - score, 1),
+        "bands": bands,
+        "actions": actions,
+        "note": "apply via aifilm heat boost --apply (field patches only; stills remain agent work)",
+    }
+
+
+def apply_impact_boost_patches(
+    shots: list[dict[str, Any]],
+    actions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Apply field-level impact boosts in-place. Returns counts of changes."""
+    changed: list[str] = []
+    for act in actions:
+        kind = str(act.get("kind") or "")
+        if kind == "lengthen_meat":
+            boost = float(act.get("boost_sec") or 4.0)
+            for sh in shots:
+                if not isinstance(sh, dict):
+                    continue
+                if infer_heat_phase(sh) in SEX_PHASES:
+                    try:
+                        d = float(sh.get("duration_sec") or 6.0)
+                    except (TypeError, ValueError):
+                        d = 6.0
+                    sh["duration_sec"] = round(d + boost, 1)
+                    changed.append(f"len:{sh.get('id')}")
+        elif kind == "set_bare_peak":
+            for sh in shots:
+                if not isinstance(sh, dict):
+                    continue
+                if infer_heat_phase(sh) == "climax":
+                    sh["wardrobe_state"] = "bare"
+                    dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+                    dsl["wardrobe_state"] = "bare"
+                    sh["dsl"] = dsl
+                    changed.append(f"bare:{sh.get('id')}")
+        elif kind == "add_detail_cu":
+            # retarget first act shot without detail
+            for sh in shots:
+                if not isinstance(sh, dict):
+                    continue
+                if infer_heat_phase(sh) != "act":
+                    continue
+                cr = str(
+                    sh.get("coverage_role") or (sh.get("dsl") or {}).get("coverage_role") or ""
+                ).lower()
+                if cr == "detail":
+                    continue
+                sh["coverage_role"] = "detail"
+                dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+                cam = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
+                cam["shot_size"] = cam.get("shot_size") or "close-up insert"
+                dsl["camera"] = cam
+                dsl["coverage_role"] = "detail"
+                dsl["framing"] = dsl.get("framing") or "union_closeup"
+                sh["dsl"] = dsl
+                if not sh.get("sex_arc_beat"):
+                    sh["sex_arc_beat"] = "penetration"
+                changed.append(f"detail:{sh.get('id')}")
+                break
+        elif kind == "penetration_verbs":
+            for sh in shots:
+                if not isinstance(sh, dict):
+                    continue
+                if infer_heat_phase(sh) != "act":
+                    continue
+                if _shot_has_penetration_verb(sh):
+                    continue
+                dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+                dsl["action"] = (
+                    str(dsl.get("action") or "") + " hips-sink thrust-rhythm straddle"
+                ).strip()
+                dsl["motion"] = (
+                    str(dsl.get("motion") or "") + " rhythm_hips hips-sink twice"
+                ).strip()
+                sh["dsl"] = dsl
+                if not resolve_coitus_beat(sh):
+                    sh["coitus_beat"] = "rhythm"
+                changed.append(f"verb:{sh.get('id')}")
+    return {"changed": len(changed), "ids": changed}
+
+
 def compute_erotic_impact_score(
     shots: list[dict[str, Any]],
     *,
