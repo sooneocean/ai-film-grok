@@ -47,6 +47,12 @@
 | **景别堆叠** | 成人 60s：宽≥1·中≥2·近≥2·局部≥2；act→climax 收紧不回退全景；连续 3 镜同 size fail（2026-07-21） |
 | **性交冲击力标竿** | 用户要性交/办事冲击/尺度太小→`coitus_grammar`；act 静帧过 **Mute Frame Test**；六拍 ENTRY→HOOK；禁拥抱冒充办事；审核软化走双轨不降 heat（2026-07-21） |
 | **成人脊柱 + 机器闸（v1.9–1.10）** | plan 成人脊柱；六拍/景别；**sex≥30%**；`spice_level` extreme；声画同动词；act 自动 SFX；hardcore 娇喘轨建议开；蒙太奇 craft 注入；`sex_pose` 多体位；`heat check|vo-suggest|soften-log`；[adult-max-playbook.md](adult-max-playbook.md) · [pose-packs/coitus-beats.md](pose-packs/coitus-beats.md) |
+| **Extreme 尺度扩展（P0 · 2026-07-29）** | `spice_level=extreme` + `adult_max_iron=true` 时强制启用以下机制：
+| | **深插抽送**：`coitus_beat=deep_thrust` 优先；prompt 注入 `deep penetrating thrust, pelvis bottoming out, skin-to-skin friction impact`；I2V 动词必须含 `thrust/pelvis/bottoming-out`
+| | **内射/中出**：`coitus_beat=internal_peak` 或 `creampie_release`；climax 镜必须描述 `internal ejaculation / 体内` 或 `creampie release / 渗出`；`sex_arc_beat=climax_release` hard；静帧可 I2V，clip 须 `register-clip --status approved` 后交付
+| | **六拍扩展**：ENTRY → UNION → RHYTHM/DEEP_THRUST → LOCK → INTERNAL_PEAK/CREAMPIE → FINISH；`coitus_strict` 默认 true；六拍缺一不可
+| | **VO 荤话**：act 阶段 `sex_vo_strict` 强制 `dirty talk`（`deep inside / 塞进去 / 顶进去`）；climax 阶段强制 peak vocalization（娇喘+抽搐描述）
+| | **SFX**：act/climax 自动叠加 wet SFX + rhythmic impact；`aifilm audio add-sfx --category explicit` |
 | 导演门禁 | `director_intent` + 每镜 `dramatic_function` 过 `write-spec` 才 queue |
 | 口白·动作 | `nar` 动词 = `dsl.action` = `dsl.motion` 首要运动 |
 | 防腻 | 连续 3 镜 ≥2 维变化（景别·主动词·`camera_axis`） |

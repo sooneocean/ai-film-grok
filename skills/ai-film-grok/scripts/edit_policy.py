@@ -1811,6 +1811,28 @@ _COITUS_READABLE_MARKERS: tuple[str, ...] = (
     "residual-tremor",
     "skin-to-skin",
     "skin to skin",
+    "deep thrust",
+    "deep-thrust",
+    "penetrating thrust",
+    "penetrating-thrust",
+    "bottoming out",
+    "bottoming-out",
+    "internal ejaculation",
+    "internal-ejaculation",
+    "internal peak",
+    "internal-peak",
+    "overflow",
+    "creampie",
+    "creampie release",
+    "creampie-release",
+    "biological fluid",
+    "biological release",
+    "wet vocalization",
+    "overflowing",
+    "leaking",
+    "残留",
+    "体内",
+    "高潮",
     "沉腰",
     "跨坐",
     "骑",
@@ -1837,8 +1859,22 @@ _COITUS_PSEUDO_ONLY: tuple[str, ...] = (
     "轻靠",
 )
 
-COITUS_BEATS = frozenset({"entry", "union", "rhythm", "lock", "finish", "hook", "undress"})
+COITUS_BEATS = frozenset(
+    {
+        "entry",
+        "union",
+        "rhythm",
+        "lock",
+        "finish",
+        "hook",
+        "undress",
+        "deep_thrust",
+        "internal_peak",
+        "creampie_release",
+    }
+)
 # Six-beat coverage required for hardcore / coitus_strict (undress optional extra)
+# deep_thrust, internal_peak, creampie_release are extreme-intensity extensions.
 COITUS_REQUIRED_BEATS = ("entry", "union", "rhythm", "lock", "finish", "hook")
 
 
@@ -1944,16 +1980,20 @@ def coverage_defaults_for_heat(
         key = COITUS_BEAT_MOTION_KEY[cb]
         base["motion_key"] = key
         base["motion"] = templates.get(key) or base["motion"]
-        if cb in {"union", "rhythm", "entry"}:
+        if cb in {"union", "rhythm", "entry", "deep_thrust"}:
             base["shot_size"] = "medium"
             base["angle"] = "slight low"
             base["framing"] = (
                 "vertical 9:16 pelvis and thighs readable, hips contact, "
-                "full head + headroom, safe framing no cropping, weight down"
+                "full head + headroom, safe framing no cropping, weight down, skin-to-skin impact"
             )
-        elif cb in {"lock", "finish"}:
+        elif cb in {"lock", "finish", "internal_peak", "creampie_release"}:
             base["shot_size"] = "close-up"
             base["angle"] = "eye level"
+            base["framing"] = (
+                "vertical 9:16 close-up on peak reaction, bare skin contact visible, "
+                "full head + headroom, safe framing no cropping, biological release readable"
+            )
         elif cb == "undress":
             base["shot_size"] = "medium full"
             base["angle"] = "eye level"
@@ -1961,15 +2001,39 @@ def coverage_defaults_for_heat(
         base["coitus_beat"] = cb
         return base
     if ph in {"act", "climax"}:
-        key = "rhythm_hips" if ph == "act" else "finish_arch"
+        if cb == "deep_thrust":
+            key = "deep_thrust"
+        elif cb == "internal_peak":
+            key = "internal_peak"
+        elif cb == "creampie_release":
+            key = "creampie_release"
+        elif ph == "act":
+            key = "rhythm_hips"
+        else:
+            key = "finish_arch"
         base["motion_key"] = key
         base["motion"] = templates.get(key) or base["motion"]
-        base["shot_size"] = "medium" if ph == "act" else "close-up"
-        base["angle"] = "slight low" if ph == "act" else "eye level"
-        base["framing"] = (
-            "vertical 9:16 coitus-readable body, pelvis or finish reaction, "
-            "full head + headroom, safe framing no cropping"
-        )
+        if cb in {"internal_peak", "creampie_release"}:
+            base["shot_size"] = "close-up"
+            base["angle"] = "eye level"
+            base["framing"] = (
+                "vertical 9:16 close-up on peak reaction, bare skin contact visible, "
+                "full head + headroom, safe framing no cropping, biological release readable"
+            )
+        elif cb == "deep_thrust":
+            base["shot_size"] = "medium"
+            base["angle"] = "slight low"
+            base["framing"] = (
+                "vertical 9:16 deep penetrating thrust visible, pelvis and thighs readable, "
+                "full head + headroom, safe framing no cropping, skin-to-skin friction"
+            )
+        else:
+            base["shot_size"] = "medium" if ph == "act" else "close-up"
+            base["angle"] = "slight low" if ph == "act" else "eye level"
+            base["framing"] = (
+                "vertical 9:16 coitus-readable body, pelvis or finish reaction, "
+                "full head + headroom, safe framing no cropping"
+            )
         base["heat_phase"] = ph
     elif ph == "foreplay":
         key = "undress_slide"
@@ -2363,6 +2427,18 @@ _NAR_EXTREME_MARKERS: tuple[str, ...] = (
     "中出",
     "灌满",
     "喷",
+    "creampie",
+    "internal ejaculation",
+    "internal peak",
+    "overflow",
+    "bottoming out",
+    "deep thrust",
+    "penetrating",
+    "biological",
+    "溢出",
+    "体内",
+    "残留",
+    "泄爆",
 )
 # dual-entendre only — counts as spice but TOO_MILD under extreme
 _NAR_MILD_ONLY_MARKERS: tuple[str, ...] = (
@@ -3954,8 +4030,48 @@ def resolve_coitus_beat(shot: dict[str, Any]) -> str | None:
         return "finish"
     if any(x in blob for x in ("leg-wrap", "clutch", "锁腰", "锁腿", "攥")):
         return "lock"
-    if any(x in blob for x in ("hips-sink", "grind", "thrust", "沉腰", "顶", "rhythm")):
+    if any(x in blob for x in ("hips-sink", "grind", "rhythm", "沉腰", "顶", "磨")):
         return "rhythm"
+    if any(
+        x in blob
+        for x in (
+            "deep thrust",
+            "deep-thrust",
+            "penetrating thrust",
+            "penetrating-thrust",
+            "bottoming out",
+            "bottoming-out",
+        )
+    ):
+        return "deep_thrust"
+    if any(
+        x in blob
+        for x in (
+            "internal ejaculation",
+            "internal-ejaculation",
+            "internal peak",
+            "internal-peak",
+            "overflow",
+            "溢出",
+            "残留",
+            "高潮",
+        )
+    ):
+        return "internal_peak"
+    if any(
+        x in blob
+        for x in (
+            "creampie",
+            "creampie release",
+            "creampie-release",
+            "biological fluid",
+            "biological release",
+            "biological fluid",
+            "leaking",
+            "渗",
+        )
+    ):
+        return "creampie_release"
     if any(x in blob for x in ("straddle", "mount", "pelvis-lock", "跨坐", "结合", "union")):
         return "union"
     if any(x in blob for x in ("pin", "entry", "拽", "压进", "按进")):
@@ -4223,7 +4339,8 @@ def resolve_sex_arc_beat(shot: dict[str, Any]) -> str | None:
 
 def _shot_has_penetration_verb(shot: dict[str, Any]) -> bool:
     """True when act/penetration language is coitus-readable (not bare hug)."""
-    if resolve_coitus_beat(shot) in {"union", "rhythm", "lock"}:
+    cb = resolve_coitus_beat(shot)
+    if cb in {"union", "rhythm", "lock", "entry", "deep_thrust"}:
         return True
     if shot_coitus_readable(shot):
         return True
@@ -4232,7 +4349,8 @@ def _shot_has_penetration_verb(shot: dict[str, Any]) -> bool:
 
 
 def _shot_has_release_marker(shot: dict[str, Any]) -> bool:
-    if resolve_coitus_beat(shot) == "finish":
+    cb = resolve_coitus_beat(shot)
+    if cb in {"finish", "internal_peak", "creampie_release"}:
         return True
     raw = (
         str(shot.get("sex_arc_beat") or (shot.get("dsl") or {}).get("sex_arc_beat") or "")
@@ -5467,17 +5585,44 @@ def suggest_vo_lines(
             "沉腰吃进整根。再顶深，磨到发软。",
             "跨坐吞满。肏穿前的节奏是她给的。",
             "再插深。锁腰夹紧，不许退。",
+            "腰猛撞。体内烧，穿透到底。",
         ]
         bank["climax"] = [
             "失声办穿。灌满前背一弓，腿软。",
             "高潮绞紧。余颤喷在你身上。",
+            "体内炸裂。全部射在你里面。",
+            "creampie溢出。身体止不住地漏。",
         ]
     by_cb = {
         "entry": bank["setup"],
         "undress": bank["foreplay"],
         "union": ["跨坐落稳。整根吃进，锁住。", "髋贴髋。结合瞬间，不许退。"],
         "rhythm": bank["act"],
-        "lock": ["腿锁腰。攥床单，再夹紧。", "锁死。指节攥白，不许拔。"],
+        "deep_thrust": [
+            "深插到底。腰猛撞，不退。",
+            "穿透她。体内顶，节奏她收。",
+            "抽送到底。骨盆撞一起，停不下。",
+        ]
+        if extreme
+        else ["深插。节奏稳住，不退。"],
+        "lock": [
+            "腿锁腰。攥床单，再夹紧。",
+            "锁死。指节攥白，不许拔。",
+        ],
+        "internal_peak": [
+            "体内炸裂。全部射在你里面。",
+            "高潮绞紧。余颤喷在你身上。",
+            "内射完成。她止不住地颤抖。",
+        ]
+        if extreme
+        else ["体内释放。高潮。颤抖。"],
+        "creampie_release": [
+            "creampie溢出。身体止不住地漏。",
+            "汁液溢出。体内炸裂。",
+            "她漏得停不下来。浸透。",
+        ]
+        if extreme
+        else ["内部释放。湿润。颤。"],
         "finish": bank["climax"],
         "hook": bank["afterglow"],
     }

@@ -120,7 +120,7 @@
     "scripts/dispatch_compact.py": "53e206a900a227cf3d8239a96735c95c67d5ef567da5aecf7b14f85b18239489",
     "scripts/drama_graph.py": "a82d0b9c57b3b4ab3e0144d5f2438de40e7bab19555aa4b015ab2d722ffce58d",
     "scripts/edit_edl_merge.py": "4d65b59eca69122636a12e8c5011b0a5811344405cc0ea5cb5e8f2c7334ba5f7",
-    "scripts/edit_policy.py": "3dbae1e24ec7c9c4100c7836367ff7187d51046253c817b12ea57322c7c84ed4",
+    "scripts/edit_policy.py": "b76e76cf00637ea558a8cbb4a6223e6021649cc62f87ad119c30b4af3c623bb8",
     "scripts/edit_strategy.py": "6e7c287f5fe09ffece7d6201fe907d8c3e4be31c6b5ce37da434961c38c85e62",
     "scripts/editor_cut.py": "a28ad743500ac2676afd5be14fa49b2fddb4c9acbbdf9f79be872815b7ac61e8",
     "scripts/env_plate.py": "a72e7dd800ed6d21c7731adea998b6df5d5200917c83590c74c4368a445982f0",
