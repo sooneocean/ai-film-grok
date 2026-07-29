@@ -1,4 +1,4 @@
-"""Fail-closed serial comparison plan for one dialogue performance shot."""
+"""Fail-closed audio-linked motion plan for one dialogue performance shot."""
 
 from __future__ import annotations
 
@@ -34,13 +34,47 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _DEPENDENCIES = {
     "state_i2i": [],
     "tts": ["state_i2i"],
-    "candidate_preservation": ["tts"],
-    "candidate_generative": ["candidate_preservation"],
-    "qa": ["candidate_generative"],
+    "primary_infinite_talk": ["tts"],
+    "secondary_grok_imagine": ["tts"],
+    "secondary_lipsync": ["secondary_grok_imagine"],
+    "qa": ["primary_infinite_talk", "secondary_lipsync"],
     "provisional_select": ["qa"],
     "human_approve": ["provisional_select"],
     "promote": ["human_approve"],
 }
+_STEP_CONDITIONS = {
+    "state_i2i": "always",
+    "tts": "always",
+    "primary_infinite_talk": "when_route_auto_or_infinite_talk",
+    "secondary_grok_imagine": "when_explicit_secondary_or_primary_technical_failure",
+    "secondary_lipsync": "when_secondary_grok_imagine_succeeds",
+    "qa": "after_active_route_succeeds",
+    "provisional_select": "after_qa",
+    "human_approve": "after_provisional_select",
+    "promote": "after_human_approve",
+}
+_ROUTES = frozenset({"auto", "infinite_talk", "grok_imagine_video"})
+_TECHNICAL_FAILURE_CODES = frozenset(
+    {
+        "provider_unavailable",
+        "timeout",
+        "queue_submission_failed",
+        "model_runtime_error",
+    }
+)
+_SECONDARY_BLOCKING_PRIMARY_FAILURES = frozenset(
+    {
+        "geometry",
+        "identity",
+        "wardrobe",
+        "background",
+        "props",
+        "lip_target",
+        "poison_frame",
+        "unique",
+        "continuity",
+    }
+)
 
 
 def _issues(plan: dict[str, Any]) -> list[dict[str, str]]:
@@ -107,33 +141,50 @@ def build_dialogue_competition_plan(
         "kind": "dialogue-competition",
         "shot_id": shot.get("id"),
         "stage": stage,
+        "route_policy": {
+            "requested": str(shot.get("dialogue_motion_route") or "auto"),
+            "primary": "infinite_talk",
+            "secondary": "grok_imagine_video_then_latentsync",
+            "secondary_trigger": [
+                "explicit_shot_route",
+                "classified_primary_technical_failure",
+            ],
+            "forbidden_secondary_triggers": [
+                "human_quality_rejection",
+                "unknown_error",
+                "identity_drift",
+            ],
+            "audio_clock": "final_tts",
+            "storyboard_source": "approved_performance_state",
+        },
         "issues": [],
         "dag": {
-            "execution": "serial_single_gpu",
+            "execution": "conditional_single_gpu",
             "steps": [
-                {"id": step, "depends_on": list(_DEPENDENCIES[step])}
-                for step in (
-                    "state_i2i",
-                    "tts",
-                    "candidate_preservation",
-                    "candidate_generative",
-                    "qa",
-                    "provisional_select",
-                    "human_approve",
-                    "promote",
-                )
+                {
+                    "id": step,
+                    "depends_on": list(_DEPENDENCIES[step]),
+                    "run_condition": _STEP_CONDITIONS[step],
+                }
+                for step in _DEPENDENCIES
             ],
         },
         "candidates": [
             {
-                "lane": "preservation",
-                "candidate_id": f"{shot.get('id')}__preservation",
+                "lane": "infinite_talk",
+                "candidate_id": f"{shot.get('id')}__infinite_talk",
+                "priority": "primary",
+                "motion_method": "face_animation_to_audio",
+                "audio_link": "native_audio_conditioning",
                 "state_image_sha256": state,
                 "audio_sha256": audio,
             },
             {
-                "lane": "generative",
-                "candidate_id": f"{shot.get('id')}__generative",
+                "lane": "grok_imagine_video",
+                "candidate_id": f"{shot.get('id')}__grok_imagine_video",
+                "priority": "secondary",
+                "motion_method": "image_to_video_then_video_lip_sync",
+                "audio_link": "latentsync_post_process",
                 "state_image_sha256": state,
                 "audio_sha256": audio,
             },
@@ -155,6 +206,14 @@ def build_dialogue_competition_plan(
         )
     if stage not in {"pilot", "production", "final"}:
         _issues(plan).append({"code": "STAGE_INVALID", "message": "unsupported stage"})
+    requested_route = str(shot.get("dialogue_motion_route") or "auto")
+    if requested_route not in _ROUTES:
+        _issues(plan).append(
+            {
+                "code": "DIALOGUE_MOTION_ROUTE_INVALID",
+                "message": "route must be auto, infinite_talk or grok_imagine_video",
+            }
+        )
     if shot.get("shot_type") != "speaking":
         _issues(plan).append({"code": "SHOT_NOT_SPEAKING", "message": "shot must be speaking"})
     if not shot.get("id") or not shot.get("speaker") or not shot.get("performance_intent"):
@@ -175,15 +234,20 @@ def build_dialogue_competition_plan(
     aliases = {
         "state_i2i": "qwen-image-i2i",
         "tts": "edge-ja",
-        "preservation_i2v": "wan22-i2v",
-        "preservation_lipsync": "latentsync-1.6",
-        "generative": "infinitetalk",
+        "infinite_talk": "infinitetalk",
+        "grok_imagine_video": "grok-imagine-video",
+        "grok_lipsync": "latentsync-1.6",
     }
     selected = {
         lane: caps.get(lane) or caps.get(capability_id, {})
         for lane, capability_id in aliases.items()
     }
-    if any(not capability.get("_current") for capability in selected.values()):
+    required_lanes = {"state_i2i", "tts"}
+    if requested_route in {"auto", "infinite_talk"}:
+        required_lanes.add("infinite_talk")
+    if requested_route == "grok_imagine_video":
+        required_lanes.update({"grok_imagine_video", "grok_lipsync"})
+    if any(not selected[lane].get("_current") for lane in required_lanes):
         _issues(plan).append(
             {"code": "CAPABILITY_STALE", "message": "required capability is stale"}
         )
@@ -196,25 +260,56 @@ def build_dialogue_competition_plan(
         }
         for lane, capability in selected.items()
     }
-    plan["candidates"][0]["models"] = [
-        selected["preservation_i2v"].get("model"),
-        selected["preservation_lipsync"].get("model"),
-    ]
-    generative_promotion = str(selected["generative"].get("promotion") or "").lower()
+    infinite_promotion = str(selected["infinite_talk"].get("promotion") or "").lower()
+    grok_promotion = str(selected["grok_imagine_video"].get("promotion") or "").lower()
+    lipsync_promotion = str(selected["grok_lipsync"].get("promotion") or "").lower()
+    plan["candidates"][0].update(
+        {
+            "models": [selected["infinite_talk"].get("model")],
+            "pilot_only": infinite_promotion not in {"production", "final"},
+            "production_eligible": infinite_promotion in {"production", "final"},
+        }
+    )
     plan["candidates"][1].update(
         {
-            "models": [selected["generative"].get("model")],
-            "pilot_only": generative_promotion not in {"production", "final"},
-            "production_eligible": generative_promotion in {"production", "final"},
+            "models": [
+                selected["grok_imagine_video"].get("model"),
+                selected["grok_lipsync"].get("model"),
+            ],
+            "pilot_only": any(
+                promotion not in {"production", "final"}
+                for promotion in (grok_promotion, lipsync_promotion)
+            ),
+            "production_eligible": all(
+                promotion in {"production", "final"}
+                for promotion in (grok_promotion, lipsync_promotion)
+            ),
         }
+    )
+    plan["selected_route"] = (
+        "grok_imagine_video" if requested_route == "grok_imagine_video" else "infinite_talk"
+    )
+    plan["secondary_available"] = all(
+        selected[lane].get("_current") for lane in ("grok_imagine_video", "grok_lipsync")
     )
     if not gpu_state.get("queue_known"):
         _issues(plan).append({"code": "GPU_QUEUE_UNKNOWN", "message": "GPU queue is unknown"})
     elif gpu_state.get("busy"):
         _issues(plan).append({"code": "GPU_BUSY", "message": "GPU is busy"})
-    if stage in {"production", "final"} and generative_promotion not in {"production", "final"}:
+    selected_production_eligible = next(
+        (
+            candidate["production_eligible"]
+            for candidate in plan["candidates"]
+            if candidate["lane"] == plan["selected_route"]
+        ),
+        False,
+    )
+    if stage in {"production", "final"} and not selected_production_eligible:
         _issues(plan).append(
-            {"code": "GENERATIVE_NOT_PROMOTED", "message": "generative lane is pilot-only"}
+            {
+                "code": "DIALOGUE_ROUTE_NOT_PROMOTED",
+                "message": "selected dialogue motion route is pilot-only",
+            }
         )
     plan["ok"] = not plan["issues"]
     return plan
@@ -222,10 +317,31 @@ def build_dialogue_competition_plan(
 
 def validate_dialogue_competition(plan: dict[str, Any]) -> dict[str, Any]:
     issues: list[dict[str, str]] = list(plan.get("issues") or [])
+    route_policy = plan.get("route_policy") or {}
+    requested_route = route_policy.get("requested")
+    expected_selected = (
+        "grok_imagine_video" if requested_route == "grok_imagine_video" else "infinite_talk"
+    )
+    if (
+        requested_route not in _ROUTES
+        or route_policy.get("primary") != "infinite_talk"
+        or route_policy.get("secondary") != "grok_imagine_video_then_latentsync"
+        or route_policy.get("secondary_trigger")
+        != ["explicit_shot_route", "classified_primary_technical_failure"]
+        or route_policy.get("forbidden_secondary_triggers")
+        != ["human_quality_rejection", "unknown_error", "identity_drift"]
+        or plan.get("selected_route") != expected_selected
+    ):
+        issues.append(
+            {
+                "code": "ROUTE_POLICY_INVALID",
+                "message": "dialogue route policy was modified",
+            }
+        )
     candidates = plan.get("candidates") if isinstance(plan.get("candidates"), list) else []
     if len(candidates) != 2 or {
         candidate.get("lane") for candidate in candidates if isinstance(candidate, dict)
-    } != {"preservation", "generative"}:
+    } != {"infinite_talk", "grok_imagine_video"}:
         issues.append(
             {"code": "CANDIDATE_LANES_INVALID", "message": "both candidate lanes are required"}
         )
@@ -243,10 +359,11 @@ def validate_dialogue_competition(plan: dict[str, Any]) -> dict[str, Any]:
             )
     steps = (plan.get("dag") or {}).get("steps", [])
     if (
-        (plan.get("dag") or {}).get("execution") != "serial_single_gpu"
+        (plan.get("dag") or {}).get("execution") != "conditional_single_gpu"
         or [step.get("id") for step in steps if isinstance(step, dict)] != list(_DEPENDENCIES)
         or any(
             step.get("depends_on") != _DEPENDENCIES.get(step.get("id"))
+            or step.get("run_condition") != _STEP_CONDITIONS.get(step.get("id"))
             for step in steps
             if isinstance(step, dict)
         )
@@ -276,7 +393,7 @@ def rank_dialogue_candidates(
         not isinstance(candidates, list)
         or len(candidates) != 2
         or {item.get("lane") for item in candidates if isinstance(item, dict)}
-        != {"preservation", "generative"}
+        != {"infinite_talk", "grok_imagine_video"}
     ):
         result["ok"] = False
         result["issues"] = [
@@ -287,12 +404,44 @@ def rank_dialogue_candidates(
         ]
         result["provisional_selection"] = None
         return result
+    primary_result = next(
+        (item for item in candidates if item.get("lane") == "infinite_talk"),
+        {},
+    )
+    primary_failure_code = str(primary_result.get("technical_failure_code") or "")
+    primary_hard_checks = primary_result.get("hard_checks") or {}
+    primary_quality_clean = all(
+        primary_hard_checks.get(key) is True for key in _SECONDARY_BLOCKING_PRIMARY_FAILURES
+    )
+    primary_quality_rejected = (
+        primary_result.get("human_quality_rejected") is True
+        or primary_result.get("quality_rejected") is True
+        or str(primary_result.get("review_status") or "").lower()
+        in {"rejected", "quality_rejected", "human_rejected"}
+        or str(primary_result.get("failure_class") or "").lower()
+        in {"quality", "human_rejection", "identity_drift"}
+    )
+    primary_failed_technically = (
+        primary_result.get("runtime_status") == "failed"
+        and primary_failure_code in _TECHNICAL_FAILURE_CODES
+        and primary_quality_clean
+        and not primary_quality_rejected
+    )
     valid: list[tuple[float, dict[str, Any]]] = []
     reference = (plan.get("candidates") or [{}])[0]
     for candidate in candidates:
         failures = [
             key for key in _HARD_CHECKS if (candidate.get("hard_checks") or {}).get(key) is not True
         ]
+        lane = candidate.get("lane")
+        selected_route = plan.get("selected_route")
+        route_activated = lane == selected_route or (
+            lane == "grok_imagine_video"
+            and selected_route == "infinite_talk"
+            and primary_failed_technically
+        )
+        if not route_activated:
+            failures.append("ROUTE_NOT_ACTIVATED")
         if candidate.get("state_image_sha256") != reference.get("state_image_sha256"):
             failures.append("STATE_HASH_MISMATCH")
         if candidate.get("audio_sha256") != reference.get("audio_sha256"):

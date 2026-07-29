@@ -54,16 +54,19 @@ def _dialogue_competition(
         value["canary_passed"] = item.get("pilot_verified") is True
         value["promotion"] = "pilot" if item.get("experimental") is True else "production"
         identity = " ".join(str(item.get(key) or "").lower() for key in ("id", "provider", "model"))
-        if "qwen" in identity and ("image" in identity or "i2i" in identity):
+        operations = set(item.get("operations") or [])
+        if "image_to_image" in operations or (
+            "qwen" in identity and ("image" in identity or "i2i" in identity)
+        ):
             value["lane"] = "state_i2i"
-        elif "edge" in identity:
+        elif "text_to_speech" in operations or "edge" in identity:
             value["lane"] = "tts"
-        elif "wan" in identity:
-            value["lane"] = "preservation_i2v"
-        elif "latent" in identity:
-            value["lane"] = "preservation_lipsync"
-        elif "infinitetalk" in identity or "fantasytalking" in identity:
-            value["lane"] = "generative"
+        elif "face_animation_to_audio" in operations or "infinitetalk" in identity:
+            value["lane"] = "infinite_talk"
+        elif "video_lip_sync" in operations or "latent" in identity:
+            value["lane"] = "grok_lipsync"
+        elif "image_to_video" in operations and "grok" in identity:
+            value["lane"] = "grok_imagine_video"
         competition_capabilities.append(value)
 
     capacity = read_json(base / "receipts" / "comfy-capacity.json")
@@ -399,6 +402,41 @@ def explain_route(
         current=current,
         stage={"draft": "pilot", "select": "production", "hero": "final"}[quality_tier],
     )
+    if isinstance(competition, dict):
+        bindings = competition.get("capability_bindings") or {}
+        active_lanes = (
+            ["grok_imagine_video", "grok_lipsync"]
+            if competition.get("selected_route") == "grok_imagine_video"
+            else ["infinite_talk"]
+        )
+        chain_ids = [
+            str((bindings.get(lane) or {}).get("id") or "")
+            for lane in active_lanes
+            if str((bindings.get(lane) or {}).get("id") or "")
+        ]
+        active = next(
+            (
+                item
+                for item in capabilities
+                if isinstance(item, dict)
+                and str(item.get("id") or "") == (chain_ids[0] if chain_ids else "")
+            ),
+            None,
+        )
+        if isinstance(active, dict):
+            selected = {
+                "capability_id": active["id"],
+                "provider": active["provider"],
+                "model": active["model"],
+                "resource": active["resource"],
+                "concurrency": active["concurrency"],
+                "route_chain": chain_ids,
+                "dialogue_motion_route": competition.get("selected_route"),
+                "requires_human_approval": True,
+            }
+            rejected = [
+                item for item in rejected if item.get("capability_id") not in set(chain_ids)
+            ]
     route_ok = selected is not None and (competition is None or competition.get("ok") is True)
     report = {
         "schema_version": 1,
@@ -456,8 +494,9 @@ def _execution_plan(route_plan: dict[str, Any], *, route_plan_sha256: str) -> di
         step_bindings = {
             "state_i2i": "state_i2i",
             "tts": "tts",
-            "candidate_preservation": "preservation_i2v",
-            "candidate_generative": "generative",
+            "primary_infinite_talk": "infinite_talk",
+            "secondary_grok_imagine": "grok_imagine_video",
+            "secondary_lipsync": "grok_lipsync",
             "qa": "dialogue-qa",
             "provisional_select": "dialogue-ranker",
             "human_approve": "human-review",
@@ -503,6 +542,7 @@ def _execution_plan(route_plan: dict[str, Any], *, route_plan_sha256: str) -> di
                     "capability_id": capability_id,
                     "resource": resources.get(step_id, "rtx5090_serial"),
                     "depends_on": depends_on,
+                    "run_condition": step.get("run_condition", "always"),
                     "idempotency_key": task_key,
                     "status": "planned" if competition.get("ok") is True else "blocked",
                 }
@@ -557,6 +597,7 @@ def _execution_plan(route_plan: dict[str, Any], *, route_plan_sha256: str) -> di
                 "capability_id": capability_id,
                 "resource": resource,
                 "depends_on": [],
+                "run_condition": "always",
                 "idempotency_key": task_key,
                 "status": "planned",
             }

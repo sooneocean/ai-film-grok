@@ -1088,14 +1088,20 @@ def validate_film_spec(
                     "forbid": ["claim_identity_lock_from_t2v"],
                 }
             if mode == "dialogue_drama" and shot.get("screen_mode") == "on_camera":
+                shot.setdefault("dialogue_motion_route", "auto")
                 shot["_recommended_engine"] = {
                     "state_still": "comfy_qwen_i2i_performance_state",
                     "keyframe": "comfy_qwen_i2i_from_performance_state",
-                    "motion": "comfy_wan22_i2v",
-                    "lipsync": "rtx_latentsync_1_6",
-                    "fallback": "musetalk_only_after_classified_latentsync_failure",
+                    "motion": "comfy_infinite_talk_audio_performance",
+                    "motion_primary": "comfy_infinite_talk_audio_performance",
+                    "motion_secondary": "grok_imagine_video",
+                    "secondary_lipsync": "rtx_latentsync_1_6",
+                    "secondary_trigger": (
+                        "explicit_route_or_classified_infinite_talk_technical_failure"
+                    ),
                     "forbid": [
-                        "whole_frame_talking_avatar_as_production_default",
+                        "silent_grok_dialogue_clip",
+                        "quality_rejection_as_provider_fallback",
                         "unreviewed_lipsync",
                         "full_cast_reference_when_state_photo_exists",
                     ],

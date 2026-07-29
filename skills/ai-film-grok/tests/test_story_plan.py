@@ -165,6 +165,9 @@ class StoryPlanTests(unittest.TestCase):
             self.assertTrue(all(not shot.get("nar") for shot in shots))
             self.assertTrue(all(shot["audio_cues"] for shot in shots))
             self.assertTrue(all(shot["translation_status"] == "pending" for shot in speaking))
+            self.assertTrue(
+                all(shot["dialogue_motion_route"] == "auto" for shot in speaking)
+            )
             for shot, japanese in zip(
                 speaking, ("まだ降りないの？", "写真の裏に君の名前がある。"), strict=True
             ):
@@ -175,7 +178,18 @@ class StoryPlanTests(unittest.TestCase):
                 shot["audio_cues"][0]["translation_status"] = "ready"
             validate_film_spec(spec, assign_missing_ids=False)
             self.assertGreater((spec.get("_dialogue_drama") or {}).get("coverage_shots", 0), 0)
-            self.assertEqual(speaking[0]["_recommended_engine"]["lipsync"], "rtx_latentsync_1_6")
+            self.assertEqual(
+                speaking[0]["_recommended_engine"]["motion_primary"],
+                "comfy_infinite_talk_audio_performance",
+            )
+            self.assertEqual(
+                speaking[0]["_recommended_engine"]["motion_secondary"],
+                "grok_imagine_video",
+            )
+            self.assertEqual(
+                speaking[0]["_recommended_engine"]["secondary_lipsync"],
+                "rtx_latentsync_1_6",
+            )
             self.assertEqual(speaking[0]["audio_recipe"]["recipe"], "dialogue_lipsync")
             self.assertTrue(speaking[0]["audio_recipe"]["lipsync"])
 

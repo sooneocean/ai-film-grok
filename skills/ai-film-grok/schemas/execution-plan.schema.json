@@ -35,6 +35,19 @@
             "items": { "type": "string" },
             "uniqueItems": true
           },
+          "run_condition": {
+            "description": "Required on newly emitted conditional dialogue tasks; optional only for schema-v1 legacy task receipts.",
+            "enum": [
+              "always",
+              "when_route_auto_or_infinite_talk",
+              "when_explicit_secondary_or_primary_technical_failure",
+              "when_secondary_grok_imagine_succeeds",
+              "after_active_route_succeeds",
+              "after_qa",
+              "after_provisional_select",
+              "after_human_approve"
+            ]
+          },
           "idempotency_key": { "type": "string", "minLength": 1 },
           "status": {
             "enum": ["planned", "authorized", "submitted", "running", "succeeded", "failed", "blocked"]

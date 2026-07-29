@@ -10,7 +10,7 @@ story.receive
 → drama-graph 投影
 → performance-state I2I
 → 日文 TTS
-→ 双路线候选
+→ 声音联动动态路由
 → QA provisional winner
 → 完整观看人工批准
 → promote / final
@@ -30,21 +30,29 @@ story.receive
 - 旁白只补 `time_jump`、`location_context`、`offscreen_fact`、`inner_context` 等画面和对白无法承载的信息。必须记录理由、信息缺口和时长；目标占比为 0，硬上限 15%。
 - 相同身份、衣着、情绪、视线、姿态、道具、光线与机位共享 `performance_state`；真实变化才拆新状态。批准 I2I receipt 必须绑定输入、输出、模型与 SHA-256。
 
-## 讲话镜竞赛
+## 讲话镜动态路由
 
-同一讲话镜的两个候选必须共享批准状态图、最终日文 TTS 和表演意图：
+同一讲话镜的两个选项必须共享批准状态图、最终日文 TTS 和表演意图：
 
-1. 保真链：Qwen I2I → Wan 2.2 I2V → LatentSync 1.6。
-2. 生成链：同状态图与音频 → 已通过实时 canary 的 InfiniteTalk/FantasyTalking。
+1. **首选**：Qwen I2I 状态图 + 最终 TTS → InfiniteTalk；音频直接驱动嘴、表情、头部与身体表演。
+2. **第二选项**：同一状态图 → Grok Imagine Video → LatentSync 1.6；Grok 负责动态，最终 TTS 仍是唯一对白时钟。
 
-执行 DAG 固定为：
+条件 DAG 固定为：
 
 ```text
-state_i2i → tts → candidate_preservation → candidate_generative
-→ qa → provisional_select → human_approve → promote
+state_i2i → tts → primary_infinite_talk
+                 ↘ secondary_grok_imagine → secondary_lipsync
+active route → qa → provisional_select → human_approve → promote
 ```
 
-RTX 5090 单队列串行；队列、GPU 或能力证据未知/过期即阻断。实验武器只可进入 pilot。自动评分只产生 provisional winner；完整观看人工批准前不得 promote，败选素材不得进入 final。
+`dialogue_motion_route=auto` 选择 InfiniteTalk；只有明确指定
+`grok_imagine_video`，或 InfiniteTalk 出现可分类的技术失败，才可启动第二选项。
+人工质量拒绝、身份漂移和未知错误都不构成自动换路理由。Grok 输出不得以无声动态片
+进入 final，必须再绑定同一 TTS 哈希并完成 LatentSync。
+
+RTX 5090 单队列串行；队列、GPU 或能力证据未知/过期即阻断。尚未晋升的 InfiniteTalk
+只可进入 pilot；架构首选不等于伪造生产就绪。自动评分只产生 provisional winner；
+完整观看人工批准前不得 promote，败选素材不得进入 final。
 
 ## 声音与交付
 

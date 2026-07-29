@@ -27,7 +27,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 ## P0
 
 1. **真相**：`drama-graph` 真，`film-spec` 投影；locks+hash 齐再媒体；先 Director’s Lens（[directors-lens.md](references/directors-lens.md)·[lesson](references/lessons-2026-07-20-directors-lens.md)）。
-2. **对白主链**：剧情先对白剧本再锁；原文是脊柱，禁模板覆盖。[workflow](references/dialogue-first-workflow.md)
+2. **对白主链**：锁对白；讲话镜=图+TTS→InfiniteTalk，备路=Grok→LatentSync。[workflow](references/dialogue-first-workflow.md)
 3. **身份介质**：锁 medium/cast/face；still 只改已批源；moderated 禁 `image_gen` 绕脸；漫剧 manhua。
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。

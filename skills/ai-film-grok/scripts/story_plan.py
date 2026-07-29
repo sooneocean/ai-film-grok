@@ -3133,6 +3133,7 @@ def project_graph_to_film_spec(
                                 "screen_mode": "on_camera",
                                 "speaker_on_camera": True,
                                 "lipsync": True,
+                                "dialogue_motion_route": "auto",
                                 "audio_cues": [
                                     {
                                         "kind": "voice",

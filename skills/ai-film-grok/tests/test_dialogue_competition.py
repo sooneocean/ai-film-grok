@@ -59,16 +59,16 @@ def _capability(
     }
 
 
-def _capabilities(*, generative_promotion: str = "pilot") -> list[dict[str, object]]:
+def _capabilities(*, infinite_promotion: str = "pilot") -> list[dict[str, object]]:
     return [
         _capability("qwen-image-i2i", lane="state_i2i"),
         _capability("edge-ja", lane="tts"),
-        _capability("wan22-i2v", lane="preservation_i2v"),
-        _capability("latentsync-1.6", lane="preservation_lipsync"),
+        _capability("grok-imagine-video", lane="grok_imagine_video"),
+        _capability("latentsync-1.6", lane="grok_lipsync"),
         _capability(
             "infinitetalk",
-            lane="generative",
-            promotion=generative_promotion,
+            lane="infinite_talk",
+            promotion=infinite_promotion,
         ),
     ]
 
@@ -101,10 +101,11 @@ def _candidate(
         "lane": lane,
         "state_image_sha256": state_hash,
         "audio_sha256": audio_hash,
-        "output_sha256": ("c" if lane == "preservation" else "d") * 64,
-        "model": "wan22+latentsync" if lane == "preservation" else "infinitetalk",
+        "output_sha256": ("c" if lane == "infinite_talk" else "d") * 64,
+        "model": "infinitetalk" if lane == "infinite_talk" else "grok+latentsync",
         "elapsed_sec": 12.5,
         "peak_vram_mb": 18000,
+        "runtime_status": "succeeded",
         "hard_checks": hard_checks,
         "quality_scores": {
             "lip_sync": quality,
@@ -119,7 +120,7 @@ def _candidate(
     }
 
 
-def test_builds_exact_serial_dag_and_shared_inputs() -> None:
+def test_builds_audio_linked_primary_secondary_dag_and_shared_inputs() -> None:
     plan = build_dialogue_competition_plan(
         _shot(),
         capabilities=_capabilities(),
@@ -132,39 +133,61 @@ def test_builds_exact_serial_dag_and_shared_inputs() -> None:
     assert [step["id"] for step in plan["dag"]["steps"]] == [
         "state_i2i",
         "tts",
-        "candidate_preservation",
-        "candidate_generative",
+        "primary_infinite_talk",
+        "secondary_grok_imagine",
+        "secondary_lipsync",
         "qa",
         "provisional_select",
         "human_approve",
         "promote",
     ]
-    assert plan["dag"]["execution"] == "serial_single_gpu"
+    assert plan["dag"]["execution"] == "conditional_single_gpu"
     assert plan["candidates"][0]["state_image_sha256"] == STATE_HASH
     assert plan["candidates"][1]["state_image_sha256"] == STATE_HASH
     assert plan["candidates"][0]["audio_sha256"] == AUDIO_HASH
     assert plan["candidates"][1]["audio_sha256"] == AUDIO_HASH
+    assert plan["selected_route"] == "infinite_talk"
+    assert plan["route_policy"]["secondary"] == "grok_imagine_video_then_latentsync"
+    assert plan["dag"]["steps"][3]["run_condition"] == (
+        "when_explicit_secondary_or_primary_technical_failure"
+    )
     assert plan["approval"]["status"] == "not_reviewed"
     assert plan["promotion"]["authorized"] is False
 
 
 @pytest.mark.parametrize("stage", ["production", "final"])
-def test_unpromoted_generative_lane_fails_closed_outside_pilot(stage: str) -> None:
+def test_unpromoted_infinite_talk_fails_closed_outside_pilot(stage: str) -> None:
     plan = build_dialogue_competition_plan(
         _shot(),
-        capabilities=_capabilities(generative_promotion="pilot"),
+        capabilities=_capabilities(infinite_promotion="pilot"),
         gpu_state={"queue_known": True, "busy": False},
         stage=stage,
         now=NOW,
     )
 
     assert plan["ok"] is False
-    assert "GENERATIVE_NOT_PROMOTED" in {issue["code"] for issue in plan["issues"]}
+    assert "DIALOGUE_ROUTE_NOT_PROMOTED" in {issue["code"] for issue in plan["issues"]}
+
+
+def test_explicit_grok_route_requires_and_selects_audio_linked_secondary() -> None:
+    shot = {**_shot(), "dialogue_motion_route": "grok_imagine_video"}
+    plan = build_dialogue_competition_plan(
+        shot,
+        capabilities=_capabilities(),
+        gpu_state={"queue_known": True, "busy": False},
+        stage="production",
+        now=NOW,
+    )
+
+    assert plan["ok"] is True
+    assert plan["selected_route"] == "grok_imagine_video"
+    assert plan["candidates"][1]["audio_link"] == "latentsync_post_process"
+    assert plan["candidates"][1]["production_eligible"] is True
 
 
 def test_stale_capability_and_busy_or_unknown_gpu_fail_closed() -> None:
     stale = _capabilities()
-    stale[2]["expires_at"] = "2026-07-29T11:59:59+00:00"
+    stale[4]["expires_at"] = "2026-07-29T11:59:59+00:00"
     stale_plan = build_dialogue_competition_plan(
         _shot(),
         capabilities=stale,
@@ -189,7 +212,7 @@ def test_stale_capability_and_busy_or_unknown_gpu_fail_closed() -> None:
     assert "GPU_QUEUE_UNKNOWN" in {issue["code"] for issue in unknown_plan["issues"]}
 
 
-def test_hard_rejection_precedes_quality_ranking() -> None:
+def test_quality_or_identity_rejection_cannot_activate_grok_secondary() -> None:
     plan = build_dialogue_competition_plan(
         _shot(),
         capabilities=_capabilities(),
@@ -200,20 +223,20 @@ def test_hard_rejection_precedes_quality_ranking() -> None:
         plan,
         [
             _candidate(
-                "preservation-a",
-                lane="preservation",
+                "infinite-a",
+                lane="infinite_talk",
                 quality=0.99,
                 hard_override={"identity": False},
             ),
-            _candidate("generative-b", lane="generative", quality=0.70),
+            _candidate("grok-b", lane="grok_imagine_video", quality=0.70),
         ],
     )
 
-    assert result["ok"] is True
-    assert result["provisional_selection"]["candidate_id"] == "generative-b"
+    assert result["ok"] is False
+    assert result["provisional_selection"] is None
     rejected = {item["candidate_id"]: item for item in result["rejected"]}
-    assert rejected["preservation-a"]["hard_failures"] == ["identity"]
-    assert result["provisional_selection"]["status"] == "pending_human_approval"
+    assert rejected["infinite-a"]["hard_failures"] == ["identity"]
+    assert "ROUTE_NOT_ACTIVATED" in rejected["grok-b"]["hard_failures"]
     assert result["approved_candidate_id"] is None
     assert result["promotion"]["authorized"] is False
 
@@ -229,18 +252,117 @@ def test_candidate_hash_drift_is_a_hard_rejection() -> None:
         plan,
         [
             _candidate(
-                "preservation-a",
-                lane="preservation",
+                "infinite-a",
+                lane="infinite_talk",
                 quality=0.95,
                 state_hash="e" * 64,
             ),
-            _candidate("generative-b", lane="generative", quality=0.75),
+            _candidate("grok-b", lane="grok_imagine_video", quality=0.75),
         ],
     )
 
     rejected = {item["candidate_id"]: item for item in result["rejected"]}
-    assert "STATE_HASH_MISMATCH" in rejected["preservation-a"]["hard_failures"]
-    assert result["provisional_selection"]["candidate_id"] == "generative-b"
+    assert "STATE_HASH_MISMATCH" in rejected["infinite-a"]["hard_failures"]
+    assert result["provisional_selection"] is None
+    assert "ROUTE_NOT_ACTIVATED" in rejected["grok-b"]["hard_failures"]
+
+
+def test_classified_primary_technical_failure_activates_grok_secondary() -> None:
+    plan = build_dialogue_competition_plan(
+        _shot(),
+        capabilities=_capabilities(),
+        gpu_state={"queue_known": True, "busy": False},
+        now=NOW,
+    )
+    failed_primary = _candidate(
+        "infinite-a",
+        lane="infinite_talk",
+        quality=0.0,
+        hard_override={"decode": False},
+    )
+    failed_primary["runtime_status"] = "failed"
+    failed_primary["technical_failure_code"] = "model_runtime_error"
+    result = rank_dialogue_candidates(
+        plan,
+        [
+            failed_primary,
+            _candidate("grok-b", lane="grok_imagine_video", quality=0.75),
+        ],
+    )
+
+    assert result["ok"] is True
+    assert result["provisional_selection"]["candidate_id"] == "grok-b"
+
+
+def test_technical_failure_cannot_mask_identity_drift_into_grok_fallback() -> None:
+    plan = build_dialogue_competition_plan(
+        _shot(),
+        capabilities=_capabilities(),
+        gpu_state={"queue_known": True, "busy": False},
+        now=NOW,
+    )
+    failed_primary = _candidate(
+        "infinite-a",
+        lane="infinite_talk",
+        quality=0.0,
+        hard_override={"decode": False, "identity": False},
+    )
+    failed_primary["runtime_status"] = "failed"
+    failed_primary["technical_failure_code"] = "model_runtime_error"
+    result = rank_dialogue_candidates(
+        plan,
+        [
+            failed_primary,
+            _candidate("grok-b", lane="grok_imagine_video", quality=0.75),
+        ],
+    )
+
+    assert result["ok"] is False
+    assert result["provisional_selection"] is None
+    rejected = {item["candidate_id"]: item for item in result["rejected"]}
+    assert "ROUTE_NOT_ACTIVATED" in rejected["grok-b"]["hard_failures"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("human_quality_rejected", True),
+        ("quality_rejected", True),
+        ("review_status", "quality_rejected"),
+        ("failure_class", "human_rejection"),
+    ],
+)
+def test_technical_failure_cannot_mask_quality_rejection_into_grok_fallback(
+    field: str,
+    value: object,
+) -> None:
+    plan = build_dialogue_competition_plan(
+        _shot(),
+        capabilities=_capabilities(),
+        gpu_state={"queue_known": True, "busy": False},
+        now=NOW,
+    )
+    failed_primary = _candidate(
+        "infinite-a",
+        lane="infinite_talk",
+        quality=0.0,
+        hard_override={"decode": False},
+    )
+    failed_primary["runtime_status"] = "failed"
+    failed_primary["technical_failure_code"] = "timeout"
+    failed_primary[field] = value
+    result = rank_dialogue_candidates(
+        plan,
+        [
+            failed_primary,
+            _candidate("grok-b", lane="grok_imagine_video", quality=0.75),
+        ],
+    )
+
+    assert result["ok"] is False
+    assert result["provisional_selection"] is None
+    rejected = {item["candidate_id"]: item for item in result["rejected"]}
+    assert "ROUTE_NOT_ACTIVATED" in rejected["grok-b"]["hard_failures"]
 
 
 def test_provisional_winner_requires_full_human_review_before_approval() -> None:
@@ -253,8 +375,8 @@ def test_provisional_winner_requires_full_human_review_before_approval() -> None
     ranked = rank_dialogue_candidates(
         plan,
         [
-            _candidate("preservation-a", lane="preservation", quality=0.90),
-            _candidate("generative-b", lane="generative", quality=0.80),
+            _candidate("infinite-a", lane="infinite_talk", quality=0.90),
+            _candidate("grok-b", lane="grok_imagine_video", quality=0.80),
         ],
     )
 
@@ -275,7 +397,7 @@ def test_provisional_winner_requires_full_human_review_before_approval() -> None
     assert rejected_review["approval"]["status"] == "blocked"
     assert approved["ok"] is True
     assert approved["approval"]["status"] == "approved"
-    assert approved["approved_candidate_id"] == "preservation-a"
+    assert approved["approved_candidate_id"] == "infinite-a"
     assert approved["promotion"]["authorized"] is True
     assert approved["provisional_selection"]["status"] == "pending_human_approval"
 
@@ -317,6 +439,17 @@ def test_validate_preserves_build_blockers_and_rejects_dag_dependency_tampering(
     assert tampered_report["ok"] is False
     assert "DAG_INVALID" in {issue["code"] for issue in tampered_report["issues"]}
 
+    policy_tampered = build_dialogue_competition_plan(
+        _shot(),
+        capabilities=_capabilities(),
+        gpu_state={"queue_known": True, "busy": False},
+        now=NOW,
+    )
+    policy_tampered["route_policy"]["forbidden_secondary_triggers"] = []
+    policy_report = validate_dialogue_competition(policy_tampered)
+    assert policy_report["ok"] is False
+    assert "ROUTE_POLICY_INVALID" in {issue["code"] for issue in policy_report["issues"]}
+
 
 def test_human_approval_rejects_a_tampered_or_already_approved_result() -> None:
     plan = build_dialogue_competition_plan(
@@ -328,8 +461,8 @@ def test_human_approval_rejects_a_tampered_or_already_approved_result() -> None:
     ranked = rank_dialogue_candidates(
         plan,
         [
-            _candidate("preservation-a", lane="preservation", quality=0.90),
-            _candidate("generative-b", lane="generative", quality=0.80),
+            _candidate("infinite-a", lane="infinite_talk", quality=0.90),
+            _candidate("grok-b", lane="grok_imagine_video", quality=0.80),
         ],
     )
     ranked["provisional_selection"]["candidate_id"] = "injected-candidate"
@@ -347,8 +480,8 @@ def test_human_approval_rejects_a_tampered_or_already_approved_result() -> None:
     clean_ranked = rank_dialogue_candidates(
         plan,
         [
-            _candidate("preservation-a", lane="preservation", quality=0.90),
-            _candidate("generative-b", lane="generative", quality=0.80),
+            _candidate("infinite-a", lane="infinite_talk", quality=0.90),
+            _candidate("grok-b", lane="grok_imagine_video", quality=0.80),
         ],
     )
     first = approve_dialogue_candidate(
@@ -392,15 +525,16 @@ def test_missing_receipt_evidence_is_hard_rejected() -> None:
         gpu_state={"queue_known": True, "busy": False},
         now=NOW,
     )
-    incomplete = _candidate("preservation-a", lane="preservation", quality=0.99)
+    incomplete = _candidate("infinite-a", lane="infinite_talk", quality=0.99)
     incomplete.pop("output_sha256")
     result = rank_dialogue_candidates(
         plan,
         [
             incomplete,
-            _candidate("generative-b", lane="generative", quality=0.70),
+            _candidate("grok-b", lane="grok_imagine_video", quality=0.70),
         ],
     )
     rejected = {item["candidate_id"]: item for item in result["rejected"]}
-    assert "OUTPUT_SHA256_INVALID" in rejected["preservation-a"]["hard_failures"]
-    assert result["provisional_selection"]["candidate_id"] == "generative-b"
+    assert "OUTPUT_SHA256_INVALID" in rejected["infinite-a"]["hard_failures"]
+    assert result["provisional_selection"] is None
+    assert "ROUTE_NOT_ACTIVATED" in rejected["grok-b"]["hard_failures"]

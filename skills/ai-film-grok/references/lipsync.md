@@ -41,9 +41,10 @@ RTX 5090 方案研究与 canary 门槛见
 
 上游 MuseTalk 泛用入口若使用 `os.system`，已被拒绝。不得仅因为文件存在就认定后端“ready”。
 
-## 整段表演生成（不是后期补嘴）
+## 剧情讲话镜整段表演（不是后期补嘴）
 
-InfiniteTalk 与 FantasyTalking 已进入 Comfy armory，但只允许显式 pilot：
+InfiniteTalk 是剧情讲话镜架构首选；它与 FantasyTalking 都已进入 Comfy
+armory，但当前实片证据只允许显式 pilot：
 
 ```bash
 aifilm comfy route \
@@ -56,6 +57,12 @@ aifilm comfy route \
   --production-stage pilot \
   --allow-experimental
 ```
+
+架构首选不代表能力已获生产晋升。`dialogue_motion_route=auto` 只有在当前
+InfiniteTalk capability 的 canary、时效与 promotion 证据齐全时才可继续；
+否则 fail closed。第二选项是 Grok Imagine Video 生成动态后，再用同一条最终
+TTS 经已批准的 LatentSync 对嘴。只允许显式选择或可分类技术失败触发，禁止把
+质量不满意、身份漂移或未知错误当作自动 fallback。
 
 它们的登记端点分别是 `local_infinite_talk` 与
 `local_fantasy_talking`，真实方法是 `face_animation_to_audio`。两者都会

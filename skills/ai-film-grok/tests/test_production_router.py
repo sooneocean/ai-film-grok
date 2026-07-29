@@ -182,14 +182,18 @@ def test_speaking_shot_route_exposes_serial_competition_dag_and_fails_closed(
     assert [step["id"] for step in competition["dag"]["steps"]] == [
         "state_i2i",
         "tts",
-        "candidate_preservation",
-        "candidate_generative",
+        "primary_infinite_talk",
+        "secondary_grok_imagine",
+        "secondary_lipsync",
         "qa",
         "provisional_select",
         "human_approve",
         "promote",
     ]
-    assert len(report["execution_plan"]["tasks"]) == 8
+    assert len(report["execution_plan"]["tasks"]) == 9
+    assert report["execution_plan"]["tasks"][3]["run_condition"] == (
+        "when_explicit_secondary_or_primary_technical_failure"
+    )
     assert all(task["status"] == "blocked" for task in report["execution_plan"]["tasks"])
     assert report["execution_plan"]["authorized"] is False
 
@@ -199,9 +203,100 @@ def test_speaking_shot_route_exposes_serial_competition_dag_and_fails_closed(
         quality_tier="select",
         now=NOW,
     )
-    assert "GENERATIVE_NOT_PROMOTED" in {
+    assert "DIALOGUE_ROUTE_NOT_PROMOTED" in {
         issue["code"] for issue in production_report["route_plan"]["dialogue_competition"]["issues"]
     }
+
+
+def test_speaking_shot_selects_infinite_talk_and_exposes_grok_audio_linked_secondary(
+    tmp_path: Path,
+) -> None:
+    _write_spec(
+        tmp_path,
+        [
+            {
+                "id": "line01",
+                "shot_role": "hero",
+                "screen_mode": "on_camera",
+                "speaker_on_camera": True,
+                "lipsync": True,
+                "dialogue_motion_route": "auto",
+                "speaker": "hero",
+                "performance_intent": {"emotion": "guarded"},
+                "performance_state": {
+                    "status": "approved",
+                    "image_sha256": "a" * 64,
+                },
+                "tts": {
+                    "status": "final",
+                    "language": "ja",
+                    "audio_sha256": "b" * 64,
+                },
+            }
+        ],
+    )
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "qwen-image-i2i",
+                provider="comfy-qwen",
+                model="qwen-image-i2i",
+                operations=["image_to_image"],
+                shot_roles=["hero"],
+            ),
+            _capability(
+                "edge-ja",
+                provider="edge",
+                model="edge-ja",
+                operations=["text_to_speech"],
+                shot_roles=["hero"],
+            ),
+            _capability(
+                "infinitetalk",
+                provider="comfy-infinitetalk",
+                model="infinitetalk",
+                operations=["face_animation_to_audio"],
+                shot_roles=["hero"],
+            ),
+            _capability(
+                "grok-imagine-video",
+                provider="grok",
+                model="imagine-video",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+            ),
+            _capability(
+                "latentsync-1.6",
+                provider="comfy-latentsync",
+                model="latentsync-1.6",
+                operations=["video_lip_sync"],
+                shot_roles=["hero"],
+            ),
+        ],
+    )
+    _write_json(
+        tmp_path / "receipts" / "comfy-capacity.json",
+        {"queue_known": True, "busy": False},
+    )
+
+    report = explain_route(tmp_path, shot_id="line01", now=NOW)
+
+    assert report["ok"] is True
+    assert report["selected"]["capability_id"] == "infinitetalk"
+    assert report["selected"]["dialogue_motion_route"] == "infinite_talk"
+    assert report["selected"]["route_chain"] == ["infinitetalk"]
+    competition = report["dialogue_competition"]
+    assert competition["secondary_available"] is True
+    assert competition["candidates"][1]["models"] == [
+        "imagine-video",
+        "latentsync-1.6",
+    ]
+    assert competition["route_policy"]["forbidden_secondary_triggers"] == [
+        "human_quality_rejection",
+        "unknown_error",
+        "identity_drift",
+    ]
 
 
 def test_dialogue_broll_routes_as_a_timed_editorial_child(tmp_path: Path) -> None:
