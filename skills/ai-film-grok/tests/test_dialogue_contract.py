@@ -247,7 +247,7 @@ class TestWriteSpecDialogueContractGate:
                 },
                 {
                     **_dc_shot("bridge01"),
-                    "screen_mode": "narration",
+                    "screen_mode": "action_cover",
                     "narration_reason": "time jump",
                     "audio_cues": [
                         {
