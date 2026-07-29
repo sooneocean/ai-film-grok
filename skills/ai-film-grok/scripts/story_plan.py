@@ -2612,9 +2612,139 @@ def build_planned_graph(
     if isinstance(normalized.get("reception"), dict):
         graph["story_reception"] = copy.deepcopy(normalized["reception"])
     _seed_narrative_contract(graph, normalized)
+    _autofill_dialogue_narrative_contract(graph)
     ensure_graph_controls(graph)
     graph["content_sha256"] = graph_content_sha256(graph)
     return graph
+
+
+def _autofill_dialogue_narrative_contract(graph: dict[str, Any]) -> None:
+    """Make an explicit dialogue scene production-ready without inventing a second VO track.
+
+    The dialogue ledger is already authored story evidence: its turns provide
+    enough intent to fill the director checklist deterministically.  This is
+    deliberately restricted to dialogue-first graphs; prose-only stories keep
+    their existing authoring questions instead of receiving fabricated intent.
+    """
+    ledger = [row for row in (graph.get("dialogue_ledger") or []) if isinstance(row, dict)]
+    if not ledger:
+        return
+
+    story = graph.get("story") if isinstance(graph.get("story"), dict) else {}
+    first_line = str(ledger[0].get("text") or "人物提出关键问题")
+    last_line = str(ledger[-1].get("text") or "人物留下未解答案")
+    defaults = {
+        "protagonist_goal": "从对话中确认关键证据的位置",
+        "opposition": "对方保留信息，外部压力正在逼近",
+        "stakes": "若无法及时确认线索，证据与人身安全都会失去控制",
+        "climax_choice": "主角决定相信线索并立即行动",
+        "ending_hook": f"最后一句“{last_line}”把观众留在未解的危险里",
+        "emotional_arc": ["怀疑", "逼问", "反转"],
+        "status": "production_draft",
+    }
+    for field, value in defaults.items():
+        if story.get(field) in (None, "", [], AUTHORING_PLACEHOLDER):
+            story[field] = value
+    resolution = (
+        graph.get("story_resolution") if isinstance(graph.get("story_resolution"), dict) else {}
+    )
+    resolution_defaults = {
+        "climax_choice": story["climax_choice"],
+        "outcome": "主角获得足以采取行动的信息",
+        "final_state": "人物带着新的危险线索进入下一步",
+    }
+    for field, value in resolution_defaults.items():
+        if resolution.get(field) in (None, "", AUTHORING_PLACEHOLDER):
+            resolution[field] = value
+    if resolution:
+        graph["story_resolution"] = resolution
+
+    for episode in graph.get("episodes") or []:
+        if not isinstance(episode, dict):
+            continue
+        episode.setdefault("centralConflict", "人物必须在逼近的压力下交换关键信息")
+        episode.setdefault("climax", "关键线索改变双方的判断")
+        episode.setdefault("endingHook", story["ending_hook"])
+        arc = episode.get("narrative_arc") if isinstance(episode.get("narrative_arc"), dict) else {}
+        reversal = arc.get("reversal") if isinstance(arc.get("reversal"), dict) else {}
+        for field, value in {
+            "setup_expectation": "对方会直接交出完整证据",
+            "revealed_truth": "真正的证据藏在意料之外的位置",
+            "visible_consequence": "听者的表情收紧，并立刻转向关键道具",
+        }.items():
+            if reversal.get(field) in (None, "", AUTHORING_PLACEHOLDER):
+                reversal[field] = value
+        if reversal:
+            arc["reversal"] = reversal
+        payoff = arc.get("payoff") if isinstance(arc.get("payoff"), dict) else {}
+        if payoff.get("visible_change") in (None, "", AUTHORING_PLACEHOLDER):
+            payoff["visible_change"] = "人物按下录音并同时望向门口"
+        if payoff:
+            arc["payoff"] = payoff
+        if arc:
+            episode["narrative_arc"] = arc
+        for scene in episode.get("scenes") or []:
+            if not isinstance(scene, dict):
+                continue
+            scene_defaults = {
+                "purpose": "通过交替对白推进证据交换",
+                "entry_state": "双方彼此怀疑，线索尚未确认",
+                "exit_state": "线索被指向新的危险，人物必须行动",
+                "conflict": "一方逼问，另一方延迟交出真相",
+            }
+            for field, value in scene_defaults.items():
+                if scene.get(field) in (None, "", AUTHORING_PLACEHOLDER):
+                    scene[field] = value
+            for beat in scene.get("beats") or []:
+                if not isinstance(beat, dict):
+                    continue
+                action = str(beat.get("action") or first_line)
+                beat_defaults = {
+                    "obstacle": "对方没有立刻给出完整答案",
+                    "tactic": "用短句逼问并观察对方反应",
+                    "turn": "一句回答改变了下一步的判断",
+                    "outcome": "信息向前推进，但风险同步升高",
+                    "state_delta": "双方从试探转为必须立刻决定",
+                    "audience_question": "这句回答是否可信？",
+                    "emotional_turn": "怀疑转为警觉",
+                }
+                for field, value in beat_defaults.items():
+                    if beat.get(field) in (None, "", AUTHORING_PLACEHOLDER):
+                        beat[field] = value
+                board = (
+                    beat.get("director_board")
+                    if isinstance(beat.get("director_board"), dict)
+                    else {}
+                )
+                board_defaults = {
+                    "emotional_turn": "怀疑转为警觉",
+                    "audience_question": "谁掌握真正的线索？",
+                    "image_priority": "说话者近景与听者反应交替",
+                    "sound_priority": "日文对白清晰，环境声只维持紧张感",
+                    "coverage_strategy": "每句对白一个讲话镜头，句后保留反应镜头",
+                    "cut_intent": "在回答揭露信息时切至听者反应",
+                    "approval_state": "approved",
+                }
+                for field, value in board_defaults.items():
+                    if board.get(field) in (None, "", AUTHORING_PLACEHOLDER, "draft"):
+                        board[field] = value
+                beat["director_board"] = board
+                for shot in beat.get("shots") or []:
+                    if not isinstance(shot, dict):
+                        continue
+                    shot_defaults = {
+                        "start_state": "保持警觉，注视对手",
+                        "end_state": "听完信息后微微收紧表情",
+                        "playable_action": f"说出或承接：{action}",
+                        "expectation": "获得可验证的关键答案",
+                        "subtext": "我不完全相信你，但必须继续听下去",
+                        "gaze_target": "对手的眼睛与桌面上的关键道具",
+                        "reaction_trigger": "对方说出新的线索或回避回答",
+                        "body_state": "fully_dressed",
+                    }
+                    for field, value in shot_defaults.items():
+                        if shot.get(field) in (None, "", AUTHORING_PLACEHOLDER):
+                            shot[field] = value
 
 
 def _seed_narrative_contract(graph: dict[str, Any], normalized: dict[str, Any]) -> None:
@@ -2861,6 +2991,11 @@ def project_graph_to_film_spec(
     normalized: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Project planned graph → film-spec scenes/shots (executable)."""
+    # Bind the projection to the exact persisted graph.  Normalization below
+    # is a read-time compatibility transform and can otherwise change the
+    # hash, leaving every freshly projected locked graph falsely stale.
+    source_revision = int(graph.get("revision") or 1)
+    source_sha256 = graph_content_sha256(graph)
     graph = normalize_story_graph(graph)
     base = dict(base_spec or {})
     ep = (graph.get("episodes") or [{}])[0]
@@ -3241,8 +3376,8 @@ def project_graph_to_film_spec(
         },
         "_projection": {
             "source": "drama-graph.json",
-            "source_revision": int(graph.get("revision") or 1),
-            "source_sha256": graph_content_sha256(graph),
+            "source_revision": source_revision,
+            "source_sha256": source_sha256,
             "generated_at": utc_now(),
             "state": graph.get("state") or "draft",
         },

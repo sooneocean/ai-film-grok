@@ -12,6 +12,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from drama_graph import validate_graph  # noqa: E402
 from film_spec import validate_film_spec  # noqa: E402
+from narrative_control import validate_narrative_graph  # noqa: E402
 from story_plan import (  # noqa: E402
     export_legacy_story_plan,
     normalize_story,
@@ -147,6 +148,7 @@ class StoryPlanTests(unittest.TestCase):
             self.assertTrue(report["ok"], report)
             graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
             self.assertEqual(len(graph.get("dialogue_ledger") or []), 2)
+            self.assertTrue(validate_narrative_graph(graph, strict=True)["ok"])
             spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
             self.assertEqual(spec["vo_mode"], "dialogue_drama")
             shots = [shot for scene in spec["scenes"] for shot in scene["shots"]]
