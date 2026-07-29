@@ -65,3 +65,50 @@ def test_adapter_must_use_controlled_input_and_output_placeholders(
     monkeypatch.setenv(vibevoice_asr_review.ARGV_ENV, '["adapter","--audio","{audio}"]')
     with pytest.raises(vibevoice_asr_review.VibeVoiceASRError, match="both"):
         vibevoice_asr_review._argv()
+
+
+def test_rejects_symlinked_input_inside_workspace(tmp_path: Path) -> None:
+    root, audio, _subtitles = _workspace(tmp_path)
+    linked = root / "linked.wav"
+    linked.symlink_to(audio)
+    with pytest.raises(vibevoice_asr_review.VibeVoiceASRError, match="non-symlink"):
+        vibevoice_asr_review._root_file(root, linked, label="audio")
+
+
+def test_rejects_receipts_symlink_before_adapter_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, audio, _subtitles = _workspace(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "receipts").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setenv(
+        vibevoice_asr_review.ARGV_ENV,
+        '["adapter","--audio","{audio}","--out","{out}"]',
+    )
+    monkeypatch.setattr(
+        vibevoice_asr_review, "analyze_media", lambda *_args, **_kwargs: {"ok": True}
+    )
+    with pytest.raises(vibevoice_asr_review.VibeVoiceASRError, match="receipts"):
+        vibevoice_asr_review.create_report(root, audio=audio)
+
+
+def test_adapter_failure_does_not_write_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, audio, _subtitles = _workspace(tmp_path)
+    monkeypatch.setenv(
+        vibevoice_asr_review.ARGV_ENV,
+        '["adapter","--audio","{audio}","--out","{out}"]',
+    )
+    monkeypatch.setattr(
+        vibevoice_asr_review, "analyze_media", lambda *_args, **_kwargs: {"ok": True}
+    )
+    monkeypatch.setattr(
+        vibevoice_asr_review.subprocess,
+        "run",
+        lambda *_args, **_kwargs: type("Result", (), {"returncode": 1})(),
+    )
+    with pytest.raises(vibevoice_asr_review.VibeVoiceASRError, match="failed"):
+        vibevoice_asr_review.create_report(root, audio=audio)
+    assert not (root / "receipts" / vibevoice_asr_review.REPORT_NAME).exists()

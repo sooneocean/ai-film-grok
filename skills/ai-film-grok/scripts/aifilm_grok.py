@@ -8009,7 +8009,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     vibevoice_asr_sub = vibevoice_asr.add_subparsers(dest="vibevoice_asr_action", required=True)
     vibevoice_asr_sub.add_parser(
-        "probe", help="Check local adapter configuration only; never starts inference or downloads a model"
+        "probe",
+        help="Check local adapter configuration only; never starts inference or downloads a model",
     )
     vibevoice_run = vibevoice_asr_sub.add_parser(
         "run", help="Run the declared local adapter and write a candidate-only ASR review"

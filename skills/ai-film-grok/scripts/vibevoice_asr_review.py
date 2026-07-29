@@ -23,6 +23,7 @@ from security_policy import (
     minimal_subprocess_env,
     parse_argv_json,
     safe_existing_file,
+    safe_workspace_directory,
 )
 from util import sha256_file, write_json
 
@@ -41,7 +42,12 @@ def _utc_now() -> str:
 def _root_file(root: Path, value: Path | str, *, label: str) -> Path:
     base = root.expanduser().resolve()
     raw = Path(value).expanduser()
-    candidate = (raw if raw.is_absolute() else base / raw).resolve(strict=False)
+    unresolved = raw if raw.is_absolute() else base / raw
+    if unresolved.is_symlink():
+        raise VibeVoiceASRError(
+            f"{label} must be a regular non-symlink file inside the film workspace"
+        )
+    candidate = unresolved.resolve(strict=False)
     try:
         return safe_existing_file(base, candidate, field=label)
     except Exception as exc:
@@ -142,7 +148,10 @@ def create_report(
         raise VibeVoiceASRError("audio must pass local technical media verification")
     subtitle_path = _root_file(base, subtitles, label="subtitles") if subtitles else None
     template = _argv()
-    receipts = base / "receipts"
+    try:
+        receipts = safe_workspace_directory(base, "receipts", field="receipts")
+    except SecurityPolicyError as exc:
+        raise VibeVoiceASRError(str(exc)) from exc
     receipts.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="vibevoice-asr-", dir=receipts) as temp_dir:
         transcript_path = Path(temp_dir) / "transcript.json"
