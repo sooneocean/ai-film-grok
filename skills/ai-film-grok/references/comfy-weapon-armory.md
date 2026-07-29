@@ -59,6 +59,22 @@ explicit experimental pilot. Production routing fails closed until a profile
 passes mean motion `>=20`, identity/contact review and human approval. The K3NK
 pair is retained only for experiment reproduction and is never auto-routed.
 
+## Private audio weapons
+
+The 5090 audio node is a separate private capability plane. `aifilm team snapshot`
+records its live readiness alongside the visual armory.
+
+| Need | Weapon | Availability rule | Promotion rule |
+|---|---|---|---|
+| Chinese narration / Japanese dialogue | Qwen3-TTS | node health reports `tts=true` | normal voice locks still apply |
+| Instrumental BGM takes | ACE-Step 1.5 | node health reports `music=true` | approve into BGM library before final |
+| Room tone / transitions | Stable Audio Open 1.0 | node health reports `ambient=true` with pinned provenance | candidate-only; human and license review before asset-pool promotion |
+| Video-bound experimental SFX | MMAudio | node health reports `sfx=true` | internal non-commercial research only |
+
+Stable Audio's capability id is `rtx5090-music-ambient`.
+It makes the reviewable route discoverable but never authorizes a formal
+timeline or final stem.
+
 ## Commands
 
 ```bash

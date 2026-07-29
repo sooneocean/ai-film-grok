@@ -181,6 +181,8 @@ def snapshot_capabilities(
     for domain, model_flag, model_name in (
         ("voice", "tts", "Qwen3-TTS"),
         ("music", "music", "ACE-Step-1.5"),
+        # Stable Audio is a review-pool capability, never a final route.
+        ("music", "ambient", "Stable Audio Open 1.0"),
     ):
         ready = bool(audio_node.get("ok") and audio_models.get(model_flag))
         capabilities.append(
