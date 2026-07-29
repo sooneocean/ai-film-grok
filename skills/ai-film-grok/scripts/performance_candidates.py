@@ -249,3 +249,30 @@ def approve(root: Path, asset_id: str) -> dict[str, Any]:
         "Private original or authorized adult performance candidate; human approved.\n",
     )
     return {**record, "receipt": str(receipt), "approval_receipt": str(approved_receipt)}
+
+
+def reject(root: Path, asset_id: str, *, reviewer: str, reason: str) -> dict[str, Any]:
+    """Keep a heard-but-unsuitable candidate out of every approval path."""
+    root = root.expanduser().resolve()
+    _, record = _find(root, asset_id)
+    if (
+        record.get("schema") != "aifilm-performance-candidate-v1"
+        or record.get("status") != "pending_human_review"
+        or not receipt_is_signed(record)
+    ):
+        raise PerformanceCandidateError("performance candidate receipt is invalid")
+    reviewer = reviewer.strip()
+    reason = reason.strip()
+    if not reviewer or not reason or len(reason) > 240:
+        raise PerformanceCandidateError("reviewer and a concise rejection reason are required")
+    record.update(
+        {
+            "status": "rejected_human_review",
+            "rejected_at": datetime.now(UTC).isoformat(),
+            "rejected_by": reviewer,
+            "rejection_reason": reason,
+        }
+    )
+    sign_receipt(record)
+    write_json(_pending_dir(root) / f"{asset_id}.json", record)
+    return {**record, "receipt": str(_pending_dir(root) / f"{asset_id}.json")}

@@ -6300,13 +6300,18 @@ def cmd_bgm_library(args: argparse.Namespace) -> int:
 
 
 def cmd_performance_candidate(args: argparse.Namespace) -> int:
-    """Create/list/approve private non-verbal performance candidates."""
-    from performance_candidates import PerformanceCandidateError, approve, generate
+    """Create, reject, or approve private non-verbal performance candidates."""
+    from config_loader import get_config
+    from performance_candidates import PerformanceCandidateError, approve, generate, reject
 
+    get_config()
     root = Path(args.root).expanduser().resolve()
     try:
         if args.performance_candidate_action == "approve":
             emit(approve(root, args.asset_id))
+            return 0
+        if args.performance_candidate_action == "reject":
+            emit(reject(root, args.asset_id, reviewer=args.reviewer, reason=args.reason))
             return 0
         base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
         token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
@@ -6330,6 +6335,48 @@ def cmd_performance_candidate(args: argparse.Namespace) -> int:
         )
         return 0
     except PerformanceCandidateError as exc:
+        raise FilmError(str(exc)) from exc
+
+
+def cmd_adult_female_voice_pack(args: argparse.Namespace) -> int:
+    """Manage fixed-profile, human-reviewed adult female dialogue and breath candidates."""
+    from adult_female_voice_pack import (
+        AdultFemaleVoicePackError,
+        approve,
+        initialize,
+        list_candidates,
+        render_pending,
+    )
+    from config_loader import get_config
+
+    get_config()
+    root = Path(args.root).expanduser().resolve()
+    try:
+        if args.adult_female_voice_pack_action == "init":
+            emit(initialize(root))
+            return 0
+        if args.adult_female_voice_pack_action == "list":
+            emit({"candidates": list_candidates(root)})
+            return 0
+        if args.adult_female_voice_pack_action == "approve":
+            emit(
+                approve(
+                    root,
+                    args.asset_id,
+                    reviewer=args.reviewer,
+                    female_voice_confirmed=bool(args.female_voice_confirmed),
+                    breath_confirmed=bool(args.breath_confirmed),
+                    artifact_free_confirmed=bool(args.artifact_free_confirmed),
+                )
+            )
+            return 0
+        base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
+        token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
+        if not base or not token:
+            raise AdultFemaleVoicePackError("AIFILM_AUDIO_NODE_URL/TOKEN are required")
+        emit(render_pending(root, base_url=base, token=token))
+        return 0
+    except AdultFemaleVoicePackError as exc:
         raise FilmError(str(exc)) from exc
 
 
@@ -6932,6 +6979,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     performance_approve.add_argument("--root", required=True)
     performance_approve.add_argument("--asset-id", required=True)
+    performance_reject = performance_candidate_sub.add_parser(
+        "reject", help="Record a human rejection; rejected candidates cannot be approved"
+    )
+    performance_reject.add_argument("--root", required=True)
+    performance_reject.add_argument("--asset-id", required=True)
+    performance_reject.add_argument("--reviewer", required=True)
+    performance_reject.add_argument("--reason", required=True)
+
+    adult_female_voice_pack = sub.add_parser(
+        "adult-female-voice-pack",
+        help="Create, render, review, and approve fixed-profile adult female dialogue/breath candidates",
+    )
+    adult_female_voice_pack_sub = adult_female_voice_pack.add_subparsers(
+        dest="adult_female_voice_pack_action", required=True
+    )
+    adult_female_voice_pack_init = adult_female_voice_pack_sub.add_parser("init")
+    adult_female_voice_pack_init.add_argument("--root", required=True)
+    adult_female_voice_pack_render = adult_female_voice_pack_sub.add_parser("render")
+    adult_female_voice_pack_render.add_argument("--root", required=True)
+    adult_female_voice_pack_list = adult_female_voice_pack_sub.add_parser("list")
+    adult_female_voice_pack_list.add_argument("--root", required=True)
+    adult_female_voice_pack_approve = adult_female_voice_pack_sub.add_parser("approve")
+    adult_female_voice_pack_approve.add_argument("--root", required=True)
+    adult_female_voice_pack_approve.add_argument("--asset-id", required=True)
+    adult_female_voice_pack_approve.add_argument("--reviewer", required=True)
+    adult_female_voice_pack_approve.add_argument("--female-voice-confirmed", action="store_true")
+    adult_female_voice_pack_approve.add_argument("--breath-confirmed", action="store_true")
+    adult_female_voice_pack_approve.add_argument("--artifact-free-confirmed", action="store_true")
 
     ambience_candidate = sub.add_parser(
         "ambience-candidate", help="Generate and human-approve Stable Audio ambience candidates"
@@ -8884,6 +8959,7 @@ def main(argv: list[str] | None = None) -> int:
             "bgm-candidate": cmd_bgm_candidate,
             "bgm-library": cmd_bgm_library,
             "performance-candidate": cmd_performance_candidate,
+            "adult-female-voice-pack": cmd_adult_female_voice_pack,
             "ambience-candidate": cmd_ambience_candidate,
             "sfx-canary": cmd_sfx_canary,
             "lipsync-node": cmd_lipsync_node,

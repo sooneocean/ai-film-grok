@@ -6,7 +6,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from performance_candidates import PerformanceCandidateError, approve, generate, sign_receipt
+from performance_candidates import (
+    PerformanceCandidateError,
+    approve,
+    generate,
+    reject,
+    sign_receipt,
+)
 
 
 def _wav() -> bytes:
@@ -109,4 +115,32 @@ def test_approve_wraps_bad_wav_as_candidate_error(
     }
     (pending / f"{asset_id}.json").write_text(json.dumps(sign_receipt(record)))
     with pytest.raises(PerformanceCandidateError, match="valid delivery WAV"):
+        approve(tmp_path, asset_id)
+
+
+def test_reject_blocks_later_approval(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AIFILM_AUDIO_RECEIPT_KEY", "x" * 24)
+    pending = tmp_path / "audio/candidates/performance/pending"
+    pending.mkdir(parents=True)
+    asset_id = "performance-adult-a-3-reject"
+    source = pending / f"{asset_id}.wav"
+    source.write_bytes(_wav())
+    record = {
+        "schema": "aifilm-performance-candidate-v1",
+        "asset_id": asset_id,
+        "status": "pending_human_review",
+        "character_id": "adult_a",
+        "language": "nonverbal",
+        "adult_confirmed": True,
+        "source_authorization": "original",
+        "model_version": "higgs-audio-v2",
+        "node_job_id": "job-3",
+        "take_seed": 3,
+        "path": f"audio/candidates/performance/pending/{asset_id}.wav",
+        "sha256": hashlib.sha256(_wav()).hexdigest(),
+    }
+    (pending / f"{asset_id}.json").write_text(json.dumps(sign_receipt(record)))
+    result = reject(tmp_path, asset_id, reviewer="dex", reason="not a female breath performance")
+    assert result["status"] == "rejected_human_review"
+    with pytest.raises(PerformanceCandidateError, match="receipt is invalid"):
         approve(tmp_path, asset_id)
