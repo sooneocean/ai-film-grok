@@ -8,6 +8,7 @@ interval while the parent dialogue, captions, and audio clock continue.
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -40,8 +41,10 @@ def iter_dialogue_broll(spec: dict[str, Any]) -> list[dict[str, Any]]:
     return found
 
 
-def default_dialogue_broll(shot: dict[str, Any]) -> list[dict[str, Any]]:
-    """Produce one conservative, no-face insert for a sufficiently long line."""
+def default_dialogue_broll(
+    shot: dict[str, Any], *, previous_kind: str | None = None
+) -> list[dict[str, Any]]:
+    """Produce one conservative but varied coverage cut for a long dialogue line."""
     duration = float(shot.get("duration_sec") or 0.0)
     if duration < MIN_DIALOGUE_SEC:
         return []
@@ -52,19 +55,75 @@ def default_dialogue_broll(shot: dict[str, Any]) -> list[dict[str, Any]]:
     start = round((duration - cover_duration) / 2, 2)
     parent_id = str(shot.get("id") or "shot")
     source_dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    speaker = str(shot.get("speaker") or "").strip()
+    cast = [str(item).strip() for item in (source_dsl.get("cast") or []) if str(item).strip()]
+    listeners = [cast_id for cast_id in cast if cast_id != speaker]
+    text = " ".join(
+        str(shot.get(key) or "")
+        for key in ("dialogue", "caption_text", "must_show", "visible_change")
+    ).lower()
+    emotion = str((shot.get("performance_state") or {}).get("emotion") or "").lower()
+    reaction_cues = ("惊", "怕", "疑", "怒", "哭", "沉默", "reveal", "shock", "fear", "anger")
+    environment_cues = ("雨", "夜", "车", "门", "街", "房", "风", "灯", "station", "room", "street")
+    wants_reaction = bool(speaker and listeners) and any(
+        cue in f"{text} {emotion}" for cue in reaction_cues
+    )
+    wants_environment = any(cue in text for cue in environment_cues)
+    kind = (
+        "reaction"
+        if wants_reaction and previous_kind != "reaction"
+        else "env"
+        if wants_environment and previous_kind != "env"
+        else "insert"
+    )
+    if kind == previous_kind:
+        kind = "env" if kind == "insert" else "insert"
+    common = {
+        "id": f"{parent_id}__broll01",
+        "kind": kind,
+        "parent_shot_id": parent_id,
+        "start_sec": start,
+        "end_sec": round(start + cover_duration, 2),
+        "cut_trigger": "dialogue_turn",
+        "audio_policy": "carry_parent_dialogue",
+        "speaker_on_camera": False,
+        "lipsync": False,
+    }
+    if kind == "reaction":
+        return [
+            {
+                **common,
+                "narrative_purpose": "show the listener absorb the emotional turn before returning to the speaker",
+                "shot_role": "hero",
+                "dsl": {
+                    "cast": [listeners[0]],
+                    "action": "listener absorbs the line; a visible emotional reaction",
+                    "motion": "held reaction with a small eye or breath change",
+                    "camera": {"shot_size": "medium close-up"},
+                    "location_id": source_dsl.get("location_id") or shot.get("location_id"),
+                },
+            }
+        ]
+    if kind == "env":
+        return [
+            {
+                **common,
+                "narrative_purpose": "let the location register the pressure of the dialogue before returning to the speaker",
+                "shot_role": "env",
+                "dsl": {
+                    "subject": "story-relevant environment, no people, no face",
+                    "action": "a small environmental change reflects the dialogue beat",
+                    "motion": "restrained atmospheric movement; frame stays empty",
+                    "camera": {"shot_size": "wide"},
+                    "location_id": source_dsl.get("location_id") or shot.get("location_id"),
+                },
+            }
+        ]
     return [
         {
-            "id": f"{parent_id}__broll01",
-            "kind": "insert",
-            "parent_shot_id": parent_id,
-            "start_sec": start,
-            "end_sec": round(start + cover_duration, 2),
-            "cut_trigger": "dialogue_turn",
+            **common,
             "narrative_purpose": "show the concrete object or environmental consequence named by the dialogue",
-            "audio_policy": "carry_parent_dialogue",
             "shot_role": "insert",
-            "speaker_on_camera": False,
-            "lipsync": False,
             "dsl": {
                 "subject": "story-relevant object or environmental detail, no people, no face",
                 "action": "a small observable change that answers the dialogue beat",
@@ -120,18 +179,44 @@ def validate_dialogue_broll(shot: dict[str, Any], *, shot_id: str) -> list[dict[
             raise DialogueBrollError(f"{bid} requires a visual dsl with motion")
         if kind in {"env", "insert"}:
             blob = " ".join(str(dsl.get(k) or "") for k in ("subject", "action", "motion", "cast"))
-            positive_blob = blob.lower().replace("no face", "").replace("no people", "")
+            positive_blob = re.sub(
+                r"\bno\s+(?:face|people|person|woman|man|girl|boy|human|character|figure|body)\b",
+                "",
+                blob.lower(),
+            )
             if dsl.get("cast") or any(
-                word in positive_blob for word in ("face", "portrait", "person", "character")
+                word in positive_blob
+                for word in (
+                    "face",
+                    "portrait",
+                    "person",
+                    "character",
+                    "woman",
+                    "man",
+                    "girl",
+                    "boy",
+                    "human",
+                    "figure",
+                    "body",
+                )
             ):
                 raise DialogueBrollError(f"{bid} {kind} B-roll must be no-face and carry no cast")
             if str(entry.get("shot_role") or "") not in {"env", "insert"}:
                 raise DialogueBrollError(f"{bid} {kind} B-roll must use matching no-face shot_role")
         else:
+            speaker = str(shot.get("speaker") or "").strip()
+            if not speaker:
+                raise DialogueBrollError(
+                    f"{bid} reaction B-roll requires an identified parent speaker"
+                )
             cast = dsl.get("cast")
             if not isinstance(cast, list) or len(cast) != 1 or not str(cast[0]).strip():
                 raise DialogueBrollError(
                     f"{bid} reaction B-roll requires exactly one locked listener cast"
+                )
+            if str(cast[0]).strip() == speaker:
+                raise DialogueBrollError(
+                    f"{bid} reaction listener must not equal the parent speaker"
                 )
             if entry.get("shot_role") != "hero":
                 raise DialogueBrollError(f"{bid} reaction B-roll must use shot_role=hero")

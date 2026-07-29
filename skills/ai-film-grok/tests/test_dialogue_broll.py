@@ -46,6 +46,49 @@ class TestDialogueBroll(unittest.TestCase):
     def test_short_dialogue_keeps_pure_a_roll(self) -> None:
         self.assertEqual(default_dialogue_broll(_shot(5.99)), [])
 
+    def test_reaction_cover_uses_locked_listener_only_on_emotional_turn(self) -> None:
+        shot = _shot()
+        shot.update(
+            {
+                "speaker": "heroine",
+                "dialogue": "The reveal leaves everyone stunned.",
+                "performance_state": {"emotion": "shock"},
+                "dsl": {"motion": "locked", "cast": ["heroine", "partner"]},
+            }
+        )
+        entry = default_dialogue_broll(shot)[0]
+        self.assertEqual(entry["kind"], "reaction")
+        self.assertEqual(entry["dsl"]["cast"], ["partner"])
+        validate_dialogue_broll({**shot, "dialogue_broll": [entry]}, shot_id="line01")
+
+    def test_reaction_never_infers_a_listener_without_parent_speaker(self) -> None:
+        shot = _shot()
+        shot.update(
+            {
+                "dialogue": "The reveal leaves everyone stunned.",
+                "performance_state": {"emotion": "shock"},
+                "dsl": {"motion": "locked", "cast": ["heroine"]},
+            }
+        )
+        self.assertNotEqual(default_dialogue_broll(shot)[0]["kind"], "reaction")
+
+    def test_reaction_rejects_the_parent_speaker_as_listener(self) -> None:
+        shot = _shot()
+        shot["speaker"] = "heroine"
+        entry = default_dialogue_broll(shot)[0]
+        entry.update({"kind": "reaction", "shot_role": "hero"})
+        entry["dsl"] = {"motion": "held reaction", "cast": ["heroine"]}
+        with self.assertRaisesRegex(DialogueBrollError, "must not equal"):
+            validate_dialogue_broll({**shot, "dialogue_broll": [entry]}, shot_id="line01")
+
+    def test_environment_cover_and_adjacent_kind_do_not_repeat(self) -> None:
+        shot = _shot()
+        shot["dialogue"] = "Rain hits the station door outside."
+        first = default_dialogue_broll(shot)[0]
+        second = default_dialogue_broll(shot, previous_kind=first["kind"])[0]
+        self.assertEqual(first["kind"], "env")
+        self.assertNotEqual(second["kind"], first["kind"])
+
     def test_no_face_insert_is_enforced(self) -> None:
         shot = _shot()
         entry = default_dialogue_broll(shot)[0]
@@ -53,8 +96,16 @@ class TestDialogueBroll(unittest.TestCase):
         with self.assertRaisesRegex(DialogueBrollError, "no-face"):
             validate_dialogue_broll({**shot, "dialogue_broll": [entry]}, shot_id="line01")
 
+    def test_no_face_insert_rejects_people_without_a_face_keyword(self) -> None:
+        shot = _shot()
+        entry = default_dialogue_broll(shot)[0]
+        entry["dsl"]["subject"] = "a woman seen from behind in the rain"
+        with self.assertRaisesRegex(DialogueBrollError, "no-face"):
+            validate_dialogue_broll({**shot, "dialogue_broll": [entry]}, shot_id="line01")
+
     def test_reaction_requires_one_listener_and_no_lipsync(self) -> None:
         shot = _shot()
+        shot["speaker"] = "heroine"
         entry = default_dialogue_broll(shot)[0]
         entry.update({"kind": "reaction", "shot_role": "hero"})
         entry["dsl"] = {"motion": "listener absorbs the reveal", "cast": ["passenger"]}

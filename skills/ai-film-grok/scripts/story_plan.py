@@ -3022,6 +3022,7 @@ def project_graph_to_film_spec(
         if isinstance(line, dict) and str(line.get("shot_ref") or "").strip()
     }
     scenes_fs: list[dict[str, Any]] = []
+    previous_broll_kind: str | None = None
     for ep_item in graph.get("episodes") or []:
         if not isinstance(ep_item, dict):
             continue
@@ -3149,7 +3150,11 @@ def project_graph_to_film_spec(
                                 },
                             }
                         )
-                        shot_obj["dialogue_broll"] = default_dialogue_broll(shot_obj)
+                        shot_obj["dialogue_broll"] = default_dialogue_broll(
+                            shot_obj, previous_kind=previous_broll_kind
+                        )
+                        if shot_obj["dialogue_broll"]:
+                            previous_broll_kind = str(shot_obj["dialogue_broll"][0]["kind"])
                     elif vo_mode == "dialogue_drama":
                         # Coverage remains visual/silent unless an editor adds
                         # a justified narration cue later.  Silence makes the
