@@ -3,6 +3,16 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.16.1] - 2026-07-29
+
+### Added
+
+- Added a receipt-backed audio armory to `bgm-library doctor|status`. It distinguishes verified ACE music editing weapons from conditional series development and explicitly excludes Foley/SFX and unproven seamless loops.
+
+### Fixed
+
+- Series packs and transition bridges now prepare a temporary target-duration reference before ACE cover generation, preventing a source master duration from overriding the requested output length.
+
 ## [2.16.0] - 2026-07-29
 
 ### Added

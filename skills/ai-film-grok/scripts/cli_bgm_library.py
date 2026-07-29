@@ -314,9 +314,21 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
                 node = _public_node_health(health(base, token), token=token)
             except Exception:
                 node = {"ok": False, "error": "audio node health check failed"}
-        report = {"ok": bool(node.get("ok")), "node": node, "library": library_status(library)}
+        from audio_armory import inspect_audio_armory
+
+        report = {
+            "ok": bool(node.get("ok")),
+            "node": node,
+            "library": library_status(library),
+            "audio_armory": inspect_audio_armory(library, node=node),
+        }
     elif action == "status":
-        report = library_status(library)
+        from audio_armory import inspect_audio_armory
+
+        report = {
+            **library_status(library),
+            "audio_armory": inspect_audio_armory(library, node=None),
+        }
     elif action == "audit":
         report = audit_library(library)
     elif action == "review-pack":
@@ -439,16 +451,32 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
         base, token = _node_credentials()
         recipes = series_recipes(library, series_id=args.series_id)
         candidates = []
-        for index, recipe in enumerate(recipes):
-            result = generate_candidates(
-                library,
-                base_url=base,
-                token=token,
-                recipe=recipe,
-                batch_size=1,
-                seeds=[int(args.seed_base) + index],
-            )
-            candidates.extend(result["candidates"])
+        # ACE cover follows reference length.  Prepare each series parent at
+        # its recipe duration so a 30-second master cannot silently become a
+        # 30-second "60-second" series variation.
+        with tempfile.TemporaryDirectory(prefix="aifilm-ace-series-") as temporary:
+            for index, recipe in enumerate(recipes):
+                parent, parent_path = get_approved_asset(library, str(recipe["parent_asset_id"]))
+                Path(temporary, str(index)).mkdir(parents=True, exist_ok=True)
+                prepared, preparation = _prepare_edit_reference(
+                    parent_path,
+                    source_duration=float((parent.get("technical") or {}).get("duration_sec") or 0),
+                    target_duration=float(recipe["duration"]),
+                    directory=Path(temporary) / str(index),
+                )
+                result = generate_candidates(
+                    library,
+                    base_url=base,
+                    token=token,
+                    recipe={
+                        **recipe,
+                        "reference_audio": str(prepared),
+                        "reference_preparation": preparation,
+                    },
+                    batch_size=1,
+                    seeds=[int(args.seed_base) + index],
+                )
+                candidates.extend(result["candidates"])
         receipt = Path(args.root).expanduser().resolve() / "receipts" / "bgm-series-pack.json"
         report = {
             "ok": True,
@@ -533,14 +561,25 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
             outgoing_path=outgoing_path,
             duration=float(args.duration),
         )
-        result = generate_candidates(
-            library,
-            base_url=base,
-            token=token,
-            recipe=recipe,
-            batch_size=int(args.batch_size),
-            seeds=list(range(int(args.seed_base), int(args.seed_base) + int(args.batch_size))),
-        )
+        with tempfile.TemporaryDirectory(prefix="aifilm-ace-bridge-") as temporary:
+            prepared, preparation = _prepare_edit_reference(
+                outgoing_path,
+                source_duration=float((outgoing.get("technical") or {}).get("duration_sec") or 0),
+                target_duration=float(recipe["duration"]),
+                directory=Path(temporary),
+            )
+            result = generate_candidates(
+                library,
+                base_url=base,
+                token=token,
+                recipe={
+                    **recipe,
+                    "reference_audio": str(prepared),
+                    "reference_preparation": preparation,
+                },
+                batch_size=int(args.batch_size),
+                seeds=list(range(int(args.seed_base), int(args.seed_base) + int(args.batch_size))),
+            )
         report = {
             "ok": True,
             "from_asset_id": args.from_asset_id,

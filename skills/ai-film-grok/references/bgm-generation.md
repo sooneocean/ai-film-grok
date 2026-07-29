@@ -160,7 +160,16 @@ ACE cover/repaint 的抽象提示词，不声称 ACE 已输出可独立交付的
 
 ACE-Step cover 会以参考音长度为准。因此当 edit 目标时长不同于批准 master，客户端只会在
 临时目录制作带淡出的 target-length reference 并上传给节点；批准 master 从不改写，临时参考
-不进 catalog，最终仍只允许人工批准的 ACE 输出进入 final。
+不进 catalog，最终仍只允许人工批准的 ACE 输出进入 final。这个规则同样适用于 series pack 与
+transition bridge，不能让 30 秒母带伪装成 10 秒过桥。
+
+### Audio armory（已收编的 5090 音乐武器）
+
+`aifilm bgm-library doctor` 会输出 `audio_armory`：只有节点健康、reference upload 可用且存在
+checksum 绑定、技术通过的真实候选时，才把 `scene_edit`（对白安全／尾奏修复）或
+`transition_bridge` 标为 `verified`。所有武器都只能离线策展、必须人审、不能直接进入 final。
+`motif_development` 在有剧集主题母带和真实候选前保持 `conditional`；Foley／逐帧 SFX 与无缝
+循环不属于 ACE 的自动武器，后者在 live seam 测试通过前也不会自动路由。
 
 ## 三阶梯 · 立刻换口味（操作）
 
