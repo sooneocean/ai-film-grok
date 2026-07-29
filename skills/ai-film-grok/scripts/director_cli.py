@@ -8,6 +8,7 @@ from typing import Any
 
 from department_cli import (
     DEPARTMENT_FILES,
+    department_path,
     mark_department_stale,
     migrate_department,
     show_department,
@@ -389,6 +390,10 @@ def migrate_audit(root: Path | str) -> dict[str, Any]:
 
 def migrate(root: Path | str, *, title: str = "Untitled") -> dict[str, Any]:
     base = Path(root).expanduser().resolve()
+    raw_book = read_json(base / "production-book.json")
+    if isinstance(raw_book, dict) and int(raw_book.get("revision") or 0) < 1:
+        normalized_book = read_production_book(base)
+        write_production_book(base, normalized_book, expected_revision=0)
     init_production_book(base, title=title, rigor="legacy")
     migrated = []
     for item in migrate_audit(base)["departments"]:
@@ -444,14 +449,15 @@ def check(root: Path | str) -> dict[str, Any]:
         for required in ("drama-graph.json", "film-spec.json"):
             if not (Path(root) / required).is_file():
                 errors.append(f"story: required canonical file is missing: {required}")
-    for department, filename in DEPARTMENT_FILES.items():
+    for department in DEPARTMENT_FILES:
         if department == "sound":
             continue
-        if (Path(root) / filename).is_file():
+        path = department_path(root, department)
+        if path.is_file():
             report = validate_department(root, department)
             departments.append(report)
             errors.extend(f"{department}: {item}" for item in report["errors"])
-            bible = read_json(Path(root) / filename) or {}
+            bible = read_json(path) or {}
             if department == "audio":
                 from audio_bible import validate_audio_bible
 

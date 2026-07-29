@@ -7,7 +7,12 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from director_cli import migrate_audit  # noqa: E402
+from director_cli import check, migrate, migrate_audit  # noqa: E402
+from production_book import (  # noqa: E402
+    init_production_book,
+    read_production_book,
+    write_production_book,
+)
 
 
 def test_migrate_audit_uses_in_root_book_department_source_file(tmp_path: Path) -> None:
@@ -57,3 +62,40 @@ def test_migrate_audit_does_not_follow_book_path_outside_root(tmp_path: Path) ->
 
     assert visual["path"] == str(tmp_path / "style-bible.json")
     assert visual["path_source"] == "default"
+
+
+def test_migrate_normalizes_revision_zero_legacy_book_before_department_sync(
+    tmp_path: Path,
+) -> None:
+    bible = tmp_path / "bible"
+    bible.mkdir()
+    (bible / "style-bible.json").write_text('{"schema_version": 3}', encoding="utf-8")
+    (tmp_path / "production-book.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "departments": {"style-bible": {"source_file": "bible/style-bible.json"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = migrate(tmp_path)
+
+    assert result["ok"] is True
+    assert result["book"]["revision"] >= 2
+    assert (tmp_path / "style-bible.json").exists() is False
+
+
+def test_check_validates_department_referenced_from_nested_book_path(tmp_path: Path) -> None:
+    init_production_book(tmp_path)
+    bible = tmp_path / "bible"
+    bible.mkdir()
+    (bible / "style-bible.json").write_text("{}", encoding="utf-8")
+    book = read_production_book(tmp_path)
+    book["departments"]["visual"]["source_file"] = "bible/style-bible.json"
+    write_production_book(tmp_path, book)
+
+    report = check(tmp_path)
+
+    assert any(item["department_id"] == "visual" for item in report["departments"])
