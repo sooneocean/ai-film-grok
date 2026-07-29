@@ -13,6 +13,7 @@ keep working.
 from __future__ import annotations
 
 import argparse
+import copy
 from pathlib import Path
 from typing import Any
 
@@ -27,19 +28,17 @@ def cmd_status(args: argparse.Namespace) -> int:
         load_manifest,
         read_json,
         recompute_gates,
-        save_manifest,
     )
 
     root = Path(args.root).expanduser().resolve()
     try:
         from scene_sound import reconcile as reconcile_scene_sound
 
-        scene_sound = reconcile_scene_sound(root, write=True)
+        scene_sound = reconcile_scene_sound(root, write=False)
     except Exception as exc:
         scene_sound = {"status": "error", "error": str(exc)[:200]}
-    manifest = load_manifest(root)
+    manifest = copy.deepcopy(load_manifest(root))
     summary = recompute_gates(root, manifest)
-    save_manifest(root, manifest)
     next_gate = None
     for name in GATE_ORDER:
         if not summary["gates"].get(name):
@@ -63,7 +62,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     open_n = int(summary.get("open_reshoot_count") or 0)
     try:
         next_actions, pipeline_stage, next_cmd, _next_id = _pipeline_bundle(
-            root, gates=gates, open_n=open_n, persist=True
+            root, gates=gates, open_n=open_n, persist=False
         )
     except Exception:
         next_actions = []

@@ -110,6 +110,17 @@ def _asset(
             )
         )
 
+    technical_state = (
+        "technical_failed"
+        if expected_hash
+        and expected_hash != media_hash
+        or qa.get("ok") is False
+        or quality.get("ok") is False
+        else "technical_pending"
+        if not technical_ok
+        else "passed"
+    )
+
     review = clip.get("shot_review") if isinstance(clip.get("shot_review"), dict) else {}
     visual_ok = bool(
         review.get("approved") is True
@@ -124,11 +135,19 @@ def _asset(
                 "current clip lacks approved identity, motion, or shot review",
             )
         )
+    visual_state = (
+        "visual_failed"
+        if review.get("approved") is False
+        or clip.get("identity_approved") is False
+        or clip.get("motion_approved") is False
+        else "visual_pending"
+        if not visual_ok
+        else "passed"
+    )
 
+    evidence = clip.get("quality_evidence")
     semantic_ok = bool(
-        media
-        and media.is_file()
-        and quality_evidence_is_current(clip.get("quality_evidence"), clip=media)
+        media and media.is_file() and quality_evidence_is_current(evidence, clip=media)
     )
     if not semantic_ok:
         issues.append(
@@ -138,6 +157,13 @@ def _asset(
                 "current clip lacks hash-bound continuity and human review evidence",
             )
         )
+    semantic_state = (
+        "semantic_pending"
+        if not isinstance(evidence, dict)
+        else "semantic_failed"
+        if not semantic_ok
+        else "passed"
+    )
 
     integration_ok = bool(
         clip.get("status") == "approved"
@@ -153,17 +179,24 @@ def _asset(
                 "approved manifest clip is not the selected current dailies candidate",
             )
         )
+    integration_state = (
+        "integration_failed"
+        if selected and media_hash and selected[0].get("media_sha256") != media_hash
+        else "integration_pending"
+        if not integration_ok
+        else "passed"
+    )
 
     if not media_hash:
         state = "candidate"
-    elif not technical_ok:
-        state = "technical_failed"
-    elif not visual_ok:
-        state = "visual_pending"
-    elif not semantic_ok:
-        state = "semantic_pending"
-    elif not integration_ok:
-        state = "integration_pending"
+    elif technical_state != "passed":
+        state = technical_state
+    elif visual_state != "passed":
+        state = visual_state
+    elif semantic_state != "passed":
+        state = semantic_state
+    elif integration_state != "passed":
+        state = integration_state
     else:
         state = "promotion_eligible"
     return {
@@ -174,16 +207,16 @@ def _asset(
         "state": state,
         "layers": {
             "candidate": bool(media_hash),
-            "technical": technical_ok,
-            "visual": visual_ok,
-            "semantic": semantic_ok,
-            "integration": integration_ok,
+            "technical": technical_state,
+            "visual": visual_state,
+            "semantic": semantic_state,
+            "integration": integration_state,
         },
         "issues": issues,
     }
 
 
-def _experiments(root: Path) -> list[dict[str, Any]]:
+def _experiments(root: Path, known_by_shot: dict[str, set[str]]) -> list[dict[str, Any]]:
     """Report only declared A/B evidence; absence is never treated as approval."""
     path = root / "receipts" / "experiment-a-b.json"
     receipt = read_json(path) if path.is_file() else {}
@@ -194,12 +227,17 @@ def _experiments(root: Path) -> list[dict[str, Any]]:
     for index, raw in enumerate(rows):
         row = raw if isinstance(raw, dict) else {}
         category = str(row.get("category") or "unknown")
+        shot_id = str(row.get("shot_id") or "")
         baseline = row.get("baseline_sha256")
         candidate = row.get("candidate_sha256")
         conclusion = row.get("human_conclusion")
-        missing = not (
-            isinstance(baseline, str)
+        valid = (
+            shot_id in known_by_shot
+            and isinstance(baseline, str)
             and isinstance(candidate, str)
+            and baseline != candidate
+            and baseline in known_by_shot.get(shot_id, set())
+            and candidate in known_by_shot.get(shot_id, set())
             and isinstance(conclusion, str)
             and conclusion.strip()
         )
@@ -207,7 +245,8 @@ def _experiments(root: Path) -> list[dict[str, Any]]:
             {
                 "id": str(row.get("id") or f"experiment-{index + 1}"),
                 "category": category,
-                "state": "experiment_evidence_missing" if missing else "experiment_reviewed",
+                "shot_id": shot_id or None,
+                "state": "experiment_reviewed" if valid else "experiment_evidence_missing",
                 "issues": [
                     _issue(
                         "EXPERIMENT_EVIDENCE_MISSING",
@@ -215,7 +254,7 @@ def _experiments(root: Path) -> list[dict[str, Any]]:
                         "A/B baseline, candidate, and human conclusion are required",
                     )
                 ]
-                if missing
+                if not valid
                 else [],
             }
         )
@@ -347,7 +386,16 @@ def build_promotion_report(root: Path | str) -> dict[str, Any]:
         if shot_id not in clips:
             assets.append(_asset(base, shot_id, {}, entries))
     final, delivery = _final(base, manifest)
-    experiments = _experiments(base)
+    known_by_shot: dict[str, set[str]] = {}
+    for asset in assets:
+        if isinstance(asset.get("sha256"), str):
+            known_by_shot.setdefault(str(asset["shot_id"]), set()).add(asset["sha256"])
+    for shot_id, entries in dailies.items():
+        for entry in entries:
+            candidate_hash = entry.get("media_sha256")
+            if isinstance(candidate_hash, str):
+                known_by_shot.setdefault(shot_id, set()).add(candidate_hash)
+    experiments = _experiments(base, known_by_shot)
     all_issues = [issue for asset in assets for issue in asset["issues"]] + final["issues"]
     for experiment in experiments:
         all_issues.extend(experiment["issues"])
@@ -383,7 +431,10 @@ def build_promotion_report(root: Path | str) -> dict[str, Any]:
 def write_promotion_report(root: Path | str, out: Path | str) -> dict[str, Any]:
     """Persist only an explicitly requested report inside the film workspace."""
     base = _root(root)
-    destination = Path(out).expanduser().resolve()
+    destination = Path(out).expanduser()
+    if not destination.is_absolute():
+        destination = base / destination
+    destination = destination.resolve()
     try:
         destination.relative_to(base)
     except ValueError as exc:

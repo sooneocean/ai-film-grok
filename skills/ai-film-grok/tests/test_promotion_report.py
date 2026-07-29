@@ -135,6 +135,44 @@ def test_report_rejects_stale_asset_evidence_after_media_replacement(tmp_path: P
     }
 
 
+def test_report_distinguishes_pending_from_explicit_technical_failure(tmp_path: Path) -> None:
+    clip = _approved_asset(tmp_path)
+    _write_manifest(tmp_path, clip=clip)
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest["clips"]["s001"].pop("qa")
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    assert build_promotion_report(tmp_path)["assets"][0]["state"] == "technical_pending"
+
+    manifest["clips"]["s001"]["qa"] = {"ok": False}
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    assert build_promotion_report(tmp_path)["assets"][0]["state"] == "technical_failed"
+
+
+def test_experiment_requires_two_known_candidates_from_the_same_shot(tmp_path: Path) -> None:
+    clip = _approved_asset(tmp_path)
+    _write_manifest(tmp_path, clip=clip)
+    (tmp_path / "receipts" / "experiment-a-b.json").write_text(
+        json.dumps(
+            {
+                "experiments": [
+                    {
+                        "id": "bad",
+                        "category": "lipsync",
+                        "shot_id": "s001",
+                        "baseline_sha256": "a" * 64,
+                        "candidate_sha256": "b" * 64,
+                        "human_conclusion": "looks better",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        build_promotion_report(tmp_path)["experiments"][0]["state"] == "experiment_evidence_missing"
+    )
+
+
 def test_report_detects_final_delivery_hash_mismatch(tmp_path: Path) -> None:
     clip = _approved_asset(tmp_path)
     _write_manifest(tmp_path, clip=clip)
@@ -163,7 +201,12 @@ def test_cli_only_writes_when_out_is_explicit_and_keeps_it_in_root(
     assert json.loads(capsys.readouterr().out)["kind"] == "promotion-report"
 
     target = tmp_path / "reports" / "promotion-report.json"
-    assert main(["promotion-report", "--root", str(tmp_path), "--out", str(target)]) == 0
+    assert (
+        main(
+            ["promotion-report", "--root", str(tmp_path), "--out", "reports/promotion-report.json"]
+        )
+        == 0
+    )
     assert target.is_file()
     assert (
         main(
@@ -187,8 +230,11 @@ def test_status_surfaces_report_only_promotion_summary(
 
     clip = _approved_asset(tmp_path)
     _write_manifest(tmp_path, clip=clip)
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
 
     assert main(["status", "--root", str(tmp_path)]) == 0
     payload = json.loads(capsys.readouterr().out)
+    after = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    assert before == after
     assert payload["promotion_report"]["report_only"] is True
     assert payload["promotion_report"]["final_state"] == "promotion_eligible"
