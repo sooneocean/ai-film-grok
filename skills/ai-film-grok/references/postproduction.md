@@ -165,7 +165,7 @@ Skill **不附带**版权曲库。你把**自己有权使用**的 rnb/许可文�
 # 只要程序化 rnb
 "$AIFILM" final --root "<root>" --music-template off
 
-# 每镜按 music_cue.mood 选不同本地纯音乐，并实际混入同一条 BGM stem；任一 mood 缺曲即失败。
+# 每镜按 music_cue.mood 选不同本地纯音乐，并实际混入同一条 BGM stem；任一 mood 缺曲或缺少 .license.txt（可用 --music-license 覆盖）即失败。
 # 例如 templates/ambient/arrival.wav、templates/dark/tension.wav、templates/rnb/climax.wav
 "$AIFILM" final --root "<root>" --music-template timeline
 

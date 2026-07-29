@@ -134,6 +134,12 @@ class MusicTemplateTests(unittest.TestCase):
             (audio / "bgm.wav").write_bytes(b"global" * 100)
             (audio / "templates" / "rnb" / "velvet.wav").write_bytes(b"rnb" * 100)
             (audio / "templates" / "dark" / "pulse.wav").write_bytes(b"dark" * 100)
+            (audio / "templates" / "rnb" / "velvet.license.txt").write_text(
+                "test", encoding="utf-8"
+            )
+            (audio / "templates" / "dark" / "pulse.license.txt").write_text(
+                "test", encoding="utf-8"
+            )
             routed = resolve_music_template_timeline(
                 root,
                 seed=9,
@@ -171,6 +177,18 @@ class MusicTemplateTests(unittest.TestCase):
             )
             self.assertEqual(routed, [])
 
+    def test_timeline_rejects_template_without_license(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            template = root / "audio" / "templates" / "rnb" / "unlicensed.wav"
+            template.parent.mkdir(parents=True)
+            template.write_bytes(b"unlicensed" * 100)
+            with self.assertRaisesRegex(SoundPlanError, "requires a license sidecar"):
+                resolve_music_template_timeline(
+                    root,
+                    timeline=[{"shot_id": "s1", "mood": "rnb", "start_sec": 0, "end_sec": 2}],
+                )
+
     def test_timeline_renders_different_template_sources_per_cue(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -183,6 +201,7 @@ class MusicTemplateTests(unittest.TestCase):
                     handle.setsampwidth(2)
                     handle.setframerate(SR)
                     handle.writeframes((np.full(SR, level * 32767)).astype(np.int16).tobytes())
+                path.with_suffix(".license.txt").write_text("test", encoding="utf-8")
             bed, selections = render_music_template_timeline(
                 root=root,
                 work=root / "work",
@@ -219,6 +238,7 @@ class MusicTemplateTests(unittest.TestCase):
             library = root / "shared" / "assets" / "bgm" / "rnb"
             library.mkdir(parents=True)
             (library / "bed.wav").write_bytes(b"shared" * 100)
+            (library / "bed.license.txt").write_text("test", encoding="utf-8")
             with mock.patch.object(
                 sound_plan, "__file__", str(root / "shared" / "scripts" / "sound_plan.py")
             ):

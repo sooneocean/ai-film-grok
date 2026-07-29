@@ -514,13 +514,10 @@ def resolve_music_template(
     except ValueError:
         pool_index = 0
 
-    lic = (
-        (music_license or "").strip()
-        or _license_sidecar_for(found)
-        or (
-            f"{source} path={found.name}; "
-            "not a commercial license grant — add *.license.txt or --music-license"
-        )
+    verified_license = (music_license or "").strip() or _license_sidecar_for(found)
+    lic = verified_license or (
+        f"{source} path={found.name}; "
+        "not a commercial license grant — add *.license.txt or --music-license"
     )
     rel: str | None
     try:
@@ -537,6 +534,7 @@ def resolve_music_template(
     return {
         "path": str(found.resolve()),
         "license_note": lic,
+        "license_verified": bool(verified_license),
         "source": source,
         "mood": mood_l,
         "mode": mode_s,
@@ -584,6 +582,11 @@ def resolve_music_template_timeline(
         )
         if resolved is None:
             continue
+        if not resolved.get("license_verified"):
+            raise SoundPlanError(
+                "music_template=timeline requires a license sidecar or --music-license for "
+                f"shot {shot_id or index} ({resolved['relative']})"
+            )
         selections.append(
             {
                 **resolved,
