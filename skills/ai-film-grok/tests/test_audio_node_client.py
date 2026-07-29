@@ -41,6 +41,10 @@ def test_rejects_non_http_node_url() -> None:
         _url("https://169.254.169.254", "/health")
     with pytest.raises(AudioNodeError):
         _url("http://192.168.88.52:8788?token=leak", "/health")
+    with pytest.raises(AudioNodeError, match="loopback-only"):
+        _url("http://192.168.88.52:8788", "/health")
+    assert _url("http://127.0.0.1:8788", "/health") == "http://127.0.0.1:8788/health"
+    assert _url("https://192.168.88.52:8788", "/health") == ("https://192.168.88.52:8788/health")
 
 
 def test_health_requires_private_token() -> None:
@@ -117,7 +121,7 @@ def test_http_error_is_not_misreported_as_network_unreachable() -> None:
     error = HTTPError("http://node/health", 404, "Not Found", {}, io.BytesIO())
     with patch("urllib.request.OpenerDirector.open", side_effect=error):
         with pytest.raises(AudioNodeError, match="HTTP 404"):
-            _request("http://192.168.88.52:8788", "x" * 32, "/health")
+            _request("http://127.0.0.1:8788", "x" * 32, "/health")
 
 
 def test_cross_origin_redirect_is_rejected_without_forwarding_token() -> None:
@@ -130,7 +134,7 @@ def test_cross_origin_redirect_is_rejected_without_forwarding_token() -> None:
     )
     with patch("urllib.request.OpenerDirector.open", side_effect=error):
         with pytest.raises(AudioNodeError, match="HTTP 302"):
-            _request("http://192.168.88.52:8788", "x" * 32, "/health")
+            _request("http://127.0.0.1:8788", "x" * 32, "/health")
 
 
 def test_render_rejects_unknown_kind(tmp_path: Path) -> None:

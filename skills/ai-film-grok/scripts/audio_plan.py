@@ -37,7 +37,7 @@ def build_audio_plan(
         from audio_timeline import compile_timeline as compile_audio_timeline
         from audio_timeline import write_timeline as persist_timeline
 
-        timeline = compile_audio_timeline(spec)
+        timeline = compile_audio_timeline(spec, root=root)
         validate_timeline(timeline)
         if write_timeline:
             path = persist_timeline(root, timeline)

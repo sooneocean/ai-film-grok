@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from audio_timeline import is_candidate_only_license, is_noncommercial_license
+from audio_timeline import (
+    is_approved_internal_sfx,
+    is_candidate_only_license,
+    is_noncommercial_license,
+)
 
 
 class SceneSoundError(ValueError):
@@ -94,6 +98,56 @@ def _approved_performance(root: Path, event: dict[str, Any], asset: Path, actual
         )
 
 
+def _approved_internal_sfx(
+    root: Path,
+    event: dict[str, Any],
+    asset: Path,
+    actual: str,
+    delivery_scope: str,
+) -> bool:
+    """Bind an NC-only scene cue to its signed, fully heard approval receipt."""
+    if not is_approved_internal_sfx(event, delivery_scope):
+        return False
+    raw = str(event.get("approval_receipt") or "")
+    try:
+        receipt_path = (root / raw.removeprefix("local:")).resolve()
+        receipt_path.relative_to(root)
+        data = json.loads(receipt_path.read_text(encoding="utf-8"))
+        source_rel = str(asset.relative_to(root))
+        from performance_candidates import receipt_is_signed
+
+        signed = receipt_is_signed(data)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    review = data.get("human_review") if isinstance(data, dict) else {}
+    return bool(
+        isinstance(data, dict)
+        and data.get("schema") == "aifilm-sfx-candidate-v1"
+        and data.get("status") == "approved_noncommercial"
+        and data.get("production_eligible") is False
+        and data.get("delivery_eligible_scopes") == ["noncommercial_internal"]
+        and data.get("approved_path") == source_rel
+        and data.get("sha256") == actual
+        and data.get("license") == event.get("license")
+        and data.get("model") == event.get("model")
+        and data.get("checkpoint_fingerprint") == event.get("checkpoint_fingerprint")
+        and data.get("node_job_id") == event.get("node_job_id")
+        and signed
+        and isinstance(review, dict)
+        and review.get("reviewer")
+        and all(
+            review.get(field) is True
+            for field in (
+                "heard_full",
+                "sync_confirmed",
+                "no_speech_confirmed",
+                "no_music_confirmed",
+                "artifact_free_confirmed",
+            )
+        )
+    )
+
+
 def _apply_event_controls(
     samples: np.ndarray, event: dict[str, Any], sample_rate: int
 ) -> np.ndarray:
@@ -116,7 +170,7 @@ def _apply_event_controls(
     return out
 
 
-def _local_asset(root: Path, event: dict[str, Any]) -> Path:
+def _local_asset(root: Path, event: dict[str, Any], *, delivery_scope: str) -> Path:
     source = str(event.get("source") or event.get("asset") or "")
     if not source.startswith("local:"):
         raise SceneSoundError(f"{event.get('id')}: final only accepts local: scene-sound assets")
@@ -128,22 +182,27 @@ def _local_asset(root: Path, event: dict[str, Any]) -> Path:
         raise SceneSoundError(f"{event.get('id')}: asset escapes film root") from exc
     if not path.is_file():
         raise SceneSoundError(f"{event.get('id')}: asset not found: {raw}")
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
     normalized_raw = raw.replace("\\", "/").lower()
     pending_candidate = (
         "/audio/candidates/" in f"/{normalized_raw}" and "/pending/" in f"/{normalized_raw}"
     )
+    approved_internal = _approved_internal_sfx(root, event, path, actual, delivery_scope)
     if (
         pending_candidate
         or is_noncommercial_license(event.get("license"))
         or is_candidate_only_license(event.get("license"))
         or event.get("production_eligible") is False
         or event.get("approval_status") == "pending_human_review"
-    ):
+    ) and not approved_internal:
         raise SceneSoundError(
             f"{event.get('id')}: non-commercial or pending candidate cannot enter a formal stem"
         )
-    actual = hashlib.sha256(path.read_bytes()).hexdigest()
-    if event.get("type") == "action_sfx" and actual in _nonproduction_sfx_hashes(root):
+    if (
+        event.get("type") == "action_sfx"
+        and not approved_internal
+        and actual in _nonproduction_sfx_hashes(root)
+    ):
         raise SceneSoundError(
             f"{event.get('id')}: known non-production SFX hash cannot enter a formal stem"
         )
@@ -160,6 +219,7 @@ def render_scene_sound_stem(
     """Mix local foley/SFX/ambience/music assets at their signed cue times."""
     samples = np.zeros((max(1, int(round(duration_sec * sample_rate))), 2), dtype=np.float32)
     executed: list[dict[str, Any]] = []
+    delivery_scope = str(timeline.get("delivery_scope") or "commercial")
     asset_types = {"action_sfx", "ambience", "music", "performance"}
     for event in timeline.get("events") or []:
         if (
@@ -168,7 +228,7 @@ def render_scene_sound_stem(
             or event.get("type") not in asset_types
         ):
             continue
-        asset = _local_asset(root, event)
+        asset = _local_asset(root, event, delivery_scope=delivery_scope)
         duration = float(event["duration_sec"])
         proc = subprocess.run(
             [

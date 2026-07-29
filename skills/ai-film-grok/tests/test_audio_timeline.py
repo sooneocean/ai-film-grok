@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -18,6 +19,8 @@ from audio_timeline import (
     rebase_to_rendered_shots,
     validate_timeline,
 )
+from performance_candidates import sign_receipt
+from util import write_json
 from voice_cast_profiles import VoiceCastError, assign_profiles, validate_event_language
 
 
@@ -117,6 +120,77 @@ def test_pending_noncommercial_sfx_cannot_enter_formal_timeline():
                 ],
             }
         )
+
+
+def test_approved_mmaudio_sfx_only_enters_noncommercial_internal_timeline(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setenv("AIFILM_AUDIO_RECEIPT_KEY", "timeline-test-signing-key-12345")
+    approved = tmp_path / "audio" / "candidates" / "sfx" / "approved-noncommercial"
+    approved.mkdir(parents=True)
+    source = approved / "take.wav"
+    source.write_bytes(b"approved-audio")
+    source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    receipt = approved / "take.receipt.json"
+    record = sign_receipt(
+        {
+            "schema": "aifilm-sfx-candidate-v1",
+            "asset_id": "mmaudio-sfx-test",
+            "status": "approved_noncommercial",
+            "production_eligible": False,
+            "delivery_eligible_scopes": ["noncommercial_internal"],
+            "approved_path": str(source.relative_to(tmp_path)),
+            "sha256": source_hash,
+            "license": "CC-BY-NC-4.0",
+            "model": "hkchengrex/MMAudio-large-44k-v2",
+            "checkpoint_fingerprint": "b" * 64,
+            "node_job_id": "job-1",
+            "human_review": {
+                "reviewer": "dex",
+                "heard_full": True,
+                "sync_confirmed": True,
+                "no_speech_confirmed": True,
+                "no_music_confirmed": True,
+                "artifact_free_confirmed": True,
+            },
+        }
+    )
+    write_json(receipt, record)
+    cue = {
+        "kind": "foley",
+        "source": "local:audio/candidates/sfx/approved-noncommercial/take.wav",
+        "license": "CC-BY-NC-4.0",
+        "source_sha256": source_hash,
+        "approval_status": "approved_noncommercial",
+        "approval_receipt": ("local:audio/candidates/sfx/approved-noncommercial/take.receipt.json"),
+        "production_eligible": False,
+        "usage_scope": "noncommercial_internal",
+        "model": "hkchengrex/MMAudio-large-44k-v2",
+        "checkpoint_fingerprint": "b" * 64,
+        "node_job_id": "job-1",
+        "material": "wood",
+        "start_offset_sec": 0,
+        "duration_sec": 1,
+    }
+    internal = _spec([cue])
+    internal["delivery_scope"] = "noncommercial_internal"
+    with pytest.raises(AudioTimelineError, match="requires the film root"):
+        compile_timeline(internal)
+    timeline = compile_timeline(internal, root=tmp_path)
+    assert timeline["delivery_scope"] == "noncommercial_internal"
+    assert timeline["events"][0]["approval_status"] == "approved_noncommercial"
+
+    forged = json.loads(json.dumps(internal))
+    forged["shots"][0]["audio_cues"][0]["approval_receipt"] = (
+        "local:audio/candidates/sfx/approved-noncommercial/missing.receipt.json"
+    )
+    with pytest.raises(AudioTimelineError, match="does not bind"):
+        compile_timeline(forged, root=tmp_path)
+
+    commercial = _spec([cue])
+    commercial["delivery_scope"] = "commercial"
+    with pytest.raises(AudioTimelineError, match="cannot enter a formal timeline"):
+        compile_timeline(commercial, root=tmp_path)
 
 
 @pytest.mark.parametrize(

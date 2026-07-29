@@ -7,13 +7,91 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
 
 class MMAudioAdapterError(RuntimeError):
     pass
+
+
+_SAFE_ENV_NAMES = frozenset(
+    {
+        "APPDATA",
+        "COMSPEC",
+        "CUDA_PATH",
+        "HF_HOME",
+        "HF_HUB_CACHE",
+        "LOCALAPPDATA",
+        "NUMBER_OF_PROCESSORS",
+        "PATH",
+        "PATHEXT",
+        "PROGRAMDATA",
+        "SYSTEMDRIVE",
+        "SYSTEMROOT",
+        "TEMP",
+        "TMP",
+        "USERNAME",
+        "USERPROFILE",
+        "WINDIR",
+    }
+)
+
+
+def _adapter_environment() -> dict[str, str]:
+    """Pass runtime paths without leaking service credentials upstream."""
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key.upper() in _SAFE_ENV_NAMES or key.upper().startswith(("CUDA_", "NVIDIA_"))
+    }
+    environment.update(
+        {
+            "HF_HUB_OFFLINE": "1",
+            "TRANSFORMERS_OFFLINE": "1",
+            "PYTHONNOUSERSITE": "1",
+        }
+    )
+    if not environment.get("USERNAME") and environment.get("USERPROFILE"):
+        environment["USERNAME"] = (
+            environment["USERPROFILE"].replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+        )
+    return environment
+
+
+def _failure_code(output: str | bytes | None, returncode: int) -> str:
+    """Reduce child output to a fixed diagnostic code without echoing prompts or paths."""
+    text = (
+        output.decode("utf-8", errors="replace") if isinstance(output, bytes) else str(output or "")
+    ).lower()
+    if "sox could not be found" in text or "'sox' is not recognized" in text:
+        return "sox_unavailable"
+    if "cuda out of memory" in text or "cuda error: out of memory" in text:
+        return "cuda_out_of_memory"
+    dependency = re.search(r"no module named ['\"]([a-z0-9_.-]{1,80})['\"]", text)
+    if dependency:
+        module = re.sub(r"[^a-z0-9]+", "_", dependency.group(1)).strip("_")
+        return f"python_dependency_missing_{module}"
+    if "localentrynotfounderror" in text or "offline mode is enabled" in text:
+        return "offline_asset_missing"
+    if "'ffmpeg' is not recognized" in text or "no such file or directory: 'ffmpeg'" in text:
+        return "ffmpeg_unavailable"
+    return f"subprocess_exit_{returncode}"
+
+
+def _run_checked(
+    command: list[str], *, stage: str, **kwargs: object
+) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(command, check=True, **kwargs)
+    except subprocess.CalledProcessError as exc:
+        code = _failure_code(exc.stderr, exc.returncode)
+        raise MMAudioAdapterError(f"{stage} failed: {code}") from None
+    except OSError:
+        raise MMAudioAdapterError(f"{stage} failed: executable_unavailable") from None
 
 
 def _sha256(path: Path) -> str:
@@ -53,10 +131,11 @@ def _require_checkout(repo: Path) -> tuple[str, str]:
         )
     ):
         raise MMAudioAdapterError("MMAudio commit and every weight SHA-256 must be pinned")
+    git_prefix = ["git", "-c", f"safe.directory={repo}", "-C", str(repo)]
     try:
         commit = (
             subprocess.run(
-                ["git", "-C", str(repo), "rev-parse", "HEAD"],
+                [*git_prefix, "rev-parse", "HEAD"],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -66,7 +145,7 @@ def _require_checkout(repo: Path) -> tuple[str, str]:
             .lower()
         )
         dirty = subprocess.run(
-            ["git", "-C", str(repo), "status", "--porcelain"],
+            [*git_prefix, "status", "--porcelain"],
             check=True,
             capture_output=True,
             text=True,
@@ -111,14 +190,7 @@ def run(
 
     out = out.expanduser().resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "HF_HUB_OFFLINE": "1",
-            "TRANSFORMERS_OFFLINE": "1",
-            "PYTHONNOUSERSITE": "1",
-        }
-    )
+    environment = _adapter_environment()
     with tempfile.TemporaryDirectory(prefix="aifilm-mmaudio-", dir=out.parent) as temporary:
         output_dir = Path(temporary)
         runner = os.environ.get("AIFILM_MMAUDIO_RUNNER", "").strip()
@@ -141,18 +213,18 @@ def run(
         ]
         if video is not None:
             command.extend(["--video", str(video.resolve())])
-        subprocess.run(
+        _run_checked(
             command,
+            stage="mmaudio_inference",
             cwd=repo,
             env=environment,
-            check=True,
             capture_output=True,
             timeout=900,
         )
         generated = list(output_dir.glob("*.flac"))
         if len(generated) != 1:
             raise MMAudioAdapterError("MMAudio did not return exactly one audio artifact")
-        subprocess.run(
+        _run_checked(
             [
                 "ffmpeg",
                 "-y",
@@ -166,7 +238,7 @@ def run(
                 "pcm_s16le",
                 str(out),
             ],
-            check=True,
+            stage="wav_normalization",
             capture_output=True,
             timeout=180,
         )
@@ -215,4 +287,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except MMAudioAdapterError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, separators=(",", ":")), file=sys.stderr)
+        raise SystemExit(2) from None
