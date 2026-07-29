@@ -97,6 +97,45 @@
         }
       }
     },
+    "wardrobe_ladders": {
+      "type": "object",
+      "description": "Canonical per-character I2I wardrobe chain. States remove registered garments outer-to-inner and retain approval provenance.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["garments", "states"],
+        "properties": {
+          "status": { "type": "string" },
+          "garments": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string", "minLength": 1 },
+                { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "minLength": 1 }, "label": { "type": "string" } }, "additionalProperties": true }
+              ]
+            }
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "parent_state_id", "removed_garment_ids", "wardrobe_state", "path", "status"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "parent_state_id": { "type": ["string", "null"] },
+                "removed_garment_ids": { "type": "array", "items": { "type": "string" } },
+                "wardrobe_state": { "type": "string" },
+                "path": { "type": "string", "minLength": 1 },
+                "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "status": { "type": "string", "enum": ["pending", "approved"] },
+                "approval": { "type": "object" }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
     "cast_state_masters": { "type": "object" },
     "art_direction": {
       "type": "object",

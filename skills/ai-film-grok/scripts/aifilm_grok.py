@@ -1500,6 +1500,11 @@ def cmd_state_index(args: argparse.Namespace) -> int:
                 str(args.wardrobe_state_id),
                 Path(args.image),
                 root=root,
+                reviewer=str(args.reviewer),
+                review_note=str(args.review_note),
+                generation_receipt=(
+                    Path(args.generation_receipt) if args.generation_receipt else None
+                ),
             )
         except ValueError as exc:
             raise FilmError(str(exc)) from exc
@@ -1510,6 +1515,23 @@ def cmd_state_index(args: argparse.Namespace) -> int:
                 "kind": "wardrobe-state-approved",
                 "character_id": args.character_id,
                 "state": state,
+            }
+        )
+        return 0
+    if action == "contact-sheet":
+        from visual_bible import load_bible
+        from wardrobe_ladder import render_contact_sheet
+
+        try:
+            sheet = render_contact_sheet(load_bible(root), str(args.character_id), root=root)
+        except ValueError as exc:
+            raise FilmError(str(exc)) from exc
+        emit(
+            {
+                "ok": True,
+                "kind": "wardrobe-ladder-contact-sheet",
+                "character_id": args.character_id,
+                **sheet,
             }
         )
         return 0
@@ -8480,6 +8502,18 @@ def build_parser() -> argparse.ArgumentParser:
     sia.add_argument("--character-id", required=True)
     sia.add_argument("--wardrobe-state-id", required=True)
     sia.add_argument("--image", required=True)
+    sia.add_argument("--reviewer", required=True)
+    sia.add_argument("--review-note", required=True)
+    sia.add_argument(
+        "--generation-receipt",
+        help="JSON receipt for this I2I generation; required for non-full states",
+    )
+    sis = si_sub.add_parser(
+        "contact-sheet",
+        help="Render an offline visual review sheet for one wardrobe ladder; never calls a provider",
+    )
+    sis.add_argument("--root", required=True)
+    sis.add_argument("--character-id", required=True)
 
     pilot = sub.add_parser(
         "pilot",

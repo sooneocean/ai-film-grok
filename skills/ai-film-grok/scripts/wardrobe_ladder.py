@@ -7,6 +7,7 @@ before it can become the input for the following step.
 
 from __future__ import annotations
 
+import json
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,30 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _stored_path(path: Path, root: Path) -> str:
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
+
+
+def _image_metadata(path: Path) -> dict[str, Any]:
+    """Read pixels once, so an approval cannot point at a corrupt file."""
+    try:
+        from PIL import Image
+
+        with Image.open(path) as image:
+            image.load()
+            return {
+                "width": image.width,
+                "height": image.height,
+                "mode": image.mode,
+                "format": image.format,
+            }
+    except Exception as exc:
+        raise ValueError(f"state image is not a readable image: {path}") from exc
 
 
 def needs_ladder(states: set[str]) -> bool:
@@ -228,6 +253,25 @@ def ladder_plan(
                     }
                 )
         elif not approved:
+            parent = states[index - 1]
+            parent_path = Path(str(parent.get("path") or ""))
+            if not parent_path.is_absolute():
+                parent_path = root / parent_path
+            parent_ready = (
+                parent.get("status") == "approved"
+                and parent_path.is_file()
+                and parent.get("sha256") == _sha256(parent_path)
+            )
+            if not parent_ready:
+                hard.append(
+                    {
+                        "code": "WARDROBE_LADDER_PARENT_UNAPPROVED",
+                        "character_id": character_id,
+                        "state_id": sid,
+                        "parent_state_id": expected_parent,
+                    }
+                )
+                continue
             plan.append(
                 {
                     "action": "generate_wardrobe_state_photo",
@@ -244,24 +288,164 @@ def ladder_plan(
 
 
 def approve_state(
-    bible: dict[str, Any], character_id: str, state_id: str, image: Path, *, root: Path
+    bible: dict[str, Any],
+    character_id: str,
+    state_id: str,
+    image: Path,
+    *,
+    root: Path,
+    reviewer: str,
+    review_note: str,
+    generation_receipt: Path | None = None,
 ) -> dict[str, Any]:
+    """Promote a reviewed state photo and preserve its I2I provenance."""
     state = state_for_id(bible, character_id, state_id)
     if not state:
         raise ValueError(f"unknown wardrobe state {character_id}:{state_id}")
+    reviewer = str(reviewer or "").strip()
+    review_note = str(review_note or "").strip()
+    if not reviewer or not review_note:
+        raise ValueError("reviewer and review_note are required to approve a wardrobe state")
     image = image.expanduser().resolve()
     if not image.is_file():
         raise ValueError(f"state image does not exist: {image}")
+    image_meta = _image_metadata(image)
+    image_sha = _sha256(image)
     parent_id = state.get("parent_state_id")
+    parent: dict[str, Any] | None = None
     if parent_id:
         parent = state_for_id(bible, character_id, str(parent_id))
         if not parent or parent.get("status") != "approved":
             raise ValueError(f"parent state {parent_id} must be approved first")
-    try:
-        stored = str(image.relative_to(root))
-    except ValueError:
-        stored = str(image)
+        if not parent.get("sha256"):
+            raise ValueError(f"parent state {parent_id} has no approved image hash")
+        parent_path = Path(str(parent.get("path") or ""))
+        if not parent_path.is_absolute():
+            parent_path = root / parent_path
+        if not parent_path.is_file() or _sha256(parent_path) != parent["sha256"]:
+            raise ValueError(f"parent state {parent_id} image is missing or hash-drifted")
+        if generation_receipt is None:
+            raise ValueError("generation_receipt is required for a non-full I2I wardrobe state")
+    receipt_record: dict[str, str] | None = None
+    if generation_receipt is not None:
+        generation_receipt = generation_receipt.expanduser().resolve()
+        if not generation_receipt.is_file():
+            raise ValueError(f"generation receipt does not exist: {generation_receipt}")
+        try:
+            parsed_receipt = json.loads(generation_receipt.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("generation_receipt must be a readable JSON receipt") from exc
+        if not isinstance(parsed_receipt, dict):
+            raise ValueError("generation_receipt must contain a JSON object")
+        if parent:
+            required_receipt = {
+                "kind": "image_edit",
+                "parent_state_id": str(parent_id),
+                "parent_state_sha256": str(parent["sha256"]),
+                "output_sha256": image_sha,
+            }
+            mismatched = [
+                key
+                for key, expected in required_receipt.items()
+                if parsed_receipt.get(key) != expected
+            ]
+            if mismatched:
+                raise ValueError(
+                    "generation_receipt must bind image_edit parent and output hashes: "
+                    + ", ".join(mismatched)
+                )
+        receipt_record = {
+            "path": _stored_path(generation_receipt, root),
+            "sha256": _sha256(generation_receipt),
+        }
+    approved_at = utc_now()
+    parent_record = (
+        {
+            "state_id": str(parent_id),
+            "path": str(parent["path"]),
+            "sha256": str(parent["sha256"]),
+        }
+        if parent
+        else None
+    )
     state.update(
-        {"path": stored, "sha256": _sha256(image), "status": "approved", "approved_at": utc_now()}
+        {
+            "path": _stored_path(image, root),
+            "sha256": image_sha,
+            "status": "approved",
+            "approved_at": approved_at,
+            "reviewer": reviewer,
+            "review_note": review_note,
+            "parent_state_sha256": parent_record["sha256"] if parent_record else None,
+            "generation_receipt": receipt_record,
+            "approval": {
+                "reviewer": reviewer,
+                "review_note": review_note,
+                "approved_at": approved_at,
+                "image": {"sha256": image_sha, **image_meta},
+                "parent": parent_record,
+                "generation_receipt": receipt_record,
+            },
+        }
     )
     return state
+
+
+def render_contact_sheet(bible: dict[str, Any], character_id: str, *, root: Path) -> dict[str, Any]:
+    """Render an offline visual review sheet of every canonical ladder state."""
+    ladder = (
+        bible.get("wardrobe_ladders", {}).get(character_id)
+        if isinstance(bible.get("wardrobe_ladders"), dict)
+        else None
+    )
+    if not isinstance(ladder, dict) or not _states(ladder):
+        raise ValueError(f"no wardrobe ladder states for {character_id}")
+    try:
+        from PIL import Image, ImageDraw, ImageOps
+    except ImportError as exc:
+        raise ValueError("Pillow is required to render a wardrobe contact sheet") from exc
+
+    states = _states(ladder)
+    cell_w, cell_h, label_h, cols = 360, 330, 88, 2
+    rows = (len(states) + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * cell_w, 36 + rows * (cell_h + label_h)), "#171717")
+    draw = ImageDraw.Draw(sheet)
+    draw.text((12, 10), f"WARDROBE LADDER · {character_id}", fill="white")
+    state_rows: list[dict[str, Any]] = []
+    for index, state in enumerate(states):
+        x, y = (index % cols) * cell_w, 36 + (index // cols) * (cell_h + label_h)
+        tile = Image.new("RGB", (cell_w, cell_h), "#454545")
+        state_path = Path(str(state.get("path") or ""))
+        if not state_path.is_absolute():
+            state_path = root / state_path
+        exists = state_path.is_file()
+        if exists:
+            try:
+                with Image.open(state_path) as source:
+                    source.load()
+                    tile.paste(ImageOps.contain(source.convert("RGB"), tile.size), (0, 0))
+            except Exception:
+                exists = False
+        if not exists:
+            ImageDraw.Draw(tile).text((12, 12), "MISSING / INVALID", fill="#ffb4b4")
+        sheet.paste(tile, (x, y))
+        removed = (
+            ", ".join(str(value) for value in state.get("removed_garment_ids") or []) or "none"
+        )
+        label = f"{state['id']} · {state.get('status', 'pending')}\nremoved: {removed}"
+        draw.multiline_text((x + 8, y + cell_h + 8), label, fill="white", spacing=3)
+        state_rows.append(
+            {
+                "id": str(state["id"]),
+                "status": str(state.get("status") or "pending"),
+                "removed_garment_ids": list(state.get("removed_garment_ids") or []),
+                "path": str(state.get("path") or ""),
+                "exists": exists,
+            }
+        )
+    out = root / "canonical" / "cast-states" / character_id / "contact-sheet.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    temp = out.with_suffix(".tmp.png")
+    sheet.save(temp, format="PNG")
+    temp.replace(out)
+    return {"path": _stored_path(out, root), "sha256": _sha256(out), "states": state_rows}

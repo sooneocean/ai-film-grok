@@ -126,6 +126,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
     shots = _shots_from_spec(spec) if spec else []
     shot_rows: list[dict[str, Any]] = []
     states_needed: set[str] = set()
+    states_needed_by_hero: dict[str, set[str]] = {}
     exact_state_ids: dict[str, set[str]] = {}
     heroes: set[str] = set()
 
@@ -136,6 +137,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
         hids = _hero_ids(sh)
         for h in hids:
             heroes.add(h)
+            states_needed_by_hero.setdefault(h, set()).add(w)
             if _wardrobe_state_id(sh):
                 exact_state_ids.setdefault(h, set()).add(str(_wardrobe_state_id(sh)))
         kf = _find_keyframe(root, sid) if sid else None
@@ -172,6 +174,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
     # dramatic costume change from silently falling back to the full cast image.
     ladder_hard: list[dict[str, Any]] = []
     ladder_plan: list[dict[str, Any]] = []
+    ladder_active_heroes: set[str] = set()
     try:
         from wardrobe_ladder import (
             ladder_plan as build_ladder_plan,
@@ -183,6 +186,12 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
 
         if needs_ladder(states_needed):
             for hid in sorted(heroes) or ["hero"]:
+                if not needs_ladder(states_needed_by_hero.get(hid, set())):
+                    continue
+                # A non-full character always repairs through the ladder.
+                # If no ladder exists, ladder_plan emits the hard actionable
+                # breakdown gap; never revive the legacy full-image edit task.
+                ladder_active_heroes.add(hid)
                 issues, steps = build_ladder_plan(bible, hid, root=root)
                 for issue in issues:
                     ladder_hard.append(
@@ -246,7 +255,9 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
 
     for hid in sorted(heroes) or ["hero"]:
         state_index[hid] = {}
-        for st in sorted(states_needed, key=lambda s: WARDROBE_RANK.get(s, 0)):
+        for st in sorted(
+            states_needed_by_hero.get(hid, {"full"}), key=lambda s: WARDROBE_RANK.get(s, 0)
+        ):
             path = None
             if resolve_state_photo is not None:
                 path = resolve_state_photo(bible, hid, st, root=root)
@@ -255,7 +266,10 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
             exists = _path_exists(root, path) if path else False
             state_index[hid][st] = {"path": path, "exists": exists}
             # full may use cast master; missing file for non-full is a gap when heat maxish
-            if st in UNDRESS_STATES and not exists:
+            # The ladder is the only allowed repair plan for an active
+            # gradual-undress character.  A legacy broad-state task would
+            # invite re-editing from the full look and breaking lineage.
+            if st in UNDRESS_STATES and not exists and hid not in ladder_active_heroes:
                 missing_states.append(f"{hid}:{st}")
                 gen_plan.append(
                     {
