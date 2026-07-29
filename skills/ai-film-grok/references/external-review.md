@@ -38,6 +38,33 @@ SHA-256. Groq may produce word-timing and safe-frame candidates; Gemini may
 produce cross-shot/contract candidates. Failed, rejected, rate-limited, or
 unavailable providers are recorded as `unavailable` and never block delivery.
 
+## Where It Adds Coverage
+
+Use this sidecar only after the local media check for the same artifact has
+passed. It is useful at three separate points, each with an explicit receipt
+purpose:
+
+| Purpose | Input | What it can catch | It cannot replace |
+| --- | --- | --- | --- |
+| `tts_rehearsal` | rendered line/stem plus VTT/SRT | missing spoken text and cue drift | voice performance approval |
+| `animatic` | rendered animatic plus captions | timing and obvious safe-frame candidates | pacing/edit approval |
+| `final` | verified final file plus captions/contract | cross-shot, subtitle-intent, and technical-frame candidates | `review-final`, post-audit, or full-film viewing |
+
+Run each one deliberately; the plugin never submits it automatically. When a
+credential is injected into the current process and a final has no current
+`purpose: final` receipt, `aifilm next` offers the final command before the
+human `review-final` step. The recommendation is advisory and disappears once
+the receipt is bound to the current final SHA-256.
+
+```bash
+# Examples: each result remains candidate-only and nonblocking.
+"$AIFILM" external-review run --root artifacts/<film> --video artifacts/<film>/audio/rehearsal.wav --subtitles artifacts/<film>/audio/rehearsal.srt --purpose tts_rehearsal
+"$AIFILM" external-review run --root artifacts/<film> --video artifacts/<film>/animatic/master.mp4 --subtitles artifacts/<film>/animatic/subtitles.srt --purpose animatic
+```
+
+Gemini authentication uses the `x-goog-api-key` HTTP header. Never put a key in
+a URL, a local config file, or an invocation copied into a receipt.
+
 ## Adult technical review
 
 For a `heat_scale: max` project, pass `--sanitized` and provide a sanitized

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -311,6 +313,54 @@ class PipelineStageTests(unittest.TestCase):
             )
             self.assertEqual(stage["stage"], "post")
             self.assertEqual(stage["detail"], "review-final")
+
+    def test_external_review_is_suggested_once_for_configured_final(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "brief.json").write_text("{}", encoding="utf-8")
+            (root / "manifest.json").write_text(
+                json.dumps(
+                    {"outputs": {"final_film": {"path": "film_final.mp4", "sha256": "abc"}}}
+                ),
+                encoding="utf-8",
+            )
+            with mock.patch.dict(os.environ, {"GROQ_API_KEY": "test-secret"}, clear=False):
+                actions = build_next_actions(
+                    root,
+                    gates={
+                        "brief": True,
+                        "style_locked": True,
+                        "spec": True,
+                        "clips_complete": True,
+                        "final_complete": False,
+                    },
+                )
+            external = next(action for action in actions if action["id"] == "external-review")
+            self.assertIn("--purpose final", external["cmd"])
+            (root / "receipts").mkdir()
+            (root / "receipts" / "external-review.json").write_text(
+                json.dumps(
+                    {
+                        "kind": "external-review",
+                        "status": "candidate_only",
+                        "purpose": "final",
+                        "inputs": {"video": {"sha256": "abc"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with mock.patch.dict(os.environ, {"GROQ_API_KEY": "test-secret"}, clear=False):
+                actions = build_next_actions(
+                    root,
+                    gates={
+                        "brief": True,
+                        "style_locked": True,
+                        "spec": True,
+                        "clips_complete": True,
+                        "final_complete": False,
+                    },
+                )
+            self.assertNotIn("external-review", [action["id"] for action in actions])
 
     def test_post_audit_precedes_export_after_final_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

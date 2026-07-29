@@ -54,6 +54,15 @@ def test_cosyvoice_rejects_edge_voice_identifier() -> None:
         cosyvoice_local_tts._provider_voice("zh-CN-XiaoxiaoNeural")
 
 
+def test_cosyvoice_rejects_symlinked_reference(tmp_path: Path) -> None:
+    target = tmp_path / "target.wav"
+    target.write_bytes(b"RIFF")
+    linked = tmp_path / "linked.wav"
+    linked.symlink_to(target)
+    with pytest.raises(cosyvoice_local_tts.CosyVoiceLocalError, match="regular file"):
+        cosyvoice_local_tts._regular_file(linked, name="COSYVOICE_REF_WAV")
+
+
 def test_explicit_cosyvoice_backend_requires_our_adapter(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -68,11 +77,21 @@ def test_explicit_cosyvoice_backend_requires_our_adapter(
 
 
 def test_cosyvoice_argv_detection(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = SCRIPTS / "adapters" / "cosyvoice_local_tts.py"
     monkeypatch.setenv(
         "AIFILM_TTS_ARGV",
-        '["python3","/trusted/adapters/cosyvoice_local_tts.py","--out","{out}"]',
+        f'["python3","{adapter}","--out","{{out}}"]',
     )
     assert tts_backend.cosyvoice_local_argv_configured()
+
+
+def test_cosyvoice_uses_extended_local_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = SCRIPTS / "adapters" / "cosyvoice_local_tts.py"
+    monkeypatch.setenv(
+        "AIFILM_TTS_ARGV",
+        f'["python3","{adapter}","--out","{{out}}"]',
+    )
+    assert tts_backend.external_tts_timeout() == 600
 
 
 def test_cosyvoice_local_settings_are_not_passed_to_other_external_adapters(
@@ -81,3 +100,15 @@ def test_cosyvoice_local_settings_are_not_passed_to_other_external_adapters(
     monkeypatch.setenv("COSYVOICE_ROOT", "/private/cosy")
     monkeypatch.setenv("AIFILM_TTS_ARGV", '["python3","/trusted/other.py"]')
     assert "COSYVOICE_ROOT" not in tts_backend.external_tts_subprocess_env()
+    assert tts_backend.external_tts_timeout() == 300
+
+
+def test_mimicking_adapter_name_is_not_trusted(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COSYVOICE_ROOT", "/private/cosy")
+    monkeypatch.setenv(
+        "AIFILM_TTS_ARGV",
+        '["/usr/bin/env","/untrusted/cosyvoice_local_tts.py","--out","{out}"]',
+    )
+    assert not tts_backend.cosyvoice_local_argv_configured()
+    assert "COSYVOICE_ROOT" not in tts_backend.external_tts_subprocess_env()
+    assert tts_backend.external_tts_timeout() == 300

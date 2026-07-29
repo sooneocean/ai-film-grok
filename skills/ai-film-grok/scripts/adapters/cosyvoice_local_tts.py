@@ -51,7 +51,7 @@ def _configuration() -> tuple[Path, Path, Path, str]:
         )
     root = Path(root_raw).expanduser().resolve()
     model = Path(model_raw).expanduser().resolve()
-    reference = _regular_file(Path(ref_raw).expanduser().resolve(), name="COSYVOICE_REF_WAV")
+    reference = _regular_file(Path(ref_raw).expanduser(), name="COSYVOICE_REF_WAV").resolve()
     if not (root / "cosyvoice").is_dir() or not (root / "third_party" / "Matcha-TTS").is_dir():
         raise CosyVoiceLocalError(f"COSYVOICE_ROOT is not a CosyVoice checkout: {root}")
     if not (model / "cosyvoice3.yaml").is_file():
@@ -131,15 +131,22 @@ def synthesize(text: str, out: Path, voice: str) -> Path:
     except ImportError as exc:  # pragma: no cover - environment prerequisite
         raise CosyVoiceLocalError("CosyVoice Python environment is not ready") from exc
     model = AutoModel(model_dir=str(model_dir))
-    result = next(
-        model.inference_zero_shot(
+    try:
+        import torch
+    except ImportError as exc:  # pragma: no cover - environment prerequisite
+        raise CosyVoiceLocalError("CosyVoice environment is missing torch") from exc
+    chunks = [
+        result["tts_speech"]
+        for result in model.inference_zero_shot(
             body,
             prompt,
             str(reference),
             stream=False,
         )
-    )
-    _write_output(result["tts_speech"], int(model.sample_rate), out)
+    ]
+    if not chunks:
+        raise CosyVoiceLocalError("CosyVoice returned no audio")
+    _write_output(torch.cat(chunks, dim=1), int(model.sample_rate), out)
     return out
 
 

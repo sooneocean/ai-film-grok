@@ -87,6 +87,9 @@ def approve(root: Path, asset_id: str, *, reviewer: str) -> dict[str, Any]:
         or not reviewer.strip()
     ):
         raise AmbienceCandidateError("candidate requires an explicit reviewer")
+    pending_root = _pending(root).resolve()
+    if source.is_symlink() or not source.resolve().is_relative_to(pending_root):
+        raise AmbienceCandidateError("candidate WAV must be a local pending file")
     if not source.is_file() or _digest(source) != record.get("sha256"):
         raise AmbienceCandidateError("candidate WAV is missing or changed")
     _validate_wav(source)

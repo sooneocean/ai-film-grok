@@ -51,6 +51,8 @@ def test_health_reports_capacity_without_private_payloads(monkeypatch: pytest.Mo
         "total_vram_mib": 2048,
     }
     assert "token" not in report
+    assert isinstance(report["tts_variants"]["voice_design"], bool)
+    assert report["tts_variants"]["custom_1_7b"] is False
 
 
 def test_health_identifies_the_configured_performance_model(

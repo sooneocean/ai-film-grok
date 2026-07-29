@@ -144,6 +144,16 @@ def _available(kind: str) -> bool:
         return False
 
 
+def _tts_variant_available(variant: str) -> bool:
+    if not _available("tts"):
+        return False
+    if variant == "voice_design":
+        return bool(MODEL_ID and MODEL_PATH)
+    if variant == "custom_1_7b":
+        return bool(CUSTOM_1_7B_MODEL_ID and CUSTOM_1_7B_MODEL_PATH)
+    return False
+
+
 def _cached_probe(
     name: str, command: list[str], fingerprint: tuple[str, ...], *, timeout: int
 ) -> dict[str, Any] | None:
@@ -363,6 +373,9 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         "ok": True,
         "node": "private-lan",
         "models": {kind: _available(kind) for kind in AUDIO_KINDS},
+        "tts_variants": {
+            variant: _tts_variant_available(variant) for variant in ("voice_design", "custom_1_7b")
+        },
         "music_batch": bool(os.environ.get("AIFILM_AUDIO_NODE_MUSIC_BATCH_ARGV", "").strip()),
         "model": MODEL_ID,
         "music_model": MUSIC_MODEL_ID,

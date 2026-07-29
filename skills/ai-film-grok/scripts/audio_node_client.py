@@ -86,6 +86,15 @@ def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> di
         }
         if public_models:
             public["models"] = public_models
+    tts_variants = raw.get("tts_variants")
+    if isinstance(tts_variants, dict):
+        public_variants = {
+            variant: tts_variants[variant]
+            for variant in ("voice_design", "custom_1_7b")
+            if isinstance(tts_variants.get(variant), bool)
+        }
+        if public_variants:
+            public["tts_variants"] = public_variants
     if isinstance(raw.get("music_batch"), bool):
         public["music_batch"] = raw["music_batch"]
     for field in _PUBLIC_MODEL_FIELDS:

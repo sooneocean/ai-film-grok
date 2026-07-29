@@ -5387,8 +5387,23 @@ def cmd_external_review(args: argparse.Namespace) -> int:
                 director_contract=args.director_contract,
                 sanitized_frame_index=args.sanitized_frame_index,
                 sanitized=bool(args.sanitized),
+                purpose=args.purpose,
             )
     except ExternalReviewError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0
+
+
+def cmd_vibevoice_asr(args: argparse.Namespace) -> int:
+    from vibevoice_asr_review import VibeVoiceASRError, capability_probe, create_report
+
+    try:
+        if args.vibevoice_asr_action == "probe":
+            report = capability_probe()
+        else:
+            report = create_report(args.root, audio=args.audio, subtitles=args.subtitles)
+    except VibeVoiceASRError as exc:
         raise FilmError(str(exc)) from exc
     emit(report)
     return 0
@@ -7981,6 +7996,27 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Required for adult technical samples and every external frame upload",
     )
+    external_run.add_argument(
+        "--purpose",
+        choices=("tts_rehearsal", "animatic", "final"),
+        default="final",
+        help="Audit stage recorded in the candidate-only receipt; default final",
+    )
+
+    vibevoice_asr = sub.add_parser(
+        "vibevoice-asr",
+        help="Local VibeVoice-ASR candidate-only subtitle and speaker review",
+    )
+    vibevoice_asr_sub = vibevoice_asr.add_subparsers(dest="vibevoice_asr_action", required=True)
+    vibevoice_asr_sub.add_parser(
+        "probe", help="Check local adapter configuration only; never starts inference or downloads a model"
+    )
+    vibevoice_run = vibevoice_asr_sub.add_parser(
+        "run", help="Run the declared local adapter and write a candidate-only ASR review"
+    )
+    vibevoice_run.add_argument("--root", required=True, help="Film workspace root")
+    vibevoice_run.add_argument("--audio", required=True, help="Verified local audio in root")
+    vibevoice_run.add_argument("--subtitles", default=None, help="Optional in-root SRT sidecar")
 
     semantic_index = sub.add_parser(
         "semantic-index",
@@ -8817,6 +8853,7 @@ def main(argv: list[str] | None = None) -> int:
             "quality-ledger": cmd_quality_ledger,
             "production-report": cmd_production_report,
             "external-review": cmd_external_review,
+            "vibevoice-asr": cmd_vibevoice_asr,
             "comfy": cmd_comfy,
             "route": cmd_route,
             "team": cmd_team,

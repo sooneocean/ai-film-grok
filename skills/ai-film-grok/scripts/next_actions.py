@@ -8,6 +8,7 @@ Pipeline stages (product spine — see references/pipeline-methodology.md):
 
 from __future__ import annotations
 
+import os
 from datetime import UTC
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,7 @@ _ACTION_STAGE: dict[str, str] = {
     "compose-render-remotion": "design",
     "final": "post",
     "final-audio": "post",
+    "external-review": "post",
     "review-final": "post",
     "post-audit": "post",
     "export-desktop": "deliver",
@@ -113,6 +115,25 @@ def _final_record(root: Path) -> dict[str, Any] | None:
     outputs = man.get("outputs") if isinstance(man.get("outputs"), dict) else {}
     rec = outputs.get("final_film")
     return rec if isinstance(rec, dict) and rec else None
+
+
+def _external_review_current(final_record: dict[str, Any] | None, root: Path) -> bool:
+    """A sidecar is current only when it reviewed this exact final checksum."""
+    if not isinstance(final_record, dict):
+        return False
+    final_sha = str(final_record.get("sha256") or "")
+    report = read_json(root / "receipts" / "external-review.json") or {}
+    inputs = report.get("inputs") if isinstance(report, dict) else None
+    video = inputs.get("video") if isinstance(inputs, dict) else None
+    return bool(
+        isinstance(report, dict)
+        and report.get("kind") == "external-review"
+        and report.get("status") == "candidate_only"
+        and report.get("purpose") == "final"
+        and isinstance(video, dict)
+        and final_sha
+        and video.get("sha256") == final_sha
+    )
 
 
 def _pilot_user_ok(root: Path) -> bool:
@@ -412,8 +433,7 @@ def build_next_actions(
                 add(
                     "heat-boost",
                     hs.get("next_cmd") or f'aifilm heat boost --root "{r}" --apply',
-                    hs.get("why")
-                    or "成人 max：impact/ecchi 未拉满 — 先 heat boost 再 bulk/final",
+                    hs.get("why") or "成人 max：impact/ecchi 未拉满 — 先 heat boost 再 bulk/final",
                 )
                 if hs.get("hard_fail"):
                     # Prefer heat over more I2V when scale is failing
@@ -502,6 +522,16 @@ def build_next_actions(
                     "[层4·后处理] 或 FFmpeg 烧字幕成片",
                 )
         else:
+            final_path = str(final_rec.get("path") or "")
+            external_configured = bool(
+                os.environ.get("GROQ_API_KEY") or os.environ.get("GEMINI_API_KEY")
+            )
+            if external_configured and final_path and not _external_review_current(final_rec, root):
+                add(
+                    "external-review",
+                    f'aifilm external-review run --root "{r}" --video "{final_path}" --purpose final',
+                    "可选外部审片：候选问题写入 receipt，不取代本地 QA 或人工终审",
+                )
             add(
                 "review-final",
                 f'aifilm review-final --root "{r}" --approve --reviewer <you> --notes "已完整观看…" '

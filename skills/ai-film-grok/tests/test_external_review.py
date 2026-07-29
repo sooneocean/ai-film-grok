@@ -70,6 +70,7 @@ def test_report_is_candidate_only_and_provider_failure_is_nonblocking(
     monkeypatch.setattr(external_review, "_groq_transcription", unavailable)
     report = external_review.create_report(root, video=video, subtitles=subtitles, sanitized=True)
     assert report["status"] == "candidate_only"
+    assert report["purpose"] == "final"
     assert report["may_approve_production"] is False
     assert report["may_change_provider"] is False
     assert report["providers"]["groq"]["status"] == "unavailable"
@@ -109,3 +110,22 @@ def test_probe_never_starts_inference_or_exposes_secret(monkeypatch: pytest.Monk
     assert report["inference_started"] is False
     assert report["providers"]["groq"]["status"] == "not_configured"
     assert report["providers"]["gemini"]["status"] == "not_configured"
+
+
+def test_gemini_key_is_sent_only_in_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def request(url: str, *, headers: dict[str, str], body: dict[str, object], timeout: int = 45):
+        captured.update({"url": url, "headers": headers, "body": body, "timeout": timeout})
+        return {"candidates": [{"content": {"parts": [{"text": '{"issues": []}'}]}}]}
+
+    monkeypatch.setattr(external_review, "_request_json", request)
+    assert external_review._gemini_audit({}, "test-secret") == []
+    assert "test-secret" not in str(captured["url"])
+    assert captured["headers"] == {"x-goog-api-key": "test-secret"}
+
+
+def test_rejects_unknown_purpose(tmp_path: Path) -> None:
+    root, video, _subtitles = _workspace(tmp_path)
+    with pytest.raises(external_review.ExternalReviewError, match="purpose"):
+        external_review.create_report(root, video=video, purpose="unknown")

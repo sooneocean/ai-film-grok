@@ -222,9 +222,16 @@ def external_argv() -> list[str] | None:
 
 
 def cosyvoice_local_argv_configured() -> bool:
-    """Whether the explicit external argv points to our local-only adapter."""
+    """Whether argv invokes this checkout's local-only CosyVoice adapter."""
     argv = external_argv()
-    return bool(argv and any(Path(part).name == "cosyvoice_local_tts.py" for part in argv))
+    if not argv or len(argv) < 2:
+        return False
+    adapter = (Path(__file__).resolve().parent / "adapters" / "cosyvoice_local_tts.py").resolve()
+    try:
+        configured = Path(argv[1]).expanduser().resolve()
+    except OSError:
+        return False
+    return configured == adapter
 
 
 def external_tts_subprocess_env() -> dict[str, str]:
@@ -241,6 +248,11 @@ def external_tts_subprocess_env() -> dict[str, str]:
             if value:
                 env[name] = value
     return env
+
+
+def external_tts_timeout() -> int:
+    """Allow one cold local model load without relaxing cloud adapter limits."""
+    return 600 if cosyvoice_local_argv_configured() else 300
 
 
 def strict_voice_enabled() -> bool:
@@ -422,9 +434,17 @@ def probe_audio_node() -> dict[str, Any]:
         from audio_node_client import health, public_health_report
 
         result = public_health_report(health(base, token), secret_values=(token,))
+        variants = result.get("tts_variants", {})
         return {
-            "ok": bool(result.get("ok") and result.get("models", {}).get("tts")),
+            "ok": bool(
+                result.get("ok")
+                and result.get("models", {}).get("tts")
+                and variants.get("voice_design") is True
+            ),
             "detail": result,
+            "error": None
+            if variants.get("voice_design") is True
+            else "audio node is missing required tts_variants.voice_design handshake",
         }
     except Exception:
         return {"ok": False, "error": "audio node health check failed"}
@@ -965,7 +985,7 @@ def tts_external(text: str, out_mp3: Path, voice: str = "") -> Path:
             argv,
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=external_tts_timeout(),
             env=external_tts_subprocess_env(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -1296,25 +1316,22 @@ def synthesize(
             voice_used = voice or "higgs-reference"
             model_used = get_config().higgs_audio_model
         elif choice == "audio_node":
-            from audio_node_client import AudioNodeError, render
-            from voice_armory import get_voice_profile, ready_tts_profile
+            from audio_node_client import AudioNodeError, health, render
+            from voice_armory import render_ready_tts_profile
 
             base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
             token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
             rendered: dict[str, Any] = {}
             profile_id = "" if _is_edge_voice_name(voice) else voice
-            profile = get_voice_profile(profile_id) if profile_id else None
-            if profile is not None and ready_tts_profile(profile_id) is None:
-                raise TTSError(
-                    f"voice profile {profile_id!r} is not render-ready: "
-                    f"{profile.get('status', 'unknown')}"
-                )
-            node_variant = str(profile.get("variant")) if profile else "voice_design"
-            node_voice = str(profile.get("speaker", "")) if profile else profile_id
-            node_language = (
-                str(profile.get("language")) if profile else (cue.get("language") or "Chinese")
-            )
-            prefix = str(profile.get("instruction_prefix", "")).strip() if profile else ""
+            try:
+                node_health = health(base, token)
+                profile = render_ready_tts_profile(profile_id, node_health.get("tts_variants", {}))
+            except (AudioNodeError, ValueError) as exc:
+                raise TTSError(f"private audio node voice is unavailable: {exc}") from exc
+            node_variant = str(profile["variant"])
+            node_voice = str(profile.get("speaker", ""))
+            node_language = str(profile["language"])
+            prefix = str(profile.get("instruction_prefix", "")).strip()
             instruction = compile_instruction(cue)
             if prefix:
                 instruction = f"{prefix} {instruction}"

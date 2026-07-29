@@ -27,6 +27,7 @@ GEMINI_AUDIT_MODEL = "gemini-2.5-flash"
 MAX_VIDEO_BYTES = 100 * 1024 * 1024
 MAX_FRAME_BYTES = 20 * 1024 * 1024
 MAX_SAFE_FRAMES = 5
+PURPOSES = frozenset({"tts_rehearsal", "animatic", "final"})
 
 
 class ExternalReviewError(ValueError):
@@ -314,8 +315,8 @@ def _groq_vision(frames: list[dict[str, Any]], key: str) -> list[dict[str, Any]]
 
 def _gemini_audit(context: dict[str, Any], key: str) -> list[dict[str, Any]]:
     response = _request_json(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_AUDIT_MODEL}:generateContent?key={key}",
-        headers={},
+        f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_AUDIT_MODEL}:generateContent",
+        headers={"x-goog-api-key": key},
         body={
             "contents": [
                 {
@@ -372,8 +373,11 @@ def create_report(
     director_contract: Path | str | None = None,
     sanitized_frame_index: Path | str | None = None,
     sanitized: bool = False,
+    purpose: str = "final",
 ) -> dict[str, Any]:
     """Write one hash-bound candidate-only report; provider failures remain nonblocking."""
+    if purpose not in PURPOSES:
+        raise ExternalReviewError("external review purpose is invalid")
     base = Path(root).expanduser().resolve()
     if not base.is_dir():
         raise ExternalReviewError("film root must exist")
@@ -464,6 +468,7 @@ def create_report(
         "schema_version": 1,
         "kind": "external-review",
         "at": _utc_now(),
+        "purpose": purpose,
         "status": "candidate_only",
         "candidate_findings": issues,
         "providers": providers,
