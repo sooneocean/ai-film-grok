@@ -4490,8 +4490,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--tts-backend",
         default=None,
-        choices=["auto", "minimax", "fish", "edge", "external"],
-        help="TTS: auto prefers external > MiniMax > pinned Fish > edge",
+        choices=["audio_node", "auto", "minimax", "fish", "edge", "external"],
+        help="TTS: audio_node uses private Qwen3-TTS; auto prefers external > MiniMax > pinned Fish > edge",
     )
     p.add_argument(
         "--vo-rate", default=None, help='TTS rate e.g. "-5%%" (edge) / maps to Fish speed'

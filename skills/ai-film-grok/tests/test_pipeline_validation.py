@@ -16,6 +16,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import aifilm_grok  # noqa: E402
+import film_spec  # noqa: E402
 import render_final  # noqa: E402
 
 
@@ -50,6 +51,9 @@ def valid_spec() -> dict[str, object]:
 
 
 class PipelineValidationTests(unittest.TestCase):
+    def test_private_audio_node_is_an_allowed_tts_backend(self) -> None:
+        self.assertIn("audio_node", film_spec.TTS_BACKENDS)
+
     def init_root(self, root: Path) -> None:
         with contextlib.redirect_stdout(StringIO()):
             rc = aifilm_grok.main(

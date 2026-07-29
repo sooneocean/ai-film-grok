@@ -359,7 +359,7 @@ _ENV_HELP: dict[str, str] = {
     "AIFILM_LIPSYNC_NODE_TOKEN": "Private RTX lip-sync node bearer token; never commit",
     "AIFILM_LIPSYNC_FALLBACK": "Technical-failure fallback: musetalk or empty",
     "AIFILM_BGM_LIBRARY_ROOT": "Shared approved ACE-Step BGM library root",
-    "AIFILM_TTS_BACKEND": "Active TTS backend: mimo | auto | edge | fish | minimax | voicebox | grok | external",
+    "AIFILM_TTS_BACKEND": "Active TTS backend: audio_node | mimo | auto | edge | fish | minimax | voicebox | grok | external",
     "AIFILM_TTS_STRICT_VOICE": "1 = fail on missing voice_id (default 1)",
     "AIFILM_TTS_VOICEBOX_FALLBACK": "0|1 — opt-in: try Voicebox when explicit backend fails",
     "AIFILM_TTS_ARGV": "External TTS command as JSON argv array",
@@ -435,7 +435,10 @@ def generate_example() -> str:
 
 
 _DEFAULT_EXAMPLES: dict[str, tuple[str, str]] = {
-    "AIFILM_TTS_BACKEND": ("mimo", "mimo | edge | fish | minimax | voicebox | grok | external"),
+    "AIFILM_TTS_BACKEND": (
+        "audio_node",
+        "audio_node (private Qwen3-TTS) | mimo | edge | fish | minimax | voicebox | grok | external",
+    ),
     "MIMO_API_BASE": ("https://api.xiaomimimo.com/v1", "OpenAI-compatible base URL"),
     "MIMO_TTS_MODEL": ("mimo-v2.5-tts", "built-in voices; free for a limited time"),
     "MIMO_TTS_VOICE": ("冰糖", "Chinese female built-in voice"),

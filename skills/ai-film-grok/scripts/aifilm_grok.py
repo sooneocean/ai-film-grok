@@ -7945,8 +7945,8 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument(
         "--tts-backend",
         default=None,
-        choices=["auto", "minimax", "fish", "edge", "external"],
-        help="auto: external > MiniMax > pinned Fish > edge",
+        choices=["audio_node", "auto", "minimax", "fish", "edge", "external"],
+        help="audio_node: private Qwen3-TTS on the 5090; auto: external > MiniMax > pinned Fish > edge",
     )
     fin.add_argument("--vo-rate", default=None)
     fin.add_argument("--vo-pitch", default=None)

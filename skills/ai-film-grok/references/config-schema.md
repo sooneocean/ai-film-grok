@@ -35,7 +35,7 @@ print(cfg.seedance_available)  # → bool, default False
 
 | ConfigSchema field | Env vars (first wins) | Type | Default | Description |
 |---|---|---|---|---|
-| `tts_backend` | `AIFILM_TTS_BACKEND` | str | `mimo` | Active backend: mimo\|auto\|edge\|fish\|minimax\|voicebox\|grok\|external |
+| `tts_backend` | `AIFILM_TTS_BACKEND` | str | `mimo` | Active backend: audio_node\|mimo\|auto\|edge\|fish\|minimax\|voicebox\|grok\|external |
 | `tts_strict_voice` | `AIFILM_TTS_STRICT_VOICE` | bool | `True` | Fail on missing voice_id |
 | `tts_voicebox_fallback` | `AIFILM_TTS_VOICEBOX_FALLBACK` | bool | `False` | Try Voicebox on explicit backend failure |
 | `tts_argv` | `AIFILM_TTS_ARGV` | str | — | External TTS JSON argv |

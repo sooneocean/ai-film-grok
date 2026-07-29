@@ -72,7 +72,7 @@ from transition_ops import TransitionOperationError, build_transition_operations
 
 VO_MODES = frozenset({"storyteller", "character", "hybrid", "dialogue_drama"})
 TTS_BACKENDS = frozenset(
-    {"auto", "mimo", "minimax", "fish", "voicebox", "edge", "external", "grok"}
+    {"audio_node", "auto", "mimo", "minimax", "fish", "voicebox", "edge", "external", "grok"}
 )
 # Motion provider profile.  Grok is the production primary; FRW is a technical
 # fallback only.  ``seedance_first`` remains accepted as a legacy input so old
