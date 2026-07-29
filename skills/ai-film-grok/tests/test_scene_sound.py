@@ -14,7 +14,11 @@ def _write_spec(
     top_level: bool = False,
     audio_cues: list[dict] | None = None,
 ) -> None:
-    shot = {"id": "s1", "action": "她走到门边，扭动门把，推门进入。"}
+    shot = {
+        "id": "s1",
+        "duration_sec": 1,
+        "action": "她走到门边，扭动门把，推门进入。",
+    }
     if audio_cues:
         shot["audio_cues"] = audio_cues
     spec = {"shots": [shot]} if top_level else {"scenes": [{"shots": [shot]}]}
@@ -200,3 +204,42 @@ def test_cue_without_explicit_timeline_position_does_not_clear_required_sound(tm
 
     ambience = next(item for item in report["events"] if item["kind"] == "ambience")
     assert ambience["status"] == "blocked"
+
+
+def test_cue_extending_past_the_shot_does_not_clear_required_sound(tmp_path: Path):
+    cue = _asset_event(tmp_path, kind="ambience")
+    cue.pop("shot_id")
+    cue["duration_sec"] = 0.2
+    spec = {"shots": [{"id": "s1", "duration_sec": 0.1, "audio_cues": [cue]}]}
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+
+    report = reconcile(tmp_path, write=False)
+
+    ambience = next(item for item in report["events"] if item["kind"] == "ambience")
+    assert ambience["status"] == "blocked"
+
+
+def test_even_a_microsecond_overrun_does_not_clear_required_sound(tmp_path: Path):
+    cue = _asset_event(tmp_path, kind="ambience")
+    cue.pop("shot_id")
+    cue.update({"start_offset_sec": 0.9, "duration_sec": 0.1000005})
+    spec = {"shots": [{"id": "s1", "duration_sec": 1, "audio_cues": [cue]}]}
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+
+    report = reconcile(tmp_path, write=False)
+
+    ambience = next(item for item in report["events"] if item["kind"] == "ambience")
+    assert ambience["status"] == "blocked"
+
+
+def test_cue_ending_exactly_at_the_shot_boundary_is_deliverable(tmp_path: Path):
+    cue = _asset_event(tmp_path, kind="ambience")
+    cue.pop("shot_id")
+    cue.update({"start_offset_sec": 0.9, "duration_sec": 0.1})
+    spec = {"shots": [{"id": "s1", "duration_sec": 1, "audio_cues": [cue]}]}
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+
+    report = reconcile(tmp_path, write=False)
+
+    ambience = next(item for item in report["events"] if item["kind"] == "ambience")
+    assert ambience["status"] == "ok"
