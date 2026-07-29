@@ -767,6 +767,8 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
             "heat_scale": "max",
             "heat_arc_strict": False,
             "sex_floor_strict": False,
+            # disable auto-apply so VO strict remains a hard fail surface
+            "sex_vo_auto_apply": False,
             "director_intent": {
                 "logline": "成人max但旁白文艺",
                 "tone": "成人",
@@ -778,6 +780,25 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
             validate_film_spec(spec, assign_missing_ids=False)
         msg = str(ctx.exception).upper()
         self.assertTrue("VO" in msg or "SPICE" in msg, msg)
+
+    def test_write_spec_vo_auto_apply_fixes_bland(self) -> None:
+        """Default max: bland nar is auto-reinforced before VO hard-fail."""
+        from edit_policy import apply_vo_spice_auto, nar_has_spice
+
+        shots = _spine(
+            ["setup", "foreplay", "act", "act", "climax", "afterglow", "bridge", "bridge"],
+            vo_spice=False,
+        )
+        for sh in shots:
+            sh["nar"] = "灯暗了下来。"
+            sh["dsl"]["camera"] = {"shot_size": "close-up", "angle": "eye level"}
+            if sh["heat_phase"] == "act":
+                sh["dsl"]["camera"] = {"shot_size": "close-up insert", "angle": "low"}
+                sh["coverage_role"] = "detail"
+            sh["lipsync"] = False
+        fixed = apply_vo_spice_auto(shots, spice_level="extreme")
+        self.assertGreater(fixed["fixed"], 0)
+        self.assertTrue(any(nar_has_spice(sh.get("nar")) for sh in shots if sh.get("nar")))
 
     @pytest.mark.slow
     def test_write_spec_armored_act_auto_escalates(self) -> None:

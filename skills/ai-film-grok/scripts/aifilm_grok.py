@@ -4002,6 +4002,56 @@ def cmd_review_final(args: argparse.Namespace) -> int:
             + ", ".join(adult_sensory.get("codes") or [])
             + "]"
         )
+    # P0 · 2026-07-29: heat check + erotic impact A floor before final_complete
+    try:
+        from heat_check import heat_check as _heat_check
+
+        heat_rep_final = _heat_check(root)
+    except Exception as exc:  # pragma: no cover
+        heat_rep_final = {"ok": False, "error": str(exc), "erotic_impact": {}}
+    heat_scale_final = (
+        str((read_json(root / "film-spec.json") or {}).get("heat_scale") or "").strip().lower()
+    )
+    if heat_scale_final == "max":
+        impact_final = (
+            heat_rep_final.get("erotic_impact")
+            if isinstance(heat_rep_final.get("erotic_impact"), dict)
+            else {}
+        )
+        impact_score = float(impact_final.get("score") or 0.0)
+        impact_floor = 75.0
+        try:
+            fs = read_json(root / "film-spec.json") or {}
+            if fs.get("erotic_impact_floor") is not None:
+                impact_floor = float(fs["erotic_impact_floor"])
+            if fs.get("erotic_impact_strict") is False or fs.get("adult_max_iron") is False:
+                impact_floor = 0.0
+        except (TypeError, ValueError):
+            pass
+        hard_codes = list(heat_rep_final.get("hard_relevant_codes") or [])
+        if impact_floor > 0 and (
+            not heat_rep_final.get("ok") or impact_score + 1e-9 < impact_floor
+        ):
+            raise FilmError(
+                "Cannot approve final: adult heat gate failed — "
+                f"heat_ok={heat_rep_final.get('ok')} impact={impact_score}/"
+                f"{impact_floor} grade={impact_final.get('grade')} "
+                f"codes={','.join(hard_codes[:10]) or 'none'}. "
+                "Run `aifilm heat check --root …`; need impact ≥A (75), 四拍弧, bare peak. "
+                "Override: erotic_impact_strict:false / adult_max_iron:false."
+            )
+        # Persist receipt for dispatch / audit
+        with contextlib.suppress(OSError):
+            write_json(
+                root / "receipts" / "heat-final-gate.json",
+                {
+                    "ok": True,
+                    "at": utc_now(),
+                    "impact_score": impact_score,
+                    "impact_floor": impact_floor,
+                    "heat": heat_rep_final,
+                },
+            )
     reviewer = str(args.reviewer or "").strip()
     notes = str(args.notes or "").strip()
     if not args.approve:

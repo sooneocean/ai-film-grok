@@ -155,8 +155,16 @@ class TestSelectBeatSpine:
         assert spine[2]["key"] == "evidence"
 
     def test_adult_default_backward_compat(self):
-        """No genre → adult default spine (DEFAULT_BEAT_SPINE)."""
+        """No genre → adult default pins ADULT_MAX (2026-07-29 IRON)."""
+        from story_plan import ADULT_MAX_BEAT_SPINE
+
         spine = select_beat_spine()
+        assert len(spine) == len(ADULT_MAX_BEAT_SPINE)
+        assert "act" in [b.get("heat_phase") for b in spine]
+
+    def test_soft_heat_uses_default_spine(self):
+        """Explicit soft cool-down keeps DEFAULT_BEAT_SPINE."""
+        spine = select_beat_spine({"heat_scale": "soft"}, genre="adult")
         assert spine == DEFAULT_BEAT_SPINE
 
     def test_adult_explicit_genre_uses_heat_logic(self):

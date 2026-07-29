@@ -1998,6 +1998,54 @@ def validate_film_spec(
             "HEAT_VO_SPICE_TOO_MILD",
         }
     ]
+    # Auto-reinforce weak nar before hard-fail (user substantive → append only)
+    if (
+        sex_vo_strict is True
+        and vo_fail_codes
+        and heat_scale == "max"
+        and spec.get("sex_vo_auto_apply") is not False
+    ):
+        try:
+            from edit_policy import apply_vo_spice_auto
+
+            vo_fix = apply_vo_spice_auto(
+                shots, spice_level=str(spice_level) if spice_level else "extreme"
+            )
+        except Exception:  # pragma: no cover
+            vo_fix = {"fixed": 0, "ids": []}
+        if int(vo_fix.get("fixed") or 0) > 0:
+            notes = list(spec.get("_heat_notes") or [])
+            notes.append(
+                f"sex_vo_auto_apply fixed {vo_fix['fixed']} shots: "
+                + ",".join((vo_fix.get("ids") or [])[:8])
+            )
+            spec["_heat_notes"] = notes
+            # re-lint heat after nar rewrite
+            heat_rep = lint_heat_arc(
+                shots,
+                heat_scale=heat_scale,
+                intimacy_min_ratio=spec.get("intimacy_min_ratio"),
+                setup_max_ratio=spec.get("setup_max_ratio"),
+                sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
+                audience_profile=audience_profile,
+                advise=heat_advise,
+                coitus_grammar=coitus_grammar,
+                spice_level=str(spice_level) if spice_level else None,
+                edit_craft=craft_list or None,
+                source_excerpt=source_excerpt,
+            )
+            spec["_heat_arc"] = heat_rep
+            vo_fail_codes = [
+                c
+                for c in (heat_rep.get("codes") or [])
+                if c
+                in {
+                    "HEAT_VO_SPICE_MISSING",
+                    "HEAT_VO_SEX_VERB_WEAK",
+                    "HEAT_VO_SPICE_RATIO_LOW",
+                    "HEAT_VO_SPICE_TOO_MILD",
+                }
+            ]
     if sex_vo_strict is True and vo_fail_codes:
         raise FilmSpecError(
             "sex VO spice failed (sex_vo_strict): "
@@ -2038,20 +2086,17 @@ def validate_film_spec(
         )
 
     # 肉戏起承转合 (前戏→插入→射出) hard on max iron
+    # P0 · 2026-07-29: SEX_ARC_RATIO_SKEW / RELEASE_RATIO_LOW also hard-fail
     sex_arc_strict = spec.get("sex_arc_strict")
     if sex_arc_strict is None:
         sex_arc_strict = _max_iron
-    # info-level SEX_ARC_RATIO_SKEW never hard-fails
-    sex_arc_fail = [
-        c
-        for c in (heat_rep.get("codes") or [])
-        if str(c).startswith("SEX_ARC_") and c != "SEX_ARC_RATIO_SKEW"
-    ]
+    sex_arc_fail = [c for c in (heat_rep.get("codes") or []) if str(c).startswith("SEX_ARC_")]
     if sex_arc_strict is True and sex_arc_fail:
         raise FilmSpecError(
             "sex arc IRON failed (sex_arc_strict): "
             + ",".join(sex_arc_fail)
-            + " — 前戏→插入→射出 must all exist with penetration verbs. "
+            + " — 前戏→插入→射出 must all exist with penetration verbs; "
+            "转拍时长≥25% 肉戏窗、合拍≥12%。"
             "禁只抱吻、禁无纳入、禁无高潮射出拍。Override: sex_arc_strict:false. "
             "See lessons-2026-07-27-adult-scale-max-sex-arc.md"
         )
@@ -2137,11 +2182,25 @@ def validate_film_spec(
             "mirror nar sex verbs in dsl.action/motion."
         )
 
-    # Attach erotic impact scorecard (advisory)
+    # Erotic impact scorecard — max IRON hard floor A (75) · 2026-07-29
+    impact: dict[str, Any] | None = None
     with contextlib.suppress(Exception):
-        spec["_erotic_impact"] = compute_erotic_impact_score(
-            shots, heat_scale=heat_scale, heat_rep=heat_rep
-        )
+        impact = compute_erotic_impact_score(shots, heat_scale=heat_scale, heat_rep=heat_rep)
+        spec["_erotic_impact"] = impact
+    impact_strict = spec.get("erotic_impact_strict")
+    if impact_strict is None:
+        impact_strict = _max_iron
+    impact_floor = float(spec.get("erotic_impact_floor") or 75.0)
+    if impact_strict is True and impact is not None:
+        score = float(impact.get("score") or 0.0)
+        if score + 1e-9 < impact_floor:
+            raise FilmSpecError(
+                f"erotic impact IRON failed (erotic_impact_strict): score={score} "
+                f"< floor={impact_floor} (grade {impact.get('grade')}) — "
+                "need sex≥50% + bare peak + 四拍弧 + 定器 CU + penetration verbs. "
+                "Target grade A (≥75) / S (≥90). "
+                "Override: erotic_impact_strict:false or erotic_impact_floor."
+            )
 
     # Heroine cast mode: single (default) vs multi — elastic from prompt/images/fields
     cast_ids: list[str] = []

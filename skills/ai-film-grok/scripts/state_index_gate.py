@@ -196,9 +196,10 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                 break
     anchor_ok = anchor.is_file()
     if needs_anchor and not anchor_ok and heat_maxish:
-        soft.append(
+        # P0 · 2026-07-29: undress-anchor hard on max/hot (was soft)
+        hard.append(
             {
-                "level": "soft",
+                "level": "hard",
                 "code": "MISSING_UNDRESS_ANCHOR",
                 "message": "undressed/bare shots present but no canonical/wardrobe/undress-anchor.*",
                 "fix": "cp peak undress keyframe → canonical/wardrobe/undress-anchor.png",
@@ -214,14 +215,35 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
         )
 
     if missing_states and heat_maxish:
-        soft.append(
-            {
-                "level": "soft",
-                "code": "MISSING_STATE_PHOTOS",
-                "message": f"missing state photos for used wardrobe: {', '.join(missing_states[:12])}",
-                "fix": "aifilm state-index plan --root … then generate cast-states; or fill cast_state_masters",
-            }
-        )
+        # bare/undressed state photos hard on max; partial stays soft
+        meat_missing = [
+            m for m in missing_states if m.endswith(":bare") or m.endswith(":undressed")
+        ]
+        if meat_missing:
+            hard.append(
+                {
+                    "level": "hard",
+                    "code": "MISSING_MEAT_STATE_PHOTOS",
+                    "message": (
+                        "missing undressed/bare state photos for max film: "
+                        + ", ".join(meat_missing[:12])
+                    ),
+                    "fix": (
+                        "generate cast-states undressed+bare before bulk I2V; "
+                        "aifilm state-index plan --root …"
+                    ),
+                }
+            )
+        other_missing = [m for m in missing_states if m not in meat_missing]
+        if other_missing:
+            soft.append(
+                {
+                    "level": "soft",
+                    "code": "MISSING_STATE_PHOTOS",
+                    "message": f"missing state photos for used wardrobe: {', '.join(other_missing[:12])}",
+                    "fix": "aifilm state-index plan --root … then generate cast-states; or fill cast_state_masters",
+                }
+            )
     elif missing_states:
         soft.append(
             {
@@ -231,6 +253,49 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                 "fix": "recommended for keyframe-first fluency",
             }
         )
+
+    # max: flag missing detail/union insert coverage (write-spec also hard-fails SEX_DETAIL_CU)
+    if heat == "max":
+        detail_ids: list[str] = []
+        for s in shots:
+            if not isinstance(s, dict):
+                continue
+            cr = str(
+                s.get("coverage_role") or (s.get("dsl") or {}).get("coverage_role") or ""
+            ).lower()
+            size = str(
+                s.get("shot_size")
+                or s.get("shotSize")
+                or ((s.get("dsl") or {}).get("camera") or {}).get("shot_size")
+                or ""
+            ).lower()
+            framing = str(s.get("framing") or (s.get("dsl") or {}).get("framing") or "").lower()
+            if (
+                cr == "detail"
+                or "insert" in size
+                or framing in {"union_closeup", "genital_lock"}
+                or "close-up insert" in size
+            ):
+                detail_ids.append(str(s.get("id") or "?"))
+        if any(_wardrobe_of(s) in {"undressed", "bare"} for s in shots) and not detail_ids:
+            soft.append(
+                {
+                    "level": "soft",
+                    "code": "MISSING_DETAIL_CU_COVERAGE",
+                    "message": "max meat block has no detail/union insert shot planned",
+                    "fix": "add coverage_role=detail or close-up insert for 定器特写 before bulk",
+                }
+            )
+            gen_plan.append(
+                {
+                    "action": "plan_detail_cu_shot",
+                    "why": "定器特写 required for mute-frame coitus readability",
+                    "agent_hint": (
+                        "Add or retarget one act shot: coverage_role=detail, "
+                        "framing=union_closeup, shot_size close-up insert"
+                    ),
+                }
+            )
 
     # --- keyframes for shots ---
     missing_kf = [r["id"] for r in shot_rows if r["id"] and not r["keyframe_ok"]]

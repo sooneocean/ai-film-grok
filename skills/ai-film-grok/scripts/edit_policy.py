@@ -4735,19 +4735,27 @@ def lint_sex_arc(
             f"release@{i_rel}) — 起→转→合 must progress in time order.",
         )
 
-    # Duration skew: penetration share of meat window
+    # Duration skew: penetration / release share of meat window (hard on max · 2026-07-29)
     meat_sec = sum(
         _shot_duration_sec(sh)
         for sh in shots
         if isinstance(sh, dict) and infer_heat_phase(sh) in SEX_PHASES | {"foreplay"}
     )
     pen_sec = beat_dur.get("penetration", 0.0)
+    rel_sec = beat_dur.get("climax_release", 0.0)
     if meat_sec > 0 and has_penetration and (pen_sec / meat_sec) < 0.25:
         _issue(
             "SEX_ARC_RATIO_SKEW",
-            "info",
+            "warning",
             f"penetration duration share {pen_sec / meat_sec:.0%} < 25% of meat window — "
-            "加长抽送镜 (转拍建议 ≥35%)。",
+            "加长抽送镜 (转拍建议 ≥35%；hard floor 25%)。",
+        )
+    if meat_sec > 0 and has_release and (rel_sec / meat_sec) < 0.12:
+        _issue(
+            "SEX_ARC_RELEASE_RATIO_LOW",
+            "warning",
+            f"climax_release duration share {rel_sec / meat_sec:.0%} < 12% of meat window — "
+            "加长射出/高潮拍 (合拍建议 ≥20%)。",
         )
 
     warn_n = sum(1 for i in issues if i.get("severity") == "warning")
@@ -5092,6 +5100,51 @@ def lint_montage_craft(
         "has_smash": has_smash,
         "note": "montage craft variety for adult cuts",
     }
+
+
+def apply_vo_spice_auto(
+    shots: list[dict[str, Any]],
+    *,
+    spice_level: str | None = "extreme",
+    max_chars: int = 55,
+) -> dict[str, Any]:
+    """Reinforce weak adult nar in-place. User substantive lines: append only.
+
+    Returns {fixed: n, ids: [...]} for write-spec notes.
+    """
+    fixed_ids: list[str] = []
+    for sh in shots:
+        if not isinstance(sh, dict):
+            continue
+        ph = infer_heat_phase(sh)
+        cb = resolve_coitus_beat(sh)
+        nar = str(sh.get("nar") or "").strip()
+        spice = nar_has_spice(nar) if nar else False
+        sex_v = nar_has_sex_verb(nar) if nar else False
+        extreme = nar_has_extreme_spice(nar) if nar else False
+        level = (spice_level or "extreme").strip().lower()
+        needs = (
+            not nar
+            or not spice
+            or (ph in SEX_PHASES and not sex_v)
+            or (level == "extreme" and ph in SEX_PHASES and not extreme)
+        )
+        if not needs:
+            continue
+        seeds = suggest_vo_lines(heat_phase=ph, coitus_beat=cb, spice_level=level)
+        seed = (seeds[0] if seeds else "沉腰吃进。锁住。").strip()
+        # Substantive user line: append seed rather than replace
+        user_substantive = bool(nar) and len(nar) >= 6 and spice
+        append_seed = (
+            user_substantive
+            and ph in SEX_PHASES
+            and (not sex_v or (level == "extreme" and not extreme))
+        )
+        merged = f"{nar.rstrip('。.!！')}。{seed}" if append_seed else seed
+        sh["nar"] = merged[:max_chars]
+        sid = str(sh.get("id") or "?")
+        fixed_ids.append(sid)
+    return {"fixed": len(fixed_ids), "ids": fixed_ids}
 
 
 def suggest_vo_lines(

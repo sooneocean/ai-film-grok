@@ -485,19 +485,40 @@ def preserve_user_nar(
         return _clip_nar(seed, max_chars)
 
     # Preserve user text; spice-augment only if sex_vo gate would fail
+    # Beat-specific tags keep multi-shot reuse of one sentence unique (timeline guard)
     nar = _clip_nar(piece, max_chars)
     need_sex = ph in {"act", "climax"}
+    sex_tag_by_cb = {
+        "entry": "顶入",
+        "union": "跨坐",
+        "rhythm": "沉腰",
+        "lock": "锁腰",
+        "finish": "办穿",
+        "hook": "余颤",
+    }
+    spice_tag_by_cb = {
+        "undress": "滑肩",
+        "entry": "贴紧",
+        "union": "咬合",
+        "rhythm": "喘",
+        "lock": "攥紧",
+        "finish": "腿软",
+        "hook": "未完",
+    }
     if need_sex and not nar_has_sex_verb(nar):
-        tag = "沉腰" if "沉腰" not in nar else "办穿"
+        tag = sex_tag_by_cb.get(cb) or ("沉腰" if "沉腰" not in nar else "办穿")
         if len(nar) + len(tag) + 1 <= max_chars:
             nar = f"{nar.rstrip('。.!！')}。{tag}。"
         else:
             nar = _clip_nar(f"{nar}{tag}", max_chars)
     elif not nar_has_spice(nar):
         # light dual-entendre suffix that hits spice markers without erasing story
-        tag = "色" if "色" not in nar else "喘"
-        if len(nar) + 1 <= max_chars and tag not in nar:
-            nar = _clip_nar(nar + tag, max_chars)
+        tag = spice_tag_by_cb.get(cb) or ("色" if "色" not in nar else "喘")
+        if len(nar) + len(tag) <= max_chars and tag not in nar:
+            if len(tag) == 1:
+                nar = _clip_nar(nar + tag, max_chars)
+            else:
+                nar = _clip_nar(f"{nar.rstrip('。.!！')}。{tag}", max_chars)
     return nar
 
 
@@ -623,23 +644,35 @@ def select_beat_spine(
     target_duration: float | None = None,
     multi_scene: bool = False,
 ) -> list[dict[str, Any]]:
-    """Pick beat spine. Genre takes priority; adult spine falls back to heat logic.
+    """Pick beat spine. Genre takes priority; adult defaults to ADULT_MAX.
 
     P0-1 · 2026-07-23: multi-genre support. Non-adult genres use GENRE_SPINES.
-    Adult genre (default) preserves backward-compat heat-signal logic.
+    P0 · 2026-07-29: genre=adult (or default) pins ADULT_MAX unless heat soft/medium.
     """
     # Non-adult genre: use genre spine directly
     if genre and genre != "adult" and genre in GENRE_SPINES:
         return [dict(b) for b in GENRE_SPINES[genre]]
 
     h = heat or {}
+    scale = str(h.get("heat_scale") or "").strip().lower()
+    # Explicit cool-down only escape from adult max spine
+    if scale in {"soft", "medium"}:
+        _ = multi_scene
+        _ = target_duration
+        return list(DEFAULT_BEAT_SPINE)
     # Explicit dual only — never infer solely from duration
     if h.get("spine") == "dual_climax" or h.get("dual_climax"):
         return list(DUAL_CLIMAX_BEAT_SPINE)
     if h.get("spine") == "hardcore_male" or h.get("hardcore"):
         return list(HARDCORE_MALE_BEAT_SPINE)
-    if h.get("spine") == "adult_max" or h.get("heat_scale") == "max":
-        # multi-scene: still adult_max once per scene, not dual
+    # Adult default IRON: always ADULT_MAX (max / unset / adult_max spine)
+    if (
+        not genre
+        or genre == "adult"
+        or scale == "max"
+        or h.get("spine") == "adult_max"
+        or h.get("evidence_max")
+    ):
         return list(ADULT_MAX_BEAT_SPINE)
     _ = multi_scene  # reserved for future scene-local spines
     _ = target_duration
@@ -1462,13 +1495,34 @@ def normalize_story(
 
     heat = detect_heat_signals(raw)
     genre_info = detect_genre(raw, heat=heat)
-    if heat.get("evidence_max"):
+    genre = genre_info["genre"]
+    # genre=adult pins max + extreme unless brief explicitly soft/medium (P0 · 2026-07-29)
+    scale_now = str(heat.get("heat_scale") or "").strip().lower()
+    if genre == "adult" and scale_now not in {"soft", "medium"}:
+        if scale_now != "max":
+            spine = str(heat.get("spine") or "default")
+            if spine in {"", "default"}:
+                spine = "adult_max"
+            heat = {
+                **heat,
+                "heat_scale": "max",
+                "spice_level": heat.get("spice_level") or "extreme",
+                "spine": spine,
+                "evidence_max": True,
+                "pinned_by": "genre_adult_default",
+            }
+        elif not heat.get("spice_level"):
+            heat = {**heat, "spice_level": "extreme"}
+        warnings.append(
+            f"adult genre pin → spine={heat.get('spine')} heat_scale={heat.get('heat_scale')} "
+            f"spice={heat.get('spice_level')}"
+        )
+    elif heat.get("evidence_max"):
         warnings.append(
             f"adult heat signals → spine={heat.get('spine')} heat_scale={heat.get('heat_scale')}"
         )
     for gw in genre_info.get("warnings", []):
         warnings.append(gw)
-    genre = genre_info["genre"]
     plot_point_candidates = _extract_plot_point_candidates(
         raw,
         genre=genre,
@@ -1739,9 +1793,9 @@ def extract_beats(
     body = str(scene.get("body") or scene.get("synopsis") or "")
     sents = _sentences(body)
     heat = heat or {}
-    adult = (genre or "adult") == "adult" and (
-        bool(heat.get("heat_scale") == "max" or heat.get("hardcore"))
-    )
+    # Adult IRON: genre adult is max spine unless soft/medium cool-down
+    _scale = str(heat.get("heat_scale") or "").strip().lower()
+    adult = (genre or "adult") == "adult" and _scale not in {"soft", "medium"}
     # Multi-scene user scripts: compact per-scene arc (prevents 3× full adult template)
     if adult and not is_only_scene:
         spine = _compact_adult_spine_for_scene(body)
@@ -1897,6 +1951,7 @@ def plan_shots(
         "bridge": ["context"],
     }
     coverage_roles = coverage_roles_by_beat.get(df, ["action"])
+    used_nars: set[str] = set()
     for i in range(n):
         idx = shot_counter_start + i
         scene_order = int(scene.get("order") or 1)
@@ -1921,6 +1976,21 @@ def plan_shots(
         heat_phase = str(beat.get("heat_phase") or "").strip().lower() or ""
         coitus_beat = str(beat.get("coitus_beat") or "").strip().lower() or ""
         wardrobe_state = str(beat.get("wardrobe_state") or "full").strip().lower() or "full"
+        # 定器特写: lock / insert plates pin coverage_role=detail (impact + detail CU gate)
+        if coitus_beat == "lock" or (coitus_beat == "rhythm" and i > 0):
+            coverage_role = "detail"
+        # Explicit four-beat sex arc (plan-time pin · 2026-07-29)
+        sex_arc_beat = ""
+        if heat_phase == "climax" or coitus_beat == "finish":
+            sex_arc_beat = "climax_release"
+        elif heat_phase == "afterglow" or coitus_beat == "hook":
+            sex_arc_beat = "afterglow"
+        elif heat_phase == "act" or coitus_beat in {"union", "rhythm", "lock"}:
+            sex_arc_beat = "penetration"
+        elif coitus_beat == "entry" and heat_phase in {"foreplay", "act"}:
+            sex_arc_beat = "entry"
+        elif heat_phase == "foreplay" or coitus_beat == "undress":
+            sex_arc_beat = "foreplay"
         # Cinema-grade camera prompt (Seedance camera language bridge, 2026-07-23).
         # Enriches the fixed-enum axis with structured move/shot/angle/pacing/lighting.
         from cinema_prompt import build_camera_prompt as _build_cinema_prompt
@@ -1987,6 +2057,17 @@ def plan_shots(
                 nar = _clip_nar("换姿再沉腰。夹紧，不许退。", 48)
             else:
                 nar = _clip_nar("再沉腰。节奏是她给的。", 48)
+        if coitus_beat == "entry" and heat_phase == "foreplay":
+            nar = _clip_nar(f"{nar.rstrip('。')}。呼吸更近。", 48)
+        if nar in used_nars:
+            progression = {
+                "foreplay": "呼吸更近。",
+                "act": "动作推进。",
+                "climax": "情绪抵达。",
+                "afterglow": "余温未散。",
+            }.get(heat_phase, "画面推进。")
+            nar = _clip_nar(f"{nar.rstrip('。')}。{progression}", 48)
+        used_nars.add(nar)
         # Multi-pose: rotate sex_pose by coitus beat + index
         pose_cycle = {
             "entry": "wall_pin",
@@ -2026,12 +2107,12 @@ def plan_shots(
         else:
             shot_size = "close-up" if local_df in {"hook", "reaction", "action"} else "medium"
         motion_by_cb = {
-            "entry": "pin seat weight drop mount-settle low angle",
-            "undress": "straps slide dress peels bare skin expands",
-            "union": "straddle-seat hips settle pelvis-lock weight down",
+            "entry": "pin seat weight drop mount-settle camera push-in torso lean",
+            "undress": "straps slide dress peels bare skin expands shoulders lean",
+            "union": "straddle-seat hips settle pelvis-lock weight down heavy breath",
             "rhythm": "hips-sink twice grind-forward thrust-rhythm locked camera",
-            "lock": "leg-wrap-waist clutch sheets micro-tremor",
-            "finish": "arch-finish residual-tremor static hold",
+            "lock": "leg-wrap-waist clutch sheets micro-tremor shoulders tremble",
+            "finish": "arch-finish residual-tremor static hold heavy breath",
             "hook": "lean to ear residual pull-back hold",
         }
         motion = motion_by_cb.get(coitus_beat) or _motion_text(axis)
@@ -2094,6 +2175,8 @@ def plan_shots(
             film_dsl["heat_phase"] = heat_phase
         if coitus_beat:
             film_dsl["coitus_beat"] = coitus_beat
+        if sex_arc_beat:
+            film_dsl["sex_arc_beat"] = sex_arc_beat
         if sex_pose:
             film_dsl["sex_pose"] = sex_pose
         shots.append(
@@ -2117,6 +2200,7 @@ def plan_shots(
                 "character_states": character_states,
                 "heatPhase": heat_phase,
                 "coitusBeat": coitus_beat,
+                "sexArcBeat": sex_arc_beat,
                 "sexPose": sex_pose,
                 "chainMode": chain,
                 "coverage_role": coverage_role,
@@ -2177,6 +2261,7 @@ def plan_shots(
                     "beat_id": beat["id"],
                     "heat_phase": heat_phase or None,
                     "coitus_beat": coitus_beat or None,
+                    "sex_arc_beat": sex_arc_beat or None,
                     "sex_pose": sex_pose or None,
                     "wardrobe_state": wardrobe_state,
                     "dsl": film_dsl,
@@ -2706,6 +2791,11 @@ def project_graph_to_film_spec(
                     cb = film.get("coitus_beat") or sh.get("coitusBeat")
                     if cb:
                         shot_obj["coitus_beat"] = cb
+                    sab = film.get("sex_arc_beat") or sh.get("sexArcBeat")
+                    if sab:
+                        shot_obj["sex_arc_beat"] = sab
+                        if not dsl.get("sex_arc_beat"):
+                            dsl["sex_arc_beat"] = sab
                     sp = film.get("sex_pose") or sh.get("sexPose")
                     if sp:
                         shot_obj["sex_pose"] = sp
@@ -2866,6 +2956,21 @@ def project_graph_to_film_spec(
     if raw_ex:
         spec["source_excerpt"] = raw_ex[:4000]
         spec["user_source_fidelity_strict"] = True
+    # genre=adult without heat: still pin max (escape only soft/medium)
+    genre_proj = str(spec.get("genre") or "adult")
+    if (
+        not heat.get("heat_scale")
+        and genre_proj == "adult"
+        and str(heat.get("heat_scale") or "") not in {"soft", "medium"}
+    ):
+        heat = {
+            **heat,
+            "heat_scale": "max",
+            "spice_level": "extreme",
+            "spine": heat.get("spine") or "adult_max",
+            "evidence_max": True,
+            "pinned_by": "project_adult_default",
+        }
     if heat.get("heat_scale"):
         spec["heat_scale"] = heat["heat_scale"]
         spec["heat_phase_auto"] = True
@@ -2875,6 +2980,10 @@ def project_graph_to_film_spec(
         spec["heat_arc_strict"] = True
         if heat.get("heat_scale") == "max":
             spec["challenge_max_scale"] = True  # 持续挑战尺度最大
+            spec["erotic_impact_strict"] = True
+            spec["sex_arc_strict"] = True
+            spec["sex_detail_cu_strict"] = True
+            spec["both_undress_strict"] = True
         # max IRON: spice always extreme when max
         spec["spice_level"] = heat.get("spice_level") or (
             "extreme" if heat.get("heat_scale") == "max" or heat.get("hardcore") else "explicit"

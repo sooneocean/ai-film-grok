@@ -28,9 +28,21 @@ from story_plan import (  # noqa: E402
 
 class HeatSignalTests(unittest.TestCase):
     def test_no_pin_without_evidence(self) -> None:
+        # detect_heat_signals alone still requires markers; genre pin is normalize_story
         h = detect_heat_signals("雨夜出租车里的一次对话")
         self.assertIsNone(h["heat_scale"])
         self.assertEqual(h["spine"], "default")
+
+    def test_normalize_adult_genre_pins_max(self) -> None:
+        """genre=adult default pins heat max even without explicit 办事 markers."""
+        norm = normalize_story("雨夜出租车里的一次对话", title_hint="雨夜")
+        self.assertEqual(norm.get("genre"), "adult")
+        self.assertEqual(norm["heat_signals"]["heat_scale"], "max")
+        self.assertEqual(norm["heat_signals"].get("spice_level"), "extreme")
+        spine = select_beat_spine(norm["heat_signals"], genre=norm["genre"])
+        phases = [b.get("heat_phase") for b in spine]
+        self.assertIn("act", phases)
+        self.assertIn("climax", phases)
 
     def test_adult_max_from_brief(self) -> None:
         h = detect_heat_signals("成人办事短剧，尺度拉满，落锁加演")
@@ -57,6 +69,12 @@ class AdultSpineTests(unittest.TestCase):
         self.assertIn("rhythm", beats)
         self.assertIn("finish", beats)
 
+    def test_adult_default_spine_without_heat_dict(self) -> None:
+        """No heat dict + adult genre → ADULT_MAX (2026-07-29)."""
+        spine = select_beat_spine(genre="adult")
+        self.assertGreaterEqual(len(spine), 8)
+        self.assertIn("act", [b.get("heat_phase") for b in spine])
+
     def test_plan_projects_heat_fields(self) -> None:
         raw = "成人办事：展厅落锁卸甲跨坐沉腰办穿，下一场换你顶。"
         norm = normalize_story(raw, title_hint="落锁加演")
@@ -73,6 +91,8 @@ class AdultSpineTests(unittest.TestCase):
         self.assertTrue(has_act)
         has_cb = any(s.get("coitus_beat") == "rhythm" for s in shots)
         self.assertTrue(has_cb)
+        has_arc = any(s.get("sex_arc_beat") == "penetration" for s in shots)
+        self.assertTrue(has_arc)
         rep = lint_heat_arc(
             shots,
             heat_scale="max",
