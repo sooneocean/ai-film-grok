@@ -119,6 +119,7 @@ ffmpeg -y -i audio/narration.wav -i out/_final_work/bgm_stereo.wav -i audio/nati
 - [high-motion-style-lock](lessons-2026-07-27-high-motion-style-lock-final.md)
 - [adult-scale-max-sex-arc](lessons-2026-07-27-adult-scale-max-sex-arc.md)
 - [anatomy-milk-futa](lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md)
+- [shot-variety-anti-boring](lessons-2026-07-29-shot-variety-anti-boring.md)（观感：重复/无聊 → motion·景别·时长）
 - [subs-always-burn-hard](lessons-2026-07-23-subs-always-burn-hard.md)
 - [wardrobe-no-redress](lessons-2026-07-21-wardrobe-no-redress-still.md)
 - memory: `memory/2026-07-29-evirus-ch04-bulk-final-iron.md`

@@ -4,6 +4,7 @@ E病毒 ch4 批跑 / 解剖修毒 / Comfy 5090 / **收尾门禁** 时先扫本�
 
 | 主题 | 文件 | 要点 |
 |------|------|------|
+| **画面抗重复·抗无聊 IRON（P0 · 后面不要再犯）** | [shot-variety-anti-boring](2026-07-29-shot-variety-anti-boring.md) · [lesson](../references/lessons-2026-07-29-shot-variety-anti-boring.md) | 门绿≠好看；motion 禁复制；camera.shot_size 真变；主戏≥4.5s；contact 可读差 |
 | **成片收尾门禁 IRON（P0 · 后面不要再犯）** | [closeout-gates-iron](2026-07-29-closeout-gates-iron.md) · [lesson](../references/lessons-2026-07-29-closeout-gates-chaebol.md) | plate≠完；heat codes；sensory；truth_contract；字幕钟；quality 缓存；narrative 重绑；export 链 |
 | **bulk→final 出片 IRON（P0 · 后面不要再犯）** | [evirus-ch04-bulk-final-iron](2026-07-29-evirus-ch04-bulk-final-iron.md) · [lesson](../references/lessons-2026-07-29-evirus-ch04-bulk-final-iron.md) | bare 拦→续接高动；evidence 双轮；final 超时/sidechain/字幕坑 |
 | **毒镜解剖 IRON（P0 · 后面不要再犯）** | [poison-shot-anatomy-iron](2026-07-29-poison-shot-anatomy-iron.md) · [lesson](../references/lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md) | 禁 futa/喷奶/霓虹器；毒 still 禁 I2V；毒 clip 禁 final |
@@ -21,7 +22,7 @@ E病毒 ch4 批跑 / 解剖修毒 / Comfy 5090 / **收尾门禁** 时先扫本�
 ## 成片前 15 秒
 1. clips 计划数齐（无 archive / orphan pilot 冒充）
 2. 中/末帧抽：无 futa、无喷奶、无回穿
-3. motion gate ok（mean 平常≥18 / 肉戏≥20）
+3. motion gate ok（mean 平常≥18 / 肉戏≥20）**且** 相邻 motion 主句不撞、contact 可读差（抗无聊）
 4. TTS 齐 + BGM rnb + license
 5. final：长超时或直调 render_final；sidechain 卡则 amix
 6. 抽帧可见中文字幕

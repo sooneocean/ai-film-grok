@@ -132,6 +132,7 @@
 
 | 文件 | 主题 |
 |---|---|
+| **[shot-variety-anti-boring](lessons-2026-07-29-shot-variety-anti-boring.md)** | **P0 抗重复·抗无聊**：门绿≠好看；motion 禁复制；camera 景别真变；主戏≥4.5s；contact 可读差（ch04 观感案） |
 | **[closeout-gates-chaebol](lessons-2026-07-29-closeout-gates-chaebol.md)** | **P0 收尾门禁**：plate≠完；heat codes / partner_wardrobe；sensory；truth_contract；字幕真钟；quality 缓存；narrative 重绑；export 链（财阀案） |
 | **[evirus-ch04-bulk-final-iron](lessons-2026-07-29-evirus-ch04-bulk-final-iron.md)** | **P0 bulk→final**：Imagine bare 拦 → undress 续接+高动；evidence 双轮；final 超时/sidechain 假死；字幕无空格或 PIL |
 | **[anatomy-milk-futa-comfy-batch](lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md)** | **P0 毒镜**：禁 futa/女体阴茎、喷奶乳汁、霓虹生殖器；中英硬 NEG；毒 still 禁 I2V；+ Comfy 5090 批跑资源塔 |

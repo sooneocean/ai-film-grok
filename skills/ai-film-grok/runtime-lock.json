@@ -222,6 +222,7 @@
     "scripts/seedance_bridge.py": "b8bb4fe8e1b526076346591de22bcee895c9189244a2128fcf26366cd1fe6aaa",
     "scripts/selects_report.py": "cb83b44c39d6e518ca8894c9faa307201c941d55ecd7cab7b156f69cae3ac6bb",
     "scripts/semantic_index.py": "a3010da4e73c114153d11bf34d54a20d5b2705f05e689a6c5e2fbc7c8cc7c479",
+    "scripts/serial_quality.py": "579da77deff4f7636ff3dc6f91ba8badb8755950335308f57e1946a04009f416",
     "scripts/sfx_candidates.py": "c7762e1b406506419b82917084948395e6b1e58fb494100b3c53d8cefc49d790",
     "scripts/shot_inventory.py": "c55e77d64a9112282972f168fe65afb27433b8dc83f13277a08fa3efef32d5f1",
     "scripts/shot_package.py": "f92d402a1e5e178426d7e2c9e32abe0eb3c1330c3f9b2994647af9eb2671c8c1",
