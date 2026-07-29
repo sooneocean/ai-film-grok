@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +70,9 @@ def main() -> int:
     if out.is_symlink() or out.suffix.lower() != ".json":
         raise ValueError("out must be a non-symlink JSON path")
 
+    # The host may globally enable hf_transfer without installing it. This
+    # adapter only needs the upstream tokenizer files, so use Hub's safe HTTP path.
+    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
     import torch
     from vibevoice.modular.modeling_vibevoice_asr import VibeVoiceASRForConditionalGeneration
     from vibevoice.processor.vibevoice_asr_processor import VibeVoiceASRProcessor
