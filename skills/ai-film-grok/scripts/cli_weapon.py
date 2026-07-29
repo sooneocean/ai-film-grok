@@ -12,6 +12,7 @@ from typing import Any
 
 from comfy_armory import ComfyArmoryError, load_armory, probe_armory
 from comfy_video import ComfyVideoError
+from media_qa import MediaQAError, analyze_media
 from util import sha256_file, utc_now, write_json
 
 
@@ -35,7 +36,13 @@ def add_weapon_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser])
     canary.add_argument("--workflow", type=Path, default=None)
     canary.add_argument("--timeout", type=int, default=1200)
     canary.add_argument("--execute", action="store_true")
+    canary.add_argument(
+        "--complete", action="store_true", help="Bind decoded media and human review"
+    )
     canary.add_argument("--confirm", action="store_true")
+    canary.add_argument("--submission-receipt", type=Path, default=None)
+    canary.add_argument("--media", type=Path, default=None)
+    canary.add_argument("--review-receipt", type=Path, default=None)
     canary.add_argument("--receipt", type=Path, default=None)
     promote = actions.add_parser(
         "promote", help="Create a human-approved promotion packet; never changes defaults"
@@ -47,7 +54,15 @@ def add_weapon_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser])
 
 
 def _weapon(weapon_id: str) -> dict[str, Any]:
-    return next((item for item in load_armory()["weapons"] if item["id"] == weapon_id), {})
+    armory = load_armory()
+    return next(
+        (
+            item
+            for item in [*armory.get("weapons", []), *armory.get("research_weapons", [])]
+            if isinstance(item, dict) and item.get("id") == weapon_id
+        ),
+        {},
+    )
 
 
 def _read_object(path: Path) -> dict[str, Any]:
@@ -60,15 +75,28 @@ def _read_object(path: Path) -> dict[str, Any]:
     return data
 
 
-def _approved(review: dict[str, Any]) -> bool:
-    return review.get("status") == "approved" and review.get("human_reviewed") is True
+def _approved(review: dict[str, Any], *, weapon_id: str, output_sha256: str) -> bool:
+    return (
+        review.get("status") == "approved"
+        and review.get("human_reviewed") is True
+        and review.get("weapon_id") == weapon_id
+        and review.get("output_sha256") == output_sha256
+    )
 
 
 def promotion_packet(weapon_id: str, canary_path: Path, review_path: Path) -> dict[str, Any]:
     canary, review = _read_object(canary_path), _read_object(review_path)
-    if canary.get("weapon_id") != weapon_id or canary.get("status") != "completed":
+    artifact = canary.get("artifact") if isinstance(canary.get("artifact"), dict) else {}
+    output_sha256 = artifact.get("output_sha256")
+    if (
+        canary.get("weapon_id") != weapon_id
+        or canary.get("status") != "completed"
+        or not isinstance(output_sha256, str)
+        or not isinstance(artifact.get("technical_qa"), dict)
+        or artifact["technical_qa"].get("ok") is not True
+    ):
         raise WeaponControlError("completed canary receipt must bind the requested weapon")
-    if not _approved(review):
+    if not _approved(review, weapon_id=weapon_id, output_sha256=output_sha256):
         raise WeaponControlError("promotion requires approved human review")
     return {
         "schema_version": 1,
@@ -78,6 +106,7 @@ def promotion_packet(weapon_id: str, canary_path: Path, review_path: Path) -> di
         "status": "promotion_ready",
         "canary_receipt": {"sha256": sha256_file(canary_path.expanduser().resolve())},
         "review_receipt": {"sha256": sha256_file(review_path.expanduser().resolve())},
+        "output_sha256": output_sha256,
         "may_change_default_provider": False,
         "registry_mutated": False,
         "next_step": "Apply a separately reviewed registry change if production routing is desired.",
@@ -107,6 +136,42 @@ def _canary_plan(weapon_id: str) -> dict[str, Any]:
     }
 
 
+def _complete_canary(args: argparse.Namespace) -> dict[str, Any]:
+    if not all((args.submission_receipt, args.media, args.review_receipt)):
+        raise WeaponControlError(
+            "canary completion requires submission receipt, media, and review receipt"
+        )
+    submitted = _read_object(args.submission_receipt)
+    if submitted.get("weapon_id") != args.weapon_id or submitted.get("status") != "submitted":
+        raise WeaponControlError("submission receipt must bind the requested submitted canary")
+    media = args.media.expanduser().resolve()
+    try:
+        technical_qa = analyze_media(media, require_audio=False, require_motion=False)
+    except MediaQAError as exc:
+        raise WeaponControlError("terminal media decode failed") from exc
+    if technical_qa.get("ok") is not True:
+        raise WeaponControlError("terminal media decode failed")
+    output_sha256 = sha256_file(media)
+    review = _read_object(args.review_receipt)
+    if not _approved(review, weapon_id=args.weapon_id, output_sha256=output_sha256):
+        raise WeaponControlError(
+            "canary completion requires approved human review bound to media hash"
+        )
+    return {
+        **_canary_plan(args.weapon_id),
+        "status": "completed",
+        "submission_receipt": {
+            "sha256": sha256_file(args.submission_receipt.expanduser().resolve())
+        },
+        "review_receipt": {"sha256": sha256_file(args.review_receipt.expanduser().resolve())},
+        "artifact": {
+            "path": str(media),
+            "output_sha256": output_sha256,
+            "technical_qa": technical_qa,
+        },
+    }
+
+
 def run_weapon(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], None]) -> int:
     try:
         if args.weapon_action == "probe":
@@ -124,7 +189,9 @@ def run_weapon(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], Non
                 if isinstance(item, dict)
             ]
         elif args.weapon_action == "canary":
-            report = _canary_plan(args.weapon_id)
+            if args.complete and args.execute:
+                raise WeaponControlError("canary completion cannot submit generation")
+            report = _complete_canary(args) if args.complete else _canary_plan(args.weapon_id)
             if args.execute:
                 if not args.confirm or args.workflow is None:
                     raise WeaponControlError("canary execution requires --workflow and --confirm")
@@ -172,6 +239,9 @@ def run_weapon(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], Non
     emit(report)
     return (
         0
-        if report.get("ok", report.get("status") in {"planned", "submitted", "promotion_ready"})
+        if report.get(
+            "ok",
+            report.get("status") in {"planned", "submitted", "completed", "promotion_ready"},
+        )
         else 2
     )

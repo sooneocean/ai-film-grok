@@ -330,6 +330,8 @@ def user_phrase_is_approval(phrase: str) -> bool:
         "pilot过",
         "pilot ok",
         "pilot pass",
+        "pilot approve",
+        "pilot approved",
         "pilot passed",
         "user approved pilot",
         "定妆过了",

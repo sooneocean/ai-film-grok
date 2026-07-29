@@ -187,8 +187,8 @@ VOICE_ARMORY: dict[str, dict[str, Any]] = {
     },
     "qwen_zh_female_clone": {
         "kind": "tts",
-        "status": "needs_base_model_and_authorized_reference",
-        "label": "Qwen Base：授权成年中文女声参考音克隆",
+        "status": "needs_authorized_reference",
+        "label": "Qwen Base：已备好模型，等待授权成年中文女声参考音克隆",
     },
 }
 

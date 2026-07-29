@@ -24,7 +24,7 @@ def test_ready_chinese_female_profiles_are_explicit_and_stable() -> None:
 
 def test_reference_profiles_are_catalogued_but_never_silently_rendered() -> None:
     assert ready_tts_profile("higgs_zh_female_reference") is None
-    assert get_voice_profile("qwen_zh_female_clone")["status"].startswith("needs_")
+    assert get_voice_profile("qwen_zh_female_clone")["status"] == "needs_authorized_reference"
     assert "qwen_zh_female_design" in catalog()
 
 

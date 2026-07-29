@@ -10,7 +10,7 @@ from typing import Any
 
 from audio_node_client import AudioNodeError, health, public_health_report
 from comfy_armory import probe_armory
-from comfy_video import ComfyVideoError, inventory, queue_status
+from comfy_video import ComfyVideoError, inventory, normalize_base_url, queue_status
 from util import utc_now, write_json
 
 
@@ -104,13 +104,19 @@ def node_status(base_url: str) -> dict[str, Any]:
 
 
 def _recover(base_url: str) -> dict[str, Any]:
-    queue = queue_status(base_url)
+    from comfy_recovery import config_from_env, recover_comfy, validate_recovery_config
+
+    config = validate_recovery_config(config_from_env())
+    recovery_url = normalize_base_url(f"http://127.0.0.1:{config.local_port}")
+    if normalize_base_url(base_url) != recovery_url:
+        raise ComfyVideoError(
+            "node recover must check the configured local recovery endpoint; omit --base-url"
+        )
+    queue = queue_status(recovery_url)
     if queue["running"] or queue["pending"]:
         raise ComfyVideoError("recovery blocked while ComfyUI queue is not idle")
-    # Existing CLI recovery owns the narrowly allowlisted Windows service path.
-    from comfy_recovery import recover_comfy_from_env
-
-    recovery = recover_comfy_from_env(confirm=True)
+    # The same validated config supplies both the checked tunnel and recovery target.
+    recovery = recover_comfy(config, confirm=True)
     return {
         "schema_version": 1,
         "kind": "rtx5090-node-recovery",
