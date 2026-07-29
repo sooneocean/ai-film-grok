@@ -153,6 +153,8 @@ canary 会回读候选数量、时长、技术检测、唯一 checksum 与唯一
 
 所有 edit/bridge 会保存父资产、目标资产、配方、seed、checkpoint 和技术检测，但不保存
 剧情原始 prompt。审听页同时显示 loop seam、结尾活跃度、对白频段占比和目标时长。
+配方另会记录可审计的配器意图（鼓、低音、和声密度、明亮度、主旋律存在感）；它们会编入
+ACE cover/repaint 的抽象提示词，不声称 ACE 已输出可独立交付的 stems。
 转场桥只有在批准、checksum 校验通过且父子绑定吻合时才实混；成片成功后，cue 和 bridge
 分别追加 usage 事件。`final` 不允许把“计划中会生成”当成“已经存在”。
 
@@ -239,7 +241,9 @@ MUSIC_GEN_BASE_URL=http://127.0.0.1:7860
 }
 ```
 
-缺少 cue 时，会按 `dramatic_function` 推导：危机偏 dark/pulse，高潮偏 rnb/full，铺陈偏 ambient/pad，余韵偏 warm/thin。`music_timeline` 还会从镜头 cast 推导角色或双人关系动机：同一角色跨段重现同一动机，剧情功能只改变其纯器乐配器（例如钢琴/弦乐/低音提琴/刷鼓）与张力；明确的 `motif_id` 始终优先。程序 BGM 会按镜头切段，确定性地变更动机 seed、能量、鼓组密度、低频与高频层，以及 stem profile；外部曲库则保留原曲，仅施加可解释的镜头级 gain/duck 自动化。实际路由会写入 `mix_report.json.music_cue_routing`，包含 `instrument_palettes` 与 `instrumental_only=true`，不会把“seed 不同”当作音乐变化的证明。
+缺少 cue 时，会按 `dramatic_function` 推导：危机偏 dark/pulse，高潮偏 rnb/full，铺陈偏 ambient/pad，余韵偏 warm/thin。`music_timeline` 还会从镜头 cast 推导角色或双人关系动机：同一角色跨段重现同一动机，剧情功能只改变其纯器乐配器（例如钢琴/弦乐/低音提琴/刷鼓）与张力；明确的 `motif_id` 始终优先。程序 BGM 会按镜头切段，确定性地变更动机 seed、能量、鼓组密度、低频与高频层，以及 stem profile；外部曲库则保留原曲，仅施加可解释的镜头级 gain/duck 自动化。对白 cue 未明确写 `duck_db` 时，先减 3 dB，再交给实时 sidechain 做细部闪避。实际路由会写入 `mix_report.json.music_cue_routing`，包含 `instrument_palettes` 与 `instrumental_only=true`，不会把“seed 不同”当作音乐变化的证明。
+
+`mix_report.json.music_mix_review` 是成片听审地图：记录每个切点相对于 downbeat 的偏差、对白保护是否有静态与动态两层、成片响度和需要回听的时间点。它绝不为追拍而移动已批准的画面切点；出现 `needs_attention` 时须先修正对白保护再 final review。
 
 旁白仍为中文、角色对白仍为日文，字幕仍为中文；`music_cue` 只控制音乐层，不会改变语言分轨。若启用 `--music-template timeline`，则每个 cue 会从 `audio/templates/<mood>/`（或共享曲库）选择一首授权纯音乐并实混到 BGM stem；任一目标 mood 缺曲即 fail-closed，不会用 default 或全片 `audio/bgm.wav` 偷换。mix report 只记录 `audio/templates/...` 或 `skill_library/...` 逻辑路径。
 

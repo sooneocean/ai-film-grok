@@ -3,6 +3,18 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.16.0] - 2026-07-29
+
+### Added
+
+- Final mixes now retain a beat-grid listening map without shifting approved picture edits, including off-downbeat, cut, and stinger review points.
+- `mix_report.json` now records dialogue-protection coverage and a human listening checklist alongside sidechain and loudness evidence.
+- ACE edit and motif-development recipes carry explicit, receipt-safe arrangement controls for drums, bass, harmony, brightness, and lead presence.
+
+### Changed
+
+- Dialogue cues receive a conservative -3 dB BGM bed reduction unless an author explicitly chooses another value; real-time sidechain remains the primary adaptive protection.
+
 ## [2.15.1] - 2026-07-29
 
 ### Fixed

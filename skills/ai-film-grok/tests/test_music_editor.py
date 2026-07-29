@@ -131,6 +131,25 @@ def test_edit_plan_never_silently_raw_truncates_a_master() -> None:
     }
 
 
+def test_motif_development_recipes_carry_auditable_arrangement_controls(tmp_path: Path) -> None:
+    parent = {
+        "asset_id": "mei-theme",
+        "mood": "rnb",
+        "energy": 0.5,
+        "stem_profile": "full",
+        "motif_family": "protagonist",
+        "series_id": "series-a",
+    }
+    recipes = motif_development_recipes(parent, parent_path=tmp_path / "master.wav")
+    climax = next(item for item in recipes if item["motif_role"] == "climax")
+    tender = next(item for item in recipes if item["motif_role"] == "tender")
+    assert (
+        climax["arrangement_controls"]["drum_intensity"]
+        > tender["arrangement_controls"]["drum_intensity"]
+    )
+    assert "arrangement controls:" in climax["prompt"]
+
+
 def test_edit_plan_is_ready_when_exact_dialogue_safe_assets_are_approved() -> None:
     receipt = {
         "schema": "aifilm-bgm-selection-v1",

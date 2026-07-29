@@ -44,6 +44,41 @@ _KEY_RE = re.compile(r"^\s*([A-Ga-g])([#b♯♭]?)(?:\s*(major|minor|maj|min|m))
 _EDIT_VARIANTS = frozenset({"exact", "dialogue-safe", "loop", "outro"})
 
 
+def _arrangement_controls(
+    *, energy: float, stem_profile: str, dialogue_safe: bool
+) -> dict[str, float]:
+    """Portable arrangement intent for ACE prompts and future stem renderers."""
+    energy = max(0.0, min(1.0, float(energy)))
+    profile = str(stem_profile or "full")
+    controls = {
+        "drum_intensity": energy,
+        "bass_presence": energy,
+        "harmonic_density": energy,
+        "brightness": 0.45 + (energy * 0.25),
+        "lead_presence": energy,
+    }
+    if profile in {"thin", "pad"}:
+        controls.update({"drum_intensity": 0.12, "bass_presence": 0.2, "lead_presence": 0.25})
+    elif profile == "pulse":
+        controls.update({"drum_intensity": max(0.35, energy), "harmonic_density": 0.35})
+    elif profile == "bass":
+        controls.update({"drum_intensity": 0.15, "harmonic_density": 0.2, "bass_presence": 0.85})
+    if dialogue_safe:
+        controls["harmonic_density"] = min(controls["harmonic_density"], 0.35)
+        controls["lead_presence"] = min(controls["lead_presence"], 0.25)
+        controls["brightness"] = min(controls["brightness"], 0.5)
+    return {key: round(value, 3) for key, value in controls.items()}
+
+
+def _arrangement_prompt(controls: dict[str, float]) -> str:
+    return (
+        "arrangement controls: "
+        f"drums {controls['drum_intensity']:.2f}, bass {controls['bass_presence']:.2f}, "
+        f"harmony {controls['harmonic_density']:.2f}, brightness {controls['brightness']:.2f}, "
+        f"lead {controls['lead_presence']:.2f}"
+    )
+
+
 def normalize_keyscale(value: Any) -> dict[str, Any]:
     raw = str(value or "").replace("♯", "#").replace("♭", "b").strip()
     match = _KEY_RE.match(raw)
@@ -363,6 +398,13 @@ def edit_variant_recipes(
             "loopable": variant == "loop",
             "prompt": prompts[variant],
         }
+        controls = _arrangement_controls(
+            energy=float(recipe["energy"]),
+            stem_profile=str(recipe["stem_profile"]),
+            dialogue_safe=bool(recipe["dialogue_safe"]),
+        )
+        recipe["arrangement_controls"] = controls
+        recipe["prompt"] = f"{recipe['prompt']}; {_arrangement_prompt(controls)}"
         if variant == "outro":
             recipe["repainting_start"] = round(max(0.0, float(target_duration) - 8.0), 3)
             recipe["repainting_end"] = float(target_duration)
@@ -401,12 +443,16 @@ def motif_development_recipes(
                 "stem_profile": profile,
                 "task_type": "cover",
                 "cover_strength": 0.76,
+                "arrangement_controls": _arrangement_controls(
+                    energy=energy, stem_profile=profile, dialogue_safe=True
+                ),
                 "prompt": (
                     f"instrumental {direction} of the supplied {motif} motif, "
                     "cinematic, dialogue-safe mix, no vocals"
                 ),
             }
         )
+        recipes[-1]["prompt"] += "; " + _arrangement_prompt(recipes[-1]["arrangement_controls"])
     return recipes
 
 

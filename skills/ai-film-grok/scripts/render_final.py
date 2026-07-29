@@ -95,6 +95,7 @@ except ImportError:  # pragma: no cover
 try:
     from music_cue import (
         apply_music_timeline_to_samples,
+        build_music_mix_review,
         build_music_timeline,
         motif_seed,
         summarize_music_timeline,
@@ -108,6 +109,7 @@ except ImportError:  # pragma: no cover
     normalize_performance_cue = None  # type: ignore
     summarize_bgm_response = None  # type: ignore
     apply_music_timeline_to_samples = None  # type: ignore
+    build_music_mix_review = None  # type: ignore
     build_music_timeline = None  # type: ignore
     motif_seed = None  # type: ignore
     summarize_music_timeline = None  # type: ignore
@@ -3894,6 +3896,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
         mix_spotting["sidechain_applied"] = False
 
+    if build_music_mix_review is not None:
+        mix_spotting["music_mix_review"] = build_music_mix_review(
+            (sound_plan or {}).get("music_timeline") or [],
+            sidechain_applied=mix_spotting["sidechain_applied"],
+        )
+
     fc = ";".join(fc_parts)
     mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "sfx", "scene_sound"] + (
         ["vocal_color"] if use_color else []
@@ -3969,6 +3977,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         if loud:
             mix_spotting["loudness_before"] = loud
             mix_spotting["loudness"] = loud
+            if build_music_mix_review is not None:
+                mix_spotting["music_mix_review"] = build_music_mix_review(
+                    (sound_plan or {}).get("music_timeline") or [],
+                    sidechain_applied=mix_spotting.get("sidechain_applied", False),
+                    loudness=loud,
+                )
         measured = (loud or {}).get("integrated_lufs") if loud else None
         apply_ln, ln_reason = should_apply_loudnorm(loud_policy, measured)
         mix_spotting["loudnorm_decision"] = {"apply": apply_ln, "reason": ln_reason}
@@ -4010,6 +4024,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 )[-400:]
         else:
             mix_spotting["loudnorm_applied"] = False
+        if build_music_mix_review is not None:
+            mix_spotting["music_mix_review"] = build_music_mix_review(
+                (sound_plan or {}).get("music_timeline") or [],
+                sidechain_applied=mix_spotting.get("sidechain_applied", False),
+                loudness=mix_spotting.get("loudness"),
+            )
         mix_spotting["artifacts"] = {
             "bgm": {"path": str(music_path), "sha256": sha256(music_path)},
             "sfx": {"path": str(sfx_stereo_path), "sha256": sha256(sfx_stereo_path)},
