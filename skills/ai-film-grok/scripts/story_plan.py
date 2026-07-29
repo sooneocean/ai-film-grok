@@ -2549,12 +2549,56 @@ def build_planned_graph(
         "props": [],
         "warnings": list(normalized.get("warnings") or []),
     }
+    screenplay = (
+        normalized.get("dialogue_screenplay")
+        if isinstance(normalized.get("dialogue_screenplay"), dict)
+        else None
+    )
+    if isinstance(screenplay, dict):
+        graph["dialogue_screenplay"] = copy.deepcopy(screenplay)
+        graph["dialogue_mode"] = str(screenplay.get("mode") or "")
     # Preserve the source dialogue as first-class, editable story truth.  The
     # planned shots are only an initial coverage scaffold; the line id binds
     # later TTS, state-photo, lipsync, subtitle and review evidence.
-    dialogue_blocks = [
-        row for row in (normalized.get("dialogue_blocks") or []) if isinstance(row, dict)
-    ]
+    dialogue_blocks: list[dict[str, Any]] = []
+    if isinstance(screenplay, dict) and screenplay.get("mode") == "dialogue_drama":
+        for scene in screenplay.get("scenes") or []:
+            if not isinstance(scene, dict):
+                continue
+            scene_id = str(scene.get("scene_id") or "")
+            for turn in scene.get("dialogue_turns") or []:
+                if not isinstance(turn, dict):
+                    continue
+                dialogue_blocks.append(
+                    {
+                        "id": turn.get("line_id"),
+                        "speaker": turn.get("speaker"),
+                        "addressee": turn.get("addressee"),
+                        "text": turn.get("dialogue_zh") or turn.get("subtitle_zh"),
+                        "caption_text": turn.get("subtitle_zh"),
+                        "spoken_ja": turn.get("dialogue_ja"),
+                        "translation_status": turn.get("translation_status"),
+                        "emotion": turn.get("emotion"),
+                        "subtext": turn.get("subtext"),
+                        "actions": copy.deepcopy(turn.get("actions") or {}),
+                        "gaze": turn.get("gaze"),
+                        "props": list(turn.get("props") or []),
+                        "state_delta": turn.get("state_delta"),
+                        "source_refs": list(
+                            (turn.get("source_evidence") or {}).get("source_refs") or []
+                        ),
+                        "source_excerpt": (turn.get("source_evidence") or {}).get("source_excerpt"),
+                        "provenance": turn.get("provenance")
+                        or (turn.get("source_evidence") or {}).get("provenance"),
+                        "review_status": turn.get("review_status"),
+                        "scene_id": scene_id,
+                        "coverage_intent": copy.deepcopy(scene.get("coverage_intent") or {}),
+                    }
+                )
+    if not dialogue_blocks:
+        dialogue_blocks = [
+            row for row in (normalized.get("dialogue_blocks") or []) if isinstance(row, dict)
+        ]
     if dialogue_blocks:
         cast_by_name = {
             str(char.get("name") or char.get("identity") or "").strip(): str(char.get("id") or "")
@@ -2593,13 +2637,30 @@ def build_planned_graph(
                 "line_id": line_id,
                 "speaker": speaker,
                 "text": str(row.get("text") or "").strip(),
-                "caption_text": str(row.get("text") or "").strip(),
-                "spoken_ja": str(row.get("text") or "").strip()
-                if _has_japanese_kana(row.get("text"))
-                else "",
-                "translation_status": "ready" if _has_japanese_kana(row.get("text")) else "pending",
-                "emotion": "",
-                "subtext": "",
+                "caption_text": str(row.get("caption_text") or row.get("text") or "").strip(),
+                "spoken_ja": str(row.get("spoken_ja") or "").strip()
+                or (
+                    str(row.get("text") or "").strip()
+                    if _has_japanese_kana(row.get("text"))
+                    else ""
+                ),
+                "translation_status": str(
+                    row.get("translation_status")
+                    or ("ready" if _has_japanese_kana(row.get("text")) else "pending")
+                ),
+                "emotion": str(row.get("emotion") or ""),
+                "subtext": str(row.get("subtext") or ""),
+                "addressee": str(row.get("addressee") or ""),
+                "actions": copy.deepcopy(row.get("actions") or {}),
+                "gaze": str(row.get("gaze") or ""),
+                "props": list(row.get("props") or []),
+                "state_delta": str(row.get("state_delta") or ""),
+                "source_refs": list(row.get("source_refs") or []),
+                "source_excerpt": str(row.get("source_excerpt") or ""),
+                "provenance": str(row.get("provenance") or ""),
+                "review_status": str(row.get("review_status") or ""),
+                "scene_ref": str(row.get("scene_id") or ""),
+                "coverage_intent": copy.deepcopy(row.get("coverage_intent") or {}),
                 "beat_ref": str(target.get("beatId") or ""),
                 "shot_ref": str(target.get("id") or ""),
                 "delivery_note": "",
@@ -3007,6 +3068,24 @@ def project_graph_to_film_spec(
                     if vo_mode == "dialogue_drama" and dialogue_line:
                         from performance_state import performance_state_id
 
+                        actions = (
+                            dialogue_line.get("actions")
+                            if isinstance(dialogue_line.get("actions"), dict)
+                            else {}
+                        )
+                        gaze = dialogue_line.get("gaze")
+                        gaze_target = (
+                            str(gaze.get("target") or "")
+                            if isinstance(gaze, dict)
+                            else str(gaze or "")
+                        )
+                        gaze_target = (
+                            gaze_target
+                            or str(dialogue_line.get("addressee") or "")
+                            or str(sh.get("gaze_target") or "")
+                            or "listener"
+                        )
+                        props = list(dialogue_line.get("props") or sh.get("props") or [])
                         caption_text = str(
                             dialogue_line.get("caption_text") or dialogue_line.get("text") or ""
                         ).strip()
@@ -3021,6 +3100,7 @@ def project_graph_to_film_spec(
                                 "duration_sec": duration,
                                 "dialogue_line_id": dialogue_line["line_id"],
                                 "speaker": dialogue_line["speaker"],
+                                "addressee": dialogue_line.get("addressee"),
                                 # dialogue_drama: Chinese stays in caption_text; nar stays empty
                                 # so narration TTS cannot steal the editorial clock.
                                 "dialogue": text,
@@ -3031,15 +3111,24 @@ def project_graph_to_film_spec(
                                 "performance_state": {
                                     "emotion": dialogue_line.get("emotion") or "neutral",
                                     "subtext": dialogue_line.get("subtext") or "",
-                                    "gaze_target": sh.get("gaze_target") or "listener",
+                                    "gaze_target": gaze_target,
                                     "head_angle": sh.get("head_angle")
                                     or "camera-safe three-quarter",
                                     "body_orientation": sh.get("body_orientation")
                                     or "oriented toward addressee",
-                                    "gesture": sh.get("playable_action") or "",
-                                    "props": list(sh.get("props") or []),
+                                    "gesture": actions.get("during")
+                                    or sh.get("playable_action")
+                                    or "",
+                                    "props": props,
                                     "lighting": dsl.get("lighting") or "",
                                     "continuity_parent": sh.get("continuity_parent") or "",
+                                },
+                                "performance_intent": {
+                                    "emotion": dialogue_line.get("emotion") or "neutral",
+                                    "subtext": dialogue_line.get("subtext") or "",
+                                    "actions": actions,
+                                    "gaze_target": gaze_target,
+                                    "state_delta": dialogue_line.get("state_delta") or {},
                                 },
                                 "screen_mode": "on_camera",
                                 "speaker_on_camera": True,
@@ -3071,8 +3160,12 @@ def project_graph_to_film_spec(
                                         "lipsync": True,
                                     },
                                     "performance": {
-                                        "playable_action": sh.get("playable_action") or "",
-                                        "gaze_target": sh.get("gaze_target") or "",
+                                        "playable_action": actions.get("during")
+                                        or sh.get("playable_action")
+                                        or "",
+                                        "gaze_target": gaze_target,
+                                        "pre_line_action": actions.get("before") or "",
+                                        "post_line_action": actions.get("after") or "",
                                     },
                                     "motion": {
                                         "action": dsl.get("action") or "",
@@ -3284,7 +3377,10 @@ def project_graph_to_film_spec(
             else base.get("audio_policy")
         ),
         "narration_budget_strict": vo_mode == "dialogue_drama",
-        "tts_backend": base.get("tts_backend") or "mimo",
+        "content_channels_strict": vo_mode == "dialogue_drama",
+        "tts_backend": (
+            "edge" if vo_mode == "dialogue_drama" else base.get("tts_backend") or "mimo"
+        ),
         "i2v_provider": base.get("i2v_provider") or "grok",
         "caption_mode": base.get("caption_mode") or "zh",
         "director_intent": di,
@@ -3491,6 +3587,7 @@ def run_plan(
     character_id_overrides: dict[str, str] | None = None,
     source_evidence_refs: list[str] | None = None,
     reception: dict[str, Any] | None = None,
+    story_mode: str = "narrative",
 ) -> dict[str, Any]:
     """End-to-end Phase 3 planner for a film root."""
     root = Path(root).expanduser().resolve()
@@ -3502,6 +3599,7 @@ def run_plan(
         source_path=source_path,
         source_evidence_refs=source_evidence_refs,
     )
+    normalized["story_mode"] = str(story_mode or "narrative")
     if reception:
         from story_reception import reception_summary, story_contract_seed
 
@@ -3526,6 +3624,36 @@ def run_plan(
                 str(treatment["planning_text"]).encode("utf-8")
             ).hexdigest(),
         }
+    from dialogue_screenplay import (
+        build_dialogue_screenplay,
+        validate_dialogue_screenplay,
+    )
+
+    received_screenplay = (
+        reception.get("dialogue_screenplay")
+        if isinstance(reception, dict) and isinstance(reception.get("dialogue_screenplay"), dict)
+        else None
+    )
+    screenplay = (
+        copy.deepcopy(received_screenplay)
+        if isinstance(received_screenplay, dict)
+        else build_dialogue_screenplay(normalized, reception=reception)
+    )
+    screenplay_validation = validate_dialogue_screenplay(
+        screenplay,
+        strict=isinstance(received_screenplay, dict),
+    )
+    if isinstance(received_screenplay, dict) and not screenplay_validation["ok"]:
+        codes = ",".join(
+            str(issue.get("code") or "SCREENPLAY_INVALID")
+            for issue in screenplay_validation.get("issues") or []
+        )
+        raise ValueError(f"received dialogue_screenplay is not lock-ready: {codes}")
+    normalized["dialogue_screenplay"] = screenplay
+    normalized["dialogue_screenplay_validation"] = screenplay_validation
+    normalized["vo_mode_suggest"] = (
+        "dialogue_drama" if screenplay.get("mode") == "dialogue_drama" else "storyteller"
+    )
     if character_id_overrides:
         for candidate in normalized.get("character_candidates") or []:
             name = str(candidate.get("name") or "")

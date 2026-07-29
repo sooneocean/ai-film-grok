@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 import sys
 from copy import deepcopy
 from pathlib import Path
+
+import jsonschema
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -238,3 +241,10 @@ def test_non_strict_reports_shape_errors_without_enforcing_review_gate():
     assert report["ok"], report
     assert report["metrics"]["scenes"] == 1
     assert report["metrics"]["candidate_only"] is True
+
+
+def test_builder_output_conforms_to_dialogue_screenplay_schema():
+    schema_path = SCRIPTS.parent / "schemas" / "dialogue-screenplay.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+    jsonschema.Draft202012Validator(schema).validate(build_dialogue_screenplay(_normalized()))

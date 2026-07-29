@@ -59,6 +59,10 @@
       "type": "boolean",
       "description": "Require reasoned, non-duplicative gap evidence for any narration in dialogue_drama."
     },
+    "content_channels_strict": {
+      "type": "boolean",
+      "description": "Keep spoken text, visible performance and motion prompts in independent channels."
+    },
     "audio_tracks": {
       "type": "object",
       "properties": {

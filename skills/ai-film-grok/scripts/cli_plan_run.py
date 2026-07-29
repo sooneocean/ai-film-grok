@@ -108,5 +108,6 @@ def _run_raw(
         character_id_overrides=character_id_overrides,
         source_evidence_refs=source_evidence_refs,
         reception=reception,
+        story_mode=str(getattr(args, "story_mode", "narrative") or "narrative"),
     )
     return report, 0 if report.get("ok") else 1

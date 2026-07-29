@@ -885,6 +885,27 @@ def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> 
     issues: list[dict[str, Any]] = []
     canonical = int(graph.get("schema_version") or 0) >= GRAPH_SCHEMA_VERSION
     story = graph.get("story") if isinstance(graph.get("story"), dict) else {}
+    screenplay = graph.get("dialogue_screenplay")
+    if screenplay is not None:
+        from dialogue_screenplay import validate_dialogue_screenplay
+
+        screenplay_validation = validate_dialogue_screenplay(screenplay, strict=strict)
+        for item in screenplay_validation["issues"]:
+            issues.append(
+                _issue(
+                    f"STORY_DIALOGUE_{item.get('code') or 'INVALID'}",
+                    str(item.get("message") or "dialogue screenplay is invalid"),
+                    node_ref=str(item.get("node_ref") or "dialogue_screenplay"),
+                )
+            )
+    elif strict and canonical and str(graph.get("dialogue_mode") or "") == "dialogue_drama":
+        issues.append(
+            _issue(
+                "STORY_DIALOGUE_SCREENPLAY_REQUIRED",
+                "dialogue_drama requires a reviewed dialogue_screenplay",
+                node_ref="dialogue_screenplay",
+            )
+        )
 
     if canonical:
         required_story = (
@@ -1168,6 +1189,9 @@ def lock_scope(graph: dict[str, Any], scope: str, *, user_phrase: str) -> dict[s
         c["locked_at"] = utc_now()
         c["lock_reason"] = user_phrase.strip()
         node["control"] = c
+    if scope == "story" and isinstance(graph.get("dialogue_screenplay"), dict):
+        graph["dialogue_screenplay"]["status"] = "locked"
+        graph["dialogue_screenplay"]["review_status"] = "locked"
     scopes = set(graph.get("lock_scopes") or [])
     scopes.add(scope)
     graph["lock_scopes"] = [s for s in LOCK_SCOPES if s in scopes]

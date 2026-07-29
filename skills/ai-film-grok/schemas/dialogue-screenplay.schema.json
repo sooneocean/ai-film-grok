@@ -71,6 +71,7 @@
         "conflict",
         "emotional_turn",
         "time_space",
+        "field_provenance",
         "dialogue_turns",
         "coverage_intent",
         "narration_gaps",
@@ -89,6 +90,29 @@
           "properties": {
             "time": { "type": "string", "minLength": 1 },
             "location": { "type": "string", "minLength": 1 }
+          }
+        },
+        "field_provenance": {
+          "type": "object",
+          "required": [
+            "scene_goal",
+            "conflict",
+            "emotional_turn",
+            "time_space"
+          ],
+          "properties": {
+            "scene_goal": {
+              "enum": ["source_supported", "creative_suggestion"]
+            },
+            "conflict": {
+              "enum": ["source_supported", "creative_suggestion"]
+            },
+            "emotional_turn": {
+              "enum": ["source_supported", "creative_suggestion"]
+            },
+            "time_space": {
+              "enum": ["source_supported", "creative_suggestion"]
+            }
           }
         },
         "dialogue_turns": {

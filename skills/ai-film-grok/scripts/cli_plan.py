@@ -46,6 +46,12 @@ def add_plan_parsers(subparsers: Any) -> None:
     )
     run.add_argument("--title", default=None, help="Title override")
     run.add_argument(
+        "--story-mode",
+        choices=("narrative", "documentary", "monologue", "experimental"),
+        default="narrative",
+        help="Narrative defaults to dialogue screenplay; other modes are explicit exceptions",
+    )
+    run.add_argument(
         "--target-duration", type=float, default=45.0, help="Target episode duration seconds"
     )
     run.add_argument(

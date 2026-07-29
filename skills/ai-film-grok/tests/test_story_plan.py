@@ -71,10 +71,13 @@ class StoryPlanTests(unittest.TestCase):
             self.assertGreaterEqual(len(flat), 3)
             for sh in flat:
                 self.assertTrue(sh.get("id"))
-                self.assertTrue(sh.get("nar"))
+                self.assertFalse(sh.get("nar"))
+                self.assertTrue(sh.get("audio_cues"))
                 self.assertTrue(sh.get("dramatic_function"))
                 self.assertTrue(sh.get("dsl"))
                 self.assertTrue(sh.get("beat_id"))
+            self.assertEqual(spec["vo_mode"], "dialogue_drama")
+            self.assertEqual(graph["dialogue_screenplay"]["status"], "candidate_only")
 
     def test_multi_scene_headers(self) -> None:
         raw = """# 旧电梯
@@ -148,7 +151,12 @@ class StoryPlanTests(unittest.TestCase):
             self.assertTrue(report["ok"], report)
             graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
             self.assertEqual(len(graph.get("dialogue_ledger") or []), 2)
-            self.assertTrue(validate_narrative_graph(graph, strict=True)["ok"])
+            strict_graph = validate_narrative_graph(graph, strict=True)
+            self.assertFalse(strict_graph["ok"])
+            self.assertIn(
+                "STORY_DIALOGUE_SCREENPLAY_REVIEW_REQUIRED",
+                {item["code"] for item in strict_graph["errors"]},
+            )
             spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
             self.assertEqual(spec["vo_mode"], "dialogue_drama")
             shots = [shot for scene in spec["scenes"] for shot in scene["shots"]]
@@ -197,7 +205,7 @@ class StoryPlanTests(unittest.TestCase):
             with self.assertRaisesRegex(Exception, "translation is pending"):
                 validate_film_spec(spec, assign_missing_ids=False)
 
-    def test_source_to_graph_to_film_spec_passes_shared_story_timeline_guard(self) -> None:
+    def test_prose_adaptation_stays_candidate_until_translation_and_review(self) -> None:
         raw = (
             "阿澄推开车门，雨水打湿她的袖口。"
             "她看见后视镜里的乘客没有下车。"
@@ -210,9 +218,14 @@ class StoryPlanTests(unittest.TestCase):
             result = run_plan(root, raw, title="雨夜车门", target_duration=45, force=True)
             self.assertTrue(result["ok"], result)
             spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
-            shots = validate_film_spec(spec, assign_missing_ids=False, film_root=root)
-            self.assertGreaterEqual(len(shots), 3)
-            self.assertEqual(len({shot["nar"] for shot in shots}), len(shots))
+            with self.assertRaisesRegex(Exception, "translation is pending"):
+                validate_film_spec(spec, assign_missing_ids=False, film_root=root)
+            graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
+            screenplay = graph["dialogue_screenplay"]
+            self.assertEqual(screenplay["mode"], "dialogue_drama")
+            self.assertEqual(screenplay["status"], "candidate_only")
+            self.assertTrue(screenplay["scenes"][0]["dialogue_turns"])
+            self.assertEqual(screenplay["narration_gaps"], [])
 
     def test_legacy_flat_graph_is_normalized_without_losing_ids(self) -> None:
         legacy = {

@@ -27,6 +27,10 @@ from story_plan import run_plan, stabilize_shot_ids  # noqa: E402
 
 
 def _fill_graph(graph: dict) -> dict:
+    # These control/lock fixtures exercise the generic narrative path, not the
+    # separate human-reviewed dialogue-screenplay gate.
+    graph.pop("dialogue_screenplay", None)
+    graph["dialogue_mode"] = "storyteller"
     graph["story"].update(
         {
             "premise": "雨夜出租車中的秘密相遇",

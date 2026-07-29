@@ -26,6 +26,31 @@ MAX_DIALOGUE_COVERAGE_RATIO = 0.40
 MIN_A_ROLL_RATIO = 0.60
 
 
+def score_dialogue_broll_value(shot: dict[str, Any], entry: dict[str, Any]) -> dict[str, Any]:
+    """Make editorial value explicit so decorative coverage can be rejected."""
+    text = " ".join(
+        str(shot.get(key) or "") for key in ("dialogue", "caption_text", "visible_change")
+    ).lower()
+    purpose = str(entry.get("narrative_purpose") or "").lower()
+    kind = str(entry.get("kind") or "")
+    information_gain = int(
+        any(token in text for token in ("照片", "信", "门", "雨", "reveal", "letter", "door"))
+        or "story-relevant" in purpose
+    )
+    emotional_turn = int(
+        kind == "reaction" and bool((shot.get("performance_state") or {}).get("emotion"))
+    )
+    repetition_risk = int("story-relevant" not in purpose and "emotional turn" not in purpose)
+    score = information_gain * 2 + emotional_turn * 2 - repetition_risk * 2
+    return {
+        "score": score,
+        "information_gain": information_gain,
+        "emotional_turn": emotional_turn,
+        "repetition_risk": repetition_risk,
+        "eligible": score > 0,
+    }
+
+
 def iter_dialogue_broll(spec: dict[str, Any]) -> list[dict[str, Any]]:
     """Return B-roll entries in film order, annotated with their parent shot."""
     found: list[dict[str, Any]] = []
@@ -90,7 +115,7 @@ def default_dialogue_broll(
         "lipsync": False,
     }
     if kind == "reaction":
-        return [
+        result = [
             {
                 **common,
                 "narrative_purpose": "show the listener absorb the emotional turn before returning to the speaker",
@@ -104,8 +129,9 @@ def default_dialogue_broll(
                 },
             }
         ]
+        return result
     if kind == "env":
-        return [
+        result = [
             {
                 **common,
                 "narrative_purpose": "let the location register the pressure of the dialogue before returning to the speaker",
@@ -119,7 +145,8 @@ def default_dialogue_broll(
                 },
             }
         ]
-    return [
+        return result
+    result = [
         {
             **common,
             "narrative_purpose": "show the concrete object or environmental consequence named by the dialogue",
@@ -133,6 +160,7 @@ def default_dialogue_broll(
             },
         }
     ]
+    return result
 
 
 def validate_dialogue_broll(shot: dict[str, Any], *, shot_id: str) -> list[dict[str, Any]]:

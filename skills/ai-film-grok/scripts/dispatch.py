@@ -28,6 +28,7 @@ _ACTION_SKILLS = {
     "narrative-lock": "story.validate",
     "grok-i2v-bulk": "image.animate",
     "state-index-plan": "character.state.update",
+    "dialogue-candidate-review": "quality.inspect",
     "audio-plan": "sound.design",
     "selects-report": "projection.verify",
     "post-audit-gate": "projection.verify",
@@ -602,6 +603,28 @@ def build_dispatch(
                 f"等待使用者審閱並鎖定 {scope} scope；Agent 不得自批",
                 "agent",
             )
+    competition_receipts = root / "receipts" / "dialogue-competitions"
+    if competition_receipts.is_dir():
+        pending_candidate_reviews: list[str] = []
+        for receipt_path in sorted(competition_receipts.glob("*.json")):
+            receipt = read_json(receipt_path)
+            if not isinstance(receipt, dict):
+                continue
+            if (
+                isinstance(receipt.get("provisional_selection"), dict)
+                and (receipt.get("approval") or {}).get("status") != "approved"
+            ):
+                pending_candidate_reviews.append(str(receipt.get("shot_id") or receipt_path.stem))
+        if pending_candidate_reviews:
+            pre(
+                "dialogue-candidate-review",
+                f'aifilm review-ui --root "{r}"',
+                (
+                    f"{len(pending_candidate_reviews)} 个讲话镜已有 provisional winner，"
+                    "必须完整观看并人工批准，败选素材不得进入 final"
+                ),
+                "visual",
+            )
     existing_ids = {a.get("id") for a in actions}
     merged: list[dict[str, str]] = []
     for p in prepend:
@@ -841,6 +864,22 @@ def build_dispatch(
         )
         if cap.get("suggested_film_spec_patch"):
             routing["i2v_patch_available"] = cap.get("suggested_film_spec_patch")
+
+    # Collectors above may prepend a stricter action (notably state-index).
+    # Re-select after collection so next_action and weapon routing cannot keep
+    # pointing at a stale bulk action.
+    primary = (
+        actions[0]
+        if workflow.get("mode") == "professional" and actions
+        else next(
+            (action for action in actions if structured_next_action(action) is not None),
+            None,
+        )
+    )
+    next_cmd = (primary or {}).get("cmd")
+    next_id = (primary or {}).get("id")
+    next_why = (primary or {}).get("why")
+    agent_do.append(f"最终 next_action={next_id or 'none'}：{next_why or '—'}")
 
     # Phase 1+2: Vertical Drama Graph + Execution jobs summary (non-breaking)
     graph_digest: dict[str, Any] | None = None

@@ -7,6 +7,10 @@
   "properties": {
     "schema_version": {"const": 1},
     "kind": {"const": "story-reception"},
+    "dialogue_screenplay": {
+      "type": "object",
+      "description": "Reviewed dialogue screenplay required before a narrative story lock."
+    },
     "source": {
       "type": "object",
       "required": ["raw_text", "sha256", "language", "source_ref"],

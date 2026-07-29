@@ -14,6 +14,7 @@ sys.path.insert(0, str(SCRIPTS))
 from dialogue_broll import (  # noqa: E402
     DialogueBrollError,
     default_dialogue_broll,
+    score_dialogue_broll_value,
     validate_dialogue_broll,
     write_broll_edit_report,
 )
@@ -31,6 +32,14 @@ def _shot(duration: float = 8.0) -> dict:
 
 
 class TestDialogueBroll(unittest.TestCase):
+    def test_editorial_value_prefers_information_or_emotional_turns(self) -> None:
+        shot = _shot()
+        shot["dialogue"] = "The letter reveals why the door stayed locked."
+        entry = default_dialogue_broll(shot)[0]
+        score = score_dialogue_broll_value(shot, entry)
+        self.assertTrue(score["eligible"])
+        self.assertGreater(score["information_gain"], 0)
+
     def test_long_dialogue_gets_one_safe_insert(self) -> None:
         shot = _shot()
         entries = default_dialogue_broll(shot)

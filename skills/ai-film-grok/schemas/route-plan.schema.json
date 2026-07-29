@@ -49,6 +49,7 @@
     },
     "alternatives": { "type": "array", "items": { "type": "object" } },
     "rejected": { "type": "array", "items": { "type": "object" } },
+    "dialogue_competition": { "type": ["object", "null"] },
     "blocked_reason": { "type": ["string", "null"] }
   },
   "$defs": {

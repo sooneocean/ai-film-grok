@@ -135,6 +135,65 @@ def test_env_shot_selects_specialized_cloud_t2v_and_explains_rejections(
     ]
 
 
+def test_speaking_shot_route_exposes_serial_competition_dag_and_fails_closed(
+    tmp_path: Path,
+) -> None:
+    _write_spec(
+        tmp_path,
+        [
+            {
+                "id": "line01",
+                "shot_role": "hero",
+                "screen_mode": "on_camera",
+                "speaker_on_camera": True,
+                "lipsync": True,
+                "speaker": "hero",
+                "performance_intent": {"emotion": "guarded"},
+                "performance_state": {
+                    "status": "approved",
+                    "image_sha256": "a" * 64,
+                },
+                "tts": {
+                    "status": "final",
+                    "language": "ja",
+                    "audio_sha256": "b" * 64,
+                },
+            }
+        ],
+    )
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "wan22-i2v",
+                provider="comfy-wan22",
+                model="wan22-i2v",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+            )
+        ],
+    )
+
+    report = plan_route(tmp_path, shot_id="line01", now=NOW)
+
+    competition = report["route_plan"]["dialogue_competition"]
+    assert report["ok"] is False
+    assert report["blocked_reason"] == "DIALOGUE_COMPETITION_BLOCKED"
+    assert [step["id"] for step in competition["dag"]["steps"]] == [
+        "state_i2i",
+        "tts",
+        "candidate_preservation",
+        "candidate_generative",
+        "qa",
+        "provisional_select",
+        "human_approve",
+        "promote",
+    ]
+    assert len(report["execution_plan"]["tasks"]) == 8
+    assert all(task["status"] == "blocked" for task in report["execution_plan"]["tasks"])
+    assert report["execution_plan"]["authorized"] is False
+
+
 def test_dialogue_broll_routes_as_a_timed_editorial_child(tmp_path: Path) -> None:
     _write_spec(
         tmp_path,

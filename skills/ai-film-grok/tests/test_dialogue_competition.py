@@ -342,9 +342,7 @@ def test_human_approval_rejects_a_tampered_or_already_approved_result() -> None:
     )
     assert tampered["ok"] is False
     assert tampered["promotion"]["authorized"] is False
-    assert "PROVISIONAL_SELECTION_INVALID" in {
-        issue["code"] for issue in tampered["issues"]
-    }
+    assert "PROVISIONAL_SELECTION_INVALID" in {issue["code"] for issue in tampered["issues"]}
 
     clean_ranked = rank_dialogue_candidates(
         plan,
@@ -367,3 +365,42 @@ def test_human_approval_rejects_a_tampered_or_already_approved_result() -> None:
     )
     assert second["ok"] is False
     assert second["promotion"]["authorized"] is False
+
+
+def test_default_inputs_fail_closed_without_mutating_capabilities() -> None:
+    missing = build_dialogue_competition_plan(_shot(), now=NOW)
+    assert missing["ok"] is False
+    assert {"CAPABILITIES_MISSING", "GPU_QUEUE_UNKNOWN"} <= {
+        issue["code"] for issue in missing["issues"]
+    }
+
+    capabilities = _capabilities()
+    original = [dict(item) for item in capabilities]
+    build_dialogue_competition_plan(
+        _shot(),
+        capabilities=capabilities,
+        gpu_state={"queue_known": True, "busy": False},
+        now=NOW,
+    )
+    assert capabilities == original
+
+
+def test_missing_receipt_evidence_is_hard_rejected() -> None:
+    plan = build_dialogue_competition_plan(
+        _shot(),
+        capabilities=_capabilities(),
+        gpu_state={"queue_known": True, "busy": False},
+        now=NOW,
+    )
+    incomplete = _candidate("preservation-a", lane="preservation", quality=0.99)
+    incomplete.pop("output_sha256")
+    result = rank_dialogue_candidates(
+        plan,
+        [
+            incomplete,
+            _candidate("generative-b", lane="generative", quality=0.70),
+        ],
+    )
+    rejected = {item["candidate_id"]: item for item in result["rejected"]}
+    assert "OUTPUT_SHA256_INVALID" in rejected["preservation-a"]["hard_failures"]
+    assert result["provisional_selection"]["candidate_id"] == "generative-b"

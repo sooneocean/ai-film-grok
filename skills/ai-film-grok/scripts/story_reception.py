@@ -127,6 +127,16 @@ def validate_story_reception(payload: object) -> dict[str, Any]:
                 raise ReceptionError("treatment.mature_intimacy.consent must be explicit")
             if not isinstance(mature.get("visual_focus"), list) or not mature["visual_focus"]:
                 raise ReceptionError("treatment.mature_intimacy.visual_focus is required")
+    screenplay = payload.get("dialogue_screenplay")
+    if screenplay is not None:
+        from dialogue_screenplay import validate_dialogue_screenplay
+
+        validation = validate_dialogue_screenplay(screenplay, strict=True)
+        if not validation["ok"]:
+            codes = ", ".join(
+                sorted({str(item.get("code") or "") for item in validation["issues"]})
+            )
+            raise ReceptionError(f"dialogue_screenplay is not lock-ready: {codes}")
     return payload
 
 

@@ -30,6 +30,84 @@ _SUPPORTED_QUALITY_TIERS = frozenset({"draft", "select", "hero"})
 _SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "schemas"
 
 
+def _dialogue_competition(
+    base: Path,
+    shot: dict[str, Any],
+    capabilities: list[dict[str, Any]],
+    *,
+    current: datetime,
+) -> dict[str, Any] | None:
+    if not (
+        shot.get("lipsync") is True
+        or shot.get("speaker_on_camera") is True
+        or str(shot.get("screen_mode") or "") == "on_camera"
+    ):
+        return None
+    from dialogue_competition import build_dialogue_competition_plan
+
+    competition_capabilities: list[dict[str, Any]] = []
+    for item in capabilities:
+        if not isinstance(item, dict):
+            continue
+        value = dict(item)
+        value["canary_passed"] = item.get("pilot_verified") is True
+        value["promotion"] = "pilot" if item.get("experimental") is True else "production"
+        identity = " ".join(str(item.get(key) or "").lower() for key in ("id", "provider", "model"))
+        if "qwen" in identity and ("image" in identity or "i2i" in identity):
+            value["lane"] = "state_i2i"
+        elif "edge" in identity:
+            value["lane"] = "tts"
+        elif "wan" in identity:
+            value["lane"] = "preservation_i2v"
+        elif "latent" in identity:
+            value["lane"] = "preservation_lipsync"
+        elif "infinitetalk" in identity or "fantasytalking" in identity:
+            value["lane"] = "generative"
+        competition_capabilities.append(value)
+
+    capacity = read_json(base / "receipts" / "comfy-capacity.json")
+    gpu_state = {"queue_known": False, "busy": False}
+    if isinstance(capacity, dict):
+        queue_known = any(
+            key in capacity
+            for key in ("busy", "queue_busy", "queue_running", "queue_pending", "queue_known")
+        )
+        gpu_state = {
+            "queue_known": bool(capacity.get("queue_known", queue_known)),
+            "busy": bool(
+                capacity.get("busy")
+                or capacity.get("queue_busy")
+                or capacity.get("queue_running")
+                or capacity.get("queue_pending")
+            ),
+        }
+    performance_state = (
+        dict(shot.get("performance_state"))
+        if isinstance(shot.get("performance_state"), dict)
+        else {}
+    )
+    tts = dict(shot.get("tts")) if isinstance(shot.get("tts"), dict) else {}
+    adapted = {
+        **shot,
+        "shot_type": "speaking",
+        "performance_intent": shot.get("performance_intent")
+        or {
+            "emotion": performance_state.get("emotion"),
+            "subtext": performance_state.get("subtext"),
+            "gaze_target": performance_state.get("gaze_target"),
+        },
+        "performance_state": performance_state,
+        "tts": tts,
+    }
+    return build_dialogue_competition_plan(
+        adapted,
+        capabilities=competition_capabilities,
+        gpu_state=gpu_state,
+        stage="pilot",
+        now=current.isoformat(),
+    )
+
+
 def _parse_time(value: object, *, field: str) -> datetime:
     text = str(value or "").strip()
     if not text:
@@ -313,10 +391,17 @@ def explain_route(
         }
 
     rejected.sort(key=lambda item: str(item.get("capability_id") or ""))
+    competition = _dialogue_competition(
+        base,
+        shot,
+        capabilities,
+        current=current,
+    )
+    route_ok = selected is not None and (competition is None or competition.get("ok") is True)
     report = {
         "schema_version": 1,
         "kind": "ai-film-route-plan",
-        "ok": selected is not None,
+        "ok": route_ok,
         "read_only": True,
         "auto_execute": False,
         "explained_at": current.isoformat(),
@@ -339,13 +424,97 @@ def explain_route(
             for rank, _capability_id, raw in viable[1:]
         ],
         "rejected": rejected,
-        "blocked_reason": None if selected is not None else "NO_VIABLE_CAPABILITY",
+        "dialogue_competition": competition,
+        "blocked_reason": (
+            None
+            if route_ok
+            else "NO_VIABLE_CAPABILITY"
+            if selected is None
+            else "DIALOGUE_COMPETITION_BLOCKED"
+        ),
     }
     _validate_contract(report, "route-plan.schema.json", error_code="INVALID_ROUTE_PLAN")
     return report
 
 
 def _execution_plan(route_plan: dict[str, Any], *, route_plan_sha256: str) -> dict[str, Any]:
+    competition = route_plan.get("dialogue_competition")
+    intent = route_plan.get("intent")
+    if isinstance(competition, dict):
+        if not isinstance(intent, dict):
+            raise RouteExplainError("INVALID_ROUTE_PLAN: intent is missing")
+        shot_id = str(intent.get("shot_id") or "").strip()
+        if not shot_id:
+            raise RouteExplainError("INVALID_ROUTE_PLAN: shot id is missing")
+        bindings = (
+            competition.get("capability_bindings")
+            if isinstance(competition.get("capability_bindings"), dict)
+            else {}
+        )
+        step_bindings = {
+            "state_i2i": "state_i2i",
+            "tts": "tts",
+            "candidate_preservation": "preservation_i2v",
+            "candidate_generative": "generative",
+            "qa": "dialogue-qa",
+            "provisional_select": "dialogue-ranker",
+            "human_approve": "human-review",
+            "promote": "media-promotion",
+        }
+        resources = {
+            "human_approve": "human_review",
+            "provisional_select": "local_cpu",
+            "qa": "local_cpu",
+            "promote": "local_filesystem",
+        }
+        tasks: list[dict[str, Any]] = []
+        task_ids: dict[str, str] = {}
+        for step in (competition.get("dag") or {}).get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            step_id = str(step.get("id") or "")
+            binding_key = step_bindings.get(step_id, step_id)
+            binding = bindings.get(binding_key)
+            capability_id = (
+                str(binding.get("id") or binding_key) if isinstance(binding, dict) else binding_key
+            )
+            task_id = f"route-{shot_id}-{step_id}"
+            task_ids[step_id] = task_id
+            depends_on = [
+                task_ids[dependency]
+                for dependency in step.get("depends_on") or []
+                if dependency in task_ids
+            ]
+            task_key = canonical_json_sha256(
+                {
+                    "route_plan_sha256": route_plan_sha256,
+                    "shot_id": shot_id,
+                    "step": step_id,
+                    "capability_id": capability_id,
+                    "depends_on": depends_on,
+                }
+            )
+            tasks.append(
+                {
+                    "id": task_id,
+                    "shot_id": shot_id,
+                    "capability_id": capability_id,
+                    "resource": resources.get(step_id, "rtx5090_serial"),
+                    "depends_on": depends_on,
+                    "idempotency_key": task_key,
+                    "status": "planned" if competition.get("ok") is True else "blocked",
+                }
+            )
+        plan = {
+            "schema_version": 1,
+            "kind": "ai-film-execution-plan",
+            "route_plan_sha256": route_plan_sha256,
+            "authorized": False,
+            "tasks": tasks,
+        }
+        _validate_contract(plan, "execution-plan.schema.json", error_code="INVALID_EXECUTION_PLAN")
+        return plan
+
     selected = route_plan.get("selected")
     if not isinstance(selected, dict):
         plan = {
