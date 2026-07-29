@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from voice_armory import (
     catalog,
     get_voice_profile,
@@ -42,6 +41,25 @@ def test_design_presets_are_ready_but_are_not_presented_as_fixed_characters() ->
         assert profile is not None
         assert profile["variant"] == "voice_design"
         assert "非固定角色" in profile["label"]
+
+
+def test_extended_design_presets_are_catalogued_as_chinese_adult_voices() -> None:
+    for profile_id in (
+        "qwen_zh_female_elegant",
+        "qwen_zh_female_husky",
+        "qwen_zh_female_whisper",
+        "qwen_zh_female_playful",
+        "qwen_zh_female_confident",
+        "qwen_zh_female_comforting",
+        "qwen_zh_female_melancholy",
+        "qwen_zh_female_mysterious",
+        "qwen_zh_female_documentary",
+        "qwen_zh_female_storyteller",
+    ):
+        profile = ready_tts_profile(profile_id)
+        assert profile is not None
+        assert profile["language"] == "Chinese"
+        assert profile["instruction_prefix"].startswith("成年中文女声")
 
 
 def test_node_voice_resolution_rejects_unknown_or_unavailable_variants() -> None:
