@@ -343,11 +343,34 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                         "out": str(path.relative_to(root)),
                         "why": "talking close-up requires a state-locked i2i performance reference",
                         "i2i_route": dialogue_i2i_route,
+                        "input_candidates": [
+                            f"canonical/cast-states/{hero_id}/{_wardrobe_of(shot)}.png",
+                            f"assets/characters/{hero_id}-canonical.png",
+                        ],
+                        "generation_receipt_out": (
+                            f"receipts/generation/performance-states/{hero_id}/{state_id}.json"
+                        ),
+                        "generation_receipt_contract": {
+                            "operation": "image_edit",
+                            "required": ["input_sha256", "output_sha256", "model"],
+                            "output_sha256_must_match": str(path.relative_to(root)),
+                        },
+                        "approval_receipt_out": (
+                            f"receipts/performance-states/{hero_id}/{state_id}.json"
+                        ),
+                        "approval_command": (
+                            "aifilm approve-performance-state --speaker "
+                            f"{hero_id} --state-id {state_id} --image {path.relative_to(root)} "
+                            "--generation-receipt <generation_receipt_out> "
+                            "--reviewer <reviewer> --review-note <note>"
+                        ),
                         "agent_hint": (
                             "Follow i2i_route: FRW only when exact img2image capability is proven; "
                             "otherwise run local capacity preflight and wait if occupied. From the "
                             "matching wardrobe state preserve face/outfit, then set emotion, gaze, "
-                            "hand/prop and camera-facing pose before lipsync"
+                            "hand/prop and camera-facing pose before lipsync. Save the provider's "
+                            "real image_edit receipt before human approval; never backfill lineage "
+                            "for an old still."
                         ),
                     }
                 )

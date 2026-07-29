@@ -53,6 +53,22 @@ def test_node_credentials_keep_explicit_environment_over_config(
     assert _node_credentials() == ("http://env-node", "env-token-which-is-not-real")
 
 
+def test_config_uses_last_nonempty_value_without_overriding_environment(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = tmp_path / "config.env"
+    config.write_text(
+        "FISH_API_KEY=stale-test-key\nFISH_API_KEY=effective-test-key\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config_loader, "_SKILL_ROOT_CANDIDATES", [config])
+    monkeypatch.setattr(config_loader, "_CONFIG", None)
+    monkeypatch.setattr(config_loader, "_CONFIG_ENV_FINGERPRINT", None)
+    monkeypatch.delenv("FISH_API_KEY", raising=False)
+
+    assert config_loader.get_config().fish_api_key == "effective-test-key"
+
+
 def test_node_credentials_fail_closed_when_configuration_is_missing(monkeypatch) -> None:
     monkeypatch.setattr(config_loader, "_SKILL_ROOT_CANDIDATES", [])
     monkeypatch.setattr(config_loader, "_CONFIG", None)

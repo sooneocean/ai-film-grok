@@ -6,7 +6,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-from PIL import Image
 from util import canonical_json_sha256, read_json, sha256_file, utc_now, write_json
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -83,6 +82,8 @@ def approve_performance_state(
     if not source.is_file():
         raise ValueError("performance state image is missing")
     try:
+        from PIL import Image
+
         with Image.open(source) as decoded:
             decoded.verify()
     except Exception as exc:  # noqa: BLE001
