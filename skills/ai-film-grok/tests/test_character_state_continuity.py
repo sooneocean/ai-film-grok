@@ -223,6 +223,15 @@ class DialoguePerformanceStateGateTests(unittest.TestCase):
                 "generate_dialogue_state_photo",
                 {step["action"] for step in report["generate_plan"]},
             )
+            step = next(
+                item
+                for item in report["generate_plan"]
+                if item["action"] == "generate_dialogue_state_photo"
+            )
+            self.assertEqual(step["generation_receipt_contract"]["operation"], "image_edit")
+            self.assertIn("input_sha256", step["generation_receipt_contract"]["required"])
+            self.assertTrue(step["generation_receipt_out"].endswith("hero-dlg_01-defiant.json"))
+            self.assertIn("approve-performance-state", step["approval_command"])
 
 
 if __name__ == "__main__":

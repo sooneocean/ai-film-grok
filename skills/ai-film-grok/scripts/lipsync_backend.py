@@ -219,6 +219,38 @@ def resolve_backend(requested: str) -> str:
     return req
 
 
+def enforce_dialogue_lipsync(*, vo_mode: str, shots: list[dict[str, Any]], requested: str) -> str:
+    """Return a fail-closed lip-sync mode for a dialogue-first final render.
+
+    ``auto`` is normally allowed to skip a unavailable backend so ordinary
+    narration renders remain usable.  That policy is unsafe for on-camera
+    dialogue: its delivery promise is Japanese speech whose pixels match the
+    audio.  A dialogue render therefore needs an explicitly ready, approved
+    preservation backend, and uses ``require`` for the actual per-shot run.
+    """
+    mode = str(vo_mode or "").strip().lower()
+    req = str(requested or "off").strip().lower()
+    targets = [
+        str(shot.get("id") or f"shot-{index + 1}")
+        for index, shot in enumerate(shots)
+        if str(shot.get("screen_mode") or "").strip().lower() == "on_camera"
+    ]
+    if mode != "dialogue_drama" or not targets:
+        return req
+    if req == "off":
+        raise LipSyncError(
+            "dialogue_drama on-camera dialogue requires a verified lip-sync backend; "
+            f"--lipsync off is forbidden for {', '.join(targets)}"
+        )
+    # Resolve before render begins.  This deliberately excludes whole-frame
+    # avatar routes: only BACKEND_PRIORITY's preservation backends are eligible.
+    if req == "auto":
+        resolve_backend("require")
+        return "require"
+    resolve_backend(req)
+    return req
+
+
 def run_external(video: Path, audio: Path, out: Path, template: list[str]) -> None:
     try:
         argv = expand_argv(

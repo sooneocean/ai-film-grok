@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -44,6 +46,41 @@ def test_explicit_target_requires_speaker_face_and_near_shot() -> None:
             "cast": ["hero", "partner"],
             "face_target": "",
         }
+    )
+
+
+def test_dialogue_render_forbids_lipsync_off() -> None:
+    with pytest.raises(lipsync_backend.LipSyncError, match="--lipsync off is forbidden"):
+        lipsync_backend.enforce_dialogue_lipsync(
+            vo_mode="dialogue_drama",
+            requested="off",
+            shots=[{"id": "talk01", "screen_mode": "on_camera"}],
+        )
+
+
+def test_dialogue_auto_requires_a_ready_preservation_backend() -> None:
+    with mock.patch.object(
+        lipsync_backend, "resolve_backend", return_value="latentsync"
+    ) as resolve:
+        assert (
+            lipsync_backend.enforce_dialogue_lipsync(
+                vo_mode="dialogue_drama",
+                requested="auto",
+                shots=[{"id": "talk01", "screen_mode": "on_camera"}],
+            )
+            == "require"
+        )
+    resolve.assert_called_once_with("require")
+
+
+def test_non_dialogue_render_keeps_lipsync_off() -> None:
+    assert (
+        lipsync_backend.enforce_dialogue_lipsync(
+            vo_mode="storyteller",
+            requested="off",
+            shots=[{"id": "talk01", "screen_mode": "on_camera"}],
+        )
+        == "off"
     )
 
 

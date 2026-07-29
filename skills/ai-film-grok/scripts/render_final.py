@@ -86,11 +86,12 @@ from util import utc_now, write_json
 # local sibling import
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
-    from lipsync_backend import lipsync_one, should_lipsync_shot
+    from lipsync_backend import enforce_dialogue_lipsync, lipsync_one, should_lipsync_shot
     from lipsync_backend import probe as lipsync_probe
 except ImportError:  # pragma: no cover
     lipsync_one = None  # type: ignore
     should_lipsync_shot = None  # type: ignore
+    enforce_dialogue_lipsync = None  # type: ignore
     lipsync_probe = None  # type: ignore
 
 try:
@@ -2552,6 +2553,16 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     font_path = resolve_font()
 
     shots = flatten_shots(spec, film_root=root)
+    if enforce_dialogue_lipsync is None:
+        raise RenderError("dialogue lip-sync gate is unavailable")
+    try:
+        lipsync_mode = enforce_dialogue_lipsync(
+            vo_mode=vo_mode,
+            shots=shots,
+            requested=lipsync_mode,
+        )
+    except Exception as exc:
+        raise RenderError(str(exc)) from exc
     try:
         # The validator runs in flatten_shots; this makes the renderer's TTS
         # selection explicit and refuses ambiguous multi-turn shots.
