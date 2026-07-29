@@ -129,3 +129,39 @@ def test_unapproved_musetalk_is_not_sent_as_production_fallback(tmp_path: Path) 
         )
 
     assert render.call_args.kwargs["fallback_backend"] == ""
+
+
+def test_pilot_can_explicitly_disable_global_node_fallback(tmp_path: Path) -> None:
+    video = tmp_path / "input.mp4"
+    audio = tmp_path / "input.wav"
+    output = tmp_path / "output.mp4"
+    video.write_bytes(b"video")
+    audio.write_bytes(b"audio")
+    cfg = mock.Mock(
+        lipsync_node_base_url="http://127.0.0.1:18790",
+        lipsync_node_token="x" * 32,
+        lipsync_fallback="musetalk",
+    )
+    node_probe = {
+        "node": {
+            "backends": {
+                "latentsync": {"ready": True, "technical_ready": True},
+                "musetalk": {"ready": True, "technical_ready": True},
+            }
+        }
+    }
+    with (
+        mock.patch.object(lipsync_backend, "probe", return_value=node_probe),
+        mock.patch.object(lipsync_backend, "resolve_backend", return_value="latentsync"),
+        mock.patch.object(lipsync_backend, "get_config", return_value=cfg),
+        mock.patch("lipsync_node_client.render", return_value={"ok": True}) as render,
+    ):
+        lipsync_backend.lipsync_one(
+            video=video,
+            audio=audio,
+            out=output,
+            backend="latentsync",
+            allow_node_fallback=False,
+        )
+
+    assert render.call_args.kwargs["fallback_backend"] == ""

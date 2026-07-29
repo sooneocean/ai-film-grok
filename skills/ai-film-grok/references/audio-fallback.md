@@ -55,6 +55,23 @@ off（默认；storyteller 强制 off）
 "$AIFILM" lipsync-canary --root "<film>" --shot shot03 --backend latentsync
 "$AIFILM" lipsync-canary --root "<film>" --shot shot03 --backend musetalk
 
+# 收编前的三镜近景试点：不会写入任何影片 manifest。
+# 先注册正脸、微侧脸、轻微头动三条独立视频，统一使用最终日语对白。
+# approval.json 必须有 approved=true；audio 的 language=ja、role=final_character_dialogue；
+# 三个 videos 条目分别以 front_closeup/three_quarter_closeup/moving_closeup 为键，
+# role=approved_character_reference，并绑定实际 SHA-256。
+"$AIFILM" lipsync-pilot create --root "<pilot-root>" \
+  --front-video "<front.mp4>" \
+  --three-quarter-video "<three-quarter.mp4>" \
+  --moving-video "<moving.mp4>" \
+  --japanese-audio "<dialogue-ja.wav>" \
+  --approval-receipt "<approval.json>"
+# run 会先确认 ComfyUI 队列完全为空；否则只写 blocked_queue 收据，不触发 GPU。
+"$AIFILM" lipsync-pilot run --root "<pilot-root>"
+# 仅当收据将 LatentSync 标为结构化技术失败且 MuseTalk 已获批准，才由人显式重跑：
+"$AIFILM" lipsync-pilot rerun-musetalk --root "<pilot-root>" --sample front_closeup
+"$AIFILM" lipsync-pilot review-template --root "<pilot-root>"
+
 # 旧本机后端仍须用户审权重（agent 不代 acknowledge）：
 backend-lock inspect --backend wav2lip --root "$W2L"
 backend-lock lock --backend wav2lip --root "$W2L" --acknowledge-trusted-weights

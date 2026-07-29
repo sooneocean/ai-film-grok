@@ -359,6 +359,7 @@ def lipsync_one(
     out: Path,
     backend: str = "auto",
     allow_unapproved: bool = False,
+    allow_node_fallback: bool = True,
 ) -> dict[str, Any]:
     video = video.expanduser().resolve()
     audio = audio.expanduser().resolve()
@@ -393,7 +394,9 @@ def lipsync_one(
         from lipsync_node_client import LipsyncNodeError, render
 
         configured_fallback = (
-            str(cfg.lipsync_fallback or "").strip().lower() if chosen == "latentsync" else ""
+            str(cfg.lipsync_fallback or "").strip().lower()
+            if allow_node_fallback and chosen == "latentsync"
+            else ""
         )
         fallback = (
             configured_fallback

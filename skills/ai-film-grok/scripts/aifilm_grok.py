@@ -5373,6 +5373,27 @@ def cmd_production_report(args: argparse.Namespace) -> int:
     return _run_quality_reporting_cli(args, "production-report")
 
 
+def cmd_external_review(args: argparse.Namespace) -> int:
+    from external_review import ExternalReviewError, capability_probe, create_report
+
+    try:
+        if args.external_review_action == "probe":
+            report = capability_probe()
+        else:
+            report = create_report(
+                args.root,
+                video=args.video,
+                subtitles=args.subtitles,
+                director_contract=args.director_contract,
+                sanitized_frame_index=args.sanitized_frame_index,
+                sanitized=bool(args.sanitized),
+            )
+    except ExternalReviewError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0
+
+
 def _cmd_graph_legacy(args: argparse.Namespace) -> int:
     """Vertical Drama Graph: legacy derive/import + canonical project/validate/status."""
     root = Path(args.root).expanduser().resolve()
@@ -6283,6 +6304,38 @@ def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") else 1
 
 
+def cmd_lipsync_pilot(args: argparse.Namespace) -> int:
+    from lipsync_pilot import (
+        LipsyncPilotError,
+        create_pilot,
+        rerun_musetalk,
+        review_template,
+        run_pilot,
+    )
+
+    try:
+        action = str(args.lipsync_pilot_action)
+        if action == "create":
+            report = create_pilot(
+                args.root,
+                front_video=args.front_video,
+                three_quarter_video=args.three_quarter_video,
+                moving_video=args.moving_video,
+                japanese_audio=args.japanese_audio,
+                approval_receipt=args.approval_receipt,
+            )
+        elif action == "run":
+            report = run_pilot(args.root)
+        elif action == "rerun-musetalk":
+            report = rerun_musetalk(args.root, sample_id=args.sample)
+        else:
+            report = review_template(args.root)
+    except LipsyncPilotError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok", True) else 1
+
+
 def cmd_capability(args: argparse.Namespace) -> int:
     """One-page readiness: TTS / FRW canary summary / optional i2v suggest+apply."""
     from capability_report import CapabilityError, build_capability_report
@@ -6789,6 +6842,39 @@ def build_parser() -> argparse.ArgumentParser:
     lsc.add_argument("--backend", default="auto")
     lsc.add_argument("--video", default=None)
     lsc.add_argument("--audio", default=None)
+
+    lsp = sub.add_parser(
+        "lipsync-pilot",
+        help="Three-shot close-dialogue LatentSync pilot; never promotes candidate media",
+    )
+    lsp_sub = lsp.add_subparsers(dest="lipsync_pilot_action", required=True)
+    lsp_create = lsp_sub.add_parser(
+        "create", help="Register three distinct standard samples and one Japanese dialogue track"
+    )
+    lsp_create.add_argument("--root", required=True)
+    lsp_create.add_argument("--front-video", required=True)
+    lsp_create.add_argument("--three-quarter-video", required=True)
+    lsp_create.add_argument("--moving-video", required=True)
+    lsp_create.add_argument("--japanese-audio", required=True)
+    lsp_create.add_argument("--approval-receipt", required=True)
+    lsp_run = lsp_sub.add_parser(
+        "run", help="Run only after the shared ComfyUI queue is proved empty"
+    )
+    lsp_run.add_argument("--root", required=True)
+    lsp_muse = lsp_sub.add_parser(
+        "rerun-musetalk",
+        help="Explicit manual fallback after a classified LatentSync technical failure",
+    )
+    lsp_muse.add_argument("--root", required=True)
+    lsp_muse.add_argument(
+        "--sample",
+        required=True,
+        choices=("front_closeup", "three_quarter_closeup", "moving_closeup"),
+    )
+    lsp_review = lsp_sub.add_parser(
+        "review-template", help="Write a human review template for completed pilot outputs"
+    )
+    lsp_review.add_argument("--root", required=True)
 
     lsn = sub.add_parser(
         "lipsync-node",
@@ -7815,6 +7901,38 @@ def build_parser() -> argparse.ArgumentParser:
                 "--timeout", type=int, default=45, help="1-120 seconds; default 45"
             )
 
+    external_review = sub.add_parser(
+        "external-review",
+        help="Read-only Groq/Gemini candidate review; never changes production gates",
+    )
+    external_review_sub = external_review.add_subparsers(
+        dest="external_review_action", required=True
+    )
+    external_review_sub.add_parser(
+        "probe", help="Check local credential presence only; sends no media or inference request"
+    )
+    external_run = external_review_sub.add_parser(
+        "run", help="Write a hash-bound candidate-only external review report"
+    )
+    external_run.add_argument("--root", required=True, help="Film workspace root")
+    external_run.add_argument(
+        "--video", required=True, help="Verified local MP4/audio source in root"
+    )
+    external_run.add_argument("--subtitles", default=None, help="Optional in-root SRT sidecar")
+    external_run.add_argument(
+        "--director-contract", default=None, help="Optional in-root contract JSON"
+    )
+    external_run.add_argument(
+        "--sanitized-frame-index",
+        default=None,
+        help="Optional in-root JSON list of declared safe frame paths; max five frames",
+    )
+    external_run.add_argument(
+        "--sanitized",
+        action="store_true",
+        help="Required for adult technical samples and every external frame upload",
+    )
+
     semantic_index = sub.add_parser(
         "semantic-index",
         help="Opt-in private semantic retrieval; returns source-bound review candidates only",
@@ -8556,7 +8674,7 @@ def main(argv: list[str] | None = None) -> int:
         # Every film-root plugin command refreshes the lightweight scene-sound
         # receipt before its own work. It never generates, downloads, or mutates
         # film-spec; write-spec repeats it after writing the new projection.
-        if getattr(args, "root", None):
+        if getattr(args, "root", None) and args.cmd != "external-review":
             root = Path(args.root).expanduser().resolve()
             if (root / "film-spec.json").is_file():
                 from scene_sound import reconcile as reconcile_scene_sound
@@ -8589,6 +8707,7 @@ def main(argv: list[str] | None = None) -> int:
             "sfx-canary": cmd_sfx_canary,
             "lipsync-node": cmd_lipsync_node,
             "lipsync-canary": cmd_lipsync_canary,
+            "lipsync-pilot": cmd_lipsync_pilot,
             "capability": cmd_capability,
             "tts-ab": cmd_tts_ab,
             "init": cmd_init,
@@ -8647,6 +8766,7 @@ def main(argv: list[str] | None = None) -> int:
             "dashboard": cmd_dashboard,
             "quality-ledger": cmd_quality_ledger,
             "production-report": cmd_production_report,
+            "external-review": cmd_external_review,
             "comfy": cmd_comfy,
             "route": cmd_route,
             "team": cmd_team,
