@@ -3470,6 +3470,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         voice_cat = event_voice_path
         mix_spotting["event_voice_stem"] = event_voice_stem
     scene_sound_path = audio_dir / "scene_sound_stereo.wav"
+    ambience_path = audio_dir / "ambience_stereo.wav"
     if formal_timeline is not None:
         try:
             scene_sound = render_scene_sound_stem(
@@ -3478,13 +3479,32 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 duration_sec=float(total_dur),
                 out=scene_sound_path,
                 sample_rate=48000,
+                ambience_out=ambience_path,
             )
         except SceneSoundError as exc:
             raise RenderError(str(exc)) from exc
     else:
         silence_wav(scene_sound_path, float(total_dur))
-        scene_sound = {"path": str(scene_sound_path), "event_count": 0, "events": []}
+        silence_wav(ambience_path, float(total_dur))
+        scene_sound = {
+            "path": str(scene_sound_path),
+            "event_count": 0,
+            "events": [],
+            "ambience": {"path": str(ambience_path), "event_count": 0, "events": []},
+        }
     mix_spotting["scene_sound"] = scene_sound
+    ambience_volume = (
+        0.0
+        if bool(getattr(args, "mute_ambience", False))
+        else float(getattr(args, "ambience_volume", 1.0))
+    )
+    ambience_volume = max(0.0, min(2.0, ambience_volume))
+    mix_spotting["ambience"] = {
+        **(scene_sound.get("ambience") or {}),
+        "volume": ambience_volume,
+        "muted": ambience_volume == 0.0,
+        "ducking": "preserved_under_narration",
+    }
     sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
     if sound_plan is None:
         sound_plan = {}
@@ -3956,10 +3976,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[native]",
         f"[3:a]volume=1.0,aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo,{sfx_dsp}[sfx]",
         f"[4:a]volume=1.0,aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[scene]",
+        f"[5:a]volume={ambience_volume:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[ambience]",
     ]
     if use_color:
         fc_parts.append(
-            f"[5:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[color]"
+            f"[6:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[color]"
         )
 
     controlled_labels = {
@@ -3967,10 +3988,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "native": "native",
         "sfx": "sfx",
         "scene_sound": "scene",
+        "ambience": "ambience",
     }
     for window_index, window in enumerate(formal_silence_windows):
         scope = str(window.get("scope") or "bed")
-        targets = ("music", "native", "sfx", "scene_sound") if scope == "bed" else (scope,)
+        targets = (
+            ("music", "native", "sfx", "scene_sound", "ambience") if scope == "bed" else (scope,)
+        )
         for target in targets:
             incoming = controlled_labels[target]
             outgoing = f"{target}_silence_{window_index}"
@@ -3982,6 +4006,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     native_label = controlled_labels["native"]
     sfx_label = controlled_labels["sfx"]
     scene_label = controlled_labels["scene_sound"]
+    ambience_label = controlled_labels["ambience"]
 
     if "sidechaincompress" in filters_help and "acrossover" in filters_help:
         # Native I2V audio is the main picture sound.  Route it through the
@@ -3996,7 +4021,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         fc_parts.append(
             "[mus_l][mus_m_ducked][mus_h]amix=inputs=3:duration=longest:normalize=0[mus_ducked]"
         )
-        fc_parts.append(f"[mus_ducked][{sfx_label}]amix=inputs=2:duration=longest:normalize=0[bed]")
+        fc_parts.append(
+            f"[mus_ducked][{sfx_label}][{ambience_label}]amix=inputs=3:duration=longest:normalize=0[bed]"
+        )
         final_amix_count = 2 + (1 if use_color else 0)
         color_in = "[color]" if use_color else ""
         fc_parts.append(
@@ -4007,10 +4034,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         fc_parts.append(
             f"[{music_label}][{native_label}][{scene_label}]amix=inputs=3:duration=longest:normalize=0[picture_bed]"
         )
+        fc_parts.append(f"[picture_bed][narr]{sc_frag}[ducked]")
         fc_parts.append(
-            f"[picture_bed][{sfx_label}]amix=inputs=2:duration=longest:normalize=0[bed]"
+            f"[ducked][{sfx_label}][{ambience_label}]amix=inputs=3:duration=longest:normalize=0[bed]"
         )
-        fc_parts.append(f"[bed][narr]{sc_frag}[ducked]")
         final_amix_count = 2 + (1 if use_color else 0)
         color_in = "[color]" if use_color else ""
         fc_parts.append(
@@ -4018,10 +4045,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
         mix_spotting["sidechain_applied"] = "broadband"
     else:
-        final_amix_count = 5 + (1 if use_color else 0)
+        final_amix_count = 6 + (1 if use_color else 0)
         color_in = "[color]" if use_color else ""
         fc_parts.append(
-            f"[narr][{music_label}][{native_label}][{sfx_label}][{scene_label}]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
+            f"[narr][{music_label}][{native_label}][{sfx_label}][{scene_label}][{ambience_label}]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
         )
         mix_spotting["sidechain_applied"] = False
 
@@ -4032,9 +4059,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
 
     fc = ";".join(fc_parts)
-    mix_spotting["mix_inputs"] = ["narration", "bgm", "native", "sfx", "scene_sound"] + (
-        ["vocal_color"] if use_color else []
-    )
+    mix_spotting["mix_inputs"] = [
+        "narration",
+        "bgm",
+        "native",
+        "sfx",
+        "scene_sound",
+        "ambience",
+    ] + (["vocal_color"] if use_color else [])
     preserved_native_shots = primary_native_shot_ids(shot_audio)
     mix_spotting["native_audio"] = {
         "role": "primary_video_sound" if preserved_native_shots else "unavailable",
@@ -4071,6 +4103,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         str(sfx_stereo_path),
         "-i",
         str(scene_sound_path),
+        "-i",
+        str(ambience_path),
     ]
     if use_color:
         mix_cmd.extend(["-i", str(color_track)])
@@ -4160,10 +4194,41 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 loudness=mix_spotting.get("loudness"),
             )
         mix_spotting["artifacts"] = {
+            "narration": {"path": str(voice_cat), "sha256": sha256(voice_cat)},
             "bgm": {"path": str(music_path), "sha256": sha256(music_path)},
+            "native": {"path": str(native_track), "sha256": sha256(native_track)},
             "sfx": {"path": str(sfx_stereo_path), "sha256": sha256(sfx_stereo_path)},
+            "scene_sound": {"path": str(scene_sound_path), "sha256": sha256(scene_sound_path)},
+            "ambience": {"path": str(ambience_path), "sha256": sha256(ambience_path)},
             "mixed": {"path": str(mixed), "sha256": sha256(mixed)},
         }
+        if bool(getattr(args, "export_stems", False)):
+            stems_dir = audio_dir / "stems"
+            if stems_dir.is_symlink():
+                raise RenderError("audio stems directory cannot be a symbolic link")
+            stems_dir.mkdir(parents=True, exist_ok=True)
+            exported_stems: dict[str, dict[str, str]] = {}
+            for name, source in (
+                ("narration.wav", voice_cat),
+                ("bgm.wav", music_path),
+                ("native.wav", native_track),
+                ("sfx.wav", sfx_stereo_path),
+                ("scene_sound.wav", scene_sound_path),
+                ("ambience.wav", ambience_path),
+            ):
+                target = safe_output_path(stems_dir, name, suffixes={".wav"}, field="audio stem")
+                shutil.copy2(source, target)
+                exported_stems[name.removesuffix(".wav")] = {
+                    "path": str(target),
+                    "sha256": sha256(target),
+                }
+            if use_color:
+                target = safe_output_path(
+                    stems_dir, "vocal_color.wav", suffixes={".wav"}, field="audio stem"
+                )
+                shutil.copy2(color_track, target)
+                exported_stems["vocal_color"] = {"path": str(target), "sha256": sha256(target)}
+            mix_spotting["exported_stems"] = exported_stems
         if mix_spotting.get("report_path"):
             atomic_write_text(
                 Path(str(mix_spotting["report_path"])),
@@ -4633,7 +4698,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--export-stems",
         action="store_true",
-        help="Export isolated VO, BGM, and SFX stems",
+        help="Export isolated narration, BGM, native, SFX, scene-sound, and ambience stems",
+    )
+    p.add_argument(
+        "--ambience-volume",
+        type=float,
+        default=1.0,
+        help="Independent ambience stem gain from 0.0 to 2.0 (default: 1.0)",
+    )
+    p.add_argument(
+        "--mute-ambience",
+        action="store_true",
+        help="Mute the ambience stem while preserving all other stems",
     )
     p.add_argument("--fps", type=int)
     p.add_argument(

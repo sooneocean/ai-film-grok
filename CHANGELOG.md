@@ -3,6 +3,13 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.25.0] - 2026-07-30
+
+### Added
+
+- Added a director-controlled ambience stem: formal ambience cues now render independently from scene effects and can be muted or gain-adjusted at final mix.
+- Made `--export-stems` export narration, BGM, native, SFX, scene-sound, and ambience WAV stems with SHA-256 evidence in `mix_report.json`.
+
 ## [2.22.0] - 2026-07-29
 
 ### Added

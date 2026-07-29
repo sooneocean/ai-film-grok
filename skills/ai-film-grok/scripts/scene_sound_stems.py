@@ -213,11 +213,48 @@ def _local_asset(root: Path, event: dict[str, Any], *, delivery_scope: str) -> P
     return path
 
 
+def _write_stem(samples: np.ndarray, *, out: Path, sample_rate: int, label: str) -> dict[str, str]:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "f32le",
+            "-ar",
+            str(sample_rate),
+            "-ac",
+            "2",
+            "-i",
+            "pipe:0",
+            "-c:a",
+            "pcm_s16le",
+            str(out),
+        ],
+        input=np.clip(samples, -1.0, 1.0).tobytes(),
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode:
+        raise SceneSoundError(f"cannot write {label} stem")
+    return {"path": str(out), "sha256": hashlib.sha256(out.read_bytes()).hexdigest()}
+
+
 def render_scene_sound_stem(
-    root: Path, timeline: dict[str, Any], *, duration_sec: float, out: Path, sample_rate: int
+    root: Path,
+    timeline: dict[str, Any],
+    *,
+    duration_sec: float,
+    out: Path,
+    sample_rate: int,
+    ambience_out: Path | None = None,
 ) -> dict[str, Any]:
-    """Mix local foley/SFX/ambience/music assets at their signed cue times."""
-    samples = np.zeros((max(1, int(round(duration_sec * sample_rate))), 2), dtype=np.float32)
+    """Render scene effects and ambience separately for director-controlled mixing."""
+    shape = (max(1, int(round(duration_sec * sample_rate))), 2)
+    samples = np.zeros(shape, dtype=np.float32)
+    ambience_samples = np.zeros(shape, dtype=np.float32)
     executed: list[dict[str, Any]] = []
     delivery_scope = str(timeline.get("delivery_scope") or "commercial")
     asset_types = {"action_sfx", "ambience", "music", "performance"}
@@ -258,11 +295,13 @@ def render_scene_sound_stem(
         start = max(0, int(round(float(event["start_sec"]) * sample_rate)))
         end = min(len(samples), start + len(decoded))
         if end > start:
-            samples[start:end] += _apply_event_controls(decoded[: end - start], event, sample_rate)
+            target = ambience_samples if event.get("type") == "ambience" else samples
+            target[start:end] += _apply_event_controls(decoded[: end - start], event, sample_rate)
         executed.append(
             {
                 "id": event.get("id"),
                 "track": event.get("track"),
+                "stem": "ambience" if event.get("type") == "ambience" else "scene_sound",
                 "source": event.get("source"),
                 "executed": True,
                 "gain": event.get("gain", 1.0),
@@ -271,35 +310,19 @@ def render_scene_sound_stem(
                 "fade_out_sec": event.get("fade_out_sec", 0.0),
             }
         )
-    samples = np.clip(samples, -1.0, 1.0)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    proc = subprocess.run(
-        [
-            "ffmpeg",
-            "-y",
-            "-v",
-            "error",
-            "-f",
-            "f32le",
-            "-ar",
-            str(sample_rate),
-            "-ac",
-            "2",
-            "-i",
-            "pipe:0",
-            "-c:a",
-            "pcm_s16le",
-            str(out),
-        ],
-        input=samples.tobytes(),
-        capture_output=True,
-        check=False,
+    scene_stem = _write_stem(samples, out=out, sample_rate=sample_rate, label="scene-sound")
+    ambience_stem = (
+        _write_stem(ambience_samples, out=ambience_out, sample_rate=sample_rate, label="ambience")
+        if ambience_out is not None
+        else None
     )
-    if proc.returncode:
-        raise SceneSoundError("cannot write scene-sound stem")
     return {
-        "path": str(out),
-        "sha256": hashlib.sha256(out.read_bytes()).hexdigest(),
+        **scene_stem,
         "event_count": len(executed),
         "events": executed,
+        "ambience": {
+            **(ambience_stem or {}),
+            "event_count": sum(1 for event in executed if event["stem"] == "ambience"),
+            "events": [event for event in executed if event["stem"] == "ambience"],
+        },
     }
