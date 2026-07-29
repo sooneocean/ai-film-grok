@@ -5,82 +5,62 @@ description: Grok Build 专用 AI 短片 skill：Idea→Verified 导演工序、
 
 # AI Film Grok
 
-把想法收成可恢复、可验收的 9:16 动态成片。真实 I2V/footage、混音、字幕与人工审片缺一不可；静图轮播或只有关键帧不算成片。
+把想法收成可恢复、可验收的 9:16 动态成片。真 I2V/footage、混音、字幕与人审缺一不可。
 
-## 单一入口
+## 入口
 
 ```bash
 SKILL_DIR="$HOME/.grok/plugins/ai-film-grok/skills/ai-film-grok"
 [ -d "$SKILL_DIR" ] || SKILL_DIR="$HOME/.grok/skills/ai-film-grok"
 AIFILM="$SKILL_DIR/scripts/aifilm"
-
-"$AIFILM" dispatch --root "<film>"          # compact 默认
+"$AIFILM" dispatch --root "<film>"          # compact
 "$AIFILM" dispatch --root "<film>" --full
 "$AIFILM" advance --root "<film>"
 ```
 
-每步后 dispatch，只执行 `next_action`；读 `context_refs`（≤3）与 `weapon_route`。路由 ready、已授权且未锁 provider 就 probe 后直用，失败即停。状态在 `receipts/dispatch.json`。
+每步后 dispatch，只跑 `next_action`；读 `context_refs`（≤3）与 `weapon_route`。ready+授权+未锁 provider 才 probe 直用，失败即停。状态：`receipts/dispatch.json`。
 
-导演骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture→Post→Master。
+骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture→Post→Master。  
+小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。  
+创作会诊：[creative-workshop](references/creative-workshop.md)（默认只编译，`apply` 才写图）。
 
-小说/剧本先 [story.receive](references/story-reception.md) → `plan run --received-file`；原文不可覆盖，lock 前须用户确认。
+## P0
 
-## 创作工作室
-
-会诊/台词/提示词/声音见 [creative-workshop](references/creative-workshop.md)；默认只编译，显式 `apply` 才写图。
-
-## P0 核心
-
-1. **故事真相**：`drama-graph.json` 真相，`film-spec.json` 投影；locks + projection hash 齐再进媒体；先 Director’s Lens（[directors-lens.md](references/directors-lens.md)）。
-2. **用户原文保真**：用户剧本/对白/主题是脊柱，模板禁整句覆盖。
-3. **身份与介质**：先锁 medium/cast/face；角色 still 只编辑已批来源；moderated 禁 `image_gen` 绕脸；漫剧默认 manhua。
-4. **先验后生**：still 过身份/结构/画风/几何（9:16 默认 ≥704×1280；接受 provider 原生 704×1280，不强制放大）才 I2V。
-5. **连续性**：`state-index check|plan` 先于 bulk；衣着只前进；Continue 硬接批准末帧。
-6. **审批/用量**：pilot 须用户批；付费绑 hash/预算；`generation-usage.json`；`advance` 遇 human/paid/external 暂停。
-7. **供应商**：I2V 默认 `grok_primary`；恢复路径才用 `frw_video_model=seedance-2-fast-i2v`（见 [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)），禁静默 bulk。
-8. **声音分轨**：口白中文 Edge；角色日文 Edge；字幕中文 `nar`。禁无 speaker 中日乒乓、说书填 `nar_ja`、清空日文轨。亲密 BGM=rnb。[voice lesson](references/lessons-2026-07-24-ep2-voice-heat-final.md)
-9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；spice=extreme；四拍弧+bare；impact≥A；禁静默降 heat。[sex-arc](references/lessons-2026-07-27-adult-scale-max-sex-arc.md)·[hard-defaults](references/hard-defaults.md)·[playbook](references/adult-max-playbook.md)
-9b. **毒镜解剖**：禁 futa/喷奶/霓虹生殖器；中英 NEG + dry nipples；毒 still 禁 I2V、毒 clip 禁 final。[anatomy](references/lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md)
-10. **字幕像素门**：成片须可见中文字幕；HF 失字须 recovery；`sub_lead=0`；禁清空 SRT。
-11. **后期单一责任**：title/subtitle/end card 单引擎；`plate-cards blank`、plate `subs=off` 防双烧。
-12. **完成定义**：`final` 技术成功 ≠ `final_complete`；review/audit/字幕/export 须齐。
-13. **安全**：凭据本机读；日志禁 token/prompt；外部调用不自动重试花费。
-14. **高动态**：平常 mean≥18、肉戏≥20；禁 KB/弱 raw；桌面 final 仅 `i2v-final-gate` ok。[high-motion](references/lessons-2026-07-27-high-motion-style-lock-final.md)
-15. **I2V 画风锁**：源=style-locked still；首段 MEDIUM LOCK cel。
-16. **5090 武器库**：未锁视觉用 `weapon_route`；仅实跑 Qwen/Wan；未验 fail closed。[规则](references/comfy-weapon-armory.md)
-17. **bulk→final 出片（P0 · 2026-07-29）**：Imagine 拦 bare → undress 续接+高动软词+MEDIUM LOCK cel，禁内衣冒充插入；重拍后 review+register 两轮；orphan 清 manifest；final 直调长超时；sidechain 假死改 amix；字幕无空格路径或 PIL 烧。[lesson](references/lessons-2026-07-29-evirus-ch04-bulk-final-iron.md)
-18. **收尾门禁（P0 · 2026-07-29）**：plate≠完。heat 看 codes（`partner_wardrobe_state`）；adult sensory（sex_sfx+mix artifacts+AV）；改 spec 刷 truth_contract；字幕用真 concat 钟；改 final 删 quality-report 并重绑 narrative；review-final→post-audit→export-desktop。[lesson](references/lessons-2026-07-29-closeout-gates-chaebol.md)·[memory](memory/2026-07-29-closeout-gates-iron.md)
+1. **真相**：`drama-graph` 真，`film-spec` 投影；locks+hash 齐再媒体；Director’s Lens。
+2. **原文保真**：用户剧本/对白/主题是脊柱，模板禁整句盖。
+3. **身份介质**：锁 medium/cast/face；still 只改已批源；moderated 禁 `image_gen` 绕脸；漫剧 manhua。
+4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
+5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
+6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
+7. **供应商**：I2V=`grok_primary`；FRW/Seedance 仅恢复路径，禁静默 bulk。
+8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM 亲密=rnb。
+9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
+9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 final。
+10. **字幕**：像素内中文；HF 失字 recovery；`sub_lead=0`；禁空 SRT。
+11. **后期单责**：title/sub/end 单引擎；plate 防双烧。
+12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐。
+13. **安全**：凭据本机；日志禁 token/prompt；外部不自动重试花费。
+14. **高动**：平常 mean≥18、肉戏≥20；禁 KB；桌面 final 仅 motion-gate ok。
+15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
+16. **5090**：未锁视觉走 `weapon_route`；未验 fail closed。
+17. **bulk→final**：[evirus ch04](references/lessons-2026-07-29-evirus-ch04-bulk-final-iron.md) — bare 续接、双轮 register、长超时 final、禁内衣装插入。
+18. **收尾门**：[closeout](references/lessons-2026-07-29-closeout-gates-chaebol.md) — heat codes、sensory、truth_contract、真 concat 钟、清 quality 缓存、review→audit→export。
 
 ## 阶段
 
-[agent](references/stages/agent.md)→[visual](references/stages/visual.md)→[voice](references/stages/voice.md)→[post](references/stages/post.md)→[deliver](references/stages/deliver.md)；暂停 [approval](references/stages/approval.md)。深挖 [INDEX](references/INDEX.md)。
+[agent](references/stages/agent.md)→[visual](references/stages/visual.md)→[voice](references/stages/voice.md)→[post](references/stages/post.md)→[deliver](references/stages/deliver.md) · [approval](references/stages/approval.md) · [INDEX](references/INDEX.md)
 
-## 最小命令
+## 命令
 
 ```bash
 "$AIFILM" doctor
-"$AIFILM" plan run --root "<film>" --received-file "<film>/receipts/story-reception.json"
 "$AIFILM" plan run --root "<film>" --text "<story>" --title "<title>" --target-duration 60
-"$AIFILM" plan validate --root "<film>" --strict
-"$AIFILM" graph project --root "<film>" --force
 "$AIFILM" write-spec --root "<film>"
 "$AIFILM" state-index check --root "<film>"
 "$AIFILM" pilot report --root "<film>"
-"$AIFILM" usage status --root "<film>"
-"$AIFILM" semantic-index query --root "<film>" --query "红夹克快递员"
-"$AIFILM" comfy probe
-"$AIFILM" comfy inventory
-"$AIFILM" comfy capacity
-"$AIFILM" node status
-"$AIFILM" weapon probe
-"$AIFILM" route explain --root "<film>" --shot-id "shot01"
-"$AIFILM" route plan --root "<film>" --shot-id "shot01" --write
-"$AIFILM" sfx-canary --root "<film>" --prompt "door closes in a quiet room" \
-  --duration 8 --seed 5100 --noncommercial-research-ok
-# 用户批准后才 pilot approve / bulk
-"$AIFILM" final --root "<film>" --post-engine hyperframes \
-  --lipsync off --music-mood rnb --tts-backend edge --compose-preset auto
+# 用户批准后 bulk
+"$AIFILM" final --root "<film>" --post-engine hyperframes --lipsync off --music-mood rnb --tts-backend edge
 "$AIFILM" review-final --root "<film>"
 ```
 
-按需：[路由](references/production-routing-control-plane.md) · [索引](references/semantic-index.md) · [Comfy LAN](references/comfy-lan-control.md) · [MMAudio](references/mmaudio-sfx.md) · [硬规则](references/hard-defaults.md) · [双语剪辑](references/lessons-2026-07-20-cut-silk-bilingual.md)（`caption_mode`、`transition_fluency`） · [防双烧](references/lessons-2026-07-20-title-double-burn.md) · [导演课](references/directors-lens.md) · [INDEX](references/INDEX.md)
+深挖：[hard-defaults](references/hard-defaults.md) · [directors-lens](references/directors-lens.md) · [comfy armory](references/comfy-weapon-armory.md) · [INDEX](references/INDEX.md)
