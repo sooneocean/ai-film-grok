@@ -17,5 +17,14 @@
 ## 逃生
 `heat_scale:soft` · `adult_max_iron:false` · `erotic_impact_strict:false` · `sex_vo_auto_apply:false` · 各 `*_strict:false`
 
-## 未做（Wave 2）
-soften-compensate CLI · endframe wardrobe rank 自动 promote 拦 · music_energy 跟 phase · pilot 三拍绑 bulk
+## Wave 2 已做（同日续）
+| 项 | 入口 |
+|----|------|
+| plan 秒数预分配 | `rebalance_adult_beat_durations`；multi-scene compact 含 climax bare |
+| soften-compensate | `aifilm heat soften-compensate --apply` |
+| promote 回穿硬拦 | `promote_wardrobe_ok` / `should_auto_promote_next` |
+| music_energy 跟 phase | `inject_music_energy_spotting` → sound_plan.music_spotting |
+| pilot 三拍绑 bulk | `_assert_pilot_adult_three_beat`（undress + union/rhythm） |
+
+## 未做（Wave 3 可选）
+像素 CV 肤色 advisory · impact S 自动冲分模板 · 色气 checklist 半自动抽帧
