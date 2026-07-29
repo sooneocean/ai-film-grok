@@ -194,6 +194,7 @@ def _allowed_binding_slots(bindings: Mapping[str, Any]) -> set[tuple[str, str]]:
     pairs = (
         ("prompt_node", "prompt_input"),
         ("sampler_node", "seed_input"),
+        ("steps_node", "steps_input"),
         ("save_node", "filename_prefix_input"),
         ("input_node", "input_image_input"),
         ("audio_node", "audio_input"),
@@ -316,6 +317,11 @@ def assert_registered_weapon_workflow(
         raise ComfyArmoryError("compiled workflow prompt must not be empty")
     if not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed < 2**64:
         raise ComfyArmoryError("compiled workflow seed is invalid")
+    if "steps_node" in bindings:
+        steps = graph[str(bindings["steps_node"])]["inputs"][str(bindings["steps_input"])]
+        allowed_steps = (weapon.get("tuning") or {}).get("steps", {}).get("allowed") or []
+        if not isinstance(steps, int) or isinstance(steps, bool) or steps not in allowed_steps:
+            raise ComfyArmoryError("compiled workflow steps are not a registered step value")
     _validate_relative_media_name(str(filename_prefix), label="filename prefix")
     if "input_node" in bindings:
         _validate_relative_media_name(
@@ -363,6 +369,7 @@ def compile_weapon_workflow(
     input_image_name: str | None = None,
     input_audio_name: str | None = None,
     filename_prefix: str = "aifilm/armory",
+    steps: int | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Bind a verified image workflow template without submitting it."""
     if not str(prompt).strip():
@@ -383,6 +390,16 @@ def compile_weapon_workflow(
     graph[bindings["prompt_node"]]["inputs"][bindings["prompt_input"]] = prompt
     graph[bindings["sampler_node"]]["inputs"][bindings["seed_input"]] = seed
     graph[bindings["save_node"]]["inputs"][bindings["filename_prefix_input"]] = filename_prefix
+    if "steps_node" in bindings:
+        selected_steps = weapon.get("defaults", {}).get("steps") if steps is None else steps
+        allowed_steps = (weapon.get("tuning") or {}).get("steps", {}).get("allowed") or []
+        if (
+            not isinstance(selected_steps, int)
+            or isinstance(selected_steps, bool)
+            or selected_steps not in allowed_steps
+        ):
+            raise ComfyArmoryError("steps must be a registered step value for this weapon")
+        graph[bindings["steps_node"]]["inputs"][bindings["steps_input"]] = selected_steps
     if "input_node" in bindings:
         if not input_image_name:
             raise ComfyArmoryError("Qwen local edit requires an input image name")

@@ -40,6 +40,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 7. **供应商**：I2V 默认 `grok_primary`；恢复路径才用 `frw_video_model=seedance-2-fast-i2v`（见 [frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)），禁静默 bulk。
 8. **声音分轨**：口白中文 Edge；角色日文 Edge；字幕中文 `nar`。禁无 speaker 中日乒乓、说书填 `nar_ja`、清空日文轨。亲密 BGM=rnb。[voice lesson](references/lessons-2026-07-24-ep2-voice-heat-final.md)
 9. **成人尺度 MAX**：act+climax≥50%、亲密≥60%、setup≤20%；spice=extreme、phase 只升；关键动作与特写须完整，禁静默降 heat。见 [sex-arc](references/lessons-2026-07-27-adult-scale-max-sex-arc.md) · [hard-defaults](references/hard-defaults.md) · [playbook](references/adult-max-playbook.md)
+9b. **毒镜·解剖 IRON**：禁 futa/女体阴茎、喷奶乳汁、霓虹生殖器符号；中英硬 NEG + dry nipples；毒 still 禁 I2V、毒 clip 禁 register/final。见 [anatomy lesson](references/lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md) · [memory](memory/2026-07-29-poison-shot-anatomy-iron.md)
 10. **字幕像素门**：成片须可见中文字幕；HF 失字须 recovery，禁清空 SRT；`sub_lead=0`；长片可直调 `render_final.py`。
 11. **后期单一责任**：title/subtitle/end card 单引擎；`plate-cards blank`、plate `subs=off` 防双烧。
 12. **完成定义**：`final` 技术成功 ≠ `final_complete`；review/post audit/字幕 attestation/export 回读须齐。

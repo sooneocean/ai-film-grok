@@ -20,6 +20,7 @@
 | **卸装后 still 源** | **P0 像素硬底**（2026-07-21 席德案）：peak 后 **禁止** `image_edit(全装 cast master)`；必须 `canonical/wardrobe/undress-anchor` 或上一已脱 still；I2V 锁 first-frame 衣着；见 [wardrobe-no-redress-still](lessons-2026-07-21-wardrobe-no-redress-still.md) |
 | **I2V 末帧不回穿 + promote 门** | **P0**（2026-07-22 astra 红外套案）：register 前验 last frame 肩/胸未整穿已脱衣物；毒末帧禁止 promote；identity 只锁脸发；见 [i2v-endframe-no-redress](lessons-2026-07-22-i2v-endframe-no-redress.md) |
 | **Keyframe-first · 状态照** | **产品硬底**（2026-07-21）：先状态照索引 `cast_state_masters` → 再 keyframe → 再 I2V；视频坏先改 keyframe/状态照；prompt 注入 `State photo ref`；见 [keyframe-first-state-index](keyframe-first-state-index.md) |
+| **一镜一静帧 · still 去重（P0 · 2026-07-29）** | **产品硬底**：approved still **禁止跨 shot 字节复用**（同 sha 多镜 = 成片「画面重复」）。`register-still --status approved` 撞 sha **硬失败**；`stills_complete` / `final_complete` 依赖 `still_uniqueness.ok`。连续亲密弧须换景别/相位/机位，禁 `cp A.png B.png`。见 [still-unique-no-reuse](lessons-2026-07-29-still-unique-no-reuse.md) |
 | **生成 first/last** | **产品硬底**（2026-07-21）：`register-clip` 后自动 last→next first（continue/卸装/max）；下镜 I2V 禁 cast 重起；按真实末帧衣着/姿势写 prompt；**末帧须先过 W8 不回穿门**；见 first-last-gen · i2v-endframe-no-redress |
 | **旁白荤梗** | **产品硬底**（2026-07-21）：max 办事剧 **每镜 nar 须含荤梗**；act/climax 须办事动词（沉腰/办穿/吃进…）；禁纯文艺灯暗句；默认 `sex_vo_strict` |
 | **用户原文保真** | **P0**（2026-07-22 金瓶梅案）：用户剧本/诗白是脊柱；`_SPICY_NAR` 仅无用户句时兜底；**禁止**整句盖成「展厅落锁」；多段剧本禁止 dual-climax 自动×N 克隆；`user_source_fidelity_strict`（max 默认）→ `USER_SOURCE_NAR_POLLUTED`；见 [user-source-fidelity](lessons-2026-07-22-user-source-fidelity.md) |
@@ -34,6 +35,7 @@
 | **成人尺度最高优先（P0 · 最重要 · 2026-07-27）** | 用户明示：**尺度拉满是最重要目标**。与画风/剪辑偏好冲突时 **先保 max 尺度与完整办事弧**。退出仅显式 soft / `adult_max_iron:false`。见 [adult-scale-max-sex-arc](lessons-2026-07-27-adult-scale-max-sex-arc.md) |
 | **肉戏起承转合全弧（P0 · 同日）** | 成人 max 肉戏块必须可读：**前戏（起）→ 蓄力/纳入前（承）→ 插入抽送（转）→ 高潮/射出（合）**。禁只抱吻；禁无插入；禁无射出/高潮拍。建议 `sex_arc_beat` 标注；时间四拍皆非零。见同上 lesson |
 | **插入衣裤脱尽 + 定器特写（P0 · 同日追加）** | **插入拍双方衣裤脱尽**（女 bare；男至少下装脱尽）；禁内裤/军裤冒充办事。肉戏块默认至少 **1 镜结合部/腰腹定器特写**。Imagine 若拦 true bare → 记 PARTIAL，**禁止**静默改回内衣全穿当「已插入」。见 [adult-scale-max-sex-arc](lessons-2026-07-27-adult-scale-max-sex-arc.md) |
+| **毒镜·解剖像素 IRON（P0 · 2026-07-29 · 后面不要再犯）** | 成人 bare/肉戏 **禁止** futa/女体阴茎、泌乳喷奶/母乳流、霓虹生殖器符号、错性别器。尺度拉满 ≠ 畸形。i2i/I2V 须中英双写硬 NEG + POS（`penis only on man` / `DELETE on woman` / **dry nipples**）。静帧见毒 **禁 I2V**；clip 见毒 **禁 register/promote/final** → archive → 解剖安全 i2i → 重渲。毒 preview 不交付。片例 ch4 避难所。见 [anatomy-milk-futa](lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md) · [memory](../memory/2026-07-29-poison-shot-anatomy-iron.md) |
 | **max 默认全闸 hard（P0 · 2026-07-28）** | `heat_scale=max` 且 `adult_max_iron≠false` 时默认 **true**：`coitus_strict` · `size_ladder_strict` · `pose_strict` · `sex_arc_strict` · `sex_detail_cu_strict` · `both_undress_strict` · 既有 sex_floor/wardrobe/vo/heat_arc。裸抱不算 penetration；合拍须高潮/射出标记；`aifilm heat check` 输出四拍占比 + 定器 CU + **erotic impact** 分。 |
 | **首帧结构** | **致命**（P0）：keyframe 解剖/融合 fail → 禁 I2V；I2V 后必抽 t=0；坏首帧=整段废（2026-07-21 33s 案） |
 | **景别堆叠** | 成人 60s：宽≥1·中≥2·近≥2·局部≥2；act→climax 收紧不回退全景；连续 3 镜同 size fail（2026-07-21） |

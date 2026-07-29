@@ -230,6 +230,27 @@ def test_compile_infinite_talk_binds_image_audio_prompt_seed_and_stable_scale() 
     assert graph["13"]["inputs"]["filename_prefix"] == "aifilm/talking/infinite-stable"
 
 
+def test_compile_fantasy_talking_accepts_only_registered_quality_steps() -> None:
+    graph = compile_weapon_workflow(
+        "fantasy-talking-6step-pilot",
+        prompt="The adult character speaks with expressive but natural mouth motion.",
+        seed=20260729,
+        input_image_name="approved/hero.png",
+        input_audio_name="approved/hero-ja.wav",
+        steps=30,
+    )
+    assert graph["13"]["inputs"]["steps"] == 30
+    with pytest.raises(ComfyArmoryError, match="registered step"):
+        compile_weapon_workflow(
+            "fantasy-talking-6step-pilot",
+            prompt="The character speaks.",
+            seed=7,
+            input_image_name="approved/hero.png",
+            input_audio_name="approved/hero.wav",
+            steps=20,
+        )
+
+
 def test_compile_talking_avatar_requires_uploaded_audio_name() -> None:
     with pytest.raises(ComfyArmoryError, match="audio"):
         compile_weapon_workflow(

@@ -615,6 +615,13 @@ class PromptInjector:
 
         # 6. Negative Constraints — always ban re-dress when undressed
         negatives = self.bible.get("negative_hints", "")
+        anatomy_no = (
+            "futa, female penis, penis on woman, wrong genital anatomy, lactation, milk spray, "
+            "breast milk, neon genital symbol, glowing genitals, wet nipples, 伪娘阴茎, 女体阴茎, "
+            "喷奶, 乳汁, 霓虹生殖器, 发光性器官, 湿乳头"
+        )
+        if str(self.bible.get("heat_scale") or "").strip().lower() == "max":
+            negatives = f"{negatives}, {anatomy_no}" if negatives else anatomy_no
         re_dress_no = (
             "fully clothed after undress, clothes reappearing, re-dressed, "
             "full armor during sex, intact outfit after strip, 回穿, 脱完又穿上"
@@ -623,6 +630,11 @@ class PromptInjector:
             negatives = f"{negatives}, {re_dress_no}" if negatives else re_dress_no
         negatives = _dedupe_csv(negatives)
 
+        if str(self.bible.get("heat_scale") or "").strip().lower() == "max":
+            parts.append(
+                "Anatomy hard: anatomically correct adult bodies, penis only on man, dry nipples; "
+                "no anatomical fusion or neon-genital artifact"
+            )
         final_prompt = "\n".join(parts)
         if negatives:
             final_prompt += f"\n--no {negatives}"

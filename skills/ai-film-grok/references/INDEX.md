@@ -119,12 +119,19 @@
 |---|---|
 | [ecchi-story.md](ecchi-story.md) | 色气叙事规范 |
 | [adult-max-playbook.md](adult-max-playbook.md) | 办事剧单入口 sex≥30% |
+| **[anatomy-milk-futa-comfy-batch](lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md)** | **P0 毒镜解剖**：禁 futa/喷奶/霓虹器；尺度≠畸形 |
 
 ---
 
 ## 踩坑 Lessons（按日期）
 
 > 新规则须标 P 码 + 层。验证稳定后可晋升到上方稳定 references。
+
+### 2026-07-29
+
+| 文件 | 主题 |
+|---|---|
+| **[anatomy-milk-futa-comfy-batch](lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md)** | **P0 毒镜**：禁 futa/女体阴茎、喷奶乳汁、霓虹生殖器；中英硬 NEG；毒 still 禁 I2V；+ Comfy 5090 批跑资源塔 |
 
 ### 2026-07-28
 

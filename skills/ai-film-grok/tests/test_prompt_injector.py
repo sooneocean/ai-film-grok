@@ -103,3 +103,12 @@ def test_state_photo_remains_primary_over_style_reference(tmp_path):
     receipt = PromptInjector(bible, template_version="I2V").assemble(shot, tmp_path)
     assert "SECONDARY style-only reference" in receipt["reference_instruction"]
     assert "PRIMARY pixel reference" in receipt["reference_instruction"]
+
+
+def test_adult_max_prompt_includes_anatomy_poison_constraints(tmp_path):
+    receipt = PromptInjector({"signature_block": "sig", "heat_scale": "max"}).assemble(
+        {"id": "shot05", "dsl": {}}, tmp_path
+    )
+    assert "female penis" in receipt["prompt_text"]
+    assert "milk spray" in receipt["prompt_text"]
+    assert "dry nipples" in receipt["prompt_text"]

@@ -961,9 +961,9 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     )
     dnotes = load_director_notes(root)
     open_items = open_reshoot_items(dnotes)
+    from anatomy_safety import anatomy_safety_report, requires_anatomy_safety
     from clip_uniqueness import active_clip_reuse_report
     from still_uniqueness import active_still_reuse_report
-    from anatomy_safety import anatomy_safety_report, requires_anatomy_safety
 
     uniqueness = active_clip_reuse_report(manifest, required_shot_ids=shot_ids)
     still_uniqueness = active_still_reuse_report(
@@ -1011,7 +1011,9 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     if anatomy_required:
         gates["stills_complete"] = gates["stills_complete"] and still_anatomy["ok"]
         gates["clips_complete"] = gates["clips_complete"] and clip_anatomy["ok"]
-        gates["final_complete"] = gates["final_complete"] and still_anatomy["ok"] and clip_anatomy["ok"]
+        gates["final_complete"] = (
+            gates["final_complete"] and still_anatomy["ok"] and clip_anatomy["ok"]
+        )
     manifest["gates"] = gates
     manifest["style_locked"] = gates["style_locked"]
     return {

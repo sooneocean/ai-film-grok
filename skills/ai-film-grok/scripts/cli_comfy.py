@@ -124,6 +124,12 @@ def add_comfy_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
     prepare_parser.add_argument("--seed", type=int, required=True)
     prepare_parser.add_argument("--input-image-name", default=None)
     prepare_parser.add_argument("--input-audio-name", default=None)
+    prepare_parser.add_argument(
+        "--steps",
+        type=int,
+        default=None,
+        help="Use only a registered pilot step value for the selected weapon",
+    )
     prepare_parser.add_argument("--filename-prefix", default="aifilm/armory")
     prepare_parser.add_argument(
         "--production-stage",
@@ -291,6 +297,7 @@ def run_comfy(args: argparse.Namespace) -> int:
                         input_image_name=args.input_image_name,
                         input_audio_name=args.input_audio_name,
                         filename_prefix=args.filename_prefix,
+                        steps=args.steps,
                     )
                     if not args.offline:
                         from comfy_armory import assert_registered_weapon_workflow

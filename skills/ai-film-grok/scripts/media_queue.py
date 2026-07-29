@@ -25,7 +25,7 @@ from security_policy import (
     safe_workspace_directory,
     validate_identifier,
 )
-from util import utc_now
+from util import read_json, utc_now
 
 OPERATIONS = frozenset({"image_gen", "image_edit", "image_to_video", "reference_to_video"})
 COMPLETION_ENDPOINTS = frozenset({*ALLOWED_VIDEO_ENDPOINTS, "image_gen", "image_edit"})
@@ -321,6 +321,52 @@ class MediaQueue:
         resolved_inputs = [path.expanduser().resolve() for path in inputs]
         if any(not path.is_file() for path in resolved_inputs):
             raise QueueError("every media input must be an existing file")
+        if operation in {"image_to_video", "reference_to_video"}:
+            from anatomy_safety import requires_anatomy_safety
+
+            if requires_anatomy_safety(self.root):
+                manifest = read_json(self.root / "manifest.json") or {}
+                stills = manifest.get("stills") if isinstance(manifest, dict) else {}
+                still = stills.get(shot_id) if isinstance(stills, dict) else None
+                if not isinstance(still, dict) or still.get("status") != "approved":
+                    raise QueueError(
+                        "adult-max I2V requires an approved keyframe for this shot; "
+                        "do not animate an unreviewed still"
+                    )
+                if still.get("anatomy_safe") is not True:
+                    raise QueueError(
+                        "adult-max I2V blocked: keyframe lacks anatomy_safe=true or was marked "
+                        "poisoned; repair the still and register it with --anatomy-safe first"
+                    )
+                approved_sha = str(still.get("sha256") or "").strip()
+                if not approved_sha:
+                    raise QueueError(
+                        "adult-max I2V blocked: approved keyframe has no SHA-256 binding"
+                    )
+                input_hashes = [sha256(path) for path in resolved_inputs]
+                if not input_hashes or input_hashes[0] != approved_sha:
+                    raise QueueError(
+                        "adult-max I2V blocked: first input does not match the approved anatomy-safe "
+                        "keyframe bytes for this shot"
+                    )
+                style = read_json(self.root / "style-bible.json") or {}
+                reference = style.get("style_reference") if isinstance(style, dict) else None
+                reference_sha = (
+                    str(reference.get("sha256") or "").strip()
+                    if isinstance(reference, dict)
+                    else ""
+                )
+                allowed_hashes = {approved_sha, *([reference_sha] if reference_sha else [])}
+                if any(input_sha not in allowed_hashes for input_sha in input_hashes):
+                    raise QueueError(
+                        "adult-max I2V blocked: every input must be the approved anatomy-safe "
+                        "keyframe or the locked style reference"
+                    )
+                if operation == "image_to_video" and len(input_hashes) != 1:
+                    raise QueueError(
+                        "adult-max image_to_video accepts exactly the one approved anatomy-safe "
+                        "keyframe; use reference_to_video for an explicit secondary style reference"
+                    )
         # Reference-first productions must carry the uploaded style image as an
         # actual provider input, not merely a sentence in a prompt receipt.
         # Frame-1-only I2V cannot consume that second image, so it is forbidden

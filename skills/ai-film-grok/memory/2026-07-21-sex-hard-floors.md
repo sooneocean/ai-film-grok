@@ -27,8 +27,14 @@
 
 ## 2026-07-27 加码（最重要）
 
-用户明示：**成人尺度拉到最高 = 全片最优先**；肉戏须 **起承转合全弧**：**前戏 → 插入 → 射出** 都要有（连贯，不可只抱吻或跳切高潮）。  
+用户明示：**成人尺度拉到最高 = 全片最优先**；肉戏须 **起承转合全弧**：**前戏 → 插入 → 射出** 都要有（连贯，不可只抱吻或跳切高潮）。
 见 [adult-scale-max-sex-arc](../references/lessons-2026-07-27-adult-scale-max-sex-arc.md) · [memory](2026-07-27-adult-scale-max-sex-arc.md)。
+
+## 2026-07-29 加码（毒镜 · 后面不要再犯）
+
+用户：「性器官跟乳汁这些都有很多问题」。
+**尺度拉满 ≠ 畸形**：禁 futa/女体阴茎、喷奶母乳、霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 register/final。
+见 [poison anatomy memory](2026-07-29-poison-shot-anatomy-iron.md) · [lesson](../references/lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md)。
 
 ## 片例
 

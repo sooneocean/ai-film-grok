@@ -3,6 +3,16 @@
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
+## [2.17.1] - 2026-07-29
+
+### Added
+
+- Added a hash-bound FantasyTalking pilot tuning control that permits only 6, 12, or 30 sampling steps; each choice remains experimental, pilot-only, and subject to human review.
+
+### Fixed
+
+- Refused unregistered FantasyTalking step counts before ComfyUI submission and preserved the production and template-mutation gates for every allowed step setting.
+
 ## [2.17.0] - 2026-07-29
 
 ### Added

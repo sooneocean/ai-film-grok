@@ -357,6 +357,8 @@
         "audio_input": "audio",
         "sampler_node": "13",
         "seed_input": "seed",
+        "steps_node": "13",
+        "steps_input": "steps",
         "save_node": "15",
         "filename_prefix_input": "filename_prefix"
       },
@@ -401,6 +403,16 @@
         "steps": 6,
         "fps": 23,
         "audio_scale": 1.0
+      },
+      "tuning": {
+        "steps": {
+          "allowed": [
+            6,
+            12,
+            30
+          ],
+          "note": "6-step is technical-only; 12/30 require the same experimental pilot authorization and human review."
+        }
       },
       "capabilities": {
         "face_animation_to_audio": true,
