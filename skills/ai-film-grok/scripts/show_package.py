@@ -61,6 +61,14 @@ def _validate(value: Any) -> dict[str, Any]:
         raise ShowPackageError(
             f"brand.motion_preset must be one of {', '.join(sorted(MOTION_PRESETS))}"
         )
+    opening_duration = _duration(opening.get("duration_sec"), "opening.duration_sec", 1.5)
+    ending_duration = _duration(ending.get("duration_sec"), "ending.duration_sec", 1.5)
+    ending_hook = _text(ending.get("next_episode_hook"), "ending.next_episode_hook")
+    if motion_preset == "suspense-red":
+        if opening_duration != 1.8 or ending_duration != 2.2:
+            raise ShowPackageError("suspense-red requires opening=1.8s and ending=2.2s")
+        if not ending_hook:
+            raise ShowPackageError("suspense-red requires ending.next_episode_hook")
     safe_bottom = captions.get("safe_bottom_px", 0)
     if (
         not isinstance(safe_bottom, int)
@@ -78,7 +86,7 @@ def _validate(value: Any) -> dict[str, Any]:
             "motion_preset": motion_preset,
         },
         "opening": {
-            "duration_sec": _duration(opening.get("duration_sec"), "opening.duration_sec", 1.5),
+            "duration_sec": opening_duration,
             "series_title": _text(opening.get("series_title"), "opening.series_title"),
             "episode": _text(opening.get("episode"), "opening.episode"),
         },
@@ -87,9 +95,9 @@ def _validate(value: Any) -> dict[str, Any]:
             "safe_bottom_px": safe_bottom,
         },
         "ending": {
-            "duration_sec": _duration(ending.get("duration_sec"), "ending.duration_sec", 1.5),
+            "duration_sec": ending_duration,
             "cta": _text(ending.get("cta"), "ending.cta"),
-            "next_episode_hook": _text(ending.get("next_episode_hook"), "ending.next_episode_hook"),
+            "next_episode_hook": ending_hook,
         },
     }
 

@@ -564,19 +564,66 @@ def _preferred_mix_audio_sources(root: Path) -> list[Path]:
     return ordered
 
 
-def _ffmpeg_mux_video_with_audio(video: Path, audio_src: Path, out: Path) -> None:
-    run_media_to_output(
+def _designed_post_effects(root: Path) -> list[tuple[Path, float, float]]:
+    """Return generated designed-post stings with their verified clock placement."""
+    receipt = root / "compose" / "hyperframes" / "media-stage-receipt.json"
+    if not receipt.is_file():
+        return []
+    try:
+        data = read_json(receipt)
+    except ComposeRenderError:
+        return []
+    cues = data.get("cinematic_audio_cues")
+    if not isinstance(cues, list):
+        return []
+    effects: list[tuple[Path, float, float]] = []
+    volume_by_id = {"suspense-intro": 0.16, "suspense-outro": 0.12}
+    media_dir = receipt.parent / "media"
+    for cue in cues:
+        if not isinstance(cue, dict):
+            continue
+        cue_id = str(cue.get("id") or "")
+        if cue_id not in volume_by_id:
+            continue
+        path = media_dir / f"{cue_id}.wav"
+        try:
+            start = float(cue.get("start_sec"))
+        except (TypeError, ValueError):
+            continue
+        if path.is_file() and not path.is_symlink() and start >= 0:
+            effects.append((path, start, volume_by_id[cue_id]))
+    return effects
+
+
+def _ffmpeg_mux_video_with_audio(
+    video: Path,
+    audio_src: Path,
+    out: Path,
+    *,
+    effects: list[tuple[Path, float, float]] | None = None,
+) -> None:
+    effects = effects or []
+    command = ["ffmpeg", "-y", "-i", str(video), "-i", str(audio_src)]
+    filter_inputs = ["[1:a]volume=1[base]"]
+    mix_inputs = ["[base]"]
+    for index, (effect, start, volume) in enumerate(effects, start=2):
+        command.extend(["-i", str(effect)])
+        label = f"fx{index}"
+        delay_ms = max(0, int(round(start * 1000)))
+        filter_inputs.append(f"[{index}:a]adelay={delay_ms}:all=1,volume={volume}[{label}]")
+        mix_inputs.append(f"[{label}]")
+    if effects:
+        filter_inputs.append(
+            f"{''.join(mix_inputs)}amix=inputs={len(mix_inputs)}:duration=first:dropout_transition=0[mixed]"
+        )
+    command.extend(
         [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(video),
-            "-i",
-            str(audio_src),
+            "-filter_complex",
+            ";".join(filter_inputs),
             "-map",
             "0:v:0",
             "-map",
-            "1:a:0",
+            "[mixed]" if effects else "[base]",
             "-c:v",
             "copy",
             "-c:a",
@@ -589,7 +636,10 @@ def _ffmpeg_mux_video_with_audio(video: Path, audio_src: Path, out: Path) -> Non
             "2",
             "-shortest",
             str(out),
-        ],
+        ]
+    )
+    run_media_to_output(
+        command,
         out,
         timeout=600,
         min_bytes=1000,
@@ -626,6 +676,7 @@ def ensure_audio_mux(
     Passthrough only when no mix stems exist and video already has usable loudness.
     """
     preferred = _preferred_mix_audio_sources(root)
+    effects = _designed_post_effects(root)
     # Use production mix when present — even if video has a silent-ish audio track
     # (Remotion/HF often inherit near-silent clip audio → mean ~-50dB).
     for audio_src in preferred:
@@ -641,7 +692,7 @@ def ensure_audio_mux(
                 )
                 continue
             try:
-                _ffmpeg_mux_video_with_audio(video, audio_src, out)
+                _ffmpeg_mux_video_with_audio(video, audio_src, out, effects=effects)
             except (ComposeRenderError, subprocess.CalledProcessError, OSError) as exc:
                 log(f"mux from {audio_src.name} failed: {exc}")
                 continue
@@ -712,7 +763,7 @@ def ensure_audio_mux(
 
     if candidates:
         audio_src = candidates[0]
-        _ffmpeg_mux_video_with_audio(video, audio_src, out)
+        _ffmpeg_mux_video_with_audio(video, audio_src, out, effects=effects)
         return {
             "ok": True,
             "action": "mux_from_final",

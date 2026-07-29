@@ -77,22 +77,22 @@ def test_platform_package_hyperframes_real_render(tmp_path: Path) -> None:
     root.mkdir()
     _seed_film(root, n_shots=1)
     plate = root / "out" / "film_final.mp4"
-    _make_motion_clip(plate, seconds=1.2, with_audio=True)
+    _make_motion_clip(plate, seconds=10.0, with_audio=True)
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["outputs"]["final_film"] = {
         "path": "film_final.mp4",
         "sha256": sha256(plate),
-        # Keep authored duration below decoded media duration: this canary must
-        # exercise HyperFrames' frame-coverage guard without disabling it.
-        "duration_sec": 1.0,
+        "duration_sec": 10.0,
     }
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     (root / "out" / "final-delivery.json").write_text(
         json.dumps({"subtitles": {"burned_in": False}}), encoding="utf-8"
     )
     (root / "out" / "final.srt").write_text(
-        "1\n00:00:00,200 --> 00:00:00,900\n真实渲染验收\n", encoding="utf-8"
+        "1\n00:00:01,000 --> 00:00:02,000\n真实渲染验收\n\n"
+        "2\n00:00:05,000 --> 00:00:06,000\n最后一句对白\n",
+        encoding="utf-8",
     )
     (root / "post-package.json").write_text(
         json.dumps(
@@ -116,12 +116,12 @@ def test_platform_package_hyperframes_real_render(tmp_path: Path) -> None:
                 "version": "1.0.0",
                 "brand": {
                     "label": "AI FILM SPACE",
-                    "accent": "#F5C2D5",
-                    "motion_preset": "romance-glow",
+                    "accent": "#A3132A",
+                    "motion_preset": "suspense-red",
                 },
-                "opening": {"duration_sec": 0.4, "series_title": "真实验收", "episode": "EP.01"},
+                "opening": {"duration_sec": 1.8, "series_title": "真实验收", "episode": "EP.01"},
                 "captions": {"safe_bottom_px": 240},
-                "ending": {"duration_sec": 0.4, "cta": "下一集", "next_episode_hook": "继续"},
+                "ending": {"duration_sec": 2.2, "cta": "下一集", "next_episode_hook": "继续"},
             },
             ensure_ascii=False,
         ),
@@ -148,12 +148,19 @@ def test_platform_package_hyperframes_real_render(tmp_path: Path) -> None:
     assert result["rendered"] is True
     assert output.is_file() and output.stat().st_size > 0
     package = json.loads((root / "compose" / "package.json").read_text(encoding="utf-8"))
-    assert package["show_package"]["brand"]["motion_preset"] == "romance-glow"
+    assert package["show_package"]["brand"]["motion_preset"] == "suspense-red"
     assert probe_has_audio(output)
     receipt = json.loads(
         (root / "compose" / "hyperframes" / "media-stage-receipt.json").read_text(encoding="utf-8")
     )
     assert receipt["platform_package"]["package_id"] == "render-canary-v1"
+    assert [cue["id"] for cue in receipt["cinematic_audio_cues"]] == [
+        "suspense-intro",
+        "suspense-outro",
+    ]
+    html = (root / "compose" / "hyperframes" / "index.html").read_text(encoding="utf-8")
+    assert 'id="platform-ending"' in html
+    assert 'data-start="7.800" data-duration="2.200"' in html
 
 
 def test_compose_metadata_and_npm_gate_fail_closed(tmp_path: Path, monkeypatch) -> None:

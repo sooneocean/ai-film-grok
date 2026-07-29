@@ -1,0 +1,23 @@
+{
+  "id": "night-train.suspense-red.v1",
+  "version": "1.0.0",
+  "brand": {
+    "label": "AI FILM SPACE",
+    "accent": "#A3132A",
+    "motion_preset": "suspense-red"
+  },
+  "opening": {
+    "duration_sec": 1.8,
+    "series_title": "夜航禁区",
+    "episode": "EP.01"
+  },
+  "captions": {
+    "identity": "platform-drama",
+    "safe_bottom_px": 240
+  },
+  "ending": {
+    "duration_sec": 2.2,
+    "cta": "下一集，敬请期待",
+    "next_episode_hook": "谁在列车抵站前换走了证据？"
+  }
+}

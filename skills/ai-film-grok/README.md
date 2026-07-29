@@ -123,6 +123,10 @@ aifilm quality-closure report --root <film-root>
 | **FFmpeg**（层 4） | 多镜拼板、VO/BGM 混音、loudnorm、编码导出；设计路径下 plate 默认 blank+subs off |
 | **jsonschema / pytest** | 规格校验与门禁单测 |
 
+### 竖屏电影悬疑包装
+
+复制 [`templates/show-package.suspense-red.example.json`](templates/show-package.suspense-red.example.json) 为影片 root 的 `show-package.json`，再以 `final --post-engine hyperframes` 输出。`suspense-red` 固定使用 1.8 秒片头、2.2 秒片尾、单一字幕所有权与连载 `ending_question` 优先的钩子；本地生成的低音提示音只会落在 SRT 未覆盖的时段，避免压住最后一句对白。每集只能登记 `post_owner=hyperframes`；Remotion 仅可做对比或衍生版型。
+
 ### 数据与可恢复性
 
 每个项目 root 是自包含工程目录：

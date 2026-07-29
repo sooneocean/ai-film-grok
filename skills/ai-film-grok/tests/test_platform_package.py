@@ -15,6 +15,7 @@ from export_composition import (  # noqa: E402
     build_end_roll_html,
     build_platform_ending_html,
     build_platform_opening_html,
+    build_suspense_audio_tags,
 )
 from platform_package import (  # noqa: E402
     PlatformPackageError,
@@ -130,6 +131,67 @@ def test_show_package_rejects_unknown_motion_preset(tmp_path: Path) -> None:
                 }
             },
         )
+
+
+def test_suspense_red_show_package_emits_cinematic_card_structure(tmp_path: Path) -> None:
+    resolved = resolve_show_package(
+        tmp_path,
+        {
+            "show_package": {
+                "id": "night-train.v1",
+                "version": "1.0.0",
+                "brand": {
+                    "label": "AI FILM SPACE",
+                    "accent": "#A3132A",
+                    "motion_preset": "suspense-red",
+                },
+                "opening": {
+                    "duration_sec": 1.8,
+                    "series_title": "夜航禁区",
+                    "episode": "EP.01",
+                },
+                "captions": {"identity": "platform-drama", "safe_bottom_px": 240},
+                "ending": {
+                    "duration_sec": 2.2,
+                    "cta": "下一集，敬请期待",
+                    "next_episode_hook": "谁在列车抵站前换走了证据？",
+                },
+            }
+        },
+    )
+
+    opening = build_platform_opening_html({}, resolved, title_dur=1.8)
+    ending = build_platform_ending_html(
+        {"film_timeline": {"output_duration": 20}}, resolved, end_dur=2.2
+    )
+
+    assert 'data-show-phase="impact"' in opening
+    assert 'data-show-phase="reveal"' in opening
+    assert 'class="platform-riddle-mark"' in opening
+    assert 'class="platform-ending-hold"' in ending
+    assert 'data-show-phase="hook"' in ending
+    assert 'data-start="17.800"' in ending
+
+
+def test_suspense_stings_are_auditable_and_do_not_overlap_captioned_dialogue(
+    tmp_path: Path,
+) -> None:
+    tags, cues = build_suspense_audio_tags(
+        tmp_path,
+        {"brand": {"motion_preset": "suspense-red"}},
+        [
+            {"start": 0.60, "end": 1.20, "text": "第一句对白"},
+            {"start": 8.0, "end": 9.4, "text": "最后一句"},
+        ],
+        total=10.0,
+        ending_start=7.8,
+    )
+
+    assert 'id="suspense-intro"' in tags[0]
+    assert 'id="suspense-outro"' in tags[1]
+    assert cues[1]["start_sec"] == pytest.approx(9.45)
+    assert (tmp_path / "media" / "suspense-intro.wav").stat().st_size > 44
+    assert (tmp_path / "media" / "suspense-outro.wav").stat().st_size > 44
 
 
 def test_none_modes_are_preserved_as_explicit_overrides(tmp_path: Path) -> None:

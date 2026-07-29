@@ -10,9 +10,12 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import math
 import os
 import re
+import struct
 import tempfile
+import wave
 from pathlib import Path
 from typing import Any
 
@@ -360,6 +363,11 @@ def build_timeline_package(
     clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
     width = int(manifest.get("width") or 720)
     height = int(manifest.get("height") or 1280)
+    if (
+        isinstance(show_package, dict)
+        and (show_package.get("brand") or {}).get("motion_preset") == "suspense-red"
+    ):
+        width, height = 1080, 1920
     fps = int(manifest.get("fps") or 30)
     title = str(spec.get("title") or manifest.get("title") or "Untitled")
 
@@ -529,17 +537,20 @@ def build_timeline_package(
 
     # Optional pre-mixed audio / final film as underlay references
     final_film = None
+    from media_duration import MediaDurationError, probe_duration_sec
+
     outputs = manifest.get("outputs") if isinstance(manifest.get("outputs"), dict) else {}
     final_rec = outputs.get("final_film") if isinstance(outputs.get("final_film"), dict) else None
     if final_rec and isinstance(final_rec.get("path"), str):
         try:
             fp = safe_existing_file(root / "out", final_rec["path"], field="final film")
+            duration_sec = probe_duration_sec(fp, label="export-compose:final film")
             final_film = {
                 "path": str(fp.relative_to(root)) if fp.is_relative_to(root) else str(fp),
                 "sha256": final_rec.get("sha256"),
-                "duration_sec": final_rec.get("duration_sec"),
+                "duration_sec": duration_sec,
             }
-        except (SecurityPolicyError, ValueError):
+        except (SecurityPolicyError, ValueError, MediaDurationError):
             final_film = None
 
     vo_candidates = [
@@ -1062,6 +1073,14 @@ def build_platform_opening_html(
     label = str(brand.get("label") or "")
     accent = str(brand.get("accent") or "")
     motion_preset = str(brand.get("motion_preset") or "drama-noir")
+    if motion_preset == "suspense-red":
+        return f'''    <section id="platform-opening" class="clip overlay platform-opening platform-cinematic-suspense" data-start="0.000" data-duration="{duration:.3f}" data-track-index="2" data-show-package="{html.escape(str(show_package.get("id") or ""))}">
+      <div class="platform-cinematic-vignette" aria-hidden="true"></div>
+      <div class="platform-riddle-mark" data-show-phase="impact" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="platform-opening-card platform-suspense-card" data-show-motion="{html.escape(motion_preset)}" style="--platform-accent:{html.escape(accent)}">
+        <p class="platform-brand" data-show-phase="reveal">{html.escape(label)}</p><h1 data-show-phase="reveal">{html.escape(title)}</h1><p class="platform-episode" data-show-phase="reveal">{html.escape(episode)}</p>
+      </div>
+    </section>'''
     return f'''    <section id="platform-opening" class="clip overlay platform-opening" data-start="0.000" data-duration="{duration:.3f}" data-track-index="2" data-show-package="{html.escape(str(show_package.get("id") or ""))}">
       <div class="platform-opening-card" data-show-motion="{html.escape(motion_preset)}" style="--platform-accent:{html.escape(accent)}">
         <p class="platform-brand">{html.escape(label)}</p><h1>{html.escape(title)}</h1><p>{html.escape(episode)}</p>
@@ -1070,7 +1089,11 @@ def build_platform_opening_html(
 
 
 def build_platform_ending_html(
-    package: dict[str, Any], show_package: dict[str, Any], *, end_dur: float
+    package: dict[str, Any],
+    show_package: dict[str, Any],
+    *,
+    end_dur: float,
+    output_duration: float | None = None,
 ) -> str:
     """Build an escaped reusable show ending positioned against the timeline duration."""
     ending = show_package.get("ending") if isinstance(show_package.get("ending"), dict) else {}
@@ -1078,8 +1101,9 @@ def build_platform_ending_html(
         package.get("film_timeline") if isinstance(package.get("film_timeline"), dict) else {}
     )
     duration = float(ending.get("duration_sec") or end_dur)
-    output_duration = float(timeline.get("output_duration") or duration)
-    start = max(0.0, output_duration - duration)
+    timeline_duration = float(timeline.get("output_duration") or duration)
+    resolved_output_duration = timeline_duration if output_duration is None else output_duration
+    start = max(0.0, resolved_output_duration - duration)
     cta = str(ending.get("cta") or "")
     serial = package.get("serial")
     contract = (
@@ -1093,6 +1117,11 @@ def build_platform_ending_html(
     hook = str(contract.get("ending_question") or ending.get("next_episode_hook") or "")
     brand = show_package.get("brand") if isinstance(show_package.get("brand"), dict) else {}
     motion_preset = str(brand.get("motion_preset") or "drama-noir")
+    if motion_preset == "suspense-red":
+        return f'''    <section id="platform-ending" class="clip overlay platform-ending platform-cinematic-suspense" data-start="{start:.3f}" data-duration="{duration:.3f}" data-track-index="6" data-show-package="{html.escape(str(show_package.get("id") or ""))}">
+      <div class="platform-ending-hold" data-show-phase="hold" aria-hidden="true"></div>
+      <div class="platform-ending-card platform-suspense-card" data-show-motion="{html.escape(motion_preset)}" data-show-phase="hook"><p>{html.escape(hook)}</p><p>{html.escape(cta)}</p></div>
+    </section>'''
     return f'''    <section id="platform-ending" class="clip overlay platform-ending" data-start="{start:.3f}" data-duration="{duration:.3f}" data-track-index="6" data-show-package="{html.escape(str(show_package.get("id") or ""))}">
       <div class="platform-ending-card" data-show-motion="{html.escape(motion_preset)}"><p>{html.escape(hook)}</p><p>{html.escape(cta)}</p></div>
     </section>'''
@@ -1107,6 +1136,92 @@ def show_motion_profile(show_package: dict[str, Any] | None) -> dict[str, str | 
         "romance-glow": {"x": 0, "y": 14, "scale": 0.88, "ease": "back.out(1.25)"},
         "suspense-red": {"x": -22, "y": 0, "scale": 1.06, "ease": "power4.out"},
     }.get(preset, {"x": 0, "y": 28, "scale": 0.92, "ease": "power3.out"})
+
+
+def _write_suspense_sting(path: Path, *, kind: str) -> float:
+    """Write a quiet deterministic PCM sting; it never depends on a remote audio provider."""
+    duration = 0.46 if kind == "intro" else 0.82
+    rate = 48_000
+    frames: list[bytes] = []
+    for index in range(int(rate * duration)):
+        t = index / rate
+        if kind == "intro":
+            envelope = math.exp(-11.0 * t)
+            sample = 0.72 * envelope * math.sin(2.0 * math.pi * (62.0 - 22.0 * t) * t)
+            sample += 0.10 * math.exp(-22.0 * t) * math.sin(2.0 * math.pi * 178.0 * t)
+        else:
+            attack = min(1.0, t / 0.035)
+            envelope = attack * math.exp(-4.8 * t)
+            sample = 0.58 * envelope * math.sin(2.0 * math.pi * (96.0 - 36.0 * t) * t)
+            sample += 0.14 * envelope * math.sin(2.0 * math.pi * 640.0 * t)
+        pcm = int(max(-0.94, min(0.94, sample)) * 32767)
+        frames.append(struct.pack("<hh", pcm, pcm))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=path.parent, suffix=".wav", delete=False) as handle:
+        temporary = Path(handle.name)
+    try:
+        with wave.open(str(temporary), "wb") as output:
+            output.setnchannels(2)
+            output.setsampwidth(2)
+            output.setframerate(rate)
+            output.writeframes(b"".join(frames))
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return duration
+
+
+def build_suspense_audio_tags(
+    hf_dir: Path,
+    show_package: dict[str, Any] | None,
+    captions: list[dict[str, Any]],
+    *,
+    total: float,
+    ending_start: float,
+) -> tuple[list[str], list[dict[str, float | str]]]:
+    """Add low-volume stings only where caption timing proves dialogue is clear."""
+    brand = show_package.get("brand") if isinstance(show_package, dict) else {}
+    if str((brand or {}).get("motion_preset") or "") != "suspense-red":
+        return [], []
+
+    media_dir = hf_dir / "media"
+    tags: list[str] = []
+    cues: list[dict[str, float | str]] = []
+    first_caption_start = min((float(cue["start"]) for cue in captions), default=total)
+    intro_duration = min(0.46, max(0.0, first_caption_start - 0.04))
+    if intro_duration >= 0.20:
+        full_duration = _write_suspense_sting(media_dir / "suspense-intro.wav", kind="intro")
+        tags.append(
+            f'    <audio id="suspense-intro" class="clip" src="media/suspense-intro.wav" '
+            f'data-start="0.000" data-duration="{min(intro_duration, full_duration):.3f}" '
+            'data-track-index="7" data-volume="0.16"></audio>'
+        )
+        cues.append(
+            {
+                "id": "suspense-intro",
+                "start_sec": 0.0,
+                "duration_sec": min(intro_duration, full_duration),
+            }
+        )
+
+    last_caption_end = max((float(cue["end"]) for cue in captions), default=0.0)
+    outro_start = max(ending_start + 0.50, last_caption_end + 0.05)
+    outro_duration = min(0.82, total - outro_start - 0.08)
+    if outro_duration >= 0.20:
+        full_duration = _write_suspense_sting(media_dir / "suspense-outro.wav", kind="outro")
+        tags.append(
+            f'    <audio id="suspense-outro" class="clip" src="media/suspense-outro.wav" '
+            f'data-start="{outro_start:.3f}" data-duration="{min(outro_duration, full_duration):.3f}" '
+            'data-track-index="8" data-volume="0.12"></audio>'
+        )
+        cues.append(
+            {
+                "id": "suspense-outro",
+                "start_sec": outro_start,
+                "duration_sec": min(outro_duration, full_duration),
+            }
+        )
+    return tags, cues
 
 
 def build_title_sequence_tsx(
@@ -1176,10 +1291,15 @@ def write_hyperframes(
         else {}
     )
     caption_theme = str((platform_package.get("caption_policy") or {}).get("theme") or "default")
+    show_caption_bottom = (
+        (package.get("show_package") or {}).get("captions", {}).get("safe_bottom_px")
+        if isinstance(package.get("show_package"), dict)
+        else None
+    )
     styles = {
         **styles,
         **caption_theme_styles(caption_theme),
-        "caption_bottom": f"{int(height * float(safe_area.get('bottom_pct') or 16) / 100)}px",
+        "caption_bottom": f"{int(show_caption_bottom or height * float(safe_area.get('bottom_pct') or 16) / 100)}px",
     }
     caption_source = str(package.get("caption_source") or "")
 
@@ -1252,6 +1372,16 @@ def write_hyperframes(
         title_dur=title_show,
         caption_source=caption_source,
     )
+    show_package = (
+        package.get("show_package") if isinstance(package.get("show_package"), dict) else None
+    )
+    ending_config = (
+        show_package.get("ending")
+        if isinstance(show_package, dict) and isinstance(show_package.get("ending"), dict)
+        else {}
+    )
+    platform_ending_duration = float(ending_config.get("duration_sec") or end_show)
+    platform_ending_start = max(0.0, total - platform_ending_duration)
 
     audio_tags: list[str] = []
     audio = package.get("audio") or {}
@@ -1275,6 +1405,14 @@ def write_hyperframes(
                 f'data-start="0" data-duration="{total:.3f}" data-track-index="4" '
                 f'data-volume="0.45"></audio>'
             )
+    suspense_audio_tags, suspense_audio_cues = build_suspense_audio_tags(
+        hf_dir,
+        show_package,
+        captions,
+        total=total,
+        ending_start=platform_ending_start,
+    )
+    audio_tags.extend(suspense_audio_tags)
 
     # Title / end / captions as overlays ON TOP of motion
     overlay_parts: list[str] = []
@@ -1324,9 +1462,6 @@ def write_hyperframes(
     title_sequence = package.get("title_sequence") or {}
     end_roll = package.get("end_roll") or {}
 
-    show_package = (
-        package.get("show_package") if isinstance(package.get("show_package"), dict) else None
-    )
     title_suppressed = str(title_sequence.get("mode") or "").strip().lower() == "none"
     end_suppressed = str(end_roll.get("mode") or "").strip().lower() == "none"
     if show_package and not title_suppressed:
@@ -1336,7 +1471,9 @@ def write_hyperframes(
             package, title_sequence, resolved_preset, styles, title_dur=title_show
         )
     if show_package and not end_suppressed:
-        end_roll_html = build_platform_ending_html(package, show_package, end_dur=end_show)
+        end_roll_html = build_platform_ending_html(
+            package, show_package, end_dur=end_show, output_duration=total
+        )
     else:
         end_roll_html = build_end_roll_html(
             package, end_roll, resolved_preset, styles, credits, output_duration=total
@@ -1344,13 +1481,6 @@ def write_hyperframes(
 
     title_disabled = bool(show_package) or bool(package.get("_platform_title_disabled"))
     end_disabled = bool(show_package) or bool(package.get("_platform_end_disabled"))
-    ending_config = (
-        show_package.get("ending")
-        if isinstance(show_package, dict) and isinstance(show_package.get("ending"), dict)
-        else {}
-    )
-    platform_ending_duration = float(ending_config.get("duration_sec") or end_show)
-    platform_ending_start = max(0.0, total - platform_ending_duration)
     show_motion = show_motion_profile(show_package)
     if title_seq_html:
         overlay_parts.append(title_seq_html)
@@ -1595,6 +1725,74 @@ def write_hyperframes(
         border-left-width: 6px;
         background: linear-gradient(105deg, rgba(80, 8, 16, 0.72), rgba(10, 10, 18, 0.52));
       }}
+      .platform-cinematic-suspense {{
+        overflow: hidden;
+        isolation: isolate;
+        background:
+          radial-gradient(ellipse at 14% 20%, rgba(163, 19, 42, 0.42), transparent 32%),
+          radial-gradient(ellipse at 82% 76%, rgba(54, 71, 89, 0.28), transparent 38%),
+          rgba(8, 9, 13, 0.42);
+      }}
+      .platform-cinematic-vignette, .platform-ending-hold {{
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background:
+          radial-gradient(ellipse at center, transparent 25%, rgba(2, 3, 7, 0.48) 72%, rgba(2, 3, 7, 0.94)),
+          repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 4px);
+      }}
+      .platform-riddle-mark {{
+        position: absolute;
+        z-index: 1;
+        top: 14%;
+        right: -8%;
+        width: 64%;
+        height: 1px;
+        background: var(--platform-accent, #a3132a);
+        box-shadow: 0 0 36px color-mix(in srgb, var(--platform-accent, #a3132a) 72%, transparent);
+        transform-origin: right center;
+      }}
+      .platform-riddle-mark span {{
+        position: absolute;
+        right: 0;
+        width: 46%;
+        height: 1px;
+        background: rgba(203, 215, 226, 0.62);
+      }}
+      .platform-riddle-mark span:nth-child(1) {{ transform: rotate(-23deg); transform-origin: right; }}
+      .platform-riddle-mark span:nth-child(2) {{ transform: rotate(31deg); transform-origin: right; }}
+      .platform-riddle-mark span:nth-child(3) {{ width: 18%; transform: translate(-220%, 90px) rotate(-58deg); }}
+      .platform-suspense-card {{
+        position: relative;
+        z-index: 1;
+        width: min(88%, 720px);
+        padding: 12% 8% 10%;
+        border: 1px solid color-mix(in srgb, var(--platform-accent, #a3132a) 82%, #cfd8df);
+        border-radius: 4px;
+        background: rgba(7, 9, 14, 0.58);
+        box-shadow: 0 34px 100px rgba(0, 0, 0, 0.68), inset 0 0 0 1px rgba(193, 210, 224, 0.07);
+      }}
+      .platform-suspense-card h1 {{
+        font-family: serif;
+        font-weight: 800;
+        letter-spacing: 0.11em;
+      }}
+      .platform-suspense-card .platform-episode {{
+        margin-top: 1.1em;
+        color: rgba(222, 230, 236, 0.88);
+        font-size: {max(17, int(width) // 27)}px;
+        font-weight: 650;
+        letter-spacing: 0.22em;
+      }}
+      .platform-ending-hold {{
+        background:
+          radial-gradient(ellipse at 72% 18%, rgba(163, 19, 42, 0.26), transparent 34%),
+          radial-gradient(ellipse at 50% 126%, rgba(4, 5, 9, 0.94), rgba(4, 5, 9, 0.08) 70%);
+      }}
+      .platform-ending-card.platform-suspense-card {{
+        margin-top: 12%;
+        border-left-width: 1px;
+      }}
       .title-sequence {{
         background: transparent;
       }}
@@ -1746,6 +1944,12 @@ def write_hyperframes(
       tl.from(".platform-opening-card", {{ scale: {show_motion["scale"]}, x: {show_motion["x"]}, y: {show_motion["y"]}, opacity: 0, duration: 0.62, ease: "{show_motion["ease"]}" }}, 0.10);
       tl.from(".platform-brand", {{ y: 12, opacity: 0, duration: 0.36, ease: "power2.out" }}, 0.28);
       tl.from(".platform-ending-card", {{ scale: {show_motion["scale"]}, x: {show_motion["x"]}, y: {show_motion["y"]}, opacity: 0, duration: 0.52, ease: "{show_motion["ease"]}" }}, {platform_ending_start + 0.08:.3f});
+      tl.fromTo(".platform-riddle-mark", {{ opacity: 0, scaleX: 0.16 }}, {{ opacity: 1, scaleX: 1, duration: 0.22, ease: "expo.out" }}, 0.10);
+      tl.to(".platform-riddle-mark", {{ opacity: 0.22, duration: 0.18, ease: "power2.in" }}, 0.42);
+      tl.fromTo(".platform-suspense-card", {{ opacity: 0, x: -28, scale: 1.04 }}, {{ opacity: 1, x: 0, scale: 1, duration: 0.46, ease: "power4.out" }}, 0.58);
+      tl.fromTo('.platform-suspense-card [data-show-phase="reveal"]', {{ opacity: 0, y: 16 }}, {{ opacity: 1, y: 0, duration: 0.32, stagger: 0.08, ease: "power3.out" }}, 0.78);
+      tl.fromTo(".platform-ending-hold", {{ opacity: 0 }}, {{ opacity: 1, duration: 0.34, ease: "sine.out" }}, {platform_ending_start + 0.02:.3f});
+      tl.fromTo('.platform-ending-card[data-show-phase="hook"]', {{ opacity: 0, y: 26, scale: 0.98 }}, {{ opacity: 1, y: 0, scale: 1, duration: 0.38, ease: "power4.out" }}, {platform_ending_start + 0.54:.3f});
       tl.from("#end-text", {{ y: 24, opacity: 0, duration: 0.45, ease: "power2.out" }}, {end_start + 0.1:.3f});
       tl.from(".er-section", {{ y: 30, opacity: 0, duration: 0.50, stagger: 0.12, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.05:.3f});
       tl.from(".er-line", {{ x: -12, opacity: 0, duration: 0.35, stagger: 0.04, ease: "power2.out" }}, {max(0.0, total - end_show) + 0.20:.3f});
@@ -1787,6 +1991,7 @@ def write_hyperframes(
             "platform_package": platform_package if platform_package.get("enabled") else None,
             "caption_theme": caption_theme,
             "show_package": show_package,
+            "cinematic_audio_cues": suspense_audio_cues,
         },
     )
     write_text(
