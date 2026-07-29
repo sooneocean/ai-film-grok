@@ -962,8 +962,18 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     dnotes = load_director_notes(root)
     open_items = open_reshoot_items(dnotes)
     from clip_uniqueness import active_clip_reuse_report
+    from still_uniqueness import active_still_reuse_report
+    from anatomy_safety import anatomy_safety_report, requires_anatomy_safety
 
     uniqueness = active_clip_reuse_report(manifest, required_shot_ids=shot_ids)
+    still_uniqueness = active_still_reuse_report(
+        manifest,
+        required_shot_ids=shot_ids,
+        keyframes_dir=dirs["keyframes"],
+    )
+    anatomy_required = requires_anatomy_safety(root)
+    still_anatomy = anatomy_safety_report(manifest, required_shot_ids=shot_ids, kind="stills")
+    clip_anatomy = anatomy_safety_report(manifest, required_shot_ids=shot_ids, kind="clips")
     from manifest_truth import preflight_manifest
 
     manifest_truth = preflight_manifest(root, manifest)
@@ -980,12 +990,15 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         "style_locked": bool(style.get("locked")) and style_reference_ok,
         "spec": bool(shots) and spec_error is None,
         "canonical": len(canonical) > 0,
-        "stills_complete": bool(shot_ids) and all(sid in approved_stills for sid in shot_ids),
+        "stills_complete": bool(shot_ids)
+        and all(sid in approved_stills for sid in shot_ids)
+        and still_uniqueness["ok"],
         "clips_complete": clips_complete,
         "assembled": assembled,
         "reshoots_clear": reshoots_clear(dnotes),
         "final_complete": bool(
             manifest_truth["ok"]
+            and still_uniqueness["ok"]
             and clips_complete
             and final_technical_ok
             and review_ok
@@ -995,6 +1008,10 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
             outputs.get("desktop_dir") and Path(outputs["desktop_dir"]).is_dir()
         ),
     }
+    if anatomy_required:
+        gates["stills_complete"] = gates["stills_complete"] and still_anatomy["ok"]
+        gates["clips_complete"] = gates["clips_complete"] and clip_anatomy["ok"]
+        gates["final_complete"] = gates["final_complete"] and still_anatomy["ok"] and clip_anatomy["ok"]
     manifest["gates"] = gates
     manifest["style_locked"] = gates["style_locked"]
     return {
@@ -1008,6 +1025,12 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         "final_review_ok": review_ok,
         "style_reference_ok": style_reference_ok,
         "clip_uniqueness": uniqueness,
+        "still_uniqueness": still_uniqueness,
+        "anatomy_safety": {
+            "required": anatomy_required,
+            "stills": still_anatomy,
+            "clips": clip_anatomy,
+        },
         "manifest_truth": manifest_truth,
         "open_reshoots": open_items,
         "open_reshoot_count": len(open_items),
@@ -2324,6 +2347,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     ensure_tree(root)
     identity_approved = getattr(args, "identity_approved", False) is True
     review_note = str(getattr(args, "review_note", "") or "").strip()
+    anatomy_safe = getattr(args, "anatomy_safe", False) is True
     source = Path(args.source).expanduser().resolve()
     style_job = None
     style = read_json(root / "style-bible.json") if (root / "style-bible.json").is_file() else {}
@@ -2367,7 +2391,29 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             "never I2V from thumbnail/landscape compress. "
             "See references/lessons-2026-07-22-keyframe-no-compress.md"
         )
+    # P0 2026-07-29: one still must not be approved for multiple shots (byte-identical)
     if args.status == "approved":
+        from still_uniqueness import StillUniquenessError, assert_still_is_unique
+
+        try:
+            assert_still_is_unique(
+                root=root,
+                shot_id=str(args.shot_id),
+                source=source,
+                status=str(args.status),
+                manifest=load_manifest(root),
+            )
+        except StillUniquenessError as exc:
+            raise FilmError(str(exc)) from exc
+    if args.status == "approved":
+        from anatomy_safety import AnatomySafetyError, require_anatomy_safe
+
+        try:
+            require_anatomy_safe(
+                root=root, anatomy_safe=anatomy_safe, kind="still", shot_id=str(args.shot_id)
+            )
+        except AnatomySafetyError as exc:
+            raise FilmError(str(exc)) from exc
         if not identity_approved:
             raise FilmError(
                 "Approved stills require --identity-approved after comparing to cast master"
@@ -2434,6 +2480,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     )
     record["geometry_qa"] = geo
     record["quality_gate"] = quality
+    record["anatomy_safe"] = anatomy_safe if args.status == "approved" else None
     if style_job:
         record["style_reference_job"] = style_job
     record["quality_receipt"] = str(write_quality_receipt(root, record["shot_id"], quality))
@@ -2663,7 +2710,16 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     identity_approved = getattr(args, "identity_approved", False) is True
     motion_approved = getattr(args, "motion_approved", False) is True
     review_note = str(getattr(args, "review_note", "") or "").strip()
+    anatomy_safe = getattr(args, "anatomy_safe", False) is True
     if args.status == "approved":
+        from anatomy_safety import AnatomySafetyError, require_anatomy_safe
+
+        try:
+            require_anatomy_safe(
+                root=root, anatomy_safe=anatomy_safe, kind="clip", shot_id=str(args.shot_id)
+            )
+        except AnatomySafetyError as exc:
+            raise FilmError(str(exc)) from exc
         if endpoint not in ALLOWED_VIDEO_ENDPOINTS:
             raise FilmError(
                 f"Approved clips require --source-endpoint in {sorted(ALLOWED_VIDEO_ENDPOINTS)}"
@@ -2726,7 +2782,22 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     else:
         uniqueness = None
     try:
-        qa = analyze_media(source, require_audio=False, require_motion=True)
+        contract_kwargs: dict[str, Any] = {}
+        if getattr(args, "strict_video_contract", False):
+            spec = read_json(root / "film-spec.json") if (root / "film-spec.json").is_file() else {}
+            aspect = str(spec.get("aspect_ratio") or "9:16").replace("/", ":")
+            if aspect == "9:16":
+                contract_kwargs.update({"min_width": 704, "min_height": 1280})
+            timeline = spec.get("timeline") if isinstance(spec, dict) else {}
+            fps = spec.get("fps") or (timeline.get("fps") if isinstance(timeline, dict) else None)
+            if fps:
+                contract_kwargs["expected_fps"] = float(fps)
+        qa = analyze_media(
+            source,
+            require_audio=False,
+            require_motion=True,
+            **contract_kwargs,
+        )
     except MediaQAError as exc:
         raise FilmError(str(exc)) from exc
     if args.status == "approved" and not qa.get("ok"):
@@ -2766,6 +2837,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             "identity_approved": identity_approved,
             "motion_approved": motion_approved,
             "review_note": review_note,
+            "anatomy_safe": anatomy_safe if args.status == "approved" else None,
             "qa": qa,
             "shot_review": shot_review,
             "quality_gate": quality,
@@ -6955,6 +7027,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Required when --status approved: brief visual review note",
     )
     rs.add_argument(
+        "--anatomy-safe",
+        action="store_true",
+        help="Required for adult-max approved stills after full-frame anatomy inspection",
+    )
+    rs.add_argument(
         "--char-id",
         help="Cast id for pixel face-identity verify (default: first dsl.cast)",
     )
@@ -6975,6 +7052,16 @@ def build_parser() -> argparse.ArgumentParser:
     rc.add_argument("--identity-approved", action="store_true")
     rc.add_argument("--motion-approved", action="store_true")
     rc.add_argument("--review-note")
+    rc.add_argument(
+        "--anatomy-safe",
+        action="store_true",
+        help="Required for adult-max approved clips after full-frame anatomy inspection",
+    )
+    rc.add_argument(
+        "--strict-video-contract",
+        action="store_true",
+        help="Approved clips: enforce native 9:16 704x1280 and film-spec FPS",
+    )
     rc.add_argument(
         "--review-receipt",
         help="v1.6 approved review receipt (defaults to receipts/reviews/<shot>.json)",
