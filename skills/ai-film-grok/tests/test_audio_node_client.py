@@ -133,6 +133,24 @@ def test_cross_origin_redirect_is_rejected_without_forwarding_token() -> None:
             _request("http://192.168.88.52:8788", "x" * 32, "/health")
 
 
+def test_reference_upload_404_reports_node_upgrade_requirement(tmp_path: Path) -> None:
+    reference = tmp_path / "reference.wav"
+    reference.write_bytes(_delivery_wav())
+    error = AudioNodeError("audio node HTTP 404")
+    with patch("audio_node_client._request", side_effect=error):
+        with pytest.raises(AudioNodeError, match="upgrade required"):
+            render_batch(
+                "http://192.168.88.52:8788",
+                "x" * 32,
+                payload={
+                    "batch_size": 1,
+                    "seeds": [1],
+                    "reference_audio": str(reference),
+                },
+                out_dir=tmp_path / "out",
+            )
+
+
 def test_render_rejects_unknown_kind(tmp_path: Path) -> None:
     with pytest.raises(AudioNodeError):
         render("http://192.168.88.52:8788", "x" * 32, "video", {}, tmp_path / "x.wav")
@@ -529,3 +547,63 @@ def test_render_batch_uploads_reference_without_sending_local_path(tmp_path: Pat
     assert "reference_audio" not in submitted
     assert submitted["reference_audio_id"] == hashlib.sha256(raw_reference).hexdigest()
     assert str(reference) not in json.dumps(submitted)
+
+
+def test_render_batch_preserves_bounded_repaint_parameters(tmp_path: Path) -> None:
+    reference = tmp_path / "private-edit-master.wav"
+    raw_reference = _delivery_wav()
+    reference.write_bytes(raw_reference)
+    generated = _delivery_wav()
+    captured: list[tuple[str, dict[str, object]]] = []
+    replies = iter(
+        [
+            json.dumps(
+                {
+                    "reference_id": hashlib.sha256(raw_reference).hexdigest(),
+                    "source_sha256": hashlib.sha256(raw_reference).hexdigest(),
+                }
+            ).encode(),
+            json.dumps({"job_id": "batch"}).encode(),
+            json.dumps(
+                {
+                    "status": "completed",
+                    "artifacts": [
+                        {
+                            "index": 0,
+                            "seed": 7,
+                            "sha256": hashlib.sha256(generated).hexdigest(),
+                        }
+                    ],
+                }
+            ).encode(),
+            generated,
+        ]
+    )
+
+    def fake_request(*args, **kwargs):
+        captured.append((args[2], kwargs))
+        return next(replies)
+
+    with (
+        patch("audio_node_client._request", side_effect=fake_request),
+        patch("audio_node_client._validate_wav"),
+    ):
+        render_batch(
+            "http://192.168.88.52:8788",
+            "x" * 32,
+            payload={
+                "prompt": "repair ending",
+                "duration": 20,
+                "batch_size": 1,
+                "seeds": [7],
+                "task_type": "repaint",
+                "reference_audio": str(reference),
+                "repainting_start": 12,
+                "repainting_end": 20,
+            },
+            out_dir=tmp_path / "edit-batch",
+        )
+
+    submitted = captured[1][1]["body"]
+    assert submitted["repainting_start"] == 12
+    assert submitted["repainting_end"] == 20

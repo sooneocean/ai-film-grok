@@ -13,6 +13,7 @@ from make_sfx_bed import SR, rnb_bgm  # noqa: E402
 from music_cue import (  # noqa: E402
     MusicCueError,
     apply_music_timeline_to_samples,
+    build_music_mix_review,
     build_music_timeline,
     motif_seed,
     normalize_music_cue,
@@ -158,6 +159,62 @@ def test_music_cue_is_deterministic_and_validates_bounds() -> None:
         normalize_music_cue({"brightness": 2})
     with pytest.raises(MusicCueError):
         normalize_music_cue({"take_seed": 2**31})
+    with pytest.raises(MusicCueError):
+        normalize_music_cue({"motif_role": "random"})
+
+
+def test_music_cue_marks_dialogue_and_authored_motif_development() -> None:
+    cue = normalize_music_cue(
+        {
+            "motif_role": "reveal",
+            "preferred_asset_id": "warm-asset-1",
+        },
+        shot={"nar": "角色说话"},
+    )
+
+    assert cue["dialogue_present"] is True
+    assert cue["motif_role"] == "reveal"
+    assert cue["preferred_asset_id"] == "warm-asset-1"
+    assert cue["duck_db"] == -3.0
+
+
+def test_music_mix_review_reports_grid_without_moving_picture_or_losing_dialogue() -> None:
+    timeline = build_music_timeline(
+        [
+            {"id": "s1", "nar": "第一句", "music_cue": {"bpm": 60}},
+            {"id": "s2", "music_cue": {"bpm": 60, "transition": "cut"}},
+        ],
+        shot_starts={"s1": 0.0, "s2": 4.5},
+        shot_ends={"s1": 4.5, "s2": 8.0},
+    )
+    report = build_music_mix_review(timeline, sidechain_applied="dynamic_eq")
+    assert report["status"] == "ready_for_human_listen"
+    assert report["beat_grid"]["picture_timing_changed"] is False
+    assert report["dialogue_protection"]["static_duck_db"] == {"s1": -3.0}
+    assert report["human_listen_points"][1]["shot_id"] == "s2"
+
+
+def test_music_mix_review_flags_authored_no_duck_when_sidechain_is_unavailable() -> None:
+    timeline = build_music_timeline(
+        [{"id": "s1", "nar": "第一句", "music_cue": {"duck_db": 0}}],
+        shot_starts={"s1": 0.0},
+        shot_ends={"s1": 3.0},
+    )
+    report = build_music_mix_review(timeline, sidechain_applied=False)
+    assert report["status"] == "needs_attention"
+    assert report["dialogue_protection"]["unprotected_shot_ids"] == ["s1"]
+
+
+def test_music_mix_review_marks_static_duck_as_degraded_without_sidechain() -> None:
+    timeline = build_music_timeline(
+        [{"id": "s1", "nar": "第一句"}],
+        shot_starts={"s1": 0.0},
+        shot_ends={"s1": 3.0},
+    )
+    report = build_music_mix_review(timeline, sidechain_applied=False)
+    assert report["status"] == "needs_attention"
+    assert report["dialogue_protection"]["unprotected_shot_ids"] == []
+    assert report["dialogue_protection"]["static_only_shot_ids"] == ["s1"]
 
 
 def test_music_timeline_automates_supplied_audio() -> None:

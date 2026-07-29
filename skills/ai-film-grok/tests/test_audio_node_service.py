@@ -576,3 +576,42 @@ def test_http_auth_rejects_before_json_parsing(monkeypatch: pytest.MonkeyPatch) 
 
     assert response.status_code == 401
     assert response.json() == {"detail": "unauthorized"}
+
+
+def test_music_batch_validates_repaint_window(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("fastapi")
+    service = importlib.import_module("audio_node_service")
+    monkeypatch.setattr(service, "TOKEN", "t" * 32)
+    references = tmp_path / "refs"
+    references.mkdir()
+    reference_id = "a" * 64
+    (references / f"{reference_id}.wav").write_bytes(b"RIFF" + b"\0" * 1024)
+    monkeypatch.setattr(service, "REFERENCES", references)
+    monkeypatch.setattr(service, "_music_batch_template", lambda: ["music"])
+    monkeypatch.setattr(asyncio, "create_task", lambda coroutine: coroutine.close())
+    base = {
+        "prompt": "repair the musical ending",
+        "duration": 20,
+        "batch_size": 1,
+        "seeds": [7],
+        "task_type": "repaint",
+        "reference_audio_id": reference_id,
+    }
+
+    accepted = asyncio.run(
+        service.create_music_batch(
+            {**base, "repainting_start": 12, "repainting_end": 20},
+            f"Bearer {'t' * 32}",
+        )
+    )
+    assert accepted["status"] == "queued"
+
+    with pytest.raises(Exception, match="repaint"):
+        asyncio.run(
+            service.create_music_batch(
+                {**base, "repainting_start": 20, "repainting_end": 12},
+                f"Bearer {'t' * 32}",
+            )
+        )

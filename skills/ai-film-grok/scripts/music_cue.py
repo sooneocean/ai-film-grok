@@ -14,6 +14,9 @@ class MusicCueError(ValueError):
 
 _MOODS = frozenset({"rnb", "dark", "ambient", "warm", "playful"})
 _TRANSITIONS = frozenset({"crossfade", "cut", "stinger"})
+_MOTIF_ROLES = frozenset(
+    {"", "statement", "fragment", "tender", "corrupted", "reveal", "loss", "reunion", "climax"}
+)
 _PROFILES = frozenset({"full", "thin", "pulse", "pad", "bass", "silence"})
 
 # These are arrangement instructions, not sample-pack identifiers.  Keeping the
@@ -147,18 +150,39 @@ def normalize_music_cue(
         raise MusicCueError("music_cue.take_seed must be an integer") from exc
     if not 0 <= seed <= 0x7FFFFFFF:
         raise MusicCueError("music_cue.take_seed must be between 0 and 2147483647")
+    motif_role = str(cue.get("motif_role") or "").strip().lower()
+    if motif_role not in _MOTIF_ROLES:
+        raise MusicCueError(f"music_cue.motif_role must be one of {sorted(_MOTIF_ROLES)}")
+    preferred_asset_id = str(cue.get("preferred_asset_id") or "").strip()
+    if len(preferred_asset_id) > 128 or any(
+        character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
+        for character in preferred_asset_id
+    ):
+        raise MusicCueError("music_cue.preferred_asset_id is invalid")
+    dialogue_present = bool(
+        cue.get("dialogue_present") or shot.get("nar") or shot.get("nar_ja") or shot.get("dialogue")
+    )
+    # The renderer also has real-time sidechain compression, but a small static
+    # bed reduction guarantees intelligibility when a platform FFmpeg build
+    # lacks that filter.  An authored value (including 0 dB) always wins.
+    duck_raw = cue.get("duck_db")
+    if duck_raw is None:
+        duck_raw = -3.0 if dialogue_present else 0.0
     return {
         "mood": mood,
         "energy": _bounded(cue.get("energy"), "energy", 0.55),
         "density": _bounded(cue.get("density"), "density", 0.45),
         "bass_presence": _bounded(cue.get("bass_presence"), "bass_presence", 0.5),
         "brightness": _bounded(cue.get("brightness"), "brightness", 0.5),
-        "duck_db": round(max(-18.0, min(0.0, float(cue.get("duck_db", 0.0)))), 2),
+        "duck_db": round(max(-18.0, min(0.0, float(duck_raw))), 2),
         "bpm": round(bpm, 2),
         "key_shift": key_shift,
         "stem_profile": profile,
         "motif_id": motif,
+        "motif_role": motif_role,
         "transition": transition,
+        "preferred_asset_id": preferred_asset_id,
+        "dialogue_present": dialogue_present,
         "seed": seed,
     }
 
@@ -234,11 +258,23 @@ def build_music_timeline(
         if end <= start:
             continue
         cue = compile_music_cue(shot, default_mood=default_mood)
+        beat_sec = 60.0 / float(cue["bpm"])
+        bar_sec = beat_sec * 4.0
+        nearest_downbeat = round(start / bar_sec) * bar_sec
         timeline.append(
             {
                 "shot_id": sid,
                 "start_sec": start,
                 "end_sec": end,
+                # This never shifts picture timing.  It tells the template
+                # renderer and reviewer where a visual cut sits against the
+                # selected cue's musical grid.
+                "beat_sync": {
+                    "beat_sec": round(beat_sec, 6),
+                    "bar_sec": round(bar_sec, 6),
+                    "nearest_downbeat_sec": round(nearest_downbeat, 6),
+                    "cut_offset_sec": round(start - nearest_downbeat, 6),
+                },
                 **cue,
             }
         )
@@ -260,8 +296,77 @@ def summarize_music_timeline(timeline: list[dict[str, Any]]) -> dict[str, Any]:
         "instrument_palettes": [item.get("instrument_palette", []) for item in timeline],
         "instrumental_only": all(item.get("instrumental_only") for item in timeline),
         "transitions": [item["transition"] for item in timeline],
+        "beat_sync": [item.get("beat_sync", {}) for item in timeline],
         "explainable": True,
         "source": "shot.music_cue with dramaturgical defaults",
+    }
+
+
+def build_music_mix_review(
+    timeline: list[dict[str, Any]],
+    *,
+    sidechain_applied: str | bool,
+    loudness: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Create an auditable listening map without moving locked picture edits.
+
+    It deliberately reports beat offsets instead of quantizing video cuts: a
+    music decision must not silently change a reviewed visual edit.  Dialogue
+    safety has two independent protections: cue-level gain and FFmpeg
+    sidechain when available.
+    """
+    dialogue = [item for item in timeline if item.get("dialogue_present")]
+    unprotected = [
+        item["shot_id"]
+        for item in dialogue
+        if float(item.get("duck_db", 0.0)) >= 0 and not sidechain_applied
+    ]
+    # A static reduction prevents the worst collision, but cannot recover in
+    # narration pauses or react to an unexpectedly loud take.  Surface that
+    # degraded mode to the reviewer rather than claiming dynamic protection.
+    static_only = (
+        [item["shot_id"] for item in dialogue] if dialogue and not sidechain_applied else []
+    )
+    listen_points: list[dict[str, Any]] = []
+    for index, item in enumerate(timeline):
+        sync = item.get("beat_sync") if isinstance(item.get("beat_sync"), dict) else {}
+        offset = abs(float(sync.get("cut_offset_sec") or 0.0))
+        if index == 0 or item.get("transition") in {"cut", "stinger"} or offset > 0.12:
+            reason = "cold_open" if index == 0 else str(item.get("transition") or "beat_offset")
+            if offset > 0.12 and reason == "crossfade":
+                reason = "off_downbeat_cut"
+            listen_points.append(
+                {
+                    "time_sec": round(float(item["start_sec"]), 3),
+                    "shot_id": item["shot_id"],
+                    "reason": reason,
+                    "cut_offset_sec": round(offset, 3),
+                }
+            )
+    integrated = None
+    if isinstance(loudness, dict):
+        integrated = loudness.get("integrated_lufs")
+    return {
+        "schema": "aifilm-music-mix-review-v1",
+        "status": "needs_attention" if unprotected or static_only else "ready_for_human_listen",
+        "beat_grid": {
+            "cut_count": len(timeline),
+            "off_downbeat_cut_count": sum(
+                1
+                for item in timeline
+                if abs(float((item.get("beat_sync") or {}).get("cut_offset_sec") or 0.0)) > 0.12
+            ),
+            "picture_timing_changed": False,
+        },
+        "dialogue_protection": {
+            "dialogue_cue_count": len(dialogue),
+            "static_duck_db": {item["shot_id"]: item.get("duck_db") for item in dialogue},
+            "sidechain_applied": sidechain_applied,
+            "unprotected_shot_ids": unprotected,
+            "static_only_shot_ids": static_only,
+        },
+        "loudness": {"integrated_lufs": integrated},
+        "human_listen_points": listen_points,
     }
 
 

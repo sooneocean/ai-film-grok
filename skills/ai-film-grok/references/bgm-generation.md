@@ -122,6 +122,72 @@ ACE-Step 歌词侧可用：`[inst]` 或空结构标记（以官方/社区文档�
 canary 会回读候选数量、时长、技术检测、唯一 checksum 与唯一 PCM 指纹；任何候选
 仍保持 `pending_human_review`，不能替代人工完整听审。
 
+### ACE-Step Music Editor v2
+
+共享 master 不再由 `final` 直接截断。片级 `music_cue` 先生成 checksum 绑定的
+`receipts/music-edit-plan.json`；选择器优先匹配准确时长、对白安全版本、
+`motif_role`（动机在剧情中的作用）、相邻调性与 BPM。缺少已批准 edit 或转场桥时，
+`final --music-template approved_library` 会列出需求并阻塞，ACE 仍只在离线策展阶段运行。
+
+```bash
+# 查看本片每个 cue 需要哪种离线编辑
+"$AIFILM" bgm-library edit-plan --root "<film-root>"
+
+# 从已批准 master 生成准确时长／对白安全／无缝循环候选；全部保持 pending
+"$AIFILM" bgm-library edit-pack --asset-id "<approved-id>" \
+  --duration 18 --variant exact --variant dialogue-safe --variant loop
+
+# 修复尾奏（ACE repaint）；只重绘最后 8 秒
+"$AIFILM" bgm-library edit-pack --asset-id "<approved-id>" \
+  --duration 60 --variant outro
+
+# 把一个剧集主题发展为 statement/fragment/tender/corrupted/reveal/loss/reunion/climax
+"$AIFILM" bgm-library motif-development --root "<film-root>" \
+  --asset-id "<approved-series-motif-id>"
+
+# 为两首调性或速度不兼容的批准曲生成过桥；生成后仍须 review-pack 听审并批准
+"$AIFILM" bgm-library bridge-pack \
+  --from-asset-id "<approved-outgoing-id>" \
+  --to-asset-id "<approved-incoming-id>" --duration 10
+```
+
+所有 edit/bridge 会保存父资产、目标资产、配方、seed、checkpoint 和技术检测，但不保存
+剧情原始 prompt。审听页同时显示 loop seam、结尾活跃度、对白频段占比和目标时长。
+配方另会记录可审计的配器意图（鼓、低音、和声密度、明亮度、主旋律存在感）；它们会编入
+ACE cover/repaint 的抽象提示词，不声称 ACE 已输出可独立交付的 stems。
+转场桥只有在批准、checksum 校验通过且父子绑定吻合时才实混；成片成功后，cue 和 bridge
+分别追加 usage 事件。`final` 不允许把“计划中会生成”当成“已经存在”。
+
+ACE-Step cover 会以参考音长度为准。因此当 edit 目标时长不同于批准 master，客户端只会在
+临时目录制作带淡出的 target-length reference 并上传给节点；批准 master 从不改写，临时参考
+不进 catalog，最终仍只允许人工批准的 ACE 输出进入 final。这个规则同样适用于 series pack 与
+transition bridge，不能让 30 秒母带伪装成 10 秒过桥。
+
+### Audio armory（已收编的 5090 音乐武器）
+
+`aifilm bgm-library doctor` 会输出 `audio_armory`：只有节点健康、reference upload 可用且存在
+checksum 绑定、技术通过的真实候选时，才把 `scene_edit`（对白安全／尾奏修复）或
+`transition_bridge` 标为 `verified`。所有武器都只能离线策展、必须人审、不能直接进入 final。
+`motif_development` 在有剧集主题母带和真实候选前保持 `conditional`；Foley／逐帧 SFX 与无缝
+循环不属于 ACE 的自动武器，后者在 live seam 测试通过前也不会自动路由。
+
+`armory` 是只读路线规划器：它不会连线生成、写 catalog 或批准候选，只列出已证实能力、缺的
+前置条件与待人工执行的命令模板。先用它确认路线，再单独执行命令并用 `review-pack` 听审：
+
+```bash
+# 给对白镜准备 18 秒候选；仅在 asset 已批准且节点有真实证据时才 ready_to_stage
+"$AIFILM" bgm-library armory --intent scene_edit --asset-id "<approved-id>" --duration 18
+
+# 剧集主题始终是两段：series-pack -> 人审批准一首主题母带 -> motif-development
+"$AIFILM" bgm-library armory --intent motif_development \
+  --root "<film-root>" --series-id "<series-id>"
+```
+
+`motif_development` 的 `--asset-id` 必须是**同一个 series_id**、已经人工批准、并且来自
+`series-pack` 的 motif 资产；一般共享 master 不能越过这道门。首次满足该前置条件但还没有
+真实 variation canary 时，规划结果会是 `canary_required`，不会假称 `verified`。明确提供的
+`--duration` 则一律要求 10–600 秒的有限数值。
+
 ## 三阶梯 · 立刻换口味（操作）
 
 ```text
@@ -201,7 +267,9 @@ MUSIC_GEN_BASE_URL=http://127.0.0.1:7860
 }
 ```
 
-缺少 cue 时，会按 `dramatic_function` 推导：危机偏 dark/pulse，高潮偏 rnb/full，铺陈偏 ambient/pad，余韵偏 warm/thin。`music_timeline` 还会从镜头 cast 推导角色或双人关系动机：同一角色跨段重现同一动机，剧情功能只改变其纯器乐配器（例如钢琴/弦乐/低音提琴/刷鼓）与张力；明确的 `motif_id` 始终优先。程序 BGM 会按镜头切段，确定性地变更动机 seed、能量、鼓组密度、低频与高频层，以及 stem profile；外部曲库则保留原曲，仅施加可解释的镜头级 gain/duck 自动化。实际路由会写入 `mix_report.json.music_cue_routing`，包含 `instrument_palettes` 与 `instrumental_only=true`，不会把“seed 不同”当作音乐变化的证明。
+缺少 cue 时，会按 `dramatic_function` 推导：危机偏 dark/pulse，高潮偏 rnb/full，铺陈偏 ambient/pad，余韵偏 warm/thin。`music_timeline` 还会从镜头 cast 推导角色或双人关系动机：同一角色跨段重现同一动机，剧情功能只改变其纯器乐配器（例如钢琴/弦乐/低音提琴/刷鼓）与张力；明确的 `motif_id` 始终优先。程序 BGM 会按镜头切段，确定性地变更动机 seed、能量、鼓组密度、低频与高频层，以及 stem profile；外部曲库则保留原曲，仅施加可解释的镜头级 gain/duck 自动化。对白 cue 未明确写 `duck_db` 时，先减 3 dB，再交给实时 sidechain 做细部闪避。实际路由会写入 `mix_report.json.music_cue_routing`，包含 `instrument_palettes` 与 `instrumental_only=true`，不会把“seed 不同”当作音乐变化的证明。
+
+`mix_report.json.music_mix_review` 是成片听审地图：记录每个切点相对于 downbeat 的偏差、对白保护是否有静态与动态两层、成片响度和需要回听的时间点。它绝不为追拍而移动已批准的画面切点；出现 `needs_attention` 时须先修正对白保护再 final review。
 
 旁白仍为中文、角色对白仍为日文，字幕仍为中文；`music_cue` 只控制音乐层，不会改变语言分轨。若启用 `--music-template timeline`，则每个 cue 会从 `audio/templates/<mood>/`（或共享曲库）选择一首授权纯音乐并实混到 BGM stem；任一目标 mood 缺曲即 fail-closed，不会用 default 或全片 `audio/bgm.wav` 偷换。mix report 只记录 `audio/templates/...` 或 `skill_library/...` 逻辑路径。
 

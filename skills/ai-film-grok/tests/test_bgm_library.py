@@ -67,14 +67,16 @@ def _metadata(
     stem_profile: str = "pad",
     motif_family: str = "",
     parent_asset_id: str | None = None,
+    keyscale: str = "A minor",
+    bpm: int = 72,
 ) -> dict[str, object]:
     recipe = {
         "mood": mood,
         "dramatic_tags": ["relationship", "intimacy"],
         "energy": energy,
         "stem_profile": stem_profile,
-        "bpm": 72,
-        "keyscale": "A minor",
+        "bpm": bpm,
+        "keyscale": keyscale,
         "timesignature": "4/4",
         "motif_family": motif_family,
     }
@@ -99,6 +101,8 @@ def _approved(
     stem_profile: str = "pad",
     motif_family: str = "",
     parent_asset_id: str | None = None,
+    keyscale: str = "A minor",
+    bpm: int = 72,
 ) -> dict[str, object]:
     staged = stage_candidate(
         library,
@@ -110,6 +114,8 @@ def _approved(
             stem_profile=stem_profile,
             motif_family=motif_family,
             parent_asset_id=parent_asset_id,
+            keyscale=keyscale,
+            bpm=bpm,
         ),
     )
     return approve_candidate(
@@ -475,9 +481,29 @@ def test_review_pack_and_rejection_are_auditable(tmp_path: Path) -> None:
     assert "<audio controls" in html
     assert "标准化配方" in html
     assert "duration" in html
+    assert "loop seam" in html
+    assert "dialogue band" in html
     rejected = reject_candidate(library, str(staged["asset_id"]), reviewer="dex", reason="vocal")
     assert rejected["status"] == "rejected"
     assert audit_library(library)["ok"]
+
+
+def test_edit_candidate_must_match_requested_duration(tmp_path: Path) -> None:
+    metadata = _metadata(mood="warm")
+    metadata["duration"] = 20.0
+    metadata["edit_variant"] = "exact"
+    metadata["recipe"] = {
+        **dict(metadata["recipe"]),
+        "duration": 20.0,
+        "edit_variant": "exact",
+    }
+
+    with pytest.raises(BGMLibraryError, match="target_duration_mismatch"):
+        stage_candidate(
+            tmp_path / "library",
+            _wav(tmp_path / "too-short.wav", frequency=440, duration=1.0),
+            metadata,
+        )
 
 
 def test_baseline_pack_has_five_moods_and_twenty_slots() -> None:
@@ -628,3 +654,200 @@ def test_recent_window_uses_thirty_days_when_usage_is_loaded(tmp_path: Path) -> 
         require_complete=True,
     )
     assert receipt["selections"][0]["asset_id"] == asset["asset_id"]
+
+
+def test_selector_prefers_harmonic_continuity_and_writes_transition_plan(
+    tmp_path: Path,
+) -> None:
+    library = tmp_path / "library"
+    first = _approved(
+        library,
+        _wav(tmp_path / "first.wav", frequency=220),
+        mood="warm",
+        seed=1,
+        keyscale="A minor",
+        bpm=72,
+    )
+    compatible = _approved(
+        library,
+        _wav(tmp_path / "compatible.wav", frequency=330),
+        mood="warm",
+        seed=2,
+        keyscale="C Major",
+        bpm=74,
+    )
+    _approved(
+        library,
+        _wav(tmp_path / "distant.wav", frequency=510),
+        mood="warm",
+        seed=3,
+        keyscale="F# Major",
+        bpm=128,
+    )
+
+    receipt = select_timeline(
+        library,
+        film_id="harmonic-film",
+        timeline=[
+            {
+                "shot_id": "s1",
+                "mood": "warm",
+                "energy": 0.5,
+                "stem_profile": "pad",
+                "preferred_asset_id": first["asset_id"],
+            },
+            {
+                "shot_id": "s2",
+                "mood": "warm",
+                "energy": 0.5,
+                "stem_profile": "pad",
+                "transition": "crossfade",
+            },
+        ],
+    )
+
+    assert receipt["selections"][0]["asset_id"] == first["asset_id"]
+    assert receipt["selections"][1]["asset_id"] == compatible["asset_id"]
+    assert receipt["selections"][1]["transition_plan"]["mode"] == "beat_crossfade"
+    assert "harmonic_continuity" in receipt["selections"][1]["selection_reason"]
+
+
+def test_selector_uses_approved_bridge_for_incompatible_authored_pair(
+    tmp_path: Path,
+) -> None:
+    library = tmp_path / "library"
+    outgoing = _approved(
+        library,
+        _wav(tmp_path / "outgoing.wav", frequency=220),
+        mood="warm",
+        seed=1,
+        keyscale="A minor",
+        bpm=72,
+    )
+    incoming = _approved(
+        library,
+        _wav(tmp_path / "incoming.wav", frequency=510),
+        mood="warm",
+        seed=2,
+        keyscale="F# Major",
+        bpm=110,
+    )
+    metadata = _metadata(mood="warm", seed=3, keyscale="F# Major", bpm=110)
+    metadata["edit_variant"] = "bridge"
+    metadata["parent_asset_id"] = outgoing["asset_id"]
+    metadata["transition_to_asset_id"] = incoming["asset_id"]
+    metadata["recipe"] = {
+        **dict(metadata["recipe"]),
+        "edit_variant": "bridge",
+        "parent_asset_id": outgoing["asset_id"],
+        "transition_to_asset_id": incoming["asset_id"],
+    }
+    bridge_staged = stage_candidate(
+        library,
+        _wav(tmp_path / "bridge.wav", frequency=760),
+        metadata,
+    )
+    bridge = approve_candidate(
+        library,
+        str(bridge_staged["asset_id"]),
+        reviewer="dex",
+        license_note="approved ACE transition bridge",
+        instrumental_confirmed=True,
+    )
+
+    receipt = select_timeline(
+        library,
+        film_id="bridge-film",
+        timeline=[
+            {
+                "shot_id": "s1",
+                "mood": "warm",
+                "preferred_asset_id": outgoing["asset_id"],
+            },
+            {
+                "shot_id": "s2",
+                "mood": "warm",
+                "preferred_asset_id": incoming["asset_id"],
+                "transition": "crossfade",
+            },
+        ],
+    )
+
+    assert [item["asset_id"] for item in receipt["selections"]] == [
+        outgoing["asset_id"],
+        incoming["asset_id"],
+    ]
+    transition = receipt["selections"][1]["transition_plan"]
+    assert transition["mode"] == "approved_bridge"
+    assert transition["bridge_asset_id"] == bridge["asset_id"]
+    assert transition["generation_required"] is False
+
+
+def test_usage_ledger_includes_approved_transition_bridge(tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    outgoing = _approved(
+        library,
+        _wav(tmp_path / "outgoing.wav", frequency=220),
+        mood="warm",
+        seed=1,
+    )
+    incoming = _approved(
+        library,
+        _wav(tmp_path / "incoming.wav", frequency=510),
+        mood="warm",
+        seed=2,
+    )
+    metadata = _metadata(mood="warm", seed=3)
+    metadata.update(
+        {
+            "edit_variant": "bridge",
+            "parent_asset_id": outgoing["asset_id"],
+            "transition_to_asset_id": incoming["asset_id"],
+        }
+    )
+    metadata["recipe"] = {
+        **dict(metadata["recipe"]),
+        "edit_variant": "bridge",
+        "parent_asset_id": outgoing["asset_id"],
+        "transition_to_asset_id": incoming["asset_id"],
+    }
+    staged = stage_candidate(
+        library,
+        _wav(tmp_path / "bridge.wav", frequency=760),
+        metadata,
+    )
+    bridge = approve_candidate(
+        library,
+        str(staged["asset_id"]),
+        reviewer="dex",
+        license_note="approved ACE transition bridge",
+        instrumental_confirmed=True,
+    )
+    receipt = {
+        "schema": "aifilm-bgm-selection-v1",
+        "film_id": "film",
+        "series_id": "",
+        "selections": [
+            {
+                "shot_id": "s2",
+                "asset_id": incoming["asset_id"],
+                "sha256": incoming["sha256"],
+                "transition_plan": {
+                    "mode": "approved_bridge",
+                    "bridge_asset_id": bridge["asset_id"],
+                    "bridge_sha256": bridge["sha256"],
+                },
+            }
+        ],
+    }
+
+    result = commit_usage(library, receipt, final_sha256="f" * 64)
+    events = [
+        json.loads(line)
+        for line in (library / "usage.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+
+    assert result["appended"] == 2
+    assert {event["usage_role"] for event in events} == {"cue", "transition_bridge"}
+    assert events[1]["shot_id"] == "s2:transition"

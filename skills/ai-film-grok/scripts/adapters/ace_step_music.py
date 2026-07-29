@@ -112,6 +112,8 @@ def main() -> None:
         timesignature=str(request.get("timesignature") or ""),
         src_audio=reference_audio or None,
         audio_cover_strength=float(request.get("cover_strength") or 0.7),
+        repainting_start=float(request.get("repainting_start") or 0.0),
+        repainting_end=float(request.get("repainting_end") or -1.0),
         inference_steps=8,
         shift=3.0,
         thinking=False,
