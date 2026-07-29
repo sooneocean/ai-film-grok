@@ -5733,6 +5733,17 @@ def cmd_director(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") else 1
 
 
+def cmd_serial(args: argparse.Namespace) -> int:
+    """Run the optional serial-production contract validator."""
+    from serial_quality import validate_serial
+
+    if args.serial_action != "validate":
+        raise FilmError(f"unknown serial action {args.serial_action!r}")
+    report = validate_serial(Path(args.root).expanduser().resolve(), write_receipt=True)
+    emit(report)
+    return 0 if report.get("ok") else 1
+
+
 def cmd_department(args: argparse.Namespace) -> int:
     from department_cli import (
         diff_department,
@@ -8694,6 +8705,12 @@ def build_parser() -> argparse.ArgumentParser:
     for director_action in ("status", "check", "verify"):
         action_parser = director_sub.add_parser(director_action)
         action_parser.add_argument("--root", required=True)
+    serial_p = sub.add_parser("serial", help="Optional serial-drama narrative and safety gates")
+    serial_sub = serial_p.add_subparsers(dest="serial_action", required=True)
+    serial_validate = serial_sub.add_parser(
+        "validate", help="Validate serial contract and write receipt"
+    )
+    serial_validate.add_argument("--root", required=True)
     d_lock_stage = director_sub.add_parser(
         "lock-stage",
         help="Human-approve and hash-lock the current stage over native evidence",
@@ -8919,6 +8936,7 @@ def main(argv: list[str] | None = None) -> int:
             "frw": cmd_frw,
             "manifest": cmd_manifest,
             "director": cmd_director,
+            "serial": cmd_serial,
             "department": cmd_department,
             "plan": cmd_plan,
             "assets": cmd_assets,

@@ -90,7 +90,7 @@ def public_health_report(raw: Any, *, secret_values: tuple[str, ...] = ()) -> di
     if isinstance(tts_variants, dict):
         public_variants = {
             variant: tts_variants[variant]
-            for variant in ("voice_design", "custom_1_7b")
+            for variant in ("voice_design", "custom_1_7b", "custom_0_6b")
             if isinstance(tts_variants.get(variant), bool)
         }
         if public_variants:

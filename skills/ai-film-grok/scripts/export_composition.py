@@ -587,6 +587,9 @@ def build_timeline_package(
         },
         "final_film": final_film,
         "director_intent": spec.get("director_intent"),
+        "episode_contract": spec.get("episode_contract")
+        if isinstance(spec.get("episode_contract"), dict)
+        else None,
         "sound_plan": spec.get("sound_plan"),
         "vo_mode": spec.get("vo_mode"),
         "title_sequence": spec.get("title_sequence")
@@ -1077,7 +1080,10 @@ def build_platform_ending_html(
     output_duration = float(timeline.get("output_duration") or duration)
     start = max(0.0, output_duration - duration)
     cta = str(ending.get("cta") or "")
-    hook = str(ending.get("next_episode_hook") or "")
+    contract = (
+        package.get("episode_contract") if isinstance(package.get("episode_contract"), dict) else {}
+    )
+    hook = str(contract.get("ending_question") or ending.get("next_episode_hook") or "")
     brand = show_package.get("brand") if isinstance(show_package.get("brand"), dict) else {}
     motion_preset = str(brand.get("motion_preset") or "drama-noir")
     return f'''    <section id="platform-ending" class="clip overlay platform-ending" data-start="{start:.3f}" data-duration="{duration:.3f}" data-track-index="6" data-show-package="{html.escape(str(show_package.get("id") or ""))}">

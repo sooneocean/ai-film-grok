@@ -79,6 +79,14 @@ def native_stage_input_refs(root: Path | str, stage: str) -> dict[str, str]:
             refs[name] = selected
     if missing:
         raise StageGateError(f"native evidence missing for {stage}: " + ", ".join(missing))
+    spec = read_json(base / "film-spec.json") or {}
+    serial = spec.get("serial") if isinstance(spec, dict) else None
+    if stage in {"concept_lock", "script_lock"} and (
+        serial is True or (isinstance(serial, dict) and serial.get("enabled") is True)
+    ):
+        if not (base / "series-bible.json").is_file():
+            raise StageGateError("serial stage requires series-bible.json")
+        refs["series"] = "series-bible.json"
     if stage in {"bulk", "dailies_review", "selects_rough_cut"}:
         if stage == "bulk":
             manifest = read_json(base / "manifest.json") or {}
@@ -147,6 +155,13 @@ def validate_native_stage_evidence(root: Path | str, stage: str) -> dict[str, st
             or (status.get("projection") or {}).get("stale") is True
         ):
             raise ValueError("script lock requires current locked narrative scopes and projection")
+    if stage in {"concept_lock", "script_lock"}:
+        from serial_quality import validate_serial
+
+        serial_report = validate_serial(base, write_receipt=True)
+        if serial_report.get("ok") is not True:
+            codes = "; ".join(item["code"] for item in serial_report["errors"])
+            raise ValueError(f"serial quality gate failed: {codes}")
     elif stage == "department_look_lock":
         style = read_json(base / refs["visual"]) or {}
         if style.get("locked") is not True:
@@ -480,6 +495,10 @@ def check(root: Path | str) -> dict[str, Any]:
 
         quality = validate_premium_vertical(root)
         errors.extend(f"creative: {item['message']}" for item in quality["errors"])
+    from serial_quality import validate_serial
+
+    serial = validate_serial(root, write_receipt=False)
+    errors.extend(f"serial: {item['message']}" for item in serial["errors"])
     if book.get("rigor") == "professional" and stage_gates.get("next_stage") is None:
         from master_delivery import validate_master_delivery
 
@@ -496,6 +515,7 @@ def check(root: Path | str) -> dict[str, Any]:
         "departments": departments,
         "stage_gates": stage_gates,
         "quality": quality,
+        "serial": serial,
     }
 
 

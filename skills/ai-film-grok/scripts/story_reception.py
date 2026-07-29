@@ -33,6 +33,8 @@ TREATMENT_FIELDS = (
     "camera_intent",
     "planning_text",
     "mature_intimacy",
+    "series_id",
+    "episode_contract",
 )
 _MINOR_MARKERS = ("未成年", "未滿18", "未满18", "underage", "minor")
 _INTIMACY_MARKERS = ("成人", "亲密", "性愛", "性爱", "性行为", "sexual", "sex", "r18")
@@ -158,6 +160,8 @@ def reception_summary(payload: dict[str, Any], *, path: Path | None = None) -> d
             "unknowns": list(payload["fidelity"]["unknowns"]),
         },
         "mature_intimacy": dict(treatment.get("mature_intimacy") or {}),
+        "series_id": str(treatment.get("series_id") or ""),
+        "episode_contract": dict(treatment.get("episode_contract") or {}),
         "provenance": dict(treatment.get("provenance") or {}),
     }
 

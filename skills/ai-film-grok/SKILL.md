@@ -38,6 +38,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 final。
 10. **字幕**：像素内中文；HF 失字 recovery；`sub_lead=0`；禁空 SRT。`caption_mode`/`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)。
 11. **后期单责**：title/sub/end 单引擎；`plate-cards blank`、plate `subs=off` 防双烧（[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)）。
+11b. **可选连载**：serial 先过 `serial validate`；系列圣经、首 30 秒承诺、单集主事件、追更钩子、成人/权利来源必须可审计（[workflow](references/serial-narrative-workflow.md)）。
 12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐。
 13. **安全**：凭据本机；日志禁 token/prompt；外部不自动重试花费。
 14. **高动**：平常 mean≥18、肉戏≥20；禁 KB；桌面 final 仅 motion-gate ok。

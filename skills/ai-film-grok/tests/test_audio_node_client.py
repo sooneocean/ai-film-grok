@@ -79,6 +79,26 @@ def test_public_health_report_drops_unknown_fields_and_current_token() -> None:
     }
 
 
+def test_public_health_report_keeps_only_known_tts_variant_flags() -> None:
+    report = public_health_report(
+        {
+            "ok": True,
+            "tts_variants": {
+                "voice_design": True,
+                "custom_1_7b": False,
+                "custom_0_6b": True,
+                "untrusted_variant": True,
+            },
+        }
+    )
+
+    assert report["tts_variants"] == {
+        "voice_design": True,
+        "custom_1_7b": False,
+        "custom_0_6b": True,
+    }
+
+
 def test_public_health_report_drops_allowlisted_windows_path() -> None:
     report = public_health_report(
         {"ok": True, "ambient_model": r"C:\\AI_Models\\stable-audio-open-1.0\\model.safetensors"}

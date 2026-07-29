@@ -72,3 +72,16 @@ def test_node_voice_resolution_rejects_unknown_or_unavailable_variants() -> None
 def test_node_voice_resolution_uses_only_live_catalogued_variant() -> None:
     profile = render_ready_tts_profile("qwen_zh_female_vivian", {"custom_1_7b": True})
     assert profile["speaker"] == "Vivian"
+
+
+def test_fast_and_multilingual_profiles_require_the_small_custom_variant() -> None:
+    for profile_id in (
+        "qwen_zh_female_vivian_fast",
+        "qwen_zh_female_serena_fast",
+        "qwen_ja_female_ono_anna",
+        "qwen_ko_female_sohee",
+    ):
+        profile = get_voice_profile(profile_id)
+        assert profile is not None
+        assert profile["variant"] == "custom_0_6b"
+        assert profile["status"] == "requires_node_variant"

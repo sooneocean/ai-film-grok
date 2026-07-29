@@ -3572,6 +3572,7 @@ def run_plan(
         normalized["title"] = str(treatment.get("title") or normalized["title"])
         normalized["logline"] = str(treatment.get("logline") or normalized["logline"])
         normalized["story_contract_seed"] = story_contract_seed(reception)
+        normalized["received_episode_contract"] = treatment.get("episode_contract")
         normalized["reception"] = reception_summary(
             reception, path=Path(source_path) if source_path else None
         )
@@ -3656,6 +3657,10 @@ def run_plan(
             }
         else:
             spec = project_graph_to_film_spec(graph, base_spec=existing, normalized=normalized)
+            received_contract = normalized.get("received_episode_contract")
+            if isinstance(received_contract, dict) and isinstance(spec.get("serial"), dict):
+                if spec["serial"].get("enabled") is True:
+                    spec["episode_contract"] = copy.deepcopy(received_contract)
             write_json(root / "film-spec.json", spec)
             # seed timeline
             shots_flat = []

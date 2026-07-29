@@ -36,6 +36,8 @@ MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL", "Qwen/Qwen3-TTS-12Hz-1
 MODEL_PATH = os.environ.get("AIFILM_AUDIO_NODE_QWEN_MODEL_PATH", MODEL_ID)
 CUSTOM_1_7B_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_QWEN_CUSTOM_1_7B_MODEL", "")
 CUSTOM_1_7B_MODEL_PATH = os.environ.get("AIFILM_AUDIO_NODE_QWEN_CUSTOM_1_7B_MODEL_PATH", "")
+CUSTOM_0_6B_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_QWEN_CUSTOM_0_6B_MODEL", "")
+CUSTOM_0_6B_MODEL_PATH = os.environ.get("AIFILM_AUDIO_NODE_QWEN_CUSTOM_0_6B_MODEL_PATH", "")
 MUSIC_MODEL_ID = os.environ.get("AIFILM_AUDIO_NODE_MUSIC_MODEL", "ACE-Step-1.5")
 MUSIC_CHECKPOINT_FINGERPRINT = os.environ.get(
     "AIFILM_AUDIO_NODE_MUSIC_CHECKPOINT_FINGERPRINT", "unknown"
@@ -151,6 +153,8 @@ def _tts_variant_available(variant: str) -> bool:
         return bool(MODEL_ID and MODEL_PATH)
     if variant == "custom_1_7b":
         return bool(CUSTOM_1_7B_MODEL_ID and CUSTOM_1_7B_MODEL_PATH)
+    if variant == "custom_0_6b":
+        return bool(CUSTOM_0_6B_MODEL_ID and CUSTOM_0_6B_MODEL_PATH)
     return False
 
 
@@ -374,7 +378,8 @@ def health(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         "node": "private-lan",
         "models": {kind: _available(kind) for kind in AUDIO_KINDS},
         "tts_variants": {
-            variant: _tts_variant_available(variant) for variant in ("voice_design", "custom_1_7b")
+            variant: _tts_variant_available(variant)
+            for variant in ("voice_design", "custom_1_7b", "custom_0_6b")
         },
         "music_batch": bool(os.environ.get("AIFILM_AUDIO_NODE_MUSIC_BATCH_ARGV", "").strip()),
         "model": MODEL_ID,
@@ -533,6 +538,8 @@ def _run_tts(payload: dict[str, Any], out: Path) -> None:
         model_id, model_path = MODEL_ID, MODEL_PATH
     elif variant == "custom_1_7b" and CUSTOM_1_7B_MODEL_ID and CUSTOM_1_7B_MODEL_PATH:
         model_id, model_path = CUSTOM_1_7B_MODEL_ID, CUSTOM_1_7B_MODEL_PATH
+    elif variant == "custom_0_6b" and CUSTOM_0_6B_MODEL_ID and CUSTOM_0_6B_MODEL_PATH:
+        model_id, model_path = CUSTOM_0_6B_MODEL_ID, CUSTOM_0_6B_MODEL_PATH
     else:
         raise ValueError("requested Qwen model variant is unavailable")
     voice = str(payload.get("voice_profile_id") or "Vivian")
