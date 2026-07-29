@@ -389,7 +389,12 @@ def run_comfy(args: argparse.Namespace) -> int:
             elif not args.allow_external_api_nodes:
                 assert_local_only_workflow(base_url, graph)
             client_id = f"aifilm-{secrets.token_hex(8)}"
-            prompt_id = submit(base_url, graph, client_id=client_id)
+            prompt_id = submit(
+                base_url,
+                graph,
+                client_id=client_id,
+                weapon_id=effective_weapon_id,
+            )
             result = wait_for_result(
                 base_url,
                 prompt_id,

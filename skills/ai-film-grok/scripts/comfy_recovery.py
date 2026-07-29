@@ -52,7 +52,12 @@ def config_from_env(
                 )
             ).expanduser(),
             local_port=int(source.get("AIFILM_COMFY_TUNNEL_PORT", "18188")),
-            remote_port=int(source.get("AIFILM_COMFY_REMOTE_PORT", "8188")),
+            remote_port=int(
+                source.get(
+                    "AIFILM_COMFY_REMOTE_PORT",
+                    source.get("AIFILM_COMFY_BROKER_PORT", "8188"),
+                )
+            ),
             remote_root=source.get(
                 "AIFILM_COMFY_REMOTE_ROOT",
                 r"C:\ComfyUI_windows_portable",

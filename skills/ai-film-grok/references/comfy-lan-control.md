@@ -7,17 +7,20 @@ external-provider approval flag.
 ## Configure
 
 ```bash
-export AIFILM_COMFYUI_BASE_URL="http://192.168.88.52:8188"
+export AIFILM_COMFYUI_BASE_URL="http://127.0.0.1:18188"
+export AIFILM_COMFY_BROKER_TOKEN="..." # keep this only in an owner-only secret store
 ```
 
-The verified 5090 armory also supplies this private URL when neither
-`--base-url` nor the environment variable is present. Use the environment
-variable to override the registered node, not to store credentials.
+The production route is an authenticated Broker on Windows loopback port
+`8189`, reached only through `ssh -L 18188:127.0.0.1:8189`. ComfyUI itself
+must listen on `127.0.0.1:8188`; do not restore LAN binding. The Broker exposes
+only read paths, image upload, and registered-armory submission. It rejects
+`/interrupt`, `/free`, and queue deletion, so one controller cannot globally
+stop a job by accident.
 
 Only `http(s)://localhost` or a literal private/loopback IP is accepted.
 Credentials, URL paths, public IPs, redirects and hostnames are rejected.
-Restrict Windows Firewall port `8188` to the controller machine; never expose
-the server through router port forwarding.
+Never expose either service through Windows Firewall or router port forwarding.
 
 ## Read-only control
 
@@ -123,16 +126,15 @@ aifilm comfy download \
 
 ## Mutating controls
 
-Queue mutation and model unloading require an explicit confirmation flag:
+Direct queue mutation and model unloading are unavailable through the Broker:
 
 ```bash
 aifilm comfy cancel --prompt-id PROMPT_ID --confirm
 aifilm comfy free-memory --confirm
 ```
 
-`cancel` deletes only the named pending prompt. It interrupts a running prompt
-only when that prompt is the sole running job, because ComfyUI `/interrupt` is
-global.
+`cancel` and `free-memory` will be rejected while the Broker is active. This is
+intentional: ComfyUI `/interrupt` and `/free` are global operations.
 
 ## Wan 2.2 provider
 
