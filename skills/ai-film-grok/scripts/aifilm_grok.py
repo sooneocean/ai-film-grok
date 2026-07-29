@@ -6370,7 +6370,9 @@ def cmd_adult_female_voice_pack(args: argparse.Namespace) -> int:
                 )
             )
             return 0
-        base = os.environ.get("AIFILM_AUDIO_NODE_URL", "").strip()
+        base = str(
+            getattr(args, "node_url", "") or os.environ.get("AIFILM_AUDIO_NODE_URL", "")
+        ).strip()
         token = os.environ.get("AIFILM_AUDIO_NODE_TOKEN", "").strip()
         if not base or not token:
             raise AdultFemaleVoicePackError("AIFILM_AUDIO_NODE_URL/TOKEN are required")
@@ -6998,6 +7000,11 @@ def build_parser() -> argparse.ArgumentParser:
     adult_female_voice_pack_init.add_argument("--root", required=True)
     adult_female_voice_pack_render = adult_female_voice_pack_sub.add_parser("render")
     adult_female_voice_pack_render.add_argument("--root", required=True)
+    adult_female_voice_pack_render.add_argument(
+        "--node-url",
+        default="",
+        help="Optional private LAN or Tailscale 100.x audio-node URL; does not persist config",
+    )
     adult_female_voice_pack_list = adult_female_voice_pack_sub.add_parser("list")
     adult_female_voice_pack_list.add_argument("--root", required=True)
     adult_female_voice_pack_approve = adult_female_voice_pack_sub.add_parser("approve")
