@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import gc
 import hashlib
+import json
 from pathlib import Path
 
 
@@ -53,13 +54,20 @@ def main() -> int:
     if not 1 <= args.duration <= 47:
         raise SystemExit("duration must be 1-47 seconds")
     model_root = _pinned_local_model(args)
+    config_path = model_root / "model_config.json"
+    if config_path.is_symlink() or not config_path.is_file():
+        raise SystemExit("local model_config.json is required")
     import torch
     import torchaudio
     from einops import rearrange
-    from stable_audio_tools import get_pretrained_model
     from stable_audio_tools.inference.generation import generate_diffusion_cond
+    from stable_audio_tools.models.factory import create_model_from_config
+    from stable_audio_tools.models.utils import load_ckpt_state_dict
 
-    model, config = get_pretrained_model(str(model_root))
+    with config_path.open(encoding="utf-8") as source:
+        config = json.load(source)
+    model = create_model_from_config(config)
+    model.load_state_dict(load_ckpt_state_dict(Path(args.checkpoint)))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device).eval().requires_grad_(False)
     sample_rate = int(config["sample_rate"])
