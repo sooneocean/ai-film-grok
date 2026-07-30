@@ -77,6 +77,11 @@ def test_cosyvoice_rejects_edge_voice_identifier() -> None:
         cosyvoice_local_tts._provider_voice("zh-CN-XiaoxiaoNeural")
 
 
+def test_cosyvoice_can_disable_optional_text_frontend(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COSYVOICE_TEXT_FRONTEND", "0")
+    assert cosyvoice_local_tts._text_frontend_enabled() is False
+
+
 def test_cosyvoice_rejects_symlinked_reference(tmp_path: Path) -> None:
     target = tmp_path / "target.wav"
     target.write_bytes(b"RIFF")

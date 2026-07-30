@@ -12,6 +12,7 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+import frw_ab  # noqa: E402
 from frw_ab import (  # noqa: E402
     FrwABError,
     approve_rank,
@@ -21,6 +22,7 @@ from frw_ab import (  # noqa: E402
     rank_candidates,
     run_experiment,
 )
+from i2v_provider import route_after_failure  # noqa: E402
 from util import canonical_json_sha256  # noqa: E402
 
 
@@ -196,19 +198,27 @@ def test_production_i2v_run_requires_valid_technical_switch_receipt(
 
     receipts = tmp_path / "receipts"
     switch_path = receipts / "provider-switch-shot01.json"
-    switch_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "kind": "provider-switch",
-                "shot_id": "shot01",
-                "primary_provider": "grok",
-                "fallback_provider": "seedance",
-                "reason_class": "technical_failure",
-                "fallback_fixed_for_shot": True,
-            }
-        ),
-        encoding="utf-8",
+    switch_receipt = {
+        "schema_version": 1,
+        "kind": "provider-switch",
+        "shot_id": "shot01",
+        "primary_provider": "grok",
+        "fallback_provider": "seedance",
+        "reason_class": "technical_failure",
+        "error": "upstream timeout",
+        "fallback_fixed_for_shot": True,
+    }
+    switch_receipt["switch_sha256"] = "tampered"
+    switch_path.write_text(json.dumps(switch_receipt), encoding="utf-8")
+    with pytest.raises(FrwABError, match="PROVIDER_SWITCH_REQUIRED"):
+        run_experiment(tmp_path, plan=plan, inputs=_inputs(), submit=submit)
+    submit.assert_not_called()
+
+    route_after_failure(
+        root=tmp_path,
+        shot_id="shot01",
+        primary="grok",
+        error="HTTP 503 service unavailable",
     )
     receipt = run_experiment(
         tmp_path,
@@ -315,6 +325,39 @@ def test_concurrent_run_claims_experiment_before_any_submission(tmp_path: Path) 
 
     assert results.count("ok") == 1
     assert sum("RUN_ALREADY_EXISTS" in result for result in results) == 1
+    assert len(calls) == 3
+
+
+def test_run_receipt_failure_leaves_fail_closed_submission_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = build_plan(
+        tmp_path,
+        experiment_id="shot01-receipt-failure",
+        operation="image_to_video",
+        stage="pilot",
+        content_class="general",
+        inputs=_inputs(),
+        catalog=_catalog(),
+    )
+    calls: list[str] = []
+
+    def submit(candidate: dict, _inputs: dict[str, str]) -> dict:
+        calls.append(str(candidate["model_id"]))
+        return {
+            "success": True,
+            "data": {"task_id": f"task-{candidate['model_id']}"},
+        }
+
+    monkeypatch.setattr(
+        frw_ab,
+        "_write_receipt",
+        mock.Mock(side_effect=OSError("simulated receipt failure")),
+    )
+    with pytest.raises(OSError, match="simulated receipt failure"):
+        run_experiment(tmp_path, plan=plan, inputs=_inputs(), submit=submit)
+    with pytest.raises(FrwABError, match="RUN_ALREADY_EXISTS"):
+        run_experiment(tmp_path, plan=plan, inputs=_inputs(), submit=submit)
     assert len(calls) == 3
 
 

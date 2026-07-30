@@ -170,7 +170,10 @@ def _open_confined_asset(root: Path, relative: Path) -> int:
     """Open a regular asset by descriptor-walking from the film root."""
     if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
         raise SceneSoundError("safe scene-sound source access is unavailable on this platform")
-    directory_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        directory_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise SceneSoundError("cannot safely open film root") from exc
     try:
         for part in relative.parts[:-1]:
             child_fd = os.open(
@@ -185,7 +188,12 @@ def _open_confined_asset(root: Path, relative: Path) -> int:
         raise SceneSoundError("cannot safely open scene-sound asset") from exc
     finally:
         os.close(directory_fd)
-    if not stat.S_ISREG(os.fstat(asset_fd).st_mode):
+    try:
+        regular = stat.S_ISREG(os.fstat(asset_fd).st_mode)
+    except OSError as exc:
+        os.close(asset_fd)
+        raise SceneSoundError("cannot safely inspect scene-sound asset") from exc
+    if not regular:
         os.close(asset_fd)
         raise SceneSoundError("scene-sound source must be a regular file")
     return asset_fd
@@ -193,7 +201,10 @@ def _open_confined_asset(root: Path, relative: Path) -> int:
 
 def _hash_fd(asset_fd: int) -> str:
     digest = hashlib.sha256()
-    with os.fdopen(os.dup(asset_fd), "rb") as source:
+    with ExitStack() as stack:
+        source_fd = os.dup(asset_fd)
+        stack.callback(os.close, source_fd)
+        source = stack.enter_context(os.fdopen(source_fd, "rb", closefd=False))
         while block := source.read(1024 * 1024):
             digest.update(block)
     os.lseek(asset_fd, 0, os.SEEK_SET)
@@ -262,41 +273,40 @@ def _stage_verified_asset(
     if not hasattr(os, "O_NOFOLLOW"):
         raise SceneSoundError("safe scene-sound staging is unavailable on this platform")
     digest = hashlib.sha256()
-    target_fd: int | None = None
+    staged_fd: int | None = None
     try:
         with ExitStack() as stack:
-            source = stack.enter_context(os.fdopen(os.dup(asset_fd), "rb"))
+            source_fd = os.dup(asset_fd)
+            stack.callback(os.close, source_fd)
+            source = stack.enter_context(os.fdopen(source_fd, "rb", closefd=False))
             if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
                 raise SceneSoundError("scene-sound source must be a regular file")
             target_fd = os.open(target, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
-            with os.fdopen(target_fd, "w+b", closefd=False) as output:
-                while block := source.read(1024 * 1024):
-                    digest.update(block)
-                    output.write(block)
-                output.flush()
-                os.fsync(output.fileno())
+            stack.callback(os.close, target_fd)
+            output = stack.enter_context(os.fdopen(target_fd, "w+b", closefd=False))
+            while block := source.read(1024 * 1024):
+                digest.update(block)
+                output.write(block)
+            output.flush()
+            os.fsync(output.fileno())
+            if digest.hexdigest() != expected_sha256:
+                raise SceneSoundError("scene-sound asset changed during staging")
+            staged_fd = os.dup(target_fd)
+            os.lseek(staged_fd, 0, os.SEEK_SET)
+            target.unlink()
     except SceneSoundError:
-        if target_fd is not None:
-            os.close(target_fd)
-        target.unlink(missing_ok=True)
+        if staged_fd is not None:
+            os.close(staged_fd)
         raise
     except OSError as exc:
-        if target_fd is not None:
-            os.close(target_fd)
-        target.unlink(missing_ok=True)
+        if staged_fd is not None:
+            os.close(staged_fd)
         raise SceneSoundError("cannot safely stage scene-sound asset") from exc
-    if digest.hexdigest() != expected_sha256:
-        os.close(target_fd)
+    finally:
         target.unlink(missing_ok=True)
-        raise SceneSoundError("scene-sound asset changed during staging")
-    try:
-        os.lseek(target_fd, 0, os.SEEK_SET)
-        target.unlink()
-    except OSError as exc:
-        os.close(target_fd)
-        target.unlink(missing_ok=True)
-        raise SceneSoundError("cannot safely finalize staged scene-sound asset") from exc
-    return target_fd
+    if staged_fd is None:
+        raise SceneSoundError("cannot safely stage scene-sound asset")
+    return staged_fd
 
 
 def _write_stem(samples: np.ndarray, *, out: Path, sample_rate: int, label: str) -> dict[str, str]:

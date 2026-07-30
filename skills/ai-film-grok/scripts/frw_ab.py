@@ -13,9 +13,9 @@ import json
 import os
 import re
 import subprocess
-from collections.abc import Callable
-from contextlib import contextmanager
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -457,7 +457,7 @@ def _safe_error_code(value: object, *, default: str) -> str:
 
 
 @contextmanager
-def _exclusive_run(run_path: Path) -> Any:
+def _exclusive_run(run_path: Path) -> Iterator[None]:
     lock_path = run_path.with_suffix(".lock")
     try:
         descriptor = os.open(
@@ -471,7 +471,8 @@ def _exclusive_run(run_path: Path) -> Any:
     try:
         yield
     finally:
-        lock_path.unlink(missing_ok=True)
+        if run_path.is_file():
+            lock_path.unlink(missing_ok=True)
 
 
 def run_experiment(

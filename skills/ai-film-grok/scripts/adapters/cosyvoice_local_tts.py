@@ -35,8 +35,8 @@ class CosyVoiceLocalError(RuntimeError):
     """A local CosyVoice prerequisite or render failed."""
 
 
-def _env(name: str) -> str:
-    return os.environ.get(name, "").strip()
+def _env(name: str, default: str = "") -> str:
+    return os.environ.get(name, default).strip()
 
 
 def _regular_file(path: Path, *, name: str) -> Path:
@@ -50,6 +50,11 @@ def _mode() -> str:
     if mode not in {"zero_shot", "sft"}:
         raise CosyVoiceLocalError("COSYVOICE_MODE must be zero_shot or sft")
     return mode
+
+
+def _text_frontend_enabled() -> bool:
+    """Allow an offline canary to bypass optional WeText downloads explicitly."""
+    return _env("COSYVOICE_TEXT_FRONTEND", "1").lower() not in {"0", "false", "no", "off"}
 
 
 def _configuration() -> tuple[Path, Path, Path | None, str]:
@@ -141,6 +146,11 @@ def synthesize(text: str, out: Path, voice: str) -> Path:
     if not body:
         raise CosyVoiceLocalError("text must not be empty")
     mode = _mode()
+    text_frontend = _text_frontend_enabled()
+    if not text_frontend:
+        # AutoModel otherwise attempts to fetch optional WeText assets during
+        # construction.  The provider accepts pre-normalized text below.
+        os.environ.setdefault("MODELSCOPE_OFFLINE", "1")
     root, model_dir, reference, prompt = _configuration()
     provider_voice = _provider_voice(voice)
     if mode == "sft" and provider_voice == "cosyvoice-local":
@@ -160,7 +170,9 @@ def synthesize(text: str, out: Path, voice: str) -> Path:
     if mode == "sft":
         chunks = [
             result["tts_speech"]
-            for result in model.inference_sft(body, provider_voice, stream=False)
+            for result in model.inference_sft(
+                body, provider_voice, stream=False, text_frontend=text_frontend
+            )
         ]
     else:
         if reference is None:  # guarded by _configuration; keeps type narrowing explicit
@@ -172,6 +184,7 @@ def synthesize(text: str, out: Path, voice: str) -> Path:
                 prompt,
                 str(reference),
                 stream=False,
+                text_frontend=text_frontend,
             )
         ]
     if not chunks:
