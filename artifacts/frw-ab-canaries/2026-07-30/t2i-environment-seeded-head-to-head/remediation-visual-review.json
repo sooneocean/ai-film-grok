@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-remediation-visual-review",
+  "experiment_id": "env-t2i-empty-platform-remediation-20260730",
+  "reviewed_at": "2026-07-30T04:21:00Z",
+  "rank_sha256": "36957e17dca602fe6a88474803af94d175dd41dee5ea5be09853e6fdd43c0285",
+  "outcome": "one_candidate_pass_pending_human_approval",
+  "automatic_resubmit": false,
+  "recommended_candidate": "qwen",
+  "candidates": [
+    {
+      "model_id": "qwen",
+      "media": {
+        "path": "remediation-outputs/qwen.png",
+        "sha256": "eda701dcd43e26ca4eae3145184db7f5d4fc052c2acf1c59eea081bb9a814712",
+        "width": 704,
+        "height": 1280
+      },
+      "eligible": true,
+      "codes": [],
+      "notes": [
+        "Empty architectural platform environment with no visible people, portraits, advertisements, signs, readable text, numbers, symbols, or logos.",
+        "Wet-platform, blue-hour, lamp-reflection brief is preserved."
+      ]
+    },
+    {
+      "model_id": "flux",
+      "media": {
+        "path": "remediation-outputs/flux.png",
+        "sha256": "d2f30aadf527c7151868b356177a9b1130cf2621900c2fa864d4f7f1f58e3e34",
+        "width": 704,
+        "height": 1280
+      },
+      "eligible": false,
+      "codes": ["TEXT_OR_SIGN_VISIBLE"],
+      "notes": [
+        "A lit station-style sign remains above the left platform, violating the no-sign/no-symbol constraint."
+      ]
+    }
+  ]
+}
