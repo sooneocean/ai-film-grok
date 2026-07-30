@@ -61,6 +61,38 @@ def spoken_text_for_shot(
     return ""
 
 
+def _is_non_vo_coverage_shot(shot: dict[str, Any]) -> bool:
+    """Reaction / action_cover / silence inserts may legitimately carry no TTS line.
+
+    dialogue_drama auto-inserts these after a speaking beat (see story_plan).
+    They must not force empty-VO failures or invent filler narration.
+    """
+    screen_mode = str(shot.get("screen_mode") or shot.get("coverage_role") or "").strip().lower()
+    if screen_mode not in {"reaction", "action_cover", "silence"}:
+        return False
+    cues = shot.get("audio_cues") if isinstance(shot.get("audio_cues"), list) else []
+    has_voice = any(
+        isinstance(cue, dict) and str(cue.get("kind") or "").strip().lower() == "voice"
+        for cue in cues
+    )
+    has_authored_speech = any(
+        isinstance(shot.get(key), str) and shot[key].strip()
+        for key in (
+            "nar",
+            "narration",
+            "nar_zh",
+            "nar_ja",
+            "dialogue",
+            "dialogue_ja",
+            "spoken_ja",
+            "vo",
+            "caption",
+        )
+    )
+    # Continuing off-camera dialogue on coverage still needs authored spoken text.
+    return not has_voice and not has_authored_speech
+
+
 def validate_linear_narration(
     shots: list[dict[str, Any]],
     *,
@@ -71,7 +103,11 @@ def validate_linear_narration(
     """Each real TTS line must advance the story rather than replay it."""
     seen: dict[str, str] = {}
     for shot in shots:
+        if not isinstance(shot, dict):
+            continue
         shot_id = str(shot.get("id") or "<unknown>")
+        if _is_non_vo_coverage_shot(shot):
+            continue
         text = spoken_text_for_shot(
             shot,
             dialogue_spoken_lang=dialogue_spoken_lang,

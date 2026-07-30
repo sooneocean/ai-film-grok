@@ -94,6 +94,32 @@ def test_linear_narration_uses_actual_character_tts_text() -> None:
         )
 
 
+def test_linear_narration_allows_silent_dialogue_coverage() -> None:
+    validate_linear_narration(
+        [
+            {"id": "reaction", "screen_mode": "reaction", "audio_cues": []},
+            {"id": "cover", "coverage_role": "action_cover"},
+            {"id": "silence", "screen_mode": "silence"},
+        ],
+        vo_mode="dialogue_drama",
+        dialogue_spoken_lang="ja",
+        narration_spoken_lang="zh",
+    )
+
+
+def test_linear_narration_does_not_hide_authored_coverage_voice() -> None:
+    with pytest.raises(RenderError, match="repeats narration from cover01"):
+        validate_linear_narration(
+            [
+                {"id": "cover01", "screen_mode": "action_cover", "nar": "门外传来脚步声。"},
+                {"id": "cover02", "screen_mode": "reaction", "nar": "门外传来脚步声。"},
+            ],
+            vo_mode="dialogue_drama",
+            dialogue_spoken_lang="ja",
+            narration_spoken_lang="zh",
+        )
+
+
 def test_subtitle_cues_stop_at_raw_speech_not_padding() -> None:
     cues, timeline = build_subtitle_cues_for_shots(
         [{"target": 3.0, "raw_vo_dur": 1.0, "units": ["第一句", "第二句"]}],

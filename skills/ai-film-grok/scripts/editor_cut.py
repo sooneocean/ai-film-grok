@@ -67,13 +67,12 @@ def build_editor_cut_report(root: Path, *, write: bool = True) -> dict[str, Any]
                     }
                 )
             selected = selected_by_shot.get(sid)
+            # The selected media digest is the authoritative take binding.  A
+            # canonical clip is normally stored as ``<shot_id>.mp4`` while its
+            # registry take_id carries a content-hash suffix, so comparing the
+            # filename to take_id would reject every correctly bound take.
             if dailies.get("planned_shot_ids") and (
-                not selected
-                or selected.get("media_sha256") != row.get("clip_sha256")
-                or (
-                    clip.get("take_id")
-                    and Path(str(selected.get("candidate") or "")).stem != clip.get("take_id")
-                )
+                not selected or selected.get("media_sha256") != row.get("clip_sha256")
             ):
                 errors.append(
                     {
