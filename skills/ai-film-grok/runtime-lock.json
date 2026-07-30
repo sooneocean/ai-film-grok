@@ -14,7 +14,7 @@
   "scripts": {
     "scripts/acoustic_policy.py": "ecb04748b470c5be6a5a912829b5d520967e8dc6cec37e2762afa801e1ee2257",
     "scripts/adapters/ace_step_music.py": "193330c78edb8e763b3efaae7161755f70e5600efeef042e22319e1d5a3c742f",
-    "scripts/adapters/chatterbox_local_tts.py": "5b7053651b62ed849f81b5b3067d6a457118127cbc7ad63b2577fe2ec138eda3",
+    "scripts/adapters/chatterbox_local_tts.py": "52fd614d7aa5aeb6df28b7087efd996f953e439ea1777c9c36549e7256da3cdc",
     "scripts/adapters/cosyvoice_infer.example.py": "d7f7f0caff898f566eedad2485e4027ba49aac736e8cfe9cca5cc97913e98462",
     "scripts/adapters/cosyvoice_local_tts.py": "4d82504030f1f16030ffb38ccac19893cda3b9a200f0493ff32c7f90a7155b03",
     "scripts/adapters/cosyvoice_tts.py": "54fb847ce4f9d9fdaea13fbd14dcd83b6c3bfda6b070f36da916eae8979021d1",
@@ -269,7 +269,7 @@
     "scripts/transition_frame_audit.py": "2cb852a48d7a64bb5249ccb8172681f68b67224a2c6d7045128fab95727e0431",
     "scripts/transition_ops.py": "ea79ad4307249a99bb17102a5ab7517fd400dd06a2c3df7897788c0f8ecffbbd",
     "scripts/tts_ab.py": "4ad5e04516095021adf2e959733592bff37182839b1551222f613f44e1f91552",
-    "scripts/tts_backend.py": "a6e030b50a87efc6401b758f4052cb8c1a6360fa5bdf15b39f81df58c00dc56b",
+    "scripts/tts_backend.py": "0723af9d2a3dfdf315dfacb330f83ebb21d1b6d725e44d497dcb6777430ebdb3",
     "scripts/tts_rehearsal.py": "581f817fe6a0da737806a760c896d80b09c1008a057a9300eeaf783beff7bb1b",
     "scripts/util/__init__.py": "cd023a44d1df34494a6cb3b99c7c18ff423b67a0402e6f7958a1d33e884fe839",
     "scripts/util/errors.py": "0085a1dae4789e270a415a5600cc38f0cadd589989b8a15ba5cca864e281432c",

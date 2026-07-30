@@ -9,7 +9,9 @@ accepts a reference recording or silently changes provider.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
+import stat
 import subprocess
 import tempfile
 from pathlib import Path
@@ -49,10 +51,77 @@ def _language() -> str:
 def _voice(value: str) -> str:
     voice = value.strip()
     if voice.endswith("Neural"):
-        raise ChatterboxError(f"Chatterbox requires a provider-native voice label, not {voice!r}")
+        raise ChatterboxError("CHATTERBOX_VOICE_PROVIDER_MISMATCH: provider-native voice required")
     if voice and voice != "chatterbox-builtin":
         raise ChatterboxError("Chatterbox local uses only the model's built-in voice")
     return "chatterbox-builtin"
+
+
+def _open_output_parent(out: Path) -> tuple[Path, int]:
+    """Open/create every output directory component without following symlinks."""
+    if not all(hasattr(os, name) for name in ("O_DIRECTORY", "O_NOFOLLOW")):
+        raise ChatterboxError("CHATTERBOX_SAFE_OUTPUT_UNSUPPORTED")
+    target = Path(os.path.abspath(out.expanduser()))
+    if not target.name:
+        raise ChatterboxError("CHATTERBOX_OUTPUT_INVALID")
+    directory_fd = os.open(target.anchor, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for component in target.parent.parts[1:]:
+            try:
+                next_fd = os.open(
+                    component,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=directory_fd,
+                )
+            except FileNotFoundError:
+                with contextlib.suppress(FileExistsError):
+                    os.mkdir(component, mode=0o700, dir_fd=directory_fd)
+                next_fd = os.open(
+                    component,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=directory_fd,
+                )
+            os.close(directory_fd)
+            directory_fd = next_fd
+        try:
+            metadata = os.stat(target.name, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            metadata = None
+        if metadata is not None and stat.S_ISLNK(metadata.st_mode):
+            raise ChatterboxError("output path must not contain a symbolic link")
+        return target, directory_fd
+    except OSError as exc:
+        os.close(directory_fd)
+        raise ChatterboxError("output path must not contain a symbolic link") from exc
+    except Exception:
+        os.close(directory_fd)
+        raise
+
+
+def _install_output(source: Path, out: Path) -> Path:
+    """Atomically install an internal render through a pinned output directory."""
+    target, directory_fd = _open_output_parent(out)
+    installed = False
+    try:
+        os.replace(source, target.name, dst_dir_fd=directory_fd)
+        installed = True
+        file_fd = os.open(target.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+        try:
+            metadata = os.fstat(file_fd)
+        finally:
+            os.close(file_fd)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size < 500:
+            raise ChatterboxError("CHATTERBOX_OUTPUT_INVALID")
+    except OSError as exc:
+        raise ChatterboxError("CHATTERBOX_OUTPUT_INSTALL_FAILED") from exc
+    except ChatterboxError:
+        if installed:
+            with contextlib.suppress(OSError):
+                os.unlink(target.name, dir_fd=directory_fd)
+        raise
+    finally:
+        os.close(directory_fd)
+    return target
 
 
 def synthesize(text: str, out: Path, voice: str = "") -> Path:
@@ -71,30 +140,28 @@ def synthesize(text: str, out: Path, voice: str = "") -> Path:
         model = ChatterboxMultilingualTTS.from_pretrained(device=_device(torch))
         audio = model.generate(body, language_id=_language())
     except Exception as exc:  # upstream errors must not select another provider
-        raise ChatterboxError(f"Chatterbox render failed: {exc}") from exc
+        raise ChatterboxError("CHATTERBOX_RENDER_FAILED") from exc
     if audio is None or audio.shape[-1] < 100:
         raise ChatterboxError("Chatterbox returned empty audio")
-    out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="aifilm-chatterbox-") as tmp_dir:
         wav = Path(tmp_dir) / "render.wav"
-        torchaudio.save(str(wav), audio.detach().cpu(), model.sr)
-        target = out if out.suffix.lower() == ".wav" else Path(tmp_dir) / "render.mp3"
-        if target != wav:
+        try:
+            torchaudio.save(str(wav), audio.detach().cpu(), model.sr)
+        except Exception as exc:
+            raise ChatterboxError("CHATTERBOX_AUDIO_SAVE_FAILED") from exc
+        rendered = wav
+        if out.suffix.lower() != ".wav":
+            rendered = Path(tmp_dir) / "render.mp3"
             result = subprocess.run(
-                ["ffmpeg", "-y", "-i", str(wav), "-ar", "44100", "-ac", "1", str(target)],
+                ["ffmpeg", "-y", "-i", str(wav), "-ar", "44100", "-ac", "1", str(rendered)],
                 capture_output=True,
                 text=True,
                 timeout=180,
                 check=False,
             )
             if result.returncode != 0:
-                raise ChatterboxError(f"ffmpeg audio export failed: {(result.stderr or '')[-400:]}")
-            os.replace(target, out)
-        else:
-            os.replace(wav, out)
-    if not out.is_file() or out.stat().st_size < 500:
-        raise ChatterboxError("Chatterbox wrote no usable audio")
-    return out
+                raise ChatterboxError("CHATTERBOX_FFMPEG_EXPORT_FAILED")
+        return _install_output(rendered, out)
 
 
 def main() -> int:

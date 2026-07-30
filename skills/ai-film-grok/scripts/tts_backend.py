@@ -263,14 +263,45 @@ def kokoro_local_argv_configured() -> bool:
 def chatterbox_local_argv_configured() -> bool:
     """Whether argv invokes this checkout's offline Chatterbox adapter."""
     argv = external_argv()
-    if not argv or len(argv) < 2:
+    if not argv or len(argv) < 6:
+        return False
+    interpreter = Path(argv[0]).expanduser()
+    if not interpreter.is_absolute():
         return False
     adapter = (Path(__file__).resolve().parent / "adapters" / "chatterbox_local_tts.py").resolve()
+    trusted_python = (
+        Path(__file__).resolve().parents[3]
+        / ".local-runtimes"
+        / "chatterbox-mac"
+        / "bin"
+        / "python"
+    ).resolve()
     try:
+        resolved_interpreter = interpreter.resolve(strict=True)
         configured = Path(argv[1]).expanduser().resolve()
     except OSError:
         return False
-    return configured == adapter
+    if (
+        resolved_interpreter != trusted_python
+        or not resolved_interpreter.is_file()
+        or not os.access(resolved_interpreter, os.X_OK)
+        or configured != adapter
+    ):
+        return False
+    option_argv = argv[2:]
+    if len(option_argv) % 2:
+        return False
+    options: dict[str, str] = {}
+    for index in range(0, len(option_argv), 2):
+        name, value = option_argv[index : index + 2]
+        if name in options:
+            return False
+        options[name] = value
+    required = {"--text-file": "{text_file}", "--out": "{out}"}
+    allowed = {**required, "--voice": "{voice}"}
+    return all(options.get(name) == value for name, value in required.items()) and all(
+        name in allowed and value == allowed[name] for name, value in options.items()
+    )
 
 
 def external_tts_subprocess_env() -> dict[str, str]:
@@ -295,6 +326,11 @@ def external_tts_subprocess_env() -> dict[str, str]:
             if value:
                 env[name] = value
     if chatterbox_local_argv_configured():
+        for name in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH"):
+            env.pop(name, None)
+        env["PATH"] = f"/opt/homebrew/bin:/usr/local/bin:{os.defpath}"
+        env["HF_HUB_OFFLINE"] = "1"
+        env["TRANSFORMERS_OFFLINE"] = "1"
         for name in ("CHATTERBOX_DEVICE", "CHATTERBOX_LANGUAGE", "HF_HOME"):
             value = os.environ.get(name)
             if value:
@@ -1027,9 +1063,18 @@ def tts_external(text: str, out_mp3: Path, voice: str = "") -> Path:
     cmd_tpl = external_argv()
     if not cmd_tpl:
         raise TTSError("AIFILM_TTS_ARGV not set")
-    out_mp3.parent.mkdir(parents=True, exist_ok=True)
-    text_file = out_mp3.with_suffix(".txt")
-    atomic_write_text(text_file, text)
+    is_chatterbox_local = chatterbox_local_argv_configured()
+    temporary_text_file: Path | None = None
+    if is_chatterbox_local:
+        file_fd, temporary_name = tempfile.mkstemp(prefix="aifilm-chatterbox-text-", suffix=".txt")
+        temporary_text_file = Path(temporary_name)
+        with os.fdopen(file_fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        text_file = temporary_text_file
+    else:
+        out_mp3.parent.mkdir(parents=True, exist_ok=True)
+        text_file = out_mp3.with_suffix(".txt")
+        atomic_write_text(text_file, text)
     try:
         argv = expand_argv(
             cmd_tpl,
@@ -1044,16 +1089,24 @@ def tts_external(text: str, out_mp3: Path, voice: str = "") -> Path:
     except SecurityPolicyError as exc:
         raise TTSError(str(exc)) from exc
     try:
-        proc = subprocess.run(
-            argv,
-            capture_output=True,
-            text=True,
-            timeout=external_tts_timeout(),
-            env=external_tts_subprocess_env(),
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise TTSError(f"external TTS could not run: {exc}") from exc
+        try:
+            proc = subprocess.run(
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=external_tts_timeout(),
+                env=external_tts_subprocess_env(),
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            if is_chatterbox_local:
+                raise TTSError("CHATTERBOX_LOCAL_EXEC_FAILED") from exc
+            raise TTSError(f"external TTS could not run: {exc}") from exc
+    finally:
+        if temporary_text_file is not None:
+            temporary_text_file.unlink(missing_ok=True)
     if proc.returncode != 0 or not out_mp3.is_file():
+        if is_chatterbox_local:
+            raise TTSError(f"CHATTERBOX_LOCAL_PROCESS_FAILED rc={proc.returncode}")
         raise TTSError(
             f"external TTS failed rc={proc.returncode}: {(proc.stderr or proc.stdout)[:800]}"
         )
