@@ -3226,6 +3226,7 @@ def project_graph_to_film_spec(
                     shots_fs.append(shot_obj)
             scenes_fs.append(
                 {
+                    "id": sc.get("id"),
                     "episode_id": ep_item.get("id"),
                     "title": sc.get("title") or "Scene",
                     "summary": sc.get("synopsis") or "",
@@ -3356,12 +3357,20 @@ def project_graph_to_film_spec(
             if cb and sid:
                 coitus_beats.setdefault(cb, []).append(sid)
 
+    production_mode = str(
+        (graph.get("project") or {}).get("production_mode")
+        or (normalized or {}).get("production_mode")
+        or base.get("production_mode")
+        or "shortform"
+    )
+    genre_default = "drama" if production_mode == "longform" else "adult"
     spec: dict[str, Any] = {
         **base,
         "title": title,
         "description": logline,
         "aspect_ratio": "9:16",
-        "genre": story.get("genre") or (normalized or {}).get("genre") or "adult",
+        "production_mode": production_mode,
+        "genre": story.get("genre") or (normalized or {}).get("genre") or genre_default,
         "vo_mode": vo_mode,
         "dialogue_spoken_lang": "ja"
         if vo_mode == "dialogue_drama"
@@ -3421,6 +3430,19 @@ def project_graph_to_film_spec(
             "state": graph.get("state") or "draft",
         },
     }
+    if production_mode == "longform":
+        target_duration = sum(
+            float(item.get("targetDuration") or 0)
+            for item in graph.get("episodes") or []
+            if isinstance(item, dict)
+        )
+        spec["longform_profile"] = {
+            "target_duration_sec": target_duration,
+            "act_count": 3,
+            "unit_max_duration_sec": 90,
+            "approval_policy": "three_gates",
+        }
+        spec["director_intent"]["audience"] = base_di.get("audience") or "8–15 分钟竖屏剧情片观众"
     # Keep user source on film-spec for fidelity gate + agent rewrites
     raw_ex = str((normalized or {}).get("raw_excerpt") or "").strip()
     if raw_ex:
@@ -3548,7 +3570,7 @@ def _ensure_film_root_skeleton(root: Path, *, title: str, theme: str) -> None:
         write_json(
             man_path,
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "provider_default": "grok-imagine",
                 "title": title,
                 "theme": theme,
@@ -3557,6 +3579,11 @@ def _ensure_film_root_skeleton(root: Path, *, title: str, theme: str) -> None:
                 "height": 1280,
                 "created_at": utc_now(),
                 "updated_at": utc_now(),
+                "review_contract_version": 2,
+                "truth_contract": {
+                    "source_of_truth": "local-contract-and-receipts",
+                    "contract_sha256": "",
+                },
                 "style_locked": False,
                 "stills": {},
                 "clips": {},
@@ -3589,10 +3616,21 @@ def run_plan(
     source_evidence_refs: list[str] | None = None,
     reception: dict[str, Any] | None = None,
     story_mode: str = "narrative",
+    production_mode: str = "shortform",
 ) -> dict[str, Any]:
     """End-to-end Phase 3 planner for a film root."""
     root = Path(root).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
+    production_mode = str(production_mode or "shortform")
+    if production_mode not in {"shortform", "longform"}:
+        raise ValueError("production_mode must be shortform|longform")
+    if production_mode == "longform":
+        if not 480 <= float(target_duration) <= 900:
+            raise ValueError("longform target duration must be within 480..900 seconds")
+        if apply_film_spec:
+            raise ValueError(
+                "longform plan run is draft-only; lock the graph then run plan project"
+            )
 
     normalized = normalize_story(
         raw,
@@ -3601,6 +3639,7 @@ def run_plan(
         source_evidence_refs=source_evidence_refs,
     )
     normalized["story_mode"] = str(story_mode or "narrative")
+    normalized["production_mode"] = production_mode
     if reception:
         from story_reception import reception_summary, story_contract_seed
 
@@ -3667,10 +3706,22 @@ def run_plan(
         title=str(normalized.get("title") or "untitled"),
         theme=str(normalized.get("logline") or "")[:200],
     )
+    if production_mode == "longform":
+        from production_book import init_production_book
+
+        init_production_book(
+            root,
+            title=str(normalized.get("title") or "untitled"),
+            rigor="professional",
+            format_pack="vertical-longform",
+            genre_pack=str(normalized.get("genre") or "drama"),
+            quality_target="premium_vertical",
+        )
     write_json(root / "receipts" / "story-normalize.json", normalized)
 
     previous_graph = read_json(root / "drama-graph.json") or None
     graph = build_planned_graph(normalized, target_duration=target_duration, root=root)
+    graph.setdefault("project", {})["production_mode"] = production_mode
     graph = stabilize_shot_ids(graph, previous_graph)
     if root:
         graph["project"]["root"] = str(root)

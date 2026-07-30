@@ -1,9 +1,9 @@
 # P0 · 画面抗重复 · 抗无聊 · 体位/特写/运镜（2026-07-29 · E病毒 ch04 避难所）
 
-> **用户原话（两轮）**：  
-> 1）很多画面是重复的而且很无聊。  
-> 2）**肉戏太单调了啊 都是重复镜头 需要有不同体位 不同特写镜头还有运镜**。  
-> **片根**：`AI FILM SPACE/0729/e-virus-ch04-shelter` · 14 镜 · final 门绿仍 **观感 PARTIAL**。  
+> **用户原话（两轮）**：
+> 1）很多画面是重复的而且很无聊。
+> 2）**肉戏太单调了啊 都是重复镜头 需要有不同体位 不同特写镜头还有运镜**。
+> **片根**：`AI FILM SPACE/0729/e-virus-ch04-shelter` · 14 镜 · final 门绿仍 **观感 PARTIAL**。
 > **关联**：[still-unique-no-reuse](lessons-2026-07-29-still-unique-no-reuse.md) · [high-motion-style-lock](lessons-2026-07-27-high-motion-style-lock-final.md) · [size-ladder](lessons-2026-07-21-size-ladder-hardcore-stack.md) · [evirus bulk→final](lessons-2026-07-29-evirus-ch04-bulk-final-iron.md)
 
 ## 现象（观众读到什么）
@@ -26,7 +26,7 @@
 | **VO 驱动 stretch 过短** | plate 把 6s 源压到 ~3s 跟旁白 | 来不及建立信息；像 PPT 翻页 |
 | **蒙太奇缺事件** | 连续 hard continue + 无 smash/反应/空镜/手部定器真跳切 | 无「剪辑惊喜」；只有顺序办事 |
 
-**不是** stream_loop 双播（本片 stretch `loops=0`）。  
+**不是** stream_loop 双播（本片 stretch `loops=0`）。
 **不只是** still 字节复用（见 still-unique）；**语义重复**同样致命。
 
 ## 铁律（后面不要再犯）
@@ -114,10 +114,10 @@ plate
 
 冲突时：
 
-1. **尺度 + 完整办事弧**（成人 max）  
-2. **可读差异 / 抗无聊**（本课）  
-3. **高动数字 mean**  
-4. 画风装饰  
+1. **尺度 + 完整办事弧**（成人 max）
+2. **可读差异 / 抗无聊**（本课）
+3. **高动数字 mean**
+4. 画风装饰
 
 不得以「mean 过了」交差重复镜；也不得以「砍肉戏换花样」降尺度。
 
@@ -138,15 +138,21 @@ plate
 | s07_sh02 | 高潮脸泪 | face CU | slow pull-back |
 
 **工程落地**：
-1. `film-spec`：`sex_pose` / `shot_size` / `dsl.camera.move` **与 still 像素对齐**（禁名义 doggy 实为站抱）。  
-2. still + I2V 全 unique sha；register 双轮；gates `spec/stills/clips` 绿。  
-3. plate：**固定 6s 槽** 手拼（`out/_pose_plate`），禁 VO-stretch 压碎；成片 `out/film_final.mp4` 84s → Desktop 同步。  
+1. `film-spec`：`sex_pose` / `shot_size` / `dsl.camera.move` **与 still 像素对齐**（禁名义 doggy 实为站抱）。
+2. still + I2V 全 unique sha；register 双轮；gates `spec/stills/clips` 绿。
+3. plate：**固定 6s 槽** 手拼（`out/_pose_plate`），禁 VO-stretch 压碎；成片 `out/film_final.mp4` 84s → Desktop 同步。
 4. HEAD_CROP：insert 用 `dramatic_function=sensory` + 去 `ecu` / `push-in on face` 字样；主戏反应镜保留 full head + headroom。
 
 **再进阶（若用户要真办事像素）**：undress-anchor `image_edit` 分体位 bare → 过审再 I2V；过不了 → 诚实 PARTIAL，禁内衣冒充插入。
 
+### GO 收口（同日晚 · DELIVERED_GO）
+
+观感返工进片后用户 **GO** → 硬烧字幕 + 官方 closeout 链（timeline 对齐 6s 钟、SIZE 纸面、narrative 重绑、review-final、post-audit、export-desktop）。
+**观感改善可交付**；尺度仍 PARTIAL（软词亲密）。收尾坑与命令链见 [closeout-gates-chaebol](lessons-2026-07-29-closeout-gates-chaebol.md) §9。
+
 ## 记忆入口
 
-- Memory：[2026-07-29-shot-variety-anti-boring](../memory/2026-07-29-shot-variety-anti-boring.md)  
-- hard-defaults 行：画面抗重复·抗无聊 · 肉戏体位·特写·运镜  
-- Agents IRON 同题两条 · session-index 2026-07-29 表行
+- Memory：[2026-07-29-shot-variety-anti-boring](../memory/2026-07-29-shot-variety-anti-boring.md)
+- 收尾 GO：[closeout-gates-iron](../memory/2026-07-29-closeout-gates-iron.md)
+- hard-defaults 行：画面抗重复·抗无聊 · 肉戏体位·特写·运镜 · 收尾门禁
+- Agents IRON 同题 · session-index 2026-07-29 表行

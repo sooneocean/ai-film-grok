@@ -277,6 +277,9 @@ def empty_manifest(*, title: str, theme: str, aspect: str) -> dict[str, Any]:
         "truth_contract": {
             "source_of_truth": "local-contract-and-receipts",
             "contract_sha256": "",
+            "graph_sha256": "",
+            "spec_sha256": "",
+            "timeline_sha256": "",
         },
         "style_locked": False,
         "stills": {},
@@ -1604,6 +1607,7 @@ def cmd_promotion_report(args: argparse.Namespace) -> int:
     return 0
 
 
+from cli_longform import cmd_longform  # noqa: E402
 from cli_status import (  # noqa: E402, F401
     _status_audio_summary,
     _status_evidence,
@@ -1704,11 +1708,6 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
         }
     write_json(root / "film-spec.json", spec)
     manifest = load_manifest(root)
-    truth = manifest.get("truth_contract")
-    if isinstance(truth, dict):
-        truth["contract_sha256"] = sha256_file(root / "film-spec.json")
-    recompute_gates(root, manifest)
-    save_manifest(root, manifest)
     # seed timeline placeholders
     timeline = {
         "schema_version": 1,
@@ -1725,6 +1724,25 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
         ],
     }
     write_json(root / "timeline.json", timeline)
+    truth = manifest.setdefault(
+        "truth_contract",
+        {"source_of_truth": "local-contract-and-receipts"},
+    )
+    truth["contract_sha256"] = sha256_file(root / "film-spec.json")
+    truth["spec_sha256"] = truth["contract_sha256"]
+    graph_path = root / "drama-graph.json"
+    truth["graph_sha256"] = sha256_file(graph_path) if graph_path.is_file() else ""
+    truth["timeline_sha256"] = sha256_file(root / "timeline.json")
+    longform_plan = None
+    if spec.get("production_mode") == "longform":
+        try:
+            from longform import LongformError, build_longform_plan
+
+            longform_plan = build_longform_plan(root, write=True)
+        except LongformError as exc:
+            raise FilmError(f"longform production plan failed: {exc}") from exc
+    recompute_gates(root, manifest)
+    save_manifest(root, manifest)
     cont = spec.get("_continuity_lint") or lint_continuity(shots)
     write_json(root / "continuity_lint.json", cont)
     # Reconcile after writing the projection so the receipt binds the current
@@ -1745,6 +1763,13 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
             "framing_lint": spec.get("_framing_lint"),
             "continuity_chain_doc": str(chain_path) if chain_path else None,
             "long_form": is_long_form(spec, shots),
+            "longform_plan": {
+                "path": str(root / "receipts" / "longform-production-plan.json"),
+                "unit_count": len(longform_plan.get("units") or []),
+                "content_sha256": longform_plan.get("content_sha256"),
+            }
+            if isinstance(longform_plan, dict)
+            else None,
             "transition_intents": spec.get("transition_intents"),
             "sound_plan": spec.get("sound_plan"),
             "scene_sound": scene_sound,
@@ -3708,9 +3733,42 @@ def cmd_final(args: argparse.Namespace) -> int:
         f"stage_plate: render_final.py (post_engine={post_engine}, "
         f"subs={subs_mode}, plate_cards={plate_cards}) — captions NOT assumed here"
     )
-    # P0: plate alone often >10min with mix; do not use default 60s / short 600s
-    plate_timeout = int(getattr(args, "plate_timeout", 0) or 0) or 1200
-    proc = run(cmd, check=False, timeout=plate_timeout)
+    # Short films retain the 1200s floor; longform scales by picture clock,
+    # shot count and lipsync work instead of being killed by a fixed timeout.
+    requested_timeout = int(getattr(args, "plate_timeout", 0) or 0)
+    if requested_timeout > 0:
+        plate_timeout = requested_timeout
+    else:
+        from longform import estimate_plate_timeout
+
+        plate_timeout = estimate_plate_timeout(
+            root,
+            lipsync=str(getattr(args, "lipsync", "off") or "off"),
+        )
+    from pipeline_events import append_event
+
+    append_event(
+        root,
+        stage="final-plate",
+        phase="started",
+        note=f"timeout_sec={plate_timeout}",
+    )
+    try:
+        proc = run(cmd, check=False, timeout=plate_timeout)
+    except subprocess.TimeoutExpired as exc:
+        append_event(
+            root,
+            stage="final-plate",
+            phase="failed",
+            note=f"timeout_sec={plate_timeout}",
+        )
+        raise FilmError(f"final plate timed out after {plate_timeout}s") from exc
+    append_event(
+        root,
+        stage="final-plate",
+        phase="completed" if proc.returncode == 0 else "failed",
+        note=f"returncode={proc.returncode}; timeout_sec={plate_timeout}",
+    )
     sys.stderr.write(proc.stderr or "")
     ffmpeg_result: dict[str, Any] | None = None
     if proc.stdout:
@@ -6064,7 +6122,6 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
         summary = recompute_gates(root, man)
         gates = summary.get("gates") or {}
         open_n = int(summary.get("open_reshoot_count") or 0)
-        save_manifest(root, man)
 
     packet = build_dispatch(
         root,
@@ -6074,20 +6131,37 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
         write_receipt=not bool(getattr(args, "no_write", False)),
         refresh_capability=bool(getattr(args, "refresh_capability", False)),
     )
+    from project_state import build_project_state, persist_project_state
 
-    # Keep pipeline HUD in sync
-    try:
-        from next_actions import detect_pipeline_stage, persist_pipeline_stage
+    project_state = build_project_state(
+        root,
+        gates=gates,
+        open_reshoot_count=open_n,
+        next_actions=list(packet.get("next_actions") or []),
+        next_cmd=packet.get("next_cmd"),
+        next_id=packet.get("next_id"),
+    )
+    packet["project_state"] = project_state
+    if not bool(getattr(args, "no_write", False)):
+        packet["project_state_receipt"] = str(persist_project_state(root, project_state))
 
-        pipeline = detect_pipeline_stage(root, gates=gates, open_reshoot_count=open_n)
-        persist_pipeline_stage(
-            root,
-            pipeline,
-            next_cmd=packet.get("next_cmd"),
-            next_id=packet.get("next_id"),
-        )
-    except Exception:
-        pass
+    # A no-write dispatch is a pure projection; regular dispatch updates the
+    # film receipt and HUD from the same canonical snapshot.
+    if not bool(getattr(args, "no_write", False)):
+        try:
+            from next_actions import detect_pipeline_stage, persist_pipeline_stage
+
+            pipeline = detect_pipeline_stage(root, gates=gates, open_reshoot_count=open_n)
+            persisted = persist_pipeline_stage(
+                root,
+                pipeline,
+                next_cmd=packet.get("next_cmd"),
+                next_id=packet.get("next_id"),
+            )
+            if persisted.get("errors"):
+                packet["hud_sync_error"] = persisted["errors"]
+        except Exception as exc:
+            packet["hud_sync_error"] = [str(exc)[:300]]
 
     if bool(getattr(args, "print_cmd_only", False)):
         print(packet.get("next_cmd") or "")
@@ -6471,14 +6545,42 @@ def cmd_adult_female_voice_pack(args: argparse.Namespace) -> int:
 
 
 def cmd_ambience_candidate(args: argparse.Namespace) -> int:
-    from ambience_candidates import AmbienceCandidateError, approve, generate, list_candidates
+    from ambience_candidates import (
+        AmbienceCandidateError,
+        approve,
+        attach_to_shot,
+        generate,
+        list_candidates,
+    )
 
     root = Path(args.root).expanduser().resolve()
     try:
         if args.ambience_candidate_action == "list":
             emit({"candidates": list_candidates(root)})
         elif args.ambience_candidate_action == "approve":
-            emit(approve(root, args.asset_id, reviewer=args.reviewer))
+            emit(
+                approve(
+                    root,
+                    args.asset_id,
+                    reviewer=args.reviewer,
+                    heard_full=bool(args.heard_full),
+                    no_speech_confirmed=bool(args.no_speech_confirmed),
+                    no_music_confirmed=bool(args.no_music_confirmed),
+                    artifact_free_confirmed=bool(args.artifact_free_confirmed),
+                )
+            )
+        elif args.ambience_candidate_action == "attach":
+            emit(
+                attach_to_shot(
+                    root,
+                    args.asset_id,
+                    shot_id=args.shot_id,
+                    start_offset_sec=args.start_offset_sec,
+                    duration_sec=args.duration,
+                    acoustic_space=args.acoustic_space,
+                    noncommercial_internal_ok=bool(args.noncommercial_internal_ok),
+                )
+            )
         else:
             base, token = (
                 os.environ.get("AIFILM_AUDIO_NODE_URL", ""),
@@ -6523,14 +6625,20 @@ def cmd_sfx_canary(args: argparse.Namespace) -> int:
 
 def cmd_sfx_candidate(args: argparse.Namespace) -> int:
     """Generate, review, and attach non-commercial MMAudio SFX."""
+    # Candidate receipts are HMAC-bound to the local audio-node credential.
+    # Generation loads config itself, but the later review subcommands must
+    # load the same local-only configuration before verifying that signature.
+    from config_loader import get_config
     from sfx_candidates import (
         SFXCandidateError,
         approve,
         attach_to_shot,
         generate,
         reject,
+        screen_speech,
     )
 
+    get_config()
     root = Path(args.root).expanduser().resolve()
     try:
         if args.sfx_candidate_action == "approve":
@@ -6544,8 +6652,11 @@ def cmd_sfx_candidate(args: argparse.Namespace) -> int:
                     no_speech_confirmed=bool(args.no_speech_confirmed),
                     no_music_confirmed=bool(args.no_music_confirmed),
                     artifact_free_confirmed=bool(args.artifact_free_confirmed),
+                    asr_speech_reviewed=bool(args.asr_speech_reviewed),
                 )
             )
+        elif args.sfx_candidate_action == "screen-speech":
+            emit(screen_speech(root, args.asset_id))
         elif args.sfx_candidate_action == "reject":
             emit(
                 reject(
@@ -7265,6 +7376,18 @@ def build_parser() -> argparse.ArgumentParser:
     ambience_approve.add_argument("--root", required=True)
     ambience_approve.add_argument("--asset-id", required=True)
     ambience_approve.add_argument("--reviewer", required=True)
+    ambience_approve.add_argument("--heard-full", action="store_true")
+    ambience_approve.add_argument("--no-speech-confirmed", action="store_true")
+    ambience_approve.add_argument("--no-music-confirmed", action="store_true")
+    ambience_approve.add_argument("--artifact-free-confirmed", action="store_true")
+    ambience_attach = ambience_sub.add_parser("attach")
+    ambience_attach.add_argument("--root", required=True)
+    ambience_attach.add_argument("--asset-id", required=True)
+    ambience_attach.add_argument("--shot-id", required=True)
+    ambience_attach.add_argument("--start-offset-sec", type=float, required=True)
+    ambience_attach.add_argument("--duration", type=float, required=True)
+    ambience_attach.add_argument("--acoustic-space", required=True)
+    ambience_attach.add_argument("--noncommercial-internal-ok", action="store_true")
 
     sfx_canary = sub.add_parser(
         "sfx-canary",
@@ -7298,6 +7421,17 @@ def build_parser() -> argparse.ArgumentParser:
     sfx_approve.add_argument("--no-speech-confirmed", action="store_true")
     sfx_approve.add_argument("--no-music-confirmed", action="store_true")
     sfx_approve.add_argument("--artifact-free-confirmed", action="store_true")
+    sfx_approve.add_argument(
+        "--asr-speech-reviewed",
+        action="store_true",
+        help="Confirm that the candidate-only ASR leakage signal was reviewed; human listening remains required",
+    )
+    sfx_screen = sfx_candidate_sub.add_parser(
+        "screen-speech",
+        help="Run candidate-only VibeVoice-ASR leakage screening before human SFX approval",
+    )
+    sfx_screen.add_argument("--root", required=True)
+    sfx_screen.add_argument("--asset-id", required=True)
     sfx_reject = sfx_candidate_sub.add_parser("reject")
     sfx_reject.add_argument("--root", required=True)
     sfx_reject.add_argument("--asset-id", required=True)
@@ -7358,7 +7492,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     lsch = sub.add_parser(
         "lipsync-challenge",
-        help="Plan and evaluate the five-backend lip-sync challenge without running GPU work",
+        help="Plan and evaluate the four-backend lip-sync challenge without running GPU work",
     )
     lsch_sub = lsch.add_subparsers(dest="lipsync_challenge_action", required=True)
     lsch_create = lsch_sub.add_parser("create")
@@ -7382,7 +7516,6 @@ def build_parser() -> argparse.ArgumentParser:
         choices=(
             "latentsync-1.6",
             "musetalk-1.5",
-            "ltx-2.3-lipdub",
             "echomimic-v3-flash",
             "longcat-video-avatar-1.5",
         ),
@@ -7478,6 +7611,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("status", help="Gate status")
     st.add_argument("--root", required=True)
+    st.set_defaults(no_write=True)
 
     quality = sub.add_parser(
         "quality", help="Read persisted per-shot quality receipts (no media scan)"
@@ -8084,8 +8218,8 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument(
         "--plate-timeout",
         type=int,
-        default=1200,
-        help="Seconds for stage_plate render_final (default 1200; short values cause fake fails)",
+        default=0,
+        help="Seconds for stage_plate; 0 auto-scales from duration, shots and lipsync (floor 1200)",
     )
     fin.add_argument(
         "--no-caption-recovery",
@@ -9253,6 +9387,9 @@ def build_parser() -> argparse.ArgumentParser:
     from cli_plan import add_plan_parsers
 
     add_plan_parsers(sub)
+    from cli_longform import add_longform_parsers
+
+    add_longform_parsers(sub)
 
     from cli_assets import add_assets_parsers
 
@@ -9381,6 +9518,7 @@ def main(argv: list[str] | None = None) -> int:
             "serial": cmd_serial,
             "department": cmd_department,
             "plan": cmd_plan,
+            "longform": cmd_longform,
             "assets": cmd_assets,
             "workshop": cmd_workshop,
             "review-ui": cmd_review_ui,

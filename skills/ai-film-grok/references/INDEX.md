@@ -28,6 +28,7 @@
 | [directors-lens.md](directors-lens.md) | Director's Lens 文本→故事→Storyboard→film-spec |
 | [beat-spines.md](beat-spines.md) | 多类型节拍骨架总纲 |
 | [pipeline-methodology.md](pipeline-methodology.md) | 工具层 + 工序层方法论 |
+| [longform-workflow.md](longform-workflow.md) | 8–15 分钟竖屏长片合约、单元与恢复 |
 | [principles.md](principles.md) | 底层泛化能力 P0–P5 |
 | [hard-defaults.md](hard-defaults.md) | 默认与跨层决策（硬门禁完整表） |
 | [production-discipline.md](production-discipline.md) | 量产纪律 season-scale |

@@ -85,31 +85,45 @@ def _capabilities(
     capabilities: list[dict[str, Any]], current: datetime
 ) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
+    lanes: dict[str, dict[str, Any]] = {}
     for item in capabilities:
         if isinstance(item, dict) and str(item.get("id") or ""):
             copy = dict(item)
             result[str(copy["id"])] = copy
-            lane = str(copy.get("lane") or "")
-            if lane:
-                result[lane] = copy
-    for item in {id(item): item for item in result.values()}.values():
         try:
             valid = (
-                datetime.fromisoformat(str(item.get("expires_at")).replace("Z", "+00:00")) > current
+                datetime.fromisoformat(str(copy.get("expires_at")).replace("Z", "+00:00")) > current
             )
             verified = (
-                datetime.fromisoformat(str(item.get("verified_at")).replace("Z", "+00:00"))
+                datetime.fromisoformat(str(copy.get("verified_at")).replace("Z", "+00:00"))
                 <= current
             )
         except (TypeError, ValueError):
             valid = False
             verified = False
-        item["_current"] = (
+        copy["_current"] = (
             valid
             and verified
-            and item.get("status") == "ready"
-            and item.get("canary_passed") is True
+            and copy.get("status") == "ready"
+            and copy.get("canary_passed") is True
         )
+        lane = str(copy.get("lane") or "")
+        incumbent = lanes.get(lane)
+        if lane and (
+            incumbent is None
+            or (copy["_current"] and not incumbent["_current"])
+            or (
+                copy["_current"] == incumbent["_current"]
+                and int(copy.get("priority") or 0) > int(incumbent.get("priority") or 0)
+            )
+            or (
+                copy["_current"] == incumbent["_current"]
+                and int(copy.get("priority") or 0) == int(incumbent.get("priority") or 0)
+                and str(copy["id"]) < str(incumbent["id"])
+            )
+        ):
+            lanes[lane] = copy
+    result.update(lanes)
     return result
 
 
@@ -247,9 +261,13 @@ def build_dialogue_competition_plan(
         required_lanes.add("infinite_talk")
     if requested_route == "grok_imagine_video":
         required_lanes.update({"grok_imagine_video", "grok_lipsync"})
-    if any(not selected[lane].get("_current") for lane in required_lanes):
+    stale_lanes = sorted(lane for lane in required_lanes if not selected[lane].get("_current"))
+    if stale_lanes:
         _issues(plan).append(
-            {"code": "CAPABILITY_STALE", "message": "required capability is stale"}
+            {
+                "code": "CAPABILITY_STALE",
+                "message": f"required capability is stale: {', '.join(stale_lanes)}",
+            }
         )
     plan["capability_bindings"] = {
         lane: {

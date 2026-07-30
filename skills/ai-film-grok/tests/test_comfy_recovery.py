@@ -12,6 +12,7 @@ sys.path.insert(0, str(SCRIPTS))
 from comfy_recovery import (  # noqa: E402
     ComfyRecoveryConfig,
     ComfyRecoveryError,
+    _ssh_base,
     config_from_env,
     recover_comfy,
     validate_recovery_config,
@@ -23,9 +24,14 @@ def _config(tmp_path: Path) -> ComfyRecoveryConfig:
     key.parent.mkdir()
     key.write_text("test-key-placeholder", encoding="utf-8")
     key.chmod(0o600)
+    known_hosts = tmp_path / ".ssh" / "known_hosts"
+    known_hosts.write_text("pinned-host-key-placeholder\n", encoding="utf-8")
+    known_hosts.chmod(0o600)
     return ComfyRecoveryConfig(
         target="user@192.168.88.52",
         identity_file=key,
+        known_hosts_file=known_hosts,
+        hostkey_alias="private-5090",
         local_port=18188,
         remote_port=8188,
         remote_root=r"C:\ComfyUI_windows_portable",
@@ -42,6 +48,10 @@ def test_recovery_config_rejects_public_or_malformed_target(tmp_path: Path) -> N
         "user@192.0.2.1",
         "user@198.18.0.1",
         "root;touch@192.168.88.52",
+        r"DOMAIN\\user@192.168.88.52",
+        r"DOMAIN\user@8.8.8.8",
+        r"DOMAIN\user -oProxyCommand=evil@192.168.88.52",
+        r"DOMAIN\user@192.168.88.52 -oProxyCommand=evil",
     ):
         with pytest.raises(ComfyRecoveryError):
             validate_recovery_config(
@@ -55,11 +65,85 @@ def test_recovery_config_rejects_public_or_malformed_target(tmp_path: Path) -> N
             )
 
 
+def test_recovery_config_accepts_bounded_windows_domain_username(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    target = r"DOMAIN\user@192.168.88.52"
+
+    checked = validate_recovery_config(
+        ComfyRecoveryConfig(
+            target=target,
+            identity_file=config.identity_file,
+            known_hosts_file=config.known_hosts_file,
+            hostkey_alias=config.hostkey_alias,
+            local_port=config.local_port,
+            remote_port=config.remote_port,
+            remote_root=config.remote_root,
+        )
+    )
+
+    assert checked.target == target
+    assert _ssh_base(checked)[-1] == target
+    assert f"HostKeyAlias={config.hostkey_alias}" in _ssh_base(checked)
+
+
+def test_config_from_env_normalizes_exactly_one_windows_domain_escape() -> None:
+    config = config_from_env({"AIFILM_COMFY_SSH_TARGET": r"DESKTOP-QFKIQD9\\user@192.168.30.36"})
+
+    assert config.target == r"DESKTOP-QFKIQD9\user@192.168.30.36"
+
+
+@pytest.mark.parametrize(
+    "target",
+    (
+        r"DESKTOP-QFKIQD9\\\\user@192.168.30.36",
+        r"DESKTOP-QFKIQD9\\user -oProxyCommand=evil@192.168.30.36",
+    ),
+)
+def test_config_from_env_does_not_normalize_unsafe_or_overescaped_target(target: str) -> None:
+    config = config_from_env({"AIFILM_COMFY_SSH_TARGET": target})
+
+    assert config.target == target
+    with pytest.raises(ComfyRecoveryError):
+        validate_recovery_config(config)
+
+
 def test_recovery_config_rejects_group_readable_identity(tmp_path: Path) -> None:
     config = _config(tmp_path)
     config.identity_file.chmod(0o640)
     with pytest.raises(ComfyRecoveryError, match="owner-only"):
         validate_recovery_config(config)
+
+
+def test_recovery_config_rejects_group_readable_known_hosts(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    config.known_hosts_file.chmod(0o640)
+    with pytest.raises(ComfyRecoveryError, match="known_hosts file must be owner-only"):
+        validate_recovery_config(config)
+
+
+def test_ssh_command_forces_pinned_hostkey_policy(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    command = _ssh_base(config)
+
+    assert "StrictHostKeyChecking=yes" in command
+    assert f"UserKnownHostsFile={config.known_hosts_file}" in command
+    assert f"HostKeyAlias={config.hostkey_alias}" in command
+
+
+def test_recovery_config_rejects_unsafe_hostkey_alias(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    with pytest.raises(ComfyRecoveryError, match="HostKeyAlias"):
+        validate_recovery_config(
+            ComfyRecoveryConfig(
+                target=config.target,
+                identity_file=config.identity_file,
+                known_hosts_file=config.known_hosts_file,
+                hostkey_alias="-oStrictHostKeyChecking=no",
+                local_port=config.local_port,
+                remote_port=config.remote_port,
+                remote_root=config.remote_root,
+            )
+        )
 
 
 def test_recovery_config_rejects_symlink_identity(tmp_path: Path) -> None:

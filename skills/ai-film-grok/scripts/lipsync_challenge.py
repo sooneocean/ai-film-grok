@@ -26,12 +26,12 @@ FIXTURE_IDS = (
 BACKEND_IDS = (
     "latentsync-1.6",
     "musetalk-1.5",
-    "ltx-2.3-lipdub",
     "echomimic-v3-flash",
     "longcat-video-avatar-1.5",
 )
-PRESERVATION_BACKENDS = BACKEND_IDS[:3]
-GENERATIVE_BACKENDS = BACKEND_IDS[3:]
+RESEARCH_ONLY_BACKEND_IDS = ("ltx-2.3-lipdub",)
+PRESERVATION_BACKENDS = BACKEND_IDS[:2]
+GENERATIVE_BACKENDS = BACKEND_IDS[2:]
 PRODUCTION_DEFAULT = "latentsync-1.6"
 BACKEND_REVIEW_LANES = {
     **{backend_id: "preservation" for backend_id in PRESERVATION_BACKENDS},
@@ -98,7 +98,7 @@ def _registry() -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
         for item in items
         if isinstance(item, dict) and isinstance(item.get("id"), str)
     }
-    if tuple(by_id) != BACKEND_IDS:
+    if set(by_id) != set(BACKEND_IDS) | set(RESEARCH_ONLY_BACKEND_IDS):
         raise LipsyncChallengeError("challenge registry backend set or ordering changed")
     if payload.get("production_default") != PRODUCTION_DEFAULT:
         raise LipsyncChallengeError("challenge registry may not change the production default")
@@ -289,8 +289,7 @@ def create_challenge(
             "minimum_fixture_wins": 3,
             "required_fixture_count": 4,
             "hard_failure_tolerance": 0,
-            "ltx_license_review_required": True,
-            "ltx_single_gpu_rtx5090_required": True,
+            "text_redub_is_not_shared_audio_benchmark": True,
             "generative_backends_final_auto_forbidden": True,
             "default_change_requires_separate_submission": True,
         },
@@ -395,7 +394,7 @@ def register_result(
     """Import externally generated media and bind all measurements to its hash."""
     challenge_path, challenge = _manifest(root)
     _, by_id = _registry()
-    if fixture_id not in FIXTURE_IDS or backend_id not in by_id:
+    if fixture_id not in FIXTURE_IDS or backend_id not in BACKEND_IDS:
         raise LipsyncChallengeError("unknown fixture or backend")
     media_path = _regular_file(output, "challenge output")
     output_hash = sha256(media_path)
@@ -705,21 +704,6 @@ def record_blind_review(
     return receipt
 
 
-def _license_approved(path: Path | None) -> bool:
-    if path is None:
-        return False
-    _, payload = _json_object(path, "license receipt")
-    return (
-        payload.get("approved") is True
-        and payload.get("backend_id") == "ltx-2.3-lipdub"
-        and isinstance(payload.get("license_id"), str)
-        and bool(payload["license_id"])
-        and payload.get("commercial_scope_reviewed") is True
-        and isinstance(payload.get("reviewer"), str)
-        and bool(payload["reviewer"])
-    )
-
-
 def _validated_reviews(base: Path, challenge_path: Path) -> list[dict[str, Any]]:
     review_paths = sorted((base / "reviews").glob("*.json"))
     if not review_paths:
@@ -865,10 +849,6 @@ def build_challenge_report(
             state = "pending_evidence"
         elif wins < 3:
             state = "challenger"
-        elif backend_id == "ltx-2.3-lipdub" and not _license_approved(license_receipt):
-            state = "blocked_license_review"
-        elif backend_id == "ltx-2.3-lipdub" and single_gpu_count < 4:
-            state = "blocked_single_gpu_evidence"
         else:
             state = "production_candidate"
         metric_names = sorted(REQUIRED_METRICS)

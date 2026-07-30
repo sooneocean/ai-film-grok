@@ -29,13 +29,34 @@ class ComfyRecoveryConfig:
     local_port: int
     remote_port: int
     remote_root: str
+    known_hosts_file: Path = Path("~/.ssh/known_hosts")
+    hostkey_alias: str = ""
 
 
-_TARGET_RE = re.compile(r"(?P<user>[A-Za-z0-9][A-Za-z0-9_.-]{0,31})@(?P<host>[0-9.]{7,15})")
+# Windows OpenSSH accepts a down-level logon name (``DOMAIN\\user``).  Keep the
+# domain optional and bounded so the target remains one argv element, never SSH
+# option syntax or a shell fragment.
+_TARGET_RE = re.compile(
+    r"(?P<user>(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,31}\\)?[A-Za-z0-9][A-Za-z0-9_.-]{0,31})@"
+    r"(?P<host>[0-9.]{7,15})"
+)
+_CONFIG_ESCAPED_TARGET_RE = re.compile(
+    r"(?P<domain>[A-Za-z0-9][A-Za-z0-9_.-]{0,31})\\\\"
+    r"(?P<user>[A-Za-z0-9][A-Za-z0-9_.-]{0,31})@(?P<host>[0-9.]{7,15})"
+)
+_HOSTKEY_ALIAS_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}")
 _RFC1918_NETWORKS = tuple(
     ipaddress.ip_network(value) for value in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
 )
 _APPROVED_REMOTE_ROOT = r"C:\ComfyUI_windows_portable"
+
+
+def _normalize_config_target(value: str) -> str:
+    """Decode only the bounded Windows domain escape emitted by config files."""
+    match = _CONFIG_ESCAPED_TARGET_RE.fullmatch(value)
+    if match is None:
+        return value
+    return f"{match.group('domain')}\\{match.group('user')}@{match.group('host')}"
 
 
 def config_from_env(
@@ -43,8 +64,11 @@ def config_from_env(
 ) -> ComfyRecoveryConfig:
     source = os.environ if environ is None else environ
     try:
+        target = _normalize_config_target(
+            source.get("AIFILM_COMFY_SSH_TARGET", "user@192.168.88.52").strip()
+        )
         return ComfyRecoveryConfig(
-            target=source.get("AIFILM_COMFY_SSH_TARGET", "user@192.168.88.52").strip(),
+            target=target,
             identity_file=Path(
                 source.get(
                     "AIFILM_COMFY_SSH_KEY",
@@ -61,6 +85,16 @@ def config_from_env(
             remote_root=source.get(
                 "AIFILM_COMFY_REMOTE_ROOT",
                 r"C:\ComfyUI_windows_portable",
+            ).strip(),
+            known_hosts_file=Path(
+                source.get(
+                    "AIFILM_COMFY_SSH_KNOWN_HOSTS",
+                    "~/.ssh/known_hosts",
+                )
+            ).expanduser(),
+            hostkey_alias=source.get(
+                "AIFILM_COMFY_SSH_HOSTKEY_ALIAS",
+                target.rsplit("@", 1)[-1],
             ).strip(),
         )
     except ValueError as exc:
@@ -83,6 +117,9 @@ def validate_recovery_config(config: ComfyRecoveryConfig) -> ComfyRecoveryConfig
         raise ComfyRecoveryError("remote ComfyUI port is invalid")
     if config.remote_root.casefold() != _APPROVED_REMOTE_ROOT.casefold():
         raise ComfyRecoveryError("remote ComfyUI root is unsafe")
+    hostkey_alias = config.hostkey_alias or match.group("host")
+    if _HOSTKEY_ALIAS_RE.fullmatch(hostkey_alias) is None:
+        raise ComfyRecoveryError("SSH HostKeyAlias is unsafe")
 
     expanded_key = config.identity_file.expanduser()
     absolute_key = expanded_key if expanded_key.is_absolute() else Path.cwd() / expanded_key
@@ -97,12 +134,32 @@ def validate_recovery_config(config: ComfyRecoveryConfig) -> ComfyRecoveryConfig
     mode = stat.S_IMODE(key_stat.st_mode)
     if mode & 0o077:
         raise ComfyRecoveryError("SSH identity file must be owner-only")
+
+    expanded_known_hosts = config.known_hosts_file.expanduser()
+    absolute_known_hosts = (
+        expanded_known_hosts
+        if expanded_known_hosts.is_absolute()
+        else Path.cwd() / expanded_known_hosts
+    )
+    if any(part.is_symlink() for part in (absolute_known_hosts, *absolute_known_hosts.parents)):
+        raise ComfyRecoveryError("SSH known_hosts file is missing or unsafe")
+    known_hosts = absolute_known_hosts.resolve()
+    if not known_hosts.is_file():
+        raise ComfyRecoveryError("SSH known_hosts file is missing or unsafe")
+    known_hosts_stat = known_hosts.stat()
+    if hasattr(os, "getuid") and known_hosts_stat.st_uid != os.getuid():
+        raise ComfyRecoveryError("SSH known_hosts file must be owned by the current user")
+    known_hosts_mode = stat.S_IMODE(known_hosts_stat.st_mode)
+    if known_hosts_mode & 0o077:
+        raise ComfyRecoveryError("SSH known_hosts file must be owner-only")
     return ComfyRecoveryConfig(
         target=config.target,
         identity_file=key,
         local_port=config.local_port,
         remote_port=config.remote_port,
         remote_root=config.remote_root,
+        known_hosts_file=known_hosts,
+        hostkey_alias=hostkey_alias,
     )
 
 
@@ -124,6 +181,12 @@ def _ssh_base(config: ComfyRecoveryConfig) -> list[str]:
         "BatchMode=yes",
         "-o",
         "IdentitiesOnly=yes",
+        "-o",
+        "StrictHostKeyChecking=yes",
+        "-o",
+        f"UserKnownHostsFile={config.known_hosts_file}",
+        "-o",
+        f"HostKeyAlias={config.hostkey_alias}",
         "-o",
         "ConnectTimeout=10",
         config.target,
@@ -196,6 +259,12 @@ def _start_tunnel(config: ComfyRecoveryConfig) -> None:
         "BatchMode=yes",
         "-o",
         "IdentitiesOnly=yes",
+        "-o",
+        "StrictHostKeyChecking=yes",
+        "-o",
+        f"UserKnownHostsFile={config.known_hosts_file}",
+        "-o",
+        f"HostKeyAlias={config.hostkey_alias}",
         "-o",
         "ExitOnForwardFailure=yes",
         "-o",

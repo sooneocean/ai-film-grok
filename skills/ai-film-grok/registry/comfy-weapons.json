@@ -154,6 +154,11 @@
       "intents": ["image-to-video", "i2v", "general-i2v"],
       "quality_tiers": ["max_practical", "standard"],
       "profile": "official",
+      "workflow_template": "templates/comfy/wan22-i2v-quality-api.json",
+      "bindings": {"prompt_node":"pos","prompt_input":"text","sampler_node":"ks_h","seed_input":"noise_seed","additional_seed_nodes":["ks_l"],"steps_node":"ks_h","steps_input":"steps","additional_steps_nodes":["ks_l"],"input_node":"img","input_image_input":"image","save_node":"save","filename_prefix_input":"filename_prefix"},
+      "defaults": {"steps":20},
+      "tuning": {"steps":{"allowed":[20]}},
+      "trusted_custom_nodes": {"VHS_VideoCombine":"custom_nodes.comfyui-videohelpersuite"},
       "requirements": {
         "diffusion_models": [
           "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
@@ -435,6 +440,249 @@
         "decode_ok": true,
         "quality_note": "strong mouth motion; face, color, clothing and background drift at 6 steps"
       }
+    },
+    {
+      "id": "hunyuan15-720p-i2v-sr-pilot",
+      "display_name": "HunyuanVideo 1.5 720p I2V with official 1080p SR pilot",
+      "status": "experimental",
+      "priority": 70,
+      "provider": "comfy_lan",
+      "source_endpoint": "local_hunyuan15_i2v_sr",
+      "node": "rtx5090-main",
+      "intents": [
+        "short-shot-i2v-sr-pilot"
+      ],
+      "quality_tiers": [
+        "max_practical"
+      ],
+      "workflow_template": "templates/comfy/hunyuan15-720p-i2v-sr-pilot-api.json",
+      "bindings": {
+        "prompt_node": "positive",
+        "prompt_input": "text",
+        "input_node": "source",
+        "input_image_input": "image",
+        "sampler_node": "noise",
+        "seed_input": "noise_seed",
+        "steps_node": "scheduler",
+        "steps_input": "steps",
+        "save_node": "save",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "hunyuanvideo1.5_720p_i2v_cfg_distilled_fp8_scaled.safetensors",
+          "hunyuanvideo1.5_1080p_sr_distilled_fp8_scaled.safetensors"
+        ],
+        "text_encoders": [
+          "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "byt5_small_glyphxl_fp16.safetensors"
+        ],
+        "vae": [
+          "hunyuanvideo15_vae_fp16.safetensors"
+        ],
+        "clip_vision": [
+          "sigclip_vision_patch14_384.safetensors"
+        ]
+      },
+      "requirement_sha256": {
+        "diffusion_models": {
+          "hunyuanvideo1.5_1080p_sr_distilled_fp8_scaled.safetensors": "242642db5bb227389724e4c0b20a2224534ac4087597246175421492319698eb"
+        }
+      },
+      "defaults": {
+        "width": 1280,
+        "height": 720,
+        "output_width": 1920,
+        "output_height": 1080,
+        "length": 121,
+        "steps": 20,
+        "sr_steps": 8,
+        "fps": 24
+      },
+      "tuning": {
+        "steps": {
+          "allowed": [
+            20
+          ],
+          "note": "Pilot is pinned to the tested distilled 720p pass; SR remains eight steps."
+        }
+      },
+      "capabilities": {
+        "image_to_video": true,
+        "latent_super_resolution_1080p": true,
+        "pilot_only": true,
+        "human_approval_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "production_promoted": false,
+        "workflow_template_sha256": "afece176ac98e92866a1bd6d6dddcf41df15c307588c4169bffd6d80b567d776",
+        "model_sr_sha256": "242642db5bb227389724e4c0b20a2224534ac4087597246175421492319698eb",
+        "output_raw_sha256": "faf42e9a52a0fddf4034f949d12599a8aff8ee957922502a465b83a03032f120",
+        "output_padded_1080p_sha256": "d8add6460c50f909c6cd3fb03dac58fd76dbf551c1d97df1115bbe489afd0d2b",
+        "technical_720p_canary_decode_ok": true,
+        "technical_1080p_canary_decode_ok": true,
+        "native_output_resolution": "1920x1072",
+        "padded_delivery_resolution": "1920x1080",
+        "independent_verifier": "ACCEPT_TECHNICAL_PILOT",
+        "human_review": false
+      }
+    },
+    {
+      "id": "ace-step15-xl-rnb-pilot",
+      "display_name": "ACE-Step 1.5 XL Turbo instrumental R&B pilot",
+      "status": "experimental",
+      "priority": 75,
+      "provider": "comfy_lan",
+      "source_endpoint": "local_ace_step15_xl",
+      "node": "rtx5090-main",
+      "intents": [
+        "instrumental-rnb-bgm-pilot"
+      ],
+      "quality_tiers": [
+        "max_practical"
+      ],
+      "workflow_template": "templates/comfy/ace-step15-xl-rnb-pilot-api.json",
+      "bindings": {
+        "prompt_node": "conditioning",
+        "prompt_input": "tags",
+        "sampler_node": "sampler",
+        "seed_input": "seed",
+        "steps_node": "sampler",
+        "steps_input": "steps",
+        "save_node": "save",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "acestep_v1.5_xl_turbo_bf16.safetensors"
+        ],
+        "text_encoders": [
+          "qwen_0.6b_ace15.safetensors",
+          "qwen_4b_ace15.safetensors"
+        ],
+        "vae": [
+          "ace_1.5_vae.safetensors"
+        ]
+      },
+      "requirement_sha256": {
+        "diffusion_models": {
+          "acestep_v1.5_xl_turbo_bf16.safetensors": "86a1afb0a1f711f0e3304ff65d874df3ae6783db683dcf982513fb9b6d14ae71"
+        }
+      },
+      "defaults": {
+        "duration": 15.0,
+        "steps": 8,
+        "bpm": 80,
+        "keyscale": "A minor",
+        "instrumental_only": true
+      },
+      "tuning": {
+        "steps": {
+          "allowed": [
+            8
+          ],
+          "note": "XL Turbo pilot is pinned to the official eight-step sampler shape."
+        }
+      },
+      "capabilities": {
+        "text_to_music": true,
+        "instrumental_bgm": true,
+        "pilot_only": true,
+        "human_listening_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "production_promoted": false,
+        "workflow_template_sha256": "33ed21e4ef226d8310e3c1980ff74adf8f75336e2aeb827f32e08945ae793955",
+        "model_sha256": "86a1afb0a1f711f0e3304ff65d874df3ae6783db683dcf982513fb9b6d14ae71",
+        "output_sha256": "3ce26f80c0c4bed7ee7802f081b928d3329d41051ab0d14a8490a8b1359b49b5",
+        "terminal_audio_decode_ok": true,
+        "speech_leakage_asr": "[Music]",
+        "independent_verifier": "ACCEPT_TECHNICAL_PILOT",
+        "full_human_listening": false
+      }
+    },
+    {
+      "id": "ltx23-native-i2v-pilot",
+      "display_name": "LTX-2.3 native synchronized I2V pilot",
+      "status": "experimental",
+      "priority": 65,
+      "provider": "comfy_lan",
+      "source_endpoint": "local_ltx23_native_i2v",
+      "node": "rtx5090-main",
+      "intents": [
+        "broll-audiovideo-pilot"
+      ],
+      "quality_tiers": [
+        "max_practical"
+      ],
+      "workflow_template": "templates/comfy/ltx23-native-i2v-pilot-api.json",
+      "bindings": {
+        "prompt_node": "303",
+        "prompt_input": "text",
+        "input_node": "source",
+        "input_image_input": "image",
+        "sampler_node": "277",
+        "seed_input": "noise_seed",
+        "save_node": "save",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "requirements": {
+        "checkpoints": [
+          "ltx-2.3-22b-dev-fp8.safetensors"
+        ],
+        "loras": [
+          "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors"
+        ],
+        "text_encoders": [
+          "gemma_3_12B_it_fp4_mixed.safetensors"
+        ],
+        "latent_upscale_models": [
+          "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+        ]
+      },
+      "requirement_sha256": {
+        "checkpoints": {
+          "ltx-2.3-22b-dev-fp8.safetensors": "28606c5b5a06ce56f896d4dfcb20f212739e07a68fbe48e53638188449d26450"
+        },
+        "loras": {
+          "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors": "31e0c0195fb841bf31af78e8b60858f489e87ddcea4a5239abc80943da65e3ac"
+        },
+        "text_encoders": {
+          "gemma_3_12B_it_fp4_mixed.safetensors": "aaca463d11e6d8d2a4bdb0d6299214c15ef78a3f73e0ef8113d5a9d0219b3f6d"
+        },
+        "latent_upscale_models": {
+          "ltx-2.3-spatial-upscaler-x2-1.1.safetensors": "5f416311fa8172b65af67530758964708d29a317b830d689a51143b7f91913ed"
+        }
+      },
+      "defaults": {
+        "width": 1280,
+        "height": 720,
+        "duration": 5,
+        "fps": 25,
+        "audio": true
+      },
+      "capabilities": {
+        "image_to_video": true,
+        "synchronized_audio_video": true,
+        "pilot_only": true,
+        "human_review_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "production_promoted": false,
+        "workflow_template_sha256": "ab7ef264bf8ef18a0a91d8f89acdb2462569ff2b91b391f1c9ce05cf57d27c81",
+        "output_sha256": "85ef1be184e00cd97625e65583a75787aa0389447704fbd6eeee94900f7b4a5b",
+        "terminal_media_decode_ok": true,
+        "visual_quality": "partial_camera_direction_mismatch",
+        "audio_quality": "fail_for_production_quiet_and_music_leakage",
+        "independent_verifier": "ACCEPT_TECHNICAL_PILOT_ONLY",
+        "human_review": false
+      }
     }
   ],
   "research_weapons": [
@@ -496,11 +744,28 @@
       "provider": "comfy_lan",
       "node": "rtx5090-main",
       "intents": ["short-shot-i2v", "short-shot-t2v"],
+      "protected_class_type_prefixes": ["HunyuanVideo15"],
       "allowed_stages": ["pilot"],
       "license_scope": "verify_before_install_and_release",
       "latest_canary_receipt_path": null,
       "requirements": {"minimum_vram_mib": 14336},
       "promotion_requirements": ["model_fingerprint", "terminal_media_decode", "continuity_review", "human_review"]
+    },
+    {
+      "id": "ace-step15-music-pilot",
+      "display_name": "ACE-Step 1.5 local music pilot",
+      "status": "experimental",
+      "readiness": "installed_unverified",
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": ["instrumental-bgm", "text-to-music"],
+      "protected_class_type_prefixes": ["TextEncodeAceStepAudio1.5", "EmptyAceStep1.5LatentAudio"],
+      "allowed_stages": ["pilot"],
+      "restrictions": ["not_final_without_full_listening", "no_auto_approval", "reject_speech_or_vocal_leakage"],
+      "license_scope": "MIT_model_output_rights_require_project_review",
+      "latest_canary_receipt_path": null,
+      "requirements": {"minimum_vram_mib": 20480},
+      "promotion_requirements": ["model_fingerprint", "terminal_audio_decode", "loudness_review", "full_human_listening"]
     },
     {
       "id": "ltx2-broll-pilot",
@@ -510,6 +775,15 @@
       "provider": "comfy_lan",
       "node": "rtx5090-main",
       "intents": ["broll-audiovideo"],
+      "protected_class_type_prefixes": [
+        "LTX",
+        "Ltxv",
+        "EmptyLTXV",
+        "ModelSamplingLTXV",
+        "ModifyLTXModel",
+        "TextGenerateLTX2",
+        "TorchCompileLTXModel"
+      ],
       "allowed_stages": ["pilot"],
       "restrictions": ["no_dialogue", "no_continuous_drama", "not_final"],
       "license_scope": "verify_before_install_and_release",
@@ -524,11 +798,11 @@
       "readiness": "not_installed_or_unverified",
       "provider": "external_result_import",
       "node": "rtx5090-main",
-      "intents": ["video-lip-sync-challenge"],
+      "intents": ["text-redub-visual-preservation-research"],
       "allowed_stages": ["research"],
       "license_scope": "review_required_before_promotion",
       "latest_canary_receipt_path": null,
-      "restrictions": ["no_auto_execute", "not_final", "not_final_lipsync_auto"],
+      "restrictions": ["no_auto_execute", "requires_text_dialogue", "not_final", "not_final_lipsync_auto", "not_shared_audio_benchmark"],
       "promotion_requirements": ["license_review", "single_gpu_rtx5090_evidence", "four_fixture_blind_review", "zero_hard_failures"]
     },
     {

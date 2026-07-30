@@ -10,6 +10,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from aifilm_grok import main  # noqa: E402
+from production_router import explain_route  # noqa: E402
 from production_team import scaffold_team, snapshot_capabilities, validate_team  # noqa: E402
 
 
@@ -185,3 +186,128 @@ def test_snapshot_only_promotes_story_model_after_explicit_canary(
     assert story["status"] == "ready"
     assert story["pilot_verified"] is True
     assert result["observations"]["m1"]["story_model"]["verified"] is True
+
+
+def test_snapshot_projects_dialogue_motion_operations_for_router(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import comfy_armory
+    import compose_render
+    import lipsync_backend
+    import tts_backend
+
+    monkeypatch.setattr(
+        comfy_armory,
+        "load_armory",
+        lambda: {
+            "weapons": [
+                {
+                    "id": "qwen-image-edit-2511-local",
+                    "display_name": "Qwen Image Edit",
+                    "provider": "comfy_lan",
+                    "status": "verified",
+                    "intents": ["image-edit"],
+                    "verified": {"real_pilot": True},
+                },
+                {
+                    "id": "infinite-talk-stable-pilot",
+                    "display_name": "InfiniteTalk",
+                    "provider": "comfy_lan",
+                    "status": "experimental",
+                    "intents": ["talking-avatar-stable-pilot"],
+                    "verified": {"real_pilot": True},
+                },
+            ]
+        },
+    )
+    monkeypatch.setattr(
+        comfy_armory,
+        "probe_armory",
+        lambda _url: {
+            "ok": True,
+            "ready_ids": ["qwen-image-edit-2511-local", "infinite-talk-stable-pilot"],
+        },
+    )
+    monkeypatch.setattr(compose_render, "probe_designed_post_tooling", lambda: {})
+    monkeypatch.setattr(
+        tts_backend,
+        "probe",
+        lambda: {"backends": {"edge": True}, "audio_node": {"ok": False}},
+    )
+    monkeypatch.setattr(
+        lipsync_backend,
+        "probe",
+        lambda: {
+            "node": {
+                "ok": True,
+                "backends": {
+                    "latentsync": {
+                        "ready": True,
+                        "approved": True,
+                        "model": "LatentSync 1.6",
+                    }
+                },
+            },
+            "ready": ["latentsync"],
+        },
+    )
+    snapshot_path = tmp_path / "receipts" / "capability-snapshot.json"
+    snapshot = snapshot_capabilities(out=snapshot_path)
+    capabilities = {item["id"]: item for item in snapshot["snapshot"]["capabilities"]}
+
+    assert capabilities["rtx5090-qwen-image-edit-2511-local"]["operations"] == ["image_to_image"]
+    assert capabilities["rtx5090-infinite-talk-stable-pilot"]["operations"] == [
+        "face_animation_to_audio"
+    ]
+    assert capabilities["edge-ja"]["operations"] == ["text_to_speech"]
+    assert capabilities["rtx5090-lipsync-latentsync"]["operations"] == ["video_lip_sync"]
+    assert capabilities["grok-imagine-video"]["pilot_verified"] is False
+
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "title": "dialogue routing",
+                "genre": "drama",
+                "scenes": [
+                    {
+                        "id": "scene01",
+                        "shots": [
+                            {
+                                "id": "line01",
+                                "shot_role": "hero",
+                                "screen_mode": "on_camera",
+                                "speaker_on_camera": True,
+                                "lipsync": True,
+                                "speaker": "hero",
+                                "performance_intent": {"emotion": "guarded"},
+                                "performance_state": {
+                                    "status": "approved",
+                                    "image_sha256": "a" * 64,
+                                },
+                                "tts": {
+                                    "status": "final",
+                                    "language": "ja",
+                                    "audio_sha256": "b" * 64,
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "receipts" / "comfy-capacity.json").write_text(
+        json.dumps({"queue_known": True, "busy": False}), encoding="utf-8"
+    )
+
+    route = explain_route(
+        tmp_path,
+        shot_id="line01",
+        now=snapshot["snapshot"]["generated_at"],
+    )
+
+    assert route["ok"] is True, route["dialogue_competition"].get("issues")
+    assert route["selected"]["capability_id"] == "rtx5090-infinite-talk-stable-pilot"
+    assert route["dialogue_competition"]["selected_route"] == "infinite_talk"
+    assert route["dialogue_competition"]["secondary_available"] is False

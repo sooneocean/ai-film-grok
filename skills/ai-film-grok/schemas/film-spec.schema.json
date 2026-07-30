@@ -7,6 +7,30 @@
   "properties": {
     "title": { "type": "string", "minLength": 1 },
     "description": { "type": "string" },
+    "production_mode": {
+      "enum": ["shortform", "longform"],
+      "description": "Absent means shortform for backward compatibility."
+    },
+    "longform_profile": {
+      "type": "object",
+      "required": [
+        "target_duration_sec",
+        "act_count",
+        "unit_max_duration_sec",
+        "approval_policy"
+      ],
+      "properties": {
+        "target_duration_sec": { "type": "number", "minimum": 480, "maximum": 900 },
+        "act_count": { "const": 3 },
+        "unit_max_duration_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 90
+        },
+        "approval_policy": { "const": "three_gates" }
+      },
+      "additionalProperties": false
+    },
     "serial": {
       "oneOf": [
         { "const": false },
@@ -869,5 +893,21 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": ["production_mode"],
+        "properties": {
+          "production_mode": { "const": "longform" }
+        }
+      },
+      "then": {
+        "required": ["aspect_ratio", "longform_profile"],
+        "properties": {
+          "aspect_ratio": { "const": "9:16" }
+        }
+      }
+    }
+  ],
   "additionalProperties": true
 }

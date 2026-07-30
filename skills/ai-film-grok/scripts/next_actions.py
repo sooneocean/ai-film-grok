@@ -15,7 +15,8 @@ from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-from util import read_json
+from security_policy import atomic_write_text
+from util import read_json, write_json
 
 # Backward-compatible internal projection (Grok Agent + layers 1–4 + delivery).
 PIPELINE_STAGES: tuple[str, ...] = (
@@ -643,12 +644,11 @@ def persist_pipeline_stage(
     next_cmd: str | None = None,
     next_id: str | None = None,
     grok_home: Path | None = None,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """Write receipts/pipeline_stage.json + optional ~/.grok/hud/aifilm-stage.* for HUD.
 
     Returns paths written (best-effort; never raises for HUD home failures).
     """
-    import json
     import os
     from datetime import datetime
 
@@ -664,9 +664,9 @@ def persist_pipeline_stage(
         "line": format_stage_line(pipeline, compact=True),
         "line_full": format_stage_line(pipeline, compact=False),
     }
-    paths: dict[str, str] = {}
+    paths: dict[str, Any] = {}
     film_path = receipts / "pipeline_stage.json"
-    film_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_json(film_path, payload)
     paths["film"] = str(film_path)
 
     # HUD sidecar (opt-out: AIFILM_HUD_STAGE=0)
@@ -678,15 +678,13 @@ def persist_pipeline_stage(
         hud.mkdir(parents=True, exist_ok=True)
         hud_json = hud / "aifilm-stage.json"
         hud_txt = hud / "aifilm-stage.txt"
-        hud_json.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-        )
+        write_json(hud_json, payload)
         line = payload["line"]
         if next_id:
             line = f"{line} → {next_id}"
-        hud_txt.write_text(line + "\n", encoding="utf-8")
+        atomic_write_text(hud_txt, line + "\n")
         paths["hud_json"] = str(hud_json)
         paths["hud_txt"] = str(hud_txt)
-    except OSError:
-        pass
+    except OSError as exc:
+        paths["errors"] = [f"hud sync failed: {exc}"]
     return paths

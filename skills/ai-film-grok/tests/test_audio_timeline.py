@@ -131,6 +131,17 @@ def test_approved_mmaudio_sfx_only_enters_noncommercial_internal_timeline(
     source = approved / "take.wav"
     source.write_bytes(b"approved-audio")
     source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    screen_path = tmp_path / "receipts" / "sfx-speech-screen" / "mmaudio-sfx-test.json"
+    screen_path.parent.mkdir(parents=True)
+    screen = {
+        "kind": "vibevoice-asr-review",
+        "status": "candidate_only",
+        "human_review_required": True,
+        "provider": {"transcript_sha256": "d" * 64},
+        "inputs": {"audio": {"sha256": source_hash}},
+        "transcript": {"segments": [{"text": "[silence]"}]},
+    }
+    write_json(screen_path, screen)
     receipt = approved / "take.receipt.json"
     record = sign_receipt(
         {
@@ -145,6 +156,15 @@ def test_approved_mmaudio_sfx_only_enters_noncommercial_internal_timeline(
             "model": "hkchengrex/MMAudio-large-44k-v2",
             "checkpoint_fingerprint": "b" * 64,
             "node_job_id": "job-1",
+            "asr_speech_screen": {
+                "status": "completed_candidate_signal",
+                "receipt": f"local:{screen_path.relative_to(tmp_path)}",
+                "audio_sha256": source_hash,
+                "report_sha256": hashlib.sha256(screen_path.read_bytes()).hexdigest(),
+                "transcript_sha256": "d" * 64,
+                "segment_count": 1,
+                "speech_like_segment_count": 0,
+            },
             "human_review": {
                 "reviewer": "dex",
                 "heard_full": True,
@@ -152,6 +172,7 @@ def test_approved_mmaudio_sfx_only_enters_noncommercial_internal_timeline(
                 "no_speech_confirmed": True,
                 "no_music_confirmed": True,
                 "artifact_free_confirmed": True,
+                "asr_speech_reviewed": True,
             },
         }
     )

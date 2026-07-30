@@ -99,6 +99,8 @@ def _capability(
     pilot_verified: bool,
     resource: str,
     experimental: bool = False,
+    operations: list[str] | None = None,
+    cost_state: str = "free_local",
 ) -> dict[str, Any]:
     """Build one schema-compatible capability without overstating a pilot."""
     now = datetime.now(UTC)
@@ -107,7 +109,7 @@ def _capability(
         "provider": provider,
         "model": model,
         "domains": domains,
-        "operations": ["image_to_video" if "motion" in domains else "text_to_video"],
+        "operations": operations or ["image_to_video" if "motion" in domains else "text_to_video"],
         "shot_roles": ["hero", "env", "bridge", "insert"],
         "content_classes": ["general"],
         "status": status,
@@ -122,7 +124,7 @@ def _capability(
         "priority": 100 if pilot_verified else 0,
         "resource": resource,
         "concurrency": 1,
-        "cost_state": "free_local",
+        "cost_state": cost_state,
     }
 
 
@@ -152,10 +154,16 @@ def snapshot_capabilities(
             intents = {str(item) for item in weapon.get("intents") or []}
             if any(item.startswith("talking-avatar") for item in intents):
                 domains = ["lipsync"]
+                operations = ["face_animation_to_audio"]
+            elif "image-edit" in intents or "local-image-edit" in intents:
+                domains = ["visual_still"]
+                operations = ["image_to_image"]
             elif {"image-to-video", "i2v"} & intents:
                 domains = ["motion"]
+                operations = ["image_to_video"]
             else:
                 domains = ["visual_still"]
+                operations = ["text_to_video"]
             capabilities.append(
                 _capability(
                     capability_id=f"rtx5090-{weapon['id']}",
@@ -166,6 +174,7 @@ def snapshot_capabilities(
                     pilot_verified=bool((weapon.get("verified") or {}).get("real_pilot")),
                     resource="gpu:rtx5090",
                     experimental=str(weapon.get("status")) == "experimental",
+                    operations=operations,
                 )
             )
     except Exception as exc:
@@ -178,6 +187,19 @@ def snapshot_capabilities(
         audio_detail.get("models") if isinstance(audio_detail.get("models"), dict) else {}
     )
     observations["rtx5090_audio"] = {"ok": bool(audio_node.get("ok")), "models": audio_models}
+    edge_ready = bool((tts.get("backends") or {}).get("edge"))
+    capabilities.append(
+        _capability(
+            capability_id="edge-ja",
+            provider="edge",
+            model="ja-JP-NanamiNeural",
+            domains=["voice"],
+            status="ready" if edge_ready else "blocked",
+            pilot_verified=edge_ready,
+            resource="m1-local",
+            operations=["text_to_speech"],
+        )
+    )
     for domain, model_flag, model_name in (
         ("voice", "tts", "Qwen3-TTS"),
         ("music", "music", "ACE-Step-1.5"),
@@ -195,6 +217,7 @@ def snapshot_capabilities(
                 # Service health is not an audio acceptance canary.
                 pilot_verified=False,
                 resource="gpu:rtx5090-audio",
+                operations=["text_to_speech"] if domain == "voice" else ["text_to_video"],
             )
         )
 
@@ -214,11 +237,38 @@ def snapshot_capabilities(
                 status="ready" if ready else "blocked",
                 pilot_verified=ready and backend.get("approved") is True,
                 resource="gpu:rtx5090-lipsync",
+                operations=["video_lip_sync"],
             )
         )
     observations["rtx5090_lipsync"] = {
         "ok": bool(node.get("ok")),
         "ready": lipsync.get("ready") or [],
+    }
+
+    # Grok is the declared dialogue secondary route.  A no-root provider probe
+    # only proves that the in-session path exists; per-film canary evidence is
+    # still required before it can become the active route.
+    from i2v_provider import GrokI2VProvider
+
+    grok = GrokI2VProvider().probe()
+    grok_available = bool(grok.ok and grok.available)
+    capabilities.append(
+        _capability(
+            capability_id="grok-imagine-video",
+            provider="grok",
+            model="grok-imagine-video",
+            domains=["motion"],
+            status="ready" if grok_available else "blocked",
+            pilot_verified=False,
+            resource="grok-in-session",
+            operations=["image_to_video"],
+            cost_state="unknown",
+        )
+    )
+    observations["grok_imagine_video"] = {
+        "available": grok_available,
+        "reason": grok.reason,
+        "film_canary_required": True,
     }
 
     post = probe_designed_post_tooling()

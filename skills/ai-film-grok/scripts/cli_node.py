@@ -133,6 +133,11 @@ def _recover(base_url: str) -> dict[str, Any]:
 
 
 def run_node(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], None]) -> int:
+    # The CLI may be started outside the shell that owns config.env.  Load the
+    # local-only configuration before reading either audio-node credential.
+    from config_loader import get_config
+
+    get_config()
     base_url = _base_url(getattr(args, "base_url", None))
     try:
         if args.node_action == "status":

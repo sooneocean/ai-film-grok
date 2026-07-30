@@ -61,6 +61,39 @@ def test_report_is_candidate_only_and_hash_bound(
     assert Path(report["path"]).is_file()
 
 
+def test_report_can_use_confined_candidate_specific_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, audio, _subtitles = _workspace(tmp_path)
+    monkeypatch.setenv(
+        vibevoice_asr_review.ARGV_ENV,
+        '["adapter","--audio","{audio}","--out","{out}"]',
+    )
+    monkeypatch.setattr(
+        vibevoice_asr_review, "analyze_media", lambda *_args, **_kwargs: {"ok": True}
+    )
+
+    def run(command, **_kwargs):
+        output = Path(command[command.index("--out") + 1])
+        output.write_text(
+            json.dumps({"segments": [{"start": 0, "end": 1, "text": "[silence]"}]}),
+            encoding="utf-8",
+        )
+        return type("Result", (), {"returncode": 0})()
+
+    monkeypatch.setattr(vibevoice_asr_review.subprocess, "run", run)
+    report = vibevoice_asr_review.create_report(
+        root,
+        audio=audio,
+        report_name=Path("sfx-speech-screen") / "mmaudio-sfx-1-abc.json",
+    )
+    assert (
+        Path(report["path"]) == root / "receipts" / "sfx-speech-screen" / "mmaudio-sfx-1-abc.json"
+    )
+    with pytest.raises(vibevoice_asr_review.VibeVoiceASRError, match="safe relative"):
+        vibevoice_asr_review._report_output(root / "receipts", Path("..") / "escape.json")
+
+
 def test_adapter_must_use_controlled_input_and_output_placeholders(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

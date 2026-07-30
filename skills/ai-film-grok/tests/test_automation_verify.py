@@ -23,7 +23,12 @@ def test_verify_requires_scene_sound_and_delivery_for_timeline_v1(tmp_path: Path
     assert {"scene_sound", "audio_delivery"} <= set(report["blocking_checks"])
 
 
-def test_verify_accepts_ready_audio_delivery_without_optional_production_book(tmp_path: Path):
+def test_verify_accepts_ready_audio_delivery_without_optional_production_book(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # This test isolates film-level audio readiness; runtime fingerprinting has
+    # its own checks and must not make a minimal temporary film nondeterministic.
+    monkeypatch.setattr("automation_verify.verify_runtime_lock", lambda *_args: {"ok": True})
     (tmp_path / "film-spec.json").write_text(
         json.dumps({"audio_timeline_v1": True, "shots": []}), encoding="utf-8"
     )

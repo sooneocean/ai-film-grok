@@ -21,11 +21,13 @@ class ComfyArmoryError(RuntimeError):
 _SKILL_ROOT = Path(__file__).resolve().parents[1]
 _REGISTRY = _SKILL_ROOT / "registry" / "comfy-weapons.json"
 _MODEL_ROUTES = {
+    "checkpoints": "/models/checkpoints",
     "diffusion_models": "/models/diffusion_models",
     "text_encoders": "/models/text_encoders",
     "vae": "/models/vae",
     "loras": "/models/loras",
     "clip_vision": "/models/clip_vision",
+    "latent_upscale_models": "/models/latent_upscale_models",
 }
 _SAFE_PREFIX = re.compile(r"[A-Za-z0-9_./-]+")
 _VERIFIED_STATUSES = frozenset({"verified", "verified-baseline"})
@@ -199,11 +201,18 @@ def _allowed_binding_slots(bindings: Mapping[str, Any]) -> set[tuple[str, str]]:
         ("input_node", "input_image_input"),
         ("audio_node", "audio_input"),
     )
-    return {
+    slots = {
         (str(bindings[node_key]), str(bindings[input_key]))
         for node_key, input_key in pairs
         if node_key in bindings and input_key in bindings
     }
+    for key, input_key in (
+        ("additional_seed_nodes", "seed_input"),
+        ("additional_steps_nodes", "steps_input"),
+    ):
+        if key in bindings and input_key in bindings:
+            slots.update((str(node), str(bindings[input_key])) for node in bindings[key])
+    return slots
 
 
 def _matches_registered_template(
@@ -258,12 +267,28 @@ def identify_registered_weapon_workflow(
         for node in graph.values()
         if isinstance(node, Mapping) and node.get("class_type")
     }
-    protected = sorted(
-        weapon["id"]
-        for weapon in weapons
-        if weapon.get("status") == "experimental"
-        and class_types.intersection((weapon.get("trusted_custom_nodes") or {}).keys())
-    )
+    armory = load_armory()
+    protected: list[str] = []
+    for weapon in list(armory["weapons"]) + list(armory.get("research_weapons") or []):
+        if weapon.get("status") != "experimental":
+            continue
+        protected_classes = {
+            str(value)
+            for value in (
+                *(weapon.get("protected_class_types") or []),
+                *(weapon.get("trusted_custom_nodes") or {}).keys(),
+            )
+        }
+        protected_prefixes = tuple(
+            str(value) for value in (weapon.get("protected_class_type_prefixes") or [])
+        )
+        if class_types.intersection(protected_classes) or any(
+            class_type.startswith(protected_prefixes)
+            for class_type in class_types
+            if protected_prefixes
+        ):
+            protected.append(str(weapon["id"]))
+    protected.sort()
     if protected:
         raise ComfyArmoryError(
             "workflow uses nodes reserved for registered experimental weapons; "
@@ -389,6 +414,8 @@ def compile_weapon_workflow(
     bindings = weapon["bindings"]
     graph[bindings["prompt_node"]]["inputs"][bindings["prompt_input"]] = prompt
     graph[bindings["sampler_node"]]["inputs"][bindings["seed_input"]] = seed
+    for node_id in bindings.get("additional_seed_nodes", []):
+        graph[node_id]["inputs"][bindings["seed_input"]] = seed
     graph[bindings["save_node"]]["inputs"][bindings["filename_prefix_input"]] = filename_prefix
     if "steps_node" in bindings:
         selected_steps = weapon.get("defaults", {}).get("steps") if steps is None else steps
@@ -400,6 +427,8 @@ def compile_weapon_workflow(
         ):
             raise ComfyArmoryError("steps must be a registered step value for this weapon")
         graph[bindings["steps_node"]]["inputs"][bindings["steps_input"]] = selected_steps
+        for node_id in bindings.get("additional_steps_nodes", []):
+            graph[node_id]["inputs"][bindings["steps_input"]] = selected_steps
     if "input_node" in bindings:
         if not input_image_name:
             raise ComfyArmoryError("Qwen local edit requires an input image name")

@@ -45,8 +45,8 @@
     "audio": {"$ref": "#/$defs/media"},
     "planned_cells": {
       "type": "array",
-      "minItems": 20,
-      "maxItems": 20,
+      "minItems": 16,
+      "maxItems": 16,
       "items": {
         "type": "object",
         "required": ["fixture_id", "backend_id", "lane", "state"],

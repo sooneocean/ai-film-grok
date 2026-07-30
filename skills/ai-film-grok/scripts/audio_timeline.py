@@ -78,6 +78,23 @@ def is_approved_internal_sfx(event: dict[str, Any], delivery_scope: str) -> bool
     )
 
 
+def is_approved_internal_ambience(event: dict[str, Any], delivery_scope: str) -> bool:
+    source = str(event.get("source") or event.get("asset") or "").replace("\\", "/")
+    receipt = str(event.get("approval_receipt") or "").replace("\\", "/")
+    return bool(
+        event.get("type") == "ambience"
+        and delivery_scope == "noncommercial_internal"
+        and event.get("approval_status") == "approved_noncommercial"
+        and event.get("production_eligible") is False
+        and event.get("usage_scope") == "noncommercial_internal"
+        and is_candidate_only_license(event.get("license"))
+        and source.startswith("local:audio/candidates/ambience/approved-noncommercial/")
+        and receipt.startswith("local:audio/candidates/ambience/approved-noncommercial/")
+        and receipt.endswith(".receipt.json")
+        and re.fullmatch(r"[0-9a-f]{64}", str(event.get("source_sha256") or ""))
+    )
+
+
 # Keep this guard deliberately narrow: a character may naturally say "开门".
 # Only explicit bracketed production directions are rejected here; broader
 # script interpretation belongs in the authoring compiler, not the renderer.
@@ -269,19 +286,27 @@ def compile_timeline(spec: dict[str, Any], *, root: Path | None = None) -> dict[
         "duration_sec": round(cursor, 3),
     }
     validate_timeline(timeline)
-    approved_internal = [
+    approved_internal_sfx = [
         event for event in events if is_approved_internal_sfx(event, timeline["delivery_scope"])
     ]
-    if approved_internal:
+    approved_internal_ambience = [
+        event
+        for event in events
+        if is_approved_internal_ambience(event, timeline["delivery_scope"])
+    ]
+    if approved_internal_sfx or approved_internal_ambience:
         if root is None:
             raise AudioTimelineError(
                 "approved non-commercial SFX compilation requires the film root"
             )
-        from sfx_candidates import approved_event_receipt_valid
+        from ambience_candidates import approved_event_receipt_valid as ambience_receipt_valid
+        from sfx_candidates import approved_event_receipt_valid as sfx_receipt_valid
 
-        if any(not approved_event_receipt_valid(root, event) for event in approved_internal):
+        if any(not sfx_receipt_valid(root, event) for event in approved_internal_sfx) or any(
+            not ambience_receipt_valid(root, event) for event in approved_internal_ambience
+        ):
             raise AudioTimelineError(
-                "approved non-commercial SFX receipt does not bind signed local audio"
+                "approved non-commercial candidate receipt does not bind signed local audio"
             )
     return timeline
 
@@ -356,7 +381,10 @@ def validate_timeline(timeline: dict[str, Any]) -> dict[str, Any]:
                 or event.get("production_eligible") is False
                 or event.get("approval_status") == "pending_human_review"
             )
-            if restricted_candidate and not is_approved_internal_sfx(event, delivery_scope):
+            approved_internal = is_approved_internal_sfx(
+                event, delivery_scope
+            ) or is_approved_internal_ambience(event, delivery_scope)
+            if restricted_candidate and not approved_internal:
                 raise AudioTimelineError(
                     f"{prefix} non-commercial or pending candidate cannot enter a formal timeline"
                 )

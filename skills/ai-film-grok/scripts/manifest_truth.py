@@ -57,6 +57,17 @@ def preflight_manifest(root: Path | str, manifest: dict[str, Any]) -> dict[str, 
             errors.append("film-spec.json missing")
         elif not expected or sha256_file(contract_path) != expected:
             errors.append("truth_contract contract_sha256 is missing or stale")
+        spec = read_json(contract_path) or {}
+        if spec.get("production_mode") == "longform":
+            for key, filename in (
+                ("graph_sha256", "drama-graph.json"),
+                ("spec_sha256", "film-spec.json"),
+                ("timeline_sha256", "timeline.json"),
+            ):
+                source = root / filename
+                recorded = str(truth.get(key) or "")
+                if not source.is_file() or not recorded or sha256_file(source) != recorded:
+                    errors.append(f"truth_contract {key} is missing or stale")
     for kind in ("stills", "clips"):
         records = manifest.get(kind) or {}
         if not isinstance(records, dict):
@@ -88,6 +99,15 @@ def migrate_manifest(root: Path | str, *, write: bool = False) -> dict[str, Any]
         if (root / "film-spec.json").is_file()
         else "",
     }
+    spec = read_json(root / "film-spec.json") or {}
+    if spec.get("production_mode") == "longform":
+        for key, filename in (
+            ("graph_sha256", "drama-graph.json"),
+            ("spec_sha256", "film-spec.json"),
+            ("timeline_sha256", "timeline.json"),
+        ):
+            source = root / filename
+            candidate["truth_contract"][key] = sha256_file(source) if source.is_file() else ""
     check = preflight_manifest(root, candidate)
     needs_refresh = candidate != manifest
     result = {

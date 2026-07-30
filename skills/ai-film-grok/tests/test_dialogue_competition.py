@@ -73,6 +73,21 @@ def _capabilities(*, infinite_promotion: str = "pilot") -> list[dict[str, object
     ]
 
 
+def test_current_preferred_tts_capability_cannot_be_overwritten_by_unverified_backend() -> None:
+    capabilities = _capabilities()
+    capabilities.append(_capability("rtx5090-voice-tts", lane="tts", canary_passed=False))
+
+    plan = build_dialogue_competition_plan(
+        _shot(),
+        capabilities,
+        gpu_state={"queue_known": True, "busy": False},
+        now=NOW,
+    )
+
+    assert plan["ok"] is True
+    assert plan["capability_bindings"]["tts"]["id"] == "edge-ja"
+
+
 def _candidate(
     candidate_id: str,
     *,

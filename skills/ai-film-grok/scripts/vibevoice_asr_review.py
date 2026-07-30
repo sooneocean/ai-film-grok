@@ -143,8 +143,35 @@ def _segments(raw: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     return segments, words
 
 
+def _report_output(receipts: Path, report_name: Path | str | None) -> Path:
+    relative = Path(report_name) if report_name is not None else Path(REPORT_NAME)
+    if (
+        relative.is_absolute()
+        or not relative.parts
+        or any(part in {"", ".", ".."} for part in relative.parts)
+        or relative.suffix != ".json"
+    ):
+        raise VibeVoiceASRError("ASR report name must be a safe relative JSON path")
+    output = receipts / relative
+    current = receipts
+    for part in relative.parts[:-1]:
+        current = current / part
+        if current.exists() and current.is_symlink():
+            raise VibeVoiceASRError("ASR report directory must not contain symlinks")
+        current.mkdir(exist_ok=True)
+        if current.is_symlink():
+            raise VibeVoiceASRError("ASR report directory must not contain symlinks")
+    if output.exists() and output.is_symlink():
+        raise VibeVoiceASRError("ASR report output must not be a symlink")
+    return output
+
+
 def create_report(
-    root: Path | str, *, audio: Path | str, subtitles: Path | str | None = None
+    root: Path | str,
+    *,
+    audio: Path | str,
+    subtitles: Path | str | None = None,
+    report_name: Path | str | None = None,
 ) -> dict[str, Any]:
     """Run a declared local adapter and write a candidate-only transcript review."""
     base = Path(root).expanduser().resolve()
@@ -170,6 +197,7 @@ def create_report(
     except SecurityPolicyError as exc:
         raise VibeVoiceASRError(str(exc)) from exc
     receipts.mkdir(exist_ok=True)
+    output = _report_output(receipts, report_name)
     with tempfile.TemporaryDirectory(prefix="vibevoice-asr-", dir=receipts) as temp_dir:
         transcript_path = Path(temp_dir) / "transcript.json"
         try:
@@ -261,7 +289,6 @@ def create_report(
         "human_review_required": True,
         "note": "ASR is an independent QA signal only; recognition disagreement requires human listening.",
     }
-    output = receipts / REPORT_NAME
     write_json(output, report)
     report["path"] = str(output)
     return report

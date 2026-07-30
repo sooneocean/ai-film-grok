@@ -55,6 +55,17 @@ def add_plan_parsers(subparsers: Any) -> None:
         "--target-duration", type=float, default=45.0, help="Target episode duration seconds"
     )
     run.add_argument(
+        "--production-mode",
+        choices=("shortform", "longform"),
+        default="shortform",
+        help="shortform keeps the existing workflow; longform v1 requires 480–900 seconds",
+    )
+    run.add_argument(
+        "--received",
+        action="store_true",
+        help="Use the canonical receipts/story-reception.json written by plan receive",
+    )
+    run.add_argument(
         "--force",
         action="store_true",
         help="Overwrite existing film-spec shots / locked bible seed",

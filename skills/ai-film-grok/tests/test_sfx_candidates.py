@@ -4,9 +4,12 @@ import hashlib
 import io
 import json
 import wave
+from argparse import Namespace
 from pathlib import Path
 from unittest.mock import patch
 
+import aifilm_grok
+import config_loader
 import pytest
 import sfx_candidates
 from sfx_candidates import SFXCandidateError, approve, attach_to_shot, generate, reject
@@ -214,7 +217,9 @@ def test_generate_cannot_follow_symlink_swapped_at_final_publish(
     assert not list((film / "audio" / "candidates" / "sfx" / "pending-original").iterdir())
 
 
-def _pending_candidate(root: Path, asset_id: str = "mmaudio-sfx-1-abc123") -> tuple[Path, Path]:
+def _pending_candidate(
+    root: Path, asset_id: str = "mmaudio-sfx-1-abc123", *, with_asr_screen: bool = True
+) -> tuple[Path, Path]:
     pending = root / "audio" / "candidates" / "sfx" / "pending"
     pending.mkdir(parents=True)
     wav = pending / f"{asset_id}.wav"
@@ -241,7 +246,42 @@ def _pending_candidate(root: Path, asset_id: str = "mmaudio-sfx-1-abc123") -> tu
     sfx_candidates.sign_receipt(record)
     receipt = pending / f"{asset_id}.json"
     receipt.write_text(json.dumps(record), encoding="utf-8")
+    if with_asr_screen:
+        _write_asr_screen(root, receipt, record)
     return wav, receipt
+
+
+def _write_asr_screen(
+    root: Path, receipt: Path, record: dict[str, object], text: str = "[silence]"
+) -> None:
+    output = (
+        root
+        / "receipts"
+        / "sfx-speech-screen"
+        / (f"{record['asset_id']}.vibevoice-asr-review.json")
+    )
+    output.parent.mkdir(parents=True)
+    transcript_sha256 = "d" * 64
+    report = {
+        "kind": "vibevoice-asr-review",
+        "status": "candidate_only",
+        "human_review_required": True,
+        "provider": {"transcript_sha256": transcript_sha256},
+        "inputs": {"audio": {"sha256": record["sha256"]}},
+        "transcript": {"segments": [{"text": text}]},
+    }
+    output.write_text(json.dumps(report), encoding="utf-8")
+    record["asr_speech_screen"] = {
+        "status": "completed_candidate_signal",
+        "receipt": f"local:{output.relative_to(root)}",
+        "audio_sha256": record["sha256"],
+        "report_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        "transcript_sha256": transcript_sha256,
+        "segment_count": 1,
+        "speech_like_segment_count": 0 if text == "[silence]" else 1,
+    }
+    sfx_candidates.sign_receipt(record)
+    receipt.write_text(json.dumps(record), encoding="utf-8")
 
 
 def test_approve_requires_complete_human_listening_attestation(
@@ -260,7 +300,88 @@ def test_approve_requires_complete_human_listening_attestation(
             no_speech_confirmed=False,
             no_music_confirmed=True,
             artifact_free_confirmed=True,
+            asr_speech_reviewed=True,
         )
+
+
+def test_approve_requires_asr_screen_and_acknowledgement(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    _pending_candidate(tmp_path, with_asr_screen=False)
+    kwargs = {
+        "reviewer": "dex",
+        "heard_full": True,
+        "sync_confirmed": True,
+        "no_speech_confirmed": True,
+        "no_music_confirmed": True,
+        "artifact_free_confirmed": True,
+        "asr_speech_reviewed": True,
+    }
+    with pytest.raises(SFXCandidateError, match="ASR speech screen"):
+        approve(tmp_path, "mmaudio-sfx-1-abc123", **kwargs)
+
+    _, receipt = _pending_candidate(
+        tmp_path / "screened", asset_id="mmaudio-sfx-2-abc123", with_asr_screen=True
+    )
+    kwargs["asr_speech_reviewed"] = False
+    with pytest.raises(SFXCandidateError, match="ASR acknowledgement"):
+        approve(tmp_path / "screened", "mmaudio-sfx-2-abc123", **kwargs)
+    assert json.loads(receipt.read_text())["status"] == "pending_human_review"
+
+
+def test_screen_speech_binds_candidate_and_only_flags_possible_leakage(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    wav, receipt = _pending_candidate(tmp_path, with_asr_screen=False)
+
+    def fake_report(root: Path, *, audio: Path, report_name: Path) -> dict[str, object]:
+        output = root / "receipts" / report_name
+        output.parent.mkdir(parents=True)
+        report = {
+            "kind": "vibevoice-asr-review",
+            "status": "candidate_only",
+            "human_review_required": True,
+            "provider": {"transcript_sha256": "e" * 64},
+            "inputs": {"audio": {"sha256": hashlib.sha256(audio.read_bytes()).hexdigest()}},
+            "transcript": {"segments": [{"text": "possible voice leakage"}]},
+        }
+        output.write_text(json.dumps(report), encoding="utf-8")
+        return {**report, "path": str(output)}
+
+    import vibevoice_asr_review
+
+    monkeypatch.setattr(vibevoice_asr_review, "create_report", fake_report)
+    screened = sfx_candidates.screen_speech(tmp_path, "mmaudio-sfx-1-abc123")
+    screen = screened["asr_speech_screen"]
+    assert screen["audio_sha256"] == hashlib.sha256(wav.read_bytes()).hexdigest()
+    assert screen["speech_like_flagged"] is True
+    assert screen["decision"] == "human_listening_required"
+    assert sfx_candidates.receipt_is_signed(json.loads(receipt.read_text()))
+
+
+def test_cli_sfx_screen_loads_config_before_receipt_verification(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Review subcommands need the same local key that signed a generated take."""
+    calls: list[str] = []
+    monkeypatch.setattr(config_loader, "get_config", lambda: calls.append("config"))
+    monkeypatch.setattr(
+        sfx_candidates,
+        "screen_speech",
+        lambda root, asset_id: {"root": str(root), "asset_id": asset_id},
+    )
+    monkeypatch.setattr(aifilm_grok, "emit", lambda _report: None)
+
+    result = aifilm_grok.cmd_sfx_candidate(
+        Namespace(
+            root=str(tmp_path), sfx_candidate_action="screen-speech", asset_id="mmaudio-sfx-1"
+        )
+    )
+
+    assert result == 0
+    assert calls == ["config"]
 
 
 def test_approve_does_not_follow_preexisting_partial_symlink(
@@ -284,6 +405,7 @@ def test_approve_does_not_follow_preexisting_partial_symlink(
         no_speech_confirmed=True,
         no_music_confirmed=True,
         artifact_free_confirmed=True,
+        asr_speech_reviewed=True,
     )
 
     assert outside.read_bytes() == b"do-not-overwrite"
@@ -315,6 +437,7 @@ def test_approve_and_attach_noncommercial_sfx_to_shot(
         no_speech_confirmed=True,
         no_music_confirmed=True,
         artifact_free_confirmed=True,
+        asr_speech_reviewed=True,
     )
     assert approved["status"] == "approved_noncommercial"
     assert approved["production_eligible"] is False
@@ -366,6 +489,7 @@ def test_attach_rejects_commercial_or_unacknowledged_scope(
         no_speech_confirmed=True,
         no_music_confirmed=True,
         artifact_free_confirmed=True,
+        asr_speech_reviewed=True,
     )
 
     with pytest.raises(SFXCandidateError, match="non-commercial"):
@@ -401,4 +525,5 @@ def test_reject_prevents_later_approval(monkeypatch: pytest.MonkeyPatch, tmp_pat
             no_speech_confirmed=True,
             no_music_confirmed=True,
             artifact_free_confirmed=True,
+            asr_speech_reviewed=True,
         )

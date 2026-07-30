@@ -16,6 +16,7 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+import config_loader  # noqa: E402
 import edit_policy  # noqa: E402
 import media_qa  # noqa: E402
 import render_final  # noqa: E402
@@ -494,7 +495,9 @@ class TTSVoiceLockTests(unittest.TestCase):
             import os
 
             with (
-                mock.patch.object(tts_backend, "_load_config_env"),
+                mock.patch.object(config_loader, "_SKILL_ROOT_CANDIDATES", []),
+                mock.patch.object(config_loader, "_CONFIG", None),
+                mock.patch.object(config_loader, "_CONFIG_ENV_FINGERPRINT", None),
                 mock.patch.dict(
                     os.environ,
                     {"AIFILM_TTS_STRICT_VOICE": "1", "FISH_API_KEY": "test-key"},
@@ -523,7 +526,9 @@ class TTSVoiceLockTests(unittest.TestCase):
         import os
 
         with (
-            mock.patch.object(tts_backend, "_load_config_env"),
+            mock.patch.object(config_loader, "_SKILL_ROOT_CANDIDATES", []),
+            mock.patch.object(config_loader, "_CONFIG", None),
+            mock.patch.object(config_loader, "_CONFIG_ENV_FINGERPRINT", None),
             mock.patch.dict(
                 os.environ,
                 {

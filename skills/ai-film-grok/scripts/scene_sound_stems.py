@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 from audio_timeline import (
+    is_approved_internal_ambience,
     is_approved_internal_sfx,
     is_candidate_only_license,
     is_noncommercial_license,
@@ -108,44 +109,35 @@ def _approved_internal_sfx(
     """Bind an NC-only scene cue to its signed, fully heard approval receipt."""
     if not is_approved_internal_sfx(event, delivery_scope):
         return False
-    raw = str(event.get("approval_receipt") or "")
     try:
-        receipt_path = (root / raw.removeprefix("local:")).resolve()
-        receipt_path.relative_to(root)
-        data = json.loads(receipt_path.read_text(encoding="utf-8"))
-        source_rel = str(asset.relative_to(root))
-        from performance_candidates import receipt_is_signed
+        from sfx_candidates import approved_event_receipt_valid
 
-        signed = receipt_is_signed(data)
-    except (OSError, ValueError, json.JSONDecodeError):
+        source_rel = str(asset.relative_to(root))
+    except ValueError:
         return False
-    review = data.get("human_review") if isinstance(data, dict) else {}
     return bool(
-        isinstance(data, dict)
-        and data.get("schema") == "aifilm-sfx-candidate-v1"
-        and data.get("status") == "approved_noncommercial"
-        and data.get("production_eligible") is False
-        and data.get("delivery_eligible_scopes") == ["noncommercial_internal"]
-        and data.get("approved_path") == source_rel
-        and data.get("sha256") == actual
-        and data.get("license") == event.get("license")
-        and data.get("model") == event.get("model")
-        and data.get("checkpoint_fingerprint") == event.get("checkpoint_fingerprint")
-        and data.get("node_job_id") == event.get("node_job_id")
-        and signed
-        and isinstance(review, dict)
-        and review.get("reviewer")
-        and all(
-            review.get(field) is True
-            for field in (
-                "heard_full",
-                "sync_confirmed",
-                "no_speech_confirmed",
-                "no_music_confirmed",
-                "artifact_free_confirmed",
-            )
-        )
+        approved_event_receipt_valid(root, event)
+        and source_rel == str(event.get("source") or "").removeprefix("local:")
+        and actual == event.get("source_sha256")
     )
+
+
+def _approved_internal_ambience(
+    root: Path, event: dict[str, Any], asset: Path, actual: str, delivery_scope: str
+) -> bool:
+    if not is_approved_internal_ambience(event, delivery_scope):
+        return False
+    try:
+        from ambience_candidates import approved_event_receipt_valid
+
+        return (
+            approved_event_receipt_valid(root, event)
+            and str(asset.relative_to(root))
+            == str(event.get("source") or "").removeprefix("local:")
+            and actual == event.get("source_sha256")
+        )
+    except (OSError, ValueError):
+        return False
 
 
 def _apply_event_controls(
@@ -187,7 +179,9 @@ def _local_asset(root: Path, event: dict[str, Any], *, delivery_scope: str) -> P
     pending_candidate = (
         "/audio/candidates/" in f"/{normalized_raw}" and "/pending/" in f"/{normalized_raw}"
     )
-    approved_internal = _approved_internal_sfx(root, event, path, actual, delivery_scope)
+    approved_internal = _approved_internal_sfx(
+        root, event, path, actual, delivery_scope
+    ) or _approved_internal_ambience(root, event, path, actual, delivery_scope)
     if (
         pending_candidate
         or is_noncommercial_license(event.get("license"))

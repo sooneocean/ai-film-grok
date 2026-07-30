@@ -68,6 +68,17 @@ def cmd_status(args: argparse.Namespace) -> int:
         next_actions = []
         pipeline_stage = {"stage": "unknown", "label_zh": "未知", "error": "detect_failed"}
         next_cmd = None
+        _next_id = None
+    from project_state import build_project_state
+
+    project_state = build_project_state(
+        root,
+        gates=gates,
+        open_reshoot_count=open_n,
+        next_actions=next_actions,
+        next_cmd=next_cmd,
+        next_id=_next_id,
+    )
     try:
         from promotion_report import build_promotion_report
 
@@ -86,6 +97,8 @@ def cmd_status(args: argparse.Namespace) -> int:
             "title": manifest.get("title"),
             "provider_default": manifest.get("provider_default"),
             "pipeline_stage": pipeline_stage,
+            "project_state": project_state,
+            "canonical_stage": project_state.get("canonical_stage"),
             "stage": pipeline_stage.get("stage") if isinstance(pipeline_stage, dict) else None,
             "stage_label": pipeline_stage.get("label_zh")
             if isinstance(pipeline_stage, dict)

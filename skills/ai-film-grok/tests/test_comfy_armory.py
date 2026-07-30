@@ -17,6 +17,7 @@ from comfy_armory import (  # noqa: E402
     assert_registered_weapon_workflow,
     compile_weapon_workflow,
     default_base_url,
+    identify_registered_weapon_workflow,
     load_armory,
     probe_armory,
     select_weapon,
@@ -52,13 +53,16 @@ def test_audio_research_weapons_bind_versioned_evidence() -> None:
         assert evidence["production_eligible"] is False
 
 
-def test_talking_avatar_template_hashes_are_registry_bound() -> None:
+def test_pilot_template_hashes_are_registry_bound() -> None:
     armory = load_armory()
     by_id = {weapon["id"]: weapon for weapon in armory["weapons"]}
     root = Path(__file__).resolve().parents[1]
     for weapon_id in (
         "infinite-talk-stable-pilot",
         "fantasy-talking-6step-pilot",
+        "hunyuan15-720p-i2v-sr-pilot",
+        "ace-step15-xl-rnb-pilot",
+        "ltx23-native-i2v-pilot",
     ):
         weapon = by_id[weapon_id]
         graph = json.loads((root / weapon["workflow_template"]).read_text(encoding="utf-8"))
@@ -229,6 +233,126 @@ def test_modified_experimental_workflow_cannot_escape_through_generic_bypass(
     submit.assert_not_called()
     report = json.loads(capsys.readouterr().out)
     assert "--weapon-id required" in report["error"]
+
+
+@pytest.mark.parametrize(
+    "class_type",
+    (
+        "HunyuanVideo15ImageToVideo",
+        "LTXAVTextEncoderLoader",
+        "ModelSamplingLTXV",
+        "TextEncodeAceStepAudio1.5",
+    ),
+)
+def test_registered_experimental_model_family_requires_explicit_weapon_id(
+    class_type: str,
+) -> None:
+    graph = {"attacker": {"class_type": class_type, "inputs": {}}}
+
+    with pytest.raises(ComfyArmoryError, match="--weapon-id required"):
+        identify_registered_weapon_workflow(graph)
+
+
+def test_generic_hunyuan_workflow_is_blocked_before_submission(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    workflow = tmp_path / "hunyuan.json"
+    workflow.write_text(
+        json.dumps(
+            {
+                "pilot": {
+                    "class_type": "HunyuanVideo15ImageToVideo",
+                    "inputs": {},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    args = Namespace(
+        base_url="http://127.0.0.1:18188",
+        comfy_action="run-workflow",
+        workflow=workflow,
+        overrides=None,
+        timeout=1,
+        allow_external_api_nodes=False,
+        weapon_id=None,
+        production_stage="production",
+        allow_experimental=False,
+        receipt=None,
+    )
+
+    with patch("cli_comfy.submit") as submit:
+        assert run_comfy(args) == 2
+    submit.assert_not_called()
+    report = json.loads(capsys.readouterr().out)
+    assert "--weapon-id required" in report["error"]
+
+
+def test_unregistered_core_only_workflow_remains_generic() -> None:
+    graph = {
+        "sampler": {
+            "class_type": "KSampler",
+            "inputs": {},
+        }
+    }
+
+    assert identify_registered_weapon_workflow(graph) is None
+
+
+def test_compile_hunyuan15_sr_pilot_binds_only_reviewable_slots() -> None:
+    graph = compile_weapon_workflow(
+        "hunyuan15-720p-i2v-sr-pilot",
+        prompt="The armored knight slowly turns toward the camera.",
+        seed=2026073002,
+        input_image_name="approved/knight.png",
+        filename_prefix="aifilm/evaluation/hunyuan15-sr",
+    )
+
+    assert graph["source"]["inputs"]["image"] == "approved/knight.png"
+    assert graph["positive"]["inputs"]["text"].startswith("The armored knight")
+    assert graph["noise"]["inputs"]["noise_seed"] == 2026073002
+    assert graph["scheduler"]["inputs"]["steps"] == 20
+    assert graph["sr_scheduler"]["inputs"]["steps"] == 8
+    assert graph["sr_unet"]["inputs"]["unet_name"].endswith(
+        "1080p_sr_distilled_fp8_scaled.safetensors"
+    )
+    assert graph["sr_upscale"]["inputs"]["width"] == 1920
+    assert graph["sr_upscale"]["inputs"]["height"] == 1080
+    assert graph["save"]["inputs"]["filename_prefix"] == "aifilm/evaluation/hunyuan15-sr"
+
+
+def test_compile_ace_step15_rnb_pilot_binds_prompt_seed_and_duration() -> None:
+    graph = compile_weapon_workflow(
+        "ace-step15-xl-rnb-pilot",
+        prompt="Instrumental sensual R&B, warm Rhodes, restrained bass, no vocals.",
+        seed=2026073003,
+        filename_prefix="aifilm/evaluation/ace15-rnb",
+    )
+
+    assert graph["conditioning"]["inputs"]["tags"].startswith("Instrumental sensual R&B")
+    assert graph["conditioning"]["inputs"]["lyrics"] == "[Instrumental]"
+    assert graph["conditioning"]["inputs"]["duration"] == 15.0
+    assert graph["latent"]["inputs"]["seconds"] == 15.0
+    assert graph["sampler"]["inputs"]["seed"] == 2026073003
+    assert graph["sampler"]["inputs"]["steps"] == 8
+    assert graph["save"]["inputs"]["filename_prefix"] == "aifilm/evaluation/ace15-rnb"
+
+
+def test_compile_ltx23_native_pilot_binds_image_prompt_and_seed() -> None:
+    graph = compile_weapon_workflow(
+        "ltx23-native-i2v-pilot",
+        prompt="The knight turns slowly; ambient room tone, no speech.",
+        seed=2026073004,
+        input_image_name="approved/knight.png",
+        filename_prefix="aifilm/evaluation/ltx23-native",
+    )
+
+    assert graph["source"]["inputs"]["image"] == "approved/knight.png"
+    assert graph["303"]["inputs"]["text"].startswith("The knight turns slowly")
+    assert graph["277"]["inputs"]["noise_seed"] == 2026073004
+    assert graph["310"]["inputs"]["fps"] == 25
+    assert graph["save"]["inputs"]["filename_prefix"] == "aifilm/evaluation/ltx23-native"
 
 
 def test_compile_infinite_talk_binds_image_audio_prompt_seed_and_stable_scale() -> None:
@@ -429,6 +553,7 @@ def test_live_probe_marks_only_fully_installed_weapons_ready(
     request: MagicMock,
 ) -> None:
     model_lists = {
+        "/models/checkpoints": [],
         "/models/diffusion_models": [
             "qwen_image_2512_fp8_e4m3fn.safetensors",
             "qwen_image_edit_2511_fp8mixed.safetensors",
@@ -437,6 +562,7 @@ def test_live_probe_marks_only_fully_installed_weapons_ready(
         "/models/vae": ["qwen_image_vae.safetensors"],
         "/models/loras": ["Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"],
         "/models/clip_vision": [],
+        "/models/latent_upscale_models": [],
     }
     request.side_effect = lambda _url, route: model_lists[route]
     report = probe_armory("https://192.168.88.52:8188")
@@ -451,6 +577,9 @@ def test_live_probe_marks_only_fully_installed_weapons_ready(
         "wan22-adult-meat-pilot",
         "infinite-talk-stable-pilot",
         "fantasy-talking-6step-pilot",
+        "hunyuan15-720p-i2v-sr-pilot",
+        "ace-step15-xl-rnb-pilot",
+        "ltx23-native-i2v-pilot",
     }
 
 
@@ -469,7 +598,15 @@ def test_live_probe_blocks_only_weapon_with_unreadable_required_hash(
                 for name in weapon.get("requirements", {}).get(group, [])
             }
         )
-        for group in ("diffusion_models", "text_encoders", "vae", "loras", "clip_vision")
+        for group in (
+            "checkpoints",
+            "diffusion_models",
+            "text_encoders",
+            "vae",
+            "loras",
+            "clip_vision",
+            "latent_upscale_models",
+        )
     }
     request.side_effect = lambda _url, route: installed[route.removeprefix("/models/")]
     model_sha256.side_effect = ComfyArmoryError("metadata unavailable")
@@ -483,8 +620,13 @@ def test_live_probe_blocks_only_weapon_with_unreadable_required_hash(
         "wan22-adult-meat-pilot",
         "infinite-talk-stable-pilot",
         "fantasy-talking-6step-pilot",
+        "hunyuan15-720p-i2v-sr-pilot",
+        "ace-step15-xl-rnb-pilot",
+        "ltx23-native-i2v-pilot",
     }
     assert blocked["wan22-adult-meat-pilot"]["sha256_errors"]["loras"]
+    assert blocked["ace-step15-xl-rnb-pilot"]["sha256_errors"]["diffusion_models"]
+    assert blocked["ltx23-native-i2v-pilot"]["sha256_errors"]["checkpoints"]
 
 
 @patch("comfy_armory._model_sha256", return_value="0" * 64)
@@ -494,6 +636,7 @@ def test_live_probe_blocks_same_name_adult_lora_with_wrong_hash(
     _sha256: MagicMock,
 ) -> None:
     request.side_effect = lambda _url, route: {
+        "/models/checkpoints": [],
         "/models/diffusion_models": [
             "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
             "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
@@ -502,6 +645,7 @@ def test_live_probe_blocks_same_name_adult_lora_with_wrong_hash(
         "/models/vae": ["wan_2.1_vae.safetensors"],
         "/models/loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"],
         "/models/clip_vision": [],
+        "/models/latent_upscale_models": [],
     }[route]
     report = probe_armory("https://192.168.88.52:8188")
     blocked = {item["id"]: item for item in report["blocked"]}
@@ -512,6 +656,7 @@ def test_live_probe_blocks_same_name_adult_lora_with_wrong_hash(
 @patch("comfy_armory._json_request")
 def test_live_probe_accepts_exact_adult_lora_hashes(request: MagicMock) -> None:
     request.side_effect = lambda _url, route: {
+        "/models/checkpoints": [],
         "/models/diffusion_models": [
             "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
             "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
@@ -520,6 +665,7 @@ def test_live_probe_accepts_exact_adult_lora_hashes(request: MagicMock) -> None:
         "/models/vae": ["wan_2.1_vae.safetensors"],
         "/models/loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"],
         "/models/clip_vision": [],
+        "/models/latent_upscale_models": [],
     }[route]
     hashes = {
         "NSFW-22-H-e8.safetensors": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",

@@ -6,7 +6,7 @@ E病毒 ch4 批跑 / 解剖修毒 / Comfy 5090 / **收尾门禁** 时先扫本�
 |------|------|------|
 | **Agent 出货纪律 IRON（P0 · 后面不要再犯）** | [agent-ship-discipline-iron](2026-07-29-agent-ship-discipline-iron.md) · [lesson](../references/lessons-2026-07-29-agent-ship-skill-budget-push.md) | SKILL≤6k+锚点；runtime-lock；干净树再 push；heat A/S 分层；dialogue_drama；wardrobe ladder |
 | **画面抗重复·体位/特写/运镜 IRON（P0 · 后面不要再犯）** | [shot-variety-anti-boring](2026-07-29-shot-variety-anti-boring.md) · [lesson](../references/lessons-2026-07-29-shot-variety-anti-boring.md) | ≥4体位+≥2脸CU+≥2L4；运镜轮换；门绿≠好看；主戏≥4.5s |
-| **成片收尾门禁 IRON（P0 · 后面不要再犯）** | [closeout-gates-iron](2026-07-29-closeout-gates-iron.md) · [lesson](../references/lessons-2026-07-29-closeout-gates-chaebol.md) | plate≠完；heat codes；sensory；truth_contract；字幕钟；quality 缓存；narrative 重绑；export 链 |
+| **成片收尾门禁 IRON（P0 · 后面不要再犯）** | [closeout-gates-iron](2026-07-29-closeout-gates-iron.md) · [lesson](../references/lessons-2026-07-29-closeout-gates-chaebol.md) | plate≠完；**手拼须齐 film_timeline=片上钟**；heat/SIZE；硬烧抽帧；narrative 只刷 hash；**review→post-audit→export** |
 | **bulk→final 出片 IRON（P0 · 后面不要再犯）** | [evirus-ch04-bulk-final-iron](2026-07-29-evirus-ch04-bulk-final-iron.md) · [lesson](../references/lessons-2026-07-29-evirus-ch04-bulk-final-iron.md) | bare 拦→续接高动；evidence 双轮；final 超时/sidechain/字幕坑 |
 | **毒镜解剖 IRON（P0 · 后面不要再犯）** | [poison-shot-anatomy-iron](2026-07-29-poison-shot-anatomy-iron.md) · [lesson](../references/lessons-2026-07-29-anatomy-milk-futa-comfy-batch.md) | 禁 futa/喷奶/霓虹器；毒 still 禁 I2V；毒 clip 禁 final |
 | **Comfy 隧道 8188 非 8189 + 队列空档 + bare 霓虹（P0 · 后面不要再犯）** | [comfy-tunnel-queue-neon](2026-07-29-comfy-tunnel-queue-neon-canary.md) · [lesson](../references/lessons-2026-07-29-comfy-tunnel-8188-not-8189.md) | 18188→**8188** only；→8189=401；idle 立刻 submit；neon 结合符禁 register |
@@ -22,7 +22,7 @@ E病毒 ch4 批跑 / 解剖修毒 / Comfy 5090 / **收尾门禁** 时先扫本�
 ## 片例
 - `AI FILM SPACE/0728/e-virus-ch04-shelter`：5090 SSH 隧道 18188→**8188**；ACE rnb BGM；anatomy_fix + batch_bare_still_i2v；canary wave3 stills under `stills/canary_5090/wave3/`
 - `AI FILM SPACE/0729/receipts/canary-maxgo/wave3`：隧道 401 根因 8189；Qwen bare still 技术 OK / neon 结合符 PARTIAL
-- `AI FILM SPACE/0729/e-virus-ch04-shelter`：14 镜 bulk；Imagine bare I2V moderated → undress 续接；motion retake；简化混音 + PIL 字幕；`out/film_final.mp4` PARTIAL
+- `AI FILM SPACE/0729/e-virus-ch04-shelter`：14 镜；体位/运镜返工 → **DELIVERED_GO**（84s 硬烧中文 · Desktop）；尺度仍 PARTIAL 软词亲密；closeout 条 13–16（双钟/SIZE/export 链）
 - `AI FILM SPACE/0729/chaebol-cast-rule-max`：10 镜 adult-max；双轨 still；motion retake；简化 final + 破冻；**官方 closeout 全绿** + Desktop 包；delivery **PARTIAL**（非真 bare）
 - `AI FILM SPACE/0729/night-lock-encore-max`：Qwen bare stills + Wan meat 04–08/10；**shot09 FALLBACK08**；多片抢 5090 + 本机 16GB 双 client OOM；delivery **bare-comfy-v2 PARTIAL**
 - `AI FILM SPACE/0729/e-virus-ch05-sensory-rebuild`：pilot still/kf/approve OK；**I2V clips=0 PARTIAL**（btc/night-lock 互抢+STOP+误 interrupt；见 pilot I2V 独占 IRON）

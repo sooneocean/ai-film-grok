@@ -47,6 +47,16 @@ def test_status_marks_live_queue_as_busy() -> None:
     assert report["comfy"]["queue"] == {"running": 1, "pending": 0}
 
 
+def test_run_node_loads_local_config_before_reading_audio_status() -> None:
+    args = Namespace(node_action="status", base_url="http://127.0.0.1:18188", receipt=None)
+    with (
+        patch("config_loader.get_config") as get_config,
+        patch("cli_node.node_status", return_value={"status": "reachable"}),
+    ):
+        assert run_node(args, emit=lambda _payload: None) == 0
+    get_config.assert_called_once_with()
+
+
 def test_recover_requires_confirmation_before_any_remote_operation(capsys) -> None:
     args = Namespace(
         node_action="recover", base_url="http://127.0.0.1:18188", confirm=False, receipt=None

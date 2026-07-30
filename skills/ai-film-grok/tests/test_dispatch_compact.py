@@ -297,6 +297,11 @@ def test_skill_entry_and_compact_context_stay_inside_token_budgets() -> None:
 
 def test_dispatch_cli_defaults_compact_and_supports_full_rollback(tmp_path: Path) -> None:
     _film(tmp_path)
+    before = {
+        path.relative_to(tmp_path): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
     script = SCRIPTS / "aifilm_grok.py"
     base = [
         sys.executable,
@@ -325,3 +330,9 @@ def test_dispatch_cli_defaults_compact_and_supports_full_rollback(tmp_path: Path
     env_run = subprocess.run(base, check=False, capture_output=True, text=True, env=env)
     assert env_run.returncode == 0, env_run.stderr
     assert json.loads(env_run.stdout)["schema_version"] == 2
+    after = {
+        path.relative_to(tmp_path): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+    assert after == before

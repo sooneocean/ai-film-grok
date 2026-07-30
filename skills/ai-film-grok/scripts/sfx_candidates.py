@@ -27,6 +27,7 @@ class SFXCandidateError(RuntimeError):
 _SAFE_ID = re.compile(r"^mmaudio-sfx-[a-z0-9_-]{1,64}$")
 _APPROVED_STATUS = "approved_noncommercial"
 _INTERNAL_SCOPE = "noncommercial_internal"
+_ASR_SCREEN_STATUS = "completed_candidate_signal"
 
 
 def _sha256(path: Path) -> str:
@@ -108,6 +109,109 @@ def _approved_receipt(root: Path, asset_id: str) -> tuple[Path, dict[str, Any]]:
     return receipt, record
 
 
+def _speech_like_segments(report: dict[str, Any]) -> int:
+    transcript = report.get("transcript")
+    entries = transcript.get("segments") if isinstance(transcript, dict) else None
+    if not isinstance(entries, list):
+        raise SFXCandidateError("ASR speech screen transcript is invalid")
+    silence = {"[silence]", "silence", "[静音]", "静音"}
+    return sum(
+        1
+        for entry in entries
+        if isinstance(entry, dict)
+        and str(entry.get("text") or "").strip().casefold() not in silence
+        and str(entry.get("text") or "").strip()
+    )
+
+
+def _speech_screen_valid(root: Path, record: dict[str, Any]) -> bool:
+    screen = record.get("asr_speech_screen")
+    if not isinstance(screen, dict) or screen.get("status") != _ASR_SCREEN_STATUS:
+        return False
+    receipt_raw = str(screen.get("receipt") or "")
+    if not receipt_raw.startswith("local:"):
+        return False
+    receipt = root / receipt_raw.removeprefix("local:")
+    if not _confined_without_symlinks(root, receipt) or not receipt.is_file():
+        return False
+    report = read_json(receipt)
+    provider = report.get("provider") if isinstance(report, dict) else None
+    audio = report.get("inputs", {}).get("audio") if isinstance(report, dict) else None
+    if not isinstance(provider, dict) or not isinstance(audio, dict):
+        return False
+    try:
+        speech_like_segments = _speech_like_segments(report)
+    except SFXCandidateError:
+        return False
+    return bool(
+        report.get("kind") == "vibevoice-asr-review"
+        and report.get("status") == "candidate_only"
+        and report.get("human_review_required") is True
+        and audio.get("sha256") == record.get("sha256") == screen.get("audio_sha256")
+        and provider.get("transcript_sha256") == screen.get("transcript_sha256")
+        and _sha256(receipt) == screen.get("report_sha256")
+        and len(report.get("transcript", {}).get("segments") or []) == screen.get("segment_count")
+        and speech_like_segments == screen.get("speech_like_segment_count")
+    )
+
+
+def screen_speech(root: Path, asset_id: str) -> dict[str, Any]:
+    """Bind an ASR leakage signal to a pending MMAudio candidate, never decide approval."""
+    from vibevoice_asr_review import VibeVoiceASRError, create_report
+
+    root = root.expanduser().resolve()
+    receipt, record = _find_pending(root, asset_id)
+    source = root / str(record.get("path") or "")
+    if (
+        record.get("status") != "pending_human_review"
+        or not receipt_is_signed(record)
+        or not _confined_without_symlinks(root, source)
+        or not source.is_file()
+        or _sha256(source) != record.get("sha256")
+    ):
+        raise SFXCandidateError("SFX candidate is not a valid pending take for ASR screening")
+    report_name = Path("sfx-speech-screen") / f"{asset_id}.vibevoice-asr-review.json"
+    try:
+        report = create_report(root, audio=source, report_name=report_name)
+    except VibeVoiceASRError as exc:
+        raise SFXCandidateError(f"VibeVoice-ASR speech screen failed: {exc}") from exc
+    output = Path(str(report.get("path") or ""))
+    try:
+        relative = output.resolve().relative_to(root)
+    except (OSError, ValueError) as exc:
+        raise SFXCandidateError("ASR speech screen receipt escaped film root") from exc
+    if not _confined_without_symlinks(root, output) or not output.is_file():
+        raise SFXCandidateError("ASR speech screen receipt is invalid")
+    provider = report.get("provider")
+    audio = (
+        report.get("inputs", {}).get("audio") if isinstance(report.get("inputs"), dict) else None
+    )
+    if (
+        not isinstance(provider, dict)
+        or not isinstance(audio, dict)
+        or report.get("kind") != "vibevoice-asr-review"
+        or report.get("status") != "candidate_only"
+        or audio.get("sha256") != record.get("sha256")
+    ):
+        raise SFXCandidateError("ASR speech screen is not bound to the MMAudio candidate")
+    speech_like_segments = _speech_like_segments(report)
+    record["asr_speech_screen"] = {
+        "status": _ASR_SCREEN_STATUS,
+        "receipt": f"local:{relative}",
+        "audio_sha256": record["sha256"],
+        "report_sha256": _sha256(output),
+        "transcript_sha256": provider.get("transcript_sha256"),
+        "segment_count": len(report.get("transcript", {}).get("segments") or []),
+        "speech_like_segment_count": speech_like_segments,
+        "speech_like_flagged": speech_like_segments > 0,
+        "screened_at": datetime.now(UTC).isoformat(),
+        "decision": "human_listening_required",
+    }
+    sign_receipt(record)
+    write_json(receipt, record)
+    return {**record, "receipt": str(receipt)}
+
+
 def approved_event_receipt_valid(root: Path, event: dict[str, Any]) -> bool:
     """Verify that a timeline cue is bound to signed, fully reviewed local bytes."""
     root = root.expanduser().resolve()
@@ -146,6 +250,7 @@ def approved_event_receipt_valid(root: Path, event: dict[str, Any]) -> bool:
         and record.get("checkpoint_fingerprint") == event.get("checkpoint_fingerprint")
         and record.get("node_job_id") == event.get("node_job_id")
         and receipt_is_signed(record)
+        and _speech_screen_valid(root, record)
         and isinstance(review, dict)
         and review.get("reviewer")
         and all(
@@ -156,6 +261,7 @@ def approved_event_receipt_valid(root: Path, event: dict[str, Any]) -> bool:
                 "no_speech_confirmed",
                 "no_music_confirmed",
                 "artifact_free_confirmed",
+                "asr_speech_reviewed",
             )
         )
     )
@@ -171,6 +277,7 @@ def approve(
     no_speech_confirmed: bool,
     no_music_confirmed: bool,
     artifact_free_confirmed: bool,
+    asr_speech_reviewed: bool,
 ) -> dict[str, Any]:
     """Approve a fully heard MMAudio take for internal non-commercial films only."""
     root = root.expanduser().resolve()
@@ -181,9 +288,12 @@ def approve(
         no_speech_confirmed,
         no_music_confirmed,
         artifact_free_confirmed,
+        asr_speech_reviewed,
     )
     if not reviewer.strip() or not all(value is True for value in checks):
-        raise SFXCandidateError("reviewer and all listening checks are required")
+        raise SFXCandidateError(
+            "reviewer, ASR acknowledgement, and all listening checks are required"
+        )
     if (
         record.get("schema") != "aifilm-sfx-candidate-v1"
         or record.get("status") != "pending_human_review"
@@ -194,6 +304,8 @@ def approve(
         or not receipt_is_signed(record)
     ):
         raise SFXCandidateError("SFX candidate is not a valid pending non-commercial take")
+    if not _speech_screen_valid(root, record):
+        raise SFXCandidateError("valid ASR speech screen is required before approval")
     expected = Path("audio") / "candidates" / "sfx" / "pending" / f"{asset_id}.wav"
     if str(record.get("path") or "") != str(expected):
         raise SFXCandidateError("SFX candidate path does not match its receipt")
@@ -247,6 +359,7 @@ def approve(
                 "no_speech_confirmed": True,
                 "no_music_confirmed": True,
                 "artifact_free_confirmed": True,
+                "asr_speech_reviewed": True,
             },
         }
     )

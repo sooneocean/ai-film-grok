@@ -4454,6 +4454,18 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     if not technical_qa.get("ok"):
         raise RenderError(f"Final MP4 failed technical QA: {technical_qa.get('errors')}")
     report["technical_qa"] = technical_qa
+    if str(spec.get("production_mode") or "shortform") == "longform":
+        from longform import LongformError, materialize_unit_masters
+
+        try:
+            report["longform_unit_masters"] = materialize_unit_masters(
+                root,
+                final_path=final_path,
+                film_timeline=film_tl,
+                shots=shot_audio,
+            )
+        except LongformError as exc:
+            raise RenderError(f"longform unit masters: {exc}") from exc
     write_json(report_path, report)
 
     # Update manifest gates

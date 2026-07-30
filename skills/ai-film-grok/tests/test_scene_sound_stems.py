@@ -106,6 +106,17 @@ def test_scene_stem_accepts_signed_human_approved_internal_sfx(
         output.setframerate(8000)
         output.writeframes(b"\0\0" * 800)
     digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+    screen_path = tmp_path / "receipts" / "sfx-speech-screen" / "mmaudio-sfx-1-test.json"
+    screen_path.parent.mkdir(parents=True)
+    screen = {
+        "kind": "vibevoice-asr-review",
+        "status": "candidate_only",
+        "human_review_required": True,
+        "provider": {"transcript_sha256": "d" * 64},
+        "inputs": {"audio": {"sha256": digest}},
+        "transcript": {"segments": [{"text": "[silence]"}]},
+    }
+    screen_path.write_text(json.dumps(screen), encoding="utf-8")
     record = {
         "schema": "aifilm-sfx-candidate-v1",
         "asset_id": "mmaudio-sfx-1-test",
@@ -119,6 +130,15 @@ def test_scene_stem_accepts_signed_human_approved_internal_sfx(
         "model": "hkchengrex/MMAudio-large-44k-v2",
         "checkpoint_fingerprint": "a" * 64,
         "node_job_id": "job-1",
+        "asr_speech_screen": {
+            "status": "completed_candidate_signal",
+            "receipt": f"local:{screen_path.relative_to(tmp_path)}",
+            "audio_sha256": digest,
+            "report_sha256": hashlib.sha256(screen_path.read_bytes()).hexdigest(),
+            "transcript_sha256": "d" * 64,
+            "segment_count": 1,
+            "speech_like_segment_count": 0,
+        },
         "human_review": {
             "reviewer": "dex",
             "heard_full": True,
@@ -126,6 +146,7 @@ def test_scene_stem_accepts_signed_human_approved_internal_sfx(
             "no_speech_confirmed": True,
             "no_music_confirmed": True,
             "artifact_free_confirmed": True,
+            "asr_speech_reviewed": True,
         },
     }
     sign_receipt(record)
@@ -159,6 +180,42 @@ def test_scene_stem_accepts_signed_human_approved_internal_sfx(
         sample_rate=8000,
     )
     assert result["event_count"] == 1
+
+    bypass = dict(record)
+    bypass.pop("asr_speech_screen")
+    bypass["human_review"] = dict(record["human_review"])
+    bypass["human_review"].pop("asr_speech_reviewed")
+    sign_receipt(bypass)
+    receipt.write_text(json.dumps(bypass), encoding="utf-8")
+    with pytest.raises(SceneSoundError, match="non-commercial or pending"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "delivery_scope": "noncommercial_internal",
+                "events": [
+                    {
+                        "id": "missing-asr-screen",
+                        "type": "action_sfx",
+                        "source": f"local:{asset.relative_to(tmp_path)}",
+                        "license": bypass["license"],
+                        "source_sha256": digest,
+                        "approval_status": "approved_noncommercial",
+                        "approval_receipt": f"local:{receipt.relative_to(tmp_path)}",
+                        "production_eligible": False,
+                        "usage_scope": "noncommercial_internal",
+                        "model": bypass["model"],
+                        "checkpoint_fingerprint": bypass["checkpoint_fingerprint"],
+                        "node_job_id": bypass["node_job_id"],
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ],
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "scene-missing-asr.wav",
+            sample_rate=8000,
+        )
+    receipt.write_text(json.dumps(record), encoding="utf-8")
 
     with pytest.raises(SceneSoundError, match="cannot enter a formal stem"):
         render_scene_sound_stem(

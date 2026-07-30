@@ -51,7 +51,19 @@ def run_from_intake(args: Namespace, root: Path) -> tuple[dict[str, Any], int]:
 
 
 def run(args: Namespace, root: Path) -> tuple[dict[str, Any], int]:
+    production_mode = str(getattr(args, "production_mode", "shortform") or "shortform")
+    target_duration = float(getattr(args, "target_duration", 45) or 45)
+    if production_mode == "longform" and not 480 <= target_duration <= 900:
+        raise PlanRunError("longform target duration must be within 480..900 seconds")
     received_file = getattr(args, "received_file", None)
+    if bool(getattr(args, "received", False)):
+        if received_file:
+            raise PlanRunError("--received and --received-file are mutually exclusive")
+        received_file = root / "receipts" / "story-reception.json"
+        if not Path(received_file).is_file():
+            raise PlanRunError(
+                "canonical story reception is missing; run plan receive or pass --received-file"
+            )
     if received_file:
         try:
             reception = load_story_reception(Path(str(received_file)))
@@ -109,5 +121,6 @@ def _run_raw(
         source_evidence_refs=source_evidence_refs,
         reception=reception,
         story_mode=str(getattr(args, "story_mode", "narrative") or "narrative"),
+        production_mode=str(getattr(args, "production_mode", "shortform") or "shortform"),
     )
     return report, 0 if report.get("ok") else 1

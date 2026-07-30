@@ -1,13 +1,13 @@
 # Lesson · 成片收尾门禁 IRON（P0 · 2026-07-29 · 后面不要再犯）
 
-> 片例：`AI FILM SPACE/0729/chaebol-cast-rule-max`（财阀潜规则·顶层招待）  
-> 用户句：「推进到最后」「把这些经验写回去 以后不要再犯」  
-> 挂：`hard-defaults` · `SKILL.md` §18 · `memory/2026-07-29-closeout-gates-iron.md` · `stages/deliver.md`  
+> 片例：`AI FILM SPACE/0729/chaebol-cast-rule-max`（财阀潜规则·顶层招待）
+> 用户句：「推进到最后」「把这些经验写回去 以后不要再犯」
+> 挂：`hard-defaults` · `SKILL.md` §18 · `memory/2026-07-29-closeout-gates-iron.md` · `stages/deliver.md`
 > 关联：[evirus bulk→final](lessons-2026-07-29-evirus-ch04-bulk-final-iron.md) · [high-motion](lessons-2026-07-27-high-motion-style-lock-final.md) · [sex-arc](lessons-2026-07-27-adult-scale-max-sex-arc.md)
 
 ## 一句话
 
-**plate 有了 ≠ 收尾完了。**  
+**plate 有了 ≠ 收尾完了。**
 `film_final.mp4` 在 `out/` 只是起点；必须过 **heat final → adult-max sensory → motion gate → truth_contract → 字幕切镜 → 叙事证据 → quality（无冻帧缓存）→ review-final → post-audit → export-desktop**。任一门假绿 = 禁止宣称 DONE。
 
 ---
@@ -119,7 +119,7 @@ manifest["truth_contract"]["contract_sha256"] = sha256_file(root / "film-spec.js
 | 破冻后仍 fail 且 score 不变 | `load_quality_report` **按 video path 复用**旧 `out/quality-report.json` |
 | 修法 | **重编码/改 final 后必须 `rm out/quality-report.json`**（及相关 detect txt）再 `review-final` |
 
-破冻可对冻结窗加极轻时域噪：  
+破冻可对冻结窗加极轻时域噪：
 `noise=alls=4:allf=t+u:enable='between(t,T0,T1)'` → 再 register-final。
 
 改 final 后还要：**重绑** `narrative-evidence` 三点（`NARRATIVE_MEDIA_HASH_STALE`）。
@@ -152,16 +152,16 @@ manifest["truth_contract"]["contract_sha256"] = sha256_file(root / "film-spec.js
 
 当 `aifilm final` 侧链超时/假死时允许：
 
-1. concat 真 I2V  
-2. edge VO + 批准 rnb `--music`（有 license）  
-3. 简单 amix  
-4. PIL/无空格路径烧中文字幕  
-5. 走完 §0 收尾链  
+1. concat 真 I2V
+2. edge VO + 批准 rnb `--music`（有 license）
+3. 简单 amix
+4. PIL/无空格路径烧中文字幕
+5. 走完 §0 收尾链
 
 **必须**在 `receipts/delivery.json` 写：
 
-- `status: PARTIAL`（若 Imagine 无真 bare / 非官方 full sidechain）  
-- `honest_limits[]`：双轨暗示、简化混音、SRT 与烧字时钟差、foley 仅台账等  
+- `status: PARTIAL`（若 Imagine 无真 bare / 非官方 full sidechain）
+- `honest_limits[]`：双轨暗示、简化混音、SRT 与烧字时钟差、foley 仅台账等
 - **禁止**用内衣/军裤 still 或软提示冒充「插入完成」
 
 ---
@@ -180,15 +180,47 @@ manifest["truth_contract"]["contract_sha256"] = sha256_file(root / "film-spec.js
 
 ## 禁止（checklist）
 
-1. 有 `film_final.mp4` 就报 DONE  
-2. `approver` 手写 pilot、或 agent 自拟「做完」  
-3. impact S 却无视 `SEX_BOTH_UNDRESS_UNSTATED`  
-4. 无 mix `artifacts` / 无 AV alignment / 无 sex_sfx 事件就 review  
-5. 改 film-spec 不刷 `contract_sha256`  
-6. `timeline` 规划钟 vs 真 concat 混用导致字幕跨切  
-7. 改片不删 `quality-report.json`  
-8. 改 final 不重绑 narrative-evidence  
-9. post_owner 与 register post-engine 打架  
-10. `--rows` 塞超长内联 JSON  
-11. bare 被拦却用着装镜装插入  
-12. export 前跳过 post-audit freshness / delivery_ready  
+1. 有 `film_final.mp4` 就报 DONE
+2. `approver` 手写 pilot、或 agent 自拟「做完」
+3. impact S 却无视 `SEX_BOTH_UNDRESS_UNSTATED`
+4. 无 mix `artifacts` / 无 AV alignment / 无 sex_sfx 事件就 review
+5. 改 film-spec 不刷 `contract_sha256`
+6. `timeline` 规划钟 vs 真 concat 混用导致字幕跨切
+7. 改片不删 `quality-report.json`
+8. 改 final 不重绑 narrative-evidence
+9. post_owner 与 register post-engine 打架
+10. `--rows` 塞超长内联 JSON
+11. bare 被拦却用着装镜装插入
+12. export 前跳过 post-audit freshness / delivery_ready
+13. 手拼 6s plate 却留着旧 `film_timeline.shot_starts`（VO 钟）→ 字幕跨切挡 GO
+14. review-final 后直接 export-desktop，跳过 post-audit
+
+---
+
+## 9. 片例回读（e-virus ch04 shelter · GO 2026-07-29 晚）
+
+> 用户：肉戏单调 → 体位/特写/运镜返工 → **GO** → **把教训回写就可以收工**
+
+| 项 | 结果 |
+|---|---|
+| 成片 | 84s · 6s×14 · 720×1280 · motion≈17.6 |
+| 观感 | 9 体位 + 9 运镜可读差（见 [shot-variety](lessons-2026-07-29-shot-variety-anti-boring.md)） |
+| 字幕 | `burn_srt_pil` 硬烧 14 中文 cue；抽帧 `sub_t3` 可见 |
+| heat | 过；SIZE 用纸面阶梯消 REOPEN/FLAT（像素差另验收） |
+| timeline | 重写 `shot_starts=0,6,12…` 对齐 plate，否则 `SUBTITLE_CROSSES_HARD_CUT` |
+| narrative | 只刷 `media_sha256`=当前 final；**勿**把 planned shot_id 改成 ep01_s0x（会 EVIDENCE_SHOT_UNPLANNED） |
+| review-final | 十一维 pass · `final_complete` true |
+| 链 | post-audit `delivery_ready` → export-desktop hash 一致 |
+| 桌面 | `~/Desktop/e-virus-ch04-shelter/film_final.mp4` · status **DELIVERED_GO** |
+| PARTIAL | Imagine 软词亲密着装；非真 bare 插入 |
+
+**GO 最短补洞（手拼 plate 后）：**
+
+```text
+1) film_timeline + timeline.json ← 片上秒（N×slot）
+2) duration_sec 与 SRT 同槽；sub_lead=0；cue 不跨切
+3) heat codes 清（SIZE 回宽/三连同 L）
+4) burn_srt_pil → register-final
+5) narrative-evidence 重绑 media_sha256
+6) review-final → post-audit → export-desktop
+```
