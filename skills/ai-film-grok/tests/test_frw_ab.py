@@ -689,6 +689,16 @@ def test_machine_rank_is_provisional_and_human_approval_is_hash_bound(
             challenger="ltx-b",
             user_phrase="草案：批准 seedance-a 为 champion，ltx-b 为 challenger",
         )
+    assert not frw_ab.selection_phrase_is_approval(
+        "If confirmed, approve seedance-a as champion and ltx-b as challenger",
+        champion="seedance-a",
+        challenger="ltx-b",
+    )
+    assert not frw_ab.selection_phrase_is_approval(
+        "批准 ab 为 champion，ltx-b 为 challenger",
+        champion="a",
+        challenger="ltx-b",
+    )
 
 
 def test_production_revalidates_role_bound_selection_receipt(tmp_path: Path) -> None:

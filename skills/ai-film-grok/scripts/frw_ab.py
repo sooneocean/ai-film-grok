@@ -193,7 +193,11 @@ def selection_phrase_is_approval(phrase: str, *, champion: str, challenger: str)
     """Require an explicit, role-bound user approval for FRW promotion."""
     value = str(phrase or "").strip()
     lowered = value.casefold()
-    if not value or any(marker in lowered for marker in SELECTION_REJECT_MARKERS):
+    if (
+        not value
+        or any(marker in lowered for marker in SELECTION_REJECT_MARKERS)
+        or re.search(r"\bif\b", lowered)
+    ):
         return False
     if not ("批准" in value or "核准" in value or re.search(r"\bapprove(?:d)?\b", lowered)):
         return False
