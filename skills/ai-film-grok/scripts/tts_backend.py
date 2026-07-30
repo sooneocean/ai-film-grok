@@ -279,16 +279,11 @@ def chatterbox_local_argv_configured() -> bool:
         / "python"
     ).resolve()
     try:
-        resolved_interpreter = interpreter.resolve(strict=True)
+        resolved_interpreter = interpreter.resolve()
         configured = Path(argv[1]).expanduser().resolve()
     except OSError:
         return False
-    if (
-        resolved_interpreter != trusted_python
-        or not resolved_interpreter.is_file()
-        or not os.access(resolved_interpreter, os.X_OK)
-        or configured != adapter
-    ):
+    if resolved_interpreter != trusted_python or configured != adapter:
         return False
     option_argv = argv[2:]
     if len(option_argv) % 2:
@@ -318,16 +313,11 @@ def piper_local_argv_configured() -> bool:
     adapter = (Path(__file__).resolve().parent / "adapters" / "piper_local_tts.py").resolve()
     trusted_python = (root / ".local-runtimes" / "piper-mac" / "bin" / "python").resolve()
     try:
-        interpreter = interpreter_path.resolve(strict=True)
+        interpreter = interpreter_path.resolve()
         configured = Path(argv[1]).expanduser().resolve()
     except OSError:
         return False
-    if (
-        interpreter != trusted_python
-        or not interpreter.is_file()
-        or not os.access(interpreter, os.X_OK)
-        or configured != adapter
-    ):
+    if interpreter != trusted_python or configured != adapter:
         return False
     option_argv = argv[2:]
     if len(option_argv) % 2:
