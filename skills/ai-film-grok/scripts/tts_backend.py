@@ -11,6 +11,7 @@ Backends (human-likeness roughly ↑):
   cosyvoice-local — explicit local CosyVoice adapter (never selected automatically)
   kokoro-local — explicit offline Kokoro Chinese adapter (never selected automatically)
   chatterbox-local — explicit offline multilingual Chatterbox adapter (never selected automatically)
+  piper-local — explicit offline Piper Chinese adapter (never selected automatically)
   external  — arbitrary approved CLI via AIFILM_TTS_ARGV
 
 Env / config.env:
@@ -79,6 +80,7 @@ TTS_BACKENDS = frozenset(
         "cosyvoice-local",
         "kokoro-local",
         "chatterbox-local",
+        "piper-local",
         "grok",
         "qwen3",
         "higgs",
@@ -304,6 +306,41 @@ def chatterbox_local_argv_configured() -> bool:
     )
 
 
+def piper_local_argv_configured() -> bool:
+    """Whether argv invokes the fixed Piper isolated runtime and adapter."""
+    argv = external_argv()
+    if not argv or len(argv) < 6:
+        return False
+    interpreter_path = Path(argv[0]).expanduser()
+    if not interpreter_path.is_absolute():
+        return False
+    root = Path(__file__).resolve().parents[3]
+    adapter = (Path(__file__).resolve().parent / "adapters" / "piper_local_tts.py").resolve()
+    trusted_python = (root / ".local-runtimes" / "piper-mac" / "bin" / "python").resolve()
+    try:
+        interpreter = interpreter_path.resolve(strict=True)
+        configured = Path(argv[1]).expanduser().resolve()
+    except OSError:
+        return False
+    if (
+        interpreter != trusted_python
+        or not interpreter.is_file()
+        or not os.access(interpreter, os.X_OK)
+        or configured != adapter
+    ):
+        return False
+    option_argv = argv[2:]
+    if len(option_argv) % 2:
+        return False
+    options: dict[str, str] = {}
+    for index in range(0, len(option_argv), 2):
+        name, value = option_argv[index : index + 2]
+        if name in options:
+            return False
+        options[name] = value
+    return options == {"--text-file": "{text_file}", "--out": "{out}", "--voice": "{voice}"}
+
+
 def external_tts_subprocess_env() -> dict[str, str]:
     """Pass CosyVoice's non-secret local render settings only to its own adapter."""
     env = minimal_subprocess_env()
@@ -335,6 +372,17 @@ def external_tts_subprocess_env() -> dict[str, str]:
             value = os.environ.get(name)
             if value:
                 env[name] = value
+    if piper_local_argv_configured():
+        for name in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH"):
+            env.pop(name, None)
+        env["PATH"] = f"/opt/homebrew/bin:/usr/local/bin:{os.defpath}"
+        env["HF_HUB_OFFLINE"] = "1"
+        env["TRANSFORMERS_OFFLINE"] = "1"
+        env["HF_DATASETS_OFFLINE"] = "1"
+        for name in ("PIPER_VOICE_DIR", "PIPER_MODEL", "PIPER_CONFIG", "PIPER_BINARY"):
+            value = os.environ.get(name)
+            if value:
+                env[name] = value
     return env
 
 
@@ -346,6 +394,7 @@ def external_tts_timeout() -> int:
             cosyvoice_local_argv_configured()
             or kokoro_local_argv_configured()
             or chatterbox_local_argv_configured()
+            or piper_local_argv_configured()
         )
         else 300
     )
@@ -572,6 +621,7 @@ def probe() -> dict[str, Any]:
         "cosyvoice-local": cosyvoice_local_argv_configured(),
         "kokoro-local": kokoro_local_argv_configured(),
         "chatterbox-local": chatterbox_local_argv_configured(),
+        "piper-local": piper_local_argv_configured(),
     }
     try:
         import edge_tts  # noqa: F401
@@ -1064,9 +1114,10 @@ def tts_external(text: str, out_mp3: Path, voice: str = "") -> Path:
     if not cmd_tpl:
         raise TTSError("AIFILM_TTS_ARGV not set")
     is_chatterbox_local = chatterbox_local_argv_configured()
+    is_piper_local = piper_local_argv_configured()
     temporary_text_file: Path | None = None
-    if is_chatterbox_local:
-        file_fd, temporary_name = tempfile.mkstemp(prefix="aifilm-chatterbox-text-", suffix=".txt")
+    if is_chatterbox_local or is_piper_local:
+        file_fd, temporary_name = tempfile.mkstemp(prefix="aifilm-local-tts-text-", suffix=".txt")
         temporary_text_file = Path(temporary_name)
         with os.fdopen(file_fd, "w", encoding="utf-8") as handle:
             handle.write(text)
@@ -1100,6 +1151,8 @@ def tts_external(text: str, out_mp3: Path, voice: str = "") -> Path:
         except (OSError, subprocess.TimeoutExpired) as exc:
             if is_chatterbox_local:
                 raise TTSError("CHATTERBOX_LOCAL_EXEC_FAILED") from exc
+            if is_piper_local:
+                raise TTSError("PIPER_LOCAL_EXEC_FAILED") from exc
             raise TTSError(f"external TTS could not run: {exc}") from exc
     finally:
         if temporary_text_file is not None:
@@ -1107,6 +1160,8 @@ def tts_external(text: str, out_mp3: Path, voice: str = "") -> Path:
     if proc.returncode != 0 or not out_mp3.is_file():
         if is_chatterbox_local:
             raise TTSError(f"CHATTERBOX_LOCAL_PROCESS_FAILED rc={proc.returncode}")
+        if is_piper_local:
+            raise TTSError(f"PIPER_LOCAL_PROCESS_FAILED rc={proc.returncode}")
         raise TTSError(
             f"external TTS failed rc={proc.returncode}: {(proc.stderr or proc.stdout)[:800]}"
         )
@@ -1538,6 +1593,17 @@ def synthesize(
             )
             voice_used = voice or "chatterbox-builtin"
             model_used = "ResembleAI/chatterbox"
+        elif choice == "piper-local":
+            if not piper_local_argv_configured():
+                raise TTSError("piper-local requires the fixed adapters/piper_local_tts.py argv")
+            _tracked(
+                "piper-local",
+                "Piper/zh_CN-chaowen-medium",
+                local_zero=True,
+                call=lambda: tts_external(text, out_mp3, voice=voice),
+            )
+            voice_used = voice or "zh_CN-chaowen-medium"
+            model_used = "Piper/zh_CN-chaowen-medium"
         elif choice == "external":
             _tracked(
                 "external",

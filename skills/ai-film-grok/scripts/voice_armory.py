@@ -375,6 +375,13 @@ TTS_MODEL_ARMORY: dict[str, dict[str, Any]] = {
         "production_eligible": False,
         "label": "Chatterbox Multilingual：显式离线候选；须隔离 runtime 实际解码与听审",
     },
+    "piper_chaowen_zh": {
+        "status": "ready_explicit",
+        "route": "piper-local",
+        "license": "MIT",
+        "production_eligible": False,
+        "label": "Piper zh_CN-chaowen-medium：本机技术候选；须实际解码与人工听审后晋升",
+    },
     "higgs_audio_v2_5": {
         "status": "license_review_required",
         "route": "higgs",
