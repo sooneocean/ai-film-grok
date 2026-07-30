@@ -71,8 +71,14 @@ def is_approved_internal_sfx(event: dict[str, Any], delivery_scope: str) -> bool
         and event.get("production_eligible") is False
         and event.get("usage_scope") == "noncommercial_internal"
         and is_noncommercial_license(event.get("license"))
-        and source.startswith("local:audio/candidates/sfx/approved-noncommercial/")
-        and receipt.startswith("local:audio/candidates/sfx/approved-noncommercial/")
+        and (
+            source.startswith("local:audio/candidates/sfx/approved-noncommercial/")
+            or source.startswith("library:sfx/approved-noncommercial/")
+        )
+        and (
+            receipt.startswith("local:audio/candidates/sfx/approved-noncommercial/")
+            or receipt.startswith("library:sfx/approved-noncommercial/")
+        )
         and receipt.endswith(".receipt.json")
         and re.fullmatch(r"[0-9a-f]{64}", str(event.get("source_sha256") or ""))
     )

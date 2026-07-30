@@ -89,11 +89,13 @@ def _voice_script_for_shot(shot: dict[str, Any], *, fallback_voice: str) -> dict
         text = str(cue.get("spoken_text") or "").strip()
         if not text:
             continue
+        language = str(cue.get("language") or "").strip().lower()
+        default_voice = "ja-JP-NanamiNeural" if language == "ja" else fallback_voice
         return {
             "text": text,
             "text_kind": str(cue.get("line_type") or "voice").strip().lower(),
-            "language": str(cue.get("language") or "").strip().lower(),
-            "voice": str(cue.get("voice") or fallback_voice).strip() or fallback_voice,
+            "language": language,
+            "voice": str(cue.get("voice") or default_voice).strip() or default_voice,
         }
     voice_channel = resolve_content_channels(shot)["voice"]
     return {
@@ -271,9 +273,52 @@ def _lock_dialogue_durations_to_rehearsal(root: Path, receipt: dict[str, Any]) -
                 "pause_before_sec": round(pre, 3),
                 "pause_after_sec": round(post, 3),
             }
+            _reflow_dialogue_broll(shot)
             changed = True
     if changed:
         write_json(spec_path, spec)
+
+
+def _reflow_dialogue_broll(shot: dict[str, Any]) -> None:
+    """Keep optional dialogue B-roll inside real TTS timing handles.
+
+    A short spoken line may no longer have enough usable interior after its
+    measured duration replaces an estimate.  In that case the optional insert
+    is removed; the beat's mandatory reaction/action coverage remains a
+    separate shot and therefore is not fabricated as a rushed 0.1s cut.
+    """
+    entries = shot.get("dialogue_broll")
+    if not isinstance(entries, list) or not entries:
+        return
+    try:
+        duration = float(shot.get("duration_sec") or 0.0)
+    except (TypeError, ValueError):
+        duration = 0.0
+    # Keep a small numerical margin inside the validator's inclusive-looking
+    # 0.8s boundary; decimal JSON floats otherwise can land just outside it.
+    edge_handle = 0.805
+    interior = duration - 2 * edge_handle
+    max_coverage = duration * 0.4 - 0.005
+    if interior < 0.25 or max_coverage < 0.25:
+        shot.pop("dialogue_broll", None)
+        shot["dialogue_broll_reflow"] = {"status": "removed_short_tts", "duration_sec": duration}
+        return
+    entry = entries[0]
+    if not isinstance(entry, dict):
+        shot.pop("dialogue_broll", None)
+        return
+    try:
+        requested = float(entry.get("end_sec")) - float(entry.get("start_sec"))
+    except (TypeError, ValueError):
+        requested = 0.0
+    coverage = min(max(requested, 0.25), interior, max_coverage)
+    start = edge_handle + max(0.0, (interior - coverage) / 2)
+    entry["start_sec"] = round(start, 3)
+    entry["end_sec"] = round(start + coverage, 3)
+    shot["dialogue_broll_reflow"] = {
+        "status": "reflowed_to_measured_tts",
+        "duration_sec": duration,
+    }
 
 
 def run_rehearsal(
@@ -296,6 +341,12 @@ def run_rehearsal(
         shots = validate_film_spec(spec, assign_missing_ids=False)
     except Exception as exc:
         raise TTSRehearsalError(f"film-spec invalid: {exc}") from exc
+
+    # Coverage, reaction and silence shots deliberately have no spoken track.
+    # They must not turn a dialogue-first rehearsal into a failed narrator job.
+    shots = [shot for shot in shots if _voice_script_for_shot(shot, fallback_voice=voice)["text"]]
+    if not shots:
+        raise TTSRehearsalError("film-spec has no spoken voice cues to rehearse")
 
     audio_dir = root / AUDIO_DIR_REL
     audio_dir.mkdir(parents=True, exist_ok=True)

@@ -49,6 +49,23 @@ def test_dialogue_rehearsal_uses_japanese_voice_cue_not_chinese_caption():
     }
 
 
+def test_dialogue_rehearsal_defaults_japanese_voice_for_a_japanese_cue():
+    script = _voice_script_for_shot(
+        {
+            "audio_cues": [
+                {
+                    "kind": "voice",
+                    "line_type": "dialogue",
+                    "language": "ja",
+                    "spoken_text": "行く。",
+                }
+            ]
+        },
+        fallback_voice="zh-CN-XiaoxiaoNeural",
+    )
+    assert script["voice"] == "ja-JP-NanamiNeural"
+
+
 def test_rehearsal_locks_dialogue_shot_duration_to_measured_audio(tmp_path: Path) -> None:
     root = tmp_path
     spec = {
@@ -60,6 +77,7 @@ def test_rehearsal_locks_dialogue_shot_duration_to_measured_audio(tmp_path: Path
                     {
                         "id": "talk01",
                         "screen_mode": "on_camera",
+                        "dialogue_ja": "行く。",
                         "duration_sec": 5,
                         "audio_cues": [
                             {
@@ -83,6 +101,98 @@ def test_rehearsal_locks_dialogue_shot_duration_to_measured_audio(tmp_path: Path
     assert shot["duration_sec"] == 1.75
     assert shot["audio_cues"][0]["duration_sec"] == 1.25
     assert shot["tts_timing_lock"]["status"] == "locked"
+
+
+def test_rehearsal_removes_broll_that_no_longer_fits_real_short_dialogue(tmp_path: Path) -> None:
+    spec = {
+        "vo_mode": "dialogue_drama",
+        "scenes": [
+            {
+                "shots": [
+                    {
+                        "id": "talk01",
+                        "duration_sec": 5,
+                        "audio_cues": [
+                            {
+                                "kind": "voice",
+                                "line_type": "dialogue",
+                                "pause_before_sec": 0,
+                                "pause_after_sec": 0,
+                            }
+                        ],
+                        "dialogue_broll": [{"id": "talk01__broll01", "start_sec": 2, "end_sec": 3}],
+                    }
+                ]
+            }
+        ],
+    }
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+    register_measured_durations(tmp_path, [{"shot_id": "talk01", "measured_duration_sec": 1.8}])
+    shot = json.loads((tmp_path / "film-spec.json").read_text(encoding="utf-8"))["scenes"][0][
+        "shots"
+    ][0]
+    assert "dialogue_broll" not in shot
+    assert shot["dialogue_broll_reflow"]["status"] == "removed_short_tts"
+
+
+def test_rehearsal_skips_silent_dialogue_coverage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec = {
+        "title": "dialogue with coverage",
+        "vo_mode": "dialogue_drama",
+        "dialogue_spoken_lang": "ja",
+        "narration_spoken_lang": "zh",
+        "director_intent": {
+            "logline": "雨夜里两人决定离开旧家。",
+            "tone": "压抑",
+            "emotional_arc": ["a", "b", "c"],
+        },
+        "scenes": [
+            {
+                "shots": [
+                    {
+                        "id": "talk01",
+                        "screen_mode": "on_camera",
+                        "audio_cues": [
+                            {
+                                "kind": "voice",
+                                "line_type": "dialogue",
+                                "language": "ja",
+                                "voice": "ja-JP-NanamiNeural",
+                                "spoken_text": "行く。",
+                                "caption_text": "我要走。",
+                                "translation_status": "ready",
+                            }
+                        ],
+                        "dialogue_ja": "行く。",
+                    },
+                    {
+                        "id": "cover01",
+                        "screen_mode": "action_cover",
+                        "audio_cues": [{"kind": "silence", "duration_sec": 1.2}],
+                    },
+                ]
+            }
+        ],
+    }
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+    monkeypatch.setattr(
+        "tts_rehearsal.validate_film_spec",
+        lambda raw, **_kwargs: [shot for scene in raw["scenes"] for shot in scene["shots"]],
+    )
+    audio = tmp_path / "talk.wav"
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=0.4", str(audio)],
+        check=True,
+        capture_output=True,
+    )
+    receipt = run_rehearsal(
+        tmp_path,
+        register_map={"talk01": audio},
+        synthesize=False,
+    )
+    assert [item["shot_id"] for item in receipt["shots"]] == ["talk01"]
 
 
 def _minimal_spec() -> dict:

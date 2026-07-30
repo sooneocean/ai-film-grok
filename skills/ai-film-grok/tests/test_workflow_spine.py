@@ -11,7 +11,13 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from aifilm_grok import _pipeline_bundle, build_parser, cmd_init  # noqa: E402
+from aifilm_grok import (  # noqa: E402
+    _compatibility_vo_mode,
+    _pipeline_bundle,
+    build_parser,
+    cmd_init,
+    cmd_resume_manifest,
+)
 from approval_ledger import append_approval  # noqa: E402
 from director_cli import lock_native_stage  # noqa: E402
 from director_stage_gates import hash_input_refs, lock_stage  # noqa: E402
@@ -125,6 +131,82 @@ def test_init_force_refuses_to_silently_upgrade_legacy_root(tmp_path: Path) -> N
 
     assert legacy.read_bytes() == before
     assert not (root / "production-book.json").exists()
+
+
+def test_resume_manifest_bootstraps_only_missing_manifest(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "legacy"
+    root.mkdir()
+    (root / "brief.json").write_text(
+        json.dumps({"title": "旧片", "theme": "可安全续作", "aspect_ratio": "9:16"}),
+        encoding="utf-8",
+    )
+    contract = root / "director-contract.json"
+    contract.write_text(json.dumps({"title": "旧片", "aspect_ratio": "9:16"}), encoding="utf-8")
+    graph = root / "drama-graph.json"
+    graph.write_text(json.dumps({"schema_version": 2}), encoding="utf-8")
+    style = root / "style-bible.json"
+    style.write_text(json.dumps({"status": "locked"}), encoding="utf-8")
+    before = {path.name: path.read_bytes() for path in (contract, graph, style)}
+
+    assert cmd_resume_manifest(Namespace(root=str(root))) == 0
+    payload = json.loads(capsys.readouterr().out)
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+
+    assert payload["ok"] is True
+    assert payload["created"] is True
+    assert manifest["title"] == "旧片"
+    assert manifest["truth_contract"]["contract_sha256"]
+    assert manifest["truth_contract"]["graph_sha256"]
+    assert manifest["style_locked"] is False
+    assert {path.name: path.read_bytes() for path in (contract, graph, style)} == before
+
+
+def test_resume_manifest_refuses_existing_manifest(tmp_path: Path) -> None:
+    root = tmp_path / "film"
+    root.mkdir()
+    (root / "manifest.json").write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(Exception, match="already exists"):
+        cmd_resume_manifest(Namespace(root=str(root)))
+
+
+def test_resume_manifest_refuses_symlink_root_and_broken_manifest_symlink(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / "brief.json").write_text(
+        json.dumps({"title": "旧片", "theme": "可安全续作", "aspect_ratio": "9:16"}),
+        encoding="utf-8",
+    )
+    linked_root = tmp_path / "linked-root"
+    linked_root.symlink_to(target, target_is_directory=True)
+
+    with pytest.raises(Exception, match="must not be a symlink"):
+        cmd_resume_manifest(Namespace(root=str(linked_root)))
+    assert not (target / "manifest.json").exists()
+
+    broken_manifest = target / "manifest.json"
+    broken_manifest.symlink_to(target / "missing-manifest.json")
+    with pytest.raises(Exception, match="already exists"):
+        cmd_resume_manifest(Namespace(root=str(target)))
+    assert broken_manifest.is_symlink()
+
+
+def test_compatibility_vo_mode_infers_dialogue_drama_only_for_explicitly_silent_projection() -> (
+    None
+):
+    silent = {"scenes": [{"shots": [{"silent": True, "dialogue": []}]}]}
+    inferred = _compatibility_vo_mode(silent)
+    assert inferred["vo_mode"] == "dialogue_drama"
+    assert inferred["dialogue_spoken_lang"] == "ja"
+    assert inferred["narration_spoken_lang"] == "zh"
+
+    dialogue = {"scenes": [{"shots": [{"silent": False, "dialogue": ["hello"]}]}]}
+    assert "vo_mode" not in _compatibility_vo_mode(dialogue)
+
+    ambiguous = {"scenes": [{"shots": [{"dialogue": []}]}]}
+    assert "vo_mode" not in _compatibility_vo_mode(ambiguous)
 
 
 def test_new_root_init_does_not_publish_partial_project_on_failure(

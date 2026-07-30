@@ -863,6 +863,56 @@ def cmd_init(args: argparse.Namespace) -> int:
     return result
 
 
+def cmd_resume_manifest(args: argparse.Namespace) -> int:
+    """Create only the missing state manifest for a legacy film root."""
+    raw_root = Path(args.root).expanduser()
+    if raw_root.is_symlink():
+        raise FilmError(f"Legacy root must not be a symlink: {raw_root}")
+    root = raw_root.resolve()
+    if not root.is_dir():
+        raise FilmError(f"Legacy root must be a real directory: {root}")
+    manifest_path = root / MANIFEST_NAME
+    if manifest_path.exists() or manifest_path.is_symlink():
+        raise FilmError(f"Manifest already exists at {manifest_path}; refusing to overwrite it")
+    brief_path = root / "brief.json"
+    if not brief_path.is_file():
+        raise FilmError(f"Legacy root needs brief.json before manifest resume: {root}")
+    brief = read_json(brief_path)
+    title = str(brief.get("title") or "").strip()
+    theme = str(brief.get("theme") or "").strip()
+    aspect = str(brief.get("aspect_ratio") or "9:16").strip()
+    if not title or not theme:
+        raise FilmError("Legacy brief.json needs non-empty title and theme before manifest resume")
+    manifest = empty_manifest(title=title, theme=theme, aspect=aspect)
+    contract_path = root / "director-contract.json"
+    graph_path = root / "drama-graph.json"
+    truth = manifest["truth_contract"]
+    truth["contract_sha256"] = sha256_file(contract_path) if contract_path.is_file() else ""
+    truth["graph_sha256"] = sha256_file(graph_path) if graph_path.is_file() else ""
+    truth["spec_sha256"] = (
+        sha256_file(root / "film-spec.json") if (root / "film-spec.json").is_file() else ""
+    )
+    truth["timeline_sha256"] = (
+        sha256_file(root / "timeline.json") if (root / "timeline.json").is_file() else ""
+    )
+    manifest["notes"].append(
+        "Legacy resume created this manifest only; existing style, contract, still, and clip evidence remains unapproved until revalidated."
+    )
+    ensure_tree(root)
+    save_manifest(root, manifest)
+    emit(
+        {
+            "ok": True,
+            "created": True,
+            "root": str(root),
+            "manifest": str(manifest_path),
+            "preserved_existing_evidence": True,
+            "next_step": "Revalidate and lock style plus native evidence before media generation.",
+        }
+    )
+    return 0
+
+
 def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     style = read_json(root / "style-bible.json") if (root / "style-bible.json").is_file() else {}
     spec = read_json(root / "film-spec.json") if (root / "film-spec.json").is_file() else {}
@@ -1380,6 +1430,32 @@ def cmd_dialogue_production_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dialogue_benchmark_queue(args: argparse.Namespace) -> int:
+    from dialogue_benchmark_queue import (
+        DialogueBenchmarkQueueError,
+        claim,
+        complete,
+        enqueue,
+        status,
+    )
+
+    try:
+        action = str(args.dialogue_benchmark_queue_action)
+        if action == "enqueue":
+            report = enqueue(Path(args.root))
+        elif action == "claim":
+            report = claim(Path(args.root))
+        elif action == "complete":
+            report = complete(Path(args.root), job_id=args.job_id, claim_token=args.claim_token)
+        else:
+            report = status(Path(args.root))
+    except DialogueBenchmarkQueueError as exc:
+        emit({"ok": False, "status": "blocked", "reason": str(exc)})
+        return 2
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
 def cmd_creative_pipeline(args: argparse.Namespace) -> int:
     from creative_pipeline import (
         build_animatic_gate,
@@ -1673,6 +1749,29 @@ def cmd_production_evidence(args: argparse.Namespace) -> int:
     return 0
 
 
+def _compatibility_vo_mode(spec: dict[str, Any]) -> dict[str, Any]:
+    """Infer the only schema-valid legacy default without mutating its source projection."""
+    if str(spec.get("vo_mode") or "").strip():
+        return spec
+    shots = [
+        shot
+        for scene in spec.get("scenes") or []
+        if isinstance(scene, dict)
+        for shot in scene.get("shots") or []
+        if isinstance(shot, dict)
+    ]
+    if shots and all(shot.get("silent") is True and not shot.get("dialogue") for shot in shots):
+        spec = dict(spec)
+        spec["vo_mode"] = "dialogue_drama"
+        spec["dialogue_spoken_lang"] = "ja"
+        spec["narration_spoken_lang"] = "zh"
+        spec["compatibility"] = {
+            "vo_mode": "inferred_dialogue_drama_ja_zh_from_explicit_silent_shots",
+            "source_projection_mutated": False,
+        }
+    return spec
+
+
 def cmd_write_spec(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     ensure_tree(root)
@@ -1684,7 +1783,7 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
         raise FilmError(f"{exc.code}: {exc}") from exc
     default_spec = root / "film-spec.json"
     spec_path = Path(args.spec).expanduser().resolve() if args.spec else default_spec
-    spec = read_json(spec_path)
+    spec = _compatibility_vo_mode(read_json(spec_path))
     try:
         shots = validate_film_spec(
             spec,
@@ -6742,6 +6841,28 @@ def cmd_sfx_candidate(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
 
 
+def cmd_sfx_library(args: argparse.Namespace) -> int:
+    """Manage the shared internal non-commercial SFX armory."""
+    from config_loader import get_config
+    from sfx_library import SFXLibraryError, audit, import_project_asset
+
+    get_config()
+    try:
+        if args.sfx_library_action == "import-project":
+            emit(
+                import_project_asset(
+                    Path(args.root),
+                    args.asset_id,
+                    library_root=Path(args.library_root) if args.library_root else None,
+                )
+            )
+        else:
+            emit(audit(library_root=Path(args.library_root) if args.library_root else None))
+        return 0
+    except SFXLibraryError as exc:
+        raise FilmError(str(exc)) from exc
+
+
 def cmd_lipsync_canary(args: argparse.Namespace) -> int:
     from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
 
@@ -7494,6 +7615,18 @@ def build_parser() -> argparse.ArgumentParser:
     sfx_attach.add_argument("--material", required=True)
     sfx_attach.add_argument("--noncommercial-internal-ok", action="store_true")
 
+    sfx_library = sub.add_parser(
+        "sfx-library",
+        help="Audit or import signed MMAudio takes into the shared non-commercial SFX armory",
+    )
+    sfx_library_sub = sfx_library.add_subparsers(dest="sfx_library_action", required=True)
+    sfx_library_audit = sfx_library_sub.add_parser("audit")
+    sfx_library_audit.add_argument("--library-root", default="")
+    sfx_library_import = sfx_library_sub.add_parser("import-project")
+    sfx_library_import.add_argument("--root", required=True, help="Legacy film project root")
+    sfx_library_import.add_argument("--asset-id", required=True)
+    sfx_library_import.add_argument("--library-root", default="")
+
     lsc = sub.add_parser(
         "lipsync-canary",
         help="Single-shot lipsync probe → receipts/lipsync-canary/ (default final still lipsync off)",
@@ -7655,6 +7788,11 @@ def build_parser() -> argparse.ArgumentParser:
     init_p.add_argument("--root", required=True)
     init_p.add_argument("--aspect", default="9:16")
     init_p.add_argument("--force", action="store_true")
+
+    resume_manifest = sub.add_parser(
+        "resume-manifest", help="Create only a missing manifest for a legacy film root"
+    )
+    resume_manifest.add_argument("--root", required=True)
 
     st = sub.add_parser("status", help="Gate status")
     st.add_argument("--root", required=True)
@@ -8486,6 +8624,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Compile the no-spend Qwen/Wan/LatentSync/MMAudio dialogue production plan",
     )
     dialogue_production_plan_p.add_argument("--root", required=True)
+    dialogue_benchmark_queue_p = sub.add_parser(
+        "dialogue-benchmark-queue",
+        help="Persist/claim the no-submit P2 Qwen/Wan/LatentSync benchmark queue",
+    )
+    dialogue_benchmark_queue_sub = dialogue_benchmark_queue_p.add_subparsers(
+        dest="dialogue_benchmark_queue_action", required=True
+    )
+    for queue_action in ("enqueue", "claim", "status"):
+        item = dialogue_benchmark_queue_sub.add_parser(queue_action)
+        item.add_argument("--root", required=True)
+    dialogue_benchmark_queue_complete_p = dialogue_benchmark_queue_sub.add_parser("complete")
+    dialogue_benchmark_queue_complete_p.add_argument("--root", required=True)
+    dialogue_benchmark_queue_complete_p.add_argument("--job-id", required=True)
+    dialogue_benchmark_queue_complete_p.add_argument("--claim-token", required=True)
 
     creative = sub.add_parser(
         "creative-pipeline", help="Radio cut, animatic and premium pre-production gates"
@@ -9574,6 +9726,7 @@ def main(argv: list[str] | None = None) -> int:
             "ambience-candidate": cmd_ambience_candidate,
             "sfx-canary": cmd_sfx_canary,
             "sfx-candidate": cmd_sfx_candidate,
+            "sfx-library": cmd_sfx_library,
             "lipsync-node": cmd_lipsync_node,
             "lipsync-canary": cmd_lipsync_canary,
             "lipsync-pilot": cmd_lipsync_pilot,
@@ -9582,6 +9735,7 @@ def main(argv: list[str] | None = None) -> int:
             "tts-ab": cmd_tts_ab,
             "elevenlabs-canary": cmd_elevenlabs_canary,
             "init": cmd_init,
+            "resume-manifest": cmd_resume_manifest,
             "status": cmd_status,
             "quality-status": cmd_quality_status,
             "production-evidence": cmd_production_evidence,
@@ -9607,6 +9761,7 @@ def main(argv: list[str] | None = None) -> int:
             "dialogue-benchmark-review": cmd_dialogue_benchmark_review,
             "dialogue-benchmark-approve": cmd_dialogue_benchmark_approve,
             "dialogue-production-plan": cmd_dialogue_production_plan,
+            "dialogue-benchmark-queue": cmd_dialogue_benchmark_queue,
             "creative-pipeline": cmd_creative_pipeline,
             "dailies": cmd_dailies,
             "post-quality": cmd_post_quality,

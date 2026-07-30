@@ -113,9 +113,14 @@ def _approved_internal_sfx(
     """Bind an NC-only scene cue to its signed, fully heard approval receipt."""
     if not is_approved_internal_sfx(event, delivery_scope):
         return False
+    source = str(event.get("source") or "")
     try:
         from sfx_candidates import approved_event_receipt_valid
 
+        if source.startswith("library:"):
+            return bool(
+                approved_event_receipt_valid(root, event) and actual == event.get("source_sha256")
+            )
         source_rel = str(asset.relative_to(root))
     except ValueError:
         return False
@@ -213,17 +218,32 @@ def _hash_fd(asset_fd: int) -> str:
 
 def _local_asset(root: Path, event: dict[str, Any], *, delivery_scope: str) -> tuple[Path, int]:
     source = str(event.get("source") or event.get("asset") or "")
-    if not source.startswith("local:"):
-        raise SceneSoundError(f"{event.get('id')}: final only accepts local: scene-sound assets")
-    raw = source.removeprefix("local:")
-    try:
-        relative = (root / raw).relative_to(root)
-    except ValueError as exc:
-        raise SceneSoundError(f"{event.get('id')}: asset escapes film root") from exc
+    if source.startswith("library:"):
+        from sfx_library import SFXLibraryError, default_library_root, resolve_uri
+
+        try:
+            library_root = default_library_root()
+            path = resolve_uri(source, library_root=library_root)
+            relative = path.relative_to(library_root)
+            asset_root = library_root
+        except (SFXLibraryError, ValueError) as exc:
+            raise SceneSoundError(f"{event.get('id')}: library asset is invalid") from exc
+        raw = source.removeprefix("library:")
+    elif source.startswith("local:"):
+        raw = source.removeprefix("local:")
+        try:
+            relative = (root / raw).relative_to(root)
+        except ValueError as exc:
+            raise SceneSoundError(f"{event.get('id')}: asset escapes film root") from exc
+        path = root.joinpath(*relative.parts)
+        asset_root = root
+    else:
+        raise SceneSoundError(
+            f"{event.get('id')}: final only accepts local: or library: scene-sound assets"
+        )
     if not relative.parts or any(part in {"", ".", ".."} for part in relative.parts):
         raise SceneSoundError(f"{event.get('id')}: asset escapes film root")
-    path = root.joinpath(*relative.parts)
-    asset_fd = _open_confined_asset(root, relative)
+    asset_fd = _open_confined_asset(asset_root, relative)
     try:
         actual = _hash_fd(asset_fd)
         normalized_raw = raw.replace("\\", "/").lower()

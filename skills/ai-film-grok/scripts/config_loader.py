@@ -193,6 +193,7 @@ class ConfigSchema:
     music_require: bool = False
     music_license: str = ""
     bgm_library_root: str = ""
+    sfx_library_root: str = ""
 
     # ── FRW / Seedance ──────────────────────────────────────────────────
     frw_api_key: str = ""
@@ -306,6 +307,7 @@ def get_config() -> ConfigSchema:
         music_require=_resolve_bool("AIFILM_MUSIC_REQUIRE", default=False),
         music_license=_env("AIFILM_MUSIC_LICENSE"),
         bgm_library_root=_env("AIFILM_BGM_LIBRARY_ROOT"),
+        sfx_library_root=_env("AIFILM_SFX_LIBRARY_ROOT"),
         # FRW
         frw_api_key=_env("FRW_API_KEY"),
         frwclaw_root=_env("FRWCLAW_ROOT"),
@@ -359,6 +361,7 @@ _ENV_HELP: dict[str, str] = {
     "AIFILM_LIPSYNC_NODE_TOKEN": "Private RTX lip-sync node bearer token; never commit",
     "AIFILM_LIPSYNC_FALLBACK": "Technical-failure fallback: musetalk or empty",
     "AIFILM_BGM_LIBRARY_ROOT": "Shared approved ACE-Step BGM library root",
+    "AIFILM_SFX_LIBRARY_ROOT": "Shared approved internal non-commercial SFX armory root",
     "AIFILM_TTS_BACKEND": "Active TTS backend: audio_node | mimo | auto | edge | fish | minimax | voicebox | grok | external",
     "AIFILM_TTS_STRICT_VOICE": "1 = fail on missing voice_id (default 1)",
     "AIFILM_TTS_VOICEBOX_FALLBACK": "0|1 — opt-in: try Voicebox when explicit backend fails",

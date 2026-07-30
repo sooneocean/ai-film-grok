@@ -61,6 +61,11 @@ RTX 5090 单队列串行；队列、GPU 或能力证据未知/过期即阻断。
 三臂的共同输入与人工选择门；它不是生成或批准的替代品。每一臂有实际产物与完整看片后，
 才可记录稳定参数并进入 bulk。
 
+若 5090 正忙，可执行 `aifilm dialogue-benchmark-queue enqueue --root <film>`，把三臂
+保存为项目内可审计的本地待办；它**绝不**提交 ComfyUI prompt。worker 使用 `claim` 时才
+重新检查 Comfy 队列、RAM 与 VRAM 门槛；不达标就保持 `pending`。每臂仍必须先由
+`dialogue-benchmark-review` 写入实际产物和人工审看，才可用 `complete` 关闭队列任务。
+
 依序用 `aifilm dialogue-benchmark-review` 记录三臂的实际产物、人工意见与参数，再用
 `aifilm dialogue-benchmark-approve` 锁定整条链。批准会以使用者本机环境中的
 `AIFILM_AUDIO_RECEIPT_KEY`（或既有 `AIFILM_AUDIO_NODE_TOKEN`）签名；任何一臂改写都会

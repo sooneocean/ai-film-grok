@@ -220,10 +220,14 @@ def screen_speech(root: Path, asset_id: str) -> dict[str, Any]:
 
 
 def approved_event_receipt_valid(root: Path, event: dict[str, Any]) -> bool:
-    """Verify that a timeline cue is bound to signed, fully reviewed local bytes."""
+    """Verify that a timeline cue is bound to signed, fully reviewed bytes."""
     root = root.expanduser().resolve()
     source_raw = str(event.get("source") or event.get("asset") or "")
     receipt_raw = str(event.get("approval_receipt") or "")
+    if source_raw.startswith("library:") or receipt_raw.startswith("library:"):
+        from sfx_library import approved_event_receipt_valid as library_event_valid
+
+        return library_event_valid(event)
     if not source_raw.startswith("local:") or not receipt_raw.startswith("local:"):
         return False
     source = root / source_raw.removeprefix("local:")
@@ -453,7 +457,19 @@ def attach_to_shot(
     material = material.strip().lower()
     if not material:
         raise SFXCandidateError("SFX material is required")
-    approval_receipt, record = _approved_receipt(root, asset_id)
+    try:
+        approval_receipt, record = _approved_receipt(root, asset_id)
+        source_ref = f"local:{record['approved_path']}"
+        receipt_ref = f"local:{approval_receipt.relative_to(root)}"
+    except SFXCandidateError:
+        from sfx_library import SFXLibraryError, approved_asset
+
+        try:
+            _, approval_receipt, record = approved_asset(asset_id)
+        except SFXLibraryError as exc:
+            raise SFXCandidateError("approved SFX receipt not found locally or in armory") from exc
+        source_ref = f"library:{record['approved_path']}"
+        receipt_ref = f"library:sfx/approved-noncommercial/{asset_id}.receipt.json"
     spec_path = root / "film-spec.json"
     spec = read_json(spec_path)
     if not isinstance(spec, dict):
@@ -475,11 +491,11 @@ def attach_to_shot(
         "start_offset_sec": round(float(start_offset_sec), 3),
         "duration_sec": round(float(duration_sec), 3),
         "asset_hint": "mmaudio_video_synchronized",
-        "source": f"local:{record['approved_path']}",
+        "source": source_ref,
         "license": record["license"],
         "source_sha256": record["sha256"],
         "approval_status": _APPROVED_STATUS,
-        "approval_receipt": f"local:{approval_receipt.relative_to(root)}",
+        "approval_receipt": receipt_ref,
         "production_eligible": False,
         "usage_scope": _INTERNAL_SCOPE,
         "model": record["model"],
