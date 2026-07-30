@@ -24,6 +24,7 @@
 **/*.egg-info/
 **/.venv/
 **/venv/
+/.local-runtimes/
 
 # Node (if any post tooling lands)
 **/node_modules/
