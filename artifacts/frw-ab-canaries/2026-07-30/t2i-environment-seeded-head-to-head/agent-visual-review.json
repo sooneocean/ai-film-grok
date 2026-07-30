@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-agent-visual-review",
+  "experiment_id": "env-t2i-seeded-20260730",
+  "reviewed_at": "2026-07-30T03:24:50Z",
+  "candidate_only": true,
+  "approved": false,
+  "approved_by": null,
+  "prompt_sha256": "593f0bf9698b7740b34c0689914f961929d3985fef2dc3208ed29c66ae6bd065",
+  "rank_sha256": "1072d0f8484305588daef019a59bb4b3065f1a2dab4e169c963414b56f4c740d",
+  "review_outcome": "pass_pending_human_approval",
+  "agent_preference": {
+    "champion": "qwen",
+    "challenger": "flux"
+  },
+  "reviews": [
+    {
+      "model_id": "qwen",
+      "media_sha256": "6db1fe6bccede6a8d2f98f2ffb574c86f1c31a4a4f32e155fa7d00eece226146",
+      "prompt_adherence": "strong",
+      "no_people": true,
+      "no_text": true,
+      "no_signs": true,
+      "independent_sample": true,
+      "promotion_eligible": true,
+      "notes": [
+        "Deserted rain-soaked railway platform, blue-hour atmosphere, warm lamps, wet reflections, and clear tracks match the brief.",
+        "No people, hanging boards, sign frames, plaques, posters, readable text, numbers, logos, icons, or symbols are visible.",
+        "Hand-painted anime background treatment is stronger than Flux.",
+        "Mean absolute pixel difference from the prior Qwen head-to-head output is 51.543."
+      ]
+    },
+    {
+      "model_id": "flux",
+      "media_sha256": "6e48dcbeea818d3997959084052a1af101acb2b115da1b8ce3a3c66d60c28a3c",
+      "prompt_adherence": "strong",
+      "no_people": true,
+      "no_text": true,
+      "no_signs": true,
+      "independent_sample": true,
+      "promotion_eligible": true,
+      "notes": [
+        "Deserted railway platform, blue-hour atmosphere, warm lamps, wet reflections, and clear tracks match the brief.",
+        "No people, hanging boards, sign frames, plaques, posters, readable text, numbers, logos, icons, or symbols are visible.",
+        "Rendering is more semi-realistic than Qwen but remains a viable challenger.",
+        "Mean absolute pixel difference from the prior Flux head-to-head output is 22.381."
+      ]
+    }
+  ],
+  "human_approval_required": true,
+  "promotion_written": false
+}

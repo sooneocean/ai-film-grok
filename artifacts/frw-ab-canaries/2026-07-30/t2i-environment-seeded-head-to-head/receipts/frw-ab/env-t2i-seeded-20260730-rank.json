@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-rank",
+  "created_at": "2026-07-30T03:23:56.387740+00:00",
+  "experiment_id": "env-t2i-seeded-20260730",
+  "operation": "text_to_image",
+  "catalog_sha256": "46ea14995336d17e498c0e92923ceaa061a7fce6407ebac040ebc4cc69a1ccdb",
+  "run_sha256": "8582affc241bc67ff5d9f7854a4dee126b47740794b02f0dbc000f76f1da7d89",
+  "poll_sha256": "fde1364ae3a07d37b12a464b29e0a9c0b12141283cc4994a38d0938c5d9bf1f3",
+  "ranking_policy": [
+    "media_qa_hard_gate",
+    "motion_score",
+    "motion_continuity",
+    "pixel_count",
+    "media_bytes",
+    "stable_model_id"
+  ],
+  "ranked": [
+    {
+      "model_id": "flux",
+      "media": {
+        "path": "outputs/flux.png",
+        "sha256": "6e48dcbeea818d3997959084052a1af101acb2b115da1b8ce3a3c66d60c28a3c",
+        "bytes": 1080127
+      },
+      "qa": {
+        "ok": true,
+        "decode_ok": null,
+        "motion_ok": null,
+        "motion_score": null,
+        "motion_continuity": null,
+        "width": 704,
+        "height": 1280,
+        "fps": null,
+        "duration_sec": null,
+        "aspect": 0.55,
+        "codes": [],
+        "soft_codes": [],
+        "errors": []
+      },
+      "viable": true,
+      "machine_score": {
+        "motion_score": 0.0,
+        "motion_continuity": 0.0,
+        "pixel_count": 901120,
+        "media_bytes": 1080127
+      }
+    },
+    {
+      "model_id": "qwen",
+      "media": {
+        "path": "outputs/qwen.png",
+        "sha256": "6db1fe6bccede6a8d2f98f2ffb574c86f1c31a4a4f32e155fa7d00eece226146",
+        "bytes": 908684
+      },
+      "qa": {
+        "ok": true,
+        "decode_ok": null,
+        "motion_ok": null,
+        "motion_score": null,
+        "motion_continuity": null,
+        "width": 704,
+        "height": 1280,
+        "fps": null,
+        "duration_sec": null,
+        "aspect": 0.55,
+        "codes": [],
+        "soft_codes": [],
+        "errors": []
+      },
+      "viable": true,
+      "machine_score": {
+        "motion_score": 0.0,
+        "motion_continuity": 0.0,
+        "pixel_count": 901120,
+        "media_bytes": 908684
+      }
+    }
+  ],
+  "rejected": [],
+  "provisional": {
+    "champion": "flux",
+    "challenger": "qwen"
+  },
+  "status": "pending_human_approval",
+  "approved": false,
+  "rank_sha256": "1072d0f8484305588daef019a59bb4b3065f1a2dab4e169c963414b56f4c740d"
+}

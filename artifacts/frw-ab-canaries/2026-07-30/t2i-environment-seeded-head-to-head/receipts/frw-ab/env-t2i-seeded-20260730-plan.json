@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-plan",
+  "created_at": "2026-07-30T03:22:37.655395+00:00",
+  "experiment_id": "env-t2i-seeded-20260730",
+  "stage": "pilot",
+  "operation": "text_to_image",
+  "content_class": "general",
+  "catalog_sha256": "46ea14995336d17e498c0e92923ceaa061a7fce6407ebac040ebc4cc69a1ccdb",
+  "input_bindings": {
+    "height": {
+      "sha256": "6636dad0df1afa3e1546a4ad4615b2d3a51f0540a1587c77c53fbf60790d4bda",
+      "present": true
+    },
+    "prompt": {
+      "sha256": "593f0bf9698b7740b34c0689914f961929d3985fef2dc3208ed29c66ae6bd065",
+      "present": true
+    },
+    "seed": {
+      "sha256": "b64d3848bbb13d3d5b838c66bdd29006db9e68c28e9d6fe117b5035acc1913df",
+      "present": true
+    },
+    "width": {
+      "sha256": "0e34a483393bd4c4a0b71a9a9f31fdba31508ddd102a4f6f7fa5fb4e2afe768a",
+      "present": true
+    }
+  },
+  "candidates": [
+    {
+      "capability_id": "text_to_image:flux",
+      "model_id": "flux",
+      "operation": "text_to_image",
+      "catalog_status": "advertised",
+      "health_state": "pending_pilot_probe",
+      "parameters": [
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "width",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "height",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "invocation": {
+        "command": "text2image",
+        "query_command": "text2image-query",
+        "fixed_args": {
+          "model": "flux"
+        }
+      }
+    },
+    {
+      "capability_id": "text_to_image:qwen",
+      "model_id": "qwen",
+      "operation": "text_to_image",
+      "catalog_status": "advertised",
+      "health_state": "pending_pilot_probe",
+      "parameters": [
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "width",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "height",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "invocation": {
+        "command": "text2image",
+        "query_command": "text2image-query",
+        "fixed_args": {
+          "model": "qwen"
+        }
+      }
+    }
+  ],
+  "promotion_sha256": null,
+  "fanout": {
+    "mode": "selected_eligible",
+    "parallel": true,
+    "unmetered": true,
+    "candidate_count": 2,
+    "declared_concurrency_limit": null
+  },
+  "provider_policy": {
+    "primary_provider": "grok",
+    "changes_primary_provider": false,
+    "requires_provider_switch_receipt": false,
+    "shot_id": null,
+    "automatic_quality_fallback": false
+  },
+  "execution": {
+    "authorized": false,
+    "explicit_run_required": true,
+    "automatic_resubmit": false
+  },
+  "plan_sha256": "071cb267250637f2e628c8421b2aab630b9a012f4fc4cddaff232ed6225e2471"
+}

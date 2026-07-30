@@ -15,6 +15,8 @@ catalog → plan → run → poll → rank → approve → production plan
 - `plan --stage pilot`：同 operation 的全部 callable 平台／classic 模型。
 - `plan --stage pilot --model A --model B`：只用于复测明确不合格候选；至少两个
   当前 eligible 模型，仍并行提交并保存选择范围。
+- `--seed`：图像路由需要独立样本时显式传入；seed 与其余输入一样只保存
+  SHA-256 绑定，并在 run 时要求完全相同。
 - `run`：一次性并行提交；已有 run receipt 时拒绝重复生成。
 - `poll`：并行查询一次，不自动重送。
 - `rank`：本机文件 read-back。视频须完整解码、9:16 最小几何、24 fps 与真实

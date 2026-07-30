@@ -172,6 +172,39 @@ def test_pilot_plan_can_limit_rerun_to_two_explicit_eligible_models(
             )
 
 
+def test_text_to_image_seed_is_hash_bound_and_forwarded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    catalog = _catalog()
+    for capability in catalog["capabilities"]:
+        if capability["operation"] == "image_to_video":
+            capability["operation"] = "text_to_image"
+            capability["capability_id"] = capability["capability_id"].replace(
+                "image_to_video", "text_to_image"
+            )
+            capability["invocation"]["command"] = "text2image"
+            capability["invocation"]["fixed_args"] = {"model": capability["model_id"]}
+    inputs = {"prompt": "empty station", "seed": "340701"}
+    plan = build_plan(
+        tmp_path,
+        experiment_id="seeded-t2i",
+        operation="text_to_image",
+        stage="pilot",
+        content_class="general",
+        inputs=inputs,
+        catalog=catalog,
+        selected_models=["seedance-a", "ltx-b"],
+    )
+    assert plan["input_bindings"]["seed"]["sha256"]
+    assert "340701" not in json.dumps(plan)
+
+    invoked = mock.Mock(return_value={"success": True, "data": {"task_id": "task-1"}})
+    monkeypatch.setattr(frw_ab, "invoke_frw", invoked)
+    frw_ab._frw_submit_candidate(plan["candidates"][0], inputs)
+    argv = invoked.call_args.args[0]
+    assert argv[argv.index("--seed") + 1] == "340701"
+
+
 def test_plan_rejects_missing_operation_inputs(tmp_path: Path) -> None:
     with pytest.raises(FrwABError, match="INVALID_INPUTS"):
         build_plan(

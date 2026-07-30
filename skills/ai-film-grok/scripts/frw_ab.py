@@ -98,6 +98,7 @@ INPUT_FLAGS = (
     "height",
     "duration",
     "fps",
+    "seed",
     "generate-audio",
     "title",
 )
