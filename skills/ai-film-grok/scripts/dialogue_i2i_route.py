@@ -7,6 +7,14 @@ from typing import Any
 from frw_canary import frw_i2i_capability
 
 BUSY_CODES = frozenset({"COMFY_QUEUE_BUSY", "VRAM_BELOW_FLOOR", "RAM_BELOW_FLOOR"})
+QWEN_FALLBACK_CODES = frozenset(
+    {
+        "QWEN_UNAVAILABLE",
+        "QWEN_MODEL_MISSING",
+        "QWEN_NODE_MISSING",
+        "QWEN_CAPABILITY_UNAVAILABLE",
+    }
+)
 NON_INTERFERENCE = [
     "never_global_interrupt",
     "never_delete_foreign_queue",
@@ -68,13 +76,13 @@ def route_dialogue_i2i(
             "blockers": sorted(codes & BUSY_CODES),
             "reason": "local 5090 is occupied; wait rather than interrupt, delete, or evict another job",
         }
-    if allow_frw_fallback and capability == "available":
+    if allow_frw_fallback and capability == "available" and codes & QWEN_FALLBACK_CODES:
         return {
             **common,
             "status": "ready",
             "selected_provider": "frw_i2i",
             "frw_i2i_capability": capability,
-            "reason": "explicit FRW fallback authorized after local Qwen capacity is unavailable",
+            "reason": "explicit FRW fallback authorized after classified local Qwen unavailability",
         }
     if local_capacity.get("ok") is True:
         return {
@@ -91,5 +99,5 @@ def route_dialogue_i2i(
         "selected_provider": None,
         "frw_i2i_capability": capability,
         "blockers": sorted(codes),
-        "reason": "Qwen local preflight did not pass; do not silently switch provider",
+        "reason": "Qwen local preflight is unknown/incomplete; do not silently switch provider",
     }

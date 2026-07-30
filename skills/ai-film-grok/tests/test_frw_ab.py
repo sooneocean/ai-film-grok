@@ -663,6 +663,7 @@ def test_machine_rank_is_provisional_and_human_approval_is_hash_bound(
     assert approved["champion"] == "seedance-a"
     assert approved["challenger"] == "ltx-b"
     assert approved["rank_sha256"]
+    assert approved["selection_binding_sha256"]
 
     with pytest.raises(FrwABError, match="HUMAN_APPROVAL_REQUIRED"):
         approve_rank(
@@ -679,6 +680,76 @@ def test_machine_rank_is_provisional_and_human_approval_is_hash_bound(
             champion="seedance-a",
             challenger="ltx-b",
             user_phrase="批准 ltx-b 为 champion，seedance-a 为 challenger",
+        )
+    with pytest.raises(FrwABError, match="HUMAN_APPROVAL_REQUIRED"):
+        approve_rank(
+            tmp_path,
+            rank=ranked,
+            champion="seedance-a",
+            challenger="ltx-b",
+            user_phrase="草案：批准 seedance-a 为 champion，ltx-b 为 challenger",
+        )
+
+
+def test_production_revalidates_role_bound_selection_receipt(tmp_path: Path) -> None:
+    catalog = _catalog()
+    rank_sha = "a" * 64
+    phrase = "批准 seedance-a 为 champion，ltx-b 为 challenger"
+    promotion = {
+        "schema_version": 1,
+        "kind": "frw-ab-promotion",
+        "approved": True,
+        "approved_by": "user",
+        "approved_at": "2026-07-30T00:00:00+00:00",
+        "user_phrase": phrase,
+        "experiment_id": "shot01-pilot",
+        "operation": "image_to_video",
+        "catalog_sha256": frw_ab._catalog_contract_hash(catalog),
+        "rank_sha256": rank_sha,
+        "champion": "seedance-a",
+        "challenger": "ltx-b",
+        "selection_binding_sha256": frw_ab._selection_binding_hash(
+            rank_sha256=rank_sha,
+            user_phrase=phrase,
+            champion="seedance-a",
+            challenger="ltx-b",
+        ),
+        "changes_primary_provider": False,
+        "requires_provider_switch_receipt": True,
+    }
+    promotion["promotion_sha256"] = frw_ab._receipt_hash(
+        promotion,
+        hash_field="promotion_sha256",
+        volatile_fields=frozenset({"approved_at"}),
+    )
+    plan = build_production_plan(
+        tmp_path,
+        experiment_id="shot01-production",
+        operation="image_to_video",
+        content_class="general",
+        inputs=_inputs(),
+        catalog=catalog,
+        promotion=promotion,
+        shot_id="shot01",
+    )
+    assert [row["model_id"] for row in plan["candidates"]] == ["seedance-a", "ltx-b"]
+
+    promotion["selection_binding_sha256"] = "0" * 64
+    promotion["promotion_sha256"] = frw_ab._receipt_hash(
+        promotion,
+        hash_field="promotion_sha256",
+        volatile_fields=frozenset({"approved_at"}),
+    )
+    with pytest.raises(FrwABError, match="PROMOTION_TAMPERED: selection binding mismatch"):
+        build_production_plan(
+            tmp_path,
+            experiment_id="shot01-production-tampered",
+            operation="image_to_video",
+            content_class="general",
+            inputs=_inputs(),
+            catalog=catalog,
+            promotion=promotion,
+            shot_id="shot01",
         )
 
 

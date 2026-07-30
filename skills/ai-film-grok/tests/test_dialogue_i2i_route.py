@@ -46,6 +46,17 @@ def test_frw_requires_explicit_fallback_authorization() -> None:
     assert "explicit FRW fallback" in route["reason"]
 
 
+def test_frw_fallback_rejects_unknown_or_incomplete_qwen_capacity() -> None:
+    for local_capacity in ({}, {"ok": False}, {"ok": False, "codes": ["UNKNOWN"]}):
+        route = route_dialogue_i2i(
+            frw_receipt={"i2i_capability": "available"},
+            local_capacity=local_capacity,
+            allow_frw_fallback=True,
+        )
+        assert route["status"] == "blocked"
+        assert route["selected_provider"] is None
+
+
 def test_route_waits_for_busy_local_without_interference() -> None:
     route = route_dialogue_i2i(
         frw_receipt={"i2i_capability": "blocked"},

@@ -183,7 +183,8 @@ def _selection_role_pattern(model_id: str, role: str) -> re.Pattern[str]:
     escaped = re.escape(model_id.casefold())
     model = rf"(?<![a-z0-9_-]){escaped}(?![a-z0-9_-])"
     return re.compile(
-        rf"(?:{model}\s*(?:为|as|is|=|:)\s*{role}\b|{role}\s*(?:为|as|is|=|:)\s*{model})",
+        rf"(?:{model}\s*(?:为|為|as|is|=|:)\s*{role}\b|"
+        rf"{role}\s*(?:为|為|as|is|=|:)\s*{model})",
         re.IGNORECASE,
     )
 
@@ -465,6 +466,8 @@ def build_production_plan(
         or promotion.get("operation") != operation
     ):
         raise FrwABError("PROMOTION_REQUIRED: current human FRW A/B promotion missing")
+    champion = str(promotion.get("champion") or "")
+    challenger = str(promotion.get("challenger") or "")
     if not allow_test_catalog_hash:
         promotion_hash = str(promotion.get("promotion_sha256") or "")
         expected_promotion_hash = _receipt_hash(
@@ -474,12 +477,27 @@ def build_production_plan(
         )
         if not promotion_hash or promotion_hash != expected_promotion_hash:
             raise FrwABError("PROMOTION_TAMPERED: approval receipt hash mismatch")
+        rank_sha = str(promotion.get("rank_sha256") or "")
+        user_phrase = str(promotion.get("user_phrase") or "")
+        expected_selection_binding = _selection_binding_hash(
+            rank_sha256=rank_sha,
+            user_phrase=user_phrase,
+            champion=champion,
+            challenger=challenger,
+        )
+        if (
+            not selection_phrase_is_approval(
+                user_phrase,
+                champion=champion,
+                challenger=challenger,
+            )
+            or promotion.get("selection_binding_sha256") != expected_selection_binding
+        ):
+            raise FrwABError("PROMOTION_TAMPERED: selection binding mismatch")
     catalog_hash = _catalog_contract_hash(catalog)
     if not allow_test_catalog_hash and promotion.get("catalog_sha256") != catalog_hash:
         raise FrwABError("PROMOTION_STALE: catalog contract changed")
     by_model = {row["model_id"]: row for row in eligible}
-    champion = str(promotion.get("champion") or "")
-    challenger = str(promotion.get("challenger") or "")
     if champion == challenger or champion not in by_model or challenger not in by_model:
         raise FrwABError("PROMOTION_STALE: champion or challenger is not eligible")
     stable_shot_id = None
@@ -939,8 +957,6 @@ def approve_rank(
     challenger: str,
     user_phrase: str,
 ) -> dict[str, Any]:
-    from pilot_review import user_phrase_is_approval
-
     expected_rank_hash = _receipt_hash(
         rank,
         hash_field="rank_sha256",
@@ -953,18 +969,11 @@ def approve_rank(
     ]
     if champion == challenger or champion not in ranked_models or challenger not in ranked_models:
         raise FrwABError("INVALID_PROMOTION: choose two distinct ranked candidates")
-    if not user_phrase_is_approval(user_phrase):
-        raise FrwABError("HUMAN_APPROVAL_REQUIRED: exact user approval phrase is required")
-    phrase = user_phrase.casefold()
-    champion_role = re.search(
-        rf"{re.escape(champion.casefold())}\s*(?:为|為|as)\s*(?:the\s+)?champion\b",
-        phrase,
-    )
-    challenger_role = re.search(
-        rf"{re.escape(challenger.casefold())}\s*(?:为|為|as)\s*(?:the\s+)?challenger\b",
-        phrase,
-    )
-    if champion_role is None or challenger_role is None:
+    if not selection_phrase_is_approval(
+        user_phrase,
+        champion=champion,
+        challenger=challenger,
+    ):
         raise FrwABError(
             "HUMAN_APPROVAL_REQUIRED: phrase must bind each selected model to its exact role"
         )
@@ -982,6 +991,12 @@ def approve_rank(
         "rank_sha256": rank_sha,
         "champion": champion,
         "challenger": challenger,
+        "selection_binding_sha256": _selection_binding_hash(
+            rank_sha256=rank_sha,
+            user_phrase=user_phrase,
+            champion=champion,
+            challenger=challenger,
+        ),
         "changes_primary_provider": False,
         "requires_provider_switch_receipt": rank.get("operation") == "image_to_video",
     }
