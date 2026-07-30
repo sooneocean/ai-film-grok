@@ -356,7 +356,7 @@ TTS_MODEL_ARMORY: dict[str, dict[str, Any]] = {
     },
     "kokoro_82m_zh": {
         "status": "install_required",
-        "route": "external",
+        "route": "kokoro-local",
         "license": "Apache-2.0",
         "production_eligible": False,
         "label": "Kokoro-82M 中文：轻量离线备选，需本机听审",

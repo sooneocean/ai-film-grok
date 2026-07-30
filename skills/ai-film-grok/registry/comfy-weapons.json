@@ -171,12 +171,19 @@
         "general_i2v": true,
         "external_api_required": false
       },
-      "verified": {
-        "real_pilot": true,
-        "normal_motion_mean": 18.2497,
-        "normal_motion_gate": true,
-        "meat_motion_gate": false
-      }
+  "verified": {
+    "real_pilot": true,
+    "normal_motion_mean": 18.2497,
+    "normal_motion_gate": true,
+    "meat_motion_gate": false,
+    "workflow_template_sha256": "dae3250e558317ba19d8f6438df3d3cce1607540844d2049e1eff51a532a6a93",
+    "output_sha256": "6d79426bb8538035731dd3526e2b29c6149080e22b2d8c33500ed50c2fce9471",
+    "technical_pilot_decode_ok": true,
+    "technical_pilot_geometry": "1024x576@16fps,5.062012s",
+    "visual_contact_sheet": "pass_stable_identity_hand_window_light",
+    "human_review": false,
+    "production_promoted": false
+  }
     },
     {
       "id": "wan22-adult-intimacy-baseline",

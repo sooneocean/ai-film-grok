@@ -69,6 +69,17 @@ def test_pilot_template_hashes_are_registry_bound() -> None:
         assert workflow_sha256(graph) == weapon["verified"]["workflow_template_sha256"]
 
 
+def test_wan_quality_template_decodes_the_completed_low_noise_pass() -> None:
+    root = Path(__file__).resolve().parents[1]
+    graph = json.loads(
+        (root / "templates/comfy/wan22-i2v-quality-api.json").read_text(encoding="utf-8")
+    )
+
+    assert graph["ks_h"]["inputs"]["latent_image"] == ["i2v", 2]
+    assert graph["ks_l"]["inputs"]["latent_image"] == ["ks_h", 0]
+    assert graph["decode"]["inputs"]["samples"] == ["ks_l", 0]
+
+
 @patch.dict(
     "os.environ",
     {"AIFILM_COMFYUI_BASE_URL": "http://192.168.88.52:8188"},

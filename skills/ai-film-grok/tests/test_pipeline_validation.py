@@ -54,6 +54,9 @@ class PipelineValidationTests(unittest.TestCase):
     def test_private_audio_node_is_an_allowed_tts_backend(self) -> None:
         self.assertIn("audio_node", film_spec.TTS_BACKENDS)
 
+    def test_offline_kokoro_is_an_allowed_explicit_tts_backend(self) -> None:
+        self.assertIn("kokoro-local", film_spec.TTS_BACKENDS)
+
     def init_root(self, root: Path) -> None:
         with contextlib.redirect_stdout(StringIO()):
             rc = aifilm_grok.main(

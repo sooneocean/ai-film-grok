@@ -9,10 +9,11 @@ Backends (human-likeness roughly ↑):
   mimo      — Xiaomi MiMo V2.5 TTS (limited-time free; built-in Chinese voices) **film default**
   edge      — Microsoft Edge Neural (free explicit fallback; more synthetic)
   cosyvoice-local — explicit local CosyVoice adapter (never selected automatically)
+  kokoro-local — explicit offline Kokoro Chinese adapter (never selected automatically)
   external  — arbitrary approved CLI via AIFILM_TTS_ARGV
 
 Env / config.env:
-  AIFILM_TTS_BACKEND=mimo|auto|minimax|fish|voicebox|edge|external|cosyvoice-local|grok
+  AIFILM_TTS_BACKEND=mimo|auto|minimax|fish|voicebox|edge|external|cosyvoice-local|kokoro-local|grok
   MIMO_API_KEY=...  MIMO_TTS_VOICE=冰糖  MIMO_TTS_MODEL=mimo-v2.5-tts
   AIFILM_GROK_TTS_VOICE=eve   # or ara, leo, carina, zagan, …
   AIFILM_GROK_TTS_LANGUAGE=zh
@@ -75,6 +76,7 @@ TTS_BACKENDS = frozenset(
         "edge",
         "external",
         "cosyvoice-local",
+        "kokoro-local",
         "grok",
         "qwen3",
         "higgs",
@@ -234,6 +236,19 @@ def cosyvoice_local_argv_configured() -> bool:
     return configured == adapter
 
 
+def kokoro_local_argv_configured() -> bool:
+    """Whether argv invokes this checkout's offline Kokoro adapter."""
+    argv = external_argv()
+    if not argv or len(argv) < 2:
+        return False
+    adapter = (Path(__file__).resolve().parent / "adapters" / "kokoro_tts.py").resolve()
+    try:
+        configured = Path(argv[1]).expanduser().resolve()
+    except OSError:
+        return False
+    return configured == adapter
+
+
 def external_tts_subprocess_env() -> dict[str, str]:
     """Pass CosyVoice's non-secret local render settings only to its own adapter."""
     env = minimal_subprocess_env()
@@ -247,12 +262,17 @@ def external_tts_subprocess_env() -> dict[str, str]:
             value = os.environ.get(name)
             if value:
                 env[name] = value
+    if kokoro_local_argv_configured():
+        for name in ("KOKORO_VOICE", "KOKORO_DEVICE", "HF_HOME"):
+            value = os.environ.get(name)
+            if value:
+                env[name] = value
     return env
 
 
 def external_tts_timeout() -> int:
     """Allow one cold local model load without relaxing cloud adapter limits."""
-    return 600 if cosyvoice_local_argv_configured() else 300
+    return 600 if cosyvoice_local_argv_configured() or kokoro_local_argv_configured() else 300
 
 
 def strict_voice_enabled() -> bool:
@@ -1110,7 +1130,11 @@ def assert_voice_backend_compatible(backend: str, voice: str | None) -> None:
         "audio_node",
     }:
         return
-    if choice in {"external", "cosyvoice-local"} or external_tts_argv_hints_provider("eleven"):
+    if choice in {
+        "external",
+        "cosyvoice-local",
+        "kokoro-local",
+    } or external_tts_argv_hints_provider("eleven"):
         raise TTSError(
             f"TTS voice {voice!r} looks like Microsoft Edge Neural — cannot use with "
             "external/ElevenLabs (AIFILM_TTS_ARGV). "
@@ -1391,6 +1415,19 @@ def synthesize(
             )
             voice_used = voice or "cosyvoice-local"
             model_used = "Fun-CosyVoice3-local"
+        elif choice == "kokoro-local":
+            if not kokoro_local_argv_configured():
+                raise TTSError(
+                    "kokoro-local requires AIFILM_TTS_ARGV to invoke adapters/kokoro_tts.py"
+                )
+            _tracked(
+                "kokoro-local",
+                "Kokoro-82M-v1.1-zh",
+                local_zero=True,
+                call=lambda: tts_external(text, out_mp3, voice=voice),
+            )
+            voice_used = voice or "zf_001"
+            model_used = "Kokoro-82M-v1.1-zh"
         elif choice == "external":
             _tracked(
                 "external",
