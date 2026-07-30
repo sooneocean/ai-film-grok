@@ -19,8 +19,8 @@ from typing import Any
 from content_channels import resolve_content_channels
 from film_spec import estimate_nar_vo_sec, validate_film_spec
 from media_duration import MediaDurationError, probe_duration_sec
+from util import read_json, utc_now, write_json
 from util import sha256_file as _sha256
-from util import utc_now, write_json
 
 SCHEMA_VERSION = 1
 KIND = "ai-film-tts-rehearsal"
@@ -199,8 +199,81 @@ def register_measured_durations(
     }
     out_path = rehearsal_receipt_path(root)
     write_json(out_path, receipt)
+    _lock_dialogue_durations_to_rehearsal(root, receipt)
+    # Keep the dialogue package synchronized with the actual rehearsal media.
+    # Absence of a dialogue graph is normal for legacy narrator projects.
+    graph = read_json(root / "drama-graph.json")
+    spec = read_json(root / "film-spec.json")
+    if isinstance(graph, dict) and isinstance(spec, dict) and graph.get("dialogue_ledger"):
+        from dialogue_scene_package import build_dialogue_scene_package
+
+        write_json(
+            root / "dialogue-scene-package.json",
+            build_dialogue_scene_package(graph, spec, receipt),
+        )
     receipt["receipt_path"] = str(out_path)
     return receipt
+
+
+def _lock_dialogue_durations_to_rehearsal(root: Path, receipt: dict[str, Any]) -> None:
+    """Replace estimated dialogue plate lengths with measured rehearsal timing.
+
+    This is intentionally limited to dialogue voice cues.  It leaves narration
+    and visual-only coverage untouched, while making any later I2V plan derive
+    from real speech plus explicit pre/post pause handles.
+    """
+    spec_path = root / "film-spec.json"
+    spec = read_json(spec_path)
+    if not isinstance(spec, dict) or spec.get("vo_mode") != "dialogue_drama":
+        return
+    measured: dict[str, dict[str, Any]] = {}
+    for item in receipt.get("shots") or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            valid = float(item.get("measured_duration_sec") or 0) > 0
+        except (TypeError, ValueError):
+            valid = False
+        if valid:
+            measured[str(item.get("shot_id") or "")] = item
+    changed = False
+    for scene in spec.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        for shot in scene.get("shots") or []:
+            if not isinstance(shot, dict):
+                continue
+            sid = str(shot.get("id") or "")
+            item = measured.get(sid)
+            cues = shot.get("audio_cues") if isinstance(shot.get("audio_cues"), list) else []
+            dialogue = next(
+                (
+                    cue
+                    for cue in cues
+                    if isinstance(cue, dict)
+                    and cue.get("kind") == "voice"
+                    and cue.get("line_type") == "dialogue"
+                ),
+                None,
+            )
+            if not item or not isinstance(dialogue, dict):
+                continue
+            measured_sec = round(float(item["measured_duration_sec"]), 3)
+            pre = max(0.0, float(dialogue.get("pause_before_sec") or 0.0))
+            post = max(0.0, float(dialogue.get("pause_after_sec") or 0.0))
+            dialogue["start_offset_sec"] = round(pre, 3)
+            dialogue["duration_sec"] = measured_sec
+            shot["duration_sec"] = round(pre + measured_sec + post, 3)
+            shot["tts_timing_lock"] = {
+                "status": "locked",
+                "audio_sha256": item.get("audio_sha256"),
+                "speech_duration_sec": measured_sec,
+                "pause_before_sec": round(pre, 3),
+                "pause_after_sec": round(post, 3),
+            }
+            changed = True
+    if changed:
+        write_json(spec_path, spec)
 
 
 def run_rehearsal(

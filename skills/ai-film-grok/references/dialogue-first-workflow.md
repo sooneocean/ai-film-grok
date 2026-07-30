@@ -9,8 +9,8 @@ story.receive
 → narrative lock
 → drama-graph 投影
 → performance-state I2I
-→ 日文 TTS
-→ 声音联动动态路由
+→ 日文 TTS 排练（实音频、时长、停顿、情绪版本）
+→ 按实测时长编排覆盖与镜头
 → QA provisional winner
 → 完整观看人工批准
 → promote / final
@@ -26,33 +26,45 @@ story.receive
 ## 画面、旁白与状态
 
 - 以对白回合设计 A-roll、正反打、过肩、反应、动作覆盖与信息插镜；长台词可切画面，声音和字幕时钟不断。
-- 禁止连续讲话大头镜；相邻镜必须改变景别、视点、眼神轴、动作或反应功能。
+- 禁止连续讲话大头镜；相邻镜必须改变景别、视点、眼神轴、动作或反应功能。每个 `beat_id` 含讲话镜时，必须有同一 `beat_id` 的 `reaction`、`action_cover` 或 `silence` 承接；同一节拍可含多句短对白，不会被强迫一行一条视频。
 - 旁白只补 `time_jump`、`location_context`、`offscreen_fact`、`inner_context` 等画面和对白无法承载的信息。必须记录理由、信息缺口和时长；目标占比为 0，硬上限 15%。
-- 相同身份、衣着、情绪、视线、姿态、道具、光线与机位共享 `performance_state`；真实变化才拆新状态。批准 I2I receipt 必须绑定输入、输出、模型与 SHA-256。
+- 状态键是「角色 × 场景 × 衣着 × 情绪 × 姿态 × 视线 × 道具 × 光线 × 空间位置」。角色母版先经 Qwen I2I 生成状态照；状态照再生成每句关键帧；已批准的上镜末帧可 promote 为下一镜候选。批准 I2I receipt 必须绑定输入、输出、模型与 SHA-256。
+- `dialogue-scene-package.json` 用 `line_id` 把台词、TTS 哈希/时长、状态照、关键帧、口型、字幕和人工审核绑在一起。`on_camera` 只允许短句、近景/微侧脸、遮挡少，且必须有状态照、TTS 与逐镜人工口型审核。
+- TTS 排练完成后会锁回每一条对白镜的 `duration_sec`（实音频 + 明确前后停顿），禁止再用估算秒数硬塞进既有 I2V 片长。
+- `aifilm dialogue-production-plan --root <film>` 会把每个 `line_id` 编译为无消费责任链：TTS → Qwen 状态照 → Qwen 关键帧 → Wan I2V →（需要时）LatentSync → Foley/MMAudio → post。每一步列出依赖与必须回执；生成计划本身不会提交 5090 队列。
 
 ## 讲话镜动态路由
 
 同一讲话镜的两个选项必须共享批准状态图、最终日文 TTS 和表演意图：
 
-1. **首选**：Qwen I2I 状态图 + 最终 TTS → InfiniteTalk；音频直接驱动嘴、表情、头部与身体表演。
-2. **第二选项**：同一状态图 → Grok Imagine Video → LatentSync 1.6；Grok 负责动态，最终 TTS 仍是唯一对白时钟。
+1. **首选**：Qwen I2I 状态图/关键帧 → Wan 2.2（或已验证 I2V）→ RTX LatentSync 1.6；最终 TTS 是唯一对白时钟。
+2. **回退**：只在 LatentSync 出现可分类技术失败时，明确选择 RTX MuseTalk 1.5。
 
 条件 DAG 固定为：
 
 ```text
-state_i2i → tts → primary_infinite_talk
-                 ↘ secondary_grok_imagine → secondary_lipsync
-active route → qa → provisional_select → human_approve → promote
+state_i2i → tts rehearsal → keyframe_i2i → Wan I2V → LatentSync 1.6
+                                                     ↘ MuseTalk 1.5 (classified failure only)
+                                              → full human review → promote
 ```
 
-`dialogue_motion_route=auto` 选择 InfiniteTalk；只有明确指定
-`grok_imagine_video`，或 InfiniteTalk 出现可分类的技术失败，才可启动第二选项。
-人工质量拒绝、身份漂移和未知错误都不构成自动换路理由。Grok 输出不得以无声动态片
-进入 final，必须再绑定同一 TTS 哈希并完成 LatentSync。
+`dialogue_motion_route=auto` 选择已验证的 I2V + LatentSync 1.6；质量拒绝、身份漂移和未知错误都不构成自动换路理由。InfiniteTalk 与 FantasyTalking 会重生成整张画面，只可作为明确标记的实验 pilot，绝不作为默认对白生产线。
 
 RTX 5090 单队列串行；队列、GPU 或能力证据未知/过期即阻断。尚未晋升的 InfiniteTalk
 只可进入 pilot；架构首选不等于伪造生产就绪。自动评分只产生 provisional winner；
 完整观看人工批准前不得 promote，败选素材不得进入 final。
+
+## 30–60 秒武器样片
+
+批量生产前，以同一组有真实 TTS 哈希的 `line_id` 做 30–60 秒样片。无消费的
+`aifilm dialogue-benchmark --root <film>` 会写出 Qwen 状态照、Wan I2V、LatentSync 1.6
+三臂的共同输入与人工选择门；它不是生成或批准的替代品。每一臂有实际产物与完整看片后，
+才可记录稳定参数并进入 bulk。
+
+依序用 `aifilm dialogue-benchmark-review` 记录三臂的实际产物、人工意见与参数，再用
+`aifilm dialogue-benchmark-approve` 锁定整条链。批准会以使用者本机环境中的
+`AIFILM_AUDIO_RECEIPT_KEY`（或既有 `AIFILM_AUDIO_NODE_TOKEN`）签名；任何一臂改写都会
+撤销批准与签名，必须重新完整审看。密钥不写进项目档或命令列。
 
 ## 声音与交付
 

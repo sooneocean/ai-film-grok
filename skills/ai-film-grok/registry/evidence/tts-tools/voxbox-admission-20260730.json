@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "kind": "tts-tool-admission",
+  "tool_id": "imyfone-voxbox",
+  "assessed_at": "2026-07-30T00:00:00Z",
+  "status": "not_admitted_no_automation_contract",
+  "admission_policy": "official_cli_or_api_required",
+  "local_installation": {
+    "detected": false,
+    "search_roots": ["/Applications", "/Users/dex/Applications"]
+  },
+  "vendor_reported_capabilities": {
+    "tts": true,
+    "document_import": true,
+    "audio_export_formats": ["wav", "mp3", "aac"],
+    "account_or_network_required": true
+  },
+  "sources": [
+    {
+      "url": "https://www.imyfone.com/support/voice-recorder/",
+      "accessed_at": "2026-07-30",
+      "evidence_scope": "vendor documentation only; not a local integration test"
+    }
+  ],
+  "automation_contract": {
+    "official_cli_verified": false,
+    "official_api_verified": false,
+    "gui_automation_allowed": false
+  },
+  "decision": {
+    "production_backend": false,
+    "armory_entry_created": false,
+    "fallback_routes": ["audio_node_qwen3_tts", "edge", "voicebox_when_verified"]
+  },
+  "recheck_requirements": [
+    "installed product version",
+    "official batch CLI or API documentation",
+    "reproducible text-to-audio request and output contract",
+    "license and account usage review"
+  ]
+}

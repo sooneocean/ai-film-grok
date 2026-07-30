@@ -8,7 +8,12 @@ Without approval, at most PILOT_MAX_SHOTS_WITHOUT_APPROVAL distinct shot_ids may
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import os
+import re
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -24,10 +29,270 @@ from util import read_json
 
 PILOT_MAX_SHOTS_WITHOUT_APPROVAL = 3
 PILOT_APPROVAL_NAME = "pilot-approval.json"
+_MAX_GATE_JSON_BYTES = 4 * 1024 * 1024
+_MAX_BENCHMARK_ARTIFACT_BYTES = 2 * 1024 * 1024 * 1024
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ProductionGateError(RuntimeError):
     """Raised when a production gate blocks the operation."""
+
+
+def _open_gate_root(root: Path) -> tuple[Path, int]:
+    raw = Path(root).expanduser()
+    base = Path(os.path.abspath(raw))
+    if raw.is_symlink() or not all(hasattr(os, name) for name in ("O_DIRECTORY", "O_NOFOLLOW")):
+        raise ProductionGateError("dialogue evidence gate: unsafe film root")
+    try:
+        root_fd = os.open(base, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise ProductionGateError("dialogue evidence gate: unsafe film root") from exc
+    return base, root_fd
+
+
+def _open_root_file(
+    root_fd: int,
+    relative: Path,
+    *,
+    code: str,
+    max_bytes: int,
+) -> tuple[int, os.stat_result]:
+    if (
+        relative.is_absolute()
+        or not relative.parts
+        or any(part in {"", ".", ".."} for part in relative.parts)
+    ):
+        raise ProductionGateError(code)
+    directory_fd = os.dup(root_fd)
+    try:
+        for component in relative.parts[:-1]:
+            next_fd = os.open(
+                component,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                dir_fd=directory_fd,
+            )
+            os.close(directory_fd)
+            directory_fd = next_fd
+        file_fd = os.open(
+            relative.parts[-1],
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            dir_fd=directory_fd,
+        )
+    except OSError as exc:
+        os.close(directory_fd)
+        raise ProductionGateError(code) from exc
+    os.close(directory_fd)
+    try:
+        metadata = os.fstat(file_fd)
+    except OSError as exc:
+        os.close(file_fd)
+        raise ProductionGateError(code) from exc
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_size <= 0 or metadata.st_size > max_bytes:
+        os.close(file_fd)
+        raise ProductionGateError(code)
+    return file_fd, metadata
+
+
+def _read_regular_json(root_fd: int, relative: Path, *, code: str) -> dict[str, Any]:
+    """Read bounded JSON through a root-bound, non-symlink file descriptor."""
+    file_fd, before = _open_root_file(
+        root_fd,
+        relative,
+        code=code,
+        max_bytes=_MAX_GATE_JSON_BYTES,
+    )
+    try:
+        chunks = bytearray()
+        while chunk := os.read(
+            file_fd,
+            min(1024 * 1024, _MAX_GATE_JSON_BYTES + 1 - len(chunks)),
+        ):
+            chunks.extend(chunk)
+            if len(chunks) > _MAX_GATE_JSON_BYTES:
+                break
+        after = os.fstat(file_fd)
+        if len(chunks) != before.st_size or (
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+            raise ProductionGateError(code)
+        value = json.loads(chunks)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
+        raise ProductionGateError(code) from exc
+    finally:
+        os.close(file_fd)
+    if not isinstance(value, dict):
+        raise ProductionGateError(code)
+    return value
+
+
+def _root_file_sha256(root_fd: int, relative: object) -> str | None:
+    if not isinstance(relative, str) or not relative.strip():
+        return None
+    code = "dialogue benchmark gate: unsafe arm artifact"
+    try:
+        file_fd, before = _open_root_file(
+            root_fd,
+            Path(relative),
+            code=code,
+            max_bytes=_MAX_BENCHMARK_ARTIFACT_BYTES,
+        )
+    except ProductionGateError:
+        return None
+    digest = hashlib.sha256()
+    try:
+        while chunk := os.read(file_fd, 1024 * 1024):
+            digest.update(chunk)
+        after = os.fstat(file_fd)
+    except OSError:
+        return None
+    finally:
+        os.close(file_fd)
+    if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    ):
+        return None
+    return digest.hexdigest()
+
+
+def _dialogue_package_line_ids(package: dict[str, Any]) -> set[str]:
+    return {
+        line_id
+        for scene in package.get("scenes") or []
+        if isinstance(scene, dict)
+        for line in scene.get("lines") or []
+        if isinstance(line, dict)
+        if isinstance((line_id := line.get("line_id")), str) and line_id.strip()
+    }
+
+
+def _assert_dialogue_benchmark_receipt(
+    root_fd: int,
+    package: dict[str, Any],
+    benchmark: dict[str, Any],
+) -> None:
+    message = (
+        "dialogue benchmark gate: Qwen, Wan, and LatentSync must use the same 30–60s "
+        "dialogue, retain current artifact hashes, receive human review, and have one "
+        "signed approved stable-parameter receipt."
+    )
+    try:
+        from dialogue_benchmark import MAX_DURATION_SEC, MIN_DURATION_SEC, WEAPONS
+        from performance_candidates import receipt_is_signed
+    except ImportError as exc:
+        raise ProductionGateError("dialogue benchmark gate: validator unavailable") from exc
+
+    if not receipt_is_signed(benchmark):
+        raise ProductionGateError(message)
+    try:
+        duration_sec = float(benchmark.get("duration_sec"))
+    except (TypeError, ValueError):
+        raise ProductionGateError(message) from None
+    line_ids = benchmark.get("line_ids")
+    weapons = benchmark.get("weapons")
+    arms = benchmark.get("arms")
+    selection = benchmark.get("selection")
+    if (
+        benchmark.get("status") != "planned"
+        or not MIN_DURATION_SEC <= duration_sec <= MAX_DURATION_SEC
+        or not isinstance(line_ids, list)
+        or not line_ids
+        or any(not isinstance(line_id, str) or not line_id.strip() for line_id in line_ids)
+        or len(line_ids) != len(set(line_ids))
+        or not set(line_ids).issubset(_dialogue_package_line_ids(package))
+        or not isinstance(weapons, list)
+        or len(weapons) != len(WEAPONS)
+        or set(weapons) != set(WEAPONS)
+        or not isinstance(arms, list)
+        or len(arms) != len(WEAPONS)
+        or not isinstance(selection, dict)
+    ):
+        raise ProductionGateError(message)
+
+    reviewed: dict[str, dict[str, Any]] = {}
+    for arm in arms:
+        if not isinstance(arm, dict):
+            raise ProductionGateError(message)
+        weapon = arm.get("weapon")
+        parameters = arm.get("stable_parameters")
+        expected_hash = arm.get("artifact_sha256")
+        if (
+            weapon not in WEAPONS
+            or weapon in reviewed
+            or arm.get("status") != "reviewed"
+            or not isinstance(arm.get("reviewer"), str)
+            or not arm["reviewer"].strip()
+            or not isinstance(arm.get("review_note"), str)
+            or not arm["review_note"].strip()
+            or not isinstance(parameters, dict)
+            or not parameters
+            or not isinstance(expected_hash, str)
+            or not _SHA256_RE.fullmatch(expected_hash)
+        ):
+            raise ProductionGateError(message)
+        current_hash = _root_file_sha256(root_fd, arm.get("artifact"))
+        if current_hash is None or not hmac.compare_digest(current_hash, expected_hash):
+            raise ProductionGateError(message)
+        reviewed[weapon] = arm
+
+    selected_weapons = selection.get("required_weapons")
+    selected_parameters = selection.get("stable_parameters")
+    approved_parameters = {weapon: reviewed[weapon]["stable_parameters"] for weapon in WEAPONS}
+    if (
+        selection.get("status") != "approved"
+        or not isinstance(selection.get("reviewer"), str)
+        or not selection["reviewer"].strip()
+        or not isinstance(selection.get("rationale"), str)
+        or not selection["rationale"].strip()
+        or not isinstance(selected_weapons, list)
+        or len(selected_weapons) != len(WEAPONS)
+        or set(selected_weapons) != set(WEAPONS)
+        or selected_parameters != approved_parameters
+    ):
+        raise ProductionGateError(message)
+
+
+def assert_dialogue_drama_production_evidence(root: Path) -> dict[str, Any]:
+    """Hard-gate dialogue final/bulk on TTS, package, lipsync, and benchmark proof."""
+    base, root_fd = _open_gate_root(root)
+    try:
+        spec = _read_regular_json(
+            root_fd,
+            Path("film-spec.json"),
+            code="dialogue evidence gate: missing or unsafe film-spec.json",
+        )
+        if spec.get("vo_mode") != "dialogue_drama":
+            return {"checked": False, "reason": "not_dialogue_drama"}
+        package = _read_regular_json(
+            root_fd,
+            Path("dialogue-scene-package.json"),
+            code="dialogue package gate: missing or unsafe dialogue-scene-package.json",
+        )
+        try:
+            from dialogue_scene_package import validate_dialogue_scene_package
+        except ImportError as exc:
+            raise ProductionGateError("dialogue package gate: validator unavailable") from exc
+        result = validate_dialogue_scene_package(package, production=True, root=base)
+        if not result.get("ok"):
+            codes = ", ".join(str(item.get("code")) for item in result.get("errors") or [])
+            raise ProductionGateError(
+                "dialogue package gate: production evidence incomplete "
+                f"[{codes or 'PACKAGE_INVALID'}]; run tts-rehearse, complete LatentSync review, "
+                "then regenerate the dialogue scene package."
+            )
+        if spec.get("dialogue_benchmark_required") is True:
+            benchmark = _read_regular_json(
+                root_fd,
+                Path("receipts/dialogue-weapon-benchmark.json"),
+                code="dialogue benchmark gate: missing or unsafe benchmark receipt",
+            )
+            _assert_dialogue_benchmark_receipt(root_fd, package, benchmark)
+        return {"ok": True, "checked": True, "line_package": True}
+    finally:
+        os.close(root_fd)
 
 
 def pilot_approval_path(root: Path) -> Path:
@@ -601,6 +866,7 @@ def assert_no_loop_risk(
             strict=strict_tts_rehearsal,
             force=False,
         )
+        assert_dialogue_drama_production_evidence(Path(root))
 
     if force:
         return []

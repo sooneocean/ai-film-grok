@@ -234,6 +234,13 @@ class TestWriteSpecDialogueContractGate:
                     "speaker": "hero",
                     "speaker_on_camera": True,
                     "lipsync": True,
+                    "lipsync_required": True,
+                    "performance_state_id": "hero-sc01-talk01",
+                    "performance_state": {"head_angle": "three-quarter"},
+                    "dsl": {
+                        **_dc_shot("talk01")["dsl"],
+                        "camera": {"shot_size": "medium close-up"},
+                    },
                     "audio_cues": [
                         {
                             "kind": "voice",
@@ -263,6 +270,7 @@ class TestWriteSpecDialogueContractGate:
                 {
                     **_dc_shot("cover01"),
                     "screen_mode": "action_cover",
+                    "beat_id": "dlg_01",
                     "audio_cues": [{"kind": "silence", "start_offset_sec": 0, "duration_sec": 1}],
                 },
             ]
@@ -271,7 +279,12 @@ class TestWriteSpecDialogueContractGate:
         spec["dialogue_spoken_lang"] = "ja"
         spec["narration_spoken_lang"] = "zh"
         spec["scenes"][0]["shots"][0].update(
-            {"dialogue_ja": "行かないで。", "caption_text": "别走。", "translation_status": "ready"}
+            {
+                "dialogue_ja": "行かないで。",
+                "caption_text": "别走。",
+                "translation_status": "ready",
+                "beat_id": "dlg_01",
+            }
         )
         spec["scenes"][0]["shots"][0]["audio_cues"][0]["spoken_text"] = "行かないで。"
         spec["scenes"][0]["shots"][0]["audio_cues"][0]["language"] = "ja"

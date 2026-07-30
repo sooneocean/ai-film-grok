@@ -1333,6 +1333,53 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") else 2
 
 
+def cmd_dialogue_benchmark(args: argparse.Namespace) -> int:
+    from dialogue_benchmark import build_dialogue_benchmark
+
+    report = build_dialogue_benchmark(Path(args.root))
+    emit(report)
+    return 0 if report.get("status") == "planned" else 2
+
+
+def cmd_dialogue_benchmark_review(args: argparse.Namespace) -> int:
+    from dialogue_benchmark import record_benchmark_arm
+
+    try:
+        parameters = json.loads(args.parameters_json)
+    except json.JSONDecodeError as exc:
+        raise FilmError("--parameters-json must be a JSON object") from exc
+    if not isinstance(parameters, dict):
+        raise FilmError("--parameters-json must be a JSON object")
+    report = record_benchmark_arm(
+        Path(args.root),
+        weapon=args.weapon,
+        artifact=Path(args.artifact),
+        reviewer=args.reviewer,
+        note=args.note,
+        parameters=parameters,
+    )
+    emit(report)
+    return 0
+
+
+def cmd_dialogue_benchmark_approve(args: argparse.Namespace) -> int:
+    from dialogue_benchmark import approve_benchmark_parameters
+
+    report = approve_benchmark_parameters(
+        Path(args.root), reviewer=args.reviewer, rationale=args.rationale
+    )
+    emit(report)
+    return 0
+
+
+def cmd_dialogue_production_plan(args: argparse.Namespace) -> int:
+    from dialogue_production_plan import build_dialogue_production_plan
+
+    report = build_dialogue_production_plan(Path(args.root))
+    emit(report)
+    return 0
+
+
 def cmd_creative_pipeline(args: argparse.Namespace) -> int:
     from creative_pipeline import (
         build_animatic_gate,
@@ -8415,6 +8462,31 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_p.add_argument("--suite", choices=("premium-vertical",), default="premium-vertical")
     benchmark_p.add_argument("--mode", choices=("contract", "live"), default="contract")
 
+    dialogue_benchmark_p = sub.add_parser(
+        "dialogue-benchmark", help="Plan the 30–60s Qwen/Wan/LatentSync benchmark without spending"
+    )
+    dialogue_benchmark_p.add_argument("--root", required=True)
+    dialogue_benchmark_review_p = sub.add_parser(
+        "dialogue-benchmark-review", help="Record a human-reviewed Qwen, Wan, or LatentSync arm"
+    )
+    dialogue_benchmark_review_p.add_argument("--root", required=True)
+    dialogue_benchmark_review_p.add_argument("--weapon", required=True)
+    dialogue_benchmark_review_p.add_argument("--artifact", required=True)
+    dialogue_benchmark_review_p.add_argument("--reviewer", required=True)
+    dialogue_benchmark_review_p.add_argument("--note", required=True)
+    dialogue_benchmark_review_p.add_argument("--parameters-json", required=True)
+    dialogue_benchmark_approve_p = sub.add_parser(
+        "dialogue-benchmark-approve", help="Approve all reviewed dialogue benchmark parameters"
+    )
+    dialogue_benchmark_approve_p.add_argument("--root", required=True)
+    dialogue_benchmark_approve_p.add_argument("--reviewer", required=True)
+    dialogue_benchmark_approve_p.add_argument("--rationale", required=True)
+    dialogue_production_plan_p = sub.add_parser(
+        "dialogue-production-plan",
+        help="Compile the no-spend Qwen/Wan/LatentSync/MMAudio dialogue production plan",
+    )
+    dialogue_production_plan_p.add_argument("--root", required=True)
+
     creative = sub.add_parser(
         "creative-pipeline", help="Radio cut, animatic and premium pre-production gates"
     )
@@ -8587,6 +8659,41 @@ def build_parser() -> argparse.ArgumentParser:
             action_parser.add_argument(
                 "--timeout", type=int, default=45, help="1-120 seconds; default 45"
             )
+
+    local_omni = sub.add_parser(
+        "local-omni-review",
+        help="Opt-in private frame review; candidate-only and cannot approve production",
+    )
+    local_omni_sub = local_omni.add_subparsers(dest="local_omni_review_action", required=True)
+    local_omni_probe = local_omni_sub.add_parser(
+        "probe", help="Read the private model list without sending frames or starting inference"
+    )
+    local_omni_run = local_omni_sub.add_parser(
+        "run", help="Review declared sanitized workspace frames and write a candidate-only report"
+    )
+    for action_parser in (local_omni_probe, local_omni_run):
+        action_parser.add_argument(
+            "--base-url",
+            default=os.environ.get("AIFILM_LOCAL_OMNI_BASE_URL", ""),
+            help="Private OpenAI-compatible /v1 URL (or AIFILM_LOCAL_OMNI_BASE_URL)",
+        )
+        action_parser.add_argument(
+            "--model",
+            default="nvidia/nemotron-nano-3-30b-a3b",
+            help="Private multimodal model id; default NVIDIA Nemotron Nano 30B A3B",
+        )
+    local_omni_run.add_argument("--root", required=True, help="Film workspace root")
+    local_omni_run.add_argument(
+        "--frame-index",
+        required=True,
+        help="In-root JSON list of 1-5 declared sanitized technical frames",
+    )
+    local_omni_run.add_argument(
+        "--sanitized",
+        action="store_true",
+        help="Required declaration: frames are safe technical review samples",
+    )
+    local_omni_run.add_argument("--timeout", type=int, default=60, help="1-120 seconds; default 60")
 
     external_review = sub.add_parser(
         "external-review",
@@ -9494,6 +9601,10 @@ def main(argv: list[str] | None = None) -> int:
             "final": cmd_final,
             "review-final": cmd_review_final,
             "benchmark": cmd_benchmark,
+            "dialogue-benchmark": cmd_dialogue_benchmark,
+            "dialogue-benchmark-review": cmd_dialogue_benchmark_review,
+            "dialogue-benchmark-approve": cmd_dialogue_benchmark_approve,
+            "dialogue-production-plan": cmd_dialogue_production_plan,
             "creative-pipeline": cmd_creative_pipeline,
             "dailies": cmd_dailies,
             "post-quality": cmd_post_quality,
@@ -9571,6 +9682,30 @@ def main(argv: list[str] | None = None) -> int:
                     )
             except LocalLLMError as exc:
                 raise FilmError(f"{exc.code}: {exc}") from exc
+            emit(report)
+            return 0 if report.get("ok", True) else 2
+
+        if args.cmd == "local-omni-review":
+            from local_omni_review import LocalOmniReviewError
+            from local_omni_review import probe as local_omni_probe
+            from local_omni_review import review_frames as local_omni_review_frames
+
+            try:
+                token = os.environ.get("AIFILM_LOCAL_OMNI_TOKEN") or None
+                if args.local_omni_review_action == "probe":
+                    report = local_omni_probe(args.base_url, model=args.model, token=token)
+                else:
+                    report = local_omni_review_frames(
+                        args.root,
+                        args.base_url,
+                        frame_index=args.frame_index,
+                        model=args.model,
+                        token=token,
+                        sanitized=bool(args.sanitized),
+                        timeout=args.timeout,
+                    )
+            except LocalOmniReviewError as exc:
+                raise FilmError(f"LOCAL_OMNI_REVIEW_ERROR: {exc}") from exc
             emit(report)
             return 0 if report.get("ok", True) else 2
 

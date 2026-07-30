@@ -74,6 +74,7 @@ def _approved_screenplay():
                 "translation_status": "ready",
                 "review_status": "approved",
                 "duration_sec": 2.0,
+                "scene_state_id": f"state_{turn['line_id']}",
             }
         )
     return screenplay

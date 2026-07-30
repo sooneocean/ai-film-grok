@@ -25,6 +25,7 @@
 **/.venv/
 **/venv/
 /.local-runtimes/
+**/g2pW/
 
 # Node (if any post tooling lands)
 **/node_modules/

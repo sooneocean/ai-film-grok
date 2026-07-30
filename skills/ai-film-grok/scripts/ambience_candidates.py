@@ -272,6 +272,12 @@ def attach_to_shot(
     noncommercial_internal_ok: bool,
 ) -> dict[str, Any]:
     """Attach a reviewed ambience bed without silently widening its license scope."""
+    from project_state import assert_audio_mutation_safe
+
+    try:
+        assert_audio_mutation_safe(root)
+    except ValueError as exc:
+        raise AmbienceCandidateError(str(exc)) from exc
     if noncommercial_internal_ok is not True:
         raise AmbienceCandidateError(
             "explicit non-commercial internal scope acknowledgement is required"

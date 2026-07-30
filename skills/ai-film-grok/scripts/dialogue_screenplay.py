@@ -8,7 +8,18 @@ from typing import Any
 SCHEMA_VERSION = 1
 KIND = "dialogue-screenplay"
 NARRATION_LIMIT = 0.15
-NARRATION_REASONS = frozenset({"time_jump", "location_context", "offscreen_fact", "inner_context"})
+NARRATION_REASONS = frozenset(
+    {
+        "time_jump",
+        "location_context",
+        "scene_establish",
+        "chapter_transition",
+        "offscreen_fact",
+        "inner_context",
+        "narrative_gap",
+        "ending_afterglow",
+    }
+)
 PROVENANCE = frozenset({"source_supported", "creative_suggestion"})
 APPROVED = frozenset({"reviewed", "approved", "locked"})
 PENDING_MARKERS = ("待确认", "待定", "pending", "unknown")
@@ -97,6 +108,12 @@ def _explicit_turn(block: dict[str, Any], index: int, refs: list[str]) -> dict[s
             "during": _text(block.get("action_during")),
             "after": _text(block.get("action_after")),
         },
+        # These are the editorial contract, not a command to generate one
+        # talking close-up per line.  A later coverage plan may hold the voice
+        # off camera or cut to a reaction/action insert.
+        "screen_mode": _text(block.get("screen_mode")) or "on_camera",
+        "lipsync_required": bool(block.get("lipsync_required", True)),
+        "scene_state_id": _text(block.get("scene_state_id")),
         "gaze": _text(block.get("gaze")) or "待确认",
         "props": _strings(block.get("props")),
         "state_delta": _text(block.get("state_delta")) or "待确认",
@@ -122,6 +139,9 @@ def _prose_candidate(body: str, line_id: str, refs: list[str]) -> dict[str, Any]
         "emotion": "待确认",
         "subtext": "待确认",
         "actions": {"before": "", "during": "", "after": ""},
+        "screen_mode": "on_camera",
+        "lipsync_required": True,
+        "scene_state_id": "",
         "gaze": "待确认",
         "props": [],
         "state_delta": "待确认",
@@ -406,6 +426,9 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
                 "props",
                 "state_delta",
                 "source_evidence",
+                "screen_mode",
+                "lipsync_required",
+                "scene_state_id",
             ):
                 if key not in turn:
                     issues.append(_issue("DIALOGUE_FIELD_REQUIRED", f"{key} is required", turn_ref))
@@ -434,6 +457,27 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
                     )
                 if _text(turn.get("review_status")) not in APPROVED:
                     issues.append(_issue("DIALOGUE_REVIEW_REQUIRED", "turn not reviewed", turn_ref))
+                screen_mode = _text(turn.get("screen_mode"))
+                if screen_mode not in {
+                    "on_camera",
+                    "off_camera",
+                    "reaction",
+                    "action_cover",
+                    "silence",
+                }:
+                    issues.append(_issue("SCREEN_MODE_INVALID", "invalid screen_mode", turn_ref))
+                if screen_mode == "on_camera" and turn.get("lipsync_required") is not True:
+                    issues.append(
+                        _issue("ON_CAMERA_LIPSYNC_REQUIRED", "on_camera requires lipsync", turn_ref)
+                    )
+                if screen_mode == "on_camera" and not _text(turn.get("scene_state_id")):
+                    issues.append(
+                        _issue(
+                            "ON_CAMERA_STATE_REQUIRED",
+                            "on_camera requires a scene_state_id",
+                            turn_ref,
+                        )
+                    )
 
     narration_duration = 0.0
     gaps = _gaps(screenplay)
@@ -460,6 +504,14 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
                 )
             if reason not in NARRATION_REASONS:
                 issues.append(_issue("NARRATION_REASON_REQUIRED", "invalid reason", gap_ref))
+            if reason == "narrative_gap" and gap_duration <= 1.2:
+                issues.append(
+                    _issue(
+                        "NARRATION_GAP_TOO_SHORT",
+                        "narrative_gap narration requires more than 1.2 seconds",
+                        gap_ref,
+                    )
+                )
             if not _text(gap.get("uncovered_information")):
                 issues.append(
                     _issue(

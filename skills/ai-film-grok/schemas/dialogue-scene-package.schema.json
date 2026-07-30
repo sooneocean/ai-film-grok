@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dialogue Scene Package v1",
+  "type": "object",
+  "required": ["schema_version", "kind", "mode", "scenes"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "dialogue-scene-package"},
+    "mode": {"const": "dialogue_drama"},
+    "scenes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["scene_id", "lines"],
+        "properties": {
+          "scene_id": {"type": "string"},
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "line_id",
+                "speaker",
+                "spoken_text",
+                "caption_text",
+                "emotion",
+                "subtext",
+                "action_while_speaking",
+                "listener",
+                "scene_state_id",
+                "screen_mode",
+                "lipsync_required",
+                "audio",
+                "lipsync"
+              ],
+              "properties": {
+                "audio": {"$ref": "#/$defs/audioEvidence"},
+                "lipsync": {"$ref": "#/$defs/lipsyncEvidence"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "evidencePath": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "audioEvidence": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["pending_tts", "measured"]},
+        "duration_sec": {"type": ["number", "null"]},
+        "sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "path": {"anyOf": [{"$ref": "#/$defs/evidencePath"}, {"type": "null"}]}
+      }
+    },
+    "lipsyncEvidence": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["pending_review", "not_required", "approved"]},
+        "reviewer": {"type": "string", "minLength": 1, "maxLength": 200},
+        "artifact_sha256": {"$ref": "#/$defs/sha256"},
+        "artifact_path": {"$ref": "#/$defs/evidencePath"}
+      }
+    }
+  }
+}

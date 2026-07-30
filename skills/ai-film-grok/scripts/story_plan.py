@@ -2581,6 +2581,9 @@ def build_planned_graph(
                         "emotion": turn.get("emotion"),
                         "subtext": turn.get("subtext"),
                         "actions": copy.deepcopy(turn.get("actions") or {}),
+                        "screen_mode": str(turn.get("screen_mode") or "on_camera"),
+                        "lipsync_required": bool(turn.get("lipsync_required", True)),
+                        "scene_state_id": str(turn.get("scene_state_id") or ""),
                         "gaze": turn.get("gaze"),
                         "props": list(turn.get("props") or []),
                         "state_delta": turn.get("state_delta"),
@@ -2652,6 +2655,9 @@ def build_planned_graph(
                 "subtext": str(row.get("subtext") or ""),
                 "addressee": str(row.get("addressee") or ""),
                 "actions": copy.deepcopy(row.get("actions") or {}),
+                "screen_mode": str(row.get("screen_mode") or "on_camera"),
+                "lipsync_required": bool(row.get("lipsync_required", True)),
+                "scene_state_id": str(row.get("scene_state_id") or ""),
                 "gaze": str(row.get("gaze") or ""),
                 "props": list(row.get("props") or []),
                 "state_delta": str(row.get("state_delta") or ""),
@@ -3038,6 +3044,7 @@ def project_graph_to_film_spec(
                         }
                     shot_obj: dict[str, Any] = {
                         "id": sh.get("id") or sh.get("filmSpecShotId"),
+                        "scene_id": sc.get("id") or sc.get("sceneId"),
                         "title": film.get("title") or sh.get("narrativePurpose") or sh.get("id"),
                         "shot_role": film.get("shot_role") or "hero",
                         "dramatic_function": film.get("dramatic_function")
@@ -3067,6 +3074,22 @@ def project_graph_to_film_spec(
                     dialogue_line = dialogue_by_shot.get(str(shot_obj["id"]))
                     if vo_mode == "dialogue_drama" and dialogue_line:
                         from performance_state import performance_state_id
+
+                        camera = dsl.setdefault("camera", {})
+                        if isinstance(camera, dict):
+                            screen_mode = str(dialogue_line.get("screen_mode") or "on_camera")
+                            near_sizes = {
+                                "close-up",
+                                "ecu",
+                                "extreme close-up",
+                                "medium close-up",
+                            }
+                            if (
+                                screen_mode == "on_camera"
+                                and str(camera.get("shot_size") or "").strip().lower()
+                                not in near_sizes
+                            ):
+                                camera["shot_size"] = "medium close-up"
 
                         actions = (
                             dialogue_line.get("actions")
@@ -3121,6 +3144,9 @@ def project_graph_to_film_spec(
                                     or "",
                                     "props": props,
                                     "lighting": dsl.get("lighting") or "",
+                                    "space_position": sh.get("space_position")
+                                    or dsl.get("space_position")
+                                    or "",
                                     "continuity_parent": sh.get("continuity_parent") or "",
                                 },
                                 "performance_intent": {
@@ -3130,9 +3156,19 @@ def project_graph_to_film_spec(
                                     "gaze_target": gaze_target,
                                     "state_delta": dialogue_line.get("state_delta") or {},
                                 },
-                                "screen_mode": "on_camera",
-                                "speaker_on_camera": True,
-                                "lipsync": True,
+                                "screen_mode": str(dialogue_line.get("screen_mode") or "on_camera"),
+                                "speaker_on_camera": str(
+                                    dialogue_line.get("screen_mode") or "on_camera"
+                                )
+                                == "on_camera",
+                                "lipsync": str(dialogue_line.get("screen_mode") or "on_camera")
+                                == "on_camera"
+                                and bool(dialogue_line.get("lipsync_required", True)),
+                                "lipsync_required": str(
+                                    dialogue_line.get("screen_mode") or "on_camera"
+                                )
+                                == "on_camera"
+                                and bool(dialogue_line.get("lipsync_required", True)),
                                 "dialogue_motion_route": "auto",
                                 "audio_cues": [
                                     {
@@ -3176,7 +3212,9 @@ def project_graph_to_film_spec(
                                 },
                             }
                         )
-                        shot_obj["performance_state_id"] = performance_state_id(shot_obj)
+                        shot_obj["performance_state_id"] = str(
+                            dialogue_line.get("scene_state_id") or ""
+                        ) or performance_state_id(shot_obj)
                         shot_obj["dialogue_broll"] = default_dialogue_broll(
                             shot_obj, previous_kind=previous_broll_kind
                         )
@@ -3186,6 +3224,11 @@ def project_graph_to_film_spec(
                         # Coverage remains visual/silent unless an editor adds
                         # a justified narration cue later.  Silence makes the
                         # absence of TTS deliberate and auditable.
+                        camera = dsl.setdefault("camera", {})
+                        if isinstance(camera, dict) and not any(
+                            prior.get("screen_mode") == "action_cover" for prior in shots_fs
+                        ):
+                            camera["shot_size"] = "wide"
                         shot_obj.update(
                             {
                                 "screen_mode": "action_cover",
@@ -3241,35 +3284,66 @@ def project_graph_to_film_spec(
             for shot in (scene.get("shots") or [])
             if isinstance(shot, dict) and shot.get("screen_mode") == "on_camera"
         ]
-        coverage_exists = any(
-            isinstance(shot, dict)
-            and shot.get("screen_mode") in {"reaction", "action_cover", "silence"}
+        coverage_beats = {
+            str(shot.get("beat_id") or "")
             for scene in scenes_fs
             for shot in (scene.get("shots") or [])
-        )
-        if len(dialogue_shots) >= 2 and not coverage_exists and scenes_fs:
-            source = dialogue_shots[-1]
+            if isinstance(shot, dict)
+            and shot.get("screen_mode") in {"reaction", "action_cover", "silence"}
+        }
+        # A beat may carry several short speech lines, but it must end on a
+        # listener/action/silence image. Grouping by beat avoids one video per
+        # line while making the edit rhythm explicit and auditable.
+        final_speaker_by_beat: dict[str, dict[str, Any]] = {}
+        for shot in dialogue_shots:
+            beat = str(shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id") or "")
+            if beat:
+                final_speaker_by_beat[beat] = shot
+        insert_after: dict[str, list[dict[str, Any]]] = {}
+        for beat, source in final_speaker_by_beat.items():
+            if beat in coverage_beats:
+                continue
             source_dsl = source.get("dsl") if isinstance(source.get("dsl"), dict) else {}
+            has_action = bool(
+                str(source.get("playable_action") or source.get("must_show") or "").strip()
+            )
+            mode = "action_cover" if has_action else "reaction"
             reaction = {
-                "id": f"{source['id']}_reaction",
-                "title": "对白后的反应停顿",
+                "id": f"{source['id']}_{mode}",
+                "scene_id": source.get("scene_id"),
+                "title": "对白节拍后的动作承接"
+                if mode == "action_cover"
+                else "对白节拍后的听者反应",
                 "shot_role": "hero",
-                "dramatic_function": "reaction",
+                "dramatic_function": "action" if mode == "action_cover" else "reaction",
                 "duration_sec": 1.5,
-                "beat_id": source.get("beat_id"),
-                "coverage_role": "reaction",
-                "screen_mode": "reaction",
+                "beat_id": beat,
+                "coverage_role": mode,
+                "screen_mode": mode,
                 "speaker_on_camera": False,
                 "lipsync": False,
+                "auto_dialogue_coverage": True,
                 "audio_cues": [{"kind": "silence", "start_offset_sec": 0.0, "duration_sec": 1.5}],
                 "dsl": {
                     **source_dsl,
-                    "action": "listener absorbs the line; a visible emotional reaction",
-                    "motion": "hold, subtle reaction and eye movement",
+                    "action": (
+                        "show the prop/action consequence of the completed line"
+                        if mode == "action_cover"
+                        else "listener absorbs the line; a visible emotional reaction"
+                    ),
+                    "motion": "hold, subtle action and eye movement",
                     "camera": {"shot_size": "medium close-up"},
                 },
             }
-            scenes_fs[-1]["shots"].append(reaction)
+            insert_after.setdefault(str(source.get("id") or ""), []).append(reaction)
+        for scene in scenes_fs:
+            ordered: list[dict[str, Any]] = []
+            for shot in scene.get("shots") or []:
+                if not isinstance(shot, dict):
+                    continue
+                ordered.append(shot)
+                ordered.extend(insert_after.get(str(shot.get("id") or ""), []))
+            scene["shots"] = ordered
 
     story = graph.get("story") if isinstance(graph.get("story"), dict) else {}
     emotional = [str(x) for x in (story.get("emotional_arc") or []) if str(x).strip()]
@@ -3379,7 +3453,9 @@ def project_graph_to_film_spec(
         if vo_mode == "dialogue_drama"
         else base.get("narration_spoken_lang", "zh"),
         "audio_cues_strict": vo_mode == "dialogue_drama",
+        "tts_rehearsal_required": vo_mode == "dialogue_drama",
         "dialogue_state_strict": vo_mode == "dialogue_drama",
+        "dialogue_benchmark_required": vo_mode == "dialogue_drama",
         "narration_gap_strict": vo_mode == "dialogue_drama",
         "audio_policy": (
             {"mode": "auto", "allow_lipsync": True}
@@ -3784,6 +3860,15 @@ def run_plan(
                 if spec["serial"].get("enabled") is True:
                     spec["episode_contract"] = copy.deepcopy(received_contract)
             write_json(root / "film-spec.json", spec)
+            # The screenplay is human-authored; this package is its stable
+            # production projection.  It deliberately stays pending until
+            # real TTS/lipsync evidence is recorded.
+            from dialogue_scene_package import build_dialogue_scene_package
+
+            write_json(
+                root / "dialogue-scene-package.json",
+                build_dialogue_scene_package(graph, spec),
+            )
             # seed timeline
             shots_flat = []
             for sc in spec.get("scenes") or []:
@@ -3828,6 +3913,7 @@ def run_plan(
                 "shot_count": len(shots_flat),
                 "scene_count": len(spec.get("scenes") or []),
                 "path": str(root / "film-spec.json"),
+                "dialogue_scene_package": str(root / "dialogue-scene-package.json"),
                 "note": "Run aifilm write-spec --root to validate + inject prompts",
             }
 

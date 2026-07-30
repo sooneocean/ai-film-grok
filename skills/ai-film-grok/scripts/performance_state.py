@@ -29,6 +29,7 @@ def performance_state_contract(shot: dict[str, Any]) -> dict[str, Any]:
         props = dsl.get("props") if isinstance(dsl.get("props"), list) else []
     return {
         "speaker": str(shot.get("speaker") or "").strip(),
+        "scene_id": str(shot.get("scene_id") or shot.get("scene_ref") or "").strip(),
         "wardrobe_state": str(
             shot.get("wardrobe_state") or dsl.get("wardrobe_state") or "full"
         ).strip(),
@@ -41,6 +42,12 @@ def performance_state_contract(shot: dict[str, Any]) -> dict[str, Any]:
         "gesture": str(state.get("gesture") or shot.get("playable_action") or "").strip(),
         "props": sorted(str(item).strip() for item in props if str(item).strip()),
         "lighting": str(state.get("lighting") or dsl.get("lighting") or "").strip(),
+        "space_position": str(
+            state.get("space_position")
+            or shot.get("space_position")
+            or dsl.get("space_position")
+            or ""
+        ).strip(),
         "shot_size": str(state.get("shot_size") or camera.get("shot_size") or "").strip(),
         "continuity_parent": str(
             state.get("continuity_parent") or shot.get("continuity_parent") or ""

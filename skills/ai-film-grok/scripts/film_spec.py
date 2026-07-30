@@ -71,6 +71,8 @@ from sound_plan import (
 from transition_ops import TransitionOperationError, build_transition_operations
 
 VO_MODES = frozenset({"storyteller", "character", "hybrid", "dialogue_drama"})
+MAX_ON_CAMERA_DIALOGUE_CHARS = 42
+ON_CAMERA_SHOT_SIZES = frozenset({"medium close-up", "close-up", "extreme close-up", "ecu"})
 TTS_BACKENDS = frozenset(
     {
         "audio_node",
@@ -85,6 +87,7 @@ TTS_BACKENDS = frozenset(
         "cosyvoice-local",
         "kokoro-local",
         "chatterbox-local",
+        "piper-local",
     }
 )
 # Motion provider profile.  Grok is the production primary; FRW is a technical
@@ -270,7 +273,7 @@ def _validate_dialogue_drama_shot(
 ) -> None:
     """Require an explicit, single-purpose audio contract for dialogue-first shots."""
     screen_mode = str(shot.get("screen_mode") or "").strip().lower()
-    valid_modes = {"on_camera", "off_camera", "reaction", "action_cover", "silence", "narration"}
+    valid_modes = {"on_camera", "off_camera", "reaction", "action_cover", "silence"}
     if screen_mode not in valid_modes:
         raise FilmSpecError(f"{shot_id}.screen_mode must be one of {sorted(valid_modes)}")
     cues = shot.get("audio_cues")
@@ -297,14 +300,42 @@ def _validate_dialogue_drama_shot(
             raise FilmSpecError(f"{shot_id}: dialogue requires Chinese caption_text")
         if not str(shot.get("dialogue_line_id") or "").strip():
             raise FilmSpecError(f"{shot_id}: on_camera dialogue requires dialogue_line_id")
+        if not str(shot.get("performance_state_id") or "").strip():
+            raise FilmSpecError(f"{shot_id}: on_camera dialogue requires performance_state_id")
+        if shot.get("lipsync_required") is not True:
+            raise FilmSpecError(f"{shot_id}: on_camera dialogue requires lipsync_required=true")
         if not bool(shot.get("speaker_on_camera")) or shot.get("lipsync") is not True:
             raise FilmSpecError(
                 f"{shot_id}: on_camera dialogue requires speaker_on_camera and lipsync"
             )
         if str(voice.get("speaker") or "") != str(shot.get("speaker") or ""):
             raise FilmSpecError(f"{shot_id}: dialogue speaker must match voice cue speaker")
-    elif screen_mode in {"narration", "action_cover"} and voices:
-        if len(voices) != 1 or voices[0].get("line_type") != "narration":
+        if len(str(voice.get("spoken_text") or "").strip()) > MAX_ON_CAMERA_DIALOGUE_CHARS:
+            raise FilmSpecError(
+                f"{shot_id}: on_camera dialogue exceeds {MAX_ON_CAMERA_DIALOGUE_CHARS} chars; "
+                "split it with reaction/action coverage"
+            )
+        dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+        camera = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
+        shot_size = str(camera.get("shot_size") or shot.get("shot_size") or "").lower().strip()
+        if shot_size not in ON_CAMERA_SHOT_SIZES:
+            raise FilmSpecError(
+                f"{shot_id}: on_camera dialogue requires near framing "
+                f"{sorted(ON_CAMERA_SHOT_SIZES)}"
+            )
+        head_angle = str(
+            (shot.get("performance_state") or {}).get("head_angle")
+            if isinstance(shot.get("performance_state"), dict)
+            else ""
+        ).lower()
+        if head_angle and not any(
+            token in head_angle for token in ("front", "three-quarter", "微侧", "正脸")
+        ):
+            raise FilmSpecError(
+                f"{shot_id}: on_camera dialogue requires front or three-quarter face"
+            )
+    elif screen_mode == "action_cover" and voices and voices[0].get("line_type") == "narration":
+        if len(voices) != 1:
             raise FilmSpecError(
                 f"{shot_id}: {screen_mode} narration requires one narration voice cue"
             )
@@ -316,7 +347,18 @@ def _validate_dialogue_drama_shot(
                 raise FilmSpecError(
                     f"{shot_id}: {screen_mode} narration requires narration_gap evidence"
                 )
-            allowed = {"time_jump", "location_context", "offscreen_fact", "inner_context"}
+            allowed = {
+                "time_jump",
+                "location_context",
+                "scene_establish",
+                "chapter_transition",
+                "offscreen_fact",
+                "inner_context",
+                "narrative_gap",
+                "ending_afterglow",
+            }
+            if not str(gap.get("gap_id") or "").strip():
+                raise FilmSpecError(f"{shot_id}: narration_gap.gap_id is required")
             if str(gap.get("reason") or "") not in allowed:
                 raise FilmSpecError(
                     f"{shot_id}: narration_gap.reason must be one of {sorted(allowed)}"
@@ -325,6 +367,13 @@ def _validate_dialogue_drama_shot(
             if not uncovered:
                 raise FilmSpecError(f"{shot_id}: narration_gap.uncovered_information is required")
             voice_text = str(voices[0].get("spoken_text") or "").strip()
+            if (
+                str(gap.get("reason") or "") == "narrative_gap"
+                and float(voices[0].get("duration_sec") or 0) <= 1.2
+            ):
+                raise FilmSpecError(
+                    f"{shot_id}: narrative_gap narration requires more than 1.2 seconds"
+                )
             visible = " ".join(
                 str(value or "").strip()
                 for value in (
@@ -346,10 +395,15 @@ def _validate_dialogue_drama_shot(
                 raise FilmSpecError(
                     f"{shot_id}: narration duplicates visible information; use silence/ambience"
                 )
+    elif voices and screen_mode != "silence":
+        if len(voices) != 1 or voices[0].get("line_type") != "dialogue":
+            raise FilmSpecError(
+                f"{shot_id}: {screen_mode} may carry only one continuing dialogue cue"
+            )
+        if shot.get("lipsync") is True or shot.get("speaker_on_camera") is True:
+            raise FilmSpecError(f"{shot_id}: {screen_mode} dialogue must not claim visible lipsync")
     elif voices:
-        raise FilmSpecError(
-            f"{shot_id}: {screen_mode} cannot carry voice; use on_camera/off_camera/narration"
-        )
+        raise FilmSpecError(f"{shot_id}: silence cannot carry voice")
 
 
 def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
@@ -1105,18 +1159,16 @@ def validate_film_spec(
                 shot["_recommended_engine"] = {
                     "state_still": "comfy_qwen_i2i_performance_state",
                     "keyframe": "comfy_qwen_i2i_from_performance_state",
-                    "motion": "comfy_infinite_talk_audio_performance",
-                    "motion_primary": "comfy_infinite_talk_audio_performance",
-                    "motion_secondary": "grok_imagine_video",
-                    "secondary_lipsync": "rtx_latentsync_1_6",
-                    "secondary_trigger": (
-                        "explicit_route_or_classified_infinite_talk_technical_failure"
-                    ),
+                    "motion": "comfy_wan22_i2v",
+                    "motion_primary": "comfy_wan22_i2v",
+                    "lipsync_primary": "rtx_latentsync_1_6",
+                    "lipsync_fallback": "rtx_musetalk_15",
+                    "fallback_trigger": "classified_latentsync_technical_failure_only",
                     "forbid": [
-                        "silent_grok_dialogue_clip",
                         "quality_rejection_as_provider_fallback",
                         "unreviewed_lipsync",
                         "full_cast_reference_when_state_photo_exists",
+                        "experimental_whole_frame_talking_as_default",
                     ],
                 }
             # B1: motion/size/axis + character stance (focal/viewpoint/look_axis)
@@ -1208,6 +1260,39 @@ def validate_film_spec(
                 "dialogue_drama requires a reaction/action_cover/silence shot; "
                 "do not cut consecutive speaking close-ups only"
             )
+        coverage_beats = {
+            str(shot.get("beat_id") or "")
+            for shot in coverage
+            if str(shot.get("beat_id") or "").strip()
+        }
+        missing_beat_coverage = sorted(
+            {
+                str(shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id") or "")
+                for shot in on_camera
+                if str(shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id") or "")
+                not in coverage_beats
+            }
+        )
+        if missing_beat_coverage:
+            raise FilmSpecError(
+                "dialogue_drama requires reaction/action_cover/silence for every dialogue beat; "
+                "missing=" + ",".join(missing_beat_coverage)
+            )
+        consecutive = 0
+        prior_speaker = ""
+        for shot in shots:
+            if shot.get("screen_mode") == "on_camera":
+                speaker = str(shot.get("speaker") or "")
+                consecutive = consecutive + 1 if speaker and speaker == prior_speaker else 1
+                prior_speaker = speaker
+                if consecutive >= 3:
+                    raise FilmSpecError(
+                        "dialogue_drama forbids three consecutive on_camera shots for the same speaker; "
+                        "insert reaction/action_cover/silence"
+                    )
+            else:
+                consecutive = 0
+                prior_speaker = ""
         dialogue_sec = sum(
             float(cue.get("duration_sec") or 0)
             for shot in shots
@@ -1228,9 +1313,22 @@ def validate_film_spec(
         spec["_dialogue_drama"] = {
             "on_camera_shots": len(on_camera),
             "coverage_shots": len(coverage),
+            "coverage_beats": sorted(coverage_beats),
+            "missing_beat_coverage": missing_beat_coverage,
             "dialogue_sec": round(dialogue_sec, 3),
             "narration_sec": round(narration_sec, 3),
             "narration_ratio": round(narration_ratio, 4),
+            "coverage_ratio": round(
+                sum(float(s.get("duration_sec") or 0) for s in coverage)
+                / max(sum(float(s.get("duration_sec") or 0) for s in shots), 1.0),
+                4,
+            ),
+            "coverage_targets": {
+                "on_camera": "35-45%",
+                "reaction": "20-25%",
+                "action_cover": "about 20%",
+                "space_or_silence": "10-15%",
+            },
             "note": "Narration is gap-only; target is <= 15% of voiced duration.",
         }
         broll = iter_dialogue_broll(spec)

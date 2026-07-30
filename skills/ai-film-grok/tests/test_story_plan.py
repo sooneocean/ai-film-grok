@@ -11,7 +11,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from drama_graph import validate_graph  # noqa: E402
-from film_spec import validate_film_spec  # noqa: E402
+from film_spec import FilmSpecError, validate_film_spec  # noqa: E402
 from narrative_control import validate_narrative_graph  # noqa: E402
 from story_plan import (  # noqa: E402
     export_legacy_story_plan,
@@ -166,6 +166,34 @@ class StoryPlanTests(unittest.TestCase):
             self.assertTrue(all(shot["audio_cues"] for shot in shots))
             self.assertTrue(all(shot["translation_status"] == "pending" for shot in speaking))
             self.assertTrue(all(shot["dialogue_motion_route"] == "auto" for shot in speaking))
+            self.assertTrue(
+                all(
+                    shot["dsl"]["camera"]["shot_size"]
+                    in {"close-up", "ecu", "extreme close-up", "medium close-up"}
+                    for shot in speaking
+                )
+            )
+            coverage = [shot for shot in shots if shot.get("screen_mode") == "action_cover"]
+            self.assertTrue(any(shot["dsl"]["camera"]["shot_size"] == "wide" for shot in coverage))
+            covered_beats = {
+                shot.get("beat_id")
+                for shot in shots
+                if shot.get("screen_mode") in {"reaction", "action_cover", "silence"}
+            }
+            self.assertTrue(
+                all(
+                    (shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id"))
+                    in covered_beats
+                    for shot in speaking
+                )
+            )
+            for index, shot in enumerate(shots):
+                if not shot.get("auto_dialogue_coverage"):
+                    continue
+                self.assertGreater(index, 0)
+                previous = shots[index - 1]
+                self.assertEqual(previous.get("screen_mode"), "on_camera")
+                self.assertEqual(previous.get("beat_id"), shot.get("beat_id"))
             for shot, japanese in zip(
                 speaking, ("まだ降りないの？", "写真の裏に君の名前がある。"), strict=True
             ):
@@ -174,19 +202,35 @@ class StoryPlanTests(unittest.TestCase):
                 shot["translation_status"] = "ready"
                 shot["audio_cues"][0]["spoken_text"] = japanese
                 shot["audio_cues"][0]["translation_status"] = "ready"
+            # This dialogue-only fixture is not an adult-max heat arc; keep the
+            # coverage assertion isolated from the unrelated adult IRON gate.
+            spec["heat_arc_strict"] = False
+            spec["adult_max_iron"] = False
             validate_film_spec(spec, assign_missing_ids=False)
             self.assertGreater((spec.get("_dialogue_drama") or {}).get("coverage_shots", 0), 0)
+            missing_beat = speaking[0].get("beat_id") or speaking[0].get("dialogue_line_id")
+            for scene in spec["scenes"]:
+                scene["shots"] = [
+                    shot
+                    for shot in scene["shots"]
+                    if not (
+                        shot.get("screen_mode") in {"reaction", "action_cover", "silence"}
+                        and shot.get("beat_id") == missing_beat
+                    )
+                ]
+            with self.assertRaisesRegex(FilmSpecError, "every dialogue beat"):
+                validate_film_spec(spec, assign_missing_ids=False)
             self.assertEqual(
                 speaking[0]["_recommended_engine"]["motion_primary"],
-                "comfy_infinite_talk_audio_performance",
+                "comfy_wan22_i2v",
             )
             self.assertEqual(
-                speaking[0]["_recommended_engine"]["motion_secondary"],
-                "grok_imagine_video",
-            )
-            self.assertEqual(
-                speaking[0]["_recommended_engine"]["secondary_lipsync"],
+                speaking[0]["_recommended_engine"]["lipsync_primary"],
                 "rtx_latentsync_1_6",
+            )
+            self.assertEqual(
+                speaking[0]["_recommended_engine"]["lipsync_fallback"],
+                "rtx_musetalk_15",
             )
             self.assertEqual(speaking[0]["audio_recipe"]["recipe"], "dialogue_lipsync")
             self.assertTrue(speaking[0]["audio_recipe"]["lipsync"])

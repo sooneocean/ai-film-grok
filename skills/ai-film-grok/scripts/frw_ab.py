@@ -902,6 +902,11 @@ def approve_rank(
         raise FrwABError("INVALID_PROMOTION: choose two distinct ranked candidates")
     if not user_phrase_is_approval(user_phrase):
         raise FrwABError("HUMAN_APPROVAL_REQUIRED: exact user approval phrase is required")
+    phrase = user_phrase.casefold()
+    if champion.casefold() not in phrase or challenger.casefold() not in phrase:
+        raise FrwABError(
+            "HUMAN_APPROVAL_REQUIRED: phrase must name the selected champion and challenger"
+        )
     rank_sha = str(rank["rank_sha256"])
     receipt = {
         "schema_version": SCHEMA_VERSION,

@@ -177,7 +177,18 @@ class DialoguePerformanceStateGateTests(unittest.TestCase):
                                 "speaker": "hero",
                                 "speaker_on_camera": True,
                                 "lipsync": True,
+                                "lipsync_required": True,
                                 "performance_state_id": "hero-dlg_01-defiant",
+                                "scene_id": "sc02",
+                                "wardrobe_state": "partial",
+                                "performance_state": {
+                                    "emotion": "defiant",
+                                    "gaze_target": "partner",
+                                    "gesture": "hand_on_door",
+                                    "props": ["key"],
+                                    "lighting": "warm_backlight",
+                                    "space_position": "doorway",
+                                },
                                 "audio_cues": [
                                     {
                                         "kind": "voice",
@@ -232,6 +243,20 @@ class DialoguePerformanceStateGateTests(unittest.TestCase):
             self.assertIn("input_sha256", step["generation_receipt_contract"]["required"])
             self.assertTrue(step["generation_receipt_out"].endswith("hero-dlg_01-defiant.json"))
             self.assertIn("approve-performance-state", step["approval_command"])
+            self.assertEqual(
+                step["state_matrix"],
+                {
+                    "character": "hero",
+                    "scene": "sc02",
+                    "wardrobe": "partial",
+                    "emotion": "defiant",
+                    "pose": "hand_on_door",
+                    "gaze": "partner",
+                    "props": ["key"],
+                    "lighting": "warm_backlight",
+                    "space_position": "doorway",
+                },
+            )
 
 
 if __name__ == "__main__":

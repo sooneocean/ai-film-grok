@@ -333,6 +333,11 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                 "approval": approval,
             }
             if not exists:
+                state = (
+                    shot.get("performance_state")
+                    if isinstance(shot.get("performance_state"), dict)
+                    else {}
+                )
                 missing_dialogue_states.append(f"{sid}:{state_id}")
                 gen_plan.append(
                     {
@@ -342,6 +347,20 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                         "performance_state_id": state_id,
                         "out": str(path.relative_to(root)),
                         "why": "talking close-up requires a state-locked i2i performance reference",
+                        "line_id": str(shot.get("dialogue_line_id") or ""),
+                        "state_matrix": {
+                            "character": hero_id,
+                            "scene": str(shot.get("scene_id") or ""),
+                            "wardrobe": _wardrobe_of(shot),
+                            "emotion": str(state.get("emotion") or ""),
+                            "pose": str(state.get("gesture") or shot.get("playable_action") or ""),
+                            "gaze": str(state.get("gaze_target") or shot.get("gaze_target") or ""),
+                            "props": list(state.get("props") or []),
+                            "lighting": str(state.get("lighting") or ""),
+                            "space_position": str(
+                                state.get("space_position") or shot.get("space_position") or ""
+                            ),
+                        },
                         "i2i_route": dialogue_i2i_route,
                         "input_candidates": [
                             f"canonical/cast-states/{hero_id}/{_wardrobe_of(shot)}.png",

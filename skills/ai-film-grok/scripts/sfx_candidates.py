@@ -430,6 +430,12 @@ def attach_to_shot(
     noncommercial_internal_ok: bool,
 ) -> dict[str, Any]:
     """Attach an approved NC take while making the film's scope explicit."""
+    from project_state import assert_audio_mutation_safe
+
+    try:
+        assert_audio_mutation_safe(root)
+    except ValueError as exc:
+        raise SFXCandidateError(str(exc)) from exc
     root = root.expanduser().resolve()
     if noncommercial_internal_ok is not True:
         raise SFXCandidateError(

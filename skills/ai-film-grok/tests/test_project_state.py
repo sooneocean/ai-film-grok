@@ -10,7 +10,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from project_state import build_project_state, persist_project_state  # noqa: E402
+from project_state import (  # noqa: E402
+    assert_audio_mutation_safe,
+    build_project_state,
+    persist_project_state,
+)
 
 
 def test_project_state_is_deterministic_and_persisted_separately(tmp_path: Path) -> None:
@@ -112,3 +116,12 @@ def test_project_state_surfaces_final_before_master_conflict(tmp_path: Path) -> 
     )
     assert "FINAL_BEFORE_CANONICAL_MASTER" in state["blockers"]
     assert state["truth_conflicts"]
+
+
+def test_audio_mutation_is_blocked_by_truth_conflict(tmp_path: Path) -> None:
+    (tmp_path / "film-spec.json").write_text('{"production_mode":"shortform"}', encoding="utf-8")
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({"gates": {"final_complete": True}}), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="FINAL_BEFORE_CANONICAL_MASTER"):
+        assert_audio_mutation_safe(tmp_path)

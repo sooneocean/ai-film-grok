@@ -49,6 +49,42 @@ def test_dialogue_rehearsal_uses_japanese_voice_cue_not_chinese_caption():
     }
 
 
+def test_rehearsal_locks_dialogue_shot_duration_to_measured_audio(tmp_path: Path) -> None:
+    root = tmp_path
+    spec = {
+        "title": "dialogue timing",
+        "vo_mode": "dialogue_drama",
+        "scenes": [
+            {
+                "shots": [
+                    {
+                        "id": "talk01",
+                        "screen_mode": "on_camera",
+                        "duration_sec": 5,
+                        "audio_cues": [
+                            {
+                                "kind": "voice",
+                                "line_type": "dialogue",
+                                "pause_before_sec": 0.2,
+                                "pause_after_sec": 0.3,
+                                "duration_sec": 5,
+                            }
+                        ],
+                    }
+                ]
+            }
+        ],
+    }
+    (root / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+    register_measured_durations(root, [{"shot_id": "talk01", "measured_duration_sec": 1.25}])
+
+    locked = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+    shot = locked["scenes"][0]["shots"][0]
+    assert shot["duration_sec"] == 1.75
+    assert shot["audio_cues"][0]["duration_sec"] == 1.25
+    assert shot["tts_timing_lock"]["status"] == "locked"
+
+
 def _minimal_spec() -> dict:
     return {
         "title": "tts-rehearsal-test",

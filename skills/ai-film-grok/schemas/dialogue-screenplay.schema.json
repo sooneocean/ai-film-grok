@@ -159,6 +159,9 @@
         "emotion",
         "subtext",
         "actions",
+        "screen_mode",
+        "lipsync_required",
+        "scene_state_id",
         "gaze",
         "props",
         "state_delta",
@@ -188,6 +191,9 @@
             "after": { "type": "string" }
           }
         },
+        "screen_mode": {"enum": ["on_camera", "off_camera", "reaction", "action_cover", "silence"]},
+        "lipsync_required": {"type": "boolean"},
+        "scene_state_id": {"type": "string"},
         "gaze": { "type": "string" },
         "props": {
           "type": "array",
@@ -224,8 +230,12 @@
           "enum": [
             "time_jump",
             "location_context",
+            "scene_establish",
+            "chapter_transition",
             "offscreen_fact",
-            "inner_context"
+            "inner_context",
+            "narrative_gap",
+            "ending_afterglow"
           ]
         },
         "uncovered_information": { "type": "string", "minLength": 1 },

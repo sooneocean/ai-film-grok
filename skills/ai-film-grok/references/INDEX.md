@@ -68,6 +68,7 @@
 |---|---|
 | [i2v-grok-primary.md](i2v-grok-primary.md) | I2V grok_primary 运营模式 |
 | [comfy-lan-control.md](comfy-lan-control.md) | 私有区网 ComfyUI 5090 控制、API 工作流与安全门禁 |
+| [local-omni-review.md](local-omni-review.md) | 私网多模态影格审片：hash-bound、candidate-only、无云端回退 |
 | [frw-degrade-dispatch.md](frw-degrade-dispatch.md) | FRW Seedance/LTX/经典 dispatch |
 | [frw-ab-workflow.md](frw-ab-workflow.md) | FRW 全模型 pilot fan-out、机器排名、人审 champion＋challenger |
 | [ltx-env-plate.md](ltx-env-plate.md) | FRW LTX T2V 无角色环境床 |

@@ -121,3 +121,15 @@ def persist_project_state(root: Path | str, snapshot: dict[str, Any]) -> Path:
     path = base / PROJECT_STATE_RELATIVE
     write_json(path, payload)
     return path
+
+
+def assert_audio_mutation_safe(root: Path | str) -> None:
+    """Fail closed before an audio attachment can mutate a split project."""
+    base = Path(root).expanduser().resolve()
+    manifest = read_json(base / "manifest.json") or {}
+    gates = manifest.get("gates") if isinstance(manifest, dict) else {}
+    snapshot = build_project_state(base, gates=gates if isinstance(gates, dict) else {})
+    conflicts = snapshot.get("truth_conflicts") or []
+    if conflicts:
+        codes = ", ".join(str(row.get("code")) for row in conflicts if isinstance(row, dict))
+        raise ValueError(f"audio attachment blocked by project truth conflict: {codes}")

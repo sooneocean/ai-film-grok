@@ -143,6 +143,7 @@ def test_tts_model_armory_keeps_unverified_models_non_routable() -> None:
         "production_eligible": False,
         "label": "Chatterbox Multilingual：显式离线候选；须隔离 runtime 实际解码与听审",
     }
+    assert models["piper_chaowen_zh"]["production_eligible"] is False
     for model_id in (
         "cosyvoice3_local",
         "kokoro_82m_zh",

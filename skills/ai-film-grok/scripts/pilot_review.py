@@ -301,18 +301,92 @@ def pilot_scorecard_ready(card: dict[str, Any] | None) -> bool:
 def user_phrase_is_approval(phrase: str) -> bool:
     """Detect user pilot approval intent (never invent approval for the agent).
 
-    Accepts short confirmations like 「可以」「ok」and run-to-completion phrasing
-    like 「直接做到生成完成」, while rejecting 「可以改 / 不行 / 重做」.
+    Accepts direct approval statements such as 「批准」「可以」「ok」and
+    run-to-completion phrasing like 「直接做到生成完成」, while rejecting
+    questions, reversals, and revisions.
     """
     p = (phrase or "").strip()
     if not p:
         return False
     low = p.lower()
+    if any(marker in p for marker in ("批准", "核准")) and any(
+        marker in p
+        for marker in (
+            "不",
+            "未",
+            "没",
+            "无",
+            "非",
+            "否",
+            "勿",
+            "别",
+            "拒",
+            "撤",
+            "收回",
+            "取消",
+            "作废",
+            "失效",
+            "过期",
+            "待定",
+            "作罢",
+            "草案",
+            "存疑",
+            "写错",
+            "他写",
+            "暂缓",
+            "暂停",
+            "搁置",
+            "延期",
+            "否决",
+            "失败",
+            "驳回",
+            "反对",
+            "谁",
+            "是否",
+            "可否",
+            "吗",
+            "么",
+            "呢",
+            "?",
+            "？",
+        )
+    ):
+        return False
     # Explicit rejections / revision requests — not approval
     reject_markers = (
         "不行",
         "不过",
         "不批",
+        "未批准",
+        "未核准",
+        "尚未批准",
+        "尚未核准",
+        "不要批准",
+        "不要核准",
+        "不能批准",
+        "不能核准",
+        "拒绝批准",
+        "拒绝核准",
+        "没有批准",
+        "没有核准",
+        "没批准",
+        "没核准",
+        "还没批准",
+        "还没核准",
+        "不会批准",
+        "不会核准",
+        "绝不批准",
+        "绝不核准",
+        "请勿批准",
+        "请勿核准",
+        "别批准",
+        "别核准",
+        "取消批准",
+        "取消核准",
+        "撤回批准",
+        "撤回核准",
+        "并非批准",
+        "并非核准",
         "重做",
         "重拍",
         "改一下",
@@ -325,6 +399,11 @@ def user_phrase_is_approval(phrase: str) -> bool:
     )
     if any(m in p or m in low for m in reject_markers):
         return False
+    direct_prefixes = ("批准", "核准", "我批准", "我核准", "正式批准", "正式核准")
+    if p in {"批准", "核准"}:
+        return True
+    if p.startswith(direct_prefixes):
+        return "pilot" in low or ("champion" in low and "challenger" in low)
     markers = (
         "pilot 过",
         "pilot过",
