@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """FRW catalog-driven A/B control plane.
 
-Pilot experiments fan out every eligible platform model. Production experiments
-are limited to a hash-bound, human-approved champion and challenger. This module
-never changes ``i2v_provider`` and never treats machine ranking as approval.
+Pilot experiments fan out every eligible platform model unless an explicit
+multi-model remediation subset is requested. Production experiments are limited
+to a hash-bound, human-approved champion and challenger. This module never
+changes ``i2v_provider`` and never treats machine ranking as approval.
 """
 
 from __future__ import annotations
@@ -350,6 +351,7 @@ def build_plan(
     content_class: str,
     inputs: dict[str, str],
     catalog: dict[str, Any],
+    selected_models: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build a pilot plan. Production must use a human promotion receipt."""
     if stage == "production":
@@ -359,6 +361,18 @@ def build_plan(
         operation=operation,
         content_class=content_class,
     )
+    mode = "all_eligible"
+    if selected_models is not None:
+        requested = [str(model).strip() for model in selected_models]
+        eligible_by_model = {row["model_id"]: row for row in candidates}
+        if (
+            len(requested) < 2
+            or len(set(requested)) != len(requested)
+            or any(model not in eligible_by_model for model in requested)
+        ):
+            raise FrwABError("INVALID_MODEL_SELECTION: choose at least two unique eligible models")
+        candidates = [eligible_by_model[model] for model in sorted(requested)]
+        mode = "selected_eligible"
     return _base_plan(
         root,
         experiment_id=experiment_id,
@@ -368,7 +382,7 @@ def build_plan(
         inputs=inputs,
         catalog=catalog,
         candidates=candidates,
-        mode="all_eligible",
+        mode=mode,
     )
 
 
@@ -1096,6 +1110,11 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument(
         "--content-class", choices=sorted(SUPPORTED_CONTENT_CLASSES), default="general"
     )
+    plan.add_argument(
+        "--model",
+        action="append",
+        help="Pilot-only eligible model subset; repeat at least twice",
+    )
     _add_inputs(plan)
 
     run = sub.add_parser("run", help="Explicitly submit a planned fanout once")
@@ -1153,6 +1172,10 @@ def main(argv: list[str] | None = None) -> int:
             catalog = fetch_catalog()
             inputs = _cli_inputs(args)
             if args.stage == "production":
+                if args.model:
+                    raise FrwABError(
+                        "INVALID_MODEL_SELECTION: --model is only valid for pilot plans"
+                    )
                 promotion = _load_required(
                     _receipt_dir(args.root) / f"promotion-{args.operation}.json",
                     kind="frw-ab-promotion",
@@ -1176,6 +1199,7 @@ def main(argv: list[str] | None = None) -> int:
                     content_class=args.content_class,
                     inputs=inputs,
                     catalog=catalog,
+                    selected_models=args.model,
                 )
             _emit(report)
             return 0

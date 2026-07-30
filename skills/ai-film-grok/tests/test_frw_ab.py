@@ -135,6 +135,43 @@ def test_pilot_plan_fans_out_all_callable_platform_models_without_persisting_inp
     assert plan["input_bindings"]["prompt"]["sha256"]
 
 
+def test_pilot_plan_can_limit_rerun_to_two_explicit_eligible_models(
+    tmp_path: Path,
+) -> None:
+    plan = build_plan(
+        tmp_path,
+        experiment_id="shot01-remediation",
+        operation="image_to_video",
+        stage="pilot",
+        content_class="restricted",
+        inputs=_inputs(),
+        catalog=_catalog(),
+        selected_models=["seedance-a", "ltx-b"],
+    )
+    assert [row["model_id"] for row in plan["candidates"]] == [
+        "ltx-b",
+        "seedance-a",
+    ]
+    assert plan["fanout"]["mode"] == "selected_eligible"
+
+    for selected_models in (
+        ["seedance-a"],
+        ["seedance-a", "seedance-a"],
+        ["seedance-a", "not-advertised"],
+    ):
+        with pytest.raises(FrwABError, match="INVALID_MODEL_SELECTION"):
+            build_plan(
+                tmp_path,
+                experiment_id=f"shot01-invalid-{len(selected_models)}",
+                operation="image_to_video",
+                stage="pilot",
+                content_class="restricted",
+                inputs=_inputs(),
+                catalog=_catalog(),
+                selected_models=selected_models,
+            )
+
+
 def test_plan_rejects_missing_operation_inputs(tmp_path: Path) -> None:
     with pytest.raises(FrwABError, match="INVALID_INPUTS"):
         build_plan(

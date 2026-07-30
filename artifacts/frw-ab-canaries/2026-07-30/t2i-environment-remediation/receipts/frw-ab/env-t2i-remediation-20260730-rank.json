@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-rank",
+  "created_at": "2026-07-30T03:09:12.246051+00:00",
+  "experiment_id": "env-t2i-remediation-20260730",
+  "operation": "text_to_image",
+  "catalog_sha256": "46ea14995336d17e498c0e92923ceaa061a7fce6407ebac040ebc4cc69a1ccdb",
+  "run_sha256": "58365e747910ce32e11af9343ca5f6ecf97a6fabb01f1bf7671dd08fba341a5b",
+  "poll_sha256": "74726e32a4cc762d434c20691b26c25a9a0d450d6f1406f57613fd187eb64b5f",
+  "ranking_policy": [
+    "media_qa_hard_gate",
+    "motion_score",
+    "motion_continuity",
+    "pixel_count",
+    "media_bytes",
+    "stable_model_id"
+  ],
+  "ranked": [
+    {
+      "model_id": "qwen",
+      "media": {
+        "path": "outputs/qwen.png",
+        "sha256": "b71ce67dc0231d075376af6c48c470a643063bad96b6e3e0749df726aefdb46e",
+        "bytes": 939802
+      },
+      "qa": {
+        "ok": true,
+        "decode_ok": null,
+        "motion_ok": null,
+        "motion_score": null,
+        "motion_continuity": null,
+        "width": 704,
+        "height": 1280,
+        "fps": null,
+        "duration_sec": null,
+        "aspect": 0.55,
+        "codes": [],
+        "soft_codes": [],
+        "errors": []
+      },
+      "viable": true,
+      "machine_score": {
+        "motion_score": 0.0,
+        "motion_continuity": 0.0,
+        "pixel_count": 901120,
+        "media_bytes": 939802
+      }
+    },
+    {
+      "model_id": "ponyxl3d",
+      "media": {
+        "path": "outputs/ponyxl3d.jpg",
+        "sha256": "ad3737493bf34c641480a1b4bbb45a6ea70f5c5b7deb20e81267272cddfe67df",
+        "bytes": 448620
+      },
+      "qa": {
+        "ok": true,
+        "decode_ok": null,
+        "motion_ok": null,
+        "motion_score": null,
+        "motion_continuity": null,
+        "width": 704,
+        "height": 1280,
+        "fps": null,
+        "duration_sec": null,
+        "aspect": 0.55,
+        "codes": [],
+        "soft_codes": [],
+        "errors": []
+      },
+      "viable": true,
+      "machine_score": {
+        "motion_score": 0.0,
+        "motion_continuity": 0.0,
+        "pixel_count": 901120,
+        "media_bytes": 448620
+      }
+    }
+  ],
+  "rejected": [],
+  "provisional": {
+    "champion": "qwen",
+    "challenger": "ponyxl3d"
+  },
+  "status": "pending_human_approval",
+  "approved": false,
+  "rank_sha256": "f9ce84419a5b44e259b81e2d97caed4c2263097d7de5876e4bfcc5b930e12b1f"
+}

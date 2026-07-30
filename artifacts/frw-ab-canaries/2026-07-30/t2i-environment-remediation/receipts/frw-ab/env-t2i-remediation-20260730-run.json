@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-run",
+  "created_at": "2026-07-30T03:07:56.935060+00:00",
+  "experiment_id": "env-t2i-remediation-20260730",
+  "stage": "pilot",
+  "operation": "text_to_image",
+  "plan_sha256": "a67f05a9d77f333be499b79d3d5a1e6bb4cee8f7a1f2f1759f27b0c8fece0fec",
+  "catalog_sha256": "46ea14995336d17e498c0e92923ceaa061a7fce6407ebac040ebc4cc69a1ccdb",
+  "fanout_count": 2,
+  "submissions": [
+    {
+      "model_id": "ponyxl3d",
+      "status": "submitted",
+      "task_id": "c02732c8-c7d5-4f89-91a4-0a892c0a3104",
+      "query_command": "text2image-query"
+    },
+    {
+      "model_id": "qwen",
+      "status": "submitted",
+      "task_id": "508ef057-fac1-4a0f-bda2-c5a24554d67e",
+      "query_command": "text2image-query"
+    }
+  ],
+  "ok": true,
+  "automatic_resubmit": false,
+  "run_sha256": "58365e747910ce32e11af9343ca5f6ecf97a6fabb01f1bf7671dd08fba341a5b"
+}
