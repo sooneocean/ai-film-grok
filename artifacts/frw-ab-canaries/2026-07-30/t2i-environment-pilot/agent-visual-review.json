@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-agent-visual-review",
+  "experiment_id": "env-t2i-pilot-20260730",
+  "reviewed_at": "2026-07-30T02:53:25Z",
+  "candidate_only": true,
+  "approved": false,
+  "approved_by": null,
+  "prompt_sha256": "ae21d91d6596bcb3f9060726f3ed88be9ad7292db1145432ca32c9398edce199",
+  "rank_sha256": "1a0f2847ec43f750cf8edc9f4c3c67aa2f889f695d4dd4da5e8dc73b947e92ff",
+  "agent_preference": {
+    "champion": "qwen",
+    "challenger": "flux"
+  },
+  "reviews": [
+    {
+      "model_id": "qwen",
+      "media_sha256": "b8a981f1813ec9e164fed4cd0cc6e08a50dfaf934a74da5cdeeb90f99c06ea12",
+      "prompt_adherence": "strong",
+      "no_people": true,
+      "notes": [
+        "Strong hand-painted anime treatment.",
+        "Empty rain-soaked railway platform, blue-hour atmosphere, and warm lamp reflections match the brief."
+      ]
+    },
+    {
+      "model_id": "flux",
+      "media_sha256": "4c62eaa6777c55209a888cf42fddd0e79bcfafd1259a231c8631d78bfbd9a5ea",
+      "prompt_adherence": "moderate",
+      "no_people": true,
+      "notes": [
+        "Strong vertical railway composition and wet reflections.",
+        "Rendering is more semi-realistic than the requested hand-painted anime look.",
+        "A small sign-like glyph is visible at the left side."
+      ]
+    },
+    {
+      "model_id": "ponyxl3d",
+      "media_sha256": "c8fb0f57bd3c936d758b1547c081de151645f3296e7d58a3afb571782cc02c32",
+      "prompt_adherence": "weak",
+      "no_people": false,
+      "notes": [
+        "Introduced a central human silhouette despite the no-people requirement.",
+        "Scene reads more like an industrial alley than a railway platform."
+      ]
+    }
+  ],
+  "human_approval_required": true,
+  "promotion_written": false
+}
