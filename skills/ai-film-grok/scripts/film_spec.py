@@ -84,6 +84,7 @@ TTS_BACKENDS = frozenset(
         "grok",
         "cosyvoice-local",
         "kokoro-local",
+        "chatterbox-local",
     }
 )
 # Motion provider profile.  Grok is the production primary; FRW is a technical

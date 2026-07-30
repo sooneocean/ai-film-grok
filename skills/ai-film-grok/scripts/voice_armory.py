@@ -368,6 +368,13 @@ TTS_MODEL_ARMORY: dict[str, dict[str, Any]] = {
         "production_eligible": False,
         "label": "Kokoro-82M 中文：轻量离线备选，需本机听审",
     },
+    "chatterbox_multilingual": {
+        "status": "install_required",
+        "route": "chatterbox-local",
+        "license": "MIT",
+        "production_eligible": False,
+        "label": "Chatterbox Multilingual：显式离线候选；须隔离 runtime 实际解码与听审",
+    },
     "higgs_audio_v2_5": {
         "status": "license_review_required",
         "route": "higgs",

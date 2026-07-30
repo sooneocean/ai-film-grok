@@ -10,6 +10,7 @@ Backends (human-likeness roughly ↑):
   edge      — Microsoft Edge Neural (free explicit fallback; more synthetic)
   cosyvoice-local — explicit local CosyVoice adapter (never selected automatically)
   kokoro-local — explicit offline Kokoro Chinese adapter (never selected automatically)
+  chatterbox-local — explicit offline multilingual Chatterbox adapter (never selected automatically)
   external  — arbitrary approved CLI via AIFILM_TTS_ARGV
 
 Env / config.env:
@@ -77,6 +78,7 @@ TTS_BACKENDS = frozenset(
         "external",
         "cosyvoice-local",
         "kokoro-local",
+        "chatterbox-local",
         "grok",
         "qwen3",
         "higgs",
@@ -258,6 +260,19 @@ def kokoro_local_argv_configured() -> bool:
     return configured == adapter
 
 
+def chatterbox_local_argv_configured() -> bool:
+    """Whether argv invokes this checkout's offline Chatterbox adapter."""
+    argv = external_argv()
+    if not argv or len(argv) < 2:
+        return False
+    adapter = (Path(__file__).resolve().parent / "adapters" / "chatterbox_local_tts.py").resolve()
+    try:
+        configured = Path(argv[1]).expanduser().resolve()
+    except OSError:
+        return False
+    return configured == adapter
+
+
 def external_tts_subprocess_env() -> dict[str, str]:
     """Pass CosyVoice's non-secret local render settings only to its own adapter."""
     env = minimal_subprocess_env()
@@ -279,12 +294,25 @@ def external_tts_subprocess_env() -> dict[str, str]:
             value = os.environ.get(name)
             if value:
                 env[name] = value
+    if chatterbox_local_argv_configured():
+        for name in ("CHATTERBOX_DEVICE", "CHATTERBOX_LANGUAGE", "HF_HOME"):
+            value = os.environ.get(name)
+            if value:
+                env[name] = value
     return env
 
 
 def external_tts_timeout() -> int:
     """Allow one cold local model load without relaxing cloud adapter limits."""
-    return 600 if cosyvoice_local_argv_configured() or kokoro_local_argv_configured() else 300
+    return (
+        600
+        if (
+            cosyvoice_local_argv_configured()
+            or kokoro_local_argv_configured()
+            or chatterbox_local_argv_configured()
+        )
+        else 300
+    )
 
 
 def strict_voice_enabled() -> bool:
@@ -507,6 +535,7 @@ def probe() -> dict[str, Any]:
         "audio_node": bool(node.get("ok")),
         "cosyvoice-local": cosyvoice_local_argv_configured(),
         "kokoro-local": kokoro_local_argv_configured(),
+        "chatterbox-local": chatterbox_local_argv_configured(),
     }
     try:
         import edge_tts  # noqa: F401
@@ -1442,6 +1471,20 @@ def synthesize(
             )
             voice_used = voice or "zf_001"
             model_used = "Kokoro-82M-v1.1-zh"
+        elif choice == "chatterbox-local":
+            if not chatterbox_local_argv_configured():
+                raise TTSError(
+                    "chatterbox-local requires AIFILM_TTS_ARGV to invoke "
+                    "adapters/chatterbox_local_tts.py"
+                )
+            _tracked(
+                "chatterbox-local",
+                "ResembleAI/chatterbox",
+                local_zero=True,
+                call=lambda: tts_external(text, out_mp3, voice=voice),
+            )
+            voice_used = voice or "chatterbox-builtin"
+            model_used = "ResembleAI/chatterbox"
         elif choice == "external":
             _tracked(
                 "external",

@@ -136,6 +136,13 @@ def test_tts_model_armory_keeps_unverified_models_non_routable() -> None:
         "production_eligible": True,
         "label": "CosyVoice-300M-SFT：内建中文女声，本机解码验证；不使用声线克隆",
     }
+    assert models["chatterbox_multilingual"] == {
+        "status": "install_required",
+        "route": "chatterbox-local",
+        "license": "MIT",
+        "production_eligible": False,
+        "label": "Chatterbox Multilingual：显式离线候选；须隔离 runtime 实际解码与听审",
+    }
     for model_id in (
         "cosyvoice3_local",
         "kokoro_82m_zh",
