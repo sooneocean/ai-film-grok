@@ -37,8 +37,11 @@ class TestRegisterVfxShot(unittest.TestCase):
             plate.write_bytes(b"plate data")
 
             report = register_vfx_shot(
-                root, shot_id="shot01", plate=str(plate),
-                status="approved", reviewer="dex",
+                root,
+                shot_id="shot01",
+                plate=str(plate),
+                status="approved",
+                reviewer="dex",
             )
             self.assertIn("shot01", report["shots"])
             self.assertEqual(report["shots"]["shot01"]["status"], "approved")
@@ -56,8 +59,11 @@ class TestRegisterVfxShot(unittest.TestCase):
             plate.write_bytes(b"data")
             with self.assertRaises(ValueError):
                 register_vfx_shot(
-                    root, shot_id="shot01", plate=str(plate),
-                    status="invalid", reviewer="dex",
+                    root,
+                    shot_id="shot01",
+                    plate=str(plate),
+                    status="invalid",
+                    reviewer="dex",
                 )
 
     def test_rejects_empty_shot_id(self):
@@ -70,8 +76,11 @@ class TestRegisterVfxShot(unittest.TestCase):
             plate.write_bytes(b"data")
             with self.assertRaises(ValueError):
                 register_vfx_shot(
-                    root, shot_id="  ", plate=str(plate),
-                    status="approved", reviewer="dex",
+                    root,
+                    shot_id="  ",
+                    plate=str(plate),
+                    status="approved",
+                    reviewer="dex",
                 )
 
     def test_unapproved_shot_makes_report_not_ok(self):
@@ -83,8 +92,11 @@ class TestRegisterVfxShot(unittest.TestCase):
             plate = root / "plate.png"
             plate.write_bytes(b"data")
             report = register_vfx_shot(
-                root, shot_id="shot01", plate=str(plate),
-                status="pending", reviewer="dex",
+                root,
+                shot_id="shot01",
+                plate=str(plate),
+                status="pending",
+                reviewer="dex",
             )
             self.assertFalse(report["ok"])
 
@@ -100,16 +112,25 @@ class TestRegisterVfxShot(unittest.TestCase):
             plate2.write_bytes(b"b")
 
             register_vfx_shot(
-                root, shot_id="shot01", plate=str(plate1),
-                status="approved", reviewer="dex",
+                root,
+                shot_id="shot01",
+                plate=str(plate1),
+                status="approved",
+                reviewer="dex",
             )
             register_vfx_shot(
-                root, shot_id="shot02", plate=str(plate2),
-                status="approved", reviewer="dex",
+                root,
+                shot_id="shot02",
+                plate=str(plate2),
+                status="approved",
+                reviewer="dex",
             )
             report = register_vfx_shot(
-                root, shot_id="shot03", plate=str(plate1),
-                status="review", reviewer="dex",
+                root,
+                shot_id="shot03",
+                plate=str(plate1),
+                status="review",
+                reviewer="dex",
             )
             self.assertEqual(len(report["shots"]), 3)
             self.assertFalse(report["ok"])  # shot03 not approved
@@ -138,8 +159,11 @@ class TestVfxGate(unittest.TestCase):
             plate = root / "plate.png"
             plate.write_bytes(b"data")
             register_vfx_shot(
-                root, shot_id="shot01", plate=str(plate),
-                status="pending", reviewer="dex",
+                root,
+                shot_id="shot01",
+                plate=str(plate),
+                status="pending",
+                reviewer="dex",
             )
             report = vfx_gate(root)
             self.assertFalse(report["ok"])
@@ -155,8 +179,11 @@ class TestVfxGate(unittest.TestCase):
             plate = root / "plate.png"
             plate.write_bytes(b"original")
             register_vfx_shot(
-                root, shot_id="shot01", plate=str(plate),
-                status="approved", reviewer="dex",
+                root,
+                shot_id="shot01",
+                plate=str(plate),
+                status="approved",
+                reviewer="dex",
             )
             # Modify plate
             plate.write_bytes(b"modified")
@@ -174,8 +201,11 @@ class TestVfxGate(unittest.TestCase):
             plate = root / "plate.png"
             plate.write_bytes(b"data")
             register_vfx_shot(
-                root, shot_id="shot01", plate=str(plate),
-                status="approved", reviewer="dex",
+                root,
+                shot_id="shot01",
+                plate=str(plate),
+                status="approved",
+                reviewer="dex",
             )
             report = vfx_gate(root)
             self.assertTrue(report["ok"])

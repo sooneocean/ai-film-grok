@@ -115,16 +115,12 @@ class AuditAndFinalGate(unittest.TestCase):
         self.assertTrue(gate["desktop_final_allowed"])
 
     def test_kb_fallback_blocks_final(self) -> None:
-        audit = build_high_motion_audit(
-            [{"id": "a1", "heat_phase": "act", "mean": 25.0}]
-        )
+        audit = build_high_motion_audit([{"id": "a1", "heat_phase": "act", "mean": 25.0}])
         gate = build_i2v_final_gate(audit, kb_fallback=True)
         self.assertFalse(gate["ok"])
 
     def test_write_receipts(self) -> None:
-        audit = build_high_motion_audit(
-            [{"id": "a1", "heat_phase": "act", "mean": 21.0}]
-        )
+        audit = build_high_motion_audit([{"id": "a1", "heat_phase": "act", "mean": 21.0}])
         gate = build_i2v_final_gate(audit)
         with tempfile.TemporaryDirectory() as td:
             paths = write_motion_gate_receipts(td, audit, gate)

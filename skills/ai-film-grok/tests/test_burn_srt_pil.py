@@ -59,8 +59,7 @@ class TestParseSrt(unittest.TestCase):
 
     def test_multiple_cues(self):
         srt = (
-            "1\n00:00:01,000 --> 00:00:03,000\nFirst\n\n"
-            "2\n00:00:04,000 --> 00:00:06,000\nSecond\n"
+            "1\n00:00:01,000 --> 00:00:03,000\nFirst\n\n2\n00:00:04,000 --> 00:00:06,000\nSecond\n"
         )
         cues = burn_srt_pil.parse_srt(srt)
         self.assertEqual(len(cues), 2)
@@ -119,9 +118,17 @@ class TestBurnEndToEnd(unittest.TestCase):
 
         subprocess.run(
             [
-                "ffmpeg", "-y", "-nostdin", "-v", "error",
-                "-f", "lavfi", "-i", "color=c=black:s=720x1280:d=3",
-                "-pix_fmt", "yuv420p",
+                "ffmpeg",
+                "-y",
+                "-nostdin",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=black:s=720x1280:d=3",
+                "-pix_fmt",
+                "yuv420p",
                 str(cls.input_video),
             ],
             capture_output=True,
@@ -139,10 +146,14 @@ class TestBurnEndToEnd(unittest.TestCase):
         from unittest import mock
 
         argv = [
-            "--video", str(cls.input_video),
-            "--srt", str(cls.srt_file),
-            "--out", str(cls.output_video),
-            "--batch", "8",
+            "--video",
+            str(cls.input_video),
+            "--srt",
+            str(cls.srt_file),
+            "--out",
+            str(cls.output_video),
+            "--batch",
+            "8",
         ]
         with mock.patch.object(sys, "argv", ["burn_srt_pil.py", *argv]):
             rc = burn_srt_pil.main()
@@ -158,7 +169,8 @@ class TestBurnEndToEnd(unittest.TestCase):
         """Burned output is a valid non-trivial mp4 file."""
         self.assertTrue(self.output_video.is_file())
         self.assertGreater(
-            self.output_video.stat().st_size, 100,
+            self.output_video.stat().st_size,
+            100,
             "output video too small — burn may have failed silently",
         )
 
@@ -176,10 +188,17 @@ class TestBurnEndToEnd(unittest.TestCase):
         frame = Path(self.tmpdir) / "frame_burned.png"
         proc = subprocess.run(
             [
-                "ffmpeg", "-y", "-nostdin", "-v", "error",
-                "-ss", "1.5",
-                "-i", str(self.output_video),
-                "-frames:v", "1",
+                "ffmpeg",
+                "-y",
+                "-nostdin",
+                "-v",
+                "error",
+                "-ss",
+                "1.5",
+                "-i",
+                str(self.output_video),
+                "-frames:v",
+                "1",
                 str(frame),
             ],
             capture_output=True,
@@ -197,7 +216,8 @@ class TestBurnEndToEnd(unittest.TestCase):
         contrast = hi - lo
         # Plain black frame has contrast 0; burned subtitles raise it significantly
         self.assertGreater(
-            contrast, 30,
+            contrast,
+            30,
             f"bottom-band contrast {contrast} too low — subtitle may not be burned in",
         )
 

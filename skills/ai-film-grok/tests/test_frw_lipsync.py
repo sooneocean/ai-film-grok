@@ -76,9 +76,7 @@ class TestBuildParameters(unittest.TestCase):
     def test_all_models_have_build_params(self):
         """Every model in LIPSYNC_MODELS can build parameters."""
         for model in LIPSYNC_MODELS:
-            params = build_parameters(
-                model, img_url="http://i", audio_url="http://a", prompt="p"
-            )
+            params = build_parameters(model, img_url="http://i", audio_url="http://a", prompt="p")
             self.assertIsInstance(params, dict)
             self.assertTrue(len(params) > 0)
 
@@ -145,8 +143,11 @@ class TestHttpJson(unittest.TestCase):
         import urllib.request
 
         exc = urllib.error.HTTPError(
-            url="http://test", code=403,
-            msg="Forbidden", hdrs=None, fp=None,
+            url="http://test",
+            code=403,
+            msg="Forbidden",
+            hdrs=None,
+            fp=None,
         )
         exc.read = mock.MagicMock(return_value=b'{"error": "no permission"}')
 
@@ -172,9 +173,7 @@ class TestHttpJson(unittest.TestCase):
             return mock_resp
 
         with mock.patch.object(urllib.request, "urlopen", side_effect=capture):
-            status, body = _http_json(
-                "POST", "http://test", api_key="k", body={"data": 1}
-            )
+            status, body = _http_json("POST", "http://test", api_key="k", body={"data": 1})
 
         self.assertEqual(status, 201)
         self.assertEqual(body, {"task_id": "abc"})

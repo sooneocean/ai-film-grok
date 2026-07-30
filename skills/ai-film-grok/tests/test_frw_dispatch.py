@@ -60,7 +60,7 @@ class TestLoadDotenv(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             env_file = root / ".env"
-            env_file.write_text('FRW_API_KEY=secret123\nMODEL=seedance\n')
+            env_file.write_text("FRW_API_KEY=secret123\nMODEL=seedance\n")
 
             env: dict[str, str] = {}
             frw_dispatch.load_dotenv(root, env)
@@ -100,7 +100,7 @@ class TestLoadDotenv(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             env_file = root / ".env"
-            env_file.write_text('KEY="quoted"\nKEY2=\'single\'\n')
+            env_file.write_text("KEY=\"quoted\"\nKEY2='single'\n")
 
             env: dict[str, str] = {}
             frw_dispatch.load_dotenv(root, env)

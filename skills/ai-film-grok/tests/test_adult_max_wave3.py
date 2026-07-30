@@ -89,7 +89,9 @@ class ImpactBoostTests(unittest.TestCase):
         plan = suggest_impact_boost_actions(_weak_shots(), heat_scale="max", target_score=90)
         self.assertTrue(plan.get("needed"))
         kinds = {a["kind"] for a in plan.get("actions") or []}
-        self.assertTrue(kinds & {"lengthen_meat", "set_bare_peak", "add_detail_cu", "penetration_verbs"})
+        self.assertTrue(
+            kinds & {"lengthen_meat", "set_bare_peak", "add_detail_cu", "penetration_verbs"}
+        )
 
     def test_apply_patches_raises_fields(self) -> None:
         shots = _weak_shots()

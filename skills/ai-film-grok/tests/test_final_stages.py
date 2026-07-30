@@ -85,13 +85,17 @@ class TestEnsureCaptionsAfterHf(unittest.TestCase):
             final_mp4 = root / "out" / "final.mp4"
             _write(final_mp4, "fake video")  # must exist for is_file() check
 
-            with mock.patch.object(final_stages, "inspect_hf_caption_export",
-                                   return_value={"ok": True, "captions_in_index_html": 5}):
-                with mock.patch.object(final_stages, "sample_bottom_band_activity",
-                                       return_value={"ok": True, "likely_count": 2}):
-                    result = final_stages.ensure_captions_after_hf(
-                        root, final_mp4=final_mp4
-                    )
+            with mock.patch.object(
+                final_stages,
+                "inspect_hf_caption_export",
+                return_value={"ok": True, "captions_in_index_html": 5},
+            ):
+                with mock.patch.object(
+                    final_stages,
+                    "sample_bottom_band_activity",
+                    return_value={"ok": True, "likely_count": 2},
+                ):
+                    result = final_stages.ensure_captions_after_hf(root, final_mp4=final_mp4)
             self.assertTrue(result["ok"])
             self.assertEqual(result["caption_owner"], "hyperframes")
 
@@ -105,13 +109,15 @@ class TestEnsureCaptionsAfterHf(unittest.TestCase):
             final_mp4 = root / "out" / "final.mp4"
             _write(final_mp4, "fake video")
 
-            with mock.patch.object(final_stages, "inspect_hf_caption_export",
-                                   return_value={"ok": True, "captions_in_index_html": 4}):
-                with mock.patch.object(final_stages, "sample_bottom_band_activity",
-                                       return_value={"ok": None}):
-                    result = final_stages.ensure_captions_after_hf(
-                        root, final_mp4=final_mp4
-                    )
+            with mock.patch.object(
+                final_stages,
+                "inspect_hf_caption_export",
+                return_value={"ok": True, "captions_in_index_html": 4},
+            ):
+                with mock.patch.object(
+                    final_stages, "sample_bottom_band_activity", return_value={"ok": None}
+                ):
+                    result = final_stages.ensure_captions_after_hf(root, final_mp4=final_mp4)
             self.assertTrue(result["ok"])
             self.assertEqual(result["caption_owner"], "hyperframes_export_only")
 
@@ -121,10 +127,14 @@ class TestEnsureCaptionsAfterHf(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            with mock.patch.object(final_stages, "inspect_hf_caption_export",
-                                   return_value={"ok": False, "captions_in_index_html": 0}):
-                with mock.patch.object(final_stages, "sample_bottom_band_activity",
-                                       return_value={"ok": False}):
+            with mock.patch.object(
+                final_stages,
+                "inspect_hf_caption_export",
+                return_value={"ok": False, "captions_in_index_html": 0},
+            ):
+                with mock.patch.object(
+                    final_stages, "sample_bottom_band_activity", return_value={"ok": False}
+                ):
                     result = final_stages.ensure_captions_after_hf(
                         root,
                         final_mp4=Path(tmp) / "fake.mp4",
@@ -144,17 +154,20 @@ class TestEnsureCaptionsAfterHf(unittest.TestCase):
             final = root / "out" / "final.mp4"
             _write(final, "fake video bytes")
 
-            with mock.patch.object(final_stages, "inspect_hf_caption_export",
-                                   return_value={"ok": False, "captions_in_index_html": 0}):
-                with mock.patch.object(final_stages, "sample_bottom_band_activity",
-                                       return_value={"ok": False}):
+            with mock.patch.object(
+                final_stages,
+                "inspect_hf_caption_export",
+                return_value={"ok": False, "captions_in_index_html": 0},
+            ):
+                with mock.patch.object(
+                    final_stages, "sample_bottom_band_activity", return_value={"ok": False}
+                ):
                     with mock.patch.object(
-                        final_stages, "run_pil_caption_burn",
+                        final_stages,
+                        "run_pil_caption_burn",
                         return_value={"ok": True, "out": str(final), "sha256": "abc"},
                     ):
-                        result = final_stages.ensure_captions_after_hf(
-                            root, final_mp4=final
-                        )
+                        result = final_stages.ensure_captions_after_hf(root, final_mp4=final)
             self.assertTrue(result["ok"])
             self.assertEqual(result["caption_owner"], "pil_recovery")
             self.assertIn("recovery", result)
@@ -169,12 +182,17 @@ class TestEnsureCaptionsAfterHf(unittest.TestCase):
             root = Path(tmp)
             _write(root / "out" / "final.srt", "1\n00:00:01,000 --> 00:00:03,000\nhi\n")
 
-            with mock.patch.object(final_stages, "inspect_hf_caption_export",
-                                   return_value={"ok": False, "captions_in_index_html": 0}):
-                with mock.patch.object(final_stages, "sample_bottom_band_activity",
-                                       return_value={"ok": False}):
+            with mock.patch.object(
+                final_stages,
+                "inspect_hf_caption_export",
+                return_value={"ok": False, "captions_in_index_html": 0},
+            ):
+                with mock.patch.object(
+                    final_stages, "sample_bottom_band_activity", return_value={"ok": False}
+                ):
                     with mock.patch.object(
-                        final_stages, "run_pil_caption_burn",
+                        final_stages,
+                        "run_pil_caption_burn",
                         return_value={"ok": False, "error": "ffmpeg failed"},
                     ):
                         result = final_stages.ensure_captions_after_hf(

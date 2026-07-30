@@ -218,11 +218,11 @@ def test_gate_recompute_invalidates_locked_style_when_reference_is_tampered(
         "stills": {},
         "clips": {
             "shot01": {
-                    "status": "approved",
-                    "shot_id": "shot01",
-                    "path": str(clip),
-                    "sha256": clip_sha,
-                    "provider": "grok",
+                "status": "approved",
+                "shot_id": "shot01",
+                "path": str(clip),
+                "sha256": clip_sha,
+                "provider": "grok",
                 "source_endpoint": "reference_to_video",
                 "identity_approved": True,
                 "motion_approved": True,

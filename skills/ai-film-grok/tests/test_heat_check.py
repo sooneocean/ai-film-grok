@@ -73,10 +73,12 @@ class TestHeatCheck(unittest.TestCase):
             spec = {
                 "heat_scale": "max",
                 "scenes": [
-                    {"shots": [
-                        {"id": "s1", "heat_phase": "act", "duration_sec": 8},
-                        {"id": "s2", "heat_phase": "climax", "duration_sec": 6},
-                    ]}
+                    {
+                        "shots": [
+                            {"id": "s1", "heat_phase": "act", "duration_sec": 8},
+                            {"id": "s2", "heat_phase": "climax", "duration_sec": 6},
+                        ]
+                    }
                 ],
                 "director_intent": {"audience_profile": "hardcore_male"},
             }
@@ -130,14 +132,25 @@ class TestHeatCheck(unittest.TestCase):
             root = Path(tmp)
             spec = {
                 "heat_scale": "max",
-                "scenes": [{"shots": [
-                    {"id": "s1", "heat_phase": "act", "duration_sec": 8, "sound_cues": [{"type": "moan"}]},
-                    {"id": "s2", "heat_phase": "act", "duration_sec": 8},
-                ]}],
-                "sound_plan": {"events": [
-                    {"type": "sfx_accent"},
-                    {"type": "sfx_accent", "sex_sfx": True},
-                ]},
+                "scenes": [
+                    {
+                        "shots": [
+                            {
+                                "id": "s1",
+                                "heat_phase": "act",
+                                "duration_sec": 8,
+                                "sound_cues": [{"type": "moan"}],
+                            },
+                            {"id": "s2", "heat_phase": "act", "duration_sec": 8},
+                        ]
+                    }
+                ],
+                "sound_plan": {
+                    "events": [
+                        {"type": "sfx_accent"},
+                        {"type": "sfx_accent", "sex_sfx": True},
+                    ]
+                },
             }
             (root / "film-spec.json").write_text(json.dumps(spec))
             report = heat_check(root)

@@ -17,7 +17,9 @@ from quality_evidence import (  # noqa: E402
 from util import sha256_file  # noqa: E402
 
 
-def test_quality_status_cli_exposes_new_contract(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_quality_status_cli_exposes_new_contract(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     from aifilm_grok import main
 
     assert main(["quality-status", "--root", str(tmp_path)]) == 0
@@ -165,5 +167,11 @@ def test_register_final_rejects_current_contract_without_approved_shot_evidence(
     )
     with pytest.raises(FilmError, match="per-shot quality evidence"):
         cmd_register_final(
-            Namespace(root=str(tmp_path), source=str(tmp_path / "final.mp4"), out_name=None, post_engine=None, allow_static=False)
+            Namespace(
+                root=str(tmp_path),
+                source=str(tmp_path / "final.mp4"),
+                out_name=None,
+                post_engine=None,
+                allow_static=False,
+            )
         )

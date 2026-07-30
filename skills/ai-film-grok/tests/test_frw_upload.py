@@ -24,16 +24,22 @@ def test_extract_upload_url_rejects_private_and_credential_urls() -> None:
         extract_upload_url({"data": {"url": "https://user:pass@cdn.example.test/a.png"}})
 
 
-def test_upload_typed_inputs_binds_first_last_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_upload_typed_inputs_binds_first_last_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     start = tmp_path / "start.png"
     end = tmp_path / "end.png"
     start.write_bytes(b"start")
     end.write_bytes(b"end")
-    monkeypatch.setattr(frw_upload, "upload_file", lambda path, **_: f"https://cdn.test/{Path(path).name}")
+    monkeypatch.setattr(
+        frw_upload, "upload_file", lambda path, **_: f"https://cdn.test/{Path(path).name}"
+    )
 
     handoff = frw_upload.upload_typed_inputs(start, end=end)
 
     assert handoff["input_mode"] == "first_last"
     assert handoff["start_url"].endswith("start.png")
     assert handoff["end_url"].endswith("end.png")
-    assert handoff["pair_checksum"] != frw_upload.upload_typed_inputs(end, end=start)["pair_checksum"]
+    assert (
+        handoff["pair_checksum"] != frw_upload.upload_typed_inputs(end, end=start)["pair_checksum"]
+    )

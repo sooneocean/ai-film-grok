@@ -133,6 +133,7 @@ def test_state_rejects_tampered_image_and_non_i2i_receipt(tmp_path: Path) -> Non
     )
     _image(image, "red")
     assert validate_performance_state(tmp_path, speaker="hero", state_id=state_id)["ok"] is False
-    assert "OUTPUT_HASH_DRIFT" in validate_performance_state(
-        tmp_path, speaker="hero", state_id=state_id
-    )["codes"]
+    assert (
+        "OUTPUT_HASH_DRIFT"
+        in validate_performance_state(tmp_path, speaker="hero", state_id=state_id)["codes"]
+    )

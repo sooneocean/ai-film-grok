@@ -81,8 +81,12 @@ class TestRecordCanary(unittest.TestCase):
 
             with self.assertRaises(ValueError) as ctx:
                 record_canary(
-                    root, provider="openai", output=str(media),
-                    reviewer="dex", identity_ok=True, motion_ok=True,
+                    root,
+                    provider="openai",
+                    output=str(media),
+                    reviewer="dex",
+                    identity_ok=True,
+                    motion_ok=True,
                 )
             self.assertIn("provider", str(ctx.exception))
 
@@ -94,8 +98,12 @@ class TestRecordCanary(unittest.TestCase):
             root = Path(tmp)
             with self.assertRaises(ValueError) as ctx:
                 record_canary(
-                    root, provider="grok", output=str(root / "nonexistent.mp4"),
-                    reviewer="dex", identity_ok=True, motion_ok=True,
+                    root,
+                    provider="grok",
+                    output=str(root / "nonexistent.mp4"),
+                    reviewer="dex",
+                    identity_ok=True,
+                    motion_ok=True,
                 )
             self.assertIn("must be a real", str(ctx.exception))
 
@@ -110,8 +118,12 @@ class TestRecordCanary(unittest.TestCase):
             media.write_bytes(b"data")
 
             report = record_canary(
-                root, provider="grok", output=str(media),
-                reviewer="dex", identity_ok=False, motion_ok=True,
+                root,
+                provider="grok",
+                output=str(media),
+                reviewer="dex",
+                identity_ok=False,
+                motion_ok=True,
             )
             self.assertFalse(report["ok"])
 
@@ -126,8 +138,12 @@ class TestRecordCanary(unittest.TestCase):
             (root / "out" / "relative.mp4").write_bytes(b"rel")
 
             report = record_canary(
-                root, provider="grok", output="out/relative.mp4",
-                reviewer="dex", identity_ok=True, motion_ok=True,
+                root,
+                provider="grok",
+                output="out/relative.mp4",
+                reviewer="dex",
+                identity_ok=True,
+                motion_ok=True,
             )
             self.assertTrue(report["ok"])
             self.assertTrue(report["output"].endswith("relative.mp4"))
@@ -147,8 +163,12 @@ class TestCanaryStatus(unittest.TestCase):
             media.write_bytes(b"data")
 
             record_canary(
-                root, provider="grok", output=str(media),
-                reviewer="dex", identity_ok=True, motion_ok=True,
+                root,
+                provider="grok",
+                output=str(media),
+                reviewer="dex",
+                identity_ok=True,
+                motion_ok=True,
             )
             status = canary_status(root)
             self.assertTrue(status["ok"])
@@ -165,8 +185,12 @@ class TestCanaryStatus(unittest.TestCase):
             media.write_bytes(b"original")
 
             record_canary(
-                root, provider="grok", output=str(media),
-                reviewer="dex", identity_ok=True, motion_ok=True,
+                root,
+                provider="grok",
+                output=str(media),
+                reviewer="dex",
+                identity_ok=True,
+                motion_ok=True,
             )
             # Modify media
             media.write_bytes(b"modified")

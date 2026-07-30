@@ -165,9 +165,7 @@ class StoryPlanTests(unittest.TestCase):
             self.assertTrue(all(not shot.get("nar") for shot in shots))
             self.assertTrue(all(shot["audio_cues"] for shot in shots))
             self.assertTrue(all(shot["translation_status"] == "pending" for shot in speaking))
-            self.assertTrue(
-                all(shot["dialogue_motion_route"] == "auto" for shot in speaking)
-            )
+            self.assertTrue(all(shot["dialogue_motion_route"] == "auto" for shot in speaking))
             for shot, japanese in zip(
                 speaking, ("まだ降りないの？", "写真の裏に君の名前がある。"), strict=True
             ):
