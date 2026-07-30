@@ -205,6 +205,24 @@ def test_text_to_image_seed_is_hash_bound_and_forwarded(
     assert argv[argv.index("--seed") + 1] == "340701"
 
 
+@pytest.mark.parametrize("parameter", ["image", "image_url", "imageUrls"])
+def test_i2v_submission_uses_catalog_image_parameter(
+    monkeypatch: pytest.MonkeyPatch, parameter: str
+) -> None:
+    candidate = {
+        "model_id": "model",
+        "parameters": [{"name": "prompt"}, {"name": parameter}],
+        "invocation": {"command": "newvideo", "fixed_args": {"model": "model"}},
+    }
+    invoked = mock.Mock(return_value={"success": True, "data": {"task_id": "task-1"}})
+    monkeypatch.setattr(frw_ab, "invoke_frw", invoked)
+    frw_ab._frw_submit_candidate(
+        candidate, {"prompt": "move", "img-url": "https://example.com/a.png"}
+    )
+    argv = invoked.call_args.args[0]
+    assert f"--{parameter}" in argv
+
+
 def test_plan_rejects_missing_operation_inputs(tmp_path: Path) -> None:
     with pytest.raises(FrwABError, match="INVALID_INPUTS"):
         build_plan(

@@ -1090,6 +1090,18 @@ def _frw_submit_candidate(candidate: dict[str, Any], inputs: dict[str, str]) -> 
         for key, value in sorted(fixed_args.items()):
             if value not in {None, ""}:
                 argv.extend((f"--{key}", str(value)))
+    declared_parameters = {
+        str(parameter.get("name") or "")
+        for parameter in candidate.get("parameters") or []
+        if isinstance(parameter, dict)
+    }
+    aliases = {
+        "img-url": ("img-url", "image_url", "image", "imageUrls"),
+        "img1": ("img1", "image_url", "image", "first_img_url"),
+        "img2": ("img2", "image2_url", "last_img_url"),
+        "audio-url": ("audio-url", "audio_url", "audioUrls"),
+        "video-url": ("video-url", "video_url", "videoUrls"),
+    }
     for key in INPUT_FLAGS:
         value = inputs.get(key)
         if value:
@@ -1097,6 +1109,10 @@ def _frw_submit_candidate(candidate: dict[str, Any], inputs: dict[str, str]) -> 
                 "positive-prompt" if command == "first-last-frame" and key == "prompt" else key
             )
             output_key = "text" if command == "tts" and key == "prompt" else output_key
+            if key in aliases:
+                output_key = next(
+                    (name for name in aliases[key] if name in declared_parameters), output_key
+                )
             argv.extend((f"--{output_key}", str(value)))
     return invoke_frw(argv)
 
