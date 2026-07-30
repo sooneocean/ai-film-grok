@@ -22,6 +22,8 @@ catalog → plan → run → poll → rank → approve → production plan
 
 计划与运行收据保存 input SHA-256，不保存 prompt 或 URL 原文。task ID、媒体
 SHA-256、catalog／plan／run／rank／promotion hash 形成可审计链。
+`poll` 也有独立 `poll_sha256`；进入 rank 前必须与当前 run、全部 task ID
+及 completed 终态一致，rank receipt 会再绑定该 poll hash。
 
 ## Pilot 示例
 

@@ -683,20 +683,61 @@ def poll_experiment(
         "terminal": bool(results) and all(row["status"] in terminal_statuses for row in results),
         "automatic_resubmit": False,
     }
+    receipt["poll_sha256"] = _receipt_hash(
+        receipt,
+        hash_field="poll_sha256",
+        volatile_fields=frozenset({"created_at"}),
+    )
     return _write_receipt(
         _receipt_path(root, str(run.get("experiment_id") or ""), "poll"),
         receipt,
     )
 
 
+def _verify_poll_receipt(poll: dict[str, Any], run: dict[str, Any]) -> None:
+    expected_hash = _receipt_hash(
+        poll,
+        hash_field="poll_sha256",
+        volatile_fields=frozenset({"created_at"}),
+    )
+    if poll.get("poll_sha256") != expected_hash:
+        raise FrwABError("POLL_TAMPERED: poll receipt hash mismatch")
+    if (
+        poll.get("kind") != "frw-ab-poll"
+        or poll.get("run_sha256") != run.get("run_sha256")
+        or poll.get("experiment_id") != run.get("experiment_id")
+        or poll.get("operation") != run.get("operation")
+    ):
+        raise FrwABError("POLL_BINDING_MISMATCH: poll does not bind the current run")
+    expected_tasks = {
+        (str(row.get("model_id") or ""), str(row.get("task_id") or ""))
+        for row in run.get("submissions") or []
+        if isinstance(row, dict) and row.get("status", "submitted") == "submitted"
+    }
+    results = [row for row in poll.get("results") or [] if isinstance(row, dict)]
+    actual_tasks = {
+        (str(row.get("model_id") or ""), str(row.get("task_id") or "")) for row in results
+    }
+    completed_statuses = {"completed", "succeeded", "success"}
+    if (
+        poll.get("terminal") is not True
+        or len(results) != len(actual_tasks)
+        or actual_tasks != expected_tasks
+        or any(row.get("status") not in completed_statuses for row in results)
+    ):
+        raise FrwABError("POLL_NOT_READY: every submitted candidate must complete")
+
+
 def rank_candidates(
     root: Path | str,
     *,
     run: dict[str, Any],
+    poll: dict[str, Any],
     candidate_paths: dict[str, Path | str],
     analyze: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
     _verify_run_receipt(run)
+    _verify_poll_receipt(poll, run)
     base = _root(root)
     allowed_models = {
         str(row.get("model_id") or "")
@@ -793,6 +834,7 @@ def rank_candidates(
         "operation": run.get("operation"),
         "catalog_sha256": run.get("catalog_sha256"),
         "run_sha256": run.get("run_sha256"),
+        "poll_sha256": poll.get("poll_sha256"),
         "ranking_policy": [
             "media_qa_hard_gate",
             "motion_score",
@@ -1166,6 +1208,10 @@ def main(argv: list[str] | None = None) -> int:
                 _receipt_path(args.root, args.experiment_id, "run"),
                 kind="frw-ab-run",
             )
+            poll = _load_required(
+                _receipt_path(args.root, args.experiment_id, "poll"),
+                kind="frw-ab-poll",
+            )
             operation = str(run.get("operation") or "")
             if operation in IMAGE_OPERATIONS:
                 from media_qa import analyze_still_geometry as analyze_candidate
@@ -1180,6 +1226,7 @@ def main(argv: list[str] | None = None) -> int:
             report = rank_candidates(
                 args.root,
                 run=run,
+                poll=poll,
                 candidate_paths=candidates,
                 analyze=analyze_candidate,
             )

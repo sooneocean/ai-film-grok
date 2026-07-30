@@ -7,7 +7,7 @@
   "approved": false,
   "approved_by": null,
   "prompt_sha256": "ae21d91d6596bcb3f9060726f3ed88be9ad7292db1145432ca32c9398edce199",
-  "rank_sha256": "1a0f2847ec43f750cf8edc9f4c3c67aa2f889f695d4dd4da5e8dc73b947e92ff",
+  "rank_sha256": "4ce613a59cc5e0653623896a806c8ef61ea530c111857416cd7a8444b30f3644",
   "agent_preference": {
     "champion": "qwen",
     "challenger": "flux"
@@ -16,11 +16,12 @@
     {
       "model_id": "qwen",
       "media_sha256": "b8a981f1813ec9e164fed4cd0cc6e08a50dfaf934a74da5cdeeb90f99c06ea12",
-      "prompt_adherence": "strong",
+      "prompt_adherence": "moderate",
       "no_people": true,
       "notes": [
         "Strong hand-painted anime treatment.",
-        "Empty rain-soaked railway platform, blue-hour atmosphere, and warm lamp reflections match the brief."
+        "Empty rain-soaked railway platform, blue-hour atmosphere, and warm lamp reflections match the brief.",
+        "A number-like station sign is visible on the foreground column despite the no-text requirement."
       ]
     },
     {

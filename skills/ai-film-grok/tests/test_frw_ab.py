@@ -84,6 +84,31 @@ def _inputs() -> dict[str, str]:
     }
 
 
+def _terminal_poll_for_run(run: dict) -> dict:
+    poll = {
+        "schema_version": 1,
+        "kind": "frw-ab-poll",
+        "experiment_id": run["experiment_id"],
+        "operation": run["operation"],
+        "run_sha256": run["run_sha256"],
+        "results": [
+            {
+                "model_id": row["model_id"],
+                "task_id": row["task_id"],
+                "status": "completed",
+                "url_sha256": "a" * 64,
+                "error_code": None,
+            }
+            for row in run["submissions"]
+            if row.get("status", "submitted") == "submitted"
+        ],
+        "terminal": True,
+        "automatic_resubmit": False,
+    }
+    poll["poll_sha256"] = canonical_json_sha256(poll)
+    return poll
+
+
 def test_pilot_plan_fans_out_all_callable_platform_models_without_persisting_inputs(
     tmp_path: Path,
 ) -> None:
@@ -455,6 +480,7 @@ def test_poll_queries_every_task_without_resubmission(tmp_path: Path) -> None:
     serialized = json.dumps(receipt)
     assert "https://cdn.example.com/" not in serialized
     assert all(row["url_sha256"] for row in receipt["results"])
+    assert len(receipt["poll_sha256"]) == 64
 
 
 def test_poll_sanitizes_untrusted_status_and_declared_url_hash(tmp_path: Path) -> None:
@@ -538,6 +564,7 @@ def test_machine_rank_is_provisional_and_human_approval_is_hash_bound(
     ranked = rank_candidates(
         tmp_path,
         run=run,
+        poll=_terminal_poll_for_run(run),
         candidate_paths={"ltx-b": first, "seedance-a": second},
         analyze=analyze,
     )
@@ -640,6 +667,7 @@ def test_still_models_rank_with_geometry_adapter(tmp_path: Path) -> None:
     ranked = rank_candidates(
         tmp_path,
         run=run,
+        poll=_terminal_poll_for_run(run),
         candidate_paths=paths,
         analyze=analyze,
     )
@@ -670,6 +698,7 @@ def test_approval_rejects_tampered_rank_receipt(tmp_path: Path) -> None:
     ranked = rank_candidates(
         tmp_path,
         run=run,
+        poll=_terminal_poll_for_run(run),
         candidate_paths=paths,
         analyze=lambda path, **_kwargs: {
             "ok": True,
@@ -693,6 +722,70 @@ def test_approval_rejects_tampered_rank_receipt(tmp_path: Path) -> None:
             challenger="b",
             user_phrase="pilot 过",
         )
+
+
+def test_rank_rejects_tampered_or_incomplete_poll(tmp_path: Path) -> None:
+    outputs = tmp_path / "outputs"
+    outputs.mkdir()
+    paths = {}
+    for model in ("a", "b"):
+        media = outputs / f"{model}.png"
+        media.write_bytes(model.encode())
+        paths[model] = media
+    run = {
+        "schema_version": 1,
+        "kind": "frw-ab-run",
+        "experiment_id": "poll-chain-pilot",
+        "operation": "text_to_image",
+        "submissions": [
+            {"model_id": "a", "task_id": "task-a", "status": "submitted"},
+            {"model_id": "b", "task_id": "task-b", "status": "submitted"},
+        ],
+    }
+    run["run_sha256"] = canonical_json_sha256(run)
+    poll = _terminal_poll_for_run(run)
+    poll["results"][0]["status"] = "processing"
+    analyze = mock.Mock()
+    with pytest.raises(FrwABError, match="POLL_TAMPERED"):
+        rank_candidates(
+            tmp_path,
+            run=run,
+            poll=poll,
+            candidate_paths=paths,
+            analyze=analyze,
+        )
+    analyze.assert_not_called()
+
+    poll = _terminal_poll_for_run(run)
+    poll["results"][0]["status"] = "processing"
+    poll["terminal"] = False
+    poll["poll_sha256"] = canonical_json_sha256(
+        {key: value for key, value in poll.items() if key != "poll_sha256"}
+    )
+    with pytest.raises(FrwABError, match="POLL_NOT_READY"):
+        rank_candidates(
+            tmp_path,
+            run=run,
+            poll=poll,
+            candidate_paths=paths,
+            analyze=analyze,
+        )
+    analyze.assert_not_called()
+
+    poll = _terminal_poll_for_run(run)
+    poll["results"].append(dict(poll["results"][0]))
+    poll["poll_sha256"] = canonical_json_sha256(
+        {key: value for key, value in poll.items() if key != "poll_sha256"}
+    )
+    with pytest.raises(FrwABError, match="POLL_NOT_READY"):
+        rank_candidates(
+            tmp_path,
+            run=run,
+            poll=poll,
+            candidate_paths=paths,
+            analyze=analyze,
+        )
+    analyze.assert_not_called()
 
 
 def test_frw_dispatch_routes_ab_to_local_control_plane() -> None:
