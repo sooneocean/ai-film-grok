@@ -1109,7 +1109,7 @@ def _frw_submit_candidate(candidate: dict[str, Any], inputs: dict[str, str]) -> 
                 "positive-prompt" if command == "first-last-frame" and key == "prompt" else key
             )
             output_key = "text" if command == "tts" and key == "prompt" else output_key
-            if key in aliases:
+            if command != "newvideo" and key in aliases:
                 output_key = next(
                     (name for name in aliases[key] if name in declared_parameters), output_key
                 )

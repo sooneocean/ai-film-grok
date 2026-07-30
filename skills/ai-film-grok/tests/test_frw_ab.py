@@ -206,7 +206,7 @@ def test_text_to_image_seed_is_hash_bound_and_forwarded(
 
 
 @pytest.mark.parametrize("parameter", ["image", "image_url", "imageUrls"])
-def test_i2v_submission_uses_catalog_image_parameter(
+def test_newvideo_submission_keeps_canonical_image_argument(
     monkeypatch: pytest.MonkeyPatch, parameter: str
 ) -> None:
     candidate = {
@@ -220,7 +220,7 @@ def test_i2v_submission_uses_catalog_image_parameter(
         candidate, {"prompt": "move", "img-url": "https://example.com/a.png"}
     )
     argv = invoked.call_args.args[0]
-    assert f"--{parameter}" in argv
+    assert "--img-url" in argv
 
 
 def test_plan_rejects_missing_operation_inputs(tmp_path: Path) -> None:
