@@ -7,6 +7,9 @@ Usage:
   frw_dispatch.py help
   # Key capability canary (writes receipts when --root given):
   frw_dispatch.py canary [--root FILM_ROOT] [--wait] [--full]
+  # Catalog-driven A/B control plane:
+  frw_dispatch.py ab catalog [--root FILM_ROOT]
+  frw_dispatch.py ab plan|run|poll|rank|approve|status ...
   # DEFAULT bulk I2V (quality):
   frw_dispatch.py newvideo --model seedance-2-fast-i2v \\
     --img-url URL --prompt "@Image1 …" \\
@@ -100,6 +103,13 @@ def run_upload_probe(argv: list[str]) -> int:
     return proc.returncode
 
 
+def run_ab(argv: list[str]) -> int:
+    """Run the local catalog-driven A/B control plane."""
+    from frw_ab import main as ab_main
+
+    return int(ab_main(argv))
+
+
 def resolve_frw_root() -> Path:
     env = os.environ.get("FRWCLAW_ROOT", "").strip()
     candidates: list[Path] = []
@@ -160,6 +170,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_canary(argv[1:])
     if argv and argv[0] == "upload-probe":
         return run_upload_probe(argv[1:])
+    if argv and argv[0] == "ab":
+        return run_ab(argv[1:])
 
     root = resolve_frw_root()
     dispatch = root / "img-video-frw" / "scripts" / "dispatch.py"

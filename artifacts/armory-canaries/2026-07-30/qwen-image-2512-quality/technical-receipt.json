@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "local-weapon-technical-receipt",
+  "weapon_id": "qwen-image-2512-quality",
+  "status": "technical_verified_visual_reject_pending_human_review",
+  "source_submission_sha256": "3782ccd9051f14f2aa46a81d247aeba259c0fbd7f70c42de46404874389cd691",
+  "workflow_sha256": "99783d4a104b48c8e47bbd66d55c100ba598864507d077a63ff778a1d20640a8",
+  "prompt_id": "418bf149-c666-4925-aacc-9faf836102f2",
+  "external_api_nodes_allowed": false,
+  "artifact": {
+    "path": "qwen2512_00001_.png",
+    "bytes": 1969671,
+    "sha256": "898e1b06d2fb66cf771bcfa0baf54931df82475eca57dcbf56a6e81dddc3e7c9",
+    "format": "PNG",
+    "width": 928,
+    "height": 1664,
+    "mode": "RGB",
+    "decode_ok": true
+  },
+  "human_review": {
+    "required": true,
+    "status": "pending"
+  },
+  "agent_visual_observation": {
+    "status": "rejected",
+    "reason": "Unexpected visible text badge reads ARMARY COMPILER; this violates the no-text production gate.",
+    "scope": "This rejects the default canary prompt as an acceptance sample; it does not invalidate the separately registered Qwen weapon."
+  },
+  "promotion": {
+    "eligible": false,
+    "reason": "Technical verification does not replace hash-bound human visual review."
+  }
+}

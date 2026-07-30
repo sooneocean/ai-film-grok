@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import wave
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -15,7 +17,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from audio_timeline import compile_timeline
 from performance_candidates import sign_receipt
 from scene_sound import reconcile
-from scene_sound_stems import SceneSoundError, _apply_event_controls, render_scene_sound_stem
+from scene_sound_stems import (  # noqa: E402
+    SceneSoundError,
+    _apply_event_controls,
+    _local_asset,
+    _open_confined_asset,
+    _stage_verified_asset,
+    render_scene_sound_stem,
+)
 
 
 def test_scene_stem_honors_event_pan_gain_and_fades():
@@ -29,6 +38,146 @@ def test_scene_stem_honors_event_pan_gain_and_fades():
     assert np.allclose(out[0], 0.0)
     assert np.allclose(out[-1], 0.0)
     assert out[5, 0] > out[5, 1]
+
+
+def test_staging_rejects_preexisting_symlink(tmp_path: Path):
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"verified bytes")
+    target = tmp_path / "target.wav"
+    target.symlink_to(source)
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    staged_name = hashlib.sha256(str(source).encode()).hexdigest() + ".wav"
+    (stage / staged_name).symlink_to(target)
+
+    source_fd = _open_confined_asset(tmp_path, Path("source.wav"))
+    try:
+        with pytest.raises(SceneSoundError, match="target already exists"):
+            _stage_verified_asset(
+                source_fd, str(source), hashlib.sha256(source.read_bytes()).hexdigest(), stage
+            )
+    finally:
+        os.close(source_fd)
+
+
+def test_staging_rejects_fifo_without_blocking(tmp_path: Path):
+    fifo = tmp_path / "asset.wav"
+    os.mkfifo(fifo)
+    stage = tmp_path / "stage"
+    stage.mkdir()
+
+    with pytest.raises(SceneSoundError, match="regular file"):
+        _open_confined_asset(tmp_path, Path("asset.wav"))
+
+
+def test_staging_closes_source_fd_when_target_creation_fails(tmp_path: Path):
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"verified bytes")
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    real_open = os.open
+
+    def fail_target(path, flags, *args, **kwargs):
+        if Path(path).parent == stage:
+            raise FileExistsError("injected target creation failure")
+        return real_open(path, flags, *args, **kwargs)
+
+    before = len(os.listdir("/dev/fd"))
+    source_fd = _open_confined_asset(tmp_path, Path("source.wav"))
+    try:
+        with patch("scene_sound_stems.os.open", side_effect=fail_target):
+            for _ in range(8):
+                with pytest.raises(SceneSoundError, match="cannot safely stage"):
+                    _stage_verified_asset(source_fd, str(source), digest, stage)
+    finally:
+        os.close(source_fd)
+    assert len(os.listdir("/dev/fd")) == before
+
+
+def test_renderer_rejects_source_swap_between_precheck_and_staging(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    asset = tmp_path / "assets" / "tone.wav"
+    asset.parent.mkdir()
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+    digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+
+    def swap_after_open(root, event, *, delivery_scope):
+        checked, source_fd = _local_asset(root, event, delivery_scope=delivery_scope)
+        checked.write_bytes(b"attacker-swapped-bytes")
+        return checked, source_fd
+
+    monkeypatch.setattr("scene_sound_stems._local_asset", swap_after_open)
+    with pytest.raises(SceneSoundError, match="changed during staging"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "events": [
+                    {
+                        "id": "swap",
+                        "type": "action_sfx",
+                        "source": "local:assets/tone.wav",
+                        "source_sha256": digest,
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ]
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "scene.wav",
+            sample_rate=8000,
+        )
+
+
+def test_renderer_passes_only_verified_fd_to_ffmpeg(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    asset = tmp_path / "assets" / "tone.wav"
+    asset.parent.mkdir()
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+    digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+    real_run = subprocess.run
+    verified_fd_calls = 0
+
+    def inspect_run(command, *args, **kwargs):
+        nonlocal verified_fd_calls
+        if command[0] == "ffmpeg" and any(str(item).startswith("/dev/fd/") for item in command):
+            passed = kwargs.get("pass_fds")
+            assert isinstance(passed, tuple) and len(passed) == 1
+            os.fstat(passed[0])
+            assert f"/dev/fd/{passed[0]}" in command
+            verified_fd_calls += 1
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr("scene_sound_stems.subprocess.run", inspect_run)
+    render_scene_sound_stem(
+        tmp_path,
+        {
+            "events": [
+                {
+                    "id": "fd",
+                    "type": "action_sfx",
+                    "source": "local:assets/tone.wav",
+                    "source_sha256": digest,
+                    "start_sec": 0,
+                    "duration_sec": 0.1,
+                }
+            ]
+        },
+        duration_sec=1,
+        out=tmp_path / "audio" / "scene.wav",
+        sample_rate=8000,
+    )
+    assert verified_fd_calls == 1
 
 
 def test_scene_stem_accepts_legacy_local_asset_field(tmp_path: Path):
@@ -59,6 +208,38 @@ def test_scene_stem_accepts_legacy_local_asset_field(tmp_path: Path):
     )
     assert Path(result["path"]).is_file()
     assert result["sha256"] == hashlib.sha256(Path(result["path"]).read_bytes()).hexdigest()
+
+
+def test_scene_stem_rejects_in_root_symlink_asset(tmp_path: Path):
+    asset = tmp_path / "assets" / "tone.wav"
+    asset.parent.mkdir()
+    with wave.open(str(asset), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 800)
+    linked = asset.parent / "linked.wav"
+    linked.symlink_to(asset)
+
+    with pytest.raises(SceneSoundError, match="cannot safely open"):
+        render_scene_sound_stem(
+            tmp_path,
+            {
+                "events": [
+                    {
+                        "id": "linked",
+                        "type": "ambience",
+                        "source": "local:assets/linked.wav",
+                        "source_sha256": hashlib.sha256(asset.read_bytes()).hexdigest(),
+                        "start_sec": 0,
+                        "duration_sec": 0.1,
+                    }
+                ]
+            },
+            duration_sec=1,
+            out=tmp_path / "audio" / "scene.wav",
+            sample_rate=8000,
+        )
 
 
 def test_scene_stem_rejects_pending_noncommercial_sfx(tmp_path: Path):

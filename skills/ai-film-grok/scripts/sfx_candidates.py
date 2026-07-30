@@ -114,12 +114,19 @@ def _speech_like_segments(report: dict[str, Any]) -> int:
     entries = transcript.get("segments") if isinstance(transcript, dict) else None
     if not isinstance(entries, list):
         raise SFXCandidateError("ASR speech screen transcript is invalid")
-    silence = {"[silence]", "silence", "[静音]", "静音"}
+    non_speech_labels = {
+        "[silence]",
+        "silence",
+        "[静音]",
+        "静音",
+        "[environmental sounds]",
+        "environmental sounds",
+    }
     return sum(
         1
         for entry in entries
         if isinstance(entry, dict)
-        and str(entry.get("text") or "").strip().casefold() not in silence
+        and str(entry.get("text") or "").strip().casefold() not in non_speech_labels
         and str(entry.get("text") or "").strip()
     )
 
@@ -482,6 +489,11 @@ def attach_to_shot(
     if not isinstance(cues, list):
         raise SFXCandidateError("target shot audio_cues must be an array")
     cues.append(cue)
+    from audio_attachment import bind
+
+    cue["attachment_receipt"] = bind(
+        root, candidate_kind="sfx", asset_id=asset_id, shot_id=shot_id, cue=cue
+    )
     spec["delivery_scope"] = _INTERNAL_SCOPE
     write_json(spec_path, spec)
     return {"ok": True, "asset_id": asset_id, "shot_id": shot_id, "cue": cue}

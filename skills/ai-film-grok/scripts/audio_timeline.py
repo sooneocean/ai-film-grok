@@ -220,6 +220,7 @@ def compile_timeline(spec: dict[str, Any], *, root: Path | None = None) -> dict[
                             "source_sha256": str(cue.get("source_sha256") or ""),
                             "approval_status": str(cue.get("approval_status") or ""),
                             "approval_receipt": str(cue.get("approval_receipt") or ""),
+                            "attachment_receipt": str(cue.get("attachment_receipt") or ""),
                             "production_eligible": cue.get("production_eligible"),
                             "usage_scope": str(cue.get("usage_scope") or ""),
                             "model": str(cue.get("model") or ""),
@@ -300,10 +301,16 @@ def compile_timeline(spec: dict[str, Any], *, root: Path | None = None) -> dict[
                 "approved non-commercial SFX compilation requires the film root"
             )
         from ambience_candidates import approved_event_receipt_valid as ambience_receipt_valid
+        from audio_attachment import valid as attachment_valid
         from sfx_candidates import approved_event_receipt_valid as sfx_receipt_valid
 
-        if any(not sfx_receipt_valid(root, event) for event in approved_internal_sfx) or any(
-            not ambience_receipt_valid(root, event) for event in approved_internal_ambience
+        if (
+            any(not sfx_receipt_valid(root, event) for event in approved_internal_sfx)
+            or any(not ambience_receipt_valid(root, event) for event in approved_internal_ambience)
+            or any(
+                not attachment_valid(root, event)
+                for event in approved_internal_sfx + approved_internal_ambience
+            )
         ):
             raise AudioTimelineError(
                 "approved non-commercial candidate receipt does not bind signed local audio"

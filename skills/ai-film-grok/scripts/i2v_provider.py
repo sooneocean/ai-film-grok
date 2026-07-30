@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from util import sha256_file, write_json
+from util import canonical_json_sha256, sha256_file, write_json
 
 
 class I2VProviderError(RuntimeError):
@@ -87,6 +87,7 @@ def _write_switch_receipt(
         "error": str(error)[:500],
         "fallback_fixed_for_shot": True,
     }
+    receipt["switch_sha256"] = canonical_json_sha256(receipt)
     if root is not None:
         path = Path(root).expanduser().resolve() / "receipts" / f"provider-switch-{shot_id}.json"
         path.parent.mkdir(parents=True, exist_ok=True)

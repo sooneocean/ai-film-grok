@@ -192,7 +192,16 @@ def test_approved_mmaudio_sfx_only_enters_noncommercial_internal_timeline(
         "material": "wood",
         "start_offset_sec": 0,
         "duration_sec": 1,
+        "gain": 1.0,
+        "pan": 0.0,
+        "fade_in_sec": 0.0,
+        "fade_out_sec": 0.0,
     }
+    from audio_attachment import bind
+
+    cue["attachment_receipt"] = bind(
+        tmp_path, candidate_kind="sfx", asset_id="mmaudio-sfx-test", shot_id="s1", cue=cue
+    )
     internal = _spec([cue])
     internal["delivery_scope"] = "noncommercial_internal"
     with pytest.raises(AudioTimelineError, match="requires the film root"):
@@ -200,6 +209,29 @@ def test_approved_mmaudio_sfx_only_enters_noncommercial_internal_timeline(
     timeline = compile_timeline(internal, root=tmp_path)
     assert timeline["delivery_scope"] == "noncommercial_internal"
     assert timeline["events"][0]["approval_status"] == "approved_noncommercial"
+
+    wrong_kind = json.loads(json.dumps(internal))
+    wrong_cue = wrong_kind["shots"][0]["audio_cues"][0]
+    wrong_cue["attachment_receipt"] = bind(
+        tmp_path,
+        candidate_kind="ambience",
+        asset_id="mmaudio-sfx-test",
+        shot_id="s1",
+        cue=wrong_cue,
+    )
+    with pytest.raises(AudioTimelineError, match="does not bind"):
+        compile_timeline(wrong_kind, root=tmp_path)
+
+    with pytest.raises(ValueError, match="candidate_kind"):
+        bind(tmp_path, candidate_kind="../sfx", asset_id="mmaudio-sfx-test", shot_id="s1", cue=cue)
+
+    linked = tmp_path / "linked"
+    linked.symlink_to(tmp_path / "audio" / "attachments" / "sfx", target_is_directory=True)
+    via_symlink = json.loads(json.dumps(internal))
+    receipt_name = Path(cue["attachment_receipt"].removeprefix("local:")).name
+    via_symlink["shots"][0]["audio_cues"][0]["attachment_receipt"] = f"local:linked/{receipt_name}"
+    with pytest.raises(AudioTimelineError, match="does not bind"):
+        compile_timeline(via_symlink, root=tmp_path)
 
     forged = json.loads(json.dumps(internal))
     forged["shots"][0]["audio_cues"][0]["approval_receipt"] = (

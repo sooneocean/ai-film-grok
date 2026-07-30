@@ -9218,6 +9218,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Proxy to FRW img-video-frw dispatch. "
             "Use: frw canary [--root ROOT] [--wait] [--full] | "
+            "frw ab catalog|plan|run|poll|rank|approve|status … | "
             "frw newvideo --model seedance-2-fast-i2v …"
         ),
     )
@@ -9227,6 +9228,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Args passed to frw_dispatch.py. "
             "Examples: canary --root <film> ; "
+            "ab catalog --root <film> ; "
             "newvideo --model seedance-2-fast-i2v --img-url … --wait"
         ),
     )

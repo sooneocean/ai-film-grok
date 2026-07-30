@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "kind": "local-weapon-canary",
+  "at": "2026-07-30T02:04:58+00:00",
+  "weapon_id": "qwen-image-2512-quality",
+  "status": "submitted",
+  "allowed_stage": "production_or_pilot",
+  "required_evidence": [
+    "workflow_sha256",
+    "model_sha256",
+    "terminal_media_decode",
+    "human_review"
+  ],
+  "may_change_default_provider": false,
+  "submission": {
+    "schema_version": 1,
+    "kind": "comfy-lan-workflow",
+    "ok": true,
+    "prompt_id": "418bf149-c666-4925-aacc-9faf836102f2",
+    "workflow_sha256": "99783d4a104b48c8e47bbd66d55c100ba598864507d077a63ff778a1d20640a8",
+    "artifacts": [
+      {
+        "filename": "qwen2512_00001_.png",
+        "subfolder": "aifilm",
+        "type": "output"
+      }
+    ],
+    "external_api_nodes_allowed": false,
+    "weapon_id": "qwen-image-2512-quality",
+    "source_endpoint": null,
+    "pilot_only": false
+  },
+  "next_step": "Download, full-decode, and human-review the returned media before promotion."
+}

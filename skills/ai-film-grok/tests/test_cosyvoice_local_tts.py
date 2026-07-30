@@ -23,7 +23,10 @@ def test_cosyvoice_requires_complete_local_configuration(monkeypatch: pytest.Mon
         "COSYVOICE_PROMPT_TEXT",
     ):
         monkeypatch.delenv(name, raising=False)
-    with pytest.raises(cosyvoice_local_tts.CosyVoiceLocalError, match="all required"):
+    monkeypatch.delenv("COSYVOICE_MODE", raising=False)
+    with pytest.raises(
+        cosyvoice_local_tts.CosyVoiceLocalError, match="ROOT and COSYVOICE_MODEL_DIR"
+    ):
         cosyvoice_local_tts._configuration()
 
 
@@ -35,7 +38,7 @@ def test_cosyvoice_validates_checkout_model_and_regular_reference(
     (root / "third_party" / "Matcha-TTS").mkdir(parents=True)
     model = tmp_path / "model"
     model.mkdir()
-    (model / "cosyvoice3.yaml").write_text("sample_rate: 24000\n", encoding="utf-8")
+    (model / "cosyvoice.yaml").write_text("sample_rate: 24000\n", encoding="utf-8")
     reference = tmp_path / "licensed.wav"
     reference.write_bytes(b"RIFF")
     monkeypatch.setenv("COSYVOICE_ROOT", str(root))
@@ -47,6 +50,26 @@ def test_cosyvoice_validates_checkout_model_and_regular_reference(
 
     assert configured[:3] == (root.resolve(), model.resolve(), reference.resolve())
     assert configured[3] == "authorized reference transcript"
+
+
+def test_cosyvoice_sft_does_not_need_a_reference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "CosyVoice"
+    (root / "cosyvoice").mkdir(parents=True)
+    (root / "third_party" / "Matcha-TTS").mkdir(parents=True)
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "cosyvoice3.yaml").write_text("sample_rate: 24000\n", encoding="utf-8")
+    monkeypatch.setenv("COSYVOICE_ROOT", str(root))
+    monkeypatch.setenv("COSYVOICE_MODEL_DIR", str(model))
+    monkeypatch.setenv("COSYVOICE_MODE", "sft")
+    monkeypatch.delenv("COSYVOICE_REF_WAV", raising=False)
+    monkeypatch.delenv("COSYVOICE_PROMPT_TEXT", raising=False)
+
+    configured = cosyvoice_local_tts._configuration()
+
+    assert configured[:3] == (root.resolve(), model.resolve(), None)
 
 
 def test_cosyvoice_rejects_edge_voice_identifier() -> None:
@@ -101,6 +124,21 @@ def test_cosyvoice_local_settings_are_not_passed_to_other_external_adapters(
     monkeypatch.setenv("AIFILM_TTS_ARGV", '["python3","/trusted/other.py"]')
     assert "COSYVOICE_ROOT" not in tts_backend.external_tts_subprocess_env()
     assert tts_backend.external_tts_timeout() == 300
+
+
+def test_cosyvoice_sft_settings_only_reach_our_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = SCRIPTS / "adapters" / "cosyvoice_local_tts.py"
+    monkeypatch.setenv(
+        "AIFILM_TTS_ARGV",
+        f'["python3","{adapter}","--out","{{out}}"]',
+    )
+    monkeypatch.setenv("COSYVOICE_MODE", "sft")
+    monkeypatch.setenv("COSYVOICE_SPEAKER", "中文女")
+
+    env = tts_backend.external_tts_subprocess_env()
+
+    assert env["COSYVOICE_MODE"] == "sft"
+    assert env["COSYVOICE_SPEAKER"] == "中文女"
 
 
 def test_mimicking_adapter_name_is_not_trusted(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -99,3 +99,16 @@ def test_status_projects_canonical_state_without_writing(
     }
     assert after == before
     assert captured[0]["canonical_stage"] == captured[0]["project_state"]["canonical_stage"]
+
+
+def test_project_state_surfaces_final_before_master_conflict(tmp_path: Path) -> None:
+    (tmp_path / "film-spec.json").write_text('{"production_mode":"shortform"}', encoding="utf-8")
+    state = build_project_state(
+        tmp_path,
+        gates={"final_complete": True, "desktop_exported": True},
+        next_actions=[],
+        next_id="x",
+        next_cmd="x",
+    )
+    assert "FINAL_BEFORE_CANONICAL_MASTER" in state["blockers"]
+    assert state["truth_conflicts"]

@@ -34,7 +34,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **供应商**：I2V=`grok_primary`；恢复路径才 `frw_video_model=seedance-2-fast-i2v`（[frw-degrade-dispatch.md](references/frw-degrade-dispatch.md)），禁静默 bulk。
+7. **供应商**：I2V=`grok_primary`；恢复路径才进 FRW，默认 `seedance-2-fast-i2v`。FRW pilot 可全 advertised＋callable 候选 A/B，production 仅人审 champion＋challenger（[frw-ab](references/frw-ab-workflow.md)）；不改 primary、禁静默 bulk。
 8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM=rnb；缺已批 edit/bridge 则 `final` 阻塞。[BGM](references/bgm-generation.md)
 8b. **对白 i2i**：先 performance-state；FRW receipt 优先，否则查 Comfy；忙则等。[lesson](references/lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
@@ -48,10 +48,9 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
 16. **5090**：未锁视觉走 `weapon_route`；未验 fail closed。
 16b. **5090/OOM**：本机仅 1 个 `comfy_video.py`；禁 `pgrep -f` 自杀；邻镜禁静默顶替。[lesson](references/lessons-2026-07-29-comfy-multifilm-contention-oom.md)
-17. **bulk→final**：[evirus ch04](references/lessons-2026-07-29-evirus-ch04-bulk-final-iron.md) — bare 续接、双轮 register、长超时 final、禁内衣装插入。
-18. **收尾门**：[closeout](references/lessons-2026-07-29-closeout-gates-chaebol.md) — heat codes、sensory、truth_contract、真 concat 钟、清 quality 缓存、review→audit→export。
-19. **抗重复**：[shot-variety](references/lessons-2026-07-29-shot-variety-anti-boring.md) — 禁复制 motion；景别真变；contact 可读。
-20. **5090 独占**：[gpu-priority](references/lessons-2026-07-29-comfy-gpu-priority-pilot-i2v.md) — 一机一 owner；实验只限 pilot；文件数才算。
+17. **bulk→final**：[evirus](references/lessons-2026-07-29-evirus-ch04-bulk-final-iron.md) — bare 续接、双轮 register、长超时、禁插内衣镜。
+18. **收尾**：[closeout](references/lessons-2026-07-29-closeout-gates-chaebol.md) — heat/sensory/truth、真 concat、review→audit→export。
+19. **镜头/算力**：[variety](references/lessons-2026-07-29-shot-variety-anti-boring.md) 禁复制 motion；[GPU](references/lessons-2026-07-29-comfy-gpu-priority-pilot-i2v.md) 一机一 owner、实验限 pilot。
 
 ## 阶段
 
@@ -67,6 +66,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" longform status --root "<film>"
 "$AIFILM" state-index check --root "<film>"
 "$AIFILM" pilot report --root "<film>"
+"$AIFILM" frw ab catalog --root "<film>"   # 只读；A/B 见 references/frw-ab-workflow.md
 # 用户批准后 bulk
 "$AIFILM" final --root "<film>" --post-engine hyperframes --lipsync off --music-mood rnb --tts-backend edge
 "$AIFILM" review-final --root "<film>"

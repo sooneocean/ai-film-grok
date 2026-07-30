@@ -24,6 +24,7 @@
     "canonical_stage_total": { "type": ["integer", "null"] },
     "internal_stage": { "type": ["string", "null"] },
     "blockers": { "type": "array", "items": { "type": "string" } },
+    "truth_conflicts": { "type": "array", "items": { "type": "object" } },
     "gates": { "type": "object" },
     "open_reshoot_count": { "type": "integer", "minimum": 0 },
     "next_id": { "type": ["string", "null"] },
@@ -37,4 +38,3 @@
   },
   "additionalProperties": false
 }
-

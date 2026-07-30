@@ -11,6 +11,8 @@
 
 **Still → Grok 锁身份（始终）。**  
 **Clip → Grok `image_to_video` primary**；只有可判定技术失败才进入 FRW fallback。
+FRW 多模型评测使用独立 [A/B 工作流](frw-ab-workflow.md)：pilot 全候选并行，
+production 只跑人审 champion＋challenger；它不会改写 primary。
 **禁止**默认 legacy `img2video`。  
 **403 ≠ 参数错**；**502 ≠ 没权限**。
 
@@ -135,6 +137,9 @@ write-spec：`ltx-*` 自动钉竖屏 `720×1280` 字符串。
 
 stdout：一行 JSON，含 `protocol_version`（1.0）/ `data.video_url` / `data.model`；入口 `frw_dispatch` / `"$AIFILM" frw`。  
 平台：frwclaw `NEW_VIDEO_TEMPLATES`；legacy：`img2video` / `first-last-frame` / `text2video` / `text2image`。
+
+全模型 A/B 控制面入口为 `"$AIFILM" frw ab …`；完整命令见
+[frw-ab-workflow.md](frw-ab-workflow.md)。
 
 ```bash
 AIFILM="$HOME/.grok/skills/ai-film-grok/scripts/aifilm"

@@ -342,6 +342,11 @@ def attach_to_shot(
     if not isinstance(cues, list):
         raise AmbienceCandidateError("target shot audio_cues must be an array")
     cues.append(cue)
+    from audio_attachment import bind
+
+    cue["attachment_receipt"] = bind(
+        root, candidate_kind="ambience", asset_id=asset_id, shot_id=shot_id, cue=cue
+    )
     spec["delivery_scope"] = _INTERNAL_SCOPE
     write_json(spec_path, spec)
     return {"ok": True, "asset_id": asset_id, "shot_id": shot_id, "cue": cue}

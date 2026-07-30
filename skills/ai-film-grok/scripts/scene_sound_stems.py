@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 import subprocess
+import tempfile
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -162,49 +166,137 @@ def _apply_event_controls(
     return out
 
 
-def _local_asset(root: Path, event: dict[str, Any], *, delivery_scope: str) -> Path:
+def _open_confined_asset(root: Path, relative: Path) -> int:
+    """Open a regular asset by descriptor-walking from the film root."""
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise SceneSoundError("safe scene-sound source access is unavailable on this platform")
+    directory_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in relative.parts[:-1]:
+            child_fd = os.open(
+                part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory_fd
+            )
+            os.close(directory_fd)
+            directory_fd = child_fd
+        asset_fd = os.open(
+            relative.parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd
+        )
+    except OSError as exc:
+        raise SceneSoundError("cannot safely open scene-sound asset") from exc
+    finally:
+        os.close(directory_fd)
+    if not stat.S_ISREG(os.fstat(asset_fd).st_mode):
+        os.close(asset_fd)
+        raise SceneSoundError("scene-sound source must be a regular file")
+    return asset_fd
+
+
+def _hash_fd(asset_fd: int) -> str:
+    digest = hashlib.sha256()
+    with os.fdopen(os.dup(asset_fd), "rb") as source:
+        while block := source.read(1024 * 1024):
+            digest.update(block)
+    os.lseek(asset_fd, 0, os.SEEK_SET)
+    return digest.hexdigest()
+
+
+def _local_asset(root: Path, event: dict[str, Any], *, delivery_scope: str) -> tuple[Path, int]:
     source = str(event.get("source") or event.get("asset") or "")
     if not source.startswith("local:"):
         raise SceneSoundError(f"{event.get('id')}: final only accepts local: scene-sound assets")
     raw = source.removeprefix("local:")
-    path = (root / raw).resolve()
     try:
-        path.relative_to(root)
+        relative = (root / raw).relative_to(root)
     except ValueError as exc:
         raise SceneSoundError(f"{event.get('id')}: asset escapes film root") from exc
-    if not path.is_file():
-        raise SceneSoundError(f"{event.get('id')}: asset not found: {raw}")
-    actual = hashlib.sha256(path.read_bytes()).hexdigest()
-    normalized_raw = raw.replace("\\", "/").lower()
-    pending_candidate = (
-        "/audio/candidates/" in f"/{normalized_raw}" and "/pending/" in f"/{normalized_raw}"
-    )
-    approved_internal = _approved_internal_sfx(
-        root, event, path, actual, delivery_scope
-    ) or _approved_internal_ambience(root, event, path, actual, delivery_scope)
-    if (
-        pending_candidate
-        or is_noncommercial_license(event.get("license"))
-        or is_candidate_only_license(event.get("license"))
-        or event.get("production_eligible") is False
-        or event.get("approval_status") == "pending_human_review"
-    ) and not approved_internal:
-        raise SceneSoundError(
-            f"{event.get('id')}: non-commercial or pending candidate cannot enter a formal stem"
+    if not relative.parts or any(part in {"", ".", ".."} for part in relative.parts):
+        raise SceneSoundError(f"{event.get('id')}: asset escapes film root")
+    path = root.joinpath(*relative.parts)
+    asset_fd = _open_confined_asset(root, relative)
+    try:
+        actual = _hash_fd(asset_fd)
+        normalized_raw = raw.replace("\\", "/").lower()
+        pending_candidate = (
+            "/audio/candidates/" in f"/{normalized_raw}" and "/pending/" in f"/{normalized_raw}"
         )
-    if (
-        event.get("type") == "action_sfx"
-        and not approved_internal
-        and actual in _nonproduction_sfx_hashes(root)
-    ):
-        raise SceneSoundError(
-            f"{event.get('id')}: known non-production SFX hash cannot enter a formal stem"
-        )
-    if actual != str(event.get("source_sha256") or ""):
-        raise SceneSoundError(f"{event.get('id')}: asset checksum changed")
-    if event.get("type") == "performance":
-        _approved_performance(root, event, path, actual)
-    return path
+        approved_internal = _approved_internal_sfx(
+            root, event, path, actual, delivery_scope
+        ) or _approved_internal_ambience(root, event, path, actual, delivery_scope)
+        if (
+            pending_candidate
+            or is_noncommercial_license(event.get("license"))
+            or is_candidate_only_license(event.get("license"))
+            or event.get("production_eligible") is False
+            or event.get("approval_status") == "pending_human_review"
+        ) and not approved_internal:
+            raise SceneSoundError(
+                f"{event.get('id')}: non-commercial or pending candidate cannot enter a formal stem"
+            )
+        if (
+            event.get("type") == "action_sfx"
+            and not approved_internal
+            and actual in _nonproduction_sfx_hashes(root)
+        ):
+            raise SceneSoundError(
+                f"{event.get('id')}: known non-production SFX hash cannot enter a formal stem"
+            )
+        if actual != str(event.get("source_sha256") or ""):
+            raise SceneSoundError(f"{event.get('id')}: asset checksum changed")
+        if event.get("type") == "performance":
+            _approved_performance(root, event, path, actual)
+        return path, asset_fd
+    except Exception:
+        os.close(asset_fd)
+        raise
+
+
+def _stage_verified_asset(
+    asset_fd: int, asset_label: str, expected_sha256: str, stage: Path
+) -> int:
+    """Return a verified temporary file descriptor, never a mutable source path."""
+    if not isinstance(expected_sha256, str) or len(expected_sha256) != 64:
+        raise SceneSoundError("scene-sound asset checksum is invalid")
+    target = stage / f"{hashlib.sha256(asset_label.encode()).hexdigest()}.wav"
+    if target.exists() or target.is_symlink():
+        raise SceneSoundError("scene-sound staging target already exists")
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise SceneSoundError("safe scene-sound staging is unavailable on this platform")
+    digest = hashlib.sha256()
+    target_fd: int | None = None
+    try:
+        with ExitStack() as stack:
+            source = stack.enter_context(os.fdopen(os.dup(asset_fd), "rb"))
+            if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
+                raise SceneSoundError("scene-sound source must be a regular file")
+            target_fd = os.open(target, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(target_fd, "w+b", closefd=False) as output:
+                while block := source.read(1024 * 1024):
+                    digest.update(block)
+                    output.write(block)
+                output.flush()
+                os.fsync(output.fileno())
+    except SceneSoundError:
+        if target_fd is not None:
+            os.close(target_fd)
+        target.unlink(missing_ok=True)
+        raise
+    except OSError as exc:
+        if target_fd is not None:
+            os.close(target_fd)
+        target.unlink(missing_ok=True)
+        raise SceneSoundError("cannot safely stage scene-sound asset") from exc
+    if digest.hexdigest() != expected_sha256:
+        os.close(target_fd)
+        target.unlink(missing_ok=True)
+        raise SceneSoundError("scene-sound asset changed during staging")
+    try:
+        os.lseek(target_fd, 0, os.SEEK_SET)
+        target.unlink()
+    except OSError as exc:
+        os.close(target_fd)
+        target.unlink(missing_ok=True)
+        raise SceneSoundError("cannot safely finalize staged scene-sound asset") from exc
+    return target_fd
 
 
 def _write_stem(samples: np.ndarray, *, out: Path, sample_rate: int, label: str) -> dict[str, str]:
@@ -252,58 +344,79 @@ def render_scene_sound_stem(
     executed: list[dict[str, Any]] = []
     delivery_scope = str(timeline.get("delivery_scope") or "commercial")
     asset_types = {"action_sfx", "ambience", "music", "performance"}
-    for event in timeline.get("events") or []:
-        if (
-            not isinstance(event, dict)
-            or event.get("muted")
-            or event.get("type") not in asset_types
-        ):
-            continue
-        asset = _local_asset(root, event, delivery_scope=delivery_scope)
-        duration = float(event["duration_sec"])
-        proc = subprocess.run(
-            [
-                "ffmpeg",
-                "-v",
-                "error",
-                "-stream_loop",
-                "-1",
-                "-i",
-                str(asset),
-                "-t",
-                f"{duration:.3f}",
-                "-ar",
-                str(sample_rate),
-                "-ac",
-                "2",
-                "-f",
-                "f32le",
-                "pipe:1",
-            ],
-            capture_output=True,
-            check=False,
-        )
-        if proc.returncode:
-            raise SceneSoundError(f"{event.get('id')}: cannot decode asset")
-        decoded = np.frombuffer(proc.stdout, dtype=np.float32).reshape((-1, 2))
-        start = max(0, int(round(float(event["start_sec"]) * sample_rate)))
-        end = min(len(samples), start + len(decoded))
-        if end > start:
-            target = ambience_samples if event.get("type") == "ambience" else samples
-            target[start:end] += _apply_event_controls(decoded[: end - start], event, sample_rate)
-        executed.append(
-            {
-                "id": event.get("id"),
-                "track": event.get("track"),
-                "stem": "ambience" if event.get("type") == "ambience" else "scene_sound",
-                "source": event.get("source"),
-                "executed": True,
-                "gain": event.get("gain", 1.0),
-                "pan": event.get("pan", 0.0),
-                "fade_in_sec": event.get("fade_in_sec", 0.0),
-                "fade_out_sec": event.get("fade_out_sec", 0.0),
-            }
-        )
+    with tempfile.TemporaryDirectory(prefix="aifilm-scene-sound-") as temporary:
+        stage = Path(temporary)
+        staged_assets: dict[tuple[str, str], int] = {}
+        try:
+            for event in timeline.get("events") or []:
+                if (
+                    not isinstance(event, dict)
+                    or event.get("muted")
+                    or event.get("type") not in asset_types
+                ):
+                    continue
+                asset, source_fd = _local_asset(root, event, delivery_scope=delivery_scope)
+                expected_sha256 = str(event.get("source_sha256") or "")
+                key = (str(asset), expected_sha256)
+                try:
+                    if key not in staged_assets:
+                        staged_assets[key] = _stage_verified_asset(
+                            source_fd, str(asset), expected_sha256, stage
+                        )
+                finally:
+                    os.close(source_fd)
+                asset_fd = staged_assets[key]
+                os.lseek(asset_fd, 0, os.SEEK_SET)
+                duration = float(event["duration_sec"])
+                proc = subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-v",
+                        "error",
+                        "-stream_loop",
+                        "-1",
+                        "-i",
+                        f"/dev/fd/{asset_fd}",
+                        "-t",
+                        f"{duration:.3f}",
+                        "-ar",
+                        str(sample_rate),
+                        "-ac",
+                        "2",
+                        "-f",
+                        "f32le",
+                        "pipe:1",
+                    ],
+                    capture_output=True,
+                    check=False,
+                    pass_fds=(asset_fd,),
+                )
+                if proc.returncode:
+                    raise SceneSoundError(f"{event.get('id')}: cannot decode asset")
+                decoded = np.frombuffer(proc.stdout, dtype=np.float32).reshape((-1, 2))
+                start = max(0, int(round(float(event["start_sec"]) * sample_rate)))
+                end = min(len(samples), start + len(decoded))
+                if end > start:
+                    target = ambience_samples if event.get("type") == "ambience" else samples
+                    target[start:end] += _apply_event_controls(
+                        decoded[: end - start], event, sample_rate
+                    )
+                executed.append(
+                    {
+                        "id": event.get("id"),
+                        "track": event.get("track"),
+                        "stem": "ambience" if event.get("type") == "ambience" else "scene_sound",
+                        "source": event.get("source"),
+                        "executed": True,
+                        "gain": event.get("gain", 1.0),
+                        "pan": event.get("pan", 0.0),
+                        "fade_in_sec": event.get("fade_in_sec", 0.0),
+                        "fade_out_sec": event.get("fade_out_sec", 0.0),
+                    }
+                )
+        finally:
+            for asset_fd in staged_assets.values():
+                os.close(asset_fd)
     scene_stem = _write_stem(samples, out=out, sample_rate=sample_rate, label="scene-sound")
     ambience_stem = (
         _write_stem(ambience_samples, out=ambience_out, sample_rate=sample_rate, label="ambience")

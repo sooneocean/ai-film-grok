@@ -361,6 +361,18 @@ def test_screen_speech_binds_candidate_and_only_flags_possible_leakage(
     assert sfx_candidates.receipt_is_signed(json.loads(receipt.read_text()))
 
 
+def test_environmental_sound_asr_label_is_not_counted_as_speech_leakage() -> None:
+    report = {"transcript": {"segments": [{"text": "[Environmental Sounds]"}]}}
+
+    assert sfx_candidates._speech_like_segments(report) == 0
+    assert (
+        sfx_candidates._speech_like_segments(
+            {"transcript": {"segments": [{"text": "possible voice leakage"}]}}
+        )
+        == 1
+    )
+
+
 def test_cli_sfx_screen_loads_config_before_receipt_verification(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

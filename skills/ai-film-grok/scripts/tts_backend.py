@@ -258,6 +258,8 @@ def external_tts_subprocess_env() -> dict[str, str]:
             "COSYVOICE_MODEL_DIR",
             "COSYVOICE_REF_WAV",
             "COSYVOICE_PROMPT_TEXT",
+            "COSYVOICE_MODE",
+            "COSYVOICE_SPEAKER",
         ):
             value = os.environ.get(name)
             if value:

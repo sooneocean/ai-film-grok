@@ -8,8 +8,14 @@ Required local configuration::
 
   COSYVOICE_ROOT=/Users/dex/Developer/CosyVoice
   COSYVOICE_MODEL_DIR=/Users/dex/Developer/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B-hf
+  COSYVOICE_MODE=zero_shot
   COSYVOICE_REF_WAV=/absolute/path/to/licensed-reference.wav
   COSYVOICE_PROMPT_TEXT='reference transcript'
+
+For the model's built-in SFT speaker (no cloning and no reference audio)::
+
+  COSYVOICE_MODE=sft
+  COSYVOICE_SPEAKER=中文女
 
 The film must use a provider-native voice label (for example
 ``cosyvoice-narrator``), never an Edge ``...Neural`` name.
@@ -39,22 +45,35 @@ def _regular_file(path: Path, *, name: str) -> Path:
     return path
 
 
-def _configuration() -> tuple[Path, Path, Path, str]:
+def _mode() -> str:
+    mode = _env("COSYVOICE_MODE") or "zero_shot"
+    if mode not in {"zero_shot", "sft"}:
+        raise CosyVoiceLocalError("COSYVOICE_MODE must be zero_shot or sft")
+    return mode
+
+
+def _configuration() -> tuple[Path, Path, Path | None, str]:
     root_raw = _env("COSYVOICE_ROOT")
     model_raw = _env("COSYVOICE_MODEL_DIR")
     ref_raw = _env("COSYVOICE_REF_WAV")
     prompt = _env("COSYVOICE_PROMPT_TEXT")
-    if not all((root_raw, model_raw, ref_raw, prompt)):
+    mode = _mode()
+    if not all((root_raw, model_raw)):
+        raise CosyVoiceLocalError("COSYVOICE_ROOT and COSYVOICE_MODEL_DIR are required")
+    if mode == "zero_shot" and not all((ref_raw, prompt)):
         raise CosyVoiceLocalError(
-            "COSYVOICE_ROOT, COSYVOICE_MODEL_DIR, COSYVOICE_REF_WAV, and "
-            "COSYVOICE_PROMPT_TEXT are all required"
+            "COSYVOICE_REF_WAV and COSYVOICE_PROMPT_TEXT are required for zero_shot"
         )
     root = Path(root_raw).expanduser().resolve()
     model = Path(model_raw).expanduser().resolve()
-    reference = _regular_file(Path(ref_raw).expanduser(), name="COSYVOICE_REF_WAV").resolve()
+    reference = (
+        _regular_file(Path(ref_raw).expanduser(), name="COSYVOICE_REF_WAV").resolve()
+        if ref_raw
+        else None
+    )
     if not (root / "cosyvoice").is_dir() or not (root / "third_party" / "Matcha-TTS").is_dir():
         raise CosyVoiceLocalError(f"COSYVOICE_ROOT is not a CosyVoice checkout: {root}")
-    if not (model / "cosyvoice3.yaml").is_file():
+    if not any((model / name).is_file() for name in ("cosyvoice.yaml", "cosyvoice3.yaml")):
         raise CosyVoiceLocalError(f"COSYVOICE_MODEL_DIR is incomplete: {model}")
     return root, model, reference, prompt
 
@@ -65,7 +84,7 @@ def _provider_voice(value: str) -> str:
         raise CosyVoiceLocalError(
             f"CosyVoice requires a provider-native voice label, not {voice!r}"
         )
-    return voice or "cosyvoice-local"
+    return voice or _env("COSYVOICE_SPEAKER") or "cosyvoice-local"
 
 
 def _write_output(samples: object, sample_rate: int, out: Path) -> None:
@@ -121,8 +140,11 @@ def synthesize(text: str, out: Path, voice: str) -> Path:
     body = text.strip()
     if not body:
         raise CosyVoiceLocalError("text must not be empty")
+    mode = _mode()
     root, model_dir, reference, prompt = _configuration()
-    _provider_voice(voice)
+    provider_voice = _provider_voice(voice)
+    if mode == "sft" and provider_voice == "cosyvoice-local":
+        provider_voice = "中文女"
     for location in (str(root), str(root / "third_party" / "Matcha-TTS")):
         if location not in sys.path:
             sys.path.insert(0, location)
@@ -135,15 +157,23 @@ def synthesize(text: str, out: Path, voice: str) -> Path:
         import torch
     except ImportError as exc:  # pragma: no cover - environment prerequisite
         raise CosyVoiceLocalError("CosyVoice environment is missing torch") from exc
-    chunks = [
-        result["tts_speech"]
-        for result in model.inference_zero_shot(
-            body,
-            prompt,
-            str(reference),
-            stream=False,
-        )
-    ]
+    if mode == "sft":
+        chunks = [
+            result["tts_speech"]
+            for result in model.inference_sft(body, provider_voice, stream=False)
+        ]
+    else:
+        if reference is None:  # guarded by _configuration; keeps type narrowing explicit
+            raise CosyVoiceLocalError("zero_shot requires COSYVOICE_REF_WAV")
+        chunks = [
+            result["tts_speech"]
+            for result in model.inference_zero_shot(
+                body,
+                prompt,
+                str(reference),
+                stream=False,
+            )
+        ]
     if not chunks:
         raise CosyVoiceLocalError("CosyVoice returned no audio")
     _write_output(torch.cat(chunks, dim=1), int(model.sample_rate), out)
