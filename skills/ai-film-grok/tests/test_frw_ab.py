@@ -427,6 +427,48 @@ def test_poll_queries_every_task_without_resubmission(tmp_path: Path) -> None:
     assert all(row["url_sha256"] for row in receipt["results"])
 
 
+def test_poll_sanitizes_untrusted_status_and_declared_url_hash(tmp_path: Path) -> None:
+    plan = build_plan(
+        tmp_path,
+        experiment_id="shot01-malicious-poll",
+        operation="image_to_video",
+        stage="pilot",
+        content_class="general",
+        inputs=_inputs(),
+        catalog=_catalog(),
+    )
+    run = run_experiment(
+        tmp_path,
+        plan=plan,
+        inputs=_inputs(),
+        submit=lambda candidate, _inputs: {
+            "success": True,
+            "data": {"task_id": f"task-{candidate['model_id']}"},
+        },
+    )
+    secret_url = "https://signed.example/SECRET?token=RAW"
+    receipt = poll_experiment(
+        tmp_path,
+        run=run,
+        query=lambda _submission: {
+            "success": True,
+            "data": {
+                "status": f"failed {secret_url}",
+                "url": secret_url,
+                "url_sha256": secret_url,
+            },
+        },
+    )
+    serialized = json.dumps(receipt)
+    assert secret_url not in serialized
+    assert all(row["status"] == "unknown" for row in receipt["results"])
+    assert all(
+        len(row["url_sha256"]) == 64
+        and all(char in "0123456789abcdef" for char in row["url_sha256"])
+        for row in receipt["results"]
+    )
+
+
 def test_machine_rank_is_provisional_and_human_approval_is_hash_bound(
     tmp_path: Path,
 ) -> None:

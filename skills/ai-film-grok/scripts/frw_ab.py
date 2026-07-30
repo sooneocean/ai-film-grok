@@ -57,6 +57,20 @@ REQUIRED_INPUTS = {
 }
 TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,159}$")
 ERROR_CODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
+SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+PROVIDER_STATUSES = frozenset(
+    {
+        "cancelled",
+        "completed",
+        "failed",
+        "pending",
+        "processing",
+        "queued",
+        "running",
+        "succeeded",
+        "success",
+    }
+)
 ASYNC_COMMANDS = {
     "first-last-frame": "flf-query",
     "img2image": "img2image-query",
@@ -608,7 +622,8 @@ def poll_experiment(
             try:
                 payload = future.result()
                 data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-                status = str(data.get("status") or "unknown")
+                raw_status = str(data.get("status") or "").strip().lower()
+                status = raw_status if raw_status in PROVIDER_STATUSES else "unknown"
                 output_url = next(
                     (
                         str(data[key])
@@ -623,13 +638,14 @@ def poll_experiment(
                     ),
                     "",
                 )
+                declared_url_sha256 = str(data.get("url_sha256") or "")
                 result = {
                     "model_id": model,
                     "task_id": task_id,
                     "status": status,
                     "url_sha256": (
-                        str(data.get("url_sha256"))
-                        if data.get("url_sha256")
+                        declared_url_sha256.lower()
+                        if SHA256_RE.fullmatch(declared_url_sha256)
                         else (_value_hash(output_url) if output_url else None)
                     ),
                     "error_code": (
@@ -647,7 +663,14 @@ def poll_experiment(
                 }
             results.append(result)
     results.sort(key=lambda row: row["model_id"])
-    terminal_statuses = {"completed", "failed", "query_failed"}
+    terminal_statuses = {
+        "cancelled",
+        "completed",
+        "failed",
+        "query_failed",
+        "succeeded",
+        "success",
+    }
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "kind": "frw-ab-poll",
