@@ -385,6 +385,56 @@ def test_status_rejects_symbolic_link_receipts_directory(
     assert envelope["data"]["error_code"] == "INVALID_RECEIPT_PATH"
 
 
+def test_status_includes_matching_operation_promotion(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from frw_ab import main
+
+    directory = tmp_path / "receipts" / "frw-ab"
+    directory.mkdir(parents=True)
+    (directory / "shot01-plan.json").write_text(
+        json.dumps({"kind": "frw-ab-plan"}), encoding="utf-8"
+    )
+    (directory / "promotion-text_to_image.json").write_text(
+        json.dumps(
+            {
+                "kind": "frw-ab-promotion",
+                "experiment_id": "shot01",
+                "operation": "text_to_image",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (directory / "promotion-image_to_video.json").write_text(
+        json.dumps(
+            {
+                "kind": "frw-ab-promotion",
+                "experiment_id": "other-shot",
+                "operation": "image_to_video",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (directory / "shot01-foreign.json").write_text(
+        json.dumps(
+            {
+                "kind": "frw-ab-promotion",
+                "experiment_id": "other-shot",
+                "operation": "image_to_video",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["status", "--root", str(tmp_path), "--experiment-id", "shot01"]) == 0
+    envelope = json.loads(capsys.readouterr().out)
+    assert {row["name"] for row in envelope["data"]["receipts"]} == {
+        "shot01-plan.json",
+        "promotion-text_to_image.json",
+    }
+
+
 def test_run_submits_candidates_concurrently_once_and_persists_no_prompt(
     tmp_path: Path,
 ) -> None:
@@ -699,6 +749,29 @@ def test_machine_rank_is_provisional_and_human_approval_is_hash_bound(
         champion="a",
         challenger="ltx-b",
     )
+    for phrase in (
+        "不要批准 seedance-a 为 champion，ltx-b 为 challenger",
+        "请勿批准 seedance-a 为 champion，ltx-b 为 challenger",
+        "我没有批准 seedance-a 为 champion，ltx-b 为 challenger",
+        "批准 seedance-a 为 champion，ltx-b 为 challenger 吗？",
+        "等我确认后再批准 seedance-a 为 champion，ltx-b 为 challenger",
+        "前提是之后确认：批准 seedance-a 为 champion，ltx-b 为 challenger",
+        "这是模型输出：批准 seedance-a 为 champion，ltx-b 为 challenger",
+        "初稿：批准 seedance-a 为 champion，ltx-b 为 challenger",
+    ):
+        assert not frw_ab.selection_phrase_is_approval(
+            phrase,
+            champion="seedance-a",
+            challenger="ltx-b",
+        )
+        with pytest.raises(FrwABError, match="HUMAN_APPROVAL_REQUIRED"):
+            approve_rank(
+                tmp_path,
+                rank=ranked,
+                champion="seedance-a",
+                challenger="ltx-b",
+                user_phrase=phrase,
+            )
 
 
 def test_production_revalidates_role_bound_selection_receipt(tmp_path: Path) -> None:

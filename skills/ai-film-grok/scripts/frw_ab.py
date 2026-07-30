@@ -111,13 +111,27 @@ SELECTION_REJECT_MARKERS = (
     "maybe",
     " if ",
     "草案",
+    "初稿",
     "示例",
     "候选",
     "建议",
     "暂定",
     "待确认",
+    "待確認",
     "如果",
     "若",
+    "确认后",
+    "確認後",
+    "前提",
+    "之后",
+    "之後",
+    "再批准",
+    "再核准",
+    "模型输出",
+    "模型輸出",
+    "引用",
+    "假设",
+    "假設",
 )
 
 
@@ -197,9 +211,10 @@ def selection_phrase_is_approval(phrase: str, *, champion: str, challenger: str)
         not value
         or any(marker in lowered for marker in SELECTION_REJECT_MARKERS)
         or re.search(r"\bif\b", lowered)
+        or any(marker in value for marker in ("?", "？", "吗", "嗎", "么", "麼", "呢"))
     ):
         return False
-    if not ("批准" in value or "核准" in value or re.search(r"\bapprove(?:d)?\b", lowered)):
+    if not (value.startswith(("批准", "核准")) or re.match(r"^approve(?:d)?\b", lowered)):
         return False
     return bool(
         _selection_role_pattern(champion, "champion").search(lowered)
@@ -1371,6 +1386,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.experiment_id:
             prefix = validate_identifier(args.experiment_id, field="experiment id")
             paths = sorted(directory.glob(f"{prefix}-*.json"))
+            paths = sorted({*paths, *directory.glob("promotion-*.json")})
         else:
             paths = sorted(directory.glob("*.json")) if directory.is_dir() else []
         report = {
@@ -1381,10 +1397,17 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "name": path.name,
                     "sha256": sha256_file(path),
-                    "kind": (read_json(path) or {}).get("kind"),
+                    "kind": receipt.get("kind"),
                 }
                 for path in paths
-                if path.is_file() and not path.is_symlink()
+                if path.is_file()
+                and not path.is_symlink()
+                and isinstance(receipt := read_json(path), dict)
+                and not (
+                    args.experiment_id
+                    and receipt.get("kind") == "frw-ab-promotion"
+                    and receipt.get("experiment_id") != prefix
+                )
             ],
             "read_only": True,
         }
