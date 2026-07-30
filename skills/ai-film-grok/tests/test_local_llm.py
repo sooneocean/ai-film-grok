@@ -9,6 +9,7 @@ from local_llm import (
     DEFAULT_MODEL,
     LocalLLMError,
     _NoRedirect,
+    _private_opener,
     _request_json,
     draft,
     normalize_base_url,
@@ -19,7 +20,12 @@ from local_llm import (
 
 def test_normalize_base_url_requires_private_numeric_v1_host() -> None:
     assert normalize_base_url("http://192.168.88.52:1234/v1/") == "http://192.168.88.52:1234/v1"
-    for value in ("https://example.com/v1", "http://8.8.8.8:1234/v1", "http://192.168.1.2:1234"):
+    for value in (
+        "https://example.com/v1",
+        "http://8.8.8.8:1234/v1",
+        "http://169.254.169.254:1234/v1",
+        "http://192.168.1.2:1234",
+    ):
         with pytest.raises(LocalLLMError):
             normalize_base_url(value)
 
@@ -27,6 +33,12 @@ def test_normalize_base_url_requires_private_numeric_v1_host() -> None:
 def test_redirect_handler_rejects_all_redirects() -> None:
     assert (
         _NoRedirect().redirect_request(None, None, 302, "Found", {}, "http://localhost/v1") is None
+    )
+
+
+def test_private_opener_ignores_ambient_proxy_configuration() -> None:
+    assert not any(
+        type(handler).__name__ == "ProxyHandler" for handler in _private_opener().handlers
     )
 
 
@@ -74,6 +86,22 @@ def test_draft_is_candidate_only_with_hashes(mock_request) -> None:
     assert report["human_apply_required"] is True
     assert report["may_modify_story_truth"] is False
     assert len(report["candidate_sha256"]) == 64
+
+
+@patch("local_llm._request_json")
+def test_draft_sanitizes_untrusted_usage_echo(mock_request) -> None:
+    mock_request.return_value = {
+        "choices": [{"finish_reason": "stop", "message": {"content": "candidate"}}],
+        "usage": {
+            "prompt_tokens": True,
+            "completion_tokens": -1,
+            "total_tokens": 12,
+            "authorization": "synthetic-secret-not-real",
+        },
+    }
+    report = draft("http://192.168.88.52:1234/v1", prompt="x")
+    assert report["usage"] == {"total_tokens": 12}
+    assert "synthetic-secret-not-real" not in repr(report)
 
 
 @patch("local_llm._request_json")

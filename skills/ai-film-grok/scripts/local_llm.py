@@ -20,6 +20,12 @@ DEFAULT_MODEL = "openai/gpt-oss-20b"
 ALLOWED_MODELS = frozenset({DEFAULT_MODEL})
 _MAX_RESPONSE_BYTES = 1_048_576
 _MAX_PROMPT_CHARS = 12_000
+_PRIVATE_NETWORKS = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("fc00::/7"),
+)
 _TWO_SHOT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -59,6 +65,22 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def _private_opener() -> urllib.request.OpenerDirector:
+    """Do not let ambient proxy settings export private requests or auth headers."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+
+
+def _safe_usage(value: Any) -> dict[str, int]:
+    """A provider response must not echo credentials through a receipt-like result."""
+    if not isinstance(value, dict):
+        return {}
+    return {
+        key: raw
+        for key in ("prompt_tokens", "completion_tokens", "total_tokens")
+        if type(raw := value.get(key)) is int and raw >= 0
+    }
+
+
 def normalize_base_url(base_url: str) -> str:
     """Accept only a private numeric host and the OpenAI-compatible ``/v1`` root."""
     parsed = urlsplit(str(base_url).strip())
@@ -75,7 +97,7 @@ def normalize_base_url(base_url: str) -> str:
         raise LocalLLMError(
             "LOCAL_LLM_URL_INVALID", "local LLM host must be a numeric private IP"
         ) from exc
-    if not (host.is_private or host.is_loopback):
+    if not (host.is_loopback or any(host in network for network in _PRIVATE_NETWORKS)):
         raise LocalLLMError(
             "LOCAL_LLM_URL_NOT_PRIVATE", "local LLM host must be private or loopback"
         )
@@ -122,7 +144,7 @@ def _request_json(
         headers=headers,
     )
     try:
-        opener = urllib.request.build_opener(_NoRedirect())
+        opener = _private_opener()
         with opener.open(request, timeout=timeout) as response:  # noqa: S310 -- private URL is validated above
             raw = response.read(_MAX_RESPONSE_BYTES + 1)
     except urllib.error.HTTPError as exc:
@@ -220,7 +242,7 @@ def draft(
     if not isinstance(content, str) or not content.strip():
         raise LocalLLMError("LOCAL_LLM_EMPTY_OUTPUT", "local LLM returned no usable candidate")
     output = content.strip()
-    usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+    usage = _safe_usage(response.get("usage"))
     return {
         "schema_version": 1,
         "kind": "local-llm-draft",
@@ -313,7 +335,7 @@ def shot_draft(
             "LOCAL_LLM_INVALID_SHOT_JSON", "local LLM did not return two usable shots"
         )
     canonical = json.dumps(candidate, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+    usage = _safe_usage(response.get("usage"))
     return {
         "schema_version": 1,
         "kind": "local-llm-shot-draft",

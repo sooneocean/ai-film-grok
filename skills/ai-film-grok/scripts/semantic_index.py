@@ -9,6 +9,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
+import re
+import stat
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -24,10 +27,83 @@ _MAX_DOCUMENTS = 128
 _MAX_QUERY_CHARS = 1_000
 _EMBED_BATCH_SIZE = 16
 _SECRET_FIELD_MARKERS = frozenset(
-    {"token", "secret", "password", "authorization", "api_key", "signature", "signed_url"}
+    {
+        "token",
+        "secret",
+        "password",
+        "authorization",
+        "apikey",
+        "signature",
+        "signedurl",
+        "cookie",
+        "credential",
+        "privatekey",
+        "accesskey",
+        "session",
+        "jwt",
+    }
 )
-_OMIT_FIELD_MARKERS = frozenset({"path", "url", "sha256", "content_sha256"})
-_SECRET_VALUE_MARKERS = ("bearer ", "sk-", "api_key=", "token=", "signature=")
+_SAFE_TEXT_KEYS = frozenset(
+    {
+        "action",
+        "beat",
+        "camera",
+        "cameraaxis",
+        "character",
+        "characters",
+        "description",
+        "dialogue",
+        "id",
+        "location",
+        "motion",
+        "mood",
+        "name",
+        "narration",
+        "notes",
+        "objective",
+        "palette",
+        "pacing",
+        "prop",
+        "scene",
+        "shotid",
+        "style",
+        "text",
+        "theme",
+        "title",
+        "wardrobe",
+    }
+)
+_SECRET_VALUE_MARKERS = (
+    "bearer ",
+    "sk-",
+    "api_key=",
+    "token=",
+    "password=",
+    "passwd=",
+    "secret=",
+    "signature=",
+    "authorization:",
+)
+_SENSITIVE_ASSIGNMENT_KEYS = (
+    "apikey",
+    "accesskey",
+    "privatekey",
+    "secret",
+    "token",
+    "session",
+    "cookie",
+    "password",
+    "authorization",
+    "jwt",
+    "signature",
+)
+_CREDENTIAL_VALUE = re.compile(
+    r"(?:gh[pousr]_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|"
+    r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})",
+    re.IGNORECASE,
+)
+_ABSOLUTE_PATH = re.compile(r"(?:^|[^A-Za-z0-9])(?:/[^\s]+|\\\\|[A-Za-z]:[\\/])")
+_MAX_SOURCE_BYTES = 2_000_000
 
 
 class SemanticIndexError(RuntimeError):
@@ -38,6 +114,38 @@ def _sha256_bytes(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _has_sensitive_assignment(text: str) -> bool:
+    for separator in ("=", ":"):
+        if separator not in text:
+            continue
+        name = re.sub(r"[^a-z0-9]", "", text.split(separator, 1)[0].lower())
+        if any(marker in name for marker in _SENSITIVE_ASSIGNMENT_KEYS):
+            return True
+    return False
+
+
+def _read_json_source(path: Path) -> tuple[bytes, dict[str, Any] | list[Any]]:
+    """Read only a regular file without following a final-component symlink."""
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                raise SemanticIndexError("index source must be a regular file")
+            raw = handle.read(_MAX_SOURCE_BYTES + 1)
+    except OSError as exc:
+        raise SemanticIndexError("index source became unsafe or unreadable") from exc
+    if len(raw) > _MAX_SOURCE_BYTES:
+        raise SemanticIndexError("index source exceeds 2 MB")
+    try:
+        value = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SemanticIndexError("index source must contain valid JSON") from exc
+    if not isinstance(value, (dict, list)):
+        raise SemanticIndexError("index source must contain a JSON object or array")
+    return raw, value
+
+
 def _source_paths(root: Path) -> list[Path]:
     candidates = [
         root / "drama-graph.json",
@@ -45,23 +153,33 @@ def _source_paths(root: Path) -> list[Path]:
         root / "reference-analysis" / "shot-grammar.json",
     ]
     receipts = root / "receipts"
+    if receipts.is_symlink():
+        raise SemanticIndexError("receipts symbolic links are not allowed")
     if receipts.is_dir():
         for path in sorted(receipts.glob("shot-review-*.json")):
             try:
-                value = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                _, value = _read_json_source(path)
+            except SemanticIndexError:
                 continue
             if isinstance(value, dict) and value.get("approved") is True:
                 candidates.append(path)
-    return [path for path in candidates if path.is_file() and not path.is_symlink()]
+    safe_paths: list[Path] = []
+    for path in candidates:
+        try:
+            resolved = path.resolve(strict=True)
+            resolved.relative_to(root)
+        except (OSError, ValueError):
+            continue
+        if path.is_file() and not path.is_symlink():
+            safe_paths.append(path)
+    return safe_paths
 
 
 def _safe_text(value: Any, *, path: str = "") -> list[str]:
     """Flatten useful JSON fields while excluding credential-like keys and values."""
     key = path.rsplit(".", 1)[-1].lower()
-    if any(marker in key for marker in _SECRET_FIELD_MARKERS):
-        return []
-    if key in _OMIT_FIELD_MARKERS:
+    normalized_key = re.sub(r"[^a-z0-9]", "", key)
+    if any(marker in normalized_key for marker in _SECRET_FIELD_MARKERS):
         return []
     if isinstance(value, dict):
         lines: list[str] = []
@@ -74,22 +192,25 @@ def _safe_text(value: Any, *, path: str = "") -> list[str]:
         for index, child in enumerate(value):
             lines.extend(_safe_text(child, path=f"{path}[{index}]"))
         return lines
+    if normalized_key not in _SAFE_TEXT_KEYS:
+        return []
     if isinstance(value, (str, int, float, bool)) and not isinstance(value, bool):
         text = str(value).strip()
         lowered = text.lower()
-        if text and not any(marker in lowered for marker in _SECRET_VALUE_MARKERS):
+        if (
+            text
+            and not any(marker in lowered for marker in _SECRET_VALUE_MARKERS)
+            and not _has_sensitive_assignment(text)
+            and not _CREDENTIAL_VALUE.search(text)
+            and not _ABSOLUTE_PATH.search(text)
+            and "://" not in text
+        ):
             return [f"{path}: {text}" if path else text]
     return []
 
 
 def _document_from_path(root: Path, path: Path) -> dict[str, Any] | None:
-    try:
-        raw = path.read_bytes()
-        value = json.loads(raw)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return None
-    if not isinstance(value, (dict, list)):
-        return None
+    raw, value = _read_json_source(path)
     relative = path.relative_to(root).as_posix()
     text = "\n".join(_safe_text(value))[:_MAX_DOCUMENT_CHARS].strip()
     if not text:
@@ -102,13 +223,19 @@ def _document_from_path(root: Path, path: Path) -> dict[str, Any] | None:
     }
 
 
-def collect_documents(root: Path | str) -> list[dict[str, Any]]:
-    """Collect a bounded, allowlisted set of local authoring documents."""
-    project = Path(root).expanduser().resolve()
+def _project_root(root: Path | str) -> Path:
+    raw_project = Path(root).expanduser()
+    if raw_project.is_symlink():
+        raise SemanticIndexError("film root symbolic links are not allowed")
+    project = raw_project.resolve()
     if not project.is_dir():
         raise SemanticIndexError("film root is missing")
-    if project.is_symlink():
-        raise SemanticIndexError("film root symbolic links are not allowed")
+    return project
+
+
+def collect_documents(root: Path | str) -> list[dict[str, Any]]:
+    """Collect a bounded, allowlisted set of local authoring documents."""
+    project = _project_root(root)
     documents = [
         doc for path in _source_paths(project) if (doc := _document_from_path(project, path))
     ]
@@ -173,7 +300,21 @@ def _embed(
 
 
 def _index_path(root: Path) -> Path:
-    return root / INDEX_RELATIVE_PATH
+    receipts = root / "receipts"
+    if receipts.is_symlink():
+        raise SemanticIndexError("receipts symbolic links are not allowed")
+    return receipts / "semantic-index.json"
+
+
+def _source_fingerprint(documents: list[dict[str, Any]]) -> set[tuple[str, str, str]]:
+    return {
+        (
+            document["source"]["relative_path"],
+            document["source"]["sha256"],
+            document["text_sha256"],
+        )
+        for document in documents
+    }
 
 
 def build_index(
@@ -185,7 +326,7 @@ def build_index(
     timeout: int = 45,
 ) -> dict[str, Any]:
     """Embed permitted local documents and atomically replace a derived index."""
-    project = Path(root).expanduser().resolve()
+    project = _project_root(root)
     endpoint = _normalize_endpoint(base_url)
     approved_model = _require_model(model)
     documents = collect_documents(project)
@@ -201,6 +342,10 @@ def build_index(
             timeout=timeout,
         )
     ]
+    if _source_fingerprint(collect_documents(project)) != _source_fingerprint(documents):
+        raise SemanticIndexError(
+            "semantic sources changed during embedding; run semantic-index build again"
+        )
     for document, vector in zip(documents, vectors, strict=True):
         document["vector"] = vector
     index = {
@@ -221,7 +366,7 @@ def build_index(
     return {
         "schema_version": 1,
         "kind": "semantic-index-build",
-        "path": str(path),
+        "relative_path": INDEX_RELATIVE_PATH.as_posix(),
         "document_count": len(documents),
         "embedding_dimensions": index["embedding_dimensions"],
         "model": approved_model,
@@ -254,6 +399,7 @@ def _load_current_index(root: Path) -> dict[str, Any]:
             or not isinstance(source.get("relative_path"), str)
             or not isinstance(source.get("sha256"), str)
             or not isinstance(document.get("text"), str)
+            or document.get("text_sha256") != _sha256_bytes(document.get("text", "").encode())
             or not isinstance(vector, list)
             or len(vector) != dimensions
         ):
@@ -262,17 +408,21 @@ def _load_current_index(root: Path) -> dict[str, Any]:
 
 
 def _require_fresh_sources(root: Path, documents: list[dict[str, Any]]) -> None:
+    current = _source_fingerprint(collect_documents(root))
+    indexed = _source_fingerprint(documents)
+    if current != indexed:
+        raise SemanticIndexError("semantic index is stale; run semantic-index build")
     for document in documents:
         source = document["source"]
         relative = Path(source["relative_path"])
         if relative.is_absolute() or ".." in relative.parts:
             raise SemanticIndexError("semantic index has an unsafe source path")
         path = root / relative
-        if (
-            not path.is_file()
-            or path.is_symlink()
-            or _sha256_bytes(path.read_bytes()) != source["sha256"]
-        ):
+        try:
+            raw, _ = _read_json_source(path)
+        except SemanticIndexError as exc:
+            raise SemanticIndexError("semantic index is stale; run semantic-index build") from exc
+        if _sha256_bytes(raw) != source["sha256"]:
             raise SemanticIndexError("semantic index is stale; run semantic-index build")
 
 
@@ -295,7 +445,7 @@ def query_index(
     timeout: int = 45,
 ) -> dict[str, Any]:
     """Return ranked source-bound text candidates; never mutate film files."""
-    project = Path(root).expanduser().resolve()
+    project = _project_root(root)
     endpoint = _normalize_endpoint(base_url)
     approved_model = _require_model(model)
     clean_query = str(query).strip()
@@ -315,6 +465,7 @@ def query_index(
         token=token,
         timeout=timeout,
     )[0]
+    _require_fresh_sources(project, documents)
     if len(query_vector) != index["embedding_dimensions"]:
         raise SemanticIndexError("embedding dimensions changed; run semantic-index build")
     ranked = sorted(

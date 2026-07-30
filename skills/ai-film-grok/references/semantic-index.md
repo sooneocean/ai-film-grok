@@ -14,9 +14,10 @@ export AIFILM_LOCAL_EMBEDDING_BASE_URL='http://192.168.88.52:1234/v1'
 export AIFILM_LOCAL_EMBEDDING_TOKEN='...'
 ```
 
-The endpoint must be a numeric private/loopback IP and end in `/v1`. Redirects,
-public hosts, credentials embedded in the URL, non-whitelisted models, malformed
-vectors, and stale sources fail closed.
+The endpoint must be a loopback, RFC1918, or IPv6 ULA numeric IP and end in
+`/v1`. Link-local/metadata addresses, redirects, ambient HTTP(S) proxies,
+public hosts, credentials embedded in the URL, non-whitelisted models,
+malformed vectors, and stale sources fail closed.
 
 ## Commands
 
@@ -33,9 +34,12 @@ aifilm semantic-index query --root '<film>' --query '谁穿红夹克在雨中送
 - `reference-analysis/shot-grammar.json`
 - approved `receipts/shot-review-*.json`
 
-Credential-like JSON keys and values are excluded. Query output includes only a
-relative source path, source SHA-256, text hash, candidate text, and similarity
-score; it never returns the stored vectors. If any indexed source has changed,
+Only an explicit allowlist of narrative fields is embedded; unknown metadata,
+credential-shaped fields or values (including password/token assignments), URLs,
+and absolute paths are excluded. Query output includes only a relative source
+path, source SHA-256, text hash, candidate text, and similarity score; it never
+returns the stored vectors. The stored candidate text must still match its
+recorded SHA-256 when loaded. If any indexed source has changed during a build or query,
 `query` stops and requires a rebuild rather than searching stale production data.
 
 Use results to locate context or compare authoring intent. They are not visual
