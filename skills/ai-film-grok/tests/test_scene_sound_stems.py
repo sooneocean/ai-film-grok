@@ -552,3 +552,72 @@ def test_walk_open_door_and_ambience_complete_the_local_scene_sound_loop(tmp_pat
     )
     assert result["event_count"] == 3
     assert Path(result["path"]).is_file()
+
+
+def test_scene_renderer_exports_ambience_without_baking_it_into_effects_stem(tmp_path: Path):
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    ambience = assets / "room-tone.wav"
+    impact = assets / "door.wav"
+    for path, frequency in ((ambience, 220), (impact, 880)):
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                f"sine=frequency={frequency}:duration=0.5",
+                str(path),
+            ],
+            check=True,
+        )
+    result = render_scene_sound_stem(
+        tmp_path,
+        {
+            "events": [
+                {
+                    "id": "room",
+                    "type": "ambience",
+                    "source": "local:assets/room-tone.wav",
+                    "source_sha256": hashlib.sha256(ambience.read_bytes()).hexdigest(),
+                    "start_sec": 0,
+                    "duration_sec": 0.5,
+                },
+                {
+                    "id": "door",
+                    "type": "action_sfx",
+                    "source": "local:assets/door.wav",
+                    "source_sha256": hashlib.sha256(impact.read_bytes()).hexdigest(),
+                    "start_sec": 0.5,
+                    "duration_sec": 0.5,
+                },
+            ]
+        },
+        duration_sec=1,
+        out=tmp_path / "audio" / "scene.wav",
+        ambience_out=tmp_path / "audio" / "ambience.wav",
+        sample_rate=8000,
+    )
+    ambience_path = Path(result["ambience"]["path"])
+    scene_path = Path(result["path"])
+    assert ambience_path.is_file()
+    assert result["ambience"]["event_count"] == 1
+    assert result["event_count"] == 2
+    for path, expect_first_half_audible in ((ambience_path, True), (scene_path, False)):
+        decoded = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(path), "-f", "f32le", "-ac", "2", "pipe:1"],
+            check=True,
+            capture_output=True,
+        )
+        samples = np.frombuffer(decoded.stdout, dtype=np.float32).reshape((-1, 2))
+        first_half_peak = float(np.max(np.abs(samples[:4000])))
+        second_half_peak = float(np.max(np.abs(samples[4000:])))
+        if expect_first_half_audible:
+            assert first_half_peak > 0.01
+            assert second_half_peak < 0.001
+        else:
+            assert first_half_peak < 0.001
+            assert second_half_peak > 0.01
