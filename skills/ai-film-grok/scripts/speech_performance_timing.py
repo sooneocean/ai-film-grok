@@ -12,6 +12,34 @@ from util import read_json, write_json
 MIN_REACTION_SPACE_SEC = 0.2
 
 
+def timing_recommendation(
+    *, actual_duration_sec: float, usable_window_sec: float
+) -> dict[str, Any]:
+    """Classify a measured timing miss without mutating audio or picture."""
+    actual = max(0.0, float(actual_duration_sec))
+    window = max(0.0, float(usable_window_sec))
+    excess = max(0.0, actual - window)
+    ratio = excess / window if window else (1.0 if actual else 0.0)
+    if ratio <= 0.03 + 1e-9:
+        action = "accept"
+    elif ratio <= 0.07 + 1e-9:
+        action = "micro_stretch_review"
+    elif ratio <= 0.12 + 1e-9:
+        action = "regenerate_rate"
+    elif ratio <= 0.20 + 1e-9:
+        action = "rework_performance"
+    else:
+        action = "rewrite_or_extend_shot"
+    return {
+        "usable_window_sec": round(window, 3),
+        "actual_duration_sec": round(actual, 3),
+        "overrun_sec": round(excess, 3),
+        "overrun_ratio": round(ratio, 4),
+        "action": action,
+        "automatic": False,
+    }
+
+
 def _hash(path: Path) -> str | None:
     if not path.is_file():
         return None
@@ -99,6 +127,11 @@ def build_speech_performance_timing(root: Path, *, write: bool = True) -> dict[s
                             "shot_id": shot_id,
                             "message": "measured dialogue duration must be positive",
                         }
+                    )
+                else:
+                    row["timing_recommendation"] = timing_recommendation(
+                        actual_duration_sec=audio_duration,
+                        usable_window_sec=max(0.0, duration - MIN_REACTION_SPACE_SEC),
                     )
                 review = read_json(root / "receipts" / "reviews" / f"{shot_id}.json") or {}
                 evidence = (review.get("performance_contract") or {}).get("evidence") or {}

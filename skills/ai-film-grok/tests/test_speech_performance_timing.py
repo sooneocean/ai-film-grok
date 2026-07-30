@@ -11,7 +11,10 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from speech_performance_timing import build_speech_performance_timing  # noqa: E402
+from speech_performance_timing import (  # noqa: E402
+    build_speech_performance_timing,
+    timing_recommendation,
+)
 
 
 class SpeechPerformanceTimingTests(unittest.TestCase):
@@ -118,3 +121,20 @@ class SpeechPerformanceTimingTests(unittest.TestCase):
         codes = {item["code"] for item in report["errors"]}
         self.assertIn("DIALOGUE_TTS_KIND_MISMATCH", codes)
         self.assertIn("DIALOGUE_TTS_TEXT_MISMATCH", codes)
+
+
+@pytest.mark.parametrize(
+    ("actual", "window", "action"),
+    [
+        (1.0, 1.0, "accept"),
+        (1.03, 1.0, "accept"),
+        (1.07, 1.0, "micro_stretch_review"),
+        (1.12, 1.0, "regenerate_rate"),
+        (1.20, 1.0, "rework_performance"),
+        (1.21, 1.0, "rewrite_or_extend_shot"),
+    ],
+)
+def test_timing_recommendation_is_explicit_and_never_automatic(actual, window, action):
+    result = timing_recommendation(actual_duration_sec=actual, usable_window_sec=window)
+    assert result["action"] == action
+    assert result["automatic"] is False
