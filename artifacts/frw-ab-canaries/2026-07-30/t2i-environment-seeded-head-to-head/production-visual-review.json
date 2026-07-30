@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-production-visual-review",
+  "experiment_id": "env-t2i-production-20260730",
+  "reviewed_at": "2026-07-30T04:16:00Z",
+  "rank_sha256": "f3437ae9bdb0cbd9ccf809d2eedb0480cb56468c0a7d7d4b2522c8e156b28a46",
+  "outcome": "reject_no_eligible_output",
+  "automatic_resubmit": false,
+  "candidates": [
+    {
+      "model_id": "qwen",
+      "media": {
+        "path": "production-outputs/qwen.png",
+        "sha256": "456dc2134a4949edc78cb8747b5488aefa9a0490dec6ff16200019124f0ef56d",
+        "width": 704,
+        "height": 1280
+      },
+      "eligible": false,
+      "codes": ["PEOPLE_VISIBLE", "TEXT_OR_SIGN_VISIBLE"],
+      "notes": [
+        "Large illustrated human figures are visible on the far platform.",
+        "Signage and readable-looking letter forms are visible behind the figures."
+      ]
+    },
+    {
+      "model_id": "flux",
+      "media": {
+        "path": "production-outputs/flux.png",
+        "sha256": "6a112beedf85b479dd9a3ef54b1811116ab371cdaebff8ce883fc1bf5d7b05c6",
+        "width": 704,
+        "height": 1280
+      },
+      "eligible": false,
+      "codes": ["PEOPLE_VISIBLE", "TEXT_OR_SIGN_VISIBLE"],
+      "notes": [
+        "Human figures are visible on the left platform.",
+        "Station signs and graphic symbols are visible near the platform."
+      ]
+    }
+  ]
+}
