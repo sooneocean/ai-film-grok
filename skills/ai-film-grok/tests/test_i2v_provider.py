@@ -16,8 +16,10 @@ from i2v_provider import (  # noqa: E402
     SeedanceProvider,
     all_providers,
     for_endpoint,
+    generate_with_fallback,
     get,
     is_technical_failure,
+    provider_switch_receipt_is_valid,
     registry_report,
     route_after_failure,
 )
@@ -453,14 +455,120 @@ class I2VProviderTests(unittest.TestCase):
             self.assertIsInstance(__import__("i2v_provider").preferred(), GrokI2VProvider)
 
     def test_only_technical_failure_routes_to_frw(self) -> None:
+        import os
+        from unittest import mock
+
         self.assertTrue(is_technical_failure("HTTP 503 service unavailable"))
         self.assertFalse(is_technical_failure({"task_id": "ambiguous"}))
         self.assertIsNone(
             route_after_failure(root=None, shot_id="s1", primary="grok", error="quality fail")
         )
-        selected = route_after_failure(root=None, shot_id="s1", primary="grok", error="HTTP 503")
+        with mock.patch.dict(
+            os.environ,
+            {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32},
+        ):
+            selected = route_after_failure(
+                root=None,
+                shot_id="s1",
+                primary="grok",
+                error="HTTP 503",
+            )
+            self.assertTrue(provider_switch_receipt_is_valid(selected[1]))
         self.assertIsNotNone(selected)
         self.assertEqual(selected[0].name, "seedance")
+
+    def test_provider_switch_writer_requires_local_hmac_key(self) -> None:
+        import json
+        import os
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            with mock.patch.dict(os.environ, {}, clear=True):
+                with self.assertRaisesRegex(I2VProviderError, "RECEIPT_KEY"):
+                    route_after_failure(
+                        root=root,
+                        shot_id="s1",
+                        primary="grok",
+                        error="HTTP 503",
+                    )
+            with mock.patch.dict(
+                os.environ,
+                {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32},
+                clear=True,
+            ):
+                selected = route_after_failure(
+                    root=root,
+                    shot_id="s1",
+                    primary="grok",
+                    error="HTTP 503 token=synthetic-secret-not-real",
+                )
+                stored = json.loads(
+                    (root / "receipts" / "provider-switch-s1.json").read_text(encoding="utf-8")
+                )
+                self.assertTrue(provider_switch_receipt_is_valid(stored))
+                self.assertEqual(stored["switch_hmac_sha256"], selected[1]["switch_hmac_sha256"])
+                self.assertNotIn("synthetic-secret-not-real", repr(stored))
+            with mock.patch.dict(
+                os.environ,
+                {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "z" * 32},
+                clear=True,
+            ):
+                self.assertFalse(provider_switch_receipt_is_valid(stored))
+
+    def test_provider_switch_rejects_pathlike_shot_id(self) -> None:
+        import os
+        from unittest import mock
+
+        with mock.patch.dict(
+            os.environ,
+            {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(I2VProviderError, "SHOT_ID_INVALID"):
+                route_after_failure(
+                    root=Path(tempfile.gettempdir()),
+                    shot_id="../receipt",
+                    primary="grok",
+                    error="HTTP 503",
+                )
+
+    def test_fallback_binds_the_executed_plan_to_its_switch_receipt(self) -> None:
+        import os
+        from unittest import mock
+
+        class FailingGrok:
+            name = "grok"
+
+            def generate(self, **_kwargs):
+                raise I2VProviderError("HTTP 503")
+
+        class Fallback:
+            name = "seedance"
+
+            def generate(self, **_kwargs):
+                return {"ok": True}
+
+        with (
+            tempfile.TemporaryDirectory() as raw,
+            mock.patch.dict(
+                os.environ,
+                {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32},
+                clear=True,
+            ),
+            mock.patch("i2v_provider.preferred", return_value=FailingGrok()),
+            mock.patch("i2v_provider.get", return_value=Fallback()),
+        ):
+            result = generate_with_fallback(
+                root=Path(raw),
+                shot_id="shot01",
+                keyframe=Path(raw) / "frame.png",
+                prompt="test",
+                plan_sha256="a" * 64,
+            )
+            assert result["route"] == "frw_fallback"
+            assert result["provider_switch"]["plan_sha256"] == "a" * 64
+            assert provider_switch_receipt_is_valid(result["provider_switch"])
 
     def test_preferred_returns_registered(self) -> None:
         """preferred() never raises and returns a registered provider."""

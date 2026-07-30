@@ -82,6 +82,11 @@ production plan 只产生 champion＋challenger 两个候选，且
 它不会自动改 `film-spec.i2v_provider`，也不会把机器第一名冒充成人审批准。
 非 I2V operation 仍须人审 promotion，但不套用 I2V 专属的 switch receipt。
 
+production I2V 前须在本机环境设置至少 32 字元的
+`AIFILM_PROVIDER_SWITCH_RECEIPT_KEY`。路由器用它签署 switch receipt；A/B
+执行端会同时核对内容 hash 与 HMAC，缺 key、旧式无签章 receipt 或手工伪造值
+一律 fail closed。密钥不得写入 film root、收据或版本库。
+
 ## Operation
 
 目录 adapter 支持 `text_to_image`、`image_to_image`、`text_to_video`、

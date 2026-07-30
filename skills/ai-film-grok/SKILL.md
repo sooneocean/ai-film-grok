@@ -1,6 +1,6 @@
 ---
 name: ai-film-grok
-description: Grok Build AI 剧情片：短片/8–15 分钟竖屏长片、I2V、声音、后期与证据交付。触发：AI 电影、漫剧、长片、dispatch、成片。
+description: Grok Imagine AI 剧情片：短片/8–15 分钟竖屏长片、I2V、声音、后期与证据交付。触发：AI 电影、漫剧、长片、dispatch、成片。
 ---
 
 # Film Grok
@@ -34,7 +34,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **供应商**：I2V=`grok_primary`；恢复路径才进 FRW，默认 `frw_video_model=seedance-2-fast-i2v`。FRW pilot 可全 advertised＋callable 候选 A/B，production 仅人审 champion＋challenger（[frw-ab](references/frw-ab-workflow.md)）；不改 primary、禁静默 bulk。
+7. **供应商**：I2V=`grok_primary`；FRW=恢复，`frw_video_model=seedance-2-fast-i2v`。pilot=advertised＋callable A/B；production=人审 champion＋challenger（[frw-ab](references/frw-ab-workflow.md)）;不改 primary/静默 bulk。
 8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM=rnb；缺已批 edit/bridge 则 `final` 阻塞。[BGM](references/bgm-generation.md)
 8b. **对白 i2i**：先 performance-state；FRW receipt 优先，否则查 Comfy；忙则等。[lesson](references/lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)

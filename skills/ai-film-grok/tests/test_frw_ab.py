@@ -168,8 +168,9 @@ def test_production_plan_requires_human_promotion_and_keeps_only_two_models(
 
 
 def test_production_i2v_run_requires_valid_technical_switch_receipt(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("AIFILM_PROVIDER_SWITCH_RECEIPT_KEY", "k" * 32)
     promotion = {
         "schema_version": 1,
         "kind": "frw-ab-promotion",
@@ -214,12 +215,41 @@ def test_production_i2v_run_requires_valid_technical_switch_receipt(
         run_experiment(tmp_path, plan=plan, inputs=_inputs(), submit=submit)
     submit.assert_not_called()
 
+    switch_receipt["switch_sha256"] = canonical_json_sha256(
+        {
+            key: value
+            for key, value in switch_receipt.items()
+            if key not in {"switch_sha256", "switch_hmac_sha256"}
+        }
+    )
+    switch_receipt["switch_hmac_sha256"] = "0" * 64
+    switch_path.write_text(json.dumps(switch_receipt), encoding="utf-8")
+    with pytest.raises(FrwABError, match="PROVIDER_SWITCH_REQUIRED"):
+        run_experiment(tmp_path, plan=plan, inputs=_inputs(), submit=submit)
+    submit.assert_not_called()
+
     route_after_failure(
         root=tmp_path,
         shot_id="shot01",
         primary="grok",
         error="HTTP 503 service unavailable",
+        plan_sha256=plan["plan_sha256"],
     )
+    replay_inputs = {**_inputs(), "prompt": "different plan must not reuse the switch receipt"}
+    replay_plan = build_production_plan(
+        tmp_path,
+        experiment_id="shot01-production-replay",
+        operation="image_to_video",
+        content_class="general",
+        inputs=replay_inputs,
+        catalog=_catalog(),
+        promotion=promotion,
+        shot_id="shot01",
+        allow_test_catalog_hash=True,
+    )
+    with pytest.raises(FrwABError, match="PROVIDER_SWITCH_REQUIRED"):
+        run_experiment(tmp_path, plan=replay_plan, inputs=replay_inputs, submit=submit)
+    submit.assert_not_called()
     receipt = run_experiment(
         tmp_path,
         plan=plan,

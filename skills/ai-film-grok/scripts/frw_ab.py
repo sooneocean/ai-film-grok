@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from i2v_provider import provider_switch_receipt_is_valid
 from security_policy import (
     SecurityPolicyError,
     safe_existing_file,
@@ -978,12 +979,6 @@ def _verify_provider_switch(root: Path | str, plan: dict[str, Any]) -> None:
     except SecurityPolicyError as exc:
         raise FrwABError(f"PROVIDER_SWITCH_REQUIRED: {exc}") from exc
     receipt = _load_required(path, kind="provider-switch")
-    switch_sha256 = str(receipt.get("switch_sha256") or "")
-    expected_switch_sha256 = _receipt_hash(
-        receipt,
-        hash_field="switch_sha256",
-        volatile_fields=frozenset(),
-    )
     if (
         receipt.get("shot_id") != stable_shot_id
         or receipt.get("primary_provider") != "grok"
@@ -991,8 +986,8 @@ def _verify_provider_switch(root: Path | str, plan: dict[str, Any]) -> None:
         or receipt.get("reason_class") != "technical_failure"
         or not str(receipt.get("error") or "").strip()
         or receipt.get("fallback_fixed_for_shot") is not True
-        or not switch_sha256
-        or switch_sha256 != expected_switch_sha256
+        or receipt.get("plan_sha256") != plan.get("plan_sha256")
+        or not provider_switch_receipt_is_valid(receipt)
     ):
         raise FrwABError("PROVIDER_SWITCH_REQUIRED: invalid technical-failure receipt")
 

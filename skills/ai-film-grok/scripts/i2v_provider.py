@@ -20,13 +20,18 @@ instances rather than replacing them.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from security_policy import SecurityPolicyError, validate_identifier
 from util import canonical_json_sha256, sha256_file, write_json
 
 
@@ -50,6 +55,10 @@ TECHNICAL_FAILURE_MARKERS = (
     "http 503",
     "http 504",
 )
+_SWITCH_HMAC_FIELD = "switch_hmac_sha256"
+_SWITCH_HASH_FIELD = "switch_sha256"
+_SWITCH_KEY_ENV = "AIFILM_PROVIDER_SWITCH_RECEIPT_KEY"
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def is_technical_failure(error: object) -> bool:
@@ -69,6 +78,76 @@ def is_technical_failure(error: object) -> bool:
     return any(marker in text for marker in TECHNICAL_FAILURE_MARKERS)
 
 
+def _provider_switch_key() -> bytes:
+    value = os.environ.get(_SWITCH_KEY_ENV, "").strip()
+    if len(value) < 32:
+        raise I2VProviderError(
+            "PROVIDER_SWITCH_RECEIPT_KEY_REQUIRED: "
+            f"{_SWITCH_KEY_ENV} must contain at least 32 characters"
+        )
+    return value.encode("utf-8")
+
+
+def _switch_content(receipt: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in receipt.items()
+        if key not in {_SWITCH_HASH_FIELD, _SWITCH_HMAC_FIELD, "path"}
+    }
+
+
+def _switch_hmac_bytes(receipt: dict[str, Any]) -> bytes:
+    return json.dumps(
+        {key: value for key, value in receipt.items() if key not in {_SWITCH_HMAC_FIELD, "path"}},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _sign_provider_switch_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
+    receipt[_SWITCH_HASH_FIELD] = canonical_json_sha256(_switch_content(receipt))
+    receipt[_SWITCH_HMAC_FIELD] = hmac.new(
+        _provider_switch_key(),
+        _switch_hmac_bytes(receipt),
+        hashlib.sha256,
+    ).hexdigest()
+    return receipt
+
+
+def provider_switch_receipt_is_valid(receipt: dict[str, Any]) -> bool:
+    """Require both canonical content binding and a local-only HMAC."""
+    content_hash = receipt.get(_SWITCH_HASH_FIELD)
+    signature = receipt.get(_SWITCH_HMAC_FIELD)
+    if (
+        not isinstance(content_hash, str)
+        or not _SHA256_RE.fullmatch(content_hash)
+        or not isinstance(signature, str)
+        or not _SHA256_RE.fullmatch(signature)
+    ):
+        return False
+    expected_hash = canonical_json_sha256(_switch_content(receipt))
+    if not hmac.compare_digest(content_hash, expected_hash):
+        return False
+    try:
+        expected_hmac = hmac.new(
+            _provider_switch_key(),
+            _switch_hmac_bytes(receipt),
+            hashlib.sha256,
+        ).hexdigest()
+    except I2VProviderError:
+        return False
+    return hmac.compare_digest(signature, expected_hmac)
+
+
+def _technical_failure_label(error: object) -> str:
+    text = str(error).lower()
+    return next(
+        (marker for marker in TECHNICAL_FAILURE_MARKERS if marker in text),
+        "technical_failure",
+    )
+
+
 def _write_switch_receipt(
     root: Path | None,
     *,
@@ -76,6 +155,7 @@ def _write_switch_receipt(
     primary: str,
     fallback: str,
     error: object,
+    plan_sha256: str | None = None,
 ) -> dict[str, Any]:
     receipt = {
         "schema_version": 1,
@@ -84,10 +164,14 @@ def _write_switch_receipt(
         "primary_provider": primary,
         "fallback_provider": fallback,
         "reason_class": "technical_failure",
-        "error": str(error)[:500],
+        "error": _technical_failure_label(error),
         "fallback_fixed_for_shot": True,
     }
-    receipt["switch_sha256"] = canonical_json_sha256(receipt)
+    if plan_sha256 is not None:
+        if not _SHA256_RE.fullmatch(plan_sha256):
+            raise I2VProviderError("PROVIDER_SWITCH_PLAN_INVALID: plan_sha256 must be SHA-256")
+        receipt["plan_sha256"] = plan_sha256
+    _sign_provider_switch_receipt(receipt)
     if root is not None:
         path = Path(root).expanduser().resolve() / "receipts" / f"provider-switch-{shot_id}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -97,14 +181,28 @@ def _write_switch_receipt(
 
 
 def route_after_failure(
-    *, root: Path | None, shot_id: str, primary: str, error: object
+    *,
+    root: Path | None,
+    shot_id: str,
+    primary: str,
+    error: object,
+    plan_sha256: str | None = None,
 ) -> tuple[I2VProvider, dict[str, Any]] | None:
     """Select FRW only after a classified Grok technical failure."""
     if primary != "grok" or not is_technical_failure(error):
         return None
+    try:
+        stable_shot_id = validate_identifier(shot_id, field="shot id")
+    except SecurityPolicyError as exc:
+        raise I2VProviderError(f"PROVIDER_SWITCH_SHOT_ID_INVALID: {exc}") from exc
     provider = get("seedance")
     return provider, _write_switch_receipt(
-        root, shot_id=shot_id, primary=primary, fallback=provider.name, error=error
+        root,
+        shot_id=stable_shot_id,
+        primary=primary,
+        fallback=provider.name,
+        error=error,
+        plan_sha256=plan_sha256,
     )
 
 
@@ -114,9 +212,12 @@ def generate_with_fallback(
     shot_id: str,
     keyframe: Path,
     prompt: str,
+    plan_sha256: str,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Run Grok first and invoke FRW only for a classified technical failure."""
+    if not isinstance(plan_sha256, str) or not _SHA256_RE.fullmatch(plan_sha256):
+        raise I2VProviderError("PROVIDER_SWITCH_PLAN_INVALID: plan_sha256 must be SHA-256")
     primary = preferred(root=root)
     try:
         result = primary.generate(keyframe=keyframe, prompt=prompt, **kwargs)
@@ -127,7 +228,13 @@ def generate_with_fallback(
         result["route"] = "grok_primary"
         return result
     except Exception as exc:
-        selected = route_after_failure(root=root, shot_id=shot_id, primary=primary.name, error=exc)
+        selected = route_after_failure(
+            root=root,
+            shot_id=shot_id,
+            primary=primary.name,
+            error=exc,
+            plan_sha256=plan_sha256,
+        )
         if selected is None:
             raise
         fallback, switch = selected
