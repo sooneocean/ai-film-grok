@@ -37,7 +37,7 @@
     "scripts/adult_max_director.py": "00513c8d84b0459ac5a4860e0ed1193812a4567c5f7bffff1aa5c80af1c68272",
     "scripts/advance.py": "c8139ff501fb5f7ef704d923c9a077d28be47c1378ec7c53d4c5a99f89845cce",
     "scripts/aifilm": "97f131b75cd6954e6aed0c8a7a05387bd45499e110226dd13df8cb6af4f996e9",
-    "scripts/aifilm_grok.py": "3911152282d7c59cd7101cf55a398d3ad60a3a6037a8b4f7ef0df978297afc4d",
+    "scripts/aifilm_grok.py": "c9b4d6eb9f777fe30ee705eeea428265607e6c6d7f3ee29ad9155711b58fc3b9",
     "scripts/ambience_candidates.py": "ac16d710a9af19c03d1f1e045d5f080aff8f571a7b4ef0fd2bafe41ac5d04b62",
     "scripts/anatomy_safety.py": "fe9d132594c2d4eb60d57de49c293016974d82a7937a8ae1d76eb00a5909b47e",
     "scripts/approval_ledger.py": "e2d04c44007d4a372699fa4c9b5c38ef2868f80e778dea5d5d155f5628503bc9",

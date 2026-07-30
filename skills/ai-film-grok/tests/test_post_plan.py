@@ -38,6 +38,14 @@ def test_new_plan_captures_video_use_hard_rules_and_default_owner(tmp_path: Path
     assert validate_post_plan(tmp_path, plan)["ok"] is True
 
 
+def test_new_plan_allows_ffmpeg_as_the_single_post_owner(tmp_path: Path) -> None:
+    plan = new_post_plan(tmp_path, owner="ffmpeg")
+
+    assert plan["post_owner"] == "ffmpeg"
+    assert plan["caption_owner"] == "ffmpeg"
+    assert validate_post_plan(tmp_path, plan)["ok"] is True
+
+
 def test_edl_source_types_are_preserved(tmp_path: Path) -> None:
     edit = tmp_path / "edit"
     edit.mkdir()

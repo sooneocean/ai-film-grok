@@ -10,7 +10,7 @@ from util import read_json, utc_now, write_json
 
 POST_PLAN_NAME = "post-plan.json"
 POST_PLAN_VERSION = 1
-OWNERS = frozenset({"hyperframes", "remotion"})
+OWNERS = frozenset({"ffmpeg", "hyperframes", "remotion"})
 SOURCE_TYPES = frozenset({"generated_clip", "real_footage"})
 
 

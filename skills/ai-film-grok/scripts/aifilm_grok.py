@@ -4764,8 +4764,8 @@ def cmd_export_compose(args: argparse.Namespace) -> int:
         )
     requested_engine = str(getattr(args, "engine", "both") or "both")
     requested_owner = str(getattr(args, "post_owner", "") or "").strip().lower()
-    if requested_owner not in {"", "hyperframes", "remotion"}:
-        raise FilmError("--post-owner must be hyperframes|remotion")
+    if requested_owner not in {"", "ffmpeg", "hyperframes", "remotion"}:
+        raise FilmError("--post-owner must be ffmpeg|hyperframes|remotion")
     owner = requested_owner or ("remotion" if requested_engine == "remotion" else "hyperframes")
     try:
         from post_plan import PostPlanError, ensure_post_plan
@@ -9160,7 +9160,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ec.add_argument(
         "--post-owner",
-        choices=["hyperframes", "remotion"],
+        choices=["ffmpeg", "hyperframes", "remotion"],
         default=None,
         help="Create a missing post-plan with this owner (default follows --engine)",
     )
@@ -9269,7 +9269,9 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--root", required=True)
     pp_sub = pp.add_subparsers(dest="post_plan_action", required=True)
     pp_init = pp_sub.add_parser("init", help="Write post-plan.json with one post owner")
-    pp_init.add_argument("--owner", choices=["hyperframes", "remotion"], default="hyperframes")
+    pp_init.add_argument(
+        "--owner", choices=["ffmpeg", "hyperframes", "remotion"], default="hyperframes"
+    )
     pp_init.add_argument("--edl", default=None, help="Workspace-relative video-use EDL path")
     pp_init.add_argument("--master-subtitles", default="out/final.srt")
     pp_init.add_argument("--audio-plan", default="sound-plan.json")
