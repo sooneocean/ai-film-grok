@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-plan",
+  "created_at": "2026-07-30T06:36:11.937549+00:00",
+  "experiment_id": "env-i2v-qwen-empty-platform-pilot-20260730",
+  "stage": "pilot",
+  "operation": "image_to_video",
+  "content_class": "general",
+  "catalog_sha256": "46ea14995336d17e498c0e92923ceaa061a7fce6407ebac040ebc4cc69a1ccdb",
+  "input_bindings": {
+    "img-url": {
+      "sha256": "b624746f7d3deddff837999ea60a3d5f8b6ce0e89156b8b6bbf78eaeea4be8c2",
+      "present": true
+    },
+    "prompt": {
+      "sha256": "8bcbc4c43cff34104e224533fdcd9c364f74fed719299f3125fd1763c2adebb4",
+      "present": true
+    }
+  },
+  "candidates": [
+    {
+      "capability_id": "image_to_video:byteplus-seedance-2-i2v",
+      "model_id": "byteplus-seedance-2-i2v",
+      "operation": "image_to_video",
+      "catalog_status": "advertised",
+      "health_state": "pending_pilot_probe",
+      "parameters": [
+        {
+          "name": "duration",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "image",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "ratio",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "resolution",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "invocation": {
+        "command": "newvideo",
+        "query_command": "newvideo-query",
+        "fixed_args": {
+          "model": "byteplus-seedance-2-i2v"
+        }
+      }
+    },
+    {
+      "capability_id": "image_to_video:classic-provider-managed",
+      "model_id": "classic-provider-managed",
+      "operation": "image_to_video",
+      "catalog_status": "advertised",
+      "health_state": "pending_pilot_probe",
+      "parameters": [
+        {
+          "name": "img-url",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "invocation": {
+        "command": "img2video",
+        "query_command": "img2video-query",
+        "fixed_args": {}
+      }
+    },
+    {
+      "capability_id": "image_to_video:ltx-i2v",
+      "model_id": "ltx-i2v",
+      "operation": "image_to_video",
+      "catalog_status": "advertised",
+      "health_state": "pending_pilot_probe",
+      "parameters": [
+        {
+          "name": "height",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "image_url",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "video_duration",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "video_fps",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "width",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "invocation": {
+        "command": "newvideo",
+        "query_command": "newvideo-query",
+        "fixed_args": {
+          "model": "ltx-i2v"
+        }
+      }
+    },
+    {
+      "capability_id": "image_to_video:seedance-2-fast-i2v",
+      "model_id": "seedance-2-fast-i2v",
+      "operation": "image_to_video",
+      "catalog_status": "advertised",
+      "health_state": "pending_pilot_probe",
+      "parameters": [
+        {
+          "name": "aspectRatio",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "16:9",
+            "9:16",
+            "21:9"
+          ]
+        },
+        {
+          "name": "duration",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "imageUrls",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "resolution",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "720p"
+          ]
+        }
+      ],
+      "invocation": {
+        "command": "newvideo",
+        "query_command": "newvideo-query",
+        "fixed_args": {
+          "model": "seedance-2-fast-i2v"
+        }
+      }
+    }
+  ],
+  "promotion_sha256": null,
+  "fanout": {
+    "mode": "all_eligible",
+    "parallel": true,
+    "unmetered": true,
+    "candidate_count": 4,
+    "declared_concurrency_limit": null
+  },
+  "provider_policy": {
+    "primary_provider": "grok",
+    "changes_primary_provider": false,
+    "requires_provider_switch_receipt": false,
+    "shot_id": null,
+    "automatic_quality_fallback": false
+  },
+  "execution": {
+    "authorized": false,
+    "explicit_run_required": true,
+    "automatic_resubmit": false
+  },
+  "plan_sha256": "c1b484634c0cd00415ac9b3072d10361b9e7cd52e7a063eea5685dc574e3a209"
+}
