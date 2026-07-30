@@ -1265,6 +1265,14 @@ def validate_film_spec(
             for shot in coverage
             if str(shot.get("beat_id") or "").strip()
         }
+        # Timed dialogue B-roll is coverage beneath its parent A-roll: it
+        # replaces picture while retaining that line's dialogue/caption clock.
+        # Treat it as beat coverage as well as legacy standalone cover shots.
+        coverage_beats.update(
+            str(shot.get("beat_id") or "")
+            for shot in on_camera
+            if shot.get("dialogue_broll") and str(shot.get("beat_id") or "").strip()
+        )
         missing_beat_coverage = sorted(
             {
                 str(shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id") or "")
