@@ -69,6 +69,16 @@ def test_pilot_template_hashes_are_registry_bound() -> None:
         assert workflow_sha256(graph) == weapon["verified"]["workflow_template_sha256"]
 
 
+def test_infinite_talk_frame_defaults_match_the_pilot_workflow() -> None:
+    armory = load_armory()
+    weapon = next(item for item in armory["weapons"] if item["id"] == "infinite-talk-stable-pilot")
+    root = Path(__file__).resolve().parents[1]
+    graph = json.loads((root / weapon["workflow_template"]).read_text(encoding="utf-8"))
+
+    assert graph["4"]["inputs"]["num_frames"] == weapon["defaults"]["num_frames"]
+    assert graph["4"]["inputs"]["fps"] == weapon["defaults"]["fps"]
+
+
 def test_wan_quality_template_decodes_the_completed_low_noise_pass() -> None:
     root = Path(__file__).resolve().parents[1]
     graph = json.loads(
@@ -367,6 +377,9 @@ def test_compile_ltx23_native_pilot_binds_image_prompt_and_seed() -> None:
 
 
 def test_compile_infinite_talk_binds_image_audio_prompt_seed_and_stable_scale() -> None:
+    weapon = next(
+        item for item in load_armory()["weapons"] if item["id"] == "infinite-talk-stable-pilot"
+    )
     graph = compile_weapon_workflow(
         "infinite-talk-stable-pilot",
         prompt="The adult character speaks calmly with restrained head motion.",
@@ -378,6 +391,8 @@ def test_compile_infinite_talk_binds_image_audio_prompt_seed_and_stable_scale() 
     assert graph["1"]["inputs"]["image"] == "approved/hero.png"
     assert graph["2"]["inputs"]["audio"] == "approved/hero-ja.wav"
     assert graph["4"]["inputs"]["audio_scale"] == 1.0
+    assert graph["4"]["inputs"]["num_frames"] == 193
+    assert weapon["defaults"]["num_frames"] == 193
     assert graph["9"]["inputs"]["positive_prompt"].startswith("The adult character")
     assert graph["11"]["inputs"]["seed"] == 20260729
     assert graph["13"]["inputs"]["filename_prefix"] == "aifilm/talking/infinite-stable"

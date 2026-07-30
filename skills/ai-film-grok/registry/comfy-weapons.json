@@ -320,6 +320,7 @@
         "width": 640,
         "height": 640,
         "steps": 20,
+        "num_frames": 193,
         "fps": 25,
         "audio_scale": 1.0
       },
@@ -335,7 +336,7 @@
         "real_pilot": true,
         "independent_verifier": "ACCEPT",
         "production_promoted": false,
-        "workflow_template_sha256": "2baa73729dda575b02048e4b5a07c012db03cf5f437261d81d87e9ed3d22677e",
+        "workflow_template_sha256": "17cd3e501ff9e84f2fe10573ae37067056e790bb288ed03a710afc0ff7f5cf46",
         "input_image_sha256": "8fe0f38c07a0c5cb9013ab0884743367052a3059d053f1aee7eb3212e5d70a85",
         "input_audio_sha256": "3461a8893e465fd3da65a2bc6a13fac1d60a8c047127778615497ee7cc0d34c0",
         "output_sha256": "465050253678bf9f55542af12f5013808e2c5c5baec56d9410833785d0f0ca57",
