@@ -236,6 +236,15 @@ def cosyvoice_local_argv_configured() -> bool:
     return configured == adapter
 
 
+def cosyvoice_local_model_label() -> str:
+    """Expose the configured local CosyVoice variant in render provenance."""
+    return (
+        "CosyVoice-300M-SFT"
+        if os.environ.get("COSYVOICE_MODE", "").strip().lower() == "sft"
+        else "Fun-CosyVoice3-local"
+    )
+
+
 def kokoro_local_argv_configured() -> bool:
     """Whether argv invokes this checkout's offline Kokoro adapter."""
     argv = external_argv()
@@ -496,6 +505,8 @@ def probe() -> dict[str, Any]:
         "qwen3": bool(qwen.get("ok")),
         "higgs": bool(higgs.get("ok")),
         "audio_node": bool(node.get("ok")),
+        "cosyvoice-local": cosyvoice_local_argv_configured(),
+        "kokoro-local": kokoro_local_argv_configured(),
     }
     try:
         import edge_tts  # noqa: F401
@@ -1412,12 +1423,12 @@ def synthesize(
                 )
             _tracked(
                 "cosyvoice-local",
-                "Fun-CosyVoice3-local",
+                cosyvoice_local_model_label(),
                 local_zero=True,
                 call=lambda: tts_external(text, out_mp3, voice=voice),
             )
             voice_used = voice or "cosyvoice-local"
-            model_used = "Fun-CosyVoice3-local"
+            model_used = cosyvoice_local_model_label()
         elif choice == "kokoro-local":
             if not kokoro_local_argv_configured():
                 raise TTSError(

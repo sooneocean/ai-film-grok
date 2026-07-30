@@ -129,6 +129,13 @@ def test_japanese_male_design_presets_require_a_decoded_audio_canary() -> None:
 def test_tts_model_armory_keeps_unverified_models_non_routable() -> None:
     models = tts_model_catalog()
     assert models["qwen3_tts_5090"]["production_eligible"] is True
+    assert models["cosyvoice_300m_sft"] == {
+        "status": "ready_explicit",
+        "route": "cosyvoice-local",
+        "license": "Apache-2.0",
+        "production_eligible": True,
+        "label": "CosyVoice-300M-SFT：内建中文女声，本机解码验证；不使用声线克隆",
+    }
     for model_id in (
         "cosyvoice3_local",
         "kokoro_82m_zh",

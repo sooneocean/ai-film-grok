@@ -354,6 +354,13 @@ TTS_MODEL_ARMORY: dict[str, dict[str, Any]] = {
         "production_eligible": False,
         "label": "CosyVoice 3：本地中文自然度候选，需服务与授权参考音频",
     },
+    "cosyvoice_300m_sft": {
+        "status": "ready_explicit",
+        "route": "cosyvoice-local",
+        "license": "Apache-2.0",
+        "production_eligible": True,
+        "label": "CosyVoice-300M-SFT：内建中文女声，本机解码验证；不使用声线克隆",
+    },
     "kokoro_82m_zh": {
         "status": "install_required",
         "route": "kokoro-local",

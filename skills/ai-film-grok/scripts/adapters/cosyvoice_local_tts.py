@@ -46,7 +46,7 @@ def _regular_file(path: Path, *, name: str) -> Path:
 
 
 def _mode() -> str:
-    mode = _env("COSYVOICE_MODE") or "zero_shot"
+    mode = (_env("COSYVOICE_MODE") or "zero_shot").lower()
     if mode not in {"zero_shot", "sft"}:
         raise CosyVoiceLocalError("COSYVOICE_MODE must be zero_shot or sft")
     return mode
@@ -73,7 +73,7 @@ def _configuration() -> tuple[Path, Path, Path | None, str]:
     model = Path(model_raw).expanduser().resolve()
     reference = (
         _regular_file(Path(ref_raw).expanduser(), name="COSYVOICE_REF_WAV").resolve()
-        if ref_raw
+        if mode == "zero_shot" and ref_raw
         else None
     )
     if not (root / "cosyvoice").is_dir() or not (root / "third_party" / "Matcha-TTS").is_dir():
@@ -101,7 +101,9 @@ def _write_output(samples: object, sample_rate: int, out: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="aifilm-cosyvoice-") as tmp_dir:
         wav = Path(tmp_dir) / "render.wav"
         torchaudio.save(str(wav), samples, sample_rate)
-        rendered = Path(tmp_dir) / f"render{out.suffix or '.mp3'}"
+        # Keep the FFmpeg destination distinct even when callers request WAV.
+        # An in-place ``render.wav → render.wav`` conversion is rejected.
+        rendered = Path(tmp_dir) / f"render.output{out.suffix or '.mp3'}"
         command = [
             "ffmpeg",
             "-y",

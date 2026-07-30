@@ -64,8 +64,8 @@ def test_cosyvoice_sft_does_not_need_a_reference(
     monkeypatch.setenv("COSYVOICE_ROOT", str(root))
     monkeypatch.setenv("COSYVOICE_MODEL_DIR", str(model))
     monkeypatch.setenv("COSYVOICE_MODE", "sft")
-    monkeypatch.delenv("COSYVOICE_REF_WAV", raising=False)
-    monkeypatch.delenv("COSYVOICE_PROMPT_TEXT", raising=False)
+    monkeypatch.setenv("COSYVOICE_REF_WAV", str(tmp_path / "stale-missing-reference.wav"))
+    monkeypatch.setenv("COSYVOICE_PROMPT_TEXT", "stale zero-shot prompt")
 
     configured = cosyvoice_local_tts._configuration()
 
@@ -111,6 +111,28 @@ def test_cosyvoice_argv_detection(monkeypatch: pytest.MonkeyPatch) -> None:
         f'["python3","{adapter}","--out","{{out}}"]',
     )
     assert tts_backend.cosyvoice_local_argv_configured()
+    assert tts_backend.probe()["backends"]["cosyvoice-local"] is True
+
+
+def test_cosyvoice_sft_model_label(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COSYVOICE_MODE", "SFT")
+    assert tts_backend.cosyvoice_local_model_label() == "CosyVoice-300M-SFT"
+
+
+def test_cosyvoice_accepts_case_insensitive_sft_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "CosyVoice"
+    (root / "cosyvoice").mkdir(parents=True)
+    (root / "third_party" / "Matcha-TTS").mkdir(parents=True)
+    model = tmp_path / "model"
+    model.mkdir()
+    (model / "cosyvoice.yaml").write_text("sample_rate: 24000\n", encoding="utf-8")
+    monkeypatch.setenv("COSYVOICE_ROOT", str(root))
+    monkeypatch.setenv("COSYVOICE_MODEL_DIR", str(model))
+    monkeypatch.setenv("COSYVOICE_MODE", "SFT")
+
+    assert cosyvoice_local_tts._configuration()[2] is None
 
 
 def test_cosyvoice_uses_extended_local_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
