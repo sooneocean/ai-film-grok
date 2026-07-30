@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-poll",
+  "created_at": "2026-07-30T04:59:57.439997+00:00",
+  "experiment_id": "env-t2i-empty-platform-remediation-20260730",
+  "operation": "text_to_image",
+  "run_sha256": "2fe2fc9d5adb6a84c2fa06c72b0b394e77fffff24092fbe4b49dd248b88f2d46",
+  "results": [
+    {
+      "model_id": "flux",
+      "task_id": "42662c88-0004-4417-8c98-83b492c4c6a7",
+      "status": "processing",
+      "url_sha256": null,
+      "error_code": null
+    },
+    {
+      "model_id": "qwen",
+      "task_id": "64c8df87-52ad-4463-9862-8082c128bb90",
+      "status": "processing",
+      "url_sha256": null,
+      "error_code": null
+    }
+  ],
+  "terminal": false,
+  "automatic_resubmit": false,
+  "poll_sha256": "0f8c064480bf184790922f166f90a7c55ac199b2f27e597d68557183ea25cfa7"
+}
