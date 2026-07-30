@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "frw-ab-poll",
-  "created_at": "2026-07-30T04:13:06.294171+00:00",
+  "created_at": "2026-07-30T04:45:38.348272+00:00",
   "experiment_id": "env-t2i-production-20260730",
   "operation": "text_to_image",
   "run_sha256": "0dffe4305748b096497c71308e89f6bf0c0904abc448efe2ef45cace394b4582",
@@ -9,19 +9,19 @@
     {
       "model_id": "flux",
       "task_id": "b38740a0-9ba9-4f84-bc79-d92a5234358f",
-      "status": "processing",
-      "url_sha256": null,
+      "status": "completed",
+      "url_sha256": "3c7d17a331ac5bc80bdfc5376e83da0b59cb2556c176ce7d3f051932265345f6",
       "error_code": null
     },
     {
       "model_id": "qwen",
       "task_id": "ba049ee2-a596-42a4-94fb-2731417dba70",
-      "status": "processing",
-      "url_sha256": null,
+      "status": "completed",
+      "url_sha256": "2c3ed1405def94502a4f840274e9463f40ab7a45e3715ba99c8f5dfcc5610037",
       "error_code": null
     }
   ],
-  "terminal": false,
+  "terminal": true,
   "automatic_resubmit": false,
-  "poll_sha256": "25fb8b281db27807dd4bf78e472adddebfa4d70e3de0d1892464ef4cc90e2fb7"
+  "poll_sha256": "2a1b046ee79eb0b7e4f28f0140e8c9b54d5ba090e45aaeb504014c59e620e65a"
 }
