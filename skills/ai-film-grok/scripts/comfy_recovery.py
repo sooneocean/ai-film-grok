@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from security_policy import minimal_subprocess_env
+from security_policy import load_allowed_env, minimal_subprocess_env
 
 
 class ComfyRecoveryError(RuntimeError):
@@ -62,6 +62,20 @@ def _normalize_config_target(value: str) -> str:
 def config_from_env(
     environ: Mapping[str, str] | None = None,
 ) -> ComfyRecoveryConfig:
+    if environ is None:
+        load_allowed_env(
+            Path(__file__).resolve().parent.parent / "config.env",
+            allowed_keys={
+                "AIFILM_COMFY_SSH_TARGET",
+                "AIFILM_COMFY_SSH_KEY",
+                "AIFILM_COMFY_TUNNEL_PORT",
+                "AIFILM_COMFY_REMOTE_PORT",
+                "AIFILM_COMFY_BROKER_PORT",
+                "AIFILM_COMFY_REMOTE_ROOT",
+                "AIFILM_COMFY_SSH_KNOWN_HOSTS",
+                "AIFILM_COMFY_SSH_HOSTKEY_ALIAS",
+            },
+        )
     source = os.environ if environ is None else environ
     try:
         target = _normalize_config_target(

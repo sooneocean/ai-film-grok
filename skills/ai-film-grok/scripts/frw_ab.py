@@ -102,6 +102,23 @@ INPUT_FLAGS = (
     "generate-audio",
     "title",
 )
+SELECTION_REJECT_MARKERS = (
+    "draft",
+    "proposal",
+    "example",
+    "template",
+    "pending",
+    "maybe",
+    " if ",
+    "草案",
+    "示例",
+    "候选",
+    "建议",
+    "暂定",
+    "待确认",
+    "如果",
+    "若",
+)
 
 
 class FrwABError(RuntimeError):
@@ -160,6 +177,42 @@ def _receipt_hash(
         if key != hash_field and key not in volatile_fields
     }
     return canonical_json_sha256(stable)
+
+
+def _selection_role_pattern(model_id: str, role: str) -> re.Pattern[str]:
+    escaped = re.escape(model_id.casefold())
+    model = rf"(?<![a-z0-9_-]){escaped}(?![a-z0-9_-])"
+    return re.compile(
+        rf"(?:{model}\s*(?:为|as|is|=|:)\s*{role}\b|{role}\s*(?:为|as|is|=|:)\s*{model})",
+        re.IGNORECASE,
+    )
+
+
+def selection_phrase_is_approval(phrase: str, *, champion: str, challenger: str) -> bool:
+    """Require an explicit, role-bound user approval for FRW promotion."""
+    value = str(phrase or "").strip()
+    lowered = value.casefold()
+    if not value or any(marker in lowered for marker in SELECTION_REJECT_MARKERS):
+        return False
+    if not ("批准" in value or "核准" in value or re.search(r"\bapprove(?:d)?\b", lowered)):
+        return False
+    return bool(
+        _selection_role_pattern(champion, "champion").search(lowered)
+        and _selection_role_pattern(challenger, "challenger").search(lowered)
+    )
+
+
+def _selection_binding_hash(
+    *, rank_sha256: str, user_phrase: str, champion: str, challenger: str
+) -> str:
+    return canonical_json_sha256(
+        {
+            "rank_sha256": rank_sha256,
+            "user_phrase": user_phrase.strip(),
+            "champion": champion,
+            "challenger": challenger,
+        }
+    )
 
 
 def _input_bindings(inputs: dict[str, str]) -> dict[str, dict[str, Any]]:
@@ -903,9 +956,17 @@ def approve_rank(
     if not user_phrase_is_approval(user_phrase):
         raise FrwABError("HUMAN_APPROVAL_REQUIRED: exact user approval phrase is required")
     phrase = user_phrase.casefold()
-    if champion.casefold() not in phrase or challenger.casefold() not in phrase:
+    champion_role = re.search(
+        rf"{re.escape(champion.casefold())}\s*(?:为|為|as)\s*(?:the\s+)?champion\b",
+        phrase,
+    )
+    challenger_role = re.search(
+        rf"{re.escape(challenger.casefold())}\s*(?:为|為|as)\s*(?:the\s+)?challenger\b",
+        phrase,
+    )
+    if champion_role is None or challenger_role is None:
         raise FrwABError(
-            "HUMAN_APPROVAL_REQUIRED: phrase must name the selected champion and challenger"
+            "HUMAN_APPROVAL_REQUIRED: phrase must bind each selected model to its exact role"
         )
     rank_sha = str(rank["rank_sha256"])
     receipt = {

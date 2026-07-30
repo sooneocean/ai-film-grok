@@ -27,6 +27,7 @@ def route_dialogue_i2i(
     *,
     frw_receipt: dict[str, Any] | None,
     local_capacity: dict[str, Any] | None = None,
+    allow_frw_fallback: bool = False,
 ) -> dict[str, Any]:
     """Choose only a proven route; never take over another 5090 workload.
 
@@ -36,29 +37,28 @@ def route_dialogue_i2i(
     common = {
         "schema_version": 1,
         "kind": "dialogue-i2i-route",
-        "primary_provider": "frw_i2i",
-        "fallback_provider": "comfy_qwen_i2i",
+        "primary_provider": "comfy_qwen_i2i",
+        "fallback_provider": "frw_i2i_explicit_only",
         "non_interference": NON_INTERFERENCE,
     }
     capability = frw_i2i_capability(frw_receipt)
-    if capability == "available":
-        return {
-            **common,
-            "status": "ready",
-            "selected_provider": "frw_i2i",
-            "reason": "FRW upload credential and exact img2image template are proven",
-        }
-
     if local_capacity is None:
         return {
             **common,
             "status": "local_preflight_required",
             "selected_provider": None,
             "frw_i2i_capability": capability,
-            "reason": "FRW exact i2i is not proven; run local capacity preflight before fallback",
+            "reason": "Qwen performance-state i2i is primary; run local 5090 capacity preflight",
         }
-
     codes = _capacity_codes(local_capacity)
+    if local_capacity.get("ok") is True and not (codes & BUSY_CODES):
+        return {
+            **common,
+            "status": "ready",
+            "selected_provider": "comfy_qwen_i2i",
+            "frw_i2i_capability": capability,
+            "reason": "local 5090 Qwen i2i capacity preflight passed",
+        }
     if codes & BUSY_CODES:
         return {
             **common,
@@ -68,13 +68,22 @@ def route_dialogue_i2i(
             "blockers": sorted(codes & BUSY_CODES),
             "reason": "local 5090 is occupied; wait rather than interrupt, delete, or evict another job",
         }
-    if local_capacity.get("ok") is True:
+    if allow_frw_fallback and capability == "available":
         return {
             **common,
             "status": "ready",
-            "selected_provider": "comfy_qwen_i2i",
+            "selected_provider": "frw_i2i",
             "frw_i2i_capability": capability,
-            "reason": "FRW exact i2i is not proven and local capacity preflight passed",
+            "reason": "explicit FRW fallback authorized after local Qwen capacity is unavailable",
+        }
+    if local_capacity.get("ok") is True:
+        return {
+            **common,
+            "status": "blocked",
+            "selected_provider": None,
+            "frw_i2i_capability": capability,
+            "blockers": sorted(codes),
+            "reason": "Qwen local preflight is incomplete; do not silently switch provider",
         }
     return {
         **common,
@@ -82,5 +91,5 @@ def route_dialogue_i2i(
         "selected_provider": None,
         "frw_i2i_capability": capability,
         "blockers": sorted(codes),
-        "reason": "local fallback preflight did not pass; do not silently switch provider",
+        "reason": "Qwen local preflight did not pass; do not silently switch provider",
     }

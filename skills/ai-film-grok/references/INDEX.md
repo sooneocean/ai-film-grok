@@ -74,7 +74,7 @@
 | [ltx-env-plate.md](ltx-env-plate.md) | FRW LTX T2V 无角色环境床 |
 | [frw-lipsync.md](frw-lipsync.md) | FRW 口型音画同步 |
 | [seedance-camera-vocab.md](seedance-camera-vocab.md) | Seedance 运镜/视觉词库 |
-| **[dialogue-i2i-frw-priority-and-5090-readdress](lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md)** | **P0 对话 i2i**：FRW 精确能力验证优先；5090 忙则等待，网络重地址 fail-closed 恢复 |
+| [dialogue-i2i-frw-priority-and-5090-readdress](lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md) | 历史 FRW i2i 事故与 5090 重地址恢复；现行政策为 Qwen 主路由、FRW 明确回退 |
 
 ## 工具栈 · 音频
 

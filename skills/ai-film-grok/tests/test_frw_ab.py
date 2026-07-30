@@ -672,6 +672,14 @@ def test_machine_rank_is_provisional_and_human_approval_is_hash_bound(
             challenger="ltx-b",
             user_phrase="pilot 过，可以量产",
         )
+    with pytest.raises(FrwABError, match="HUMAN_APPROVAL_REQUIRED"):
+        approve_rank(
+            tmp_path,
+            rank=ranked,
+            champion="seedance-a",
+            challenger="ltx-b",
+            user_phrase="批准 ltx-b 为 champion，seedance-a 为 challenger",
+        )
 
 
 def test_approval_rejects_injected_or_same_candidate(tmp_path: Path) -> None:

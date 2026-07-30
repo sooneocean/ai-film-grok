@@ -27,13 +27,23 @@ def test_frw_i2i_requires_exact_still_probe_and_upload_credential() -> None:
     assert proven["i2i_capability"] == "available"
 
 
-def test_route_prefers_frw_only_when_exact_i2i_is_proven() -> None:
+def test_route_prefers_qwen_even_when_frw_i2i_is_proven() -> None:
     route = route_dialogue_i2i(
         frw_receipt={"i2i_capability": "available"},
         local_capacity={"ok": True},
     )
     assert route["status"] == "ready"
+    assert route["selected_provider"] == "comfy_qwen_i2i"
+
+
+def test_frw_requires_explicit_fallback_authorization() -> None:
+    route = route_dialogue_i2i(
+        frw_receipt={"i2i_capability": "available"},
+        local_capacity={"ok": False, "codes": ["QWEN_UNAVAILABLE"]},
+        allow_frw_fallback=True,
+    )
     assert route["selected_provider"] == "frw_i2i"
+    assert "explicit FRW fallback" in route["reason"]
 
 
 def test_route_waits_for_busy_local_without_interference() -> None:
