@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -17,7 +18,14 @@ from dialogue_benchmark_queue import (  # noqa: E402
     enqueue,
     status,
 )
+from runtime_policy import sha256  # noqa: E402
 from util import write_json  # noqa: E402
+
+LEGACY_WEAPONS = (
+    "comfy_qwen_i2i_performance_state",
+    "comfy_wan22_i2v",
+    "rtx_latentsync_1_6",
+)
 
 
 def _fixture(root: Path) -> None:
@@ -96,6 +104,56 @@ def test_frw_arm_claim_does_not_require_comfy_capacity(tmp_path: Path) -> None:
     assert result["capacity"] == {"ok": True, "status": "not_required", "executor": "frw"}
 
 
+def test_existing_wan_latentsync_benchmark_remains_queueable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fixture(tmp_path)
+    receipt = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
+    report = json.loads(receipt.read_text(encoding="utf-8"))
+    report["weapons"] = list(LEGACY_WEAPONS)
+    report["arms"] = [{"weapon": weapon, "status": "pending"} for weapon in LEGACY_WEAPONS]
+    write_json(receipt, report)
+    jobs = enqueue(tmp_path)["jobs"]
+    assert [job["weapon"] for job in jobs] == list(LEGACY_WEAPONS)
+
+    class Config:
+        comfyui_base_url = "http://127.0.0.1:18188"
+
+    monkeypatch.setattr("config_loader.get_config", lambda: Config())
+    monkeypatch.setattr("comfy_video.submission_capacity", lambda _url: {"ok": False})
+    assert claim(tmp_path)["status"] == "deferred"
+
+
+def test_claim_rejects_job_bound_to_a_replaced_benchmark(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fixture(tmp_path)
+    enqueue(tmp_path)
+    receipt = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
+    report = json.loads(receipt.read_text(encoding="utf-8"))
+    report["line_ids"] = ["sc01_ln02"]
+    write_json(receipt, report)
+
+    class Config:
+        comfyui_base_url = "http://127.0.0.1:18188"
+
+    monkeypatch.setattr("config_loader.get_config", lambda: Config())
+    monkeypatch.setattr("comfy_video.submission_capacity", lambda _url: {"ok": True})
+    with pytest.raises(DialogueBenchmarkQueueError, match="BENCHMARK_MISMATCH"):
+        claim(tmp_path)
+    assert status(tmp_path)["counts"]["running"] == 0
+
+
+def test_rejects_duplicate_weapons_in_benchmark_receipt(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    receipt = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
+    report = json.loads(receipt.read_text(encoding="utf-8"))
+    report["weapons"].append(report["weapons"][0])
+    write_json(receipt, report)
+    with pytest.raises(DialogueBenchmarkQueueError, match="NOT_QUEUEABLE"):
+        enqueue(tmp_path)
+
+
 def test_concurrent_claim_does_not_double_claim(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -130,10 +188,13 @@ def test_complete_rejects_review_without_real_artifact_evidence(tmp_path: Path) 
         {"schema_version": 1, "kind": "dialogue-benchmark-queue", "jobs": queue},
     )
     receipt = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
-    import json
-
     report = json.loads(receipt.read_text(encoding="utf-8"))
     report["arms"][0]["status"] = "reviewed"
     write_json(receipt, report)
+    queue[0]["benchmark_sha256"] = sha256(receipt)
+    write_json(
+        tmp_path / "receipts" / "dialogue-benchmark-queue.json",
+        {"schema_version": 1, "kind": "dialogue-benchmark-queue", "jobs": queue},
+    )
     with pytest.raises(DialogueBenchmarkQueueError, match="REVIEW_EVIDENCE_INVALID"):
         complete(tmp_path, job_id=queued["id"], claim_token="valid-token")

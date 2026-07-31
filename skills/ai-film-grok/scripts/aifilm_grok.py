@@ -3193,6 +3193,15 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     motion_approved = getattr(args, "motion_approved", False) is True
     review_note = str(getattr(args, "review_note", "") or "").strip()
     anatomy_safe = getattr(args, "anatomy_safe", False) is True
+    if args.status == "approved" and str(endpoint or "").startswith("frw_ltx"):
+        from visual_text_audit import VisualTextAuditError, require_clean_audit
+
+        try:
+            require_clean_audit(root, source)
+        except VisualTextAuditError as exc:
+            raise FilmError(
+                f"approved FRW LTX clip requires clean visual-text audit: {exc}"
+            ) from exc
     if args.status == "approved":
         from anatomy_safety import AnatomySafetyError, require_anatomy_safe
 

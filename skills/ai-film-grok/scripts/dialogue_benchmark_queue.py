@@ -23,6 +23,23 @@ _PENDING = "pending"
 _RUNNING = "running"
 _SUCCEEDED = "succeeded"
 
+# P2 jobs are durable production intent.  A benchmark receipt made by the
+# immediately preceding, approved weapon set must remain claimable after the
+# default armory changes; otherwise a routing update silently strands already
+# rehearsed dialogue and its locked TTS evidence.
+_LEGACY_WEAPON_EXECUTORS = {
+    "comfy_qwen_i2i_performance_state": "comfy",
+    "comfy_wan22_i2v": "comfy",
+    "rtx_latentsync_1_6": "comfy",
+}
+_EXECUTOR_BY_WEAPON = {**_LEGACY_WEAPON_EXECUTORS, **WEAPON_EXECUTORS}
+_SUPPORTED_WEAPON_SETS = frozenset(
+    {
+        frozenset(WEAPONS),
+        frozenset(_LEGACY_WEAPON_EXECUTORS),
+    }
+)
+
 
 class DialogueBenchmarkQueueError(RuntimeError):
     pass
@@ -35,6 +52,7 @@ def _paths(root: Path | str) -> tuple[Path, Path, Path]:
 
 def _benchmark(base: Path, receipt: Path) -> dict[str, Any]:
     value = read_json(receipt) or {}
+    weapons = value.get("weapons") if isinstance(value, dict) else None
     try:
         duration = float(value.get("duration_sec"))
     except (AttributeError, TypeError, ValueError) as exc:
@@ -44,7 +62,9 @@ def _benchmark(base: Path, receipt: Path) -> dict[str, Any]:
         or value.get("kind") != "dialogue-weapon-benchmark"
         or value.get("status") != "planned"
         or not MIN_DURATION_SEC <= duration <= MAX_DURATION_SEC
-        or set(value.get("weapons") or []) != set(WEAPONS)
+        or not isinstance(weapons, list)
+        or len(weapons) != len(set(weapons))
+        or frozenset(weapons) not in _SUPPORTED_WEAPON_SETS
         or not isinstance(value.get("line_ids"), list)
         or not value["line_ids"]
     ):
@@ -89,12 +109,12 @@ def enqueue(root: Path | str) -> dict[str, Any]:
         existing = [job for job in queue["jobs"] if job.get("benchmark_sha256") == benchmark_hash]
         if not existing:
             jobs = []
-            for weapon in WEAPONS:
+            for weapon in benchmark["weapons"]:
                 jobs.append(
                     {
                         "id": f"dbq_{secrets.token_hex(10)}",
                         "weapon": weapon,
-                        "executor": WEAPON_EXECUTORS[weapon],
+                        "executor": _EXECUTOR_BY_WEAPON[weapon],
                         "line_ids": list(benchmark["line_ids"]),
                         "benchmark_sha256": benchmark_hash,
                         "status": _PENDING,
@@ -136,14 +156,24 @@ def claim(root: Path | str) -> dict[str, Any]:
     """Claim one deferred arm with the capacity gate required by its executor."""
     base, receipt, queue_path = _paths(root)
     _benchmark(base, receipt)
+    benchmark_hash = sha256(receipt)
     with _queue_lock(queue_path):
         queue = _read_queue(queue_path)
         if any(job.get("status") == _RUNNING for job in queue["jobs"]):
             raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_ALREADY_RUNNING")
-        job = next((item for item in queue["jobs"] if item.get("status") == _PENDING), None)
+        job = next(
+            (
+                item
+                for item in queue["jobs"]
+                if item.get("status") == _PENDING and item.get("benchmark_sha256") == benchmark_hash
+            ),
+            None,
+        )
         if not isinstance(job, dict):
+            if any(item.get("status") == _PENDING for item in queue["jobs"]):
+                raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_BENCHMARK_MISMATCH")
             raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_EMPTY")
-        executor = str(job.get("executor") or WEAPON_EXECUTORS.get(str(job.get("weapon")), ""))
+        executor = str(job.get("executor") or _EXECUTOR_BY_WEAPON.get(str(job.get("weapon")), ""))
         if executor == "comfy":
             from comfy_video import ComfyVideoError, submission_capacity
             from config_loader import get_config
@@ -194,6 +224,7 @@ def complete(root: Path | str, *, job_id: str, claim_token: str) -> dict[str, An
     """Complete only after the corresponding human-reviewed benchmark arm exists."""
     base, receipt, queue_path = _paths(root)
     report = _benchmark(base, receipt)
+    benchmark_hash = sha256(receipt)
     with _queue_lock(queue_path):
         queue = _read_queue(queue_path)
         job = next((item for item in queue["jobs"] if item.get("id") == job_id), None)
@@ -201,6 +232,7 @@ def complete(root: Path | str, *, job_id: str, claim_token: str) -> dict[str, An
             not isinstance(job, dict)
             or job.get("status") != _RUNNING
             or job.get("claim_token") != claim_token
+            or job.get("benchmark_sha256") != benchmark_hash
         ):
             raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_CLAIM_INVALID")
         arm = next(

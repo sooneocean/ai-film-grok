@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -18,6 +19,7 @@ from comfy_video import (
     upload_image,
     wait_for_result,
 )
+from security_policy import safe_existing_file
 from util import sha256_file, utc_now, write_json
 
 WINDOW_PADDING_FRAMES = 2
@@ -53,8 +55,9 @@ def repair_windows(
 def _load_rejected_audit(root: Path, audit_path: Path | None) -> dict[str, Any]:
     path = audit_path or root / "receipts" / "visual-text-audit.json"
     try:
-        report = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        safe_path = safe_existing_file(root, path, field="visual text audit receipt")
+        report = json.loads(safe_path.read_text(encoding="utf-8"))
+    except Exception as exc:
         raise VisualTextRepairError("a rejected visual-text audit receipt is required") from exc
     if report.get("kind") != "visual-text-audit" or report.get("status") != "rejected":
         raise VisualTextRepairError("repair requires a rejected visual-text audit")
@@ -160,9 +163,12 @@ def repair_clip(
     i2i: Callable[[str, Path, Path, int], dict[str, Any]] = _qwen_i2i,
 ) -> dict[str, Any]:
     root_path = Path(root).expanduser().resolve()
-    source = Path(clip).expanduser().resolve()
-    if not source.is_file() or root_path not in source.parents:
-        raise VisualTextRepairError("repair clip must be a regular file inside the film workspace")
+    try:
+        source = safe_existing_file(root_path, Path(clip).expanduser(), field="repair clip")
+    except Exception as exc:
+        raise VisualTextRepairError(
+            "repair clip must be a regular file inside the film workspace"
+        ) from exc
     audit = _load_rejected_audit(
         root_path, Path(audit_path).expanduser().resolve() if audit_path else None
     )
@@ -173,6 +179,44 @@ def repair_clip(
     if not isinstance(frames, list) or not isinstance(findings, list):
         raise VisualTextRepairError("visual-text audit receipt is malformed")
     windows = repair_windows([int(item["index"]) for item in findings], frame_count=len(frames))
+    existing_path = root_path / "receipts" / "visual-text-repair.json"
+    if existing_path.is_file():
+        try:
+            existing = json.loads(existing_path.read_text(encoding="utf-8"))
+            existing_source = (existing.get("source") or {}).get("sha256")
+            existing_output = (existing.get("output") or {}).get("path")
+            if existing_source == sha256_file(source) and isinstance(existing_output, str):
+                output = safe_existing_file(
+                    root_path, root_path / existing_output, field="existing repaired clip"
+                )
+                if sha256_file(output) == (existing.get("output") or {}).get("sha256"):
+                    return {**existing, "path": str(existing_path), "deduplicated": True}
+        except Exception:
+            pass
+    lock = root_path / "work" / f".visual-text-repair-{sha256_file(source)[:16]}.lock"
+    lock.parent.mkdir(exist_ok=True)
+    try:
+        lock_fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as exc:
+        raise VisualTextRepairError("repair_blocked: matching repair is already running") from exc
+    os.close(lock_fd)
+    try:
+        return _repair_locked(root_path, source, audit, frames, findings, windows, base_url, i2i)
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def _repair_locked(
+    root_path: Path,
+    source: Path,
+    audit: dict[str, Any],
+    frames: list[Any],
+    findings: list[Any],
+    windows: list[tuple[int, int]],
+    base_url: str,
+    i2i: Callable[[str, Path, Path, int], dict[str, Any]],
+) -> dict[str, Any]:
+    """Perform the single admitted repair after a source-hash keyed lock is held."""
     rejected = root_path / "rejected"
     rejected.mkdir(exist_ok=True)
     retained = rejected / f"{source.stem}-{sha256_file(source)[:12]}{source.suffix}"
@@ -185,8 +229,16 @@ def repair_clip(
     frame_receipts: list[dict[str, Any]] = []
     for start, end in windows:
         for index in range(start, end + 1):
-            input_path = root_path / str(frames[index]["path"])
-            if not input_path.is_file() or sha256_file(input_path) != frames[index]["sha256"]:
+            declared_path = Path(str(frames[index]["path"]))
+            if declared_path.is_absolute():
+                raise VisualTextRepairError("audit frame path must be relative to film workspace")
+            try:
+                input_path = safe_existing_file(
+                    root_path, root_path / declared_path, field="audited frame"
+                )
+            except Exception as exc:
+                raise VisualTextRepairError("audited source frame is missing or unsafe") from exc
+            if sha256_file(input_path) != frames[index]["sha256"]:
                 raise VisualTextRepairError("audited source frame is missing or changed")
             output = repair_dir / f"repaired_{index:08d}.png"
             receipt = i2i(base_url, input_path, output, index)
