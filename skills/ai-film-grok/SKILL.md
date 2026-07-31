@@ -16,12 +16,11 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" dispatch --root "<film>"          # compact
 "$AIFILM" dispatch --root "<film>" --full
 "$AIFILM" advance --root "<film>"
-"$AIFILM" autopilot --root "<film>" --max-actions 3
 ```
 
-每步后 dispatch，只跑 `next_action`；读 `context_refs`（≤3）与 `weapon_route`。ready+授权+未锁 provider 才 probe 直用，失败即停。状态：`receipts/dispatch.json`。
+每步后 dispatch，只跑 `next_action`；读 `context_refs` 与 `weapon_route`。失败即停。状态：`receipts/dispatch.json`。
 
-`autopilot` 是单次、可重入的自动驾驶：只执行本地动作与已启用项目的 allowlist 外部动作；外部动作必须有已知 USD-tick 成本、剩余预算、实时 provider 就绪证据与固定 payload。它在 Pilot/终片等人工关、未知成本、超预算、质量或容量异常时停止，并写 `receipts/autopilot.json`；审核控制台读取该状态，Telegram 仅在本机环境变量已配置时发送无敏感摘要。
+`autopilot`：仅本地或项目显式 allowlist 的预算动作；需整数 tick、实时就绪，遇人工/质量/容量关即停并写 `receipts/autopilot.json`。
 
 骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture→Post→Master。
 小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。
