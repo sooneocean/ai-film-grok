@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from comfy_armory import ComfyArmoryError, select_weapon
+from comfy_armory import ComfyArmoryError, load_armory, select_weapon
 from util import read_json
 
 _STILL_DEMAND_STAGES = frozenset(
@@ -67,6 +67,17 @@ def _requested_operation(*items: dict[str, Any] | None) -> str | None:
     return None
 
 
+def _research_intents() -> set[str]:
+    """Return research-only intents which must never fall back to production."""
+    return {
+        str(intent).strip().lower()
+        for weapon in load_armory().get("research_weapons", [])
+        if isinstance(weapon, dict)
+        for intent in weapon.get("intents", [])
+        if str(intent).strip()
+    }
+
+
 def build_weapon_route(
     root: Path | str,
     *,
@@ -102,6 +113,24 @@ def build_weapon_route(
     }
     if not demand_detected:
         return {**common, "status": "not_required", "reason": "no current visual weapon demand"}
+
+    try:
+        research_intents = _research_intents()
+    except ComfyArmoryError as exc:
+        return {
+            **common,
+            "status": "blocked",
+            "reason": f"cannot verify research-only intent boundary: {exc}",
+            "fail_closed": True,
+        }
+    if requested_operation in research_intents:
+        return {
+            **common,
+            "status": "blocked",
+            "operation": requested_operation,
+            "reason": "research-only intent cannot be routed or auto-executed",
+            "fail_closed": True,
+        }
 
     provider_keys = _I2V_PROVIDER_KEYS if motion_demand else _STILL_PROVIDER_KEYS
     locked_provider = _locked_provider(

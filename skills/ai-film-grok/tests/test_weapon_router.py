@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -103,6 +105,26 @@ def test_adult_bulk_motion_fails_closed_without_promoted_meat_weapon(
     assert route["status"] == "blocked"
     assert route["fail_closed"] is True
     assert "no promoted Wan 2.2 weapon" in route["reason"]
+
+
+@pytest.mark.parametrize(
+    "intent",
+    ["control-video-i2v-research", "pose-guided-motion-research"],
+)
+def test_research_motion_intent_never_falls_back_to_generic_i2v(
+    tmp_path: Path,
+    intent: str,
+) -> None:
+    route = build_weapon_route(
+        tmp_path,
+        workflow=_workflow("bulk"),
+        primary_job={"skillId": "image.animate", "input": {"intent": intent}},
+    )
+
+    assert route["status"] == "blocked"
+    assert route["operation"] == intent
+    assert route["fail_closed"] is True
+    assert route["auto_execute_when_requested"] is False
 
 
 def test_compact_and_full_dispatch_share_weapon_route(tmp_path: Path) -> None:

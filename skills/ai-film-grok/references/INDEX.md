@@ -1,6 +1,6 @@
 # References 索引
 
-> 126 个 reference Markdown 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
+> 127 个 reference Markdown 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
 > 踩坑 lessons（61 个）见末节,按日期归档;新规则须标 P 码 + 层。
 
 ---
@@ -72,6 +72,7 @@
 | [seedvr2-video-restoration.md](seedvr2-video-restoration.md) | SeedVR2 视频修复/放大 research 武器与无下载探针 |
 | [wan22-s2v-performance.md](wan22-s2v-performance.md) | Wan 2.2 声音条件 I2V research 武器与资源门槛 |
 | [wan22-dancer-performance.md](wan22-dancer-performance.md) | Wan 2.2 Dancer 编舞 research 武器与无执行探针 |
+| [wan22-fun-control.md](wan22-fun-control.md) | Wan 2.2 Fun Control 姿态/控制视频 research 武器 |
 | [local-omni-review.md](local-omni-review.md) | 私网多模态影格审片：hash-bound、candidate-only、无云端回退 |
 | [frw-degrade-dispatch.md](frw-degrade-dispatch.md) | FRW Seedance/LTX/经典 dispatch |
 | [frw-ab-workflow.md](frw-ab-workflow.md) | FRW 全模型 pilot fan-out、机器排名、人审 champion＋challenger |

@@ -194,3 +194,17 @@ cd skills/ai-film-grok
 It is limited to research. A future canary requires an idle queue, 24 GiB free
 VRAM, hash-bound source image/audio, exact weight fingerprints, full decode and
 human review; it never substitutes for dialogue lip-sync or final media.
+
+## Wan 2.2 Fun Control research lane
+
+`wan22-fun-control-research` records the reference-image/control-video node
+contract and only its named dependencies:
+
+```bash
+cd skills/ai-film-grok
+./scripts/runtime-python scripts/wan_fun_control_probe.py
+```
+
+It remains research-only. Any later canary needs source/control-video rights and
+hashes, an idle resource gate, model/CLIP Vision fingerprints, full decode,
+control-following review and human review.

@@ -296,9 +296,10 @@
     "scripts/voice_cast_profiles.py": "c0f7adea3e3161729c645d42a605567fc050864b5da9ee74618c23b28142776a",
     "scripts/voice_tracks.py": "e1966502340f87d39a55d0757b038bdca2c6992fd3c097215da7d5ab48d33724",
     "scripts/wan_dancer_probe.py": "2dc1bfdca78318a6cbfa2a804a590caa678ddb552ae278c32714940a9f67bd2d",
+    "scripts/wan_fun_control_probe.py": "bc41e1c10b0b4a45f8a579926b0a93eff50045e50887f9b6e2bfe16700a82f8a",
     "scripts/wan_s2v_probe.py": "aa0dc5ff6f90339301b87648aa3c9938d85dda9d64e2bed75726857f089b9a4f",
     "scripts/wardrobe_ladder.py": "c4e44797eab8109f3a38505c2fc5c9fb28f56533bb64640db2feed004b3342c0",
-    "scripts/weapon_router.py": "5675ad888a58d3aaed98cc13254c8a2a8f74536c780fde13d0684ce52bf22d20",
+    "scripts/weapon_router.py": "e106c888f4dde852dbff62af2ba68eb4cda29e86839e292b2af941c4bbc257b1",
     "scripts/workflow_spine.py": "d78ddeec94d246b3e65ba1ca345cf5379367e7397bd384e68ac3157706fc211e"
   },
   "requirements_sha256": "b0acb41843d88a97955a7f14a300c9f873957f3e7a6da00bc3343e178289728a"
