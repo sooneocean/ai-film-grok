@@ -329,10 +329,19 @@ def assert_registered_weapon_workflow(
         template = json.loads(_template_path(weapon).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ComfyArmoryError(f"cannot read workflow template: {exc}") from exc
-    if set(graph) != set(template):
+    audio_extension = weapon.get("audio_conditioning_extension") or {}
+    extension_nodes = {
+        str(audio_extension.get("source_node") or ""),
+        str(audio_extension.get("encode_node") or ""),
+    } - {""}
+    if set(graph) != set(template) | extension_nodes:
         raise ComfyArmoryError("unapproved workflow mutation: node set changed")
     bindings = weapon.get("bindings") or {}
     allowed_slots = _allowed_binding_slots(bindings)
+    if extension_nodes:
+        latent_node = str(audio_extension.get("latent_node") or "")
+        latent_input = str(audio_extension.get("latent_input") or "")
+        allowed_slots.add((latent_node, latent_input))
     for node_id, expected_node in template.items():
         actual_node = graph.get(node_id)
         if not isinstance(actual_node, Mapping) or set(actual_node) != set(expected_node):
@@ -353,6 +362,24 @@ def assert_registered_weapon_workflow(
                 and (str(node_id), str(input_name)) not in allowed_slots
             ):
                 raise ComfyArmoryError(f"unapproved workflow mutation at {node_id}.{input_name}")
+
+    if extension_nodes:
+        source_node = str(audio_extension["source_node"])
+        encode_node = str(audio_extension["encode_node"])
+        latent_node = str(audio_extension["latent_node"])
+        latent_input = str(audio_extension["latent_input"])
+        audio_vae_node = str(audio_extension["audio_vae_node"])
+        audio_name = graph.get(source_node, {}).get("inputs", {}).get("audio")
+        expected_source = {"class_type": "LoadAudio", "inputs": {"audio": audio_name}}
+        expected_encode = {
+            "class_type": "LTXVAudioVAEEncode",
+            "inputs": {"audio": [source_node, 0], "audio_vae": [audio_vae_node, 0]},
+        }
+        if graph.get(source_node) != expected_source or graph.get(encode_node) != expected_encode:
+            raise ComfyArmoryError("unapproved LTX audio-conditioning extension")
+        if graph[latent_node]["inputs"][latent_input] != [encode_node, 0]:
+            raise ComfyArmoryError("LTX audio-conditioning latent link is invalid")
+        _validate_relative_media_name(str(audio_name), label="input audio name")
 
     prompt = graph[str(bindings["prompt_node"])]["inputs"][str(bindings["prompt_input"])]
     seed = graph[str(bindings["sampler_node"])]["inputs"][str(bindings["seed_input"])]

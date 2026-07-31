@@ -663,6 +663,13 @@
         "save_node": "save",
         "filename_prefix_input": "filename_prefix"
       },
+      "audio_conditioning_extension": {
+        "source_node": "audio_source",
+        "encode_node": "audio_encode",
+        "latent_node": "318",
+        "latent_input": "audio_latent",
+        "audio_vae_node": "279"
+      },
       "requirements": {
         "checkpoints": [
           "ltx-2.3-22b-dev-fp8.safetensors"
@@ -701,6 +708,7 @@
       "capabilities": {
         "image_to_video": true,
         "synchronized_audio_video": true,
+        "audio_conditioned_dialogue_challenger": true,
         "pilot_only": true,
         "human_review_required": true,
         "external_api_required": false

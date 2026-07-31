@@ -180,6 +180,31 @@ class PostAuditTests(unittest.TestCase):
             self.assertIn("FINAL_SCORECARD_INCOMPLETE", codes)
             self.assertIn("SCREENING_EVIDENCE_INCOMPLETE", codes)
 
+    def test_approved_review_rejects_tampered_editorial_receipt_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "out").mkdir()
+            (root / "receipts").mkdir()
+            (root / "receipts" / "final-editorial-review.json").write_text(
+                json.dumps({"ok": True, "inputs": {}}), encoding="utf-8"
+            )
+            (root / "out" / "final-review.json").write_text(
+                json.dumps(
+                    {
+                        "approved": True,
+                        "editorial_review": {
+                            "ok": True,
+                            "inputs": {},
+                            "receipt_sha256": "forged",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = audit(root, write=False)
+            codes = {item["code"] for item in report["hard_failures"]}
+            self.assertIn("FINAL_EDITORIAL_REVIEW_TAMPERED", codes)
+
 
 class PremiumGateElevationTests(unittest.TestCase):
     """P2-6/P2-8: premium projects elevate face-identity drift + color-grade to hard."""
