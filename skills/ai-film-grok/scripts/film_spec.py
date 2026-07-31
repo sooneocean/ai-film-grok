@@ -93,8 +93,8 @@ TTS_BACKENDS = frozenset(
 # Motion provider profile.  Grok is the production primary; FRW is a technical
 # fallback only.  ``seedance_first`` remains accepted as a legacy input so old
 # specs can be read, but it no longer changes the active provider.
-I2V_PROVIDERS = frozenset({"frw", "grok", "auto"})
-I2V_PROFILES = frozenset({"seedance_first", "grok_primary"})
+I2V_PROVIDERS = frozenset({"frw", "frw-ltx23", "grok", "auto"})
+I2V_PROFILES = frozenset({"ltx23_primary", "seedance_first", "grok_primary"})
 # Native resolution for 9:16 shorts.  FRW fallback may return 704x1280 and must
 # preserve that native pair; conforming is a later delivery decision.
 DEFAULT_FRW_ASPECT = "9:16"
@@ -142,13 +142,14 @@ def resolve_i2v_profile() -> str:
 
     cfg = get_config()
     raw = cfg.i2v_profile.strip().lower()
-    if raw == "seedance_first":
-        return "grok_primary"
-    return "grok_primary"
+    return raw if raw in I2V_PROFILES else "ltx23_primary"
 
 
 def default_i2v_provider() -> str:
-    return "grok" if resolve_i2v_profile() == "grok_primary" else "frw"
+    profile = resolve_i2v_profile()
+    if profile == "ltx23_primary":
+        return "frw-ltx23"
+    return "grok" if profile == "grok_primary" else "frw"
 
 
 def default_frw_video_model() -> str:
@@ -751,7 +752,7 @@ def validate_film_spec(
         notes = list(spec.get("_tts_notes") or [])
         notes.append("auto→mimo for storyteller/hybrid (中文说书默认；显式 edge/fish/… 可覆盖)")
         spec["_tts_notes"] = notes
-    # I2V profile: Grok primary; FRW is technical fallback only.
+    # I2V profile is explicit so existing projects can keep their locked route.
     i2v_profile = resolve_i2v_profile()
     spec["_i2v_profile"] = i2v_profile
     chain = frw_i2v_fallback_chain()
@@ -770,7 +771,12 @@ def validate_film_spec(
     if i2v_provider == "auto":
         i2v_provider = default_i2v_provider()
         i2v_notes = list(spec.get("_i2v_notes") or [])
-        if i2v_profile == "grok_primary":
+        if i2v_profile == "ltx23_primary":
+            i2v_notes.append(
+                "auto→frw-ltx23 (LTX 2.3 native-audio primary; fresh approved canary and "
+                "per-shot media review required)"
+            )
+        elif i2v_profile == "grok_primary":
             i2v_notes.append(
                 "auto→grok (AIFILM_I2V_PROFILE=grok_primary / Seedance unavailable: "
                 "bulk image_to_video; still=image_edit cast; register image_to_video)"
@@ -793,6 +799,8 @@ def validate_film_spec(
     if not isinstance(raw_fvm, str) or raw_fvm.lower() not in FRW_VIDEO_MODELS:
         raise FilmSpecError(f"film-spec frw_video_model must be one of {sorted(FRW_VIDEO_MODELS)}")
     fvm = raw_fvm.lower()
+    if i2v_provider == "frw-ltx23" and fvm == "legacy-img2video":
+        fvm = "ltx-i2v"
     if fvm == "seedance-2-fast-i2v":
         raise FilmSpecError(
             "frw_video_model=seedance-2-fast-i2v is unavailable; use LTX 2.3 Audio or "
@@ -881,13 +889,21 @@ def validate_film_spec(
     if "_frw_t2v_fallback_chain" not in spec:
         spec["_frw_t2v_fallback_chain"] = list(FRW_T2V_FALLBACK_CHAIN)
     # Layer routing summary for agents (P1 hero vs P5 synth)
-    hero_primary = "grok_image_to_video" if i2v_provider == "grok" else f"frw:{fvm}"
+    hero_primary = (
+        "frw_ltx23_img2video_audio"
+        if i2v_provider == "frw-ltx23"
+        else "grok_image_to_video" if i2v_provider == "grok" else f"frw:{fvm}"
+    )
     spec["_layer_routing"] = {
         "i2v_profile": i2v_profile,
         "hero_still": "grok_image_edit_cast",
         "hero_motion_primary": hero_primary,
         "hero_i2v_provider": i2v_provider,
-        "hero_motion_fallback": list(chain),
+        "hero_motion_fallback": (
+            ["frw:legacy-img2video", "rtx:latentsync_1_6_after_review"]
+            if i2v_provider == "frw-ltx23"
+            else list(chain)
+        ),
         "hero_motion_frw_only_lifeboat": FRW_I2V_FRW_ONLY_LIFEBOAT,
         "env_synth_primary": "grok_image_to_video_no_face",
         "env_synth_fallback": list(FRW_T2V_FALLBACK_CHAIN),
@@ -897,7 +913,9 @@ def validate_film_spec(
             "FRW upload-probe is required only after a classified Grok technical failure"
         ),
         "register_endpoint_hero": (
-            "image_to_video"
+            "frw_ltx23_img2video_audio"
+            if i2v_provider == "frw-ltx23"
+            else "image_to_video"
             if i2v_provider == "grok"
             else "frw_seedance_i2v|frw_ltx_*|frw_img2video"
         ),

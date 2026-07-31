@@ -188,8 +188,8 @@ def route_after_failure(
     error: object,
     plan_sha256: str | None = None,
 ) -> tuple[I2VProvider, dict[str, Any]] | None:
-    """Select FRW only after a classified Grok technical failure."""
-    if primary != "grok" or not is_technical_failure(error):
+    """Select a reviewed fallback only after a classified technical failure."""
+    if primary not in {"grok", "frw-ltx23"} or not is_technical_failure(error):
         return None
     try:
         stable_shot_id = validate_identifier(shot_id, field="shot id")
@@ -225,7 +225,7 @@ def generate_with_fallback(
             raise I2VProviderError(
                 str(result.get("stderr") or result.get("error") or "Grok failed")
             )
-        result["route"] = "grok_primary"
+        result["route"] = f"{primary.name}_primary"
         return result
     except Exception as exc:
         selected = route_after_failure(
@@ -239,7 +239,7 @@ def generate_with_fallback(
             raise
         fallback, switch = selected
         result = fallback.generate(keyframe=keyframe, prompt=prompt, **kwargs)
-        result["route"] = "frw_fallback"
+        result["route"] = f"{primary.name}_technical_fallback"
         result["provider_switch"] = switch
         return result
 
@@ -565,6 +565,57 @@ class FrwImg2VideoProvider(SeedanceProvider):
         ]
 
 
+class FrwLtx23AudioProvider(SeedanceProvider):
+    """FRW LTX 2.3 prompt-conditioned native-audio I2V production lane."""
+
+    name = "frw-ltx23"
+    endpoints = frozenset({"frw_ltx23_img2video_audio"})
+    command_timeout_sec = 900
+
+    def probe(self, *, root: Path | None = None) -> CapabilityReport:
+        if root is None:
+            return CapabilityReport(
+                provider=self.name,
+                ok=False,
+                available=False,
+                reason="LTX 2.3 requires a film-scoped approved native-audio canary.",
+                models=["ltx-2.3", "img2video-audio"],
+                profile="ltx23_primary",
+                detail={"canary_required": True},
+            )
+        receipt = root / "receipts" / "frw-ltx23-i2v-audio-canary.json"
+        try:
+            data = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        approved = bool(
+            data.get("ok")
+            and data.get("output_sha256")
+            and data.get("full_decode_ok") is True
+            and data.get("human_review") == "approved"
+        )
+        return CapabilityReport(
+            provider=self.name,
+            ok=approved,
+            available=approved,
+            reason=("LTX 2.3 native-audio I2V canary approved." if approved else "LTX 2.3 native-audio canary missing or not fully approved."),
+            models=["ltx-2.3", "img2video-audio"],
+            profile="ltx23_primary",
+            detail={"canary_required": True, "receipt": str(receipt), **data},
+        )
+
+    def build_command(
+        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
+    ) -> list[str]:
+        dispatch = Path(__file__).resolve().parent / "frw_dispatch.py"
+        return [
+            "python3", str(dispatch), "img2video-audio", "--img-url",
+            str(kwargs.get("img_url") or keyframe), "--prompt", prompt,
+            "--width", str(kwargs.get("width", 704)), "--height", str(kwargs.get("height", 1280)),
+            "--duration", str(duration_sec), "--wait",
+        ]
+
+
 class LocalComfyWan22Provider(I2VProvider):
     """Explicit private-LAN Wan 2.2 I2V lane on the user's RTX 5090."""
 
@@ -801,19 +852,15 @@ def for_endpoint(source_endpoint: str) -> I2VProvider | None:
 
 
 def preferred(*, root: Path | None = None) -> I2VProvider:
-    """Resolve Grok as the production primary provider.
-
-    FRW is selected only through :func:`route_after_failure`, after a
-    classified technical failure and a checksum-bound switch receipt.
-    """
+    """Resolve the configured production primary without overriding shot locks."""
     try:
         from film_spec import resolve_i2v_profile
 
         profile = resolve_i2v_profile()
     except Exception:
-        profile = "grok_primary"
+        profile = "ltx23_primary"
     requested = profile
-    provider = get("grok")
+    provider = get("frw-ltx23" if profile == "ltx23_primary" else "grok")
     if root is not None:
         write_json(
             Path(root) / "receipts" / "i2v-routing.json",
@@ -822,7 +869,11 @@ def preferred(*, root: Path | None = None) -> I2VProvider:
                 "requested_profile": requested,
                 "selected_provider": provider.name,
                 "fallback": False,
-                "reason": "grok_primary production default; FRW requires technical-failure switch",
+                "reason": (
+                    "LTX 2.3 native-audio primary; technical fallback requires a signed receipt"
+                    if provider.name == "frw-ltx23"
+                    else "grok_primary production default; FRW requires technical-failure switch"
+                ),
                 "models": list(provider.probe(root=root).models),
                 "requires_hero_repilot": False,
             },
@@ -863,4 +914,5 @@ def registry_report(*, root: Path | None = None) -> dict[str, Any]:
 register(GrokI2VProvider())
 register(SeedanceProvider())
 register(FrwImg2VideoProvider())
+register(FrwLtx23AudioProvider())
 register(LocalComfyWan22Provider())
