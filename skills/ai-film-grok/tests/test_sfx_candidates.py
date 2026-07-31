@@ -86,6 +86,7 @@ def test_generate_stays_pending_and_never_production_eligible(
 ) -> None:
     monkeypatch.setenv("AIFILM_AUDIO_NODE_URL", "http://node")
     monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    monkeypatch.setenv("AIFILM_SFX_LIBRARY_ROOT", str(tmp_path / "armory"))
     wav = _delivery_wav()
 
     def fake_render(_base, _token, **kwargs):
@@ -378,6 +379,7 @@ def test_screen_speech_binds_candidate_and_only_flags_possible_leakage(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    monkeypatch.setenv("AIFILM_SFX_LIBRARY_ROOT", str(tmp_path / "armory"))
     wav, receipt = _pending_candidate(tmp_path, with_asr_screen=False)
 
     def fake_report(root: Path, *, audio: Path, report_name: Path) -> dict[str, object]:

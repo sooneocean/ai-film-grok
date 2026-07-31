@@ -7,7 +7,13 @@ import pytest
 from audio_timeline import compile_timeline
 from scene_sound_stems import render_scene_sound_stem
 from sfx_candidates import approve, attach_to_shot
-from sfx_library import audit, import_project_asset
+from sfx_library import (
+    audit,
+    candidate_asset,
+    import_project_asset,
+    stage_project_candidate,
+    write_candidate_review_pack,
+)
 from test_sfx_candidates import _pending_candidate
 
 
@@ -41,6 +47,63 @@ def test_import_project_asset_creates_one_auditable_global_copy(
     assert report["unique_sha256_count"] == 1
     assert report["invalid"] == []
     assert (armory / "sfx" / "reviews" / "mmaudio-sfx-1-abc123.vibevoice-asr-review.json").is_file()
+
+
+def test_stage_project_candidate_keeps_reviewable_bytes_in_global_vault(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    project, armory = tmp_path / "project", tmp_path / "armory"
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    _pending_candidate(project)
+
+    staged = stage_project_candidate(project, "mmaudio-sfx-1-abc123", library_root=armory)
+    wav, receipt, record = candidate_asset(
+        "mmaudio-sfx-1-abc123", library_root=armory
+    )
+
+    assert staged["source"] == "library:sfx/pending-noncommercial/mmaudio-sfx-1-abc123.wav"
+    assert wav.is_file() and receipt.is_file()
+    assert record["status"] == "pending_human_review"
+    assert record["production_eligible"] is False
+    assert audit(library_root=armory)["candidate_count"] == 1
+
+
+def test_stage_project_candidate_rebinds_asr_evidence_to_global_vault(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    project, armory = tmp_path / "project", tmp_path / "armory"
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    _pending_candidate(project, with_asr_screen=True)
+
+    stage_project_candidate(project, "mmaudio-sfx-1-abc123", library_root=armory)
+    _, _, record = candidate_asset("mmaudio-sfx-1-abc123", library_root=armory)
+
+    assert record["asr_speech_screen"]["receipt"] == (
+        "library:sfx/reviews/candidates/mmaudio-sfx-1-abc123.vibevoice-asr-review.json"
+    )
+    assert (
+        armory
+        / "sfx"
+        / "reviews"
+        / "candidates"
+        / "mmaudio-sfx-1-abc123.vibevoice-asr-review.json"
+    ).is_file()
+
+
+def test_candidate_review_pack_uses_global_not_project_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    project, armory = tmp_path / "project", tmp_path / "armory"
+    monkeypatch.setenv("AIFILM_AUDIO_NODE_TOKEN", "x" * 32)
+    _pending_candidate(project, with_asr_screen=True)
+    stage_project_candidate(project, "mmaudio-sfx-1-abc123", library_root=armory)
+
+    pack = write_candidate_review_pack("foundation", library_root=armory)
+    content = Path(pack["path"]).read_text(encoding="utf-8")
+
+    assert pack["candidate_count"] == 1
+    assert "pending-noncommercial/mmaudio-sfx-1-abc123.wav" in content
+    assert str(project) not in content
 
 
 def test_audit_rejects_tampered_asr_evidence(

@@ -12,6 +12,7 @@ sys.path.insert(0, str(SCRIPTS))
 from i2v_provider import (  # noqa: E402
     GrokI2VProvider,
     I2VProviderError,
+    FrwLtx23AudioProvider,
     LocalComfyWan22Provider,
     SeedanceProvider,
     all_providers,
@@ -32,6 +33,7 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIn("grok", names)
         self.assertIn("seedance", names)
         self.assertIn("comfy-wan22", names)
+        self.assertIn("frw-ltx23", names)
 
     def test_grok_probe_ok(self) -> None:
         """The in-session probe is available without a film root."""
@@ -61,6 +63,7 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIsInstance(for_endpoint("frw_seedance_i2v"), SeedanceProvider)
         self.assertIsInstance(for_endpoint("frw_seedance_flf"), SeedanceProvider)
         self.assertEqual(for_endpoint("frw_img2video").name, "frw-img2video")
+        self.assertIsInstance(for_endpoint("frw_ltx23_img2video_audio"), FrwLtx23AudioProvider)
         self.assertIsInstance(for_endpoint("local_wan22_i2v"), LocalComfyWan22Provider)
         # unknown endpoint → None
         self.assertIsNone(for_endpoint("nonexistent"))
@@ -83,6 +86,22 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIn("newvideo", cmd)
         self.assertIn("seedance-2-fast-i2v", cmd)
         self.assertIn("--wait", cmd)
+
+    def test_ltx23_audio_requires_film_canary_and_uses_native_audio_command(self) -> None:
+        provider = get("frw-ltx23")
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self.assertFalse(provider.probe(root=root).available)
+            receipt = root / "receipts" / "frw-ltx23-i2v-audio-canary.json"
+            receipt.parent.mkdir()
+            receipt.write_text(
+                '{"ok":true,"output_sha256":"abc","full_decode_ok":true,"human_review":"approved"}',
+                encoding="utf-8",
+            )
+            self.assertTrue(provider.probe(root=root).available)
+        cmd = provider.build_command(keyframe=Path("/tmp/kf.png"), prompt="room tone", duration_sec=6)
+        self.assertIn("img2video-audio", cmd)
+        self.assertIn("--duration", cmd)
 
     def test_seedance_flf_variant(self) -> None:
         sp = get("seedance")

@@ -137,7 +137,7 @@ class QueueShotMembershipTests(unittest.TestCase):
                     operation="image_to_video",
                     prompt_file=prompt,
                     inputs=[still],
-                    allow_without_pilot=True,
+                    allow_without_pilot=False,
                 )
             self.assertEqual(job["shot_id"], "shot01")
 

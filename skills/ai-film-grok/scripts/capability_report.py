@@ -86,7 +86,8 @@ def suggest_i2v_from_canary(
         "warnings": [],
         "recommendations": [],
     }
-    # Profile gate: Seedance-unavailable season defaults to grok without canary
+    # LTX primary stays fail-closed without a current receipt; no report may
+    # silently claim a provider is ready merely because its CLI is installed.
     try:
         from film_spec import resolve_i2v_profile
 
@@ -94,6 +95,12 @@ def suggest_i2v_from_canary(
     except Exception:
         profile = "grok_primary"
     out["i2v_profile"] = profile
+    if profile == "ltx23_primary" and not receipt:
+        out["recommendations"] = [
+            "LTX 2.3 primary is configured but has no current capability receipt; "
+            "record a decoded, human-approved img2video-audio canary before dispatch."
+        ]
+        return out
     if profile == "grok_primary" and not receipt:
         out["ok"] = True
         out["patch"] = {
@@ -138,7 +145,11 @@ def suggest_i2v_from_canary(
     warnings: list[str] = []
     recs: list[str] = []
 
-    if l1 == "seedance-2-fast-i2v" or seedance.startswith("201"):
+    if l1 in {"ltx23-img2video-audio", "frw_ltx23_img2video_audio"}:
+        patch["i2v_provider"] = "frw-ltx23"
+        patch["frw_video_model"] = "ltx-i2v"
+        rationale.append("approved LTX 2.3 native-audio I2V canary → L1 FRW LTX 2.3")
+    elif l1 == "seedance-2-fast-i2v" or seedance.startswith("201"):
         patch["i2v_provider"] = "frw"
         patch["frw_video_model"] = "seedance-2-fast-i2v"
         rationale.append("seedance_i2v accepted (201) → L1 FRW Seedance")

@@ -157,6 +157,8 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
                         "unexpected_visual_text_detected_false",
                         "native_audio_dialogue_matches_expected",
                         "mouth_audio_sync_approved",
+                        "expected_duration_sec",
+                        "native_duration_sec",
                         "caption_owner_ffmpeg_or_hyperframes_once",
                     ],
                 )

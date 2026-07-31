@@ -35,8 +35,8 @@ def _final_path(root: Path, manifest: dict[str, Any]) -> Path | None:
         return _first(root, "out/film_final.mp4", "out/film_hyperframes.mp4", "out/final.mp4")
 
 
-def _native_dialogue_shots(spec: dict[str, Any]) -> set[str]:
-    """Return only dialogue explicitly evidenced as generated native audio."""
+def _post_tts_dialogue_shots(spec: dict[str, Any]) -> set[str]:
+    """Return dialogue that explicitly replaces provider sound with post TTS."""
     result: set[str] = set()
     for scene in spec.get("scenes") or []:
         if not isinstance(scene, dict):
@@ -48,13 +48,7 @@ def _native_dialogue_shots(spec: dict[str, Any]) -> set[str]:
                 if not isinstance(contract, dict):
                     continue
                 for line in contract.get("lines") or []:
-                    if not isinstance(line, dict) or line.get("audio_origin") != "native":
-                        continue
-                    evidence = line.get("lipsync_evidence")
-                    if (
-                        isinstance(evidence, dict)
-                        and evidence.get("method") == "generated_native_audio"
-                    ):
+                    if isinstance(line, dict) and line.get("audio_origin") == "post_vo":
                         result.add(str(shot.get("id") or ""))
     return result - {""}
 
@@ -137,7 +131,7 @@ def audit(root: Path | str, *, write: bool = True) -> dict[str, Any]:
                     }
                 )
 
-    expected_suppression = _native_dialogue_shots(spec)
+    expected_suppression = _post_tts_dialogue_shots(spec)
     mix = read_json(root / "audio" / "mix_report.json") or {}
     native = mix.get("native_audio") if isinstance(mix.get("native_audio"), dict) else {}
     suppressed = {str(item) for item in native.get("suppressed_for_tts_shots") or []}
@@ -145,8 +139,8 @@ def audit(root: Path | str, *, write: bool = True) -> dict[str, Any]:
     for shot_id in sorted(expected_suppression - suppressed):
         issues.append(
             {
-                "code": "NATIVE_DIALOGUE_NOT_SUPPRESSED",
-                "message": "native dialogue is contract-proven but not suppressed under post TTS",
+                "code": "POST_TTS_NATIVE_AUDIO_NOT_SUPPRESSED",
+                "message": "post-TTS dialogue did not suppress its generated native audio",
                 "shot_id": shot_id,
             }
         )
@@ -154,7 +148,7 @@ def audit(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         issues.append(
             {
                 "code": "DUPLICATE_DIALOGUE_RISK",
-                "message": "native dialogue and post TTS are both preserved in the final mix",
+                "message": "post TTS and generated native dialogue are both preserved in the final mix",
                 "shot_id": shot_id,
             }
         )

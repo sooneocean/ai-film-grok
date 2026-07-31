@@ -285,11 +285,7 @@ def primary_native_shot_ids(shot_audio: list[dict[str, Any]]) -> list[str]:
 
 
 def native_dialogue_replaced_by_post_tts(shot: dict[str, Any]) -> bool:
-    """True only when the shot contract proves its native stem contains dialogue.
-
-    Native ambience and foley have no comparable machine-readable speech marker,
-    so they must remain available to the final mix.
-    """
+    """True only when an approved dialogue contract explicitly selects post TTS."""
     contracts = shot.get("dialogue_contracts")
     if not isinstance(contracts, list):
         return False
@@ -297,13 +293,7 @@ def native_dialogue_replaced_by_post_tts(shot: dict[str, Any]) -> bool:
         if not isinstance(contract, dict):
             continue
         for line in contract.get("lines") or []:
-            if not isinstance(line, dict) or str(line.get("audio_origin") or "") != "native":
-                continue
-            evidence = line.get("lipsync_evidence")
-            if (
-                isinstance(evidence, dict)
-                and str(evidence.get("method") or "") == "generated_native_audio"
-            ):
+            if isinstance(line, dict) and str(line.get("audio_origin") or "") == "post_vo":
                 return True
     return False
 

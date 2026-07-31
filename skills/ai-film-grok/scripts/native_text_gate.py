@@ -25,6 +25,18 @@ def validate_native_text_review(review: dict[str, Any]) -> dict[str, Any]:
         return {"ok": False, "reason": "NATIVE_DIALOGUE_MISMATCH"}
     if review.get("mouth_audio_sync_approved") is not True:
         return {"ok": False, "reason": "NATIVE_MOUTH_SYNC_REJECTED"}
+    expected_duration = review.get("expected_duration_sec")
+    native_duration = review.get("native_duration_sec")
+    if expected_duration is not None or native_duration is not None:
+        if not isinstance(expected_duration, (int, float)) or not isinstance(native_duration, (int, float)):
+            return {"ok": False, "reason": "NATIVE_DURATION_REVIEW_INCOMPLETE"}
+        if abs(float(expected_duration) - float(native_duration)) > 0.5:
+            return {
+                "ok": False,
+                "reason": "NATIVE_DURATION_MISMATCH",
+                "expected_duration_sec": expected_duration,
+                "native_duration_sec": native_duration,
+            }
     caption_owner = review.get("caption_owner")
     if caption_owner not in _CAPTION_OWNERS:
         return {

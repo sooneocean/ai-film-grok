@@ -48,7 +48,7 @@ def test_primary_native_audio_excludes_silence_and_tts_replaced_stems() -> None:
     ) == ["shot01", "shot03"]
 
 
-def test_only_contract_proven_native_dialogue_is_replaced_by_post_tts() -> None:
+def test_only_explicit_post_tts_dialogue_replaces_native_audio() -> None:
     native_dialogue = {
         "dialogue_contracts": [
             {
@@ -61,7 +61,7 @@ def test_only_contract_proven_native_dialogue_is_replaced_by_post_tts() -> None:
             }
         ]
     }
-    assert render_final.native_dialogue_replaced_by_post_tts(native_dialogue) is True
+    assert render_final.native_dialogue_replaced_by_post_tts(native_dialogue) is False
     assert render_final.native_dialogue_replaced_by_post_tts({"dialogue_contracts": []}) is False
     assert (
         render_final.native_dialogue_replaced_by_post_tts(
@@ -71,7 +71,7 @@ def test_only_contract_proven_native_dialogue_is_replaced_by_post_tts() -> None:
                 ]
             }
         )
-        is False
+        is True
     )
 
 

@@ -23,6 +23,7 @@ _ASSET_ID = re.compile(r"^mmaudio-sfx-[a-z0-9_-]{1,64}$")
 _APPROVED = "approved_noncommercial"
 _SCOPE = "noncommercial_internal"
 _PREFIX = "sfx/approved-noncommercial/"
+_PENDING_PREFIX = "sfx/pending-noncommercial/"
 
 
 class SFXLibraryError(RuntimeError):
@@ -79,14 +80,115 @@ def _review_relative(asset_id: str) -> str:
     return f"sfx/reviews/{asset_id}.vibevoice-asr-review.json"
 
 
+def _pending_relative(asset_id: str, *, receipt: bool = False) -> str:
+    if not _ASSET_ID.fullmatch(asset_id):
+        raise SFXLibraryError("invalid SFX asset id")
+    suffix = ".receipt.json" if receipt else ".wav"
+    return f"{_PENDING_PREFIX}{asset_id}{suffix}"
+
+
+def _candidate_review_relative(asset_id: str) -> str:
+    if not _ASSET_ID.fullmatch(asset_id):
+        raise SFXLibraryError("invalid SFX asset id")
+    return f"sfx/reviews/candidates/{asset_id}.vibevoice-asr-review.json"
+
+
 def _prepare(root: Path) -> Path:
     root = root.expanduser().resolve()
-    for relative in ("sfx", "sfx/approved-noncommercial", "sfx/reviews"):
+    for relative in (
+        "sfx",
+        "sfx/approved-noncommercial",
+        "sfx/pending-noncommercial",
+        "sfx/reviews",
+        "sfx/reviews/candidates",
+    ):
         path = _safe(root, relative)
         path.mkdir(parents=True, exist_ok=True)
         if path.is_symlink():
             raise SFXLibraryError("library directory must not be symlinked")
     return root
+
+
+def _candidate_record(
+    project_root: Path, asset_id: str
+) -> tuple[Path, Path, dict[str, Any]]:
+    if not _ASSET_ID.fullmatch(asset_id):
+        raise SFXLibraryError("invalid SFX asset id")
+    pending = project_root / "audio" / "candidates" / "sfx" / "pending"
+    receipt = pending / f"{asset_id}.json"
+    wav = pending / f"{asset_id}.wav"
+    record = read_json(receipt)
+    if (
+        not isinstance(record, dict)
+        or not receipt_is_signed(record)
+        or record.get("asset_id") != asset_id
+        or record.get("status") != "pending_human_review"
+        or record.get("production_eligible") is not False
+        or record.get("usage_scope") != "noncommercial_internal_research"
+        or record.get("license") != "CC-BY-NC-4.0"
+        or record.get("path") != str(wav.relative_to(project_root))
+        or not wav.is_file()
+        or wav.is_symlink()
+        or _sha256(wav) != record.get("sha256")
+    ):
+        raise SFXLibraryError("project SFX candidate does not bind pending bytes")
+    _validate_wav(wav)
+    return wav, receipt, record
+
+
+def stage_project_candidate(
+    project_root: Path, asset_id: str, *, library_root: Path | None = None
+) -> dict[str, Any]:
+    """Copy a pending take to the global review vault without approving it.
+
+    The vault is deliberately a copy, not a symlink: project cleanup must never
+    invalidate the WAV offered for human listening.
+    """
+    project_root = project_root.expanduser().resolve()
+    source_wav, source_receipt, record = _candidate_record(project_root, asset_id)
+    root = _prepare(library_root or default_library_root())
+    destination = _safe(root, _pending_relative(asset_id))
+    _copy_once(source_wav, destination)
+
+    canonical = dict(record)
+    canonical["pending_path"] = _pending_relative(asset_id)
+    canonical["library_scope"] = "global_candidate_review_vault"
+    canonical["staged_at"] = datetime.now(UTC).isoformat()
+    canonical["project_origin"] = {
+        "project_root_sha256": hashlib.sha256(str(project_root).encode()).hexdigest(),
+        "candidate_receipt_sha256": _sha256(source_receipt),
+    }
+    screen = canonical.get("asr_speech_screen")
+    if isinstance(screen, dict):
+        raw = str(screen.get("receipt") or "")
+        if not raw.startswith("local:"):
+            raise SFXLibraryError("project SFX candidate ASR receipt is invalid")
+        screen_source = project_root / raw.removeprefix("local:")
+        if not screen_source.is_file() or screen_source.is_symlink():
+            raise SFXLibraryError("project SFX candidate ASR receipt is unavailable")
+        review_destination = _safe(root, _candidate_review_relative(asset_id))
+        _copy_once(screen_source, review_destination)
+        canonical["asr_speech_screen"] = _canonical_screen(
+            screen,
+            report_path=review_destination,
+            audio_sha256=str(canonical["sha256"]),
+            asset_id=asset_id,
+        )
+        canonical["asr_speech_screen"]["receipt"] = (
+            f"library:{_candidate_review_relative(asset_id)}"
+        )
+    sign_receipt(canonical)
+    receipt_destination = _safe(root, _pending_relative(asset_id, receipt=True))
+    write_json(receipt_destination, canonical)
+    return {
+        "asset_id": asset_id,
+        "library_root": str(root),
+        "source": f"library:{_pending_relative(asset_id)}",
+        "receipt": f"library:{_pending_relative(asset_id, receipt=True)}",
+        "sha256": canonical["sha256"],
+        "status": "pending_human_review",
+        "production_eligible": False,
+    }
 
 
 def _copy_once(source: Path, destination: Path) -> None:
@@ -253,6 +355,77 @@ def approved_asset(
     return wav, receipt, record
 
 
+def candidate_asset(
+    asset_id: str, *, library_root: Path | None = None
+) -> tuple[Path, Path, dict[str, Any]]:
+    """Return a globally retained candidate; this never confers approval."""
+    root = (library_root or default_library_root()).expanduser().resolve()
+    wav = resolve_uri(f"library:{_pending_relative(asset_id)}", library_root=root)
+    receipt = resolve_uri(
+        f"library:{_pending_relative(asset_id, receipt=True)}", library_root=root
+    )
+    record = read_json(receipt)
+    if (
+        not isinstance(record, dict)
+        or not receipt_is_signed(record)
+        or record.get("asset_id") != asset_id
+        or record.get("status") != "pending_human_review"
+        or record.get("production_eligible") is not False
+        or record.get("usage_scope") != "noncommercial_internal_research"
+        or record.get("license") != "CC-BY-NC-4.0"
+        or record.get("pending_path") != _pending_relative(asset_id)
+        or record.get("sha256") != _sha256(wav)
+    ):
+        raise SFXLibraryError("global SFX candidate receipt does not bind pending bytes")
+    return wav, receipt, record
+
+
+def write_candidate_review_pack(
+    name: str, *, library_root: Path | None = None
+) -> dict[str, Any]:
+    """Write a local listening list backed only by retained global candidate bytes."""
+    safe_name = re.sub(r"[^a-z0-9_-]+", "-", name.strip().lower()).strip("-")
+    if not safe_name:
+        raise SFXLibraryError("review pack name is invalid")
+    root = _prepare(library_root or default_library_root())
+    pending = _safe(root, "sfx/pending-noncommercial")
+    rows: list[tuple[str, str, str]] = []
+    for receipt in sorted(pending.glob("*.receipt.json")):
+        asset_id = receipt.name.removesuffix(".receipt.json")
+        try:
+            _, _, record = candidate_asset(asset_id, library_root=root)
+        except SFXLibraryError:
+            continue
+        screen = record.get("asr_speech_screen")
+        if not isinstance(screen, dict) or screen.get("speech_like_flagged") is not False:
+            continue
+        rows.append((asset_id, str(record.get("seed") or ""), _pending_relative(asset_id)))
+    pack_dir = _safe(root, "sfx/review-packs")
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    path = _safe(root, f"sfx/review-packs/{safe_name}.md")
+    lines = [
+        f"# {safe_name} · ASR 通过待试听",
+        "",
+        "这些是 MMAudio 的非商用研究候选。ASR 未侦测到语音不代表批准；请完整试听后逐条签收。",
+        "",
+        "| 资产 | 种子 | 音频 |",
+        "|---|---:|---|",
+    ]
+    lines.extend(
+        f"| `{asset_id}` | {seed} | [试听]({root / relative}) |"
+        for asset_id, seed, relative in rows
+    )
+    if not rows:
+        lines.append("| — | — | 暂无通过 ASR 的全局候选 |")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return {
+        "path": str(path),
+        "candidate_count": len(rows),
+        "status": "pending_human_review",
+        "approval": "human_listening_required",
+    }
+
+
 def _asr_review_valid(record: dict[str, Any], *, library_root: Path | None = None) -> bool:
     screen = record.get("asr_speech_screen")
     if not isinstance(screen, dict):
@@ -348,11 +521,15 @@ def audit(*, library_root: Path | None = None) -> dict[str, Any]:
     asset_ids: list[str] = []
     hashes: set[str] = set()
     invalid: list[str] = []
+    candidate_ids: list[str] = []
+    invalid_candidates: list[str] = []
     if not approved.exists():
         return {
             "library_root": str(root),
             "approved_count": 0,
             "unique_sha256_count": 0,
+            "candidate_count": 0,
+            "invalid_candidates": [],
             "invalid": [],
             "target_100_ready": False,
         }
@@ -366,10 +543,22 @@ def audit(*, library_root: Path | None = None) -> dict[str, Any]:
             hashes.add(str(record["sha256"]))
         except SFXLibraryError:
             invalid.append(asset_id)
+    pending = _safe(root, "sfx/pending-noncommercial")
+    if pending.exists():
+        for receipt in sorted(pending.glob("*.receipt.json")):
+            asset_id = receipt.name.removesuffix(".receipt.json")
+            try:
+                candidate_asset(asset_id, library_root=root)
+                candidate_ids.append(asset_id)
+            except SFXLibraryError:
+                invalid_candidates.append(asset_id)
     return {
         "library_root": str(root),
         "approved_count": len(asset_ids),
         "unique_sha256_count": len(hashes),
+        "candidate_count": len(candidate_ids),
+        "candidate_asset_ids": candidate_ids,
+        "invalid_candidates": invalid_candidates,
         "asset_ids": asset_ids,
         "invalid": invalid,
         "target_100_ready": len(asset_ids) >= 100 and not invalid,

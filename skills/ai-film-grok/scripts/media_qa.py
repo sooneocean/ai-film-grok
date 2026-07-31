@@ -22,6 +22,7 @@ ALLOWED_VIDEO_ENDPOINTS = frozenset(
         "frw_seedance_i2v",  # FRW newvideo seedance-*-i2v (DEFAULT bulk quality)
         "frw_seedance_flf",  # FRW newvideo seedance-*-flf / pro-flf
         "frw_ltx_i2v",  # FRW newvideo ltx-i2v (precise w×h; probe if 502)
+        "frw_ltx23_img2video_audio",  # FRW LTX 2.3 prompt-conditioned native-audio I2V
         "frw_ltx_t2v",  # FRW newvideo ltx-t2v (empty/env plates)
         "frw_ltx_flf",  # FRW newvideo ltx-flf
         "frw_ltx_lipsync",  # FRW ltx-音画同步 (probe: often 502)

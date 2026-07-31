@@ -216,7 +216,16 @@ def screen_speech(root: Path, asset_id: str) -> dict[str, Any]:
     }
     sign_receipt(record)
     write_json(receipt, record)
-    return {**record, "receipt": str(receipt)}
+    try:
+        from sfx_library import SFXLibraryError, stage_project_candidate
+
+        staged = stage_project_candidate(root, asset_id)
+    except SFXLibraryError as exc:
+        raise SFXCandidateError(
+            "SFX candidate is retained in the project but global review-vault staging failed: "
+            f"{exc}"
+        ) from exc
+    return {**record, "receipt": str(receipt), "armory_staging": staged}
 
 
 def approved_event_receipt_valid(root: Path, event: dict[str, Any]) -> bool:
@@ -707,7 +716,16 @@ def generate(
             wav_name=wav.name,
             receipt_name=receipt.name,
         )
-    return {**record, "receipt": str(receipt)}
+    try:
+        from sfx_library import SFXLibraryError, stage_project_candidate
+
+        staged = stage_project_candidate(root, asset_id)
+    except SFXLibraryError as exc:
+        raise SFXCandidateError(
+            "SFX candidate is retained in the project but global review-vault staging failed: "
+            f"{exc}"
+        ) from exc
+    return {**record, "receipt": str(receipt), "armory_staging": staged}
 
 
 def batch_generate_and_screen(

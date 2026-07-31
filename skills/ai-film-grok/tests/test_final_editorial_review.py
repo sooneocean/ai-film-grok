@@ -10,7 +10,7 @@ sys.path.insert(0, str(SCRIPTS))
 import final_editorial_review as editorial  # noqa: E402
 
 
-def test_native_dialogue_contract_requires_suppression() -> None:
+def test_post_tts_dialogue_contract_requires_suppression() -> None:
     spec = {
         "scenes": [
             {
@@ -21,8 +21,7 @@ def test_native_dialogue_contract_requires_suppression() -> None:
                             {
                                 "lines": [
                                     {
-                                        "audio_origin": "native",
-                                        "lipsync_evidence": {"method": "generated_native_audio"},
+                                        "audio_origin": "post_vo",
                                     }
                                 ]
                             }
@@ -32,7 +31,7 @@ def test_native_dialogue_contract_requires_suppression() -> None:
             }
         ]
     }
-    assert editorial._native_dialogue_shots(spec) == {"shot01"}
+    assert editorial._post_tts_dialogue_shots(spec) == {"shot01"}
 
 
 def test_currentness_detects_final_or_mix_change(tmp_path: Path) -> None:
