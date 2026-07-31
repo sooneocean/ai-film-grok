@@ -9,9 +9,9 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from util import sha256_file, write_json  # noqa: E402
 from visual_text_audit import VisualTextAuditError, audit_clip, require_clean_audit  # noqa: E402
 from visual_text_repair import repair_clip, repair_windows  # noqa: E402
-from util import sha256_file, write_json  # noqa: E402
 
 
 def _video(root: Path) -> Path:
