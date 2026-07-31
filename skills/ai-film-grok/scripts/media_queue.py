@@ -16,6 +16,12 @@ from typing import Any
 
 from cache import ContentCache
 from media_qa import ALLOWED_VIDEO_ENDPOINTS, MediaQAError, analyze_media
+from production_chain import (
+    ProductionChainError,
+    build_shot_contract,
+    canonical_contract_required,
+    require_current_queue_contract,
+)
 from production_gates import (
     ProductionGateError,
     assert_heat_allows_media,
@@ -419,6 +425,14 @@ class MediaQueue:
                     f"shot_id {shot_id!r} is not in film-spec "
                     f"(known={sorted(known_ids)}). write-spec first; do not queue ghost shots."
                 )
+        try:
+            source_contract = build_shot_contract(self.root, shot_id)
+            if not source_contract["ok"]:
+                raise ProductionChainError(
+                    ", ".join(str(code) for code in source_contract.get("errors") or [])
+                )
+        except ProductionChainError as exc:
+            raise QueueError(f"queue source contract is not ready: {exc}") from exc
         prompt_hash = sha256(prompt)
         input_records = [{"path": str(path), "sha256": sha256(path)} for path in resolved_inputs]
         legacy_identity = {
@@ -498,6 +512,7 @@ class MediaQueue:
                 "created_at": utc_now(),
                 "is_canary": is_canary,
                 "seed_offset": seed_offset,
+                "source_contract": source_contract,
             }
             if cache_key:
                 job["cache_key"] = cache_key
@@ -789,6 +804,14 @@ class MediaQueue:
                 raise QueueError(
                     f"job operation {job.get('operation')} does not match endpoint {endpoint}"
                 )
+            source_contract = job.get("source_contract")
+            if isinstance(source_contract, dict):
+                try:
+                    require_current_queue_contract(self.root, source_contract)
+                except ProductionChainError as exc:
+                    raise QueueError(str(exc)) from exc
+            elif canonical_contract_required(self.root):
+                raise QueueError("queue job source contract is missing for a canonical project")
             usage_binding = None
             if generation_id:
                 usage_binding = _usage_binding(

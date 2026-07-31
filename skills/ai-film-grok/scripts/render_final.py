@@ -30,7 +30,7 @@ from audio_timeline import caption_bindings as timeline_caption_bindings
 from audio_timeline import compile_timeline as compile_audio_timeline_v1
 from audio_timeline import timeline_hash as audio_timeline_hash
 from checkpoint import CheckpointManager
-from dialogue_broll import write_broll_edit_report
+from dialogue_broll import validate_broll_visual_review, write_broll_edit_report
 from edit_policy import (
     DEFAULT_TRANSITION_SEC,
     PolicyError,
@@ -2735,6 +2735,19 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 )
             except (KeyError, SecurityPolicyError) as exc:
                 raise RenderError(str(exc)) from exc
+            recorded_sha256 = str(broll_rec.get("sha256") or "")
+            actual_sha256 = sha256(broll_clip)
+            if not recorded_sha256 or recorded_sha256 != actual_sha256:
+                raise RenderError(f"Dialogue B-roll {bid} source SHA-256 is missing or mismatched")
+            visual_review = validate_broll_visual_review(
+                broll_rec.get("broll_visual_review"),
+                kind=str(entry.get("kind") or ""),
+                expected_sha256=actual_sha256,
+            )
+            if not visual_review["ok"]:
+                raise RenderError(
+                    f"Dialogue B-roll {bid} visual review blocked: {visual_review['reason']}"
+                )
             broll_sources.append({**entry, "clip": broll_clip})
         native_audio = None
         native_audio_audible: bool | None = None

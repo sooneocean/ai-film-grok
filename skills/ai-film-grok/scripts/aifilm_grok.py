@@ -3675,6 +3675,91 @@ def cmd_auto_cut(args: argparse.Namespace) -> int:
     return 0 if edl.get("ranges") else 1
 
 
+def cmd_shortform(args: argparse.Namespace) -> int:
+    """Plan/review/assemble the provider-neutral shortform director package."""
+    from shortform_director import (
+        ShortformError,
+        aroll_broll,
+        assemble_aroll,
+        create_package,
+        enable_lipsync,
+        render_lipsync,
+        review,
+        validate_package,
+    )
+    from shortform_motion import ShortformMotionError, build_plan, render_plan
+
+    try:
+        action = str(args.shortform_action)
+        if action == "plan":
+            report = create_package(
+                args.root,
+                mode=args.mode,
+                approved_script=Path(args.approved_script) if args.approved_script else None,
+                source_video=Path(args.source_video) if args.source_video else None,
+                transcript=Path(args.transcript) if args.transcript else None,
+                anchor=Path(args.anchor) if args.anchor else None,
+            )
+        elif action == "validate":
+            report = validate_package(args.root, require_approved=args.require_approved)
+        elif action == "review":
+            report = review(
+                args.root,
+                stage=args.stage,
+                reviewer=args.reviewer,
+                note=args.note,
+                approve=args.approve,
+            )
+        elif action == "enable-lipsync":
+            report = enable_lipsync(
+                args.root,
+                shot_id=args.shot_id,
+                speaker=args.speaker,
+                face_target=args.face_target,
+                audio_sha256=args.audio_sha256,
+            )
+        elif action == "render-lipsync":
+            report = render_lipsync(
+                args.root,
+                shot_id=args.shot_id,
+                video=Path(args.video),
+                audio=Path(args.audio),
+                out=Path(args.out) if args.out else None,
+                backend=args.backend,
+            )
+        elif action == "aroll-broll":
+            report = {"ok": True, "entries": aroll_broll(args.root, beat_id=args.beat_id)}
+        elif action == "assemble-aroll":
+            report = assemble_aroll(
+                args.root,
+                visual_dir=Path(args.visual_dir),
+                out=Path(args.out) if args.out else None,
+            )
+        elif action == "motion-plan":
+            layers = read_json(Path(args.layers))
+            if not isinstance(layers, list):
+                raise ShortformError("--layers must contain a JSON list")
+            report = build_plan(
+                args.root, base=Path(args.base), layers=layers, shot_id=args.shot_id
+            )
+        elif action == "render-motion":
+            report = render_plan(
+                args.root,
+                plan=Path(args.plan),
+                duration_sec=args.duration,
+                fps=args.fps,
+                width=args.width,
+                height=args.height,
+                out=Path(args.out) if args.out else None,
+            )
+        else:
+            raise ShortformError(f"unknown shortform action {action}")
+    except (ShortformError, ShortformMotionError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok", True) else 1
+
+
 def cmd_reencode_clips(args: argparse.Namespace) -> int:
     """Re-encode all film-spec clips to clean h264 and re-register (fixes FRW moov / sha drift)."""
     root = Path(args.root).expanduser().resolve()
@@ -5424,6 +5509,15 @@ def cmd_manifest(args: argparse.Namespace) -> int:
     return 0 if report["ok"] else 2
 
 
+def cmd_truth(args: argparse.Namespace) -> int:
+    """Audit production authority records without modifying the film root."""
+    from production_truth import audit_production_truth
+
+    report = audit_production_truth(Path(args.root))
+    emit(report)
+    return 0 if report["ok"] else 2
+
+
 def cmd_export_desktop(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     desktop = Path.home() / "Desktop"
@@ -6025,6 +6119,25 @@ def cmd_vibevoice_asr(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
     emit(report)
     return 0
+
+
+def cmd_speech_preview(args: argparse.Namespace) -> int:
+    """Operate the private, candidate-only Speech-to-Speech preview sidecar."""
+    from speech_preview import SpeechPreviewError, export_candidate, probe, record_session, start
+
+    try:
+        if args.speech_preview_action == "probe":
+            report = probe()
+        elif args.speech_preview_action == "start":
+            report = start(confirm=bool(args.confirm))
+        elif args.speech_preview_action == "session":
+            report = record_session(args.root, audio=args.audio, session_json=args.session_json)
+        else:
+            report = export_candidate(args.root, session_receipt=args.session_receipt)
+    except SpeechPreviewError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok", True) else 2
 
 
 def _cmd_graph_legacy(args: argparse.Namespace) -> int:
@@ -8103,6 +8216,14 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--root", required=True)
     st.set_defaults(no_write=True)
 
+    truth = sub.add_parser(
+        "truth", help="Read-only audit of production authority records and projection drift"
+    )
+    truth_sub = truth.add_subparsers(dest="truth_action", required=True)
+    truth_audit = truth_sub.add_parser("audit")
+    truth_audit.add_argument("--root", required=True)
+    truth_audit.set_defaults(no_write=True)
+
     quality = sub.add_parser(
         "quality", help="Read persisted per-shot quality receipts (no media scan)"
     )
@@ -8461,6 +8582,74 @@ def build_parser() -> argparse.ArgumentParser:
         dest="target_duration",
         help="Optional target total duration (sec) to aim segment count at",
     )
+
+    shortform = sub.add_parser(
+        "shortform", help="Provider-neutral 15–60s topic/A-roll/C-roll planning and A-roll remux"
+    )
+    shortform_sub = shortform.add_subparsers(dest="shortform_action", required=True)
+    sf_plan = shortform_sub.add_parser("plan", help="Create a hash-bound shortform package")
+    sf_plan.add_argument("--root", required=True)
+    sf_plan.add_argument("--mode", required=True, choices=("topic", "aroll", "croll"))
+    sf_plan.add_argument("--approved-script", default="")
+    sf_plan.add_argument("--source-video", default="")
+    sf_plan.add_argument("--transcript", default="")
+    sf_plan.add_argument("--anchor", default="")
+    sf_validate = shortform_sub.add_parser(
+        "validate", help="Validate source hashes and editorial rules"
+    )
+    sf_validate.add_argument("--root", required=True)
+    sf_validate.add_argument("--require-approved", action="store_true")
+    sf_review = shortform_sub.add_parser("review", help="Record plan or sample review")
+    sf_review.add_argument("--root", required=True)
+    sf_review.add_argument("--stage", required=True, choices=("plan", "sample"))
+    sf_review.add_argument("--reviewer", required=True)
+    sf_review.add_argument("--note", required=True)
+    sf_review.add_argument("--approve", action="store_true")
+    sf_lipsync = shortform_sub.add_parser(
+        "enable-lipsync", help="Bind one B/C near shot to final audio"
+    )
+    sf_lipsync.add_argument("--root", required=True)
+    sf_lipsync.add_argument("--shot-id", required=True)
+    sf_lipsync.add_argument("--speaker", required=True)
+    sf_lipsync.add_argument("--face-target", required=True)
+    sf_lipsync.add_argument("--audio-sha256", required=True)
+    sf_render_lipsync = shortform_sub.add_parser(
+        "render-lipsync", help="Explicitly submit one hash-bound B/C sample to the locked backend"
+    )
+    sf_render_lipsync.add_argument("--root", required=True)
+    sf_render_lipsync.add_argument("--shot-id", required=True)
+    sf_render_lipsync.add_argument("--video", required=True)
+    sf_render_lipsync.add_argument("--audio", required=True)
+    sf_render_lipsync.add_argument("--backend", default="auto")
+    sf_render_lipsync.add_argument("--out", default="")
+    sf_broll = shortform_sub.add_parser(
+        "aroll-broll", help="Plan one bounded source-audio-preserving A-roll cover"
+    )
+    sf_broll.add_argument("--root", required=True)
+    sf_broll.add_argument("--beat-id", required=True)
+    sf_assemble = shortform_sub.add_parser(
+        "assemble-aroll", help="Remux source audio under reviewed A-roll visuals"
+    )
+    sf_assemble.add_argument("--root", required=True)
+    sf_assemble.add_argument("--visual-dir", required=True)
+    sf_assemble.add_argument("--out", default="")
+    sf_motion = shortform_sub.add_parser(
+        "motion-plan", help="Write deterministic local layer-motion plan"
+    )
+    sf_motion.add_argument("--root", required=True)
+    sf_motion.add_argument("--shot-id", required=True)
+    sf_motion.add_argument("--base", required=True)
+    sf_motion.add_argument("--layers", required=True)
+    sf_render_motion = shortform_sub.add_parser(
+        "render-motion", help="Render one deterministic local layer-motion sample"
+    )
+    sf_render_motion.add_argument("--root", required=True)
+    sf_render_motion.add_argument("--plan", required=True)
+    sf_render_motion.add_argument("--duration", required=True, type=float)
+    sf_render_motion.add_argument("--fps", type=int, default=30)
+    sf_render_motion.add_argument("--width", type=int, default=1080)
+    sf_render_motion.add_argument("--height", type=int, default=1920)
+    sf_render_motion.add_argument("--out", default="")
 
     extf = sub.add_parser(
         "extract-frame",
@@ -8918,11 +9107,12 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_p.add_argument("--mode", choices=("contract", "live"), default="contract")
 
     dialogue_benchmark_p = sub.add_parser(
-        "dialogue-benchmark", help="Plan the 30–60s Qwen/Wan/LatentSync benchmark without spending"
+        "dialogue-benchmark",
+        help="Plan the 30–60s Qwen/keyframe/FRW-LTX benchmark without spending",
     )
     dialogue_benchmark_p.add_argument("--root", required=True)
     dialogue_benchmark_review_p = sub.add_parser(
-        "dialogue-benchmark-review", help="Record a human-reviewed Qwen, Wan, or LatentSync arm"
+        "dialogue-benchmark-review", help="Record a human-reviewed Qwen/keyframe/FRW-LTX arm"
     )
     dialogue_benchmark_review_p.add_argument("--root", required=True)
     dialogue_benchmark_review_p.add_argument("--weapon", required=True)
@@ -8938,7 +9128,7 @@ def build_parser() -> argparse.ArgumentParser:
     dialogue_benchmark_approve_p.add_argument("--rationale", required=True)
     dialogue_production_plan_p = sub.add_parser(
         "dialogue-production-plan",
-        help="Compile the no-spend Qwen/Wan/LatentSync/MMAudio dialogue production plan",
+        help="Compile the no-spend Qwen/keyframe/FRW-LTX/LatentSync-fallback dialogue plan",
     )
     dialogue_production_plan_p.add_argument("--root", required=True)
     dialogue_benchmark_queue_p = sub.add_parser(
@@ -9217,6 +9407,39 @@ def build_parser() -> argparse.ArgumentParser:
     vibevoice_run.add_argument("--root", required=True, help="Film workspace root")
     vibevoice_run.add_argument("--audio", required=True, help="Verified local audio in root")
     vibevoice_run.add_argument("--subtitles", default=None, help="Optional in-root SRT sidecar")
+
+    speech_preview = sub.add_parser(
+        "speech-preview",
+        help="Private RTX 5090 speech preview sidecar; candidate-only, never a production TTS backend",
+    )
+    speech_preview_sub = speech_preview.add_subparsers(dest="speech_preview_action", required=True)
+    speech_preview_sub.add_parser(
+        "probe",
+        help="Validate loopback launcher and capacity-check configuration; never starts inference",
+    )
+    speech_start = speech_preview_sub.add_parser(
+        "start", help="Request the configured private launcher after a live capacity gate"
+    )
+    speech_start.add_argument(
+        "--confirm", action="store_true", help="Required to launch the sidecar"
+    )
+    speech_session = speech_preview_sub.add_parser(
+        "session", help="Record one decoded, measured dialogue turn as a candidate-only receipt"
+    )
+    speech_session.add_argument("--root", required=True, help="Film workspace root")
+    speech_session.add_argument(
+        "--audio", required=True, help="Decoded reply audio inside the workspace"
+    )
+    speech_session.add_argument(
+        "--session-json", required=True, help="In-workspace measured client result JSON"
+    )
+    speech_export = speech_preview_sub.add_parser(
+        "export-candidate", help="Export a hash-bound preview candidate for human listening"
+    )
+    speech_export.add_argument("--root", required=True, help="Film workspace root")
+    speech_export.add_argument(
+        "--session-receipt", required=True, help="In-workspace speech-preview session receipt"
+    )
 
     semantic_index = sub.add_parser(
         "semantic-index",
@@ -10054,6 +10277,7 @@ def main(argv: list[str] | None = None) -> int:
             "init": cmd_init,
             "resume-manifest": cmd_resume_manifest,
             "status": cmd_status,
+            "truth": cmd_truth,
             "quality-status": cmd_quality_status,
             "production-evidence": cmd_production_evidence,
             "stage": cmd_stage,
@@ -10070,6 +10294,7 @@ def main(argv: list[str] | None = None) -> int:
             "assemble": cmd_assemble,
             "ingest-footage": cmd_ingest_footage,
             "auto-cut": cmd_auto_cut,
+            "shortform": cmd_shortform,
             "reencode-clips": cmd_reencode_clips,
             "final": cmd_final,
             "review-final": cmd_review_final,
@@ -10120,6 +10345,7 @@ def main(argv: list[str] | None = None) -> int:
             "production-report": cmd_production_report,
             "external-review": cmd_external_review,
             "vibevoice-asr": cmd_vibevoice_asr,
+            "speech-preview": cmd_speech_preview,
             "comfy": cmd_comfy,
             "node": cmd_node,
             "weapon": cmd_weapon,

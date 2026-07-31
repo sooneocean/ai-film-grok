@@ -54,6 +54,21 @@ def build_motion_generation_evidence(
             raise MotionEvidenceError("queue job belongs to another shot")
         if str(job.get("operation") or "") != source_endpoint:
             raise MotionEvidenceError("queue operation does not match source endpoint")
+        source_contract = job.get("source_contract")
+        if isinstance(source_contract, dict):
+            try:
+                from production_chain import ProductionChainError, require_current_queue_contract
+
+                require_current_queue_contract(base, source_contract)
+            except ProductionChainError as exc:
+                raise MotionEvidenceError(str(exc)) from exc
+        else:
+            from production_chain import canonical_contract_required
+
+            if canonical_contract_required(base):
+                raise MotionEvidenceError(
+                    "queue job source contract is missing for a canonical project"
+                )
         receipt = job.get("receipt") if isinstance(job.get("receipt"), dict) else {}
         if receipt.get("output_sha256") != output_sha:
             raise MotionEvidenceError("queue receipt output hash does not match clip")
@@ -76,6 +91,9 @@ def build_motion_generation_evidence(
                     "generation_id": receipt.get("generation_id"),
                     "input_hashes": input_hashes,
                     "receipt_sha256": output_sha,
+                    "source_contract_sha256": source_contract.get("contract_sha256")
+                    if isinstance(source_contract, dict)
+                    else None,
                 },
             }
         )

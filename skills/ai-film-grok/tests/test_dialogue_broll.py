@@ -15,6 +15,7 @@ from dialogue_broll import (  # noqa: E402
     DialogueBrollError,
     default_dialogue_broll,
     score_dialogue_broll_value,
+    validate_broll_visual_review,
     validate_dialogue_broll,
     write_broll_edit_report,
 )
@@ -32,6 +33,62 @@ def _shot(duration: float = 8.0) -> dict:
 
 
 class TestDialogueBroll(unittest.TestCase):
+    def test_no_face_broll_requires_a_human_no_text_review(self) -> None:
+        review = {
+            "clip_sha256": "a" * 64,
+            "sampled_frames": ["00:00:00.000", "00:00:01.000"],
+            "human_reviewed": True,
+            "reviewer": "dex",
+            "unexpected_visual_text_detected": False,
+            "unexpected_person_or_face_detected": False,
+        }
+        self.assertEqual(
+            validate_broll_visual_review(review, kind="env", expected_sha256="a" * 64)["status"],
+            "approved",
+        )
+        self.assertEqual(
+            validate_broll_visual_review(review, kind="env", expected_sha256="b" * 64)["reason"],
+            "BROLL_VISUAL_REVIEW_STALE",
+        )
+
+    def test_no_face_broll_rejects_visual_text_or_missing_human_review(self) -> None:
+        review = {
+            "clip_sha256": "a" * 64,
+            "sampled_frames": ["00:00:00.000"],
+            "human_reviewed": True,
+            "reviewer": "dex",
+            "unexpected_visual_text_detected": True,
+            "unexpected_person_or_face_detected": False,
+        }
+        self.assertEqual(
+            validate_broll_visual_review(review, kind="insert", expected_sha256="a" * 64)["reason"],
+            "BROLL_VISUAL_TEXT_REJECTED",
+        )
+        review["unexpected_visual_text_detected"] = False
+        review["human_reviewed"] = False
+        self.assertEqual(
+            validate_broll_visual_review(review, kind="insert", expected_sha256="a" * 64)["reason"],
+            "BROLL_HUMAN_REVIEW_REQUIRED",
+        )
+
+    def test_no_face_broll_normalizes_kind_and_requires_registered_sha(self) -> None:
+        review = {
+            "clip_sha256": "a" * 64,
+            "sampled_frames": ["00:00:00.000"],
+            "human_reviewed": True,
+            "reviewer": "dex",
+            "unexpected_visual_text_detected": False,
+            "unexpected_person_or_face_detected": True,
+        }
+        self.assertEqual(
+            validate_broll_visual_review(review, kind="ENV", expected_sha256="a" * 64)["reason"],
+            "BROLL_PERSON_OR_FACE_REJECTED",
+        )
+        self.assertEqual(
+            validate_broll_visual_review(review, kind="env")["reason"],
+            "BROLL_SOURCE_SHA_MISSING",
+        )
+
     def test_editorial_value_prefers_information_or_emotional_turns(self) -> None:
         shot = _shot()
         shot["dialogue"] = "The letter reveals why the door stayed locked."

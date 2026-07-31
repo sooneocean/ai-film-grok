@@ -838,6 +838,34 @@
       ]
     },
     {
+      "id": "speech-preview-5090",
+      "display_name": "Hugging Face Speech-to-Speech dialogue preview sidecar",
+      "status": "experimental",
+      "readiness": "experimental_candidate_only",
+      "provider": "private_loopback_sidecar",
+      "node": "rtx5090-main",
+      "intents": ["interactive-dialogue-preview", "speech-transcription-preview", "voice-performance-audition"],
+      "allowed_stages": ["research", "pilot"],
+      "license_scope": "Apache-2.0_package_verify_model_licenses_before_use",
+      "latest_canary_receipt_path": null,
+      "requirements": {"minimum_vram_mib": 24576, "minimum_ram_mib": 12288, "python_version": "3.11", "loopback_only": true},
+      "restrictions": [
+        "no_public_listener",
+        "no_llm_proxy",
+        "no_default_tts_routing",
+        "not_final_audio",
+        "no_auto_approval"
+      ],
+      "execution_cli": "aifilm speech-preview probe | start --confirm | session | export-candidate",
+      "promotion_requirements": [
+        "live_capacity_receipt",
+        "model_and_runtime_provenance",
+        "terminal_audio_decode",
+        "zh_ja_language_review",
+        "full_human_listening"
+      ]
+    },
+    {
       "id": "hunyuanvideo-1.5-shot-pilot",
       "display_name": "HunyuanVideo 1.5 short-shot pilot",
       "status": "experimental",

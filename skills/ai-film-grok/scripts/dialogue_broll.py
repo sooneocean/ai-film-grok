@@ -26,6 +26,30 @@ MAX_DIALOGUE_COVERAGE_RATIO = 0.40
 MIN_A_ROLL_RATIO = 0.60
 
 
+def validate_broll_visual_review(
+    review: dict[str, Any] | None, *, kind: str, expected_sha256: str | None = None
+) -> dict[str, Any]:
+    """Fail closed until the generated coverage has a focused human review."""
+    if not isinstance(review, dict):
+        return {"ok": False, "reason": "BROLL_VISUAL_REVIEW_MISSING"}
+    if not review.get("clip_sha256") or not review.get("sampled_frames"):
+        return {"ok": False, "reason": "BROLL_VISUAL_REVIEW_INCOMPLETE"}
+    if not expected_sha256:
+        return {"ok": False, "reason": "BROLL_SOURCE_SHA_MISSING"}
+    if review.get("clip_sha256") != expected_sha256:
+        return {"ok": False, "reason": "BROLL_VISUAL_REVIEW_STALE"}
+    if review.get("human_reviewed") is not True or not str(review.get("reviewer") or "").strip():
+        return {"ok": False, "reason": "BROLL_HUMAN_REVIEW_REQUIRED"}
+    if review.get("unexpected_visual_text_detected") is not False:
+        return {"ok": False, "reason": "BROLL_VISUAL_TEXT_REJECTED"}
+    if (
+        str(kind).strip().lower() in {"env", "insert"}
+        and review.get("unexpected_person_or_face_detected") is not False
+    ):
+        return {"ok": False, "reason": "BROLL_PERSON_OR_FACE_REJECTED"}
+    return {"ok": True, "status": "approved"}
+
+
 def score_dialogue_broll_value(shot: dict[str, Any], entry: dict[str, Any]) -> dict[str, Any]:
     """Make editorial value explicit so decorative coverage can be rejected."""
     text = " ".join(

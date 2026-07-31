@@ -14,12 +14,45 @@ def _present(root: Path, relative: str) -> bool:
     return (root / relative).is_file()
 
 
+def _queue_contract_evidence(root: Path) -> dict[str, Any]:
+    """Report whether queued work still matches the plan and assets it started with."""
+    state = read_json(root / "receipts" / "media-queue.json") or {}
+    jobs = state.get("jobs", []) if isinstance(state, dict) else []
+    if not isinstance(jobs, list):
+        return {"job_count": 0, "contracts_current": False, "chain_bound": False}
+    checked = 0
+    stale_job_ids: list[str] = []
+    unbound_job_ids: list[str] = []
+    from production_chain import queue_contract_is_current
+
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        contract = job.get("source_contract")
+        job_id = str(job.get("id") or "unknown")
+        if not isinstance(contract, dict):
+            unbound_job_ids.append(job_id)
+            continue
+        checked += 1
+        if not queue_contract_is_current(root, contract).get("ok"):
+            stale_job_ids.append(job_id)
+    return {
+        "job_count": len(jobs),
+        "checked_contracts": checked,
+        "contracts_current": not stale_job_ids,
+        "chain_bound": not unbound_job_ids,
+        "stale_job_ids": stale_job_ids,
+        "unbound_job_ids": unbound_job_ids,
+    }
+
+
 def build_evidence(root: Path) -> dict[str, Any]:
     control = control_status(root)
     pilot = read_json(root / "receipts" / "pilot-approval.json") or {}
     scorecard = read_json(root / "receipts" / "pilot-scorecard.json") or {}
     final = read_json(root / "receipts" / "final-delivery.json") or {}
     clips = sorted((root / "clips").glob("*.mp4")) if (root / "clips").is_dir() else []
+    queue_contracts = _queue_contract_evidence(root)
     evidence = {
         "story": {
             "graph_present": _present(root, "drama-graph.json"),
@@ -36,6 +69,7 @@ def build_evidence(root: Path) -> dict[str, Any]:
             "mix_report": _present(root, "audio/mix_report.json"),
         },
         "motion": {"clip_count": len(clips), "clips_present": bool(clips)},
+        "queue": queue_contracts,
         "delivery": {
             "final_delivery": bool(final),
             "final_mp4": _present(root, "final.mp4"),
@@ -46,6 +80,7 @@ def build_evidence(root: Path) -> dict[str, Any]:
         evidence["pilot"]["user_approved"]
         and evidence["story"]["semantic_ok"]
         and evidence["story"]["projection_current"]
+        and queue_contracts["contracts_current"]
     )
     return {
         "ok": True,
