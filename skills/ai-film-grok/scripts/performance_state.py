@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,20 @@ def _identifier(value: object, *, field: str) -> str:
     if not _SAFE_ID.fullmatch(text):
         raise ValueError(f"{field} must be a safe identifier")
     return text
+
+
+def _logical_identifier(value: object, *, field: str) -> str:
+    text = str(value or "").strip()
+    if not text or len(text) > 255 or any(char in text for char in ("/", "\\", "\x00")):
+        raise ValueError(f"{field} must be a non-path logical identifier")
+    return text
+
+
+def _path_token(value: object, *, field: str) -> str:
+    logical = _logical_identifier(value, field=field)
+    if _SAFE_ID.fullmatch(logical):
+        return logical
+    return f"id-{sha256(logical.encode('utf-8')).hexdigest()[:20]}"
 
 
 def performance_state_contract(shot: dict[str, Any]) -> dict[str, Any]:
@@ -57,14 +72,14 @@ def performance_state_contract(shot: dict[str, Any]) -> dict[str, Any]:
 
 def performance_state_id(shot: dict[str, Any]) -> str:
     contract = performance_state_contract(shot)
-    speaker = _identifier(contract["speaker"] or "hero", field="speaker")
+    speaker = _path_token(contract["speaker"] or "hero", field="speaker")
     digest = canonical_json_sha256(contract)
     return f"{speaker}-state-{digest[:12]}"
 
 
 def _state_paths(root: Path, *, speaker: str, state_id: str) -> tuple[Path, Path]:
-    speaker = _identifier(speaker, field="speaker")
-    state_id = _identifier(state_id, field="state_id")
+    speaker = _path_token(speaker, field="speaker")
+    state_id = _path_token(state_id, field="state_id")
     image = root / "canonical" / "performance-states" / speaker / f"{state_id}.png"
     receipt = root / "receipts" / "performance-states" / speaker / f"{state_id}.json"
     return image, receipt
@@ -116,8 +131,8 @@ def approve_performance_state(
     payload = {
         "schema_version": 1,
         "kind": "dialogue-performance-state-approval",
-        "speaker": _identifier(speaker, field="speaker"),
-        "performance_state_id": _identifier(state_id, field="state_id"),
+        "speaker": _logical_identifier(speaker, field="speaker"),
+        "performance_state_id": _logical_identifier(state_id, field="state_id"),
         "image": {
             "path": str(source),
             "sha256": actual_sha,

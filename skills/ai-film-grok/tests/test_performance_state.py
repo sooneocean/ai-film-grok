@@ -62,6 +62,14 @@ def test_state_id_reuses_identical_performance_and_splits_real_change() -> None:
     assert performance_state_id(base) != performance_state_id(changed)
 
 
+def test_unicode_logical_state_id_uses_stable_safe_paths(tmp_path: Path) -> None:
+    report = validate_performance_state(tmp_path, speaker="女主角", state_id="state_sc02_门口_决绝")
+    assert report["performance_state_id"] == "state_sc02_门口_决绝"
+    assert "女主角" not in report["image_path"]
+    assert "state_sc02_门口_决绝" not in report["image_path"]
+    assert report["image_path"].endswith(".png")
+
+
 def test_approved_state_requires_hash_bound_i2i_and_human_review(tmp_path: Path) -> None:
     state_id = "hero-state-deadbeef"
     image = tmp_path / "canonical" / "performance-states" / "hero" / f"{state_id}.png"

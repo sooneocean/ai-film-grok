@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "local-weapon-technical-receipt",
+  "weapon_id": "wan22-i2v-quality",
+  "status": "technical_rejected_geometry",
+  "source_submission_sha256": "8f01a44033cf1e3c2af20e14c3d0ef0dde1051ca2915b6b0a3fe9c81342a43dd",
+  "workflow_sha256": "85e24b4b3e76e35e838d0ff9bb736163ee023167bbb1e494dc57f2d53e65e84e",
+  "prompt_id": "dca87734-0f77-4558-ba65-5084c5a0deab",
+  "external_api_nodes_allowed": false,
+  "input": {
+    "path": "../qwen-image-2512-quality-retest/armory-qwen-retest_00001_.png",
+    "sha256": "a5cf8046be059fa1acaaa35d5dc66201b10532e31e7c91388535468bcd2cc351",
+    "width": 928,
+    "height": 1664
+  },
+  "artifact": {
+    "path": "armory-wan22_00001.mp4",
+    "sha256": "3bd1c9375fcc49e16deb1900488a79597409a0152ceddee971220ea9ef504565",
+    "width": 1024,
+    "height": 576,
+    "fps": 16.0,
+    "duration_sec": 5.0625,
+    "decoded_frames": 81,
+    "decode_ok": true,
+    "motion_ok": true,
+    "motion_score": 16.3088,
+    "motion_continuity": 1.0
+  },
+  "geometry_review": {
+    "status": "rejected",
+    "reason": "Portrait input was emitted as a 16:9 landscape video and the subject's face was materially cropped out.",
+    "evidence_frame": "frame-mid.png"
+  },
+  "promotion": {
+    "eligible": false,
+    "reason": "A portrait I2V route must preserve source geometry; this canary does not."
+  }
+}

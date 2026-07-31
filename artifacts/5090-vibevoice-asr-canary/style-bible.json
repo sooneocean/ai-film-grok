@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "locked": false,
+  "title": "VibeVoice ASR Canary",
+  "medium": "photoreal cinematic short",
+  "palette": "to be filled from theme",
+  "lighting": "motivated practicals, natural contrast",
+  "lens": "contemporary digital cinema, modest depth of field",
+  "rendering": "photoreal, detailed skin/fabric; switch to anime only if theme requires",
+  "signature_block": "Consistent film style for 'VibeVoice ASR Canary': photoreal cinematic short, natural skin texture, coherent palette, stable wardrobe and identity across shots.",
+  "identity_lock": "to be filled: face hair eyes wardrobe for each recurring adult cast member",
+  "negative_hints": "do not change face identity, do not switch medium mid-film, no underage characters, no random outfit recolor",
+  "canonical_style_path": null,
+  "cast_masters": {},
+  "updated_at": "2026-07-30T04:46:20+00:00"
+}

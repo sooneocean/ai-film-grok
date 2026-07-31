@@ -50,6 +50,9 @@
 **/*.bak-*
 **/*~pre-*
 
+# transient locks emitted while canary evidence is being assembled
+artifacts/**/*.lock
+
 # session / run-continuation tooling artifacts (never commit)
 .omo/
 .zcode/

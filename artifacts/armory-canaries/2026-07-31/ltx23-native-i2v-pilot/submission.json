@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "kind": "local-weapon-error",
+  "ok": false,
+  "error": "canary execution failed; inspect its guarded Comfy receipt"
+}

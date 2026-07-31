@@ -300,6 +300,39 @@ def test_run_workflow_cannot_bypass_experimental_gate_by_omitting_weapon_id(
     assert "pilot-only" in report["error"]
 
 
+def test_registered_weapon_uses_its_own_custom_node_allowlist(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    weapon = next(
+        item for item in load_armory()["weapons"] if item["id"] == "qwen-image-2512-quality"
+    )
+    workflow = Path(__file__).resolve().parents[1] / weapon["workflow_template"]
+    args = Namespace(
+        base_url="http://127.0.0.1:18188",
+        comfy_action="run-workflow",
+        workflow=workflow,
+        overrides=None,
+        timeout=1,
+        allow_external_api_nodes=False,
+        weapon_id=weapon["id"],
+        production_stage="production",
+        allow_experimental=False,
+        enqueue=False,
+        receipt=None,
+    )
+    with (
+        patch("comfy_armory.assert_registered_weapon_workflow"),
+        patch("cli_comfy.assert_local_only_workflow") as generic_guard,
+        patch("cli_comfy.submit", return_value="prompt-1") as submit,
+        patch("cli_comfy.wait_for_result", return_value={"artifacts": []}),
+    ):
+        assert run_comfy(args) == 0
+
+    generic_guard.assert_not_called()
+    submit.assert_called_once()
+    assert json.loads(capsys.readouterr().out)["weapon_id"] == weapon["id"]
+
+
 def test_modified_experimental_workflow_cannot_escape_through_generic_bypass(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

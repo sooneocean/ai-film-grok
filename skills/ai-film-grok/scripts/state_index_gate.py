@@ -318,17 +318,24 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
             if not state_id:
                 missing_dialogue_states.append(f"{sid}:missing-performance-state-id")
                 continue
-            path = root / "canonical" / "performance-states" / hero_id / f"{state_id}.png"
             approval = validate_performance_state(
                 root,
                 speaker=hero_id,
                 state_id=state_id,
             )
+            state_path = Path(str(approval["image_path"]))
+            state_rel = state_path.relative_to(root)
+            approval_receipt_rel = Path(str(approval["receipt_path"])).relative_to(root)
+            generation_receipt_rel = (
+                Path("receipts/generation/performance-states")
+                / state_path.parent.name
+                / f"{state_path.stem}.json"
+            )
             exists = bool(approval.get("ok"))
             dialogue_state_index[sid] = {
                 "hero_id": hero_id,
                 "performance_state_id": state_id,
-                "path": str(path),
+                "path": str(state_path),
                 "exists": exists,
                 "approval": approval,
             }
@@ -345,7 +352,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                         "shot_id": sid,
                         "hero_id": hero_id,
                         "performance_state_id": state_id,
-                        "out": str(path.relative_to(root)),
+                        "out": str(state_rel),
                         "why": "talking close-up requires a state-locked i2i performance reference",
                         "line_id": str(shot.get("dialogue_line_id") or ""),
                         "state_matrix": {
@@ -366,20 +373,16 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                             f"canonical/cast-states/{hero_id}/{_wardrobe_of(shot)}.png",
                             f"assets/characters/{hero_id}-canonical.png",
                         ],
-                        "generation_receipt_out": (
-                            f"receipts/generation/performance-states/{hero_id}/{state_id}.json"
-                        ),
+                        "generation_receipt_out": str(generation_receipt_rel),
                         "generation_receipt_contract": {
                             "operation": "image_edit",
                             "required": ["input_sha256", "output_sha256", "model"],
-                            "output_sha256_must_match": str(path.relative_to(root)),
+                            "output_sha256_must_match": str(state_rel),
                         },
-                        "approval_receipt_out": (
-                            f"receipts/performance-states/{hero_id}/{state_id}.json"
-                        ),
+                        "approval_receipt_out": str(approval_receipt_rel),
                         "approval_command": (
                             "aifilm approve-performance-state --speaker "
-                            f"{hero_id} --state-id {state_id} --image {path.relative_to(root)} "
+                            f"{hero_id} --state-id {state_id} --image {state_rel} "
                             "--generation-receipt <generation_receipt_out> "
                             "--reviewer <reviewer> --review-note <note>"
                         ),

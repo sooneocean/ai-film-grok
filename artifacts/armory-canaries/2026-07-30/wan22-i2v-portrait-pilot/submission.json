@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "kind": "comfy-lan-workflow",
+  "ok": true,
+  "prompt_id": "51829cc2-61b4-45c6-ad38-bacb16139919",
+  "workflow_sha256": "ae8100b359b07dcb2c26f3bdd18ebf1d1d1981c8a9dcf67642516d6ce69bd6ad",
+  "artifacts": [
+    {
+      "filename": "armory-wan22-portrait-20260730_00001.mp4",
+      "subfolder": "aifilm",
+      "type": "output"
+    }
+  ],
+  "external_api_nodes_allowed": false,
+  "weapon_id": "wan22-i2v-portrait-pilot",
+  "source_endpoint": null,
+  "pilot_only": true
+}

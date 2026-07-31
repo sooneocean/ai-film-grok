@@ -1,0 +1,409 @@
+{
+  "unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "hunyuanvideo1.5_720p_i2v_cfg_distilled_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "clip": {
+    "class_type": "DualCLIPLoader",
+    "inputs": {
+      "clip_name1": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "clip_name2": "byt5_small_glyphxl_fp16.safetensors",
+      "type": "hunyuan_video_15",
+      "device": "default"
+    }
+  },
+  "vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "hunyuanvideo15_vae_fp16.safetensors"
+    }
+  },
+  "vision_loader": {
+    "class_type": "CLIPVisionLoader",
+    "inputs": {
+      "clip_name": "sigclip_vision_patch14_384.safetensors"
+    }
+  },
+  "source": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "armory-qwen-retest_00001_.png"
+    }
+  },
+  "vision": {
+    "class_type": "CLIPVisionEncode",
+    "inputs": {
+      "clip_vision": [
+        "vision_loader",
+        0
+      ],
+      "image": [
+        "source",
+        0
+      ],
+      "crop": "center"
+    }
+  },
+  "positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "The adult man takes one slow natural breath, makes a small reassuring head turn toward the camera, and his suit fabric shifts subtly. Locked portrait composition, realistic facial identity and hands, stable city background, gentle cinematic camera push-in. No speech, no text, no letters, no logo, no watermark, no badge, no signage, no symbols, no UI, no typography.",
+      "clip": [
+        "clip",
+        0
+      ]
+    }
+  },
+  "negative": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "identity drift, armor deformation, extra limbs, missing fingers, melting metal, camera shake, scene change, duplicate subject, watermark, text, low detail",
+      "clip": [
+        "clip",
+        0
+      ]
+    }
+  },
+  "conditioning": {
+    "class_type": "HunyuanVideo15ImageToVideo",
+    "inputs": {
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "start_image": [
+        "source",
+        0
+      ],
+      "clip_vision_output": [
+        "vision",
+        0
+      ],
+      "width": 1280,
+      "height": 720,
+      "length": 121,
+      "batch_size": 1
+    }
+  },
+  "sampling_model": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "unet",
+        0
+      ],
+      "shift": 7.0
+    }
+  },
+  "noise": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 2026073007
+    }
+  },
+  "sampler_select": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "scheduler": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "sampling_model",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 20,
+      "denoise": 1.0
+    }
+  },
+  "guider": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "sampling_model",
+        0
+      ],
+      "positive": [
+        "conditioning",
+        0
+      ],
+      "negative": [
+        "conditioning",
+        1
+      ],
+      "cfg": 1.0
+    }
+  },
+  "sample": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "noise",
+        0
+      ],
+      "guider": [
+        "guider",
+        0
+      ],
+      "sampler": [
+        "sampler_select",
+        0
+      ],
+      "sigmas": [
+        "scheduler",
+        0
+      ],
+      "latent_image": [
+        "conditioning",
+        2
+      ]
+    }
+  },
+  "sr_upscale_loader": {
+    "class_type": "LatentUpscaleModelLoader",
+    "inputs": {
+      "model_name": "hunyuanvideo15_latent_upsampler_1080p.safetensors"
+    }
+  },
+  "sr_upscale": {
+    "class_type": "HunyuanVideo15LatentUpscaleWithModel",
+    "inputs": {
+      "model": [
+        "sr_upscale_loader",
+        0
+      ],
+      "samples": [
+        "sample",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "width": 1920,
+      "height": 1080,
+      "crop": "disabled"
+    }
+  },
+  "sr_conditioning": {
+    "class_type": "HunyuanVideo15SuperResolution",
+    "inputs": {
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "latent": [
+        "sr_upscale",
+        0
+      ],
+      "noise_augmentation": 0.7,
+      "vae": [
+        "vae",
+        0
+      ],
+      "start_image": [
+        "source",
+        0
+      ],
+      "clip_vision_output": [
+        "vision",
+        0
+      ]
+    }
+  },
+  "sr_unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "hunyuanvideo1.5_1080p_sr_distilled_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "sr_sampling_model": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "sr_unet",
+        0
+      ],
+      "shift": 2.0
+    }
+  },
+  "sr_scheduler": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "sr_sampling_model",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 8,
+      "denoise": 1.0
+    }
+  },
+  "sr_split_sigmas": {
+    "class_type": "SplitSigmas",
+    "inputs": {
+      "sigmas": [
+        "sr_scheduler",
+        0
+      ],
+      "step": 4
+    }
+  },
+  "sr_noise": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 889
+    }
+  },
+  "sr_disable_noise": {
+    "class_type": "DisableNoise",
+    "inputs": {}
+  },
+  "sr_sampler_select": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    }
+  },
+  "sr_guider_high": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "sr_sampling_model",
+        0
+      ],
+      "positive": [
+        "sr_conditioning",
+        0
+      ],
+      "negative": [
+        "sr_conditioning",
+        1
+      ],
+      "cfg": 1.0
+    }
+  },
+  "sr_sample_high": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "sr_noise",
+        0
+      ],
+      "guider": [
+        "sr_guider_high",
+        0
+      ],
+      "sampler": [
+        "sr_sampler_select",
+        0
+      ],
+      "sigmas": [
+        "sr_split_sigmas",
+        0
+      ],
+      "latent_image": [
+        "sr_conditioning",
+        2
+      ]
+    }
+  },
+  "sr_guider_low": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "model": [
+        "sr_sampling_model",
+        0
+      ],
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "cfg": 1.0
+    }
+  },
+  "sr_sample_low": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "sr_disable_noise",
+        0
+      ],
+      "guider": [
+        "sr_guider_low",
+        0
+      ],
+      "sampler": [
+        "sr_sampler_select",
+        0
+      ],
+      "sigmas": [
+        "sr_split_sigmas",
+        1
+      ],
+      "latent_image": [
+        "sr_sample_high",
+        0
+      ]
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecodeTiled",
+    "inputs": {
+      "samples": [
+        "sr_sample_low",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 8
+    }
+  },
+  "video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "decode",
+        0
+      ],
+      "fps": 24.0
+    }
+  },
+  "save": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "video",
+        0
+      ],
+      "filename_prefix": "aifilm/armory-hunyuan15",
+      "format": "mp4",
+      "codec": "h264"
+    }
+  }
+}

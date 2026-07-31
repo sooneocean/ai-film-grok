@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "kind": "local-video-canary-technical-receipt",
+  "status": "technical_verified_candidate_pending_human_review",
+  "weapon_id": "wan22-i2v-portrait-pilot",
+  "prompt_id": "51829cc2-61b4-45c6-ad38-bacb16139919",
+  "external_api_nodes_allowed": false,
+  "production_promoted": false,
+  "human_review_required": true,
+  "input": {
+    "path": "../qwen-image-2512-quality-retest/armory-qwen-retest_00001_.png",
+    "sha256": "a5cf8046be059fa1acaaa35d5dc66201b10532e31e7c91388535468bcd2cc351"
+  },
+  "workflow": {
+    "path": "workflow.json",
+    "file_sha256": "fa14f8113b44171eff7ae2f0f28f16ca484179303f53363c386088d99b5be3e5",
+    "canonical_sha256": "ae8100b359b07dcb2c26f3bdd18ebf1d1d1981c8a9dcf67642516d6ce69bd6ad",
+    "portrait_canvas": "576x1024"
+  },
+  "output": {
+    "path": "armory-wan22-portrait-20260730_00001.mp4",
+    "sha256": "82372cad041b0c54051c9616776044e5570e60047789866bda59a0351ec6d6f2",
+    "bytes": 763180,
+    "codec": "h264",
+    "pixel_format": "yuv420p",
+    "width": 576,
+    "height": 1024,
+    "frame_rate": "16/1",
+    "frames": 81,
+    "duration_seconds": 5.062012,
+    "full_decode_ok": true,
+    "motion_difference_luma_mean": 1.442694
+  },
+  "visual_spot_check": {
+    "frame_path": "frame-mid.png",
+    "frame_sha256": "a5c069d7db49288c1b94360ad3035602beb9ff768a0fcc265ffe0228a3c562ba",
+    "portrait_geometry_preserved": true,
+    "visible_text_or_logo": false,
+    "note": "mid-frame shows a full vertical subject with no visible typography; human visual review remains required"
+  }
+}

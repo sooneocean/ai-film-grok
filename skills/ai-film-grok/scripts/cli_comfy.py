@@ -405,7 +405,7 @@ def run_comfy(args: argparse.Namespace) -> int:
                     raise ComfyVideoError(str(exc)) from exc
             if args.enqueue and (registered_weapon is None or args.production_stage != "pilot"):
                 raise ComfyVideoError("--enqueue requires a registered pilot weapon")
-            elif not args.allow_external_api_nodes:
+            elif registered_weapon is None and not args.allow_external_api_nodes:
                 assert_local_only_workflow(base_url, graph)
             client_id = f"aifilm-{secrets.token_hex(8)}"
             prompt_id = submit(
