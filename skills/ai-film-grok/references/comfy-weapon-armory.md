@@ -179,3 +179,18 @@ cd skills/ai-film-grok
 It does not make a queued prompt executable. It remains excluded from dialogue
 lip-sync and final delivery until an idle-queue resource gate, model and audio
 encoder fingerprints, full decode, alignment review and human review all pass.
+
+## Wan 2.2 Dancer research lane
+
+`wan22-dancer-performance-research` records the paired global/local Dancer
+dependency contract without treating its model names as fingerprints or pilot
+evidence:
+
+```bash
+cd skills/ai-film-grok
+./scripts/runtime-python scripts/wan_dancer_probe.py
+```
+
+It is limited to research. A future canary requires an idle queue, 24 GiB free
+VRAM, hash-bound source image/audio, exact weight fingerprints, full decode and
+human review; it never substitutes for dialogue lip-sync or final media.
