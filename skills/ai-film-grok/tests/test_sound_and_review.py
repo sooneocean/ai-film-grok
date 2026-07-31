@@ -105,10 +105,10 @@ class TestDirectorReviewExpansion:
         assert "theme" in SCORECARD_DIMENSIONS
         assert "performance" in SCORECARD_DIMENSIONS
 
-    def test_scorecard_has_11_dimensions(self):
+    def test_scorecard_has_16_dimensions(self):
         from director_review import SCORECARD_DIMENSIONS
 
-        assert len(SCORECARD_DIMENSIONS) == 11
+        assert len(SCORECARD_DIMENSIONS) == 16
 
     def test_default_actions_for_new_dims(self):
         from director_review import _DEFAULT_ACTION_FOR_DIM
@@ -117,6 +117,8 @@ class TestDirectorReviewExpansion:
         assert _DEFAULT_ACTION_FOR_DIM["emotion"] == "recut"
         assert _DEFAULT_ACTION_FOR_DIM["theme"] == "recut"
         assert _DEFAULT_ACTION_FOR_DIM["performance"] == "reshoot"
+        assert _DEFAULT_ACTION_FOR_DIM["cinematic_coherence"] == "recut"
+        assert _DEFAULT_ACTION_FOR_DIM["performance_truth"] == "reshoot"
 
     def test_cli_flags_generated_for_new_dims(self):
         from director_review import SCORECARD_CLI_FLAGS
@@ -125,3 +127,4 @@ class TestDirectorReviewExpansion:
         assert "emotion" in SCORECARD_CLI_FLAGS
         assert "theme" in SCORECARD_CLI_FLAGS
         assert "performance" in SCORECARD_CLI_FLAGS
+        assert "whole_film_integrity" in SCORECARD_CLI_FLAGS

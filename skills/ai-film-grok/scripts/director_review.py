@@ -20,6 +20,11 @@ SCORECARD_DIMENSIONS: tuple[str, ...] = (
     "emotion",  # P3-5: emotional arc — does the film land its emotional beats?
     "theme",  # P3-5: thematic coherence — is the theme communicated?
     "performance",  # P3-5: acting quality — does the performance serve the story?
+    "cinematic_coherence",  # scene geography, visual progression, and shot handoffs
+    "coverage_sufficiency",  # dialogue beats retain reaction/action/silence coverage
+    "performance_truth",  # visible performance change, not camera-only micro-motion
+    "editorial_rhythm",  # cuts and transitions land on authored changes
+    "whole_film_integrity",  # the final watch still feels like one directed film
 )
 
 # CLI flag stem: --score-identity, --score-dead-air, ...
@@ -42,6 +47,11 @@ _DEFAULT_ACTION_FOR_DIM: dict[str, str] = {
     "emotion": "recut",
     "theme": "recut",
     "performance": "reshoot",
+    "cinematic_coherence": "recut",
+    "coverage_sufficiency": "recut",
+    "performance_truth": "reshoot",
+    "editorial_rhythm": "recut",
+    "whole_film_integrity": "recut",
 }
 
 

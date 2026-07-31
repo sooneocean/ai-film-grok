@@ -32,6 +32,7 @@
 | [principles.md](principles.md) | 底层泛化能力 P0–P5 |
 | [hard-defaults.md](hard-defaults.md) | 默认与跨层决策（硬门禁完整表） |
 | [production-discipline.md](production-discipline.md) | 量产纪律 season-scale |
+| [short-drama-sop-bridge.md](short-drama-sop-bridge.md) | 短剧量产 SOP 的运营层桥接：G0–G11、运行卡、返工分流与三遍终检 |
 | [director-self-scorecard.md](director-self-scorecard.md) | 导演自评卡 |
 | [genre-migration-test.md](genre-migration-test.md) | 题材迁移测试 |
 

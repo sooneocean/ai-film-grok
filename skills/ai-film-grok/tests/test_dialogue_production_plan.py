@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from argparse import Namespace
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import dialogue_production_plan as plan_module  # noqa: E402
+from aifilm_grok import cmd_dialogue_production_plan  # noqa: E402
 from dialogue_production_plan import build_dialogue_production_plan  # noqa: E402
 from story_plan import run_plan  # noqa: E402
 from util import write_json  # noqa: E402
@@ -86,6 +88,18 @@ def test_plan_refuses_a_film_spec_rejected_by_canonical_gate(
     monkeypatch.setattr(plan_module, "validate_film_spec", reject)
     with pytest.raises(ValueError, match="FILM_SPEC_INVALID"):
         build_dialogue_production_plan(tmp_path)
+
+
+def test_cli_reports_invalid_film_spec_without_traceback(tmp_path: Path, capsys) -> None:
+    write_json(tmp_path / "film-spec.json", {"scenes": []})
+
+    assert cmd_dialogue_production_plan(Namespace(root=str(tmp_path))) == 2
+
+    assert json.loads(capsys.readouterr().out) == {
+        "ok": False,
+        "status": "blocked",
+        "reason": "DIALOGUE_PRODUCTION_PLAN_FILM_SPEC_INVALID",
+    }
 
 
 def test_plan_rejects_one_missing_beat_coverage_from_real_projection(tmp_path: Path) -> None:

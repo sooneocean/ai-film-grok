@@ -9,6 +9,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from director_review import SCORECARD_DIMENSIONS  # noqa: E402
 from review_ui import (
     _PAGE,  # noqa: E402
     make_handler,  # noqa: E402
@@ -131,55 +132,11 @@ def test_review_ui_writes_hash_bound_final_review_input(tmp_path: Path) -> None:
         "watched_full": True,
         "final_output_sha256": final_sha256,
         "human_minutes": 2,
-        "scorecard": {
-            dimension: "pass"
-            for dimension in (
-                "identity",
-                "style",
-                "motion",
-                "escalation",
-                "audio",
-                "subs",
-                "dead_air",
-                "rhythm",
-                "emotion",
-                "theme",
-                "performance",
-            )
-        },
-        "grades": {
-            dimension: 4
-            for dimension in (
-                "identity",
-                "style",
-                "motion",
-                "escalation",
-                "audio",
-                "subs",
-                "dead_air",
-                "rhythm",
-                "emotion",
-                "theme",
-                "performance",
-            )
-        },
+        "scorecard": {dimension: "pass" for dimension in SCORECARD_DIMENSIONS},
+        "grades": {dimension: 4 for dimension in SCORECARD_DIMENSIONS},
         "screening_evidence": {
             dimension: {"timestamp_sec": index + 0.1, "note": "checked"}
-            for index, dimension in enumerate(
-                (
-                    "identity",
-                    "style",
-                    "motion",
-                    "escalation",
-                    "audio",
-                    "subs",
-                    "dead_air",
-                    "rhythm",
-                    "emotion",
-                    "theme",
-                    "performance",
-                )
-            )
+            for index, dimension in enumerate(SCORECARD_DIMENSIONS)
         },
         "fail_reasons": {},
         "reshoot_shots": [],

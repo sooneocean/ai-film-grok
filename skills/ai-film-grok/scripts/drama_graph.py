@@ -420,13 +420,34 @@ def derive_graph(root: Path, *, write: bool = True) -> dict[str, Any]:
                         "assetHints": hints,
                     }
                 )
+            first_shot = group[0] if group else {}
+            first_dsl = first_shot.get("dsl") if isinstance(first_shot.get("dsl"), dict) else {}
+            first_performance = (
+                first_shot.get("performance")
+                if isinstance(first_shot.get("performance"), dict)
+                else {}
+            )
+            visible_change = str(
+                first_shot.get("performance_delta")
+                or first_dsl.get("visible_change")
+                or first_shot.get("visible_change")
+                or ""
+            )
             beats_out.append(
                 {
                     "id": beat_id,
                     "order": bi,
                     "objective": objective,
                     "action": objective,
-                    "outcome": "",
+                    "obstacle": str(first_performance.get("reaction_trigger") or ""),
+                    "tactic": str(
+                        first_performance.get("playable_action")
+                        or first_dsl.get("action")
+                        or objective
+                    ),
+                    "turn": visible_change,
+                    "outcome": visible_change,
+                    "state_delta": visible_change,
                     "emotionalShift": {"from": "", "to": ""},
                     "importance": importance,
                     "targetDuration": beat_dur or None,

@@ -63,9 +63,8 @@ def test_premium_profile_accepts_authored_minimum(tmp_path: Path) -> None:
                                 },
                                 "dsl": {
                                     "camera_axis": "screen_left",
-                                    "shot_size": "close_up",
-                                    "lens_mm": 50,
                                     "lighting": "冷顶光",
+                                    "camera": {"shot_size": "close_up", "lens_mm": 50},
                                 },
                             }
                         ],

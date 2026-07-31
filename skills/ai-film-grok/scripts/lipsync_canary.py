@@ -118,6 +118,8 @@ def run_lipsync_canary(
     out_dir = root / "receipts" / "lipsync-canary"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_mp4 = out_dir / f"{shot_id}-{be}.mp4"
+    # A failed retry must not inherit a playable-looking artifact from an earlier run.
+    out_mp4.unlink(missing_ok=True)
     source_copy = out_dir / f"{shot_id}-original{face.suffix.lower()}"
     if not source_copy.is_file():
         shutil.copy2(face, source_copy)

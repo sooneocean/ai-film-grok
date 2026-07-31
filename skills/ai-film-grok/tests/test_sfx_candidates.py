@@ -12,7 +12,51 @@ import aifilm_grok
 import config_loader
 import pytest
 import sfx_candidates
-from sfx_candidates import SFXCandidateError, approve, attach_to_shot, generate, reject
+from sfx_candidates import (
+    SFXCandidateError,
+    approve,
+    attach_to_shot,
+    batch_generate_and_screen,
+    generate,
+    reject,
+)
+
+
+def test_batch_generates_then_screens_without_approving(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[str] = []
+
+    def fake_generate(_root: Path, **kwargs: object) -> dict[str, object]:
+        calls.append(f"generate:{kwargs['seed']}")
+        return {"asset_id": f"mmaudio-sfx-{kwargs['seed']}-candidate"}
+
+    def fake_screen(_root: Path, asset_id: str) -> dict[str, object]:
+        calls.append(f"screen:{asset_id}")
+        return {
+            "status": "pending_human_review",
+            "asr_speech_screen": {"speech_like_flagged": False},
+        }
+
+    monkeypatch.setattr(sfx_candidates, "generate", fake_generate)
+    monkeypatch.setattr(sfx_candidates, "screen_speech", fake_screen)
+    report = batch_generate_and_screen(
+        tmp_path,
+        [
+            {"prompt": "door", "duration": 2, "seed": 1},
+            {"prompt": "keys", "duration": 2, "seed": 2},
+        ],
+        noncommercial_research_ok=True,
+    )
+
+    assert report["generated_count"] == report["screened_count"] == 2
+    assert report["approval"] == "human_listening_required"
+    assert calls == [
+        "generate:1",
+        "screen:mmaudio-sfx-1-candidate",
+        "generate:2",
+        "screen:mmaudio-sfx-2-candidate",
+    ]
 
 
 def _delivery_wav() -> bytes:

@@ -468,6 +468,21 @@ def assert_pilot_allows_add(
     - Else allow at most PILOT_MAX_SHOTS_WITHOUT_APPROVAL distinct shot_ids (pilot window).
     - force / AIFILM_SKIP_PILOT_GATE=1 → skip (tests / emergency).
     """
+    # A bounded concept pilot may precede its compiled film spec. Once a
+    # strict production contract exists, force cannot bypass its audit.
+    spec = read_json(root / "film-spec.json")
+    if isinstance(spec, dict) and (spec.get("cinematic_audit_strict") is True or force):
+        try:
+            from cinematic_audit import audit
+
+            cinematic = audit(root, require_authored_contract=True)
+        except Exception as exc:  # noqa: BLE001
+            raise ProductionGateError(f"cinematic queue gate unavailable: {exc}") from exc
+        if not cinematic.get("ok"):
+            raise ProductionGateError(
+                "cinematic queue gate: HARD block media-queue add — impact: "
+                + ",".join(cinematic.get("blocking_codes") or ["UNKNOWN"])
+            )
     if force:
         return {"skipped": True, "reason": "force"}
     if env_skip and os.environ.get("AIFILM_SKIP_PILOT_GATE", "").strip() in {"1", "true", "yes"}:

@@ -45,7 +45,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 | 角色/画风定妆 | 反复改 prompt，脸服每镜飘 | **双 master**（style-v1 + cast-v1）+ lookbook，全片同一锚 |
 | 分镜与旁白节奏 | 旁白过长 → 画面 loop 重播、成片无聊 | **Director’s Lens**（文本→故事→storyboard）+ **film-spec + VO 预算门禁** |
 | 批量出图出片 | 记不住哪镜过了、重跑撞墙 | **media-queue** 串行 claim、失败 typed requeue、断点可续 |
-| 一致性验收 | 成片才发现换脸/换服/换模 | **pilot 三镜门禁** + still/clip 注册 + 十一维 scorecard |
+| 一致性验收 | 成片才发现换脸/换服/换模 | **全项目硬性 cinematic-audit**（节拍、表演、对白覆盖、构图、连续性）+ pilot 三镜门禁 + still/clip 注册 + 十六维 scorecard；旧项目同样必须重审与补拍 |
 | 配音混音字幕 | 手搓 TTS、BGM 抢戏、无字幕 | **一键 `final`**：Edge/外部 TTS、R&B 床轨、旁白 duck、PIL 烧字幕 |
 | 60 秒时长对齐 | 短旁白把成片压成 40 秒 | **`duration_sec` 槽位下限**（静音 pad + 画面 hold 满槽） |
 | 色气片踩坑 | BGM 变恐怖、中文声线乱、审核连撞 | 默认 **rnb**、中文 **edge**、moderation 换 soft still 纪律 |
@@ -67,7 +67,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 1. 给参考角色 / 定妆审美；  
 2. 批准 pilot 三镜（说「可以」等）；  
-3. 完整看完成片，十一维 scorecard 签字。
+3. 完整看完成片，十六维 scorecard 签字。
 
 ---
 
@@ -381,11 +381,11 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.25.6`
+- 插件版本：`2.26.0`
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
-- Python 脚本：`279` 个
-- pytest 文件：`309` 个
+- Python 脚本：`280` 个
+- pytest 文件：`310` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

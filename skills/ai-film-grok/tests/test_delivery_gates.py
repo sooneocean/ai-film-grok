@@ -47,16 +47,32 @@ class DeliveryGateTests(unittest.TestCase):
             "scenes": [
                 {
                     "title": "scene",
+                    "director_board": {
+                        "emotional_turn": "平静变成警觉",
+                        "visual_strategy": "人物走向门口，镜头跟随",
+                        "performance_strategy": "步伐与视线同步改变",
+                    },
                     "shots": [
                         {
                             "id": "shot01",
+                            "beat_id": "beat01",
                             "title": "shot",
                             "dramatic_function": "hook",
                             "nar": "这是完整测试旁白。",
+                            "performance_delta": "人物走到门口并停下",
+                            "performance": {
+                                "subtext": "门外有未知声音",
+                                "playable_action": "走向门口",
+                                "reaction_trigger": "听见敲门",
+                            },
                             "dsl": {
                                 "subject": "adult person",
                                 "action": "walks",
                                 "motion": "walk, camera pan, idle",
+                                "visible_change": "人物从房间中央走到门口",
+                                "camera_axis": "pan_with",
+                                "lighting": "neutral interior",
+                                "camera": {"shot_size": "medium", "lens_mm": "35"},
                             },
                         }
                     ],
@@ -180,6 +196,16 @@ class DeliveryGateTests(unittest.TestCase):
             "theme@1.7:theme comes through",
             "--screening-evidence",
             "performance@1.9:acting serves story",
+            "--screening-evidence",
+            "cinematic_coherence@1.9:scene geography and handoffs stay coherent",
+            "--screening-evidence",
+            "coverage_sufficiency@1.9:each dialogue beat retains playable coverage",
+            "--screening-evidence",
+            "performance_truth@1.9:visible performance changes drive the shot",
+            "--screening-evidence",
+            "editorial_rhythm@1.9:cuts land on authored changes",
+            "--screening-evidence",
+            "whole_film_integrity@1.9:the complete film holds together",
         ]
 
     @pytest.mark.slow
@@ -293,6 +319,16 @@ class DeliveryGateTests(unittest.TestCase):
                     "pass",
                     "--score-performance",
                     "pass",
+                    "--score-cinematic-coherence",
+                    "pass",
+                    "--score-coverage-sufficiency",
+                    "pass",
+                    "--score-performance-truth",
+                    "pass",
+                    "--score-editorial-rhythm",
+                    "pass",
+                    "--score-whole-film-integrity",
+                    "pass",
                 ]
             )
         self.assertEqual(missing_evidence_rc, 2)
@@ -331,6 +367,16 @@ class DeliveryGateTests(unittest.TestCase):
                     "--score-theme",
                     "pass",
                     "--score-performance",
+                    "pass",
+                    "--score-cinematic-coherence",
+                    "pass",
+                    "--score-coverage-sufficiency",
+                    "pass",
+                    "--score-performance-truth",
+                    "pass",
+                    "--score-editorial-rhythm",
+                    "pass",
+                    "--score-whole-film-integrity",
                     "pass",
                     *self.screening_args(),
                 ]
@@ -420,6 +466,16 @@ class DeliveryGateTests(unittest.TestCase):
                     "--score-theme",
                     "pass",
                     "--score-performance",
+                    "pass",
+                    "--score-cinematic-coherence",
+                    "pass",
+                    "--score-coverage-sufficiency",
+                    "pass",
+                    "--score-performance-truth",
+                    "pass",
+                    "--score-editorial-rhythm",
+                    "pass",
+                    "--score-whole-film-integrity",
                     "pass",
                     "--reshoot-shots",
                     "shot01",

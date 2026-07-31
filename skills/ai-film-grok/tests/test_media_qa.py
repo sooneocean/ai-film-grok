@@ -177,6 +177,7 @@ class MediaQATests(unittest.TestCase):
         self.assertIn("local_wan22_i2v", ALLOWED_VIDEO_ENDPOINTS)
         self.assertIn("local_infinite_talk", ALLOWED_VIDEO_ENDPOINTS)
         self.assertIn("local_fantasy_talking", ALLOWED_VIDEO_ENDPOINTS)
+        self.assertIn("local_latentsync", ALLOWED_VIDEO_ENDPOINTS)
         self.assertTrue(approved_clip_record(valid))
         for key, value in (
             ("source_endpoint", "unknown"),

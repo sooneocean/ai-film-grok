@@ -195,6 +195,8 @@ def run_weapon(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], Non
             if args.execute:
                 if not args.confirm or args.workflow is None:
                     raise WeaponControlError("canary execution requires --workflow and --confirm")
+                if args.receipt is None:
+                    raise WeaponControlError("canary execution requires --receipt")
                 # Reuse the guarded Comfy submit path; generic workflows cannot bypass armory gates.
                 from argparse import Namespace
 
@@ -212,7 +214,7 @@ def run_weapon(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], Non
                             weapon_id=args.weapon_id,
                             production_stage="pilot",
                             allow_experimental=True,
-                            receipt=None,
+                            receipt=args.receipt.with_name(f"{args.receipt.stem}-guarded.json"),
                         )
                     )
                 if code != 0:

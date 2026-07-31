@@ -274,12 +274,38 @@ def resolve_native_audio_volume(
 
 
 def primary_native_shot_ids(shot_audio: list[dict[str, Any]]) -> list[str]:
-    """Keep legacy stems, but exclude newly measured near-silent native audio."""
+    """Keep usable native ambience, never a stem replaced by rendered TTS."""
     return [
         str(item["id"])
         for item in shot_audio
-        if item.get("native_audio") and item.get("native_audio_audible") is not False
+        if item.get("native_audio")
+        and item.get("native_audio_audible") is not False
+        and not item.get("native_audio_suppressed_for_tts")
     ]
+
+
+def native_dialogue_replaced_by_post_tts(shot: dict[str, Any]) -> bool:
+    """True only when the shot contract proves its native stem contains dialogue.
+
+    Native ambience and foley have no comparable machine-readable speech marker,
+    so they must remain available to the final mix.
+    """
+    contracts = shot.get("dialogue_contracts")
+    if not isinstance(contracts, list):
+        return False
+    for contract in contracts:
+        if not isinstance(contract, dict):
+            continue
+        for line in contract.get("lines") or []:
+            if not isinstance(line, dict) or str(line.get("audio_origin") or "") != "native":
+                continue
+            evidence = line.get("lipsync_evidence")
+            if (
+                isinstance(evidence, dict)
+                and str(evidence.get("method") or "") == "generated_native_audio"
+            ):
+                return True
+    return False
 
 
 def resolve_native_audio_gain(native_record: dict[str, Any] | None) -> float:
@@ -295,7 +321,8 @@ def resolve_native_audio_gain(native_record: dict[str, Any] | None) -> float:
     return max(NATIVE_AUDIO_GAIN_MIN, min(NATIVE_AUDIO_GAIN_MAX, gain))
 
 
-# 混音：I2V 原生声是主视频声；旁白出现时让原生 BGM 与配乐暂避。
+# 混音：TTS 是对白的唯一来源。含已渲染 TTS 的镜头不得再混入 I2V 原生声，
+# 否则音频驱动 I2V 会把同一句话叠播成两个人声。
 # Multi-track mix (旁白 / 娇喘语助 / 原生 clip 音 / BGM 独立增益):
 # - BGM 生成用固定健康 amp（不吃 music_volume，避免「生成压一次 + 混音再压一次」→ 音乐消失）
 # - music_volume 只在 amix 时用；sidechain 说话时让路，停顿时音乐回来
@@ -2725,6 +2752,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             recorded_audible = native_record.get("audible")
             native_audio_audible = recorded_audible if isinstance(recorded_audible, bool) else None
             native_audio_gain = resolve_native_audio_gain(native_record)
+        native_dialogue_replaced = (
+            native_audio is not None and native_dialogue_replaced_by_post_tts(shot)
+        )
         caption_lang = str(
             spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
         )
@@ -2987,7 +3017,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 "tts_backend_lock": shot_tts_backend,
                 "native_audio": native_audio,
                 "native_audio_audible": native_audio_audible,
-                "native_audio_gain": native_audio_gain,
+                # The contract is the evidence that native audio contains
+                # dialogue. Do not sacrifice unlabelled ambience/foley.
+                "native_audio_suppressed_for_tts": native_dialogue_replaced,
+                "native_audio_gain": 0.0 if native_dialogue_replaced else native_audio_gain,
                 "visual_fit": use_fit,
                 "vo_fit": vo_fit if use_fit == "slot" else "n/a",
                 "vo_atempo_plan": vo_atempo_plan,
@@ -4068,10 +4101,20 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "ambience",
     ] + (["vocal_color"] if use_color else [])
     preserved_native_shots = primary_native_shot_ids(shot_audio)
+    suppressed_native_shots = [
+        item["id"] for item in shot_audio if item.get("native_audio_suppressed_for_tts")
+    ]
     mix_spotting["native_audio"] = {
-        "role": "primary_video_sound" if preserved_native_shots else "unavailable",
+        "role": (
+            "primary_video_sound"
+            if preserved_native_shots
+            else "suppressed_for_tts"
+            if suppressed_native_shots
+            else "unavailable"
+        ),
         "volume": native_audio_volume,
         "preserved_shots": preserved_native_shots,
+        "suppressed_for_tts_shots": suppressed_native_shots,
         "gain_plan": {
             item["id"]: item["native_audio_gain"] for item in shot_audio if item.get("native_audio")
         },
@@ -4452,9 +4495,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "path": str(native_track),
             "sha256": sha256(native_track),
             "volume": native_audio_volume,
-            "role": "primary_video_sound" if preserved_native_shots else "unavailable",
+            "role": mix_spotting["native_audio"]["role"],
             "ducked_under_narration": "sidechaincompress" in filters_help,
             "preserved_shots": preserved_native_shots,
+            "suppressed_for_tts_shots": suppressed_native_shots,
         },
         "audio_provenance": {
             "mix_report": str(mix_report_path) if mix_report_path.is_file() else None,

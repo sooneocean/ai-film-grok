@@ -16,7 +16,7 @@ sys.path.insert(0, str(SCRIPTS))
 import render_final  # noqa: E402
 
 
-def test_native_i2v_audio_defaults_to_primary_picture_sound() -> None:
+def test_native_i2v_audio_can_supply_picture_sound_when_no_tts_is_rendered() -> None:
     assert render_final.DEFAULT_NATIVE_AUDIO_VOLUME == 0.72
     assert render_final.DEFAULT_NATIVE_AUDIO_VOLUME > render_final.DEFAULT_MUSIC_VOLUME
 
@@ -32,14 +32,47 @@ def test_cli_native_audio_volume_overrides_voice_track_policy() -> None:
     )
 
 
-def test_primary_native_audio_excludes_measured_near_silence_but_keeps_legacy_stems() -> None:
+def test_primary_native_audio_excludes_silence_and_tts_replaced_stems() -> None:
     assert render_final.primary_native_shot_ids(
         [
             {"id": "shot01", "native_audio": Path("audible.m4a"), "native_audio_audible": True},
             {"id": "shot02", "native_audio": Path("silent.m4a"), "native_audio_audible": False},
             {"id": "shot03", "native_audio": Path("legacy.m4a")},
+            {
+                "id": "shot04",
+                "native_audio": Path("spoken-native.m4a"),
+                "native_audio_audible": True,
+                "native_audio_suppressed_for_tts": True,
+            },
         ]
     ) == ["shot01", "shot03"]
+
+
+def test_only_contract_proven_native_dialogue_is_replaced_by_post_tts() -> None:
+    native_dialogue = {
+        "dialogue_contracts": [
+            {
+                "lines": [
+                    {
+                        "audio_origin": "native",
+                        "lipsync_evidence": {"method": "generated_native_audio"},
+                    }
+                ]
+            }
+        ]
+    }
+    assert render_final.native_dialogue_replaced_by_post_tts(native_dialogue) is True
+    assert render_final.native_dialogue_replaced_by_post_tts({"dialogue_contracts": []}) is False
+    assert (
+        render_final.native_dialogue_replaced_by_post_tts(
+            {
+                "dialogue_contracts": [
+                    {"lines": [{"audio_origin": "post_vo", "lipsync_evidence": {}}]}
+                ]
+            }
+        )
+        is False
+    )
 
 
 def test_native_audio_gain_normalizes_audible_stems_without_amplifying_silence() -> None:

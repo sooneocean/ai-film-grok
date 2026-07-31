@@ -41,13 +41,30 @@ def _first(mapping: dict[str, Any], *keys: str) -> Any:
     return None
 
 
-def validate_premium_vertical(root: Path | str) -> dict[str, Any]:
+def _beats_from_graph(graph: dict[str, Any]) -> list[dict[str, Any]]:
+    """Read both the compact contract view and the canonical episode graph."""
+    direct = graph.get("beats") or graph.get("beat_nodes")
+    if isinstance(direct, list):
+        return [beat for beat in direct if isinstance(beat, dict)]
+    beats: list[dict[str, Any]] = []
+    for episode in graph.get("episodes") or []:
+        if not isinstance(episode, dict):
+            continue
+        for scene in episode.get("scenes") or []:
+            if isinstance(scene, dict):
+                beats.extend(beat for beat in scene.get("beats") or [] if isinstance(beat, dict))
+    return beats
+
+
+def validate_premium_vertical(
+    root: Path | str, *, graph: dict[str, Any] | None = None, spec: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Validate authored intent without inventing content or human approval."""
 
     base = Path(root).expanduser().resolve()
     errors: list[dict[str, str]] = []
-    graph = read_json(base / "drama-graph.json") or {}
-    spec = read_json(base / "film-spec.json") or {}
+    graph = graph if graph is not None else read_json(base / "drama-graph.json") or {}
+    spec = spec if spec is not None else read_json(base / "film-spec.json") or {}
     if not isinstance(graph, dict):
         errors.append(_issue("GRAPH_MISSING", "drama-graph.json is not an object", "graph"))
         graph = {}
@@ -55,8 +72,8 @@ def validate_premium_vertical(root: Path | str) -> dict[str, Any]:
         errors.append(_issue("SPEC_MISSING", "film-spec.json is not an object", "spec"))
         spec = {}
 
-    beats = graph.get("beats") or graph.get("beat_nodes") or []
-    if not isinstance(beats, list) or not beats:
+    beats = _beats_from_graph(graph)
+    if not beats:
         errors.append(_issue("BEATS_MISSING", "authored beats are required", "beats"))
     else:
         for index, beat in enumerate(beats):
@@ -97,8 +114,10 @@ def validate_premium_vertical(root: Path | str) -> dict[str, Any]:
                     )
                 )
         dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+        camera = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
         for field in ("camera_axis", "shot_size", "lens_mm", "lighting"):
-            if not _authored(dsl.get(field)):
+            value = camera.get(field) if field in {"shot_size", "lens_mm"} else dsl.get(field)
+            if not _authored(value):
                 errors.append(
                     _issue("SHOT_CRAFT_MISSING", f"{field} must be authored", f"{ref}.dsl.{field}")
                 )

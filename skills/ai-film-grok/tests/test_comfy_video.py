@@ -42,6 +42,15 @@ from comfy_video import (  # noqa: E402
 
 
 class ComfyVideoTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._driver_vram_fallback = os.environ.pop("AIFILM_COMFY_DRIVER_VRAM_FALLBACK", None)
+
+    def tearDown(self) -> None:
+        if self._driver_vram_fallback is None:
+            os.environ.pop("AIFILM_COMFY_DRIVER_VRAM_FALLBACK", None)
+        else:
+            os.environ["AIFILM_COMFY_DRIVER_VRAM_FALLBACK"] = self._driver_vram_fallback
+
     def test_armory_auto_routes_general_i2v_to_official_quality(self) -> None:
         selection = select_wan22_weapon(intent="general", stage="production")
         self.assertEqual(selection["profile"]["name"], "official")
@@ -514,6 +523,190 @@ class ComfyVideoTests(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertEqual(report["status"], "ready")
         self.assertEqual(report["blockers"], [])
+
+    @patch.dict(
+        os.environ,
+        {
+            "AIFILM_COMFY_DRIVER_VRAM_FALLBACK": "1",
+            "AIFILM_COMFY_SSH_TARGET": "user@private-node",
+            "AIFILM_COMFY_SSH_KEY": "/tmp/private-key",
+            "AIFILM_COMFY_SSH_KNOWN_HOSTS": "/tmp/known-hosts",
+            "AIFILM_COMFY_SSH_HOSTKEY_ALIAS": "private-node",
+            "AIFILM_COMFY_SSH_EXPECTED_HOSTNAME": "private-node",
+        },
+        clear=False,
+    )
+    @patch("comfy_video.subprocess.run")
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_uses_authenticated_driver_vram_when_comfy_is_stale(
+        self,
+        request: MagicMock,
+        run: MagicMock,
+    ) -> None:
+        request.side_effect = [
+            {
+                "system": {"ram_free": 16 * 1024**3},
+                "devices": [
+                    {
+                        "name": "RTX 5090",
+                        "type": "cuda",
+                        "vram_total": 32 * 1024**3,
+                        "vram_free": 20 * 1024**3,
+                    }
+                ],
+            },
+            {"queue_running": [], "queue_pending": []},
+        ]
+        run.side_effect = [
+            MagicMock(returncode=0, stdout="123\n"),
+            MagicMock(
+                returncode=0,
+                stdout=(
+                    "ssh -fN -o HostKeyAlias=private-node "
+                    "-L 127.0.0.1:18188:127.0.0.1:8188 user@private-node\n"
+                ),
+            ),
+            MagicMock(
+                returncode=0,
+                stdout=(
+                    '{"hostname":"private-node","comfy_version":"","python_version":"",'
+                    '"gpu_name":"NVIDIA GeForce RTX 5090","gpu_total":34359738368,'
+                    '"gpu_free_mib":"31320"}\n'
+                ),
+            ),
+        ]
+
+        report = submission_capacity("http://127.0.0.1:18188")
+
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["observed"]["device"]["vram_source"], "nvidia-smi-via-ssh")
+        self.assertEqual(report["observed"]["device"]["comfy_vram_free_bytes"], 20 * 1024**3)
+        self.assertEqual(report["observed"]["device"]["driver_vram_free_bytes"], 31320 * 1024**2)
+
+    @patch.dict(
+        os.environ,
+        {
+            "AIFILM_COMFY_DRIVER_VRAM_FALLBACK": "1",
+            "AIFILM_COMFY_SSH_TARGET": "user@private-node",
+            "AIFILM_COMFY_SSH_KEY": "/tmp/private-key",
+            "AIFILM_COMFY_SSH_KNOWN_HOSTS": "/tmp/known-hosts",
+            "AIFILM_COMFY_SSH_HOSTKEY_ALIAS": "private-node",
+            "AIFILM_COMFY_SSH_EXPECTED_HOSTNAME": "private-node",
+        },
+        clear=False,
+    )
+    @patch("comfy_video.subprocess.run")
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_fails_closed_when_enabled_driver_probe_fails(
+        self,
+        request: MagicMock,
+        run: MagicMock,
+    ) -> None:
+        request.side_effect = [
+            {
+                "system": {"ram_free": 16 * 1024**3},
+                "devices": [{"name": "RTX 5090", "type": "cuda", "vram_free": 28 * 1024**3}],
+            },
+            {"queue_running": [], "queue_pending": []},
+        ]
+        run.side_effect = [
+            MagicMock(returncode=0, stdout="123\n"),
+            MagicMock(
+                returncode=0,
+                stdout=(
+                    "ssh -fN -o HostKeyAlias=private-node "
+                    "-L 127.0.0.1:18188:127.0.0.1:8188 user@private-node\n"
+                ),
+            ),
+            MagicMock(returncode=1, stdout=""),
+        ]
+
+        report = submission_capacity("http://127.0.0.1:18188")
+
+        self.assertFalse(report["ok"])
+        self.assertIn("RESOURCE_METRICS_UNAVAILABLE", str(report["blockers"]))
+        self.assertEqual(report["observed"]["device"]["vram_source"], "comfyui")
+
+    @patch.dict(
+        os.environ,
+        {
+            "AIFILM_COMFY_DRIVER_VRAM_FALLBACK": "1",
+            "AIFILM_COMFY_SSH_TARGET": "user@private-node",
+            "AIFILM_COMFY_SSH_KEY": "/tmp/private-key",
+            "AIFILM_COMFY_SSH_KNOWN_HOSTS": "/tmp/known-hosts",
+            "AIFILM_COMFY_SSH_HOSTKEY_ALIAS": "private-node",
+            "AIFILM_COMFY_SSH_EXPECTED_HOSTNAME": "private-node",
+        },
+        clear=False,
+    )
+    @patch("comfy_video.subprocess.run")
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_rejects_non_tunnel_base_url(
+        self, request: MagicMock, run: MagicMock
+    ) -> None:
+        request.side_effect = [
+            {
+                "system": {"ram_free": 16 * 1024**3},
+                "devices": [
+                    {
+                        "name": "RTX 5090",
+                        "type": "cuda",
+                        "vram_total": 32 * 1024**3,
+                        "vram_free": 28 * 1024**3,
+                    }
+                ],
+            },
+            {"queue_running": [], "queue_pending": []},
+        ]
+        report = submission_capacity("https://192.168.88.52:8188")
+        self.assertFalse(report["ok"])
+        self.assertIn("loopback SSH tunnel", str(report["blockers"]))
+        run.assert_not_called()
+
+    @patch.dict(
+        os.environ,
+        {
+            "AIFILM_COMFY_DRIVER_VRAM_FALLBACK": "1",
+            "AIFILM_COMFY_SSH_TARGET": "user@private-node",
+            "AIFILM_COMFY_SSH_KEY": "/tmp/private-key",
+            "AIFILM_COMFY_SSH_KNOWN_HOSTS": "/tmp/known-hosts",
+            "AIFILM_COMFY_SSH_HOSTKEY_ALIAS": "private-node",
+            "AIFILM_COMFY_SSH_EXPECTED_HOSTNAME": "private-node",
+        },
+        clear=False,
+    )
+    @patch("comfy_video.subprocess.run")
+    @patch("comfy_video._json_request")
+    def test_submission_capacity_rejects_tunnel_with_lookalike_ssh_identity(
+        self, request: MagicMock, run: MagicMock
+    ) -> None:
+        request.side_effect = [
+            {
+                "system": {"ram_free": 16 * 1024**3},
+                "devices": [
+                    {
+                        "name": "RTX 5090",
+                        "type": "cuda",
+                        "vram_total": 32 * 1024**3,
+                        "vram_free": 28 * 1024**3,
+                    }
+                ],
+            },
+            {"queue_running": [], "queue_pending": []},
+        ]
+        run.side_effect = [
+            MagicMock(returncode=0, stdout="123\n"),
+            MagicMock(
+                returncode=0,
+                stdout=(
+                    "ssh -fN -o HostKeyAlias=private-node-evil "
+                    "-L 127.0.0.1:18188:127.0.0.1:8188 user@private-node-evil\n"
+                ),
+            ),
+        ]
+        report = submission_capacity("http://127.0.0.1:18188")
+        self.assertFalse(report["ok"])
+        self.assertIn("not the authenticated SSH tunnel", str(report["blockers"]))
 
     @patch("comfy_video._json_request")
     def test_submission_capacity_fails_closed_on_pressure_and_busy_queue(

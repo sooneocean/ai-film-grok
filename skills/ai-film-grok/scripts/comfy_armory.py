@@ -63,6 +63,7 @@ def _select_candidates(
     quality: str,
     identity_lock: bool,
     ready_ids: set[str] | None,
+    stage: str,
     allow_experimental: bool,
 ) -> list[dict[str, Any]]:
     candidates = []
@@ -71,7 +72,12 @@ def _select_candidates(
         is_experimental = status == "experimental"
         if status not in _VERIFIED_STATUSES and not (is_experimental and allow_experimental):
             continue
-        if (weapon.get("verified") or {}).get("real_pilot") is not True:
+        if is_experimental and stage != "pilot":
+            continue
+        is_authorized_first_pilot = is_experimental and stage == "pilot" and allow_experimental
+        if (weapon.get("verified") or {}).get(
+            "real_pilot"
+        ) is not True and not is_authorized_first_pilot:
             continue
         if operation not in weapon.get("intents", []):
             continue
@@ -125,6 +131,7 @@ def select_weapon(
         quality=quality,
         identity_lock=identity_lock,
         ready_ids=ready_ids,
+        stage=normalized_stage,
         allow_experimental=allow_experimental,
     )
     if not candidates:
@@ -156,6 +163,20 @@ def _weapon(weapon_id: str) -> dict[str, Any]:
     if weapon is None:
         raise ComfyArmoryError(f"unknown verified weapon: {weapon_id}")
     return weapon
+
+
+def _enforce_prompt_contract(weapon: Mapping[str, Any], prompt: str) -> None:
+    """Reject declared pilot exclusions before a workflow can reach the node."""
+    forbidden = weapon.get("prompt_forbidden_patterns") or []
+    if not isinstance(forbidden, list):
+        raise ComfyArmoryError("weapon prompt contract must be a list")
+    for pattern in forbidden:
+        if not isinstance(pattern, str) or not pattern:
+            raise ComfyArmoryError("weapon prompt contract contains an invalid pattern")
+        if re.search(pattern, prompt, flags=re.IGNORECASE):
+            raise ComfyArmoryError(
+                f"prompt violates the declared pilot contract for weapon: {weapon['id']}"
+            )
 
 
 def authorize_weapon_execution(
@@ -402,6 +423,7 @@ def compile_weapon_workflow(
     if not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed < 2**64:
         raise ComfyArmoryError("seed must be an integer from 0 through 2^64-1")
     weapon = _weapon(weapon_id)
+    _enforce_prompt_contract(weapon, str(prompt))
     filename_prefix = _validate_relative_media_name(filename_prefix, label="filename prefix")
     if not weapon.get("workflow_template"):
         raise ComfyArmoryError(

@@ -17,6 +17,8 @@ import mimetypes
 import os
 import re
 import secrets
+import shlex
+import subprocess
 import tempfile
 import time
 import unicodedata
@@ -47,6 +49,7 @@ GIB = 1024**3
 DEFAULT_MIN_FREE_RAM_BYTES = 12 * GIB
 DEFAULT_MIN_FREE_VRAM_BYTES = 24 * GIB
 _SUBMISSION_LOCK_WAIT_SEC = 5.0
+_SSH_TARGET = re.compile(r"^[A-Za-z0-9_.\\-]+@[A-Za-z0-9.:-]+$")
 
 
 WAN22_OFFICIAL_PROFILE: dict[str, Any] = {
@@ -562,6 +565,139 @@ def queue_status(base_url: str) -> dict[str, Any]:
     }
 
 
+def _driver_vram_probe(
+    *,
+    base_url: str,
+    expected_hostname: str,
+    expected_comfy_version: str,
+    expected_python_version: str,
+    expected_device_name: str,
+    expected_vram_total: int | None,
+) -> tuple[int | None, str | None]:
+    """Read the configured private executor's physical free VRAM, if available."""
+    # Configuration loading belongs to the CLI boundary. Re-loading config.env
+    # here would mutate a caller's environment and make capacity checks depend
+    # on unrelated local state (including test fixtures).
+    if str(os.environ.get("AIFILM_COMFY_DRIVER_VRAM_FALLBACK") or "").strip() != "1":
+        return None, None
+    target = str(os.environ.get("AIFILM_COMFY_SSH_TARGET") or "").strip()
+    key = str(os.environ.get("AIFILM_COMFY_SSH_KEY") or "").strip()
+    known_hosts = str(os.environ.get("AIFILM_COMFY_SSH_KNOWN_HOSTS") or "").strip()
+    hostkey_alias = str(os.environ.get("AIFILM_COMFY_SSH_HOSTKEY_ALIAS") or "").strip()
+    if not all((target, key, known_hosts, hostkey_alias, expected_hostname)):
+        return None, "driver VRAM fallback is enabled but SSH configuration is incomplete"
+    if not _SSH_TARGET.fullmatch(target):
+        return None, "driver VRAM fallback SSH target is invalid"
+    parsed_base_url = urllib.parse.urlsplit(normalize_base_url(base_url))
+    if parsed_base_url.scheme != "http" or parsed_base_url.hostname != "127.0.0.1":
+        return None, "driver VRAM fallback requires a loopback SSH tunnel endpoint"
+    local_port = parsed_base_url.port
+    if local_port is None:
+        return None, "driver VRAM fallback requires an explicit loopback SSH tunnel port"
+    try:
+        listener = subprocess.run(
+            ["lsof", "-nP", f"-iTCP:{local_port}", "-sTCP:LISTEN", "-t"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        listener_pids = [line.strip() for line in listener.stdout.splitlines() if line.strip()]
+        if listener.returncode != 0 or len(listener_pids) != 1 or not listener_pids[0].isdigit():
+            return None, "driver VRAM fallback cannot verify the loopback SSH tunnel listener"
+        tunnel = subprocess.run(
+            ["ps", "-p", listener_pids[0], "-o", "command="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None, "driver VRAM fallback cannot inspect the loopback SSH tunnel"
+    forward = f"127.0.0.1:{local_port}:127.0.0.1:8188"
+    try:
+        # Windows user targets legitimately contain a backslash.  POSIX shlex
+        # would consume it and turn the destination comparison into a false
+        # mismatch, so preserve the listener process's argv spelling.
+        tunnel_argv = shlex.split(tunnel.stdout.strip(), posix=False)
+    except ValueError:
+        tunnel_argv = []
+    has_forward = any(
+        token == forward and index > 0 and tunnel_argv[index - 1] in {"-L", "-oLocalForward"}
+        for index, token in enumerate(tunnel_argv)
+    )
+    has_hostkey_alias = (
+        any(
+            token == f"HostKeyAlias={hostkey_alias}"
+            and index > 0
+            and tunnel_argv[index - 1] == "-o"
+            for index, token in enumerate(tunnel_argv)
+        )
+        or f"-oHostKeyAlias={hostkey_alias}" in tunnel_argv
+    )
+    if (
+        tunnel.returncode != 0
+        or not tunnel_argv
+        or tunnel_argv[0] != "ssh"
+        or not has_forward
+        or tunnel_argv[-1] != target
+        or not has_hostkey_alias
+    ):
+        return None, "driver VRAM fallback loopback endpoint is not the authenticated SSH tunnel"
+    command = [
+        "ssh",
+        "-i",
+        key,
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "StrictHostKeyChecking=yes",
+        "-o",
+        f"UserKnownHostsFile={known_hosts}",
+        "-o",
+        f"HostKeyAlias={hostkey_alias}",
+        "--",
+        target,
+        (
+            'powershell -NoProfile -Command "'
+            "$stats=Invoke-RestMethod http://127.0.0.1:8188/system_stats; "
+            "$gpu=@($stats.devices | Where-Object {$_.type -eq 'cuda'}); "
+            "if($gpu.Count -ne 1){exit 2}; "
+            "$free=(& nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits).Trim(); "
+            "[PSCustomObject]@{hostname=$env:COMPUTERNAME; "
+            "comfy_version=$stats.system.comfyui_version; python_version=$stats.system.python_version; "
+            'gpu_name=$gpu[0].name; gpu_total=$gpu[0].vram_total; gpu_free_mib=$free}|ConvertTo-Json -Compress"'
+        ),
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None, "driver VRAM fallback SSH probe failed"
+    values = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if result.returncode != 0 or len(values) != 1:
+        return None, "driver VRAM fallback SSH probe returned invalid data"
+    try:
+        identity = json.loads(values[0])
+    except ValueError:
+        return None, "driver VRAM fallback SSH probe returned invalid data"
+    if not isinstance(identity, dict):
+        return None, "driver VRAM fallback SSH probe returned invalid data"
+    driver_name = str(identity.get("gpu_name") or "")
+    raw_mib = str(identity.get("gpu_free_mib") or "")
+    if (
+        str(identity.get("hostname") or "").casefold() != expected_hostname.casefold()
+        or str(identity.get("comfy_version") or "") != expected_comfy_version
+        or str(identity.get("python_version") or "") != expected_python_version
+        or identity.get("gpu_total") != expected_vram_total
+    ):
+        return None, "driver VRAM fallback executor does not match the ComfyUI endpoint"
+    if not raw_mib.isdigit() or "rtx5090" not in re.sub(r"[^a-z0-9]", "", driver_name.lower()):
+        return None, "driver VRAM fallback GPU identity is invalid"
+    if "rtx5090" not in re.sub(r"[^a-z0-9]", "", expected_device_name.lower()):
+        return None, "ComfyUI CUDA device does not match the configured driver GPU"
+    return int(raw_mib) * 1024**2, None
+
+
 def submission_capacity(base_url: str) -> dict[str, Any]:
     system = _json_request(base_url, "/system_stats")
     queue = queue_status(base_url)
@@ -583,7 +719,20 @@ def submission_capacity(base_url: str) -> dict[str, Any]:
     ]
     selected_device = cuda_devices[0] if len(cuda_devices) == 1 else None
     reported_vram = selected_device.get("vram_free") if selected_device else None
-    vram_free = reported_vram if type(reported_vram) is int and reported_vram >= 0 else None
+    comfy_vram_free = reported_vram if type(reported_vram) is int and reported_vram >= 0 else None
+    driver_vram_free, driver_vram_error = (
+        _driver_vram_probe(
+            base_url=base_url,
+            expected_hostname=str(os.environ.get("AIFILM_COMFY_SSH_EXPECTED_HOSTNAME") or ""),
+            expected_comfy_version=str((system_info or {}).get("comfyui_version") or ""),
+            expected_python_version=str((system_info or {}).get("python_version") or ""),
+            expected_device_name=str(selected_device.get("name") or ""),
+            expected_vram_total=selected_device.get("vram_total"),
+        )
+        if selected_device
+        else (None, None)
+    )
+    vram_free = driver_vram_free if driver_vram_free is not None else comfy_vram_free
     blockers: list[dict[str, str]] = []
     if type(ram_free) is not int or ram_free < 0:
         blockers.append(
@@ -616,6 +765,13 @@ def submission_capacity(base_url: str) -> dict[str, Any]:
                 "message": "free GPU memory is below the 24 GiB submission floor",
             }
         )
+    if driver_vram_error:
+        blockers.append(
+            {
+                "code": "RESOURCE_METRICS_UNAVAILABLE",
+                "message": driver_vram_error,
+            }
+        )
     if queue["running"] or queue["pending"]:
         blockers.append(
             {
@@ -640,6 +796,10 @@ def submission_capacity(base_url: str) -> dict[str, Any]:
                 "name": selected_device.get("name"),
                 "vram_total_bytes": selected_device.get("vram_total"),
                 "vram_free_bytes": vram_free,
+                "comfy_vram_free_bytes": comfy_vram_free,
+                "driver_vram_free_bytes": driver_vram_free,
+                "driver_vram_probe_error": driver_vram_error,
+                "vram_source": "nvidia-smi-via-ssh" if driver_vram_free is not None else "comfyui",
             }
             if selected_device
             else None,

@@ -708,3 +708,59 @@ def generate(
             receipt_name=receipt.name,
         )
     return {**record, "receipt": str(receipt)}
+
+
+def batch_generate_and_screen(
+    root: Path,
+    candidates: list[dict[str, Any]],
+    *,
+    noncommercial_research_ok: bool,
+) -> dict[str, Any]:
+    """Generate a bounded SFX batch and attach ASR signals, never approve it."""
+    if not 1 <= len(candidates) <= 24:
+        raise SFXCandidateError("SFX batch must contain 1-24 candidates")
+    seen_seeds: set[int] = set()
+    results: list[dict[str, Any]] = []
+    for index, item in enumerate(candidates):
+        if not isinstance(item, dict):
+            raise SFXCandidateError(f"SFX batch item {index} is invalid")
+        seed = item.get("seed")
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed in seen_seeds:
+            raise SFXCandidateError("SFX batch seeds must be unique integers")
+        seen_seeds.add(seed)
+        generated = generate(
+            root,
+            prompt=str(item.get("prompt") or ""),
+            duration=float(item.get("duration") or 0),
+            seed=seed,
+            source_video=Path(str(item["video"])).expanduser() if item.get("video") else None,
+            noncommercial_research_ok=noncommercial_research_ok,
+        )
+        asset_id = str(generated["asset_id"])
+        try:
+            screened = screen_speech(root, asset_id)
+            results.append(
+                {
+                    "asset_id": asset_id,
+                    "status": screened["status"],
+                    "speech_like_flagged": screened["asr_speech_screen"]["speech_like_flagged"],
+                    "human_review_required": True,
+                }
+            )
+        except SFXCandidateError as exc:
+            results.append(
+                {
+                    "asset_id": asset_id,
+                    "status": "pending_asr_screen",
+                    "asr_error": str(exc),
+                    "human_review_required": True,
+                }
+            )
+    return {
+        "schema": "aifilm-sfx-batch-v1",
+        "status": "pending_human_review",
+        "generated_count": len(results),
+        "screened_count": sum("speech_like_flagged" in result for result in results),
+        "results": results,
+        "approval": "human_listening_required",
+    }

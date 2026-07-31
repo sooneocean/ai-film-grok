@@ -63,6 +63,7 @@ def test_pilot_template_hashes_are_registry_bound() -> None:
         "hunyuan15-720p-i2v-sr-pilot",
         "ace-step15-xl-rnb-pilot",
         "ltx23-native-i2v-pilot",
+        "ltx23-distilled-fp8-fast-broll-pilot",
     ):
         weapon = by_id[weapon_id]
         graph = json.loads((root / weapon["workflow_template"]).read_text(encoding="utf-8"))
@@ -88,6 +89,52 @@ def test_wan_quality_template_decodes_the_completed_low_noise_pass() -> None:
     assert graph["ks_h"]["inputs"]["latent_image"] == ["i2v", 2]
     assert graph["ks_l"]["inputs"]["latent_image"] == ["ks_h", 0]
     assert graph["decode"]["inputs"]["samples"] == ["ks_l", 0]
+
+
+def test_wan_portrait_pilot_preserves_a_portrait_latent_canvas() -> None:
+    root = Path(__file__).resolve().parents[1]
+    graph = json.loads(
+        (root / "templates/comfy/wan22-i2v-portrait-pilot-api.json").read_text(encoding="utf-8")
+    )
+    weapon = next(
+        item for item in load_armory()["weapons"] if item["id"] == "wan22-i2v-portrait-pilot"
+    )
+
+    assert graph["i2v"]["inputs"]["width"] == weapon["defaults"]["width"] == 576
+    assert graph["i2v"]["inputs"]["height"] == weapon["defaults"]["height"] == 1024
+    assert graph["i2v"]["inputs"]["height"] > graph["i2v"]["inputs"]["width"]
+    assert workflow_sha256(graph) == weapon["verified"]["workflow_template_sha256"]
+    assert weapon["requirements"]["clip_vision"] == ["clip_vision_h.safetensors"]
+    assert weapon["requirements"]["loras"] == [
+        "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+        "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+    ]
+
+
+@patch("comfy_armory._json_request")
+def test_portrait_wan_probe_fails_closed_when_template_lora_is_missing(
+    request: MagicMock,
+) -> None:
+    request.side_effect = lambda _url, route: {
+        "/models/checkpoints": [],
+        "/models/diffusion_models": [
+            "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+            "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+        ],
+        "/models/text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+        "/models/vae": ["wan_2.1_vae.safetensors"],
+        "/models/clip_vision": ["clip_vision_h.safetensors"],
+        "/models/loras": ["wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"],
+        "/models/latent_upscale_models": [],
+    }[route]
+
+    report = probe_armory("https://192.168.88.52:8188")
+    blocked = {item["id"]: item for item in report["blocked"]}
+
+    assert "wan22-i2v-portrait-pilot" in blocked
+    assert blocked["wan22-i2v-portrait-pilot"]["missing"] == {
+        "loras": ["wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"]
+    }
 
 
 @patch.dict(
@@ -121,6 +168,34 @@ def test_identity_preserving_edit_routes_to_qwen_edit_2511() -> None:
 def test_unavailable_layered_intent_fails_closed() -> None:
     with pytest.raises(ComfyArmoryError, match="no verified weapon"):
         select_weapon("layered-image")
+
+
+def test_explicit_experimental_pilot_can_compile_its_first_canary() -> None:
+    route = select_weapon(
+        "image-to-video",
+        quality="max_practical",
+        stage="pilot",
+        allow_experimental=True,
+    )
+
+    assert route["weapon"]["id"] == "wan22-i2v-portrait-pilot"
+    assert route["weapon"]["verified"]["real_pilot"] is False
+
+
+def test_unattested_experimental_weapon_cannot_route_without_pilot_opt_in() -> None:
+    route = select_weapon("image-to-video", quality="max_practical", stage="pilot")
+
+    assert route["weapon"]["id"] == "wan22-i2v-quality"
+
+
+def test_experimental_weapon_cannot_route_in_production() -> None:
+    with pytest.raises(ComfyArmoryError, match="no verified weapon"):
+        select_weapon(
+            "short-shot-i2v-sr-pilot",
+            quality="max_practical",
+            stage="production",
+            allow_experimental=True,
+        )
 
 
 def test_unverified_high_priority_candidate_cannot_enter_armory() -> None:
@@ -376,6 +451,41 @@ def test_compile_ltx23_native_pilot_binds_image_prompt_and_seed() -> None:
     assert graph["save"]["inputs"]["filename_prefix"] == "aifilm/evaluation/ltx23-native"
 
 
+def test_compile_ltx23_distilled_fp8_broll_pilot_binds_an_empty_scene_contract() -> None:
+    graph = compile_weapon_workflow(
+        "ltx23-distilled-fp8-fast-broll-pilot",
+        prompt="An empty rain-soaked alley; ambient rain only, no people or speech.",
+        seed=2026073101,
+        input_image_name="approved/empty-alley.png",
+        filename_prefix="aifilm/evaluation/ltx23-distilled-fp8",
+    )
+
+    assert graph["316"]["inputs"]["ckpt_name"] == "ltx-2.3-22b-distilled-fp8.safetensors"
+    assert graph["source"]["inputs"]["image"] == "approved/empty-alley.png"
+    assert graph["303"]["inputs"]["text"].startswith("An empty rain-soaked alley")
+    assert graph["277"]["inputs"]["noise_seed"] == 2026073101
+    assert graph["save"]["inputs"]["filename_prefix"] == "aifilm/evaluation/ltx23-distilled-fp8"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "Two people have a dialogue in a continuous dramatic scene.",
+        "A character speaks to camera with narration.",
+    ],
+)
+def test_compile_ltx23_distilled_fp8_broll_rejects_dialogue_and_character_prompting(
+    prompt: str,
+) -> None:
+    with pytest.raises(ComfyArmoryError, match="declared pilot contract"):
+        compile_weapon_workflow(
+            "ltx23-distilled-fp8-fast-broll-pilot",
+            prompt=prompt,
+            seed=1,
+            input_image_name="approved/empty-alley.png",
+        )
+
+
 def test_compile_infinite_talk_binds_image_audio_prompt_seed_and_stable_scale() -> None:
     weapon = next(
         item for item in load_armory()["weapons"] if item["id"] == "infinite-talk-stable-pilot"
@@ -599,6 +709,7 @@ def test_live_probe_marks_only_fully_installed_weapons_ready(
     }
     assert {item["id"] for item in report["blocked"]} == {
         "wan22-i2v-quality",
+        "wan22-i2v-portrait-pilot",
         "wan22-adult-intimacy-baseline",
         "wan22-adult-meat-pilot",
         "infinite-talk-stable-pilot",
@@ -606,6 +717,7 @@ def test_live_probe_marks_only_fully_installed_weapons_ready(
         "hunyuan15-720p-i2v-sr-pilot",
         "ace-step15-xl-rnb-pilot",
         "ltx23-native-i2v-pilot",
+        "ltx23-distilled-fp8-fast-broll-pilot",
     }
 
 

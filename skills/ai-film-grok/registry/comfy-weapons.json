@@ -186,6 +186,31 @@
   }
     },
     {
+      "id": "wan22-i2v-portrait-pilot",
+      "display_name": "Wan 2.2 I2V portrait-canvas pilot",
+      "status": "experimental",
+      "priority": 101,
+      "provider": "comfy-wan22",
+      "node": "rtx5090-main",
+      "intents": ["image-to-video", "i2v", "general-i2v"],
+      "quality_tiers": ["max_practical", "standard"],
+      "profile": "portrait-canvas-pilot",
+      "workflow_template": "templates/comfy/wan22-i2v-portrait-pilot-api.json",
+      "bindings": {"prompt_node":"pos","prompt_input":"text","sampler_node":"ks_h","seed_input":"noise_seed","additional_seed_nodes":["ks_l"],"steps_node":"ks_h","steps_input":"steps","additional_steps_nodes":["ks_l"],"input_node":"img","input_image_input":"image","save_node":"save","filename_prefix_input":"filename_prefix"},
+      "defaults": {"width":576,"height":1024,"steps":20,"length":81,"fps":16},
+      "tuning": {"steps":{"allowed":[20]}},
+      "trusted_custom_nodes": {"VHS_VideoCombine":"custom_nodes.comfyui-videohelpersuite"},
+      "requirements": {
+        "diffusion_models": ["wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"],
+        "text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+        "vae": ["wan_2.1_vae.safetensors"],
+        "clip_vision": ["clip_vision_h.safetensors"],
+        "loras": ["wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors", "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"]
+      },
+      "capabilities": {"general_i2v":true,"portrait_canvas":true,"pilot_only":true,"human_approval_required":true,"external_api_required":false},
+      "verified": {"real_pilot":false,"production_promoted":false,"workflow_template_sha256":"db8b1794b4d07f334c534a4da01f41a238c5d0eb875244fc8ad807e79e463562","human_review":false}
+    },
+    {
       "id": "wan22-adult-intimacy-baseline",
       "display_name": "Wan 2.2 attested adult intimacy baseline",
       "status": "verified-baseline",
@@ -691,6 +716,65 @@
         "independent_verifier": "ACCEPT_TECHNICAL_PILOT_ONLY",
         "human_review": false
       }
+    },
+    {
+      "id": "ltx23-distilled-fp8-fast-broll-pilot",
+      "display_name": "LTX-2.3 distilled FP8 fast B-roll pilot",
+      "status": "experimental",
+      "priority": 64,
+      "readiness": "installed_unverified",
+      "provider": "comfy_lan",
+      "source_endpoint": "local_ltx23_distilled_fp8_i2v",
+      "node": "rtx5090-main",
+      "intents": ["fast-broll-i2v"],
+      "quality_tiers": ["standard"],
+      "workflow_template": "templates/comfy/ltx23-distilled-fp8-fast-broll-i2v-pilot-api.json",
+      "bindings": {
+        "prompt_node": "303",
+        "prompt_input": "text",
+        "input_node": "source",
+        "input_image_input": "image",
+        "sampler_node": "277",
+        "seed_input": "noise_seed",
+        "save_node": "save",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "requirements": {
+        "checkpoints": ["ltx-2.3-22b-distilled-fp8.safetensors"],
+        "loras": ["ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors"],
+        "text_encoders": ["gemma_3_12B_it_fp4_mixed.safetensors"],
+        "latent_upscale_models": ["ltx-2.3-spatial-upscaler-x2-1.1.safetensors"]
+      },
+      "minimum_vram_mib": 24576,
+      "execution_profile": "DistilledPipeline_or_equivalent_local_only",
+      "allowed_stages": ["pilot"],
+      "restrictions": ["no_dialogue", "no_continuous_drama", "not_final", "no_auto_promotion"],
+      "prompt_forbidden_patterns": [
+        "\\b(dialogue|conversation|voiceover|narration|speaks?|talks?)\\b",
+        "\\b(two people|characters?)\\b",
+        "\\bcontinuous dramatic scene\\b"
+      ],
+      "license_scope": "LTX-2-license-review-before-release",
+      "latest_canary_receipt_path": null,
+      "capabilities": {
+        "image_to_video": true,
+        "synchronized_audio_video": true,
+        "pilot_only": true,
+        "human_review_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": false,
+        "production_promoted": false,
+        "workflow_template_sha256": "ea5640cfe4824e82519fea0002e230c1bbf30da8c6426f2a7bcee8d5a66af557"
+      },
+      "promotion_requirements": [
+        "model_fingerprint",
+        "terminal_media_decode",
+        "no_people_or_dialogue_semantic_review",
+        "audio_review",
+        "human_review"
+      ]
     }
   ],
   "research_weapons": [
@@ -774,6 +858,33 @@
       "latest_canary_receipt_path": null,
       "requirements": {"minimum_vram_mib": 20480},
       "promotion_requirements": ["model_fingerprint", "terminal_audio_decode", "loudness_review", "full_human_listening"]
+    },
+    {
+      "id": "ltx23-temporal-x2-research",
+      "display_name": "LTX-2.3 temporal x2 extension research",
+      "status": "experimental",
+      "readiness": "not_installed",
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": ["temporal-extension-research"],
+      "allowed_stages": ["research"],
+      "restrictions": [
+        "no_auto_download",
+        "no_auto_execute",
+        "not_final",
+        "requires_continuity_review"
+      ],
+      "license_scope": "LTX-2-license-review-before-release",
+      "required_model": "ltx-2.3-temporal-upscaler-x2-1.0.safetensors",
+      "latest_canary_receipt_path": null,
+      "requirements": {"minimum_vram_mib": 32607},
+      "promotion_requirements": [
+        "official_weight_fingerprint",
+        "single_gpu_rtx5090_evidence",
+        "terminal_media_decode",
+        "boundary_continuity_review",
+        "human_review"
+      ]
     },
     {
       "id": "ltx2-broll-pilot",

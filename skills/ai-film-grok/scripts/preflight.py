@@ -1128,6 +1128,12 @@ def run_preflight(root: Path) -> dict[str, Any]:
             shot_ids_for_inv = [
                 str(s["id"]) for s in validate_film_spec(spec, assign_missing_ids=False)
             ]
+            shot_ids_for_inv.extend(
+                str(entry.get("id"))
+                for shot in validate_film_spec(spec, assign_missing_ids=False)
+                for entry in (shot.get("dialogue_broll") or [])
+                if isinstance(entry, dict) and str(entry.get("id") or "").strip()
+            )
         except Exception:
             # fall back to raw ids without full validation
             for scene in spec.get("scenes") or []:

@@ -103,9 +103,9 @@ class HardDefaultsContractTests(unittest.TestCase):
         self.assertEqual(MEAN_MEAT_FLOOR, 20.0)
         self.assertEqual(MEAN_MEAT_TARGET, 24.0)
 
-    # --- §后期: 导演复审十一维 ---
-    def test_review_scorecard_has_eleven_dimensions(self) -> None:
-        """hard-defaults.md + director-methodology.md: '十一维全 pass'."""
+    # --- §后期: 导演复审十六维 ---
+    def test_review_scorecard_has_sixteen_dimensions(self) -> None:
+        """Cinema quality contract: all sixteen dimensions must pass."""
         expected = (
             "identity",
             "style",
@@ -118,9 +118,14 @@ class HardDefaultsContractTests(unittest.TestCase):
             "emotion",
             "theme",
             "performance",
+            "cinematic_coherence",
+            "coverage_sufficiency",
+            "performance_truth",
+            "editorial_rhythm",
+            "whole_film_integrity",
         )
         self.assertEqual(SCORECARD_DIMENSIONS, expected)
-        self.assertEqual(len(SCORECARD_DIMENSIONS), 11)
+        self.assertEqual(len(SCORECARD_DIMENSIONS), 16)
 
     # --- §视觉: 静帧几何·禁压缩 ---
     def test_keyframe_min_dimensions(self) -> None:

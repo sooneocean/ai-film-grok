@@ -114,9 +114,14 @@
 - **方法论**：BGM 不再是整段 bed loop——有入点出点、有情绪段。
 
 ### 4. 导演复审升级
-- **维度**：十一维（自 v1.22.0 由七维扩为十一维）——新增 rhythm/emotion/theme/performance
+- **维度**：十六维（由十一维扩展）——新增 cinematic_coherence、coverage_sufficiency、performance_truth、editorial_rhythm、whole_film_integrity；所有维度均需完整观看后的人工证据。
 - **方法论**：导演复审不只校验元数据——真正考验节奏曲线、情绪弧线、
   主题贯穿、表演质量。
+
+### 5. 电影性审计（所有项目硬性）
+- **门禁**：`cinematic-audit` 在 write-spec、preflight、pilot、media-queue、final 与 review-final 均会执行；没有“旧片豁免”或 `--force` 绕过。
+- **证据**：对白段需有反应／动作／静默覆盖；推动剧情的镜头需有可见表演变化；最终批准还需逐镜 approved 媒体记录、可解码且含音轨与运动的最终 MP4。
+- **修复顺序**：先补导演板与节拍契约，再补镜头表演/构图/衔接，最后补拍并重跑审计；不要以旁白或一张静帧代替镜头内事件。
 
 ---
 

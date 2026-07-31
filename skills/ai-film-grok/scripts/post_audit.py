@@ -196,6 +196,48 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
                 "message": "approved full-film review receipt is missing",
             }
         )
+    editorial_review = (
+        review.get("editorial_review") if isinstance(review.get("editorial_review"), dict) else {}
+    )
+    if review.get("approved"):
+        editorial_path = root / "receipts" / "final-editorial-review.json"
+        stored_editorial = read_json(editorial_path) or {}
+        if not editorial_review or not stored_editorial:
+            hard.append(
+                {
+                    "code": "FINAL_EDITORIAL_REVIEW_MISSING",
+                    "message": "approved final review is missing the final editorial report",
+                }
+            )
+        elif editorial_review.get("receipt_sha256") != _hash(editorial_path) or (
+            editorial_review.get("inputs") != stored_editorial.get("inputs")
+            or editorial_review.get("ok") != stored_editorial.get("ok")
+        ):
+            hard.append(
+                {
+                    "code": "FINAL_EDITORIAL_REVIEW_TAMPERED",
+                    "message": "final editorial report does not match the approved review receipt",
+                }
+            )
+        elif not stored_editorial.get("ok"):
+            hard.append(
+                {
+                    "code": "FINAL_EDITORIAL_REVIEW_FAILED",
+                    "message": "approved final review contains a failed editorial report",
+                }
+            )
+        else:
+            from final_editorial_review import is_current as editorial_review_is_current
+
+            editorial_freshness = editorial_review_is_current(root, stored_editorial)
+            if not editorial_freshness["ok"]:
+                hard.append(
+                    {
+                        "code": "FINAL_EDITORIAL_REVIEW_STALE",
+                        "message": "final editorial report no longer matches the current delivery: "
+                        + ", ".join(editorial_freshness["mismatches"]),
+                    }
+                )
     from director_review import SCORECARD_DIMENSIONS
 
     scorecard_raw = review.get("scorecard") if isinstance(review.get("scorecard"), dict) else {}
@@ -592,6 +634,11 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
             "ok": audio_provenance.get("ok"),
             "path": audio_provenance.get("path"),
             "sha256": audio_provenance.get("sha256"),
+        },
+        "editorial_review": {
+            "path": str(root / "receipts" / "final-editorial-review.json"),
+            "sha256": _hash(root / "receipts" / "final-editorial-review.json"),
+            "ok": editorial_review.get("ok"),
         },
     }
     sidecar_expectations = {

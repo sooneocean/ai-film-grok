@@ -18,6 +18,7 @@ sys.path.insert(0, str(SCRIPTS))
 import aifilm_grok  # noqa: E402
 import film_spec  # noqa: E402
 import render_final  # noqa: E402
+from cinematic_audit import current_audit  # noqa: E402
 
 
 def valid_spec() -> dict[str, object]:
@@ -32,16 +33,32 @@ def valid_spec() -> dict[str, object]:
         "scenes": [
             {
                 "title": "Scene 1",
+                "director_board": {
+                    "emotional_turn": "不安变成警觉",
+                    "visual_strategy": "中景开门后切近景反应",
+                    "performance_strategy": "先克制，再以手和视线暴露紧张",
+                },
                 "shots": [
                     {
                         "id": "shot01",
+                        "beat_id": "beat01",
                         "title": "开场",
                         "dramatic_function": "hook",
                         "nar": "夜里，车门缓缓打开。",
+                        "performance_delta": "手从门把离开，身体踏入门内",
+                        "performance": {
+                            "subtext": "她知道门后有人",
+                            "playable_action": "推开车门并踏入",
+                            "reaction_trigger": "门锁弹开",
+                        },
                         "dsl": {
                             "subject": "an adult woman",
                             "action": "opens a door",
                             "motion": "door open, blink, idle not speaking",
+                            "visible_change": "关闭的车门被推开",
+                            "camera_axis": "pan_with",
+                            "lighting": "cold streetlamp",
+                            "camera": {"shot_size": "medium", "lens_mm": "35"},
                         },
                     }
                 ],
@@ -131,6 +148,21 @@ class PipelineValidationTests(unittest.TestCase):
             self.assertEqual(rc, 0, result)
             saved = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
             self.assertEqual(saved["scenes"][0]["shots"][0]["id"], "shot01")
+            self.assertTrue(current_audit(root)["ok"], current_audit(root))
+
+    def test_write_spec_rejects_incomplete_cinematic_contract_before_persisting(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "film"
+            self.init_root(root)
+            spec = valid_spec()
+            del spec["scenes"][0]["director_board"]  # type: ignore[index]
+            before = (root / "film-spec.json").read_bytes()
+
+            rc, result = self.write_spec(root, spec)
+
+            self.assertEqual(rc, 2)
+            self.assertIn("CREATIVE_CONTRACT_DIRECTOR_BOARD_MISSING", result["error"])
+            self.assertEqual((root / "film-spec.json").read_bytes(), before)
 
     def test_write_spec_rejects_repeated_actual_tts_and_unbound_sfx(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -146,11 +178,21 @@ class PipelineValidationTests(unittest.TestCase):
                         "dramatic_function": "action",
                         "speaker": "heroine",
                         "nar": "她转身离开。",
+                        "performance_delta": "她转身离开门边",
+                        "performance": {
+                            "subtext": "不愿解释",
+                            "playable_action": "转身",
+                            "reaction_trigger": "听见脚步",
+                        },
                         "dialogue_ja": "行く",
                         "dsl": {
                             "subject": "an adult woman",
                             "action": "turns away",
                             "motion": "turn",
+                            "visible_change": "她从面对门变成背对门",
+                            "camera_axis": "pull_back",
+                            "lighting": "cold streetlamp",
+                            "camera": {"shot_size": "wide", "lens_mm": "35"},
                         },
                     },
                     {
@@ -178,6 +220,7 @@ class PipelineValidationTests(unittest.TestCase):
             self.assertIn("unknown shot_id", result["error"])
 
             spec["sound_plan"]["events"][0]["shot_id"] = "shot02"  # type: ignore[index]
+            spec["transition_intents"] = ["hard"]
             rc, result = self.write_spec(root, spec)
             self.assertEqual(rc, 0, result)
 

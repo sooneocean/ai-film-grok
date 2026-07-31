@@ -55,6 +55,60 @@ class PilotGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "receipts").mkdir()
+            (root / "drama-graph.json").write_text(
+                json.dumps(
+                    {
+                        "beats": [
+                            {
+                                "id": "beat01",
+                                "obstacle": "door",
+                                "tactic": "open",
+                                "turn": "opens",
+                                "outcome": "enters",
+                                "state_delta": "closed to open",
+                                "end_state": "open",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "film-spec.json").write_text(
+                json.dumps(
+                    {
+                        "scenes": [
+                            {
+                                "director_board": {
+                                    "emotional_turn": "calm to alert",
+                                    "visual_strategy": "medium follow",
+                                    "performance_strategy": "hand opens door",
+                                },
+                                "shots": [
+                                    {
+                                        "id": "shot01",
+                                        "beat_id": "beat01",
+                                        "dramatic_function": "hook",
+                                        "performance_delta": "hand opens door",
+                                        "performance": {
+                                            "subtext": "alert",
+                                            "playable_action": "open",
+                                            "reaction_trigger": "knock",
+                                        },
+                                        "dsl": {
+                                            "camera": {"shot_size": "medium", "lens_mm": "35"},
+                                            "camera_axis": "pan_with",
+                                            "lighting": "cold",
+                                            "motion": "open door",
+                                            "visible_change": "door opens",
+                                        },
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
             known: set[str] = set()
             for i in range(1, 4):
                 sid = f"shot0{i}"
@@ -63,6 +117,24 @@ class PilotGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ProductionGateError, "pilot"):
                 assert_pilot_allows_add(
                     root, shot_id="shot04", existing_shot_ids=known, env_skip=False
+                )
+
+    def test_force_cannot_bypass_cinematic_contract(self) -> None:
+        from production_gates import assert_pilot_allows_add
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "receipts").mkdir()
+            (root / "film-spec.json").write_text(
+                '{"cinematic_audit_strict": true}', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ProductionGateError, "SHOTS_MISSING"):
+                assert_pilot_allows_add(
+                    root,
+                    shot_id="shot01",
+                    existing_shot_ids=set(),
+                    force=True,
+                    env_skip=False,
                 )
 
     def test_assert_accepts_user_file(self) -> None:

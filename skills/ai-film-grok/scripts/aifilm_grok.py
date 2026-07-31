@@ -923,6 +923,13 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         shots = []
         spec_error = str(exc)
     shot_ids = [shot["id"] for shot in shots]
+    broll_ids = [
+        str(entry.get("id"))
+        for shot in shots
+        for entry in (shot.get("dialogue_broll") or [])
+        if isinstance(entry, dict) and str(entry.get("id") or "").strip()
+    ]
+    inventory_ids = shot_ids + broll_ids
     dirs = film_dirs(root)
     stills = manifest.get("stills") or {}
     clips = manifest.get("clips") or {}
@@ -1071,7 +1078,7 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     manifest["gates"] = gates
     manifest["style_locked"] = gates["style_locked"]
     return {
-        "shot_ids": shot_ids,
+        "shot_ids": inventory_ids,
         "approved_stills": approved_stills,
         "approved_clips": approved_clips,
         "canonical_count": len(canonical),
@@ -1353,12 +1360,33 @@ def cmd_preflight(args: argparse.Namespace) -> int:
         report = run_preflight(root)
     except PreflightError as exc:
         raise FilmError(str(exc)) from exc
+    from cinematic_audit import write_audit
+
+    cinematic = write_audit(root, require_authored_contract=True)
+    report["cinematic_audit"] = cinematic
+    if not cinematic.get("ok"):
+        report.setdefault("hard", []).append(
+            {
+                "code": "CINEMATIC_AUDIT_FAILED",
+                "message": ",".join(cinematic.get("blocking_codes") or []),
+            }
+        )
+        report["hard_ok"] = False
     emit(report)
     if not report.get("hard_ok"):
         return 2
     if getattr(args, "strict", False) and not report.get("soft_ok"):
         return 3
     return 0
+
+
+def cmd_cinematic_audit(args: argparse.Namespace) -> int:
+    """Write a current, checksum-bound cinematic coherence audit without spending."""
+    from cinematic_audit import write_audit
+
+    report = write_audit(Path(args.root), require_authored_contract=True)
+    emit(report)
+    return 0 if report.get("ok") else 2
 
 
 def cmd_quality(args: argparse.Namespace) -> int:
@@ -1425,7 +1453,11 @@ def cmd_dialogue_benchmark_approve(args: argparse.Namespace) -> int:
 def cmd_dialogue_production_plan(args: argparse.Namespace) -> int:
     from dialogue_production_plan import build_dialogue_production_plan
 
-    report = build_dialogue_production_plan(Path(args.root))
+    try:
+        report = build_dialogue_production_plan(Path(args.root))
+    except ValueError as exc:
+        emit({"ok": False, "status": "blocked", "reason": str(exc)})
+        return 2
     emit(report)
     return 0
 
@@ -1772,18 +1804,179 @@ def _compatibility_vo_mode(spec: dict[str, Any]) -> dict[str, Any]:
     return spec
 
 
+def _compatibility_director_intent(spec: dict[str, Any], root: Path) -> dict[str, Any]:
+    """Project only signed director intent into legacy compiled specs."""
+    if isinstance(spec.get("director_intent"), dict):
+        return spec
+    contract_path = root / "director-contract.json"
+    if not contract_path.is_file():
+        return spec
+    contract = read_json(contract_path)
+    if str(contract.get("status") or "").lower() != "locked":
+        return spec
+    intent = contract.get("intent")
+    if not isinstance(intent, dict):
+        return spec
+    required = ("logline", "tone", "emotional_arc")
+    if not all(intent.get(key) for key in required):
+        return spec
+    spec = dict(spec)
+    spec["director_intent"] = {
+        key: intent[key]
+        for key in ("logline", "tone", "emotional_arc", "audience")
+        if key in intent
+    }
+    spec.setdefault("compatibility", {})["director_intent"] = (
+        "projected_from_locked_director_contract"
+    )
+    return spec
+
+
+def _compatibility_screen_modes(spec: dict[str, Any]) -> dict[str, Any]:
+    """Only label explicitly silent legacy shots; leave ambiguous shots blocked."""
+    changed = False
+    spec = dict(spec)
+    scenes = []
+    for scene in spec.get("scenes") or []:
+        scene_copy = dict(scene) if isinstance(scene, dict) else scene
+        if isinstance(scene_copy, dict):
+            shots = []
+            for shot in scene_copy.get("shots") or []:
+                shot_copy = dict(shot) if isinstance(shot, dict) else shot
+                if (
+                    isinstance(shot_copy, dict)
+                    and not shot_copy.get("screen_mode")
+                    and shot_copy.get("silent") is True
+                ):
+                    shot_copy["screen_mode"] = "silence"
+                    changed = True
+                shots.append(shot_copy)
+            scene_copy["shots"] = shots
+        scenes.append(scene_copy)
+    if changed:
+        spec["scenes"] = scenes
+        spec.setdefault("compatibility", {})["screen_mode"] = "silence_from_explicit_silent_shots"
+    return spec
+
+
+def _compatibility_audio_cues(spec: dict[str, Any], root: Path) -> dict[str, Any]:
+    """Project declared locked-shot sound intent into non-executed cue plans."""
+    contract_path = root / "director-contract.json"
+    if not contract_path.is_file():
+        return spec
+    contract = read_json(contract_path)
+    if str(contract.get("status") or "").lower() != "locked":
+        return spec
+    sounds = {
+        str(shot.get("id")): shot.get("sound")
+        for scene in contract.get("scenes") or []
+        if isinstance(scene, dict)
+        for shot in scene.get("shots") or []
+        if isinstance(shot, dict) and isinstance(shot.get("sound"), dict)
+    }
+    changed = False
+    spec = dict(spec)
+    scenes = []
+    for scene in spec.get("scenes") or []:
+        scene_copy = dict(scene) if isinstance(scene, dict) else scene
+        if isinstance(scene_copy, dict):
+            shots = []
+            for shot in scene_copy.get("shots") or []:
+                shot_copy = dict(shot) if isinstance(shot, dict) else shot
+                sound = sounds.get(str(shot_copy.get("id") if isinstance(shot_copy, dict) else ""))
+                if (
+                    isinstance(shot_copy, dict)
+                    and shot_copy.get("silent") is True
+                    and not shot_copy.get("audio_cues")
+                    and isinstance(sound, dict)
+                ):
+                    duration = float(
+                        shot_copy.get("duration_seconds") or shot_copy.get("duration_sec") or 0
+                    )
+                    ambience = str(sound.get("ambience") or "declared scene ambience")
+                    cues = [
+                        {
+                            "kind": "ambience",
+                            "start_offset_sec": 0,
+                            "duration_sec": duration,
+                            "asset_hint": ambience,
+                        }
+                    ]
+                    for effect in (sound.get("effects") or [])[:2]:
+                        cues.append(
+                            {
+                                "kind": "sfx",
+                                "start_offset_sec": min(duration - 0.25, 1.0 + len(cues)),
+                                "duration_sec": 0.25,
+                                "asset_hint": str(effect),
+                            }
+                        )
+                    shot_copy["audio_cues"] = cues
+                    changed = True
+                shots.append(shot_copy)
+            scene_copy["shots"] = shots
+        scenes.append(scene_copy)
+    if changed:
+        spec["scenes"] = scenes
+        spec.setdefault("compatibility", {})["audio_cues"] = (
+            "projected_from_locked_contract_sound_intent"
+        )
+    return spec
+
+
+def _compatibility_dramatic_functions(spec: dict[str, Any]) -> dict[str, Any]:
+    """Map only explicit legacy shot evidence into the current role enum."""
+    spec = dict(spec)
+    changed = False
+    scenes = []
+    for scene in spec.get("scenes") or []:
+        current = dict(scene) if isinstance(scene, dict) else scene
+        if isinstance(current, dict):
+            shots = []
+            for shot in current.get("shots") or []:
+                item = dict(shot) if isinstance(shot, dict) else shot
+                if isinstance(item, dict) and not item.get("dramatic_function"):
+                    if str(item.get("screen_mode") or "") == "reaction":
+                        item["dramatic_function"] = "reaction"
+                    elif str(item.get("screen_mode") or "") == "silence" or item.get(
+                        "director_beat"
+                    ):
+                        item["dramatic_function"] = "action"
+                    else:
+                        shots.append(item)
+                        continue
+                    changed = True
+                shots.append(item)
+            current["shots"] = shots
+        scenes.append(current)
+    if changed:
+        spec["scenes"] = scenes
+        spec.setdefault("compatibility", {})["dramatic_function"] = (
+            "mapped_from_locked_shot_evidence"
+        )
+    return spec
+
+
 def cmd_write_spec(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
     ensure_tree(root)
     try:
         from narrative_control import NarrativeControlError, assert_projection_ready
 
-        assert_projection_ready(root, require_locked=True)
+        # write-spec creates the projection that later media gates require locked.
+        assert_projection_ready(root, require_locked=False)
     except NarrativeControlError as exc:
         raise FilmError(f"{exc.code}: {exc}") from exc
     default_spec = root / "film-spec.json"
     spec_path = Path(args.spec).expanduser().resolve() if args.spec else default_spec
-    spec = _compatibility_vo_mode(read_json(spec_path))
+    spec = _compatibility_dramatic_functions(
+        _compatibility_audio_cues(
+            _compatibility_director_intent(
+                _compatibility_screen_modes(_compatibility_vo_mode(read_json(spec_path))), root
+            ),
+            root,
+        )
+    )
     try:
         shots = validate_film_spec(
             spec,
@@ -1793,6 +1986,36 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
         )
     except FilmSpecError as exc:
         raise FilmError(str(exc)) from exc
+
+    from cinematic_audit import audit
+
+    # Write-spec is the graph-projection boundary and never admits an
+    # incoherent shot contract into production.
+    cinematic = audit(root, spec=spec)
+    if not cinematic.get("ok"):
+        raise FilmError(
+            "cinematic audit failed: " + ",".join(cinematic.get("blocking_codes") or [])
+        )
+
+    from drama_graph import derive_graph
+
+    # Validate the complete contract against a disposable projection before
+    # touching the project. A rejected legacy spec must not become the new
+    # on-disk truth merely because its graph has not yet been refreshed.
+    with tempfile.TemporaryDirectory(prefix="aifilm-cinematic-") as staging:
+        stage_root = Path(staging)
+        write_json(stage_root / "film-spec.json", spec)
+        staged_graph = derive_graph(stage_root, write=False)
+        strict_cinematic = audit(
+            root,
+            spec=spec,
+            graph=staged_graph,
+            require_authored_contract=True,
+        )
+    if not strict_cinematic.get("ok"):
+        raise FilmError(
+            "cinematic audit failed: " + ",".join(strict_cinematic.get("blocking_codes") or [])
+        )
 
     # --- New Visual Bible Prompt Injector Logic ---
     bible = load_bible(root)
@@ -1853,6 +2076,10 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
             "note": "Short form: continue joins still should promote last frame; doc optional",
         }
     write_json(root / "film-spec.json", spec)
+    # The film spec is the projection source at this boundary. Rebuild its
+    # graph before producing a strict audit so no production command can see a
+    # stale or pre-contract beat map.
+    derive_graph(root, write=True)
     manifest = load_manifest(root)
     # seed timeline placeholders
     timeline = {
@@ -1899,6 +2126,14 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
         scene_sound = reconcile_scene_sound(root, write=True)
     except Exception as exc:
         raise FilmError(f"scene-sound reconcile failed: {exc}") from exc
+    from cinematic_audit import write_audit
+
+    cinematic_receipt = write_audit(root, require_authored_contract=True)
+    if not cinematic_receipt.get("ok"):
+        raise FilmError(
+            "cinematic audit failed after projection: "
+            + ",".join(cinematic_receipt.get("blocking_codes") or [])
+        )
     emit(
         {
             "ok": True,
@@ -1919,6 +2154,7 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
             "transition_intents": spec.get("transition_intents"),
             "sound_plan": spec.get("sound_plan"),
             "scene_sound": scene_sound,
+            "cinematic_audit": cinematic_receipt,
         }
     )
     return 0
@@ -3702,6 +3938,16 @@ def cmd_final(args: argparse.Namespace) -> int:
         except PostPlanError as exc:
             raise FilmError(str(exc)) from exc
 
+    from cinematic_audit import write_audit
+
+    cinematic = write_audit(root, require_authored_contract=True, require_clip_evidence=True)
+    if not cinematic.get("ok"):
+        raise FilmError(
+            "Cannot render final: cinematic audit failed ["
+            + ", ".join(cinematic.get("blocking_codes") or [])
+            + "]"
+        )
+
     # Lesson preflight (default on): hard blocks; soft logs; --skip-preflight escapes
     preflight_report: dict[str, Any] | None = None
     if not bool(getattr(args, "skip_preflight", False)):
@@ -4215,6 +4461,15 @@ def which_npx_safe() -> str | None:
 
 def cmd_review_final(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
+    from cinematic_audit import write_audit
+
+    cinematic = write_audit(root, require_authored_contract=True, require_media_evidence=True)
+    if not cinematic.get("ok"):
+        raise FilmError(
+            "Cannot approve final: cinematic audit failed ["
+            + ", ".join(cinematic.get("blocking_codes") or [])
+            + "]"
+        )
     manifest = load_manifest(root)
     review_input = None
     if getattr(args, "review_file", None):
@@ -4257,6 +4512,16 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
     if not technical_qa.get("ok"):
         raise FilmError(f"Cannot approve final: technical QA failed: {technical_qa.get('errors')}")
+    from final_editorial_review import audit as editorial_audit
+
+    editorial_review = editorial_audit(root, write=True)
+    if not editorial_review.get("ok"):
+        codes = ", ".join(
+            str(item.get("code") or "FAILED") for item in editorial_review.get("issues") or []
+        )
+        raise FilmError("Cannot approve final: editorial review requires recut [" + codes + "]")
+    editorial_receipt = Path(str(editorial_review["path"]))
+    editorial_review["receipt_sha256"] = sha256(editorial_receipt)
     # v1.23: objective delivery-quality gate before the director's subjective scorecard.
     # Fails here = not worth a human reviewer's time (decode errors, missing audio,
     # black frames, freezes, or overall score below the floor).
@@ -4464,6 +4729,7 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         "notes": notes,
         "output_sha256": final_record["sha256"],
         "technical_qa": technical_qa,
+        "editorial_review": editorial_review,
         "scorecard": scorecard,
         "grades": grades,
         "fail_reasons": fail_reasons,
@@ -4538,6 +4804,15 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         }
     )
     return 0
+
+
+def cmd_final_editorial_review(args: argparse.Namespace) -> int:
+    """Write the no-spend final editorial report without granting approval."""
+    from final_editorial_review import audit
+
+    report = audit(Path(args.root).expanduser().resolve(), write=True)
+    emit(report)
+    return 0 if report["ok"] else 2
 
 
 def cmd_review_shot(args: argparse.Namespace) -> int:
@@ -4686,6 +4961,15 @@ def cmd_pilot(args: argparse.Namespace) -> int:
         raise FilmError(f"Cannot import pilot_review: {exc}") from exc
 
     root = Path(args.root).expanduser().resolve()
+    from cinematic_audit import write_audit
+
+    cinematic = write_audit(root, require_authored_contract=True)
+    if not cinematic.get("ok"):
+        raise FilmError(
+            "pilot blocked by cinematic audit ["
+            + ", ".join(cinematic.get("blocking_codes") or [])
+            + "]"
+        )
     action = str(getattr(args, "pilot_action", "") or "")
     try:
         if action == "pick":
@@ -6779,6 +7063,7 @@ def cmd_sfx_candidate(args: argparse.Namespace) -> int:
         SFXCandidateError,
         approve,
         attach_to_shot,
+        batch_generate_and_screen,
         generate,
         reject,
         screen_speech,
@@ -6787,7 +7072,19 @@ def cmd_sfx_candidate(args: argparse.Namespace) -> int:
     get_config()
     root = Path(args.root).expanduser().resolve()
     try:
-        if args.sfx_candidate_action == "approve":
+        if args.sfx_candidate_action == "batch":
+            payload = read_json(Path(args.manifest))
+            candidates = payload.get("candidates") if isinstance(payload, dict) else None
+            if not isinstance(candidates, list):
+                raise SFXCandidateError("SFX batch manifest requires candidates array")
+            emit(
+                batch_generate_and_screen(
+                    root,
+                    candidates,
+                    noncommercial_research_ok=bool(args.noncommercial_research_ok),
+                )
+            )
+        elif args.sfx_candidate_action == "approve":
             emit(
                 approve(
                     root,
@@ -7580,6 +7877,14 @@ def build_parser() -> argparse.ArgumentParser:
     sfx_generate.add_argument("--seed", type=int, required=True)
     sfx_generate.add_argument("--video", default="")
     sfx_generate.add_argument("--noncommercial-research-ok", action="store_true")
+    sfx_batch = sfx_candidate_sub.add_parser(
+        "batch", help="Generate and ASR-screen 1-24 non-commercial SFX candidates"
+    )
+    sfx_batch.add_argument("--root", required=True)
+    sfx_batch.add_argument(
+        "--manifest", required=True, help="JSON: {candidates:[{prompt,duration,seed}]}"
+    )
+    sfx_batch.add_argument("--noncommercial-research-ok", action="store_true")
     sfx_approve = sfx_candidate_sub.add_parser("approve")
     sfx_approve.add_argument("--root", required=True)
     sfx_approve.add_argument("--asset-id", required=True)
@@ -8534,6 +8839,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="v3 repeat dimension:CANONICAL_CODE[:shot]",
     )
 
+    editorial_review = sub.add_parser(
+        "final-editorial-review",
+        help="Write a hash-bound no-spend editorial review before final approval",
+    )
+    editorial_review.add_argument("--root", required=True)
+
     performance_timeline = sub.add_parser(
         "performance-timeline",
         help="Compile checksum-bound per-shot performance evidence into a director timeline",
@@ -8584,6 +8895,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-black", action="store_true", help="Downgrade black-frame fail to warn"
     )
     qcheck.add_argument("--allow-freeze", action="store_true", help="Downgrade freeze fail to warn")
+
+    cinematic = sub.add_parser(
+        "cinematic-audit",
+        help="Write a checksum-bound cinematic coherence/coverage audit (no-spend)",
+    )
+    cinematic.add_argument("--root", required=True)
 
     from cli_optimization import add_optimization_parsers
 
@@ -9756,6 +10073,7 @@ def main(argv: list[str] | None = None) -> int:
             "reencode-clips": cmd_reencode_clips,
             "final": cmd_final,
             "review-final": cmd_review_final,
+            "final-editorial-review": cmd_final_editorial_review,
             "benchmark": cmd_benchmark,
             "dialogue-benchmark": cmd_dialogue_benchmark,
             "dialogue-benchmark-review": cmd_dialogue_benchmark_review,
@@ -9772,6 +10090,7 @@ def main(argv: list[str] | None = None) -> int:
             "director-notes": cmd_director_notes,
             "next": cmd_next,
             "preflight": cmd_preflight,
+            "cinematic-audit": cmd_cinematic_audit,
             "quality": cmd_quality,
             "heat": cmd_heat,
             "state-index": cmd_state_index,

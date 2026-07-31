@@ -176,6 +176,7 @@ class PostAuditTests(unittest.TestCase):
             )
             report = audit(root, write=False)
             codes = {item["code"] for item in report["hard_failures"]}
+            self.assertIn("FINAL_EDITORIAL_REVIEW_MISSING", codes)
             self.assertIn("FINAL_SCORECARD_INCOMPLETE", codes)
             self.assertIn("SCREENING_EVIDENCE_INCOMPLETE", codes)
 

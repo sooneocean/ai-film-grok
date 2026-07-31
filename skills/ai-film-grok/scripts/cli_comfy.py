@@ -27,6 +27,7 @@ from comfy_video import (
     wait_for_result,
     workflow_sha256,
 )
+from security_policy import load_allowed_env
 from util import write_json
 
 
@@ -238,6 +239,17 @@ def _maybe_write_receipt(args: argparse.Namespace, report: dict[str, Any]) -> No
 
 
 def run_comfy(args: argparse.Namespace) -> int:
+    load_allowed_env(
+        Path(__file__).resolve().parent.parent / "config.env",
+        allowed_keys={
+            "AIFILM_COMFY_DRIVER_VRAM_FALLBACK",
+            "AIFILM_COMFY_SSH_TARGET",
+            "AIFILM_COMFY_SSH_KEY",
+            "AIFILM_COMFY_SSH_KNOWN_HOSTS",
+            "AIFILM_COMFY_SSH_HOSTKEY_ALIAS",
+            "AIFILM_COMFY_SSH_EXPECTED_HOSTNAME",
+        },
+    )
     try:
         base_url = _base_url(args)
         action = args.comfy_action

@@ -281,6 +281,53 @@ class TestRunLipsyncCanary(unittest.TestCase):
             self.assertFalse(report["ok"])
             self.assertNotIn("human_review", report)
 
+    def test_failed_retry_removes_a_previous_canary_artifact(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            video = root / "shot.mp4"
+            audio = root / "shot.wav"
+            video.write_bytes(b"video")
+            audio.write_bytes(b"audio")
+            stale = root / "receipts" / "lipsync-canary" / "shot01-latentsync.mp4"
+            stale.parent.mkdir(parents=True)
+            stale.write_bytes(b"yesterday")
+
+            def fake_lipsync_one(**kwargs):
+                raise RuntimeError("timed out")
+
+            with mock.patch.dict(
+                sys.modules,
+                {
+                    "lipsync_backend": mock.MagicMock(
+                        probe=lambda: {
+                            "ready": [],
+                            "node": {
+                                "backends": {
+                                    "latentsync": {"ready": False, "technical_ready": True}
+                                }
+                            },
+                        },
+                        resolve_backend=mock.Mock(
+                            side_effect=AssertionError("must bypass production resolver")
+                        ),
+                        lipsync_one=fake_lipsync_one,
+                    ),
+                },
+            ):
+                report = run_lipsync_canary(
+                    root,
+                    shot_id="shot01",
+                    backend="latentsync",
+                    video=video,
+                    audio=audio,
+                )
+
+            self.assertFalse(report["ok"])
+            self.assertIsNone(report["output"])
+            self.assertFalse(stale.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
