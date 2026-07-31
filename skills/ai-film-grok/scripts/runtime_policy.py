@@ -150,7 +150,7 @@ def build_runtime_lock(
     root = skill_dir.expanduser().resolve()
     if script_paths is None:
         script_paths = _default_script_paths(root)
-    scripts: dict[str, str] = {}
+    scripts: list[dict[str, str]] = []
     for path in script_paths:
         resolved = path.expanduser().resolve()
         if not resolved.is_file():
@@ -159,11 +159,14 @@ def build_runtime_lock(
             key = str(resolved.relative_to(root))
         except ValueError:
             key = str(resolved)
-        scripts[key] = sha256(resolved)
+        # Keep paths and fingerprints as separate JSON fields.  Apart from
+        # being clearer to parse, this prevents secret scanners from treating
+        # an OAuth-named path plus a SHA-256 integrity digest as a credential.
+        scripts.append({"path": key, "sha256": sha256(resolved)})
     requirements_path = root / "requirements.lock"
     package_names = tuple(_requirements(requirements_path)) or LOCKED_PACKAGES
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "python": platform.python_version(),
         "commands": {"ffmpeg": _command_version("ffmpeg"), "ffprobe": _command_version("ffprobe")},
         "packages": _package_versions(package_names),
@@ -195,7 +198,25 @@ def verify_runtime_lock(skill_dir: Path, lock_path: Path) -> dict[str, Any]:
         actual = actual_packages[package]
         if actual != wanted:
             errors.append(f"{package} version drift: expected {wanted}, found {actual}")
-    for relative, wanted in (expected.get("scripts") or {}).items():
+    raw_scripts = expected.get("scripts") or []
+    if isinstance(raw_scripts, dict):
+        # Read v1 locks so existing projects receive a useful drift report;
+        # newly written locks always use the scanner-safe v2 record shape.
+        script_entries = [{"path": path, "sha256": digest} for path, digest in raw_scripts.items()]
+    elif isinstance(raw_scripts, list):
+        script_entries = raw_scripts
+    else:
+        script_entries = []
+        errors.append("runtime lock scripts must be an object or list")
+    for entry in script_entries:
+        if not isinstance(entry, dict):
+            errors.append("runtime lock script entry is invalid")
+            continue
+        relative = entry.get("path")
+        wanted = entry.get("sha256")
+        if not isinstance(relative, str) or not isinstance(wanted, str):
+            errors.append("runtime lock script entry is invalid")
+            continue
         path = Path(relative)
         if not path.is_absolute():
             path = root / path

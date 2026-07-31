@@ -15,6 +15,11 @@ from production_book import ProductionBookError, read_production_book
 from project_state import build_project_state
 from util import read_json
 
+
+class ProductionTruthError(ValueError):
+    """A canonical project no longer has a coherent delivery authority chain."""
+
+
 AUTHORITY = {
     "creative_contract": "film-spec.json",
     "canonical_narrative": "drama-graph.json when canonical; otherwise film-spec.json",
@@ -112,3 +117,17 @@ def audit_production_truth(root: Path | str) -> dict[str, Any]:
         },
         "blockers": blockers,
     }
+
+
+def require_current_canonical_truth(root: Path | str) -> dict[str, Any]:
+    """Block canonical delivery when its read-only authority audit is not current.
+
+    Legacy roots retain their explicit compatibility path.  Canonical projects
+    must not treat a stale queue contract as merely an advisory report.
+    """
+    report = audit_production_truth(root)
+    graph = (report.get("checks") or {}).get("canonical_graph") or {}
+    if graph.get("canonical") and not report.get("ok"):
+        blockers = ", ".join(str(item) for item in report.get("blockers") or [])
+        raise ProductionTruthError("canonical delivery blocked by truth audit: " + blockers)
+    return report

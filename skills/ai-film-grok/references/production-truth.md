@@ -31,6 +31,8 @@ Graph 不是每个旧项目的强制前置条件；没有 Graph 的 legacy short
 
 canonical 项目在 `register-clip --status approved` 时也必须提供 `--queue-job-id`；随后该 job 的输出 hash、端点、QA 与 source contract 都会被 `motion-evidence` 复验。故意先登记 clip、再补 queue 来源的路径不可用。
 
+同一份 canonical truth audit 也是 `final` 与 `review-final` 的硬前置：只要发现 `QUEUE_CONTRACT_STALE`、Graph 投影过期或 manifest 真相失效，就不能渲染或批准最终片。legacy 不会因这条新门禁被自动升级。
+
 旧项目没有这份绑定时被标为 `legacy-unbound`，不是被悄悄视为可追溯。canonical Graph 项目必须先完成资产注册与锁定投影，才能创建绑定的 queue job。
 
 ## 使用时机

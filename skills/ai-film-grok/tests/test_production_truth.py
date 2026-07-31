@@ -117,3 +117,46 @@ def test_truth_audit_is_exposed_as_a_read_only_cli(tmp_path: Path, capsys) -> No
     payload = json.loads(capsys.readouterr().out)
     assert payload["kind"] == "production-truth-audit"
     assert "MANIFEST_TRUTH_INVALID" in payload["blockers"]
+
+
+def test_canonical_truth_blocks_final_and_review_before_media_work(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import argparse
+
+    import aifilm_grok
+    import production_truth
+
+    monkeypatch.setattr(
+        production_truth,
+        "audit_production_truth",
+        lambda _root: {
+            "ok": False,
+            "checks": {"canonical_graph": {"canonical": True}},
+            "blockers": ["QUEUE_CONTRACT_STALE"],
+        },
+    )
+    args = argparse.Namespace(root=str(tmp_path))
+
+    import pytest
+
+    with pytest.raises(aifilm_grok.FilmError, match="QUEUE_CONTRACT_STALE"):
+        aifilm_grok.cmd_final(args)
+    with pytest.raises(aifilm_grok.FilmError, match="QUEUE_CONTRACT_STALE"):
+        aifilm_grok.cmd_review_final(args)
+
+
+def test_legacy_truth_remains_delivery_compatible(tmp_path: Path, monkeypatch) -> None:
+    import production_truth
+
+    monkeypatch.setattr(
+        production_truth,
+        "audit_production_truth",
+        lambda _root: {
+            "ok": False,
+            "checks": {"canonical_graph": {"canonical": False}},
+            "blockers": ["MANIFEST_TRUTH_INVALID"],
+        },
+    )
+
+    assert production_truth.require_current_canonical_truth(tmp_path)["ok"] is False

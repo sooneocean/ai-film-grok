@@ -35,6 +35,8 @@ import hashlib
 import json
 import mimetypes
 import os
+import secrets
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -383,11 +385,45 @@ def _http_bytes(
 
 
 def _download_url(url: str, out: Path, *, timeout: float = 180) -> Path:
+    """Download a generated artifact with curl and atomically publish it."""
     out = Path(out).expanduser().resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
-    req = urllib.request.Request(str(url), headers={"User-Agent": "aifilm-grok-oauth/1.1"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        out.write_bytes(resp.read())
+    partial = out.with_name(f".{out.name}.{secrets.token_hex(16)}.partial")
+    command = [
+        "curl",
+        "--fail",
+        "--location",
+        "--silent",
+        "--show-error",
+        "--connect-timeout",
+        "30",
+        "--max-time",
+        str(timeout),
+        "--user-agent",
+        "aifilm-grok-oauth/1.1",
+        "--output",
+        str(partial),
+        "--url",
+        str(url),
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout + 5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        partial.unlink(missing_ok=True)
+        raise GrokOAuthError(f"artifact download failed: {exc}") from exc
+    if result.returncode != 0:
+        partial.unlink(missing_ok=True)
+        detail = (result.stderr or result.stdout or "curl failed").strip()[:500]
+        raise GrokOAuthError(f"artifact download failed: {detail}")
+    if not partial.is_file():
+        raise GrokOAuthError("artifact download failed: curl produced no output")
+    partial.replace(out)
     return out
 
 

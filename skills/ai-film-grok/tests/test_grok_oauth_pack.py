@@ -6,7 +6,9 @@ import base64
 import hashlib
 import json
 import sys
+import threading
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -16,6 +18,91 @@ sys.path.insert(0, str(SCRIPTS))
 
 import grok_oauth as go  # noqa: E402
 from generation_usage import start_generation, usage_status  # noqa: E402
+
+
+def test_download_url_uses_curl_and_publishes_atomically(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    output = tmp_path / "clip.mp4"
+    output.write_bytes(b"previously-approved")
+    captured: list[str] = []
+
+    def fake_run(command: list[str], **_kwargs: object) -> SimpleNamespace:
+        captured.extend(command)
+        partial = Path(command[command.index("--output") + 1])
+        partial.write_bytes(b"new-artifact")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(go.subprocess, "run", fake_run)
+
+    assert go._download_url("https://example.com/clip.mp4", output) == output
+    assert output.read_bytes() == b"new-artifact"
+    assert not list(tmp_path.glob("*.partial"))
+    assert captured == [
+        "curl",
+        "--fail",
+        "--location",
+        "--silent",
+        "--show-error",
+        "--connect-timeout",
+        "30",
+        "--max-time",
+        "180",
+        "--user-agent",
+        "aifilm-grok-oauth/1.1",
+        "--output",
+        captured[captured.index("--output") + 1],
+        "--url",
+        "https://example.com/clip.mp4",
+    ]
+
+
+def test_download_url_failure_preserves_existing_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    output = tmp_path / "clip.mp4"
+    output.write_bytes(b"previously-approved")
+    monkeypatch.setattr(
+        go.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=22, stdout="", stderr="404 Not Found"),
+    )
+
+    with pytest.raises(go.GrokOAuthError, match="404 Not Found"):
+        go._download_url("https://example.com/missing.mp4", output)
+
+    assert output.read_bytes() == b"previously-approved"
+    assert not list(tmp_path.glob("*.partial"))
+
+
+def test_download_url_uses_distinct_partials_for_concurrent_downloads(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    output = tmp_path / "clip.mp4"
+    entered = threading.Barrier(2)
+    partials: list[Path] = []
+
+    def fake_run(command: list[str], **_kwargs: object) -> SimpleNamespace:
+        partial = Path(command[command.index("--output") + 1])
+        partials.append(partial)
+        entered.wait(timeout=1)
+        partial.write_bytes(b"artifact")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(go.subprocess, "run", fake_run)
+    workers = [
+        threading.Thread(target=go._download_url, args=("https://example.com/clip.mp4", output))
+        for _ in range(2)
+    ]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+
+    assert len(partials) == 2
+    assert partials[0] != partials[1]
+    assert output.read_bytes() == b"artifact"
+    assert not list(tmp_path.glob("*.partial"))
 
 
 @pytest.mark.slow

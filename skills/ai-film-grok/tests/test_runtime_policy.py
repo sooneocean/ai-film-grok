@@ -65,7 +65,11 @@ class RuntimeLockTests(unittest.TestCase):
 
             report = build_runtime_lock(root)
 
-            self.assertIn("scripts/new_quality_gate.py", report["scripts"])
+            self.assertIn(
+                {"path": "scripts/new_quality_gate.py", "sha256": report["scripts"][0]["sha256"]},
+                report["scripts"],
+            )
+            self.assertEqual(report["schema_version"], 2)
 
     def test_script_change_invalidates_runtime_lock(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
