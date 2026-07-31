@@ -41,7 +41,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 8b. **对白 i2i**：先 performance-state；FRW receipt 优先，否则查 Comfy；忙则等。[lesson](references/lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 final。
-10. **字幕**：像素内中文；HF 失字 recovery；`sub_lead=0`；禁空 SRT。`caption_mode`/`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)。
+10. **字幕与画面字**：最终画面内字幕唯一所有权=HyperFrames；HF 失字必须修 HF 后重渲，禁 FFmpeg/PIL 兜底或双烧；`sub_lead=0`，禁空 SRT。I2V 出现任何内生字幕、乱码、伪字或水印时，禁入成片：全解码帧审计→命中帧及前后帧逐帧 i2i→重编→全帧复审→人工审。`caption_mode`/`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)。
 11. **后期单责**：title/sub/end 单引擎；`plate-cards blank`、plate `subs=off` 防双烧（[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)）。
 11b. **连载**：`serial validate`；系列圣经、单集事件、追更钩子与权利来源可审计。[workflow](references/serial-narrative-workflow.md)
 12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐。

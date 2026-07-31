@@ -3194,7 +3194,13 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     review_note = str(getattr(args, "review_note", "") or "").strip()
     anatomy_safe = getattr(args, "anatomy_safe", False) is True
     queue_job_id = str(getattr(args, "queue_job_id", "") or "").strip()
-    if args.status == "approved" and str(endpoint or "").startswith("frw_ltx"):
+    if args.status == "approved":
+        from motion_evidence import MotionEvidenceError, require_queue_job_for_canonical_project
+
+        try:
+            require_queue_job_for_canonical_project(root, queue_job_id=queue_job_id)
+        except MotionEvidenceError as exc:
+            raise FilmError(str(exc)) from exc
         from visual_text_audit import VisualTextAuditError, require_clean_audit
 
         try:
@@ -3204,16 +3210,6 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                 f"approved FRW LTX clip requires clean visual-text audit: {exc}"
             ) from exc
     if args.status == "approved":
-        from motion_evidence import MotionEvidenceError, require_queue_job_for_canonical_project
-
-        # Direct Python callers predating --queue-job-id can still register a
-        # fully reviewed local import. The CLI always supplies this attribute,
-        # so canonical CLI registrations remain queue-bound.
-        if hasattr(args, "queue_job_id"):
-            try:
-                require_queue_job_for_canonical_project(root, queue_job_id=queue_job_id)
-            except MotionEvidenceError as exc:
-                raise FilmError(str(exc)) from exc
         from anatomy_safety import AnatomySafetyError, require_anatomy_safe
 
         try:
@@ -4023,6 +4019,12 @@ def cmd_final(args: argparse.Namespace) -> int:
     if not script.is_file():
         raise FilmError(f"Missing {script}")
     root = Path(args.root).expanduser().resolve()
+    from production_truth import ProductionTruthError, require_current_canonical_truth
+
+    try:
+        require_current_canonical_truth(root)
+    except ProductionTruthError as exc:
+        raise FilmError(str(exc)) from exc
     post_engine = str(getattr(args, "post_engine", "ffmpeg") or "ffmpeg").strip().lower()
     if post_engine not in {"ffmpeg", "hyperframes", "remotion"}:
         raise FilmError("--post-engine must be ffmpeg|hyperframes|remotion")
@@ -4134,7 +4136,7 @@ def cmd_final(args: argparse.Namespace) -> int:
     # ── Staged final (P0 · 2026-07-23): no assumed captions ──
     # stage_plate  → FFmpeg VO/BGM/clips; HF/Remotion path forces plate subs=off
     # stage_hf     → HyperFrames owns designed captions (export+render)
-    # stage_caption→ verify pixels; pil_recovery only as named stage if HF failed
+    # stage_caption→ verify pixels; HyperFrames is the sole caption owner
     # Never: hand-mux silent plate and claim "HF will have burned subs".
     stages_receipt: dict[str, Any] = {}
     subs_mode = str(getattr(args, "subs", None) or "").strip().lower()
@@ -4403,13 +4405,14 @@ def cmd_final(args: argparse.Namespace) -> int:
             "output_sha256": result.get("output_sha256"),
         }
 
-        # stage_caption: verify HF put captions in delivery; recover explicitly if not
+        # stage_caption: verify HF put captions in delivery.  A formal HF
+        # deliverable never falls back to another caption renderer: that would
+        # violate the single-owner contract and hide a broken HF export.
         final_path = Path(str(result.get("output") or root / "out" / "film_final.mp4"))
         log("stage_caption: verify HF caption ownership (no assume) ...")
         caption_gate = ensure_captions_after_hf(
             root,
             final_mp4=final_path,
-            allow_pil_recovery=not bool(getattr(args, "no_caption_recovery", False)),
         )
         stages_receipt["caption"] = caption_gate
         if not caption_gate.get("ok"):
@@ -4422,12 +4425,10 @@ def cmd_final(args: argparse.Namespace) -> int:
                     "stages": stages_receipt,
                     "stages_receipt": str(stages_path),
                     "error": caption_gate.get("error")
-                    or "HF caption gate failed and recovery did not produce burned subs",
+                    or "HF caption gate failed; a HyperFrames re-render is required",
                     "next": [
-                        f'python3 "{skill_dir}/scripts/burn_srt_pil.py" '
-                        f'--video "{final_path}" --srt "{root}/out/final.srt" '
-                        f'--out "{final_path}"',
-                        "or re-run: aifilm final --post-engine hyperframes",
+                        "inspect compose/hyperframes caption layout and SRT binding",
+                        "re-run: aifilm final --post-engine hyperframes",
                     ],
                 }
             )
@@ -4436,8 +4437,6 @@ def cmd_final(args: argparse.Namespace) -> int:
         burned = owner in {
             "hyperframes",
             "hyperframes_export_only",
-            "pil_recovery",
-            "ffmpeg_plate",
         }
         stages_receipt["deliver"] = patch_delivery_burned_in(root, burned_in=burned, owner=owner)
         stages_path = write_stages_receipt(root, stages_receipt)
@@ -4565,6 +4564,12 @@ def which_npx_safe() -> str | None:
 
 def cmd_review_final(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
+    from production_truth import ProductionTruthError, require_current_canonical_truth
+
+    try:
+        require_current_canonical_truth(root)
+    except ProductionTruthError as exc:
+        raise FilmError(str(exc)) from exc
     from cinematic_audit import write_audit
 
     cinematic = write_audit(root, require_authored_contract=True, require_media_evidence=True)
@@ -9016,8 +9021,8 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["ffmpeg", "hyperframes", "remotion"],
         help=(
             "Staged final: ffmpeg=plate burns captions; "
-            "hyperframes|remotion=stage_plate (subs off) → stage_hf captions → "
-            "stage_caption verify (pil_recovery if HF pixels empty) → deliver. "
+            "hyperframes=stage_plate (subs off) → stage_hf captions → "
+            "stage_caption verify (HF failure blocks and must re-render) → deliver. "
             "Never assumes HF burned without gate."
         ),
     )
@@ -9039,9 +9044,7 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument(
         "--no-caption-recovery",
         action="store_true",
-        help=(
-            "After HF, if caption pixel gate fails do NOT run pil burn recovery — hard fail instead"
-        ),
+        help=("Deprecated compatibility flag; HyperFrames delivery never uses caption recovery"),
     )
     fin.add_argument(
         "--compose-quality",

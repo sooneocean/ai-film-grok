@@ -175,16 +175,8 @@ def run_pil_caption_burn(root: Path, *, video: Path, srt: Path, out: Path) -> di
     }
 
 
-def ensure_captions_after_hf(
-    root: Path,
-    *,
-    final_mp4: Path,
-    allow_pil_recovery: bool = True,
-) -> dict[str, Any]:
-    """Stage caption: verify HF caption ownership; recover with PIL if needed.
-
-    Returns caption_owner: hyperframes | pil_recovery | missing
-    """
+def ensure_captions_after_hf(root: Path, *, final_mp4: Path) -> dict[str, Any]:
+    """Fail closed unless HyperFrames is the verified caption owner."""
     root = Path(root).expanduser().resolve()
     final_mp4 = Path(final_mp4).expanduser().resolve()
     srt = root / "out" / "final.srt"
@@ -237,44 +229,9 @@ def ensure_captions_after_hf(
             report["note"] = "pixel probe unavailable; export captions accepted with caution"
             return report
 
-    if not allow_pil_recovery:
-        report["caption_owner"] = "missing"
-        report["ok"] = False
-        report["error"] = (
-            "HF caption gate failed and pil recovery disabled. "
-            "Re-run compose-render or burn_srt_pil.py"
-        )
-        return report
-
-    if not srt.is_file():
-        report["caption_owner"] = "missing"
-        report["ok"] = False
-        report["error"] = "no out/final.srt for pil recovery"
-        return report
-
-    # Explicit recovery — never silent
-    bak = root / "out" / "film_final_pre_caption_recovery.mp4"
-    if final_mp4.is_file() and not bak.exists():
-        bak.write_bytes(final_mp4.read_bytes())
-    recovery = run_pil_caption_burn(root, video=final_mp4, srt=srt, out=final_mp4)
-    report["recovery"] = recovery
-    if recovery.get("ok"):
-        report["caption_owner"] = "pil_recovery"
-        report["ok"] = True
-        report["note"] = (
-            "HF did not put verifiable captions in pixels; "
-            "stage_caption ran burn_srt_pil recovery (explicit, not assumed)"
-        )
-        # re-probe
-        report["pixel_probe_after_recovery"] = sample_bottom_band_activity(
-            final_mp4, timestamps=timestamps
-        )
-    else:
-        report["caption_owner"] = "missing"
-        report["ok"] = False
-        report["error"] = "pil recovery failed: " + str(
-            recovery.get("error") or recovery.get("stderr")
-        )
+    report["caption_owner"] = "missing"
+    report["ok"] = False
+    report["error"] = "HF caption gate failed; repair the HyperFrames captions and re-render"
     return report
 
 

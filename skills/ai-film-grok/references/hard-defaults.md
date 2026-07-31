@@ -118,7 +118,7 @@
 | 规则 | 默认 |
 |---|---|
 | 交付 | `final --post-engine hyperframes` |
-| 双烧 | `plate-cards blank` + `subs off` |
+| 字幕唯一所有权 | `plate-cards blank` + `subs off`；最终烧字只能由 HyperFrames 完成，HF 失败即修复并重渲，禁 PIL/FFmpeg 兜底 |
 | final | 串行；FRW clip 先 re-encode 再 register |
 | loudnorm | auto ≈ -16 LUFS |
 | 路径 | HF 忌空格路径 → 可拷 `/tmp/...` |
@@ -168,6 +168,6 @@
 见 [lessons-2026-07-22-shaofu-cast-subs-bgm-final.md](lessons-2026-07-22-shaofu-cast-subs-bgm-final.md)。
 
 - 角色 still：只 `image_edit(cast)`；禁审核失败后 t2i 绕脸
-- HF `subs=off` 仅当 HF 真完成；否则 plate **burn**
+- HF `subs=off` 仅当 HF 真完成；HF 失字即阻塞交付、修 HF 后重渲，禁止 plate/PIL 改烧
 - 色气 BGM：`assets/bgm/rnb/*` 优先
 - `aifilm final` → render_final **timeout≥600s**

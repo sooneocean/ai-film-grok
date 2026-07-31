@@ -144,7 +144,10 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
                 ],
             )
             stages.append(i2v)
-            if mode == "on_camera" and bool(line.get("lipsync_required")):
+            # Every provider I2V clip is scanned: visual text can appear in B-roll
+            # and non-lipsync shots just as readily as in dialogue close-ups.
+            requires_visual_text_audit = True
+            if requires_visual_text_audit:
                 visual_text_audit = _stage(
                     f"{line_id}:visual-text-audit",
                     line_id=line_id,

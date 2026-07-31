@@ -24,7 +24,7 @@
 |------|------|----------|------|
 | `stage_plate` | `render_final --subs off --plate-cards blank` | **无**（plate 只出 VO/BGM/片） | plate ok + `out/final.srt` 已写 |
 | `stage_hf` | HyperFrames export+render | **HF 设计字幕** | `captions_placed` / index `.caption` |
-| `stage_caption` | 像素探针；失败则 **显式** `burn_srt_pil` recovery | hyperframes 或 pil_recovery | 底栏探针或 recovery ok |
+| `stage_caption` | 像素探针；失败则修复 HyperFrames 后重渲 | **hyperframes 唯一** | 底栏探针与 HF export 都通过 |
 | `stage_deliver` | 写 `receipts/final-stages.json` + `caption_owner` | 记账 | `burned_in` 与 owner 一致 |
 
 | 步骤 | 命令/动作 | 验收 |
@@ -42,8 +42,8 @@
 ## 本机烧字配方（无 libass）
 
 ```bash
-# 首选：render_final 内置 PIL burn
-python3 "$AIFILM_SCRIPTS/render_final.py" --root "<root>" --subs burn ...
+# 仅排查用：不得作为正式 HyperFrames 交付的字幕替代。
+# 修复 HyperFrames 设计层与 SRT 绑定后，重跑正式 final。
 
 # 若已有 film_final 无字 + final.srt：
 # 用 render_final.sub_png + ffmpeg overlay 分批烧（见 session 2026-07-23 脚本）

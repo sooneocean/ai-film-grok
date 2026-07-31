@@ -881,6 +881,23 @@ def register_final_film(
     if not source.is_file():
         raise ComposeRenderError(f"Source MP4 missing: {source}")
 
+    if post_engine == "hyperframes":
+        # All formal HyperFrames registrations, including --register-only and
+        # register-final, share this fail-closed ownership gate.
+        try:
+            from final_stages import ensure_captions_after_hf
+
+            caption_gate = ensure_captions_after_hf(root, final_mp4=source)
+        except Exception as exc:
+            raise ComposeRenderError(f"could not verify HyperFrames captions: {exc}") from exc
+        if not caption_gate.get("ok"):
+            raise ComposeRenderError(
+                str(
+                    caption_gate.get("error")
+                    or "HyperFrames caption gate failed; re-render required"
+                )
+            )
+
     if source.resolve() != final_path.resolve():
         shutil.copy2(source, final_path)
 
@@ -1434,6 +1451,21 @@ def compose_render(
         ],
     }
 
+    # This command is also a formal HyperFrames-final entry point, so it must
+    # enforce the same single caption owner as `aifilm final`.  Do this before
+    # registration: an HF render without verified HF captions is not a final.
+    try:
+        from final_stages import ensure_captions_after_hf
+
+        caption_gate = ensure_captions_after_hf(root, final_mp4=mixed_out)
+    except Exception as exc:
+        raise ComposeRenderError(f"could not verify HyperFrames captions: {exc}") from exc
+    result["caption"] = caption_gate
+    if not caption_gate.get("ok"):
+        raise ComposeRenderError(
+            str(caption_gate.get("error") or "HyperFrames caption gate failed; re-render required")
+        )
+
     if register:
         try:
             reg = register_final_film(
@@ -1448,6 +1480,13 @@ def compose_render(
             result["output"] = reg["output"]
             result["output_sha256"] = reg["output_sha256"]
             result["duration_sec"] = reg.get("duration_sec")
+            from final_stages import patch_delivery_burned_in
+
+            result["caption_delivery"] = patch_delivery_burned_in(
+                root,
+                burned_in=True,
+                owner=str(caption_gate["caption_owner"]),
+            )
         except ComposeRenderError as exc:
             result["register_error"] = str(exc)
             result["hint"] = (

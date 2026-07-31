@@ -23,6 +23,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import final_stages  # noqa: E402
+from compose_render import ComposeRenderError, register_final_film  # noqa: E402
 
 
 def _write(path: Path, text: str) -> None:
@@ -121,8 +122,8 @@ class TestEnsureCaptionsAfterHf(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertEqual(result["caption_owner"], "hyperframes_export_only")
 
-    def test_pil_recovery_disabled_no_srt(self):
-        """HF failed, recovery disabled, no SRT → caption_owner=missing."""
+    def test_hf_failure_without_srt_blocks_delivery(self):
+        """HF failure blocks delivery rather than choosing another caption owner."""
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -136,15 +137,13 @@ class TestEnsureCaptionsAfterHf(unittest.TestCase):
                     final_stages, "sample_bottom_band_activity", return_value={"ok": False}
                 ):
                     result = final_stages.ensure_captions_after_hf(
-                        root,
-                        final_mp4=Path(tmp) / "fake.mp4",
-                        allow_pil_recovery=False,
+                        root, final_mp4=Path(tmp) / "fake.mp4"
                     )
             self.assertFalse(result["ok"])
             self.assertEqual(result["caption_owner"], "missing")
 
-    def test_pil_recovery_success(self):
-        """HF failed + PIL recovery succeeds → caption_owner=pil_recovery."""
+    def test_hf_failure_never_calls_pil_recovery(self):
+        """A broken HF export stays rejected even when a PIL tool is available."""
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -166,16 +165,14 @@ class TestEnsureCaptionsAfterHf(unittest.TestCase):
                         final_stages,
                         "run_pil_caption_burn",
                         return_value={"ok": True, "out": str(final), "sha256": "abc"},
-                    ):
+                    ) as pil_burn:
                         result = final_stages.ensure_captions_after_hf(root, final_mp4=final)
-            self.assertTrue(result["ok"])
-            self.assertEqual(result["caption_owner"], "pil_recovery")
-            self.assertIn("recovery", result)
-            # Backup should have been created
-            self.assertTrue((root / "out" / "film_final_pre_caption_recovery.mp4").is_file())
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["caption_owner"], "missing")
+            pil_burn.assert_not_called()
 
-    def test_pil_recovery_failure(self):
-        """HF failed + PIL recovery fails → caption_owner=missing."""
+    def test_hf_failure_names_hyperframes_rerender_as_the_fix(self):
+        """The rejection asks for an HF repair, never a second caption renderer."""
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -190,17 +187,29 @@ class TestEnsureCaptionsAfterHf(unittest.TestCase):
                 with mock.patch.object(
                     final_stages, "sample_bottom_band_activity", return_value={"ok": False}
                 ):
-                    with mock.patch.object(
-                        final_stages,
-                        "run_pil_caption_burn",
-                        return_value={"ok": False, "error": "ffmpeg failed"},
-                    ):
-                        result = final_stages.ensure_captions_after_hf(
-                            root, final_mp4=Path(tmp) / "fake.mp4"
-                        )
+                    result = final_stages.ensure_captions_after_hf(
+                        root, final_mp4=Path(tmp) / "fake.mp4"
+                    )
             self.assertFalse(result["ok"])
             self.assertEqual(result["caption_owner"], "missing")
-            self.assertIn("pil recovery failed", result.get("error", ""))
+            self.assertIn("HyperFrames", result.get("error", ""))
+
+
+class TestHyperFramesFinalRegistration(unittest.TestCase):
+    def test_register_final_blocks_without_verified_hyperframes_captions(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "candidate.mp4"
+            _write(source, "not decoded because caption gate runs first")
+            with mock.patch.object(
+                final_stages,
+                "ensure_captions_after_hf",
+                return_value={"ok": False, "error": "HF caption gate failed"},
+            ):
+                with self.assertRaisesRegex(ComposeRenderError, "HF caption gate failed"):
+                    register_final_film(root, source, post_engine="hyperframes")
 
 
 class TestPatchDeliveryBurnedIn(unittest.TestCase):

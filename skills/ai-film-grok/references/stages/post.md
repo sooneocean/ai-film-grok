@@ -14,7 +14,7 @@
 | SRT `segment starts before previous ends` | **`sub_lead` 默认 0**；cue 写盘前非重叠钳制（`render_final` 已内建） |
 | `aifilm final --plate-timeout 900` 假失败 | **长片直调** `scripts/render_final.py`（15–30min+） |
 | `review-shot --approve` 未变 approved | 换片后 **再** `register-clip --status approved --review-receipt`（sha 对齐） |
-| plate 无字当交付 | plate `subs=off` 后必须 **burn 中文**（`burn_srt_pil` 或 HF 真烧） |
+| plate 无字当交付 | plate `subs=off` 后必须由 **HyperFrames** 真烧中文；失字即修复 HF 并重渲，禁其他烧字器兜底 |
 
 深入资料：[post-compose.md](../post-compose.md) · [postproduction.md](../postproduction.md) ·  
 [subs-always-burn-hard](../lessons-2026-07-23-subs-always-burn-hard.md) ·  

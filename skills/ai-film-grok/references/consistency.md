@@ -125,6 +125,8 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 | **T4 入组前检** | register-still 前目视/OCR 四角+底边；命中 → **禁 register / 禁 I2V** |
 | **T5 脏了先 scrub** | `image_edit` 去字 → 复检 → 再 I2V；禁止脏 keyframe bulk |
 
+I2V 成片若仍出现内生字幕、乱码、伪字或水印，不可用最终字幕覆盖或裁切掩盖：先运行 `visual-text-audit` 全解码帧审计；命中后运行 `visual-text-repair`，它会对命中帧及相邻帧逐帧 Qwen i2i，保留被拒绝源片、重编输出，再对修复片执行全帧复审与人工审。最终中文字幕只由 HyperFrames 在最后一层烧入。
+
 **禁止**：带着角落 `shot11` 字样的 still 进成片；把工程 ID 写进 Imagine prompt 当画面描述。
 
 ### 1d. 首帧结构门禁（2026-07-21 · P0 致命）
