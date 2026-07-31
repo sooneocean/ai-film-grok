@@ -70,6 +70,16 @@ def test_unicode_logical_state_id_uses_stable_safe_paths(tmp_path: Path) -> None
     assert report["image_path"].endswith(".png")
 
 
+@pytest.mark.parametrize("malicious_id", ["hero;touch-pwned", "hero$(touch pwned)", "hero\nnext"])
+def test_logical_state_identifiers_reject_shell_metacharacters(
+    tmp_path: Path, malicious_id: str
+) -> None:
+    with pytest.raises(ValueError, match="safe logical identifier"):
+        validate_performance_state(tmp_path, speaker=malicious_id, state_id="state-01")
+    with pytest.raises(ValueError, match="safe logical identifier"):
+        validate_performance_state(tmp_path, speaker="hero", state_id=malicious_id)
+
+
 def test_approved_state_requires_hash_bound_i2i_and_human_review(tmp_path: Path) -> None:
     state_id = "hero-state-deadbeef"
     image = tmp_path / "canonical" / "performance-states" / "hero" / f"{state_id}.png"

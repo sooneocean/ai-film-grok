@@ -21,9 +21,14 @@ def _identifier(value: object, *, field: str) -> str:
 
 
 def _logical_identifier(value: object, *, field: str) -> str:
-    text = str(value or "").strip()
-    if not text or len(text) > 255 or any(char in text for char in ("/", "\\", "\x00")):
-        raise ValueError(f"{field} must be a non-path logical identifier")
+    text = str(value or "")
+    if (
+        not text
+        or text != text.strip()
+        or len(text) > 255
+        or not all(char.isalnum() or char in "_-" for char in text)
+    ):
+        raise ValueError(f"{field} must be a safe logical identifier")
     return text
 
 

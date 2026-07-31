@@ -13,6 +13,7 @@ Also hooked from preflight / dispatch.
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -318,11 +319,22 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
             if not state_id:
                 missing_dialogue_states.append(f"{sid}:missing-performance-state-id")
                 continue
-            approval = validate_performance_state(
-                root,
-                speaker=hero_id,
-                state_id=state_id,
-            )
+            try:
+                approval = validate_performance_state(
+                    root,
+                    speaker=hero_id,
+                    state_id=state_id,
+                )
+            except ValueError as exc:
+                missing_dialogue_states.append(f"{sid}:invalid-performance-state-id")
+                dialogue_state_index[sid] = {
+                    "hero_id": hero_id,
+                    "performance_state_id": state_id,
+                    "path": None,
+                    "exists": False,
+                    "approval": {"ok": False, "error": str(exc)},
+                }
+                continue
             state_path = Path(str(approval["image_path"]))
             state_rel = state_path.relative_to(root)
             approval_receipt_rel = Path(str(approval["receipt_path"])).relative_to(root)
@@ -382,7 +394,8 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                         "approval_receipt_out": str(approval_receipt_rel),
                         "approval_command": (
                             "aifilm approve-performance-state --speaker "
-                            f"{hero_id} --state-id {state_id} --image {state_rel} "
+                            f"{shlex.quote(hero_id)} --state-id {shlex.quote(state_id)} "
+                            f"--image {shlex.quote(str(state_rel))} "
                             "--generation-receipt <generation_receipt_out> "
                             "--reviewer <reviewer> --review-note <note>"
                         ),
