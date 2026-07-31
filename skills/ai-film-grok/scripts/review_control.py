@@ -243,6 +243,9 @@ def review_queue(root: Path | str) -> dict[str, Any]:
     base = _root(root)
     ledger = read_approval_ledger(base)
     actions = _load_actions(base)
+    from interactive_orchestration import queue_status
+
+    cloud = queue_status(base)
     items: list[dict[str, Any]] = []
     for stage, title, paths in [*STAGES, *_shot_items(base)]:
         hashes = _hashes(base, paths)
@@ -264,6 +267,47 @@ def review_queue(root: Path | str) -> dict[str, Any]:
                 ],
             }
         )
+    for item in items:
+        if not item["id"].startswith("shot:"):
+            continue
+        shot_id = item["id"].removeprefix("shot:")
+        candidates = [row for row in cloud["candidates"] if row.get("shot_id") == shot_id]
+        item["cloud_candidates"] = [
+            {
+                key: row.get(key)
+                for key in (
+                    "id",
+                    "provider",
+                    "model",
+                    "task_id",
+                    "status",
+                    "error_code",
+                    "media_path",
+                    "receipt_path",
+                    "technical_qa",
+                )
+            }
+            for row in candidates
+        ]
+        bound_paths = tuple(
+            str(row[key])
+            for row in candidates
+            if row.get("status") == "reviewable"
+            for key in ("media_path", "receipt_path")
+            if isinstance(row.get(key), str)
+        )
+        if bound_paths:
+            extra_hashes = _hashes(base, bound_paths)
+            item["input_hashes"].update(extra_hashes)
+            item["evidence_refs"] = sorted(item["input_hashes"])
+            item["media"] = sorted(
+                set(item["media"])
+                | {
+                    path
+                    for path in extra_hashes
+                    if Path(path).suffix.lower() in {".mp4", ".mov", ".m4v", ".webm"}
+                }
+            )
     book = read_json(base / "production-book.json") or {}
     if book.get("rigor") == "professional":
         from director_cli import validate_native_stage_evidence
@@ -295,6 +339,7 @@ def review_queue(root: Path | str) -> dict[str, Any]:
         "kind": "review-queue",
         "ledger_revision": ledger["revision"],
         "items": items,
+        "cloud": {"next_reviewable_shot": cloud["next_reviewable_shot"]},
         "budget": budget_status(base),
         "runtime": runtime_status(base),
     }
@@ -425,6 +470,7 @@ def record_action(
     note: str,
     timestamp_sec: float | None,
     expected_ledger_revision: int,
+    candidate_id: str | None = None,
 ) -> dict[str, Any]:
     base = _root(root)
     stage = _safe_stage(stage)
@@ -448,6 +494,16 @@ def record_action(
     item = next((value for value in queue["items"] if value["id"] == stage), None)
     if item is None or not item["input_hashes"]:
         raise ReviewControlError("review item has no current local evidence")
+    from interactive_orchestration import (
+        InteractiveOrchestrationError,
+        assert_review_action_allowed,
+        note_review_action,
+    )
+
+    try:
+        assert_review_action_allowed(base, stage=stage, action=action, candidate_id=candidate_id)
+    except InteractiveOrchestrationError as exc:
+        raise ReviewControlError(str(exc)) from exc
     event = {
         "stage": stage,
         "action": action,
@@ -457,6 +513,8 @@ def record_action(
         "input_hashes": item["input_hashes"],
         "recorded_at": utc_now(),
     }
+    if candidate_id is not None:
+        event["candidate_id"] = candidate_id
     if action == "approve":
         if stage.startswith("director:"):
             director_stage = stage.split(":", 1)[1]
@@ -488,6 +546,7 @@ def record_action(
                         "source": "review-ui",
                         "action": "approve",
                         "stage": stage,
+                        "candidate_id": candidate_id,
                     },
                     input_hashes=item["input_hashes"],
                     evidence_refs=item["evidence_refs"],
@@ -508,6 +567,7 @@ def record_action(
         phase="completed" if action == "approve" else "failed",
         note=issue,
     )
+    note_review_action(base, stage=stage, action=action, candidate_id=candidate_id)
     return {"ok": True, "event": event, "queue": review_queue(base)}
 
 

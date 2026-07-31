@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "armory-qwen-no-text-technical-receipt",
-  "status": "technical_verified_candidate_pending_human_review",
+  "status": "approved_for_production_use_non_default",
   "weapon_id": "qwen-image-2512-quality",
   "prompt_id": "a24e1f2f-fd1d-41f2-b0c7-e3946e95ad3b",
   "workflow_sha256": "ab1597cb65409a3cdca7265963f65882724f179a104aaa61f3fa0a169d90b562",
@@ -22,5 +22,16 @@
     "automatic_promotion": false,
     "default_route_changed": false
   },
-  "next_gate": "human_visual_review_required"
+  "human_visual_review": {
+    "approved": true,
+    "approved_by": "user",
+    "approval_phrase": "審完ok下一步"
+  },
+  "production_use_authorization": {
+    "approved": true,
+    "approved_by": "user",
+    "authorization_phrase": "授權下一步",
+    "scope": "production_use_non_default"
+  },
+  "next_gate": "project_bound_use_or_default_route_change_requires_separate_authorization"
 }

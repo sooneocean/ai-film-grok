@@ -1469,6 +1469,7 @@ def cmd_dialogue_benchmark_queue(args: argparse.Namespace) -> int:
         complete,
         enqueue,
         status,
+        submit_comfy,
     )
 
     try:
@@ -1479,6 +1480,14 @@ def cmd_dialogue_benchmark_queue(args: argparse.Namespace) -> int:
             report = claim(Path(args.root))
         elif action == "complete":
             report = complete(Path(args.root), job_id=args.job_id, claim_token=args.claim_token)
+        elif action == "submit-comfy":
+            report = submit_comfy(
+                Path(args.root),
+                job_id=args.job_id,
+                claim_token=args.claim_token,
+                workflow=Path(args.workflow),
+                weapon_id=args.weapon_id,
+            )
         else:
             report = status(Path(args.root))
     except DialogueBenchmarkQueueError as exc:
@@ -4025,7 +4034,7 @@ def cmd_final(args: argparse.Namespace) -> int:
         require_current_canonical_truth(root)
     except ProductionTruthError as exc:
         raise FilmError(str(exc)) from exc
-    post_engine = str(getattr(args, "post_engine", "ffmpeg") or "ffmpeg").strip().lower()
+    post_engine = str(getattr(args, "post_engine", "hyperframes") or "hyperframes").strip().lower()
     if post_engine not in {"ffmpeg", "hyperframes", "remotion"}:
         raise FilmError("--post-engine must be ffmpeg|hyperframes|remotion")
     post_plan: dict[str, Any] | None = None
@@ -6681,6 +6690,14 @@ def cmd_review_ui(args: argparse.Namespace) -> int:
     return code
 
 
+def cmd_interactive(args: argparse.Namespace) -> int:
+    from cli_interactive import run_interactive
+
+    report, code = run_interactive(args)
+    emit(report)
+    return code
+
+
 def cmd_dispatch(args: argparse.Namespace) -> int:
     """Auto-orchestrate: craft + capability + next → single agent packet."""
     root = Path(args.root).expanduser().resolve()
@@ -9012,12 +9029,12 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument(
         "--plate-cards",
         choices=["text", "blank", "auto"],
-        default="auto",
-        help="auto: blank under hyperframes/remotion, text under ffmpeg; blank=pad only no glyphs",
+        default="blank",
+        help="blank=pad only with no glyphs (default); text is an explicit FFmpeg-only compatibility override",
     )
     fin.add_argument(
         "--post-engine",
-        default="ffmpeg",
+        default="hyperframes",
         choices=["ffmpeg", "hyperframes", "remotion"],
         help=(
             "Staged final: ffmpeg=plate burns captions; "
@@ -9028,11 +9045,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     fin.add_argument(
         "--subs",
-        default=None,
+        default="off",
         choices=["burn", "off"],
         help=(
-            "Plate only: burn|off. Default burn for ffmpeg; forced off for "
-            "hyperframes|remotion so HF owns captions (double-burn guard)."
+            "Plate only: off is the default so HyperFrames is the sole text/caption layer; "
+            "burn is an explicit FFmpeg-only compatibility override."
         ),
     )
     fin.add_argument(
@@ -9284,6 +9301,12 @@ def build_parser() -> argparse.ArgumentParser:
     dialogue_benchmark_queue_complete_p.add_argument("--root", required=True)
     dialogue_benchmark_queue_complete_p.add_argument("--job-id", required=True)
     dialogue_benchmark_queue_complete_p.add_argument("--claim-token", required=True)
+    dialogue_benchmark_queue_submit_p = dialogue_benchmark_queue_sub.add_parser("submit-comfy")
+    dialogue_benchmark_queue_submit_p.add_argument("--root", required=True)
+    dialogue_benchmark_queue_submit_p.add_argument("--job-id", required=True)
+    dialogue_benchmark_queue_submit_p.add_argument("--claim-token", required=True)
+    dialogue_benchmark_queue_submit_p.add_argument("--workflow", required=True)
+    dialogue_benchmark_queue_submit_p.add_argument("--weapon-id", required=True)
 
     creative = sub.add_parser(
         "creative-pipeline", help="Radio cut, animatic and premium pre-production gates"
@@ -10369,6 +10392,9 @@ def build_parser() -> argparse.ArgumentParser:
     from review_ui import add_review_ui_parsers
 
     add_review_ui_parsers(sub)
+    from cli_interactive import add_interactive_parsers
+
+    add_interactive_parsers(sub)
 
     from cli_comfy import add_comfy_parsers
 
@@ -10504,6 +10530,7 @@ def main(argv: list[str] | None = None) -> int:
             "assets": cmd_assets,
             "workshop": cmd_workshop,
             "review-ui": cmd_review_ui,
+            "interactive": cmd_interactive,
             "usage": cmd_generation_usage,
             "metrics": cmd_metrics,
             "experiment": cmd_experiment,

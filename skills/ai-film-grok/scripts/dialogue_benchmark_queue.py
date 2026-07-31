@@ -8,13 +8,20 @@ records the existing human-review receipt before completing the queue job.
 from __future__ import annotations
 
 import fcntl
+import json
 import secrets
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from dialogue_benchmark import MAX_DURATION_SEC, MIN_DURATION_SEC, WEAPON_EXECUTORS, WEAPONS
+from dialogue_benchmark import (
+    MAX_DURATION_SEC,
+    MIN_DURATION_SEC,
+    WEAPON_EXECUTORS,
+    supported_weapon_set,
+)
 from runtime_policy import sha256
+from security_policy import SecurityPolicyError, safe_existing_file
 from util import read_json, utc_now, write_json
 
 _QUEUE_NAME = "dialogue-benchmark-queue.json"
@@ -33,12 +40,12 @@ _LEGACY_WEAPON_EXECUTORS = {
     "rtx_latentsync_1_6": "comfy",
 }
 _EXECUTOR_BY_WEAPON = {**_LEGACY_WEAPON_EXECUTORS, **WEAPON_EXECUTORS}
-_SUPPORTED_WEAPON_SETS = frozenset(
-    {
-        frozenset(WEAPONS),
-        frozenset(_LEGACY_WEAPON_EXECUTORS),
-    }
-)
+_COMFY_WEAPON_BY_BENCHMARK_ARM = {
+    "comfy_qwen_i2i_performance_state": "qwen-image-edit-2511-local",
+    "comfy_qwen_i2i_keyframe": "qwen-image-edit-2511-local",
+    "comfy_wan22_i2v": "wan22-i2v-quality",
+    "rtx_latentsync_1_6": "latentsync-1-6-local",
+}
 
 
 class DialogueBenchmarkQueueError(RuntimeError):
@@ -62,9 +69,7 @@ def _benchmark(base: Path, receipt: Path) -> dict[str, Any]:
         or value.get("kind") != "dialogue-weapon-benchmark"
         or value.get("status") != "planned"
         or not MIN_DURATION_SEC <= duration <= MAX_DURATION_SEC
-        or not isinstance(weapons, list)
-        or len(weapons) != len(set(weapons))
-        or frozenset(weapons) not in _SUPPORTED_WEAPON_SETS
+        or not supported_weapon_set(weapons)
         or not isinstance(value.get("line_ids"), list)
         or not value["line_ids"]
     ):
@@ -84,6 +89,22 @@ def _read_queue(path: Path) -> dict[str, Any]:
     if value.get("kind") != "dialogue-benchmark-queue" or not isinstance(value.get("jobs"), list):
         raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_INVALID")
     return value
+
+
+def _same_benchmark_identity(
+    job: dict[str, Any], queue: dict[str, Any], report: dict[str, Any], benchmark_hash: str
+) -> bool:
+    """Permit receipt review rewrites without accepting a different benchmark."""
+    if job.get("benchmark_sha256") == benchmark_hash:
+        return True
+    batch_weapons = {
+        item.get("weapon")
+        for item in queue["jobs"]
+        if item.get("benchmark_sha256") == job.get("benchmark_sha256")
+    }
+    return job.get("line_ids") == report.get("line_ids") and batch_weapons == set(
+        report.get("weapons") or []
+    )
 
 
 @contextmanager
@@ -155,7 +176,7 @@ def status(root: Path | str) -> dict[str, Any]:
 def claim(root: Path | str) -> dict[str, Any]:
     """Claim one deferred arm with the capacity gate required by its executor."""
     base, receipt, queue_path = _paths(root)
-    _benchmark(base, receipt)
+    report = _benchmark(base, receipt)
     benchmark_hash = sha256(receipt)
     with _queue_lock(queue_path):
         queue = _read_queue(queue_path)
@@ -165,7 +186,8 @@ def claim(root: Path | str) -> dict[str, Any]:
             (
                 item
                 for item in queue["jobs"]
-                if item.get("status") == _PENDING and item.get("benchmark_sha256") == benchmark_hash
+                if item.get("status") == _PENDING
+                and _same_benchmark_identity(item, queue, report, benchmark_hash)
             ),
             None,
         )
@@ -232,8 +254,9 @@ def complete(root: Path | str, *, job_id: str, claim_token: str) -> dict[str, An
             not isinstance(job, dict)
             or job.get("status") != _RUNNING
             or job.get("claim_token") != claim_token
-            or job.get("benchmark_sha256") != benchmark_hash
         ):
+            raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_CLAIM_INVALID")
+        if not _same_benchmark_identity(job, queue, report, benchmark_hash):
             raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_CLAIM_INVALID")
         arm = next(
             (item for item in report.get("arms") or [] if item.get("weapon") == job.get("weapon")),
@@ -265,3 +288,75 @@ def complete(root: Path | str, *, job_id: str, claim_token: str) -> dict[str, An
         queue["updated_at"] = utc_now()
         write_json(queue_path, queue)
     return {"ok": True, "status": "succeeded", "job": job}
+
+
+def submit_comfy(
+    root: Path | str,
+    *,
+    job_id: str,
+    claim_token: str,
+    workflow: Path | str,
+    weapon_id: str,
+) -> dict[str, Any]:
+    """Submit a claimed Comfy benchmark arm through its registered weapon only."""
+    base, receipt, queue_path = _paths(root)
+    report = _benchmark(base, receipt)
+    benchmark_hash = sha256(receipt)
+    try:
+        workflow_path = safe_existing_file(base, workflow, field="benchmark workflow")
+        graph = json.loads(workflow_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError, SecurityPolicyError) as exc:
+        raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_WORKFLOW_INVALID") from exc
+    if not isinstance(graph, dict):
+        raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_WORKFLOW_INVALID")
+    with _queue_lock(queue_path):
+        queue = _read_queue(queue_path)
+        job = next((item for item in queue["jobs"] if item.get("id") == job_id), None)
+        expected_weapon = _COMFY_WEAPON_BY_BENCHMARK_ARM.get(str(job.get("weapon") if job else ""))
+        if (
+            not isinstance(job, dict)
+            or job.get("status") != _RUNNING
+            or job.get("claim_token") != claim_token
+            or job.get("executor") != "comfy"
+            or weapon_id != expected_weapon
+            or job.get("submission_started_at")
+            or not _same_benchmark_identity(job, queue, report, benchmark_hash)
+        ):
+            raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_SUBMISSION_INVALID")
+        job.update(
+            {
+                "submission_started_at": utc_now(),
+                "workflow": str(workflow_path.relative_to(base)),
+                "workflow_sha256": sha256(workflow_path),
+                "weapon_id": weapon_id,
+            }
+        )
+        queue["updated_at"] = utc_now()
+        write_json(queue_path, queue)
+    try:
+        from comfy_armory import (
+            ComfyArmoryError,
+            assert_registered_weapon_workflow,
+            authorize_weapon_execution,
+        )
+        from comfy_video import ComfyVideoError, submit
+        from config_loader import get_config
+
+        base_url = str(get_config().comfyui_base_url or "").strip()
+        if not base_url:
+            raise DialogueBenchmarkQueueError("COMFY_BASE_URL_UNCONFIGURED")
+        authorize_weapon_execution(weapon_id, stage="pilot", allow_experimental=False)
+        assert_registered_weapon_workflow(base_url, weapon_id, graph)
+        prompt_id = submit(base_url, graph, weapon_id=weapon_id)
+    except (ComfyArmoryError, ComfyVideoError) as exc:
+        raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_COMFY_SUBMISSION_FAILED") from exc
+    with _queue_lock(queue_path):
+        queue = _read_queue(queue_path)
+        job = next((item for item in queue["jobs"] if item.get("id") == job_id), None)
+        if not isinstance(job, dict) or job.get("claim_token") != claim_token:
+            raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_CLAIM_INVALID")
+        job["comfy_prompt_id"] = prompt_id
+        job["submitted_at"] = utc_now()
+        queue["updated_at"] = utc_now()
+        write_json(queue_path, queue)
+    return {"ok": True, "status": "submitted", "job": job, "prompt_id": prompt_id}

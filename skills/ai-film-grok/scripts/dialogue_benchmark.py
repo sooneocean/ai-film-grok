@@ -26,6 +26,12 @@ WEAPON_EXECUTORS = {
     "comfy_qwen_i2i_keyframe": "comfy",
     "frw_ltx23_img2video_audio": "frw",
 }
+LEGACY_P2_WEAPONS = (
+    "comfy_qwen_i2i_performance_state",
+    "comfy_wan22_i2v",
+    "rtx_latentsync_1_6",
+)
+SUPPORTED_WEAPON_SETS = frozenset({frozenset(WEAPONS), frozenset(LEGACY_P2_WEAPONS)})
 _PACKAGE_NAME = "dialogue-scene-package.json"
 _REPORT_NAME = "dialogue-weapon-benchmark.json"
 _MAX_PACKAGE_BYTES = 4 * 1024 * 1024
@@ -249,6 +255,14 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def supported_weapon_set(weapons: object) -> bool:
+    return (
+        isinstance(weapons, list)
+        and len(weapons) == len(set(weapons))
+        and frozenset(weapons) in SUPPORTED_WEAPON_SETS
+    )
+
+
 def record_benchmark_arm(
     root: Path | str,
     *,
@@ -264,7 +278,8 @@ def record_benchmark_arm(
         report = _read_report(root_fd)
         media = Path(artifact).expanduser().resolve()
         if (
-            weapon not in WEAPONS
+            not supported_weapon_set(report.get("weapons"))
+            or weapon not in report.get("weapons", [])
             or not media.is_file()
             or not media.is_relative_to(base)
             or not reviewer.strip()
@@ -319,6 +334,8 @@ def approve_benchmark_parameters(
     _base, root_fd = _open_benchmark_root(root)
     try:
         report = _read_report(root_fd)
+        if not supported_weapon_set(report.get("weapons")):
+            raise ValueError("BENCHMARK_SELECTION_INVALID")
         if any(
             not isinstance(arm, dict) or arm.get("status") != "reviewed" for arm in report["arms"]
         ):
@@ -329,7 +346,7 @@ def approve_benchmark_parameters(
             "status": "approved",
             "reviewer": reviewer.strip(),
             "rationale": rationale.strip(),
-            "required_weapons": list(WEAPONS),
+            "required_weapons": list(report.get("weapons") or []),
             "stable_parameters": {
                 str(arm["weapon"]): dict(arm.get("stable_parameters") or {})
                 for arm in report["arms"]

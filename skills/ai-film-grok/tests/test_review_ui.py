@@ -12,6 +12,7 @@ sys.path.insert(0, str(SCRIPTS))
 from director_review import SCORECARD_DIMENSIONS  # noqa: E402
 from review_ui import (
     _PAGE,  # noqa: E402
+    create_invite,  # noqa: E402
     make_handler,  # noqa: E402
 )
 
@@ -69,6 +70,41 @@ def test_status_rejects_bad_token_and_action_rejects_cross_origin(tmp_path: Path
         server.server_close()
 
 
+def test_one_time_invite_exchanges_to_loopback_cookie(tmp_path: Path) -> None:
+    (tmp_path / "receipts").mkdir()
+    server = _server(tmp_path)
+    try:
+        session = {
+            "kind": "review-ui-session",
+            "root": str(tmp_path.resolve()),
+            "port": server.server_port,
+            "token": "test-token",
+        }
+        (tmp_path / "receipts" / "review-ui-session.json").write_text(
+            json.dumps(session), encoding="utf-8"
+        )
+        invite = create_invite(tmp_path)["url"].split("?invite=", 1)[1]
+        connection = HTTPConnection("127.0.0.1", server.server_port)
+        connection.request("GET", f"/?invite={invite}")
+        response = connection.getresponse()
+        assert response.status == 303
+        cookie = response.getheader("Set-Cookie")
+        assert cookie and "HttpOnly" in cookie and "SameSite=Strict" in cookie
+        response.read()
+        connection.close()
+        connection = HTTPConnection("127.0.0.1", server.server_port)
+        connection.request("GET", f"/?invite={invite}")
+        assert connection.getresponse().status == 401
+        connection.close()
+        connection = HTTPConnection("127.0.0.1", server.server_port)
+        connection.request("GET", "/api/status", headers={"Cookie": cookie.split(";", 1)[0]})
+        assert connection.getresponse().status == 200
+        connection.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_media_range_and_workspace_escape_are_handled(tmp_path: Path) -> None:
     (tmp_path / "receipts").mkdir()
     (tmp_path / "sample.mp4").write_bytes(b"abcdef")
@@ -111,6 +147,8 @@ def test_page_exposes_media_preview_and_budget_controls() -> None:
     assert "/api/final-review-input" in _PAGE
     assert "autopilot-status" in _PAGE
     assert "autopilot-enabled" in _PAGE
+    assert "cloudCards" in _PAGE
+    assert "history.replaceState" in _PAGE
 
 
 def test_review_ui_writes_hash_bound_final_review_input(tmp_path: Path) -> None:

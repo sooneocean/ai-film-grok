@@ -240,8 +240,68 @@ def test_action_shot_obeys_ltx_grok_frw_wan_local_priority(tmp_path: Path) -> No
     assert [item["capability_id"] for item in report["alternatives"]] == [
         "grok-i2v",
         "frw-wan",
-        "local-wan",
     ]
+    rejected = {item["capability_id"]: item["reasons"] for item in report["rejected"]}
+    assert "CLOUD_CAPABILITY_AVAILABLE" in rejected["local-wan"]
+
+
+def test_ready_cloud_capability_reserves_local_capacity(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}], i2v_provider="auto")
+    cloud = _capability(
+        "frw-cloud",
+        provider="frw",
+        model="ltx-i2v",
+        operations=["image_to_video"],
+        shot_roles=["hero"],
+    )
+    cloud["resource"] = "cloud"
+    local = _capability(
+        "local-wan",
+        provider="comfy-wan",
+        model="wan2.2",
+        operations=["image_to_video"],
+        shot_roles=["hero"],
+    )
+    local["resource"] = "gpu:rtx5090"
+    _write_capabilities(
+        tmp_path,
+        [cloud, local],
+    )
+
+    report = explain_route(tmp_path, shot_id="shot01", now=NOW)
+
+    assert report["selected"]["capability_id"] == "frw-cloud"
+    rejected = {item["capability_id"]: item["reasons"] for item in report["rejected"]}
+    assert "CLOUD_CAPABILITY_AVAILABLE" in rejected["local-wan"]
+
+
+def test_local_is_available_when_no_ready_cloud_capability_exists(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}], i2v_provider="auto")
+    cloud = _capability(
+        "frw-cloud",
+        provider="frw",
+        model="ltx-i2v",
+        operations=["image_to_video"],
+        shot_roles=["hero"],
+        status="blocked",
+    )
+    cloud["resource"] = "cloud"
+    local = _capability(
+        "local-wan",
+        provider="comfy-wan",
+        model="wan2.2",
+        operations=["image_to_video"],
+        shot_roles=["hero"],
+    )
+    local["resource"] = "gpu:rtx5090"
+    _write_capabilities(
+        tmp_path,
+        [cloud, local],
+    )
+
+    report = explain_route(tmp_path, shot_id="shot01", now=NOW)
+
+    assert report["selected"]["capability_id"] == "local-wan"
 
 
 def test_auto_ltx_default_is_not_a_hard_lock_when_ltx_is_blocked(tmp_path: Path) -> None:

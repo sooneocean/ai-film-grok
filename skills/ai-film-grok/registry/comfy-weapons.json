@@ -151,39 +151,77 @@
       "priority": 100,
       "provider": "comfy-wan22",
       "node": "rtx5090-main",
-      "intents": ["image-to-video", "i2v", "general-i2v"],
-      "quality_tiers": ["max_practical", "standard"],
+      "intents": [
+        "image-to-video",
+        "i2v",
+        "general-i2v"
+      ],
+      "quality_tiers": [
+        "max_practical",
+        "standard"
+      ],
       "profile": "official",
       "workflow_template": "templates/comfy/wan22-i2v-quality-api.json",
-      "bindings": {"prompt_node":"pos","prompt_input":"text","sampler_node":"ks_h","seed_input":"noise_seed","additional_seed_nodes":["ks_l"],"steps_node":"ks_h","steps_input":"steps","additional_steps_nodes":["ks_l"],"input_node":"img","input_image_input":"image","save_node":"save","filename_prefix_input":"filename_prefix"},
-      "defaults": {"steps":20},
-      "tuning": {"steps":{"allowed":[20]}},
-      "trusted_custom_nodes": {"VHS_VideoCombine":"custom_nodes.comfyui-videohelpersuite"},
+      "bindings": {
+        "prompt_node": "pos",
+        "prompt_input": "text",
+        "sampler_node": "ks_h",
+        "seed_input": "noise_seed",
+        "additional_seed_nodes": [
+          "ks_l"
+        ],
+        "steps_node": "ks_h",
+        "steps_input": "steps",
+        "additional_steps_nodes": [
+          "ks_l"
+        ],
+        "input_node": "img",
+        "input_image_input": "image",
+        "save_node": "save",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "defaults": {
+        "steps": 20
+      },
+      "tuning": {
+        "steps": {
+          "allowed": [
+            20
+          ]
+        }
+      },
+      "trusted_custom_nodes": {
+        "VHS_VideoCombine": "custom_nodes.comfyui-videohelpersuite"
+      },
       "requirements": {
         "diffusion_models": [
           "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
           "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
         ],
-        "text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
-        "vae": ["wan_2.1_vae.safetensors"]
+        "text_encoders": [
+          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        ],
+        "vae": [
+          "wan_2.1_vae.safetensors"
+        ]
       },
       "capabilities": {
         "general_i2v": true,
         "external_api_required": false
       },
-  "verified": {
-    "real_pilot": true,
-    "normal_motion_mean": 18.2497,
-    "normal_motion_gate": true,
-    "meat_motion_gate": false,
-    "workflow_template_sha256": "dae3250e558317ba19d8f6438df3d3cce1607540844d2049e1eff51a532a6a93",
-    "output_sha256": "6d79426bb8538035731dd3526e2b29c6149080e22b2d8c33500ed50c2fce9471",
-    "technical_pilot_decode_ok": true,
-    "technical_pilot_geometry": "1024x576@16fps,5.062012s",
-    "visual_contact_sheet": "pass_stable_identity_hand_window_light",
-    "human_review": false,
-    "production_promoted": false
-  }
+      "verified": {
+        "real_pilot": true,
+        "normal_motion_mean": 18.2497,
+        "normal_motion_gate": true,
+        "meat_motion_gate": false,
+        "workflow_template_sha256": "dae3250e558317ba19d8f6438df3d3cce1607540844d2049e1eff51a532a6a93",
+        "output_sha256": "6d79426bb8538035731dd3526e2b29c6149080e22b2d8c33500ed50c2fce9471",
+        "technical_pilot_decode_ok": true,
+        "technical_pilot_geometry": "1024x576@16fps,5.062012s",
+        "visual_contact_sheet": "pass_stable_identity_hand_window_light",
+        "human_review": false,
+        "production_promoted": false
+      }
     },
     {
       "id": "wan22-i2v-portrait-pilot",
@@ -192,23 +230,84 @@
       "priority": 101,
       "provider": "comfy-wan22",
       "node": "rtx5090-main",
-      "intents": ["image-to-video", "i2v", "general-i2v"],
-      "quality_tiers": ["max_practical", "standard"],
+      "intents": [
+        "image-to-video",
+        "i2v",
+        "general-i2v"
+      ],
+      "quality_tiers": [
+        "max_practical",
+        "standard"
+      ],
       "profile": "portrait-canvas-pilot",
       "workflow_template": "templates/comfy/wan22-i2v-portrait-pilot-api.json",
-      "bindings": {"prompt_node":"pos","prompt_input":"text","sampler_node":"ks_h","seed_input":"noise_seed","additional_seed_nodes":["ks_l"],"steps_node":"ks_h","steps_input":"steps","additional_steps_nodes":["ks_l"],"input_node":"img","input_image_input":"image","save_node":"save","filename_prefix_input":"filename_prefix"},
-      "defaults": {"width":576,"height":1024,"steps":20,"length":81,"fps":16},
-      "tuning": {"steps":{"allowed":[20]}},
-      "trusted_custom_nodes": {"VHS_VideoCombine":"custom_nodes.comfyui-videohelpersuite"},
-      "requirements": {
-        "diffusion_models": ["wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"],
-        "text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
-        "vae": ["wan_2.1_vae.safetensors"],
-        "clip_vision": ["clip_vision_h.safetensors"],
-        "loras": ["wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors", "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"]
+      "bindings": {
+        "prompt_node": "pos",
+        "prompt_input": "text",
+        "sampler_node": "ks_h",
+        "seed_input": "noise_seed",
+        "additional_seed_nodes": [
+          "ks_l"
+        ],
+        "steps_node": "ks_h",
+        "steps_input": "steps",
+        "additional_steps_nodes": [
+          "ks_l"
+        ],
+        "input_node": "img",
+        "input_image_input": "image",
+        "save_node": "save",
+        "filename_prefix_input": "filename_prefix"
       },
-      "capabilities": {"general_i2v":true,"portrait_canvas":true,"pilot_only":true,"human_approval_required":true,"external_api_required":false},
-      "verified": {"real_pilot":false,"production_promoted":false,"workflow_template_sha256":"db8b1794b4d07f334c534a4da01f41a238c5d0eb875244fc8ad807e79e463562","human_review":false}
+      "defaults": {
+        "width": 576,
+        "height": 1024,
+        "steps": 20,
+        "length": 81,
+        "fps": 16
+      },
+      "tuning": {
+        "steps": {
+          "allowed": [
+            20
+          ]
+        }
+      },
+      "trusted_custom_nodes": {
+        "VHS_VideoCombine": "custom_nodes.comfyui-videohelpersuite"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+          "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+        ],
+        "text_encoders": [
+          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        ],
+        "vae": [
+          "wan_2.1_vae.safetensors"
+        ],
+        "clip_vision": [
+          "clip_vision_h.safetensors"
+        ],
+        "loras": [
+          "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+          "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+        ]
+      },
+      "capabilities": {
+        "general_i2v": true,
+        "portrait_canvas": true,
+        "pilot_only": true,
+        "human_approval_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": false,
+        "production_promoted": false,
+        "workflow_template_sha256": "db8b1794b4d07f334c534a4da01f41a238c5d0eb875244fc8ad807e79e463562",
+        "human_review": false
+      }
     },
     {
       "id": "wan22-adult-intimacy-baseline",
@@ -217,16 +316,25 @@
       "priority": 90,
       "provider": "comfy-wan22",
       "node": "rtx5090-main",
-      "intents": ["adult-intimacy-i2v"],
-      "quality_tiers": ["max_practical", "standard"],
+      "intents": [
+        "adult-intimacy-i2v"
+      ],
+      "quality_tiers": [
+        "max_practical",
+        "standard"
+      ],
       "profile": "adult-motion",
       "requirements": {
         "diffusion_models": [
           "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
           "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
         ],
-        "text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
-        "vae": ["wan_2.1_vae.safetensors"]
+        "text_encoders": [
+          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        ],
+        "vae": [
+          "wan_2.1_vae.safetensors"
+        ]
       },
       "capabilities": {
         "adult_attestation_required": true,
@@ -244,17 +352,29 @@
       "priority": 80,
       "provider": "comfy-wan22",
       "node": "rtx5090-main",
-      "intents": ["adult-meat-motion-i2v"],
-      "quality_tiers": ["max_practical", "standard"],
+      "intents": [
+        "adult-meat-motion-i2v"
+      ],
+      "quality_tiers": [
+        "max_practical",
+        "standard"
+      ],
       "profile": "adult-general-experimental",
       "requirements": {
         "diffusion_models": [
           "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
           "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
         ],
-        "text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
-        "vae": ["wan_2.1_vae.safetensors"],
-        "loras": ["NSFW-22-H-e8.safetensors", "NSFW-22-L-e8.safetensors"]
+        "text_encoders": [
+          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        ],
+        "vae": [
+          "wan_2.1_vae.safetensors"
+        ],
+        "loras": [
+          "NSFW-22-H-e8.safetensors",
+          "NSFW-22-L-e8.safetensors"
+        ]
       },
       "requirement_sha256": {
         "loras": {
@@ -669,7 +789,16 @@
         "latent_node": "318",
         "latent_input": "audio_latent",
         "audio_vae_node": "279",
-        "frame_slots": [["295", "length"], ["305", "frames_number"]]
+        "frame_slots": [
+          [
+            "295",
+            "length"
+          ],
+          [
+            "305",
+            "frames_number"
+          ]
+        ]
       },
       "requirements": {
         "checkpoints": [
@@ -735,8 +864,12 @@
       "provider": "comfy_lan",
       "source_endpoint": "local_ltx23_distilled_fp8_i2v",
       "node": "rtx5090-main",
-      "intents": ["fast-broll-i2v"],
-      "quality_tiers": ["standard"],
+      "intents": [
+        "fast-broll-i2v"
+      ],
+      "quality_tiers": [
+        "standard"
+      ],
       "workflow_template": "templates/comfy/ltx23-distilled-fp8-fast-broll-i2v-pilot-api.json",
       "bindings": {
         "prompt_node": "303",
@@ -749,15 +882,30 @@
         "filename_prefix_input": "filename_prefix"
       },
       "requirements": {
-        "checkpoints": ["ltx-2.3-22b-distilled-fp8.safetensors"],
-        "loras": ["ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors"],
-        "text_encoders": ["gemma_3_12B_it_fp4_mixed.safetensors"],
-        "latent_upscale_models": ["ltx-2.3-spatial-upscaler-x2-1.1.safetensors"]
+        "checkpoints": [
+          "ltx-2.3-22b-distilled-fp8.safetensors"
+        ],
+        "loras": [
+          "ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors"
+        ],
+        "text_encoders": [
+          "gemma_3_12B_it_fp4_mixed.safetensors"
+        ],
+        "latent_upscale_models": [
+          "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+        ]
       },
       "minimum_vram_mib": 24576,
       "execution_profile": "DistilledPipeline_or_equivalent_local_only",
-      "allowed_stages": ["pilot"],
-      "restrictions": ["no_dialogue", "no_continuous_drama", "not_final", "no_auto_promotion"],
+      "allowed_stages": [
+        "pilot"
+      ],
+      "restrictions": [
+        "no_dialogue",
+        "no_continuous_drama",
+        "not_final",
+        "no_auto_promotion"
+      ],
       "prompt_forbidden_patterns": [
         "\\b(dialogue|conversation|voiceover|narration|speaks?|talks?)\\b",
         "\\b(two people|characters?)\\b",
@@ -784,6 +932,87 @@
         "audio_review",
         "human_review"
       ]
+    },
+    {
+      "id": "lipdub22b-official-fp8-pilot",
+      "display_name": "LipDub 22B official FP8 pilot",
+      "status": "experimental",
+      "priority": 65,
+      "readiness": "installed_unverified",
+      "provider": "comfy_lan",
+      "source_endpoint": "local_ltx23_lipdub",
+      "node": "rtx5090-main",
+      "intents": [
+        "text-redub-visual-preservation-research"
+      ],
+      "quality_tiers": [
+        "pilot"
+      ],
+      "workflow_template": "templates/comfy/lipdub22b-official-fp8-api-pilot.json",
+      "bindings": {
+        "prompt_node": "2483",
+        "prompt_input": "text",
+        "sampler_node": "4832",
+        "seed_input": "noise_seed",
+        "save_node": "4852",
+        "filename_prefix_input": "filename_prefix",
+        "input_node": "5002",
+        "input_image_input": "file"
+      },
+      "requirements": {
+        "checkpoints": [
+          "ltx-2.3-22b-dev-fp8.safetensors"
+        ],
+        "loras": [
+          "ltx-2.3-22b-distilled-lora-384.safetensors",
+          "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors"
+        ],
+        "text_encoders": [
+          "gemma_3_12B_it_fp4_mixed.safetensors"
+        ],
+        "latent_upscale_models": [
+          "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+        ]
+      },
+      "minimum_vram_mib": 24576,
+      "execution_profile": "OfficialLipDubTwoStageFP8LocalOnly",
+      "allowed_stages": [
+        "pilot"
+      ],
+      "restrictions": [
+        "single-speaker-only",
+        "not-final",
+        "no-auto-promotion",
+        "human-review-required"
+      ],
+      "license_scope": "LTX-2-license-review-before-release",
+      "latest_canary_receipt_path": null,
+      "capabilities": {
+        "text_redub": true,
+        "synchronized_audio_video": true,
+        "pilot_only": true,
+        "human_review_required": true,
+        "external_api_required": false
+      },
+      "trusted_custom_nodes": {
+        "GetImageSizeAndCount": "custom_nodes.comfyui-kjnodes",
+        "LTXAddVideoICLoRAGuide": "custom_nodes.ComfyUI-LTXVideo",
+        "LTXFloatToInt": "custom_nodes.ComfyUI-LTXVideo",
+        "LTXICLoRALoaderModelOnly": "custom_nodes.ComfyUI-LTXVideo",
+        "LTXVSetAudioRefTokens": "custom_nodes.ComfyUI-LTXVideo",
+        "LTXVTiledVAEDecode": "custom_nodes.ComfyUI-LTXVideo"
+      },
+      "verified": {
+        "real_pilot": false,
+        "production_promoted": false,
+        "workflow_template_sha256": "99b0192b0f7baa4d2e7717a8055e7d8f589d234085f3c91ab9f98399a1f6d4b4"
+      },
+      "promotion_requirements": [
+        "terminal_media_decode",
+        "frame_audio_semantic_review",
+        "zero_text_artifacts",
+        "human_review"
+      ]
     }
   ],
   "research_weapons": [
@@ -794,8 +1023,14 @@
       "readiness": "real_canary_pending_human_listening_asr_flag",
       "provider": "audio_node",
       "node": "rtx5090-main",
-      "intents": ["video-bound-foley", "text-to-sfx"],
-      "allowed_stages": ["research", "pilot"],
+      "intents": [
+        "video-bound-foley",
+        "text-to-sfx"
+      ],
+      "allowed_stages": [
+        "research",
+        "pilot"
+      ],
       "license_scope": "CC-BY-NC-4.0_noncommercial_internal_only",
       "latest_canary_receipt_path": "registry/evidence/audio-canaries/mmaudio-video-foley-20260729.json",
       "restrictions": [
@@ -820,8 +1055,14 @@
       "readiness": "real_canary_verified_candidate_only",
       "provider": "ssh_adapter",
       "node": "rtx5090-main",
-      "intents": ["dialogue-asr-review", "speaker-segmentation", "subtitle-mismatch-review"],
-      "allowed_stages": ["review"],
+      "intents": [
+        "dialogue-asr-review",
+        "speaker-segmentation",
+        "subtitle-mismatch-review"
+      ],
+      "allowed_stages": [
+        "review"
+      ],
       "license_scope": "local_review_only_verify_upstream_before_distribution",
       "latest_canary_receipt_path": "registry/evidence/audio-canaries/vibevoice-asr-review-20260729.json",
       "restrictions": [
@@ -844,11 +1085,23 @@
       "readiness": "experimental_candidate_only",
       "provider": "private_loopback_sidecar",
       "node": "rtx5090-main",
-      "intents": ["interactive-dialogue-preview", "speech-transcription-preview", "voice-performance-audition"],
-      "allowed_stages": ["research", "pilot"],
+      "intents": [
+        "interactive-dialogue-preview",
+        "speech-transcription-preview",
+        "voice-performance-audition"
+      ],
+      "allowed_stages": [
+        "research",
+        "pilot"
+      ],
       "license_scope": "Apache-2.0_package_verify_model_licenses_before_use",
       "latest_canary_receipt_path": null,
-      "requirements": {"minimum_vram_mib": 24576, "minimum_ram_mib": 12288, "python_version": "3.11", "loopback_only": true},
+      "requirements": {
+        "minimum_vram_mib": 24576,
+        "minimum_ram_mib": 12288,
+        "python_version": "3.11",
+        "loopback_only": true
+      },
       "restrictions": [
         "no_public_listener",
         "no_llm_proxy",
@@ -872,13 +1125,27 @@
       "readiness": "not_installed_or_unverified",
       "provider": "comfy_lan",
       "node": "rtx5090-main",
-      "intents": ["short-shot-i2v", "short-shot-t2v"],
-      "protected_class_type_prefixes": ["HunyuanVideo15"],
-      "allowed_stages": ["pilot"],
+      "intents": [
+        "short-shot-i2v",
+        "short-shot-t2v"
+      ],
+      "protected_class_type_prefixes": [
+        "HunyuanVideo15"
+      ],
+      "allowed_stages": [
+        "pilot"
+      ],
       "license_scope": "verify_before_install_and_release",
       "latest_canary_receipt_path": null,
-      "requirements": {"minimum_vram_mib": 14336},
-      "promotion_requirements": ["model_fingerprint", "terminal_media_decode", "continuity_review", "human_review"]
+      "requirements": {
+        "minimum_vram_mib": 14336
+      },
+      "promotion_requirements": [
+        "model_fingerprint",
+        "terminal_media_decode",
+        "continuity_review",
+        "human_review"
+      ]
     },
     {
       "id": "ace-step15-music-pilot",
@@ -887,14 +1154,33 @@
       "readiness": "installed_unverified",
       "provider": "comfy_lan",
       "node": "rtx5090-main",
-      "intents": ["instrumental-bgm", "text-to-music"],
-      "protected_class_type_prefixes": ["TextEncodeAceStepAudio1.5", "EmptyAceStep1.5LatentAudio"],
-      "allowed_stages": ["pilot"],
-      "restrictions": ["not_final_without_full_listening", "no_auto_approval", "reject_speech_or_vocal_leakage"],
+      "intents": [
+        "instrumental-bgm",
+        "text-to-music"
+      ],
+      "protected_class_type_prefixes": [
+        "TextEncodeAceStepAudio1.5",
+        "EmptyAceStep1.5LatentAudio"
+      ],
+      "allowed_stages": [
+        "pilot"
+      ],
+      "restrictions": [
+        "not_final_without_full_listening",
+        "no_auto_approval",
+        "reject_speech_or_vocal_leakage"
+      ],
       "license_scope": "MIT_model_output_rights_require_project_review",
       "latest_canary_receipt_path": null,
-      "requirements": {"minimum_vram_mib": 20480},
-      "promotion_requirements": ["model_fingerprint", "terminal_audio_decode", "loudness_review", "full_human_listening"]
+      "requirements": {
+        "minimum_vram_mib": 20480
+      },
+      "promotion_requirements": [
+        "model_fingerprint",
+        "terminal_audio_decode",
+        "loudness_review",
+        "full_human_listening"
+      ]
     },
     {
       "id": "ltx23-temporal-x2-research",
@@ -903,8 +1189,12 @@
       "readiness": "not_installed",
       "provider": "comfy_lan",
       "node": "rtx5090-main",
-      "intents": ["temporal-extension-research"],
-      "allowed_stages": ["research"],
+      "intents": [
+        "temporal-extension-research"
+      ],
+      "allowed_stages": [
+        "research"
+      ],
       "restrictions": [
         "no_auto_download",
         "no_auto_execute",
@@ -914,7 +1204,9 @@
       "license_scope": "LTX-2-license-review-before-release",
       "required_model": "ltx-2.3-temporal-upscaler-x2-1.0.safetensors",
       "latest_canary_receipt_path": null,
-      "requirements": {"minimum_vram_mib": 32607},
+      "requirements": {
+        "minimum_vram_mib": 32607
+      },
       "promotion_requirements": [
         "official_weight_fingerprint",
         "single_gpu_rtx5090_evidence",
@@ -930,7 +1222,9 @@
       "readiness": "not_installed_or_unverified",
       "provider": "comfy_lan",
       "node": "rtx5090-main",
-      "intents": ["broll-audiovideo"],
+      "intents": [
+        "broll-audiovideo"
+      ],
       "protected_class_type_prefixes": [
         "LTX",
         "Ltxv",
@@ -940,12 +1234,26 @@
         "TextGenerateLTX2",
         "TorchCompileLTXModel"
       ],
-      "allowed_stages": ["pilot"],
-      "restrictions": ["no_dialogue", "no_continuous_drama", "not_final"],
+      "allowed_stages": [
+        "pilot"
+      ],
+      "restrictions": [
+        "no_dialogue",
+        "no_continuous_drama",
+        "not_final"
+      ],
       "license_scope": "verify_before_install_and_release",
       "latest_canary_receipt_path": null,
-      "requirements": {"minimum_vram_mib": 32607, "quantization": "low_vram_int8_or_equivalent"},
-      "promotion_requirements": ["model_fingerprint", "terminal_media_decode", "audio_review", "human_review"]
+      "requirements": {
+        "minimum_vram_mib": 32607,
+        "quantization": "low_vram_int8_or_equivalent"
+      },
+      "promotion_requirements": [
+        "model_fingerprint",
+        "terminal_media_decode",
+        "audio_review",
+        "human_review"
+      ]
     },
     {
       "id": "ltx-2.3-lipdub-challenge",
@@ -954,12 +1262,27 @@
       "readiness": "not_installed_or_unverified",
       "provider": "external_result_import",
       "node": "rtx5090-main",
-      "intents": ["text-redub-visual-preservation-research"],
-      "allowed_stages": ["research"],
+      "intents": [
+        "text-redub-visual-preservation-research"
+      ],
+      "allowed_stages": [
+        "research"
+      ],
       "license_scope": "review_required_before_promotion",
       "latest_canary_receipt_path": null,
-      "restrictions": ["no_auto_execute", "requires_text_dialogue", "not_final", "not_final_lipsync_auto", "not_shared_audio_benchmark"],
-      "promotion_requirements": ["license_review", "single_gpu_rtx5090_evidence", "four_fixture_blind_review", "zero_hard_failures"]
+      "restrictions": [
+        "no_auto_execute",
+        "requires_text_dialogue",
+        "not_final",
+        "not_final_lipsync_auto",
+        "not_shared_audio_benchmark"
+      ],
+      "promotion_requirements": [
+        "license_review",
+        "single_gpu_rtx5090_evidence",
+        "four_fixture_blind_review",
+        "zero_hard_failures"
+      ]
     },
     {
       "id": "echomimic-v3-flash-challenge",
@@ -968,12 +1291,26 @@
       "readiness": "not_installed_or_unverified",
       "provider": "external_result_import",
       "node": "rtx5090-main",
-      "intents": ["face-animation-to-audio-challenge"],
-      "allowed_stages": ["research", "pilot"],
+      "intents": [
+        "face-animation-to-audio-challenge"
+      ],
+      "allowed_stages": [
+        "research",
+        "pilot"
+      ],
       "license_scope": "verify_before_pilot",
       "latest_canary_receipt_path": null,
-      "restrictions": ["whole_frame_generation", "no_pixel_preservation_claim", "not_final_lipsync_auto"],
-      "promotion_requirements": ["model_fingerprint", "single_gpu_evidence", "terminal_media_decode", "human_review"]
+      "restrictions": [
+        "whole_frame_generation",
+        "no_pixel_preservation_claim",
+        "not_final_lipsync_auto"
+      ],
+      "promotion_requirements": [
+        "model_fingerprint",
+        "single_gpu_evidence",
+        "terminal_media_decode",
+        "human_review"
+      ]
     },
     {
       "id": "longcat-video-avatar-1.5-challenge",
@@ -982,12 +1319,26 @@
       "readiness": "blocked_single_gpu_feasibility",
       "provider": "external_result_import",
       "node": "rtx5090-main",
-      "intents": ["face-animation-to-audio-challenge"],
-      "allowed_stages": ["research"],
+      "intents": [
+        "face-animation-to-audio-challenge"
+      ],
+      "allowed_stages": [
+        "research"
+      ],
       "license_scope": "verify_before_pilot",
       "latest_canary_receipt_path": null,
-      "restrictions": ["whole_frame_generation", "no_pixel_preservation_claim", "single_gpu_required", "not_final_lipsync_auto"],
-      "promotion_requirements": ["single_gpu_feasibility", "model_fingerprint", "terminal_media_decode", "human_review"]
+      "restrictions": [
+        "whole_frame_generation",
+        "no_pixel_preservation_claim",
+        "single_gpu_required",
+        "not_final_lipsync_auto"
+      ],
+      "promotion_requirements": [
+        "single_gpu_feasibility",
+        "model_fingerprint",
+        "terminal_media_decode",
+        "human_review"
+      ]
     },
     {
       "id": "hunyuanvideo-foley-evaluation",
@@ -996,12 +1347,24 @@
       "readiness": "research_only",
       "provider": "audio_node",
       "node": "rtx5090-main",
-      "intents": ["video-bound-foley"],
-      "allowed_stages": ["research"],
+      "intents": [
+        "video-bound-foley"
+      ],
+      "allowed_stages": [
+        "research"
+      ],
       "license_scope": "verify_before_install_and_release",
       "latest_canary_receipt_path": null,
-      "restrictions": ["not_production", "license_review_required"],
-      "promotion_requirements": ["license_review", "windows_cuda_probe", "single_shot_listening_review", "human_review"]
+      "restrictions": [
+        "not_production",
+        "license_review_required"
+      ],
+      "promotion_requirements": [
+        "license_review",
+        "windows_cuda_probe",
+        "single_shot_listening_review",
+        "human_review"
+      ]
     }
   ],
   "blocked_capabilities": [

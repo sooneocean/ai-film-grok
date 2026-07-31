@@ -415,6 +415,32 @@ def _action_provider_priority(capability: dict[str, Any]) -> int:
     }.get(_action_lane(capability), 0)
 
 
+def _is_cloud_capability(capability: dict[str, Any]) -> bool:
+    """Classify only the first-party cloud lanes; legacy snapshots remain compatible."""
+    provider = str(capability.get("provider") or "").strip().lower()
+    resource = str(capability.get("resource") or "").strip().lower()
+    if provider not in {"frw", "grok"}:
+        return False
+    return (
+        resource == "cloud"
+        or resource.startswith("api:")
+        or resource
+        in {
+            "frw-cloud",
+            "grok-in-session",
+        }
+        or not resource.startswith(("gpu:", "m1-", "local"))
+    )
+
+
+def _is_local_capability(capability: dict[str, Any]) -> bool:
+    resource = str(capability.get("resource") or "").strip().lower()
+    provider = str(capability.get("provider") or "").strip().lower()
+    return resource.startswith(("gpu:", "m1-", "local")) or provider.startswith(
+        ("comfy", "local", "private-")
+    )
+
+
 def _rank(capability: dict[str, Any], intent: dict[str, Any]) -> tuple[int, int, int, int, int]:
     roles = capability.get("shot_roles") or []
     role_affinity = 2 if roles == [intent["shot_role"]] else 1
@@ -497,6 +523,25 @@ def explain_route(
             rejected.append({**projection, "reasons": sorted(set(reasons))})
             continue
         viable.append((_rank(raw, intent), capability_id, raw))
+
+    # A healthy FRW/Grok cloud capability reserves scarce local executors.  A
+    # transient cloud task failure is recorded by the orchestration queue, not
+    # reinterpreted here as a capability gap.
+    if any(_is_cloud_capability(item[2]) for item in viable):
+        retained: list[tuple[tuple[int, int, int, int, int], str, dict[str, Any]]] = []
+        for rank, capability_id, raw in viable:
+            if _is_local_capability(raw):
+                rejected.append(
+                    {
+                        "capability_id": capability_id,
+                        "provider": raw.get("provider"),
+                        "model": raw.get("model"),
+                        "reasons": ["CLOUD_CAPABILITY_AVAILABLE"],
+                    }
+                )
+            else:
+                retained.append((rank, capability_id, raw))
+        viable = retained
 
     viable.sort(key=lambda item: item[1])
     viable.sort(key=lambda item: item[0], reverse=True)

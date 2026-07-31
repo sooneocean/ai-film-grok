@@ -27,3 +27,17 @@ def notify_telegram(message: str, *, opener=urlopen) -> dict[str, object]:
         return {"attempted": True, "ok": ok, "reason": "sent" if ok else "http_error"}
     except (OSError, URLError, ValueError):
         return {"attempted": True, "ok": False, "reason": "delivery_failed"}
+
+
+def notify_review_ready(root: str, *, shot_id: str, provider: str, model: str) -> dict[str, object]:
+    """Send a one-time loopback review invite; Telegram never receives the API session token."""
+    try:
+        from review_ui import ReviewUIError, create_invite
+
+        invite = create_invite(root)
+    except (OSError, ValueError, ReviewUIError):
+        return {"attempted": False, "ok": False, "reason": "review_ui_unavailable"}
+    report = notify_telegram(
+        f"云端候选可审核：镜头 {shot_id} · {provider}/{model}。一次性审核链接：{invite['url']}"
+    )
+    return {key: value for key, value in report.items() if key != "url"}

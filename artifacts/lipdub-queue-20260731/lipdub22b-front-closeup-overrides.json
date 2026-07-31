@@ -1,0 +1,14 @@
+{
+  "2483": {
+    "text": "A woman walks through a night market, speaking Japanese directly to camera: \"今夜、ここで話しましょう。あなたの答えを聞かせて。\""
+  },
+  "4832": {
+    "noise_seed": 314159
+  },
+  "4852": {
+    "filename_prefix": "lipdub22b_front_closeup_pilot"
+  },
+  "5002": {
+    "file": "front_closeup_dialogue_ja.mp4"
+  }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a formal final film: edge-tts VO + optional lip-sync + BGM + PIL subs + FFmpeg.
+"""Render a formal final film: edge-tts VO + optional lip-sync + BGM + FFmpeg plate.
 
 Adapted from ai-film-codex postproduction (render_motion_film / make_v6 patterns)
 for ai-film-grok local manifests and Grok I2V clips.
@@ -2509,6 +2509,14 @@ def write_srt(path: Path, cues: list[dict[str, Any]], *, preserve_overlaps: bool
     write_srt_file(path, fixed)
 
 
+def resolve_subtitle_mode(args: argparse.Namespace) -> str:
+    """Return the explicit plate-caption mode; visible captions belong to HyperFrames by default."""
+    subs_mode = str(getattr(args, "subs", "off") or "off").strip().lower()
+    if subs_mode not in {"burn", "off"}:
+        raise RenderError("--subs must be burn|off")
+    return subs_mode
+
+
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
     try:
@@ -3227,7 +3235,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     # 3) Title / end cards
     # plate_cards=blank: keep pad duration for VO/SRT clock, no burned glyphs
     # (designed-post HyperFrames/Remotion draws the readable title once).
-    plate_cards = str(getattr(args, "plate_cards", "text") or "text").strip().lower()
+    plate_cards = str(getattr(args, "plate_cards", "blank") or "blank").strip().lower()
     if plate_cards not in {"text", "blank"}:
         raise RenderError("--plate-cards must be text|blank")
     title_text = args.title or spec.get("title") or manifest.get("title") or "AI Film"
@@ -4331,9 +4339,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
 
     # Burn subs with PIL overlays (no drawtext dependency).
     # --subs off keeps SRT only (for HyperFrames designed captions underlay path).
-    subs_mode = str(getattr(args, "subs", "burn") or "burn").strip().lower()
-    if subs_mode not in {"burn", "off"}:
-        raise RenderError("--subs must be burn|off")
+    subs_mode = resolve_subtitle_mode(args)
     video_subbed = work / "video_subbed.mp4"
     if subs_mode == "off" or not cues:
         shutil.copy2(silent, video_subbed)
@@ -4634,8 +4640,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--plate-cards",
         choices=["text", "blank"],
-        default="text",
-        help="text=FFmpeg burns title/end glyphs; blank=pad only (for HyperFrames/Remotion designed cards)",
+        default="blank",
+        help="blank=pad only with no glyphs (default); text is an explicit FFmpeg compatibility override",
     )
     p.add_argument(
         "--sub-lead",
@@ -4747,9 +4753,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument(
         "--subs",
-        default="burn",
+        default="off",
         choices=["burn", "off"],
-        help="burn=PIL burned captions (default); off=SRT only (HyperFrames designed captions)",
+        help="off=SRT only (default; HyperFrames owns visible captions); burn is an explicit FFmpeg compatibility override",
     )
     p.add_argument("--width", type=int)
     p.add_argument("--height", type=int)

@@ -17,6 +17,7 @@ from dialogue_benchmark_queue import (  # noqa: E402
     complete,
     enqueue,
     status,
+    submit_comfy,
 )
 from runtime_policy import sha256  # noqa: E402
 from util import write_json  # noqa: E402
@@ -144,6 +145,52 @@ def test_claim_rejects_job_bound_to_a_replaced_benchmark(
     assert status(tmp_path)["counts"]["running"] == 0
 
 
+def test_claim_allows_pending_arm_after_human_review_rewrites_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fixture(tmp_path)
+    enqueue(tmp_path)
+    receipt = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
+    report = json.loads(receipt.read_text(encoding="utf-8"))
+    report["arms"][0]["review_note"] = "approved state"
+    write_json(receipt, report)
+
+    class Config:
+        comfyui_base_url = "http://127.0.0.1:18188"
+
+    monkeypatch.setattr("config_loader.get_config", lambda: Config())
+    monkeypatch.setattr("comfy_video.submission_capacity", lambda _url: {"ok": True})
+    result = claim(tmp_path)
+    assert result["status"] == "claimed"
+    assert result["job"]["weapon"] == WEAPONS[0]
+
+
+def test_submit_rejects_claim_after_benchmark_is_replaced(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    job = enqueue(tmp_path)["jobs"][0]
+    queue = status(tmp_path)["jobs"]
+    queue[0].update(status="running", claim_token="valid-token", executor="comfy")
+    write_json(
+        tmp_path / "receipts" / "dialogue-benchmark-queue.json",
+        {"schema_version": 1, "kind": "dialogue-benchmark-queue", "jobs": queue},
+    )
+    workflow = tmp_path / "workflow.json"
+    write_json(workflow, {})
+    receipt = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
+    report = json.loads(receipt.read_text(encoding="utf-8"))
+    report["line_ids"] = ["sc01_ln02"]
+    write_json(receipt, report)
+
+    with pytest.raises(DialogueBenchmarkQueueError, match="SUBMISSION_INVALID"):
+        submit_comfy(
+            tmp_path,
+            job_id=job["id"],
+            claim_token="valid-token",
+            workflow=workflow,
+            weapon_id="qwen-image-edit-2511-local",
+        )
+
+
 def test_rejects_duplicate_weapons_in_benchmark_receipt(tmp_path: Path) -> None:
     _fixture(tmp_path)
     receipt = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
@@ -176,6 +223,34 @@ def test_concurrent_claim_does_not_double_claim(
         results = list(workers.map(try_claim, range(2)))
     assert sum(result.get("status") == "claimed" for result in results) == 1
     assert status(tmp_path)["counts"]["running"] == 1
+
+
+def test_complete_allows_same_benchmark_after_its_human_review_rewrites_receipt(
+    tmp_path: Path,
+) -> None:
+    _fixture(tmp_path)
+    queued = enqueue(tmp_path)["jobs"][0]
+    queue = status(tmp_path)["jobs"]
+    queue[0].update(status="running", claim_token="valid-token")
+    write_json(
+        tmp_path / "receipts" / "dialogue-benchmark-queue.json",
+        {"schema_version": 1, "kind": "dialogue-benchmark-queue", "jobs": queue},
+    )
+    artifact = tmp_path / "qwen-state.png"
+    artifact.write_bytes(b"reviewed state")
+    receipt = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
+    report = json.loads(receipt.read_text(encoding="utf-8"))
+    report["arms"][0].update(
+        status="reviewed",
+        reviewer="Dex",
+        review_note="approved",
+        artifact="qwen-state.png",
+        artifact_sha256=sha256(artifact),
+        stable_parameters={"seed": 7},
+    )
+    write_json(receipt, report)
+    result = complete(tmp_path, job_id=queued["id"], claim_token="valid-token")
+    assert result["status"] == "succeeded"
 
 
 def test_complete_rejects_review_without_real_artifact_evidence(tmp_path: Path) -> None:
