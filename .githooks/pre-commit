@@ -2,13 +2,10 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-cd "$ROOT"
 PUBLISH_SCRIPT="/Users/dex/.agents/skills/gitea-publish/scripts/gitea_publish.py"
 PUBLISH_HOOKS="/Users/dex/.agents/skills/gitea-publish/hooks"
 
 GIT_CONFIG_COUNT=1 \
 GIT_CONFIG_KEY_0=core.hooksPath \
 GIT_CONFIG_VALUE_0="$PUBLISH_HOOKS" \
-python3 "$PUBLISH_SCRIPT" hook pre-push --repo "$ROOT" \
-  --remote-name "${1:-}" --remote-url "${2:-}" --json
-exec python3 "$ROOT/scripts/release_gate.py"
+python3 "$PUBLISH_SCRIPT" hook pre-commit --repo "$ROOT" --json

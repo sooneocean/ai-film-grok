@@ -58,11 +58,26 @@ class I2VProviderTests(unittest.TestCase):
             self.assertIn("canary", str(report.reason).lower())
 
     def test_grok_film_root_accepts_hash_bound_canary(self) -> None:
+        import hashlib
+        import json
+
         with tempfile.TemporaryDirectory() as raw:
             tmp_path = Path(raw)
+            output = tmp_path / "out" / "canary.mp4"
+            output.parent.mkdir()
+            output.write_bytes(b"grok canary")
             receipt = tmp_path / "receipts" / "grok-i2v-canary.json"
             receipt.parent.mkdir()
-            receipt.write_text('{"ok": true, "output_sha256": "abc"}', encoding="utf-8")
+            receipt.write_text(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "output": str(output),
+                        "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+                    }
+                ),
+                encoding="utf-8",
+            )
             report = get("grok").probe(root=tmp_path)
             self.assertTrue(report.available)
 
@@ -98,14 +113,28 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIn("--wait", cmd)
 
     def test_ltx23_audio_requires_film_canary_and_uses_native_audio_command(self) -> None:
+        import hashlib
+        import json
+
         provider = get("frw-ltx23")
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             self.assertFalse(provider.probe(root=root).available)
+            output = root / "out" / "ltx-canary.mp4"
+            output.parent.mkdir()
+            output.write_bytes(b"ltx canary")
             receipt = root / "receipts" / "frw-ltx23-i2v-audio-canary.json"
             receipt.parent.mkdir()
             receipt.write_text(
-                '{"ok":true,"output_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","full_decode_ok":true,"human_review":"approved"}',
+                json.dumps(
+                    {
+                        "ok": True,
+                        "output": str(output),
+                        "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+                        "full_decode_ok": True,
+                        "human_review": "approved",
+                    }
+                ),
                 encoding="utf-8",
             )
             self.assertTrue(provider.probe(root=root).available)
@@ -773,16 +802,21 @@ class I2VProviderTests(unittest.TestCase):
             self.assertTrue(all(provider_switch_receipt_is_valid(item) for item in receipts))
 
     def test_frw_wan_canary_requires_explicit_wan_model_identity(self) -> None:
+        import hashlib
         import json
 
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
+            output = root / "out" / "wan-canary.mp4"
+            output.parent.mkdir()
+            output.write_bytes(b"wan canary")
             receipt = root / "receipts" / "frw-wan-i2v-canary.json"
             receipt.parent.mkdir()
             payload = {
                 "ok": True,
                 "model": "not-wan",
-                "output_sha256": "a" * 64,
+                "output": str(output),
+                "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
                 "full_decode_ok": True,
                 "human_review": "approved",
             }

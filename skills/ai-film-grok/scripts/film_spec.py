@@ -139,9 +139,8 @@ FRW_VIDEO_MODELS = frozenset(
 def resolve_i2v_profile() -> str:
     """Operating profile for hero I2V bulk.
 
-    ``seedance_first`` is retained for backwards-compatible parsing but is no
-    longer allowed to promote FRW to the primary route.  FRW selection happens
-    only after a classified Grok technical failure.
+    ``seedance_first`` is retained for backwards-compatible parsing but now
+    normalizes to the supported LTX-first action chain.
     """
     from config_loader import get_config
 
@@ -768,6 +767,7 @@ def validate_film_spec(
     spec["_i2v_profile"] = i2v_profile
     chain = frw_i2v_fallback_chain()
     raw_i2v = spec.get("i2v_provider", "auto")
+    spec["_i2v_provider_explicit"] = isinstance(raw_i2v, str) and raw_i2v.strip().lower() != "auto"
     raw_still = spec.get("still_provider", "auto")
     if not isinstance(raw_still, str) or raw_still.lower() not in {
         "auto",

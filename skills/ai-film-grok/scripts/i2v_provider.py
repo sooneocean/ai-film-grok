@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from security_policy import SecurityPolicyError, validate_identifier
+from security_policy import SecurityPolicyError, safe_existing_file, validate_identifier
 from util import canonical_json_sha256, sha256_file, write_json
 
 
@@ -56,6 +56,19 @@ TECHNICAL_FAILURE_MARKERS = (
     "http 502",
     "http 503",
     "http 504",
+)
+NON_TECHNICAL_FAILURE_MARKERS = (
+    "human review",
+    "human_review",
+    "review rejected",
+    "quality fail",
+    "quality rejection",
+    "identity fail",
+    "motion review",
+    "pilot rejected",
+    "moderation",
+    "content policy",
+    "approval rejected",
 )
 _SWITCH_HMAC_FIELD = "switch_hmac_sha256"
 _SWITCH_HASH_FIELD = "switch_sha256"
@@ -84,6 +97,8 @@ def is_technical_failure(error: object) -> bool:
             return True
         error = error.get("error") or error.get("message") or ""
     text = str(error).lower()
+    if any(marker in text for marker in NON_TECHNICAL_FAILURE_MARKERS):
+        return False
     return any(marker in text for marker in TECHNICAL_FAILURE_MARKERS)
 
 
@@ -164,6 +179,21 @@ def _technical_failure_label(error: object) -> str:
 def _has_wan_model_identity(value: object) -> bool:
     """Accept only a model name whose provider token is explicitly Wan."""
     return bool(_WAN_MODEL_IDENTITY_RE.search(str(value or "").strip().casefold()))
+
+
+def _canary_output_is_bound(root: Path, data: dict[str, Any]) -> bool:
+    output = data.get("output")
+    if isinstance(output, dict):
+        output = output.get("path")
+    output = output or data.get("output_path")
+    expected = data.get("output_sha256")
+    if not output or not isinstance(expected, str) or not _SHA256_RE.fullmatch(expected):
+        return False
+    try:
+        media = safe_existing_file(root, str(output), field="canary output")
+    except SecurityPolicyError:
+        return False
+    return hmac.compare_digest(sha256_file(media), expected)
 
 
 def _write_switch_receipt(
@@ -426,7 +456,7 @@ class GrokI2VProvider(I2VProvider):
                 import json
 
                 data = json.loads(receipt.read_text(encoding="utf-8"))
-                available = bool(data.get("ok") and data.get("output_sha256"))
+                available = bool(data.get("ok") and _canary_output_is_bound(Path(root), data))
                 return CapabilityReport(
                     provider=self.name,
                     ok=available,
@@ -683,11 +713,9 @@ class FrwLtx23AudioProvider(SeedanceProvider):
             data = json.loads(receipt.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             data = {}
-        output_sha256 = data.get("output_sha256")
         approved = bool(
             data.get("ok")
-            and isinstance(output_sha256, str)
-            and _SHA256_RE.fullmatch(output_sha256)
+            and _canary_output_is_bound(root, data)
             and data.get("full_decode_ok") is True
             and data.get("human_review") == "approved"
         )
@@ -755,12 +783,10 @@ class FrwWanProvider(SeedanceProvider):
         except (OSError, ValueError):
             data = {}
         model = str(data.get("provider_model") or data.get("model") or "").lower()
-        output_sha256 = data.get("output_sha256")
         approved = bool(
             data.get("ok")
             and _has_wan_model_identity(model)
-            and isinstance(output_sha256, str)
-            and _SHA256_RE.fullmatch(output_sha256)
+            and _canary_output_is_bound(root, data)
             and data.get("full_decode_ok") is True
             and data.get("human_review") == "approved"
         )

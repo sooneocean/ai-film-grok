@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import re
 import sys
 from pathlib import Path
 
@@ -77,7 +79,54 @@ def _capability(
     }
 
 
-def _write_capabilities(root: Path, capabilities: list[dict[str, object]]) -> Path:
+def _write_capabilities(
+    root: Path,
+    capabilities: list[dict[str, object]],
+    *,
+    bind_route_evidence: bool = True,
+) -> Path:
+    rows = [dict(item) for item in capabilities]
+    if bind_route_evidence:
+        for item in rows:
+            provider = str(item.get("provider") or "").lower()
+            model = str(item.get("model") or "").lower()
+            operations = set(item.get("operations") or [])
+            payload: dict[str, object] | None = None
+            if (
+                provider == "frw"
+                and re.search(r"(?:^|/)wan(?:[0-9._-]|$)", model)
+                and "image_to_video" in operations
+            ):
+                output = root / "out" / f"{item['id']}.mp4"
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_bytes(f"media:{item['id']}".encode())
+                payload = {
+                    "ok": True,
+                    "model": model,
+                    "output": str(output.relative_to(root)),
+                    "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+                    "full_decode_ok": True,
+                    "human_review": "approved",
+                }
+            elif provider.startswith(("comfy", "local")) and "image_to_video" in operations:
+                payload = {
+                    "kind": "comfy-submission-capacity",
+                    "ok": True,
+                    "floors": {
+                        "ram_free_bytes": 12 * 1024**3,
+                        "vram_free_bytes": 24 * 1024**3,
+                    },
+                    "observed": {
+                        "ram_free_bytes": 16 * 1024**3,
+                        "device": {"vram_free_bytes": 28 * 1024**3},
+                        "queue": {"running": 0, "pending": 0},
+                    },
+                }
+            if payload is not None:
+                receipt = root / "receipts" / "capability-evidence" / f"{item['id']}.json"
+                _write_json(receipt, payload)
+                item["receipt_path"] = str(receipt.relative_to(root))
+                item["receipt_sha256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
     path = root / "receipts" / "capability-snapshot.json"
     _write_json(
         path,
@@ -85,7 +134,7 @@ def _write_capabilities(root: Path, capabilities: list[dict[str, object]]) -> Pa
             "schema_version": 1,
             "kind": "ai-film-capability-snapshot",
             "generated_at": "2026-07-28T10:00:00+00:00",
-            "capabilities": capabilities,
+            "capabilities": rows,
         },
     )
     return path

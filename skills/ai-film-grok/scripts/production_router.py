@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import jsonschema
-from security_policy import SecurityPolicyError, validate_identifier
+from security_policy import SecurityPolicyError, safe_existing_file, validate_identifier
 from util import canonical_json_sha256, read_json, sha256_file, write_json
 
 
@@ -29,6 +30,7 @@ _RESTRICTED_PHASES = frozenset({"foreplay", "act", "climax", "afterglow"})
 _RESTRICTED_WARDROBE = frozenset({"partial", "undressed", "bare"})
 _SUPPORTED_QUALITY_TIERS = frozenset({"draft", "select", "hero"})
 _SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "schemas"
+_WAN_MODEL_IDENTITY_RE = re.compile(r"(?:^|/)wan(?:[0-9._-]|$)")
 
 
 def _dialogue_competition(
@@ -217,7 +219,11 @@ def build_shot_intent(
     identity_lock = role == "hero"
     operation = "image_to_video" if identity_lock else "text_to_video"
     unlocked_values = {"", "auto", "default", "unlocked"}
-    film_lock = str(spec.get("i2v_provider") or "").strip().lower() if identity_lock else ""
+    film_lock = (
+        str(spec.get("i2v_provider") or "").strip().lower()
+        if identity_lock and spec.get("_i2v_provider_explicit") is True
+        else ""
+    )
     shot_lock = str(shot.get("i2v_provider") or shot.get("provider") or "").strip().lower()
     provider_lock = (
         shot_lock
@@ -250,6 +256,7 @@ def _hard_rejections(
     capability: dict[str, Any],
     intent: dict[str, Any],
     *,
+    base: Path,
     current: datetime,
     allow_experimental: bool,
 ) -> list[str]:
@@ -289,23 +296,107 @@ def _hard_rejections(
     supported_tiers = capability.get("quality_tiers")
     if isinstance(supported_tiers, list) and intent["quality_tier"] not in supported_tiers:
         reasons.append("QUALITY_TIER_UNSUPPORTED")
+    lane = _action_lane(capability)
+    if lane in {"frw-wan", "local"}:
+        receipt = _bound_capability_receipt(base, capability)
+        if receipt is None:
+            reasons.append("CAPABILITY_EVIDENCE_UNBOUND")
+        elif lane == "frw-wan" and not _frw_wan_receipt_ready(base, receipt):
+            reasons.append("FRW_WAN_IDENTITY_UNVERIFIED")
+        elif lane == "local" and not _local_capacity_receipt_ready(receipt):
+            reasons.append("LOCAL_CAPACITY_UNVERIFIED")
     return reasons
 
 
-def _action_provider_priority(capability: dict[str, Any]) -> int:
+def _action_lane(capability: dict[str, Any]) -> str:
     identity = " ".join(
         str(capability.get(key) or "").strip().lower() for key in ("id", "provider", "model")
     )
     provider = str(capability.get("provider") or "").strip().lower()
     if "frw" in identity and "ltx" in identity:
-        return 4
+        return "frw-ltx"
     if provider == "grok" or "grok" in identity:
-        return 3
-    if "frw" in identity and "wan" in identity:
-        return 2
+        return "grok"
+    if "frw" in identity and _WAN_MODEL_IDENTITY_RE.search(
+        str(capability.get("model") or "").strip().lower()
+    ):
+        return "frw-wan"
     if provider.startswith(("comfy", "local")) or "local" in identity:
-        return 1
-    return 0
+        return "local"
+    return "other"
+
+
+def _bound_capability_receipt(base: Path, capability: dict[str, Any]) -> dict[str, Any] | None:
+    path = capability.get("receipt_path")
+    expected = capability.get("receipt_sha256")
+    if not isinstance(path, str) or not isinstance(expected, str):
+        return None
+    try:
+        receipt_path = safe_existing_file(base, path, field="capability receipt")
+    except SecurityPolicyError:
+        return None
+    if sha256_file(receipt_path) != expected:
+        return None
+    receipt = read_json(receipt_path)
+    return receipt if isinstance(receipt, dict) else None
+
+
+def _receipt_output_is_bound(base: Path, receipt: dict[str, Any]) -> bool:
+    output = receipt.get("output")
+    if isinstance(output, dict):
+        output = output.get("path")
+    output = output or receipt.get("output_path")
+    expected = receipt.get("output_sha256")
+    if not isinstance(output, str) or not isinstance(expected, str):
+        return False
+    try:
+        output_path = safe_existing_file(base, output, field="capability output")
+    except SecurityPolicyError:
+        return False
+    return sha256_file(output_path) == expected
+
+
+def _frw_wan_receipt_ready(base: Path, receipt: dict[str, Any]) -> bool:
+    model = str(receipt.get("provider_model") or receipt.get("model") or "").strip().lower()
+    return bool(
+        receipt.get("ok") is True
+        and _WAN_MODEL_IDENTITY_RE.search(model)
+        and receipt.get("full_decode_ok") is True
+        and receipt.get("human_review") == "approved"
+        and _receipt_output_is_bound(base, receipt)
+    )
+
+
+def _local_capacity_receipt_ready(receipt: dict[str, Any]) -> bool:
+    floors = receipt.get("floors") if isinstance(receipt.get("floors"), dict) else {}
+    observed = receipt.get("observed") if isinstance(receipt.get("observed"), dict) else {}
+    device = observed.get("device") if isinstance(observed.get("device"), dict) else {}
+    queue = observed.get("queue") if isinstance(observed.get("queue"), dict) else {}
+    ram_floor = floors.get("ram_free_bytes")
+    vram_floor = floors.get("vram_free_bytes")
+    ram_free = observed.get("ram_free_bytes")
+    vram_free = device.get("vram_free_bytes")
+    return bool(
+        receipt.get("ok") is True
+        and receipt.get("kind") == "comfy-submission-capacity"
+        and isinstance(ram_floor, int)
+        and isinstance(vram_floor, int)
+        and isinstance(ram_free, int)
+        and isinstance(vram_free, int)
+        and ram_free >= ram_floor
+        and vram_free >= vram_floor
+        and queue.get("running") == 0
+        and queue.get("pending") == 0
+    )
+
+
+def _action_provider_priority(capability: dict[str, Any]) -> int:
+    return {
+        "frw-ltx": 4,
+        "grok": 3,
+        "frw-wan": 2,
+        "local": 1,
+    }.get(_action_lane(capability), 0)
 
 
 def _rank(capability: dict[str, Any], intent: dict[str, Any]) -> tuple[int, int, int, int, int]:
@@ -375,6 +466,7 @@ def explain_route(
         reasons = _hard_rejections(
             raw,
             intent,
+            base=base,
             current=current,
             allow_experimental=allow_experimental,
         )
