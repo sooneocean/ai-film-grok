@@ -1,4 +1,4 @@
-"""Structural checks: FRW Seedance-first routing is present and non-conflicting."""
+"""Structural checks for retained FRW history and the current fallback contract."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ SCHEMA = ROOT / "schemas" / "film-spec.schema.json"
 
 
 @pytest.mark.slow
-class FrwSeedanceDocsTests(unittest.TestCase):
+class FrwDegradeDocsTests(unittest.TestCase):
     @pytest.mark.slow
     def test_frw_degrade_reference_seedance_first(self) -> None:
         self.assertTrue(REF.is_file(), f"missing {REF}")
@@ -55,10 +55,11 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         skill = SKILL.read_text(encoding="utf-8")
         visual_card = (ROOT / "references" / "stages" / "visual.md").read_text(encoding="utf-8")
         reachable = skill + visual_card
-        # Current season: grok_primary; Seedance kept as restore path + FRW degrade docs
+        # Current season: Grok primary; LTX handles native-audio dialogue and
+        # FRW img2video is a reviewed fallback. Seedance remains historical only.
         self.assertIn("grok_primary", reachable)
-        self.assertIn("seedance-2-fast-i2v", reachable)
-        self.assertIn("frw_video_model", reachable)
+        self.assertIn("LTX 2.3", skill)
+        self.assertIn("img2video", skill)
         self.assertIn("frw-degrade-dispatch.md", reachable)
         degrade = REF.read_text(encoding="utf-8")
         seedance_lesson = LESSON_SEED.read_text(encoding="utf-8")
@@ -153,17 +154,18 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         ):
             self.assertIn(ep, qa)
         fs = FILM_SPEC.read_text(encoding="utf-8")
-        self.assertIn('DEFAULT_FRW_VIDEO_MODEL = "seedance-2-fast-i2v"', fs)
+        self.assertIn('FRW_I2V_FRW_ONLY_LIFEBOAT = "legacy-img2video"', fs)
+        self.assertIn("DEFAULT_FRW_VIDEO_MODEL = FRW_I2V_FRW_ONLY_LIFEBOAT", fs)
         self.assertIn('DEFAULT_FRW_RESOLUTION = "720p"', fs)
         self.assertIn("legacy-img2video", fs)
         launcher = FRW_LAUNCHER.read_text(encoding="utf-8")
-        self.assertIn("Seedance-first", launcher)
-        self.assertIn("seedance-2-fast-i2v", launcher)
+        self.assertIn("img2video-audio", launcher)
+        self.assertIn("newvideo", launcher)
 
     @pytest.mark.slow
     def test_example_and_schema_fields(self) -> None:
         ex = EXAMPLE.read_text(encoding="utf-8")
-        self.assertIn("seedance-2-fast-i2v", ex)
+        self.assertIn("legacy-img2video", ex)
         self.assertIn("frw_video_model", ex)
         self.assertIn("720p", ex)
         schema = SCHEMA.read_text(encoding="utf-8")
@@ -186,7 +188,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
 
         # Constants: provider is profile-resolved ("auto"); FRW model ids stay documented
         self.assertEqual(DEFAULT_I2V_PROVIDER, "auto")
-        self.assertEqual(DEFAULT_FRW_VIDEO_MODEL, "seedance-2-fast-i2v")
+        self.assertEqual(DEFAULT_FRW_VIDEO_MODEL, "legacy-img2video")
         self.assertEqual(DEFAULT_FRW_ENV_MODEL, "ltx-t2v")
         self.assertEqual(default_i2v_provider(), "grok")  # grok_primary default season
         spec = {
@@ -228,7 +230,7 @@ class FrwSeedanceDocsTests(unittest.TestCase):
         }
         validate_film_spec(spec, assign_missing_ids=False)
         self.assertEqual(spec.get("i2v_provider"), "grok")
-        self.assertEqual(spec.get("frw_video_model"), "seedance-2-fast-i2v")
+        self.assertEqual(spec.get("frw_video_model"), "legacy-img2video")
         self.assertEqual(spec.get("frw_env_model"), "ltx-t2v")
         self.assertEqual(spec.get("frw_resolution"), "720p")
         self.assertEqual(spec.get("frw_aspect_ratio"), "9:16")

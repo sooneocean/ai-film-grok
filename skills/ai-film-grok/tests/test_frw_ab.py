@@ -317,7 +317,7 @@ def test_production_i2v_run_requires_valid_technical_switch_receipt(
         "kind": "provider-switch",
         "shot_id": "shot01",
         "primary_provider": "grok",
-        "fallback_provider": "seedance",
+        "fallback_provider": "frw-img2video",
         "reason_class": "technical_failure",
         "error": "upstream timeout",
         "fallback_fixed_for_shot": True,

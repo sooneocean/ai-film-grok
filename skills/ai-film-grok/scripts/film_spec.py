@@ -104,7 +104,7 @@ DEFAULT_FRW_FPS = "24"
 # LTX preferred pixel size for vertical shorts (probe-validated 2026-07-20)
 DEFAULT_LTX_WIDTH = "704"
 DEFAULT_LTX_HEIGHT = "1280"
-# Explicit last-resort (never default; agent must set frw_video_model deliberately)
+# Explicit FRW-only fallback; it never promotes FRW over the primary route.
 FRW_I2V_FRW_ONLY_LIFEBOAT = "legacy-img2video"
 # Env / synth layer (no face import): LTX T2V is primary for B-roll beds
 # 2026-07-21: ltx-t2v completed on sample key; seedance t2v may 403
