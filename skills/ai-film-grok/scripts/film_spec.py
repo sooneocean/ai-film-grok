@@ -113,7 +113,7 @@ DEFAULT_FRW_ENV_MODEL = "ltx-t2v"
 # NEVER default legacy img2video (胃镜室质量坑).
 FRW_VIDEO_MODELS = frozenset(
     {
-        "seedance-2-fast-i2v",  # FRW fallback after a recorded technical switch
+        "seedance-2-fast-i2v",  # retained solely to give old specs a clear unavailable error
         "seedance-2-fast-t2v",
         "seedance-2-pro-flf",  # multi-ref / first-last style (pro)
         "seedance-2-pro-t2v",
@@ -793,6 +793,11 @@ def validate_film_spec(
     if not isinstance(raw_fvm, str) or raw_fvm.lower() not in FRW_VIDEO_MODELS:
         raise FilmSpecError(f"film-spec frw_video_model must be one of {sorted(FRW_VIDEO_MODELS)}")
     fvm = raw_fvm.lower()
+    if fvm == "seedance-2-fast-i2v":
+        raise FilmSpecError(
+            "frw_video_model=seedance-2-fast-i2v is unavailable; use LTX 2.3 Audio or "
+            "legacy-img2video only as the reviewed FRW fallback"
+        )
     if fvm == "auto":
         fvm = default_frw_video_model()
         notes = list(spec.get("_frw_video_notes") or [])
@@ -805,7 +810,7 @@ def validate_film_spec(
         notes = list(spec.get("_frw_video_notes") or [])
         notes.append(
             "WARN legacy-img2video: old FRW template 348771… quality floor; "
-            "FRW-only lifeboat when Seedance 403 and Grok unavailable; "
+            "FRW-only lifeboat when the primary route is unavailable; "
             "register frw_img2video — never claim seedance (2026-07-21); "
             "prefer Grok primary; FRW is fallback only"
         )

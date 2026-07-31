@@ -232,11 +232,11 @@ class StoryPlanTests(unittest.TestCase):
             )
             self.assertEqual(
                 speaking[0]["_recommended_engine"]["lipsync_fallback"],
-                "rtx_latentsync_1_6_after_frw_i2v_fallback",
+                "rtx_latentsync_1_6_after_frw_img2video_fallback",
             )
             self.assertEqual(
                 speaking[0]["_recommended_engine"]["motion_fallback"],
-                "frw_seedance_2_fast_i2v_rejection_only",
+                "frw_img2video_rejection_only",
             )
             self.assertEqual(speaking[0]["audio_recipe"]["recipe"], "dialogue_lipsync")
             self.assertTrue(speaking[0]["audio_recipe"]["lipsync"])

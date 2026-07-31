@@ -60,6 +60,7 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIsInstance(for_endpoint("image_to_video"), GrokI2VProvider)
         self.assertIsInstance(for_endpoint("frw_seedance_i2v"), SeedanceProvider)
         self.assertIsInstance(for_endpoint("frw_seedance_flf"), SeedanceProvider)
+        self.assertEqual(for_endpoint("frw_img2video").name, "frw-img2video")
         self.assertIsInstance(for_endpoint("local_wan22_i2v"), LocalComfyWan22Provider)
         # unknown endpoint → None
         self.assertIsNone(for_endpoint("nonexistent"))
@@ -475,7 +476,7 @@ class I2VProviderTests(unittest.TestCase):
             )
             self.assertTrue(provider_switch_receipt_is_valid(selected[1]))
         self.assertIsNotNone(selected)
-        self.assertEqual(selected[0].name, "seedance")
+        self.assertEqual(selected[0].name, "frw-img2video")
 
     def test_provider_switch_writer_requires_local_hmac_key(self) -> None:
         import json

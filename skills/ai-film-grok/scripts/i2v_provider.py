@@ -195,7 +195,7 @@ def route_after_failure(
         stable_shot_id = validate_identifier(shot_id, field="shot id")
     except SecurityPolicyError as exc:
         raise I2VProviderError(f"PROVIDER_SWITCH_SHOT_ID_INVALID: {exc}") from exc
-    provider = get("seedance")
+    provider = get("frw-img2video")
     return provider, _write_switch_receipt(
         root,
         shot_id=stable_shot_id,
@@ -513,6 +513,58 @@ class SeedanceProvider(I2VProvider):
         }
 
 
+class FrwImg2VideoProvider(SeedanceProvider):
+    """The original FRW ``img2video`` fallback, without Seedance selection."""
+
+    name = "frw-img2video"
+    endpoints = frozenset({"frw_img2video"})
+
+    def probe(self, *, root: Path | None = None) -> CapabilityReport:
+        del root
+        try:
+            from frw_dispatch import resolve_frw_root
+
+            resolve_frw_root()
+        except SystemExit as exc:
+            return CapabilityReport(
+                provider=self.name,
+                ok=False,
+                available=False,
+                reason=str(exc)[:200],
+                models=["img2video"],
+                profile="frw_fallback",
+            )
+        return CapabilityReport(
+            provider=self.name,
+            ok=False,
+            available=False,
+            reason="FRW img2video is resolvable; a current film canary is still required.",
+            models=["img2video"],
+            profile="frw_fallback",
+            detail={"canary_required": True},
+        )
+
+    def build_command(
+        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
+    ) -> list[str]:
+        del duration_sec
+        dispatch = Path(__file__).resolve().parent / "frw_dispatch.py"
+        return [
+            "python3",
+            str(dispatch),
+            "img2video",
+            "--img-url",
+            str(kwargs.get("img_url") or keyframe),
+            "--prompt",
+            prompt,
+            "--width",
+            str(kwargs.get("width", 704)),
+            "--height",
+            str(kwargs.get("height", 1280)),
+            "--wait",
+        ]
+
+
 class LocalComfyWan22Provider(I2VProvider):
     """Explicit private-LAN Wan 2.2 I2V lane on the user's RTX 5090."""
 
@@ -810,4 +862,5 @@ def registry_report(*, root: Path | None = None) -> dict[str, Any]:
 # Default registrations (importable side-effect)
 register(GrokI2VProvider())
 register(SeedanceProvider())
+register(FrwImg2VideoProvider())
 register(LocalComfyWan22Provider())

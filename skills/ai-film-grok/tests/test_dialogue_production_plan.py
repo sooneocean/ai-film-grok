@@ -64,16 +64,14 @@ def test_plan_binds_all_weapons_to_one_line_id(
         "frw_upload_image",
         "frw_ltx23_img2video_audio",
         "native_text_gate.validate_native_text_review",
-        "frw_seedance_2_fast_i2v",
+        "frw_img2video",
         "rtx_latentsync_1_6",
         "mmaudio_or_audio_node_with_foley_plan",
     ]
     assert {stage["line_id"] for stage in plan["stages"]} == {"sc01_ln01"}
     fallback = next(stage for stage in plan["stages"] if stage["tool"] == "rtx_latentsync_1_6")
     assert fallback["activation"].startswith("only_after_ltx_native_audio_rejection")
-    frw_fallback = next(
-        stage for stage in plan["stages"] if stage["tool"] == "frw_seedance_2_fast_i2v"
-    )
+    frw_fallback = next(stage for stage in plan["stages"] if stage["tool"] == "frw_img2video")
     assert frw_fallback["activation"].startswith("only_after_ltx_native_audio_rejection")
     assert frw_fallback["depends_on"] == [
         "sc01_ln01:frw-keyframe-upload",
@@ -83,7 +81,7 @@ def test_plan_binds_all_weapons_to_one_line_id(
     assert upload["depends_on"] == ["sc01_ln01:keyframe"]
     assert fallback["depends_on"] == [frw_fallback["stage_id"], "sc01_ln01:tts"]
     assert plan["route"]["lipsync_primary"] == "frw_ltx23_native_audio_i2v_human_verified"
-    assert plan["route"]["dialogue_i2v_fallback"] == "frw_seedance_2_fast_i2v_rejection_only"
+    assert plan["route"]["dialogue_i2v_fallback"] == "frw_img2video_rejection_only"
     assert "caption_owner_ffmpeg_or_hyperframes_once" in plan["post"]["evidence_required"]
     assert "dialogue_route_acceptance" in plan["post"]["evidence_required"]
 
