@@ -3938,16 +3938,6 @@ def cmd_final(args: argparse.Namespace) -> int:
         except PostPlanError as exc:
             raise FilmError(str(exc)) from exc
 
-    from cinematic_audit import write_audit
-
-    cinematic = write_audit(root, require_authored_contract=True, require_clip_evidence=True)
-    if not cinematic.get("ok"):
-        raise FilmError(
-            "Cannot render final: cinematic audit failed ["
-            + ", ".join(cinematic.get("blocking_codes") or [])
-            + "]"
-        )
-
     # Lesson preflight (default on): hard blocks; soft logs; --skip-preflight escapes
     preflight_report: dict[str, Any] | None = None
     if not bool(getattr(args, "skip_preflight", False)):
@@ -3984,6 +3974,16 @@ def cmd_final(args: argparse.Namespace) -> int:
                 f'Run aifilm preflight --root "{root}" or drop --preflight-strict.'
             )
         log(f"preflight ok (hard=0 soft={len(soft)}) → post_engine={post_engine}")
+
+    from cinematic_audit import write_audit
+
+    cinematic = write_audit(root, require_authored_contract=True, require_clip_evidence=True)
+    if not cinematic.get("ok"):
+        raise FilmError(
+            "Cannot render final: cinematic audit failed ["
+            + ", ".join(cinematic.get("blocking_codes") or [])
+            + "]"
+        )
 
     # Fail early before TTS if loop-risk VO would force boring stream_loop.
     # When receipts/tts-rehearsal.json present, measured_duration_sec preferred over estimate.

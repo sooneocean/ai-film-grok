@@ -142,12 +142,12 @@ class FinalPreflightGateTests(unittest.TestCase):
                 skip_compose_check=False,
                 keep_compose_raw=False,
             )
-            # Skip preflight lesson gates; inventory still fails closed when
-            # film-spec shots ≠ approved clips (sediment gate — not skippable).
+            # Skip preflight lesson gates; cinematic evidence still fails closed
+            # when film-spec shots lack approved clips (not skippable).
             with self.assertRaises(aifilm_grok.FilmError) as ctx:
                 aifilm_grok.cmd_final(args)
             msg = str(ctx.exception).lower()
-            self.assertIn("inventory", msg)
+            self.assertIn("cinematic audit", msg)
             self.assertNotIn("preflight hard", msg)
 
 
