@@ -165,3 +165,17 @@ cd skills/ai-film-grok
 The command is read-only and intentionally reports `execution_ready=false`.
 See `seedvr2-video-restoration.md` for the weight-fingerprint, full-decode,
 source-comparison and human-review gates required before a bounded canary.
+
+## Wan 2.2 S2V research lane
+
+`wan22-s2v-performance-research` is a sound-conditioned I2V research route.
+Its dependency probe checks only the node contract and named model listings:
+
+```bash
+cd skills/ai-film-grok
+./scripts/runtime-python scripts/wan_s2v_probe.py
+```
+
+It does not make a queued prompt executable. It remains excluded from dialogue
+lip-sync and final delivery until an idle-queue resource gate, model and audio
+encoder fingerprints, full decode, alignment review and human review all pass.

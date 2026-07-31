@@ -295,6 +295,7 @@
     "scripts/voice_armory.py": "4b8d17c54027a488af364bb90f4dc88de6484c9cea43ee067f9019d84266f040",
     "scripts/voice_cast_profiles.py": "c0f7adea3e3161729c645d42a605567fc050864b5da9ee74618c23b28142776a",
     "scripts/voice_tracks.py": "e1966502340f87d39a55d0757b038bdca2c6992fd3c097215da7d5ab48d33724",
+    "scripts/wan_s2v_probe.py": "aa0dc5ff6f90339301b87648aa3c9938d85dda9d64e2bed75726857f089b9a4f",
     "scripts/wardrobe_ladder.py": "c4e44797eab8109f3a38505c2fc5c9fb28f56533bb64640db2feed004b3342c0",
     "scripts/weapon_router.py": "5675ad888a58d3aaed98cc13254c8a2a8f74536c780fde13d0684ce52bf22d20",
     "scripts/workflow_spine.py": "d78ddeec94d246b3e65ba1ca345cf5379367e7397bd384e68ac3157706fc211e"

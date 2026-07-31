@@ -1020,6 +1020,52 @@
         "face_text_hallucination_review",
         "human_review"
       ]
+    },
+    {
+      "id": "wan22-s2v-performance-research",
+      "display_name": "Wan 2.2 sound-conditioned performance research",
+      "status": "experimental",
+      "readiness": "named_dependencies_present_fingerprint_unverified",
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": ["sound-conditioned-i2v-research", "performance-motion-research"],
+      "allowed_stages": ["research"],
+      "license_scope": "verify_model_and_audio_input_rights_before_release",
+      "latest_canary_receipt_path": null,
+      "required_class_types": [
+        "WanSoundImageToVideo",
+        "AudioEncoderLoader",
+        "AudioEncoderEncode"
+      ],
+      "required_models": {
+        "diffusion_models": "wan2.2_s2v_14B_fp8_scaled.safetensors",
+        "audio_encoders": "wav2vec2_large_english_fp16.safetensors"
+      },
+      "requirements": {
+        "minimum_free_vram_mib": 24576,
+        "minimum_free_ram_mib": 12288,
+        "source_image_and_audio_hashes_required": true,
+        "model_and_audio_encoder_fingerprints_required": true
+      },
+      "restrictions": [
+        "no_auto_download",
+        "no_auto_execute",
+        "no_auto_promotion",
+        "not_final",
+        "not_lipsync_substitute",
+        "no_dialogue_delivery_without_separate_lipsync_review",
+        "human_review_required"
+      ],
+      "probe_command": "./scripts/runtime-python scripts/wan_s2v_probe.py",
+      "promotion_requirements": [
+        "idle_queue_and_resource_gate",
+        "model_and_audio_encoder_fingerprints",
+        "source_image_and_audio_hashes",
+        "terminal_media_decode",
+        "audio_video_alignment_review",
+        "identity_and_background_stability_review",
+        "full_human_review"
+      ]
     }
   ],
   "blocked_capabilities": [
