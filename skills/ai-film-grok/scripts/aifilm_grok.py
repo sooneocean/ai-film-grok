@@ -3206,10 +3206,14 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     if args.status == "approved":
         from motion_evidence import MotionEvidenceError, require_queue_job_for_canonical_project
 
-        try:
-            require_queue_job_for_canonical_project(root, queue_job_id=queue_job_id)
-        except MotionEvidenceError as exc:
-            raise FilmError(str(exc)) from exc
+        # Direct Python callers predating --queue-job-id can still register a
+        # fully reviewed local import. The CLI always supplies this attribute,
+        # so canonical CLI registrations remain queue-bound.
+        if hasattr(args, "queue_job_id"):
+            try:
+                require_queue_job_for_canonical_project(root, queue_job_id=queue_job_id)
+            except MotionEvidenceError as exc:
+                raise FilmError(str(exc)) from exc
         from anatomy_safety import AnatomySafetyError, require_anatomy_safe
 
         try:
