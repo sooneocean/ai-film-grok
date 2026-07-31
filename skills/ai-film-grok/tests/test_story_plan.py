@@ -224,15 +224,19 @@ class StoryPlanTests(unittest.TestCase):
                 validate_film_spec(spec, assign_missing_ids=False)
             self.assertEqual(
                 speaking[0]["_recommended_engine"]["motion_primary"],
-                "comfy_wan22_i2v",
+                "frw_ltx23_img2video_audio",
             )
             self.assertEqual(
                 speaking[0]["_recommended_engine"]["lipsync_primary"],
-                "rtx_latentsync_1_6",
+                "frw_ltx23_native_audio_i2v_human_verified",
             )
             self.assertEqual(
                 speaking[0]["_recommended_engine"]["lipsync_fallback"],
-                "rtx_musetalk_15",
+                "rtx_latentsync_1_6_after_frw_i2v_fallback",
+            )
+            self.assertEqual(
+                speaking[0]["_recommended_engine"]["motion_fallback"],
+                "frw_seedance_2_fast_i2v_rejection_only",
             )
             self.assertEqual(speaking[0]["audio_recipe"]["recipe"], "dialogue_lipsync")
             self.assertTrue(speaking[0]["audio_recipe"]["lipsync"])

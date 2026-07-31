@@ -81,6 +81,21 @@ def test_claim_marks_only_one_job_running_when_capacity_is_ready(
     assert status(tmp_path)["counts"]["running"] == 1
 
 
+def test_frw_arm_claim_does_not_require_comfy_capacity(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    jobs = enqueue(tmp_path)["jobs"]
+    for job in jobs[:-1]:
+        job["status"] = "succeeded"
+    write_json(
+        tmp_path / "receipts" / "dialogue-benchmark-queue.json",
+        {"schema_version": 1, "kind": "dialogue-benchmark-queue", "jobs": jobs},
+    )
+    result = claim(tmp_path)
+    assert result["status"] == "claimed"
+    assert result["job"]["weapon"] == "frw_ltx23_img2video_audio"
+    assert result["capacity"] == {"ok": True, "status": "not_required", "executor": "frw"}
+
+
 def test_concurrent_claim_does_not_double_claim(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

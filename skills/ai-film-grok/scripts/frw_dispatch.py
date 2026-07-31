@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Thin launcher for frwclaw-pro img-video-frw dispatch.py (official CLI contract).
+"""Thin launcher for the installed frwclaw-pro official CLI contract.
 
-Used by ai-film-grok for **Seedance-first bulk 2V** (newvideo), not legacy img2video.
+Used by ai-film-grok for catalog-driven FRW video work, including LTX 2.3
+``img2video-audio`` for an explicitly reviewed dialogue performance candidate.
+It supports both the current root launcher (``frwclaw-pro``) and the retired
+``img-video-frw/scripts/dispatch.py`` layout during local migrations.
 
 Usage:
   frw_dispatch.py help
@@ -19,7 +22,9 @@ Usage:
   frw_dispatch.py newvideo --model seedance-2-pro-flf \\
     --img1 URL --img2 URL --prompt "@Image1 @Image2 …" --aspect-ratio 9:16 --wait
   frw_dispatch.py upload --file-path /path/to/keyframe.png --category image
-  # LEGACY (discouraged): img2video — quality floor, see lessons-2026-07-20-seedance-quality.md
+  # Native-audio dialogue candidate (must pass native-text and human review):
+  frw_dispatch.py img2video-audio --img-url URL \
+    --prompt "Japanese dialogue; no visible text, subtitles, captions, or watermark" --wait
 
 Env:
   FRWCLAW_ROOT    override skill root
@@ -54,18 +59,58 @@ def run_canary(argv: list[str]) -> int:
     return proc.returncode
 
 
+def _current_launcher(root: Path) -> Path | None:
+    launcher = root / "frwclaw-pro"
+    return launcher if launcher.is_file() else None
+
+
+def _legacy_dispatch(root: Path) -> Path | None:
+    dispatch = root / "img-video-frw" / "scripts" / "dispatch.py"
+    return dispatch if dispatch.is_file() else None
+
+
+def is_supported_frw_root(root: Path) -> bool:
+    """Whether *root* exposes a known, runnable frwclaw-pro entry point."""
+    return _current_launcher(root) is not None or _legacy_dispatch(root) is not None
+
+
+def build_dispatch_command(root: Path, argv: list[str]) -> list[str]:
+    """Build the command without ever placing FRW credentials in argv."""
+    launcher = _current_launcher(root)
+    if launcher is not None:
+        return [str(launcher), *argv]
+    dispatch = _legacy_dispatch(root)
+    if dispatch is not None:
+        return [resolve_python(root), str(dispatch), *argv]
+    # ``resolve_frw_root`` verifies real roots before this helper is reached.
+    # Retaining the legacy shape here keeps the launcher independently testable
+    # when callers inject a root in a subprocess contract test.
+    return [resolve_python(root), str(root / "img-video-frw" / "scripts" / "dispatch.py"), *argv]
+
+
 def run_upload_probe(argv: list[str]) -> int:
     """Run the no-paid upload authorization canary and redact provider URLs."""
     if "--file-path" not in argv:
         print(json.dumps({"ok": False, "error": "upload-probe requires --file-path"}))
         return 2
     root = resolve_frw_root()
-    dispatch = root / "img-video-frw" / "scripts" / "dispatch.py"
-    py = resolve_python(root)
+    if _current_launcher(root) is not None:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "command": "upload-probe",
+                    "error": "FRW_UPLOAD_PROBE_UNAVAILABLE_CURRENT_PACKAGE",
+                    "next": "run an explicit reviewed `aifilm frw upload` when upload is authorized",
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 2
     env = os.environ.copy()
     load_dotenv(root, env)
     env["PYTHONPATH"] = ""
-    cmd = [py, str(dispatch), "upload-canary", *argv]
+    cmd = build_dispatch_command(root, ["upload-canary", *argv])
     try:
         proc = subprocess.run(
             cmd, env=env, cwd=str(root), timeout=120, capture_output=True, text=True
@@ -123,11 +168,10 @@ def resolve_frw_root() -> Path:
         ]
     )
     for root in candidates:
-        dispatch = root / "img-video-frw" / "scripts" / "dispatch.py"
-        if dispatch.is_file():
+        if is_supported_frw_root(root):
             return root.resolve()
     raise SystemExit(
-        "frw_dispatch: cannot find frwclaw-pro with img-video-frw/scripts/dispatch.py. "
+        "frw_dispatch: cannot find frwclaw-pro with a current launcher or legacy dispatch.py. "
         "Install/sync frwclaw-pro or set FRWCLAW_ROOT. "
         "See references/frw-degrade-dispatch.md"
     )
@@ -174,20 +218,17 @@ def main(argv: list[str] | None = None) -> int:
         return run_ab(argv[1:])
 
     root = resolve_frw_root()
-    dispatch = root / "img-video-frw" / "scripts" / "dispatch.py"
-    py = resolve_python(root)
-
     env = os.environ.copy()
     load_dotenv(root, env)
     # Avoid PYTHONPATH ABI leaks into frw venv
     env["PYTHONPATH"] = ""
 
-    cmd = [py, str(dispatch), *argv]
+    cmd = build_dispatch_command(root, argv)
     try:
         proc = subprocess.run(cmd, env=env, cwd=str(root), timeout=60)
     except OSError as exc:
         print(
-            f"frw_dispatch: failed to exec {py}: {exc}",
+            f"frw_dispatch: failed to exec FRW launcher: {exc}",
             file=sys.stderr,
         )
         return 1

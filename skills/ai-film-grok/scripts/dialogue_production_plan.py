@@ -30,6 +30,7 @@ def _stage(
     tool: str,
     depends_on: list[str],
     evidence_required: list[str],
+    activation: str = "always",
 ) -> dict[str, Any]:
     return {
         "stage_id": stage_id,
@@ -38,12 +39,13 @@ def _stage(
         "tool": tool,
         "depends_on": depends_on,
         "execution": "manual_verified_only",
+        "activation": activation,
         "evidence_required": evidence_required,
     }
 
 
 def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
-    """Return the explicit line-keyed Qwen → Wan → LatentSync/post workflow.
+    """Return the explicit line-keyed dialogue production workflow.
 
     This deliberately does not submit media work. It makes every required
     operator handoff and receipt visible before a queue is touched.
@@ -112,24 +114,96 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
                 ],
             )
             stages.append(keyframe)
+            frw_upload = _stage(
+                f"{line_id}:frw-keyframe-upload",
+                line_id=line_id,
+                kind="frw_i2v_keyframe_upload",
+                tool="frw_upload_image",
+                depends_on=[keyframe["stage_id"]],
+                evidence_required=[
+                    "approved_keyframe_path",
+                    "keyframe_sha256",
+                    "uploaded_img_url",
+                    "upload_receipt",
+                ],
+            )
+            stages.append(frw_upload)
             i2v = _stage(
                 f"{line_id}:i2v",
                 line_id=line_id,
-                kind="performance_i2v",
-                tool="comfy_wan22_i2v",
-                depends_on=[keyframe["stage_id"]],
-                evidence_required=["mp4_path", "ffprobe", "motion_review", "last_frame_candidate"],
+                kind="native_audio_dialogue_i2v",
+                tool="frw_ltx23_img2video_audio",
+                depends_on=[frw_upload["stage_id"]],
+                evidence_required=[
+                    "frw_task_id",
+                    "native_mp4",
+                    "ffprobe",
+                    "motion_review",
+                    "native_audio_dialogue_review",
+                    "provider_prompt_no_visible_text",
+                ],
             )
             stages.append(i2v)
             if mode == "on_camera" and bool(line.get("lipsync_required")):
+                native_text_gate = _stage(
+                    f"{line_id}:native-text-gate",
+                    line_id=line_id,
+                    kind="native_text_rejection_gate",
+                    tool="native_text_gate.validate_native_text_review",
+                    depends_on=[i2v["stage_id"]],
+                    evidence_required=[
+                        "clip_sha256",
+                        "sampled_frames",
+                        "unexpected_visual_text_detected_false",
+                        "native_audio_dialogue_matches_expected",
+                        "mouth_audio_sync_approved",
+                        "caption_owner_ffmpeg_or_hyperframes_once",
+                    ],
+                )
+                stages.append(native_text_gate)
+                frw_i2v_fallback = _stage(
+                    f"{line_id}:frw-i2v-fallback",
+                    line_id=line_id,
+                    kind="frw_i2v_visual_fallback",
+                    tool="frw_seedance_2_fast_i2v",
+                    # The gate's recorded rejection is the authorization for a
+                    # fallback. It is intentionally not an automatic retry.
+                    depends_on=[frw_upload["stage_id"], native_text_gate["stage_id"]],
+                    activation=(
+                        "only_after_ltx_native_audio_rejection: "
+                        "dialogue_mismatch|mouth_sync_failure|provider_visual_text|decode_failure"
+                    ),
+                    evidence_required=[
+                        "frw_task_id",
+                        "fallback_mp4",
+                        "ffprobe",
+                        "motion_review",
+                        "provider_prompt_no_visible_text",
+                        "fallback_reason",
+                        "ltx_rejection_review",
+                    ],
+                )
+                stages.append(frw_i2v_fallback)
                 stages.append(
                     _stage(
-                        f"{line_id}:lipsync",
+                        f"{line_id}:latentsync-fallback",
                         line_id=line_id,
-                        kind="visible_dialogue_lipsync",
+                        kind="visible_dialogue_lipsync_fallback",
                         tool="rtx_latentsync_1_6",
-                        depends_on=[i2v["stage_id"], tts["stage_id"]],
-                        evidence_required=["lipsync_mp4", "tts_sha256", "human_face_review"],
+                        # The native-text gate is a branch: a rejected gate must not
+                        # block the expensive fallback from receiving its rejection receipt.
+                        depends_on=[frw_i2v_fallback["stage_id"], tts["stage_id"]],
+                        activation=(
+                            "only_after_ltx_native_audio_rejection: "
+                            "dialogue_mismatch|mouth_sync_failure|provider_visual_text|decode_failure"
+                        ),
+                        evidence_required=[
+                            "lipsync_mp4",
+                            "tts_sha256",
+                            "human_face_review",
+                            "fallback_reason",
+                            "ltx_rejection_review",
+                        ],
                     )
                 )
             stages.append(
@@ -150,6 +224,16 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
                     "scene_state_id": state_id,
                     "audio_locked": audio.get("status") == "measured",
                     "requires_lipsync": mode == "on_camera" and bool(line.get("lipsync_required")),
+                    "primary_dialogue_route": (
+                        "frw_ltx23_img2video_audio"
+                        if mode == "on_camera" and bool(line.get("lipsync_required"))
+                        else None
+                    ),
+                    "fallback_dialogue_route": (
+                        "frw_seedance_2_fast_i2v_rejection_only"
+                        if mode == "on_camera" and bool(line.get("lipsync_required"))
+                        else None
+                    ),
                 }
             )
 
@@ -162,9 +246,11 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
         "route": {
             "state_photo": "comfy_qwen_i2i_performance_state",
             "keyframe": "comfy_qwen_i2i_keyframe",
-            "i2v": "comfy_wan22_i2v",
-            "lipsync_primary": "rtx_latentsync_1_6",
-            "lipsync_fallback": "rtx_musetalk_1_5_classified_technical_failure_only",
+            "dialogue_i2v_primary": "frw_ltx23_img2video_audio",
+            "dialogue_i2v_fallback": "frw_seedance_2_fast_i2v_rejection_only",
+            "native_text_gate": "reject_provider_burned_text_before_post",
+            "lipsync_primary": "frw_ltx23_native_audio_i2v_human_verified",
+            "lipsync_fallback": "rtx_latentsync_1_6_after_frw_i2v_fallback",
             "sound": "mmaudio_or_audio_node_with_foley_plan",
             "post": "post-plan.json_to_final_to_review",
         },
@@ -178,6 +264,8 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
             "evidence_required": [
                 "media_decode",
                 "subtitle_audit",
+                "caption_owner_ffmpeg_or_hyperframes_once",
+                "dialogue_route_acceptance",
                 "mix_audit",
                 "human_final_review",
             ],

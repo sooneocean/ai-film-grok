@@ -15,6 +15,7 @@ sys.path.insert(0, str(SCRIPTS))
 import contextlib
 
 import aifilm_grok  # noqa: E402
+import media_queue  # noqa: E402
 import tts_backend  # noqa: E402
 from media_queue import MediaQueue, QueueError  # noqa: E402
 from preflight import run_preflight  # noqa: E402
@@ -127,13 +128,17 @@ class QueueShotMembershipTests(unittest.TestCase):
             still = root / "k.png"
             still.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 32)
             q = MediaQueue(root, budget_units=10)
-            job = q.add_job(
-                shot_id="shot01",
-                operation="image_to_video",
-                prompt_file=prompt,
-                inputs=[still],
-                allow_without_pilot=True,
-            )
+            with (
+                mock.patch.object(media_queue, "assert_pilot_allows_add"),
+                mock.patch.object(media_queue, "assert_heat_allows_media"),
+            ):
+                job = q.add_job(
+                    shot_id="shot01",
+                    operation="image_to_video",
+                    prompt_file=prompt,
+                    inputs=[still],
+                    allow_without_pilot=True,
+                )
             self.assertEqual(job["shot_id"], "shot01")
 
 

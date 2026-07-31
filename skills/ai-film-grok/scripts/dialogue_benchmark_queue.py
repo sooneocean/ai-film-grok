@@ -1,8 +1,8 @@
 """Deferred, capacity-gated queue for the dialogue P2 weapon benchmark.
 
-The queue stores intent locally.  It never posts a Comfy prompt: a worker must
-claim a job after the resource tower is ready, run the weapon manually, and
-record the existing human-review receipt before completing the queue job.
+The queue stores intent locally. It never posts a provider request: a worker
+claims a job after the executor-specific capacity gate, runs it manually, and
+records the existing human-review receipt before completing the queue job.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from dialogue_benchmark import MAX_DURATION_SEC, MIN_DURATION_SEC, WEAPONS
+from dialogue_benchmark import MAX_DURATION_SEC, MIN_DURATION_SEC, WEAPON_EXECUTORS, WEAPONS
 from runtime_policy import sha256
 from util import read_json, utc_now, write_json
 
@@ -80,7 +80,7 @@ def _queue_lock(queue_path: Path):
 
 
 def enqueue(root: Path | str) -> dict[str, Any]:
-    """Persist one deferred P2 job per weapon without contacting ComfyUI."""
+    """Persist one deferred P2 job per weapon without contacting an executor."""
     base, receipt, queue_path = _paths(root)
     benchmark = _benchmark(base, receipt)
     benchmark_hash = sha256(receipt)
@@ -94,6 +94,7 @@ def enqueue(root: Path | str) -> dict[str, Any]:
                     {
                         "id": f"dbq_{secrets.token_hex(10)}",
                         "weapon": weapon,
+                        "executor": WEAPON_EXECUTORS[weapon],
                         "line_ids": list(benchmark["line_ids"]),
                         "benchmark_sha256": benchmark_hash,
                         "status": _PENDING,
@@ -132,31 +133,9 @@ def status(root: Path | str) -> dict[str, Any]:
 
 
 def claim(root: Path | str) -> dict[str, Any]:
-    """Claim only when ComfyUI is genuinely idle and above resource floors."""
+    """Claim one deferred arm with the capacity gate required by its executor."""
     base, receipt, queue_path = _paths(root)
     _benchmark(base, receipt)
-    from comfy_video import ComfyVideoError, submission_capacity
-    from config_loader import get_config
-
-    base_url = str(get_config().comfyui_base_url or "").strip()
-    if not base_url:
-        return {"ok": False, "status": "deferred", "reason": "COMFY_BASE_URL_UNCONFIGURED"}
-    try:
-        capacity = submission_capacity(base_url)
-    except ComfyVideoError as exc:
-        return {
-            "ok": False,
-            "status": "deferred",
-            "reason": "COMFY_CAPACITY_UNAVAILABLE",
-            "detail": str(exc),
-        }
-    if not capacity.get("ok"):
-        return {
-            "ok": False,
-            "status": "deferred",
-            "reason": "COMFY_CAPACITY_BLOCKED",
-            "capacity": capacity,
-        }
     with _queue_lock(queue_path):
         queue = _read_queue(queue_path)
         if any(job.get("status") == _RUNNING for job in queue["jobs"]):
@@ -164,8 +143,41 @@ def claim(root: Path | str) -> dict[str, Any]:
         job = next((item for item in queue["jobs"] if item.get("status") == _PENDING), None)
         if not isinstance(job, dict):
             raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_QUEUE_EMPTY")
+        executor = str(job.get("executor") or WEAPON_EXECUTORS.get(str(job.get("weapon")), ""))
+        if executor == "comfy":
+            from comfy_video import ComfyVideoError, submission_capacity
+            from config_loader import get_config
+
+            base_url = str(get_config().comfyui_base_url or "").strip()
+            if not base_url:
+                return {"ok": False, "status": "deferred", "reason": "COMFY_BASE_URL_UNCONFIGURED"}
+            try:
+                capacity = submission_capacity(base_url)
+            except ComfyVideoError as exc:
+                return {
+                    "ok": False,
+                    "status": "deferred",
+                    "reason": "COMFY_CAPACITY_UNAVAILABLE",
+                    "detail": str(exc),
+                }
+            if not capacity.get("ok"):
+                return {
+                    "ok": False,
+                    "status": "deferred",
+                    "reason": "COMFY_CAPACITY_BLOCKED",
+                    "capacity": capacity,
+                }
+        elif executor == "frw":
+            capacity = {"ok": True, "status": "not_required", "executor": "frw"}
+        else:
+            raise DialogueBenchmarkQueueError("DIALOGUE_BENCHMARK_EXECUTOR_INVALID")
         job.update(
-            {"status": _RUNNING, "claimed_at": utc_now(), "claim_token": secrets.token_hex(16)}
+            {
+                "status": _RUNNING,
+                "claimed_at": utc_now(),
+                "claim_token": secrets.token_hex(16),
+                "executor": executor,
+            }
         )
         queue["updated_at"] = utc_now()
         write_json(queue_path, queue)

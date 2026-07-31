@@ -118,6 +118,60 @@ class TestLoadDotenv(unittest.TestCase):
             self.assertEqual(env, {"EXISTING": "val"})
 
 
+class TestCurrentPackageLayout(unittest.TestCase):
+    def test_current_launcher_is_a_supported_root_and_is_preferred(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "frwclaw-pro").touch()
+            self.assertTrue(frw_dispatch.is_supported_frw_root(root))
+            self.assertEqual(
+                frw_dispatch.build_dispatch_command(root, ["img2video-audio", "--wait"]),
+                [str(root / "frwclaw-pro"), "img2video-audio", "--wait"],
+            )
+
+    def test_native_audio_uses_the_actual_frw_subcommand_contract(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "frwclaw-pro").touch()
+            args = [
+                "img2video-audio",
+                "--img-url",
+                "https://example.invalid/keyframe.png",
+                "--prompt",
+                "Japanese dialogue, no visible text",
+                "--width",
+                "704",
+                "--height",
+                "1280",
+                "--duration",
+                "5",
+                "--wait",
+            ]
+            self.assertEqual(
+                frw_dispatch.build_dispatch_command(root, args),
+                [str(root / "frwclaw-pro"), *args],
+            )
+            self.assertNotIn("--model", args)
+
+    def test_legacy_dispatch_remains_supported(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dispatch = root / "img-video-frw" / "scripts" / "dispatch.py"
+            dispatch.parent.mkdir(parents=True)
+            dispatch.touch()
+            with mock.patch.object(frw_dispatch, "resolve_python", return_value="python-test"):
+                self.assertEqual(
+                    frw_dispatch.build_dispatch_command(root, ["help"]),
+                    ["python-test", str(dispatch), "help"],
+                )
+
+
 class TestRunCanary(unittest.TestCase):
     """run_canary dispatches to frw_canary.py."""
 

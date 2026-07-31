@@ -105,8 +105,8 @@ def test_benchmark_plans_same_lines_without_requiring_lipsync(
     assert report["duration_sec"] == 30
     assert [arm["weapon"] for arm in report["arms"]] == [
         "comfy_qwen_i2i_performance_state",
-        "comfy_wan22_i2v",
-        "rtx_latentsync_1_6",
+        "comfy_qwen_i2i_keyframe",
+        "frw_ltx23_img2video_audio",
     ]
 
 
@@ -163,13 +163,22 @@ def test_benchmark_locks_all_three_stage_parameters_after_human_review(
     for weapon in WEAPONS:
         artifact = tmp_path / f"{weapon}.mp4"
         artifact.write_bytes(b"review artifact")
+        parameters: dict[str, object] = {"seed": 7}
+        if weapon == "frw_ltx23_img2video_audio":
+            parameters["native_text_review"] = {
+                "sampled_frames": ["frames/0001.png", "frames/0060.png"],
+                "unexpected_visual_text_detected": False,
+                "native_audio_dialogue_matches_expected": True,
+                "mouth_audio_sync_approved": True,
+                "caption_owner": "hyperframes",
+            }
         record_benchmark_arm(
             tmp_path,
             weapon=weapon,
             artifact=artifact,
             reviewer="Dex",
             note="face and motion reviewed",
-            parameters={"seed": 7},
+            parameters=parameters,
         )
     receipt = approve_benchmark_parameters(tmp_path, reviewer="Dex", rationale="stable chain")
     assert receipt["selection"]["status"] == "approved"
@@ -187,3 +196,22 @@ def test_benchmark_locks_all_three_stage_parameters_after_human_review(
     changed = (tmp_path / "receipts" / "dialogue-weapon-benchmark.json").read_text(encoding="utf-8")
     assert '"status": "pending_human_review"' in changed
     assert "receipt_hmac_sha256" not in changed
+
+
+def test_ltx_benchmark_arm_requires_clean_native_text_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_json(tmp_path / "dialogue-scene-package.json", _package(tmp_path, 10))
+    monkeypatch.setattr(package_module, "_probe_media_fd", lambda fd, expected: expected == "audio")
+    build_dialogue_benchmark(tmp_path)
+    artifact = tmp_path / "ltx.mp4"
+    artifact.write_bytes(b"review artifact")
+    with pytest.raises(ValueError, match="LTX_NATIVE_TEXT_REVIEW_REQUIRED"):
+        record_benchmark_arm(
+            tmp_path,
+            weapon="frw_ltx23_img2video_audio",
+            artifact=artifact,
+            reviewer="Dex",
+            note="reviewed",
+            parameters={"seed": 7},
+        )

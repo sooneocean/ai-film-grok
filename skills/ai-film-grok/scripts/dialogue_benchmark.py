@@ -18,9 +18,14 @@ MIN_DURATION_SEC = 30.0
 MAX_DURATION_SEC = 60.0
 WEAPONS = (
     "comfy_qwen_i2i_performance_state",
-    "comfy_wan22_i2v",
-    "rtx_latentsync_1_6",
+    "comfy_qwen_i2i_keyframe",
+    "frw_ltx23_img2video_audio",
 )
+WEAPON_EXECUTORS = {
+    "comfy_qwen_i2i_performance_state": "comfy",
+    "comfy_qwen_i2i_keyframe": "comfy",
+    "frw_ltx23_img2video_audio": "frw",
+}
 _PACKAGE_NAME = "dialogue-scene-package.json"
 _REPORT_NAME = "dialogue-weapon-benchmark.json"
 _MAX_PACKAGE_BYTES = 4 * 1024 * 1024
@@ -269,14 +274,27 @@ def record_benchmark_arm(
         arm = next((item for item in report["arms"] if item.get("weapon") == weapon), None)
         if not isinstance(arm, dict):
             raise ValueError("BENCHMARK_ARM_INPUT_INVALID")
+        artifact_sha256 = _sha256_file(media)
+        stable_parameters = dict(parameters)
+        if weapon == "frw_ltx23_img2video_audio":
+            from native_text_gate import validate_native_text_review
+
+            review = stable_parameters.get("native_text_review")
+            if not isinstance(review, dict):
+                raise ValueError("LTX_NATIVE_TEXT_REVIEW_REQUIRED")
+            review = {**review, "clip_sha256": artifact_sha256}
+            native_text_gate = validate_native_text_review(review)
+            if not native_text_gate.get("ok"):
+                raise ValueError(str(native_text_gate.get("reason") or "LTX_NATIVE_TEXT_REJECTED"))
+            stable_parameters["native_text_review"] = review
         arm.update(
             {
                 "status": "reviewed",
                 "artifact": str(media.relative_to(base)),
-                "artifact_sha256": _sha256_file(media),
+                "artifact_sha256": artifact_sha256,
                 "reviewer": reviewer.strip(),
                 "review_note": note.strip(),
-                "stable_parameters": dict(parameters),
+                "stable_parameters": stable_parameters,
             }
         )
         # A changed arm invalidates both the prior parameter selection and its

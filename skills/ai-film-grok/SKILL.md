@@ -5,7 +5,7 @@ description: Grok Imagine AI 剧情片：短片/8–15 分钟竖屏长片、I2V�
 
 # Film Grok
 
-把想法收成可恢复、可验收的 9:16 动态成片。I2V、混音、字幕与人审缺一不可。
+产出可验收的 9:16 成片。
 
 ## 入口
 
@@ -24,12 +24,12 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。  
 创作会诊：[creative-workshop](references/creative-workshop.md)（默认只编译，`apply` 才写图）。
 
-长片 v1：`plan run --production-mode longform --target-duration 480..900`；锁 graph 后 project→write-spec。9:16、三幕、≤90s 单元、故事/animatic→pilot→全片观看三闸；status/resume 只读。禁静默换 provider。[longform](references/longform-workflow.md)
+长片 v1：`plan run --production-mode longform --target-duration 480..900`；锁 graph 后 project→write-spec。9:16、三幕、≤90s 单元、故事/animatic→pilot→全片观看三闸；禁静默换 provider。[longform](references/longform-workflow.md)
 
 ## P0
 
 1. **真相**：graph 真、spec 投影；locks+hash 齐再媒体；先 Director’s Lens（[guide](references/directors-lens.md)·[lesson](references/lessons-2026-07-20-directors-lens.md)）。
-2. **对白主链**：锁对白；讲话镜=图+TTS→InfiniteTalk，备路=Grok→LatentSync。[workflow](references/dialogue-first-workflow.md)
+2. **对白主链**：锁对白；讲话镜=FRW LTX 2.3 有声I2V→无烧字/口型审；拒绝才 Seedance I2V→LatentSync。LTX 不接锁 TTS；字幕 FFmpeg/HyperFrames 一次烧入。[workflow](references/dialogue-first-workflow.md)
 3. **身份介质**：锁 medium/cast/face；still 只改已批源；moderated 禁 `image_gen` 绕脸；漫剧 manhua。
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。

@@ -42,7 +42,11 @@ music_template=on 且全无文件 → hard fail
 ```text
 off（默认；storyteller 强制 off）
   → 用户要开口 + shot.lipsync=true + speaker/face target + 正脸/微侧近景
-  → 已批准 RTX LatentSync 1.6
+  → 默认 FRW LTX 2.3 `img2video-audio`（原生有声 I2V）
+  → 抽帧确认无供应商字幕/乱码，且人审台词语义与口型
+  → LTX 的原生声音来自提示词；当前 FRW CLI 不接收锁定 TTS 音频
+  → 仅上述一项失败时先回退原 FRW `seedance-2-fast-i2v`（同一批准关键帧）
+  → 上镜对白的 FRW 回退片与已锁定 TTS 再启用已批准 RTX LatentSync 1.6
   → 可分类技术失败才按显式策略回退 RTX MuseTalk 1.5
   → 旧流程保留已 lock 本机 MuseTalk/Wav2Lip/external
   → auto 未就绪或失败写回执；显式 backend/require 失败停 final
