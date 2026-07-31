@@ -95,13 +95,33 @@ class I2VProviderTests(unittest.TestCase):
             receipt = root / "receipts" / "frw-ltx23-i2v-audio-canary.json"
             receipt.parent.mkdir()
             receipt.write_text(
-                '{"ok":true,"output_sha256":"abc","full_decode_ok":true,"human_review":"approved"}',
+                '{"ok":true,"output_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","full_decode_ok":true,"human_review":"approved"}',
                 encoding="utf-8",
             )
             self.assertTrue(provider.probe(root=root).available)
-        cmd = provider.build_command(keyframe=Path("/tmp/kf.png"), prompt="room tone", duration_sec=6)
+        cmd = provider.build_command(
+            keyframe=Path("/tmp/kf.png"), prompt="room tone", duration_sec=6
+        )
         self.assertIn("img2video-audio", cmd)
         self.assertIn("--duration", cmd)
+
+    def test_ltx23_primary_cannot_generate_without_a_valid_film_canary(self) -> None:
+        import os
+        from unittest import mock
+
+        with (
+            tempfile.TemporaryDirectory() as raw,
+            mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "ltx23_primary"}, clear=False),
+        ):
+            root = Path(raw)
+            with self.assertRaisesRegex(I2VProviderError, "I2V_PRIMARY_NOT_READY"):
+                generate_with_fallback(
+                    root=root,
+                    shot_id="shot01",
+                    keyframe=root / "keyframe.png",
+                    prompt="room tone",
+                    plan_sha256="a" * 64,
+                )
 
     def test_seedance_flf_variant(self) -> None:
         sp = get("seedance")
@@ -467,12 +487,12 @@ class I2VProviderTests(unittest.TestCase):
         # active must be a registered provider
         self.assertIn(report["active"], report["registered"])
 
-    def test_legacy_seedance_profile_cannot_change_preferred_provider(self) -> None:
+    def test_legacy_seedance_profile_maps_to_ltx_primary(self) -> None:
         import os
         from unittest import mock
 
         with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "seedance_first"}):
-            self.assertIsInstance(__import__("i2v_provider").preferred(), GrokI2VProvider)
+            self.assertIsInstance(__import__("i2v_provider").preferred(), FrwLtx23AudioProvider)
 
     def test_only_technical_failure_routes_to_frw(self) -> None:
         import os

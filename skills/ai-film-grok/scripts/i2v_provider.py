@@ -215,10 +215,17 @@ def generate_with_fallback(
     plan_sha256: str,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Run Grok first and invoke FRW only for a classified technical failure."""
+    """Run a live-ready primary and invoke fallback only for technical failure."""
     if not isinstance(plan_sha256, str) or not _SHA256_RE.fullmatch(plan_sha256):
         raise I2VProviderError("PROVIDER_SWITCH_PLAN_INVALID: plan_sha256 must be SHA-256")
     primary = preferred(root=root)
+    if primary.name == "frw-ltx23":
+        capability = primary.probe(root=root)
+        if not capability.available:
+            raise I2VProviderError(
+                "I2V_PRIMARY_NOT_READY: provider=frw-ltx23; "
+                f"{capability.reason or 'missing live capability'}"
+            )
     try:
         result = primary.generate(keyframe=keyframe, prompt=prompt, **kwargs)
         if not result.get("ok"):
@@ -590,9 +597,11 @@ class FrwLtx23AudioProvider(SeedanceProvider):
             data = json.loads(receipt.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             data = {}
+        output_sha256 = data.get("output_sha256")
         approved = bool(
             data.get("ok")
-            and data.get("output_sha256")
+            and isinstance(output_sha256, str)
+            and _SHA256_RE.fullmatch(output_sha256)
             and data.get("full_decode_ok") is True
             and data.get("human_review") == "approved"
         )

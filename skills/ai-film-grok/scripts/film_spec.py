@@ -142,6 +142,8 @@ def resolve_i2v_profile() -> str:
 
     cfg = get_config()
     raw = cfg.i2v_profile.strip().lower()
+    if raw == "seedance_first":
+        return "ltx23_primary"
     return raw if raw in I2V_PROFILES else "ltx23_primary"
 
 

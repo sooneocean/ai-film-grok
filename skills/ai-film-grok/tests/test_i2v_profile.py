@@ -34,9 +34,9 @@ class I2VProfileTests(unittest.TestCase):
 
     def test_seedance_first_env(self) -> None:
         with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "seedance_first"}):
-            # Legacy profile remains parseable but cannot promote FRW over Grok.
-            self.assertEqual(resolve_i2v_profile(), "grok_primary")
-            self.assertEqual(default_i2v_provider(), "grok")
+            # Legacy profile remains parseable but now maps to the LTX primary.
+            self.assertEqual(resolve_i2v_profile(), "ltx23_primary")
+            self.assertEqual(default_i2v_provider(), "frw-ltx23")
 
     def test_write_spec_auto_to_grok(self) -> None:
         with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}):
