@@ -98,6 +98,12 @@
 
 ## 5. 最终混音与验收门
 
+统一生产入口为 `aifilm audio-produce --root <film>`：它会把 TTS、BGM、Foley 与环境音
+编译到同一份 `audio/production-plan.json`，同时落盘 timeline、voice cast、TTS manifest、
+字幕绑定与场景声音回执。审核已锁定的声线后才加 `--render-tts`；BGM、Foley、环境音的
+候选生成与人工审核仍须走各自的 candidate/library 命令，入口不会静默替换或批准素材。
+画面完成后由 `aifilm final` 读取同一 timeline 输出全部 stem 与最终混音。
+
 `final` 前必须将 `scene_events` 展开为绝对时间并输出独立：
 
 ```text

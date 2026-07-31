@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -29,6 +29,8 @@ def _write_json(path: Path, value: object) -> None:
 
 
 def _write_spec(root: Path, shots: list[dict[str, object]], **extra: object) -> None:
+    if "i2v_provider" in extra and "_i2v_provider_explicit" not in extra:
+        extra["_i2v_provider_explicit"] = True
     _write_json(
         root / "film-spec.json",
         {
@@ -239,6 +241,72 @@ def test_action_shot_obeys_ltx_grok_frw_wan_local_priority(tmp_path: Path) -> No
         "frw-wan",
         "local-wan",
     ]
+
+
+def test_auto_ltx_default_is_not_a_hard_lock_when_ltx_is_blocked(tmp_path: Path) -> None:
+    _write_spec(
+        tmp_path,
+        [{"id": "shot01", "shot_role": "hero"}],
+        i2v_provider="frw-ltx23",
+        _i2v_provider_explicit=False,
+    )
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "frw-ltx",
+                provider="frw",
+                model="ltx-2.3",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                status="blocked",
+            ),
+            _capability(
+                "grok-i2v",
+                provider="grok",
+                model="grok-imagine-video",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+            ),
+        ],
+    )
+
+    report = explain_route(tmp_path, shot_id="shot01", now=NOW)
+
+    assert report["selected"]["capability_id"] == "grok-i2v"
+    rejected = {item["capability_id"]: item["reasons"] for item in report["rejected"]}
+    assert "CAPABILITY_NOT_READY" in rejected["frw-ltx"]
+
+
+def test_wan_and_local_routes_fail_closed_without_bound_evidence(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "fake-frw-wan",
+                provider="frw",
+                model="not-wan",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+            ),
+            _capability(
+                "local-wan",
+                provider="comfy-wan22",
+                model="wan22-i2v",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+            ),
+        ],
+        bind_route_evidence=False,
+    )
+
+    report = explain_route(tmp_path, shot_id="shot01", now=NOW)
+
+    assert report["selected"] is None
+    rejected = {item["capability_id"]: item["reasons"] for item in report["rejected"]}
+    assert "ACTION_PROVIDER_NOT_IN_CHAIN" in rejected["fake-frw-wan"]
+    assert "CAPABILITY_EVIDENCE_UNBOUND" in rejected["local-wan"]
 
 
 def test_speaking_shot_route_exposes_serial_competition_dag_and_fails_closed(

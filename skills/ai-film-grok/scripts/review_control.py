@@ -23,6 +23,7 @@ from util import exclusive_file_lock, read_json, sha256_file, utc_now, write_jso
 
 SETTINGS_NAME = "review-control.json"
 ACTION_NAME = "review-actions.json"
+AUTOPILOT_NAME = "autopilot.json"
 STAGES = (
     ("story", "故事与导演合约", ("drama-graph.json", "film-spec.json")),
     ("design", "视觉设计与资产", ("style-bible.json", "assets.json")),
@@ -93,6 +94,12 @@ def _default_settings() -> dict[str, Any]:
         "reviewer": "owner",
         "budget_envelopes": {"still": 0, "motion": 0, "audio": 0, "post": 0},
         "advance_mode": "next_review_gate",
+        "autopilot": {
+            "enabled": False,
+            "sample_every": 5,
+            "allowed_providers": [],
+            "telegram_notify": True,
+        },
     }
 
 
@@ -107,6 +114,20 @@ def load_settings(root: Path | str) -> dict[str, Any]:
         default["budget_envelopes"] = {
             key: max(0, int(envelopes.get(key, 0))) for key in default["budget_envelopes"]
         }
+    autopilot = value.get("autopilot")
+    if isinstance(autopilot, dict):
+        default["autopilot"] = {
+            "enabled": bool(autopilot.get("enabled", False)),
+            "sample_every": max(1, int(autopilot.get("sample_every", 5))),
+            "allowed_providers": sorted(
+                {
+                    str(item).strip()
+                    for item in autopilot.get("allowed_providers", [])
+                    if isinstance(item, str) and item.strip()
+                }
+            ),
+            "telegram_notify": bool(autopilot.get("telegram_notify", True)),
+        }
     return default
 
 
@@ -116,6 +137,7 @@ def update_settings(
     expected_revision: int,
     reviewer: str | None = None,
     budget_envelopes: dict[str, Any] | None = None,
+    autopilot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     base = _root(root)
     path = _settings_path(base)
@@ -135,6 +157,26 @@ def update_settings(
                 if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
                     raise ReviewControlError("budget values must be non-negative numbers")
                 current["budget_envelopes"][key] = int(value)
+        if autopilot is not None:
+            if set(autopilot) - {"enabled", "sample_every", "allowed_providers", "telegram_notify"}:
+                raise ReviewControlError("unknown autopilot setting")
+            merged = dict(current["autopilot"])
+            merged.update(autopilot)
+            allowed = merged["allowed_providers"]
+            if not isinstance(allowed, list):
+                raise ReviewControlError("autopilot allowed_providers must be a list")
+            current["autopilot"] = {
+                "enabled": bool(merged["enabled"]),
+                "sample_every": max(1, int(merged["sample_every"])),
+                "allowed_providers": sorted(
+                    {
+                        str(item).strip()
+                        for item in allowed
+                        if isinstance(item, str) and item.strip()
+                    }
+                ),
+                "telegram_notify": bool(merged["telegram_notify"]),
+            }
         current["revision"] = int(current["revision"]) + 1
         current["updated_at"] = utc_now()
         write_json(path, current)
@@ -312,6 +354,12 @@ def runtime_status(root: Path | str) -> dict[str, Any]:
         ),
         "unknown": counts.get("unknown", 0),
     }
+
+
+def autopilot_status(root: Path | str) -> dict[str, Any] | None:
+    """Return the latest non-secret autopilot receipt, if one exists."""
+    value = read_json(_root(root) / "receipts" / AUTOPILOT_NAME)
+    return value if isinstance(value, dict) else None
 
 
 def _load_actions(root: Path) -> dict[str, Any]:

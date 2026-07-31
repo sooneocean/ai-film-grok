@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from audio_delivery_gate import build_delivery_report
-from audio_timeline import caption_bindings, compile_timeline
+from audio_timeline import caption_bindings, compile_timeline, timeline_hash
 
 
 def _timeline():
@@ -146,3 +146,37 @@ def test_delivery_gate_resolves_symlinked_temp_root_before_containment_check(tmp
         root=alias,
     )
     assert report["ok"] is True
+
+
+def test_delivery_gate_rejects_stale_unified_production_receipt():
+    timeline = _timeline()
+    manifest = {
+        "jobs": [
+            {
+                "audio_event_id": timeline["events"][0]["id"],
+                "request_sha256": "x",
+                "status": "ready",
+            }
+        ]
+    }
+    scene_sound = {"source_projection_sha256": "a" * 64, "status": "ok"}
+    production = {
+        "kind": "aifilm-audio-production",
+        "timeline": {"sha256": timeline_hash(timeline)},
+        "tracks": {
+            "tts": {"event_count": 1},
+            "bgm": {"event_count": 0},
+            "foley": {"event_count": 0},
+            "ambience": {"event_count": 0},
+        },
+        "scene_sound": {"source_projection_sha256": "b" * 64},
+    }
+    report = build_delivery_report(
+        timeline=timeline,
+        tts_manifest=manifest,
+        subtitle_bindings=caption_bindings(timeline),
+        audio_production=production,
+        scene_sound_receipt=scene_sound,
+    )
+    assert report["ok"] is False
+    assert any("stale for scene sound" in error for error in report["errors"])

@@ -31,6 +31,8 @@ _RESTRICTED_WARDROBE = frozenset({"partial", "undressed", "bare"})
 _SUPPORTED_QUALITY_TIERS = frozenset({"draft", "select", "hero"})
 _SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "schemas"
 _WAN_MODEL_IDENTITY_RE = re.compile(r"(?:^|/)wan(?:[0-9._-]|$)")
+_MIN_LOCAL_RAM_BYTES = 12 * 1024**3
+_MIN_LOCAL_VRAM_BYTES = 24 * 1024**3
 
 
 def _dialogue_competition(
@@ -297,6 +299,12 @@ def _hard_rejections(
     if isinstance(supported_tiers, list) and intent["quality_tier"] not in supported_tiers:
         reasons.append("QUALITY_TIER_UNSUPPORTED")
     lane = _action_lane(capability)
+    if (
+        intent["operation"] == "image_to_video"
+        and lane == "other"
+        and not intent.get("provider_lock")
+    ):
+        reasons.append("ACTION_PROVIDER_NOT_IN_CHAIN")
     if lane in {"frw-wan", "local"}:
         receipt = _bound_capability_receipt(base, capability)
         if receipt is None:
@@ -383,6 +391,10 @@ def _local_capacity_receipt_ready(receipt: dict[str, Any]) -> bool:
         and isinstance(vram_floor, int)
         and isinstance(ram_free, int)
         and isinstance(vram_free, int)
+        and ram_floor >= _MIN_LOCAL_RAM_BYTES
+        and vram_floor >= _MIN_LOCAL_VRAM_BYTES
+        and ram_free >= _MIN_LOCAL_RAM_BYTES
+        and vram_free >= _MIN_LOCAL_VRAM_BYTES
         and ram_free >= ram_floor
         and vram_free >= vram_floor
         and queue.get("running") == 0

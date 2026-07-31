@@ -26,6 +26,7 @@ from transaction_receipt import (
 Runner = Callable[[dict[str, Any], "RunnerSpec"], dict[str, Any]]
 _SECRET_KEY = re.compile(r"(authorization|token|api[_-]?key|secret|signature|signed[_-]?url)", re.I)
 _BEARER = re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/-]+")
+_AUTOPILOT_TOKEN = object()
 
 
 def _redact(value: Any, *, key: str = "") -> Any:
@@ -438,7 +439,13 @@ def _execute_program(argv: tuple[str, ...], *, skill_id: str) -> dict[str, Any]:
     return result
 
 
-def run_skill(skill_id: str, payload_file: Path | str, *, dry_run: bool = False) -> dict[str, Any]:
+def run_skill(
+    skill_id: str,
+    payload_file: Path | str,
+    *,
+    dry_run: bool = False,
+    _autopilot_token: object | None = None,
+) -> dict[str, Any]:
     try:
         payload = _load_payload(Path(payload_file))
         shown = show_skill(skill_id)
@@ -513,10 +520,16 @@ def run_skill(skill_id: str, payload_file: Path | str, *, dry_run: bool = False)
             return report
         approval_ref: str | None = None
         approval_input_hashes: dict[str, str] = {}
-        if report["runner"]["approval_class"] == "human_required":
+        autopilot_authorized = _autopilot_token is _AUTOPILOT_TOKEN
+        if report["runner"]["approval_class"] == "human_required" and not autopilot_authorized:
             approval_ref, approval_input_hashes = _require_current_approval(
                 root, skill_id=skill_id, spec=spec, payload=payload, transaction=tx
             )
+        elif report["runner"]["approval_class"] == "human_required":
+            # The caller is responsible for checking a project-bound budget, live
+            # provider readiness and an allowlisted skill before it can use this
+            # narrow bypass.  Do not turn it into a generic CLI flag.
+            report["runner"]["approval_class"] = "autopilot_budget_authorized"
         refuse_approved_output_overwrite(root, payload)
         receipt = begin_receipt(
             root,
@@ -556,3 +569,10 @@ def run_skill(skill_id: str, payload_file: Path | str, *, dry_run: bool = False)
         return dict(completed["result"])
     except (TransactionConflict, ValueError) as exc:
         return {"ok": False, "error": str(exc)}
+
+
+def run_autopilot_skill(
+    skill_id: str, payload_file: Path | str, *, dry_run: bool = False
+) -> dict[str, Any]:
+    """Internal entry point; only the autopilot safety gate may skip a human approval."""
+    return run_skill(skill_id, payload_file, dry_run=dry_run, _autopilot_token=_AUTOPILOT_TOKEN)

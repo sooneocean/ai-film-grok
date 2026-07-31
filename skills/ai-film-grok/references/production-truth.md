@@ -29,6 +29,8 @@ Graph 不是每个旧项目的强制前置条件；没有 Graph 的 legacy short
 
 新建 queue job 会冻结一份 `shot-production-contract`：该镜的 `film-spec`、`drama-graph`、`assets-registry` 的 SHA-256，以及角色状态引用。任务完成时与 queue→clip 的 motion evidence 登记时都会重新验证这份契约；任何计划或资产漂移都会保留任务原状态并拒绝晋级。`production-evidence` 和 `truth audit` 同时汇总所有 queue contract，避免“单镜检查通过、总表仍把旧任务当有效”的分裂。
 
+canonical 项目在 `register-clip --status approved` 时也必须提供 `--queue-job-id`；随后该 job 的输出 hash、端点、QA 与 source contract 都会被 `motion-evidence` 复验。故意先登记 clip、再补 queue 来源的路径不可用。
+
 旧项目没有这份绑定时被标为 `legacy-unbound`，不是被悄悄视为可追溯。canonical Graph 项目必须先完成资产注册与锁定投影，才能创建绑定的 queue job。
 
 ## 使用时机

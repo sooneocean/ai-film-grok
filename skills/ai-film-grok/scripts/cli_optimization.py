@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from argparse import Namespace
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 
@@ -91,6 +92,48 @@ def add_optimization_parsers(subparsers: Any) -> None:
     dashboard_build.add_argument("--roots-dir", required=True)
     dashboard_build.add_argument("--days", type=int, default=30)
     dashboard_build.add_argument("--out", required=True)
+
+    program_parser = subparsers.add_parser(
+        "optimization-program",
+        help="Manage challenger, two-stage, audio, and weekly evidence contracts",
+    )
+    program_sub = program_parser.add_subparsers(dest="program_action", required=True)
+    program_init = program_sub.add_parser(
+        "init", help="Create the no-spend optimisation program receipt"
+    )
+    program_init.add_argument("--root", required=True)
+    draft = program_sub.add_parser("draft", help="Record a reviewed low-cost draft stage")
+    draft.add_argument("--root", required=True)
+    draft.add_argument("--shot-id", required=True)
+    draft.add_argument("--model", choices=("ltx-fast",), required=True)
+    for name in ("still-approved", "composition-pass", "motion-pass", "continuity-pass"):
+        draft.add_argument(f"--{name}", action="store_true")
+    formal = program_sub.add_parser(
+        "formal", help="Authorize, but do not dispatch, formal generation"
+    )
+    formal.add_argument("--root", required=True)
+    formal.add_argument("--shot-id", required=True)
+    formal.add_argument("--model", choices=("infinitetalk", "hunyuan-720p-sr"), required=True)
+    formal.add_argument("--evidence-receipt", required=True)
+    audio = program_sub.add_parser(
+        "audio", help="Record decoded and human-reviewed audio lane evidence"
+    )
+    audio.add_argument("--root", required=True)
+    audio.add_argument(
+        "--lane", choices=("qwen3-tts", "ace-step", "stable-audio", "mmaudio"), required=True
+    )
+    audio.add_argument("--artifact", required=True)
+    audio.add_argument("--review-receipt", required=True)
+    audio.add_argument("--production-eligible", action="store_true")
+    evaluate = program_sub.add_parser(
+        "evaluate", help="Evaluate a challenger from three or more complete metrics receipts"
+    )
+    evaluate.add_argument("--root", required=True)
+    evaluate.add_argument(
+        "--challenger", choices=("infinitetalk", "ltx-fast", "hunyuan-720p-sr"), required=True
+    )
+    evaluate.add_argument("--metrics-root", action="append", required=True)
+    evaluate.add_argument("--baseline-metrics-root", action="append", required=True)
 
 
 def _call(
@@ -195,3 +238,64 @@ def dashboard(args: Namespace) -> tuple[dict[str, Any], int]:
     from optimization_dashboard import build
 
     return _call(build, args.roots_dir, days=args.days, out=args.out)
+
+
+def program(args: Namespace) -> tuple[dict[str, Any], int]:
+    from optimization_program import (
+        approve_formal_stage,
+        evaluate_challenger,
+        init_program,
+        record_audio_lane,
+        record_draft_stage,
+    )
+
+    if args.program_action == "init":
+        return _call(init_program, args.root)
+    if args.program_action == "draft":
+        return _call(
+            record_draft_stage,
+            args.root,
+            shot_id=args.shot_id,
+            model=args.model,
+            still_approved=args.still_approved,
+            composition_pass=args.composition_pass,
+            motion_pass=args.motion_pass,
+            continuity_pass=args.continuity_pass,
+        )
+    if args.program_action == "formal":
+        return _call(
+            approve_formal_stage,
+            args.root,
+            shot_id=args.shot_id,
+            formal_model=args.model,
+            evidence_receipt=args.evidence_receipt,
+        )
+    if args.program_action == "evaluate":
+        from util import read_json
+
+        reports, baselines = [], []
+        for root in args.metrics_root:
+            metrics = read_json(Path(root).expanduser() / "receipts" / "metrics.json")
+            if not isinstance(metrics, dict):
+                raise OptimizationCliError(f"missing metrics receipt: {root}")
+            reports.append(metrics)
+        for root in args.baseline_metrics_root:
+            metrics = read_json(Path(root).expanduser() / "receipts" / "metrics.json")
+            if not isinstance(metrics, dict):
+                raise OptimizationCliError(f"missing baseline metrics receipt: {root}")
+            baselines.append(metrics)
+        return _call(
+            evaluate_challenger,
+            args.root,
+            challenger=args.challenger,
+            reports=reports,
+            baseline_reports=baselines,
+        )
+    return _call(
+        record_audio_lane,
+        args.root,
+        lane=args.lane,
+        artifact=args.artifact,
+        review_receipt=args.review_receipt,
+        production_eligible=args.production_eligible,
+    )

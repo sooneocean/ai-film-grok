@@ -81,6 +81,17 @@ class I2VProviderTests(unittest.TestCase):
             report = get("grok").probe(root=tmp_path)
             self.assertTrue(report.available)
 
+    def test_grok_film_root_rejects_missing_media_and_fake_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            receipt = root / "receipts" / "grok-i2v-canary.json"
+            receipt.parent.mkdir()
+            receipt.write_text(
+                '{"ok":true,"output":"out/missing.mp4","output_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}',
+                encoding="utf-8",
+            )
+            self.assertFalse(get("grok").probe(root=root).available)
+
     def test_endpoint_resolution(self) -> None:
         """Existing source_endpoint labels resolve to owning provider."""
         self.assertIsInstance(for_endpoint("image_to_video"), GrokI2VProvider)
@@ -146,11 +157,17 @@ class I2VProviderTests(unittest.TestCase):
 
     def test_ltx23_primary_cannot_generate_without_a_valid_film_canary(self) -> None:
         import os
+        from types import SimpleNamespace
         from unittest import mock
 
         with (
             tempfile.TemporaryDirectory() as raw,
             mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "ltx23_primary"}, clear=False),
+            mock.patch.object(
+                LocalComfyWan22Provider,
+                "probe",
+                return_value=SimpleNamespace(available=False, reason="local capacity unavailable"),
+            ),
         ):
             root = Path(raw)
             with self.assertRaisesRegex(I2VProviderError, "I2V_PROVIDER_CHAIN_EXHAUSTED"):
@@ -711,6 +728,7 @@ class I2VProviderTests(unittest.TestCase):
         from unittest import mock
 
         self.assertTrue(is_technical_failure("HTTP 503 service unavailable"))
+        self.assertFalse(is_technical_failure("human review timed out"))
         self.assertFalse(is_technical_failure({"task_id": "ambiguous"}))
         self.assertIsNone(
             route_after_failure(root=None, shot_id="s1", primary="grok", error="quality fail")

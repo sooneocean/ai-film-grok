@@ -115,6 +115,13 @@ def test_settings_use_optimistic_revision_and_budget_envelopes(tmp_path: Path) -
         root, expected_revision=0, reviewer="dex", budget_envelopes={"motion": 12}
     )
     assert updated["budget_envelopes"]["motion"] == 12
+    assert updated["autopilot"]["enabled"] is False
+    updated = update_settings(
+        root,
+        expected_revision=1,
+        autopilot={"enabled": True, "allowed_providers": ["grok"], "sample_every": 5},
+    )
+    assert updated["autopilot"]["allowed_providers"] == ["grok"]
     with pytest.raises(ReviewControlConflict):
         update_settings(root, expected_revision=0, reviewer="other")
 

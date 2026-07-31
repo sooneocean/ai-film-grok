@@ -3193,6 +3193,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     motion_approved = getattr(args, "motion_approved", False) is True
     review_note = str(getattr(args, "review_note", "") or "").strip()
     anatomy_safe = getattr(args, "anatomy_safe", False) is True
+    queue_job_id = str(getattr(args, "queue_job_id", "") or "").strip()
     if args.status == "approved" and str(endpoint or "").startswith("frw_ltx"):
         from visual_text_audit import VisualTextAuditError, require_clean_audit
 
@@ -3203,6 +3204,12 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                 f"approved FRW LTX clip requires clean visual-text audit: {exc}"
             ) from exc
     if args.status == "approved":
+        from motion_evidence import MotionEvidenceError, require_queue_job_for_canonical_project
+
+        try:
+            require_queue_job_for_canonical_project(root, queue_job_id=queue_job_id)
+        except MotionEvidenceError as exc:
+            raise FilmError(str(exc)) from exc
         from anatomy_safety import AnatomySafetyError, require_anatomy_safe
 
         try:
@@ -3345,7 +3352,6 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         from quality_evidence import QualityEvidenceError, build_shot_quality_evidence
 
         clip_path = Path(record["path"])
-        queue_job_id = str(getattr(args, "queue_job_id", "") or "").strip()
         motion_evidence: dict[str, Any] | None = None
         if queue_job_id:
             try:
@@ -6040,13 +6046,14 @@ def cmd_generation_usage(args: argparse.Namespace) -> int:
 
 
 def _run_optimization_cli(args: argparse.Namespace, action: str) -> int:
-    from cli_optimization import OptimizationCliError, dashboard, experiment, gold, metrics
+    from cli_optimization import OptimizationCliError, dashboard, experiment, gold, metrics, program
 
     runners = {
         "metrics": metrics,
         "experiment": experiment,
         "gold": gold,
         "dashboard": dashboard,
+        "optimization-program": program,
     }
     try:
         report, code = runners[action](args)
@@ -6070,6 +6077,10 @@ def cmd_gold(args: argparse.Namespace) -> int:
 
 def cmd_dashboard(args: argparse.Namespace) -> int:
     return _run_optimization_cli(args, "dashboard")
+
+
+def cmd_optimization_program(args: argparse.Namespace) -> int:
+    return _run_optimization_cli(args, "optimization-program")
 
 
 def _run_quality_reporting_cli(args: argparse.Namespace, command: str) -> int:
@@ -6768,6 +6779,20 @@ def cmd_advance(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") else 2
 
 
+def cmd_autopilot(args: argparse.Namespace) -> int:
+    """Run one bounded, budget-authorized automation pass for a film."""
+    from autopilot import AutopilotError, autopilot_once
+
+    try:
+        report = autopilot_once(
+            Path(args.root), max_actions=int(args.max_actions), dry_run=bool(args.dry_run)
+        )
+    except AutopilotError as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return 0 if report.get("ok") else 2
+
+
 def cmd_craft(args: argparse.Namespace) -> int:
     """Craft spine status (idea→verified)."""
     root_s = getattr(args, "root", None)
@@ -6825,13 +6850,17 @@ def cmd_audio_verify(args: argparse.Namespace) -> int:
     timeline = read_json(audio_dir / "audio-timeline.json")
     manifest = read_json(audio_dir / "tts-manifest.json")
     bindings = read_json(audio_dir / "caption-bindings.json")
+    production = read_json(audio_dir / "production-plan.json")
+    scene_sound = read_json(root / "receipts" / "scene-sound-status.json")
     if (
         not isinstance(timeline, dict)
         or not isinstance(manifest, dict)
         or not isinstance(bindings, list)
+        or not isinstance(production, dict)
+        or not isinstance(scene_sound, dict)
     ):
         raise FilmError(
-            "audio-verify requires audio-timeline.json, tts-manifest.json, caption-bindings.json"
+            "audio-verify requires unified production artifacts; run audio-produce first"
         )
     final_path = Path(args.final).expanduser().resolve() if args.final else None
     out = audio_dir / "audio-delivery-report.json"
@@ -6843,6 +6872,8 @@ def cmd_audio_verify(args: argparse.Namespace) -> int:
         final_mp4=final_path,
         previous_report=previous_report if isinstance(previous_report, dict) else None,
         root=root,
+        audio_production=production,
+        scene_sound_receipt=scene_sound,
     )
     write_json(out, report)
     emit({**report, "path": str(out)})
@@ -6871,6 +6902,17 @@ def cmd_audio_tts_render(args: argparse.Namespace) -> int:
     try:
         emit(render_tts_events(Path(args.root)))
     except AudioTTSRenderError as exc:
+        raise FilmError(str(exc)) from exc
+    return 0
+
+
+def cmd_audio_produce(args: argparse.Namespace) -> int:
+    """Prepare the unified production-audio contract for one film."""
+    from audio_production import AudioProductionError, prepare_audio_production
+
+    try:
+        emit(prepare_audio_production(Path(args.root), render_tts=bool(args.render_tts)))
+    except AudioProductionError as exc:
         raise FilmError(str(exc)) from exc
     return 0
 
@@ -7821,6 +7863,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=3,
         help="Maximum local steps, hard-capped at 10",
     )
+    autopilot_p = sub.add_parser(
+        "autopilot",
+        help="Execute bounded local and budget-authorized external steps; stop at every safety gate",
+    )
+    autopilot_p.add_argument("--root", required=True)
+    autopilot_p.add_argument("--max-actions", type=int, default=3)
+    autopilot_p.add_argument("--dry-run", action="store_true")
 
     craft_p = sub.add_parser(
         "craft",
@@ -7890,6 +7939,17 @@ def build_parser() -> argparse.ArgumentParser:
         "audio-tts-render", help="Render each event TTS asset and write actual durations"
     )
     atr.add_argument("--root", required=True)
+
+    aprod = sub.add_parser(
+        "audio-produce",
+        help="Compile TTS, BGM, Foley, and ambience into one production-audio receipt",
+    )
+    aprod.add_argument("--root", required=True)
+    aprod.add_argument(
+        "--render-tts",
+        action="store_true",
+        help="Render the already locked TTS jobs; does not generate BGM/Foley/ambience candidates",
+    )
 
     ae = sub.add_parser("audio-event", help="Edit one auditable audio-timeline event")
     ae.add_argument("--root", required=True)
@@ -8588,6 +8648,23 @@ def build_parser() -> argparse.ArgumentParser:
     shot_review.add_argument(
         "--reference", action="append", default=[], help="Optional reference asset path; repeatable"
     )
+
+    review_pack = sub.add_parser(
+        "review-pack",
+        help="Create an unapproved local decode, frame, contact-sheet and hash evidence package",
+    )
+    review_pack.add_argument("--root", required=True)
+    review_pack.add_argument("--id", required=True, help="Stable review package id")
+    review_pack.add_argument("--source", help="Existing local video path")
+    review_pack.add_argument(
+        "--comfy-filename",
+        help="Download this named Comfy output first; mutually exclusive with --source",
+    )
+    review_pack.add_argument("--comfy-base-url", help="ComfyUI base URL for --comfy-filename")
+    review_pack.add_argument("--comfy-subfolder", default="")
+    review_pack.add_argument("--comfy-type", choices=("input", "output", "temp"), default="output")
+    review_pack.add_argument("--no-expect-audio", dest="expect_audio", action="store_false")
+    review_pack.set_defaults(expect_audio=True)
 
     review_contract = sub.add_parser(
         "review-contract",
@@ -10332,12 +10409,14 @@ def main(argv: list[str] | None = None) -> int:
             "grok-oauth": cmd_grok_oauth,
             "dispatch": cmd_dispatch,
             "advance": cmd_advance,
+            "autopilot": cmd_autopilot,
             "craft": cmd_craft,
             "selects": cmd_selects,
             "audio-plan": cmd_audio_plan,
             "audio-verify": cmd_audio_verify,
             "verify": cmd_verify,
             "audio-tts-render": cmd_audio_tts_render,
+            "audio-produce": cmd_audio_produce,
             "audio-event": cmd_audio_event,
             "bgm-candidate": cmd_bgm_candidate,
             "bgm-library": cmd_bgm_library,
@@ -10423,6 +10502,7 @@ def main(argv: list[str] | None = None) -> int:
             "experiment": cmd_experiment,
             "gold": cmd_gold,
             "dashboard": cmd_dashboard,
+            "optimization-program": cmd_optimization_program,
             "quality-ledger": cmd_quality_ledger,
             "production-report": cmd_production_report,
             "external-review": cmd_external_review,
@@ -10659,6 +10739,58 @@ def main(argv: list[str] | None = None) -> int:
                 raise FilmError(str(exc)) from exc
             emit(report)
             return 0 if report["passed"] else 1
+        if args.cmd == "review-pack":
+            from review_pack import (
+                ReviewPackError,
+                build_review_pack,
+                comfy_download_target,
+                ensure_review_pack_available,
+            )
+
+            supplied = [bool(args.source), bool(args.comfy_filename)]
+            if sum(supplied) != 1:
+                raise FilmError("review-pack requires exactly one of --source or --comfy-filename")
+            root = Path(args.root).expanduser().resolve()
+            source = Path(args.source).expanduser() if args.source else None
+            download = None
+            if args.comfy_filename:
+                from comfy_armory import ComfyArmoryError, default_base_url
+                from comfy_video import ComfyVideoError, download_result
+
+                try:
+                    ensure_review_pack_available(root, pack_id=args.id)
+                    base_url = args.comfy_base_url or default_base_url()
+                    source = comfy_download_target(
+                        root, pack_id=args.id, filename=args.comfy_filename
+                    )
+                    download = download_result(
+                        base_url,
+                        {
+                            "filename": args.comfy_filename,
+                            "subfolder": args.comfy_subfolder,
+                            "type": args.comfy_type,
+                        },
+                        source,
+                    )
+                except (
+                    ComfyArmoryError,
+                    ComfyVideoError,
+                    ReviewPackError,
+                    SecurityPolicyError,
+                ) as exc:
+                    raise FilmError(str(exc)) from exc
+            try:
+                report = build_review_pack(
+                    root,
+                    pack_id=args.id,
+                    source=source,
+                    expect_audio=args.expect_audio,
+                    download=download,
+                )
+            except (ReviewPackError, ValueError) as exc:
+                raise FilmError(str(exc)) from exc
+            emit(report)
+            return 0 if report["ok"] else 1
         if args.cmd == "analyze-reference":
             from reference_audit import ReferenceAuditError, run_reference_audit
 

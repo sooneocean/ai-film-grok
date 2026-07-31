@@ -14,6 +14,14 @@ class MotionEvidenceError(ValueError):
     pass
 
 
+def require_queue_job_for_canonical_project(root: Path | str, *, queue_job_id: str | None) -> None:
+    """Do not let canonical clips bypass the queue-to-evidence contract."""
+    from production_chain import canonical_contract_required
+
+    if canonical_contract_required(root) and not str(queue_job_id or "").strip():
+        raise MotionEvidenceError("canonical approved clips require --queue-job-id")
+
+
 def build_motion_generation_evidence(
     root: Path | str,
     *,

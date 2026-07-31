@@ -109,6 +109,8 @@ def test_page_exposes_media_preview_and_budget_controls() -> None:
     assert "alert(" not in _PAGE
     assert "final-review-form" in _PAGE
     assert "/api/final-review-input" in _PAGE
+    assert "autopilot-status" in _PAGE
+    assert "autopilot-enabled" in _PAGE
 
 
 def test_review_ui_writes_hash_bound_final_review_input(tmp_path: Path) -> None:
