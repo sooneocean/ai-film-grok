@@ -375,6 +375,10 @@ def _frw_wan_receipt_ready(base: Path, receipt: dict[str, Any]) -> bool:
     )
 
 
+def _queue_lane_idle(value: Any) -> bool:
+    return (type(value) is int and value == 0) or (isinstance(value, list) and not value)
+
+
 def _local_capacity_receipt_ready(receipt: dict[str, Any]) -> bool:
     floors = receipt.get("floors") if isinstance(receipt.get("floors"), dict) else {}
     observed = receipt.get("observed") if isinstance(receipt.get("observed"), dict) else {}
@@ -397,8 +401,8 @@ def _local_capacity_receipt_ready(receipt: dict[str, Any]) -> bool:
         and vram_free >= _MIN_LOCAL_VRAM_BYTES
         and ram_free >= ram_floor
         and vram_free >= vram_floor
-        and queue.get("running") == 0
-        and queue.get("pending") == 0
+        and _queue_lane_idle(queue.get("running"))
+        and _queue_lane_idle(queue.get("pending"))
     )
 
 

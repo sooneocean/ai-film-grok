@@ -15,6 +15,7 @@ sys.path.insert(0, str(SCRIPTS))
 from aifilm_grok import main  # noqa: E402
 from production_router import (  # noqa: E402
     RouteExplainError,
+    _local_capacity_receipt_ready,
     explain_route,
     plan_route,
     preflight_route_plan,
@@ -307,6 +308,37 @@ def test_wan_and_local_routes_fail_closed_without_bound_evidence(tmp_path: Path)
     rejected = {item["capability_id"]: item["reasons"] for item in report["rejected"]}
     assert "ACTION_PROVIDER_NOT_IN_CHAIN" in rejected["fake-frw-wan"]
     assert "CAPABILITY_EVIDENCE_UNBOUND" in rejected["local-wan"]
+
+
+@pytest.mark.parametrize(
+    ("running", "pending"),
+    [
+        (0, 0),
+        ([], []),
+    ],
+)
+def test_local_capacity_accepts_both_idle_queue_shapes(
+    running: object,
+    pending: object,
+) -> None:
+    assert (
+        _local_capacity_receipt_ready(
+            {
+                "kind": "comfy-submission-capacity",
+                "ok": True,
+                "floors": {
+                    "ram_free_bytes": 12 * 1024**3,
+                    "vram_free_bytes": 24 * 1024**3,
+                },
+                "observed": {
+                    "ram_free_bytes": 16 * 1024**3,
+                    "device": {"vram_free_bytes": 28 * 1024**3},
+                    "queue": {"running": running, "pending": pending},
+                },
+            }
+        )
+        is True
+    )
 
 
 def test_speaking_shot_route_exposes_serial_competition_dag_and_fails_closed(
