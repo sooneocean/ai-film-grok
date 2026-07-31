@@ -165,7 +165,7 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
                     f"{line_id}:frw-i2v-fallback",
                     line_id=line_id,
                     kind="frw_i2v_visual_fallback",
-                    tool="frw_seedance_2_fast_i2v",
+                    tool="frw_img2video",
                     # The gate's recorded rejection is the authorization for a
                     # fallback. It is intentionally not an automatic retry.
                     depends_on=[frw_upload["stage_id"], native_text_gate["stage_id"]],
@@ -230,7 +230,7 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
                         else None
                     ),
                     "fallback_dialogue_route": (
-                        "frw_seedance_2_fast_i2v_rejection_only"
+                        "frw_img2video_rejection_only"
                         if mode == "on_camera" and bool(line.get("lipsync_required"))
                         else None
                     ),
@@ -247,10 +247,10 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
             "state_photo": "comfy_qwen_i2i_performance_state",
             "keyframe": "comfy_qwen_i2i_keyframe",
             "dialogue_i2v_primary": "frw_ltx23_img2video_audio",
-            "dialogue_i2v_fallback": "frw_seedance_2_fast_i2v_rejection_only",
+            "dialogue_i2v_fallback": "frw_img2video_rejection_only",
             "native_text_gate": "reject_provider_burned_text_before_post",
             "lipsync_primary": "frw_ltx23_native_audio_i2v_human_verified",
-            "lipsync_fallback": "rtx_latentsync_1_6_after_frw_i2v_fallback",
+            "lipsync_fallback": "rtx_latentsync_1_6_after_frw_img2video_fallback",
             "sound": "mmaudio_or_audio_node_with_foley_plan",
             "post": "post-plan.json_to_final_to_review",
         },

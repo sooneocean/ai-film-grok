@@ -152,20 +152,16 @@ def default_i2v_provider() -> str:
 
 
 def default_frw_video_model() -> str:
-    # Keep seedance model id documented for when profile flips back; not used for grok L1
-    return "seedance-2-fast-i2v"
+    return FRW_I2V_FRW_ONLY_LIFEBOAT
 
 
 def frw_i2v_fallback_chain() -> tuple[str, ...]:
-    return (
-        "frw:seedance-2-fast-i2v",
-        "frw:ltx-i2v",
-    )
+    return ("frw:legacy-img2video",)
 
 
 # Back-compat names used across codebase
 DEFAULT_I2V_PROVIDER = "auto"  # resolved in validate via profile
-DEFAULT_FRW_VIDEO_MODEL = "seedance-2-fast-i2v"
+DEFAULT_FRW_VIDEO_MODEL = FRW_I2V_FRW_ONLY_LIFEBOAT
 FRW_I2V_FALLBACK_CHAIN = frw_i2v_fallback_chain()
 FRW_ENV_MODELS = frozenset(
     {
@@ -1161,9 +1157,9 @@ def validate_film_spec(
                     "keyframe": "comfy_qwen_i2i_from_performance_state",
                     "motion": "frw_ltx23_img2video_audio",
                     "motion_primary": "frw_ltx23_img2video_audio",
-                    "motion_fallback": "frw_seedance_2_fast_i2v_rejection_only",
+                    "motion_fallback": "frw_img2video_rejection_only",
                     "lipsync_primary": "frw_ltx23_native_audio_i2v_human_verified",
-                    "lipsync_fallback": "rtx_latentsync_1_6_after_frw_i2v_fallback",
+                    "lipsync_fallback": "rtx_latentsync_1_6_after_frw_img2video_fallback",
                     "fallback_trigger": "reviewed_ltx_native_audio_rejection_only",
                     "native_text_gate": "reject_provider_burned_text_before_post",
                     "forbid": [

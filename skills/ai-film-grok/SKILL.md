@@ -29,12 +29,12 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 ## P0
 
 1. **真相**：graph 真、spec 投影；locks+hash 齐再媒体；先 Director’s Lens（[guide](references/directors-lens.md)·[lesson](references/lessons-2026-07-20-directors-lens.md)）。
-2. **对白主链**：锁对白；讲话镜=FRW LTX 2.3 有声I2V→无烧字/口型审；拒绝才 Seedance I2V→LatentSync。LTX 不接锁 TTS；字幕 FFmpeg/HyperFrames 一次烧入。[workflow](references/dialogue-first-workflow.md)
+2. **对白主链**：锁对白；讲话镜=FRW LTX 2.3 有声I2V→无烧字/口型审；拒绝才原 FRW `img2video`→LatentSync。LTX 不接锁 TTS；字幕 FFmpeg/HyperFrames 一次烧入。[workflow](references/dialogue-first-workflow.md)
 3. **身份介质**：锁 medium/cast/face；still 只改已批源；moderated 禁 `image_gen` 绕脸；漫剧 manhua。
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **供应商**：I2V=`grok_primary`；FRW=恢复，`frw_video_model=seedance-2-fast-i2v`。pilot=advertised＋callable A/B；production=人审 champion＋challenger（[frw-ab](references/frw-ab-workflow.md)）;不改 primary/静默 bulk。
+7. **供应商**：I2V=`grok_primary`；FRW 回退=`img2video`；Seedance 不可用，禁止选用。pilot=advertised＋callable A/B；production=人审 champion＋challenger（[frw-ab](references/frw-ab-workflow.md)）;不改 primary/静默 bulk。
 8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM=rnb；缺已批 edit/bridge 则 `final` 阻塞。[BGM](references/bgm-generation.md)
 8b. **对白 i2i**：先 performance-state；FRW receipt 优先，否则查 Comfy；忙则等。[lesson](references/lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
