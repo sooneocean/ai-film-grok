@@ -10,7 +10,8 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from visual_text_audit import VisualTextAuditError, audit_clip, require_clean_audit  # noqa: E402
-from visual_text_repair import repair_windows  # noqa: E402
+from visual_text_repair import repair_clip, repair_windows  # noqa: E402
+from util import sha256_file, write_json  # noqa: E402
 
 
 def _video(root: Path) -> Path:
@@ -66,3 +67,31 @@ def test_audit_rejects_a_single_detected_frame(tmp_path: Path) -> None:
 
 def test_repair_windows_extend_merge_and_clamp() -> None:
     assert repair_windows([0, 3, 9], frame_count=10) == [(0, 5), (7, 9)]
+
+
+def test_repair_deduplicates_a_matching_completed_receipt(tmp_path: Path) -> None:
+    source = tmp_path / "clips" / "rejected.mp4"
+    source.parent.mkdir()
+    source.write_bytes(b"source")
+    repaired = source.with_name("rejected-text-repaired.mp4")
+    repaired.write_bytes(b"repaired")
+    source_sha = sha256_file(source)
+    write_json(
+        tmp_path / "receipts" / "visual-text-audit.json",
+        {
+            "kind": "visual-text-audit",
+            "status": "rejected",
+            "clip": {"sha256": source_sha},
+            "frames": [{"path": "x", "sha256": "x"}],
+            "findings": [{"index": 0}],
+        },
+    )
+    write_json(
+        tmp_path / "receipts" / "visual-text-repair.json",
+        {
+            "source": {"sha256": source_sha},
+            "output": {"path": "clips/rejected-text-repaired.mp4", "sha256": sha256_file(repaired)},
+        },
+    )
+    report = repair_clip(tmp_path, source, base_url="http://127.0.0.1:18188")
+    assert report["deduplicated"] is True
