@@ -668,7 +668,8 @@
         "encode_node": "audio_encode",
         "latent_node": "318",
         "latent_input": "audio_latent",
-        "audio_vae_node": "279"
+        "audio_vae_node": "279",
+        "frame_slots": [["295", "length"], ["305", "frames_number"]]
       },
       "requirements": {
         "checkpoints": [

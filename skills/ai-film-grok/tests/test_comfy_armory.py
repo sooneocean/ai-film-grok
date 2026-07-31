@@ -451,6 +451,33 @@ def test_compile_ltx23_native_pilot_binds_image_prompt_and_seed() -> None:
     assert graph["save"]["inputs"]["filename_prefix"] == "aifilm/evaluation/ltx23-native"
 
 
+def test_registered_ltx23_pilot_allows_only_declared_audio_conditioning_extension() -> None:
+    graph = compile_weapon_workflow(
+        "ltx23-native-i2v-pilot",
+        prompt="An adult woman speaks naturally with subtle movement.",
+        seed=2026073104,
+        input_image_name="approved/state.png",
+        filename_prefix="aifilm/pilot/ltx23-dialogue",
+    )
+    graph["audio_source"] = {"class_type": "LoadAudio", "inputs": {"audio": "approved/line-ja.mp3"}}
+    graph["audio_encode"] = {
+        "class_type": "LTXVAudioVAEEncode",
+        "inputs": {"audio": ["audio_source", 0], "audio_vae": ["279", 0]},
+    }
+    graph["318"]["inputs"]["audio_latent"] = ["audio_encode", 0]
+
+    def node_info(_base_url: str, route: str) -> dict[str, dict[str, object]]:
+        class_type = route.rsplit("/", 1)[-1]
+        return {class_type: {"python_module": "nodes", "category": "local", "api_node": False}}
+
+    with patch("comfy_armory._json_request", side_effect=node_info):
+        assert_registered_weapon_workflow("http://127.0.0.1:18188", "ltx23-native-i2v-pilot", graph)
+
+    graph["audio_encode"]["inputs"]["audio_vae"] = ["316", 2]
+    with pytest.raises(ComfyArmoryError, match="audio-conditioning"):
+        assert_registered_weapon_workflow("http://127.0.0.1:18188", "ltx23-native-i2v-pilot", graph)
+
+
 def test_compile_ltx23_distilled_fp8_broll_pilot_binds_an_empty_scene_contract() -> None:
     graph = compile_weapon_workflow(
         "ltx23-distilled-fp8-fast-broll-pilot",

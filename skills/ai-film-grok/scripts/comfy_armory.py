@@ -342,6 +342,8 @@ def assert_registered_weapon_workflow(
         latent_node = str(audio_extension.get("latent_node") or "")
         latent_input = str(audio_extension.get("latent_input") or "")
         allowed_slots.add((latent_node, latent_input))
+        for frame_node, frame_input in audio_extension.get("frame_slots") or []:
+            allowed_slots.add((str(frame_node), str(frame_input)))
     for node_id, expected_node in template.items():
         actual_node = graph.get(node_id)
         if not isinstance(actual_node, Mapping) or set(actual_node) != set(expected_node):
@@ -379,6 +381,18 @@ def assert_registered_weapon_workflow(
             raise ComfyArmoryError("unapproved LTX audio-conditioning extension")
         if graph[latent_node]["inputs"][latent_input] != [encode_node, 0]:
             raise ComfyArmoryError("LTX audio-conditioning latent link is invalid")
+        frame_values = [
+            graph[str(node)]["inputs"][str(input_name)]
+            for node, input_name in audio_extension.get("frame_slots") or []
+        ]
+        if (
+            not frame_values
+            or len(set(frame_values)) != 1
+            or not isinstance(frame_values[0], int)
+            or not 9 <= frame_values[0] <= 241
+            or (frame_values[0] != 126 and (frame_values[0] - 1) % 8)
+        ):
+            raise ComfyArmoryError("LTX audio-conditioning frame length is invalid")
         _validate_relative_media_name(str(audio_name), label="input audio name")
 
     prompt = graph[str(bindings["prompt_node"])]["inputs"][str(bindings["prompt_input"])]
