@@ -171,6 +171,11 @@ def add_comfy_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
     )
     run_parser.add_argument("--timeout", type=int, default=1200)
     run_parser.add_argument(
+        "--enqueue",
+        action="store_true",
+        help="Queue an explicitly authorized pilot behind existing ComfyUI work",
+    )
+    run_parser.add_argument(
         "--allow-external-api-nodes",
         action="store_true",
         help="Allow workflow nodes that may call paid external providers",
@@ -398,6 +403,8 @@ def run_comfy(args: argparse.Namespace) -> int:
                     )
                 except ComfyArmoryError as exc:
                     raise ComfyVideoError(str(exc)) from exc
+            if args.enqueue and (registered_weapon is None or args.production_stage != "pilot"):
+                raise ComfyVideoError("--enqueue requires a registered pilot weapon")
             elif not args.allow_external_api_nodes:
                 assert_local_only_workflow(base_url, graph)
             client_id = f"aifilm-{secrets.token_hex(8)}"
@@ -406,6 +413,7 @@ def run_comfy(args: argparse.Namespace) -> int:
                 graph,
                 client_id=client_id,
                 weapon_id=effective_weapon_id,
+                allow_queue=bool(args.enqueue),
             )
             result = wait_for_result(
                 base_url,

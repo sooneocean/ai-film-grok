@@ -1162,9 +1162,23 @@ def submit(
     *,
     client_id: str | None = None,
     weapon_id: str | None = None,
+    allow_queue: bool = False,
 ) -> str:
     with _submission_admission_lock(base_url):
-        assert_submission_capacity(base_url)
+        if allow_queue:
+            report = submission_capacity(base_url)
+            codes = {str(item.get("code") or "") for item in report["blockers"]}
+            queue = report["observed"]["queue"]
+            if not queue["running"] and not queue["pending"]:
+                raise ComfyVideoError("queue submission requires an occupied ComfyUI queue")
+            if not codes or not codes <= {
+                "RAM_BELOW_FLOOR",
+                "VRAM_BELOW_FLOOR",
+                "COMFY_QUEUE_BUSY",
+            }:
+                raise ComfyVideoError("queue submission blocked by a non-capacity health error")
+        else:
+            assert_submission_capacity(base_url)
         resolved_client_id = client_id or f"aifilm-{secrets.token_hex(8)}"
         data = _json_request(
             base_url,
