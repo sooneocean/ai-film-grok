@@ -181,21 +181,28 @@ def snapshot_capabilities(
         if has_local_motion:
             from comfy_video import submission_capacity
 
-            capacity = submission_capacity(str(live_armory.get("base_url") or base_url or ""))
-            capacity_receipt = (
-                snapshot_root / "receipts" / "capability-evidence" / ("comfy-wan22-capacity.json")
-            )
-            write_json(capacity_receipt, capacity)
-            observations["rtx5090_capacity"] = {
-                "ok": capacity.get("ok") is True,
-                "status": capacity.get("status"),
-                "blockers": [
-                    str(item.get("code"))
-                    for item in capacity.get("blockers") or []
-                    if isinstance(item, dict) and item.get("code")
-                ],
-                "receipt": str(capacity_receipt),
-            }
+            try:
+                capacity = submission_capacity(str(live_armory.get("base_url") or base_url or ""))
+                capacity_receipt = (
+                    snapshot_root / "receipts" / "capability-evidence" / "comfy-wan22-capacity.json"
+                )
+                write_json(capacity_receipt, capacity)
+                observations["rtx5090_capacity"] = {
+                    "ok": capacity.get("ok") is True,
+                    "status": capacity.get("status"),
+                    "blockers": [
+                        str(item.get("code"))
+                        for item in capacity.get("blockers") or []
+                        if isinstance(item, dict) and item.get("code")
+                    ],
+                    "receipt": str(capacity_receipt),
+                }
+            except Exception as exc:
+                capacity = {"ok": False}
+                observations["rtx5090_capacity"] = {
+                    "ok": False,
+                    "error": type(exc).__name__,
+                }
         observations["rtx5090_armory"] = {
             "ok": bool(live_armory.get("ok")),
             "ready_ids": sorted(ready_ids),
@@ -215,7 +222,9 @@ def snapshot_capabilities(
                 domains = ["visual_still"]
                 operations = ["text_to_video"]
             model_ready = weapon["id"] in ready_ids
-            capacity_ready = capacity is None or capacity.get("ok") is True
+            capacity_ready = domains != ["motion"] or (
+                capacity is not None and capacity.get("ok") is True
+            )
             capability = _capability(
                 capability_id=f"rtx5090-{weapon['id']}",
                 provider=str(weapon.get("provider") or "comfy_lan"),
@@ -329,8 +338,13 @@ def snapshot_capabilities(
     )
     action_observations: dict[str, Any] = {}
     for capability_id, provider, model, resource, canary_path in action_providers:
-        report = provider.probe(root=snapshot_root)
-        available = bool(report.ok and report.available)
+        try:
+            report = provider.probe(root=snapshot_root)
+            available = bool(report.ok and report.available)
+            reason = report.reason
+        except Exception as exc:
+            available = False
+            reason = f"{type(exc).__name__}: provider probe failed"
         capability = _capability(
             capability_id=capability_id,
             provider=provider.name,
@@ -347,7 +361,7 @@ def snapshot_capabilities(
         capabilities.append(capability)
         action_observations[provider.name] = {
             "available": available,
-            "reason": report.reason,
+            "reason": reason,
             "film_canary_required": True,
             "receipt": str(canary_path),
         }
