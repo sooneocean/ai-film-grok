@@ -18,6 +18,7 @@ class RouteExplainError(ValueError):
 
 SELECTION_POLICY = [
     "hard_constraints",
+    "action_provider_priority",
     "quality_floor",
     "quality_score",
     "role_affinity",
@@ -291,10 +292,27 @@ def _hard_rejections(
     return reasons
 
 
-def _rank(capability: dict[str, Any], intent: dict[str, Any]) -> tuple[int, int, int, int]:
+def _action_provider_priority(capability: dict[str, Any]) -> int:
+    identity = " ".join(
+        str(capability.get(key) or "").strip().lower() for key in ("id", "provider", "model")
+    )
+    provider = str(capability.get("provider") or "").strip().lower()
+    if "frw" in identity and "ltx" in identity:
+        return 4
+    if provider == "grok" or "grok" in identity:
+        return 3
+    if "frw" in identity and "wan" in identity:
+        return 2
+    if provider.startswith(("comfy", "local")) or "local" in identity:
+        return 1
+    return 0
+
+
+def _rank(capability: dict[str, Any], intent: dict[str, Any]) -> tuple[int, int, int, int, int]:
     roles = capability.get("shot_roles") or []
     role_affinity = 2 if roles == [intent["shot_role"]] else 1
     return (
+        _action_provider_priority(capability),
         int(capability.get("quality_floor") or 0),
         int(capability.get("quality_score") or 0),
         role_affinity,
@@ -340,7 +358,7 @@ def explain_route(
         raise RouteExplainError("INVALID_CAPABILITY_SNAPSHOT: duplicate capability id")
     current = _parse_time(now or datetime.now(UTC).isoformat(), field="now")
 
-    viable: list[tuple[tuple[int, int, int, int], str, dict[str, Any]]] = []
+    viable: list[tuple[tuple[int, int, int, int, int], str, dict[str, Any]]] = []
     rejected: list[dict[str, Any]] = []
     for raw in capabilities:
         if not isinstance(raw, dict):
@@ -384,9 +402,10 @@ def explain_route(
             "resource": selected_raw["resource"],
             "concurrency": selected_raw["concurrency"],
             "rank": {
+                "action_provider_priority": _action_provider_priority(selected_raw),
                 "quality_floor": int(selected_raw.get("quality_floor") or 0),
                 "quality_score": int(selected_raw.get("quality_score") or 0),
-                "role_affinity": _rank(selected_raw, intent)[2],
+                "role_affinity": _rank(selected_raw, intent)[3],
                 "priority": int(selected_raw.get("priority") or 0),
             },
             "requires_human_approval": bool(

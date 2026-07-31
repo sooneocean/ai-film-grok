@@ -1,6 +1,6 @@
-# Grok 媒体管线（+ FRW 2V 显式恢复）
+# 动作媒体管线（FRW LTX → Grok → FRW Wan → local）
 
-**Grok Imagine** 负责身份/静帧与当前默认 I2V；**FRW 2V** 仅在 Seedance canary + pilot 通过后显式恢复。本地持久化队列负责去重、预算、退避、回执与断点续作。Python 不内嵌 key；FRW 经 frwclaw `.env`。
+**Grok Imagine** 负责身份/静帧；动作 I2V 默认依序使用 **FRW LTX 2.3、Grok、已证明模型身份的 FRW Wan、已验证本地路线**。本地持久化队列负责去重、预算、退避、回执与断点续作。Python 不内嵌 key；FRW 经 frwclaw `.env`。
 
 ## 工具分工
 
@@ -10,7 +10,9 @@
 | Grok `image_edit` | 身份保持的镜头变体与修复（bulk still） |
 | **FRW `img2video`** | 显式 legacy 救生艇；不得作为默认 bulk 2V |
 | **FRW `first-last-frame`** | 有明确首尾帧时锁构图 |
-| Grok `image_to_video` | 当前 `grok_primary` 默认；不宣称 FLF |
+| FRW `img2video-audio` | 当前 `ltx23_primary` 第一动作路线；须影片级批准 canary |
+| Grok `image_to_video` | 第二动作路线；不宣称 FLF |
+| FRW Wan I2V | 第三路线；canary 与响应都须明确证明 Wan 模型身份 |
 | Grok `reference_to_video` | 多参考运动；不宣称精确 first/last 锁定 |
 | `"$AIFILM" frw …` | 官方 dispatch 代理 |
 
@@ -42,7 +44,7 @@ Q="$SKILL_DIR/scripts/media-queue"
 "$Q" budget --root "<root>" --units 30
 ```
 
-每次只 claim 一项，复制回传的 `job_id` 和 `claim_token`，调用当前锁定的 provider 后立即回写。FRW 只能在 canary + pilot 通过后启用：
+每次只 claim 一项，复制回传的 `job_id` 和 `claim_token`，调用当前锁定的 provider 后立即回写。每个 FRW 路线都须对应 canary；已启动路线只可在技术失败后签名切换：
 
 ```bash
 # 显式 FRW legacy 救生艇（先 upload keyframe，再 img2video --wait）
@@ -86,7 +88,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 ## 能力边界
 
 - Grok I2V 不保证 endpoint match 或 A/B 连镜精确衔接；**`motion_first_last: false`**（只有 frame-1）。
-- **bulk 默认 FRW** `img2video`（frame-1）或 `first-last-frame`（真 FLF）；见 [frw-degrade-dispatch.md](frw-degrade-dispatch.md)。
+- **bulk 默认链**：FRW LTX 2.3 → Grok → verified FRW Wan → verified local；legacy `img2video` 不在自动链。见 [frw-degrade-dispatch.md](frw-degrade-dispatch.md)。
 - **流畅度（强制）**：continue 缝 **逐字节复用**上镜已核准末帧为下镜 2V frame-1——`extract-frame --promote-keyframe <next>`；长片维护 `continuity_chain.md` 九项核对；**禁止** cast 重起、禁止 dissolve/定格/倒放/插镜掩盖。见 [continuity_chain.md](continuity_chain.md)。
 - 需要引擎级 first/last lock 时用 FRW `first-last-frame`，仍共用 pose 字段 + chain 文件。
 - Grok HTTP 429 / FRW 排队时串行请求，让队列退避，只恢复缺失镜头。

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "kind": "comfy-weapon-preparation",
+  "ok": true,
+  "weapon_id": "qwen-image-2512-quality",
+  "intent": "photoreal-image",
+  "quality": "max_practical",
+  "workflow": "/Users/dex/.grok/plugins/ai-film-grok/artifacts/armory-canaries/2026-07-31/qwen-image-2512-no-text-0703/workflow.json",
+  "workflow_sha256": "ab1597cb65409a3cdca7265963f65882724f179a104aaa61f3fa0a169d90b562",
+  "prompt_sha256": "444ee6e602fa610b23d939d8bbe4c772db877c29fc1ee16eb496fbb0c666d61f",
+  "live_model_readback": true,
+  "external_api_nodes_allowed": false,
+  "source_endpoint": null,
+  "pilot_only": false
+}

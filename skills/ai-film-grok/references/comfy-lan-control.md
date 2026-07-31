@@ -1,8 +1,9 @@
 # Private ComfyUI LAN control
 
-`comfy_lan` is an explicit local GPU lane. It never replaces `grok_primary`
-silently and never routes to ComfyUI API nodes unless the operator passes the
-external-provider approval flag.
+`comfy_lan` is a verified local GPU fallback lane. It follows FRW LTX, Grok,
+and a model-identified FRW Wan route in the default action chain. It never
+silently bypasses those gates or routes to ComfyUI API nodes unless the
+operator passes the external-provider approval flag.
 
 ## Configure
 
@@ -67,9 +68,9 @@ The receipt never contains the SSH target, key path, command output or prompt.
 | **18188** | **8188** | ComfyUI | `/system_stats` → 200 + Comfy JSON |
 | 18790 | 8790 | lipsync / audio node | token auth (not Comfy) |
 
-**Wrong:** `-L 18188:127.0.0.1:8189` → `{"detail":"unauthorized"}` 401.  
-That is **not** Comfy downtime. Kill the bad ssh and recreate  
-`-L 18188:127.0.0.1:8188`. Env defaults: `AIFILM_COMFY_REMOTE_PORT=8188`.  
+**Wrong:** `-L 18188:127.0.0.1:8189` → `{"detail":"unauthorized"}` 401.
+That is **not** Comfy downtime. Kill the bad ssh and recreate
+`-L 18188:127.0.0.1:8188`. Env defaults: `AIFILM_COMFY_REMOTE_PORT=8188`.
 Full lesson: [`lessons-2026-07-29-comfy-tunnel-8188-not-8189.md`](lessons-2026-07-29-comfy-tunnel-8188-not-8189.md).
 
 When another bulk owns the GPU, submit on the first idle tick — do **not**

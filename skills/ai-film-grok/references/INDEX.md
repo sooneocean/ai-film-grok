@@ -67,7 +67,7 @@
 
 | 文件 | 主题 |
 |---|---|
-| [i2v-grok-primary.md](i2v-grok-primary.md) | I2V grok_primary 运营模式 |
+| [i2v-grok-primary.md](i2v-grok-primary.md) | 旧项目显式 Grok-first 兼容模式 |
 | [comfy-lan-control.md](comfy-lan-control.md) | 私有区网 ComfyUI 5090 控制、API 工作流与安全门禁 |
 | [local-omni-review.md](local-omni-review.md) | 私网多模态影格审片：hash-bound、candidate-only、无云端回退 |
 | [speech-preview.md](speech-preview.md) | 私有 5090 Speech-to-Speech 互动对白预演：loopback、容量门、候选回执 |

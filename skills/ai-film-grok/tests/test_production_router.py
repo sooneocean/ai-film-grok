@@ -127,11 +127,68 @@ def test_env_shot_selects_specialized_cloud_t2v_and_explains_rejections(
     assert "SHOT_ROLE_UNSUPPORTED" in rejected["wan-hero"]
     assert report["selection_policy"] == [
         "hard_constraints",
+        "action_provider_priority",
         "quality_floor",
         "quality_score",
         "role_affinity",
         "priority",
         "stable_id",
+    ]
+
+
+def test_action_shot_obeys_ltx_grok_frw_wan_local_priority(tmp_path: Path) -> None:
+    _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
+    _write_capabilities(
+        tmp_path,
+        [
+            _capability(
+                "local-wan",
+                provider="comfy-wan22",
+                model="wan22-i2v",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                quality_floor=5,
+                quality_score=5,
+            ),
+            _capability(
+                "grok-i2v",
+                provider="grok",
+                model="grok-imagine-video",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                quality_floor=5,
+                quality_score=5,
+            ),
+            _capability(
+                "frw-ltx",
+                provider="frw",
+                model="ltx-2.3",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                quality_floor=4,
+                quality_score=4,
+            ),
+            _capability(
+                "frw-wan",
+                provider="frw",
+                model="wan-i2v",
+                operations=["image_to_video"],
+                shot_roles=["hero"],
+                quality_floor=5,
+                quality_score=5,
+            ),
+        ],
+    )
+
+    report = explain_route(tmp_path, shot_id="shot01", now=NOW)
+
+    assert report["selected"]["capability_id"] == "frw-ltx"
+    assert report["selected"]["rank"]["action_provider_priority"] == 4
+    assert report["selected"]["rank"]["role_affinity"] == 2
+    assert [item["capability_id"] for item in report["alternatives"]] == [
+        "grok-i2v",
+        "frw-wan",
+        "local-wan",
     ]
 
 

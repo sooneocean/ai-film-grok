@@ -74,7 +74,7 @@ def suggest_i2v_from_canary(
 ) -> dict[str, Any]:
     """Map FRW canary signals → film-spec patch + rationale.
 
-    Aligns with references/frw-degrade-dispatch.md + i2v profile (grok_primary).
+    Aligns with the action order FRW LTX → Grok → verified FRW Wan → local.
     Does not invent legacy-img2video as default apply target.
     """
     cur = current_spec or {}
@@ -93,13 +93,45 @@ def suggest_i2v_from_canary(
 
         profile = resolve_i2v_profile()
     except Exception:
-        profile = "grok_primary"
+        profile = "ltx23_primary"
     out["i2v_profile"] = profile
-    if profile == "ltx23_primary" and not receipt:
-        out["recommendations"] = [
-            "LTX 2.3 primary is configured but has no current capability receipt; "
-            "record a decoded, human-approved img2video-audio canary before dispatch."
+    if profile == "ltx23_primary":
+        patch = {
+            "i2v_provider": "frw-ltx23",
+            "frw_video_model": "ltx-i2v",
+            "frw_env_model": "ltx-t2v",
+        }
+        ltx_approved = bool(
+            receipt
+            and str(receipt.get("recommended_l1") or "")
+            in {"ltx23-img2video-audio", "frw_ltx23_img2video_audio"}
+        )
+        out["ok"] = ltx_approved
+        out["patch"] = patch
+        out["changes"] = {
+            key: {"from": cur.get(key), "to": value}
+            for key, value in patch.items()
+            if cur.get(key) != value
+        }
+        out["rationale"] = [
+            "动作主链固定为 FRW LTX 2.3 → Grok I2V → verified FRW Wan → verified local I2V"
         ]
+        out["warnings"] = (
+            []
+            if ltx_approved
+            else ["LTX 2.3 primary lacks a current decoded, human-approved film canary"]
+        )
+        out["recommendations"] = [
+            "record a film-scoped FRW LTX 2.3 img2video-audio canary",
+            "do not rewrite film-spec to a fallback provider; runtime routing skips unready lanes",
+            "FRW Wan is eligible only when its response proves model identity; otherwise continue local",
+        ]
+        out["current"] = {
+            "i2v_provider": cur.get("i2v_provider"),
+            "frw_video_model": cur.get("frw_video_model"),
+            "frw_env_model": cur.get("frw_env_model"),
+            "tts_backend": cur.get("tts_backend"),
+        }
         return out
     if profile == "grok_primary" and not receipt:
         out["ok"] = True

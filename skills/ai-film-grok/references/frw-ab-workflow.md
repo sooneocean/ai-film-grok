@@ -1,6 +1,6 @@
 # FRW 全模型 A/B 工作流
 
-FRW A/B 是独立评测层，不改变 `grok_primary`。Pilot 可并行提交当前目录中同
+FRW A/B 是独立评测层，不改变默认动作优先链。Pilot 可并行提交当前目录中同
 operation 的全部可调用模型；production 必须先由机器 QA 排名，再由用户明确
 批准 champion 与 challenger。人物主链进入 FRW 时仍需既有
 `provider-switch-<shot>.json` 技术失败回执；此要求专用于 production I2V。

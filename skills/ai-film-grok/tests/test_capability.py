@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -34,7 +36,8 @@ class SuggestI2VTests(unittest.TestCase):
             "recommended_l2": "ltx-t2v",
             "notes": "ok",
         }
-        s = suggest_i2v_from_canary(receipt, current_spec={})
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}):
+            s = suggest_i2v_from_canary(receipt, current_spec={})
         self.assertEqual(s["patch"].get("i2v_provider"), "frw")
         self.assertEqual(s["patch"].get("frw_video_model"), "seedance-2-fast-i2v")
         self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
@@ -50,10 +53,14 @@ class SuggestI2VTests(unittest.TestCase):
             "recommended_l2": "ltx-t2v",
             "notes": "seedance_403_permission,l1_prefer_grok_720p",
         }
-        s = suggest_i2v_from_canary(
-            receipt,
-            current_spec={"i2v_provider": "frw", "frw_video_model": "seedance-2-fast-i2v"},
-        )
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}):
+            s = suggest_i2v_from_canary(
+                receipt,
+                current_spec={
+                    "i2v_provider": "frw",
+                    "frw_video_model": "seedance-2-fast-i2v",
+                },
+            )
         self.assertEqual(s["patch"].get("i2v_provider"), "grok")
         self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
         self.assertIn("i2v_provider", s["changes"])
@@ -63,11 +70,11 @@ class SuggestI2VTests(unittest.TestCase):
 
     @pytest.mark.slow
     def test_no_receipt(self) -> None:
-        # grok_primary (default season): no canary still suggests Grok L1 + LTX env
+        # Default action policy stays LTX-first even while its canary is absent.
         s = suggest_i2v_from_canary(None)
         self.assertFalse(s["has_canary"])
-        self.assertTrue(s["ok"])
-        self.assertEqual(s["patch"].get("i2v_provider"), "grok")
+        self.assertFalse(s["ok"])
+        self.assertEqual(s["patch"].get("i2v_provider"), "frw-ltx23")
         self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
         self.assertTrue(s["recommendations"])
 
@@ -171,7 +178,7 @@ class BuildReportSmoke(unittest.TestCase):
             )
             report = build_capability_report(root=root, suggest_i2v=True)
             self.assertTrue(report["frw"]["present"])
-            self.assertEqual(report["suggested_film_spec_patch"]["i2v_provider"], "grok")
+            self.assertEqual(report["suggested_film_spec_patch"]["i2v_provider"], "frw-ltx23")
             # no silent apply
             loaded = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
             self.assertEqual(loaded["i2v_provider"], "frw")
@@ -179,7 +186,7 @@ class BuildReportSmoke(unittest.TestCase):
             report2 = build_capability_report(root=root, suggest_i2v=True, apply=True)
             self.assertTrue(report2["apply"]["ok"])
             loaded2 = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
-            self.assertEqual(loaded2["i2v_provider"], "grok")
+            self.assertEqual(loaded2["i2v_provider"], "frw-ltx23")
 
 
 if __name__ == "__main__":

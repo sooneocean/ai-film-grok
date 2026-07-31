@@ -1155,7 +1155,7 @@ def _verify_provider_switch(root: Path | str, plan: dict[str, Any]) -> None:
     if (
         receipt.get("shot_id") != stable_shot_id
         or receipt.get("primary_provider") != "grok"
-        or receipt.get("fallback_provider") != "frw-img2video"
+        or receipt.get("fallback_provider") not in {"frw-wan", "frw-img2video"}
         or receipt.get("reason_class") != "technical_failure"
         or not str(receipt.get("error") or "").strip()
         or receipt.get("fallback_fixed_for_shot") is not True

@@ -48,12 +48,12 @@
 }
 ```
 
-## I2V / Grok 主力（FRW 技术备援 · 顶层字段）
+## I2V / 动作主链（顶层字段）
 
 | 字段 | 默认 | 说明 |
 |------|------|------|
-| `i2v_provider` | `grok` | `auto`→`grok`；FRW 仅在 Grok 明确技术失败且有 switch receipt 时启用 |
-| `frw_video_model` | **`seedance-2-fast-i2v`** | 仅 FRW fallback；`legacy-img2video` 仅显式（write-spec WARN） |
+| `i2v_provider` | `auto` | `auto`→`frw-ltx23`；运行时依次探测 Grok、FRW Wan、已验证本地路线 |
+| `frw_video_model` | `ltx-i2v` | LTX 参数/回执；FRW Wan 必须由供应商响应证明模型身份 |
 | `frw_aspect_ratio` | 跟 `aspect_ratio` 或 `9:16` | 传给 `frw newvideo --aspect-ratio` |
 | `frw_resolution` | **`720p`** | provider 档位；9:16 交付优先原生 **704×1280**，禁止 576 生成再放大 |
 | `frw_duration` | `"5"` | Seedance duration 字符串 |
@@ -125,7 +125,7 @@ FRW LTX 参数必须 **string** 宽高；竖屏优先 `704`×`1280`。[frw-ltx-p
 | `dsl.chain_mode` | 作者 | `continue`→真接戏须 promote 字节；假接戏改 `cut` |
 | `dsl.cut_on` | 建议 mid_motion | continue 动能切 |
 
-lint 码：`CAMERA_AXIS_FLAT` · `SOFT_SOUP` · `STYLE_SOUP` · `MOTION_MONOTONY`。  
+lint 码：`CAMERA_AXIS_FLAT` · `SOFT_SOUP` · `STYLE_SOUP` · `MOTION_MONOTONY`。
 权威：[lessons-2026-07-20-transition-motion-v2.md](lessons-2026-07-20-transition-motion-v2.md)、[shot-motion.md](shot-motion.md)。
 
 ## 导演意图（`director_intent` · 必填）
@@ -192,7 +192,7 @@ lint 码：`CAMERA_AXIS_FLAT` · `SOFT_SOUP` · `STYLE_SOUP` · `MOTION_MONOTONY
 | `transition_style` | 全局默认 xfade 名（title/end 边缝也用） |
 | `transition_styles` | **每缝** xfade 名，长度 **= n_shots−1**；不写则 write-spec 自动建议 |
 
-`hard` = concat 不叠化；`soft`/`hold` = xfade（hold 更长）。片头/片尾接缝默认跟 `transition_default` + `transition_style`。  
+`hard` = concat 不叠化；`soft`/`hold` = xfade（hold 更长）。片头/片尾接缝默认跟 `transition_default` + `transition_style`。
 **continue 入缝永远 hard**（作者 soft 也会被改掉）。改 intents/styles 后 **只 re-final**；改 `camera_axis`/motion 像素须 **re-I2V**。见 [lessons-2026-07-20-transition-motion-v2.md](lessons-2026-07-20-transition-motion-v2.md)。
 
 ## 声音 spotting（P2）
@@ -281,7 +281,7 @@ lint 码：`CAMERA_AXIS_FLAT` · `SOFT_SOUP` · `STYLE_SOUP` · `MOTION_MONOTONY
 
 ## Agent 生产门禁
 
-0. 文本输入已完成 Director’s Lens（至少 detailed shot 可填）；禁止跳过弧线重构。  
+0. 文本输入已完成 Director’s Lens（至少 detailed shot 可填）；禁止跳过弧线重构。
 1. `write-spec` 通过（含 intent + dramatic_function；可缺 motion 由 beat 补全）。
 2. **未锁 intent / beat 前，不得** `media-queue add` 烧 I2V。
 3. 风格锁与定妆仍按 [style-bible.md](style-bible.md) / [consistency.md](consistency.md)。

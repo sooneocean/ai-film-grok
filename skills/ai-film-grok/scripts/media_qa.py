@@ -27,6 +27,7 @@ ALLOWED_VIDEO_ENDPOINTS = frozenset(
         "frw_ltx_flf",  # FRW newvideo ltx-flf
         "frw_ltx_lipsync",  # FRW ltx-音画同步 (probe: often 502)
         "frw_wan_lipsync",  # FRW wan-音画同步
+        "frw_wan_i2v",  # FRW I2V only when response and canary prove Wan identity
         "frw_seedance_lipsync",  # FRW seedance-2-pro-lipsync (probe: often 403)
         "frw_newvideo",  # other FRW NEW_VIDEO templates (byteplus/gimm/wan/…)
         "frw_img2video",  # LEGACY template 348771… — discouraged (quality floor)

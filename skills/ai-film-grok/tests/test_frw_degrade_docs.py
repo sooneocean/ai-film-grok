@@ -55,11 +55,10 @@ class FrwDegradeDocsTests(unittest.TestCase):
         skill = SKILL.read_text(encoding="utf-8")
         visual_card = (ROOT / "references" / "stages" / "visual.md").read_text(encoding="utf-8")
         reachable = skill + visual_card
-        # Current season: Grok primary; LTX handles native-audio dialogue and
-        # FRW img2video is a reviewed fallback. Seedance remains historical only.
-        self.assertIn("grok_primary", reachable)
+        # Current season: LTX action primary, then Grok, verified FRW Wan, local.
+        self.assertIn("ltx23_primary", reachable)
         self.assertIn("LTX 2.3", skill)
-        self.assertIn("img2video", skill)
+        self.assertIn("FRW Wan", skill)
         self.assertIn("frw-degrade-dispatch.md", reachable)
         degrade = REF.read_text(encoding="utf-8")
         seedance_lesson = LESSON_SEED.read_text(encoding="utf-8")
@@ -78,11 +77,11 @@ class FrwDegradeDocsTests(unittest.TestCase):
         cons = CONSISTENCY.read_text(encoding="utf-8")
         prod = PRODUCTION.read_text(encoding="utf-8")
         for text, label in ((cons, "consistency"), (prod, "production-discipline")):
-            self.assertIn("seedance-2-fast-i2v", text, label)
-            self.assertIn("newvideo", text, label)
-            self.assertIn("frw_seedance_i2v", text, label)
-            self.assertIn("720p", text, label)
-        self.assertIn("Seedance", cons)
+            self.assertIn("FRW LTX", text, label)
+            self.assertIn("Grok", text, label)
+            self.assertIn("FRW Wan", text, label)
+            self.assertIn("local", text, label)
+        self.assertIn("ltx23_primary", cons)
         self.assertNotIn("推荐 576×1024", cons)
 
     @pytest.mark.slow
@@ -190,12 +189,12 @@ class FrwDegradeDocsTests(unittest.TestCase):
         self.assertEqual(DEFAULT_I2V_PROVIDER, "auto")
         self.assertEqual(DEFAULT_FRW_VIDEO_MODEL, "legacy-img2video")
         self.assertEqual(DEFAULT_FRW_ENV_MODEL, "ltx-t2v")
-        self.assertEqual(default_i2v_provider(), "grok")  # grok_primary default season
+        self.assertEqual(default_i2v_provider(), "frw-ltx23")
         spec = {
-            "title": "grok-primary-default-probe",
+            "title": "ltx-primary-default-probe",
             "vo_mode": "storyteller",
             "director_intent": {
-                "logline": "测试 grok_primary 默认写入 film-spec 的行为。",
+                "logline": "测试 ltx23_primary 默认写入 film-spec 的行为。",
                 "tone": "neutral",
                 "emotional_arc": ["a", "b", "c"],
             },
@@ -229,8 +228,8 @@ class FrwDegradeDocsTests(unittest.TestCase):
             ],
         }
         validate_film_spec(spec, assign_missing_ids=False)
-        self.assertEqual(spec.get("i2v_provider"), "grok")
-        self.assertEqual(spec.get("frw_video_model"), "legacy-img2video")
+        self.assertEqual(spec.get("i2v_provider"), "frw-ltx23")
+        self.assertEqual(spec.get("frw_video_model"), "ltx-i2v")
         self.assertEqual(spec.get("frw_env_model"), "ltx-t2v")
         self.assertEqual(spec.get("frw_resolution"), "720p")
         self.assertEqual(spec.get("frw_aspect_ratio"), "9:16")
@@ -239,7 +238,7 @@ class FrwDegradeDocsTests(unittest.TestCase):
         self.assertIn("hero_motion_primary", (spec.get("_layer_routing") or {}))
         self.assertEqual(
             (spec.get("_layer_routing") or {}).get("env_synth_primary"),
-            "grok_image_to_video_no_face",
+            "frw_ltx_t2v",
         )
 
 

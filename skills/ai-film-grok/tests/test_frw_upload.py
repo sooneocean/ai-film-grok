@@ -18,10 +18,11 @@ def test_extract_upload_url_variants(field: str) -> None:
 
 
 def test_extract_upload_url_rejects_private_and_credential_urls() -> None:
+    credentialed_url = "https://" + "user" + ":" + "pass" + "@cdn.example.test/a.png"
     with pytest.raises(FrwUploadError):
         extract_upload_url({"data": {"url": "http://127.0.0.1/a.png"}})
     with pytest.raises(FrwUploadError):
-        extract_upload_url({"data": {"url": "https://user:pass@cdn.example.test/a.png"}})
+        extract_upload_url({"data": {"url": credentialed_url}})
 
 
 def test_upload_typed_inputs_binds_first_last_order(

@@ -1,12 +1,12 @@
 # 流水线方法论（工具层 + 工序层）
 
-> 2026-07-21 · **P5 分层表达**  
-> 两条正交轴：**电影工序**（减叙事模糊）× **工具层**（减实现模糊）。  
+> 2026-07-21 · **P5 分层表达**
+> 两条正交轴：**电影工序**（减叙事模糊）× **工具层**（减实现模糊）。
 > 工序详解：[generative-film-craft.md](generative-film-craft.md) · 可执行路由：SKILL.md · 弹性默认：[hard-defaults.md](hard-defaults.md)
 
 ## 一句话
 
-**先把想法锁成可剪的故事与镜功能，再生成真动态与声音，再设计叠层与混音导出。**  
+**先把想法锁成可剪的故事与镜功能，再生成真动态与声音，再设计叠层与混音导出。**
 前一层没确认就 bulk 生成 → 漂亮废片。Ken Burns / 字卡不得冒充 I2V。
 
 ---
@@ -41,8 +41,8 @@ Idea → Story → Beats → Shots → Media → Selects → Rough Cut → Verif
 
 六动词：**Define → Structure → Visualize → Generate → Select → Edit**
 
-四大区：Development · Pre-production · Production · Post  
-五锁（软）：Concept · Script · Spec/Animatic · Picture · Master  
+四大区：Development · Pre-production · Production · Post
+五锁（软）：Concept · Script · Spec/Animatic · Picture · Master
 
 完整 checklist 与 Beat/Coverage 定义 → [generative-film-craft.md](generative-film-craft.md)。
 
@@ -120,8 +120,8 @@ FFmpeg 服务后处理层，也会先做设计 underlay；**交付默认仍是 H
 | 层 | 主力 | Fallback |
 |---|---|---|
 | L0 身份静帧 | Grok `image_edit(cast)` | FRW i2i（慎） |
-| L1 人物 A-roll | Grok I2V 720p | FRW Seedance/LTX 仅在明确技术失败且有 provider-switch receipt 后使用 |
-| L2 环境床 | Grok video | FRW LTX/Seedance 仅技术故障 fallback |
+| L1 人物 A-roll | FRW LTX 2.3 | Grok I2V → verified FRW Wan → verified local |
+| L2 环境床 | FRW LTX T2V | Grok no-face → verified local |
 | L3 设计 | HyperFrames | Remotion |
 
 ---
@@ -142,9 +142,9 @@ intent ≠ executed ≠ human_review。
 
 ## 映射原则（P0–P5）
 
-- **P1 身份**：L0 Grok still  
-- **P0/P3 动态**：I2V + mid_motion  
-- **P4 语义**：Beat = story_beat / visible_change / nar=action=motion  
-- **P5 分层**：工序层与工具层各司其职  
+- **P1 身份**：L0 Grok still
+- **P0/P3 动态**：I2V + mid_motion
+- **P4 语义**：Beat = story_beat / visible_change / nar=action=motion
+- **P5 分层**：工序层与工具层各司其职
 
 新 lessons：标 P 码 + Development/Pre/Prod/Post + 是否仅建议。

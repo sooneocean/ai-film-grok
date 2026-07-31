@@ -90,12 +90,11 @@ TTS_BACKENDS = frozenset(
         "piper-local",
     }
 )
-# Motion provider profile.  Grok is the production primary; FRW is a technical
-# fallback only.  ``seedance_first`` remains accepted as a legacy input so old
-# specs can be read, but it no longer changes the active provider.
+# Motion provider profile. FRW LTX 2.3 is the production action primary.
+# ``seedance_first`` and ``grok_primary`` remain readable compatibility inputs.
 I2V_PROVIDERS = frozenset({"frw", "frw-ltx23", "grok", "auto"})
 I2V_PROFILES = frozenset({"ltx23_primary", "seedance_first", "grok_primary"})
-# Native resolution for 9:16 shorts.  FRW fallback may return 704x1280 and must
+# Native resolution for 9:16 shorts. FRW LTX may return 704x1280 and must
 # preserve that native pair; conforming is a later delivery decision.
 DEFAULT_FRW_ASPECT = "9:16"
 DEFAULT_FRW_RESOLUTION = "720p"
@@ -104,8 +103,14 @@ DEFAULT_FRW_FPS = "24"
 # LTX preferred pixel size for vertical shorts (probe-validated 2026-07-20)
 DEFAULT_LTX_WIDTH = "704"
 DEFAULT_LTX_HEIGHT = "1280"
-# Explicit FRW-only fallback; it never promotes FRW over the primary route.
+# Explicit legacy FRW lifeboat; it is not part of the automatic action chain.
 FRW_I2V_FRW_ONLY_LIFEBOAT = "legacy-img2video"
+ACTION_MOTION_PROVIDER_CHAIN = (
+    "frw_ltx23_img2video_audio",
+    "grok_image_to_video",
+    "frw_wan_i2v_verified",
+    "local_verified_i2v",
+)
 # Env / synth layer (no face import): LTX T2V is primary for B-roll beds
 # 2026-07-21: ltx-t2v completed on sample key; seedance t2v may 403
 DEFAULT_FRW_ENV_MODEL = "ltx-t2v"
@@ -159,7 +164,11 @@ def default_frw_video_model() -> str:
 
 
 def frw_i2v_fallback_chain() -> tuple[str, ...]:
-    return ("frw:legacy-img2video",)
+    return (
+        "grok:image_to_video",
+        "frw:wan-i2v-verified",
+        "local:verified-i2v",
+    )
 
 
 # Back-compat names used across codebase
@@ -784,10 +793,9 @@ def validate_film_spec(
                 "bulk image_to_video; still=image_edit cast; register image_to_video)"
             )
         else:
-            i2v_notes.append("auto→grok (Grok primary; FRW is technical fallback only)")
+            i2v_notes.append("auto→frw-ltx23 (compatibility profile normalized to LTX primary)")
         spec["_i2v_notes"] = i2v_notes
-    # Explicit FRW remains readable for a deliberate fallback/recovery run,
-    # but is never selected by ``auto``.
+    # Explicit legacy FRW remains readable for a deliberate recovery run.
     if i2v_profile == "grok_primary" and i2v_provider == "frw":
         i2v_notes = list(spec.get("_i2v_notes") or [])
         i2v_notes.append(
@@ -820,9 +828,9 @@ def validate_film_spec(
         notes = list(spec.get("_frw_video_notes") or [])
         notes.append(
             "WARN legacy-img2video: old FRW template 348771… quality floor; "
-            "FRW-only lifeboat when the primary route is unavailable; "
+            "FRW-only lifeboat outside the automatic action chain; "
             "register frw_img2video — never claim seedance (2026-07-21); "
-            "prefer Grok primary; FRW is fallback only"
+            "prefer the LTX → Grok → verified FRW Wan → verified local chain"
         )
         spec["_frw_video_notes"] = notes
     if fvm.startswith("ltx-"):
@@ -871,7 +879,8 @@ def validate_film_spec(
         else:
             spec["frw_width"] = str(spec["frw_width"])
             spec["frw_height"] = str(spec["frw_height"])
-    # Fallback chain note for agents (not auto-executed).
+    # Action fallback order is policy, while execution remains capability- and
+    # receipt-gated in i2v_provider.generate_with_fallback.
     spec["_frw_fallback_chain"] = list(chain)
     # Env / synth layer model (LTX T2V beds — no face import)
     raw_env = spec.get("frw_env_model", DEFAULT_FRW_ENV_MODEL)
@@ -903,18 +912,19 @@ def validate_film_spec(
         "hero_still": "grok_image_edit_cast",
         "hero_motion_primary": hero_primary,
         "hero_i2v_provider": i2v_provider,
-        "hero_motion_fallback": (
-            ["frw:legacy-img2video", "rtx:latentsync_1_6_after_review"]
-            if i2v_provider == "frw-ltx23"
-            else list(chain)
-        ),
+        "hero_motion_priority": list(ACTION_MOTION_PROVIDER_CHAIN),
+        "hero_motion_fallback": list(chain),
         "hero_motion_frw_only_lifeboat": FRW_I2V_FRW_ONLY_LIFEBOAT,
-        "env_synth_primary": "grok_image_to_video_no_face",
-        "env_synth_fallback": list(FRW_T2V_FALLBACK_CHAIN),
-        "env_plate_cli": "grok image_to_video with no-face prompt; FRW env-plate only after technical failure",
+        "env_synth_primary": "frw_ltx_t2v",
+        "env_synth_fallback": [
+            "grok:image_to_video_no_face",
+            "local:verified-t2v",
+        ],
+        "env_plate_cli": "frw newvideo --model ltx-t2v; then Grok no-face I2V if unavailable",
         "env_register_endpoint": "frw_ltx_t2v",
         "key_canary": (
-            "FRW upload-probe is required only after a classified Grok technical failure"
+            "FRW LTX needs a film-scoped approved canary; Grok, FRW Wan and local routes "
+            "must each prove live readiness before fallback"
         ),
         "register_endpoint_hero": (
             "frw_ltx23_img2video_audio"
@@ -925,8 +935,9 @@ def validate_film_spec(
         ),
         "designed_post": "hyperframes|remotion",
         "note": (
-            "hero and environment motion use Grok primary; every FRW route is fallback only after "
-            "a classified technical failure; never T2V a face as identity"
+            "action order is FRW LTX 2.3 → Grok I2V → verified FRW Wan → other verified "
+            "local I2V; unready providers are skipped, while an attempted provider switches "
+            "only after a classified technical failure"
         ),
     }
     # Caption language(s) for designed-post (HyperFrames/Remotion)

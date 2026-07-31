@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""I2V provider abstraction layer.
+"""I2V provider abstraction and action-routing layer.
 
-Unifies Grok image_to_video and FRW Seedance behind a single interface so new
-providers can be added by implementing :class:`I2VProvider` and registering it,
-instead of scattering string ``source_endpoint`` labels through ``frw_dispatch.py``
-and ``capability_report.py``.
+Runs the production action order FRW LTX 2.3 → Grok I2V → verified FRW Wan →
+verified local providers behind a single interface. New providers can be added
+by implementing :class:`I2VProvider` and registering them instead of scattering
+``source_endpoint`` labels through the codebase.
 
 This module is the **registry + routing** layer; the actual generation still
 delegates to the existing paths:
 
 * Grok provider → Grok Build ``image_to_video`` (in-session) or
   ``scripts/adapters/grok_oauth_image.py``.
-* Seedance provider → ``scripts/frw_dispatch.py`` (FRW newvideo seedance-*-i2v).
+* FRW providers → ``scripts/frw_dispatch.py``.
+* Local providers → the private, capability-gated ComfyUI control plane.
 
 Backward-compatible: the existing ``source_endpoint`` labels in
 ``ALLOWED_VIDEO_ENDPOINTS`` keep working — the registry maps them to provider
@@ -27,6 +28,7 @@ import os
 import re
 import subprocess
 import sys
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -59,10 +61,17 @@ _SWITCH_HMAC_FIELD = "switch_hmac_sha256"
 _SWITCH_HASH_FIELD = "switch_sha256"
 _SWITCH_KEY_ENV = "AIFILM_PROVIDER_SWITCH_RECEIPT_KEY"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_WAN_MODEL_IDENTITY_RE = re.compile(r"(?:^|/)wan(?:[0-9._-]|$)")
+ACTION_PROVIDER_PRIORITY = (
+    "frw-ltx23",
+    "grok",
+    "frw-wan",
+    "comfy-wan22",
+)
 
 
 def is_technical_failure(error: object) -> bool:
-    """Return whether an error is safe to route from Grok to FRW.
+    """Return whether an error is safe to route to the next provider.
 
     Provider quality rejection, human review failure, and ambiguous task
     creation are deliberately not classified as automatic fallback triggers.
@@ -92,13 +101,17 @@ def _switch_content(receipt: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in receipt.items()
-        if key not in {_SWITCH_HASH_FIELD, _SWITCH_HMAC_FIELD, "path"}
+        if key not in {_SWITCH_HASH_FIELD, _SWITCH_HMAC_FIELD, "path", "archive_path"}
     }
 
 
 def _switch_hmac_bytes(receipt: dict[str, Any]) -> bytes:
     return json.dumps(
-        {key: value for key, value in receipt.items() if key not in {_SWITCH_HMAC_FIELD, "path"}},
+        {
+            key: value
+            for key, value in receipt.items()
+            if key not in {_SWITCH_HMAC_FIELD, "path", "archive_path"}
+        },
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
@@ -148,6 +161,11 @@ def _technical_failure_label(error: object) -> str:
     )
 
 
+def _has_wan_model_identity(value: object) -> bool:
+    """Accept only a model name whose provider token is explicitly Wan."""
+    return bool(_WAN_MODEL_IDENTITY_RE.search(str(value or "").strip().casefold()))
+
+
 def _write_switch_receipt(
     root: Path | None,
     *,
@@ -160,6 +178,8 @@ def _write_switch_receipt(
     receipt = {
         "schema_version": 1,
         "kind": "provider-switch",
+        # The archive is append-only evidence, including repeated attempts for one shot.
+        "event_id": uuid.uuid4().hex,
         "shot_id": shot_id,
         "primary_provider": primary,
         "fallback_provider": fallback,
@@ -173,10 +193,19 @@ def _write_switch_receipt(
         receipt["plan_sha256"] = plan_sha256
     _sign_provider_switch_receipt(receipt)
     if root is not None:
-        path = Path(root).expanduser().resolve() / "receipts" / f"provider-switch-{shot_id}.json"
+        receipt_root = Path(root).expanduser().resolve() / "receipts"
+        path = receipt_root / f"provider-switch-{shot_id}.json"
+        archive_path = (
+            receipt_root
+            / "provider-switches"
+            / (f"provider-switch-{shot_id}-{primary}-to-{fallback}-{receipt['event_id']}.json")
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
         write_json(path, receipt)
+        write_json(archive_path, receipt)
         receipt["path"] = str(path)
+        receipt["archive_path"] = str(archive_path)
     return receipt
 
 
@@ -187,15 +216,23 @@ def route_after_failure(
     primary: str,
     error: object,
     plan_sha256: str | None = None,
+    fallback_name: str | None = None,
 ) -> tuple[I2VProvider, dict[str, Any]] | None:
     """Select a reviewed fallback only after a classified technical failure."""
-    if primary not in {"grok", "frw-ltx23"} or not is_technical_failure(error):
+    if primary not in ACTION_PROVIDER_PRIORITY or not is_technical_failure(error):
         return None
     try:
         stable_shot_id = validate_identifier(shot_id, field="shot id")
     except SecurityPolicyError as exc:
         raise I2VProviderError(f"PROVIDER_SWITCH_SHOT_ID_INVALID: {exc}") from exc
-    provider = get("frw-img2video")
+    if fallback_name is None:
+        try:
+            fallback_name = ACTION_PROVIDER_PRIORITY[ACTION_PROVIDER_PRIORITY.index(primary) + 1]
+        except (ValueError, IndexError):
+            return None
+    if fallback_name not in ACTION_PROVIDER_PRIORITY:
+        raise I2VProviderError(f"PROVIDER_SWITCH_FALLBACK_INVALID: {fallback_name}")
+    provider = get(fallback_name)
     return provider, _write_switch_receipt(
         root,
         shot_id=stable_shot_id,
@@ -215,42 +252,91 @@ def generate_with_fallback(
     plan_sha256: str,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Run a live-ready primary and invoke fallback only for technical failure."""
+    """Run the action-provider chain in policy order.
+
+    Unready providers are skipped with a receipt-visible reason.  A provider
+    that starts a task may fall through only after a classified technical
+    failure; quality or human-review rejection never switches silently.
+    """
     if not isinstance(plan_sha256, str) or not _SHA256_RE.fullmatch(plan_sha256):
         raise I2VProviderError("PROVIDER_SWITCH_PLAN_INVALID: plan_sha256 must be SHA-256")
-    primary = preferred(root=root)
-    if primary.name == "frw-ltx23":
-        capability = primary.probe(root=root)
-        if not capability.available:
-            raise I2VProviderError(
-                "I2V_PRIMARY_NOT_READY: provider=frw-ltx23; "
-                f"{capability.reason or 'missing live capability'}"
-            )
     try:
-        result = primary.generate(keyframe=keyframe, prompt=prompt, **kwargs)
-        if not result.get("ok"):
-            raise I2VProviderError(
-                str(result.get("stderr") or result.get("error") or "Grok failed")
+        stable_shot_id = validate_identifier(shot_id, field="shot id")
+    except SecurityPolicyError as exc:
+        raise I2VProviderError(f"PROVIDER_SWITCH_SHOT_ID_INVALID: {exc}") from exc
+    attempts: list[dict[str, Any]] = []
+    technical_failure: tuple[str, object] | None = None
+    switches: list[dict[str, Any]] = []
+    for index, provider_name in enumerate(provider_priority()):
+        provider = get(provider_name)
+        capability = provider.probe(root=root)
+        if not capability.available:
+            attempts.append(
+                {
+                    "provider": provider_name,
+                    "status": "not_ready",
+                    "reason": str(capability.reason or "live capability unavailable")[:200],
+                }
             )
-        result["route"] = f"{primary.name}_primary"
+            continue
+        if technical_failure is not None:
+            failed_provider, failed_error = technical_failure
+            switch = _write_switch_receipt(
+                root,
+                shot_id=stable_shot_id,
+                primary=failed_provider,
+                fallback=provider_name,
+                error=failed_error,
+                plan_sha256=plan_sha256,
+            )
+            switches.append(switch)
+            technical_failure = None
+        try:
+            result = provider.generate(keyframe=keyframe, prompt=prompt, **kwargs)
+            if not result.get("ok"):
+                raise I2VProviderError(
+                    str(result.get("stderr") or result.get("error") or f"{provider_name} failed")
+                )
+        except Exception as exc:
+            attempts.append(
+                {
+                    "provider": provider_name,
+                    "status": "technical_failure" if is_technical_failure(exc) else "failed_closed",
+                    "reason": _technical_failure_label(exc)
+                    if is_technical_failure(exc)
+                    else "non_technical_failure",
+                }
+            )
+            if not is_technical_failure(exc):
+                raise
+            technical_failure = (provider_name, exc)
+            continue
+        attempts.append({"provider": provider_name, "status": "completed"})
+        result["route"] = f"{provider_name}_{'primary' if index == 0 else 'fallback'}"
+        result["routing_attempts"] = attempts
+        result["provider_priority"] = list(provider_priority())
+        if switches:
+            result["provider_switch"] = switches[-1]
+            result["provider_switches"] = switches
+        if root is not None:
+            write_json(
+                Path(root).expanduser().resolve() / "receipts" / "i2v-routing.json",
+                {
+                    "schema_version": 2,
+                    "kind": "i2v-routing",
+                    "shot_id": stable_shot_id,
+                    "plan_sha256": plan_sha256,
+                    "provider_priority": list(provider_priority()),
+                    "selected_provider": provider_name,
+                    "attempts": attempts,
+                    "provider_switch_sha256s": [item[_SWITCH_HASH_FIELD] for item in switches],
+                },
+            )
         return result
-    except Exception as exc:
-        selected = route_after_failure(
-            root=root,
-            shot_id=shot_id,
-            primary=primary.name,
-            error=exc,
-            plan_sha256=plan_sha256,
-        )
-        if selected is None:
-            raise
-        fallback, switch = selected
-        result = fallback.generate(keyframe=keyframe, prompt=prompt, **kwargs)
-        result["route"] = (
-            "frw_fallback" if primary.name == "grok" else f"{primary.name}_technical_fallback"
-        )
-        result["provider_switch"] = switch
-        return result
+    reasons = ", ".join(
+        f"{item['provider']}={item['status']}:{item['reason']}" for item in attempts
+    )
+    raise I2VProviderError(f"I2V_PROVIDER_CHAIN_EXHAUSTED: {reasons}")
 
 
 @dataclass
@@ -365,7 +451,7 @@ class GrokI2VProvider(I2VProvider):
             provider=self.name,
             ok=True,
             available=True,
-            reason="Grok image_to_video is the default in-session I2V (grok_primary).",
+            reason="Grok image_to_video is ready as the second action lane.",
             models=["image_to_video", "reference_to_video"],
             profile="grok_primary",
         )
@@ -641,6 +727,99 @@ class FrwLtx23AudioProvider(SeedanceProvider):
         ]
 
 
+class FrwWanProvider(SeedanceProvider):
+    """FRW-managed I2V accepted only when the response proves a Wan backend.
+
+    The current public FRW CLI exposes a generic ``img2video`` command, not a
+    model selector.  This lane therefore stays unavailable until a film-scoped
+    canary and every generation response both identify Wan explicitly.
+    """
+
+    name = "frw-wan"
+    endpoints = frozenset({"frw_wan_i2v"})
+
+    def probe(self, *, root: Path | None = None) -> CapabilityReport:
+        if root is None:
+            return CapabilityReport(
+                provider=self.name,
+                ok=False,
+                available=False,
+                reason="FRW Wan requires a film-scoped model-identity canary.",
+                models=["wan"],
+                profile="frw_wan_fallback",
+                detail={"canary_required": True},
+            )
+        receipt = root / "receipts" / "frw-wan-i2v-canary.json"
+        try:
+            data = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        model = str(data.get("provider_model") or data.get("model") or "").lower()
+        output_sha256 = data.get("output_sha256")
+        approved = bool(
+            data.get("ok")
+            and _has_wan_model_identity(model)
+            and isinstance(output_sha256, str)
+            and _SHA256_RE.fullmatch(output_sha256)
+            and data.get("full_decode_ok") is True
+            and data.get("human_review") == "approved"
+        )
+        return CapabilityReport(
+            provider=self.name,
+            ok=approved,
+            available=approved,
+            reason=(
+                "FRW Wan I2V canary approved."
+                if approved
+                else "FRW Wan model identity is not exposed or the canary is not approved."
+            ),
+            models=["wan"],
+            profile="frw_wan_fallback",
+            detail={"canary_required": True, "receipt": str(receipt), **data},
+        )
+
+    def build_command(
+        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
+    ) -> list[str]:
+        del duration_sec
+        dispatch = Path(__file__).resolve().parent / "frw_dispatch.py"
+        return [
+            sys.executable,
+            str(dispatch),
+            "img2video",
+            "--img-url",
+            str(kwargs.get("img_url") or keyframe),
+            "--prompt",
+            prompt,
+            "--width",
+            str(kwargs.get("width", 704)),
+            "--height",
+            str(kwargs.get("height", 1280)),
+            "--wait",
+        ]
+
+    def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        result = super().generate(keyframe=keyframe, prompt=prompt, **kwargs)
+        payload: dict[str, Any] = {}
+        for line in reversed(str(result.get("stdout") or "").splitlines()):
+            try:
+                parsed = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(parsed, dict):
+                payload = parsed
+                break
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        model = str(
+            data.get("model") or data.get("provider_model") or payload.get("model") or ""
+        ).lower()
+        if result.get("ok") and not _has_wan_model_identity(model):
+            result["ok"] = False
+            result["stderr"] = "FRW_WAN_MODEL_IDENTITY_UNVERIFIED"
+        result["provider_model"] = model or None
+        return result
+
+
 class LocalComfyWan22Provider(I2VProvider):
     """Explicit private-LAN Wan 2.2 I2V lane on the user's RTX 5090."""
 
@@ -678,9 +857,10 @@ class LocalComfyWan22Provider(I2VProvider):
                 profile="explicit_local",
             )
         try:
-            from comfy_video import probe
+            from comfy_video import probe, submission_capacity
 
             detail = probe(base_url)
+            capacity = submission_capacity(base_url)
         except Exception as exc:
             return CapabilityReport(
                 provider=self.name,
@@ -691,16 +871,19 @@ class LocalComfyWan22Provider(I2VProvider):
                 profile="explicit_local",
             )
         models = list((detail.get("models") or {}).get("official") or [])
+        available = bool(detail.get("ok") and capacity.get("ok"))
         return CapabilityReport(
             provider=self.name,
-            ok=bool(detail.get("ok")),
-            available=bool(detail.get("ok")),
-            reason="Private RTX 5090 Wan 2.2 is ready."
-            if detail.get("ok")
-            else "Required Wan 2.2 assets are missing.",
+            ok=available,
+            available=available,
+            reason=(
+                "Private RTX 5090 Wan 2.2 is ready."
+                if available
+                else "Private Wan 2.2 assets or submission capacity are unavailable."
+            ),
             models=models,
             profile="explicit_local",
-            detail=detail,
+            detail={**detail, "submission_capacity": capacity},
         )
 
     def build_command(
@@ -876,6 +1059,19 @@ def for_endpoint(source_endpoint: str) -> I2VProvider | None:
     return None
 
 
+def provider_priority() -> tuple[str, ...]:
+    """Return the production action order, followed by future verified locals."""
+    local_tail = tuple(
+        sorted(
+            name
+            for name in _REGISTRY
+            if (name.startswith("comfy-") or name.startswith("local-"))
+            and name not in ACTION_PROVIDER_PRIORITY
+        )
+    )
+    return (*ACTION_PROVIDER_PRIORITY, *local_tail)
+
+
 def preferred(*, root: Path | None = None) -> I2VProvider:
     """Resolve the configured production primary without overriding shot locks."""
     try:
@@ -890,14 +1086,17 @@ def preferred(*, root: Path | None = None) -> I2VProvider:
         write_json(
             Path(root) / "receipts" / "i2v-routing.json",
             {
-                "schema_version": 1,
+                "schema_version": 2,
+                "kind": "i2v-routing-preflight",
                 "requested_profile": requested,
                 "selected_provider": provider.name,
+                "provider_priority": list(provider_priority()),
                 "fallback": False,
                 "reason": (
-                    "LTX 2.3 native-audio primary; technical fallback requires a signed receipt"
+                    "FRW LTX 2.3 is first; later providers require live readiness and "
+                    "attempted-provider switches require signed receipts"
                     if provider.name == "frw-ltx23"
-                    else "grok_primary production default; FRW requires technical-failure switch"
+                    else "legacy grok_primary compatibility profile"
                 ),
                 "models": list(provider.probe(root=root).models),
                 "requires_hero_repilot": False,
@@ -940,4 +1139,5 @@ register(GrokI2VProvider())
 register(SeedanceProvider())
 register(FrwImg2VideoProvider())
 register(FrwLtx23AudioProvider())
+register(FrwWanProvider())
 register(LocalComfyWan22Provider())

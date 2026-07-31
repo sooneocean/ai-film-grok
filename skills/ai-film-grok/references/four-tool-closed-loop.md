@@ -1,6 +1,6 @@
 # 四工具闭环：脚本 → 动效 → 剪辑 → 渲染
 
-> 2026-07-23 · ai-film-grok × {HyperFrames, Remotion, video-use, Seedance}  
+> 2026-07-23 · ai-film-grok × {HyperFrames, Remotion, video-use, Seedance}
 > 全程 AI 闭环，每个工具落位到八环主脊的精确环节。
 
 ## 一句话
@@ -20,7 +20,7 @@ Idea → Story → Beats → Shots
   ↓ prompt_injector 写 prompts/*.txt    (camera_prompt 进 I2V 指令)
   ↓ seedance_bridge.bridge_film_spec      (camera_prompt → @Image1 结构化 prompt)
 Media → Selects
-  ↓ i2v_provider.preferred()              (profile 路由: grok_primary / seedance_first)
+  ↓ i2v_provider.provider_priority()       (FRW LTX → Grok → FRW Wan → local)
   ↓ (生成式 clip) 或 ingest-footage → auto-cut (真人素材)
   ↓ edit_policy.merge_edls                (生成式 + 真人 EDL 合并, 字幕最后)
 (Cut) → Rough
@@ -49,7 +49,7 @@ Verified → final (HF/Remotion designed-post) → review → export
   ├─ 是 → ingest-footage → auto-cut → merge_edls(生成式, 真人)
   └─ 否 → 纯生成式 clip
 ↓
-I2V provider = preferred()  (grok_primary 默认 / seedance_first 恢复)
+I2V provider = provider_priority()  (ltx23_primary 默认；逐级 live gate)
   ├─ Grok: image_to_video (in-session)
   └─ Seedance: frw newvideo seedance-2-fast-i2v (恢复路径)
 ↓

@@ -20,8 +20,8 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 每步后 dispatch，只跑 `next_action`；读 `context_refs`（≤3）与 `weapon_route`。ready+授权+未锁 provider 才 probe 直用，失败即停。状态：`receipts/dispatch.json`。
 
-骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture→Post→Master。  
-小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。  
+骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture→Post→Master。
+小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。
 创作会诊：[creative-workshop](references/creative-workshop.md)（默认只编译，`apply` 才写图）。
 
 长片 v1：`plan run --production-mode longform --target-duration 480..900`；锁 graph 后 project→write-spec。9:16、三幕、≤90s 单元、故事/animatic→pilot→全片观看三闸；禁静默换 provider。[longform](references/longform-workflow.md)
@@ -34,7 +34,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **供应商**：I2V=`grok_primary`；FRW 回退=`img2video`；Seedance 不可用，禁止选用。pilot=advertised＋callable A/B；production=人审 champion＋challenger（[frw-ab](references/frw-ab-workflow.md)）;不改 primary/静默 bulk。
+7. **动作供应商**：`ltx23_primary`：**FRW LTX 2.3 → Grok I2V → verified FRW Wan → verified local**。未就绪跳过；已启动者仅技术失败可签名降级。禁 Seedance。
 8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM=rnb；缺已批 edit/bridge 则 `final` 阻塞。[BGM](references/bgm-generation.md)
 8b. **对白 i2i**：先 performance-state；FRW receipt 优先，否则查 Comfy；忙则等。[lesson](references/lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)

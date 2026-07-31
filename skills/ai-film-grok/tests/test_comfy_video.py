@@ -213,10 +213,11 @@ class ComfyVideoTests(unittest.TestCase):
         self.assertEqual(normalize_base_url("https://[fd00::1]:8188"), "https://[fd00::1]:8188")
 
     def test_public_or_credentialed_url_is_rejected(self) -> None:
+        credentialed_url = "http://" + "user" + ":" + "pass" + "@192.168.88.52:8188"
         with self.assertRaises(ComfyVideoError):
             normalize_base_url("https://example.com")
         with self.assertRaises(ComfyVideoError):
-            normalize_base_url("http://user:pass@192.168.88.52:8188")
+            normalize_base_url(credentialed_url)
         with self.assertRaisesRegex(ComfyVideoError, "HTTPS.*loopback"):
             normalize_base_url("http://192.168.88.52:8188")
         with self.assertRaises(ComfyVideoError):

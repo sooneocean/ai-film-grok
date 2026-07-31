@@ -478,7 +478,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "tools": {
             "still_generate": "image_gen (agent tool)",
             "still_edit": "image_edit (agent tool)",
-            "motion": "image_to_video (agent tool)",
+            "motion": "FRW LTX 2.3 → Grok I2V → verified FRW Wan → verified local",
             "motion_multi_ref": "reference_to_video (agent tool)",
             "vo": "MiMo (default; limited-time free), MiniMax/Fish/edge, or structured AIFILM_TTS_ARGV (cross-provider fallback is opt-in)",
             "lipsync": "locked MuseTalk/Wav2Lip or structured AIFILM_LIPSYNC_ARGV (optional post)",

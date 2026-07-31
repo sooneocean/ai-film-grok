@@ -63,13 +63,13 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 
 ### Cast master 验收清单（全勾才算过）
 
-- [ ] 脸型/瞳色/发型与用户参考一致  
-- [ ] **发色稳定**：与 ref/cast 同色名；禁霓虹光下漂成黑/棕/另一女主色（见 §1b）  
-- [ ] 服装主色与配件（如光环、领带色）稳定  
-- [ ] 介质正确（anime ≠ photoreal）  
-- [ ] 竖屏 9:16 或可安全裁切  
-- [ ] 明确 **18+ 成人**比例与脸  
-- [ ] 光线干净、可做后续 edit 锚点  
+- [ ] 脸型/瞳色/发型与用户参考一致
+- [ ] **发色稳定**：与 ref/cast 同色名；禁霓虹光下漂成黑/棕/另一女主色（见 §1b）
+- [ ] 服装主色与配件（如光环、领带色）稳定
+- [ ] 介质正确（anime ≠ photoreal）
+- [ ] 竖屏 9:16 或可安全裁切
+- [ ] 明确 **18+ 成人**比例与脸
+- [ ] 光线干净、可做后续 edit 锚点
 
 ### 1e. 静帧禁压缩 / 错幅（2026-07-22 · P0）
 
@@ -87,7 +87,7 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 
 ### 1f. 先验后生 · 算力刀口（2026-07-22 · P0）
 
-> 用户：「验证完再生成视频；图片也是一样逻辑；算力放在刀口上；重复生成成本过高」。  
+> 用户：「验证完再生成视频；图片也是一样逻辑；算力放在刀口上；重复生成成本过高」。
 > 完整：[lessons-2026-07-22-verify-before-generate.md](lessons-2026-07-22-verify-before-generate.md)
 
 | 规则 | 要求 |
@@ -129,7 +129,7 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 
 ### 1d. 首帧结构门禁（2026-07-21 · P0 致命）
 
-> 片例：成片 ~33s `shot13`——**静帧手/身结构坏 → I2V 整段毒化**。用户：「首帧坏了导致整个片段都坏了」。  
+> 片例：成片 ~33s `shot13`——**静帧手/身结构坏 → I2V 整段毒化**。用户：「首帧坏了导致整个片段都坏了」。
 > 完整见 [lessons-2026-07-21-keyframe-first-frame-poison.md](lessons-2026-07-21-keyframe-first-frame-poison.md)。
 
 | 规则 | 要求 |
@@ -145,7 +145,7 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 
 ### 1e. 卸装后禁止回穿 · Still 源链（2026-07-21 · P0 致命）
 
-> 片例：`xide-hardcore-thrust`——film-spec 已 `bare`，shot05–10 仍从**全装 cast master** 重画 → 丝袜/甲「穿回去」。用户定性**严重 bug**。  
+> 片例：`xide-hardcore-thrust`——film-spec 已 `bare`，shot05–10 仍从**全装 cast master** 重画 → 丝袜/甲「穿回去」。用户定性**严重 bug**。
 > 完整见 [lessons-2026-07-21-wardrobe-no-redress-still.md](lessons-2026-07-21-wardrobe-no-redress-still.md) · [sex-undress-ladder](lessons-2026-07-21-sex-undress-ladder.md)。
 
 | 规则 | 要求 |
@@ -159,12 +159,12 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 | **W6 抽检** | 从 peak 起每镜 t≈1s：半脱标记仍在；整齐全装 = **identity/escalation fail**，禁 final 装傻 |
 | **W7 keyframe-first** | I2V 只吃本镜 keyframe；坏了先改 keyframe/状态照再 I2V（[keyframe-first-state-index](keyframe-first-state-index.md)） |
 
-**铁律**：`wardrobe_state` 文字过闸 ≠ 像素过闸；**ref 全装 = 成片回穿**。  
+**铁律**：`wardrobe_state` 文字过闸 ≠ 像素过闸；**ref 全装 = 成片回穿**。
 **禁止**：审核失败后用全装 cast 重起 act 十镜；并行 bulk `image_edit(cast)` 覆盖已脱镜。
 
 ### 1f. I2V 末帧禁止回穿 + promote 门（2026-07-22 · P0 致命）
 
-> 片例：`astra-encore-120`——shot04 首帧 partial 正确，I2V 末帧红外套穿回肩/胸；promote 把毒末帧写成 shot05 → 全线回穿。  
+> 片例：`astra-encore-120`——shot04 首帧 partial 正确，I2V 末帧红外套穿回肩/胸；promote 把毒末帧写成 shot05 → 全线回穿。
 > 完整见 [lessons-2026-07-22-i2v-endframe-no-redress.md](lessons-2026-07-22-i2v-endframe-no-redress.md)。
 
 | 规则 | 要求 |
@@ -177,21 +177,21 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 
 **铁律**：静帧对 + 末帧回穿 = 仍算回穿事故。**末帧才是衣着真相。**
 
-## 2. 生成纪律（Grok 主路径）
+## 2. 生成纪律（动作优先链）
 
-1. **主角出现的每一镜**：`image_edit`，按 **wardrobe_state 选状态照为主 ref**；full 时用 cast master。  
-   - **W3**：已过卸装峰值 / non-full state → **主图 ref = state photo / undress-anchor / 已脱 still**；cast 仅可作脸辅，不得当衣着真相源。  
-2. Prompt **必须**以 `style-bible.signature_block` + `identity_lock` + **`Hair lock`** 开头（见 style-bible.md）。  
-3. 只改：pose / expression / environment / action / wetness / camera——**不改发色/瞳色/签名服色**。  
-4. **禁止**对主角反复 `image_gen` 从零抽卡。  
+1. **主角出现的每一镜**：`image_edit`，按 **wardrobe_state 选状态照为主 ref**；full 时用 cast master。
+   - **W3**：已过卸装峰值 / non-full state → **主图 ref = state photo / undress-anchor / 已脱 still**；cast 仅可作脸辅，不得当衣着真相源。
+2. Prompt **必须**以 `style-bible.signature_block` + `identity_lock` + **`Hair lock`** 开头（见 style-bible.md）。
+3. 只改：pose / expression / environment / action / wetness / camera——**不改发色/瞳色/签名服色**。
+4. **禁止**对主角反复 `image_gen` 从零抽卡。
 5. 漂了：用 cast master 当 ref 修坏帧，不要整镜重抽换脸/**换发色**。
 
 ### 量产前 Pilot（硬）
 
 在写满 10+ 镜之前：
 
-1. 只做 **3 镜 pilot**（建议 hook + reaction + action）。  
-2. **用户**对比 cast master：脸 / 发 / 服 / 介质（agent 不得自批）。  
+1. 只做 **3 镜 pilot**（建议 hook + reaction + action）。
+2. **用户**对比 cast master：脸 / 发 / 服 / 介质（agent 不得自批）。
 3. 写 `receipts/pilot-approval.json`：
 
 ```json
@@ -205,37 +205,37 @@ aifilm register-clip --root "$ROOT" --shot-id shot01 --source clips/shot01.mp4 \
 }
 ```
 
-4. 缺 `approved_by: user`（或会话中用户原话批准）→ **禁止**批量。  
+4. 缺 `approved_by: user`（或会话中用户原话批准）→ **禁止**批量。
 5. 全片 still **同一 img2img 锚**（cast master）。禁止「机构戏用 cast、色气戏用 naked 用户图」两套锚。用户高色气图只作 **style 参考/lookbook**，定妆锚用着衣 cast。
 
-## 3. Provider 路由（Grok primary + FRW technical fallback）
+## 3. Provider 路由（FRW LTX → Grok → FRW Wan → local）
 
-当前可复现默认是 `grok_primary`。Seedance 只有 provider canary 与当前项目 pilot 都通过后才能显式恢复；定妆 / still 仍使用 **Grok**。完整契约见 [hard-defaults.md](hard-defaults.md)、[frw-degrade-dispatch.md](frw-degrade-dispatch.md) 与历史 Seedance lessons。
+当前默认是 `ltx23_primary`。FRW LTX 必须有当前影片 canary；缺证据时运行时跳到 Grok，不永久改写项目锁。FRW Wan 只有模型身份明确时才能启用；本地路线还要通过队列、RAM、VRAM 与 pilot。完整契约见 [hard-defaults.md](hard-defaults.md) 与 [frw-degrade-dispatch.md](frw-degrade-dispatch.md)。
 
 | 规则 | 要求 |
 |------|------|
-| **分层** | 创作/身份/动画 → Grok；FRW 只在 Grok 技术失败后启用 |
-| **Key canary** | 仅 fallback 前执行 upload-probe；API key 与 upload JWT 分离 |
-| film-spec | 默认 `i2v_provider: grok`；FRW 仅写入 shot 级 fallback receipt |
-| 技术失败 | Grok timeout/429/5xx/连接失败 → FRW；质量拒绝、人工拒绝、未知错误不自动切换 |
+| **分层** | 创作/身份静帧 → Grok；人物动作按 FRW LTX → Grok → verified FRW Wan → verified local |
+| **Key canary** | 每条动作路线须有当前影片证据；API key 与 upload JWT 分离 |
+| film-spec | 默认 `i2v_provider: auto`→`frw-ltx23`；回退顺序写入 `_layer_routing` |
+| 技术失败 | 已尝试路线 timeout/429/5xx/连接失败才可签名切到下一条；质量、人工、未知拒绝不自动切换 |
 | 锚点（若 FRW still） | 必须先 `upload` cast；每镜 **img2image**（禁止 text2image 出主角） |
 | 模型 | FRW 侧 **整片固定同一 `frw_video_model`**；禁止半 Seedance 半 legacy 冒充 |
 | 尺寸 | 保留 provider 原生画幅；9:16 的 FRW pair 可为 **704×1280**；禁止强制 720 或拉伸 |
 | Prompt | 每镜前缀同一 `identity_lock` + `signature_block`；场景句放后半；Seedance 用 `@Image1 …` |
-| **分镜动态** | 默认 **`newvideo --model seedance-2-fast-i2v`**；有明确尾帧 **`seedance-2-pro-flf`** |
+| **分镜动态** | 默认 FRW LTX 2.3；未就绪或技术失败依序到 Grok、verified FRW Wan、verified local |
 | **禁止默认** | legacy `img2video` / 旧 FLF 模板（须显式 `legacy-img2video`） |
 | **入口** | `"$AIFILM" frw …` 或 `scripts/frw_dispatch.py`；stdout JSON `protocol_version=1.0` |
 | **入组** | 下载 → **`reencode-clips`（不升分辨率）** → `register-clip`（真实 endpoint） |
 | 禁止 | 半片 Grok still + 半片 FRW still 混剪同一角色 |
 | 禁止 | 长期半片 Grok I2V + 半片 FRW I2V（单镜兜底后尽快统一） |
 | 禁止 | 错 poll 的 `frw_batch_flf`；把 Grok I2V 说成 FLF；403 后仍写 model=seedance |
-| 质检 | 每 5 镜抽 1 镜对照 cast；失败整批 pause；pilot 3 镜 Grok 人审 fail → 不 bulk；FRW 只承接技术失败 |
+| 质检 | 每 5 镜抽 1 镜对照 cast；失败整批 pause；每条已启用路线的 pilot 均须人审 |
 | 注册 | `--review-note` 写真实 `provider=` `model=` `fallback=` `res=` `identity_lock_ok` |
 
 ```bash
 AIFILM="$HOME/.grok/skills/ai-film-grok/scripts/aifilm"
 
-# FRW fallback：仅技术故障后上传已批 keyframe → Seedance newvideo
+# 仅在当前路线的 canary／门禁通过后，按动作优先链提交已批 keyframe
 "$AIFILM" frw upload --file-path "<root>/keyframes/shot01.png" --category image
 "$AIFILM" frw newvideo \
   --model seedance-2-fast-i2v \
@@ -263,17 +263,17 @@ AIFILM="$HOME/.grok/skills/ai-film-grok/scripts/aifilm"
 
 注册前目视：
 
-- 与 cast master 同一人（脸/发/服）  
-- 与 style master 同一介质与色级  
-- 无乱入元素、无儿童化脸  
+- 与 cast master 同一人（脸/发/服）
+- 与 style master 同一介质与色级
+- 无乱入元素、无儿童化脸
 
 `review-note` 建议模板：`id-ok face/hair/outfit; medium=anime; cast=kei-v1`。
 
 ### Clip
 
-- 身份不漂于该镜 still  
-- 可见运动（非冻帧）  
-- 不因 I2V 糊成另一画风  
+- 身份不漂于该镜 still
+- 可见运动（非冻帧）
+- 不因 I2V 糊成另一画风
 
 身份/画风 fail → `director-notes` + reshoot，**禁止**靠 assemble 硬拼。
 

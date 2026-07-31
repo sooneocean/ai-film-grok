@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from i2v_provider import (  # noqa: E402
     FrwLtx23AudioProvider,
+    FrwWanProvider,
     GrokI2VProvider,
     I2VProviderError,
     LocalComfyWan22Provider,
@@ -20,6 +21,7 @@ from i2v_provider import (  # noqa: E402
     generate_with_fallback,
     get,
     is_technical_failure,
+    provider_priority,
     provider_switch_receipt_is_valid,
     registry_report,
     route_after_failure,
@@ -34,6 +36,13 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIn("seedance", names)
         self.assertIn("comfy-wan22", names)
         self.assertIn("frw-ltx23", names)
+        self.assertIn("frw-wan", names)
+
+    def test_action_provider_priority_is_ltx_grok_frw_wan_then_local(self) -> None:
+        self.assertEqual(
+            provider_priority(),
+            ("frw-ltx23", "grok", "frw-wan", "comfy-wan22"),
+        )
 
     def test_grok_probe_ok(self) -> None:
         """The in-session probe is available without a film root."""
@@ -64,6 +73,7 @@ class I2VProviderTests(unittest.TestCase):
         self.assertIsInstance(for_endpoint("frw_seedance_flf"), SeedanceProvider)
         self.assertEqual(for_endpoint("frw_img2video").name, "frw-img2video")
         self.assertIsInstance(for_endpoint("frw_ltx23_img2video_audio"), FrwLtx23AudioProvider)
+        self.assertIsInstance(for_endpoint("frw_wan_i2v"), FrwWanProvider)
         self.assertIsInstance(for_endpoint("local_wan22_i2v"), LocalComfyWan22Provider)
         # unknown endpoint → None
         self.assertIsNone(for_endpoint("nonexistent"))
@@ -114,7 +124,7 @@ class I2VProviderTests(unittest.TestCase):
             mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "ltx23_primary"}, clear=False),
         ):
             root = Path(raw)
-            with self.assertRaisesRegex(I2VProviderError, "I2V_PRIMARY_NOT_READY"):
+            with self.assertRaisesRegex(I2VProviderError, "I2V_PROVIDER_CHAIN_EXHAUSTED"):
                 generate_with_fallback(
                     root=root,
                     shot_id="shot01",
@@ -122,6 +132,179 @@ class I2VProviderTests(unittest.TestCase):
                     prompt="room tone",
                     plan_sha256="a" * 64,
                 )
+
+    def test_ltx_not_ready_falls_through_to_ready_grok(self) -> None:
+        import os
+        from types import SimpleNamespace
+        from unittest import mock
+
+        class UnreadyLtx:
+            name = "frw-ltx23"
+
+            def probe(self, **_kwargs):
+                return SimpleNamespace(available=False, reason="canary missing")
+
+        class ReadyGrok:
+            name = "grok"
+
+            def probe(self, **_kwargs):
+                return SimpleNamespace(available=True, reason="ready")
+
+            def generate(self, **_kwargs):
+                return {"ok": True, "provider": self.name}
+
+        providers = {
+            "frw-ltx23": UnreadyLtx(),
+            "grok": ReadyGrok(),
+        }
+        with (
+            tempfile.TemporaryDirectory() as raw,
+            mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "ltx23_primary"}, clear=False),
+            mock.patch(
+                "i2v_provider.get",
+                side_effect=lambda name: (
+                    providers.get(name)
+                    or SimpleNamespace(
+                        name=name,
+                        probe=lambda **_kwargs: SimpleNamespace(
+                            available=False, reason="not ready"
+                        ),
+                    )
+                ),
+            ),
+        ):
+            result = generate_with_fallback(
+                root=Path(raw),
+                shot_id="shot01",
+                keyframe=Path(raw) / "frame.png",
+                prompt="action",
+                plan_sha256="a" * 64,
+            )
+        self.assertEqual(result["route"], "grok_fallback")
+        self.assertEqual(result["routing_attempts"][0]["provider"], "frw-ltx23")
+        self.assertEqual(result["routing_attempts"][0]["status"], "not_ready")
+
+    def test_technical_failure_uses_next_ready_provider_in_priority_order(self) -> None:
+        import os
+        from types import SimpleNamespace
+        from unittest import mock
+
+        class Provider:
+            def __init__(self, name: str, *, ready: bool, error: str | None = None):
+                self.name = name
+                self.ready = ready
+                self.error = error
+
+            def probe(self, **_kwargs):
+                return SimpleNamespace(
+                    available=self.ready, reason="ready" if self.ready else "off"
+                )
+
+            def generate(self, **_kwargs):
+                if self.error:
+                    raise I2VProviderError(self.error)
+                return {"ok": True, "provider": self.name}
+
+        providers = {
+            "frw-ltx23": Provider("frw-ltx23", ready=True, error="HTTP 503"),
+            "grok": Provider("grok", ready=True, error="HTTP 503"),
+            "frw-wan": Provider("frw-wan", ready=True),
+            "comfy-wan22": Provider("comfy-wan22", ready=True),
+        }
+        with (
+            tempfile.TemporaryDirectory() as raw,
+            mock.patch.dict(
+                os.environ,
+                {
+                    "AIFILM_I2V_PROFILE": "ltx23_primary",
+                    "AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32,
+                },
+                clear=False,
+            ),
+            mock.patch("i2v_provider.get", side_effect=lambda name: providers[name]),
+        ):
+            result = generate_with_fallback(
+                root=Path(raw),
+                shot_id="shot01",
+                keyframe=Path(raw) / "frame.png",
+                prompt="action",
+                plan_sha256="b" * 64,
+            )
+            receipts = sorted(
+                (Path(raw) / "receipts" / "provider-switches").glob("provider-switch-*.json")
+            )
+        self.assertEqual(result["route"], "frw-wan_fallback")
+        self.assertEqual(
+            [item["provider"] for item in result["routing_attempts"]],
+            ["frw-ltx23", "grok", "frw-wan"],
+        )
+        self.assertEqual(
+            [path.name.rsplit("-", 1)[0] for path in receipts],
+            ["provider-switch-shot01-frw-ltx23-to-grok", "provider-switch-shot01-grok-to-frw-wan"],
+        )
+        with mock.patch.dict(
+            os.environ,
+            {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32},
+            clear=False,
+        ):
+            self.assertTrue(provider_switch_receipt_is_valid(result["provider_switch"]))
+
+    def test_multiple_technical_fallbacks_preserve_each_signed_switch(self) -> None:
+        import json
+        import os
+        from types import SimpleNamespace
+        from unittest import mock
+
+        class Provider:
+            def __init__(self, name: str, error: str | None = None):
+                self.name = name
+                self.error = error
+
+            def probe(self, **_kwargs):
+                return SimpleNamespace(available=True, reason="ready")
+
+            def generate(self, **_kwargs):
+                if self.error:
+                    raise I2VProviderError(self.error)
+                return {"ok": True, "provider": self.name}
+
+        providers = {
+            "frw-ltx23": Provider("frw-ltx23", "HTTP 503"),
+            "grok": Provider("grok", "HTTP 502"),
+            "frw-wan": Provider("frw-wan"),
+            "comfy-wan22": Provider("comfy-wan22"),
+        }
+        with (
+            tempfile.TemporaryDirectory() as raw,
+            mock.patch.dict(
+                os.environ,
+                {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32},
+                clear=False,
+            ),
+            mock.patch("i2v_provider.get", side_effect=lambda name: providers[name]),
+        ):
+            root = Path(raw)
+            result = generate_with_fallback(
+                root=root,
+                shot_id="shot01",
+                keyframe=root / "frame.png",
+                prompt="action",
+                plan_sha256="c" * 64,
+            )
+            self.assertEqual(
+                [
+                    (item["primary_provider"], item["fallback_provider"])
+                    for item in result["provider_switches"]
+                ],
+                [("frw-ltx23", "grok"), ("grok", "frw-wan")],
+            )
+            for item in result["provider_switches"]:
+                self.assertTrue(provider_switch_receipt_is_valid(item))
+                self.assertTrue(Path(item["archive_path"]).is_file())
+            routing = json.loads(
+                (root / "receipts" / "i2v-routing.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(len(routing["provider_switch_sha256s"]), 2)
 
     def test_seedance_flf_variant(self) -> None:
         sp = get("seedance")
@@ -515,7 +698,7 @@ class I2VProviderTests(unittest.TestCase):
             )
             self.assertTrue(provider_switch_receipt_is_valid(selected[1]))
         self.assertIsNotNone(selected)
-        self.assertEqual(selected[0].name, "frw-img2video")
+        self.assertEqual(selected[0].name, "frw-wan")
 
     def test_provider_switch_writer_requires_local_hmac_key(self) -> None:
         import json
@@ -549,12 +732,78 @@ class I2VProviderTests(unittest.TestCase):
                 self.assertTrue(provider_switch_receipt_is_valid(stored))
                 self.assertEqual(stored["switch_hmac_sha256"], selected[1]["switch_hmac_sha256"])
                 self.assertNotIn("synthetic-secret-not-real", repr(stored))
+                archived = list(
+                    (root / "receipts" / "provider-switches").glob(
+                        "provider-switch-s1-grok-to-frw-wan-*.json"
+                    )
+                )
+                self.assertEqual(len(archived), 1)
             with mock.patch.dict(
                 os.environ,
                 {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "z" * 32},
                 clear=True,
             ):
                 self.assertFalse(provider_switch_receipt_is_valid(stored))
+
+    def test_repeated_switches_are_preserved_as_distinct_signed_events(self) -> None:
+        import json
+        import os
+        from unittest import mock
+
+        with (
+            tempfile.TemporaryDirectory() as raw,
+            mock.patch.dict(
+                os.environ,
+                {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32},
+                clear=True,
+            ),
+        ):
+            root = Path(raw)
+            route_after_failure(root=root, shot_id="s1", primary="grok", error="HTTP 503")
+            route_after_failure(root=root, shot_id="s1", primary="grok", error="HTTP 504")
+            archived = sorted(
+                (root / "receipts" / "provider-switches").glob(
+                    "provider-switch-s1-grok-to-frw-wan-*.json"
+                )
+            )
+            self.assertEqual(len(archived), 2)
+            receipts = [json.loads(path.read_text(encoding="utf-8")) for path in archived]
+            self.assertEqual({item["error"] for item in receipts}, {"http 503", "http 504"})
+            self.assertEqual(len({item["event_id"] for item in receipts}), 2)
+            self.assertTrue(all(provider_switch_receipt_is_valid(item) for item in receipts))
+
+    def test_frw_wan_canary_requires_explicit_wan_model_identity(self) -> None:
+        import json
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            receipt = root / "receipts" / "frw-wan-i2v-canary.json"
+            receipt.parent.mkdir()
+            payload = {
+                "ok": True,
+                "model": "not-wan",
+                "output_sha256": "a" * 64,
+                "full_decode_ok": True,
+                "human_review": "approved",
+            }
+            receipt.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertFalse(get("frw-wan").probe(root=root).available)
+            payload["model"] = "wan2.2-i2v"
+            receipt.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertTrue(get("frw-wan").probe(root=root).available)
+
+    def test_frw_wan_generation_fails_closed_without_response_model_identity(self) -> None:
+        import json
+        from unittest import mock
+
+        provider = get("frw-wan")
+        with mock.patch(
+            "i2v_provider.SeedanceProvider.generate",
+            return_value={"ok": True, "stdout": json.dumps({"data": {"id": "task-1"}})},
+        ):
+            result = provider.generate(keyframe=Path("/tmp/keyframe.png"), prompt="action")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["stderr"], "FRW_WAN_MODEL_IDENTITY_UNVERIFIED")
 
     def test_provider_switch_rejects_pathlike_shot_id(self) -> None:
         import os
@@ -577,27 +826,41 @@ class I2VProviderTests(unittest.TestCase):
         import os
         from unittest import mock
 
-        class FailingGrok:
-            name = "grok"
+        class Provider:
+            def __init__(self, name: str, *, ready: bool, error: str | None = None):
+                self.name = name
+                self.ready = ready
+                self.error = error
+
+            def probe(self, **_kwargs):
+                from types import SimpleNamespace
+
+                return SimpleNamespace(
+                    available=self.ready, reason="ready" if self.ready else "off"
+                )
 
             def generate(self, **_kwargs):
-                raise I2VProviderError("HTTP 503")
+                if self.error:
+                    raise I2VProviderError(self.error)
+                return {"ok": True, "provider": self.name}
 
-        class Fallback:
-            name = "seedance"
-
-            def generate(self, **_kwargs):
-                return {"ok": True}
-
+        providers = {
+            "frw-ltx23": Provider("frw-ltx23", ready=True, error="HTTP 503"),
+            "grok": Provider("grok", ready=True),
+            "frw-wan": Provider("frw-wan", ready=False),
+            "comfy-wan22": Provider("comfy-wan22", ready=False),
+        }
         with (
             tempfile.TemporaryDirectory() as raw,
             mock.patch.dict(
                 os.environ,
-                {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32},
+                {
+                    "AIFILM_I2V_PROFILE": "ltx23_primary",
+                    "AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32,
+                },
                 clear=True,
             ),
-            mock.patch("i2v_provider.preferred", return_value=FailingGrok()),
-            mock.patch("i2v_provider.get", return_value=Fallback()),
+            mock.patch("i2v_provider.get", side_effect=lambda name: providers[name]),
         ):
             result = generate_with_fallback(
                 root=Path(raw),
@@ -606,7 +869,7 @@ class I2VProviderTests(unittest.TestCase):
                 prompt="test",
                 plan_sha256="a" * 64,
             )
-            assert result["route"] == "frw_fallback"
+            assert result["route"] == "grok_fallback"
             assert result["provider_switch"]["plan_sha256"] == "a" * 64
             assert provider_switch_receipt_is_valid(result["provider_switch"])
 

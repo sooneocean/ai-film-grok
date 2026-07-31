@@ -394,8 +394,9 @@ def build_dispatch(
             }
         )
 
-    # I2V profile (Grok primary; every FRW route is fallback-only)
-    i2v_profile = "grok_primary"
+    # Action motion profile.  Capability checks may skip an unready lane, but
+    # the policy order remains FRW LTX → Grok → verified FRW Wan → local.
+    i2v_profile = "ltx23_primary"
     try:
         from film_spec import resolve_i2v_profile
 
@@ -406,7 +407,15 @@ def build_dispatch(
     # Capability hygiene once per media-ish ring
     if craft_stage in {"shots", "media", "selects", "rough", "verified"}:
         canary = root / "receipts" / "frw-key-capability.json"
-        if i2v_profile == "grok_primary":
+        if i2v_profile == "ltx23_primary":
+            if craft_stage in {"shots", "media"}:
+                pre(
+                    "action-i2v-chain",
+                    f"# Motion: FRW LTX 2.3 → Grok image_to_video → verified FRW Wan → verified local I2V  (profile={i2v_profile})",
+                    "动作镜按固定优先级逐级探测；未就绪可跳过，已启动路线只在明确技术失败后签名降级",
+                    "visual",
+                )
+        elif i2v_profile == "grok_primary":
             if craft_stage in {"shots", "media"}:
                 pre(
                     "grok-i2v-bulk",
@@ -819,7 +828,13 @@ def build_dispatch(
     agent_do.append("用户说「可以/ok/一路做完」才 pilot approve / run_to_completion")
 
     # Fallback routing summary for media + Grok Build native tools
-    i2v_line = "grok_primary: still=image_edit(cast) · motion=image_to_video · FRW only after technical failure"
+    i2v_line = (
+        "ltx23_primary: still=image_edit(cast) · motion=FRW LTX 2.3 → "
+        "Grok image_to_video → verified FRW Wan → verified local I2V"
+        if i2v_profile == "ltx23_primary"
+        else "grok_primary: still=image_edit(cast) · motion=image_to_video · "
+        "FRW Wan/local only after readiness or technical-failure gates"
+    )
     routing = {
         "tts_default": "edge",
         "tts_quality": "voicebox if app up",
@@ -827,7 +842,7 @@ def build_dispatch(
         "lipsync": "off default; canary after backend-lock",
         "i2v_profile": i2v_profile,
         "i2v": i2v_line,
-        "env_plate": "Grok image_to_video no-face path; FRW env-plate only after technical failure",
+        "env_plate": "FRW LTX no-face path first; then Grok and verified local fallback",
         "lipsync_frw": "FRW lipsync is fallback-only; upload-probe and new receipt required",
         "ref": "references/frw-lipsync.md · ltx-env-plate.md · i2v-grok-primary.md",
         "grok_build": {
@@ -836,7 +851,7 @@ def build_dispatch(
             "text": "Reasoning + structured JSON → brief / director_intent / beats / film-spec",
             "tools": "web_search · x_* · shell/aifilm · optional MCP collections",
             "image": "image_gen · image_edit(cast); batch: grok-oauth image|image-edit",
-            "video": "PRIMARY: image_to_video; batch OAuth: grok-oauth video --image kf --wait; FRW fallback-only",
+            "video": "SECOND: image_to_video after FRW LTX; batch OAuth: grok-oauth video --image kf --wait",
             "voice": "session chat ≠ VO; default Edge（旁白中文、角色日文）；其他后端须显式选择并留回执",
             "memory": "film-root + receipts (project RAG default)",
             "sdk_optional": "OAuth first; XAI_API_KEY only if no auth.json",

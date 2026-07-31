@@ -13,12 +13,12 @@
 | 3 | 才 I2V 或 bulk edit | 未验 30 still 开 30 I2V |
 | 4 | 坏了只修上游再烧 | 对糊图盲重试 video |
 
-权威课：[lessons-2026-07-22-verify-before-generate.md](lessons-2026-07-22-verify-before-generate.md) · 几何：[keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md)。  
+权威课：[lessons-2026-07-22-verify-before-generate.md](lessons-2026-07-22-verify-before-generate.md) · 几何：[keyframe-no-compress](lessons-2026-07-22-keyframe-no-compress.md)。
 用户说「一路做完」= 不反复停问，**仍须每镜先验**。
 
 ## 叙事上游（Director’s Lens · 2026-07-20）
 
-用户给文本/brief 时：**先** [directors-lens.md](directors-lens.md) 重构故事与 storyboard，**再** `film-spec` / `write-spec`。  
+用户给文本/brief 时：**先** [directors-lens.md](directors-lens.md) 重构故事与 storyboard，**再** `film-spec` / `write-spec`。
 禁止原文插图化；可选收据 `receipts/directors-lens.md`。沉淀见 [lessons-2026-07-20-directors-lens.md](lessons-2026-07-20-directors-lens.md)。
 
 ## 规划 ≠ 剪辑（Editor’s Cut · 2026-07-20）
@@ -28,7 +28,7 @@
 | A 生成规划 | still+clip 库存齐 | register 全过 |
 | B 剪辑师过片 | `receipts/editor-cut.md` 四轴 | 再 final 才可称交付级 |
 
-权威：[editor-cut-pass.md](editor-cut-pass.md)。  
+权威：[editor-cut-pass.md](editor-cut-pass.md)。
 成人漫剧默认 `heat_scale: max` + 双 KPI（看点+刺激点）：[ecchi-story.md](ecchi-story.md)。
 
 ## VO 预算与反 loop（硬门禁 · S1/S2）
@@ -42,8 +42,8 @@
 | **S2 no-loop beats** | `hook` / `action` | `plan_stretch(forbid_loop)` → 永不 `stream_loop`；盖不住则 final 报错 |
 | final 二次门 | `loop_risk_shots` 非空 | `assert_no_loop_risk` 挡 final |
 
-**一镜一句一动作**。多情节 → 拆成多镜（新 still + 新 motion）。  
-**禁止**用 `stream_loop` 把同一画面正放两遍来「撑时长」。  
+**一镜一句一动作**。多情节 → 拆成多镜（新 still + 新 motion）。
+**禁止**用 `stream_loop` 把同一画面正放两遍来「撑时长」。
 **时长不够 → 加镜 / 升 10s / 砍字**，不要 loop。
 
 ## 口白·动作锁与防腻（soft · 2026-07-17）
@@ -67,7 +67,7 @@ Agent 写 still/I2V prompt 时：**motion 字符串以主动作为首**，微动
 | 建议 `visible_change` / `story_beat` | `VISIBLE_CHANGE_MISSING` |
 | 硬拦（可选） | `meaningful_motion_strict: true` |
 
-每镜 I2V 须回答 beat 故事问题（登场/靠近/感官/反应/行动/余韵）。  
+每镜 I2V 须回答 beat 故事问题（登场/靠近/感官/反应/行动/余韵）。
 详解：[lessons-2026-07-20-meaningful-motion.md](lessons-2026-07-20-meaningful-motion.md)。
 
 ## Continuity Chain（硬 · 2026-07-20）
@@ -113,19 +113,19 @@ Agent 写 still/I2V prompt 时：**motion 字符串以主动作为首**，微动
 
 路径：`receipts/pilot-approval.json`。
 
-## Grok I2V 优先（FRW 技术备援）
+## 动作 I2V 优先链（LTX → Grok → FRW Wan → local）
 
 | 规则 | 要求 |
 |------|------|
-| 默认 | `i2v_provider: grok`；`auto` 永远解析 Grok primary |
+| 默认 | `i2v_provider: auto` → `frw-ltx23`；动作顺序 FRW LTX → Grok → verified FRW Wan → verified local |
 | Still | **Grok** `image_edit(cast)` 同源；禁止 FRW text2image 批量主角 |
 | Still 卸装后 | peak 后 **只** `image_edit(undress-anchor/已脱 still)`；**禁**全装 cast 重起（回穿 P0） |
 | 状态照索引 | `cast_state_masters` + keyframe-first；I2V 只吃 keyframe；坏了改 keyframe |
-| bulk 2V | **Grok `image_to_video`**；FRW `newvideo` / `frw_seedance_i2v`（`seedance-2-fast-i2v`）仅 provider-switch 后执行 |
+| bulk 2V | **FRW LTX 2.3 → Grok `image_to_video` → verified FRW Wan → verified local**；每段须当前 canary／切换收据 |
 | 有尾帧 | FRW first-last 仅 fallback；保留 pair checksum 与 Contract checksum |
 | 入组 | 下载 → ffprobe → 全解码 → perceptual/exact duplicate gate → 人工 review |
-| **L1 人物** | Grok I2V → FRW Seedance/LTX fallback；`shot_role: hero` + cast still |
-| **L2 合成** | Grok no-face motion；FRW `ltx-t2v` 仅 fallback；禁用 T2V 声称脸一致 |
+| **L1 人物** | FRW LTX 2.3 → Grok I2V → verified FRW Wan → verified local；`shot_role: hero` + cast still |
+| **L2 合成** | FRW `ltx-t2v` → Grok no-face → verified local；禁用 T2V 声称脸一致 |
 | LTX 参数 | dims/duration/fps **string**；FRW `720p` 档位下竖屏原生 704×1280 |
 | 禁止默认 | legacy img2video；T2V 当 A-roll 主角 |
 | 记账 | seedance-blocked / LTX 502；恢复后重烤 |
@@ -146,7 +146,7 @@ Agent 写 still/I2V prompt 时：**motion 字符串以主动作为首**，微动
 | `next` 路由 | clips 齐 → `tts-rehearse`；framing 风险 → fix-framing |
 | 证据分层 | `status.evidence` intent ≠ executed ≠ human_review |
 
-详解：[lessons-2026-07-20-sediment-cn-codex.md](lessons-2026-07-20-sediment-cn-codex.md)。  
+详解：[lessons-2026-07-20-sediment-cn-codex.md](lessons-2026-07-20-sediment-cn-codex.md)。
 **非 port**：5090 IP-Adapter 必经、Studio/OpenCut 必交付、Director Contract v2 硬依赖、**Grok I2V ≠ first-last-frame**、平台 FRW zip 覆盖本机 frwclaw。
 
 ### FRW 降级（用户授权时 · 2026-07-20）
@@ -220,27 +220,27 @@ media-queue requeue --root ROOT --job-id ID --reset-attempts
 
 ## TTS（中文）
 
-- 成片旁白默认：`--tts-backend edge` + `zh-CN-YunxiNeural` / `zh-CN-XiaoxiaoNeural`。  
-- `write-spec`：storyteller/hybrid 且 `tts_backend=auto` → **自动钉 edge**。  
-- 若环境 `AIFILM_TTS_ARGV` 指向 ElevenLabs 等 external：**禁止**把 edge 的 Neural 名当 provider voice id（preflight hard / synthesize 失败）。  
+- 成片旁白默认：`--tts-backend edge` + `zh-CN-YunxiNeural` / `zh-CN-XiaoxiaoNeural`。
+- `write-spec`：storyteller/hybrid 且 `tts_backend=auto` → **自动钉 edge**。
+- 若环境 `AIFILM_TTS_ARGV` 指向 ElevenLabs 等 external：**禁止**把 edge 的 Neural 名当 provider voice id（preflight hard / synthesize 失败）。
 - 一角一声仍成立：显式 edge 后端时整片锁同一 `vo_voice`。
 
 ## 听感默认（2026-07-20 A–H · 见 lessons-2026-07-20-audio-compose.md）
 
-- BGM：`rnb` + 侧链 release≈720ms；loudnorm **auto**（过响/过轻 → ~-16 LUFS）。  
-- SFX：`auto_sfx` 按 beat 叠入；关：`sound_plan.auto_sfx=false`。  
-- 本地曲：`audio/bgm.wav` 或 `audio/templates/rnb.wav` + `*.license.txt`；`--music-template off` 强制程序化。  
+- BGM：`rnb` + 侧链 release≈720ms；loudnorm **auto**（过响/过轻 → ~-16 LUFS）。
+- SFX：`auto_sfx` 按 beat 叠入；关：`sound_plan.auto_sfx=false`。
+- 本地曲：`audio/bgm.wav` 或 `audio/templates/rnb.wav` + `*.license.txt`；`--music-template off` 强制程序化。
 - `status` → `audio.*`；`audio/mix_report.json` 可审计。
 
 ## I2V 静戏 motion
 
-- 静戏（倾听、对视、坐）也必须写 **可测微动**：blink / breath / hair / push-in。  
+- 静戏（倾听、对视、坐）也必须写 **可测微动**：blink / breath / hair / push-in。
 - `register-clip` motion 失败：`fail --reason motion` → 加强 motion 文案后 `requeue --reset-attempts`，**不要**用静帧蒙混。
 
 ## 系列续作
 
-- 同角色：**复制 cast master**，新 root + 新 film-spec。  
-- 用户明确说「整集生产 / 新版本」：pilot-approval 可记 `user_phrase`；禁止无用户意图空批。  
+- 同角色：**复制 cast master**，新 root + 新 film-spec。
+- 用户明确说「整集生产 / 新版本」：pilot-approval 可记 `user_phrase`；禁止无用户意图空批。
 
 ## 审核安全视觉（soft ladder）
 
@@ -248,9 +248,9 @@ media-queue requeue --root ROOT --job-id ID --reset-attempts
 
 建议阶梯（仍全员成人）：
 
-1. 对视 / 耳语距离  
-2. 贴身拥抱、湿发、蒸汽  
-3. 锁骨/颈线、服装失序暗示  
+1. 对视 / 耳语距离
+2. 贴身拥抱、湿发、蒸汽
+3. 锁骨/颈线、服装失序暗示
 4. 震惊 / 泪崩 / ahegao-despair **表情**（非露点硬核）
 
 `explicit` 构图若 moderated：**同一 beat 改 clothed suggestive**，`nar` 可保留荤点（storyteller）。
@@ -271,23 +271,23 @@ media-queue requeue --root ROOT --job-id ID --reset-attempts
 
 详见 [consistency.md](consistency.md)、[style-bible.md](style-bible.md)。摘要：
 
-1. **定妆双件套**：`style-v1`（介质）+ `cast/<id>-v1`（脸服）；转面设定图不得直接当 style 锁定。  
-2. **Pilot 3 镜批准**后才批量 still / I2V；写 `receipts/pilot-approval.json`。  
-3. 主角镜只用 **edit / img2img**，cast 为第一参考；禁止纯文生主角。  
-4. 降级 FRW 时：**固定 model + 固定分辨率 + 全程 img2image**；禁止半片 Grok 半片 FRW 混角色。  
-5. 终审 scorecard 必须含 **`style`**；style fail 不得交付。  
-6. 每镜 prompt 前缀强制 `signature_block` + `identity_lock`。  
-7. **画面零工程字（致命）**：prompt **禁止**写 `shot11`/`keyframe shotXX`；必写 `No text/watermark/labels`；register 前扫四角。见 [lessons-2026-07-21-no-shot-watermark.md](lessons-2026-07-21-no-shot-watermark.md)。  
+1. **定妆双件套**：`style-v1`（介质）+ `cast/<id>-v1`（脸服）；转面设定图不得直接当 style 锁定。
+2. **Pilot 3 镜批准**后才批量 still / I2V；写 `receipts/pilot-approval.json`。
+3. 主角镜只用 **edit / img2img**，cast 为第一参考；禁止纯文生主角。
+4. 降级 FRW 时：**固定 model + 固定分辨率 + 全程 img2image**；禁止半片 Grok 半片 FRW 混角色。
+5. 终审 scorecard 必须含 **`style`**；style fail 不得交付。
+6. 每镜 prompt 前缀强制 `signature_block` + `identity_lock`。
+7. **画面零工程字（致命）**：prompt **禁止**写 `shot11`/`keyframe shotXX`；必写 `No text/watermark/labels`；register 前扫四角。见 [lessons-2026-07-21-no-shot-watermark.md](lessons-2026-07-21-no-shot-watermark.md)。
 8. **首帧结构（致命）**：I2V 首帧=keyframe；手指数/融合/破面 fail → **禁 I2V**；register-clip 前抽 t=0。见 [lessons-2026-07-21-keyframe-first-frame-poison.md](lessons-2026-07-21-keyframe-first-frame-poison.md)。
 
 ### 教训 [2026-07-16]（完整表见 [lessons-2026-07-16-kei.md](lessons-2026-07-16-kei.md)）
 
 追加（同日 v3/v4 收工）：
 
-- 现象：漏光环 / EL 中文差 / 有 srt 无画面字 / 60s 变 30s。  
+- 现象：漏光环 / EL 中文差 / 有 srt 无画面字 / 60s 变 30s。
 - 规则：签名配件写进 lock；中文用 Edge 女声；**必须烧录字幕**；时长用槽位堆；续集新 root+复用 cast。
 
-- 画风漂：无锚批量 / 混 provider / 设定图当 style → 双 master + 单 provider + pilot。  
-- 重播无聊：长 VO → loop → **nar≤28 + 一镜一句**。  
-- final 炸：并发 final、脏编码、sha 不同步 → 串行 final、re-encode、re-register。  
+- 画风漂：无锚批量 / 混 provider / 设定图当 style → 双 master + 单 provider + pilot。
+- 重播无聊：长 VO → loop → **nar≤28 + 一镜一句**。
+- final 炸：并发 final、脏编码、sha 不同步 → 串行 final、re-encode、re-register。
 - pilot 自批无效：必须用户明确「pilot 过」。

@@ -88,13 +88,15 @@ Grok 脑（推理+工具）→ Imagine 静帧/I2V（会话原生或 OAuth 批处
 
 | 任务 | 工具 | 何时用 |
 |------|------|--------|
-| 默认 bulk（当前） | **Grok** `image_to_video` / OAuth `video --wait` | `AIFILM_I2V_PROFILE=grok_primary` |
-| FRW fallback | **FRW** `seedance-2-fast-i2v` / `ltx-i2v` | provider-switch receipt + upload-probe |
+| 默认动作第一路 | **FRW LTX 2.3** `img2video-audio` | `AIFILM_I2V_PROFILE=ltx23_primary` + approved canary |
+| 第二路 | **Grok** `image_to_video` / OAuth `video --wait` | live canary；技术切换须签名回执 |
+| 第三路 | **FRW Wan** | canary 与响应均须证明 Wan 身份 |
+| 本地尾路 | verified Comfy/local | queue、RAM、VRAM 与 pilot 全部过闸 |
 | Grok I2V 会话 | `image_to_video` 6s/10s · 720p | pilot / 交互 |
 | Grok I2V 批处理 | `aifilm grok-oauth video --image … --wait` | 无会话 bulk、脚本队列 |
 | 多参考动 | 优先 edit 成单帧再 I2V；`reference_to_video` 少用 | 用户明确要求时 |
 | 接戏 | extract last → promote keyframe → **只对该图** I2V | 禁 cast 重起 |
-| T2V 环境床 fallback | FRW `ltx-t2v` | Grok no-face 技术失败后；**不**用 T2V 锁脸 |
+| T2V 环境床 | FRW `ltx-t2v` | 第一选择；失败后 Grok no-face；**不**用 T2V 锁脸 |
 
 注册：Grok 动 → `--source-endpoint image_to_video`；FRW → `frw_seedance_*` 等。
 ---

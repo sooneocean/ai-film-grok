@@ -1,6 +1,6 @@
 # I2V · Grok Primary 运营模式（Seedance 暂不可用）
 
-> 2026-07-21 · FRW Seedance 权限/通道不可用时的**默认做片机制**。  
+> 2026-07-21 · 保留给旧项目显式锁定的 **Grok-first 兼容模式**；当前默认为 `ltx23_primary`。
 > 恢复 Seedance：`AIFILM_I2V_PROFILE=seedance_first` + canary 201。
 
 ## 一句话
@@ -81,7 +81,7 @@ aifilm write-spec --root "<film>"   # auto→grok
 
 ## 与旧 Seedance 路径对照
 
-| | Seedance first | **Grok primary（当前）** |
+| | Seedance first | **Grok primary（兼容锁定）** |
 |--|----------------|-------------------------|
 | bulk 动 | FRW newvideo | **image_to_video** |
 | canary | bulk 前硬建议 | 可选（仅 env） |
@@ -90,9 +90,9 @@ aifilm write-spec --root "<film>"   # auto→grok
 
 ## 恢复 Seedance
 
-1. `AIFILM_I2V_PROFILE=seedance_first`  
-2. `aifilm frw canary --root <film>` → seedance 201  
-3. `capability --suggest-i2v --apply` → `i2v_provider=frw`  
-4. `write-spec` 再 queue  
+1. `AIFILM_I2V_PROFILE=seedance_first`
+2. `aifilm frw canary --root <film>` → seedance 201
+3. `capability --suggest-i2v --apply` → `i2v_provider=frw`
+4. `write-spec` 再 queue
 
 权威：[frw-degrade-dispatch.md](frw-degrade-dispatch.md) · [grok-build-sdk.md](grok-build-sdk.md) · [hard-defaults.md](hard-defaults.md)

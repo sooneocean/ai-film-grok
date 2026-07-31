@@ -104,7 +104,7 @@ print(cfg.seedance_available)  # → bool, default False
 
 | ConfigSchema field | Env vars (first wins) | Type | Default |
 |---|---|---|---|
-| `i2v_profile` | `AIFILM_I2V_PROFILE` | str | `grok_primary` |
+| `i2v_profile` | `AIFILM_I2V_PROFILE` | str | `ltx23_primary` |
 | `seedance_available` | `AIFILM_SEEDANCE_AVAILABLE` | bool | `False` |
 
 ### Lipsync

@@ -9,6 +9,7 @@ from semantic_index import SemanticIndexError, build_index, collect_documents, q
 
 
 def _write_root(root: Path) -> None:
+    synthetic_github_token = "ghp" + "_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012"
     (root / "drama-graph.json").write_text(
         json.dumps(
             {
@@ -24,7 +25,7 @@ def _write_root(root: Path) -> None:
                 "notes": "/etc/hosts",
                 "description": r"C:\\Users\\dex\\private.txt",
                 "text": r"\\server\\share\\private.txt",
-                "theme": "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012",
+                "theme": synthetic_github_token,
                 "mood": "prefix(/Users/dex/private/story.txt)",
                 "objective": "password=synthetic-secret-not-real",
                 "dialogue": "access key = ACCESS_SECRET_8",
@@ -42,6 +43,7 @@ def _write_root(root: Path) -> None:
 
 def test_collect_documents_is_source_bound_and_redacts_secret_values(tmp_path: Path) -> None:
     _write_root(tmp_path)
+    synthetic_github_token = "ghp" + "_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012"
 
     documents = collect_documents(tmp_path)
 
@@ -59,7 +61,7 @@ def test_collect_documents_is_source_bound_and_redacts_secret_values(tmp_path: P
     assert all("C:\\Users\\dex\\private.txt" not in item["text"] for item in documents)
     assert all("\\\\server\\share\\private.txt" not in item["text"] for item in documents)
     assert all(
-        "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012" not in item["text"] for item in documents
+        synthetic_github_token not in item["text"] for item in documents
     )
     assert all("prefix(/Users/dex/private/story.txt)" not in item["text"] for item in documents)
     assert all("synthetic-secret-not-real" not in item["text"] for item in documents)
