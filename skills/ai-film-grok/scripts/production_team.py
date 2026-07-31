@@ -128,6 +128,28 @@ def _capability(
     }
 
 
+def _snapshot_root(destination: Path) -> Path:
+    return (
+        destination.parent.parent if destination.parent.name == "receipts" else destination.parent
+    )
+
+
+def _bind_receipt(
+    capability: dict[str, Any],
+    *,
+    root: Path,
+    receipt_path: Path,
+) -> None:
+    try:
+        relative = receipt_path.resolve().relative_to(root)
+    except (OSError, ValueError):
+        return
+    if not receipt_path.is_file():
+        return
+    capability["receipt_path"] = str(relative)
+    capability["receipt_sha256"] = sha256_file(receipt_path)
+
+
 def snapshot_capabilities(
     *, out: Path | str, base_url: str | None = None, verify_story: bool = False
 ) -> dict[str, Any]:
@@ -138,19 +160,47 @@ def snapshot_capabilities(
     from tts_backend import probe as probe_tts
 
     destination = Path(out).expanduser().resolve()
+    snapshot_root = _snapshot_root(destination)
     capabilities: list[dict[str, Any]] = []
     observations: dict[str, Any] = {}
     try:
         armory = load_armory()
         live_armory = probe_armory(base_url)
         ready_ids = set(live_armory.get("ready_ids") or [])
+        weapons = [
+            weapon
+            for weapon in armory.get("weapons") or []
+            if isinstance(weapon, dict) and isinstance(weapon.get("id"), str)
+        ]
+        has_local_motion = any(
+            {"image-to-video", "i2v"} & {str(item) for item in weapon.get("intents") or []}
+            for weapon in weapons
+        )
+        capacity: dict[str, Any] | None = None
+        capacity_receipt: Path | None = None
+        if has_local_motion:
+            from comfy_video import submission_capacity
+
+            capacity = submission_capacity(str(live_armory.get("base_url") or base_url or ""))
+            capacity_receipt = (
+                snapshot_root / "receipts" / "capability-evidence" / ("comfy-wan22-capacity.json")
+            )
+            write_json(capacity_receipt, capacity)
+            observations["rtx5090_capacity"] = {
+                "ok": capacity.get("ok") is True,
+                "status": capacity.get("status"),
+                "blockers": [
+                    str(item.get("code"))
+                    for item in capacity.get("blockers") or []
+                    if isinstance(item, dict) and item.get("code")
+                ],
+                "receipt": str(capacity_receipt),
+            }
         observations["rtx5090_armory"] = {
             "ok": bool(live_armory.get("ok")),
             "ready_ids": sorted(ready_ids),
         }
-        for weapon in armory.get("weapons") or []:
-            if not isinstance(weapon, dict) or not isinstance(weapon.get("id"), str):
-                continue
+        for weapon in weapons:
             intents = {str(item) for item in weapon.get("intents") or []}
             if any(item.startswith("talking-avatar") for item in intents):
                 domains = ["lipsync"]
@@ -164,19 +214,26 @@ def snapshot_capabilities(
             else:
                 domains = ["visual_still"]
                 operations = ["text_to_video"]
-            capabilities.append(
-                _capability(
-                    capability_id=f"rtx5090-{weapon['id']}",
-                    provider=str(weapon.get("provider") or "comfy_lan"),
-                    model=str(weapon.get("display_name") or weapon["id"]),
-                    domains=domains,
-                    status="ready" if weapon["id"] in ready_ids else "blocked",
-                    pilot_verified=bool((weapon.get("verified") or {}).get("real_pilot")),
-                    resource="gpu:rtx5090",
-                    experimental=str(weapon.get("status")) == "experimental",
-                    operations=operations,
-                )
+            model_ready = weapon["id"] in ready_ids
+            capacity_ready = capacity is None or capacity.get("ok") is True
+            capability = _capability(
+                capability_id=f"rtx5090-{weapon['id']}",
+                provider=str(weapon.get("provider") or "comfy_lan"),
+                model=str(weapon.get("display_name") or weapon["id"]),
+                domains=domains,
+                status="ready" if model_ready and capacity_ready else "blocked",
+                pilot_verified=bool((weapon.get("verified") or {}).get("real_pilot")),
+                resource="gpu:rtx5090",
+                experimental=str(weapon.get("status")) == "experimental",
+                operations=operations,
             )
+            if domains == ["motion"] and capacity_receipt is not None:
+                _bind_receipt(
+                    capability,
+                    root=snapshot_root,
+                    receipt_path=capacity_receipt,
+                )
+            capabilities.append(capability)
     except Exception as exc:
         observations["rtx5090_armory"] = {"ok": False, "error": type(exc).__name__}
 
@@ -245,31 +302,56 @@ def snapshot_capabilities(
         "ready": lipsync.get("ready") or [],
     }
 
-    # Grok is the declared dialogue secondary route.  A no-root provider probe
-    # only proves that the in-session path exists; per-film canary evidence is
-    # still required before it can become the active route.
-    from i2v_provider import GrokI2VProvider
+    from i2v_provider import FrwLtx23AudioProvider, FrwWanProvider, GrokI2VProvider
 
-    grok = GrokI2VProvider().probe()
-    grok_available = bool(grok.ok and grok.available)
-    capabilities.append(
-        _capability(
-            capability_id="grok-imagine-video",
-            provider="grok",
-            model="grok-imagine-video",
+    action_providers = (
+        (
+            "frw-ltx23-i2v-audio",
+            FrwLtx23AudioProvider(),
+            "LTX 2.3 img2video-audio",
+            "frw-cloud",
+            snapshot_root / "receipts" / "frw-ltx23-i2v-audio-canary.json",
+        ),
+        (
+            "grok-imagine-video",
+            GrokI2VProvider(),
+            "grok-imagine-video",
+            "grok-in-session",
+            snapshot_root / "receipts" / "grok-i2v-canary.json",
+        ),
+        (
+            "frw-wan-i2v",
+            FrwWanProvider(),
+            "Wan",
+            "frw-cloud",
+            snapshot_root / "receipts" / "frw-wan-i2v-canary.json",
+        ),
+    )
+    action_observations: dict[str, Any] = {}
+    for capability_id, provider, model, resource, canary_path in action_providers:
+        report = provider.probe(root=snapshot_root)
+        available = bool(report.ok and report.available)
+        capability = _capability(
+            capability_id=capability_id,
+            provider=provider.name,
+            model=model,
             domains=["motion"],
-            status="ready" if grok_available else "blocked",
-            pilot_verified=False,
-            resource="grok-in-session",
+            status="ready" if available else "blocked",
+            pilot_verified=available,
+            resource=resource,
             operations=["image_to_video"],
             cost_state="unknown",
         )
-    )
-    observations["grok_imagine_video"] = {
-        "available": grok_available,
-        "reason": grok.reason,
-        "film_canary_required": True,
-    }
+        capability["human_approval_required"] = True
+        _bind_receipt(capability, root=snapshot_root, receipt_path=canary_path)
+        capabilities.append(capability)
+        action_observations[provider.name] = {
+            "available": available,
+            "reason": report.reason,
+            "film_canary_required": True,
+            "receipt": str(canary_path),
+        }
+    observations["action_i2v"] = action_observations
 
     post = probe_designed_post_tooling()
     ffmpeg_ready = bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))

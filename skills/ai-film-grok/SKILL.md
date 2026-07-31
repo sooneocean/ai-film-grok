@@ -20,7 +20,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 每步后 dispatch，只跑 `next_action`；读 `context_refs` 与 `weapon_route`。失败即停。状态：`receipts/dispatch.json`。
 
-`autopilot`：仅本地或项目显式 allowlist 的预算动作；需整数 tick、实时就绪，遇人工/质量/容量关即停并写 `receipts/autopilot.json`。
+`autopilot`：仅 allowlist 预算动作；整数 tick+实时就绪；人工/质量/容量关即停并写 receipt。
 
 骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture→Post→Master。
 小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。
