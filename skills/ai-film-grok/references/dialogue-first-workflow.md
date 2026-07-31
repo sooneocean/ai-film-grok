@@ -46,12 +46,12 @@ story.receive
 ```text
 state_i2i → tts rehearsal → keyframe_i2i → FRW keyframe upload → FRW LTX 2.3 native-audio I2V
   → native-text gate → post
-  └→ only on rejection: FRW img2video → LatentSync 1.6 (on-camera dialogue only)
-                                                     ↘ MuseTalk 1.5 (classified failure only)
+  └→ stable close-up: FRW img2video → LatentSync 1.6
+  └→ head/body acting or camera movement: InfiniteTalk / FantasyTalking pilot
                                               → full human review → promote
 ```
 
-`dialogue_motion_route=auto` 只在 FRW 原生有声音画 canary 已通过且可审查时选择 LTX 2.3；它生成的声音必须逐镜确认台词语义、口型和无烧字。质量拒绝、身份漂移和未知错误都不构成静默换路理由。只有被记录为 LTX 拒绝原因的对白失败才可先切到原 FRW `img2video`，并在需要时进入 LatentSync 1.6。InfiniteTalk 与 FantasyTalking 会重生成整张画面，只可作为明确标记的实验 pilot，绝不作为默认对白生产线。
+`dialogue_motion_route=auto` 只在 FRW 原生有声音画 canary 已通过且可审查时选择 LTX 2.3；它生成的声音必须逐镜确认台词语义、口型和无烧字。质量拒绝、身份漂移和未知错误都不构成静默换路理由。LTX 被记录为技术拒绝后：单人、正脸、稳定机位、短句近景才走 FRW `img2video` → LatentSync；需要头部、身体、表情或镜头运动整段重演时，才进 InfiniteTalk／FantasyTalking 的明确 pilot。两者重生成整张画面，未经 canary 与人工批准不得进入 production。
 
 RTX 5090 单队列串行；队列、GPU 或能力证据未知/过期即阻断。尚未晋升的 InfiniteTalk
 只可进入 pilot；架构首选不等于伪造生产就绪。自动评分只产生 provisional winner；

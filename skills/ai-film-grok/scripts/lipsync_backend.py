@@ -32,7 +32,7 @@ class LipSyncError(RuntimeError):
     pass
 
 
-BACKEND_PRIORITY = ("latentsync", "musetalk", "wav2lip", "external")
+BACKEND_PRIORITY = ("latentsync", "wav2lip", "external")
 
 
 def emit(obj: dict[str, Any]) -> None:
@@ -210,7 +210,7 @@ def resolve_backend(requested: str) -> str:
                 "lipsync required but no backend ready (see lipsync_backend.py doctor)"
             )
         return ready[0]
-    if req not in ("latentsync", "external", "musetalk", "wav2lip"):
+    if req not in ("latentsync", "external", "wav2lip"):
         raise LipSyncError(f"Unknown backend {req}")
     if req == "external" and info.get("external_config_error"):
         raise LipSyncError(str(info["external_config_error"]))
@@ -405,7 +405,7 @@ def lipsync_one(
     node_backends = (initial_probe.get("node") or {}).get("backends") or {}
     if (
         allow_unapproved
-        and requested in {"latentsync", "musetalk"}
+        and requested == "latentsync"
         and (node_backends.get(requested) or {}).get("technical_ready")
     ):
         chosen = requested
@@ -418,8 +418,7 @@ def lipsync_one(
     info = initial_probe
     node_backends = (info.get("node") or {}).get("backends") or {}
     use_node = bool(
-        chosen in {"latentsync", "musetalk"}
-        and (node_backends.get(chosen) or {}).get("technical_ready")
+        chosen == "latentsync" and (node_backends.get(chosen) or {}).get("technical_ready")
     )
     if use_node:
         cfg = get_config()

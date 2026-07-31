@@ -105,7 +105,7 @@ def test_node_latentsync_precedes_local_backends() -> None:
         mock.patch("lipsync_node_client.health", return_value=node_health),
     ):
         info = lipsync_backend.probe()
-        assert info["ready"][:2] == ["latentsync", "musetalk"]
+        assert info["ready"] == ["latentsync"]
         assert lipsync_backend.resolve_backend("auto") == "latentsync"
 
 

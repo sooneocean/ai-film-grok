@@ -8113,7 +8113,6 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         choices=(
             "latentsync-1.6",
-            "musetalk-1.5",
             "echomimic-v3-flash",
             "longcat-video-avatar-1.5",
         ),
@@ -8848,8 +8847,8 @@ def build_parser() -> argparse.ArgumentParser:
     fin.add_argument(
         "--lipsync",
         default="off",
-        choices=["auto", "off", "require", "latentsync", "external", "musetalk", "wav2lip"],
-        help="Lip-sync OFF by default. RTX node priority: LatentSync 1.6 then MuseTalk 1.5.",
+        choices=["auto", "off", "require", "latentsync", "external", "wav2lip"],
+        help="Lip-sync OFF by default. RTX node uses LatentSync 1.6 for approved close-up repair.",
     )
     fin.add_argument("--sub-lead", type=float, default=0.08, help="Show subtitles early (seconds)")
     fin.add_argument(

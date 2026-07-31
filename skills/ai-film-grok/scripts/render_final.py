@@ -2640,7 +2640,6 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     # Storyteller: never lipsync unless user forced --lipsync require
     if vo_mode == "storyteller" and lipsync_mode not in (
         "require",
-        "musetalk",
         "wav2lip",
         "external",
     ):
@@ -4748,8 +4747,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--lipsync",
         default="off",
-        choices=["auto", "off", "require", "latentsync", "external", "musetalk", "wav2lip"],
-        help="Lip-sync OFF by default; RTX node priority is LatentSync then MuseTalk",
+        choices=["auto", "off", "require", "latentsync", "external", "wav2lip"],
+        help="Lip-sync OFF by default; RTX node uses LatentSync for approved close-up repair.",
     )
     p.add_argument(
         "--allow-loop-risk",

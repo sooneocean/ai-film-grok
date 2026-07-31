@@ -25,7 +25,7 @@ class LipsyncNodeError(RuntimeError):
 
 
 _JOB_ID = re.compile(r"^[A-Za-z0-9-]{1,80}$")
-_BACKENDS = {"latentsync", "musetalk"}
+_BACKENDS = {"latentsync"}
 _MAX_VIDEO_BYTES = 512 * 1024 * 1024
 _MAX_AUDIO_BYTES = 64 * 1024 * 1024
 _ALLOWED_NODE_NETWORKS = (

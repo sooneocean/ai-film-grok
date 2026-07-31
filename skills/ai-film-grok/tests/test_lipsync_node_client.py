@@ -125,7 +125,7 @@ def test_render_downloads_hash_bound_mp4_atomically(tmp_path: Path) -> None:
         "status": "completed",
         "requested_backend": "latentsync",
         "chosen_backend": "latentsync",
-        "fallback_backend": "musetalk",
+        "fallback_backend": None,
         "input_video_sha256": hashlib.sha256(video.read_bytes()).hexdigest(),
         "input_audio_sha256": hashlib.sha256(audio.read_bytes()).hexdigest(),
         "parameters": {"inference_steps": 20, "guidance_scale": 1.5, "deepcache": True},
@@ -154,7 +154,6 @@ def test_render_downloads_hash_bound_mp4_atomically(tmp_path: Path) -> None:
             audio=audio,
             out=output,
             backend="latentsync",
-            fallback_backend="musetalk",
         )
 
     assert output.read_bytes() == artifact
