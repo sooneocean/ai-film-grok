@@ -1,6 +1,6 @@
 # LongCat-Video-Avatar 1.5：短对白 lip-sync 接线研究
 
-> 状态：研究完成，未安装模型、未改动节点、未排队 GPU。  
+> 状态：研究完成，未安装模型、未改动节点、未排队 GPU。
 > 目标：把 LongCat 的“音频驱动整段表演”能力接入 ai-film-grok，同时保留短版后制 lip-sync 的像素保真承诺。
 
 ## 结论
