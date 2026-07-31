@@ -151,3 +151,17 @@ module identities.
 Before mutations, read `/queue`. Never interrupt an unknown running prompt.
 Large model installation still uses `.part` download, exact byte count,
 SHA-256 verification and atomic rename before it can enter the armory.
+
+## SeedVR2 research lane
+
+`seedvr2-video-restoration-research` records the live custom-node contract
+without treating advertised model choices as installed weights. Probe it with:
+
+```bash
+cd skills/ai-film-grok
+./scripts/runtime-python scripts/seedvr2_probe.py
+```
+
+The command is read-only and intentionally reports `execution_ready=false`.
+See `seedvr2-video-restoration.md` for the weight-fingerprint, full-decode,
+source-comparison and human-review gates required before a bounded canary.
