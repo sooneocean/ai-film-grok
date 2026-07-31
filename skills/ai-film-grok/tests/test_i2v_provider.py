@@ -10,9 +10,9 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from i2v_provider import (  # noqa: E402
+    FrwLtx23AudioProvider,
     GrokI2VProvider,
     I2VProviderError,
-    FrwLtx23AudioProvider,
     LocalComfyWan22Provider,
     SeedanceProvider,
     all_providers,

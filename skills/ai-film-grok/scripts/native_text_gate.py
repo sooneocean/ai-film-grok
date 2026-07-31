@@ -21,6 +21,13 @@ def validate_native_text_review(review: dict[str, Any]) -> dict[str, Any]:
         return {"ok": False, "reason": "NATIVE_TEXT_REVIEW_INCOMPLETE", "missing": missing}
     if review.get("unexpected_visual_text_detected") is not False:
         return {"ok": False, "reason": "PROVIDER_VISUAL_TEXT_REJECTED"}
+    audit = review.get("visual_text_audit")
+    if not isinstance(audit, dict):
+        return {"ok": False, "reason": "VISUAL_TEXT_AUDIT_REQUIRED"}
+    if audit.get("kind") != "visual-text-audit" or audit.get("status") != "clean":
+        return {"ok": False, "reason": "PROVIDER_VISUAL_TEXT_REJECTED"}
+    if (audit.get("clip") or {}).get("sha256") != review.get("clip_sha256"):
+        return {"ok": False, "reason": "VISUAL_TEXT_AUDIT_STALE"}
     if review.get("native_audio_dialogue_matches_expected") is not True:
         return {"ok": False, "reason": "NATIVE_DIALOGUE_MISMATCH"}
     if review.get("mouth_audio_sync_approved") is not True:
@@ -28,7 +35,9 @@ def validate_native_text_review(review: dict[str, Any]) -> dict[str, Any]:
     expected_duration = review.get("expected_duration_sec")
     native_duration = review.get("native_duration_sec")
     if expected_duration is not None or native_duration is not None:
-        if not isinstance(expected_duration, (int, float)) or not isinstance(native_duration, (int, float)):
+        if not isinstance(expected_duration, (int, float)) or not isinstance(
+            native_duration, (int, float)
+        ):
             return {"ok": False, "reason": "NATIVE_DURATION_REVIEW_INCOMPLETE"}
         if abs(float(expected_duration) - float(native_duration)) > 0.5:
             return {

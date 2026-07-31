@@ -171,6 +171,11 @@ def test_benchmark_locks_all_three_stage_parameters_after_human_review(
                 "native_audio_dialogue_matches_expected": True,
                 "mouth_audio_sync_approved": True,
                 "caption_owner": "hyperframes",
+                "visual_text_audit": {
+                    "kind": "visual-text-audit",
+                    "status": "clean",
+                    "clip": {"sha256": hashlib.sha256(b"review artifact").hexdigest()},
+                },
             }
         record_benchmark_arm(
             tmp_path,

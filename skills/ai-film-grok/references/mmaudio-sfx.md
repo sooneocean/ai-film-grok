@@ -98,6 +98,16 @@ The client uploads at most 128 MiB and the node accepts at most 30 seconds. The
 receipt stores hashes, model provenance, and license scope—not the prompt or
 local source path.
 
+Every generated candidate is also copied, hash-checked, and signed into the
+global review vault at `/Users/dex/AI FILM SPACE/audio-armory/sfx/pending-noncommercial/`.
+That copy is intentionally not a symlink, so project cleanup cannot break a
+listening link. It remains `pending_human_review` and cannot be attached or
+used in delivery. Rebuild the listening list from retained bytes with:
+
+```bash
+aifilm sfx-library review-pack --name foley-foundation
+```
+
 MMAudio can produce speech-like sounds or unwanted music. Before listening,
 run the private VibeVoice-ASR cross-screen. It binds the exact candidate WAV
 hash and an ASR receipt to the pending candidate. A non-silence transcript is

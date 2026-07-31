@@ -892,7 +892,9 @@ def validate_film_spec(
     hero_primary = (
         "frw_ltx23_img2video_audio"
         if i2v_provider == "frw-ltx23"
-        else "grok_image_to_video" if i2v_provider == "grok" else f"frw:{fvm}"
+        else "grok_image_to_video"
+        if i2v_provider == "grok"
+        else f"frw:{fvm}"
     )
     spec["_layer_routing"] = {
         "i2v_profile": i2v_profile,

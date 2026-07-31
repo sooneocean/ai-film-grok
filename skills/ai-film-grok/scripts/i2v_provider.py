@@ -239,7 +239,9 @@ def generate_with_fallback(
             raise
         fallback, switch = selected
         result = fallback.generate(keyframe=keyframe, prompt=prompt, **kwargs)
-        result["route"] = f"{primary.name}_technical_fallback"
+        result["route"] = (
+            "frw_fallback" if primary.name == "grok" else f"{primary.name}_technical_fallback"
+        )
         result["provider_switch"] = switch
         return result
 
@@ -598,7 +600,11 @@ class FrwLtx23AudioProvider(SeedanceProvider):
             provider=self.name,
             ok=approved,
             available=approved,
-            reason=("LTX 2.3 native-audio I2V canary approved." if approved else "LTX 2.3 native-audio canary missing or not fully approved."),
+            reason=(
+                "LTX 2.3 native-audio I2V canary approved."
+                if approved
+                else "LTX 2.3 native-audio canary missing or not fully approved."
+            ),
             models=["ltx-2.3", "img2video-audio"],
             profile="ltx23_primary",
             detail={"canary_required": True, "receipt": str(receipt), **data},
@@ -609,10 +615,20 @@ class FrwLtx23AudioProvider(SeedanceProvider):
     ) -> list[str]:
         dispatch = Path(__file__).resolve().parent / "frw_dispatch.py"
         return [
-            "python3", str(dispatch), "img2video-audio", "--img-url",
-            str(kwargs.get("img_url") or keyframe), "--prompt", prompt,
-            "--width", str(kwargs.get("width", 704)), "--height", str(kwargs.get("height", 1280)),
-            "--duration", str(duration_sec), "--wait",
+            "python3",
+            str(dispatch),
+            "img2video-audio",
+            "--img-url",
+            str(kwargs.get("img_url") or keyframe),
+            "--prompt",
+            prompt,
+            "--width",
+            str(kwargs.get("width", 704)),
+            "--height",
+            str(kwargs.get("height", 1280)),
+            "--duration",
+            str(duration_sec),
+            "--wait",
         ]
 
 

@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from comfy_armory import compile_weapon_workflow
 from comfy_video import (
@@ -18,7 +19,6 @@ from comfy_video import (
     wait_for_result,
 )
 from util import sha256_file, utc_now, write_json
-from visual_text_audit import VisualTextAuditError
 
 WINDOW_PADDING_FRAMES = 2
 WEAPON_ID = "qwen-image-edit-2511-local"
@@ -33,7 +33,9 @@ class VisualTextRepairError(ValueError):
     pass
 
 
-def repair_windows(indices: list[int], *, frame_count: int, padding: int = WINDOW_PADDING_FRAMES) -> list[tuple[int, int]]:
+def repair_windows(
+    indices: list[int], *, frame_count: int, padding: int = WINDOW_PADDING_FRAMES
+) -> list[tuple[int, int]]:
     if frame_count < 1:
         raise VisualTextRepairError("frame count must be positive")
     windows: list[tuple[int, int]] = []
@@ -67,8 +69,21 @@ def _replace_frames(source: Path, repaired: dict[int, Path], output: Path, fps: 
     staging.mkdir(parents=True)
     try:
         result = subprocess.run(
-            ["ffmpeg", "-y", "-i", str(source), "-map", "0:v:0", "-vsync", "0", str(staging / "frame_%08d.png")],
-            text=True, capture_output=True, check=True, timeout=1800,
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(source),
+                "-map",
+                "0:v:0",
+                "-vsync",
+                "0",
+                str(staging / "frame_%08d.png"),
+            ],
+            text=True,
+            capture_output=True,
+            check=True,
+            timeout=1800,
         )
         del result
         for index, frame in repaired.items():
@@ -78,10 +93,31 @@ def _replace_frames(source: Path, repaired: dict[int, Path], output: Path, fps: 
             shutil.copy2(frame, target)
         subprocess.run(
             [
-                "ffmpeg", "-y", "-framerate", f"{fps:.12g}", "-i", str(staging / "frame_%08d.png"),
-                "-i", str(source), "-map", "0:v:0", "-map", "1:a?", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                "-c:a", "copy", "-shortest", str(output),
-            ], text=True, capture_output=True, check=True, timeout=1800,
+                "ffmpeg",
+                "-y",
+                "-framerate",
+                f"{fps:.12g}",
+                "-i",
+                str(staging / "frame_%08d.png"),
+                "-i",
+                str(source),
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a?",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "copy",
+                "-shortest",
+                str(output),
+            ],
+            text=True,
+            capture_output=True,
+            check=True,
+            timeout=1800,
         )
     except (OSError, subprocess.CalledProcessError) as exc:
         raise VisualTextRepairError("could not rebuild repaired video") from exc
@@ -94,7 +130,10 @@ def _qwen_i2i(base_url: str, frame: Path, output: Path, seed: int) -> dict[str, 
         capacity = assert_submission_capacity(base_url)
         uploaded = upload_image(base_url, frame)
         graph = compile_weapon_workflow(
-            WEAPON_ID, prompt=POSITIVE_PROMPT, seed=seed, input_image_name=uploaded["name"],
+            WEAPON_ID,
+            prompt=POSITIVE_PROMPT,
+            seed=seed,
+            input_image_name=uploaded["name"],
             filename_prefix=f"aifilm/visual-text-repair/{frame.stem}",
         )
         graph["negative_encode"]["inputs"]["prompt"] = NEGATIVE_PROMPT
@@ -103,18 +142,30 @@ def _qwen_i2i(base_url: str, frame: Path, output: Path, seed: int) -> dict[str, 
         downloaded = download_result(base_url, result, output)
     except (ComfyVideoError, KeyError) as exc:
         raise VisualTextRepairError(f"repair_blocked: {exc}") from exc
-    return {"provider": "comfy_qwen_i2i", "capacity": capacity, "upload": uploaded, "prompt_id": prompt_id, "output": downloaded}
+    return {
+        "provider": "comfy_qwen_i2i",
+        "capacity": capacity,
+        "upload": uploaded,
+        "prompt_id": prompt_id,
+        "output": downloaded,
+    }
 
 
 def repair_clip(
-    root: Path | str, clip: Path | str, *, base_url: str, audit_path: Path | str | None = None,
+    root: Path | str,
+    clip: Path | str,
+    *,
+    base_url: str,
+    audit_path: Path | str | None = None,
     i2i: Callable[[str, Path, Path, int], dict[str, Any]] = _qwen_i2i,
 ) -> dict[str, Any]:
     root_path = Path(root).expanduser().resolve()
     source = Path(clip).expanduser().resolve()
     if not source.is_file() or root_path not in source.parents:
         raise VisualTextRepairError("repair clip must be a regular file inside the film workspace")
-    audit = _load_rejected_audit(root_path, Path(audit_path).expanduser().resolve() if audit_path else None)
+    audit = _load_rejected_audit(
+        root_path, Path(audit_path).expanduser().resolve() if audit_path else None
+    )
     if ((audit.get("clip") or {}).get("sha256")) != sha256_file(source):
         raise VisualTextRepairError("visual-text audit receipt is stale for this clip")
     frames = audit.get("frames") or []
@@ -142,7 +193,14 @@ def repair_clip(
             if not output.is_file() or output.stat().st_size < 32:
                 raise VisualTextRepairError("repair_blocked: I2I did not create an image")
             repaired[index] = output
-            frame_receipts.append({"index": index, "input_sha256": sha256_file(input_path), "output_sha256": sha256_file(output), **receipt})
+            frame_receipts.append(
+                {
+                    "index": index,
+                    "input_sha256": sha256_file(input_path),
+                    "output_sha256": sha256_file(output),
+                    **receipt,
+                }
+            )
     repair_output = root_path / "clips" / f"{source.stem}-text-repaired.mp4"
     repair_output.parent.mkdir(exist_ok=True)
     fps = float((audit.get("clip") or {}).get("fps") or 0)
@@ -150,12 +208,19 @@ def repair_clip(
         raise VisualTextRepairError("repair audit lacks a valid frame rate")
     _replace_frames(source, repaired, repair_output, fps)
     report = {
-        "schema_version": 1, "kind": "visual-text-repair", "at": utc_now(), "status": "pending_reaudit",
+        "schema_version": 1,
+        "kind": "visual-text-repair",
+        "at": utc_now(),
+        "status": "pending_reaudit",
         "source": {"path": str(source.relative_to(root_path)), "sha256": sha256_file(source)},
         "retained_rejected_source": str(retained.relative_to(root_path)),
-        "output": {"path": str(repair_output.relative_to(root_path)), "sha256": sha256_file(repair_output)},
+        "output": {
+            "path": str(repair_output.relative_to(root_path)),
+            "sha256": sha256_file(repair_output),
+        },
         "windows": [{"start_frame": start, "end_frame": end} for start, end in windows],
-        "frame_repairs": frame_receipts, "requires": ["visual-text-audit rerun", "human review"],
+        "frame_repairs": frame_receipts,
+        "requires": ["visual-text-audit rerun", "human review"],
     }
     path = root_path / "receipts" / "visual-text-repair.json"
     write_json(path, report)

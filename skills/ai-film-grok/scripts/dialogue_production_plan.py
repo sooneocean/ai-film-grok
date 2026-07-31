@@ -145,16 +145,44 @@ def build_dialogue_production_plan(root: Path | str) -> dict[str, Any]:
             )
             stages.append(i2v)
             if mode == "on_camera" and bool(line.get("lipsync_required")):
+                visual_text_audit = _stage(
+                    f"{line_id}:visual-text-audit",
+                    line_id=line_id,
+                    kind="provider_visual_text_audit",
+                    tool="visual-text-audit",
+                    depends_on=[i2v["stage_id"]],
+                    evidence_required=[
+                        "clip_sha256",
+                        "every_decoded_frame_scan",
+                        "visual_text_audit_receipt",
+                    ],
+                )
+                stages.append(visual_text_audit)
+                visual_text_repair = _stage(
+                    f"{line_id}:visual-text-repair",
+                    line_id=line_id,
+                    kind="provider_visual_text_repair",
+                    tool="visual-text-repair",
+                    depends_on=[visual_text_audit["stage_id"]],
+                    activation="only_after_provider_visual_text_rejected",
+                    evidence_required=[
+                        "repair_receipt",
+                        "repaired_clip_sha256",
+                        "clean_reaudit_receipt",
+                    ],
+                )
+                stages.append(visual_text_repair)
                 native_text_gate = _stage(
                     f"{line_id}:native-text-gate",
                     line_id=line_id,
                     kind="native_text_rejection_gate",
                     tool="native_text_gate.validate_native_text_review",
-                    depends_on=[i2v["stage_id"]],
+                    depends_on=[visual_text_audit["stage_id"], visual_text_repair["stage_id"]],
                     evidence_required=[
                         "clip_sha256",
                         "sampled_frames",
                         "unexpected_visual_text_detected_false",
+                        "matching_clean_visual_text_audit",
                         "native_audio_dialogue_matches_expected",
                         "mouth_audio_sync_approved",
                         "expected_duration_sec",

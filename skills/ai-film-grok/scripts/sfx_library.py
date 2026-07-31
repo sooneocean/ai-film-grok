@@ -14,6 +14,7 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from audio_node_client import _validate_wav
 from performance_candidates import receipt_is_signed, sign_receipt
@@ -109,9 +110,7 @@ def _prepare(root: Path) -> Path:
     return root
 
 
-def _candidate_record(
-    project_root: Path, asset_id: str
-) -> tuple[Path, Path, dict[str, Any]]:
+def _candidate_record(project_root: Path, asset_id: str) -> tuple[Path, Path, dict[str, Any]]:
     if not _ASSET_ID.fullmatch(asset_id):
         raise SFXLibraryError("invalid SFX asset id")
     pending = project_root / "audio" / "candidates" / "sfx" / "pending"
@@ -361,9 +360,7 @@ def candidate_asset(
     """Return a globally retained candidate; this never confers approval."""
     root = (library_root or default_library_root()).expanduser().resolve()
     wav = resolve_uri(f"library:{_pending_relative(asset_id)}", library_root=root)
-    receipt = resolve_uri(
-        f"library:{_pending_relative(asset_id, receipt=True)}", library_root=root
-    )
+    receipt = resolve_uri(f"library:{_pending_relative(asset_id, receipt=True)}", library_root=root)
     record = read_json(receipt)
     if (
         not isinstance(record, dict)
@@ -380,9 +377,7 @@ def candidate_asset(
     return wav, receipt, record
 
 
-def write_candidate_review_pack(
-    name: str, *, library_root: Path | None = None
-) -> dict[str, Any]:
+def write_candidate_review_pack(name: str, *, library_root: Path | None = None) -> dict[str, Any]:
     """Write a local listening list backed only by retained global candidate bytes."""
     safe_name = re.sub(r"[^a-z0-9_-]+", "-", name.strip().lower()).strip("-")
     if not safe_name:
@@ -412,7 +407,7 @@ def write_candidate_review_pack(
         "|---|---:|---|",
     ]
     lines.extend(
-        f"| `{asset_id}` | {seed} | [试听]({root / relative}) |"
+        f"| `{asset_id}` | {seed} | [试听]({quote(str(root / relative), safe='/')}) |"
         for asset_id, seed, relative in rows
     )
     if not rows:

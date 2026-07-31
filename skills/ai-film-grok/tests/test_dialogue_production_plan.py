@@ -63,6 +63,8 @@ def test_plan_binds_all_weapons_to_one_line_id(
         "comfy_qwen_i2i_keyframe",
         "frw_upload_image",
         "frw_ltx23_img2video_audio",
+        "visual-text-audit",
+        "visual-text-repair",
         "native_text_gate.validate_native_text_review",
         "frw_img2video",
         "rtx_latentsync_1_6",
@@ -80,6 +82,10 @@ def test_plan_binds_all_weapons_to_one_line_id(
     upload = next(stage for stage in plan["stages"] if stage["tool"] == "frw_upload_image")
     assert upload["depends_on"] == ["sc01_ln01:keyframe"]
     assert fallback["depends_on"] == [frw_fallback["stage_id"], "sc01_ln01:tts"]
+    native_text = next(
+        stage for stage in plan["stages"] if stage["tool"] == "native_text_gate.validate_native_text_review"
+    )
+    assert native_text["depends_on"] == ["sc01_ln01:visual-text-audit", "sc01_ln01:visual-text-repair"]
     assert plan["route"]["lipsync_primary"] == "frw_ltx23_native_audio_i2v_human_verified"
     assert plan["route"]["dialogue_i2v_fallback"] == "frw_img2video_rejection_only"
     assert "caption_owner_ffmpeg_or_hyperframes_once" in plan["post"]["evidence_required"]

@@ -7254,7 +7254,12 @@ def cmd_sfx_candidate(args: argparse.Namespace) -> int:
 def cmd_sfx_library(args: argparse.Namespace) -> int:
     """Manage the shared internal non-commercial SFX armory."""
     from config_loader import get_config
-    from sfx_library import SFXLibraryError, audit, import_project_asset
+    from sfx_library import (
+        SFXLibraryError,
+        audit,
+        import_project_asset,
+        write_candidate_review_pack,
+    )
 
     get_config()
     try:
@@ -7263,6 +7268,13 @@ def cmd_sfx_library(args: argparse.Namespace) -> int:
                 import_project_asset(
                     Path(args.root),
                     args.asset_id,
+                    library_root=Path(args.library_root) if args.library_root else None,
+                )
+            )
+        elif args.sfx_library_action == "review-pack":
+            emit(
+                write_candidate_review_pack(
+                    args.name,
                     library_root=Path(args.library_root) if args.library_root else None,
                 )
             )
@@ -7525,6 +7537,36 @@ def cmd_node(args: argparse.Namespace) -> int:
     from cli_node import run_node
 
     return run_node(args, emit=emit)
+
+
+def cmd_visual_text_audit(args: argparse.Namespace) -> int:
+    from visual_text_audit import VisualTextAuditError, audit_clip
+
+    try:
+        report = audit_clip(
+            args.root,
+            args.source,
+            base_url=args.base_url,
+            model=args.model,
+            token=os.environ.get("AIFILM_LOCAL_OMNI_TOKEN") or None,
+        )
+    except VisualTextAuditError as exc:
+        raise FilmError(f"VISUAL_TEXT_AUDIT_ERROR: {exc}") from exc
+    emit(report)
+    return 0 if report["status"] == "clean" else 2
+
+
+def cmd_visual_text_repair(args: argparse.Namespace) -> int:
+    from visual_text_repair import VisualTextRepairError, repair_clip
+
+    try:
+        report = repair_clip(
+            args.root, args.source, base_url=args.base_url, audit_path=args.audit_receipt
+        )
+    except VisualTextRepairError as exc:
+        raise FilmError(f"VISUAL_TEXT_REPAIR_ERROR: {exc}") from exc
+    emit(report)
+    return 0
 
 
 def cmd_weapon(args: argparse.Namespace) -> int:
@@ -8044,6 +8086,11 @@ def build_parser() -> argparse.ArgumentParser:
     sfx_library_import.add_argument("--root", required=True, help="Legacy film project root")
     sfx_library_import.add_argument("--asset-id", required=True)
     sfx_library_import.add_argument("--library-root", default="")
+    sfx_library_review = sfx_library_sub.add_parser(
+        "review-pack", help="Write a listening pack from retained global SFX candidates"
+    )
+    sfx_library_review.add_argument("--name", required=True)
+    sfx_library_review.add_argument("--library-root", default="")
 
     lsc = sub.add_parser(
         "lipsync-canary",
@@ -9353,6 +9400,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     local_omni_run.add_argument("--timeout", type=int, default=60, help="1-120 seconds; default 60")
 
+    visual_text_audit = sub.add_parser(
+        "visual-text-audit",
+        help="Fail-closed every-frame inspection for provider-burned visual text",
+    )
+    visual_text_audit.add_argument("--root", required=True)
+    visual_text_audit.add_argument(
+        "--source", required=True, help="Video inside the film workspace"
+    )
+    visual_text_audit.add_argument(
+        "--base-url", default=os.environ.get("AIFILM_LOCAL_OMNI_BASE_URL", "")
+    )
+    visual_text_audit.add_argument("--model", default="nvidia/nemotron-nano-3-30b-a3b")
+    visual_text_repair = sub.add_parser(
+        "visual-text-repair",
+        help="Repair a rejected visual-text audit with bounded Qwen I2I frame edits",
+    )
+    visual_text_repair.add_argument("--root", required=True)
+    visual_text_repair.add_argument(
+        "--source", required=True, help="Rejected video inside the film workspace"
+    )
+    visual_text_repair.add_argument(
+        "--base-url", default=os.environ.get("AIFILM_COMFYUI_BASE_URL", "http://127.0.0.1:18188")
+    )
+    visual_text_repair.add_argument("--audit-receipt", default=None)
+
     external_review = sub.add_parser(
         "external-review",
         help="Read-only Groq/Gemini candidate review; never changes production gates",
@@ -10303,6 +10375,8 @@ def main(argv: list[str] | None = None) -> int:
             "dialogue-benchmark-review": cmd_dialogue_benchmark_review,
             "dialogue-benchmark-approve": cmd_dialogue_benchmark_approve,
             "dialogue-production-plan": cmd_dialogue_production_plan,
+            "visual-text-audit": cmd_visual_text_audit,
+            "visual-text-repair": cmd_visual_text_repair,
             "dialogue-benchmark-queue": cmd_dialogue_benchmark_queue,
             "creative-pipeline": cmd_creative_pipeline,
             "dailies": cmd_dailies,
