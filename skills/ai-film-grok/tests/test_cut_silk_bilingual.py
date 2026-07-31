@@ -53,7 +53,7 @@ class CutSilkBilingualDocsTests(unittest.TestCase):
         self.assertIn("camera_axis", schema)
         self.assertIn("dolly_in", schema)
         self.assertIn("camera_axis", ex)
-        self.assertIn("seedance-2-fast-i2v", ex)
+        self.assertIn("legacy-img2video", ex)
 
 
 class TransitionFluencyTests(unittest.TestCase):
