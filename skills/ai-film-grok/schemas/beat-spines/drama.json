@@ -1,0 +1,50 @@
+[
+  {
+    "key": "hook",
+    "dramatic_function": "hook",
+    "importance": "climax",
+    "objective": "建立人物处境与核心张力",
+    "weight": 0.12,
+    "shots_n": 1
+  },
+  {
+    "key": "setup",
+    "dramatic_function": "approach",
+    "importance": "supporting",
+    "objective": "人物关系与空间建立",
+    "weight": 0.18,
+    "shots_n": 1
+  },
+  {
+    "key": "rising",
+    "dramatic_function": "action",
+    "importance": "important",
+    "objective": "冲突升级，主角行动推进",
+    "weight": 0.22,
+    "shots_n": 2
+  },
+  {
+    "key": "turn",
+    "dramatic_function": "reaction",
+    "importance": "important",
+    "objective": "转折点：反应/抉择/觉醒",
+    "weight": 0.2,
+    "shots_n": 1
+  },
+  {
+    "key": "climax",
+    "dramatic_function": "action",
+    "importance": "climax",
+    "objective": "高潮：决定性对抗或选择",
+    "weight": 0.18,
+    "shots_n": 1
+  },
+  {
+    "key": "resolution",
+    "dramatic_function": "afterglow",
+    "importance": "supporting",
+    "objective": "结果沉淀与新常态",
+    "weight": 0.1,
+    "shots_n": 1
+  }
+]

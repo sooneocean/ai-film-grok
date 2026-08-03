@@ -1,0 +1,42 @@
+[
+  {
+    "key": "hook",
+    "dramatic_function": "hook",
+    "importance": "climax",
+    "objective": "开场钩子：异常/欲望/冲突入口",
+    "weight": 0.12,
+    "shots_n": 1
+  },
+  {
+    "key": "setup",
+    "dramatic_function": "approach",
+    "importance": "supporting",
+    "objective": "建立人物关系与空间",
+    "weight": 0.18,
+    "shots_n": 1
+  },
+  {
+    "key": "escalate",
+    "dramatic_function": "sensory",
+    "importance": "important",
+    "objective": "情绪/信息升级",
+    "weight": 0.22,
+    "shots_n": 2
+  },
+  {
+    "key": "peak",
+    "dramatic_function": "action",
+    "importance": "climax",
+    "objective": "高潮或关键决定",
+    "weight": 0.28,
+    "shots_n": 2
+  },
+  {
+    "key": "button",
+    "dramatic_function": "afterglow",
+    "importance": "supporting",
+    "objective": "余韵与下一集钩子",
+    "weight": 0.2,
+    "shots_n": 1
+  }
+]
