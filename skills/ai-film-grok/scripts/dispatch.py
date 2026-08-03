@@ -395,7 +395,7 @@ def build_dispatch(
         )
 
     # Action motion profile.  Capability checks may skip an unready lane, but
-    # the policy order remains FRW LTX → Grok → verified FRW Wan → local.
+    # the policy order remains FRW LTX → FRW API I2V → Grok Video 1.5.
     i2v_profile = "ltx23_primary"
     try:
         from film_spec import resolve_i2v_profile
@@ -411,7 +411,7 @@ def build_dispatch(
             if craft_stage in {"shots", "media"}:
                 pre(
                     "action-i2v-chain",
-                    f"# Motion: FRW LTX 2.3 → Grok image_to_video → verified FRW Wan → verified local I2V  (profile={i2v_profile})",
+                    f"# Motion: FRW LTX 2.3 → FRW API img2video → Grok Video 1.5  (profile={i2v_profile})",
                     "动作镜按固定优先级逐级探测；未就绪可跳过，已启动路线只在明确技术失败后签名降级",
                     "visual",
                 )
@@ -830,7 +830,7 @@ def build_dispatch(
     # Fallback routing summary for media + Grok Build native tools
     i2v_line = (
         "ltx23_primary: still=image_edit(cast) · motion=FRW LTX 2.3 → "
-        "Grok image_to_video → verified FRW Wan → verified local I2V"
+        "FRW API img2video → Grok Video 1.5"
         if i2v_profile == "ltx23_primary"
         else "grok_primary: still=image_edit(cast) · motion=image_to_video · "
         "FRW Wan/local only after readiness or technical-failure gates"

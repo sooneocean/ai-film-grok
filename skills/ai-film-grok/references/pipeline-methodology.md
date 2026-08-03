@@ -13,14 +13,23 @@
 
 ## 轴 A · 电影工序（逐层减模糊）
 
-**对外唯一进度：Professional 11 阶段**（`dispatch.workflow`）：
+**对外唯一进度：七段主流程**（默认 `dispatch.phase`）：
+
+```text
+定义故事 → 设计演出 → Pilot 样片 → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付
+```
+
+每次 dispatch 只给一个 `next_action`；`blocked_by` 说明当前不能前进的原因，
+`required_proof` 说明过关证据，`optional_actions` 只作辅助而不竞争主线。
+
+**Professional 11 阶段**（`dispatch.workflow`）是内部证据排序与旧项目相容投影：
 
 ```text
 概念锁 → 剧本锁 → 部门与视觉锁 → 镜头与动态分镜锁 → Pilot 批准
 → 批量生成 → 每日样片审核 → 选片与粗剪 → 画面锁定 → 后期锁定 → 母版锁定
 ```
 
-`agent → visual → voice → design → post → deliver → done` 仅是兼容旧
+`agent → visual → voice → design → post → deliver → done` 同样仅是兼容旧
 receipt、HUD 与路由的**内部执行层**，不得作为第二套用户进度。
 
 **创作八环检查表**（`aifilm craft`，不是项目进度）：
@@ -65,7 +74,7 @@ Reasoning / Structured / Web·X Search
         ↓
 Grok Agent（規劃 + Prompt 優化 + 角色一致性 + Imagine）
         ↓
-1. 視覺生成     Grok still + Seedance/Grok I2V
+1. 視覺生成     Grok still + FRW LTX / FRW API / Grok I2V
 2. 語音生成     Edge TTS + tts-rehearse + SRT
 3. 動態合成     HyperFrames（優先） / Remotion
 4. 最終後處理   FFmpeg 拼板 · 混音 · 導出
@@ -120,7 +129,7 @@ FFmpeg 服务后处理层，也会先做设计 underlay；**交付默认仍是 H
 | 层 | 主力 | Fallback |
 |---|---|---|
 | L0 身份静帧 | Grok `image_edit(cast)` | FRW i2i（慎） |
-| L1 人物 A-roll | FRW LTX 2.3 | Grok I2V → verified FRW Wan → verified local |
+| L1 人物 A-roll | FRW LTX 2.3 | FRW API I2V → Grok Video 1.5 |
 | L2 环境床 | FRW LTX T2V | Grok no-face → verified local |
 | L3 设计 | HyperFrames | Remotion |
 

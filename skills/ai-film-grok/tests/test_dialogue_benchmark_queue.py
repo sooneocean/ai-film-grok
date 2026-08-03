@@ -22,13 +22,6 @@ from dialogue_benchmark_queue import (  # noqa: E402
 from runtime_policy import sha256  # noqa: E402
 from util import write_json  # noqa: E402
 
-LEGACY_WEAPONS = (
-    "comfy_qwen_i2i_performance_state",
-    "comfy_wan22_i2v",
-    "rtx_latentsync_1_6",
-)
-
-
 def _fixture(root: Path) -> None:
     write_json(root / "dialogue-scene-package.json", {"kind": "dialogue-scene-package"})
     write_json(
@@ -103,26 +96,6 @@ def test_frw_arm_claim_does_not_require_comfy_capacity(tmp_path: Path) -> None:
     assert result["status"] == "claimed"
     assert result["job"]["weapon"] == "frw_ltx23_img2video_audio"
     assert result["capacity"] == {"ok": True, "status": "not_required", "executor": "frw"}
-
-
-def test_existing_wan_latentsync_benchmark_remains_queueable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _fixture(tmp_path)
-    receipt = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
-    report = json.loads(receipt.read_text(encoding="utf-8"))
-    report["weapons"] = list(LEGACY_WEAPONS)
-    report["arms"] = [{"weapon": weapon, "status": "pending"} for weapon in LEGACY_WEAPONS]
-    write_json(receipt, report)
-    jobs = enqueue(tmp_path)["jobs"]
-    assert [job["weapon"] for job in jobs] == list(LEGACY_WEAPONS)
-
-    class Config:
-        comfyui_base_url = "http://127.0.0.1:18188"
-
-    monkeypatch.setattr("config_loader.get_config", lambda: Config())
-    monkeypatch.setattr("comfy_video.submission_capacity", lambda _url: {"ok": False})
-    assert claim(tmp_path)["status"] == "deferred"
 
 
 def test_claim_rejects_job_bound_to_a_replaced_benchmark(

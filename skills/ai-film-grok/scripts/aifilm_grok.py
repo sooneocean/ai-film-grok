@@ -478,7 +478,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "tools": {
             "still_generate": "image_gen (agent tool)",
             "still_edit": "image_edit (agent tool)",
-            "motion": "FRW LTX 2.3 → Grok I2V → verified FRW Wan → verified local",
+            "motion": "FRW LTX 2.3 → FRW API I2V → Grok Video 1.5",
             "motion_multi_ref": "reference_to_video (agent tool)",
             "vo": "MiMo (default; limited-time free), MiniMax/Fish/edge, or structured AIFILM_TTS_ARGV (cross-provider fallback is opt-in)",
             "lipsync": "locked MuseTalk/Wav2Lip or structured AIFILM_LIPSYNC_ARGV (optional post)",
@@ -1170,6 +1170,13 @@ def cmd_next(args: argparse.Namespace) -> int:
         )
     except Exception as exc:
         raise FilmError(f"next_actions failed: {exc}") from exc
+    try:
+        from workflow_spine import public_flow_phase
+
+        workflow = pipeline.get("workflow") if isinstance(pipeline, dict) else None
+        phase = public_flow_phase(workflow) if isinstance(workflow, dict) else None
+    except (ImportError, OSError, ValueError):
+        phase = None
 
     print_stage = bool(getattr(args, "print_stage", False))
     print_stage_only = bool(getattr(args, "print_stage_only", False))
@@ -1186,6 +1193,7 @@ def cmd_next(args: argparse.Namespace) -> int:
             {
                 "ok": True,
                 "root": str(root),
+                "phase": phase,
                 "pipeline_stage": pipeline,
                 "stage": pipeline.get("stage"),
                 "stage_label": pipeline.get("label_zh"),
@@ -1204,6 +1212,7 @@ def cmd_next(args: argparse.Namespace) -> int:
             {
                 "ok": True,
                 "root": str(root),
+                "phase": phase,
                 "pipeline_stage": pipeline,
                 "stage": pipeline.get("stage"),
                 "stage_label": pipeline.get("label_zh"),
@@ -1232,6 +1241,7 @@ def cmd_next(args: argparse.Namespace) -> int:
         {
             "ok": True,
             "root": str(root),
+            "phase": phase,
             "pipeline_stage": pipeline,
             "stage": pipeline.get("stage"),
             "stage_label": pipeline.get("label_zh"),
@@ -1267,10 +1277,18 @@ def cmd_stage(args: argparse.Namespace) -> int:
 
     line = format_stage_line(pipeline, compact=not bool(getattr(args, "full", False)))
     if getattr(args, "json", False) or getattr(args, "as_json", False):
+        try:
+            from workflow_spine import public_flow_phase
+
+            workflow = pipeline.get("workflow") if isinstance(pipeline, dict) else None
+            phase = public_flow_phase(workflow) if isinstance(workflow, dict) else None
+        except (ImportError, OSError, ValueError):
+            phase = None
         emit(
             {
                 "ok": True,
                 "root": str(root),
+                "phase": phase,
                 "pipeline_stage": pipeline,
                 "stage": pipeline.get("stage"),
                 "stage_label": pipeline.get("label_zh"),

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -30,7 +29,6 @@ _RESTRICTED_PHASES = frozenset({"foreplay", "act", "climax", "afterglow"})
 _RESTRICTED_WARDROBE = frozenset({"partial", "undressed", "bare"})
 _SUPPORTED_QUALITY_TIERS = frozenset({"draft", "select", "hero"})
 _SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "schemas"
-_WAN_MODEL_IDENTITY_RE = re.compile(r"(?:^|/)wan(?:[0-9._-]|$)")
 _MIN_LOCAL_RAM_BYTES = 12 * 1024**3
 _MIN_LOCAL_VRAM_BYTES = 24 * 1024**3
 
@@ -305,12 +303,12 @@ def _hard_rejections(
         and not intent.get("provider_lock")
     ):
         reasons.append("ACTION_PROVIDER_NOT_IN_CHAIN")
-    if lane in {"frw-wan", "local"}:
+    if lane in {"frw-api", "local"}:
         receipt = _bound_capability_receipt(base, capability)
         if receipt is None:
             reasons.append("CAPABILITY_EVIDENCE_UNBOUND")
-        elif lane == "frw-wan" and not _frw_wan_receipt_ready(base, receipt):
-            reasons.append("FRW_WAN_IDENTITY_UNVERIFIED")
+        elif lane == "frw-api" and not _frw_api_receipt_ready(base, receipt):
+            reasons.append("FRW_API_I2V_CANARY_UNVERIFIED")
         elif lane == "local" and not _local_capacity_receipt_ready(receipt):
             reasons.append("LOCAL_CAPACITY_UNVERIFIED")
     return reasons
@@ -325,10 +323,8 @@ def _action_lane(capability: dict[str, Any]) -> str:
         return "frw-ltx"
     if provider == "grok" or "grok" in identity:
         return "grok"
-    if "frw" in identity and _WAN_MODEL_IDENTITY_RE.search(
-        str(capability.get("model") or "").strip().lower()
-    ):
-        return "frw-wan"
+    if provider == "frw" and ("img2video" in identity or "frw-api-i2v" in identity):
+        return "frw-api"
     if provider.startswith(("comfy", "local")) or "local" in identity:
         return "local"
     return "other"
@@ -364,11 +360,11 @@ def _receipt_output_is_bound(base: Path, receipt: dict[str, Any]) -> bool:
     return sha256_file(output_path) == expected
 
 
-def _frw_wan_receipt_ready(base: Path, receipt: dict[str, Any]) -> bool:
-    model = str(receipt.get("provider_model") or receipt.get("model") or "").strip().lower()
+def _frw_api_receipt_ready(base: Path, receipt: dict[str, Any]) -> bool:
+    model = str(receipt.get("provider_model") or receipt.get("model") or "").strip()
     return bool(
         receipt.get("ok") is True
-        and _WAN_MODEL_IDENTITY_RE.search(model)
+        and model
         and receipt.get("full_decode_ok") is True
         and receipt.get("human_review") == "approved"
         and _receipt_output_is_bound(base, receipt)
@@ -408,10 +404,9 @@ def _local_capacity_receipt_ready(receipt: dict[str, Any]) -> bool:
 
 def _action_provider_priority(capability: dict[str, Any]) -> int:
     return {
-        "frw-ltx": 4,
-        "grok": 3,
-        "frw-wan": 2,
-        "local": 1,
+        "frw-ltx": 3,
+        "frw-api": 2,
+        "grok": 1,
     }.get(_action_lane(capability), 0)
 
 

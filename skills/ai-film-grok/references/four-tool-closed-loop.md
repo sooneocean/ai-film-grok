@@ -20,7 +20,7 @@ Idea → Story → Beats → Shots
   ↓ prompt_injector 写 prompts/*.txt    (camera_prompt 进 I2V 指令)
   ↓ seedance_bridge.bridge_film_spec      (camera_prompt → @Image1 结构化 prompt)
 Media → Selects
-  ↓ i2v_provider.provider_priority()       (FRW LTX → Grok → FRW Wan → local)
+  ↓ i2v_provider.provider_priority()       (FRW LTX → FRW API I2V → Grok Video 1.5)
   ↓ (生成式 clip) 或 ingest-footage → auto-cut (真人素材)
   ↓ edit_policy.merge_edls                (生成式 + 真人 EDL 合并, 字幕最后)
 (Cut) → Rough

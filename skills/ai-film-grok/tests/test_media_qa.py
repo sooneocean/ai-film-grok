@@ -175,7 +175,7 @@ class MediaQATests(unittest.TestCase):
         }
         self.assertIn("image_to_video", ALLOWED_VIDEO_ENDPOINTS)
         self.assertIn("frw_wan_i2v", ALLOWED_VIDEO_ENDPOINTS)
-        self.assertIn("local_wan22_i2v", ALLOWED_VIDEO_ENDPOINTS)
+        self.assertNotIn("local_wan22_i2v", ALLOWED_VIDEO_ENDPOINTS)
         self.assertIn("local_infinite_talk", ALLOWED_VIDEO_ENDPOINTS)
         self.assertIn("local_fantasy_talking", ALLOWED_VIDEO_ENDPOINTS)
         self.assertIn("local_latentsync", ALLOWED_VIDEO_ENDPOINTS)

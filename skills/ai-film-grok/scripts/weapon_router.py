@@ -103,6 +103,14 @@ def build_weapon_route(
     if not demand_detected:
         return {**common, "status": "not_required", "reason": "no current visual weapon demand"}
 
+    if motion_demand:
+        return {
+            **common,
+            "status": "retired",
+            "fail_closed": True,
+            "reason": "WAN22_I2V_RETIRED: use the cloud I2V chain from film-spec instead",
+        }
+
     provider_keys = _I2V_PROVIDER_KEYS if motion_demand else _STILL_PROVIDER_KEYS
     locked_provider = _locked_provider(
         base,

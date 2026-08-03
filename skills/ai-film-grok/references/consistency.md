@@ -210,13 +210,13 @@ I2V 成片若仍出现内生字幕、乱码、伪字或水印，不可用最终�
 4. 缺 `approved_by: user`（或会话中用户原话批准）→ **禁止**批量。
 5. 全片 still **同一 img2img 锚**（cast master）。禁止「机构戏用 cast、色气戏用 naked 用户图」两套锚。用户高色气图只作 **style 参考/lookbook**，定妆锚用着衣 cast。
 
-## 3. Provider 路由（FRW LTX → Grok → FRW Wan → local）
+## 3. Provider 路由（FRW LTX → FRW API I2V → Grok Video 1.5）
 
-当前默认是 `ltx23_primary`。FRW LTX 必须有当前影片 canary；缺证据时运行时跳到 Grok，不永久改写项目锁。FRW Wan 只有模型身份明确时才能启用；本地路线还要通过队列、RAM、VRAM 与 pilot。完整契约见 [hard-defaults.md](hard-defaults.md) 与 [frw-degrade-dispatch.md](frw-degrade-dispatch.md)。
+当前默认是 `ltx23_primary`。FRW LTX、FRW API I2V 与 Grok Video 1.5 都必须有当前影片 canary；缺证据时仅跳过该路，不永久改写项目锁。完整契约见 [hard-defaults.md](hard-defaults.md) 与 [frw-degrade-dispatch.md](frw-degrade-dispatch.md)。
 
 | 规则 | 要求 |
 |------|------|
-| **分层** | 创作/身份静帧 → Grok；人物动作按 FRW LTX → Grok → verified FRW Wan → verified local |
+| **分层** | 创作/身份静帧 → Grok；人物动作按 FRW LTX → FRW API I2V → Grok Video 1.5 |
 | **Key canary** | 每条动作路线须有当前影片证据；API key 与 upload JWT 分离 |
 | film-spec | 默认 `i2v_provider: auto`→`frw-ltx23`；回退顺序写入 `_layer_routing` |
 | 技术失败 | 已尝试路线 timeout/429/5xx/连接失败才可签名切到下一条；质量、人工、未知拒绝不自动切换 |
@@ -224,7 +224,7 @@ I2V 成片若仍出现内生字幕、乱码、伪字或水印，不可用最终�
 | 模型 | FRW 侧 **整片固定同一 `frw_video_model`**；禁止半 Seedance 半 legacy 冒充 |
 | 尺寸 | 保留 provider 原生画幅；9:16 的 FRW pair 可为 **704×1280**；禁止强制 720 或拉伸 |
 | Prompt | 每镜前缀同一 `identity_lock` + `signature_block`；场景句放后半；Seedance 用 `@Image1 …` |
-| **分镜动态** | 默认 FRW LTX 2.3；未就绪或技术失败依序到 Grok、verified FRW Wan、verified local |
+| **分镜动态** | 默认 FRW LTX 2.3；未就绪或技术失败依序到 FRW API I2V、Grok Video 1.5 |
 | **禁止默认** | legacy `img2video` / 旧 FLF 模板（须显式 `legacy-img2video`） |
 | **入口** | `"$AIFILM" frw …` 或 `scripts/frw_dispatch.py`；stdout JSON `protocol_version=1.0` |
 | **入组** | 下载 → **`reencode-clips`（不升分辨率）** → `register-clip`（真实 endpoint） |

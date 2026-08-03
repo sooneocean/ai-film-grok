@@ -311,7 +311,7 @@ def snapshot_capabilities(
         "ready": lipsync.get("ready") or [],
     }
 
-    from i2v_provider import FrwLtx23AudioProvider, FrwWanProvider, GrokI2VProvider
+    from i2v_provider import FrwImg2VideoProvider, FrwLtx23AudioProvider, GrokI2VProvider
 
     action_providers = (
         (
@@ -322,18 +322,18 @@ def snapshot_capabilities(
             snapshot_root / "receipts" / "frw-ltx23-i2v-audio-canary.json",
         ),
         (
-            "grok-imagine-video",
-            GrokI2VProvider(),
-            "grok-imagine-video",
-            "grok-in-session",
-            snapshot_root / "receipts" / "grok-i2v-canary.json",
+            "frw-api-i2v",
+            FrwImg2VideoProvider(),
+            "img2video",
+            "frw-cloud",
+            snapshot_root / "receipts" / "frw-api-i2v-canary.json",
         ),
         (
-            "frw-wan-i2v",
-            FrwWanProvider(),
-            "Wan",
-            "frw-cloud",
-            snapshot_root / "receipts" / "frw-wan-i2v-canary.json",
+            "grok-video-1-5",
+            GrokI2VProvider(),
+            "grok-video-1.5",
+            "grok-in-session",
+            snapshot_root / "receipts" / "grok-i2v-canary.json",
         ),
     )
     action_observations: dict[str, Any] = {}

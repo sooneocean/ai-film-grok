@@ -234,7 +234,7 @@
       "providers": ["grok", "frw", "comfy_lan"],
       "tags": ["motion"],
       "phases": ["0", "6"],
-      "cli": { "run": "aifilm comfy route --intent image-to-video · comfy-wan22 + aifilm register-clip", "validate": "aifilm comfy armory --live · aifilm selects --root" },
+      "cli": { "run": "aifilm frw img2video + aifilm register-clip", "validate": "aifilm capability --root <film> · aifilm selects --root" },
       "inputContract": "registry/contracts/skill-envelope.in.json",
       "outputContract": "registry/contracts/skill-envelope.out.json"
     },

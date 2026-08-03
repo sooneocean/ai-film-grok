@@ -188,24 +188,15 @@ def test_env_shot_selects_specialized_cloud_t2v_and_explains_rejections(
     ]
 
 
-def test_action_shot_obeys_ltx_grok_frw_wan_local_priority(tmp_path: Path) -> None:
+def test_action_shot_obeys_ltx_frw_api_grok_priority(tmp_path: Path) -> None:
     _write_spec(tmp_path, [{"id": "shot01", "shot_role": "hero"}])
     _write_capabilities(
         tmp_path,
         [
             _capability(
-                "local-wan",
-                provider="comfy-wan22",
-                model="wan22-i2v",
-                operations=["image_to_video"],
-                shot_roles=["hero"],
-                quality_floor=5,
-                quality_score=5,
-            ),
-            _capability(
-                "grok-i2v",
-                provider="grok",
-                model="grok-imagine-video",
+                "frw-api-i2v",
+                provider="frw",
+                model="img2video",
                 operations=["image_to_video"],
                 shot_roles=["hero"],
                 quality_floor=5,
@@ -221,9 +212,9 @@ def test_action_shot_obeys_ltx_grok_frw_wan_local_priority(tmp_path: Path) -> No
                 quality_score=4,
             ),
             _capability(
-                "frw-wan",
-                provider="frw",
-                model="wan-i2v",
+                "grok-i2v",
+                provider="grok",
+                model="grok-video-1.5",
                 operations=["image_to_video"],
                 shot_roles=["hero"],
                 quality_floor=5,
@@ -235,14 +226,11 @@ def test_action_shot_obeys_ltx_grok_frw_wan_local_priority(tmp_path: Path) -> No
     report = explain_route(tmp_path, shot_id="shot01", now=NOW)
 
     assert report["selected"]["capability_id"] == "frw-ltx"
-    assert report["selected"]["rank"]["action_provider_priority"] == 4
+    assert report["selected"]["rank"]["action_provider_priority"] == 3
     assert report["selected"]["rank"]["role_affinity"] == 2
     assert [item["capability_id"] for item in report["alternatives"]] == [
         "grok-i2v",
-        "frw-wan",
     ]
-    rejected = {item["capability_id"]: item["reasons"] for item in report["rejected"]}
-    assert "CLOUD_CAPABILITY_AVAILABLE" in rejected["local-wan"]
 
 
 def test_ready_cloud_capability_reserves_local_capacity(tmp_path: Path) -> None:

@@ -261,7 +261,7 @@ def test_snapshot_projects_dialogue_motion_operations_for_router(
     ]
     assert capabilities["edge-ja"]["operations"] == ["text_to_speech"]
     assert capabilities["rtx5090-lipsync-latentsync"]["operations"] == ["video_lip_sync"]
-    assert capabilities["grok-imagine-video"]["pilot_verified"] is False
+    assert capabilities["grok-video-1-5"]["pilot_verified"] is False
 
     (tmp_path / "film-spec.json").write_text(
         json.dumps(
@@ -415,7 +415,7 @@ def test_snapshot_lists_full_action_chain_with_film_scoped_canary_state(
     canaries = {
         "grok": receipts / "grok-i2v-canary.json",
         "frw-ltx23": receipts / "frw-ltx23-i2v-audio-canary.json",
-        "frw-wan": receipts / "frw-wan-i2v-canary.json",
+        "frw-api-i2v": receipts / "frw-api-i2v-canary.json",
     }
     for path in canaries.values():
         path.write_text('{"ok":true}\n', encoding="utf-8")
@@ -439,14 +439,14 @@ def test_snapshot_lists_full_action_chain_with_film_scoped_canary_state(
             profile="ltx23_primary",
             detail={"receipt": str(canaries["frw-ltx23"])},
         ),
-        "frw-wan": i2v_provider.CapabilityReport(
-            provider="frw-wan",
+        "frw-api-i2v": i2v_provider.CapabilityReport(
+            provider="frw-api-i2v",
             ok=True,
             available=True,
             reason="approved",
-            models=["wan"],
-            profile="frw_wan_fallback",
-            detail={"receipt": str(canaries["frw-wan"])},
+            models=["img2video"],
+            profile="frw_api_fallback",
+            detail={"receipt": str(canaries["frw-api-i2v"])},
         ),
     }
     monkeypatch.setattr(
@@ -460,9 +460,9 @@ def test_snapshot_lists_full_action_chain_with_film_scoped_canary_state(
         lambda _self, **_kwargs: reports["frw-ltx23"],
     )
     monkeypatch.setattr(
-        i2v_provider.FrwWanProvider,
+        i2v_provider.FrwImg2VideoProvider,
         "probe",
-        lambda _self, **_kwargs: reports["frw-wan"],
+        lambda _self, **_kwargs: reports["frw-api-i2v"],
     )
 
     result = snapshot_capabilities(out=receipts / "capability-snapshot.json")
@@ -470,7 +470,7 @@ def test_snapshot_lists_full_action_chain_with_film_scoped_canary_state(
 
     assert capabilities["frw-ltx23"]["pilot_verified"] is True
     assert capabilities["grok"]["pilot_verified"] is True
-    assert capabilities["frw-wan"]["pilot_verified"] is True
-    for provider in ("frw-ltx23", "grok", "frw-wan"):
+    assert capabilities["frw-api-i2v"]["pilot_verified"] is True
+    for provider in ("frw-ltx23", "grok", "frw-api-i2v"):
         assert capabilities[provider]["receipt_path"] == str(canaries[provider].relative_to(root))
         assert len(capabilities[provider]["receipt_sha256"]) == 64

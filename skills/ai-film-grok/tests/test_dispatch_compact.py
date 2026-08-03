@@ -46,7 +46,7 @@ def test_compact_packet_is_small_and_keeps_execution_contract(tmp_path: Path) ->
     body = json.dumps(compact, ensure_ascii=False).encode("utf-8")
 
     assert len(body) <= 5000
-    assert compact["schema_version"] == 3
+    assert compact["schema_version"] == 4
     assert compact["mode"] == "compact"
     for key in (
         "skill_id",
@@ -68,6 +68,101 @@ def test_compact_packet_is_small_and_keeps_execution_contract(tmp_path: Path) ->
     assert "production_evidence" not in compact
     assert "agent_instruction" not in compact
     assert compact["responsibility"] == full["responsibility"]
+    assert compact["phase"]["id"] == "define_story"
+    assert compact["phase"]["index"] == 1
+    assert compact["phase"]["total"] == 7
+    assert compact["required_proof"] == compact["phase"]["proof"]
+    assert isinstance(compact["blocked_by"], list)
+    assert isinstance(compact["optional_actions"], list)
+
+
+def test_compact_projects_professional_workflow_to_one_public_phase() -> None:
+    packet = {
+        "ok": True,
+        "schema_version": 2,
+        "root": "/tmp/film",
+        "craft_stage": "rough",
+        "pipeline_stage": "post",
+        "next_id": "review-final",
+        "next_cmd": 'aifilm review-final --root "/tmp/film"',
+        "next_why": "成片已渲，待完整审片",
+        "next_action": {
+            "skill_id": "quality.inspect",
+            "operation": "review-final",
+            "argv": ["review-final", "--root", "/tmp/film"],
+            "spend_class": "local",
+            "approval_class": "human_required",
+        },
+        "next_actions": [
+            {"id": "review-final", "why": "成片已渲，待完整审片"},
+            {"id": "post-audit", "why": "审片后再做当前版本审计"},
+        ],
+        "workflow": {"current_stage": "master_lock", "delivery_pending": False},
+    }
+
+    compact = compact_dispatch(packet)
+
+    assert compact["phase"]["id"] == "post_master"
+    assert compact["phase"]["label_zh"] == "后期母版"
+    assert compact["required_proof"] == "字幕、混音、最终审片与 post-audit 均绑定当前成片"
+    assert compact["optional_actions"] == [
+        {"id": "post-audit", "why": "审片后再做当前版本审计"}
+    ]
+    assert compact["blocked_by"] == [
+        {
+            "code": "HUMAN_APPROVAL_REQUIRED",
+            "summary": "下一动作涉及用户批准、付费或外部服务；不得自动执行。",
+        }
+    ]
+
+
+def test_public_phase_mapping_covers_legacy_and_delivery_states() -> None:
+    stages = {
+        "concept_lock": "define_story",
+        "script_lock": "define_story",
+        "department_look_lock": "design_performance",
+        "shot_animatic_lock": "design_performance",
+        "pilot_approval": "pilot",
+        "bulk": "production",
+        "dailies_review": "selects_rough",
+        "selects_rough_cut": "selects_rough",
+        "picture_lock": "selects_rough",
+        "post_locks": "post_master",
+        "master_lock": "post_master",
+        "complete": "delivery",
+    }
+    for stage, expected_phase in stages.items():
+        compact = compact_dispatch(
+            {
+                "ok": True,
+                "craft_stage": "idea",
+                "pipeline_stage": "agent",
+                "next_action": {},
+                "workflow": {"current_stage": stage, "delivery_pending": False},
+            }
+        )
+        assert compact["phase"]["id"] == expected_phase
+    assert compact["phase"]["complete"] is True
+
+
+def test_compact_marks_missing_executable_action_as_a_blocker() -> None:
+    compact = compact_dispatch(
+        {
+            "ok": False,
+            "craft_stage": "idea",
+            "pipeline_stage": "agent",
+            "next_action": {},
+            "next_actions": [],
+            "workflow": {"current_stage": "concept_lock"},
+        }
+    )
+
+    assert compact["blocked_by"] == [
+        {
+            "code": "NO_EXECUTABLE_NEXT_ACTION",
+            "summary": "当前没有可直接执行的结构化动作；读取 next_why 或完整回执。",
+        }
+    ]
 
 
 def test_compact_packet_bounds_untrusted_human_readable_fields() -> None:
@@ -295,6 +390,32 @@ def test_skill_entry_and_compact_context_stay_inside_token_budgets() -> None:
         assert (skill_root / "references" / "stages" / f"{stage}.md").is_file()
 
 
+def test_public_entry_docs_name_the_same_seven_phase_contract() -> None:
+    skill_root = Path(__file__).resolve().parents[1]
+    repo_root = skill_root.parents[1]
+    for path in (
+        repo_root / "README.md",
+        repo_root / "commands" / "ai-film-grok.md",
+        skill_root / "SKILL.md",
+        skill_root / "README.md",
+        skill_root / "references" / "pipeline-methodology.md",
+        skill_root / "references" / "auto-dispatch.md",
+    ):
+        content = path.read_text(encoding="utf-8")
+        assert all(
+            term in content
+            for term in (
+                "定义故事",
+                "设计演出",
+                "Pilot",
+                "批量制作",
+                "选片与粗剪",
+                "后期母版",
+                "审片与交付",
+            )
+        ), path
+
+
 def test_dispatch_cli_defaults_compact_and_supports_full_rollback(tmp_path: Path) -> None:
     _film(tmp_path)
     before = {
@@ -314,7 +435,11 @@ def test_dispatch_cli_defaults_compact_and_supports_full_rollback(tmp_path: Path
     ]
     compact_run = subprocess.run(base, check=False, capture_output=True, text=True)
     assert compact_run.returncode == 0, compact_run.stderr
-    assert json.loads(compact_run.stdout)["mode"] == "compact"
+    compact = json.loads(compact_run.stdout)
+    assert compact["mode"] == "compact"
+    assert compact["schema_version"] == 4
+    assert compact["phase"]["id"] == "define_story"
+    assert compact["phase"]["total"] == 7
 
     full_run = subprocess.run(
         [*base, "--format", "full"],

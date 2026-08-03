@@ -204,35 +204,6 @@ def test_benchmark_locks_all_three_stage_parameters_after_human_review(
     assert "receipt_hmac_sha256" not in changed
 
 
-def test_review_uses_the_receipt_weapon_set_for_a_legacy_p2_benchmark(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    legacy = [
-        "comfy_qwen_i2i_performance_state",
-        "comfy_wan22_i2v",
-        "rtx_latentsync_1_6",
-    ]
-    write_json(tmp_path / "dialogue-scene-package.json", _package(tmp_path, 10))
-    monkeypatch.setattr(package_module, "_probe_media_fd", lambda fd, expected: expected == "audio")
-    build_dialogue_benchmark(tmp_path)
-    receipt_path = tmp_path / "receipts" / "dialogue-weapon-benchmark.json"
-    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    receipt["weapons"] = legacy
-    receipt["arms"] = [{"weapon": weapon, "status": "pending"} for weapon in legacy]
-    write_json(receipt_path, receipt)
-    artifact = tmp_path / "qwen-state.png"
-    artifact.write_bytes(b"real still")
-    updated = record_benchmark_arm(
-        tmp_path,
-        weapon=legacy[0],
-        artifact=artifact,
-        reviewer="Dex",
-        note="approved state still",
-        parameters={"seed": 731001},
-    )
-    assert updated["arms"][0]["status"] == "reviewed"
-
-
 def test_ltx_benchmark_arm_requires_clean_native_text_review(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

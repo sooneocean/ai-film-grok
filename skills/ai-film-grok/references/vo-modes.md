@@ -59,7 +59,7 @@ Set top-level:
 4. 旁白只允许 `screen_mode: narration`，且必须填写 `narration_reason`（时空跳转、无法用动作/对白表达的因果、章节桥接或结尾余韵）。
 5. `dialogue_state_strict: true` 时，缺少 `canonical/performance-states/<speaker>/<state>.png` 会阻挡生产；不要用全装 cast 图代替表演状态照。
 
-目标武器链：`Qwen i2i performance state → Qwen i2i keyframe → Wan 2.2 I2V → LatentSync 1.6 → per-shot human review`。InfiniteTalk/FantasyTalking 仍是显式 pilot，不能作为量产讲话镜默认。
+目标武器链：`Qwen i2i performance state → Qwen i2i keyframe → FRW LTX 2.3 audio I2V → per-shot human review`；仅分类技术失败时才可走 `FRW API img2video → LatentSync 1.6`。InfiniteTalk/FantasyTalking 仍是显式 pilot，不能作为量产讲话镜默认。
 
 ## Decision tree (agent must follow)
 

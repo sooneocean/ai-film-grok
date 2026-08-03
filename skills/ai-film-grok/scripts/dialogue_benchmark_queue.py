@@ -34,16 +34,10 @@ _SUCCEEDED = "succeeded"
 # immediately preceding, approved weapon set must remain claimable after the
 # default armory changes; otherwise a routing update silently strands already
 # rehearsed dialogue and its locked TTS evidence.
-_LEGACY_WEAPON_EXECUTORS = {
-    "comfy_qwen_i2i_performance_state": "comfy",
-    "comfy_wan22_i2v": "comfy",
-    "rtx_latentsync_1_6": "comfy",
-}
-_EXECUTOR_BY_WEAPON = {**_LEGACY_WEAPON_EXECUTORS, **WEAPON_EXECUTORS}
+_EXECUTOR_BY_WEAPON = dict(WEAPON_EXECUTORS)
 _COMFY_WEAPON_BY_BENCHMARK_ARM = {
     "comfy_qwen_i2i_performance_state": "qwen-image-edit-2511-local",
     "comfy_qwen_i2i_keyframe": "qwen-image-edit-2511-local",
-    "comfy_wan22_i2v": "wan22-i2v-quality",
     "rtx_latentsync_1_6": "latentsync-1-6-local",
 }
 

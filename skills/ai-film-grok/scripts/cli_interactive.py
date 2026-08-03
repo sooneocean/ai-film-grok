@@ -7,6 +7,7 @@ from typing import Any
 
 from interactive_orchestration import (
     InteractiveOrchestrationError,
+    poll_frw_candidate,
     queue_status,
     record_task_failure,
     record_terminal_media,
@@ -23,6 +24,13 @@ def add_interactive_parsers(subparsers: Any) -> None:
     submit.add_argument("--shot-id", required=True)
     submit.add_argument("--capability-id", required=True)
     submit.add_argument("--task-id", required=True)
+    submit.add_argument("--query-operation")
+    poll = sub.add_parser(
+        "poll", help="Poll a submitted FRW task without generating or downloading"
+    )
+    poll.add_argument("--root", required=True)
+    poll.add_argument("--candidate-id", required=True)
+    poll.add_argument("--download", action="store_true", help="Safely stage a completed FRW video")
     terminal = sub.add_parser("terminal", help="Bind staged decoded cloud media for review")
     terminal.add_argument("--root", required=True)
     terminal.add_argument("--candidate-id", required=True)
@@ -44,6 +52,11 @@ def run_interactive(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                 shot_id=args.shot_id,
                 capability_id=args.capability_id,
                 task_id=args.task_id,
+                query_operation=args.query_operation,
+            ), 0
+        if args.interactive_action == "poll":
+            return poll_frw_candidate(
+                args.root, candidate_id=args.candidate_id, download=bool(args.download)
             ), 0
         if args.interactive_action == "terminal":
             return record_terminal_media(

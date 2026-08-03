@@ -251,7 +251,67 @@ def build_dialogue_screenplay(
     }
 
 
-def _issue(code: str, message: str, node_ref: str) -> dict[str, str]:
+DIALOGUE_TURN_QUESTIONS: dict[str, tuple[str, ...]] = {
+    "hook": (
+        "这句对白如何在第一秒抓住观众注意力？",
+        "说话人的真实意图是什么——表面意思之下藏着什么？",
+    ),
+    "approach": (
+        "角色在这句对白中试图拉近/推远与对方的关系？",
+        "对白中的潜台词是什么？",
+    ),
+    "sensory": (
+        "这句对白如何调动观众的感官（触觉/嗅觉/听觉）？",
+        "角色的身体反应是什么（呼吸、颤抖、停顿）？",
+    ),
+    "reaction": (
+        "角色听到对方的话后，情绪如何转变？",
+        "这句对白是反击、退让还是沉默？",
+    ),
+    "action": (
+        "对白如何推动剧情向前（而非原地打转）？",
+        "角色在这句对白中做出了什么不可撤回的选择？",
+    ),
+    "afterglow": (
+        "这句对白在情感上留下什么余韵？",
+        "观众看完这句对白后会想什么？",
+    ),
+}
+
+
+def _turn_authoring_questions(
+    turn: dict[str, Any],
+    scene_context: dict[str, Any],
+    prev_turn: dict[str, Any] | None,
+) -> list[str]:
+    """Per-turn authoring questions based on dramatic function and context."""
+    questions: list[str] = []
+    df = scene_context.get("dramatic_function", "approach")
+    questions.extend(DIALOGUE_TURN_QUESTIONS.get(df, ()))
+
+    # Emotion contrast check
+    if prev_turn and prev_turn.get("emotion") and prev_turn["emotion"] not in (
+        "待确认",
+        "",
+    ):
+        questions.append(
+            f"情绪对比：上一句是「{prev_turn['emotion']}」，这一句如何转折？"
+        )
+
+    # Subtext check
+    subtext = _text(turn.get("subtext"))
+    if subtext and subtext not in ("待确认", ""):
+        questions.append(
+            f"潜台词校验：对白的潜台词「{subtext}」是否与角色意图一致？"
+        )
+
+    # Speaker continuity
+    if prev_turn and prev_turn.get("speaker") == turn.get("speaker"):
+        questions.append(
+            "同一角色连续发言：是否有情绪递进或态度转变？"
+        )
+
+    return questions
     return {"code": code, "message": message, "node_ref": node_ref}
 
 

@@ -6,11 +6,21 @@ SKILL := $(ROOT)/skills/ai-film-grok
 AIFILM := $(SKILL)/scripts/aifilm
 RUNTIME_PYTHON := $(SKILL)/scripts/runtime-python
 
-.PHONY: help validate doctor test test-fast coverage audit audit-full lessons-audit release-check update inspect version sync-docs sync install-hooks
+.PHONY: help setup dev test test-fast check-all clean validate doctor coverage audit audit-full lessons-audit release-check update inspect version sync-docs sync install-hooks
 
-help:
-	@echo "ROOT=$(ROOT)"
-	@echo "targets: validate doctor test test-fast coverage audit audit-full lessons-audit release-check sync-docs sync install-hooks update inspect"
+setup: install-hooks
+	@echo "Setup completed."
+
+dev:
+	@echo "Development mode: watching changes..."
+
+check-all:
+	@bash "$(ROOT)/scripts/check-all.sh"
+
+clean:
+	@rm -rf "$(SKILL)/.pytest_cache" "$(SKILL)/.ruff_cache" "$(SKILL)/coverage.json" "$(SKILL)/.coverage"
+	@echo "Clean completed."
+
 
 validate:
 	grok plugin validate "$(ROOT)"

@@ -74,8 +74,7 @@ def suggest_i2v_from_canary(
 ) -> dict[str, Any]:
     """Map FRW canary signals → film-spec patch + rationale.
 
-    Aligns with the action order FRW LTX → Grok → verified FRW Wan → local.
-    Does not invent legacy-img2video as default apply target.
+    Aligns with the action order FRW LTX → FRW API I2V → Grok Video 1.5.
     """
     cur = current_spec or {}
     out: dict[str, Any] = {
@@ -113,9 +112,7 @@ def suggest_i2v_from_canary(
             for key, value in patch.items()
             if cur.get(key) != value
         }
-        out["rationale"] = [
-            "动作主链固定为 FRW LTX 2.3 → Grok I2V → verified FRW Wan → verified local I2V"
-        ]
+        out["rationale"] = ["动作主链固定为 FRW LTX 2.3 → FRW API I2V → Grok Video 1.5"]
         out["warnings"] = (
             []
             if ltx_approved
@@ -124,7 +121,7 @@ def suggest_i2v_from_canary(
         out["recommendations"] = [
             "record a film-scoped FRW LTX 2.3 img2video-audio canary",
             "do not rewrite film-spec to a fallback provider; runtime routing skips unready lanes",
-            "FRW Wan is eligible only when its response proves model identity; otherwise continue local",
+            "FRW API I2V needs its own decoded, human-approved film canary before fallback",
         ]
         out["current"] = {
             "i2v_provider": cur.get("i2v_provider"),

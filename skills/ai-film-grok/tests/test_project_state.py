@@ -103,6 +103,8 @@ def test_status_projects_canonical_state_without_writing(
     }
     assert after == before
     assert captured[0]["canonical_stage"] == captured[0]["project_state"]["canonical_stage"]
+    assert captured[0]["phase"]["id"] == "define_story"
+    assert captured[0]["phase"]["total"] == 7
 
 
 def test_project_state_surfaces_final_before_master_conflict(tmp_path: Path) -> None:

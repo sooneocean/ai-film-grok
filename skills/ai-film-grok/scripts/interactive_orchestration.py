@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +16,15 @@ from util import exclusive_file_lock, read_json, sha256_file, utc_now, write_jso
 STATE_NAME = "interactive-orchestration.json"
 _MEDIA_SUFFIXES = frozenset({".mp4", ".mov", ".m4v", ".webm"})
 _ERROR_CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
+_FRW_QUERY_OPERATIONS = frozenset(
+    {
+        "newvideo-query",
+        "text2video-query",
+        "img2video-query",
+        "img2video-audio-query",
+        "flf-query",
+    }
+)
 
 
 class InteractiveOrchestrationError(ValueError):
@@ -97,6 +109,7 @@ def submit_cloud_candidate(
     shot_id: str,
     capability_id: str,
     task_id: str,
+    query_operation: str | None = None,
 ) -> dict[str, Any]:
     """Register an already-submitted adapter task without sending provider requests."""
     base = _root(root)
@@ -105,6 +118,11 @@ def submit_cloud_candidate(
     capability_id = validate_identifier(capability_id, field="capability id")
     task_id = validate_identifier(task_id, field="task id")
     capability = _cloud_capability(base, capability_id)
+    if query_operation is not None:
+        if query_operation not in _FRW_QUERY_OPERATIONS:
+            raise InteractiveOrchestrationError("unsupported FRW query operation")
+        if str(capability["provider"]).lower() != "frw":
+            raise InteractiveOrchestrationError("only FRW candidates use a CLI query operation")
     with exclusive_file_lock(_path(base)):
         state = _load(base)
         existing = next(
@@ -121,14 +139,105 @@ def submit_cloud_candidate(
             "status": "submitted",
             "submitted_at": utc_now(),
         }
+        if query_operation is not None:
+            payload["query_operation"] = query_operation
         if existing is not None:
-            if {key: existing.get(key) for key in ("shot_id", "capability_id", "task_id")} != {
-                key: payload[key] for key in ("shot_id", "capability_id", "task_id")
+            binding = ("shot_id", "capability_id", "task_id", "query_operation")
+            if {key: existing.get(key) for key in binding} != {
+                key: payload.get(key) for key in binding
             }:
                 raise InteractiveOrchestrationError("candidate id is already bound to another task")
             return state
         state["candidates"].append(payload)
         return _write(base, state)
+
+
+def _provider_payload(stdout: str) -> dict[str, Any]:
+    for line in reversed(stdout.splitlines()):
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def poll_frw_candidate(
+    root: Path | str, *, candidate_id: str, download: bool = False
+) -> dict[str, Any]:
+    """Poll a submitted FRW task through its stable query CLI contract.
+
+    This performs no generation or download.  It deliberately retains only
+    the normalized task state/error code; media still enters through the
+    workspace-only terminal-media gate.
+    """
+    base = _root(root)
+    candidate_id = validate_identifier(candidate_id, field="candidate id")
+    with exclusive_file_lock(_path(base)):
+        state = _load(base)
+        candidate = dict(_candidate(state, candidate_id))
+    if str(candidate.get("provider") or "").lower() != "frw":
+        raise InteractiveOrchestrationError("only FRW has a standalone polling adapter")
+    operation = candidate.get("query_operation")
+    if operation not in _FRW_QUERY_OPERATIONS:
+        raise InteractiveOrchestrationError("FRW candidate has no approved query operation")
+    dispatch = Path(__file__).resolve().with_name("frw_dispatch.py")
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(dispatch), str(operation), "--task-id", str(candidate["task_id"])],
+            capture_output=True,
+            text=True,
+            timeout=75,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise InteractiveOrchestrationError("FRW polling adapter could not run") from exc
+    payload = _provider_payload(proc.stdout)
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    error_code = data.get("error_code")
+    normalized = {
+        "protocol_version": payload.get("protocol_version"),
+        "done": payload.get("done") is True,
+        "success": payload.get("success") is True,
+        "next_action": payload.get("next_action"),
+        "error_code": error_code if isinstance(error_code, str) else None,
+        "returncode": proc.returncode,
+    }
+    downloaded: dict[str, object] | None = None
+    download_error: str | None = None
+    if normalized["done"] and normalized["success"] and download:
+        media_url = data.get("video_url") or data.get("url")
+        if not isinstance(media_url, str):
+            download_error = "DOWNLOAD_URL_MISSING"
+        else:
+            try:
+                from cloud_media_download import CloudMediaDownloadError, download_cloud_video
+
+                downloaded = download_cloud_video(base, candidate_id=candidate_id, url=media_url)
+            except CloudMediaDownloadError:
+                download_error = "DOWNLOAD_FAILED"
+    with exclusive_file_lock(_path(base)):
+        state = _load(base)
+        stored = _candidate(state, candidate_id)
+        stored["last_poll"] = normalized
+        stored["last_polled_at"] = utc_now()
+        if normalized["error_code"] and _ERROR_CODE_RE.fullmatch(normalized["error_code"]):
+            stored.update(
+                status="failed", error_code=normalized["error_code"], terminal_at=utc_now()
+            )
+        elif proc.returncode != 0 or not payload:
+            stored.update(status="failed", error_code="RUNTIME_ERROR", terminal_at=utc_now())
+        elif download_error:
+            stored.update(
+                status="download_failed", error_code=download_error, terminal_at=utc_now()
+            )
+        elif downloaded is not None:
+            stored.update(status="downloaded", downloaded=downloaded, terminal_at=utc_now())
+        elif normalized["done"] and normalized["success"]:
+            stored["status"] = "awaiting_terminal_media"
+        result = _write(base, state)
+    return result
 
 
 def record_terminal_media(
@@ -137,11 +246,15 @@ def record_terminal_media(
     """Accept only a previously staged, decoded workspace video for human review."""
     base = _root(root)
     candidate_id = validate_identifier(candidate_id, field="candidate id")
+    raw_media = Path(media_path).expanduser()
+    unresolved_media = raw_media if raw_media.is_absolute() else base / raw_media
+    if unresolved_media.is_symlink():
+        raise InteractiveOrchestrationError("cloud candidate media may not be a symbolic link")
     try:
         media = safe_existing_file(base, media_path, field="cloud candidate media")
     except SecurityPolicyError as exc:
         raise InteractiveOrchestrationError(str(exc)) from exc
-    if media.is_symlink() or media.suffix.lower() not in _MEDIA_SUFFIXES:
+    if media.suffix.lower() not in _MEDIA_SUFFIXES:
         raise InteractiveOrchestrationError("cloud candidate media must be a workspace video")
     try:
         qa = analyze_media(
@@ -169,8 +282,10 @@ def record_terminal_media(
     with exclusive_file_lock(_path(base)):
         state = _load(base)
         candidate = _candidate(state, candidate_id)
-        if candidate.get("status") == "failed":
-            raise InteractiveOrchestrationError("failed cloud candidate cannot become reviewable")
+        if candidate.get("status") not in {"awaiting_terminal_media", "downloaded"}:
+            raise InteractiveOrchestrationError(
+                "cloud candidate has not completed its provider/download lifecycle"
+            )
         candidate.update(
             status="reviewable",
             media_path=relative,

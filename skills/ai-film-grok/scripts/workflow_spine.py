@@ -57,6 +57,82 @@ STAGE_TO_CRAFT: dict[str, str] = {
     "master_lock": "verified",
 }
 
+# The director model is deliberately more granular than the user journey.  The
+# mapping below is the only progress vocabulary shown by compact dispatch.  It
+# keeps the evidence ordering intact while removing the need to learn both the
+# 11-stage contract and the craft checklist before starting a film.
+PUBLIC_FLOW: tuple[dict[str, str], ...] = (
+    {
+        "id": "define_story",
+        "label_zh": "定义故事",
+        "proof": "故事来源、主题与可执行叙事图已确认",
+    },
+    {
+        "id": "design_performance",
+        "label_zh": "设计演出",
+        "proof": "画风、角色状态、镜头与时长计划已锁定",
+    },
+    {
+        "id": "pilot",
+        "label_zh": "Pilot 样片",
+        "proof": "代表镜已完整审看，并有用户批准回执",
+    },
+    {
+        "id": "production",
+        "label_zh": "批量制作",
+        "proof": "所需镜头已生成、审查并登记为 approved selects",
+    },
+    {
+        "id": "selects_rough",
+        "label_zh": "选片与粗剪",
+        "proof": "选择集、接戏与节奏已形成当前粗剪证据",
+    },
+    {
+        "id": "post_master",
+        "label_zh": "后期母版",
+        "proof": "字幕、混音、最终审片与 post-audit 均绑定当前成片",
+    },
+    {
+        "id": "delivery",
+        "label_zh": "审片与交付",
+        "proof": "完整观看、解码、hash 与导出回读完成",
+    },
+)
+
+_PUBLIC_PHASE_BY_STAGE: dict[str, str] = {
+    "concept_lock": "define_story",
+    "script_lock": "define_story",
+    "department_look_lock": "design_performance",
+    "shot_animatic_lock": "design_performance",
+    "pilot_approval": "pilot",
+    "bulk": "production",
+    "dailies_review": "selects_rough",
+    "selects_rough_cut": "selects_rough",
+    "picture_lock": "selects_rough",
+    "post_locks": "post_master",
+    "master_lock": "post_master",
+    "complete": "delivery",
+}
+
+
+def public_flow_phase(workflow: dict[str, Any]) -> dict[str, Any]:
+    """Return the seven-step user-facing phase for a workflow projection."""
+    stage = str(workflow.get("current_stage") or "concept_lock")
+    phase_id = _PUBLIC_PHASE_BY_STAGE.get(stage, "define_story")
+    index = next(index for index, item in enumerate(PUBLIC_FLOW) if item["id"] == phase_id)
+    phase = dict(PUBLIC_FLOW[index])
+    phase.update(
+        {
+            "index": index + 1,
+            "total": len(PUBLIC_FLOW),
+            "complete": stage == "complete" and not bool(workflow.get("delivery_pending")),
+            # Kept solely for full diagnostics and migration tooling.
+            "internal_stage": stage,
+        }
+    )
+    return phase
+
+
 _ACTION_PRIORITY: dict[str, tuple[str, ...]] = {
     "concept_lock": ("workflow-stage-lock", "workflow-concept"),
     "script_lock": (

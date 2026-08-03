@@ -58,7 +58,7 @@ Idea → Story → Beats → Shots → Media → Selects → Rough Cut → Verif
 
 ### media
 - **开场**：`capability`（TTS/FRW/BGM/lipsync）
-- **I2V**：Seedance → Grok → 显式 legacy；`capability --suggest-i2v`
+- **I2V**：FRW LTX 2.3 → FRW API I2V → Grok Video 1.5；每路先过影片级 canary，`capability --suggest-i2v`
 - **TTS**：edge 默认；Voicebox 质量/FALLBACK；禁 Neural→EL
 - **BGM**：片级模板 → skill `assets/bgm/` → 程序化 rnb
 - **Lipsync**：默认 off；说书强制 off；canary 后 auto

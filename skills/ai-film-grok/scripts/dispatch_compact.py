@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from context_routing import select_context_refs
+from workflow_spine import public_flow_phase
 
 _STATE_SUFFIXES = {".json", ".md", ".txt", ".srt"}
 _STATE_IGNORES = {
@@ -246,6 +247,43 @@ def _attention(packet: dict[str, Any]) -> list[dict[str, str]]:
     return attention[:8]
 
 
+def _public_phase(packet: dict[str, Any]) -> dict[str, Any]:
+    """Project legacy/professional state onto the one seven-step user flow."""
+    workflow = packet.get("workflow") if isinstance(packet.get("workflow"), dict) else {}
+    if workflow:
+        return public_flow_phase(workflow)
+    # Lightweight callers and older receipts may not carry workflow yet.
+    craft = str(packet.get("craft_stage") or "idea")
+    fallback_stage = {
+        "idea": "concept_lock",
+        "story": "script_lock",
+        "beats": "shot_animatic_lock",
+        "shots": "shot_animatic_lock",
+        "media": "bulk",
+        "selects": "dailies_review",
+        "rough": "selects_rough_cut",
+        "verified": "master_lock",
+    }.get(craft, "concept_lock")
+    return public_flow_phase({"current_stage": fallback_stage})
+
+
+def _optional_actions(packet: dict[str, Any]) -> list[dict[str, str]]:
+    """Expose alternatives as deliberately non-primary, non-executable summaries."""
+    primary_id = str(packet.get("next_id") or "")
+    optional: list[dict[str, str]] = []
+    for action in packet.get("next_actions") or []:
+        if not isinstance(action, dict) or str(action.get("id") or "") == primary_id:
+            continue
+        action_id = str(action.get("id") or "")
+        why = _bounded_text(action.get("why"), max_bytes=280)
+        if not action_id or not why:
+            continue
+        optional.append({"id": action_id, "why": why})
+        if len(optional) == 3:
+            break
+    return optional
+
+
 def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
     """Project the full audit packet into the default agent-facing schema."""
     attention = _attention(packet)
@@ -259,16 +297,25 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
     )
     full_bytes = _json_bytes(packet)
     base_metrics = packet.get("metrics") if isinstance(packet.get("metrics"), dict) else {}
+    phase = _public_phase(packet)
+    blockers = [
+        {"code": item["code"], "summary": item["summary"]}
+        for item in attention
+        if item["severity"] in {"block", "stop"} or item["code"] == "NO_EXECUTABLE_NEXT_ACTION"
+    ]
     compact = {
         "ok": bool(packet.get("ok")),
         "kind": "ai-film-dispatch",
-        "schema_version": 3,
+        "schema_version": 4,
         "full_schema_version": packet.get("schema_version"),
         "mode": "compact",
         "at": packet.get("at"),
         "root": packet.get("root"),
         "craft_stage": packet.get("craft_stage"),
         "pipeline_stage": packet.get("pipeline_stage"),
+        # The sole user-facing progress model.  `workflow` remains below as a
+        # diagnostic compatibility projection for existing callers.
+        "phase": phase,
         "next_id": packet.get("next_id"),
         "next_cmd": _bounded_text(packet.get("next_cmd"), max_bytes=1536),
         "next_why": _bounded_text(packet.get("next_why"), max_bytes=768),
@@ -289,6 +336,9 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
             "stage_total": (packet.get("workflow") or {}).get("stage_total"),
             "blocking": (packet.get("workflow") or {}).get("blocking"),
         },
+        "blocked_by": blockers,
+        "required_proof": phase["proof"],
+        "optional_actions": _optional_actions(packet),
         "attention": attention,
         "hard_gate_codes": HARD_GATE_CODES,
         "context_refs": refs,

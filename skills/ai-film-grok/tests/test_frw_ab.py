@@ -316,8 +316,8 @@ def test_production_i2v_run_requires_valid_technical_switch_receipt(
         "schema_version": 1,
         "kind": "provider-switch",
         "shot_id": "shot01",
-        "primary_provider": "grok",
-        "fallback_provider": "frw-img2video",
+        "primary_provider": "frw-ltx23",
+        "fallback_provider": "frw-api-i2v",
         "reason_class": "technical_failure",
         "error": "upstream timeout",
         "fallback_fixed_for_shot": True,
@@ -344,7 +344,19 @@ def test_production_i2v_run_requires_valid_technical_switch_receipt(
     route_after_failure(
         root=tmp_path,
         shot_id="shot01",
-        primary="grok",
+        primary="frw-ltx23",
+        fallback_name="grok",
+        error="HTTP 503 service unavailable",
+        plan_sha256=plan["plan_sha256"],
+    )
+    with pytest.raises(FrwABError, match="PROVIDER_SWITCH_REQUIRED"):
+        run_experiment(tmp_path, plan=plan, inputs=_inputs(), submit=submit)
+    submit.assert_not_called()
+
+    route_after_failure(
+        root=tmp_path,
+        shot_id="shot01",
+        primary="frw-ltx23",
         error="HTTP 503 service unavailable",
         plan_sha256=plan["plan_sha256"],
     )

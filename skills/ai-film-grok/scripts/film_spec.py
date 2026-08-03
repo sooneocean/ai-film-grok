@@ -107,9 +107,8 @@ DEFAULT_LTX_HEIGHT = "1280"
 FRW_I2V_FRW_ONLY_LIFEBOAT = "legacy-img2video"
 ACTION_MOTION_PROVIDER_CHAIN = (
     "frw_ltx23_img2video_audio",
-    "grok_image_to_video",
-    "frw_wan_i2v_verified",
-    "local_verified_i2v",
+    "frw_api_img2video",
+    "grok_video_1_5",
 )
 # Env / synth layer (no face import): LTX T2V is primary for B-roll beds
 # 2026-07-21: ltx-t2v completed on sample key; seedance t2v may 403
@@ -164,9 +163,8 @@ def default_frw_video_model() -> str:
 
 def frw_i2v_fallback_chain() -> tuple[str, ...]:
     return (
-        "grok:image_to_video",
-        "frw:wan-i2v-verified",
-        "local:verified-i2v",
+        "frw:img2video-api",
+        "grok:video-1.5",
     )
 
 
@@ -827,10 +825,9 @@ def validate_film_spec(
     if fvm == "legacy-img2video":
         notes = list(spec.get("_frw_video_notes") or [])
         notes.append(
-            "WARN legacy-img2video: old FRW template 348771… quality floor; "
-            "FRW-only lifeboat outside the automatic action chain; "
-            "register frw_img2video — never claim seedance (2026-07-21); "
-            "prefer the LTX → Grok → verified FRW Wan → verified local chain"
+            "FRW API img2video fallback: current film canary plus decoded, human-approved "
+            "media are required; register frw_img2video with the actual returned model; "
+            "prefer the LTX → FRW API I2V → Grok Video 1.5 chain"
         )
         spec["_frw_video_notes"] = notes
     if fvm.startswith("ltx-"):
@@ -923,8 +920,8 @@ def validate_film_spec(
         "env_plate_cli": "frw newvideo --model ltx-t2v; then Grok no-face I2V if unavailable",
         "env_register_endpoint": "frw_ltx_t2v",
         "key_canary": (
-            "FRW LTX needs a film-scoped approved canary; Grok, FRW Wan and local routes "
-            "must each prove live readiness before fallback"
+            "FRW LTX, FRW API I2V, and Grok Video 1.5 each need a film-scoped approved "
+            "canary before fallback"
         ),
         "register_endpoint_hero": (
             "frw_ltx23_img2video_audio"

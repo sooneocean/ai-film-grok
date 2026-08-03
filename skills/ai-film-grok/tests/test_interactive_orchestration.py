@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -38,7 +39,12 @@ def _snapshot(root: Path, *, status: str = "ready", resource: str = "cloud") -> 
 def test_failed_cloud_task_is_retained_without_local_fallback(tmp_path: Path) -> None:
     _snapshot(tmp_path)
     interactive.submit_cloud_candidate(
-        tmp_path, candidate_id="c1", shot_id="shot1", capability_id="frw_cloud", task_id="task1"
+        tmp_path,
+        candidate_id="c1",
+        shot_id="shot1",
+        capability_id="frw_cloud",
+        task_id="task1",
+        query_operation="newvideo-query",
     )
     report = interactive.record_task_failure(tmp_path, candidate_id="c1", error_code="TASK_FAILED")
 
@@ -52,7 +58,12 @@ def test_terminal_media_must_stay_in_workspace_and_pass_decode(
 ) -> None:
     _snapshot(tmp_path)
     interactive.submit_cloud_candidate(
-        tmp_path, candidate_id="c1", shot_id="shot1", capability_id="frw_cloud", task_id="task1"
+        tmp_path,
+        candidate_id="c1",
+        shot_id="shot1",
+        capability_id="frw_cloud",
+        task_id="task1",
+        query_operation="newvideo-query",
     )
     with pytest.raises(interactive.InteractiveOrchestrationError):
         interactive.record_terminal_media(tmp_path, candidate_id="c1", media_path="/etc/passwd")
@@ -72,6 +83,17 @@ def test_terminal_media_must_stay_in_workspace_and_pass_decode(
         }
 
     monkeypatch.setattr(interactive, "analyze_media", fake_analyze)
+    monkeypatch.setattr(
+        interactive.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {"protocol_version": "1.0", "done": True, "success": True, "next_action": "ok"}
+            ),
+        ),
+    )
+    interactive.poll_frw_candidate(tmp_path, candidate_id="c1")
 
     report = interactive.record_terminal_media(
         tmp_path, candidate_id="c1", media_path="out/candidate.mp4"
@@ -93,6 +115,67 @@ def test_non_cloud_capability_cannot_enter_cloud_queue(tmp_path: Path) -> None:
             capability_id="frw_cloud",
             task_id="task1",
         )
+
+
+def test_frw_poll_retains_normalized_status_without_downloading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _snapshot(tmp_path)
+    interactive.submit_cloud_candidate(
+        tmp_path,
+        candidate_id="c1",
+        shot_id="shot1",
+        capability_id="frw_cloud",
+        task_id="task1",
+        query_operation="newvideo-query",
+    )
+    monkeypatch.setattr(
+        interactive.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "protocol_version": "1.0",
+                    "done": True,
+                    "success": True,
+                    "next_action": "ok",
+                    "data": {"video_url": "https://untrusted.example/candidate.mp4"},
+                }
+            ),
+        ),
+    )
+
+    report = interactive.poll_frw_candidate(tmp_path, candidate_id="c1")
+
+    candidate = report["candidates"][0]
+    assert candidate["status"] == "awaiting_terminal_media"
+    assert "video_url" not in json.dumps(candidate)
+    assert candidate["last_poll"]["success"] is True
+
+
+def test_frw_poll_malformed_response_becomes_auditable_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _snapshot(tmp_path)
+    interactive.submit_cloud_candidate(
+        tmp_path,
+        candidate_id="c1",
+        shot_id="shot1",
+        capability_id="frw_cloud",
+        task_id="task1",
+        query_operation="newvideo-query",
+    )
+    monkeypatch.setattr(
+        interactive.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="upstream broke"),
+    )
+
+    report = interactive.poll_frw_candidate(tmp_path, candidate_id="c1")
+
+    assert report["candidates"][0]["status"] == "failed"
+    assert report["candidates"][0]["error_code"] == "RUNTIME_ERROR"
 
 
 def test_approval_requires_reviewable_cloud_candidate(tmp_path: Path) -> None:

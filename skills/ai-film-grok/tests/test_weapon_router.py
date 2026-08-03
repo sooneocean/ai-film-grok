@@ -74,16 +74,16 @@ def test_non_visual_stage_does_not_route_weapon(tmp_path: Path) -> None:
     assert route["demand_detected"] is False
 
 
-def test_bulk_motion_demand_auto_selects_verified_wan_weapon(tmp_path: Path) -> None:
+def test_bulk_motion_demand_fails_closed_after_wan_retirement(tmp_path: Path) -> None:
     route = build_weapon_route(
         tmp_path,
         workflow=_workflow("bulk"),
         primary_job={"skillId": "image.animate"},
     )
 
-    assert route["status"] == "ready"
-    assert route["weapon_id"] == "wan22-i2v-quality"
-    assert route["provider"] == "comfy-wan22"
+    assert route["status"] == "retired"
+    assert route["fail_closed"] is True
+    assert "WAN22_I2V_RETIRED" in route["reason"]
 
 
 def test_adult_bulk_motion_fails_closed_without_promoted_meat_weapon(
@@ -100,9 +100,9 @@ def test_adult_bulk_motion_fails_closed_without_promoted_meat_weapon(
         primary_job={"skillId": "image.animate"},
     )
 
-    assert route["status"] == "blocked"
+    assert route["status"] == "retired"
     assert route["fail_closed"] is True
-    assert "no promoted Wan 2.2 weapon" in route["reason"]
+    assert "WAN22_I2V_RETIRED" in route["reason"]
 
 
 def test_compact_and_full_dispatch_share_weapon_route(tmp_path: Path) -> None:

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """I2V provider abstraction and action-routing layer.
 
-Runs the production action order FRW LTX 2.3 → Grok I2V → verified FRW Wan →
-verified local providers behind a single interface. New providers can be added
+Runs the production action order FRW LTX 2.3 → FRW API I2V → Grok Video 1.5
+behind a single interface. New providers can be added
 by implementing :class:`I2VProvider` and registering them instead of scattering
 ``source_endpoint`` labels through the codebase.
 
@@ -75,12 +75,7 @@ _SWITCH_HASH_FIELD = "switch_sha256"
 _SWITCH_KEY_ENV = "AIFILM_PROVIDER_SWITCH_RECEIPT_KEY"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _WAN_MODEL_IDENTITY_RE = re.compile(r"(?:^|/)wan(?:[0-9._-]|$)")
-ACTION_PROVIDER_PRIORITY = (
-    "frw-ltx23",
-    "grok",
-    "frw-wan",
-    "comfy-wan22",
-)
+ACTION_PROVIDER_PRIORITY = ("frw-ltx23", "frw-api-i2v", "grok")
 
 
 def is_technical_failure(error: object) -> bool:
@@ -194,6 +189,29 @@ def _canary_output_is_bound(root: Path, data: dict[str, Any]) -> bool:
     except SecurityPolicyError:
         return False
     return hmac.compare_digest(sha256_file(media), expected)
+
+
+def _canary_media_is_approved(root: Path, data: dict[str, Any]) -> bool:
+    """Require a real local decode and usable geometry, not a claimed receipt flag."""
+    output = data.get("output")
+    if isinstance(output, dict):
+        output = output.get("path")
+    output = output or data.get("output_path")
+    if not output:
+        return False
+    try:
+        media = safe_existing_file(root, str(output), field="canary output")
+        from media_qa import analyze_media
+
+        report = analyze_media(media, require_audio=False, require_motion=False)
+    except Exception:
+        return False
+    return bool(
+        report.get("ok")
+        and report.get("decode_ok")
+        and int(report.get("width") or 0) >= 704
+        and int(report.get("height") or 0) >= 1280
+    )
 
 
 def _write_switch_receipt(
@@ -432,10 +450,11 @@ class I2VProvider:
 
 
 class GrokI2VProvider(I2VProvider):
-    """Grok Build image_to_video — frame-1 I2V (default when Seedance unavailable)."""
+    """Grok Video 1.5 frame-1 I2V fallback."""
 
     name = "grok"
     endpoints = frozenset({"image_to_video", "reference_to_video"})
+    model = "grok-imagine-video-1.5"
 
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
         # A no-root probe describes the in-session Build capability. For a film
@@ -448,7 +467,7 @@ class GrokI2VProvider(I2VProvider):
                     ok=False,
                     available=False,
                     reason="Grok I2V canary not run for this film root.",
-                    models=["image_to_video", "reference_to_video"],
+                    models=[self.model],
                     profile="grok_primary",
                     detail={"canary_required": True, "receipt": str(receipt)},
                 )
@@ -456,15 +475,21 @@ class GrokI2VProvider(I2VProvider):
                 import json
 
                 data = json.loads(receipt.read_text(encoding="utf-8"))
-                available = bool(data.get("ok") and _canary_output_is_bound(Path(root), data))
+                recorded_model = str(data.get("provider_model") or data.get("model") or "").strip()
+                available = bool(
+                    data.get("ok")
+                    and recorded_model == self.model
+                    and _canary_output_is_bound(Path(root), data)
+                    and _canary_media_is_approved(Path(root), data)
+                )
                 return CapabilityReport(
                     provider=self.name,
                     ok=available,
                     available=available,
                     reason="Grok I2V live canary passed."
                     if available
-                    else "Grok I2V canary failed.",
-                    models=["image_to_video", "reference_to_video"],
+                    else "Grok Video 1.5 canary failed or is not verified for this model.",
+                    models=[self.model],
                     profile="grok_primary",
                     detail=data,
                 )
@@ -482,7 +507,7 @@ class GrokI2VProvider(I2VProvider):
             ok=True,
             available=True,
             reason="Grok image_to_video is ready as the second action lane.",
-            models=["image_to_video", "reference_to_video"],
+            models=[self.model],
             profile="grok_primary",
         )
 
@@ -500,6 +525,8 @@ class GrokI2VProvider(I2VProvider):
             str(adapter),
             "--image",
             str(keyframe),
+            "--model",
+            self.model,
             "--prompt",
             prompt,
             "--duration",
@@ -639,34 +666,51 @@ class SeedanceProvider(I2VProvider):
 
 
 class FrwImg2VideoProvider(SeedanceProvider):
-    """The original FRW ``img2video`` fallback, without Seedance selection."""
+    """Film-scoped FRW API ``img2video`` lane.
 
-    name = "frw-img2video"
+    FRW exposes this as a generic API, not a Wan/Seedance selector.  A passed
+    canary records the actual returned model and terminal media evidence.
+    """
+
+    name = "frw-api-i2v"
     endpoints = frozenset({"frw_img2video"})
 
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
-        del root
-        try:
-            from frw_dispatch import resolve_frw_root
-
-            resolve_frw_root()
-        except SystemExit as exc:
+        if root is None:
             return CapabilityReport(
                 provider=self.name,
                 ok=False,
                 available=False,
-                reason=str(exc)[:200],
+                reason="FRW API I2V requires a film-scoped approved canary.",
                 models=["img2video"],
-                profile="frw_fallback",
+                profile="frw_api_fallback",
+                detail={"canary_required": True},
             )
+        receipt = root / "receipts" / "frw-api-i2v-canary.json"
+        try:
+            data = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        approved = bool(
+            data.get("ok")
+            and _canary_output_is_bound(root, data)
+            and _canary_media_is_approved(root, data)
+            and data.get("full_decode_ok") is True
+            and data.get("human_review") == "approved"
+            and str(data.get("provider_model") or data.get("model") or "").strip()
+        )
         return CapabilityReport(
             provider=self.name,
-            ok=False,
-            available=False,
-            reason="FRW img2video is resolvable; a current film canary is still required.",
-            models=["img2video"],
-            profile="frw_fallback",
-            detail={"canary_required": True},
+            ok=approved,
+            available=approved,
+            reason=(
+                "FRW API I2V canary approved."
+                if approved
+                else "FRW API I2V canary is missing, unapproved, or lacks returned model identity."
+            ),
+            models=[str(data.get("provider_model") or data.get("model") or "img2video")],
+            profile="frw_api_fallback",
+            detail={"canary_required": True, "receipt": str(receipt), **data},
         )
 
     def build_command(
@@ -766,6 +810,9 @@ class FrwWanProvider(SeedanceProvider):
     name = "frw-wan"
     endpoints = frozenset({"frw_wan_i2v"})
 
+    def __init__(self) -> None:
+        raise I2VProviderError("FRW_WAN_I2V_RETIRED: use frw-api-i2v instead")
+
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
         if root is None:
             return CapabilityReport(
@@ -852,6 +899,9 @@ class LocalComfyWan22Provider(I2VProvider):
     name = "comfy-wan22"
     command_timeout_sec = 1830
     endpoints = frozenset({"local_wan22_i2v"})
+
+    def __init__(self) -> None:
+        raise I2VProviderError("WAN22_I2V_RETIRED: local Wan 2.2 I2V has been removed")
 
     def _base_url(self) -> str:
         from config_loader import get_config
@@ -1086,16 +1136,8 @@ def for_endpoint(source_endpoint: str) -> I2VProvider | None:
 
 
 def provider_priority() -> tuple[str, ...]:
-    """Return the production action order, followed by future verified locals."""
-    local_tail = tuple(
-        sorted(
-            name
-            for name in _REGISTRY
-            if (name.startswith("comfy-") or name.startswith("local-"))
-            and name not in ACTION_PROVIDER_PRIORITY
-        )
-    )
-    return (*ACTION_PROVIDER_PRIORITY, *local_tail)
+    """Return the closed cloud production action order."""
+    return ACTION_PROVIDER_PRIORITY
 
 
 def preferred(*, root: Path | None = None) -> I2VProvider:
@@ -1165,5 +1207,3 @@ register(GrokI2VProvider())
 register(SeedanceProvider())
 register(FrwImg2VideoProvider())
 register(FrwLtx23AudioProvider())
-register(FrwWanProvider())
-register(LocalComfyWan22Provider())

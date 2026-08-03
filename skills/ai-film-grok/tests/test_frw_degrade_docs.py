@@ -55,10 +55,10 @@ class FrwDegradeDocsTests(unittest.TestCase):
         skill = SKILL.read_text(encoding="utf-8")
         visual_card = (ROOT / "references" / "stages" / "visual.md").read_text(encoding="utf-8")
         reachable = skill + visual_card
-        # Current season: LTX action primary, then Grok, verified FRW Wan, local.
+        # Current season: LTX action primary, then FRW API I2V, then Grok Video 1.5.
         self.assertIn("ltx23_primary", reachable)
         self.assertIn("LTX 2.3", skill)
-        self.assertIn("FRW Wan", skill)
+        self.assertIn("FRW API I2V", skill)
         self.assertIn("frw-degrade-dispatch.md", reachable)
         degrade = REF.read_text(encoding="utf-8")
         seedance_lesson = LESSON_SEED.read_text(encoding="utf-8")
@@ -79,8 +79,8 @@ class FrwDegradeDocsTests(unittest.TestCase):
         for text, label in ((cons, "consistency"), (prod, "production-discipline")):
             self.assertIn("FRW LTX", text, label)
             self.assertIn("Grok", text, label)
-            self.assertIn("FRW Wan", text, label)
-            self.assertIn("local", text, label)
+            self.assertIn("FRW API I2V", text, label)
+            self.assertIn("Video 1.5", text, label)
         self.assertIn("ltx23_primary", cons)
         self.assertNotIn("推荐 576×1024", cons)
 

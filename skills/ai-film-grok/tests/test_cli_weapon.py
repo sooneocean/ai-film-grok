@@ -28,7 +28,7 @@ def _completed_canary(*, weapon_id: str = "ltx2-broll-pilot", sha: str = "abc123
 def test_canary_is_a_plan_without_execute_or_remote_submission(capsys) -> None:
     args = Namespace(
         weapon_action="canary",
-        weapon_id="wan22-i2v-quality",
+        weapon_id="qwen-image-edit-2511-local",
         base_url="http://127.0.0.1:18188",
         execute=False,
         complete=False,

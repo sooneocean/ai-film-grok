@@ -43,9 +43,7 @@ generation.
 |---|---|---|---|
 | Highest practical local text-to-image quality | `text-to-image`, `keyframe`, `character-still`, `poster`, `chinese-text` | `qwen-image-2512-quality` | 928x1664, 50 steps, CFG 4, Euler/simple, shift 3.1 |
 | Local wardrobe/color/object edit with identity retention | `local-image-edit`, `wardrobe-edit`, `color-edit`, `identity-preserving-edit` | `qwen-image-edit-2511-local` | FP8 mixed + verified 4-step edit LoRA |
-| General local I2V | `image-to-video`, `i2v`, `general-i2v` | `wan22-i2v-quality` | Official Wan 2.2 high/low pair, 20 steps |
-| Adult intimacy I2V | `adult-intimacy-i2v` | `wan22-adult-intimacy-baseline` | Adult attestation required |
-| Adult meat-motion pilot | `adult-meat-motion-i2v` | `wan22-adult-meat-pilot` | Experimental opt-in, pilot only, human approval required |
+| Local I2V | — | **Retired** | Wan 2.2 local I2V is not an available pilot or production route |
 | Stable talking-avatar pilot | `talking-avatar-stable-pilot` | `infinite-talk-stable-pilot` | 640², 20 steps, audio scale 1; identity stable but Japanese mouth articulation still needs review |
 | Expressive talking-avatar pilot | `talking-avatar-expressive-pilot` | `fantasy-talking-6step-pilot` | 640², 6-step technical canary; strong motion with known identity/color drift |
 

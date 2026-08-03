@@ -18,11 +18,12 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" advance --root "<film>"
 ```
 
-每步后 dispatch，只跑 `next_action`；读 `context_refs` 与 `weapon_route`。失败即停。状态：`receipts/dispatch.json`。
+每步后 dispatch，只跑 `next_action`；先解除 `blocked_by`，再以 `required_proof` 判断能否过关。读 `context_refs` 与 `weapon_route`。失败即停。状态：`receipts/dispatch.json`。
 
 `autopilot`：仅 allowlist 预算动作；整数 tick+实时就绪；人工/质量/容量关即停并写 receipt。
 
-骨架：Concept→Script→Look→Animatic→Pilot→Bulk→Dailies→Selects/Rough→Picture→Post→Master。
+主流程（对外唯一进度）：**定义故事 → 设计演出 → Pilot 样片 → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付**。
+Professional 11-stage 与八环只保留为内部证据／诊断投影，不要求用户同时理解多套阶段名称。
 小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。
 创作会诊：[creative-workshop](references/creative-workshop.md)（默认只编译，`apply` 才写图）。
 
@@ -36,12 +37,11 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **动作供应商**：`ltx23_primary`：**FRW LTX 2.3 → Grok I2V → verified FRW Wan → verified local**。未就绪跳过；已启动者仅技术失败可签名降级。禁 Seedance。
+7. **动作供应商**：`ltx23_primary`：**FRW LTX 2.3 → FRW API I2V → Grok Video 1.5**。每路均须当前影片 canary；未就绪跳过，已启动者仅技术失败可签名降级。禁 Seedance 与 Wan 2.2 本地 I2V。
 8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM=rnb；缺已批 edit/bridge 则 `final` 阻塞。[BGM](references/bgm-generation.md)
-8b. **对白 i2i**：先 performance-state；FRW receipt 优先，否则查 Comfy；忙则等。[lesson](references/lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 final。
-10. **字幕与画面字**：最终画面内字幕唯一所有权=HyperFrames；HF 失字必须修 HF 后重渲，禁 FFmpeg/PIL 兜底或双烧；`sub_lead=0`，禁空 SRT。I2V 出现任何内生字幕、乱码、伪字或水印时，禁入成片：全解码帧审计→命中帧及前后帧逐帧 i2i→重编→全帧复审→人工审。`caption_mode`/`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)。
+10. **字幕/画面字**：唯一 owner=HyperFrames；禁双烧与空 SRT。`caption_mode` 与 `transition_fluency` 依 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)；I2V 出现内生字、水印或乱码即禁入成片：全帧审计→逐帧修复→重编→复审→人工审。
 11. **后期单责**：title/sub/end 单引擎；`plate-cards blank`、plate `subs=off` 防双烧（[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)）。
 11b. **连载**：`serial validate`；系列圣经、单集事件、追更钩子与权利来源可审计。[workflow](references/serial-narrative-workflow.md)
 12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐。
@@ -50,9 +50,6 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
 16. **5090**：未锁视觉走 `weapon_route`；未验 fail closed。
 16b. **5090/OOM**：本机仅 1 个 `comfy_video.py`；禁 `pgrep -f` 自杀；邻镜禁静默顶替。[lesson](references/lessons-2026-07-29-comfy-multifilm-contention-oom.md)
-17. **bulk→final**：[evirus](references/lessons-2026-07-29-evirus-ch04-bulk-final-iron.md) — bare 续接、双轮 register、长超时、禁插内衣镜。
-18. **收尾**：[closeout](references/lessons-2026-07-29-closeout-gates-chaebol.md) — heat/sensory/truth、真 concat、review→audit→export。
-19. **镜头/算力**：[variety](references/lessons-2026-07-29-shot-variety-anti-boring.md) 禁复制 motion；[GPU](references/lessons-2026-07-29-comfy-gpu-priority-pilot-i2v.md) 一机一 owner、实验限 pilot。
 
 ## 阶段
 

@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from i2v_provider import provider_switch_receipt_is_valid
+from i2v_provider import provider_priority, provider_switch_receipt_is_valid
 from security_policy import (
     SecurityPolicyError,
     safe_existing_file,
@@ -393,7 +393,7 @@ def _base_plan(
             ),
         },
         "provider_policy": {
-            "primary_provider": "grok",
+            "primary_provider": provider_priority()[0],
             "changes_primary_provider": False,
             "requires_provider_switch_receipt": (
                 stage == "production" and operation == "image_to_video"
@@ -1152,10 +1152,13 @@ def _verify_provider_switch(root: Path | str, plan: dict[str, Any]) -> None:
     except SecurityPolicyError as exc:
         raise FrwABError(f"PROVIDER_SWITCH_REQUIRED: {exc}") from exc
     receipt = _load_required(path, kind="provider-switch")
+    priority = provider_priority()
+    expected_primary = priority[0]
+    expected_fallback = priority[1]
     if (
         receipt.get("shot_id") != stable_shot_id
-        or receipt.get("primary_provider") != "grok"
-        or receipt.get("fallback_provider") not in {"frw-wan", "frw-img2video"}
+        or receipt.get("primary_provider") != expected_primary
+        or receipt.get("fallback_provider") != expected_fallback
         or receipt.get("reason_class") != "technical_failure"
         or not str(receipt.get("error") or "").strip()
         or receipt.get("fallback_fixed_for_shot") is not True

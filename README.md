@@ -88,13 +88,13 @@ chmod 600 ~/.grok/plugins/ai-film-grok/skills/ai-film-grok/config.env
 
 类比拍短片：**先定剧本与试镜，再批量开拍，再剪辑成片**——不能跳步 bulk。
 
-### 双轴主脊
+### 单一主流程，内部多层证据
 
 | 轴 | 解决什么 | 入口 |
 |---|---|---|
-| **Professional 11 阶段** | 项目进度与验收模糊 | Concept Lock → Script Lock → Look/Shot/Pilot → Bulk/Dailies/Selects → Picture/Post/Master Lock |
-| **创作八环检查表** | 叙事模糊（想到哪拍到哪） | Idea → Story → Beats → Shots → Media → Selects → Rough → **Verified MP4** |
-| **工具四层** | 实现模糊（不知道用哪个模型） | Agent → 视觉 → 语音 → 设计(HF) → FFmpeg → 交付 |
+| **七段主流程** | 使用者唯一的项目进度 | 定义故事 → 设计演出 → Pilot → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付 |
+| 八环检查表 | 内部创作证据与回退定位 | Idea → Story → Beats → Shots → Media → Selects → Rough → Verified MP4 |
+| Professional 11 阶段／工具层 | 旧项目相容、路由与审计 | 相容诊断字段，不作为第二套进度 |
 
 ### 自动调配（每回合主入口）
 
@@ -107,32 +107,33 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 "$AIFILM" doctor
 "$AIFILM" dispatch --root "<film-root>"
-# 读 JSON：craft_stage · next_cmd · agent_instruction · routing · hard_gates
-# 本回合只做 next_cmd；做完再 dispatch。禁止跳环 bulk。
+# 读 JSON：phase · next_action · blocked_by · required_proof · optional_actions
+# 本回合只做 next_action；做完再 dispatch。禁止跳过 Pilot 后直接 bulk。
 ```
 
 | 字段 | 含义 |
 |------|------|
-| `workflow.current_stage` | 对外唯一的 11 阶段当前位置 |
-| `craft_stage` | 创作检查表位置（不是项目进度） |
-| `next_cmd` | **唯一**推荐命令 |
-| `agent_do` / `agent_instruction` | 本回合 checklist |
-| `routing` | TTS / BGM / I2V 兜底策略摘要 |
-| `hard_gates` | 不可跳过的门禁 |
+| `phase` | **唯一**对外阶段与完成所需证据 |
+| `next_action` | **唯一**可执行下一步；`next_cmd` 是兼容字段 |
+| `blocked_by` | 当前必须解除的阻塞原因 |
+| `required_proof` | 进入下一段需要的实际证据 |
+| `optional_actions` | 非主线辅助项，不可替代下一步 |
+| `workflow` / `craft_stage` | 旧项目相容与诊断投影 |
 
 `dispatch` **不会**：自批 pilot、静默改 film-spec、默认开 lipsync。  
 用户说「可以 / 一路做完」才 unlock 批量。
 
-### 阶段 → 你该做什么
+### 七段流程 → 你该做什么
 
-| 阶段 | 工序区 | 你该做的 | 典型命令 |
-|------|--------|----------|----------|
-| `agent` | 企划 + 预生产 | Brief / Lens → lock-style → write-spec → **pilot** | `init` `lock-style` `write-spec` `pilot *` |
-| `visual` | 生产画面 | still → **I2V** → register · continue | `media-queue` `image_to_video` / OAuth `queue-run-oauth` `register-clip` |
-| `voice` | 声轨 | Radio 测旁白 | `tts-rehearse --backend edge` |
-| `design` | 后期设计 | Studio / 设计成片 | `compose-preview` · `final --post-engine hyperframes` |
-| `post` | 锁画 | 十一维审批 | `review-final` |
-| `deliver` / `done` | Master | 导出 | `export-desktop` |
+| 阶段 | 通过证据 | 典型下一步 |
+|------|----------|------------|
+| 定义故事 | 主题、故事来源与叙事图已确认 | `plan run` / Lens / narrative lock |
+| 设计演出 | 画风、状态、镜头与时长计划已锁定 | `lock-style` · `write-spec` |
+| Pilot 样片 | 代表镜完整审看，用户明确批准 | `pilot report` / `pilot approve` |
+| 批量制作 | 所需镜头已生成、审查、登记 | `media-queue` · `register-clip` |
+| 选片与粗剪 | 选择集、接戏、节奏有当前证据 | `selects` · `editor-cut` |
+| 后期母版 | 字幕、混音、final review、post-audit 已绑定 | `tts-rehearse` · `final` · `review-final` |
+| 审片与交付 | 完整观看、解码、hash、导出回读完成 | `export-desktop` |
 
 ### 硬门禁（工程 · 不可跳）
 
@@ -151,7 +152,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 1. 会话加载 skill：`/ai-film-grok` 或 `/aifilm`  
 2. 给主题 / 参考图 / film root  
-3. Agent 跑 `dispatch`，只执行 `next_cmd`  
+3. Agent 跑 `dispatch`，先解除 `blocked_by`，只执行 `next_action`
 4. 静帧 / I2V 优先会话内 Imagine 工具；量产可用 OAuth 队列  
 5. 你批准 pilot → bulk → `final` → 你完整看片签十一维
 
@@ -159,9 +160,9 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 ## 架构图
 
-### 总览（工具四层 + 11 阶段）
+### 总览（七段主流程 + 工具层）
 
-![ai-film-grok 架构：Prompt → Professional 11 阶段 → 视觉/语音/设计/FFmpeg → 交付；侧栏可插拔模型](skills/ai-film-grok/docs/architecture.png)
+![ai-film-grok 架构：Prompt → 七段主流程 → 视觉/语音/设计/FFmpeg → 交付；侧栏可插拔模型](skills/ai-film-grok/docs/architecture.png)
 
 矢量源：[`skills/ai-film-grok/docs/architecture.svg`](./skills/ai-film-grok/docs/architecture.svg) · PNG：[`architecture.png`](./skills/ai-film-grok/docs/architecture.png)
 
@@ -184,8 +185,8 @@ flowchart TB
 
   subgraph VIS["1 · 视觉层 · 可插拔"]
     STILL["静帧<br/>image_gen / image_edit / OAuth image"]
-    I2V["I2V bulk<br/>默认 grok_primary → Grok image_to_video"]
-    FRW["可选 FRW<br/>Seedance I2V · LTX T2V 环境床"]
+    I2V["I2V bulk<br/>默认 ltx23_primary → FRW LTX 2.3"]
+    FRW["分类技术失败 fallback<br/>FRW API I2V → Grok Video 1.5"]
     Q["media-queue · register-clip · continue"]
     STILL --> I2V --> Q
     FRW -.-> Q
@@ -305,20 +306,18 @@ final --post-engine hyperframes
 
 | 插槽 | 默认（当前季） | 可切换 | 怎么换 |
 |------|----------------|--------|--------|
-| **运营 profile** | `grok_primary` | `seedance_first` | `AIFILM_I2V_PROFILE=…` |
-| **L1 人物 I2V** | Grok `image_to_video`（720p 串行） | FRW Seedance I2V | film-spec `i2v_provider=grok\|frw`；恢复 Seedance：`seedance_first` + canary 201 |
+| **运营 profile** | `ltx23_primary` | `grok_primary`（仅旧项目锁定） | `AIFILM_I2V_PROFILE=…` |
+| **L1 人物 I2V** | FRW LTX 2.3 `img2video-audio` | FRW API `img2video` → Grok `image_to_video` | 每路均需影片级 approved canary；仅分类技术失败可切换 |
 | OAuth 批 I2V | `queue-run-oauth` / `grok-oauth video --wait` | 视频模型 env | `AIFILM_GROK_VIDEO_MODEL`（默认 `grok-imagine-video`） |
 | L2 无脸环境床 | FRW **`ltx-t2v`**（`env-plate`） | — | `aifilm env-plate` · register `frw_ltx_t2v` |
 | 会话工具 | `image_to_video` | `reference_to_video`（少用） | 无原生 T2V |
 
 ```bash
-# 当前默认（Seedance 暂关）
-AIFILM_I2V_PROFILE=grok_primary
-AIFILM_SEEDANCE_AVAILABLE=0
+# 当前默认
+AIFILM_I2V_PROFILE=ltx23_primary
 
-# 恢复 FRW Seedance bulk（须 canary 201）
-# AIFILM_I2V_PROFILE=seedance_first
-# AIFILM_SEEDANCE_AVAILABLE=1
+# 仅旧项目显式锁定时使用 Grok-first 兼容路径
+# AIFILM_I2V_PROFILE=grok_primary
 ```
 
 ### 3 · TTS（旁白）
@@ -446,8 +445,7 @@ v1.6 新项目还需为 final 的七个维度各提供 `--screening-evidence "�
 | 变量 | 默认 | 含义 |
 |------|------|------|
 | `AIFILM_TTS_BACKEND` | `edge` | TTS 后端 |
-| `AIFILM_I2V_PROFILE` | `grok_primary` | I2V 运营季 |
-| `AIFILM_SEEDANCE_AVAILABLE` | `0` | Seedance 是否当 bulk |
+| `AIFILM_I2V_PROFILE` | `ltx23_primary` | I2V 运营季；Grok-first 仅旧项目显式锁定 |
 | `AIFILM_LIPSYNC_BACKEND` | `off` | 口型 |
 | `AIFILM_GROK_AUTH` | `auto` | OAuth / API key |
 | `AIFILM_GROK_CHAT_MODEL` | `grok-4.5` | OAuth chat |
@@ -463,7 +461,7 @@ v1.6 新项目还需为 final 的七个维度各提供 `--screening-evidence "�
 
 - 中文 final TTS → **edge**  
 - 色气 BGM → **rnb**（`dark` 仅恐怖）  
-- I2V → **`grok_primary`**（Seedance 暂关，除非显式恢复）  
+- I2V → **`ltx23_primary`**（FRW LTX 2.3 → FRW API I2V → Grok Video 1.5；每路须当前影片 canary）
 - pilot 须用户批准才 bulk  
 
 ---

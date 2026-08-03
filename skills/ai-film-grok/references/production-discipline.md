@@ -113,18 +113,18 @@ Agent 写 still/I2V prompt 时：**motion 字符串以主动作为首**，微动
 
 路径：`receipts/pilot-approval.json`。
 
-## 动作 I2V 优先链（LTX → Grok → FRW Wan → local）
+## 动作 I2V 优先链（LTX → FRW API I2V → Grok Video 1.5）
 
 | 规则 | 要求 |
 |------|------|
-| 默认 | `i2v_provider: auto` → `frw-ltx23`；动作顺序 FRW LTX → Grok → verified FRW Wan → verified local |
+| 默认 | `i2v_provider: auto` → `frw-ltx23`；动作顺序 FRW LTX → FRW API I2V → Grok Video 1.5 |
 | Still | **Grok** `image_edit(cast)` 同源；禁止 FRW text2image 批量主角 |
 | Still 卸装后 | peak 后 **只** `image_edit(undress-anchor/已脱 still)`；**禁**全装 cast 重起（回穿 P0） |
 | 状态照索引 | `cast_state_masters` + keyframe-first；I2V 只吃 keyframe；坏了改 keyframe |
-| bulk 2V | **FRW LTX 2.3 → Grok `image_to_video` → verified FRW Wan → verified local**；每段须当前 canary／切换收据 |
+| bulk 2V | **FRW LTX 2.3 → FRW API `img2video` → Grok Video 1.5**；每段须当前 canary／切换收据 |
 | 有尾帧 | FRW first-last 仅 fallback；保留 pair checksum 与 Contract checksum |
 | 入组 | 下载 → ffprobe → 全解码 → perceptual/exact duplicate gate → 人工 review |
-| **L1 人物** | FRW LTX 2.3 → Grok I2V → verified FRW Wan → verified local；`shot_role: hero` + cast still |
+| **L1 人物** | FRW LTX 2.3 → FRW API I2V → Grok Video 1.5；`shot_role: hero` + cast still |
 | **L2 合成** | FRW `ltx-t2v` → Grok no-face → verified local；禁用 T2V 声称脸一致 |
 | LTX 参数 | dims/duration/fps **string**；FRW `720p` 档位下竖屏原生 704×1280 |
 | 禁止默认 | legacy img2video；T2V 当 A-roll 主角 |

@@ -1,7 +1,7 @@
 # FRW 2V · Seedance / LTX / 经典通道（官方 dispatch 契约）
 
 > 2026-07-21 · **质量路由 + Key 能力位版**
-> **运营默认**：`AIFILM_I2V_PROFILE=ltx23_primary`；动作顺序为 FRW LTX → Grok → verified FRW Wan → verified local。`grok_primary` 仅保留给旧项目显式锁定。
+> **运营默认**：`AIFILM_I2V_PROFILE=ltx23_primary`；动作顺序为 FRW LTX → FRW API I2V → Grok Video 1.5。`grok_primary` 仅保留给旧项目显式锁定。
 > 探针课：[lessons-2026-07-20-frw-ltx-probe.md](lessons-2026-07-20-frw-ltx-probe.md)
 > 胃镜室：[lessons-2026-07-20-seedance-quality.md](lessons-2026-07-20-seedance-quality.md)
 > **Key 矩阵**：[lessons-2026-07-21-frw-key-capability.md](lessons-2026-07-21-frw-key-capability.md)
@@ -10,7 +10,7 @@
 ## 一句话
 
 **Still → 已批准角色状态图锁身份。**
-**Clip → FRW LTX 2.3 primary → Grok `image_to_video` → verified FRW Wan → verified local。**
+**Clip → FRW LTX 2.3 primary → FRW API `img2video` → Grok Video 1.5。**
 未就绪 provider 可留下原因后跳过；已开始的任务只有可判定技术失败才进入下一路线。
 FRW 多模型评测使用独立 [A/B 工作流](frw-ab-workflow.md)：pilot 全候选并行，
 production 只跑人审 champion＋challenger；它不会改写 primary。
@@ -60,7 +60,7 @@ production 只跑人审 champion＋challenger；它不会改写 primary。
 | 层 | 职责 | **主力**（权限开） | **Fallback** | 禁止 |
 |----|------|-------------------|--------------|------|
 | **L0** 身份静帧 | cast/style | **Grok** `image_edit(cast)` | FRW text2image（非身份）；img2image 慎 | 每镜纯 T2I 重抽脸 |
-| **L1** 人物 A-roll | 有脸 `hero` | **FRW LTX 2.3** | Grok → verified FRW Wan → verified local | **LTX T2V 当脸**；冒充 Wan |
+| **L1** 人物 A-roll | 有脸 `hero` | **FRW LTX 2.3** | FRW API I2V → Grok Video 1.5 | **LTX T2V 当脸**；冒充模型 |
 | **L2** 合成/环境 | `env\|bridge\|insert` | **LTX T2V** | Seedance t2v → **classic t2v** | 用 T2V 声称人物一致 |
 | **L3** 设计后期 | 字幕/片头 | HyperFrames | Remotion | Ken Burns 当戏 |
 

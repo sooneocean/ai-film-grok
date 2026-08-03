@@ -1,6 +1,6 @@
 # 自动调配 · `aifilm dispatch`
 
-> Agent 主入口：把八环 craft + 机位 capability + next 收成**一回合一步**。
+> Agent 主入口：把内部证据与机位 capability 收成**一回合一步**。
 > 不替代硬门禁；只负责「现在该干什么」。
 
 ## 一句话
@@ -9,16 +9,17 @@
 aifilm dispatch --root "<film>"
 ```
 
-默认只读 compact JSON 的 `next_cmd`、`next_action`、`hard_gate_codes` 与
-`context_refs`；做完再跑一次，直到 `craft_stage=verified` 且已 export。
+默认只读 compact JSON 的 `phase`、`next_action`、`blocked_by`、
+`required_proof` 与 `optional_actions`；做完再跑一次，直到审片与交付完成。
+`phase` 固定为：定义故事 → 设计演出 → Pilot 样片 → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付。
 完整审计包始终写入 `receipts/dispatch.json`。
 
 ## 会自动帮你调什么
 
 | 维度 | 行为 |
 |------|------|
-| 工序环 | 推断 idea…verified，优先 craft 缺口 |
-| 工具层 | 对齐 agent/visual/voice/design/post |
+| 七段主流程 | 投影当前阶段与通过所需证据 |
+| 内部证据／工具层 | 只用于选择主动作与诊断，不另建用户进度 |
 | **Grok Build** | `routing.grok_build`：Imagine 静帧/I2V、推理、检索、记忆（见 [grok-build-sdk.md](grok-build-sdk.md)） |
 | FRW | Media 前无 canary → 插入 `frw canary` |
 | I2V | 有 canary → 提示 `capability --suggest-i2v`（改 spec 须 `--apply`） |
@@ -75,7 +76,7 @@ dispatch。遇付费、外部服务、pilot、人审、重复、状态过期或�
 
 ## 用户口令
 
-- 「继续 / 下一步」→ `dispatch` → 执行 `next_cmd`
+- 「继续 / 下一步」→ `dispatch` → 先解除 `blocked_by` 后执行 `next_action`
 - 「一路做完」→ `run_to_completion`：仍每步 dispatch，遇 pilot/十一维等人审点暂停
 - 「停」→ 停止 bulk
 

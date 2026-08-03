@@ -41,7 +41,7 @@ Director’s Lens（文本→故事→storyboard） → P0 P4 语义先写死（
 init / lock-style          → P1
 write-spec                 → P0 P4（lint）+ P2/P3（intents 强 hard · camera_axis）
 continuity-chain           → P2
-I2V/Seedance hero + promote → P1 P2 P3（脸只走 I2V；403→LTX i2v→Grok）
+I2V hero + promote → P1 P2 P3（脸只走已验证 I2V；FRW LTX→FRW API→Grok）
 LTX T2V env beds           → P5 合成层（无脸；拼进时间线，不锁身份）
 final ffmpeg               → P3（visual_fit vo + hard；env↔hero 可 soft）
 final hyperframes|remotion → P5（blank plate + 字幕/片头；不替代 P0–P4）

@@ -69,6 +69,15 @@ def cmd_status(args: argparse.Namespace) -> int:
         pipeline_stage = {"stage": "unknown", "label_zh": "未知", "error": "detect_failed"}
         next_cmd = None
         _next_id = None
+    try:
+        from workflow_spine import build_workflow_status, public_flow_phase
+
+        workflow = pipeline_stage.get("workflow") if isinstance(pipeline_stage, dict) else None
+        if not isinstance(workflow, dict):
+            workflow = build_workflow_status(root, gates=gates)
+        phase = public_flow_phase(workflow) if isinstance(workflow, dict) else None
+    except (ImportError, OSError, ValueError):
+        phase = None
     from project_state import build_project_state
 
     project_state = build_project_state(
@@ -96,6 +105,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             "root": str(root),
             "title": manifest.get("title"),
             "provider_default": manifest.get("provider_default"),
+            "phase": phase,
             "pipeline_stage": pipeline_stage,
             "project_state": project_state,
             "canonical_stage": project_state.get("canonical_stage"),

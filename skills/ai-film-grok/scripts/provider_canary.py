@@ -27,10 +27,13 @@ def record_canary(
     reviewer: str,
     identity_ok: bool,
     motion_ok: bool,
+    provider_model: str = "",
     notes: str = "",
 ) -> dict[str, Any]:
     if provider not in {"grok", "seedance"}:
         raise ValueError("provider must be grok|seedance")
+    if provider == "grok" and not provider_model.strip():
+        provider_model = "grok-imagine-video-1.5"
     base = Path(root).expanduser().resolve()
     media = Path(output).expanduser()
     if not media.is_absolute():
@@ -42,6 +45,7 @@ def record_canary(
         "schema_version": 1,
         "kind": "provider-canary",
         "provider": provider,
+        "provider_model": provider_model.strip() or None,
         "output": str(media),
         "output_sha256": sha,
         "reviewer": reviewer.strip(),

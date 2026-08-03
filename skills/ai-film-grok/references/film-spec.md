@@ -52,11 +52,11 @@
 
 | 字段 | 默认 | 说明 |
 |------|------|------|
-| `i2v_provider` | `auto` | `auto`→`frw-ltx23`；运行时依次探测 Grok、FRW Wan、已验证本地路线 |
-| `frw_video_model` | `ltx-i2v` | LTX 参数/回执；FRW Wan 必须由供应商响应证明模型身份 |
+| `i2v_provider` | `auto` | `auto`→`frw-ltx23`；运行时依次探测 FRW API I2V、Grok Video 1.5 |
+| `frw_video_model` | `ltx-i2v` | LTX 参数/回执；FRW API I2V 须以影片级 canary 证明 |
 | `frw_aspect_ratio` | 跟 `aspect_ratio` 或 `9:16` | 传给 `frw newvideo --aspect-ratio` |
 | `frw_resolution` | **`720p`** | provider 档位；9:16 交付优先原生 **704×1280**，禁止 576 生成再放大 |
-| `frw_duration` | `"5"` | Seedance duration 字符串 |
+| `frw_duration` | `"5"` | FRW 视频时长参数 |
 
 CLI 配方与入组纪律：[frw-degrade-dispatch.md](frw-degrade-dispatch.md)、[lessons-2026-07-20-seedance-quality.md](lessons-2026-07-20-seedance-quality.md)。
 
@@ -64,8 +64,8 @@ CLI 配方与入组纪律：[frw-degrade-dispatch.md](frw-degrade-dispatch.md)�
 
 | 层 | 字段 | 主力 → Fallback |
 |----|------|-----------------|
-| 人物 A-roll | `shot_role: hero` | **Grok image_to_video** → FRW Seedance/LTX（仅技术失败）→ 人工复核 |
-| 合成/空镜 | `frw_env_model` + `env\|bridge\|insert` | **Grok image_to_video**；无身份输入时才走 Grok no-face → FRW LTX T2V（仅技术失败） |
+| 人物 A-roll | `shot_role: hero` | **FRW LTX 2.3** → FRW API I2V → Grok Video 1.5（仅分类技术失败）→ 人工复核 |
+| 合成/空镜 | `frw_env_model` + `env\|bridge\|insert` | **FRW LTX T2V**；无人物身份时使用，须独立 canary |
 | 身份静帧 | — | **Grok cast** |
 
 FRW LTX 参数必须 **string** 宽高；竖屏优先 `704`×`1280`。[frw-ltx-probe.md](lessons-2026-07-20-frw-ltx-probe.md)。

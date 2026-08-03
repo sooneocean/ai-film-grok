@@ -145,264 +145,6 @@
       }
     },
     {
-      "id": "wan22-i2v-quality",
-      "display_name": "Wan 2.2 I2V official quality",
-      "status": "verified",
-      "priority": 100,
-      "provider": "comfy-wan22",
-      "node": "rtx5090-main",
-      "intents": [
-        "image-to-video",
-        "i2v",
-        "general-i2v"
-      ],
-      "quality_tiers": [
-        "max_practical",
-        "standard"
-      ],
-      "profile": "official",
-      "workflow_template": "templates/comfy/wan22-i2v-quality-api.json",
-      "bindings": {
-        "prompt_node": "pos",
-        "prompt_input": "text",
-        "sampler_node": "ks_h",
-        "seed_input": "noise_seed",
-        "additional_seed_nodes": [
-          "ks_l"
-        ],
-        "steps_node": "ks_h",
-        "steps_input": "steps",
-        "additional_steps_nodes": [
-          "ks_l"
-        ],
-        "input_node": "img",
-        "input_image_input": "image",
-        "save_node": "save",
-        "filename_prefix_input": "filename_prefix"
-      },
-      "defaults": {
-        "steps": 20
-      },
-      "tuning": {
-        "steps": {
-          "allowed": [
-            20
-          ]
-        }
-      },
-      "trusted_custom_nodes": {
-        "VHS_VideoCombine": "custom_nodes.comfyui-videohelpersuite"
-      },
-      "requirements": {
-        "diffusion_models": [
-          "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
-          "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
-        ],
-        "text_encoders": [
-          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-        ],
-        "vae": [
-          "wan_2.1_vae.safetensors"
-        ]
-      },
-      "capabilities": {
-        "general_i2v": true,
-        "external_api_required": false
-      },
-      "verified": {
-        "real_pilot": true,
-        "normal_motion_mean": 18.2497,
-        "normal_motion_gate": true,
-        "meat_motion_gate": false,
-        "workflow_template_sha256": "dae3250e558317ba19d8f6438df3d3cce1607540844d2049e1eff51a532a6a93",
-        "output_sha256": "6d79426bb8538035731dd3526e2b29c6149080e22b2d8c33500ed50c2fce9471",
-        "technical_pilot_decode_ok": true,
-        "technical_pilot_geometry": "1024x576@16fps,5.062012s",
-        "visual_contact_sheet": "pass_stable_identity_hand_window_light",
-        "human_review": false,
-        "production_promoted": false
-      }
-    },
-    {
-      "id": "wan22-i2v-portrait-pilot",
-      "display_name": "Wan 2.2 I2V portrait-canvas pilot",
-      "status": "experimental",
-      "priority": 101,
-      "provider": "comfy-wan22",
-      "node": "rtx5090-main",
-      "intents": [
-        "image-to-video",
-        "i2v",
-        "general-i2v"
-      ],
-      "quality_tiers": [
-        "max_practical",
-        "standard"
-      ],
-      "profile": "portrait-canvas-pilot",
-      "workflow_template": "templates/comfy/wan22-i2v-portrait-pilot-api.json",
-      "bindings": {
-        "prompt_node": "pos",
-        "prompt_input": "text",
-        "sampler_node": "ks_h",
-        "seed_input": "noise_seed",
-        "additional_seed_nodes": [
-          "ks_l"
-        ],
-        "steps_node": "ks_h",
-        "steps_input": "steps",
-        "additional_steps_nodes": [
-          "ks_l"
-        ],
-        "input_node": "img",
-        "input_image_input": "image",
-        "save_node": "save",
-        "filename_prefix_input": "filename_prefix"
-      },
-      "defaults": {
-        "width": 576,
-        "height": 1024,
-        "steps": 20,
-        "length": 81,
-        "fps": 16
-      },
-      "tuning": {
-        "steps": {
-          "allowed": [
-            20
-          ]
-        }
-      },
-      "trusted_custom_nodes": {
-        "VHS_VideoCombine": "custom_nodes.comfyui-videohelpersuite"
-      },
-      "requirements": {
-        "diffusion_models": [
-          "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
-          "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
-        ],
-        "text_encoders": [
-          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-        ],
-        "vae": [
-          "wan_2.1_vae.safetensors"
-        ],
-        "clip_vision": [
-          "clip_vision_h.safetensors"
-        ],
-        "loras": [
-          "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
-          "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
-        ]
-      },
-      "capabilities": {
-        "general_i2v": true,
-        "portrait_canvas": true,
-        "pilot_only": true,
-        "human_approval_required": true,
-        "external_api_required": false
-      },
-      "verified": {
-        "real_pilot": false,
-        "production_promoted": false,
-        "workflow_template_sha256": "db8b1794b4d07f334c534a4da01f41a238c5d0eb875244fc8ad807e79e463562",
-        "human_review": false
-      }
-    },
-    {
-      "id": "wan22-adult-intimacy-baseline",
-      "display_name": "Wan 2.2 attested adult intimacy baseline",
-      "status": "verified-baseline",
-      "priority": 90,
-      "provider": "comfy-wan22",
-      "node": "rtx5090-main",
-      "intents": [
-        "adult-intimacy-i2v"
-      ],
-      "quality_tiers": [
-        "max_practical",
-        "standard"
-      ],
-      "profile": "adult-motion",
-      "requirements": {
-        "diffusion_models": [
-          "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
-          "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
-        ],
-        "text_encoders": [
-          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-        ],
-        "vae": [
-          "wan_2.1_vae.safetensors"
-        ]
-      },
-      "capabilities": {
-        "adult_attestation_required": true,
-        "external_api_required": false
-      },
-      "verified": {
-        "real_pilot": true,
-        "meat_motion_gate": false
-      }
-    },
-    {
-      "id": "wan22-adult-meat-pilot",
-      "display_name": "Wan 2.2 CubeyAI adult motion pilot",
-      "status": "experimental",
-      "priority": 80,
-      "provider": "comfy-wan22",
-      "node": "rtx5090-main",
-      "intents": [
-        "adult-meat-motion-i2v"
-      ],
-      "quality_tiers": [
-        "max_practical",
-        "standard"
-      ],
-      "profile": "adult-general-experimental",
-      "requirements": {
-        "diffusion_models": [
-          "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
-          "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
-        ],
-        "text_encoders": [
-          "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-        ],
-        "vae": [
-          "wan_2.1_vae.safetensors"
-        ],
-        "loras": [
-          "NSFW-22-H-e8.safetensors",
-          "NSFW-22-L-e8.safetensors"
-        ]
-      },
-      "requirement_sha256": {
-        "loras": {
-          "NSFW-22-H-e8.safetensors": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",
-          "NSFW-22-L-e8.safetensors": "d6b783742f4d5fd63a0223ae1d5bf64fc995a6b408480ac2a00528ae0d4146db"
-        }
-      },
-      "capabilities": {
-        "adult_attestation_required": true,
-        "pilot_only": true,
-        "human_approval_required": true,
-        "external_api_required": false
-      },
-      "verified": {
-        "real_pilot": true,
-        "normal_motion_mean": 18.0956,
-        "normal_motion_gate": true,
-        "meat_motion_gate": false,
-        "seed_sensitive": true,
-        "promoted": false,
-        "source": "https://huggingface.co/lopi999/Wan2.2-I2V_General-NSFW-LoRA",
-        "upstream": "https://civitai.com/models/1307155",
-        "high_lora_sha256": "34e2144d3cd65360f97d09ccbe03e1c39a096df6c9234af5fe3899d1b63cda39",
-        "low_lora_sha256": "d6b783742f4d5fd63a0223ae1d5bf64fc995a6b408480ac2a00528ae0d4146db",
-        "commercial_use": "restricted_rentcivit"
-      }
-    },
-    {
       "id": "infinite-talk-stable-pilot",
       "display_name": "InfiniteTalk stable audio-scale-1 pilot",
       "status": "experimental",
@@ -999,13 +741,100 @@
         "LTXAddVideoICLoRAGuide": "custom_nodes.ComfyUI-LTXVideo",
         "LTXFloatToInt": "custom_nodes.ComfyUI-LTXVideo",
         "LTXICLoRALoaderModelOnly": "custom_nodes.ComfyUI-LTXVideo",
-        "LTXVSetAudioRefTokens": "custom_nodes.ComfyUI-LTXVideo",
         "LTXVTiledVAEDecode": "custom_nodes.ComfyUI-LTXVideo"
+      },
+      "trusted_custom_node_prefixes": {
+        "LTXVSetAudioRef": "custom_nodes.ComfyUI-LTXVideo"
       },
       "verified": {
         "real_pilot": false,
         "production_promoted": false,
         "workflow_template_sha256": "99b0192b0f7baa4d2e7717a8055e7d8f589d234085f3c91ab9f98399a1f6d4b4"
+      },
+      "promotion_requirements": [
+        "terminal_media_decode",
+        "frame_audio_semantic_review",
+        "zero_text_artifacts",
+        "human_review"
+      ]
+    },
+    {
+      "id": "lipdub22b-official-fp8-vertical-pilot",
+      "display_name": "LipDub 22B official FP8 vertical pilot",
+      "status": "experimental",
+      "priority": 66,
+      "readiness": "installed_unverified",
+      "provider": "comfy_lan",
+      "source_endpoint": "local_ltx23_lipdub_vertical",
+      "node": "rtx5090-main",
+      "intents": [
+        "text-redub-visual-preservation-research"
+      ],
+      "quality_tiers": [
+        "pilot"
+      ],
+      "workflow_template": "templates/comfy/lipdub22b-official-fp8-vertical-api-pilot.json",
+      "bindings": {
+        "prompt_node": "2483",
+        "prompt_input": "text",
+        "sampler_node": "4832",
+        "seed_input": "noise_seed",
+        "save_node": "4852",
+        "filename_prefix_input": "filename_prefix",
+        "input_node": "5002",
+        "input_image_input": "file"
+      },
+      "requirements": {
+        "checkpoints": [
+          "ltx-2.3-22b-dev-fp8.safetensors"
+        ],
+        "loras": [
+          "ltx-2.3-22b-distilled-lora-384.safetensors",
+          "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors"
+        ],
+        "text_encoders": [
+          "gemma_3_12B_it_fp4_mixed.safetensors"
+        ],
+        "latent_upscale_models": [
+          "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+        ]
+      },
+      "minimum_vram_mib": 24576,
+      "execution_profile": "OfficialLipDubTwoStageFP8VerticalLocalOnly",
+      "allowed_stages": [
+        "pilot"
+      ],
+      "restrictions": [
+        "9:16-output-only",
+        "single-speaker-only",
+        "not-final",
+        "no-auto-promotion",
+        "human-review-required"
+      ],
+      "license_scope": "LTX-2-license-review-before-release",
+      "latest_canary_receipt_path": null,
+      "capabilities": {
+        "text_redub": true,
+        "synchronized_audio_video": true,
+        "portrait_9_16": true,
+        "pilot_only": true,
+        "human_review_required": true,
+        "external_api_required": false
+      },
+      "trusted_custom_nodes": {
+        "GetImageSizeAndCount": "custom_nodes.comfyui-kjnodes",
+        "LTXAddVideoICLoRAGuide": "custom_nodes.ComfyUI-LTXVideo",
+        "LTXFloatToInt": "custom_nodes.ComfyUI-LTXVideo",
+        "LTXICLoRALoaderModelOnly": "custom_nodes.ComfyUI-LTXVideo",
+        "LTXVTiledVAEDecode": "custom_nodes.ComfyUI-LTXVideo"
+      },
+      "trusted_custom_node_prefixes": {
+        "LTXVSetAudioRef": "custom_nodes.ComfyUI-LTXVideo"
+      },
+      "verified": {
+        "real_pilot": false,
+        "production_promoted": false,
+        "workflow_template_sha256": "8b16a695bd95992d62324f337590e0010a99bf9b333fae9b686fcbd07d73566f"
       },
       "promotion_requirements": [
         "terminal_media_decode",

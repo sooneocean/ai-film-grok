@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Private ComfyUI video client for the user's RTX 5090 node.
+"""Private ComfyUI helpers for the user's RTX 5090 node.
 
-The production default remains Grok.  This module exposes an explicit local
-Wan 2.2 lane with model/read-back evidence and no cloud upload.
+The historical local Wan 2.2 I2V submitter is retained only for receipt and
+workflow inspection compatibility. Generation is retired and fails closed.
 """
 
 from __future__ import annotations
@@ -29,8 +29,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from util import write_json
-
 try:
     import fcntl
 except ImportError:  # pragma: no cover - Windows is the remote executor, not orchestrator
@@ -50,6 +48,7 @@ DEFAULT_MIN_FREE_RAM_BYTES = 12 * GIB
 DEFAULT_MIN_FREE_VRAM_BYTES = 24 * GIB
 _SUBMISSION_LOCK_WAIT_SEC = 5.0
 _SSH_TARGET = re.compile(r"^[A-Za-z0-9_.\\-]+@[A-Za-z0-9.:-]+$")
+WAN22_I2V_RETIRED = "WAN22_I2V_RETIRED: local Wan 2.2 I2V cannot be submitted"
 
 
 WAN22_OFFICIAL_PROFILE: dict[str, Any] = {
@@ -1461,6 +1460,7 @@ def generate(
     subject_basis: str,
     timeout_sec: int = 1800,
 ) -> dict[str, Any]:
+    raise ComfyVideoError(WAN22_I2V_RETIRED)
     if str(profile.get("name") or "").startswith("adult-"):
         validate_adult_request(prompt=prompt, subject_basis=subject_basis)
     capability = probe(base_url)
@@ -1515,12 +1515,14 @@ def generate(
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Private RTX 5090 ComfyUI video client")
+    parser = argparse.ArgumentParser(
+        description="Private RTX 5090 ComfyUI helpers; Wan 2.2 generation is retired"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     probe_cmd = sub.add_parser("probe")
     probe_cmd.add_argument("--base-url", required=True)
 
-    generate_cmd = sub.add_parser("generate")
+    generate_cmd = sub.add_parser("generate", help="Retired; rejects without contacting ComfyUI")
     generate_cmd.add_argument("--base-url", required=True)
     generate_cmd.add_argument("--image", type=Path, required=True)
     generate_cmd.add_argument("--prompt", required=True)
@@ -1570,29 +1572,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "probe":
         report = probe(args.base_url)
     else:
-        profile = resolve_wan22_profile(
-            args.profile,
-            intent=args.weapon_intent,
-            stage=args.production_stage,
-            allow_experimental=args.allow_experimental,
-        )
-        report = generate(
-            base_url=args.base_url,
-            image=args.image,
-            prompt=args.prompt,
-            out=args.out,
-            width=args.width,
-            height=args.height,
-            duration_sec=args.duration,
-            seed=args.seed,
-            turbo=args.turbo,
-            profile=profile,
-            subject_basis=args.subject_basis or "",
-            timeout_sec=args.timeout,
-        )
-        receipt_path = args.receipt or args.out.with_suffix(args.out.suffix + ".receipt.json")
-        report["receipt_path"] = str(Path(receipt_path).expanduser().resolve())
-        write_json(Path(receipt_path).expanduser().resolve(), report)
+        print(json.dumps({"ok": False, "error": WAN22_I2V_RETIRED}, ensure_ascii=False))
+        return 2
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report.get("ok") else 2
 

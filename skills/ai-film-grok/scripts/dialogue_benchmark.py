@@ -26,12 +26,7 @@ WEAPON_EXECUTORS = {
     "comfy_qwen_i2i_keyframe": "comfy",
     "frw_ltx23_img2video_audio": "frw",
 }
-LEGACY_P2_WEAPONS = (
-    "comfy_qwen_i2i_performance_state",
-    "comfy_wan22_i2v",
-    "rtx_latentsync_1_6",
-)
-SUPPORTED_WEAPON_SETS = frozenset({frozenset(WEAPONS), frozenset(LEGACY_P2_WEAPONS)})
+SUPPORTED_WEAPON_SETS = frozenset({frozenset(WEAPONS)})
 _PACKAGE_NAME = "dialogue-scene-package.json"
 _REPORT_NAME = "dialogue-weapon-benchmark.json"
 _MAX_PACKAGE_BYTES = 4 * 1024 * 1024

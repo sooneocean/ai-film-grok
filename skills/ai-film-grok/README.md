@@ -2,7 +2,7 @@
 
 > **安装 / 使用逻辑 / 架构图 / 可插拔模型** → 仓库根 [README.md](../../README.md)（对外主文档）。
 
-**一句话**：把「从灵感到可发布的 AI 动态短片」收成**可恢复、可验收**流水线——Professional 11 阶段 dispatch + **视觉**（Grok still + 默认 `grok_primary` I2V）+ **语音**（Edge TTS）+ **设计**（HyperFrames / Remotion）+ **FFmpeg** → 交付。
+**一句话**：把「从灵感到可发布的 AI 动态短片」收成**可恢复、可验收**的七段流程——定义故事 → 设计演出 → Pilot → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付。
 
 正式交付必须是**真实动态成片**（I2V 验收），不是静图轮播、Ken Burns 或只有关键帧。
 
@@ -13,7 +13,7 @@
         ↓
 Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
         ↓
-1. 视觉生成     Grok Imagine 静帧 + I2V（默认 grok_primary；可选 FRW Seedance）
+1. 视觉生成     Grok Imagine 静帧 + I2V（默认 ltx23_primary：FRW LTX → FRW API → Grok）
 2. 语音生成     Edge TTS（可插拔 voicebox / grok / minimax / fish / external）
 3. 动态合成     HyperFrames（优先） / Remotion（备选）
 4. 最终后处理   FFmpeg（拼板 · 混音 · 导出）
@@ -26,13 +26,13 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 - **工具四层**：[`references/pipeline-methodology.md`](references/pipeline-methodology.md)  
 - 弹性默认：[`references/hard-defaults.md`](references/hard-defaults.md)
 
-运行时：优先 `aifilm dispatch`；`status|next|preflight|stage` → **`pipeline_stage`**（HUD sidecar）。
+运行时：优先 `aifilm dispatch` 的 **`phase`**；`status|next|preflight|stage` 的 `pipeline_stage` 仅供 HUD／旧项目诊断。
 
 ### 架构总览
 
 ![ai-film-grok 四层流水线](docs/architecture.png)
 
-> 当前季默认 **I2V = grok_primary**。完整插拔矩阵与安装步骤见仓库根 README。
+> 当前季默认 **I2V = ltx23_primary**；`grok_primary` 仅保留给已锁定的旧项目。完整插拔矩阵与安装步骤见仓库根 README。
 
 ---
 
@@ -73,17 +73,18 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 ## 技术栈（你实际在用什么）
 
-### 核心生成：Grok primary + FRW fallback
+### 核心生成：FRW LTX primary + 证据化 fallback
 
 | 能力 | 在本 skill 中的角色 | 入口 |
 |------|---------------------|------|
 | **Grok Imagine（图像）** | 文生图 / 图生图：风格样张、定妆、每镜关键帧 | `image_gen`、`image_edit` |
-| **Grok Imagine Video** | 当前 `grok_primary` 默认 I2V | `image_to_video` |
-| **FRW Seedance（技术备援）** | Grok 明确技术失败后，先 upload-probe 再使用；保留原生尺寸 | `"$AIFILM" frw newvideo --model seedance-2-fast-i2v` |
+| **FRW LTX 2.3** | 当前 `ltx23_primary` 第一动作路线；需影片级 approved canary | `"$AIFILM" frw img2video-audio --model ltx2.3` |
+| **FRW API I2V** | LTX 分类技术失败后的第二路线；需影片级 approved canary | `"$AIFILM" frw img2video` |
+| **Grok Imagine Video** | FRW 两路不可用或分类技术失败后的第三路线；需影片级 approved canary | `image_to_video` |
 
 要点：
 
-- **分层**：静帧与 bulk 动画都默认 **Grok**；FRW 只能在可判定技术失败后自动备援，并写 provider-switch receipt。
+- **分层**：静帧默认 **Grok**；bulk 动画依序为 **FRW LTX → FRW API → Grok**，每次切换都须分类技术失败并写 provider-switch receipt。
 - FRW fallback 必须区分 `FRW_API_KEY`（任务 API）与 `FRW_TOKEN`（上传 JWT）；上传前执行 `upload-probe`。
 - **禁止** 默认 legacy `img2video`；**禁止** 576 生成再放大到 720 当高清。  
 - Python **不内嵌 key**：Grok 工具由 agent 调；FRW 经 `frw_dispatch` + frwclaw `.env`；本仓库负责 **规格、队列、QA、成片门禁**。  

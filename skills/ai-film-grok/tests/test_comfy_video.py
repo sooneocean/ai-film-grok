@@ -25,6 +25,7 @@ from comfy_video import (  # noqa: E402
     cancel_prompt,
     download_result,
     free_memory,
+    generate,
     inventory,
     load_api_workflow,
     normalize_base_url,
@@ -50,6 +51,22 @@ class ComfyVideoTests(unittest.TestCase):
             os.environ.pop("AIFILM_COMFY_DRIVER_VRAM_FALLBACK", None)
         else:
             os.environ["AIFILM_COMFY_DRIVER_VRAM_FALLBACK"] = self._driver_vram_fallback
+
+    def test_local_wan_generation_is_retired_before_any_network_call(self) -> None:
+        with self.assertRaisesRegex(ComfyVideoError, "WAN22_I2V_RETIRED"):
+            generate(
+                base_url="http://127.0.0.1:8188",
+                image=Path("frame.png"),
+                prompt="movement",
+                out=Path("clip.mp4"),
+                width=704,
+                height=1280,
+                duration_sec=5,
+                seed=1,
+                turbo=False,
+                profile=WAN22_OFFICIAL_PROFILE,
+                subject_basis="adult",
+            )
 
     def test_armory_auto_routes_general_i2v_to_official_quality(self) -> None:
         selection = select_wan22_weapon(intent="general", stage="production")

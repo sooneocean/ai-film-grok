@@ -107,6 +107,16 @@ def select_weapon(
     normalized_stage = str(stage).strip().lower()
     if normalized_stage not in {"pilot", "production"}:
         raise ComfyArmoryError(f"unsupported production stage: {stage}")
+    if normalized in {
+        "image-to-video",
+        "i2v",
+        "general-i2v",
+        "adult-intimacy-i2v",
+        "adult-meat-motion-i2v",
+    }:
+        raise ComfyArmoryError(
+            "WAN22_I2V_RETIRED: local Wan 2.2 I2V is not an available production or pilot route"
+        )
     if normalized == "adult-meat-motion-i2v":
         if normalized_stage == "production":
             raise ComfyArmoryError(
@@ -422,6 +432,7 @@ def assert_registered_weapon_workflow(
         )
 
     trusted_custom_nodes = weapon.get("trusted_custom_nodes") or {}
+    trusted_custom_node_prefixes = weapon.get("trusted_custom_node_prefixes") or {}
     for class_type in sorted(
         {
             str(node["class_type"])
@@ -441,7 +452,17 @@ def assert_registered_weapon_workflow(
         python_module = str(info.get("python_module") or "")
         if python_module == "nodes" or python_module.startswith("comfy_extras."):
             continue
-        if trusted_custom_nodes.get(class_type) != python_module:
+        expected_module = trusted_custom_nodes.get(class_type)
+        if expected_module is None:
+            expected_module = next(
+                (
+                    module
+                    for prefix, module in trusted_custom_node_prefixes.items()
+                    if class_type.startswith(str(prefix))
+                ),
+                None,
+            )
+        if expected_module != python_module:
             raise ComfyArmoryError(
                 f"untrusted node module for {class_type}: {python_module or 'unknown'}"
             )
