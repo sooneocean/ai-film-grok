@@ -390,6 +390,22 @@ def test_skill_entry_and_compact_context_stay_inside_token_budgets() -> None:
         assert (skill_root / "references" / "stages" / f"{stage}.md").is_file()
 
 
+def test_voice_pipeline_does_not_require_full_ep2_lesson() -> None:
+    """Phase2 P1: default voice context stays on stages/voice, not 100+ line lesson."""
+    skill_root = Path(__file__).resolve().parents[1]
+    routing = json.loads((skill_root / "registry" / "context-routing.json").read_text())
+    voice_refs = routing["pipeline_stages"]["voice"]
+    by_path = {item["path"]: item for item in voice_refs}
+    assert by_path["references/stages/voice.md"]["required"] is True
+    ep2 = by_path.get("references/lessons-2026-07-24-ep2-voice-heat-final.md")
+    assert ep2 is not None
+    assert ep2["required"] is False
+    voice_card = (skill_root / "references" / "stages" / "voice.md").read_text(encoding="utf-8")
+    assert len(voice_card.splitlines()) <= 30
+    assert "口白" in voice_card and "日文" in voice_card
+    assert "hard-defaults" in voice_card
+
+
 def test_public_entry_docs_name_the_same_seven_phase_contract() -> None:
     skill_root = Path(__file__).resolve().parents[1]
     repo_root = skill_root.parents[1]

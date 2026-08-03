@@ -1,19 +1,23 @@
 # ai-film-grok 流程瘦身 Phase 2 — 2026-08-03
 
-**Status:** P0–P5 DONE 2026-08-03 · v2.31.16 · not pushed  
-**前置:** ROI A–E + release 2.31.15 已合入；见 `2026-08-03-roi-optimization-plan.md`  
+**Status:** **P0–P5 VERIFIED DONE** · 2026-08-03 · **v2.31.16–17**  
+**Remote:** 2.31.16 已在 origin；**2.31.17**（untrack canary media）本地领先 origin（需你 `push`）  
+**前置:** ROI A–E + release 2.31.15；见 `2026-08-03-roi-optimization-plan.md`  
 **目标:** 更有效率、更稳定——**少重复真相、少 token 税、少流程名词、少仓内垃圾**
 
-### Session result
+### Session result（验收 2026-08-03）
 
 | Batch | Result |
 |-------|--------|
-| P0 | ruff + fast suite + doctor core green；story/shot extract 已在 2.31.14–15 |
-| P1 | voice lesson `required:false`；stages/voice 自洽（2.31.15 已含部分） |
-| P2 | `~/.grok/Agents.md` 102→85 行指针（备份 process-slim）；plugin AGENTS 硬规则改指针 |
-| P3 | `memory/README.md` 契约；18 对 memory 已是短卡 |
-| P4 | 清单 + **P4b untrack 27 media**（本地保留；gitignore 防回写） |
-| P5 | craft-spine / generative-film-craft / INDEX / SKILL 七步映射 |
+| P0 | ruff + dispatch 测绿；doctor core 绿；story/shot extract 在 2.31.14–15 |
+| P1 | voice/rough ep2 lesson `required:false`；`stages/voice` ≤30 行含声线表；`max_refs=3` |
+| P2 | 全局 Agents ~85 行指针（备份 process-slim）；plugin AGENTS 硬规则改指针 |
+| P3 | `memory/README.md`；41 卡中 18 对 lesson；仅 1 卡 >60 行（流水线 wave 表，可接受） |
+| P4 | 清单 + **P4b untrack 27 media**；tracked artifacts media = **0** |
+| P5 | craft-spine / generative-film-craft 标内部；INDEX/SKILL 七步唯一主进度 |
+| P6 | 未开（按计划） |
+
+**回归锁：** `test_voice_pipeline_does_not_require_full_ep2_lesson` · `test_public_entry_docs_name_the_same_seven_phase_contract`
 
 ---
 
