@@ -14,12 +14,14 @@ from drama_graph import validate_graph  # noqa: E402
 from film_spec import FilmSpecError, validate_film_spec  # noqa: E402
 from narrative_control import validate_narrative_graph  # noqa: E402
 from story_plan import (  # noqa: E402
+    build_planned_graph,
     export_legacy_story_plan,
     normalize_story,
     normalize_story_graph,
     project_graph_to_film_spec,
     run_plan,
 )
+from util import FilmError  # noqa: E402
 
 
 class StoryPlanTests(unittest.TestCase):
@@ -334,6 +336,32 @@ class StoryPlanTests(unittest.TestCase):
         self.assertEqual(graph["episodes"][0]["id"], "ep-empty")
         spec = project_graph_to_film_spec(graph)
         self.assertEqual(spec["scenes"], [])
+
+    def test_pre_plan_validation_blocks_invalid_graph(self) -> None:
+        """run_plan() raises FilmError when build_planned_graph returns
+        a graph missing required top-level keys (e.g. story_resolution)."""
+        from unittest.mock import patch
+
+        raw = "雨夜出租车里的一次对话。"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def _return_invalid_graph(*args, **kwargs):
+                graph = build_planned_graph(*args, **kwargs)
+                del graph["story_resolution"]
+                return graph
+
+            with patch("story_plan.build_planned_graph", _return_invalid_graph):
+                with self.assertRaises(FilmError) as cm:
+                    run_plan(
+                        root,
+                        raw,
+                        title="pre-plan-validation-test",
+                        target_duration=30,
+                        apply_film_spec=True,
+                        force=True,
+                    )
+            self.assertIn("PRE_PLAN_NARRATIVE", str(cm.exception))
 
 
 if __name__ == "__main__":

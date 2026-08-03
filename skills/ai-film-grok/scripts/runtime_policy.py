@@ -135,7 +135,26 @@ def _command_version(command: str) -> str | None:
     return text[0].strip() if text else None
 
 
-def _package_versions(names: Iterable[str]) -> dict[str, str | None]:
+def _skill_python(skill_dir: Path) -> str | None:
+    """Resolve the skill's own runtime Python (not the host agent's sys.executable)."""
+    helper = (skill_dir / "scripts" / "runtime-python").resolve()
+    if not helper.is_file():
+        return None
+    try:
+        proc = subprocess.run(
+            ["sh", str(helper)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=minimal_subprocess_env(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    exe = (proc.stdout or "").strip()
+    return exe or None
+
+
+def _package_versions(names: Iterable[str], skill_dir: Path | None = None) -> dict[str, str | None]:
     """Resolve package versions from the skill runtime interpreter.
 
     Query via a short-lived subprocess with ``PYTHONPATH`` cleared so host-agent
@@ -160,9 +179,13 @@ def _package_versions(names: Iterable[str]) -> dict[str, str | None]:
     )
     env = minimal_subprocess_env()
     env.pop("PYTHONPATH", None)
+    # Use the skill's pinned runtime (not sys.executable which may be Hermes' own Python).
+    interpreter = _skill_python(skill_dir) if skill_dir is not None else None
+    if interpreter is None:
+        interpreter = sys.executable
     try:
         proc = subprocess.run(
-            [sys.executable, "-c", probe, json.dumps(ordered)],
+            [interpreter, "-c", probe, json.dumps(ordered)],
             capture_output=True,
             text=True,
             timeout=30,
@@ -208,11 +231,26 @@ def build_runtime_lock(
         scripts.append({"path": key, "sha256": sha256(resolved)})
     requirements_path = root / "requirements.lock"
     package_names = tuple(_requirements(requirements_path)) or LOCKED_PACKAGES
+    # Resolve python version from the skill runtime, not platform.python_version()
+    # (which reports the host agent's Python, not the skill's pinned interpreter).
+    runtime_py = _skill_python(root)
+    py_version = platform.python_version()
+    if runtime_py:
+        try:
+            vproc = subprocess.run(
+                [runtime_py, "-c", "import sys; print(sys.version.split()[0])"],
+                capture_output=True, text=True, timeout=10,
+                env=minimal_subprocess_env(),
+            )
+            if vproc.returncode == 0 and vproc.stdout.strip():
+                py_version = vproc.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
     return {
         "schema_version": 2,
-        "python": platform.python_version(),
+        "python": py_version,
         "commands": {"ffmpeg": _command_version("ffmpeg"), "ffprobe": _command_version("ffprobe")},
-        "packages": _package_versions(package_names),
+        "packages": _package_versions(package_names, root),
         "scripts": scripts,
         "requirements_sha256": sha256(requirements_path) if requirements_path.is_file() else None,
     }

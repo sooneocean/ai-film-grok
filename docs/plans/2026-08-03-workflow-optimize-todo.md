@@ -1,6 +1,6 @@
 # 流程优化 Todo Plan — 2026-08-03
 
-**Status:** **Wave A–C SHIPPED** (v2.31.20–21) · Wave D pending  
+**Status:** **Wave A–D SHIPPED** (v2.31.20–22)  
 **视角：** 你怎么把一集从故事做到桌面成片（不是再拆 CLI 行数）。  
 **前置已完成：** ROI A–E · Process slim P0–P5（v2.31.16–19）  
 **方法：** 7 步主流程 × 近两周片例 PARTIAL × 门禁密度  
@@ -88,11 +88,11 @@
 - [x] **C2 · `tunnel-probe` + doctor `comfy_tunnel`** — `TUNNEL_WRONG_PORT`  
 - [x] **C3 · `queue-progress`** — 非空 takes/clips 才算进度  
 
-### Wave D — Final 包装（有成片回归痛再开）
+### Wave D — Final 包装 · **DONE (v2.31.22)**
 
-- [ ] **D1 · final 超时策略表**（长片默认 ≥1800s / 或直调 render_final）写进 stages/post + CLI 默认  
-- [ ] **D2 · sidechain 失败自动降级 amix**（带 PARTIAL receipt，不静默）  
-- [ ] **D3 · 字幕路径空格 / force_style 炸 → 已有 /tmp 路径；确保 final-one-shot 默认走稳路径  
+- [x] **D1 · final 超时策略** — short 1200 / ≥480s 或 longform 1800；超时指 render_final  
+- [x] **D2 · sidechain → amix PARTIAL** — `receipts/final-mix-partial.json`  
+- [x] **D3 · SRT 空格稳路径** — `stable_path_for_ffmpeg_filter` + PIL burn  
 
 ### Wave E — 明确不做 / 延后
 

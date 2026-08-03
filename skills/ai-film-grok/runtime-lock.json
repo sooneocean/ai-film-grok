@@ -114,7 +114,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "c89bc2cbaf6b37a6632f08caffe40266163b129d4f8df3afea8bbbabaf38279c"
+      "sha256": "5bad27fefed58f1d850f548ec6046f00cfe238742c79261824eba90e582762d1"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -226,7 +226,7 @@
     },
     {
       "path": "scripts/beat_extraction.py",
-      "sha256": "2db8e1bd96cfe5c2e4202e1ce5a4e3b7f1064642a1b13918c5d235ce8a197cfe"
+      "sha256": "57dbb7c228a221aaa49221c6629342a29d4355a28536f9b8981f53539e54f3fe"
     },
     {
       "path": "scripts/beat_spine.py",
@@ -618,7 +618,7 @@
     },
     {
       "path": "scripts/final_stages.py",
-      "sha256": "ab335fc4aa59d4c7dd6ce29ca3ec642db554c6374397b746db34a495667549bd"
+      "sha256": "11f7eae38e56f0f024080d10b741a7c4cd55f4cbb736531c18d8b7588d3c5097"
     },
     {
       "path": "scripts/framing_lint.py",
@@ -718,7 +718,7 @@
     },
     {
       "path": "scripts/longform.py",
-      "sha256": "0e6ed4de99a75457af9e6c4c54c39ff83424d7cc08b7f1d11b93a7d0e80d0b3d"
+      "sha256": "234d2a24f49466a0252b10a6fd49345d273f7174285f90e7fe46b35ca15ae376"
     },
     {
       "path": "scripts/ltx23_audio_canary.py",
@@ -994,7 +994,7 @@
     },
     {
       "path": "scripts/render_final.py",
-      "sha256": "a623f39c21e20a5a482bea9f2b9300fdebed56eed4a3374997c8790612d5db7e"
+      "sha256": "639473058a52600fb3ace9b6a417f13401d11c4bbb8017c015b781a6505fff3d"
     },
     {
       "path": "scripts/render_workspace.py",
@@ -1018,7 +1018,7 @@
     },
     {
       "path": "scripts/runtime_policy.py",
-      "sha256": "bf083fe0cb44a6f9f7ec8353f1235f2b50d0afa054a43f227e9e3b9a8fb72173"
+      "sha256": "ed9836a3ea9b3df1287e625fdb2ccd2cb33cc1289a48dfbcb2a8874cd129809d"
     },
     {
       "path": "scripts/scene_sound.py",
@@ -1130,7 +1130,7 @@
     },
     {
       "path": "scripts/story_plan.py",
-      "sha256": "401cfd0a06f656f4356251f7a1b78ad0958d2649fdf9b0e0dc8d40087a0ec410"
+      "sha256": "2e6b6358f2f035e15568035cdfdee82774962e8e08c4c9e4faf0f9a6141379ae"
     },
     {
       "path": "scripts/story_quality.py",

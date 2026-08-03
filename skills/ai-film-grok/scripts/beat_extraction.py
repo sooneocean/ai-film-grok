@@ -293,25 +293,26 @@ def select_beat_spine(
     """Pick beat spine. Genre takes priority; adult defaults to adult_max.
 
     Spines are loaded from JSON files in schemas/beat-spines/ via
-    beat_spine.load_spine().
+    beat_spine.load_spine().  Any genre that has a corresponding spine
+    file (e.g. thriller.json, romance.json) is auto-discovered — no
+    hardcoded name list needed.
     """
-    # Non-adult genre: use genre spine directly
-    if genre and genre != "adult" and genre in GENRE_NAMES:
-        return [dict(b) for b in load_spine(genre)]
-
+    # Explicit spine overrides (heat-signal or caller-specified)
     h = heat or {}
     scale = str(h.get("heat_scale") or "").strip().lower()
+
     # Explicit cool-down only escape from adult max spine
     if scale in {"soft", "medium"}:
-        _ = multi_scene
-        _ = target_duration
         return [dict(b) for b in load_spine("default")]
-    # Explicit dual only — never infer solely from duration
+    # Explicit dual / hardcore overrides
     if h.get("spine") == "dual_climax" or h.get("dual_climax"):
         return [dict(b) for b in load_spine("dual_climax")]
     if h.get("spine") == "hardcore_male" or h.get("hardcore"):
         return [dict(b) for b in load_spine("hardcore_male")]
-    # Adult default IRON: always adult_max (max / unset / adult_max spine)
+    # Non-adult genre: auto-discover spine file if it exists; fall back to default
+    if genre and genre != "adult" and spine_exists(genre):
+        return [dict(b) for b in load_spine(genre)]
+    # Adult default IRON: always adult_max (max / unset / adult_max spine / evidence_max)
     if (
         not genre
         or genre == "adult"

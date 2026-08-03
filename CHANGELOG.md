@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.31.22] - 2026-08-03
+
+### Added
+- **Workflow Wave D (final engineering):**
+  - Plate timeout floors: short **1200s**; longform / ≥480s picture **1800s** (`estimate_plate_timeout`).
+  - Timeout error on `aifilm final` now points to larger `--plate-timeout` or direct `render_final.py` + `AIFILM_FFMPEG_TIMEOUT`.
+  - Sidechain mix failure/timeout → **simple amix fallback** with `receipts/final-mix-partial.json` (PARTIAL, not silent).
+  - `stable_path_for_ffmpeg_filter`: mirror SRT to `/tmp` when film path has spaces; PIL caption burn uses it.
+- Tests: `tests/test_final_wave_d.py`; longform timeout floor cases.
+- stages/post + longform-workflow timeout / PARTIAL notes.
+- Genre beat spines: `select_beat_spine` auto-discovers via `spine_exists` (not only GENRE_NAMES).
+- Pre-plan structural keys (`story` / `episodes` / `story_resolution`) before writing drama-graph.
+- `runtime_policy` resolves package/Python versions from skill `runtime-python` (not host agent interpreter).
+
 ## [2.31.21] - 2026-08-03
 
 ### Added
@@ -16,6 +30,10 @@
 
 ### Changed
 - SKILL commands list + stages/visual · stages/deliver pointers for new throughput cmds (SKILL ≤6kB).
+- **Single closeout CLI path:** `aifilm closeout status|run` owns `closeout.py` receipts; `workflow_pack` re-exports without dual subparser registration. `pilot pack` primary; `pilot-pack` alias.
+
+### Fixed
+- Conflicting `closeout` argparse registration (`aifilm_grok` + `cli_workflow`) that blocked help/smoke.
 
 ## [2.31.20] - 2026-08-03
 

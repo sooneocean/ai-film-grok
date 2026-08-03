@@ -2508,6 +2508,33 @@ def write_srt(path: Path, cues: list[dict[str, Any]], *, preserve_overlaps: bool
     write_srt_file(path, fixed)
 
 
+def stable_path_for_ffmpeg_filter(
+    path: Path,
+    *,
+    suffix: str,
+    prefix: str = "aifilm",
+) -> Path:
+    """Copy path to /tmp when it contains spaces (libass/subtitles= path break).
+
+    PIL overlay burn does not need this; keep for any ``subtitles=`` / ASS consumers
+    and HyperFrames handoff that pass absolute SRT paths into ffmpeg.
+    """
+    import tempfile
+
+    path = Path(path).expanduser().resolve()
+    text = str(path)
+    if " " not in text and "\t" not in text:
+        return path
+    if not path.is_file():
+        return path
+    dest = Path(tempfile.gettempdir()) / f"{prefix}-{sha256(path)[:16]}{suffix}"
+    try:
+        shutil.copy2(path, dest)
+    except OSError:
+        return path
+    return dest
+
+
 def resolve_subtitle_mode(args: argparse.Namespace) -> str:
     """Return the explicit plate-caption mode; visible captions belong to HyperFrames by default."""
     subs_mode = str(getattr(args, "subs", "off") or "off").strip().lower()
@@ -4175,7 +4202,101 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             str(mixed),
         ]
     )
-    run(mix_cmd)
+    # Wave D · sidechain can hang or fail mid-plate → simple amix PARTIAL (not silent)
+    try:
+        run(mix_cmd)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as mix_exc:
+        prior_sc = mix_spotting.get("sidechain_applied")
+        if not prior_sc:
+            raise RenderError(
+                f"audio mix failed (no sidechain to fall back from): {mix_exc}"
+            ) from mix_exc
+        log(
+            f"sidechain mix failed ({type(mix_exc).__name__}) → simple amix PARTIAL "
+            f"(was {prior_sc!r})"
+        )
+        # Remove partial output if any
+        with contextlib.suppress(OSError):
+            if mixed.is_file():
+                mixed.unlink()
+        color_in = "[6:a]" if use_color else ""
+        # Input order: 0 narr, 1 music, 2 native, 3 sfx, 4 scene, 5 ambience, [6 color]
+        n_in = 6 + (1 if use_color else 0)
+        simple_fc = (
+            f"[0:a][1:a][2:a][3:a][4:a][5:a]{color_in}"
+            f"amix=inputs={n_in}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
+        )
+        simple_cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(voice_cat),
+            "-i",
+            str(music_path),
+            "-i",
+            str(native_track),
+            "-i",
+            str(sfx_stereo_path),
+            "-i",
+            str(scene_sound_path),
+            "-i",
+            str(ambience_path),
+        ]
+        if use_color:
+            simple_cmd.extend(["-i", str(color_track)])
+        simple_cmd.extend(
+            [
+                "-filter_complex",
+                simple_fc,
+                "-map",
+                "[aout]",
+                "-ar",
+                str(mix_sample_rate),
+                "-ac",
+                "2",
+                "-c:a",
+                "pcm_s16le",
+                str(mixed),
+            ]
+        )
+        try:
+            run(simple_cmd)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as amix_exc:
+            raise RenderError(
+                f"audio mix failed after sidechain→amix fallback: {amix_exc}"
+            ) from amix_exc
+        mix_spotting["sidechain_applied"] = False
+        mix_spotting["sidechain_fallback"] = {
+            "from": prior_sc,
+            "to": "amix_simple",
+            "partial": True,
+            "error": str(mix_exc)[:300],
+            "error_type": type(mix_exc).__name__,
+        }
+        mix_spotting["delivery_partial"] = True
+        mix_spotting["partial_reason"] = "sidechain_mix_failed_amix_fallback"
+        # Persist PARTIAL receipt for closeout / agents (not silent quality pass)
+        try:
+            partial_path = root / "receipts" / "final-mix-partial.json"
+            partial_path.parent.mkdir(parents=True, exist_ok=True)
+            write_json(
+                partial_path,
+                {
+                    "kind": "final-mix-partial",
+                    "schema_version": 1,
+                    "at": utc_now(),
+                    "ok": True,
+                    "partial": True,
+                    "reason": "sidechain_mix_failed_amix_fallback",
+                    "from": prior_sc,
+                    "to": "amix_simple",
+                    "error": str(mix_exc)[:300],
+                    "mixed": str(mixed),
+                },
+            )
+            mix_spotting["partial_receipt"] = str(partial_path)
+        except Exception as rec_exc:  # noqa: BLE001
+            mix_spotting["partial_receipt_error"] = str(rec_exc)[:160]
 
     # Phase F/G: loudness probe + optional/auto loudnorm toward shortform target
     try:
@@ -4335,6 +4456,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     except SecurityPolicyError as exc:
         raise RenderError(str(exc)) from exc
     write_srt(srt_path, cues, preserve_overlaps=use_event_tts)
+    # Wave D · if film root path has spaces, also mirror SRT to /tmp for any
+    # libass/subtitles= consumers (PIL burn already uses PNG overlays, no force_style).
+    srt_stable = stable_path_for_ffmpeg_filter(srt_path, suffix=".srt", prefix="aifilm-srt")
+    if srt_stable != srt_path:
+        log(f"SRT mirrored to space-free path for ffmpeg filters: {srt_stable}")
 
     # Burn subs with PIL overlays (no drawtext dependency).
     # --subs off keeps SRT only (for HyperFrames designed captions underlay path).
@@ -4524,6 +4650,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         },
         "subtitles": {
             "srt": str(srt_path),
+            "srt_stable": str(srt_stable) if srt_stable != srt_path else None,
             "srt_sha256": sha256(srt_path),
             "cue_count": len(cues),
             "burned_in": subs_mode == "burn",

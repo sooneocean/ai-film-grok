@@ -38,4 +38,4 @@ aifilm longform status --root "<film>"
 
 ## 长任务
 
-final 的 plate timeout 由总时长、镜数与 lipsync 工作量动态估算，短片仍保留 1200 秒下限。事件写入 `receipts/pipeline-events.jsonl`；超时明确失败，不自动改 provider。
+final 的 plate timeout 由总时长、镜数与 lipsync 工作量动态估算：短片 floor **1200s**；片板≥480s 或 `production_mode=longform` floor **1800s**（cap 21600）。事件写入 `receipts/pipeline-events.jsonl`；超时明确失败并提示直调 `render_final` / 加大 `--plate-timeout`，不自动改 provider。sidechain 混音失败会 amix 降级并写 `receipts/final-mix-partial.json`（PARTIAL）。

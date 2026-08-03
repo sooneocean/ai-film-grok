@@ -142,13 +142,21 @@ def run_pil_caption_burn(root: Path, *, video: Path, srt: Path, out: Path) -> di
     burn = scripts / "burn_srt_pil.py"
     if not burn.is_file():
         return {"ok": False, "error": f"missing {burn}"}
+    # Wave D: mirror SRT off spacey film roots so any nested ffmpeg is safe
+    srt_use = Path(srt)
+    try:
+        from render_final import stable_path_for_ffmpeg_filter
+
+        srt_use = stable_path_for_ffmpeg_filter(srt_use, suffix=".srt", prefix="aifilm-srt")
+    except Exception:
+        srt_use = Path(srt)
     cmd = [
         sys.executable,
         str(burn),
         "--video",
         str(video),
         "--srt",
-        str(srt),
+        str(srt_use),
         "--out",
         str(out),
     ]

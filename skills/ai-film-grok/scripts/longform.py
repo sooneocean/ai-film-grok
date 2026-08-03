@@ -611,6 +611,14 @@ def estimate_plate_timeout(
     shot_count: int | None = None,
     lipsync: str = "off",
 ) -> int:
+    """Dynamic plate wall-clock for ``aifilm final`` → render_final subprocess.
+
+    Floors (Wave D · 2026-08-03):
+    - short / default: **1200s**
+    - longform clock (≥480s picture) or ``production_mode=longform``: **1800s**
+    Cap 21600s. Override with ``--plate-timeout``. Stuck sidechain is handled
+    inside render_final (amix PARTIAL), not by this estimate alone.
+    """
     base = Path(root).expanduser().resolve()
     timeline = read_json(base / "timeline.json") or {}
     shots = [item for item in timeline.get("shots") or [] if isinstance(item, dict)]
@@ -622,4 +630,11 @@ def estimate_plate_timeout(
     count = int(shot_count if shot_count is not None else len(shots))
     lipsync_factor = 18 if str(lipsync or "off") != "off" else 0
     estimate = math.ceil(600 + duration * 3 + count * (20 + lipsync_factor))
-    return min(21600, max(1200, estimate))
+    floor = 1200
+    if duration + 1e-9 >= MIN_DURATION_SEC:
+        floor = 1800
+    else:
+        spec = read_json(base / "film-spec.json") or {}
+        if str(spec.get("production_mode") or "").strip().lower() == "longform":
+            floor = 1800
+    return min(21600, max(floor, estimate))

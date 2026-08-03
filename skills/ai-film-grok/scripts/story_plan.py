@@ -35,7 +35,7 @@ from narrative_control import (
 )
 from shot_planning import DRAMATIC_FUNCS, plan_shots  # noqa: F401  (re-export)
 from story_contract import draft_story_contract as _draft_story_contract
-from util import read_json, utc_now, write_json
+from util import FilmError, read_json, utc_now, write_json
 
 # Beat extraction + story contract live in dedicated modules; re-export for
 # public API / tests (GENRES, extract_beats, select_beat_spine, …).
@@ -2510,6 +2510,17 @@ def run_plan(
     graph = stabilize_shot_ids(graph, previous_graph)
     if root:
         graph["project"]["root"] = str(root)
+
+    # Pre-plan structural check — verify the graph has the essential
+    # top-level keys that make it usable downstream.  Draft-level
+    # missing fields (obstacle, tactic, …) are expected and handled
+    # by the narrative lock flow later.
+    REQUIRED_GRAPH_KEYS = ("story", "episodes", "story_resolution")
+    missing_keys = [k for k in REQUIRED_GRAPH_KEYS if k not in graph]
+    if missing_keys:
+        raise FilmError(
+            f"PRE_PLAN_NARRATIVE: graph missing required keys: {','.join(missing_keys)}"
+        )
 
     from drama_graph import GRAPH_NAME, validate_graph
 

@@ -4300,7 +4300,15 @@ def cmd_final(args: argparse.Namespace) -> int:
             phase="failed",
             note=f"timeout_sec={plate_timeout}",
         )
-        raise FilmError(f"final plate timed out after {plate_timeout}s") from exc
+        # Wave D: do not leave agents guessing — point at direct render_final + floor
+        skill_scripts = Path(__file__).resolve().parent
+        raise FilmError(
+            f"final plate timed out after {plate_timeout}s. "
+            f"Retry with --plate-timeout {max(plate_timeout * 2, 1800)} "
+            f"or direct: {skill_scripts / 'runtime-python'} "
+            f"{skill_scripts / 'render_final.py'} --root {root} "
+            f"(set AIFILM_FFMPEG_TIMEOUT≥1800 for long mixes)"
+        ) from exc
     append_event(
         root,
         stage="final-plate",

@@ -11,8 +11,12 @@ Verifies:
 
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
@@ -288,3 +292,64 @@ class TestDramaticFunctionEnumUnchanged:
             spine = load_spine(g)
             for beat in spine:
                 assert beat["dramatic_function"] in DRAMATIC_FUNCS
+
+
+class TestSelectBeatSpineAutoDiscovery:
+    """select_beat_spine() auto-discovers genre spines from JSON files."""
+
+    def test_auto_discovers_non_genre_spine_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A spine JSON that is not in GENRES (e.g. thriller) is still found
+        via file-based auto-discovery (beat_spine.SCHEMA_DIR)."""
+        import beat_spine
+
+        # Create a temporary thriller spine file in a fake schema dir
+        thriller_spine = [
+            {
+                "key": "hook",
+                "dramatic_function": "hook",
+                "importance": "climax",
+                "objective": "悬念开场",
+                "weight": 0.15,
+                "shots_n": 1,
+            },
+            {
+                "key": "tension",
+                "dramatic_function": "sensory",
+                "importance": "important",
+                "objective": "紧张升级",
+                "weight": 0.35,
+                "shots_n": 2,
+            },
+            {
+                "key": "climax",
+                "dramatic_function": "action",
+                "importance": "climax",
+                "objective": "真相揭露",
+                "weight": 0.35,
+                "shots_n": 2,
+            },
+            {
+                "key": "resolution",
+                "dramatic_function": "afterglow",
+                "importance": "supporting",
+                "objective": "余韵",
+                "weight": 0.15,
+                "shots_n": 1,
+            },
+        ]
+        fake_schema = tmp_path / "beat-spines"
+        fake_schema.mkdir()
+        (fake_schema / "thriller.json").write_text(
+            json.dumps(thriller_spine, ensure_ascii=False), encoding="utf-8"
+        )
+        monkeypatch.setattr(beat_spine, "SCHEMA_DIR", fake_schema)
+
+        # spine_exists and load_spine now look in the fake dir
+        assert beat_spine.spine_exists("thriller")
+        spine = select_beat_spine(genre="thriller")
+        assert len(spine) == 4
+        assert spine[0]["key"] == "hook"
+        assert spine[2]["key"] == "climax"
+        assert spine[3]["key"] == "resolution"

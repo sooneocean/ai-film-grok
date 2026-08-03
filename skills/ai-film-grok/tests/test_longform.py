@@ -218,6 +218,8 @@ def test_longform_status_does_not_backup_corrupt_checkpoint(tmp_path: Path) -> N
 
 def test_dynamic_plate_timeout_preserves_short_default_and_scales_longform(tmp_path: Path) -> None:
     assert estimate_plate_timeout(tmp_path, duration_sec=60, shot_count=12, lipsync="off") == 1200
+    # Wave D: longform clock (≥480s) floors at 1800 even with few shots
+    assert estimate_plate_timeout(tmp_path, duration_sec=480, shot_count=10, lipsync="off") >= 1800
     assert (
         estimate_plate_timeout(
             tmp_path,
@@ -227,6 +229,20 @@ def test_dynamic_plate_timeout_preserves_short_default_and_scales_longform(tmp_p
         )
         > 3600
     )
+
+
+def test_plate_timeout_longform_mode_floor(tmp_path: Path) -> None:
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "production_mode": "longform",
+                "longform_profile": {"target_duration_sec": 600},
+            }
+        ),
+        encoding="utf-8",
+    )
+    # short picture estimate but longform mode → still ≥1800
+    assert estimate_plate_timeout(tmp_path, duration_sec=90, shot_count=12, lipsync="off") >= 1800
 
 
 def test_resume_refuses_unit_before_verified_dependency(tmp_path: Path) -> None:
