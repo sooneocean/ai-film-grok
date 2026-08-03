@@ -18,7 +18,11 @@
 | 字幕路径空格 / force_style | SRT 镜像无空格 `/tmp`；主路径 **PIL 烧字**（禁依赖 `subtitles=` force_style） |
 | `review-shot --approve` 未变 approved | 换片后 **再** `register-clip --status approved --review-receipt`（sha 对齐） |
 | plate 无字当交付 | plate `subs=off` 后必须由 **HyperFrames** 真烧中文；失字即修复 HF 并重渲，禁其他烧字器兜底 |
+| 等长 6s PPT 感 | **VO-fit** 对白镜 + 变长 xfade；先帧链 promote 再 dissolve |
+| final 门红但用户要看片 | plate-xfade + rnb + **HF 字幕** → `*-silk-final.mp4`；**PARTIAL** 回执，不标 final_complete |
+| 静图/Ken Burns 装片 | 拒交付；真 I2V/H3 continue（2026-08-03 荒岛） |
 
 深入资料：[post-compose.md](../post-compose.md) · [postproduction.md](../postproduction.md) ·  
 [subs-always-burn-hard](../lessons-2026-07-23-subs-always-burn-hard.md) ·  
-**[ep2-voice-heat-final](../lessons-2026-07-24-ep2-voice-heat-final.md)**
+**[ep2-voice-heat-final](../lessons-2026-07-24-ep2-voice-heat-final.md)** ·  
+**[huangdao-rhythm-still-voice-silk](../lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md)**

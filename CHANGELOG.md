@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.33.1] - 2026-08-03
+
+### Added
+- **Huangdao rhythm/still/voice/silk lesson:** ban character-sheet keyframes, VO-fit dialogue pace, spoken_lang↔cast_voices lock, last-frame chain, HyperFrames silk ship path (PARTIAL).
+- `media_qa.lint_still_not_character_sheet` hard-fails path tokens (sheet/turnaround/ortho…); soft multi-cell advisory.
+- `register-still --status approved` raises `STILL_LOOKS_LIKE_CHARACTER_SHEET` before I2V.
+- hard-defaults + stages visual/voice/post pointers; memory short card.
+
+### Tests
+- `tests/test_still_character_sheet_lint.py`
+
 ## [2.33.0] - 2026-08-03
 
 ### Changed

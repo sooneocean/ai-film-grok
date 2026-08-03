@@ -1,7 +1,7 @@
 # References 索引
 
 > **165** 个 reference Markdown 的分类导航（含 stages / lessons）。agent 按需加载时先查此表，再读目标文件。  
-> 踩坑 lessons **76** 个，见末节按日期归档；新规则须标 P 码 + 层。  
+> 踩坑 lessons **77** 个，见末节按日期归档；新规则须标 P 码 + 层。  
 > **文档分层（2026-08-03）**：`hard-defaults`（机读）→ `stages/*`（回合默认）→ `memory/*`（短卡）→ `lessons-*`（按需复盘）。勿在 Agents 复写 IRON 正文。  
 > **用户主进度只有 7 步**（SKILL）；八环 / Professional 11-stage 为内部投影。
 
@@ -139,6 +139,13 @@
 ## 踩坑 Lessons（按日期）
 
 > 新规则须标 P 码 + 层。验证稳定后可晋升到上方稳定 references。
+
+### 2026-08-03
+
+| 文件 | 主题 |
+|---|---|
+| [huangdao-rhythm-still-voice-silk](lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) | 禁设定拼图 keyframe · VO-fit 节奏 · 口白 lang 锁 · 末帧链 · HF 丝滑 ship |
+| [dialogue-primary-chain](../memory/2026-08-03-dialogue-primary-chain.md) | 对白主链中文（memory 短卡） |
 
 ### 2026-07-29
 

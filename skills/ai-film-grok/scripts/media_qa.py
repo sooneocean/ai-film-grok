@@ -374,6 +374,143 @@ def _probe_still_size(path: Path) -> tuple[int, int]:
         return 0, 0
 
 
+def lint_still_not_character_sheet(source: str | Path) -> dict[str, Any]:
+    """Gate multi-panel character sheets / turnarounds before I2V.
+
+    Lesson 2026-08-03 huangdao-99-ep01: keyframe was a cast expression sheet.
+
+    Strategy (low false-positive):
+    - **Hard** if filename/path contains sheet markers (sheet|turnaround|ortho|model-sheet|…)
+    - **Soft** multi-cell layout heuristic (advisory only; beach/sky full-bleeds often look multi-cell)
+
+    Codes: STILL_LOOKS_LIKE_CHARACTER_SHEET (hard) · STILL_SHEET_SUSPECT (soft)
+    """
+    source = Path(source)
+    out: dict[str, Any] = {
+        "ok": True,
+        "path": str(source),
+        "codes": [],
+        "errors": [],
+        "soft_codes": [],
+        "signals": {},
+        "lesson": "lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md",
+    }
+    if not source.is_file():
+        out["ok"] = False
+        out["codes"] = ["KEYFRAME_MISSING"]
+        out["errors"] = [f"still missing: {source}"]
+        return out
+
+    name = source.name.lower()
+    path_l = str(source).lower()
+    hard_tokens = (
+        "character-sheet",
+        "character_sheet",
+        "modelsheet",
+        "model-sheet",
+        "model_sheet",
+        "turnaround",
+        "expression-board",
+        "expression_board",
+        "ortho",
+        "refsheet",
+        "ref-sheet",
+        "ref_sheet",
+        "_sheet.",
+        "-sheet.",
+        "sheet_v",
+    )
+    hit = [t for t in hard_tokens if t in name or t in path_l]
+    if hit:
+        out["ok"] = False
+        out["codes"] = ["STILL_LOOKS_LIKE_CHARACTER_SHEET"]
+        out["errors"] = [
+            f"still path marks character sheet ({hit[0]}). "
+            "Use a single continuous story frame for this shot before I2V. "
+            "See references/lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md"
+        ]
+        out["signals"] = {"path_token": hit[0]}
+        return out
+
+    # Soft heuristic only
+    try:
+        import statistics
+
+        from PIL import Image
+    except Exception as exc:  # pragma: no cover
+        out["soft_codes"] = ["STILL_SHEET_LINT_UNAVAILABLE"]
+        out["signals"] = {"import_error": str(exc)}
+        return out
+
+    try:
+        im = Image.open(source).convert("RGB")
+    except Exception as exc:
+        out["ok"] = False
+        out["codes"] = ["KEYFRAME_UNREADABLE"]
+        out["errors"] = [f"cannot open still: {exc}"]
+        return out
+
+    w0, h0 = im.size
+    im_s = im.resize((72, max(96, int(72 * h0 / max(w0, 1)))), Image.Resampling.BILINEAR)
+    w, h = im_s.size
+    # row-major luminances
+    lums = []
+    for y in range(im_s.size[1]):
+        for x in range(im_s.size[0]):
+            r, g, b = im_s.getpixel((x, y))
+            lums.append(0.2126 * r + 0.7152 * g + 0.0722 * b)
+
+    def cell_active(rows: int, cols: int) -> int:
+        n = 0
+        for r in range(rows):
+            for c in range(cols):
+                x0, x1 = int(c * w / cols), int((c + 1) * w / cols)
+                y0, y1 = int(r * h / rows), int((r + 1) * h / rows)
+                vals = [lums[y * w + x] for y in range(y0, y1) for x in range(x0, x1)]
+                if not vals:
+                    continue
+                dark = sum(1 for v in vals if v < 200) / len(vals)
+                std = statistics.pstdev(vals) if len(vals) > 1 else 0.0
+                if dark >= 0.12 and std >= 20:
+                    n += 1
+        return n
+
+    active23 = cell_active(2, 3)
+
+    # paper-like corners: bright + low local variance
+    def corner_paper_score() -> int:
+        score = 0
+        patches = (
+            (0, 10, 0, 10),
+            (w - 10, w, 0, 10),
+            (0, 10, h - 10, h),
+            (w - 10, w, h - 10, h),
+        )
+        for x0, x1, y0, y1 in patches:
+            vals = [lums[y * w + x] for y in range(y0, y1) for x in range(x0, x1)]
+            if not vals:
+                continue
+            if statistics.fmean(vals) >= 230 and statistics.pstdev(vals) <= 14:
+                score += 1
+        return score
+
+    paper = corner_paper_score()
+    out["signals"] = {
+        "active_cells_2x3": active23,
+        "paper_corners": paper,
+        "size": [w0, h0],
+    }
+    # Advisory only: multi-cell + paper board
+    if active23 >= 5 and paper >= 3:
+        out["soft_codes"] = ["STILL_SHEET_SUSPECT"]
+        out["signals"]["hint"] = (
+            "multi-cell + paper corners — human-check not a character sheet before I2V"
+        )
+    elif active23 >= 5:
+        out["soft_codes"] = ["STILL_MULTI_CELL_LAYOUT"]
+    return out
+
+
 def analyze_still_geometry(
     source: Path,
     *,

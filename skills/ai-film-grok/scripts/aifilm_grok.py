@@ -2902,7 +2902,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
         aspect = str(spec.get("aspect_ratio") or aspect)
     except Exception:
         spec = {}
-    from media_qa import analyze_still_geometry
+    from media_qa import analyze_still_geometry, lint_still_not_character_sheet
     from quality_gates import evaluate_keyframe, require_quality, write_quality_receipt
 
     geo = analyze_still_geometry(source, aspect_ratio=aspect)
@@ -2913,6 +2913,15 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             + " — re-export ≥720×1280 9:16 (or film aspect) full-res; "
             "never I2V from thumbnail/landscape compress. "
             "See references/lessons-2026-07-22-keyframe-no-compress.md"
+        )
+    # P0 2026-08-03 huangdao: multi-panel character sheets must not become I2V keyframes
+    sheet = lint_still_not_character_sheet(source)
+    if args.status == "approved" and not sheet.get("ok"):
+        raise FilmError(
+            "Approved still failed character-sheet content gate: "
+            + "; ".join(sheet.get("errors") or ["STILL_LOOKS_LIKE_CHARACTER_SHEET"])
+            + " — one continuous story frame only; never turnaround/expression boards. "
+            "See references/lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md"
         )
     # P0 2026-07-29: one still must not be approved for multiple shots (byte-identical)
     if args.status == "approved":
