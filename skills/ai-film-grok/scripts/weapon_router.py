@@ -103,26 +103,22 @@ def build_weapon_route(
     if not demand_detected:
         return {**common, "status": "not_required", "reason": "no current visual weapon demand"}
 
-    if motion_demand:
-        return {
-            **common,
-            "status": "retired",
-            "fail_closed": True,
-            "reason": "WAN22_I2V_RETIRED: use the cloud I2V chain from film-spec instead",
-        }
-
     provider_keys = _I2V_PROVIDER_KEYS if motion_demand else _STILL_PROVIDER_KEYS
     locked_provider = _locked_provider(
         base,
         provider_keys,
-        selected_local_provider="comfy_lan" if still_demand else None,
+        selected_local_provider="comfy_lan" if still_demand else ("comfy-h3" if motion_demand else None),
     )
     if locked_provider:
         return {
             **common,
             "status": "provider_locked",
             "provider": locked_provider,
-            "reason": "the film already locks a still provider; the armory cannot switch it",
+            "reason": (
+                "the film already locks a motion provider; the armory cannot switch it"
+                if motion_demand
+                else "the film already locks a still provider; the armory cannot switch it"
+            ),
         }
 
     spec = read_json(base / "film-spec.json") or {}
@@ -134,14 +130,26 @@ def build_weapon_route(
         if edit_demand
         else "text-to-image"
     )
-    production_stage = "pilot" if stage == "pilot_approval" else "production"
+    # Local MiniMax H3 motion is pilot/experimental until production promotion.
+    production_stage = "pilot" if (stage == "pilot_approval" or motion_demand) else "production"
+    allow_experimental = bool(motion_demand)
     try:
         route = select_weapon(
             operation,
             stage=production_stage,
             identity_lock=edit_demand,
+            allow_experimental=allow_experimental,
         )
     except ComfyArmoryError as exc:
+        if motion_demand:
+            return {
+                **common,
+                "status": "blocked",
+                "fail_closed": True,
+                "reason": (
+                    f"{exc}; cloud I2V chain (grok_primary) remains the default production path"
+                ),
+            }
         return {
             **common,
             "status": "blocked",
@@ -149,6 +157,9 @@ def build_weapon_route(
             "fail_closed": True,
         }
     weapon = route["weapon"]
+    pilot_only = bool((weapon.get("capabilities") or {}).get("pilot_only")) or str(
+        weapon.get("status") or ""
+    ) == "experimental"
     return {
         **common,
         "status": "ready",
@@ -156,13 +167,23 @@ def build_weapon_route(
         "quality": route.get("quality") or "max_practical",
         "weapon_id": weapon["id"],
         "provider": str(weapon.get("provider") or "comfy_lan"),
-        "command": f"aifilm comfy route --intent {operation}",
+        "source_endpoint": weapon.get("source_endpoint"),
+        "command": (
+            f"aifilm comfy route --intent {operation}"
+            + (" --allow-experimental" if pilot_only else "")
+        ),
         "auto_select": True,
-        "auto_execute_when_requested": True,
+        "auto_execute_when_requested": not pilot_only,
         "requires_live_probe": True,
+        "pilot_only": pilot_only,
         "pilot_verified": bool((weapon.get("verified") or {}).get("real_pilot")),
         "reason": (
-            "unlocked visual demand maps to the highest-priority pilot-verified local weapon; "
-            "the execution command performs current model read-back"
+            "unlocked visual demand maps to the highest-priority local weapon; "
+            "experimental MiniMax H3 motion is pilot-gated and never silent bulk"
+            if pilot_only
+            else (
+                "unlocked visual demand maps to the highest-priority pilot-verified local weapon; "
+                "the execution command performs current model read-back"
+            )
         ),
     }

@@ -764,7 +764,9 @@ def submission_capacity(base_url: str) -> dict[str, Any]:
                 "message": "free GPU memory is below the 24 GiB submission floor",
             }
         )
-    if driver_vram_error:
+    # Driver VRAM is preferred when available, but a failed SSH nvidia-smi probe
+    # must not block submission when ComfyUI already reported valid free VRAM.
+    if driver_vram_error and driver_vram_free is None and comfy_vram_free is None:
         blockers.append(
             {
                 "code": "RESOURCE_METRICS_UNAVAILABLE",

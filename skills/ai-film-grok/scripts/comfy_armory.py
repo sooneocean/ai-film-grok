@@ -107,25 +107,30 @@ def select_weapon(
     normalized_stage = str(stage).strip().lower()
     if normalized_stage not in {"pilot", "production"}:
         raise ComfyArmoryError(f"unsupported production stage: {stage}")
+    # Local Wan 2.2 I2V remains retired. MiniMax H3 experimental pilots own the
+    # local motion intents when registered; production still requires promotion.
+    if normalized == "adult-meat-motion-i2v" and normalized_stage == "production":
+        raise ComfyArmoryError(
+            "no promoted local weapon meets the adult meat-motion production gate"
+        )
     if normalized in {
         "image-to-video",
         "i2v",
         "general-i2v",
         "adult-intimacy-i2v",
         "adult-meat-motion-i2v",
-    }:
+        "text-to-video",
+        "t2v",
+        "reference-to-video",
+        "r2v",
+        "minimax-h3-t2v",
+        "minimax-h3-i2v",
+        "minimax-h3-r2v",
+    } and normalized_stage == "pilot" and not allow_experimental:
         raise ComfyArmoryError(
-            "WAN22_I2V_RETIRED: local Wan 2.2 I2V is not an available production or pilot route"
+            "local MiniMax H3 motion pilot requires explicit experimental authorization "
+            "(--allow-experimental) until a weapon is production-promoted"
         )
-    if normalized == "adult-meat-motion-i2v":
-        if normalized_stage == "production":
-            raise ComfyArmoryError(
-                "no promoted Wan 2.2 weapon meets the adult meat-motion production gate"
-            )
-        if not allow_experimental:
-            raise ComfyArmoryError(
-                "adult meat-motion pilot requires explicit experimental authorization"
-            )
     if normalized in {
         "talking-avatar-stable-pilot",
         "talking-avatar-expressive-pilot",
@@ -515,9 +520,22 @@ def compile_weapon_workflow(
             graph[node_id]["inputs"][bindings["steps_input"]] = selected_steps
     if "input_node" in bindings:
         if not input_image_name:
-            raise ComfyArmoryError("Qwen local edit requires an input image name")
+            raise ComfyArmoryError(
+                f"weapon {weapon_id} requires an uploaded input image name"
+            )
         input_image_name = _validate_relative_media_name(input_image_name, label="input image name")
         graph[bindings["input_node"]]["inputs"][bindings["input_image_input"]] = input_image_name
+    for node in graph.values():
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        for key, value in list(inputs.items()):
+            if value == "__AIFILM_PROMPT__":
+                inputs[key] = prompt
+            if value == "__AIFILM_INPUT_IMAGE__" and input_image_name:
+                inputs[key] = input_image_name
     if "audio_node" in bindings:
         if not input_audio_name:
             raise ComfyArmoryError("talking-avatar workflow requires an uploaded audio name")
