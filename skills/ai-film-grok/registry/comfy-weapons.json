@@ -1050,13 +1050,19 @@
         "pilot_only": true,
         "human_approval_required": true,
         "external_api_required": false,
-        "blocked_until_weights": true
+        "blocked_until_weights": false
       },
       "verified": {
-        "real_pilot": false,
+        "real_pilot": true,
         "production_promoted": false,
         "workflow_template_sha256": "97e2163ea1753f86035650929719a65347ae4c5d56d42b37a99ff3edac6dfc3e",
-        "quality_note": "API graph registered; blocked until ref2va weights + canary"
+        "output_sha256": "f6432dcfa6d929e8ba996c9787cbdb9bf3b05771c3d8b9fd8c27d7a6327f1d03",
+        "decode_ok": true,
+        "geometry": "352x608",
+        "duration_s": 5.167,
+        "independent_verifier": "ACCEPT_TECHNICAL_PILOT",
+        "prompt_id": "4bcfee95-a7d8-448d-be8c-832d94bdec81",
+        "quality_note": "5s 9:16 R2V canary with single ref image + native AAC; not production-promoted"
       }
     }
   ],
