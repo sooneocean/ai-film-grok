@@ -114,7 +114,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "7fe88da3e7e51d015387d79902ff1a2e8f0f61a67002dae87ee2cfb35166321a"
+      "sha256": "c3c0317997975d8dd4aba7529920b447b395ceeff07445c4e3870021a008057b"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -406,11 +406,11 @@
     },
     {
       "path": "scripts/compose_preview.py",
-      "sha256": "e2c42fb8af65a21301ca6e89c2bdc6f5332301b0b5fc0b07b420ce4ffb46cf0a"
+      "sha256": "dc015a60859d29ec6cde5059b93dde0eb701be8d6566217baa61c13a4b7fb248"
     },
     {
       "path": "scripts/compose_render.py",
-      "sha256": "b27252d33fd4b975482b8ee520ecb544d0eebb381f7e07d982eb51463e26879e"
+      "sha256": "9312c92fbe4f757bbb17f526f89f0b69ac5cf76be709c9e73e6d0ca0e26c4169"
     },
     {
       "path": "scripts/config_loader.py",
@@ -610,7 +610,7 @@
     },
     {
       "path": "scripts/final_stages.py",
-      "sha256": "089ed339dfff40daed1193aedaddbf21a75ae3f103fb481afe7888ae84e1596b"
+      "sha256": "c08da40491ca44098ce15b8f2e35c0c78efa9223be269738ee734c46a833b224"
     },
     {
       "path": "scripts/framing_lint.py",
@@ -706,7 +706,7 @@
     },
     {
       "path": "scripts/logger.py",
-      "sha256": "28b69919dc327b2ba90d3c14fb53509054f5e7cfcbd30dd4cbbaa159afa4d12d"
+      "sha256": "730edca681fe4c469181ff1867c24be4dc888069b960aac66681001e5b716de9"
     },
     {
       "path": "scripts/longform.py",
@@ -862,7 +862,7 @@
     },
     {
       "path": "scripts/plan_feedback.py",
-      "sha256": "d6aeb27ade77a44ad5384ea89ec2ff0ecaf471da7c44413a0cfd65d940b1d280"
+      "sha256": "5c9ee222829cf48703895b31cfc2a3e06ea963c1bdba2c11bd777c05efcc3a12"
     },
     {
       "path": "scripts/planning_autopilot.py",
@@ -982,7 +982,7 @@
     },
     {
       "path": "scripts/render_final.py",
-      "sha256": "c01087735e97771fd3a6ecc0729e415aaff47ed1a1710a8345072860c1d2018f"
+      "sha256": "fd189d1da5bc7d9ffc3a0f8dda44e615cd9047fc25ad89d50ad646ebab7cb4af"
     },
     {
       "path": "scripts/render_workspace.py",

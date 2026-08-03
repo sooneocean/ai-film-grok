@@ -17,6 +17,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from logger import log
+
 # Ensure skill package root is importable before `scripts.*` (shell wrapper does not set PYTHONPATH)
 _SKILL_DIR = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -217,8 +219,6 @@ def grok_permission_mode(config_path: Path) -> str | None:
     return None
 
 
-def log(msg: str) -> None:
-    print(msg, file=sys.stderr, flush=True)
 
 
 def film_output_path(root: Path, name: str, *, field: str = "output name") -> Path:

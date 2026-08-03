@@ -44,6 +44,7 @@ from edit_policy import (
 )
 from event_voice_stem import EventVoiceStemError, render_event_voice_stem
 from film_spec import FilmSpecError, validate_film_spec
+from logger import log
 from media_qa import MediaQAError, analyze_media, approved_clip_record
 from narrative_timeline import (
     NarrativeTimelineError,
@@ -355,8 +356,6 @@ def read_json(path: Path) -> dict[str, Any]:
     return data
 
 
-def log(msg: str) -> None:
-    print(msg, file=sys.stderr, flush=True)
 
 
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:

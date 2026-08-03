@@ -1,6 +1,6 @@
 # ai-film-grok ROI 优化计划 — 2026-08-03
 
-**Status:** A/B DONE · C补 DONE (2.25.1–2.31.9 rollup) · D DONE (hot-path contracts) · v2.31.11 · not pushed  
+**Status:** A–D DONE · E DONE (logger/util) · G DONE (worktree prune) · plan_feedback WIP landed · v2.31.12 · not pushed  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok`  
 **HEAD:** `166ed817` · **version:** `2.31.6` · **branch:** `main`（ahead origin 14，working tree clean）  
 **Method:** 实跑基线（pytest / ruff / doctor / project_audit），按 impact×likelihood÷cost 排序

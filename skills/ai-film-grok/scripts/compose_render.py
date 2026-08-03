@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from logger import log
 from media_probe import run_media_to_output
 from media_qa import MediaQAError, analyze_media
 from runtime_policy import sha256
@@ -49,10 +50,6 @@ def read_json(path: Path) -> dict[str, Any]:
     if data is None:
         raise ComposeRenderError(f"Missing JSON: {path}")
     return data
-
-
-def log(msg: str) -> None:
-    print(msg, file=sys.stderr, flush=True)
 
 
 def run(

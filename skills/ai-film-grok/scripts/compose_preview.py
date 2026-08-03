@@ -20,6 +20,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from logger import log
 from security_policy import SecurityPolicyError, minimal_subprocess_env, safe_workspace_directory
 from util import utc_now
 
@@ -30,10 +31,6 @@ PREVIEW_META_REL = "compose/preview.json"
 
 class ComposePreviewError(RuntimeError):
     pass
-
-
-def log(msg: str) -> None:
-    print(msg, file=sys.stderr, flush=True)
 
 
 def preview_receipt_path(root: Path) -> Path:

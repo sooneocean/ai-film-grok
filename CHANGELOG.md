@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.31.12] - 2026-08-03
+
+### Changed
+- Unified plain `logger.log` shim (stderr line, not JSON); structured logging stays on `get_logger`.
+- `compose_render` / `compose_preview` / `render_final` / `aifilm_grok` now import shared `log` instead of local print copies.
+- `final_stages` JSON I/O delegates to `util.write_json` / `util.read_json` (atomic writes).
+
+### Added
+- `plan_feedback` pattern helpers (shot-count / weight suggestions) + unit tests.
+- Logger plain-compat tests.
+
+### Fixed
+- Pruned 13 prunable temporary git worktrees left from release/agent checkouts.
+
+
 ## [2.31.11] - 2026-08-03
 
 ### Added

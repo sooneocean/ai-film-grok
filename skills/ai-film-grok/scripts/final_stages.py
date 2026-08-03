@@ -17,29 +17,23 @@ PIL burn is a **named recovery stage**, never a silent assumption that HF worked
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from security_policy import minimal_subprocess_env
+from util import read_json as _util_read_json
 from util import sha256_file as _sha256
-from util import utc_now
+from util import utc_now, write_json
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_json(path, data)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+    data = _util_read_json(path)
     return data if isinstance(data, dict) else {}
 
 

@@ -124,7 +124,12 @@ _DEFAULT: Logger = Logger()
 
 
 def log(msg: str) -> None:
-    _DEFAULT.info(msg)
+    """Backward-compatible plain stderr line (not JSON).
+
+    Historical callers (render_final / aifilm_grok / compose_*) expect a single
+    human-readable line on stderr. Structured JSON goes through ``get_logger``.
+    """
+    print(msg, file=sys.stderr, flush=True)
 
 
 def set_level(level: LogLevel) -> None:

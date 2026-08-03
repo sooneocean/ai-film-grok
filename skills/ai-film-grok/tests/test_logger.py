@@ -176,8 +176,8 @@ class TestLoggerCounters(unittest.TestCase):
 class TestModuleLevelAPI(unittest.TestCase):
     """Module-level log/set_level/get_logger functions."""
 
-    def test_log_function(self):
-        """log() writes at INFO level via default logger."""
+    def test_log_function_is_plain_stderr(self):
+        """log() stays a plain one-line stderr shim (not JSON)."""
         buf = io.StringIO()
         old = sys.stderr
         sys.stderr = buf
@@ -185,27 +185,36 @@ class TestModuleLevelAPI(unittest.TestCase):
             log("test message")
         finally:
             sys.stderr = old
-        data = json.loads(buf.getvalue().strip())
-        self.assertEqual(data["message"], "test message")
+        out = buf.getvalue()
+        self.assertIn("test message", out)
+        self.assertFalse(out.strip().startswith("{"))
 
     def test_get_logger_named(self):
         """get_logger returns a Logger with the given name."""
         logger = get_logger("mymodule")
         self.assertEqual(logger._name, "mymodule")
 
-    def test_set_level_affects_default(self):
-        """set_level changes the default logger level."""
-        old_level = LogLevel.INFO
+    def test_set_level_affects_default_structured_logger(self):
+        """set_level changes the default structured Logger, not plain log()."""
+        from logger import _DEFAULT
+
+        old_level = _DEFAULT._level
         set_level(LogLevel.ERROR)
         buf = io.StringIO()
         old = sys.stderr
         sys.stderr = buf
         try:
-            log("should not appear")
+            _DEFAULT.info("should not appear")
+            _DEFAULT.error("should appear")
+            # plain log() ignores level filters by design
+            log("plain always appears")
         finally:
             sys.stderr = old
             set_level(old_level)
-        self.assertEqual(buf.getvalue(), "")
+        out = buf.getvalue()
+        self.assertNotIn("should not appear", out)
+        self.assertIn("should appear", out)
+        self.assertIn("plain always appears", out)
 
 
 if __name__ == "__main__":
