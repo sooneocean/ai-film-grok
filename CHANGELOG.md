@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.31.28] - 2026-08-03
+
+### Fixed
+- `runtime_policy` now resolves the skill's pinned runtime Python (via `runtime-python` script) instead of using `sys.executable` / `platform.python_version()` which reflected the host agent's Python, not the skill's. Fixes doctor `runtime_lock` false drift when run from inside Hermes.
+
+
+## [2.31.27] - 2026-08-03
+
+### Added
+- **Dual-lane hybrid_h3 config**: `AIFILM_I2V_PROFILE=hybrid_h3` keeps Grok bulk auto while restricted/meat soft-locks to local MiniMax H3 (`comfy-h3`).
+- Film-spec `h3` + `motion_lanes` defaults; shot-intent recommendations (`recommended_lane/provider/weapon`, H3 audio/duration).
+- Example: `templates/film-spec.hybrid-h3.example.json`.
+- Tests: `tests/test_hybrid_h3_lanes.py`.
+
+### Changed
+- Hybrid firepower docs + hard-defaults + weapon-lane matrix: Wan local → MiniMax H3.
+- Shot-intent schema allows H3 routing fields and audio policies.
+
 ## [2.31.26] - 2026-08-03
 
 ### Added

@@ -103,11 +103,11 @@ def _requirements(path: Path) -> dict[str, str]:
     return result
 
 
-def verify_requirements_lock(path: Path) -> dict[str, Any]:
+def verify_requirements_lock(path: Path, skill_dir: Path | None = None) -> dict[str, Any]:
     expected = _requirements(path)
     errors: list[str] = []
     packages: dict[str, dict[str, str | None]] = {}
-    for name, actual in _package_versions(expected).items():
+    for name, actual in _package_versions(expected, skill_dir).items():
         wanted = expected[name]
         packages[name] = {"expected": wanted, "actual": actual}
         if actual != wanted:
@@ -289,7 +289,7 @@ def verify_runtime_lock(skill_dir: Path, lock_path: Path) -> dict[str, Any]:
         if actual != wanted:
             errors.append(f"{command} version drift")
     expected_packages = expected.get("packages") or {}
-    actual_packages = _package_versions(expected_packages)
+    actual_packages = _package_versions(expected_packages, root)
     for package, wanted in expected_packages.items():
         actual = actual_packages[package]
         if actual != wanted:

@@ -400,7 +400,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         lipsync_info = lipsync_probe()
     except Exception as exc:
         lipsync_info = {"ok": False, "error": str(exc)}
-    requirements = verify_requirements_lock(skill_dir / "requirements.lock")
+    requirements = verify_requirements_lock(skill_dir / "requirements.lock", skill_dir)
     runtime = verify_runtime_lock(skill_dir, skill_dir / "runtime-lock.json")
     schema_ok = False
     schema_error = None
