@@ -147,7 +147,14 @@ class NarrativeControlTests(unittest.TestCase):
             self.assertFalse(report["ready_for_projection"])
             graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
             self.assertEqual(graph["schema_version"], 2)
-            self.assertIn("STORY_GOAL_MISSING", report["narrative"]["issue_codes"])
+            # draft_story_contract may pre-fill genre goal/stakes; draft still
+            # fails closed on beat/scene authoring gaps.
+            codes = report["narrative"]["issue_codes"]
+            self.assertTrue(
+                any(c.startswith("BEAT_") or c.startswith("SCENE_") for c in codes),
+                codes,
+            )
+            self.assertIn("BEAT_OBSTACLE_MISSING", codes)
             shots = [
                 sh
                 for ep in graph["episodes"]
@@ -255,7 +262,15 @@ class NarrativeControlTests(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0)
             report = json.loads(proc.stdout)
             self.assertFalse(report["ok"])
-            self.assertIn("STORY_GOAL_MISSING", report["issue_codes"])
+            codes = report["issue_codes"]
+            self.assertTrue(
+                any(
+                    c.startswith("BEAT_") or c.startswith("SCENE_") or c.startswith("STORY_")
+                    for c in codes
+                ),
+                codes,
+            )
+            self.assertIn("BEAT_OBSTACLE_MISSING", codes)
 
     @pytest.mark.slow
     def test_projection_hash_drift_is_visible(self) -> None:

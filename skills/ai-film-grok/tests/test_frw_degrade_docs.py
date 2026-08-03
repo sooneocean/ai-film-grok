@@ -55,8 +55,8 @@ class FrwDegradeDocsTests(unittest.TestCase):
         skill = SKILL.read_text(encoding="utf-8")
         visual_card = (ROOT / "references" / "stages" / "visual.md").read_text(encoding="utf-8")
         reachable = skill + visual_card
-        # Current season: LTX action primary, then FRW API I2V, then Grok Video 1.5.
-        self.assertIn("ltx23_primary", reachable)
+        # Current season: Grok action primary; dialogue still FRW LTX 2.3.
+        self.assertIn("grok_primary", reachable)
         self.assertIn("LTX 2.3", skill)
         self.assertIn("FRW API I2V", skill)
         self.assertIn("frw-degrade-dispatch.md", reachable)
