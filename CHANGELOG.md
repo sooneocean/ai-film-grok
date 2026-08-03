@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.31.21] - 2026-08-03
+
+### Added
+- **Workflow Wave B–C** (`workflow_pack` + `cli_workflow`):
+  - `aifilm bulk-preflight` — single-door bulk readiness (pilot/heat/state/still/anatomy/tunnel/lease); optional `media-queue add --require-preflight` / `AIFILM_REQUIRE_BULK_PREFLIGHT=1`.
+  - `aifilm variety-precheck` — design-time anti-boring matrix → `receipts/variety-precheck.json` + `variety-matrix.md`.
+  - `aifilm select-shortlist` — multi-take preferred shortlist (advisory; never deletes takes).
+  - `aifilm gpu-lease status|acquire|heartbeat|release` — 5090 one-owner lease (`~/.grok/run/gpu-lease.json`).
+  - `aifilm tunnel-probe` — `18188/system_stats` Comfy JSON; `TUNNEL_WRONG_PORT` on 401/unauthorized.
+  - `aifilm queue-progress` — honest progress = non-empty takes/clips only.
+- `doctor` advisory field `comfy_tunnel` (does not fail core).
+- `dispatch`: plate present → prefer `closeout-run`; skill maps for bulk-preflight / pilot-pack / variety.
+- Tests: `tests/test_workflow_pack.py` (18 cases with Wave A).
+
+### Changed
+- SKILL commands list + stages/visual · stages/deliver pointers for new throughput cmds (SKILL ≤6kB).
+
+## [2.31.20] - 2026-08-03
+
+### Added
+- **Workflow Wave A:** `aifilm closeout status|run` — heat → human review-final gate → post-audit → optional export next_cmd; receipt `receipts/closeout.json`.
+- **`aifilm pilot pack`** — one-screen pilot GO pack (`receipts/pilot-go.json`: three-beat, media, score, heat, state-index, GO template).
+- When `pilot-go.json` exists with `ok=false`, bulk `media-queue add` fails closed (`assert_pilot_go_allows_bulk`).
+- `next_actions`: prefer `closeout-run` when a final/plate exists; surface `pilot-pack` in pilot window.
+- Tests: `tests/test_workflow_wave_a.py`.
+
+
 ## [2.31.19] - 2026-08-03
 
 ### Changed

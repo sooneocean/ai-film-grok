@@ -7,6 +7,7 @@ import argparse
 import fcntl
 import hashlib
 import json
+import os
 import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -318,6 +319,7 @@ class MediaQueue:
         canary_group_id: str | None = None,
         seed_offset: int = 0,
         generation_contract: dict[str, Any] | None = None,
+        require_preflight: bool = False,
     ) -> dict[str, Any]:
         try:
             shot_id = validate_identifier(shot_id, field="shot id")
@@ -490,6 +492,19 @@ class MediaQueue:
                 assert_heat_allows_media(self.root)
             except ProductionGateError as exc:
                 raise QueueError(str(exc)) from exc
+            # Wave B1: optional bulk-preflight hard gate
+            want_pf = require_preflight or os.environ.get(
+                "AIFILM_REQUIRE_BULK_PREFLIGHT", ""
+            ).strip().lower() in {"1", "true", "yes", "on"}
+            if want_pf and not allow_without_pilot:
+                try:
+                    from workflow_pack import WorkflowPackError, assert_bulk_preflight
+
+                    assert_bulk_preflight(self.root, require=True)
+                except WorkflowPackError as exc:
+                    raise QueueError(str(exc)) from exc
+                except Exception as exc:  # noqa: BLE001
+                    raise QueueError(f"bulk preflight unavailable: {exc}") from exc
             effective_budget = int(
                 (state.get("policy") or {}).get("budget_units") or self.budget_units
             )
@@ -942,6 +957,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip pilot user-approval gate (emergency / unit tests only)",
     )
     add.add_argument(
+        "--require-preflight",
+        action="store_true",
+        help="Require receipts/bulk-preflight ok (or run it); also AIFILM_REQUIRE_BULK_PREFLIGHT=1",
+    )
+    add.add_argument(
         "--assembly-receipt", help="Path to prompt_assembly_shot.json receipt for traceability"
     )
     add.add_argument("--provider", help="Generation provider for contract-bound job identity")
@@ -1013,6 +1033,7 @@ def main(argv: list[str] | None = None) -> int:
                 allow_without_pilot=bool(getattr(args, "allow_without_pilot", False)),
                 assembly_receipt=Path(args.assembly_receipt) if args.assembly_receipt else None,
                 generation_contract=_generation_contract_from_args(args),
+                require_preflight=bool(getattr(args, "require_preflight", False)),
             )
         elif args.command == "claim":
             result = queue.claim()

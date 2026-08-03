@@ -50,6 +50,8 @@ _ACTION_STAGE: dict[str, str] = {
     "final-audio": "post",
     "external-review": "post",
     "review-final": "post",
+    "closeout-run": "post",
+    "pilot-pack": "agent",
     "post-audit": "post",
     "export-desktop": "deliver",
     "done": "done",
@@ -403,6 +405,11 @@ def build_next_actions(
     )
 
     if not pilot_ok:
+        add(
+            "pilot-pack",
+            f'aifilm pilot pack --root "{r}"',
+            "pilot GO 证据包（媒体+三拍+state+heat）— 一屏看是否可 bulk",
+        )
         add("pilot-report", f'aifilm pilot report --root "{r}"', "查看 pilot 三镜素材与评分状态")
         if not score_ok:
             if pilot_score.get("failures"):
@@ -461,6 +468,11 @@ def build_next_actions(
                 "镜头未齐：队列生成 + register-clip",
             )
         else:
+            add(
+                "pilot-pack",
+                f'aifilm pilot pack --root "{r}"',
+                "pilot GO 证据包：三镜/卸装三拍/score/heat/state — bulk 前一屏",
+            )
             add(
                 "pilot-window",
                 f'media-queue add --root "{r}" …  # 无 pilot 批准时最多 3 个不同 shot_id',
@@ -534,6 +546,12 @@ def build_next_actions(
                 )
         else:
             final_path = str(final_rec.get("path") or "")
+            # Wave A3: plate/final exists → prefer closeout ladder (not orphan "what next?")
+            add(
+                "closeout-run",
+                f'aifilm closeout run --root "{r}"',
+                "[交付] 成片/plate 已在 → closeout：heat→review-final→post-audit（不自动批分）",
+            )
             external_configured = bool(
                 os.environ.get("GROQ_API_KEY") or os.environ.get("GEMINI_API_KEY")
             )

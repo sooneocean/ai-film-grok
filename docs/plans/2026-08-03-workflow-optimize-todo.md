@@ -1,7 +1,8 @@
 # 流程优化 Todo Plan — 2026-08-03
 
+**Status:** **Wave A–C SHIPPED** (v2.31.20–21) · Wave D pending  
 **视角：** 你怎么把一集从故事做到桌面成片（不是再拆 CLI 行数）。  
-**前置已完成：** ROI A–E · Process slim P0–P5（v2.31.16–18）  
+**前置已完成：** ROI A–E · Process slim P0–P5（v2.31.16–19）  
 **方法：** 7 步主流程 × 近两周片例 PARTIAL × 门禁密度  
 **原则：** 砍「重复决策 / 假进度 / 收尾手搓」；不砍 pilot 人审、不静默降 heat
 
@@ -57,50 +58,35 @@
 
 ### Wave A — 收尾与 Pilot 打包（推荐先做 · 1–2 会话）
 
-- [ ] **A1 · `aifilm closeout run --root`**  
-  - 串：heat check 摘要 → review-final → post-audit →（可选）export-desktop  
-  - 任一步 hard fail：**停 + 单一 next_cmd + required_proof**（与 dispatch 同形）  
-  - 完成定义：ch04/chaebol 类片根上 dry-run 绿路径可复现；失败路径测 2 个  
+- [x] **A1 · `aifilm closeout status|run --root`**  
+  - 串：heat 摘要 → review-final 闸（不自动批）→ post-audit →（可选）export next_cmd  
+  - hard fail：**停 + next_cmd + required_proof**；回执 `receipts/closeout.json`  
+  - 测：`tests/test_workflow_wave_a.py`  
 
-- [ ] **A2 · `aifilm pilot pack --root`（或 pilot report --go-ready）**  
-  - 一页 JSON/md：3 pilot 镜路径 · undress/union/rhythm 证据 · state-index 缺口 · heat impact 分 · 用户 GO 粘贴模板  
-  - bulk 前 media-queue 读 `pilot_go.ok`（已有则接线，无则加薄闸）  
-  - 完成定义：缺 undress 时 `ok=false` 且挡住 bulk  
+- [x] **A2 · `aifilm pilot pack --root`**  
+  - `receipts/pilot-go.json`：三镜 · 卸装三拍 · score/approval · heat · state-index · GO 模板  
+  - bulk：若存在 pilot-go 且 `ok=false` → `assert_pilot_go_allows_bulk` 挡 media-queue  
 
-- [ ] **A3 · dispatch `next` 在 plate 存在时优先 closeout**  
-  - 避免 agent 停在「已有 final.mp4 不知下一步」  
-  - 完成定义：mock receipt 测：plate 在 + final_complete 假 → next=closeout  
+- [x] **A3 · `next_actions` plate 优先 closeout-run**  
+  - final 在 + 未 final_complete → `closeout-run` 先于 `review-final`  
 
-### Wave B — 批量诚实与设计期省返工（1–2 会话）
+### Wave B — 批量诚实与设计期省返工 · **DONE (v2.31.21)**
 
-- [ ] **B1 · `aifilm bulk-preflight --root`**  
-  - 合并：state-index · still 唯一 · 几何 9:16 · poison/anatomy 标记 · heat hard_fail · 本机 comfy client 单例 · 隧道 `/system_stats`  
-  - **一条命令**出 pass/fail 表；media-queue add 可挂 `--require-preflight`  
-  - 完成定义：缺状态照 / 毒 still / heat fail 各至少 1 条 fail-closed 测  
+- [x] **B1 · `aifilm bulk-preflight --root`**  
+  - 合并 pilot/heat/state/still/anatomy/tunnel/lease；`media-queue add --require-preflight`  
+  - 回执 `receipts/bulk-preflight.json`；测 `test_workflow_pack.py`  
 
-- [ ] **B2 · 设计期 variety 预检（plan/write-spec 后）**  
-  - 输出：体位集合数 · 脸 CU 计数 · 相邻 motion 撞车列表 · L4 insert 数  
-  - 人审 1 页「镜头差矩阵」再进 still（比 bulk 后重渲便宜 10×）  
-  - 完成定义：与 hard-defaults 抗无聊门槛一致的 pytest；dispatch agent/shots 阶段可 next 到此  
+- [x] **B2 · `aifilm variety-precheck`**  
+  - 体位 / 脸 CU / L4 / 邻镜 motion·camera 撞车 → `variety-matrix.md`  
 
-- [ ] **B3 · select shortlist**  
-  - 多 take：motion mean × medium style × contact 可读（启发式字段即可）  
-  - 完成定义：同镜 ≥2 take 时自动标 preferred；不静默删其它 take  
+- [x] **B3 · `aifilm select-shortlist`**  
+  - 多 take preferred（不删 take）→ `receipts/select-shortlist.json`  
 
-### Wave C — 算力与队列（运维为主 · 可与 A/B 并行）
+### Wave C — 算力与队列 · **DONE (v2.31.21)**
 
-- [ ] **C1 · 5090 lease 文件协议**  
-  - `receipts/gpu-lease.json`：owner film root · pid · started · heartbeat  
-  - 提交前：idle + lease 空或本片；禁 pgrep 宽杀（已有 lesson，缺统一入口）  
-  - 完成定义：第二片 submit 时清晰 `blocked_by=lease`  
-
-- [ ] **C2 · 隧道 doctor 探针固定**  
-  - doctor 或 preflight：`18188/system_stats` 必须 Comfy JSON；8189 特征 → 显式码 `TUNNEL_WRONG_PORT`  
-  - 完成定义：mock 401 body 测  
-
-- [ ] **C3 · interrupt / 0-progress 诚实**  
-  - takes 文件数 + 非空字节才算 progress（已有记忆）；统一写进 queue status  
-  - 完成定义：agent 不会把 interrupt 报成 DONE  
+- [x] **C1 · `aifilm gpu-lease`** — `~/.grok/run/gpu-lease.json` 一机一 owner  
+- [x] **C2 · `tunnel-probe` + doctor `comfy_tunnel`** — `TUNNEL_WRONG_PORT`  
+- [x] **C3 · `queue-progress`** — 非空 takes/clips 才算进度  
 
 ### Wave D — Final 包装（有成片回归痛再开）
 
@@ -156,7 +142,7 @@ D 仅当 final 再炸
 |------|------|------|
 | `2026-08-03-roi-optimization-plan` | A–E DONE | 工程绿线；本计划不重复 |
 | `2026-08-03-process-slim-phase2` | P0–P5 DONE · P6 未开 | 文档税；本计划吃 **成片吞吐** |
-| 本档 | **提议 · 未执行** | 拍片主流程 ROI |
+| 本档 | **Wave A 已落地** · B–D 待开 | 拍片主流程 ROI |
 
 ---
 

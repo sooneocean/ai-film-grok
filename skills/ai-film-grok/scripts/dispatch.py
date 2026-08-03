@@ -32,7 +32,11 @@ _ACTION_SKILLS = {
     "audio-plan": "sound.design",
     "selects-report": "projection.verify",
     "post-audit-gate": "projection.verify",
+    "closeout-run": "projection.verify",
     "production-evidence-gate": "projection.verify",
+    "bulk-preflight": "image.animate",
+    "pilot-pack": "quality.inspect",
+    "variety-precheck": "story.validate",
 }
 _SKILL_POLICIES = {
     "keyframe.generate": ("external", "human_required"),
@@ -46,9 +50,12 @@ _COMMAND_POLICIES = {
     "dailies": ("local", "human_required"),
     "export-desktop": ("local", "human_required"),
     "final": ("external", "human_required"),
+    "closeout": ("local", "human_required"),
     "grok-oauth": ("external", "human_required"),
     "media-queue": ("external", "human_required"),
     "pilot": ("local", "human_required"),
+    "pilot-pack": ("local", "human_required"),
+    "bulk-preflight": ("local", "none"),
     "queue-run-oauth": ("paid", "human_required"),
     "review-ui": ("local", "human_required"),
     "review-final": ("local", "human_required"),
@@ -562,7 +569,33 @@ def build_dispatch(
 
     freshness = audit_freshness(root, post_audit)
     post_audit_gate = bool(post_audit.get("delivery_ready")) and not freshness.get("stale")
-    if craft_stage in {"post", "verified"} and not post_audit_gate:
+    # A3: when a plate exists, prefer closeout chain over scattered review/post-audit cmds
+    plate_exists = any(
+        (root / rel).is_file()
+        for rel in (
+            "out/film_final.mp4",
+            "out/film_hyperframes.mp4",
+            "out/final.mp4",
+            "final.mp4",
+        )
+    )
+    if not plate_exists:
+        man_out = read_json(root / "manifest.json") or {}
+        ff = ((man_out.get("outputs") or {}).get("final_film") or {}) if isinstance(
+            man_out, dict
+        ) else {}
+        raw_ff = str(ff.get("path") or "").strip()
+        if raw_ff:
+            pff = Path(raw_ff)
+            plate_exists = pff.is_file() if pff.is_absolute() else (root / pff).is_file()
+    if plate_exists and craft_stage in {"post", "verified", "design"} and not post_audit_gate:
+        pre(
+            "closeout-run",
+            f'aifilm closeout run --root "{r}"',
+            "plate exists — run closeout chain (heat → review-final gate → post-audit → export next)",
+            "post",
+        )
+    elif craft_stage in {"post", "verified"} and not post_audit_gate:
         pre(
             "post-audit-gate",
             f'aifilm post-audit --root "{r}"',

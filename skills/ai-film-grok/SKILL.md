@@ -62,15 +62,16 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 ```bash
 "$AIFILM" doctor
 "$AIFILM" plan run --root "<film>" --text "<story>" --title "<title>" --target-duration 60
-"$AIFILM" plan run --root "<film>" --received --production-mode longform --target-duration 600
 "$AIFILM" write-spec --root "<film>"
-"$AIFILM" longform status --root "<film>"
 "$AIFILM" state-index check --root "<film>"
-"$AIFILM" pilot report --root "<film>"
-"$AIFILM" frw ab catalog --root "<film>"   # 只读；A/B 见 references/frw-ab-workflow.md
-# 用户批准后 bulk
+"$AIFILM" pilot pack --root "<film>"          # GO 包 → pilot-go.json
+"$AIFILM" variety-precheck --root "<film>"    # 设计期抗无聊
+"$AIFILM" bulk-preflight --root "<film>"      # bulk 单门
+# 用户批准后 bulk → final
 "$AIFILM" final --root "<film>" --post-engine hyperframes --lipsync off --music-mood rnb --tts-backend edge
+"$AIFILM" closeout run --root "<film>"        # plate 后收尾链（不自动批分）
 "$AIFILM" review-final --root "<film>"
+# 吞吐：select-shortlist · gpu-lease · tunnel-probe · queue-progress
 ```
 
-深挖：[hard-defaults](references/hard-defaults.md) · [directors-lens](references/directors-lens.md) · [comfy armory](references/comfy-weapon-armory.md) · [INDEX](references/INDEX.md)
+深挖：[hard-defaults](references/hard-defaults.md) · [stages/visual](references/stages/visual.md) · [stages/deliver](references/stages/deliver.md) · [INDEX](references/INDEX.md)

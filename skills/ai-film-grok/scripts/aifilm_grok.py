@@ -523,6 +523,20 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         )
     report["designed_post"] = designed
 
+    # Soft Comfy tunnel probe (C2) — advisory only; missing tunnel must not fail core doctor
+    tunnel: dict[str, Any] = {"ok": None, "required_for": "5090 comfy bulk"}
+    try:
+        from workflow_pack import tunnel_probe
+
+        tunnel = {
+            **tunnel_probe(port=int(os.environ.get("AIFILM_COMFY_TUNNEL_PORT") or 18188)),
+            "required_for": "5090 comfy bulk",
+            "advisory": True,
+        }
+    except Exception as exc:  # pragma: no cover
+        tunnel = {"ok": None, "skipped": True, "error": str(exc)[:160], "advisory": True}
+    report["comfy_tunnel"] = tunnel
+
     # video-use skill readiness (real-footage editing ring, 2026-07-23) — soft probe
     video_use: dict[str, Any] = {"ok": False, "required_for": "ingest-footage / auto-cut"}
     try:
@@ -5119,6 +5133,13 @@ def cmd_pilot(args: argparse.Namespace) -> int:
             shots = [s.strip() for s in shots_raw.split(",") if s.strip()] or None
             emit(pilot_report(root, shots=shots))
             return 0
+        if action == "pack":
+            from pilot_pack import pilot_pack
+
+            shots_raw = str(getattr(args, "shots", "") or "")
+            shots = [s.strip() for s in shots_raw.split(",") if s.strip()] or None
+            emit(pilot_pack(root, shots=shots))
+            return 0
         if action == "score":
             from pilot_review import fail_scorecard_to_director_notes
 
@@ -5566,6 +5587,31 @@ def cmd_truth(args: argparse.Namespace) -> int:
     report = audit_production_truth(Path(args.root))
     emit(report)
     return 0 if report["ok"] else 2
+
+
+def cmd_closeout(args: argparse.Namespace) -> int:
+    """Wave A1: heat → review gate → post-audit → optional export next_cmd."""
+    from closeout import closeout_run, closeout_status
+
+    root = Path(args.root).expanduser().resolve()
+    action = str(getattr(args, "closeout_action", "run") or "run")
+    if action == "status":
+        report = closeout_status(root)
+        emit(report)
+        return 0 if report.get("ok") else 2
+    report = closeout_run(
+        root,
+        execute=not bool(getattr(args, "status_only", False)),
+        export=bool(getattr(args, "export", False)),
+        export_name=getattr(args, "name", None),
+    )
+    emit(report)
+    # 0 = delivery_ready or stopped only at optional export; 2 = hard stop mid ladder
+    if report.get("delivery_ready") or report.get("ok"):
+        return 0
+    if report.get("stopped_at") == "export_desktop":
+        return 0
+    return 2
 
 
 def cmd_export_desktop(args: argparse.Namespace) -> int:
@@ -7625,6 +7671,13 @@ def cmd_comfy(args: argparse.Namespace) -> int:
     from cli_comfy import run_comfy
 
     return run_comfy(args)
+
+
+def cmd_workflow(args: argparse.Namespace) -> int:
+    """Wave A–C throughput: closeout / pilot-pack / bulk-preflight / lease / tunnel."""
+    from cli_workflow import run_workflow_cmd
+
+    return run_workflow_cmd(args)
 
 
 def cmd_node(args: argparse.Namespace) -> int:
@@ -9985,6 +10038,12 @@ def build_parser() -> argparse.ArgumentParser:
     pr = pilot_sub.add_parser("report", help="Media + scorecard + approval status for pilot shots")
     pr.add_argument("--root", required=True)
     pr.add_argument("--shots", default="", help="Comma shot ids (default auto-pick)")
+    pk = pilot_sub.add_parser(
+        "pack",
+        help="Pilot GO pack: 3 shots + adult three-beat + heat/state → receipts/pilot-go.json",
+    )
+    pk.add_argument("--root", required=True)
+    pk.add_argument("--shots", default="", help="Comma shot ids (default auto-pick)")
     ps = pilot_sub.add_parser(
         "score", help="Write receipts/pilot-scorecard.json (identity/style/motion)"
     )
@@ -10010,6 +10069,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-require-scorecard",
         action="store_true",
         help="Allow without pilot-scorecard all-pass (not recommended)",
+    )
+
+    closeout = sub.add_parser(
+        "closeout",
+        help="Delivery ladder: heat → review-final gate → post-audit → optional export",
+    )
+    closeout_sub = closeout.add_subparsers(dest="closeout_action", required=True)
+    cos = closeout_sub.add_parser("status", help="Read-only closeout ladder status")
+    cos.add_argument("--root", required=True)
+    cor = closeout_sub.add_parser(
+        "run",
+        help="Run automatable steps; stop at human review-final (never auto-approve)",
+    )
+    cor.add_argument("--root", required=True)
+    cor.add_argument(
+        "--export",
+        action="store_true",
+        help="After post-audit ok, emit export-desktop next_cmd (requires --name)",
+    )
+    cor.add_argument("--name", default=None, help="Desktop export folder name (with --export)")
+    cor.add_argument(
+        "--status-only",
+        action="store_true",
+        help="Do not run post-audit; status snapshot only",
     )
 
     cpv = sub.add_parser(
@@ -10429,6 +10512,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_route_parsers(sub)
 
+    from cli_workflow import add_workflow_parsers
+
+    add_workflow_parsers(sub)
+
     return p
 
 
@@ -10531,6 +10618,7 @@ def main(argv: list[str] | None = None) -> int:
             "heat": cmd_heat,
             "state-index": cmd_state_index,
             "pilot": cmd_pilot,
+            "closeout": cmd_closeout,
             "compose-preview": cmd_compose_preview,
             "export-compose": cmd_export_compose,
             "compose-render": cmd_compose_render,
@@ -10564,6 +10652,14 @@ def main(argv: list[str] | None = None) -> int:
             "weapon": cmd_weapon,
             "route": cmd_route,
             "team": cmd_team,
+            # closeout → cmd_closeout (closeout.py). pilot pack → cmd_pilot.
+            "pilot-pack": cmd_workflow,
+            "bulk-preflight": cmd_workflow,
+            "variety-precheck": cmd_workflow,
+            "select-shortlist": cmd_workflow,
+            "gpu-lease": cmd_workflow,
+            "tunnel-probe": cmd_workflow,
+            "queue-progress": cmd_workflow,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:

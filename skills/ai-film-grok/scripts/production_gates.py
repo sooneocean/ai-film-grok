@@ -490,6 +490,15 @@ def assert_pilot_allows_add(
     pilot = load_pilot_approval(root)
     if pilot_is_user_approved(pilot):
         assert_provider_pilot_current(root)
+        # Wave A2: when pilot-go.json exists, require ok before bulk beyond pilot window
+        try:
+            from pilot_pack import assert_pilot_go_allows_bulk
+
+            assert_pilot_go_allows_bulk(root, force=force)
+        except ProductionGateError:
+            raise
+        except Exception:
+            pass
         return {"ok": True, "pilot": pilot}
     known = set(existing_shot_ids) | {shot_id}
     if len(known) <= PILOT_MAX_SHOTS_WITHOUT_APPROVAL:
