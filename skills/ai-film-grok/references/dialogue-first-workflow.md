@@ -27,7 +27,7 @@ story.receive
 
 - 以对白回合设计 A-roll、正反打、过肩、反应、动作覆盖与信息插镜；长台词可切画面，声音和字幕时钟不断。
 - 禁止连续讲话大头镜；相邻镜必须改变景别、视点、眼神轴、动作或反应功能。每个 `beat_id` 含讲话镜时，必须有同一 `beat_id` 的 `reaction`、`action_cover` 或 `silence` 承接；同一节拍可含多句短对白，不会被强迫一行一条视频。
-- 旁白只补 gap 信息；目标占比 0，硬上限默认 **5%**。**禁止**第三人称说书填钟。
+- 旁白只补 gap 信息；目标占比 0，硬上限默认 **5%**。**禁止**第三人称说书填钟。**（v2.34 起场景级硬闸）** 每个 scene（嵌套 shots）必须有 ≥1 条 `on_camera`/`off_camera` 对白（`spoken_text`+dialogue voice cue）；每场纯 `silence`/`action_cover`/纯 `nar` 硬拒收。逃生=scene `{"silent_scene": true, "narration_reason": "…"}`，或 spec `allow_silent_scenes:true`；默认绝不产「全旁白/全静默」场景。
 - 状态键是「角色 × 场景 × 衣着 × 情绪 × 姿态 × 视线 × 道具 × 光线 × 空间位置」。角色母版先经 Qwen I2I 生成状态照；状态照再生成每句关键帧；已批准的上镜末帧可 promote 为下一镜候选。批准 I2I receipt 必须绑定输入、输出、模型与 SHA-256。
 - `dialogue-scene-package.json` 用 `line_id` 把台词、TTS 哈希/时长、状态照、关键帧、口型、字幕和人工审核绑在一起。`on_camera` 只允许短句、近景/微侧脸、遮挡少，且必须有状态照、TTS 与逐镜人工口型审核。
 - TTS 排练完成后会锁回每一条对白镜的 `duration_sec`（实音频 + 明确前后停顿），禁止再用估算秒数硬塞进既有 I2V 片长。
@@ -36,6 +36,14 @@ story.receive
 ## 讲话镜动态路由
 
 同一讲话镜的候选必须共享批准状态图与表演意图；只有 FRW `img2video` → LatentSync 的回退分支会绑定最终日文 TTS。LTX 原生有声 I2V 仅按提示词生成声音，不接收该 TTS：
+
+**v2.34 对白车道补充（用户新规：对话对白优先 + 工具组 grok i2v/5090 H3 i2v/r2v）**
+
+| 场景 | 路由 | 音频要点 |
+|---|---|---|
+| 非敏感对白近景 | `cloud_dialogue_ltx`（FRW LTX 2.3 原生有声 I2V） | LTX 原生有声（中文）；`audio_policy=prefer_native` |
+| **restricted 对白近景**（heat/bare/高难 + on_camera 台词） | `local_dialogue_h3`（5090 `minimax-h3-i2v-pilot`；有状态照链 → `minimax-h3-r2v-pilot`） | H3 prompt 首部硬注入：`Audio: the visible character speaks this line in natural Mandarin on camera; mouth visibly articulates the line, lip sync priority; line: 「<spoken_text>」.` `prefer_native` |
+| 无台词覆盖镜（action_cover/silence/reaction） | 沿用各车道（Grok / FRW env / H3 i2v） | 不能占满一整场（v2.34 场景级规） |
 
 1. **首选**：Qwen I2I 状态图/关键帧 → FRW 上传取得 `img-url` → FRW `img2video-audio`（此子命令选择 LTX 2.3）。提示词强制含「无可见文字、无字幕、无水印」，但提示词不是门禁：必须解码抽帧，人审确认没有供应商烧字、听到的台词符合预期、口型与声音一致。
 2. **第一回退**：仅在 LTX 原生音画被明确拒绝（台词不符、口型不符、供应商烧字或解码失败）时，才使用原 FRW `img2video`；它复用同一批准关键帧。LTX 的 `img2video-audio` 会按提示词自行生成声音，当前 FRW CLI **不接收外部 TTS 音频**，因此不能把它误记成已锁定 TTS 的口型结果。

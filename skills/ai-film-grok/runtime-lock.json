@@ -614,7 +614,7 @@
     },
     {
       "path": "scripts/film_spec.py",
-      "sha256": "c62af376bf1d1ed1042d93485cb18df2b63871d09cf82fc1c8e5b6a7e7910772"
+      "sha256": "7db20e612c0877c43dc81f852da0bee6074011179b933795ac1a46acefcbe37c"
     },
     {
       "path": "scripts/final_editorial_review.py",
@@ -670,7 +670,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "075b034f5bd23dd411e904e5c2e5bfe826b6a311da9ab54d432b188147d0780d"
+      "sha256": "51dfd5e3d5ffb0e79a5b30cc5e55148aa09eee5d5ed8835de7784a06e25e7796"
     },
     {
       "path": "scripts/heat_check.py",
@@ -794,7 +794,7 @@
     },
     {
       "path": "scripts/narrative_control.py",
-      "sha256": "6293285cd9fa80393692c0278bac1bd094cb9094c72d6ca441cd5b6b33d3a5bc"
+      "sha256": "2d436d206af0956e348d871ef0885c3ce39eff31ae50e2efb42d206d909d1172"
     },
     {
       "path": "scripts/narrative_evidence.py",
@@ -942,7 +942,7 @@
     },
     {
       "path": "scripts/production_router.py",
-      "sha256": "d6c33c2034425a48cf9a1076b968d6b6964d2d953c7c2ccaff1766276a1a1398"
+      "sha256": "1e365b3cc0c830cdb4acbf6087a7852aa5efccb8b89eacac1493b22b77bc14aa"
     },
     {
       "path": "scripts/production_team.py",

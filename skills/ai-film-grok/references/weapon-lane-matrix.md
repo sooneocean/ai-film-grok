@@ -2,6 +2,12 @@
 
 > 2026-08-03 · 运营真相。类比：**Grok = 量产流水线**；**H3 = 重工车间**；**LTX = 对白棚**；**Qwen = 本地修片台**。
 
+## 对白优先（v2.34 新）
+
+- **对白镜画面必须可见「人在讲」**（on_camera>嘴动+近景；肉戏对白→H3 i2v/r2v 注入 Mandarin 台词）。
+- **禁全场纯 silence/action_cover 或纯 nar**：每场 ≥1 条 on/off_camera 对白；逃生 `narration_reason`（见 [hard-defaults](hard-defaults.md) 对白场景级规）。
+- 工具组 = `grok i2v`（安全 setup/只做 bulk） · `5090 H3 i2v/r2v`（restricted/肉戏/对白restricted） · `FRW LTX`（安全对白棚） · `Qwen`（状态照）。
+
 ## 默认
 
 | 片型 | Profile / H3 |
@@ -18,7 +24,8 @@
 | Foreplay soft clothed | Grok | Grok 优先；moderation → 签名切 H3 | 同上 |
 | Act / climax / bare / undressed | Qwen Edit / undress-anchor | **H3 I2V**（queue 硬拦云 bulk） | H3 `prefer_native` |
 | 高难（deep_thrust / creampie / L4+contact / force_local_h3） | 本地状态照 | **H3** | 同上 |
-| 对白近景 | Grok face | FRW LTX 2.3 | 原生有声 |
+| 对白近景（非敏感） | Grok face | FRW LTX 2.3 | 原生有声（中文） |
+| **对白近景（restricted / bare）** | Qwen 状态照 | **5090 H3 i2v**（台词注入）；有状态照链 → **H3 r2v** | H3 原声 spoken Mandarin |
 | Env / bridge | 可选 | FRW env 或 H3 T2V（低优先） | 环境 |
 | 毒镜 | Qwen 解剖修 | **禁 I2V** | — |
 

@@ -1000,7 +1000,11 @@ def validate_heat_arc_alignment(
                         node_ref=str(beat.get("id") or beat_index),
                     )
                 )
-            if heat_phase == "resolution" and dramatic_function in {"conflict", "escalation", "twist"}:
+            if heat_phase == "resolution" and dramatic_function in {
+                "conflict",
+                "escalation",
+                "twist",
+            }:
                 issues.append(
                     _issue(
                         "HEAT_ARC_MISMATCH",
@@ -1035,7 +1039,9 @@ def compute_narrative_health(graph: dict[str, Any]) -> dict[str, Any]:
     warnings = [i for i in all_issues if i.get("severity") != "hard"]
 
     issue_codes = semantic.get("issue_codes") or []
-    character_code_count = sum(1 for i in all_issues if i.get("code") == "CHARACTER_ATTR_INCONSISTENT")
+    character_code_count = sum(
+        1 for i in all_issues if i.get("code") == "CHARACTER_ATTR_INCONSISTENT"
+    )
     heat_arc_count = sum(1 for i in all_issues if i.get("code") == "HEAT_ARC_MISMATCH")
     contract_count = len(all_issues) - character_code_count - heat_arc_count
 

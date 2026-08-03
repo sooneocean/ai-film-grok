@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.34.0] - 2026-08-03
+
+### Added
+- **Dialogue-first scene gate (P0):** `dialogue_drama` now rejects any scene with zero `on_camera`/`off_camera` dialogue shots. Scenes that are pure silence, pure `action_cover` coverage, or carry only third-person narrator VO are refused — every scene must put a visible speaking character in frame. Escapes: `scene {"silent_scene": true, "narration_reason": "..."}` for justified bridge gaps, or spec-level `allow_silent_scenes: true`. Spec audit surfaces `scenes_without_dialogue` and `allow_silent_scenes` in `_dialogue_drama`.
+- **H3 dialogue-native prompt injection:** `h3_workflow._prompt_for_shot` inspects the shot's `audio_cues`. When a `dialogue` voice cue exists and `screen_mode == "on_camera"`/`"off_camera"`, the MiniMax H3 prompt now hard-injects the spoken Mandarin line with lip-sync priority — every v shot reads as the character actually talking. Non-dialogue shots keep the ambient/foley fallback.
+- **Restricted dialogue → H3 lane:** `production_router.build_shot_intent` routes restricted (`heat_phase=act/climax`/`bare`/`undressed`) on-camera dialogue to `local_dialogue_h3` (`minimax-h3-i2v-pilot`; `r2v` when a reference state chain exists) instead of the `cloud_dialogue_ltx` lane, keeping meat+speech on the RTX 5090, `audio_policy=prefer_native`.
+
+### Changed
+- **Tool matrix pinned to four providers** — `grok i2v` (safe bulk) · `5090 H3 i2v/r2v` (restricted + restricted dialogue) · `FRW LTX 2.3` (safe dialogue棚) · `Qwen I2I` (state photos). SKILL P0 #7/#8 and `references/weapon-lane-matrix.md` updated to match.
+- `SKILL.md` P0 #8 rewritten as **声线·对白优先**: scene-level dialogue hard gate, no narration as primary scene voice, dialogue shot face = speaker, restricted dialogue → H3.
+
+### Docs
+- `references/hard-defaults.md`: two new P0 rows — 对白优先·场景级拒旁白 v2.34 and 对白肉戏 → H3 本地对白路径.
+- `references/dialogue-first-workflow.md`: scene-level gate summary; new **v2.34 对白车道补充** table.
+- `references/weapon-lane-matrix.md`: new 对白优先 preamble; 对白近景 row split into sensitive (LTX) vs restricted (H3) lanes.
+
+### Tests
+- `tests/test_dialogue_scene_gate.py` (10 tests): scene gate rejects silence-only / action_cover-only / missing narration_reason; passes with dialogue; escapes via `silent_scene+narration_reason` and `allow_silent_scenes`; H3 prompt injection on / off-camera / r2v; ambient fallback when no dialogue cue.
+- `tests/test_dialogue_primary_chain.py::test_dialogue_drama_rejects_storyteller_nar` updated to satisfy the new scene gate before reaching the storyteller rule.
+- `tests/test_dialogue_contract.py::test_dialogue_drama_rejects_unbound_or_implicit_voice` updated to isolate the audio_cues check behind a valid scene dialogue gate.
+
 ## [2.33.2] - 2026-08-03
 
 ### Changed

@@ -70,6 +70,75 @@ def test_chinese_spoken_and_hf_caption_preference() -> None:
 def test_dialogue_drama_rejects_storyteller_nar() -> None:
     from film_spec import FilmSpecError, validate_film_spec
 
+    # v2.34 scene-level dialogue-first gate: a scene must carry at least one
+    # on_camera/off_camera dialogue cue; pure coverage + bare nar triggers the
+    # scene gate first. We need a talking beat present so the scene-gate passes,
+    # and then the storyteller gate still fires on the nar-only shot.
+    talking = {
+        "id": "shot00",
+        "dramatic_function": "action",
+        "duration_sec": 8,
+        "screen_mode": "on_camera",
+        "speaker": "hero",
+        "dialogue_line_id": "ln_shot00",
+        "performance_state_id": "st_shot00",
+        "lipsync_required": True,
+        "speaker_on_camera": True,
+        "lipsync": True,
+        "beat_id": "b1",
+        "caption_text": "别走。",
+        "nar": "别走。",
+        "audio_cues": [
+            {
+                "kind": "voice",
+                "line_type": "dialogue",
+                "language": "zh",
+                "speaker": "hero",
+                "spoken_text": "别走。",
+                "duration_sec": 8,
+            }
+        ],
+        "performance_state": {"head_angle": "front"},
+        "dsl": {
+            "subject": "woman",
+            "action": "speak close-up",
+            "motion": "lips move eyes blink",
+            "camera": {"shot_size": "close-up"},
+        },
+    }
+    # coverage for beat b1 so dialogue_drama beat-coverage check also passes,
+    # isolating the storyteller rule as the only failing gate.
+    cover = {
+        "id": "shot02",
+        "dramatic_function": "reaction",
+        "duration_sec": 2,
+        "screen_mode": "reaction",
+        "beat_id": "b1",
+        "audio_cues": [{"kind": "silence", "start_offset_sec": 0, "duration_sec": 2}],
+        "dsl": {
+            "subject": "hero",
+            "action": "eyes lift",
+            "motion": "slow eyebrow lift",
+            "camera": {"shot_size": "close-up"},
+        },
+    }
+    storyteller = {
+        "id": "shot01",
+        "dramatic_function": "action",
+        "duration_sec": 3,
+        "screen_mode": "action_cover",
+        "beat_id": "b1",
+        "nar": "话说她把门落锁。",
+        "audio_cues": [
+            {"kind": "silence", "start_offset_sec": 0, "duration_sec": 3}
+        ],
+        "dsl": {
+            "subject": "woman",
+            "action": "close door carefully",
+            "motion": "hand on latch door closes",
+            "camera": {"shot_size": "medium"},
+        },
+    }
     spec = {
         "schema_version": 1,
         "title": "t",
@@ -87,24 +156,7 @@ def test_dialogue_drama_rejects_storyteller_nar() -> None:
         "transition_default": "soft",
         "scenes": [
             {
-                "shots": [
-                    {
-                        "id": "shot01",
-                        "dramatic_function": "action",
-                        "duration_sec": 3,
-                        "screen_mode": "action_cover",
-                        "nar": "话说她把门落锁。",
-                        "audio_cues": [
-                            {"kind": "silence", "start_offset_sec": 0, "duration_sec": 3}
-                        ],
-                        "dsl": {
-                            "subject": "woman",
-                            "action": "close door carefully",
-                            "motion": "hand on latch door closes",
-                            "camera": {"shot_size": "medium"},
-                        },
-                    }
-                ]
+                "shots": [talking, cover, storyteller],
             }
         ],
     }

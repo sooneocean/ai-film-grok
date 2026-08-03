@@ -112,12 +112,45 @@ def _prompt_for_shot(root: Path, shot: dict[str, Any], *, mode: str) -> str:
             "Vertical 9:16. Animate the start frame with medium cel-anime style lock. "
             "Keep identity and wardrobe fixed. "
         )
-    # H3 generates usable stereo diegetic audio; ask for natural room/SFX, not silence.
-    audio = (
-        "Audio: natural diegetic ambience and soft foley matched to the action; "
-        "no on-screen speech unless the shot is clearly dialogue."
-    )
+    # Dialogue-first: a shot carrying a dialogue cue must show the character
+    # visibly speaking it on camera (user rule — every v shot looks like talking).
+    dialogue_text = _spoken_dialogue_text(shot)
+    screen_mode = str(shot.get("screen_mode") or "")
+    if dialogue_text and screen_mode == "off_camera":
+        audio = (
+            f"Audio: the character continues this line off camera while the picture "
+            f"holds the reverse or coverage shot; spoken in natural Mandarin; "
+            f"line: 「{dialogue_text}」."
+        )
+    elif dialogue_text and screen_mode == "on_camera":
+        audio = (
+            f"Audio: the visible character speaks this line in natural Mandarin on camera; "
+            f"mouth visibly articulates the line, lip sync priority; line: 「{dialogue_text}」."
+        )
+    else:
+        # H3 generates usable stereo diegetic audio; ask for natural room/SFX, not silence.
+        audio = (
+            "Audio: natural diegetic ambience and soft foley matched to the action; "
+            "no on-screen speech unless the shot is clearly dialogue."
+        )
     return f"{prefix}{body or 'subtle camera push-in, natural motion.'} {audio}"
+
+
+def _spoken_dialogue_text(shot: dict[str, Any]) -> str:
+    """Extract the spoken dialogue line for a shot's audio_cues, if any."""
+    cues = shot.get("audio_cues")
+    if not isinstance(cues, list):
+        return ""
+    for cue in cues:
+        if not isinstance(cue, dict):
+            continue
+        if (
+            cue.get("kind") == "voice"
+            and cue.get("line_type") == "dialogue"
+            and str(cue.get("spoken_text") or "").strip()
+        ):
+            return str(cue["spoken_text"]).strip()
+    return ""
 
 
 def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:

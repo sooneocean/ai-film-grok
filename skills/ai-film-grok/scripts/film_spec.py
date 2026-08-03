@@ -845,6 +845,66 @@ def validate_film_spec(
         if not str(spec.get("caption_lang") or "").strip():
             spec["caption_lang"] = "zh"
     validate_director_intent(spec)
+    if mode == "dialogue_drama":
+        # v2.34 dialogue-first scene contract gate (early): every scene must put a
+        # speaking character in frame at least once (on_camera/off_camera dialogue cue
+        # with non-empty spoken_text). Scenes that only carry silence, coverage or
+        # pure narration VO are rejected — narration stays gap-only, never the
+        # primary voice of a scene. Escapes: scene {"silent_scene": true,
+        # "narration_reason": "..."} for a justified gap scene, or spec-level
+        # allow_silent_scenes:true.
+        allow_silent_scenes_early = spec.get("allow_silent_scenes") is True
+        scenes_early = spec.get("scenes")
+        if not allow_silent_scenes_early and isinstance(scenes_early, list) and scenes_early:
+            scenes_without_dialogue_early: list[str] = []
+            for scene_index, scene in enumerate(scenes_early, start=1):
+                if not isinstance(scene, dict):
+                    continue
+                if scene.get("silent_scene") is True:
+                    if not str(scene.get("narration_reason") or "").strip():
+                        scenes_without_dialogue_early.append(
+                            f"scene{scene_index}(id={scene.get('id') or scene_index}):"
+                            f"silent_scene_requires_narration_reason"
+                        )
+                    continue
+                scene_shots = scene.get("shots")
+                if not isinstance(scene_shots, list):
+                    continue
+                has_dialogue = False
+                for scene_shot in scene_shots:
+                    if not isinstance(scene_shot, dict):
+                        continue
+                    if str(scene_shot.get("screen_mode") or "") not in {
+                        "on_camera",
+                        "off_camera",
+                    }:
+                        continue
+                    cues = scene_shot.get("audio_cues")
+                    if not isinstance(cues, list):
+                        continue
+                    if any(
+                        isinstance(cue, dict)
+                        and cue.get("kind") == "voice"
+                        and cue.get("line_type") == "dialogue"
+                        and str(cue.get("spoken_text") or "").strip()
+                        for cue in cues
+                    ):
+                        has_dialogue = True
+                        break
+                if not has_dialogue:
+                    scenes_without_dialogue_early.append(
+                        f"scene{scene_index}(id={scene.get('id') or scene_index})"
+                    )
+            if scenes_without_dialogue_early:
+                raise FilmSpecError(
+                    "dialogue_drama requires dialogue in every scene — no narration-only "
+                    "or silence-only scenes: "
+                    + "; ".join(scenes_without_dialogue_early)
+                    + ". Give the scene at least one on_camera/off_camera character "
+                    "dialogue cue with visible speaking character. Escapes: scene "
+                    "{'silent_scene': true, 'narration_reason': '...'} for a justified "
+                    "gap scene, or spec-level allow_silent_scenes:true."
+                )
     tts_backend = spec.get("tts_backend", "auto")
     if not isinstance(tts_backend, str) or tts_backend.lower() not in TTS_BACKENDS:
         raise FilmSpecError(f"film-spec tts_backend must be one of {sorted(TTS_BACKENDS)}")
@@ -1441,6 +1501,55 @@ def validate_film_spec(
                 "dialogue_drama requires reaction/action_cover/silence for every dialogue beat; "
                 "missing=" + ",".join(missing_beat_coverage)
             )
+        # Dialogue-first scene contract: every scene must put a speaking character
+        # in frame at least once (on_camera or off_camera dialogue). Scenes made of
+        # pure silence/coverage plates or narration-VO-only pictures are rejected —
+        # narration is gap-only, never the primary voice of a scene.
+        # Escape: scene {"silent_scene": true, "narration_reason": "..."} or spec-level
+        # allow_silent_scenes:true.
+        allow_silent_scenes = spec.get("allow_silent_scenes") is True
+        has_scenes = isinstance(spec.get("scenes"), list) and bool(spec.get("scenes"))
+
+        def _scene_dialogue_shots(scene: dict[str, Any]) -> list[dict[str, Any]]:
+            scene_shots = scene.get("shots")
+            if not isinstance(scene_shots, list):
+                return []
+            talking: list[dict[str, Any]] = []
+            for scene_shot in scene_shots:
+                if not isinstance(scene_shot, dict):
+                    continue
+                if str(scene_shot.get("screen_mode") or "") not in {"on_camera", "off_camera"}:
+                    continue
+                cues = scene_shot.get("audio_cues")
+                if not isinstance(cues, list):
+                    continue
+                if any(
+                    isinstance(cue, dict)
+                    and cue.get("kind") == "voice"
+                    and cue.get("line_type") == "dialogue"
+                    and str(cue.get("spoken_text") or "").strip()
+                    for cue in cues
+                ):
+                    talking.append(scene_shot)
+            return talking
+
+        scenes_without_dialogue: list[str] = []
+        if has_scenes and not allow_silent_scenes:
+            for scene_index, scene in enumerate(spec.get("scenes") or [], start=1):
+                if not isinstance(scene, dict):
+                    continue
+                if scene.get("silent_scene") is True:
+                    if str(scene.get("narration_reason") or "").strip():
+                        continue
+                    scenes_without_dialogue.append(
+                        f"scene{scene_index}(id={scene.get('id') or scene_index}):"
+                        "silent_scene_requires_narration_reason"
+                    )
+                    continue
+                if not _scene_dialogue_shots(scene):
+                    scenes_without_dialogue.append(
+                        f"scene{scene_index}(id={scene.get('id') or scene_index})"
+                    )
         consecutive = 0
         prior_speaker = ""
         for shot in shots:
@@ -1511,6 +1620,8 @@ def validate_film_spec(
         spec["_dialogue_drama"] = {
             "on_camera_shots": len(on_camera),
             "coverage_shots": len(coverage),
+            "scenes_without_dialogue": scenes_without_dialogue,
+            "allow_silent_scenes": allow_silent_scenes,
             "coverage_beats": sorted(coverage_beats),
             "missing_beat_coverage": missing_beat_coverage,
             "dialogue_sec": round(dialogue_sec, 3),

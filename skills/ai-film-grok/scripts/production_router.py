@@ -374,8 +374,19 @@ def build_shot_intent(
     recommended_weapon: str | None = None
     audio_policy = "carry_parent_dialogue" if parent_shot_id is not None else None
     if dialogue and identity_lock:
-        recommended_lane = "cloud_dialogue_ltx"
-        recommended_provider = "frw-ltx23"
+        # Dialogue-first lane: restricted (meat/bare) on-camera dialogue goes to
+        # local H3 (RTX 5090 i2v; r2v when reference states exist) with spoken
+        # Mandarin in-prompt; safe dialogue keeps the FRW LTX 2.3 native-audio棚.
+        if restricted:
+            recommended_lane = str(lanes.get("dialogue_restricted_local") or "local_dialogue_h3")
+            recommended_provider = "comfy-h3"
+            recommended_weapon = "minimax-h3-i2v-pilot"
+            audio_policy = str(h3_cfg.get("audio_policy") or "prefer_native")
+            if h3_enabled and not provider_lock:
+                provider_lock = "comfy-h3"
+        else:
+            recommended_lane = "cloud_dialogue_ltx"
+            recommended_provider = "frw-ltx23"
     elif restricted and identity_lock:
         recommended_lane = str(lanes.get("restricted_local") or "local_h3")
         recommended_provider = "comfy-h3"

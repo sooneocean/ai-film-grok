@@ -213,12 +213,55 @@ class TestWriteSpecDialogueContractGate:
     def test_dialogue_drama_rejects_unbound_or_implicit_voice(self):
         from film_spec import FilmSpecError, validate_film_spec
 
-        spec = _dc_spec([_dc_shot()])
+        # v2.34: scene-level dialogue-first gate rejects scenes without any dialogue
+        # cue first; give the scene a second, fully legal talking shot and put the
+        # bad shot in beat b1 with matching reaction coverage so neither the scene
+        # gate nor the beat-coverage gate can fire before the audio_cues check.
+        talking = {
+            **_dc_shot("talk00"),
+            "screen_mode": "on_camera",
+            "speaker": "hero",
+            "dialogue_line_id": "ln_talk00",
+            "performance_state_id": "st_talk00",
+            "lipsync_required": True,
+            "speaker_on_camera": True,
+            "lipsync": True,
+            "beat_id": "b0",
+            "caption_text": "别走。",
+            "nar": "别走。",
+            "duration_sec": 8,
+            "audio_cues": [
+                {
+                    "kind": "voice",
+                    "line_type": "dialogue",
+                    "language": "zh",
+                    "speaker": "hero",
+                    "spoken_text": "别走。",
+                    "duration_sec": 8,
+                }
+            ],
+            "performance_state": {"head_angle": "front"},
+            "dsl": {
+                **_dc_shot("talk00")["dsl"],
+                "camera": {"shot_size": "close-up"},
+            },
+        }
+        cover_b0 = {
+            **_dc_shot("cover_b0"),
+            "screen_mode": "reaction",
+            "beat_id": "b0",
+            "duration_sec": 2,
+            # keep nar short enough that est_vo_sec (≈len/6.2) ≤ 2.0 + slack 0.5
+            "nar": "静场。",
+            "audio_cues": [{"kind": "silence", "start_offset_sec": 0, "duration_sec": 2}],
+        }
+        bad = _dc_shot()
+        bad.pop("nar")
+        bad["screen_mode"] = "on_camera"
+        spec = _dc_spec([talking, cover_b0, bad])
         spec["vo_mode"] = "dialogue_drama"
         spec["dialogue_spoken_lang"] = "ja"
         spec["narration_spoken_lang"] = "zh"
-        spec["scenes"][0]["shots"][0].pop("nar")
-        spec["scenes"][0]["shots"][0]["screen_mode"] = "on_camera"
         with pytest.raises(FilmSpecError, match="audio_cues"):
             validate_film_spec(spec, assign_missing_ids=False)
 
