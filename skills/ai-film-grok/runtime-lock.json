@@ -225,6 +225,10 @@
       "sha256": "5f32da697722ac99b2734f4142b26c5d4263b4dd15e485c7c2297fd003672555"
     },
     {
+      "path": "scripts/beat_extraction.py",
+      "sha256": "468f701794d4485c66bcdfdee9a8b9613330744e17ed5dc88a133a3ac766d7fa"
+    },
+    {
       "path": "scripts/beat_spine.py",
       "sha256": "d777266dd53059996fbfc9cdc0e0ad32764a721f6e6f85cf9f0a85c0e071eb6c"
     },
@@ -1245,5 +1249,5 @@
       "sha256": "8fbd7f94f5b7641cd558dca6086adf4c58b7d6378157442b05d812e0265bd2e1"
     }
   ],
-  "requirements_sha256": "b0acb41843d88a97955a7f14a300c9f873957f3e7a6da00bc3343e178289728a"
+  "requirements_sha256": "f838edfba26f348d5c4aa08e96fb2439a7796ac1ef6a8479ad399b853959fcf7"
 }

@@ -135,8 +135,51 @@ def _command_version(command: str) -> str | None:
 
 
 def _package_versions(names: Iterable[str]) -> dict[str, str | None]:
+    """Resolve package versions from the skill runtime interpreter.
+
+    Query via a short-lived subprocess with ``PYTHONPATH`` cleared so host-agent
+    contamination (e.g. Hermes injecting its venv onto ``sys.path``) cannot make
+    doctor / requirements.lock disagree with ``aifilm``'s real import graph.
+    Falls back to in-process ``importlib.metadata`` only if the clean probe fails.
+    """
+    ordered = list(names)
+    empty = {name: None for name in ordered}
+    if not ordered:
+        return empty
+    probe = (
+        "import json,sys\n"
+        "from importlib import metadata\n"
+        "names=json.loads(sys.argv[1])\n"
+        "out={}\n"
+        "for name in names:\n"
+        "    try:\n"
+        "        out[name]=metadata.version(name)\n"
+        "    except metadata.PackageNotFoundError:\n"
+        "        out[name]=None\n"
+        "print(json.dumps(out,separators=(',',':')))\n"
+    )
+    env = minimal_subprocess_env()
+    env.pop("PYTHONPATH", None)
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", probe, json.dumps(ordered)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        proc = None
+    if proc is not None and proc.returncode == 0 and proc.stdout.strip():
+        try:
+            payload = json.loads(proc.stdout.strip().splitlines()[-1])
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            return {name: payload.get(name) for name in ordered}
     versions: dict[str, str | None] = {}
-    for name in names:
+    for name in ordered:
         try:
             versions[name] = metadata.version(name)
         except metadata.PackageNotFoundError:
