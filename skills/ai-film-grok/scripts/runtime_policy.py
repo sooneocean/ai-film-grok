@@ -265,9 +265,24 @@ def verify_runtime_lock(skill_dir: Path, lock_path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         return {"ok": False, "errors": [f"runtime lock unreadable: {exc}"]}
     errors: list[str] = []
-    if expected.get("python") != platform.python_version():
+    # Use the skill's pinned runtime Python for version comparison (not the
+    # host agent's platform.python_version() which may differ).
+    runtime_py = _skill_python(root)
+    actual_py = platform.python_version()
+    if runtime_py:
+        try:
+            vproc = subprocess.run(
+                [runtime_py, "-c", "import sys; print(sys.version.split()[0])"],
+                capture_output=True, text=True, timeout=10,
+                env=minimal_subprocess_env(),
+            )
+            if vproc.returncode == 0 and vproc.stdout.strip():
+                actual_py = vproc.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
+    if expected.get("python") != actual_py:
         errors.append(
-            f"python version drift: expected {expected.get('python')}, found {platform.python_version()}"
+            f"python version drift: expected {expected.get('python')}, found {actual_py}"
         )
     for command, wanted in (expected.get("commands") or {}).items():
         actual = _command_version(command)

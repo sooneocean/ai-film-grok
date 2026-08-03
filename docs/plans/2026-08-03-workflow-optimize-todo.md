@@ -1,6 +1,6 @@
 # 流程优化 Todo Plan — 2026-08-03
 
-**Status:** **Wave A–D SHIPPED** (v2.31.20–22)  
+**Status:** **Wave A–F SHIPPED** (v2.31.20–23)  
 **视角：** 你怎么把一集从故事做到桌面成片（不是再拆 CLI 行数）。  
 **前置已完成：** ROI A–E · Process slim P0–P5（v2.31.16–19）  
 **方法：** 7 步主流程 × 近两周片例 PARTIAL × 门禁密度  
@@ -94,6 +94,12 @@
 - [x] **D2 · sidechain → amix PARTIAL** — `receipts/final-mix-partial.json`  
 - [x] **D3 · SRT 空格稳路径** — `stable_path_for_ffmpeg_filter` + PIL burn  
 
+### Wave F — Agent 回路胶合 · **DONE (v2.31.23)**
+
+- [x] dispatch 注入 variety-precheck / bulk-preflight  
+- [x] next_actions bulk 前 bulk-preflight  
+- [x] advance allowlist closeout / bulk-preflight / variety / pilot-pack  
+
 ### Wave E — 明确不做 / 延后
 
 | 项 | 原因 |
@@ -142,7 +148,7 @@ D 仅当 final 再炸
 |------|------|------|
 | `2026-08-03-roi-optimization-plan` | A–E DONE | 工程绿线；本计划不重复 |
 | `2026-08-03-process-slim-phase2` | P0–P5 DONE · P6 未开 | 文档税；本计划吃 **成片吞吐** |
-| 本档 | **Wave A 已落地** · B–D 待开 | 拍片主流程 ROI |
+| 本档 | **Wave A–F 已落地** (v2.31.23) | 拍片主流程 ROI + agent 回路胶合 |
 
 ---
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.31.23] - 2026-08-03
+
+### Added
+- **Wave F agent-loop glue:** dispatch injects `variety-precheck` (design) and `bulk-preflight` (post-pilot bulk); `next_actions` surfaces bulk-preflight before queue.
+- `advance` allowlist: `closeout-run`, `bulk-preflight`, `variety-precheck`, `pilot-pack` (local, approval none).
+- closeout / pilot-pack / throughput CLIs marked local+none for advance (review-final still human).
+- Tests: `tests/test_workflow_wave_f.py`.
+- `runtime_policy.verify_runtime_lock` compares skill `runtime-python` version (not host agent).
+
+
+
 ## [2.31.22] - 2026-08-03
 
 ### Added

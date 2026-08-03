@@ -106,7 +106,7 @@
     },
     {
       "path": "scripts/advance.py",
-      "sha256": "c8139ff501fb5f7ef704d923c9a077d28be47c1378ec7c53d4c5a99f89845cce"
+      "sha256": "13e7ae0d8f95a0553e5a6fb39ac6e3df5ba8160e8e6ceab9a656dfae7c46fd77"
     },
     {
       "path": "scripts/aifilm",
@@ -546,7 +546,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "4a76fe0254df23a701eb5a230f891b59cfa283fc4e5be2d69b7e0c5cb7dee38d"
+      "sha256": "b0d2716247c89651e6aa5e6ee2094aa371e9142042c265b56359e0ea52fa72bd"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -798,7 +798,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "2c70e8bfd7e0cd778d50406c2b0bf35caec8bf1067fc0e26da3334899d13762d"
+      "sha256": "fa1fb6df467aa53db2a7d80a67b2b9965c49bc5da6201802f3220c0864b7ac89"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -1018,7 +1018,7 @@
     },
     {
       "path": "scripts/runtime_policy.py",
-      "sha256": "ed9836a3ea9b3df1287e625fdb2ccd2cb33cc1289a48dfbcb2a8874cd129809d"
+      "sha256": "32ad7f6c2a510720a09bda591d2405740dcb4a701ce60d81b6b4085f52300b00"
     },
     {
       "path": "scripts/scene_sound.py",

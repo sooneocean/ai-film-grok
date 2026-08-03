@@ -461,6 +461,15 @@ def build_next_actions(
 
     if not gates.get("clips_complete"):
         if pilot_ok or not gates.get("spec"):
+            # Wave F: bulk door before queue when pilot already GO
+            if pilot_ok:
+                bulk_rec = read_json(root / "receipts" / "bulk-preflight.json") or {}
+                if bulk_rec.get("ok") is not True:
+                    add(
+                        "bulk-preflight",
+                        f'aifilm bulk-preflight --root "{r}" --no-tunnel',
+                        "bulk 单门未绿 — 先 bulk-preflight 再 media-queue",
+                    )
             add(
                 "queue-or-register",
                 f'media-queue add --root "{r}" --shot-id <id> --operation image_to_video … '

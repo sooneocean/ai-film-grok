@@ -50,12 +50,18 @@ _COMMAND_POLICIES = {
     "dailies": ("local", "human_required"),
     "export-desktop": ("local", "human_required"),
     "final": ("external", "human_required"),
-    "closeout": ("local", "human_required"),
+    # closeout run = local post-audit ladder (does NOT auto-approve review-final)
+    "closeout": ("local", "none"),
     "grok-oauth": ("external", "human_required"),
     "media-queue": ("external", "human_required"),
     "pilot": ("local", "human_required"),
-    "pilot-pack": ("local", "human_required"),
+    "pilot-pack": ("local", "none"),  # GO evidence write; approve remains human
     "bulk-preflight": ("local", "none"),
+    "variety-precheck": ("local", "none"),
+    "select-shortlist": ("local", "none"),
+    "queue-progress": ("local", "none"),
+    "tunnel-probe": ("local", "none"),
+    "gpu-lease": ("local", "none"),
     "queue-run-oauth": ("paid", "human_required"),
     "review-ui": ("local", "human_required"),
     "review-final": ("local", "human_required"),
@@ -602,6 +608,32 @@ def build_dispatch(
             "final delivery requires a current post-audit receipt with no hard failures",
             "post",
         )
+    # Wave F · design-time variety + bulk door before media (agent loop glue)
+    if craft_stage in {"shots", "agent"} and gates.get("spec") and not gates.get("clips_complete"):
+        variety_rec = read_json(root / "receipts" / "variety-precheck.json") or {}
+        if variety_rec.get("ok") is not True:
+            pre(
+                "variety-precheck",
+                f'aifilm variety-precheck --root "{r}"',
+                "设计期抗无聊矩阵未绿 — 先 variety-precheck 再 still/I2V（bulk 后返工更贵）",
+                "agent",
+            )
+    if craft_stage in {"media", "shots", "selects"} and gates.get("spec"):
+        try:
+            from production_gates import load_pilot_approval, pilot_is_user_approved
+
+            pilot_ok_now = pilot_is_user_approved(load_pilot_approval(root))
+        except Exception:
+            pilot_ok_now = False
+        if pilot_ok_now and not gates.get("clips_complete"):
+            bulk_rec = read_json(root / "receipts" / "bulk-preflight.json") or {}
+            if bulk_rec.get("ok") is not True:
+                pre(
+                    "bulk-preflight",
+                    f'aifilm bulk-preflight --root "{r}" --no-tunnel',
+                    "pilot 已批但 bulk-preflight 未绿 — 单门过闸后再 media-queue bulk",
+                    "visual",
+                )
     quality = _quality_summary(root)
     if quality["failed_count"]:
         pre(

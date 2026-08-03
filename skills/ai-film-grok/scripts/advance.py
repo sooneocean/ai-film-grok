@@ -75,6 +75,28 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
         ("post-audit",),
         verifier=("post-audit",),
     ),
+    # Wave F · throughput cmds (local + approval none)
+    "closeout-run": AdvancePolicy(
+        ("projection.verify", "dispatch.orchestrate"),
+        ("closeout", "run"),
+        verifier=("closeout", "status"),
+    ),
+    "bulk-preflight": AdvancePolicy(
+        ("image.animate", "projection.verify", "dispatch.orchestrate"),
+        ("bulk-preflight",),
+        bool_flags=("--no-tunnel", "--no-lease"),
+        verifier=("bulk-preflight",),
+    ),
+    "variety-precheck": AdvancePolicy(
+        ("story.validate", "dispatch.orchestrate"),
+        ("variety-precheck",),
+        verifier=("variety-precheck",),
+    ),
+    "pilot-pack": AdvancePolicy(
+        ("quality.inspect", "dispatch.orchestrate"),
+        ("pilot", "pack"),
+        verifier=("pilot", "pack"),
+    ),
     "quality-gate-repair": AdvancePolicy(
         ("dispatch.orchestrate",),
         ("preflight",),
