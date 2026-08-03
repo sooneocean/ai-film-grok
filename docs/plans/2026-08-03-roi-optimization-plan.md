@@ -1,6 +1,6 @@
 # ai-film-grok ROI 优化计划 — 2026-08-03
 
-**Status:** executing — Batch A done; B partial (spine delegate + tests); C in progress  
+**Status:** Batch A DONE · B DONE (spine delegate + tests green) · C PARTIAL (v2.31.10 entry only; full 2.26–2.31 backfill deferred) · commit 14ad4766 · not pushed  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok`  
 **HEAD:** `166ed817` · **version:** `2.31.6` · **branch:** `main`（ahead origin 14，working tree clean）  
 **Method:** 实跑基线（pytest / ruff / doctor / project_audit），按 impact×likelihood÷cost 排序
