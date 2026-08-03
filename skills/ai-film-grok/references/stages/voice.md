@@ -13,13 +13,13 @@
 - `nar` 是字幕/中文语义，`nar_ja` 是角色日文口语，不得互相覆盖。
 - final 前自检：打印 `speaker | voice | spoken_lang`，无理由跳变 = 不合格。
 
-色气或亲密段落 BGM 默认 rnb；dark 只用于恐怖，曲库缺失才走程序生成。  
+色气或亲密段落 BGM 默认 **rnb**；dark 只用于恐怖，曲库缺失才走程序生成。  
 dialogue、SFX、BGM 与 mixed 各自保留来源、hash 和 mix evidence。  
-外部 TTS、克隆声线与 lipsync 不静默启用，也不把普通 I2V 口部运动宣称为真实口型同步。
-RTX 5090 口型仍须逐镜 canary；Wav2Lip 只作应急基线，候选目标为 LatentSync 1.6 → MuseTalk 1.5。
+final：`sub_lead=0`；长片直调 `render_final`；review 后还要 `register-clip approved`。  
+外部 TTS、克隆声线与 lipsync 不静默启用；RTX 5090 口型须逐镜 canary（LatentSync 1.6 → MuseTalk 1.5）。
 
-深入资料：  
-[voices.md](../voices.md) · [audio-recipe.md](../audio-recipe.md) ·  
-[character-dialogue-ja](../lessons-2026-07-23-character-dialogue-ja.md) ·
-**[ep2-voice-heat-final（今天全量坑）](../lessons-2026-07-24-ep2-voice-heat-final.md)** ·
-[RTX 5090 lip-sync routing](../lessons-2026-07-28-rtx5090-lipsync-routing.md)
+机读门禁：[hard-defaults](../hard-defaults.md)。  
+深入（按需，不默认加载）：[voices](../voices.md) · [audio-recipe](../audio-recipe.md) ·  
+[character-dialogue-ja](../lessons-2026-07-23-character-dialogue-ja.md) ·  
+[ep2-voice-heat-final](../lessons-2026-07-24-ep2-voice-heat-final.md) ·  
+[5090 lipsync](../lessons-2026-07-28-rtx5090-lipsync-routing.md)

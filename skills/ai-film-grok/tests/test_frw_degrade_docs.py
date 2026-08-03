@@ -189,9 +189,9 @@ class FrwDegradeDocsTests(unittest.TestCase):
         self.assertEqual(DEFAULT_I2V_PROVIDER, "auto")
         self.assertEqual(DEFAULT_FRW_VIDEO_MODEL, "legacy-img2video")
         self.assertEqual(DEFAULT_FRW_ENV_MODEL, "ltx-t2v")
-        self.assertEqual(default_i2v_provider(), "frw-ltx23")
+        self.assertEqual(default_i2v_provider(), "grok")
         spec = {
-            "title": "ltx-primary-default-probe",
+            "title": "grok-primary-default-probe",
             "vo_mode": "storyteller",
             "director_intent": {
                 "logline": "测试 ltx23_primary 默认写入 film-spec 的行为。",
@@ -228,8 +228,8 @@ class FrwDegradeDocsTests(unittest.TestCase):
             ],
         }
         validate_film_spec(spec, assign_missing_ids=False)
-        self.assertEqual(spec.get("i2v_provider"), "frw-ltx23")
-        self.assertEqual(spec.get("frw_video_model"), "ltx-i2v")
+        self.assertEqual(spec.get("i2v_provider"), "grok")
+        self.assertEqual(spec.get("frw_video_model"), "legacy-img2video")
         self.assertEqual(spec.get("frw_env_model"), "ltx-t2v")
         self.assertEqual(spec.get("frw_resolution"), "720p")
         self.assertEqual(spec.get("frw_aspect_ratio"), "9:16")

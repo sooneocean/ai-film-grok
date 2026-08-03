@@ -74,13 +74,13 @@
     "voice": [
       {
         "path": "references/stages/voice.md",
-        "reason": "Voice, dialogue and mix routing",
+        "reason": "Voice, dialogue and mix routing (P0 声线表在阶段卡；长课按需)",
         "required": true
       },
       {
         "path": "references/lessons-2026-07-24-ep2-voice-heat-final.md",
-        "reason": "P0 口白中文/角色日文/禁乒乓 + final SRT 坑",
-        "required": true
+        "reason": "ep2 全量坑复盘（仅深挖时加载）",
+        "required": false
       }
     ],
     "design": [

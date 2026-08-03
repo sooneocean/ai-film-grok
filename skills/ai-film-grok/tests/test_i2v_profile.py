@@ -19,7 +19,7 @@ from film_spec import (  # noqa: E402
 
 
 class I2VProfileTests(unittest.TestCase):
-    def test_ltx23_primary_default(self) -> None:
+    def test_grok_primary_default(self) -> None:
         env = {
             k: v
             for k, v in os.environ.items()
@@ -29,12 +29,18 @@ class I2VProfileTests(unittest.TestCase):
             # clear those keys
             os.environ.pop("AIFILM_I2V_PROFILE", None)
             os.environ.pop("AIFILM_SEEDANCE_AVAILABLE", None)
-            self.assertEqual(resolve_i2v_profile(), "ltx23_primary")
-            self.assertEqual(default_i2v_provider(), "frw-ltx23")
+            self.assertEqual(resolve_i2v_profile(), "grok_primary")
+            self.assertEqual(default_i2v_provider(), "grok")
 
     def test_seedance_first_env(self) -> None:
+        # seedance_first is unavailable; it normalizes to the grok working mode.
         with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "seedance_first"}):
-            # Legacy profile remains parseable but now maps to the LTX primary.
+            self.assertEqual(resolve_i2v_profile(), "grok_primary")
+            self.assertEqual(default_i2v_provider(), "grok")
+
+    def test_ltx23_primary_opt_in(self) -> None:
+        # Explicit opt-in retains the FRW LTX 2.3 chain (no forced switch).
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "ltx23_primary"}):
             self.assertEqual(resolve_i2v_profile(), "ltx23_primary")
             self.assertEqual(default_i2v_provider(), "frw-ltx23")
 

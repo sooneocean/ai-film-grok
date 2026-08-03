@@ -37,7 +37,7 @@ Professional 11-stage 与八环只保留为内部证据／诊断投影，不要�
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **动作供应商**：`ltx23_primary`：**FRW LTX 2.3 → FRW API I2V → Grok Video 1.5**。每路均须当前影片 canary；未就绪跳过，已启动者仅技术失败可签名降级。禁 Seedance 与 Wan 2.2 本地 I2V。
+7. **动作供应商**：`grok_primary`：**Grok image_to_video → FRW API I2V → FRW LTX 2.3**（对白讲话镜锁 FRW LTX 有声 I2V，不接 Grok）。每路均须当前影片 canary；未就绪跳过，已启动者仅技术失败可签名降级。禁 Seedance 与 Wan 2.2 本地 I2V。
 8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM=rnb；缺已批 edit/bridge 则 `final` 阻塞。[BGM](references/bgm-generation.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 final。

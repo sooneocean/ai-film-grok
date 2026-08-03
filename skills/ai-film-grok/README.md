@@ -13,7 +13,7 @@
         ↓
 Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
         ↓
-1. 视觉生成     Grok Imagine 静帧 + I2V（默认 ltx23_primary：FRW LTX → FRW API → Grok）
+1. 视觉生成     Grok Imagine 静帧 + I2V（默认 grok_primary：对白讲话镜锁 FRW LTX 原生有声 → Grok 主链）
 2. 语音生成     Edge TTS（可插拔 voicebox / grok / minimax / fish / external）
 3. 动态合成     HyperFrames（优先） / Remotion（备选）
 4. 最终后处理   FFmpeg（拼板 · 混音 · 导出）
@@ -32,7 +32,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 ![ai-film-grok 四层流水线](docs/architecture.png)
 
-> 当前季默认 **I2V = ltx23_primary**；`grok_primary` 仅保留给已锁定的旧项目。完整插拔矩阵与安装步骤见仓库根 README。
+> 当前季默认 **I2V = grok_primary**；`ltx23_primary` 仅保留给已锁定的旧项目。完整插拔矩阵与安装步骤见仓库根 README。
 
 ---
 
@@ -78,13 +78,13 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 | 能力 | 在本 skill 中的角色 | 入口 |
 |------|---------------------|------|
 | **Grok Imagine（图像）** | 文生图 / 图生图：风格样张、定妆、每镜关键帧 | `image_gen`、`image_edit` |
-| **FRW LTX 2.3** | 当前 `ltx23_primary` 第一动作路线；需影片级 approved canary | `"$AIFILM" frw img2video-audio --model ltx2.3` |
-| **FRW API I2V** | LTX 分类技术失败后的第二路线；需影片级 approved canary | `"$AIFILM" frw img2video` |
-| **Grok Imagine Video** | FRW 两路不可用或分类技术失败后的第三路线；需影片级 approved canary | `image_to_video` |
+| **Grok Imagine Video** | 当前 `grok_primary` 第一动作路线（对白讲话镜锁 FRW LTX 有声）；需影片级 approved canary | `image_to_video` |
+| **FRW LTX 2.3** | 对白讲话镜原生有声主链；否则分类技术失败后的备选路线；需影片级 approved canary | `"$AIFILM" frw img2video-audio --model ltx2.3` |
+| **FRW API I2V** | 无对白动作在 Grok 不可用后的备选路线；需影片级 approved canary | `"$AIFILM" frw img2video` |
 
 要点：
 
-- **分层**：静帧默认 **Grok**；bulk 动画依序为 **FRW LTX → FRW API → Grok**，每次切换都须分类技术失败并写 provider-switch receipt。
+- **分层**：静帧默认 **Grok**；bulk 动画主链为 **Grok → FRW API I2V → FRW LTX**（对白讲话镜直接锁 FRW LTX 原生有声），每次切换都须分类技术失败并写 provider-switch receipt。
 - FRW fallback 必须区分 `FRW_API_KEY`（任务 API）与 `FRW_TOKEN`（上传 JWT）；上传前执行 `upload-probe`。
 - **禁止** 默认 legacy `img2video`；**禁止** 576 生成再放大到 720 当高清。  
 - Python **不内嵌 key**：Grok 工具由 agent 调；FRW 经 `frw_dispatch` + frwclaw `.env`；本仓库负责 **规格、队列、QA、成片门禁**。  

@@ -139,22 +139,22 @@ def resolve_i2v_profile() -> str:
     """Operating profile for hero I2V bulk.
 
     ``seedance_first`` is retained for backwards-compatible parsing but now
-    normalizes to the supported LTX-first action chain.
+    normalizes to the supported Grok-first action chain.
     """
     from config_loader import get_config
 
     cfg = get_config()
     raw = cfg.i2v_profile.strip().lower()
     if raw == "seedance_first":
-        return "ltx23_primary"
-    return raw if raw in I2V_PROFILES else "ltx23_primary"
+        return "grok_primary"
+    return raw if raw in I2V_PROFILES else "grok_primary"
 
 
 def default_i2v_provider() -> str:
     profile = resolve_i2v_profile()
-    if profile == "ltx23_primary":
-        return "frw-ltx23"
-    return "grok" if profile == "grok_primary" else "frw"
+    if profile == "grok_primary":
+        return "grok"
+    return "frw-ltx23" if profile == "ltx23_primary" else "frw"
 
 
 def default_frw_video_model() -> str:

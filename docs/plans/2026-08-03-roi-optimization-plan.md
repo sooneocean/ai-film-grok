@@ -1,9 +1,20 @@
 # ai-film-grok ROI 优化计划 — 2026-08-03
 
-**Status:** A–D DONE · E DONE (logger/util) · G DONE (worktree prune) · plan_feedback WIP landed · v2.31.12 · not pushed  
+**Status:** A–E DONE · G partial · F deferred · **v2.31.15** (import fix + grok_primary land)  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok`  
-**HEAD:** `166ed817` · **version:** `2.31.6` · **branch:** `main`（ahead origin 14，working tree clean）  
+**version:** `2.31.15` · **branch:** `main`（ahead origin；本批 commit 后工作区应收干净）  
 **Method:** 实跑基线（pytest / ruff / doctor / project_audit），按 impact×likelihood÷cost 排序
+
+### Session closeout (2026-08-03 · 全面优化)
+
+| Batch | Result |
+|-------|--------|
+| A runtime-lock | DONE — `aifilm lock-runtime`；doctor `core_readiness.ok=true` |
+| B story dual-path | DONE — `story_plan` ~−650 行；beat APIs re-export `beat_extraction`；`draft_story_contract` in `story_contract` |
+| C docs | DONE earlier + this CHANGELOG 2.31.13 |
+| D final contracts | DONE earlier (`test_final_hotpath_contracts`)；本轮补 re-export 同一性测 |
+| E util | DONE earlier + `final_stages` write 直连 util |
+| Verify | fast suite **2502 passed** · ruff scripts clean · doctor core green · strict advisory only |
 
 ---
 

@@ -28,11 +28,8 @@ from util import sha256_file as _sha256
 from util import utc_now, write_json
 
 
-def _write_json(path: Path, data: dict[str, Any]) -> None:
-    write_json(path, data)
-
-
 def _read_json(path: Path) -> dict[str, Any]:
+    """Strict-local: missing/invalid JSON becomes {} (stage receipts)."""
     data = _util_read_json(path)
     return data if isinstance(data, dict) else {}
 
@@ -237,7 +234,7 @@ def patch_delivery_burned_in(root: Path, *, burned_in: bool, owner: str) -> dict
     subs["caption_owner"] = owner
     subs["caption_stages_at"] = utc_now()
     data["subtitles"] = subs
-    _write_json(path, data)
+    write_json(path, data)
     return {"path": str(path), "burned_in": burned_in, "caption_owner": owner}
 
 
@@ -256,5 +253,5 @@ def write_stages_receipt(root: Path, stages: dict[str, Any]) -> Path:
             "deliver: burned_in reflects actual owner",
         ],
     }
-    _write_json(path, payload)
+    write_json(path, payload)
     return path

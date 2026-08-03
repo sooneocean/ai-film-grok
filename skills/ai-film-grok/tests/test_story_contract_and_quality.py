@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
+from beat_extraction import extract_beats as be_extract_beats
+from beat_extraction import select_beat_spine as be_select_beat_spine
 from beat_spine import list_spines, load_spine, spine_exists
 from plan_feedback import analyze_evidence
 from story_contract import (
     DEFAULT_CONTRACT,
     GENRE_CONTRACT_TEMPLATES,
     _extract_emotional_arc,
+    draft_story_contract,
     suggest_story_contract,
 )
 from story_normalize import (
@@ -34,7 +34,6 @@ from story_quality import (
     score_arc,
     score_conflict,
     score_hook,
-    score_payoff,
     score_story,
 )
 
@@ -42,7 +41,7 @@ from story_quality import (
 class TestStoryContract:
     def test_default_contract_template(self):
         assert "adult" in GENRE_CONTRACT_TEMPLATES
-        assert DEFAULT_CONTRACT == GENRE_CONTRACT_TEMPLATES["adult"]
+        assert GENRE_CONTRACT_TEMPLATES["adult"] == DEFAULT_CONTRACT
 
     def test_suggest_emotional_arc_keywords(self):
         arc1 = _extract_emotional_arc({"raw_excerpt": "主角在痛苦中挣扎，最后陷入恐惧与慌乱"})
@@ -55,6 +54,37 @@ class TestStoryContract:
         contract = suggest_story_contract({"raw_excerpt": "复仇与解脱的故事", "genre": "mystery"})
         assert contract["theme"] == "真相与代价"
         assert contract["genre"] == "mystery"
+
+    def test_draft_story_contract_is_single_implementation(self):
+        """story_plan / story_normalize must re-export story_contract.draft."""
+        import story_plan
+
+        assert story_plan._draft_story_contract is draft_story_contract
+        drafted = draft_story_contract(
+            {
+                "logline": "雨夜伞下的秘密",
+                "genre": "mystery",
+                "character_candidates": [{"id": "c1", "name": "林"}],
+            }
+        )
+        assert drafted["status"] == "draft_suggested"
+        assert drafted["theme"] == "真相与代价"
+        assert drafted["protagonist_ids"] == ["c1"]
+        seed = draft_story_contract(
+            {
+                "logline": "x",
+                "genre": "drama",
+                "story_contract_seed": {"theme": "作者锁定主题", "stakes": "自定义赌注"},
+            }
+        )
+        assert seed["theme"] == "作者锁定主题"
+        assert seed["stakes"] == "自定义赌注"
+
+    def test_beat_apis_reexport_beat_extraction(self):
+        import story_plan
+
+        assert story_plan.select_beat_spine is be_select_beat_spine
+        assert story_plan.extract_beats is be_extract_beats
 
 
 class TestBeatSpine:

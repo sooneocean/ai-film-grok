@@ -185,8 +185,8 @@ flowchart TB
 
   subgraph VIS["1 · 视觉层 · 可插拔"]
     STILL["静帧<br/>image_gen / image_edit / OAuth image"]
-    I2V["I2V bulk<br/>默认 ltx23_primary → FRW LTX 2.3"]
-    FRW["分类技术失败 fallback<br/>FRW API I2V → Grok Video 1.5"]
+    I2V["I2V bulk<br/>默认 grok_primary → Grok image_to_video"]
+    FRW["对白讲话镜锁 FRW LTX 2.3 原生有声<br/>分类技术失败 fallback → FRW API I2V → Grok"]
     Q["media-queue · register-clip · continue"]
     STILL --> I2V --> Q
     FRW -.-> Q
@@ -306,18 +306,18 @@ final --post-engine hyperframes
 
 | 插槽 | 默认（当前季） | 可切换 | 怎么换 |
 |------|----------------|--------|--------|
-| **运营 profile** | `ltx23_primary` | `grok_primary`（仅旧项目锁定） | `AIFILM_I2V_PROFILE=…` |
-| **L1 人物 I2V** | FRW LTX 2.3 `img2video-audio` | FRW API `img2video` → Grok `image_to_video` | 每路均需影片级 approved canary；仅分类技术失败可切换 |
+| **运营 profile** | `grok_primary` | `ltx23_primary`（仅旧项目锁定） | `AIFILM_I2V_PROFILE=…` |
+| **L1 人物 I2V** | Grok `image_to_video`（对白讲话镜锁 FRW LTX 2.3 有声） | FRW API `img2video` → FRW LTX 2.3 | 每路均需影片级 approved canary；仅分类技术失败可切换 |
 | OAuth 批 I2V | `queue-run-oauth` / `grok-oauth video --wait` | 视频模型 env | `AIFILM_GROK_VIDEO_MODEL`（默认 `grok-imagine-video`） |
 | L2 无脸环境床 | FRW **`ltx-t2v`**（`env-plate`） | — | `aifilm env-plate` · register `frw_ltx_t2v` |
 | 会话工具 | `image_to_video` | `reference_to_video`（少用） | 无原生 T2V |
 
 ```bash
 # 当前默认
-AIFILM_I2V_PROFILE=ltx23_primary
+AIFILM_I2V_PROFILE=grok_primary
 
-# 仅旧项目显式锁定时使用 Grok-first 兼容路径
-# AIFILM_I2V_PROFILE=grok_primary
+# 仅旧项目显式锁定时使用 LTX-first 兼容路径
+# AIFILM_I2V_PROFILE=ltx23_primary
 ```
 
 ### 3 · TTS（旁白）
@@ -445,7 +445,7 @@ v1.6 新项目还需为 final 的七个维度各提供 `--screening-evidence "�
 | 变量 | 默认 | 含义 |
 |------|------|------|
 | `AIFILM_TTS_BACKEND` | `edge` | TTS 后端 |
-| `AIFILM_I2V_PROFILE` | `ltx23_primary` | I2V 运营季；Grok-first 仅旧项目显式锁定 |
+| `AIFILM_I2V_PROFILE` | `grok_primary` | I2V 运营季；LTX-first 仅旧项目显式锁定 |
 | `AIFILM_LIPSYNC_BACKEND` | `off` | 口型 |
 | `AIFILM_GROK_AUTH` | `auto` | OAuth / API key |
 | `AIFILM_GROK_CHAT_MODEL` | `grok-4.5` | OAuth chat |
@@ -461,7 +461,7 @@ v1.6 新项目还需为 final 的七个维度各提供 `--screening-evidence "�
 
 - 中文 final TTS → **edge**  
 - 色气 BGM → **rnb**（`dark` 仅恐怖）  
-- I2V → **`ltx23_primary`**（FRW LTX 2.3 → FRW API I2V → Grok Video 1.5；每路须当前影片 canary）
+- I2V → **`grok_primary`**（Grok image_to_video 主链；对白讲话镜锁 FRW LTX 2.3 有声；每路须当前影片 canary）
 - pilot 须用户批准才 bulk  
 
 ---

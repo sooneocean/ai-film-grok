@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 # Genre-specific story templates used to suggest contract fields.
@@ -114,6 +115,87 @@ def _extract_emotional_arc(normalized: dict[str, Any]) -> list[str]:
             arc = ["迷失", "挣扎", "觉醒"]
 
     return arc[:5]
+
+
+def draft_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:
+    """Create an honest story contract; unknown intent stays blank/draft.
+
+    Genre suggestions from ``suggest_story_contract`` are pre-filled as
+    ``draft_suggested`` so the author can review and confirm. Optional
+    ``story_contract_seed`` on the normalized payload overrides fields.
+    """
+    logline = str(normalized.get("logline") or "")
+    genre = str(normalized.get("genre") or "adult")
+    contract: dict[str, Any] = {
+        "genre": genre,
+        "premise": logline,
+        "logline": logline,
+        "theme": "",
+        "protagonist_ids": [
+            str(c.get("id"))
+            for c in (normalized.get("character_candidates") or [])
+            if isinstance(c, dict) and c.get("id")
+        ][:2],
+        "protagonist_goal": "",
+        "protagonist_want": "",
+        "protagonist_need": "",
+        "protagonist_arc": "",
+        "opposition": "",
+        "stakes": "",
+        "climax_choice": "",
+        "ending_hook": "",
+        "emotional_arc": [],
+        "act_structure": {
+            "setup": "",
+            "confrontation": "",
+            "resolution": "",
+            "setup_ratio": 0.20,
+            "confrontation_ratio": 0.50,
+            "resolution_ratio": 0.30,
+        },
+        "pace_chart": [],
+        "constraints": [],
+        "status": "needs_authoring",
+        "authoring_questions": [
+            "主角想要什么？",
+            "谁或什么阻止他？",
+            "失败的代价是什么？",
+            "本集的关键选择是什么？",
+            "结尾留下什么未解决问题？",
+        ],
+    }
+    suggestions = suggest_story_contract(normalized)
+    for key in (
+        "theme",
+        "protagonist_goal",
+        "protagonist_want",
+        "protagonist_need",
+        "protagonist_arc",
+        "opposition",
+        "stakes",
+        "climax_choice",
+        "ending_hook",
+        "emotional_arc",
+        "act_structure",
+    ):
+        val = suggestions.get(key)
+        if val not in (None, "", [], {}):
+            contract[key] = copy.deepcopy(val)
+    if suggestions.get("status") == "draft_suggested":
+        contract["status"] = "draft_suggested"
+        contract["authoring_questions"] = (
+            suggestions.get("authoring_questions") or contract["authoring_questions"]
+        )
+    seed = normalized.get("story_contract_seed")
+    if isinstance(seed, dict):
+        for key, value in seed.items():
+            if key in contract and value not in (None, "", [], {}):
+                contract[key] = copy.deepcopy(value)
+    return contract
+
+
+# Back-compat alias used by story_plan / story_normalize / tests.
+_draft_story_contract = draft_story_contract
 
 
 def suggest_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:

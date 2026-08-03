@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.31.15] - 2026-08-03
+
+### Fixed
+- **HEAD import break:** `story_plan` imported `story_contract.draft_story_contract` but the function was not yet in-tree — land full `draft_story_contract` + `_draft_story_contract` alias.
+- Complete WIP from 2.31.13 notes that never made the prior commit: I2V default **`grok_primary`**, `final_stages` → `util.write_json`, story re-export contract tests.
+
+### Changed
+- I2V operating default: `film_spec` / `i2v_provider` / `capability_report` / `config_loader` / docs → grok-first (dialogue still FRW LTX when locked).
+- Refresh `runtime-lock.json` after landing scripts.
+
+### Added
+- Contract tests: re-export identity (`story_plan` ↔ `beat_extraction` / `story_contract`) and seed override for draft contracts.
+- Plans: ROI session closeout; `docs/plans/2026-08-03-process-slim-phase2.md` (proposed process slim).
+
 ## [2.31.14] - 2026-08-03
 
 ### Changed

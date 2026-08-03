@@ -1,15 +1,15 @@
 {
   "schema_version": 2,
-  "python": "3.9.6",
+  "python": "3.11.15",
   "commands": {
     "ffmpeg": "ffmpeg version 8.1 Copyright (c) 2000-2026 the FFmpeg developers",
     "ffprobe": "ffprobe version 8.1 Copyright (c) 2007-2026 the FFmpeg developers"
   },
   "packages": {
-    "numpy": "2.0.2",
-    "Pillow": "10.4.0",
-    "edge-tts": null,
-    "jsonschema": "4.25.1"
+    "numpy": "1.26.4",
+    "Pillow": "12.2.0",
+    "edge-tts": "7.2.8",
+    "jsonschema": "4.23.0"
   },
   "scripts": [
     {

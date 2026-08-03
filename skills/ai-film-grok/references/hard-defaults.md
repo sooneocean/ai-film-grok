@@ -92,11 +92,11 @@
 
 | 规则 | 默认 |
 |---|---|
-| bulk 动作 I2V | **`ltx23_primary`**：FRW LTX 2.3 → FRW API `img2video` → Grok Video 1.5 |
+| bulk 动作 I2V | **`grok_primary`**：Grok image_to_video 主链；对白讲话镜锁 FRW LTX 2.3 原生有声 |
 | **高动态常态（P0 · 2026-07-27）** | **产品硬底**：平常 mean≥**18**；肉戏 act/climax mean≥**20**（目标≥24）；成片 1:00→片尾包络≥**18**。禁止 Ken Burns/仅微呼吸/弱 raw 装片；多 take 取 mean 最高且时长≥镜长；肉戏 10s 优先 **6s×2 hybrid**。交付前写 `i2v-high-motion-audit` + `i2v-final-gate`；**仅 gate ok 才拷桌面 film_final**。**代码入口**：`scripts/i2v_motion_gate.py`（`MEAN_NORMAL_FLOOR=18` / `MEAN_MEAT_FLOOR=20`）· CLI `aifilm i2v-motion-gate --rows …`。见 [high-motion-style-lock](lessons-2026-07-27-high-motion-style-lock-final.md) |
 | **I2V 画风锁 MEDIUM（P0 · 同案）** | 源图= style-locked still/keyframe；prompt 首段 **MEDIUM LOCK cel anime**（match style-v1；禁 photoreal/3D/半写实油光）；高动重跑与 last-frame 连戏 **不得** 用 mean 换 medium fail；交付前 style audit 抽帧。见同上 lesson |
 | **vocal_color 默认** | **never**（2026-07-27 用户永久禁娇喘轨除非显式恢复）；`forbid_vocal_color` / gain=0 |
-| I2V profile | `AIFILM_I2V_PROFILE=ltx23_primary`；旧项目可显式锁 `grok_primary` |
+| I2V profile | `AIFILM_I2V_PROFILE=grok_primary`；旧项目可显式锁 `ltx23_primary` |
 | FRW LTX canary | 影片级完整解码＋人工批准后才可执行；缺证据时跳到 Grok，但不永久改写 film-spec |
 | 403 / 502 | **403**=未开通；**502**=平台挂；勿混淆 |
 | 动作降级 | 未就绪路线可跳过；已尝试路线仅 timeout/429/5xx/连接失败才签名降级；质量/人工拒绝不切换 |
@@ -106,7 +106,7 @@
 | 静帧 | 主角 Grok **`image_edit(cast)`**；禁反复纯 `image_gen`；加载 `/imagine` |
 | **静帧几何·禁压缩** | **P0**：I2V 前 keyframe **≥704×1280 且 9:16 竖比**；FRW 原生 704×1280 不强制升到 720；禁横图/缩略图/缩水 jpg。 |
 | **先验后生·算力刀口** | **P0**（2026-07-22）：**验证通过才烧下一级**（still 先验→I2V；ref 先验→image_edit bulk）。禁止未验批量 I2V/出图；坏了只修上游。见 [verify-before-generate](lessons-2026-07-22-verify-before-generate.md) |
-| Grok Build | 推理+Imagine；静帧仍以 Grok/Qwen 锁定；动作 I2V 为 LTX 后的第二路线 |
+| Grok Build | 推理+Imagine；静帧仍以 Grok/Qwen 锁定；动作 I2V 为 Grok 主链，对白讲话镜锁 FRW LTX |
 | 构图 | 禁裁头（P0·2026-07-27 强化）：主戏镜 full head+headroom；**裁脚优先于裁头**；定器特写=「脸+结合同镜」或短 insert，禁无头主镜；打包慎用 increase+crop 切顶。见 [headroom-no-crop-heads](lessons-2026-07-27-headroom-no-crop-heads.md) |
 | 库存 | film-spec 镜数 = approved clips |
 | 同源 | 禁止半 Grok 半 FRW still/2V |
@@ -128,7 +128,7 @@
 
 1. `write-spec` 过 → 才 `media-queue add`
 2. pilot 用户批准 → 才 bulk（无批准最多 3 shot_id）
-3. hero bulk 按 FRW LTX → FRW API I2V → Grok Video 1.5；每一路仍须当前 canary/pilot
+3. hero bulk 按 Grok image_to_video → FRW API I2V → FRW LTX 2.3（对白讲话镜直接锁 FRW LTX 有声）；每一路仍须当前 canary/pilot
 4. continue 串行 + 字节 promote；禁 cast 重起
 5. 失败只用 fail/requeue；禁手改 queue JSON
 6. moderation：换 soft still，荤点留给 VO

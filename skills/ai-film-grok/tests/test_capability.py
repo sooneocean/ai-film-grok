@@ -70,11 +70,11 @@ class SuggestI2VTests(unittest.TestCase):
 
     @pytest.mark.slow
     def test_no_receipt(self) -> None:
-        # Default action policy stays LTX-first even while its canary is absent.
+        # Grok primary: session image_to_video is available without a FRW canary.
         s = suggest_i2v_from_canary(None)
         self.assertFalse(s["has_canary"])
-        self.assertFalse(s["ok"])
-        self.assertEqual(s["patch"].get("i2v_provider"), "frw-ltx23")
+        self.assertTrue(s["ok"])
+        self.assertEqual(s["patch"].get("i2v_provider"), "grok")
         self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
         self.assertTrue(s["recommendations"])
 
@@ -178,7 +178,7 @@ class BuildReportSmoke(unittest.TestCase):
             )
             report = build_capability_report(root=root, suggest_i2v=True)
             self.assertTrue(report["frw"]["present"])
-            self.assertEqual(report["suggested_film_spec_patch"]["i2v_provider"], "frw-ltx23")
+            self.assertEqual(report["suggested_film_spec_patch"]["i2v_provider"], "grok")
             # no silent apply
             loaded = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
             self.assertEqual(loaded["i2v_provider"], "frw")
@@ -186,7 +186,7 @@ class BuildReportSmoke(unittest.TestCase):
             report2 = build_capability_report(root=root, suggest_i2v=True, apply=True)
             self.assertTrue(report2["apply"]["ok"])
             loaded2 = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
-            self.assertEqual(loaded2["i2v_provider"], "frw-ltx23")
+            self.assertEqual(loaded2["i2v_provider"], "grok")
 
 
 if __name__ == "__main__":

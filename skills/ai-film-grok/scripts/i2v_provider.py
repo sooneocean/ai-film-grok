@@ -1147,9 +1147,9 @@ def preferred(*, root: Path | None = None) -> I2VProvider:
 
         profile = resolve_i2v_profile()
     except Exception:
-        profile = "ltx23_primary"
+        profile = "grok_primary"
     requested = profile
-    provider = get("frw-ltx23" if profile == "ltx23_primary" else "grok")
+    provider = get("grok" if profile == "grok_primary" else "frw-ltx23")
     if root is not None:
         write_json(
             Path(root) / "receipts" / "i2v-routing.json",
@@ -1161,10 +1161,11 @@ def preferred(*, root: Path | None = None) -> I2VProvider:
                 "provider_priority": list(provider_priority()),
                 "fallback": False,
                 "reason": (
-                    "FRW LTX 2.3 is first; later providers require live readiness and "
-                    "attempted-provider switches require signed receipts"
-                    if provider.name == "frw-ltx23"
-                    else "legacy grok_primary compatibility profile"
+                    "Grok image_to_video is first for bulk action; FRW retains LTX "
+                    "native-audio talking heads and legacy compatibility via explicit "
+                    "ltx23_primary profile"
+                    if provider.name == "grok"
+                    else "explicit ltx23_primary compatibility profile"
                 ),
                 "models": list(provider.probe(root=root).models),
                 "requires_hero_repilot": False,

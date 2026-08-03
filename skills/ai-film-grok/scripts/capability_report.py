@@ -85,14 +85,14 @@ def suggest_i2v_from_canary(
         "warnings": [],
         "recommendations": [],
     }
-    # LTX primary stays fail-closed without a current receipt; no report may
+    # Grok primary stays fail-closed without a current receipt; no report may
     # silently claim a provider is ready merely because its CLI is installed.
     try:
         from film_spec import resolve_i2v_profile
 
         profile = resolve_i2v_profile()
     except Exception:
-        profile = "ltx23_primary"
+        profile = "grok_primary"
     out["i2v_profile"] = profile
     if profile == "ltx23_primary":
         patch = {
