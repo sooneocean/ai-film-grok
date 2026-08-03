@@ -226,7 +226,7 @@
     },
     {
       "path": "scripts/beat_extraction.py",
-      "sha256": "57dbb7c228a221aaa49221c6629342a29d4355a28536f9b8981f53539e54f3fe"
+      "sha256": "2db8e1bd96cfe5c2e4202e1ce5a4e3b7f1064642a1b13918c5d235ce8a197cfe"
     },
     {
       "path": "scripts/beat_spine.py",
@@ -1018,7 +1018,7 @@
     },
     {
       "path": "scripts/runtime_policy.py",
-      "sha256": "ed9836a3ea9b3df1287e625fdb2ccd2cb33cc1289a48dfbcb2a8874cd129809d"
+      "sha256": "bf083fe0cb44a6f9f7ec8353f1235f2b50d0afa054a43f227e9e3b9a8fb72173"
     },
     {
       "path": "scripts/scene_sound.py",
