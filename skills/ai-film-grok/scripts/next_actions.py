@@ -489,6 +489,16 @@ def build_next_actions(
             )
 
     if gates.get("clips_complete") and not gates.get("final_complete"):
+        # Wave H: multi-take shortlist before post when takes exist
+        sel_rec = read_json(root / "receipts" / "select-shortlist.json") or {}
+        takes_dir = root / "takes"
+        has_takes = takes_dir.is_dir() and any(takes_dir.rglob("*.mp4"))
+        if has_takes and not sel_rec.get("shots"):
+            add(
+                "select-shortlist",
+                f'aifilm select-shortlist --root "{r}"',
+                "有多 take — 先 select-shortlist 再 post/final（preferred 仅建议）",
+            )
         final_rec = _final_record(root)
         preview_ok = _preview_ok(root)
         rehearse_ok = _tts_rehearse_ok(root)

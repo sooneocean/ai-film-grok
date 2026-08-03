@@ -388,10 +388,29 @@ def assert_bulk_preflight(
     require: bool = True,
     probe_tunnel: bool = False,
     check_lease: bool = False,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
-    """Fail-closed bulk door. Default skips tunnel/lease (queue-friendly)."""
+    """Fail-closed bulk door. Default skips tunnel/lease (queue-friendly).
+
+    Wave H: reuse green ``receipts/bulk-preflight.json`` when film-spec mtime
+    is not newer than the receipt (avoids re-running on every media-queue add).
+    """
+    root_p = _root(root)
+    receipt_path = root_p / "receipts" / BULK_PREFLIGHT_NAME
+    spec_path = root_p / "film-spec.json"
+    if not force_refresh and receipt_path.is_file():
+        cached = read_json(receipt_path) or {}
+        if cached.get("ok") is True:
+            try:
+                rec_mtime = receipt_path.stat().st_mtime
+                spec_mtime = spec_path.stat().st_mtime if spec_path.is_file() else 0.0
+                if rec_mtime + 1e-6 >= spec_mtime:
+                    cached = {**cached, "reused": True, "source": "receipt"}
+                    return cached
+            except OSError:
+                pass
     report = bulk_preflight(
-        root,
+        root_p,
         write=True,
         probe_tunnel=probe_tunnel,
         check_lease=check_lease,

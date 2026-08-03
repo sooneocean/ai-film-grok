@@ -37,6 +37,7 @@ _ACTION_SKILLS = {
     "bulk-preflight": "image.animate",
     "pilot-pack": "quality.inspect",
     "variety-precheck": "story.validate",
+    "select-shortlist": "projection.verify",
 }
 _SKILL_POLICIES = {
     "keyframe.generate": ("external", "human_required"),
@@ -634,6 +635,18 @@ def build_dispatch(
                     "pilot 已批但 bulk-preflight 未绿 — 单门过闸后再 media-queue bulk",
                     "visual",
                 )
+    # Wave H · after clips: select-shortlist once (multi-take preferred, never deletes)
+    if craft_stage in {"selects", "media", "rough"} and gates.get("clips_complete"):
+        sel_rec = read_json(root / "receipts" / "select-shortlist.json") or {}
+        takes_dir = root / "takes"
+        has_takes = takes_dir.is_dir() and any(takes_dir.rglob("*.mp4"))
+        if has_takes and not sel_rec.get("shots"):
+            pre(
+                "select-shortlist",
+                f'aifilm select-shortlist --root "{r}"',
+                "clips 齐且有 takes — 先 select-shortlist 标 preferred（不删 take）再粗剪/final",
+                "visual",
+            )
     quality = _quality_summary(root)
     if quality["failed_count"]:
         pre(

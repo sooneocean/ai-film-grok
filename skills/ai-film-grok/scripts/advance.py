@@ -97,6 +97,11 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
         ("pilot", "pack"),
         verifier=("pilot", "pack"),
     ),
+    "select-shortlist": AdvancePolicy(
+        ("projection.verify", "dispatch.orchestrate"),
+        ("select-shortlist",),
+        verifier=("select-shortlist",),
+    ),
     "quality-gate-repair": AdvancePolicy(
         ("dispatch.orchestrate",),
         ("preflight",),

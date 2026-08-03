@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.31.26] - 2026-08-03
+
+### Added
+- **Wave H:** green `bulk-preflight` receipt reuse when film-spec is not newer (faster multi-add enqueue).
+- dispatch/next inject `select-shortlist` after clips when `takes/` has media; advance allowlist entry.
+- Tests: `tests/test_workflow_wave_h.py`.
+
 ## [2.31.25] - 2026-08-03
 
 ### Added
@@ -13,7 +20,7 @@
 
 ### Changed
 - Local Wan 2.2 I2V stays retired; H3 is a new local path, not a Wan un-retire
-- Comfy capacity: failed driver VRAM SSH probe no longer hard-blocks when ComfyUI free-VRAM metrics are valid
+- Comfy ops: default AIFILM_COMFY_DRIVER_VRAM_FALLBACK=0 so capacity uses ComfyUI metrics when SSH nvidia-smi probe is not fully wired
 - Docs: comfy-weapon-armory + hard-defaults H3 pointers
 
 ## [2.31.24] - 2026-08-03
