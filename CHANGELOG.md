@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.31.29] - 2026-08-03
+
+### Added
+- MiniMax H3 **R2V pilot verified** on private RTX 5090 ( real_pilot + output hash).
+- Canary:  (352x608, ~5.2s, h264+aac).
+
 ## [2.31.28]
 
 ### Added
