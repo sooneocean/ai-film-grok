@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.33.0] - 2026-08-03
+
+### Changed
+- **Chinese dialogue primary:** default `dialogue_spoken_lang=zh` (Edge 晓伊/云希); Japanese opt-in.
+- **Dialogue primary chain:** default `vo_mode=dialogue_drama`; no third-person storyteller fill; narration gap hard cap 5%.
+- **Interactive reverse-shot:** multi-sentence prose → alternating speakers + reverse/OTS reaction coverage.
+- **Subtitles:** HyperFrames sole designed caption owner; prefer `caption_text`; plate `subs=off`.
+
+### Tests
+- `test_dialogue_primary_chain.py` and related voice/plan updates.
+
 ## [2.31.36] - 2026-08-03
 
 ### Added

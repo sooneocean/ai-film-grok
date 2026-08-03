@@ -367,16 +367,30 @@ def _validate_dialogue_drama_shot(
             raise FilmSpecError(
                 f"{shot_id}: on_camera voice must be a dialogue cue with spoken_text"
             )
-        if str(voice.get("language") or "").lower() != "ja":
-            raise FilmSpecError(f"{shot_id}: character dialogue voice language must be ja")
-        if str(shot.get("translation_status") or "").lower() != "ready":
+        voice_lang = str(voice.get("language") or "").lower()
+        if voice_lang not in {"zh", "ja"}:
             raise FilmSpecError(
-                f"{shot_id}: Japanese dialogue translation is pending; fill dialogue_ja before TTS/lipsync"
+                f"{shot_id}: character dialogue voice language must be zh (default) or ja (opt-in)"
             )
-        if not re.search(r"[\u3040-\u30ff]", str(shot.get("dialogue_ja") or "")):
-            raise FilmSpecError(f"{shot_id}: dialogue_ja must contain Japanese kana")
+        if voice_lang == "ja":
+            if str(shot.get("translation_status") or "").lower() != "ready":
+                raise FilmSpecError(
+                    f"{shot_id}: Japanese dialogue translation is pending; "
+                    "fill dialogue_ja before TTS/lipsync"
+                )
+            if not re.search(r"[\u3040-\u30ff]", str(shot.get("dialogue_ja") or "")):
+                raise FilmSpecError(f"{shot_id}: dialogue_ja must contain Japanese kana")
+        else:
+            spoken = str(voice.get("spoken_text") or "").strip()
+            caption = str(shot.get("caption_text") or spoken).strip()
+            if not re.search(r"[\u4e00-\u9fff]", spoken + caption):
+                raise FilmSpecError(
+                    f"{shot_id}: Chinese dialogue requires Han characters in spoken_text/caption_text"
+                )
         if not str(shot.get("caption_text") or "").strip():
-            raise FilmSpecError(f"{shot_id}: dialogue requires Chinese caption_text")
+            raise FilmSpecError(
+                f"{shot_id}: dialogue requires Chinese caption_text (HyperFrames subtitle owner)"
+            )
         if not str(shot.get("dialogue_line_id") or "").strip():
             raise FilmSpecError(f"{shot_id}: on_camera dialogue requires dialogue_line_id")
         if not str(shot.get("performance_state_id") or "").strip():
@@ -819,10 +833,17 @@ def validate_film_spec(
     if mode != "dialogue_drama" and iter_dialogue_broll(spec):
         raise FilmSpecError("dialogue_broll is only supported when vo_mode=dialogue_drama")
     if mode == "dialogue_drama":
-        if str(spec.get("dialogue_spoken_lang") or "").lower() != "ja":
-            raise FilmSpecError("dialogue_drama requires dialogue_spoken_lang=ja")
-        if str(spec.get("narration_spoken_lang") or "").lower() != "zh":
+        dlang = str(spec.get("dialogue_spoken_lang") or "zh").lower()
+        if dlang not in {"zh", "ja"}:
+            raise FilmSpecError(
+                "dialogue_drama requires dialogue_spoken_lang=zh (default) or ja (opt-in)"
+            )
+        spec["dialogue_spoken_lang"] = dlang
+        if str(spec.get("narration_spoken_lang") or "zh").lower() != "zh":
             raise FilmSpecError("dialogue_drama requires narration_spoken_lang=zh")
+        spec["narration_spoken_lang"] = "zh"
+        if not str(spec.get("caption_lang") or "").strip():
+            spec["caption_lang"] = "zh"
     validate_director_intent(spec)
     tts_backend = spec.get("tts_backend", "auto")
     if not isinstance(tts_backend, str) or tts_backend.lower() not in TTS_BACKENDS:
@@ -1452,6 +1473,41 @@ def validate_film_spec(
             and cue.get("line_type") == "narration"
         )
         narration_ratio = narration_sec / max(dialogue_sec + narration_sec, 1.0)
+        try:
+            narration_budget = float(spec.get("narration_budget_ratio") or 0.05)
+        except (TypeError, ValueError):
+            narration_budget = 0.05
+        narration_budget = max(0.0, min(0.15, narration_budget))
+        if spec.get("allow_storyteller_nar") is not True:
+            for shot in shots:
+                if not isinstance(shot, dict):
+                    continue
+                sid = str(shot.get("id") or "?")
+                nar = str(shot.get("nar") or "").strip()
+                if not nar:
+                    continue
+                cues = shot.get("audio_cues") if isinstance(shot.get("audio_cues"), list) else []
+                has_dialogue_voice = any(
+                    isinstance(c, dict)
+                    and c.get("kind") == "voice"
+                    and c.get("line_type") == "dialogue"
+                    for c in cues
+                )
+                has_narration_voice = any(
+                    isinstance(c, dict)
+                    and c.get("kind") == "voice"
+                    and c.get("line_type") == "narration"
+                    for c in cues
+                )
+                if has_dialogue_voice:
+                    continue
+                if has_narration_voice and str(shot.get("narration_reason") or "").strip():
+                    continue
+                raise FilmSpecError(
+                    f"{sid}: dialogue_drama forbids third-person storyteller nar as primary "
+                    "voice — use character dialogue cues, pure-visual silence/action_cover, "
+                    "or a justified narration gap. Escape: allow_storyteller_nar:true"
+                )
         spec["_dialogue_drama"] = {
             "on_camera_shots": len(on_camera),
             "coverage_shots": len(coverage),
@@ -1460,6 +1516,8 @@ def validate_film_spec(
             "dialogue_sec": round(dialogue_sec, 3),
             "narration_sec": round(narration_sec, 3),
             "narration_ratio": round(narration_ratio, 4),
+            "narration_target_ratio": 0.0,
+            "narration_budget_ratio": narration_budget,
             "coverage_ratio": round(
                 sum(float(s.get("duration_sec") or 0) for s in coverage)
                 / max(sum(float(s.get("duration_sec") or 0) for s in shots), 1.0),
@@ -1471,7 +1529,10 @@ def validate_film_spec(
                 "action_cover": "about 20%",
                 "space_or_silence": "10-15%",
             },
-            "note": "Narration is gap-only; target is <= 15% of voiced duration.",
+            "note": (
+                "Cinema dialogue primary: speech=character Chinese mouth; no speech=pure picture. "
+                f"Narration gap-only; target 0, hard cap {narration_budget:.0%}."
+            ),
         }
         broll = iter_dialogue_broll(spec)
         spec["_dialogue_broll"] = {
@@ -1481,9 +1542,13 @@ def validate_film_spec(
             "audio_policy": "carry_parent_dialogue",
             "note": "B-roll replaces only parent picture inside bounded cuts; dialogue/subtitle clocks stay on A-roll.",
         }
-        if spec.get("narration_budget_strict") is not False and narration_ratio > 0.15:
+        if (
+            spec.get("narration_budget_strict") is not False
+            and narration_ratio > narration_budget + 1e-9
+        ):
             raise FilmSpecError(
-                f"dialogue_drama narration budget exceeded: {narration_ratio:.0%} > 15%"
+                f"dialogue_drama narration budget exceeded: {narration_ratio:.0%} > "
+                f"{narration_budget:.0%} (target 0; raise narration_budget_ratio or cut gap VO)"
             )
 
     # Aggregate VO budget report (non-blocking summary for agents / status)
@@ -2435,12 +2500,17 @@ def validate_film_spec(
             "HEAT_VO_SPICE_TOO_MILD",
         }
     ]
-    # Auto-reinforce weak nar before hard-fail (user substantive → append only)
+    vo_mode_now = str(spec.get("vo_mode") or "").strip().lower()
+    sex_vo_auto = spec.get("sex_vo_auto_apply")
+    if sex_vo_auto is None:
+        sex_vo_auto = vo_mode_now != "dialogue_drama"
+    # Auto-reinforce weak nar only for storyteller/hybrid (never inject third-person into dialogue_drama)
     if (
         sex_vo_strict is True
         and vo_fail_codes
         and heat_scale == "max"
-        and spec.get("sex_vo_auto_apply") is not False
+        and sex_vo_auto is not False
+        and vo_mode_now != "dialogue_drama"
     ):
         try:
             from edit_policy import apply_vo_spice_auto

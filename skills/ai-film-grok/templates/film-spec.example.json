@@ -7,13 +7,13 @@
     "heroine": "edge",
     "partner": "edge"
   },
-  "dialogue_spoken_lang": "ja",
+  "dialogue_spoken_lang": "zh",
   "narration_spoken_lang": "zh",
   "caption_lang": "zh",
   "cast_voices": {
     "storyteller": "zh-CN-XiaoxiaoNeural",
-    "heroine": "ja-JP-NanamiNeural",
-    "partner": "ja-JP-KeitaNeural"
+    "heroine": "zh-CN-XiaoyiNeural",
+    "partner": "zh-CN-YunxiNeural"
   },
   "i2v_provider": "grok",
   "frw_video_model": "legacy-img2video",

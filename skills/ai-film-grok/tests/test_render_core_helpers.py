@@ -49,11 +49,20 @@ def test_shot_text_and_voice_follow_language_contract() -> None:
         "shot_type": "dialogue",
         "speaker": "heroine",
         "nar": "中文",
+        "dialogue": "别走。",
+        "caption_text": "别走。",
         "dialogue_ja": "行く",
     }
-    assert caption_text_for_shot(character) == "中文"
-    assert spoken_text_for_shot(character) == "行く"
-    assert voice_for_shot(character, default_voice="default", cast_voices={}, vo_mode="character")
+    assert caption_text_for_shot(character) == "别走。"
+    assert spoken_text_for_shot(character) == "别走。"
+    assert spoken_text_for_shot(character, dialogue_spoken_lang="ja") == "行く"
+    assert voice_for_shot(
+        character,
+        default_voice="default",
+        cast_voices={},
+        vo_mode="character",
+        dialogue_spoken_lang="zh",
+    ).startswith("zh-CN-")
     assert caption_text_for_shot({"nar": "中文", "nar_ja": "日本語"}, caption_lang="ja") == "日本語"
 
 
@@ -257,9 +266,13 @@ def test_lead_dialogue_locks_require_japanese_script_and_language() -> None:
             ],
             dialogue_spoken_lang="ja",
         )
-    with pytest.raises(RenderError, match="dialogue_spoken_lang=ja"):
+    validate_voice_language_locks(
+        [{"id": "f01", "speaker": "heroine", "dialogue": "别走。", "caption_text": "别走。"}],
+        dialogue_spoken_lang="zh",
+    )
+    with pytest.raises(RenderError, match="needs Chinese spoken"):
         validate_voice_language_locks(
-            [{"id": "f01", "speaker": "heroine", "nar": "中文"}],
+            [{"id": "f01b", "speaker": "heroine", "dialogue_ja": "行かないで"}],
             dialogue_spoken_lang="zh",
         )
     with pytest.raises(RenderError, match="needs nar_ja/dialogue_ja/spoken_ja"):

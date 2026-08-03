@@ -10,7 +10,7 @@ from dialogue_style import style_guidance_for_scene
 
 SCHEMA_VERSION = 1
 KIND = "dialogue-screenplay"
-NARRATION_LIMIT = 0.15
+NARRATION_LIMIT = 0.05
 NARRATION_REASONS = frozenset(
     {
         "time_jump",
@@ -163,9 +163,15 @@ def _explicit_turn(block: dict[str, Any], index: int, refs: list[str]) -> dict[s
         "addressee": _text(block.get("addressee")) or "pending_addressee",
         "dialogue_zh": dialogue_zh or subtitle_zh,
         "subtitle_zh": subtitle_zh,
+        "spoken_zh": dialogue_zh or subtitle_zh,
         "dialogue_ja": dialogue_ja,
         "translation_status": _text(block.get("translation_status"))
-        or ("ready" if dialogue_ja and subtitle_zh else "pending"),
+        or (
+            "ready"
+            if (dialogue_zh or subtitle_zh)
+            and re.search(r"[\u4e00-\u9fff]", dialogue_zh or subtitle_zh or "")
+            else ("ready" if dialogue_ja and subtitle_zh else "pending")
+        ),
         "emotion": _text(block.get("emotion")) or "待确认",
         "subtext": _text(block.get("subtext")) or "待确认",
         "actions": {
@@ -189,32 +195,85 @@ def _explicit_turn(block: dict[str, Any], index: int, refs: list[str]) -> dict[s
     }
 
 
-def _prose_candidate(body: str, line_id: str, refs: list[str]) -> dict[str, Any]:
+def _prose_candidate(
+    body: str,
+    line_id: str,
+    refs: list[str],
+    *,
+    speaker: str = "pending_cast",
+    addressee: str = "pending_addressee",
+    excerpt: str | None = None,
+) -> dict[str, Any]:
     # The source sentence remains byte-for-byte; only its proposed use as
     # speech is creative, so no new fact is smuggled into the story.
-    excerpt = _first_sentence(body)
+    text = _text(excerpt) if excerpt is not None else _first_sentence(body)
     return {
         "line_id": line_id,
-        "speaker": "pending_cast",
-        "addressee": "pending_addressee",
-        "dialogue_zh": excerpt,
-        "subtitle_zh": excerpt,
+        "speaker": speaker,
+        "addressee": addressee,
+        "dialogue_zh": text,
+        "subtitle_zh": text,
+        "spoken_zh": text,
         "dialogue_ja": "",
-        "translation_status": "pending",
+        "translation_status": "ready" if re.search(r"[\u4e00-\u9fff]", text) else "pending",
         "emotion": "待确认",
         "subtext": "待确认",
         "actions": {"before": "", "during": "", "after": ""},
         "screen_mode": "on_camera",
         "lipsync_required": True,
         "scene_state_id": "",
-        "gaze": "待确认",
+        "gaze": addressee if addressee not in {"", "pending_addressee"} else "待确认",
         "props": [],
         "state_delta": "待确认",
         "duration_sec": 0.0,
         "provenance": "creative_suggestion",
-        "source_evidence": _evidence(refs, excerpt, "creative_suggestion"),
+        "source_evidence": _evidence(refs, text, "creative_suggestion"),
         "review_status": "pending",
+        "shot_reverse_shot": True,
     }
+
+
+def _prose_interactive_turns(
+    body: str,
+    *,
+    scene_index: int,
+    refs: list[str],
+    character_candidates: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Split prose into multi-turn Chinese dialogue with reverse-shot pairing."""
+    sentences = [
+        part.strip()
+        for part in re.split(r"(?<=[。！？!?])\s*|\n+", _text(body))
+        if part and part.strip()
+    ]
+    if not sentences:
+        return []
+    sentences = sentences[:6]
+    cast_ids: list[str] = []
+    for cand in character_candidates or []:
+        if not isinstance(cand, dict):
+            continue
+        cid = _text(cand.get("id") or cand.get("name"))
+        if cid and cid not in cast_ids:
+            cast_ids.append(cid)
+    if len(cast_ids) < 2:
+        cast_ids = ["heroine", "partner"]
+    a, b = cast_ids[0], cast_ids[1]
+    turns: list[dict[str, Any]] = []
+    for i, sentence in enumerate(sentences, 1):
+        speaker = a if i % 2 == 1 else b
+        addressee = b if speaker == a else a
+        turns.append(
+            _prose_candidate(
+                body,
+                f"line_{scene_index:03d}_{i:03d}",
+                refs,
+                speaker=speaker,
+                addressee=addressee,
+                excerpt=sentence,
+            )
+        )
+    return turns
 
 
 def _dramatic_function_for_purpose(purpose: str) -> str:
@@ -278,7 +337,14 @@ def build_dialogue_screenplay(
             for offset, block in enumerate(bound, 1)
         ]
         if mode == "dialogue_drama" and not turns and body:
-            turns = [_prose_candidate(body, f"line_{scene_index:03d}_001", refs)]
+            turns = _prose_interactive_turns(
+                body,
+                scene_index=scene_index,
+                refs=refs,
+                character_candidates=list(normalized.get("character_candidates") or []),
+            )
+            if not turns:
+                turns = [_prose_candidate(body, f"line_{scene_index:03d}_001", refs)]
 
         # Inject per-turn authoring questions
         scene_df = _dramatic_function_for_purpose(
@@ -335,6 +401,7 @@ def build_dialogue_screenplay(
                     "reaction": mode == "dialogue_drama",
                     "action_cover": mode == "dialogue_drama",
                     "environment_insert": True,
+                    "interactive_pair": mode == "dialogue_drama" and len(turns) >= 2,
                 },
                 "narration_gaps": [],
                 "source_evidence": _evidence(refs, body, "source_supported"),

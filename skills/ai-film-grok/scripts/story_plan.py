@@ -896,7 +896,10 @@ def normalize_story(
     if len(raw) < 8:
         warnings.append("source very short — planner will use vertical beat template")
     if not dialogues:
-        warnings.append("no dialogue lines detected — default storyteller VO")
+        warnings.append(
+            "no quoted dialogue detected — default dialogue_drama with pure-visual "
+            "coverage and/or candidate character lines (not third-person storyteller VO)"
+        )
 
     heat = detect_heat_signals(raw)
     genre_info = detect_genre(raw, heat=heat)
@@ -951,11 +954,8 @@ def normalize_story(
         "episode_chunks": episode_chunks,
         "source_evidence_refs": list(source_evidence_refs or []),
         "plot_point_candidates": plot_point_candidates,
-        # A source that already declares speakers should keep those turns as
-        # the editorial clock.  ``character`` remains available for manually
-        # authored specs, while the planner emits the stricter dialogue-first
-        # package below.
-        "vo_mode_suggest": "dialogue_drama" if dialogues else "storyteller",
+        # Cinema dialogue is the product default (Chinese spoken primary).
+        "vo_mode_suggest": "dialogue_drama",
         "heat_signals": heat,
         "genre_evidence": genre_info["evidence"],
         "warnings": warnings,
@@ -987,7 +987,7 @@ def structure_episode(
         "endingHook": AUTHORING_PLACEHOLDER,
         "aspectRatio": "9:16",
         "status": "planning",
-        "vo_mode": normalized.get("vo_mode_suggest") or "storyteller",
+        "vo_mode": normalized.get("vo_mode_suggest") or "dialogue_drama",
     }
 
 
@@ -1683,9 +1683,11 @@ def project_graph_to_film_spec(
         graph.get("project", {}).get("title") or ep.get("title") or base.get("title") or "untitled"
     )
     logline = str(ep.get("openingHook") or (normalized or {}).get("logline") or title)
-    vo_mode = str((normalized or {}).get("vo_mode_suggest") or base.get("vo_mode") or "storyteller")
+    vo_mode = str(
+        (normalized or {}).get("vo_mode_suggest") or base.get("vo_mode") or "dialogue_drama"
+    )
     if vo_mode not in {"storyteller", "character", "hybrid", "dialogue_drama"}:
-        vo_mode = "storyteller"
+        vo_mode = "dialogue_drama"
 
     cast_ids = [
         c.get("id") for c in (graph.get("characters") or []) if isinstance(c, dict) and c.get("id")
@@ -1794,10 +1796,39 @@ def project_graph_to_film_spec(
                         )
                         props = list(dialogue_line.get("props") or sh.get("props") or [])
                         caption_text = str(
-                            dialogue_line.get("caption_text") or dialogue_line.get("text") or ""
+                            dialogue_line.get("caption_text")
+                            or dialogue_line.get("dialogue_zh")
+                            or dialogue_line.get("subtitle_zh")
+                            or dialogue_line.get("text")
+                            or ""
                         ).strip()
-                        spoken_ja = str(dialogue_line.get("spoken_ja") or "").strip()
-                        text = spoken_ja or caption_text
+                        spoken_ja = str(
+                            dialogue_line.get("spoken_ja") or dialogue_line.get("dialogue_ja") or ""
+                        ).strip()
+                        spoken_zh = str(
+                            dialogue_line.get("spoken_zh")
+                            or dialogue_line.get("dialogue_zh")
+                            or dialogue_line.get("text")
+                            or caption_text
+                            or ""
+                        ).strip()
+                        dlang = "zh"
+                        text = spoken_zh or caption_text or spoken_ja
+                        if spoken_zh or (
+                            caption_text and re.search(r"[\u4e00-\u9fff]", caption_text)
+                        ):
+                            translation_status = "ready"
+                        elif spoken_ja:
+                            dlang = "ja"
+                            text = spoken_ja
+                            translation_status = (
+                                dialogue_line.get("translation_status") or "pending"
+                            )
+                        else:
+                            translation_status = (
+                                dialogue_line.get("translation_status") or "pending"
+                            )
+                        caption_text = caption_text or spoken_zh or text
                         duration = max(
                             float(shot_obj["duration_sec"]),
                             round(max(1.0, len(text) / 4.0) + 0.8, 1),
@@ -1808,13 +1839,11 @@ def project_graph_to_film_spec(
                                 "dialogue_line_id": dialogue_line["line_id"],
                                 "speaker": dialogue_line["speaker"],
                                 "addressee": dialogue_line.get("addressee"),
-                                # dialogue_drama: Chinese stays in caption_text; nar stays empty
-                                # so narration TTS cannot steal the editorial clock.
+                                # dialogue_drama: Chinese spoken primary; nar empty.
                                 "dialogue": text,
                                 "caption_text": caption_text,
                                 "dialogue_ja": spoken_ja,
-                                "translation_status": dialogue_line.get("translation_status")
-                                or "pending",
+                                "translation_status": translation_status,
                                 "performance_state": {
                                     "emotion": dialogue_line.get("emotion") or "neutral",
                                     "subtext": dialogue_line.get("subtext") or "",
@@ -1861,11 +1890,8 @@ def project_graph_to_film_spec(
                                         "speaker": dialogue_line["speaker"],
                                         "spoken_text": text,
                                         "caption_text": caption_text,
-                                        "language": "ja",
-                                        "translation_status": dialogue_line.get(
-                                            "translation_status"
-                                        )
-                                        or "pending",
+                                        "language": dlang,
+                                        "translation_status": translation_status,
                                         "emotion": dialogue_line.get("emotion") or "",
                                         "purpose": "dialogue",
                                         "lipsync_required": True,
@@ -1984,6 +2010,21 @@ def project_graph_to_film_spec(
             if beat:
                 final_speaker_by_beat[beat] = shot
         insert_after: dict[str, list[dict[str, Any]]] = {}
+        ordered_dialogue = [
+            shot
+            for scene in scenes_fs
+            for shot in (scene.get("shots") or [])
+            if isinstance(shot, dict) and shot.get("screen_mode") == "on_camera"
+        ]
+        prev_speaker_global = ""
+        reverse_beats: set[str] = set()
+        for shot in ordered_dialogue:
+            sp = str(shot.get("speaker") or "")
+            beat = str(shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id") or "")
+            if prev_speaker_global and sp and sp != prev_speaker_global and beat:
+                reverse_beats.add(beat)
+            if sp:
+                prev_speaker_global = sp
         for beat, source in final_speaker_by_beat.items():
             if beat in coverage_beats:
                 continue
@@ -1991,32 +2032,66 @@ def project_graph_to_film_spec(
             has_action = bool(
                 str(source.get("playable_action") or source.get("must_show") or "").strip()
             )
-            mode = "action_cover" if has_action else "reaction"
+            use_reverse = beat in reverse_beats or bool(str(source.get("addressee") or "").strip())
+            mode = "action_cover" if has_action and not use_reverse else "reaction"
+            addressee = str(source.get("addressee") or "listener")
+            speaker = str(source.get("speaker") or "")
+            headroom = (
+                "vertical 9:16 face-priority, full head and both shoulders inside frame, "
+                "ample headroom, safe framing no cropping, eyes readable"
+            )
+            if use_reverse:
+                title = "正反打·听者反应（OTS reverse）"
+                action = (
+                    f"listener {addressee} absorbs {speaker}'s line; "
+                    "shot-reverse-shot opposite eyeline, over-shoulder reverse angle"
+                )
+                motion = "subtle reverse-angle hold, eye reaction, micro head turn toward speaker"
+                camera = {
+                    "shot_size": "medium close-up",
+                    "angle": "eye level",
+                    "axis": "reverse",
+                    "framing": f"over-shoulder reverse, {headroom}",
+                }
+                coverage_role = "reverse_reaction"
+            elif mode == "action_cover":
+                title = "对白节拍后的动作承接"
+                action = "show the prop/action consequence of the completed line"
+                motion = "hold, subtle action and eye movement"
+                camera = {"shot_size": "medium close-up", "framing": headroom}
+                coverage_role = mode
+            else:
+                title = "对白节拍后的听者反应"
+                action = "listener absorbs the line; a visible emotional reaction"
+                motion = "hold, subtle action and eye movement"
+                camera = {"shot_size": "medium close-up", "framing": headroom}
+                coverage_role = mode
             reaction = {
-                "id": f"{source['id']}_{mode}",
+                "id": f"{source['id']}_{coverage_role}",
                 "scene_id": source.get("scene_id"),
-                "title": "对白节拍后的动作承接"
-                if mode == "action_cover"
-                else "对白节拍后的听者反应",
+                "title": title,
                 "shot_role": "hero",
                 "dramatic_function": "action" if mode == "action_cover" else "reaction",
                 "duration_sec": 1.5,
                 "beat_id": beat,
-                "coverage_role": mode,
+                "coverage_role": coverage_role,
                 "screen_mode": mode,
                 "speaker_on_camera": False,
                 "lipsync": False,
                 "auto_dialogue_coverage": True,
+                "shot_reverse_shot": use_reverse,
                 "audio_cues": [{"kind": "silence", "start_offset_sec": 0.0, "duration_sec": 1.5}],
                 "dsl": {
                     **source_dsl,
-                    "action": (
-                        "show the prop/action consequence of the completed line"
-                        if mode == "action_cover"
-                        else "listener absorbs the line; a visible emotional reaction"
+                    "action": action,
+                    "motion": motion,
+                    "camera": camera,
+                    "composition": headroom,
+                    "cast": (
+                        [addressee]
+                        if addressee and addressee not in {"listener", "pending_addressee"}
+                        else source_dsl.get("cast")
                     ),
-                    "motion": "hold, subtle action and eye movement",
-                    "camera": {"shot_size": "medium close-up"},
                 },
             }
             insert_after.setdefault(str(source.get("id") or ""), []).append(reaction)
@@ -2130,12 +2205,13 @@ def project_graph_to_film_spec(
         "production_mode": production_mode,
         "genre": story.get("genre") or (normalized or {}).get("genre") or genre_default,
         "vo_mode": vo_mode,
-        "dialogue_spoken_lang": "ja"
-        if vo_mode == "dialogue_drama"
-        else base.get("dialogue_spoken_lang", "ja"),
+        "dialogue_spoken_lang": (
+            "zh" if vo_mode == "dialogue_drama" else base.get("dialogue_spoken_lang", "zh")
+        ),
         "narration_spoken_lang": "zh"
         if vo_mode == "dialogue_drama"
         else base.get("narration_spoken_lang", "zh"),
+        "caption_lang": base.get("caption_lang") or "zh",
         "audio_cues_strict": vo_mode == "dialogue_drama",
         "tts_rehearsal_required": vo_mode == "dialogue_drama",
         "dialogue_state_strict": vo_mode == "dialogue_drama",
@@ -2148,6 +2224,11 @@ def project_graph_to_film_spec(
         ),
         "narration_budget_strict": vo_mode == "dialogue_drama",
         "content_channels_strict": vo_mode == "dialogue_drama",
+        "sex_vo_auto_apply": (
+            False
+            if vo_mode == "dialogue_drama" and base.get("sex_vo_auto_apply") is None
+            else base.get("sex_vo_auto_apply")
+        ),
         "tts_backend": (
             "edge" if vo_mode == "dialogue_drama" else base.get("tts_backend") or "mimo"
         ),
@@ -2468,9 +2549,13 @@ def run_plan(
         raise ValueError(f"received dialogue_screenplay is not lock-ready: {codes}")
     normalized["dialogue_screenplay"] = screenplay
     normalized["dialogue_screenplay_validation"] = screenplay_validation
-    normalized["vo_mode_suggest"] = (
-        "dialogue_drama" if screenplay.get("mode") == "dialogue_drama" else "storyteller"
-    )
+    sp_mode = str(screenplay.get("mode") or "dialogue_drama")
+    if sp_mode == "storyteller":
+        normalized["vo_mode_suggest"] = "storyteller"
+    elif sp_mode == "monologue":
+        normalized["vo_mode_suggest"] = "character"
+    else:
+        normalized["vo_mode_suggest"] = "dialogue_drama"
     if character_id_overrides:
         for candidate in normalized.get("character_candidates") or []:
             name = str(candidate.get("name") or "")

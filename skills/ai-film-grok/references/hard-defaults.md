@@ -50,7 +50,7 @@
 | **Wave 6 final 闭环（P0 · 同日）** | `final_ok`=impact≥S(默认90)+弧/时长；`aifilm final` / `review-final` / `export-desktop` 绑 `assert_heat_allows_final`；逃生 `--skip-heat-gate` / `AIFILM_SKIP_HEAT_FINAL_GATE=1`。queue 仍只硬拦 A 以下。 |
 | **Agent 出货纪律（P0 · 同日 · 后面不要再犯）** | `SKILL.md` **≤6000B** 且保留文档锚点；改 scripts **必刷 runtime-lock**；push 前工作区干净；完成=origin 绿。见 [agent-ship-skill-budget-push](lessons-2026-07-29-agent-ship-skill-budget-push.md)。 |
 | **wardrobe ladder（P0 · 同日）** | 逐件卸装：garments → 串行 state I2I → `state-index approve-state`（本地登记、不调 provider）；exact `wardrobe_state_id` 未批 = state-index hard。 |
-| **dialogue_drama（P0 · 同日）** | 角色口 ja + 字幕 zh；`spoken_text` 供 TTS，`caption_text` 供字；禁用说书 `nar` 抢时钟；源文保真查 cue/caption。 |
+| **dialogue_drama（P0 · 默认主链 · 2026-08-03）** | 默认 `vo_mode`。**角色口中文** + 字幕 zh（**仅 HyperFrames 烧字**）；散文拆句正反打；禁说书 `nar` 抢时钟。 |
 | **Wave 2 强制拉满（P0 · 同日）** | plan **秒数预分配** meat≥50%；multi-scene compact 含 **climax bare**；`aifilm heat soften-compensate --apply`（VO+SFX+energy，禁降 heat）；promote **回穿 rank 硬拦**；`music_spotting` 跟 phase energy；pilot 批准须 **undress+union/rhythm** 三拍证据才 bulk。 |
 | **首帧结构** | **致命**（P0）：keyframe 解剖/融合 fail → 禁 I2V；I2V 后必抽 t=0；坏首帧=整段废（2026-07-21 33s 案） |
 | **景别堆叠** | 成人 60s：宽≥1·中≥2·近≥2·局部≥2；act→climax 收紧不回退全景；连续 3 镜同 size fail（2026-07-21） |
@@ -75,7 +75,7 @@
 | 规则 | 默认 |
 |---|---|
 | TTS | 中文成片 **edge**；storyteller `auto`→edge |
-| **人物对白 / 口白语言** | **P0**（2026-07-23 / **07-24 强化**）：**口白·说书=中文**；**角色开口=日文**（`dialogue_spoken_lang=ja`，女 `ja-JP-NanamiNeural` / 男 `ja-JP-KeitaNeural`）；**字幕仍中文**（`caption_lang=zh`，烧 `nar` 非 `nar_ja`）。角色镜须 `speaker` + `nar` + `nar_ja`；说书镜 **禁** `nar_ja`。**禁止无 speaker 理由的中日乒乓**；成块切换。禁赶片清空 `nar_ja`。见 [character-dialogue-ja](lessons-2026-07-23-character-dialogue-ja.md) · [ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md) · [voices.md](voices.md) |
+| **人物对白 / 口白语言** | **P0**（**08-03 中文主链**）：默认 **角色开口=中文**（`dialogue_spoken_lang=zh`，女 `zh-CN-XiaoyiNeural` / 男 `zh-CN-YunxiNeural`）；**字幕中文** `caption_text`（**仅 HyperFrames**，plate `subs=off`）。日文仅显式 `ja`。无对白=纯画面。见 [dialogue-first-workflow](dialogue-first-workflow.md) · [voices.md](voices.md) |
 | **final / SRT** | **P0**（2026-07-24；07-29 长片 v1）：`sub_lead=0` 或写盘前非重叠钳制；`aifilm final` 默认按时长/镜数/lipsync 动态 timeout，长片不再固定 1200s；plate 后中文硬烧。见 [ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md) · [longform](longform-workflow.md) |
 | Voicebox | **质量升级 + opt-in 本地兜底**（非默认替换 edge）；固定 `VOICEBOX_PROFILE`；`AIFILM_TTS_VOICEBOX_FALLBACK=1` 才 edge 失败再试 |
 | 机位 | 开场 **`aifilm dispatch`**（craft+capability+next）；或 `capability`；`--suggest-i2v` / `--apply` 改 I2V 须显式 |
@@ -86,7 +86,7 @@
 | VO 预算 | `nar` ≤55 字（快节奏 ≤28）；`est_vo_sec ≤ duration_sec+0.5`；日文对白按 `nar_ja` 估长 |
 | loop | hook/action 永不 stream_loop |
 | 一角一声 | 固定 `vo_voice` / `cast_voices`；显式 TTS 失败不静默跨商降级 |
-| **声线主导** | **旁白 `nar` + BGM**；`vocal_color` 娇喘独立轨 **默认关**（`voice_tracks.enabled=false` · gain=0）；`tone_tags` 只进画面；`sound_cues` 可进 SFX；见 [voice-tracks.md](voice-tracks.md) |
+| **声线主导** | **对白主链·中文**：角色中文 `spoken_text` + HF 字幕 `caption_text` + BGM duck；无对白=静镜。第三人称 `nar` **仅 gap**。`vocal_color` 默认关；见 [voice-tracks.md](voice-tracks.md) |
 
 ## 视觉与一致性
 

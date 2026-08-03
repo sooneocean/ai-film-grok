@@ -193,20 +193,21 @@ def test_resume_manifest_refuses_symlink_root_and_broken_manifest_symlink(
     assert broken_manifest.is_symlink()
 
 
-def test_compatibility_vo_mode_infers_dialogue_drama_only_for_explicitly_silent_projection() -> (
-    None
-):
+def test_compatibility_vo_mode_defaults_to_dialogue_drama_when_missing() -> None:
     silent = {"scenes": [{"shots": [{"silent": True, "dialogue": []}]}]}
     inferred = _compatibility_vo_mode(silent)
     assert inferred["vo_mode"] == "dialogue_drama"
-    assert inferred["dialogue_spoken_lang"] == "ja"
+    assert inferred["dialogue_spoken_lang"] == "zh"
     assert inferred["narration_spoken_lang"] == "zh"
 
     dialogue = {"scenes": [{"shots": [{"silent": False, "dialogue": ["hello"]}]}]}
-    assert "vo_mode" not in _compatibility_vo_mode(dialogue)
+    assert _compatibility_vo_mode(dialogue)["vo_mode"] == "dialogue_drama"
 
     ambiguous = {"scenes": [{"shots": [{"dialogue": []}]}]}
-    assert "vo_mode" not in _compatibility_vo_mode(ambiguous)
+    assert _compatibility_vo_mode(ambiguous)["vo_mode"] == "dialogue_drama"
+
+    explicit = {"vo_mode": "storyteller", "scenes": []}
+    assert _compatibility_vo_mode(explicit)["vo_mode"] == "storyteller"
 
 
 def test_new_root_init_does_not_publish_partial_project_on_failure(

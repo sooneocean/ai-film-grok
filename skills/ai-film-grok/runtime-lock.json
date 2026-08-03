@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "06217988244ce211e9f58a34aa475de9a57e88e7bb100a10f3118738acf79a8d"
+      "sha256": "bea7b67a8b01ae9e22b42945ae48e9244e7226589dde11e36d494679820e0e43"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -530,7 +530,7 @@
     },
     {
       "path": "scripts/dialogue_screenplay.py",
-      "sha256": "e136e1376f6423081e712e764c50c6fe961e96f875f15940a0a21e335020ff36"
+      "sha256": "d1ddfba28e414d3032161bb49c7a28dc7a560d4ef96603f786d603dadcdae675"
     },
     {
       "path": "scripts/dialogue_style.py",
@@ -614,7 +614,7 @@
     },
     {
       "path": "scripts/film_spec.py",
-      "sha256": "dcc75388f3c5979cba23161d1a1fd43a4bf416831fe9515627f5c4e851874151"
+      "sha256": "c62af376bf1d1ed1042d93485cb18df2b63871d09cf82fc1c8e5b6a7e7910772"
     },
     {
       "path": "scripts/final_editorial_review.py",
@@ -1006,7 +1006,7 @@
     },
     {
       "path": "scripts/render_final.py",
-      "sha256": "964494b635aa24543795db492efd5e6d402d6a559d7db81e71aba4ebc6677436"
+      "sha256": "80b33f1dd1a83dc8afecad6210a8b12b6abde01fcf06f0aec79d429d1696961e"
     },
     {
       "path": "scripts/render_workspace.py",
@@ -1142,7 +1142,7 @@
     },
     {
       "path": "scripts/story_plan.py",
-      "sha256": "aec369c38e19cb200c8eb9576fbfdef02a92da1641c2da5d736872e2aa0935bd"
+      "sha256": "f993bed9d2f4d15913c17af77203f4ce12fec10abcd612dc45dc5f992df257c4"
     },
     {
       "path": "scripts/story_quality.py",

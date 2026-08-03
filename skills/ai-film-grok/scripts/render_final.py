@@ -133,7 +133,10 @@ except ImportError:  # pragma: no cover
 # TTS 质量与稳定声线分开选择；跨服务商降级必须显式开启。
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"  # edge 显式后端默认女声
 STORYTELLER_VOICE = "zh-CN-XiaoxiaoNeural"
-# P0 · 2026-07-23: character dialogue defaults to Japanese edge voices
+# P0 · 2026-08-03: character dialogue defaults to Chinese edge voices
+HEROINE_ZH_VOICE = "zh-CN-XiaoyiNeural"
+PARTNER_ZH_VOICE = "zh-CN-YunxiNeural"
+# Opt-in Japanese when dialogue_spoken_lang=ja
 HEROINE_JA_VOICE = "ja-JP-NanamiNeural"
 PARTNER_JA_VOICE = "ja-JP-KeitaNeural"
 _NARRATOR_SPEAKERS = frozenset({"storyteller", "narrator", "vo", "旁白", "os", "inner", "内心"})
@@ -160,13 +163,12 @@ def _locked_voice_role(shot: dict[str, Any]) -> str | None:
 def validate_voice_language_locks(
     shots: list[dict[str, Any]], *, dialogue_spoken_lang: str
 ) -> None:
-    """Fail closed if a named lead could lose its Japanese dialogue track.
+    """Fail closed if a named lead loses its language-locked spoken track.
 
-    The film-level cast voice is the accent lock.  A per-shot ``vo_voice`` is
-    intentionally rejected for locked roles: allowing it would make a voice
-    switch look like an ordinary shot-level tweak.
+    Product default 2026-08-03: Chinese dialogue primary. Japanese is opt-in
+    via dialogue_spoken_lang=ja.
     """
-    dlang = (dialogue_spoken_lang or "").strip().lower()
+    dlang = (dialogue_spoken_lang or "zh").strip().lower()
     for shot in shots:
         role = _locked_voice_role(shot)
         if role is None:
@@ -184,27 +186,53 @@ def validate_voice_language_locks(
             )
         if role == "storyteller":
             continue
-        if dlang not in {"ja", "jp", "japanese"}:
-            raise RenderError(
-                f"Shot {sid} ({role}) requires dialogue_spoken_lang=ja; "
-                "female and male lead dialogue is Japanese-locked"
+        if dlang in {"ja", "jp", "japanese"}:
+            japanese_line = next(
+                (
+                    str(shot[key]).strip()
+                    for key in ("nar_ja", "dialogue_ja", "spoken_ja")
+                    if isinstance(shot.get(key), str) and shot[key].strip()
+                ),
+                "",
             )
-        japanese_line = next(
+            if not japanese_line:
+                raise RenderError(
+                    f"Shot {sid} ({role}) needs nar_ja/dialogue_ja/spoken_ja; "
+                    "do not synthesize a Chinese fallback for Japanese-locked dialogue"
+                )
+            if not re.search(r"[\u3040-\u30ff\u31f0-\u31ff]", japanese_line):
+                raise RenderError(
+                    f"Shot {sid} ({role}) Japanese-locked dialogue must contain Japanese kana"
+                )
+            continue
+        chinese_line = next(
             (
                 str(shot[key]).strip()
-                for key in ("nar_ja", "dialogue_ja", "spoken_ja")
+                for key in (
+                    "dialogue",
+                    "spoken_zh",
+                    "dialogue_zh",
+                    "caption_text",
+                    "nar",
+                    "spoken_text",
+                )
                 if isinstance(shot.get(key), str) and shot[key].strip()
             ),
             "",
         )
-        if not japanese_line:
+        if not chinese_line:
+            for cue in shot.get("audio_cues") or []:
+                if (
+                    isinstance(cue, dict)
+                    and cue.get("kind") == "voice"
+                    and str(cue.get("spoken_text") or "").strip()
+                ):
+                    chinese_line = str(cue.get("spoken_text")).strip()
+                    break
+        if not chinese_line or not re.search(r"[\u4e00-\u9fff]", chinese_line):
             raise RenderError(
-                f"Shot {sid} ({role}) needs nar_ja/dialogue_ja/spoken_ja; "
-                "do not synthesize a Chinese fallback for Japanese-locked dialogue"
-            )
-        if not re.search(r"[\u3040-\u30ff\u31f0-\u31ff]", japanese_line):
-            raise RenderError(
-                f"Shot {sid} ({role}) Japanese-locked dialogue must contain Japanese kana"
+                f"Shot {sid} ({role}) needs Chinese spoken/caption text; "
+                "dialogue_spoken_lang=zh is the product default"
             )
 
 
@@ -1925,18 +1953,34 @@ def validate_linear_narration(
 
 
 def caption_text_for_shot(shot: dict[str, Any], *, caption_lang: str = "zh") -> str:
-    """On-screen subtitle text. Default Chinese even when TTS is Japanese."""
+    """On-screen subtitle text for HyperFrames (sole designed-caption owner)."""
     lang = (caption_lang or "zh").strip().lower()
     if lang in {"ja", "jp", "japanese"}:
         for key in ("nar_ja", "dialogue_ja", "spoken_ja", "nar", "narration"):
             val = shot.get(key)
             if isinstance(val, str) and val.strip():
                 return val.strip()
-    # zh / default: never let Japanese be the only caption source when Chinese exists
-    for key in ("nar", "narration", "nar_zh", "caption", "dialogue"):
+    for key in (
+        "caption_text",
+        "subtitle_zh",
+        "dialogue_zh",
+        "spoken_zh",
+        "nar",
+        "narration",
+        "nar_zh",
+        "caption",
+        "dialogue",
+    ):
         val = shot.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
+    for cue in shot.get("audio_cues") or []:
+        if not isinstance(cue, dict) or cue.get("kind") != "voice":
+            continue
+        for key in ("caption_text", "spoken_text"):
+            val = cue.get(key)
+            if isinstance(val, str) and val.strip() and re.search(r"[\u4e00-\u9fff]", val):
+                return val.strip()
     for key in ("nar_ja", "dialogue_ja"):
         val = shot.get(key)
         if isinstance(val, str) and val.strip():
@@ -1947,14 +1991,33 @@ def caption_text_for_shot(shot: dict[str, Any], *, caption_lang: str = "zh") -> 
 def spoken_text_for_shot(
     shot: dict[str, Any],
     *,
-    dialogue_spoken_lang: str = "ja",
+    dialogue_spoken_lang: str = "zh",
     narration_spoken_lang: str = "zh",
     vo_mode: str = "storyteller",
 ) -> str:
-    """Text fed to TTS. Character lines prefer Japanese when policy is ja."""
-    dlang = (dialogue_spoken_lang or "ja").strip().lower()
+    """Text fed to TTS. Character lines prefer Chinese when policy is zh (default)."""
+    dlang = (dialogue_spoken_lang or "zh").strip().lower()
     nlang = (narration_spoken_lang or "zh").strip().lower()
     character = is_character_speech_shot(shot)
+    if character and dlang in {"zh", "cn", "chinese", "zh-cn", "zh_cn"}:
+        for key in (
+            "spoken_zh",
+            "dialogue_zh",
+            "dialogue",
+            "caption_text",
+            "nar",
+            "spoken_text",
+        ):
+            val = shot.get(key)
+            if isinstance(val, str) and val.strip() and re.search(r"[\u4e00-\u9fff]", val):
+                return val.strip()
+        for cue in shot.get("audio_cues") or []:
+            if (
+                isinstance(cue, dict)
+                and cue.get("kind") == "voice"
+                and str(cue.get("spoken_text") or "").strip()
+            ):
+                return str(cue.get("spoken_text")).strip()
     if character and dlang in {"ja", "jp", "japanese"}:
         for key in ("nar_ja", "dialogue_ja", "spoken_ja", "dialogue"):
             val = shot.get(key)
@@ -1985,25 +2048,28 @@ def voice_for_shot(
     default_voice: str,
     cast_voices: dict[str, str] | None,
     vo_mode: str,
-    dialogue_spoken_lang: str = "ja",
+    dialogue_spoken_lang: str = "zh",
 ) -> str:
     """Resolve one stable voice id for this shot — 一角一声.
 
-    Named storyteller/heroine/partner roles are immutable at shot level: their
-    global cast voice is the accent lock. Other roles retain legacy priority.
+    Default character voices are Chinese (2026-08-03); ja only when policy is ja.
     """
     cast_voices = cast_voices or {}
+    dlang = (dialogue_spoken_lang or "zh").strip().lower()
+    ja_mode = dlang in {"ja", "jp", "japanese"}
+    heroine_default = HEROINE_JA_VOICE if ja_mode else HEROINE_ZH_VOICE
+    partner_default = PARTNER_JA_VOICE if ja_mode else PARTNER_ZH_VOICE
     locked_role = _locked_voice_role(shot)
     if locked_role == "storyteller":
         return cast_voices.get("storyteller") or STORYTELLER_VOICE
     if locked_role == "heroine":
-        return cast_voices.get("heroine") or HEROINE_JA_VOICE
+        return cast_voices.get("heroine") or heroine_default
     if locked_role == "partner":
         return (
             cast_voices.get("partner")
             or cast_voices.get("male_hero")
             or cast_voices.get("hero")
-            or PARTNER_JA_VOICE
+            or partner_default
         )
     explicit = shot.get("vo_voice") or shot.get("voice")
     if isinstance(explicit, str) and explicit.strip():
@@ -2020,8 +2086,7 @@ def voice_for_shot(
         if c0 in cast_voices:
             return cast_voices[c0]
     sp = _shot_speaker_key(shot)
-    dlang = (dialogue_spoken_lang or "ja").strip().lower()
-    if is_character_speech_shot(shot) and dlang in {"ja", "jp", "japanese"}:
+    if is_character_speech_shot(shot):
         if sp in cast_voices:
             return cast_voices[sp]
         if sp in _PARTNER_SPEAKERS or any(k in cast_voices for k in ("partner", "male_hero")):
@@ -2029,13 +2094,12 @@ def voice_for_shot(
                 if k in cast_voices:
                     return cast_voices[k]
             if sp in _PARTNER_SPEAKERS:
-                return PARTNER_JA_VOICE
+                return partner_default
         if sp in _HEROINE_SPEAKERS or "heroine" in cast_voices:
             if "heroine" in cast_voices:
                 return cast_voices["heroine"]
-            return HEROINE_JA_VOICE
-        # character speech without clear gender → heroine JA default
-        return cast_voices.get("heroine") or HEROINE_JA_VOICE
+            return heroine_default
+        return cast_voices.get("heroine") or heroine_default
     if vo_mode == "storyteller" and "storyteller" in cast_voices:
         return cast_voices["storyteller"]
     if "storyteller" in cast_voices and not is_character_speech_shot(shot):

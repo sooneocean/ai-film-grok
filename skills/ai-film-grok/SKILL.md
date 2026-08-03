@@ -39,10 +39,10 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
 7. **动作**：`grok_primary`=Grok→FRW API→LTX 2.3（对白锁 LTX）。**`hybrid_h3`**：云 bulk=Grok；restricted/肉戏→本地 MiniMax H3（`aifilm h3`，verified；**bulk 仍要 pilot 批**）。禁 Seedance/Wan 本地 I2V。H3 原声 `prefer_native`。
-8. **声线**：口白中/角色日=Edge；字幕中。禁无 speaker 乒乓、`nar_ja` 说书、清空日文轨。BGM=rnb。[BGM](references/bgm-generation.md)
+8. **声线**：默认对白主链·**中文**（有对白=角色中文口型；无对白=纯画面；禁第三人称旁白）。Edge；BGM=rnb。[对白](references/dialogue-first-workflow.md)·[BGM](references/bgm-generation.md)
 9. **成人 MAX**：肉戏≥50%·亲密≥60%·setup≤20%；extreme；四拍+bare；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V。
-10. **字幕**：owner=HyperFrames；禁双烧/空 SRT。`caption_mode`+`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)；I2V 内生字/水印禁入成片。
+10. **字幕**：owner=**仅 HyperFrames**（plate `subs=off`；禁 FFmpeg/PIL 交付烧字）。`caption_text` 中文；`caption_mode`+`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)·[stages/post](references/stages/post.md)。
 11. **后期单责**：title/sub/end 单引擎；plate `subs=off`。[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)
 11b. **连载**：`serial validate`；圣经/事件/钩子可审计。[workflow](references/serial-narrative-workflow.md)
 12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐。

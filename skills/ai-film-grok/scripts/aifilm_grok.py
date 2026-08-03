@@ -1820,7 +1820,7 @@ def cmd_production_evidence(args: argparse.Namespace) -> int:
 
 
 def _compatibility_vo_mode(spec: dict[str, Any]) -> dict[str, Any]:
-    """Infer the only schema-valid legacy default without mutating its source projection."""
+    """Fill missing vo_mode with cinema dialogue primary chain (Chinese spoken)."""
     if str(spec.get("vo_mode") or "").strip():
         return spec
     shots = [
@@ -1830,15 +1830,18 @@ def _compatibility_vo_mode(spec: dict[str, Any]) -> dict[str, Any]:
         for shot in scene.get("shots") or []
         if isinstance(shot, dict)
     ]
+    reason = "inferred_dialogue_drama_default"
     if shots and all(shot.get("silent") is True and not shot.get("dialogue") for shot in shots):
-        spec = dict(spec)
-        spec["vo_mode"] = "dialogue_drama"
-        spec["dialogue_spoken_lang"] = "ja"
-        spec["narration_spoken_lang"] = "zh"
-        spec["compatibility"] = {
-            "vo_mode": "inferred_dialogue_drama_ja_zh_from_explicit_silent_shots",
-            "source_projection_mutated": False,
-        }
+        reason = "inferred_dialogue_drama_zh_from_explicit_silent_shots"
+    spec = dict(spec)
+    spec["vo_mode"] = "dialogue_drama"
+    spec["dialogue_spoken_lang"] = spec.get("dialogue_spoken_lang") or "zh"
+    spec["narration_spoken_lang"] = spec.get("narration_spoken_lang") or "zh"
+    spec["caption_lang"] = spec.get("caption_lang") or "zh"
+    spec["compatibility"] = {
+        "vo_mode": reason,
+        "source_projection_mutated": False,
+    }
     return spec
 
 

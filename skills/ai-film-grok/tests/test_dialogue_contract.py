@@ -115,7 +115,7 @@ def _dc_spec(shots):
         "schema_version": 1,
         "title": "dc-test",
         "vo_mode": "storyteller",
-        "dialogue_spoken_lang": "ja",
+        "dialogue_spoken_lang": "zh",
         "narration_spoken_lang": "zh",
         "aspect": "9:16",
         "director_intent": {
@@ -280,14 +280,14 @@ class TestWriteSpecDialogueContractGate:
         spec["narration_spoken_lang"] = "zh"
         spec["scenes"][0]["shots"][0].update(
             {
-                "dialogue_ja": "行かないで。",
+                "dialogue": "别走。",
                 "caption_text": "别走。",
                 "translation_status": "ready",
                 "beat_id": "dlg_01",
             }
         )
-        spec["scenes"][0]["shots"][0]["audio_cues"][0]["spoken_text"] = "行かないで。"
-        spec["scenes"][0]["shots"][0]["audio_cues"][0]["language"] = "ja"
+        spec["scenes"][0]["shots"][0]["audio_cues"][0]["spoken_text"] = "别走。"
+        spec["scenes"][0]["shots"][0]["audio_cues"][0]["language"] = "zh"
         for shot in spec["scenes"][0]["shots"]:
             shot.pop("nar", None)
         with pytest.raises(FilmSpecError, match="narration budget"):

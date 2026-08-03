@@ -168,7 +168,10 @@ class StoryPlanTests(unittest.TestCase):
             self.assertTrue(all(shot["audio_cues"] for shot in shots))
             self.assertTrue(all(shot["lipsync_required"] is True for shot in speaking))
             self.assertTrue(all(shot["lipsync"] is True for shot in speaking))
-            self.assertTrue(all(shot["translation_status"] == "pending" for shot in speaking))
+            self.assertTrue(all(shot["translation_status"] == "ready" for shot in speaking))
+            self.assertTrue(
+                all((shot.get("audio_cues") or [{}])[0].get("language") == "zh" for shot in speaking)
+            )
             self.assertTrue(all(shot["dialogue_motion_route"] == "auto" for shot in speaking))
             self.assertTrue(
                 all(
@@ -198,18 +201,24 @@ class StoryPlanTests(unittest.TestCase):
                 previous = shots[index - 1]
                 self.assertEqual(previous.get("screen_mode"), "on_camera")
                 self.assertEqual(previous.get("beat_id"), shot.get("beat_id"))
-            for shot, japanese in zip(
-                speaking, ("まだ降りないの？", "写真の裏に君の名前がある。"), strict=True
+            for shot, chinese in zip(
+                speaking, ("你为什么还没下车？", "因为照片背后写着你的名字。"), strict=True
             ):
-                shot["dialogue_ja"] = japanese
-                shot["dialogue"] = japanese
+                shot["dialogue"] = chinese
+                shot["caption_text"] = chinese
                 shot["translation_status"] = "ready"
-                shot["audio_cues"][0]["spoken_text"] = japanese
+                shot["audio_cues"][0]["spoken_text"] = chinese
+                shot["audio_cues"][0]["language"] = "zh"
+                shot["audio_cues"][0]["caption_text"] = chinese
                 shot["audio_cues"][0]["translation_status"] = "ready"
             # This dialogue-only fixture is not an adult-max heat arc; keep the
             # coverage assertion isolated from the unrelated adult IRON gate.
             spec["heat_arc_strict"] = False
             spec["adult_max_iron"] = False
+            spec["sex_vo_strict"] = False
+            spec["erotic_impact_strict"] = False
+            spec["sex_floor_strict"] = False
+            spec["heat_scale"] = "soft"
             validate_film_spec(spec, assign_missing_ids=False)
             self.assertGreater((spec.get("_dialogue_drama") or {}).get("coverage_shots", 0), 0)
             missing_beat = speaking[0].get("beat_id") or speaking[0].get("dialogue_line_id")
@@ -261,15 +270,23 @@ class StoryPlanTests(unittest.TestCase):
             ]
             self.assertEqual(len(speaking), 12)
 
-    def test_chinese_dialogue_blocks_tts_until_japanese_script_is_ready(self) -> None:
+    def test_chinese_dialogue_is_ready_for_tts_without_japanese(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             run_plan(root, "阿澄：别回头。", title="停", target_duration=12, force=True)
             spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
-            with self.assertRaisesRegex(Exception, "translation is pending"):
-                validate_film_spec(spec, assign_missing_ids=False)
+            self.assertEqual(spec.get("dialogue_spoken_lang"), "zh")
+            speaking = [
+                shot
+                for scene in spec["scenes"]
+                for shot in scene["shots"]
+                if shot.get("screen_mode") == "on_camera"
+            ]
+            self.assertTrue(speaking)
+            self.assertEqual(speaking[0].get("translation_status"), "ready")
+            self.assertEqual((speaking[0].get("audio_cues") or [{}])[0].get("language"), "zh")
 
-    def test_prose_adaptation_stays_candidate_until_translation_and_review(self) -> None:
+    def test_prose_adaptation_builds_interactive_chinese_candidates(self) -> None:
         raw = (
             "阿澄推开车门，雨水打湿她的袖口。"
             "她看见后视镜里的乘客没有下车。"
@@ -281,15 +298,17 @@ class StoryPlanTests(unittest.TestCase):
             root = Path(tmp)
             result = run_plan(root, raw, title="雨夜车门", target_duration=45, force=True)
             self.assertTrue(result["ok"], result)
-            spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
-            with self.assertRaisesRegex(Exception, "translation is pending"):
-                validate_film_spec(spec, assign_missing_ids=False, film_root=root)
             graph = json.loads((root / "drama-graph.json").read_text(encoding="utf-8"))
             screenplay = graph["dialogue_screenplay"]
             self.assertEqual(screenplay["mode"], "dialogue_drama")
             self.assertEqual(screenplay["status"], "candidate_only")
-            self.assertTrue(screenplay["scenes"][0]["dialogue_turns"])
+            turns = screenplay["scenes"][0]["dialogue_turns"]
+            self.assertGreaterEqual(len(turns), 2)
             self.assertEqual(screenplay["narration_gaps"], [])
+            if len(turns) >= 2:
+                self.assertNotEqual(turns[0]["speaker"], turns[1]["speaker"])
+            self.assertTrue(all(t.get("dialogue_zh") for t in turns))
+            self.assertTrue(screenplay["scenes"][0]["coverage_intent"].get("shot_reverse_shot"))
 
     def test_legacy_flat_graph_is_normalized_without_losing_ids(self) -> None:
         legacy = {

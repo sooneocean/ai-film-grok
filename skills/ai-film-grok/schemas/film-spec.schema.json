@@ -3,12 +3,25 @@
   "$id": "https://local.dex/ai-film-grok/film-spec.schema.json",
   "title": "ai-film-grok film-spec",
   "type": "object",
-  "required": ["title", "vo_mode", "director_intent", "scenes"],
+  "required": [
+    "title",
+    "vo_mode",
+    "director_intent",
+    "scenes"
+  ],
   "properties": {
-    "title": { "type": "string", "minLength": 1 },
-    "description": { "type": "string" },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
     "production_mode": {
-      "enum": ["shortform", "longform"],
+      "enum": [
+        "shortform",
+        "longform"
+      ],
       "description": "Absent means shortform for backward compatibility."
     },
     "longform_profile": {
@@ -20,21 +33,47 @@
         "approval_policy"
       ],
       "properties": {
-        "target_duration_sec": { "type": "number", "minimum": 480, "maximum": 900 },
-        "act_count": { "const": 3 },
+        "target_duration_sec": {
+          "type": "number",
+          "minimum": 480,
+          "maximum": 900
+        },
+        "act_count": {
+          "const": 3
+        },
         "unit_max_duration_sec": {
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 90
         },
-        "approval_policy": { "const": "three_gates" }
+        "approval_policy": {
+          "const": "three_gates"
+        }
       },
       "additionalProperties": false
     },
     "serial": {
       "oneOf": [
-        { "const": false },
-        { "type": "object", "properties": { "enabled": { "const": true }, "series_id": { "type": "string", "minLength": 1 } }, "required": ["enabled", "series_id"], "additionalProperties": true }
+        {
+          "const": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "const": true
+            },
+            "series_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "enabled",
+            "series_id"
+          ],
+          "additionalProperties": true
+        }
       ],
       "description": "Optional serial-drama mode. Enabled projects require series-bible.json and episode_contract at concept/script lock."
     },
@@ -45,28 +84,79 @@
     },
     "_projection": {
       "type": "object",
-      "required": ["source", "source_revision", "source_sha256", "generated_at"],
+      "required": [
+        "source",
+        "source_revision",
+        "source_sha256",
+        "generated_at"
+      ],
       "properties": {
-        "source": { "const": "drama-graph.json" },
-        "source_revision": { "type": "integer", "minimum": 1 },
-        "source_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "generated_at": { "type": "string" },
-        "state": { "type": "string" }
+        "source": {
+          "const": "drama-graph.json"
+        },
+        "source_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "generated_at": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
       }
     },
-    "aspect_ratio": { "enum": ["9:16", "16:9", "1:1", "3:4", "4:3"] },
+    "aspect_ratio": {
+      "enum": [
+        "9:16",
+        "16:9",
+        "1:1",
+        "3:4",
+        "4:3"
+      ]
+    },
     "delivery_scope": {
-      "enum": ["commercial", "noncommercial_internal"],
+      "enum": [
+        "commercial",
+        "noncommercial_internal"
+      ],
       "description": "MMAudio CC-BY-NC assets require noncommercial_internal; commercial remains the default."
     },
     "genre": {
       "type": "string",
-      "enum": ["adult", "drama", "mystery", "arthouse", "documentary"],
+      "enum": [
+        "adult",
+        "drama",
+        "mystery",
+        "arthouse",
+        "documentary"
+      ],
       "description": "Beat spine selector. Determines which beat template drives dramatic_function assignment. See references/beat-spines.md. Default: adult (backward compat)."
     },
-    "vo_mode": { "enum": ["storyteller", "character", "hybrid", "dialogue_drama"] },
-    "dialogue_spoken_lang": { "enum": ["ja"] },
-    "narration_spoken_lang": { "enum": ["zh"] },
+    "vo_mode": {
+      "enum": [
+        "storyteller",
+        "character",
+        "hybrid",
+        "dialogue_drama"
+      ]
+    },
+    "dialogue_spoken_lang": {
+      "enum": [
+        "zh",
+        "ja"
+      ],
+      "description": "Character dialogue TTS language. Product default zh (2026-08-03); ja remains opt-in."
+    },
+    "narration_spoken_lang": {
+      "enum": [
+        "zh"
+      ]
+    },
     "audio_tracks_strict": {
       "type": "boolean",
       "description": "Require explicit dialogue/BGM/SFX contract and rendered artifact evidence. Defaults false for backward compatibility."
@@ -89,36 +179,78 @@
     },
     "content_channels_strict": {
       "type": "boolean",
-      "description": "Keep spoken text, visible performance and motion prompts in independent channels."
+      "default": false,
+      "description": "Require explicit separation of voice, performance, motion, and in-scene triggers."
     },
     "audio_tracks": {
       "type": "object",
       "properties": {
-        "dialogue": { "type": "object", "additionalProperties": true },
-        "sfx": { "type": "object", "additionalProperties": true },
-        "music": { "type": "object", "additionalProperties": true },
-        "bgm": { "type": "object", "additionalProperties": true }
+        "dialogue": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "sfx": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "music": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "bgm": {
+          "type": "object",
+          "additionalProperties": true
+        }
       },
       "additionalProperties": true
     },
-    "tts_backend": { "enum": ["auto", "minimax", "fish", "voicebox", "edge", "external"] },
+    "tts_backend": {
+      "enum": [
+        "auto",
+        "minimax",
+        "fish",
+        "voicebox",
+        "edge",
+        "external"
+      ]
+    },
     "still_provider": {
-      "enum": ["grok", "comfy_lan", "auto"],
+      "enum": [
+        "grok",
+        "comfy_lan",
+        "auto"
+      ],
       "description": "Still-image provider lock. auto leaves per-demand armory selection unlocked."
     },
     "i2v_provider": {
-      "enum": ["frw", "frw-ltx23", "grok", "comfy-h3", "auto"],
+      "enum": [
+        "frw",
+        "frw-ltx23",
+        "grok",
+        "comfy-h3",
+        "auto"
+      ],
       "description": "Bulk motion provider. auto follows AIFILM_I2V_PROFILE (grok_primary/hybrid_h3 → grok; ltx23_primary → frw-ltx23). comfy-h3 is the local MiniMax H3 pilot lock; restricted shots may soft-lock to comfy-h3 under hybrid_h3 without changing film-wide auto bulk."
     },
     "motion_lanes": {
       "type": "object",
       "description": "Optional dual-lane owners: cloud vs local MiniMax H3.",
       "properties": {
-        "default": { "type": "string" },
-        "restricted_local": { "type": "string" },
-        "env": { "type": "string" },
-        "dialogue": { "type": "string" },
-        "setup_non_sensitive": { "type": "string" }
+        "default": {
+          "type": "string"
+        },
+        "restricted_local": {
+          "type": "string"
+        },
+        "env": {
+          "type": "string"
+        },
+        "dialogue": {
+          "type": "string"
+        },
+        "setup_non_sensitive": {
+          "type": "string"
+        }
       },
       "additionalProperties": true
     },
@@ -126,11 +258,21 @@
       "type": "object",
       "description": "Local MiniMax H3 lane controls (enabled by hybrid_h3 profile or explicit true).",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "stage": { "type": "string" },
-        "max_duration_sec": { "type": "number" },
-        "megapixels_draft": { "type": "number" },
-        "megapixels_select": { "type": "number" },
+        "enabled": {
+          "type": "boolean"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "max_duration_sec": {
+          "type": "number"
+        },
+        "megapixels_draft": {
+          "type": "number"
+        },
+        "megapixels_select": {
+          "type": "number"
+        },
         "audio_policy": {
           "enum": [
             "prefer_native",
@@ -140,7 +282,9 @@
           ],
           "description": "H3 native stereo: prefer_native keeps usable diegetic audio; strip only when forced or unusable."
         },
-        "allow_bulk": { "type": "boolean" }
+        "allow_bulk": {
+          "type": "boolean"
+        }
       },
       "additionalProperties": true
     },
@@ -162,7 +306,10 @@
       ],
       "description": "FRW NEW_VIDEO model. Default seedance-2-fast-i2v. LTX needs string width/height. Never default legacy-img2video."
     },
-    "frw_aspect_ratio": { "type": "string", "description": "Seedance aspect e.g. 9:16" },
+    "frw_aspect_ratio": {
+      "type": "string",
+      "description": "Seedance aspect e.g. 9:16"
+    },
     "frw_resolution": {
       "type": "string",
       "description": "Native Seedance resolution e.g. 720p. Do not generate 576 then upscale."
@@ -194,22 +341,44 @@
       "description": "Env/synth bed T2V model (no face). Default ltx-t2v. Not for hero identity."
     },
     "caption_mode": {
-      "enum": ["zh", "zh_en", "en"],
+      "enum": [
+        "zh",
+        "zh_en",
+        "en"
+      ],
       "description": "Designed-post captions; zh_en needs per-shot nar_en"
     },
     "heat_scale": {
-      "enum": ["soft", "medium", "hot", "max"],
+      "enum": [
+        "soft",
+        "medium",
+        "hot",
+        "max"
+      ],
       "description": "Adult/ecchi heat. Default max for adult briefs. See ecchi-story.md"
     },
     "adult_max_director": {
       "type": "object",
       "description": "Evidence-bearing sensory direction for explicit max projects. It is projected during write-spec and verified against current media before final review.",
       "properties": {
-        "schema_version": { "type": "integer", "minimum": 1 },
-        "strict": { "type": "boolean" },
-        "require_media_evidence": { "type": "boolean" },
-        "require_human_final_review": { "type": "boolean" },
-        "minimum_av_alignment_score": { "type": "integer", "minimum": 0, "maximum": 100 }
+        "schema_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "strict": {
+          "type": "boolean"
+        },
+        "require_media_evidence": {
+          "type": "boolean"
+        },
+        "require_human_final_review": {
+          "type": "boolean"
+        },
+        "minimum_av_alignment_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
       },
       "additionalProperties": false
     },
@@ -245,7 +414,7 @@
     },
     "heat_arc_strict": {
       "type": "boolean",
-      "description": "Hard-fail when intimacy core <70% or setup >20% on max (HEAT_INTIMACY_RATIO_LOW / HEAT_SETUP_RATIO_HIGH). Default true when heat_scale=max."
+      "description": "If true, all heat arc lint warnings hard-fail write-spec"
     },
     "adult_max_iron": {
       "type": "boolean",
@@ -275,12 +444,12 @@
       "type": "boolean",
       "description": "Hard-fail SEX_POSE_STALE. Default true on max IRON."
     },
-    "heat_arc_strict": {
-      "type": "boolean",
-      "description": "If true, all heat arc lint warnings hard-fail write-spec"
-    },
     "cast_mode": {
-      "enum": ["auto", "single", "multi"],
+      "enum": [
+        "auto",
+        "single",
+        "multi"
+      ],
       "description": "Heroine count mode. auto=infer from prompt/images; default resolves to single"
     },
     "user_prompt": {
@@ -294,7 +463,9 @@
     },
     "cast_ref_images": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Paths/URLs of cast reference images"
     },
     "multi_heroine": {
@@ -303,23 +474,41 @@
     },
     "heroine_ids": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Cast ids for each heroine (each needs cast master)"
     },
     "cast_ids": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Optional full cast id list"
     },
     "title_sequence": {
       "type": "object",
       "properties": {
-        "subtitle": { "type": "string" },
-        "tagline": { "type": "string" },
-        "show_motifs": { "type": "boolean", "default": true },
+        "subtitle": {
+          "type": "string"
+        },
+        "tagline": {
+          "type": "string"
+        },
+        "show_motifs": {
+          "type": "boolean",
+          "default": true
+        },
         "style": {
           "type": "string",
-          "enum": ["auto", "cinematic", "noir", "playful", "ecchi-rnb", "minimal"]
+          "enum": [
+            "auto",
+            "cinematic",
+            "noir",
+            "playful",
+            "ecchi-rnb",
+            "minimal"
+          ]
         }
       },
       "additionalProperties": true
@@ -329,12 +518,26 @@
       "properties": {
         "mode": {
           "type": "string",
-          "enum": ["auto", "full", "cast_only", "none"],
+          "enum": [
+            "auto",
+            "full",
+            "cast_only",
+            "none"
+          ],
           "default": "auto"
         },
-        "cast_heading": { "type": "string", "default": "Cast" },
-        "crew_heading": { "type": "string", "default": "Crew" },
-        "show_shot_list": { "type": "boolean", "default": false },
+        "cast_heading": {
+          "type": "string",
+          "default": "Cast"
+        },
+        "crew_heading": {
+          "type": "string",
+          "default": "Crew"
+        },
+        "show_shot_list": {
+          "type": "boolean",
+          "default": false
+        },
         "scroll_duration_sec": {
           "type": "number",
           "minimum": 2,
@@ -356,20 +559,48 @@
       }
     },
     "transition_fluency": {
-      "enum": ["auto", "silk", "punchy", "cinematic"],
+      "enum": [
+        "auto",
+        "silk",
+        "punchy",
+        "cinematic"
+      ],
       "description": "auto→silk; cinematic=edit_craft rich rhythm; continue seams always hard"
     },
-    "tts_allow_network_fallback": { "type": "boolean", "default": false },
-    "native_audio_volume": { "type": "number", "minimum": 0, "maximum": 1 },
-    "transition_sec": { "type": "number", "minimum": 0, "maximum": 0.6 },
-    "transition_default": { "enum": ["hard", "soft", "hold"] },
+    "tts_allow_network_fallback": {
+      "type": "boolean",
+      "default": false
+    },
+    "native_audio_volume": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "transition_sec": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.6
+    },
+    "transition_default": {
+      "enum": [
+        "hard",
+        "soft",
+        "hold"
+      ]
+    },
     "transition_style": {
       "type": "string",
       "description": "Default xfade style for soft/hold (and title/end edges). One of fade|fadeblack|fadewhite|smoothleft|smoothright|smoothup|smoothdown|hblur|dissolve."
     },
     "transition_intents": {
       "type": "array",
-      "items": { "enum": ["hard", "soft", "hold"] },
+      "items": {
+        "enum": [
+          "hard",
+          "soft",
+          "hold"
+        ]
+      },
       "description": "Per story join hard|soft|hold; length must be n_shots-1"
     },
     "transition_styles": {
@@ -395,36 +626,73 @@
       "description": "Scene-adaptive audio routing. Default mode=auto never auto-sings. See references/audio-recipe.md",
       "properties": {
         "mode": {
-          "enum": ["auto", "storyteller_only", "musical_hybrid"]
+          "enum": [
+            "auto",
+            "storyteller_only",
+            "musical_hybrid"
+          ]
         },
-        "allow_sung": { "type": "boolean" },
-        "allow_lipsync": { "type": "boolean" },
+        "allow_sung": {
+          "type": "boolean"
+        },
+        "allow_lipsync": {
+          "type": "boolean"
+        },
         "bed_source": {
-          "enum": ["auto", "library_only", "approved_library", "procedural_only"]
+          "enum": [
+            "auto",
+            "library_only",
+            "approved_library",
+            "procedural_only"
+          ]
         },
-        "max_sung_shots": { "type": "integer", "minimum": 0 },
-        "music_seed": { "type": "integer" }
+        "max_sung_shots": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "music_seed": {
+          "type": "integer"
+        }
       },
       "additionalProperties": true
-    },
-    "content_channels_strict": {
-      "type": "boolean",
-      "default": false,
-      "description": "Require explicit separation of voice, performance, motion, and in-scene triggers."
     },
     "subtitle_carryovers": {
       "type": "array",
       "description": "Explicit human-approved subtitle carry-over across a hard/Continue cut.",
       "items": {
         "type": "object",
-        "required": ["from_shot_id", "to_shot_id", "cue_start_sec", "cue_end_sec", "reason", "human_approved"],
+        "required": [
+          "from_shot_id",
+          "to_shot_id",
+          "cue_start_sec",
+          "cue_end_sec",
+          "reason",
+          "human_approved"
+        ],
         "properties": {
-          "from_shot_id": {"type": "string", "minLength": 1},
-          "to_shot_id": {"type": "string", "minLength": 1},
-          "cue_start_sec": {"type": "number", "minimum": 0},
-          "cue_end_sec": {"type": "number", "exclusiveMinimum": 0},
-          "reason": {"type": "string", "minLength": 3},
-          "human_approved": {"type": "boolean"}
+          "from_shot_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to_shot_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cue_start_sec": {
+            "type": "number",
+            "minimum": 0
+          },
+          "cue_end_sec": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3
+          },
+          "human_approved": {
+            "type": "boolean"
+          }
         },
         "additionalProperties": false
       }
@@ -435,8 +703,12 @@
       "items": {
         "type": "object",
         "properties": {
-          "locked": { "type": "boolean" },
-          "reason": { "type": "string" }
+          "locked": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       }
@@ -449,7 +721,9 @@
           "minLength": 1,
           "description": "BGM mood. 色气默认 rnb (aliases: soul/sensual). dark=horror only."
         },
-        "bed": { "type": "boolean" },
+        "bed": {
+          "type": "boolean"
+        },
         "bed_gain_hint": {
           "type": "number",
           "description": "Mean bed gain from audio_recipe routing (write-spec)"
@@ -458,14 +732,36 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["type"],
+            "required": [
+              "type"
+            ],
             "properties": {
-              "type": { "enum": ["mute", "sfx_accent", "duck", "music_in", "music_out", "fade_in", "fade_out"] },
-              "shot_id": { "type": "string" },
-              "duration_sec": { "type": "number" },
-              "kind": { "type": "string" },
-              "depth": { "type": "number" },
-              "at_sec": { "type": "number" }
+              "type": {
+                "enum": [
+                  "mute",
+                  "sfx_accent",
+                  "duck",
+                  "music_in",
+                  "music_out",
+                  "fade_in",
+                  "fade_out"
+                ]
+              },
+              "shot_id": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "depth": {
+                "type": "number"
+              },
+              "at_sec": {
+                "type": "number"
+              }
             },
             "additionalProperties": true
           }
@@ -476,14 +772,40 @@
           "items": {
             "type": "object",
             "properties": {
-              "label": { "type": "string", "description": "e.g. 'main_theme', 'tension_rise', 'climax_hit'" },
-              "start_sec": { "type": "number", "description": "Music entry point in seconds" },
-              "end_sec": { "type": "number", "description": "Music exit point in seconds" },
-              "fade_in_sec": { "type": "number", "description": "Fade-in duration" },
-              "fade_out_sec": { "type": "number", "description": "Fade-out duration" },
-              "emotion": { "type": "string", "description": "Emotional function of this music segment" },
-              "beat_ref": { "type": "string", "description": "Beat id this music segment serves" },
-              "intensity": { "type": "number", "minimum": 0, "maximum": 10, "description": "Music intensity 0-10" }
+              "label": {
+                "type": "string",
+                "description": "e.g. 'main_theme', 'tension_rise', 'climax_hit'"
+              },
+              "start_sec": {
+                "type": "number",
+                "description": "Music entry point in seconds"
+              },
+              "end_sec": {
+                "type": "number",
+                "description": "Music exit point in seconds"
+              },
+              "fade_in_sec": {
+                "type": "number",
+                "description": "Fade-in duration"
+              },
+              "fade_out_sec": {
+                "type": "number",
+                "description": "Fade-out duration"
+              },
+              "emotion": {
+                "type": "string",
+                "description": "Emotional function of this music segment"
+              },
+              "beat_ref": {
+                "type": "string",
+                "description": "Beat id this music segment serves"
+              },
+              "intensity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10,
+                "description": "Music intensity 0-10"
+              }
             }
           }
         },
@@ -491,56 +813,188 @@
           "type": "object",
           "description": "P3-2: Multi-track audio mixing — independent tracks with各自的 gain/ducking.",
           "properties": {
-            "dialogue": { "type": "object", "properties": { "gain": {"type":"number"}, "duck_to_bgm": {"type":"boolean"} } },
-            "sfx": { "type": "object", "properties": { "gain": {"type":"number"}, "duck_to_bgm": {"type":"boolean"} } },
-            "ambience": { "type": "object", "properties": { "gain": {"type":"number"} } },
-            "foley": { "type": "object", "properties": { "gain": {"type":"number"} } },
-            "music": { "type": "object", "properties": { "gain": {"type":"number"}, "sidechain_duck": {"type":"boolean"} } }
+            "dialogue": {
+              "type": "object",
+              "properties": {
+                "gain": {
+                  "type": "number"
+                },
+                "duck_to_bgm": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "sfx": {
+              "type": "object",
+              "properties": {
+                "gain": {
+                  "type": "number"
+                },
+                "duck_to_bgm": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "ambience": {
+              "type": "object",
+              "properties": {
+                "gain": {
+                  "type": "number"
+                }
+              }
+            },
+            "foley": {
+              "type": "object",
+              "properties": {
+                "gain": {
+                  "type": "number"
+                }
+              }
+            },
+            "music": {
+              "type": "object",
+              "properties": {
+                "gain": {
+                  "type": "number"
+                },
+                "sidechain_duck": {
+                  "type": "boolean"
+                }
+              }
+            }
           }
         }
       },
       "additionalProperties": true
     },
-    "continuity_strict": { "type": "boolean" },
+    "continuity_strict": {
+      "type": "boolean"
+    },
     "grade": {
       "type": "object",
       "description": "P3-1: Color grading parameters. From 0/10 to parameterized. color_grade_strict: true → COLOR_GRADE_MISSING gate in post_audit.",
       "properties": {
-        "lut_path": { "type": "string", "description": "Path to LUT file (.cube) for color grading" },
-        "color_temperature": { "type": "string", "description": "Target color temperature (warm/cool/neutral + Kelvin)" },
-        "saturation": { "type": "number", "minimum": 0, "maximum": 3, "description": "Saturation multiplier (1.0 = normal)" },
-        "contrast": { "type": "number", "minimum": 0, "maximum": 2, "description": "Contrast multiplier (1.0 = normal)" },
-        "brightness": { "type": "number", "minimum": 0, "maximum": 2, "description": "Brightness multiplier (1.0 = normal)" },
-        "skin_tone_protection": { "type": "boolean", "description": "If true, protect skin tones from grade drift" },
-        "gamma": { "type": "number", "minimum": 0.1, "maximum": 3, "description": "Gamma adjustment (1.0 = normal)" }
+        "lut_path": {
+          "type": "string",
+          "description": "Path to LUT file (.cube) for color grading"
+        },
+        "color_temperature": {
+          "type": "string",
+          "description": "Target color temperature (warm/cool/neutral + Kelvin)"
+        },
+        "saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "Saturation multiplier (1.0 = normal)"
+        },
+        "contrast": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Contrast multiplier (1.0 = normal)"
+        },
+        "brightness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Brightness multiplier (1.0 = normal)"
+        },
+        "skin_tone_protection": {
+          "type": "boolean",
+          "description": "If true, protect skin tones from grade drift"
+        },
+        "gamma": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 3,
+          "description": "Gamma adjustment (1.0 = normal)"
+        }
       }
     },
-    "color_grade_strict": { "type": "boolean", "description": "P3-1: If true, post_audit hard-fails when grade is missing or incomplete" },
-    "lufs_strict": { "type": "boolean", "description": "P3-4: If true, LUFS out of range → hard failure (LUFS_OUT_OF_RANGE). Default: warning only." },
-    "lufs_min": { "type": "number", "default": -23, "description": "P3-4: Minimum acceptable integrated LUFS (EBU R128 default -23)" },
-    "lufs_max": { "type": "number", "default": -14, "description": "P3-4: Maximum acceptable integrated LUFS (streaming default -14)" },
-    "vo_voice": { "type": "string", "minLength": 1 },
+    "color_grade_strict": {
+      "type": "boolean",
+      "description": "P3-1: If true, post_audit hard-fails when grade is missing or incomplete"
+    },
+    "lufs_strict": {
+      "type": "boolean",
+      "description": "P3-4: If true, LUFS out of range → hard failure (LUFS_OUT_OF_RANGE). Default: warning only."
+    },
+    "lufs_min": {
+      "type": "number",
+      "default": -23,
+      "description": "P3-4: Minimum acceptable integrated LUFS (EBU R128 default -23)"
+    },
+    "lufs_max": {
+      "type": "number",
+      "default": -14,
+      "description": "P3-4: Maximum acceptable integrated LUFS (streaming default -14)"
+    },
+    "vo_voice": {
+      "type": "string",
+      "minLength": 1
+    },
     "director_intent": {
       "type": "object",
-      "required": ["logline", "tone", "emotional_arc"],
+      "required": [
+        "logline",
+        "tone",
+        "emotional_arc"
+      ],
       "properties": {
-        "logline": { "type": "string", "minLength": 8 },
-        "tone": { "type": "string", "minLength": 1 },
+        "logline": {
+          "type": "string",
+          "minLength": 8
+        },
+        "tone": {
+          "type": "string",
+          "minLength": 1
+        },
         "emotional_arc": {
           "type": "array",
           "minItems": 3,
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "act_structure": {
           "type": "object",
           "description": "Three-act structure with ratio and beat anchors. See references/directors-lens.md. pace_chart_strict: true → write-spec enforces non-empty.",
           "properties": {
-            "setup": { "type": "string", "minLength": 1, "description": "Act 1: setup — world, character, inciting incident" },
-            "confrontation": { "type": "string", "minLength": 1, "description": "Act 2: confrontation — obstacles, rising action, midpoint turn" },
-            "resolution": { "type": "string", "minLength": 1, "description": "Act 3: resolution — climax, denouement, new normal" },
-            "setup_ratio": { "type": "number", "minimum": 0.05, "maximum": 0.50, "description": "Act 1 proportion (default 0.20, classic 1:2:1)" },
-            "confrontation_ratio": { "type": "number", "minimum": 0.20, "maximum": 0.70, "description": "Act 2 proportion (default 0.50)" },
-            "resolution_ratio": { "type": "number", "minimum": 0.05, "maximum": 0.50, "description": "Act 3 proportion (default 0.30)" }
+            "setup": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Act 1: setup — world, character, inciting incident"
+            },
+            "confrontation": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Act 2: confrontation — obstacles, rising action, midpoint turn"
+            },
+            "resolution": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Act 3: resolution — climax, denouement, new normal"
+            },
+            "setup_ratio": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 0.5,
+              "description": "Act 1 proportion (default 0.20, classic 1:2:1)"
+            },
+            "confrontation_ratio": {
+              "type": "number",
+              "minimum": 0.2,
+              "maximum": 0.7,
+              "description": "Act 2 proportion (default 0.50)"
+            },
+            "resolution_ratio": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 0.5,
+              "description": "Act 3 proportion (default 0.30)"
+            }
           }
         },
         "pace_chart": {
@@ -548,18 +1002,54 @@
           "description": "Structured rhythm curve: each entry has start_tc, end_tc, cut_freq, emotion_intensity. pace_chart_strict: true → write-spec enforces non-empty + ratios match act_structure.",
           "items": {
             "type": "object",
-            "required": ["label", "start_ratio", "end_ratio", "intensity"],
+            "required": [
+              "label",
+              "start_ratio",
+              "end_ratio",
+              "intensity"
+            ],
             "properties": {
-              "label": { "type": "string", "minLength": 1, "description": "e.g. 慢燃/加速/高潮/释放" },
-              "start_ratio": { "type": "number", "minimum": 0, "maximum": 1, "description": "Start position as ratio of total duration (0-1)" },
-              "end_ratio": { "type": "number", "minimum": 0, "maximum": 1, "description": "End position as ratio of total duration (0-1)" },
-              "cut_freq": { "type": "string", "enum": ["slow", "medium", "fast", "rapid"], "description": "Target cut frequency for this segment" },
-              "intensity": { "type": "number", "minimum": 0, "maximum": 10, "description": "Emotional intensity 0-10 for this segment" }
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "description": "e.g. 慢燃/加速/高潮/释放"
+              },
+              "start_ratio": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Start position as ratio of total duration (0-1)"
+              },
+              "end_ratio": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "End position as ratio of total duration (0-1)"
+              },
+              "cut_freq": {
+                "type": "string",
+                "enum": [
+                  "slow",
+                  "medium",
+                  "fast",
+                  "rapid"
+                ],
+                "description": "Target cut frequency for this segment"
+              },
+              "intensity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10,
+                "description": "Emotional intensity 0-10 for this segment"
+              }
             }
           },
           "minItems": 3
         },
-        "audience": { "type": "string", "minLength": 1 },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
         "protagonist_want": {
           "type": "string",
           "minLength": 1,
@@ -577,7 +1067,10 @@
         },
         "taboos": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "additionalProperties": true
@@ -587,10 +1080,16 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["shots"],
+        "required": [
+          "shots"
+        ],
         "properties": {
-          "title": { "type": "string" },
-          "summary": { "type": "string" },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
           "director_board": {
             "type": "object",
             "description": "Director decision board per scene — the questions a director answers at a production meeting. Mirrors drama-graph beat.director_board; write-spec lints authored (non-placeholder) on scene_strict.",
@@ -611,11 +1110,19 @@
                 "type": "string",
                 "description": "How this scene should cut — smash on the turn, hold on the afterglow, montage on the act?"
               },
-              "image_priority": { "type": "string" },
-              "sound_priority": { "type": "string" },
+              "image_priority": {
+                "type": "string"
+              },
+              "sound_priority": {
+                "type": "string"
+              },
               "approval_state": {
                 "type": "string",
-                "enum": ["draft", "review", "approved"],
+                "enum": [
+                  "draft",
+                  "review",
+                  "approved"
+                ],
                 "description": "approved required before bulk generate when scene_strict=true"
               }
             },
@@ -625,48 +1132,135 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["id", "dramatic_function", "dsl"],
+              "required": [
+                "id",
+                "dramatic_function",
+                "dsl"
+              ],
               "properties": {
                 "id": {
                   "type": "string",
                   "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
                 },
-                "title": { "type": "string" },
-                "nar": { "type": "string", "minLength": 1 },
-                "dialogue_line_id": { "type": "string", "minLength": 1 },
-                "dialogue_ja": { "type": "string" },
-                "caption_text": { "type": "string", "minLength": 1 },
-                "translation_status": { "enum": ["pending", "ready"] },
-                "performance_state_id": { "type": "string", "minLength": 1 },
+                "title": {
+                  "type": "string"
+                },
+                "nar": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "dialogue_line_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "dialogue_ja": {
+                  "type": "string"
+                },
+                "caption_text": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "translation_status": {
+                  "enum": [
+                    "pending",
+                    "ready"
+                  ]
+                },
+                "performance_state_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "performance_state": {
                   "type": "object",
                   "properties": {
-                    "emotion": { "type": "string" },
-                    "subtext": { "type": "string" },
-                    "gaze_target": { "type": "string" },
-                    "head_angle": { "type": "string" },
-                    "body_orientation": { "type": "string" },
-                    "gesture": { "type": "string" },
-                    "props": { "type": "array", "items": { "type": "string" } },
-                    "lighting": { "type": "string" },
-                    "continuity_parent": { "type": "string" }
+                    "emotion": {
+                      "type": "string"
+                    },
+                    "subtext": {
+                      "type": "string"
+                    },
+                    "gaze_target": {
+                      "type": "string"
+                    },
+                    "head_angle": {
+                      "type": "string"
+                    },
+                    "body_orientation": {
+                      "type": "string"
+                    },
+                    "gesture": {
+                      "type": "string"
+                    },
+                    "props": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "lighting": {
+                      "type": "string"
+                    },
+                    "continuity_parent": {
+                      "type": "string"
+                    }
                   },
                   "additionalProperties": true
                 },
-                "screen_mode": { "enum": ["on_camera", "off_camera", "reaction", "action_cover", "silence"] },
+                "screen_mode": {
+                  "enum": [
+                    "on_camera",
+                    "off_camera",
+                    "reaction",
+                    "action_cover",
+                    "silence"
+                  ]
+                },
                 "dialogue_motion_route": {
-                  "enum": ["auto", "infinite_talk", "grok_imagine_video"],
+                  "enum": [
+                    "auto",
+                    "infinite_talk",
+                    "grok_imagine_video"
+                  ],
                   "description": "On-camera dialogue motion: InfiniteTalk is primary; Grok Imagine Video plus approved lipsync is the explicit or technical-failure secondary."
                 },
-                "narration_reason": { "type": "string", "minLength": 1 },
+                "narration_reason": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "narration_gap": {
                   "type": "object",
-                  "required": ["gap_id", "reason", "uncovered_information"],
+                  "required": [
+                    "gap_id",
+                    "reason",
+                    "uncovered_information"
+                  ],
                   "properties": {
-                    "gap_id": { "type": "string", "minLength": 1 },
-                    "reason": { "enum": ["time_jump", "location_context", "scene_establish", "chapter_transition", "offscreen_fact", "inner_context", "narrative_gap", "ending_afterglow"] },
-                    "uncovered_information": { "type": "string", "minLength": 1 },
-                    "source_refs": { "type": "array", "items": { "type": "string" } }
+                    "gap_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "reason": {
+                      "enum": [
+                        "time_jump",
+                        "location_context",
+                        "scene_establish",
+                        "chapter_transition",
+                        "offscreen_fact",
+                        "inner_context",
+                        "narrative_gap",
+                        "ending_afterglow"
+                      ]
+                    },
+                    "uncovered_information": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "source_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
                   },
                   "additionalProperties": false
                 },
@@ -682,121 +1276,373 @@
                     "bridge"
                   ]
                 },
-                "duration_sec": { "type": "number", "exclusiveMinimum": 0, "maximum": 60 },
+                "duration_sec": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 60
+                },
                 "audio_cues": {
                   "type": "array",
                   "description": "Timed, shot-relative audio plan. Only kind=voice may carry spoken_text for TTS.",
                   "items": {
                     "type": "object",
-                    "required": ["kind", "start_offset_sec", "duration_sec"],
+                    "required": [
+                      "kind",
+                      "start_offset_sec",
+                      "duration_sec"
+                    ],
                     "properties": {
-                      "kind": {"enum": ["voice", "foley", "sfx", "ambience", "music", "performance", "silence"]},
-                      "start_offset_sec": {"type": "number", "minimum": 0},
-                      "duration_sec": {"type": "number", "exclusiveMinimum": 0},
-                      "speaker": {"type": "string"},
-                      "line_type": {"enum": ["dialogue", "inner_monologue", "phone_broadcast", "narration"]},
-                      "spoken_text": {"type": "string"},
-                      "emotion": {"type": "string"},
-                      "performance": {"type": "object"},
-                      "asset_hint": {"type": "string"},
-                      "source": {"type": "string"},
-                      "license": {"type": "string"},
-                      "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-                      "character_id": {"type": "string"},
-                      "language": {"type": "string"},
-                      "node_job_id": {"type": "string"},
-                      "approval_status": {"type": "string"},
-                      "approval_receipt": {"type": "string"},
-                      "production_eligible": {"type": "boolean"},
-                      "usage_scope": {"type": "string"},
-                      "model": {"type": "string"},
-                      "checkpoint_fingerprint": {"type": "string"},
-                      "material": {"type": "string"},
-                      "adult_confirmed": {"type": "boolean"},
-                      "source_authorization": {"enum": ["original", "authorized_reference"]},
-                      "take_seed": {"type": "integer"},
-                      "model_version": {"type": "string"},
-                      "purpose": {"type": "string"}
+                      "kind": {
+                        "enum": [
+                          "voice",
+                          "foley",
+                          "sfx",
+                          "ambience",
+                          "music",
+                          "performance",
+                          "silence"
+                        ]
+                      },
+                      "start_offset_sec": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "duration_sec": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "speaker": {
+                        "type": "string"
+                      },
+                      "line_type": {
+                        "enum": [
+                          "dialogue",
+                          "inner_monologue",
+                          "phone_broadcast",
+                          "narration"
+                        ]
+                      },
+                      "spoken_text": {
+                        "type": "string"
+                      },
+                      "emotion": {
+                        "type": "string"
+                      },
+                      "performance": {
+                        "type": "object"
+                      },
+                      "asset_hint": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "license": {
+                        "type": "string"
+                      },
+                      "source_sha256": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "character_id": {
+                        "type": "string"
+                      },
+                      "language": {
+                        "type": "string"
+                      },
+                      "node_job_id": {
+                        "type": "string"
+                      },
+                      "approval_status": {
+                        "type": "string"
+                      },
+                      "approval_receipt": {
+                        "type": "string"
+                      },
+                      "production_eligible": {
+                        "type": "boolean"
+                      },
+                      "usage_scope": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "checkpoint_fingerprint": {
+                        "type": "string"
+                      },
+                      "material": {
+                        "type": "string"
+                      },
+                      "adult_confirmed": {
+                        "type": "boolean"
+                      },
+                      "source_authorization": {
+                        "enum": [
+                          "original",
+                          "authorized_reference"
+                        ]
+                      },
+                      "take_seed": {
+                        "type": "integer"
+                      },
+                      "model_version": {
+                        "type": "string"
+                      },
+                      "purpose": {
+                        "type": "string"
+                      }
                     },
-                    "allOf": [{
-                      "if": {"properties": {"kind": {"const": "performance"}}},
-                      "then": {"required": ["source", "license", "source_sha256", "character_id", "language", "node_job_id", "approval_status", "approval_receipt", "adult_confirmed", "source_authorization", "take_seed", "model_version"]}
-                    }],
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "kind": {
+                              "const": "performance"
+                            }
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "source",
+                            "license",
+                            "source_sha256",
+                            "character_id",
+                            "language",
+                            "node_job_id",
+                            "approval_status",
+                            "approval_receipt",
+                            "adult_confirmed",
+                            "source_authorization",
+                            "take_seed",
+                            "model_version"
+                          ]
+                        }
+                      }
+                    ],
                     "additionalProperties": true
                   }
                 },
-                "lipsync": { "type": "boolean" },
-                "dialogue": { "type": "string" },
+                "lipsync": {
+                  "type": "boolean"
+                },
+                "dialogue": {
+                  "type": "string"
+                },
                 "music_cue": {
                   "type": "object",
                   "description": "Per-shot emotional BGM direction; compiled into procedural stems or source automation.",
                   "properties": {
-                    "mood": { "type": "string", "enum": ["rnb", "dark", "ambient", "warm", "playful"] },
-                    "energy": { "type": "number", "minimum": 0, "maximum": 1 },
-                    "density": { "type": "number", "minimum": 0, "maximum": 1 },
-                    "bass_presence": { "type": "number", "minimum": 0, "maximum": 1 },
-                    "brightness": { "type": "number", "minimum": 0, "maximum": 1 },
-                    "duck_db": { "type": "number", "minimum": -18, "maximum": 0 },
-                    "bpm": { "type": "number", "minimum": 40, "maximum": 180 },
-                    "key_shift": { "type": "integer", "minimum": -12, "maximum": 12 },
-                    "stem_profile": { "type": "string", "enum": ["full", "thin", "pulse", "pad", "bass", "silence"] },
-                    "motif_id": { "type": "string", "minLength": 1, "maxLength": 80 },
-                    "transition": { "type": "string", "enum": ["crossfade", "cut", "stinger"] }
+                    "mood": {
+                      "type": "string",
+                      "enum": [
+                        "rnb",
+                        "dark",
+                        "ambient",
+                        "warm",
+                        "playful"
+                      ]
+                    },
+                    "energy": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "density": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "bass_presence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "brightness": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "duck_db": {
+                      "type": "number",
+                      "minimum": -18,
+                      "maximum": 0
+                    },
+                    "bpm": {
+                      "type": "number",
+                      "minimum": 40,
+                      "maximum": 180
+                    },
+                    "key_shift": {
+                      "type": "integer",
+                      "minimum": -12,
+                      "maximum": 12
+                    },
+                    "stem_profile": {
+                      "type": "string",
+                      "enum": [
+                        "full",
+                        "thin",
+                        "pulse",
+                        "pad",
+                        "bass",
+                        "silence"
+                      ]
+                    },
+                    "motif_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "transition": {
+                      "type": "string",
+                      "enum": [
+                        "crossfade",
+                        "cut",
+                        "stinger"
+                      ]
+                    }
                   },
                   "additionalProperties": false
                 },
-                "speaker_on_camera": { "type": "boolean" },
+                "speaker_on_camera": {
+                  "type": "boolean"
+                },
                 "dialogue_broll": {
                   "type": "array",
                   "maxItems": 1,
                   "description": "Visual cutaway nested under a dialogue A-roll; it carries the parent dialogue audio and does not add timeline duration.",
                   "items": {
                     "type": "object",
-                    "required": ["id", "kind", "parent_shot_id", "start_sec", "end_sec", "cut_trigger", "narrative_purpose", "audio_policy", "shot_role", "speaker_on_camera", "lipsync", "dsl"],
+                    "required": [
+                      "id",
+                      "kind",
+                      "parent_shot_id",
+                      "start_sec",
+                      "end_sec",
+                      "cut_trigger",
+                      "narrative_purpose",
+                      "audio_policy",
+                      "shot_role",
+                      "speaker_on_camera",
+                      "lipsync",
+                      "dsl"
+                    ],
                     "properties": {
-                      "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
-                      "kind": {"enum": ["env", "insert", "reaction"]},
-                      "parent_shot_id": {"type": "string"},
-                      "start_sec": {"type": "number", "minimum": 0},
-                      "end_sec": {"type": "number", "exclusiveMinimum": 0},
-                      "cut_trigger": {"type": "string", "minLength": 1},
-                      "narrative_purpose": {"type": "string", "minLength": 1},
-                      "audio_policy": {"const": "carry_parent_dialogue"},
-                      "shot_role": {"enum": ["hero", "env", "insert"]},
-                      "speaker_on_camera": {"const": false},
-                      "lipsync": {"const": false},
-                      "dsl": {"type": "object", "minProperties": 1}
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+                      },
+                      "kind": {
+                        "enum": [
+                          "env",
+                          "insert",
+                          "reaction"
+                        ]
+                      },
+                      "parent_shot_id": {
+                        "type": "string"
+                      },
+                      "start_sec": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "end_sec": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "cut_trigger": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "narrative_purpose": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "audio_policy": {
+                        "const": "carry_parent_dialogue"
+                      },
+                      "shot_role": {
+                        "enum": [
+                          "hero",
+                          "env",
+                          "insert"
+                        ]
+                      },
+                      "speaker_on_camera": {
+                        "const": false
+                      },
+                      "lipsync": {
+                        "const": false
+                      },
+                      "dsl": {
+                        "type": "object",
+                        "minProperties": 1
+                      }
                     },
                     "additionalProperties": true
                   }
                 },
-                "scene_trigger": { "type": "string" },
+                "scene_trigger": {
+                  "type": "string"
+                },
                 "content_channels": {
                   "type": "object",
                   "properties": {
-                    "voice": { "type": "object" },
-                    "performance": { "type": "object" },
-                    "motion": { "type": "object" }
+                    "voice": {
+                      "type": "object"
+                    },
+                    "performance": {
+                      "type": "object"
+                    },
+                    "motion": {
+                      "type": "object"
+                    }
                   }
                 },
                 "heat_phase": {
                   "type": "string",
-                  "enum": ["setup", "foreplay", "act", "climax", "afterglow", "bridge"],
+                  "enum": [
+                    "setup",
+                    "foreplay",
+                    "act",
+                    "climax",
+                    "afterglow",
+                    "bridge"
+                  ],
                   "description": "Adult heat arc phase; intimacy core = foreplay+act+climax"
                 },
                 "wardrobe_state": {
                   "type": "string",
-                  "enum": ["full", "armored", "partial", "undressed", "bare"],
+                  "enum": [
+                    "full",
+                    "armored",
+                    "partial",
+                    "undressed",
+                    "bare"
+                  ],
                   "description": "Costume ladder (monotonic undress). max IRON: act≥undressed, climax=bare; partial only foreplay. Later shots must not re-dress. Missing → inherit + phase escalate on write-spec. See sex-undress-ladder + adult-max iron."
                 },
                 "partner_wardrobe_state": {
                   "type": "string",
-                  "enum": ["full", "armored", "partial", "undressed", "bare"],
+                  "enum": [
+                    "full",
+                    "armored",
+                    "partial",
+                    "undressed",
+                    "bare"
+                  ],
                   "description": "Partner/male wardrobe. Penetration IRON: ≥undressed (pants off)."
                 },
                 "sex_arc_beat": {
                   "type": "string",
-                  "enum": ["foreplay", "entry", "penetration", "climax_release", "afterglow"],
+                  "enum": [
+                    "foreplay",
+                    "entry",
+                    "penetration",
+                    "climax_release",
+                    "afterglow"
+                  ],
                   "description": "Four-beat sex arc: 起 foreplay → 承 entry → 转 penetration → 合 climax_release"
                 },
                 "coverage_role": {
@@ -809,19 +1655,52 @@
                 },
                 "coitus_beat": {
                   "type": "string",
-                  "enum": ["entry", "undress", "union", "rhythm", "lock", "finish", "hook"],
+                  "enum": [
+                    "entry",
+                    "undress",
+                    "union",
+                    "rhythm",
+                    "lock",
+                    "finish",
+                    "hook"
+                  ],
                   "description": "Six-beat coitus grammar"
                 },
                 "sensory_cues": {
                   "type": "object",
                   "description": "Per-shot visual, motion, sound and edit intent. Required for act/climax after max projection.",
                   "properties": {
-                    "visual_coverage": { "type": "string", "enum": ["establish", "escalation", "action_progress", "detail", "climax_reaction", "afterglow"] },
-                    "motion_beat": { "type": "string" },
-                    "sound_events": { "type": "array", "items": { "type": "string" } },
-                    "music_energy": { "type": "number", "minimum": 0, "maximum": 1 },
-                    "cut_trigger": { "type": "string" },
-                    "require_timestamp_evidence": { "type": "boolean" }
+                    "visual_coverage": {
+                      "type": "string",
+                      "enum": [
+                        "establish",
+                        "escalation",
+                        "action_progress",
+                        "detail",
+                        "climax_reaction",
+                        "afterglow"
+                      ]
+                    },
+                    "motion_beat": {
+                      "type": "string"
+                    },
+                    "sound_events": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "music_energy": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "cut_trigger": {
+                      "type": "string"
+                    },
+                    "require_timestamp_evidence": {
+                      "type": "boolean"
+                    }
                   },
                   "additionalProperties": false
                 },
@@ -834,7 +1713,10 @@
                   "type": "object",
                   "description": "Visual DSL; write-spec fills motion/shot_size/camera_axis from beat defaults",
                   "properties": {
-                    "motion": { "type": "string", "minLength": 1 },
+                    "motion": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "camera_axis": {
                       "type": "string",
                       "enum": [
@@ -866,12 +1748,22 @@
                     },
                     "look_axis": {
                       "type": "string",
-                      "enum": ["left", "right", "center"],
+                      "enum": [
+                        "left",
+                        "right",
+                        "center"
+                      ],
                       "description": "Screen direction for 180-degree continuity; reverse flips"
                     },
                     "wardrobe_state": {
                       "type": "string",
-                      "enum": ["full", "armored", "partial", "undressed", "bare"],
+                      "enum": [
+                        "full",
+                        "armored",
+                        "partial",
+                        "undressed",
+                        "bare"
+                      ],
                       "description": "Same as shot.wardrobe_state; act sex must not stay full/armored"
                     },
                     "chain_mode": {
@@ -882,12 +1774,24 @@
                       "type": "string",
                       "description": "mid_motion preferred on continue for energy continuity"
                     },
-                    "visible_change": { "type": "string" },
-                    "story_beat": { "type": "string" },
-                    "action": { "type": "string" },
-                    "start_pose": { "type": "string" },
-                    "end_pose": { "type": "string" },
-                    "nar_en": { "type": "string" },
+                    "visible_change": {
+                      "type": "string"
+                    },
+                    "story_beat": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string"
+                    },
+                    "start_pose": {
+                      "type": "string"
+                    },
+                    "end_pose": {
+                      "type": "string"
+                    },
+                    "nar_en": {
+                      "type": "string"
+                    },
                     "subtext": {
                       "type": "string",
                       "description": "Character interiority — the unspoken thought driving this beat. Fights 'motion without performance': I2V can move bodies, subtext makes them act. See principles.md P0/P4"
@@ -903,8 +1807,12 @@
                     "camera": {
                       "type": "object",
                       "properties": {
-                        "shot_size": { "type": "string" },
-                        "angle": { "type": "string" }
+                        "shot_size": {
+                          "type": "string"
+                        },
+                        "angle": {
+                          "type": "string"
+                        }
                       },
                       "additionalProperties": true
                     }
@@ -916,7 +1824,12 @@
                   "description": "English caption line for caption_mode zh_en; not TTS by default"
                 },
                 "shot_role": {
-                  "enum": ["hero", "env", "bridge", "insert"],
+                  "enum": [
+                    "hero",
+                    "env",
+                    "bridge",
+                    "insert"
+                  ],
                   "description": "hero=face I2V; env/bridge/insert=LTX T2V synth beds (no identity claim)"
                 }
               },
@@ -926,20 +1839,37 @@
         },
         "additionalProperties": true
       }
+    },
+    "caption_lang": {
+      "enum": [
+        "zh",
+        "zh_en",
+        "en"
+      ],
+      "description": "Designed subtitle language; HyperFrames is sole caption owner on final."
     }
   },
   "allOf": [
     {
       "if": {
-        "required": ["production_mode"],
+        "required": [
+          "production_mode"
+        ],
         "properties": {
-          "production_mode": { "const": "longform" }
+          "production_mode": {
+            "const": "longform"
+          }
         }
       },
       "then": {
-        "required": ["aspect_ratio", "longform_profile"],
+        "required": [
+          "aspect_ratio",
+          "longform_profile"
+        ],
         "properties": {
-          "aspect_ratio": { "const": "9:16" }
+          "aspect_ratio": {
+            "const": "9:16"
+          }
         }
       }
     }
