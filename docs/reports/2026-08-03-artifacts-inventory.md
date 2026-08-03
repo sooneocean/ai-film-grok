@@ -1,6 +1,7 @@
-# Tracked artifacts inventory — 2026-08-03 (P4 · list only)
+# Tracked artifacts inventory — 2026-08-03 (P4)
 
-**Policy this batch:** list + recommend; **no** `git rm` / disk wipe without explicit follow-up.
+**Policy:** list first → then untrack media (P4b · 2026-08-03 继续推进).  
+**Executed:** `git rm --cached` on **27** media files under `artifacts/`; local files kept on disk; root `.gitignore` now ignores canary media globs. JSON/workflow/receipts remain tracked.
 
 ## Summary
 

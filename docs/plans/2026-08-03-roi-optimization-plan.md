@@ -1,6 +1,6 @@
 # ai-film-grok ROI 优化计划 — 2026-08-03
 
-**Status:** A–E DONE · G partial · F deferred · **v2.31.15** (import fix + grok_primary land)  
+**Status:** A–E DONE · G partial · F deferred · **P4b artifacts media untrack** · **v2.31.17**  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok`  
 **version:** `2.31.15` · **branch:** `main`（ahead origin；本批 commit 后工作区应收干净）  
 **Method:** 实跑基线（pytest / ruff / doctor / project_audit），按 impact×likelihood÷cost 排序

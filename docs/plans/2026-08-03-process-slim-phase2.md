@@ -12,7 +12,7 @@
 | P1 | voice lesson `required:false`；stages/voice 自洽（2.31.15 已含部分） |
 | P2 | `~/.grok/Agents.md` 102→85 行指针（备份 process-slim）；plugin AGENTS 硬规则改指针 |
 | P3 | `memory/README.md` 契约；18 对 memory 已是短卡 |
-| P4 | `docs/reports/2026-08-03-artifacts-inventory.md` 清单 only |
+| P4 | 清单 + **P4b untrack 27 media**（本地保留；gitignore 防回写） |
 | P5 | craft-spine / generative-film-craft / INDEX / SKILL 七步映射 |
 
 ---

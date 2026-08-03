@@ -54,6 +54,18 @@
 artifacts/**/*.lock
 artifacts/lipdub-queue-*
 
+# canary binary media — keep JSON/receipts tracked; media stays local only
+artifacts/**/*.mp4
+artifacts/**/*.mov
+artifacts/**/*.webm
+artifacts/**/*.png
+artifacts/**/*.jpg
+artifacts/**/*.jpeg
+artifacts/**/*.webp
+artifacts/**/*.wav
+artifacts/**/*.mp3
+artifacts/**/*.flac
+
 # session / run-continuation tooling artifacts (never commit)
 .omo/
 .zcode/

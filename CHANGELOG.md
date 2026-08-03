@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.31.17] - 2026-08-03
+
+### Changed
+- **Repo slim P4b:** untrack 27 canary media blobs under `artifacts/` (mp4/png/jpg/mp3); keep JSON/workflow/receipts tracked. Local media files remain on disk.
+- Root `.gitignore` ignores `artifacts/**/*.{mp4,png,jpg,...}` so canary binaries do not re-enter the index.
+
+### Docs
+- Mark `docs/reports/2026-08-03-artifacts-inventory.md` as executed (untrack done).
+
+
 ## [2.31.16] - 2026-08-03
 
 ### Changed
