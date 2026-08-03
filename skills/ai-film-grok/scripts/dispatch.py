@@ -612,9 +612,11 @@ def build_dispatch(
     )
     if not plate_exists:
         man_out = read_json(root / "manifest.json") or {}
-        ff = ((man_out.get("outputs") or {}).get("final_film") or {}) if isinstance(
-            man_out, dict
-        ) else {}
+        ff = (
+            ((man_out.get("outputs") or {}).get("final_film") or {})
+            if isinstance(man_out, dict)
+            else {}
+        )
         raw_ff = str(ff.get("path") or "").strip()
         if raw_ff:
             pff = Path(raw_ff)

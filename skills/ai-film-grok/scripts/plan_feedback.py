@@ -139,9 +139,7 @@ def _analyze_shot_count(
                     "type": "shot_count_deviation",
                     "direction": direction,
                     "planned_shots": data[0]["planned"],
-                    "avg_actual_shots": round(
-                        sum(d["actual"] for d in data) / len(data), 1
-                    ),
+                    "avg_actual_shots": round(sum(d["actual"] for d in data) / len(data), 1),
                     "avg_deviation_pct": round(avg_dev, 1),
                     "suggestion": (
                         f"Adjust shots_n for beat '{beat_key}': "

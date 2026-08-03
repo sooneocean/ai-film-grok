@@ -182,16 +182,37 @@ DEFAULT_H3_CONFIG: dict[str, object] = {
 
 
 def resolve_h3_config(spec: dict | None = None) -> dict[str, object]:
-    """Merge film-spec h3 block with profile defaults (hybrid_h3 opts in)."""
+    """Merge film-spec h3 block with profile defaults (hybrid_h3 opts in).
+
+    Adult / heat max films auto-enable dual-lane H3 (Grok bulk + local meat)
+    unless ``h3.enabled`` is explicitly false or heat is soft.
+    """
     profile = resolve_i2v_profile()
     raw = (spec or {}).get("h3") if isinstance(spec, dict) else None
     merged = dict(DEFAULT_H3_CONFIG)
     if profile == "hybrid_h3":
         merged["enabled"] = True
+    # Adult-max default dual-lane without requiring env hybrid_h3.
+    if isinstance(spec, dict) and profile != "ltx23_primary":
+        genre = str(spec.get("genre") or "").strip().lower()
+        heat = str(spec.get("heat_scale") or "").strip().lower()
+        adult_max = spec.get("adult_max_iron")
+        soft = heat in {"soft", "medium"} or adult_max is False
+        adultish = genre == "adult" or heat in {"max", "hot", "extreme"}
+        explicit_enabled = raw.get("enabled") if isinstance(raw, dict) else None
+        if (
+            not soft
+            and adultish
+            and explicit_enabled is not False
+            and (explicit_enabled is True or not isinstance(raw, dict) or "enabled" not in raw)
+        ):
+            merged["enabled"] = True
     if isinstance(raw, dict):
         for key, value in raw.items():
             if key in DEFAULT_H3_CONFIG or key in {"notes"}:
                 merged[key] = value
+        if raw.get("enabled") is False:
+            merged["enabled"] = False
     # clamp duration hard top for GPU safety
     try:
         max_dur = float(merged.get("max_duration_sec") or 8)
@@ -847,7 +868,7 @@ def validate_film_spec(
             i2v_notes.append(
                 "auto→grok bulk primary + hybrid_h3 lanes: restricted/meat → comfy-h3 pilot; "
                 "env → FRW ltx-t2v; dialogue → FRW LTX; setup non-sensitive → Grok; "
-                "H3 native audio stripped for final TTS/BGM by default"
+                "H3 audio prefer_native (keep usable stereo; else strip→TTS/BGM)"
             )
         else:
             i2v_notes.append("auto→frw-ltx23 (compatibility profile normalized to LTX primary)")
@@ -861,17 +882,26 @@ def validate_film_spec(
         )
         spec["_i2v_notes"] = i2v_notes
     spec["i2v_provider"] = i2v_provider
-    # Dual-lane MiniMax H3 defaults (opt-in via hybrid_h3 or explicit h3.enabled).
+    # Dual-lane MiniMax H3: hybrid_h3 profile, explicit h3.enabled, or adult-max auto.
     h3_cfg = resolve_h3_config(spec)
     spec["h3"] = h3_cfg
-    if h3_cfg.get("enabled") is True and not isinstance(spec.get("motion_lanes"), dict):
-        spec["motion_lanes"] = {
-            "default": "cloud",
-            "restricted_local": "comfy-h3",
-            "env": "frw_ltx_t2v",
-            "dialogue": "frw_ltx23",
-            "setup_non_sensitive": "grok",
-        }
+    if h3_cfg.get("enabled") is True:
+        if str(spec.get("_i2v_profile") or "") == "grok_primary":
+            spec["_i2v_profile"] = "hybrid_h3"
+            notes = list(spec.get("_i2v_notes") or [])
+            notes.append(
+                "adult/heat dual-lane: film promoted to hybrid_h3 (Grok setup bulk + "
+                "local MiniMax H3 restricted/meat); set h3.enabled=false to opt out"
+            )
+            spec["_i2v_notes"] = notes
+        if not isinstance(spec.get("motion_lanes"), dict):
+            spec["motion_lanes"] = {
+                "default": "cloud",
+                "restricted_local": "comfy-h3",
+                "env": "frw_ltx_t2v",
+                "dialogue": "frw_ltx23",
+                "setup_non_sensitive": "grok",
+            }
     # FRW video model (Seedance/LTX path). auto → seedance id kept as aspirational label
     raw_fvm = spec.get("frw_video_model", default_frw_video_model())
     if not isinstance(raw_fvm, str) or raw_fvm.lower() not in FRW_VIDEO_MODELS:

@@ -7,8 +7,6 @@ plan → generate on 5090 → optional silent plate → queue complete → regis
 
 from __future__ import annotations
 
-import json
-import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -152,11 +150,7 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
         "r2v": "local_minimax_h3_r2v",
     }[mode]
     still = _approved_still(base, shot_id)
-    audio_policy = str(
-        intent.get("audio_policy")
-        or h3.get("audio_policy")
-        or "prefer_native"
-    )
+    audio_policy = str(intent.get("audio_policy") or h3.get("audio_policy") or "prefer_native")
     max_dur = float(intent.get("max_duration_sec") or h3.get("max_duration_sec") or 8)
     enabled = bool(intent.get("h3_enabled") or h3.get("enabled") is True)
     return {
@@ -176,10 +170,7 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
         "max_duration_sec": max_dur,
         "megapixels_draft": float(h3.get("megapixels_draft") or 0.2),
         "allow_bulk": bool(h3.get("allow_bulk")),
-        "command": (
-            f'aifilm h3 run --root "{base}" --shot-id {shot_id} '
-            f"--mode {mode} --register"
-        ),
+        "command": (f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {mode} --register'),
     }
 
 
@@ -265,6 +256,111 @@ def _native_audio_usable(path: Path, *, min_db: float = -42.0) -> tuple[bool, di
         meta["usable_reason"] = "has_audio_stream_volume_unknown"
     meta["usable"] = usable
     return usable, meta
+
+
+# Delivery geometry floor for 9:16 short-form (matches keyframe / motion gate).
+_H3_MIN_WIDTH = 704
+_H3_MIN_HEIGHT = 1280
+
+
+def ensure_h3_delivery_geometry(
+    src: Path,
+    dest: Path,
+    *,
+    min_width: int = _H3_MIN_WIDTH,
+    min_height: int = _H3_MIN_HEIGHT,
+) -> dict[str, Any]:
+    """Upscale H3 output to ≥704×1280 9:16 when the local model emits small frames.
+
+    H3 film-lane canaries historically decode near 352×608; register/final gates
+    expect short-form floor geometry. Deterministic scale+pad, no crop of heads.
+    """
+    src = Path(src).expanduser().resolve()
+    dest = Path(dest).expanduser().resolve()
+    meta: dict[str, Any] = {
+        "ok": True,
+        "source": str(src),
+        "upscaled": False,
+        "min_width": min_width,
+        "min_height": min_height,
+    }
+    if not src.is_file():
+        raise H3WorkflowError(f"H3 geometry source missing: {src}")
+    width = height = 0
+    try:
+        from media_qa import analyze_media
+
+        qa = analyze_media(src, require_audio=False, require_motion=False)
+        width = int(qa.get("width") or 0)
+        height = int(qa.get("height") or 0)
+    except Exception as exc:  # noqa: BLE001
+        meta["probe_error"] = str(exc)[:200]
+        meta["deliver_path"] = str(src)
+        meta["width"] = width
+        meta["height"] = height
+        return meta
+    meta["width"] = width
+    meta["height"] = height
+    if width >= min_width and height >= min_height:
+        meta["deliver_path"] = str(src)
+        meta["reason"] = "already_meets_floor"
+        return meta
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    vf = (
+        f"scale={min_width}:{min_height}:force_original_aspect_ratio=decrease,"
+        f"pad={min_width}:{min_height}:(ow-iw)/2:(oh-ih)/2:color=black"
+    )
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(src),
+        "-vf",
+        vf,
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "copy",
+        str(dest),
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if proc.returncode != 0 or not dest.is_file():
+        cmd_a = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(src),
+            "-vf",
+            vf,
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            str(dest),
+        ]
+        proc = subprocess.run(cmd_a, capture_output=True, text=True, check=False)
+    if proc.returncode != 0 or not dest.is_file():
+        raise H3WorkflowError(f"H3 geometry upscale failed: {(proc.stderr or '')[:300]}")
+    meta["upscaled"] = True
+    meta["deliver_path"] = str(dest)
+    meta["upscaled_path"] = str(dest)
+    meta["reason"] = f"upscaled_from_{width}x{height}"
+    try:
+        from media_qa import analyze_media
+
+        qa2 = analyze_media(dest, require_audio=False, require_motion=False)
+        meta["width"] = int(qa2.get("width") or min_width)
+        meta["height"] = int(qa2.get("height") or min_height)
+    except Exception:  # noqa: BLE001
+        meta["width"] = min_width
+        meta["height"] = min_height
+    return meta
 
 
 def resolve_h3_deliver_audio(
@@ -395,10 +491,13 @@ def run_h3_shot(
     if not result.get("ok"):
         raise H3WorkflowError(f"H3 generate failed: {result.get('stderr') or result}")
 
+    # Geometry floor before audio plate decisions (upscale preserves streams when possible).
+    geo_out = takes_dir / f"{shot_id}_h3_{plan['mode']}_{seed}_704x1280.mp4"
+    geometry = ensure_h3_delivery_geometry(raw_out, geo_out)
+    geometry_path = Path(str(geometry.get("deliver_path") or raw_out))
+
     audio_policy = str(plan.get("audio_policy") or "prefer_native")
-    audio_decision = resolve_h3_deliver_audio(
-        raw_out, plate_out, audio_policy=audio_policy
-    )
+    audio_decision = resolve_h3_deliver_audio(geometry_path, plate_out, audio_policy=audio_policy)
     deliver = Path(audio_decision["deliver_path"])
     stripped = bool(audio_decision["audio_stripped"])
     use_clip_audio = bool(audio_decision["use_clip_audio"])
@@ -411,11 +510,11 @@ def run_h3_shot(
         "shot_id": shot_id,
         "plan": plan,
         "provider_result": {
-            k: result.get(k)
-            for k in ("ok", "prompt_id", "weapon_id", "source_endpoint", "receipt")
+            k: result.get(k) for k in ("ok", "prompt_id", "weapon_id", "source_endpoint", "receipt")
         },
         "raw_path": str(raw_out),
         "raw_sha256": sha256_file(raw_out),
+        "geometry": geometry,
         "deliver_path": str(deliver),
         "deliver_sha256": sha256_file(deliver),
         "audio_stripped": stripped,
@@ -423,9 +522,7 @@ def run_h3_shot(
         "audio_policy_effective": audio_policy_effective,
         "use_clip_audio": use_clip_audio,
         "native_audio_meta": audio_decision.get("native_audio_meta"),
-        "prompt_sha256": __import__("hashlib")
-        .sha256(prompt.encode("utf-8"))
-        .hexdigest(),
+        "prompt_sha256": __import__("hashlib").sha256(prompt.encode("utf-8")).hexdigest(),
     }
     receipt_path = base / "receipts" / f"h3-run-{shot_id}.json"
     write_json(receipt_path, receipt)
@@ -576,9 +673,7 @@ def register_h3_clip(
         cmd.extend(("--identity-approved", "--motion-approved"))
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
-        raise H3WorkflowError(
-            f"register-clip failed: {(proc.stderr or proc.stdout or '')[:400]}"
-        )
+        raise H3WorkflowError(f"register-clip failed: {(proc.stderr or proc.stdout or '')[:400]}")
     # Annotate manifest clip with H3 audio policy for post.
     if use_clip_audio is None:
         use_clip_audio = audio_policy not in {"strip_native_use_tts_bgm", "mute_native"}
@@ -610,9 +705,10 @@ def list_h3_eligible_shots(root: Path | str) -> dict[str, Any]:
     rows = []
     for shot in _iter_shots(spec):
         intent = build_shot_intent(spec, shot)
-        if intent.get("recommended_provider") == "comfy-h3" or intent.get(
-            "provider_lock"
-        ) == "comfy-h3":
+        if (
+            intent.get("recommended_provider") == "comfy-h3"
+            or intent.get("provider_lock") == "comfy-h3"
+        ):
             rows.append(
                 {
                     "shot_id": shot.get("id"),

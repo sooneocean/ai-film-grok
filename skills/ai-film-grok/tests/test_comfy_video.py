@@ -615,11 +615,12 @@ class ComfyVideoTests(unittest.TestCase):
     )
     @patch("comfy_video.subprocess.run")
     @patch("comfy_video._json_request")
-    def test_submission_capacity_fails_closed_when_enabled_driver_probe_fails(
+    def test_submission_capacity_soft_falls_back_when_driver_probe_fails(
         self,
         request: MagicMock,
         run: MagicMock,
     ) -> None:
+        """Driver probe failure must not block when ComfyUI already reported free VRAM."""
         request.side_effect = [
             {
                 "system": {"ram_free": 16 * 1024**3},
@@ -641,9 +642,13 @@ class ComfyVideoTests(unittest.TestCase):
 
         report = submission_capacity("http://127.0.0.1:18188")
 
-        self.assertFalse(report["ok"])
-        self.assertIn("RESOURCE_METRICS_UNAVAILABLE", str(report["blockers"]))
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["blockers"], [])
         self.assertEqual(report["observed"]["device"]["vram_source"], "comfyui")
+        self.assertIn(
+            "SSH probe returned invalid data",
+            str(report["observed"]["device"]["driver_vram_probe_error"] or ""),
+        )
 
     @patch.dict(
         os.environ,
@@ -659,9 +664,10 @@ class ComfyVideoTests(unittest.TestCase):
     )
     @patch("comfy_video.subprocess.run")
     @patch("comfy_video._json_request")
-    def test_submission_capacity_rejects_non_tunnel_base_url(
+    def test_submission_capacity_non_tunnel_skips_driver_probe_ssh(
         self, request: MagicMock, run: MagicMock
     ) -> None:
+        """Non-loopback URL cannot use driver fallback SSH; Comfy metrics still admit."""
         request.side_effect = [
             {
                 "system": {"ram_free": 16 * 1024**3},
@@ -677,8 +683,12 @@ class ComfyVideoTests(unittest.TestCase):
             {"queue_running": [], "queue_pending": []},
         ]
         report = submission_capacity("https://192.168.88.52:8188")
-        self.assertFalse(report["ok"])
-        self.assertIn("loopback SSH tunnel", str(report["blockers"]))
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["observed"]["device"]["vram_source"], "comfyui")
+        self.assertIn(
+            "loopback SSH tunnel",
+            str(report["observed"]["device"]["driver_vram_probe_error"] or ""),
+        )
         run.assert_not_called()
 
     @patch.dict(
@@ -695,9 +705,10 @@ class ComfyVideoTests(unittest.TestCase):
     )
     @patch("comfy_video.subprocess.run")
     @patch("comfy_video._json_request")
-    def test_submission_capacity_rejects_tunnel_with_lookalike_ssh_identity(
+    def test_submission_capacity_lookalike_ssh_skips_driver_uses_comfy(
         self, request: MagicMock, run: MagicMock
     ) -> None:
+        """Lookalike tunnel identity fails driver probe; Comfy VRAM still admits."""
         request.side_effect = [
             {
                 "system": {"ram_free": 16 * 1024**3},
@@ -723,8 +734,12 @@ class ComfyVideoTests(unittest.TestCase):
             ),
         ]
         report = submission_capacity("http://127.0.0.1:18188")
-        self.assertFalse(report["ok"])
-        self.assertIn("not the authenticated SSH tunnel", str(report["blockers"]))
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["observed"]["device"]["vram_source"], "comfyui")
+        self.assertIn(
+            "not the authenticated SSH tunnel",
+            str(report["observed"]["device"]["driver_vram_probe_error"] or ""),
+        )
 
     @patch("comfy_video._json_request")
     def test_submission_capacity_fails_closed_on_pressure_and_busy_queue(

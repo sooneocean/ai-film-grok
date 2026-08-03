@@ -849,7 +849,10 @@ def validate_narrative_contract(
                 )
             if previous_point:
                 prev_point = points.get(previous_point)
-                if isinstance(prev_point, dict) and prev_point.get("status") not in {"carried", "season_hook"}:
+                if isinstance(prev_point, dict) and prev_point.get("status") not in {
+                    "carried",
+                    "season_hook",
+                }:
                     issues.append(
                         _issue(
                             "CARRY_POINT_STATUS_INVALID",

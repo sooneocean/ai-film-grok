@@ -218,8 +218,6 @@ def grok_permission_mode(config_path: Path) -> str | None:
     return None
 
 
-
-
 def film_output_path(root: Path, name: str, *, field: str = "output name") -> Path:
     try:
         out_dir = safe_workspace_directory(root, "out", field="film output directory")
@@ -3394,9 +3392,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         h3_audio = "prefer_native"
         try:
             film_spec_raw = read_json(root / "film-spec.json") or {}
-            h3_block = (
-                film_spec_raw.get("h3") if isinstance(film_spec_raw.get("h3"), dict) else {}
-            )
+            h3_block = film_spec_raw.get("h3") if isinstance(film_spec_raw.get("h3"), dict) else {}
             candidate = str(h3_block.get("audio_policy") or "").strip()
             if candidate in {
                 "prefer_native",

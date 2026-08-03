@@ -456,7 +456,10 @@ _DEFAULT_EXAMPLES: dict[str, tuple[str, str]] = {
     "AIFILM_GROK_VIDEO_MODEL": ("grok-imagine-video", ""),
     "AIFILM_GROK_TTS_VOICE": ("eve", "eve | ara | leo | carina | zagan | …"),
     "AIFILM_GROK_TTS_LANGUAGE": ("zh", "zh | en | …"),
-    "AIFILM_I2V_PROFILE": ("grok_primary", "grok_primary | hybrid_h3 | ltx23_primary | seedance_first"),
+    "AIFILM_I2V_PROFILE": (
+        "grok_primary",
+        "grok_primary | hybrid_h3 | ltx23_primary | seedance_first",
+    ),
     "AIFILM_SEEDANCE_AVAILABLE": ("0", ""),
     "VOICEBOX_BASE_URL": ("http://127.0.0.1:17493", "alias: AIFILM_VOICEBOX_URL"),
     "VOICEBOX_PROFILE": ("", "alias: AIFILM_VOICEBOX_PROFILE; name or id; one voice one lock"),

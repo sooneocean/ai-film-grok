@@ -427,6 +427,61 @@ class MediaQueue:
                     f"shot_id {shot_id!r} is not in film-spec "
                     f"(known={sorted(known_ids)}). write-spec first; do not queue ghost shots."
                 )
+            # Hybrid dual-lane: restricted/meat soft-lock must not enter Grok cloud bulk.
+            if operation in {"image_to_video", "reference_to_video"} and isinstance(raw_spec, dict):
+                try:
+                    from production_router import build_shot_intent
+
+                    shot_row: dict[str, Any] | None = None
+                    for scene in raw_spec.get("scenes") or []:
+                        if not isinstance(scene, dict):
+                            continue
+                        for sh in scene.get("shots") or []:
+                            if isinstance(sh, dict) and str(sh.get("id") or "") == shot_id:
+                                shot_row = sh
+                                break
+                        if shot_row is not None:
+                            break
+                    if shot_row is None:
+                        for sh in raw_spec.get("shots") or []:
+                            if isinstance(sh, dict) and str(sh.get("id") or "") == shot_id:
+                                shot_row = sh
+                                break
+                    if shot_row is not None:
+                        intent = build_shot_intent(raw_spec, shot_row)
+                        locked = str(intent.get("provider_lock") or "").strip().lower()
+                        rec = str(intent.get("recommended_provider") or "").strip().lower()
+                        h3_on = bool(intent.get("h3_enabled"))
+                        wants_h3 = locked == "comfy-h3" or (
+                            h3_on
+                            and rec == "comfy-h3"
+                            and intent.get("content_class") == "restricted_local"
+                        )
+                        contract_provider = (
+                            str((generation_contract or {}).get("provider") or "").strip().lower()
+                        )
+                        allow_cloud = os.environ.get(
+                            "AIFILM_ALLOW_CLOUD_RESTRICTED", ""
+                        ).strip().lower() in {"1", "true", "yes", "on"}
+                        if wants_h3 and contract_provider not in {
+                            "comfy-h3",
+                            "comfy_h3",
+                            "local_h3",
+                            "minimax-h3",
+                        }:
+                            if not allow_cloud:
+                                raise QueueError(
+                                    f"shot {shot_id!r} is restricted_local → local MiniMax H3 "
+                                    f"(provider_lock={locked or rec}). "
+                                    f'Use: aifilm h3 plan --root "{self.root}" --shot-id {shot_id} '
+                                    f'&& aifilm h3 run --root "{self.root}" --shot-id {shot_id} '
+                                    f"--register. Escape: AIFILM_ALLOW_CLOUD_RESTRICTED=1 "
+                                    f"(not recommended for bare/meat)."
+                                )
+                except QueueError:
+                    raise
+                except Exception:
+                    pass
         try:
             source_contract = build_shot_contract(self.root, shot_id)
             if not source_contract["ok"]:

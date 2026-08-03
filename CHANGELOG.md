@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.31.36] - 2026-08-03
+
+### Added
+- **Dual-lane weapon matrix (Grok Video 1.5 + 5090 MiniMax H3):** adult/heat-max films auto-enable H3 dual-lane; setup bulk stays Grok; restricted/meat/high-difficulty soft-lock `comfy-h3`.
+- `production_router.classify_shot_content` + difficulty flags (`coitus_beat`, L4+contact, `force_local_h3`, …).
+- `media-queue` hard-blocks cloud I2V for restricted_local (escape: `AIFILM_ALLOW_CLOUD_RESTRICTED=1`).
+- `h3_workflow.ensure_h3_delivery_geometry` upscales H3 deliverables to ≥704×1280 before register.
+- Docs: `references/weapon-lane-matrix.md` + visual stage card + hard-defaults pointers.
+
+### Changed
+- `shot-intent.schema.json` accepts difficulty/route/still-provider fields.
+- Restricted route tests use `comfy-h3` (not retired wan22) under hybrid dual-lane.
+
+
+## [2.31.35] - 2026-08-03
+
+### Added
+- **Wave W8 · autopilot local throughput allowlist:** `LOCAL_THROUGHPUT_NEXT_IDS` contract (closeout-run, bulk-preflight, variety-precheck, pilot-pack, select-shortlist, export-desktop, agent-review-final assist, …).
+- Autopilot local path fail-closes when `next_id` is not on `ADVANCE_ACTIONS` (`local_not_allowlisted`).
+- Dry-run never shells local advance (plans only).
+- Tests: `tests/test_workflow_w8_autopilot.py` (allowlist ∩ advance, --apply reject, dry-run, local execute, human stop).
+
+### Changed
+- Local autopilot steps record `next_id` + `w8_throughput` on the receipt for audit.
+
 ## [2.31.34] - 2026-08-03
 
 ### Changed

@@ -21,6 +21,31 @@ RESERVATIONS_RECEIPT = "autopilot-reservations.json"
 _AUTOMATABLE_SKILLS = frozenset(
     {"keyframe.generate", "image.animate", "voice.synthesize", "video.render"}
 )
+# Wave W8 · local no-spend throughput next_ids that advance_local may execute.
+# Single truth remains ADVANCE_ACTIONS; this set is the documented W8 contract
+# (closeout / preflight / variety + related pack/shortlist/export/assist).
+LOCAL_THROUGHPUT_NEXT_IDS = frozenset(
+    {
+        "closeout-run",
+        "bulk-preflight",
+        "variety-precheck",
+        "pilot-pack",
+        "select-shortlist",
+        "export-desktop",
+        "agent-review-final",  # L0 assist only; advance rejects --apply
+        "post-audit-gate",
+        "selects-report",
+        "audio-plan",
+        "state-index-plan",
+        "narrative-validate",
+        "narrative-project",
+        "production-evidence-gate",
+        "write-spec",
+        "quality-gate-repair",
+        "dailies_review-evidence",
+        "done",
+    }
+)
 _BUDGET_STAGE = {
     "keyframe.generate": "still",
     "image.animate": "motion",
@@ -267,10 +292,35 @@ def autopilot_once(
                     stop_reason = "human_approval_required"
                     break
                 if action.get("spend_class") == "local":
-                    from advance import advance_local
+                    from advance import ADVANCE_ACTIONS, advance_local
 
+                    next_id = str(packet.get("next_id") or "")
+                    # W8: local path only for advance-allowlisted next_ids (fail closed).
+                    if next_id not in ADVANCE_ACTIONS:
+                        stop_reason = "local_not_allowlisted"
+                        detail = f"local next_id not on advance allowlist: {next_id or '(empty)'}"
+                        break
+                    if dry_run:
+                        # Never shell out on dry_run; plan only (mirrors external dry_run intent).
+                        executed.append(
+                            {
+                                "kind": "local",
+                                "dry_run": True,
+                                "next_id": next_id,
+                                "operation": action.get("operation"),
+                                "w8_throughput": next_id in LOCAL_THROUGHPUT_NEXT_IDS,
+                            }
+                        )
+                        continue
                     local = advance_local(base, max_local=1)
-                    executed.append({"kind": "local", "report": local})
+                    executed.append(
+                        {
+                            "kind": "local",
+                            "next_id": next_id,
+                            "w8_throughput": next_id in LOCAL_THROUGHPUT_NEXT_IDS,
+                            "report": local,
+                        }
+                    )
                     if not local.get("ok") or local.get("executed_count") != 1:
                         stop_reason, detail = (
                             str(local.get("stop_reason")),

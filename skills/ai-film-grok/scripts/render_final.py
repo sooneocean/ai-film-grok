@@ -356,8 +356,6 @@ def read_json(path: Path) -> dict[str, Any]:
         raise ValueError(f"Invalid JSON: {path}") from exc
 
 
-
-
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
     argv = list(cmd)
     executable = Path(argv[0]).name if argv else ""

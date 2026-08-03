@@ -18,17 +18,17 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" advance --root "<film>"
 ```
 
-每步后 dispatch，只跑 `next_action`；先解除 `blocked_by`，再以 `required_proof` 判断能否过关。读 `context_refs` 与 `weapon_route`。失败即停。状态：`receipts/dispatch.json`。
+每步后 dispatch，只跑 `next_action`；先 `blocked_by` 再 `required_proof`。读 `context_refs`/`weapon_route`。失败即停。`receipts/dispatch.json`。
 
-`autopilot`：仅 allowlist 预算动作；整数 tick+实时就绪；人工/质量/容量关即停并写 receipt。
+`autopilot`：allowlist 预算 + **本地吞吐**（closeout/preflight/variety…）；人审/质量/容量关即停写 receipt。
 
-主流程（对外唯一进度）：**定义故事 → 设计演出 → Pilot 样片 → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付**。  
+主流程：**定义故事 → 设计演出 → Pilot 样片 → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付**。  
 映射：idea/story/beats→agent · shots/media→visual · rough/voice→voice+post · verified→deliver。  
-八环 / Professional 11-stage = 内部证据；规则正文 `hard-defaults`；默认 context 只 stages；lessons 按需。
+八环/11-stage=内部；规则 `hard-defaults`；context 只 stages。
 
-小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。  
-创作会诊：[creative-workshop](references/creative-workshop.md)（默认只编译，`apply` 才写图）。  
-长片 v1：`plan run --production-mode longform --target-duration 480..900`；[longform](references/longform-workflow.md)
+小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；lock 须用户确认。  
+会诊：[creative-workshop](references/creative-workshop.md)（默认编译，`apply` 才写图）。  
+长片：`plan run --production-mode longform --target-duration 480..900`；[longform](references/longform-workflow.md)
 
 ## P0
 
@@ -38,20 +38,19 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **动作供应商**：`grok_primary` 云主链：**Grok I2V → FRW API I2V → FRW LTX 2.3**（对白锁 LTX 有声）。**`hybrid_h3`**：云 bulk 仍 Grok；restricted/肉戏 soft-lock **本地 MiniMax H3 film-lane**（`comfy-h3` verified；`aifilm h3 plan|run`，无需 experimental 旗；**bulk 仍要用户 pilot 批准**）。禁 Seedance 与 Wan 2.2 本地 I2V。H3 **原声可用则保留**（`prefer_native`）。
-8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM=rnb；缺已批 edit/bridge 则 `final` 阻塞。[BGM](references/bgm-generation.md)
-9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
-9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 final。
-10. **字幕/画面字**：唯一 owner=HyperFrames；禁双烧与空 SRT。`caption_mode` 与 `transition_fluency` 依 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)；I2V 出现内生字、水印或乱码即禁入成片：全帧审计→逐帧修复→重编→复审→人工审。
-11. **后期单责**：title/sub/end 单引擎；`plate-cards blank`、plate `subs=off` 防双烧（[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)）。
-11b. **连载**：`serial validate`；系列圣经、单集事件、追更钩子与权利来源可审计。[workflow](references/serial-narrative-workflow.md)
+7. **动作**：`grok_primary`=Grok→FRW API→LTX 2.3（对白锁 LTX）。**`hybrid_h3`**：云 bulk=Grok；restricted/肉戏→本地 MiniMax H3（`aifilm h3`，verified；**bulk 仍要 pilot 批**）。禁 Seedance/Wan 本地 I2V。H3 原声 `prefer_native`。
+8. **声线**：口白中/角色日=Edge；字幕中。禁无 speaker 乒乓、`nar_ja` 说书、清空日文轨。BGM=rnb。[BGM](references/bgm-generation.md)
+9. **成人 MAX**：肉戏≥50%·亲密≥60%·setup≤20%；extreme；四拍+bare；禁静默降 heat。[playbook](references/adult-max-playbook.md)
+9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V。
+10. **字幕**：owner=HyperFrames；禁双烧/空 SRT。`caption_mode`+`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)；I2V 内生字/水印禁入成片。
+11. **后期单责**：title/sub/end 单引擎；plate `subs=off`。[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)
+11b. **连载**：`serial validate`；圣经/事件/钩子可审计。[workflow](references/serial-narrative-workflow.md)
 12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐。
 13. **安全**：凭据本机；日志禁 token/prompt；外部不自动重试花费。
-14. **高动**：平常 mean≥18、肉戏≥20；禁 KB；桌面 final 仅 motion-gate ok。
+14. **高动**：mean≥18、肉戏≥20；桌面 final 仅 motion-gate ok。
 15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
-16. **5090**：未锁视觉走 `weapon_route`；未验 fail closed。
-16b. **5090/OOM**：本机仅 1 个 `comfy_video.py`；禁 `pgrep -f` 自杀；邻镜禁静默顶替。[lesson](references/lessons-2026-07-29-comfy-multifilm-contention-oom.md)
-17. **口型路由**：默认 off（说书）；近景对白必须人工批准后走 RTX `LatentSync 1.6` → `MuseTalk 1.5`，质差禁切 FRW。[lipsync](references/lipsync.md)
+16. **5090**：未锁视觉走 `weapon_route`；未验 fail closed。本机仅 1×`comfy_video`；禁 pgrep 自杀。[oom](references/lessons-2026-07-29-comfy-multifilm-contention-oom.md)
+17. **口型**：默认 off；近景对白须人批后 LatentSync→MuseTalk，质差禁切 FRW。[lipsync](references/lipsync.md)
 
 ## 阶段
 

@@ -239,7 +239,9 @@ def build_runtime_lock(
         try:
             vproc = subprocess.run(
                 [runtime_py, "-c", "import sys; print(sys.version.split()[0])"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
                 env=minimal_subprocess_env(),
             )
             if vproc.returncode == 0 and vproc.stdout.strip():
@@ -273,7 +275,9 @@ def verify_runtime_lock(skill_dir: Path, lock_path: Path) -> dict[str, Any]:
         try:
             vproc = subprocess.run(
                 [runtime_py, "-c", "import sys; print(sys.version.split()[0])"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
                 env=minimal_subprocess_env(),
             )
             if vproc.returncode == 0 and vproc.stdout.strip():
@@ -281,9 +285,7 @@ def verify_runtime_lock(skill_dir: Path, lock_path: Path) -> dict[str, Any]:
         except (OSError, subprocess.SubprocessError):
             pass
     if expected.get("python") != actual_py:
-        errors.append(
-            f"python version drift: expected {expected.get('python')}, found {actual_py}"
-        )
+        errors.append(f"python version drift: expected {expected.get('python')}, found {actual_py}")
     for command, wanted in (expected.get("commands") or {}).items():
         actual = _command_version(command)
         if actual != wanted:

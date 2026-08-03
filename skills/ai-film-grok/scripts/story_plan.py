@@ -406,9 +406,6 @@ def detect_genre(
     }
 
 
-
-
-
 _SCENE_HDR = re.compile(
     r"^(?:#{1,3}\s*|场景\s*[:：]?\s*|Scene\s*\d*\s*[:：]?\s*|第[一二三四五六七八九十\d]+场\s*[:：]?\s*)(.+)$",
     re.IGNORECASE | re.MULTILINE,
@@ -967,7 +964,6 @@ def normalize_story(
             "note": "Agent may refine; this is structure-only normalize",
         },
     }
-
 
 
 def structure_episode(

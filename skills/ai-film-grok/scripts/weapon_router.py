@@ -107,7 +107,9 @@ def build_weapon_route(
     locked_provider = _locked_provider(
         base,
         provider_keys,
-        selected_local_provider="comfy_lan" if still_demand else ("comfy-h3" if motion_demand else None),
+        selected_local_provider="comfy_lan"
+        if still_demand
+        else ("comfy-h3" if motion_demand else None),
     )
     if locked_provider:
         return {
@@ -160,9 +162,10 @@ def build_weapon_route(
             "fail_closed": True,
         }
     weapon = route["weapon"]
-    pilot_only = bool((weapon.get("capabilities") or {}).get("pilot_only")) or str(
-        weapon.get("status") or ""
-    ) == "experimental"
+    pilot_only = (
+        bool((weapon.get("capabilities") or {}).get("pilot_only"))
+        or str(weapon.get("status") or "") == "experimental"
+    )
     promoted = bool((weapon.get("verified") or {}).get("production_promoted"))
     # Motion film-lane: select free, never auto-bulk-execute (queue/h3 run is explicit).
     auto_execute = (not pilot_only) and not motion_demand
@@ -170,9 +173,8 @@ def build_weapon_route(
     if motion_demand and film_cli == "aifilm h3":
         command = "aifilm h3 plan|run --register"
     else:
-        command = (
-            f"aifilm comfy route --intent {operation}"
-            + (" --allow-experimental" if pilot_only else "")
+        command = f"aifilm comfy route --intent {operation}" + (
+            " --allow-experimental" if pilot_only else ""
         )
     return {
         **common,

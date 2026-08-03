@@ -126,10 +126,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "next_cmd": (
                 None
                 if gates.get("final_complete")
-                else (
-                    # Draft if missing; apply path needs user phrase (shown in human_next)
-                    f'aifilm agent-review-final --root "{base}"'
-                )
+                # Draft if missing; apply path needs user phrase (shown in human_next)
+                else (f'aifilm agent-review-final --root "{base}"')
             ),
             "required_proof": None
             if gates.get("final_complete")

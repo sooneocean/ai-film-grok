@@ -98,3 +98,48 @@ def test_h3_duration_clamped() -> None:
     assert float(cfg["max_duration_sec"]) == 15.0
     cfg2 = resolve_h3_config({"h3": {"enabled": True, "max_duration_sec": 1}})
     assert float(cfg2["max_duration_sec"]) == 3.0
+
+
+def test_adult_genre_auto_enables_h3_under_grok_primary() -> None:
+    with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}, clear=False):
+        cfg = resolve_h3_config({"genre": "adult", "heat_scale": "max"})
+        assert cfg["enabled"] is True
+        # Drama without hot heat must not auto dual-lane.
+        cfg_drama = resolve_h3_config({"genre": "drama", "heat_scale": ""})
+        assert cfg_drama["enabled"] is False
+        # Explicit opt-out wins.
+        cfg_off = resolve_h3_config(
+            {"genre": "adult", "heat_scale": "max", "h3": {"enabled": False}}
+        )
+        assert cfg_off["enabled"] is False
+
+
+def test_difficulty_coitus_marks_restricted_without_heat_phase() -> None:
+    with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "hybrid_h3"}):
+        intent = build_shot_intent(
+            {"_i2v_profile": "hybrid_h3", "h3": {"enabled": True}},
+            {
+                "id": "s_hard",
+                "shot_role": "hero",
+                "coitus_beat": "deep_thrust",
+            },
+        )
+    assert intent["content_class"] == "restricted_local"
+    assert intent["provider_lock"] == "comfy-h3"
+    assert any("coitus_beat" in f for f in intent.get("difficulty_flags") or [])
+    assert intent["recommended_still_provider"] == "comfy_lan"
+
+
+def test_l4_contact_difficulty() -> None:
+    intent = build_shot_intent(
+        {"_i2v_profile": "hybrid_h3", "h3": {"enabled": True}},
+        {
+            "id": "s_l4",
+            "shot_role": "hero",
+            "shot_size": "l4",
+            "contact": True,
+            "dsl": {"camera": {"shot_size": "l4"}},
+        },
+    )
+    assert intent["content_class"] == "restricted_local"
+    assert "l4_contact:l4" in (intent.get("difficulty_flags") or [])

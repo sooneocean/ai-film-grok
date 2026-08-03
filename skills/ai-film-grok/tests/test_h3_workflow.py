@@ -13,6 +13,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from h3_workflow import (  # noqa: E402
+    ensure_h3_delivery_geometry,
     list_h3_eligible_shots,
     plan_h3_shot,
     resolve_h3_deliver_audio,
@@ -144,3 +145,43 @@ def test_explicit_strip_always_strips(tmp_path: Path) -> None:
         )
     assert decision["audio_stripped"] is True
     assert decision["use_clip_audio"] is False
+
+
+def test_ensure_geometry_skips_when_floor_met(tmp_path: Path) -> None:
+    raw = tmp_path / "ok.mp4"
+    dest = tmp_path / "out.mp4"
+    raw.write_bytes(b"fake")
+    with mock.patch(
+        "media_qa.analyze_media",
+        return_value={"width": 704, "height": 1280, "ok": True},
+    ):
+        meta = ensure_h3_delivery_geometry(raw, dest)
+    assert meta["upscaled"] is False
+    assert meta["deliver_path"] == str(raw.resolve())
+
+
+def test_ensure_geometry_upscales_small(tmp_path: Path) -> None:
+    raw = tmp_path / "small.mp4"
+    dest = tmp_path / "out.mp4"
+    raw.write_bytes(b"fake")
+    calls = {"n": 0}
+
+    def _probe(path, **kwargs):  # noqa: ANN001
+        calls["n"] += 1
+        p = Path(path)
+        if p.name == "out.mp4":
+            return {"width": 704, "height": 1280, "ok": True}
+        return {"width": 352, "height": 608, "ok": True}
+
+    def _run(*_a, **_k):
+        dest.write_bytes(b"up")
+        return type("P", (), {"returncode": 0, "stderr": "", "stdout": ""})()
+
+    with (
+        mock.patch("media_qa.analyze_media", side_effect=_probe),
+        mock.patch("h3_workflow.subprocess.run", side_effect=_run),
+    ):
+        meta = ensure_h3_delivery_geometry(raw, dest)
+    assert meta["upscaled"] is True
+    assert meta["deliver_path"] == str(dest.resolve())
+    assert dest.is_file()

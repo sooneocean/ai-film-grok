@@ -1,6 +1,6 @@
 # 流程优化 Todo Plan — 2026-08-03
 
-**Status:** **Wave A–H SHIPPED** (v2.31.20–26)  
+**Status:** **Wave A–H + W8 SHIPPED** (v2.31.20–26 · W8 v2.31.35)  
 **视角：** 你怎么把一集从故事做到桌面成片（不是再拆 CLI 行数）。  
 **前置已完成：** ROI A–E · Process slim P0–P5（v2.31.16–19）  
 **方法：** 7 步主流程 × 近两周片例 PARTIAL × 门禁密度  
@@ -48,7 +48,7 @@
 | **W5** | 5090 lease / 队列诚实 | 高（PARTIAL 主因） | 中 | 并行（运维+小码） |
 | **W6** | Final 超时/混音包装 | 中高 | 中 | 有成片痛再开 |
 | **W7** | Still 毒检自动化加深 | 中高 | 高 | 有 CV/启发式才开 |
-| **W8** | Autopilot 扩 allowlist | 中 | 中 | 观察 W1–W3 后再扩 |
+| **W8** | Autopilot 扩 allowlist | 中 | 中 | **DONE v2.31.35** |
 | **W9** | CLI 再抽 aifilm_grok | 低（对拍片） | 高 | **不单独 sprint**（=旧 P6/F） |
 | **W10** | hard-defaults 再拆表 | 低 | 中 | 仅当门禁测难写时 |
 
@@ -135,13 +135,19 @@ C1–C3 运维并行（lease / 隧道 / 进度诚实）
 D 仅当 final 再炸
 ```
 
-**默认推荐下一会话（A–F 已 ship）：**
+### Wave W8 — Autopilot 本地吞吐白名单 · **DONE (v2.31.35)**
 
-1. **实片 GO** — 给 film root，用 `dispatch` 走 next（吞吐门已接）  
-2. **W8** — autopilot allowlist 扩 closeout/bulk-preflight/variety（说 `go W8`）  
-3. **收尾档案** — 本机跑 `artifacts/session-wrap-finish.sh`（agent shell 挂时）
+- [x] `LOCAL_THROUGHPUT_NEXT_IDS` 契约（closeout / bulk-preflight / variety + pack/shortlist/export/assist）
+- [x] local 路径：`next_id ∉ ADVANCE_ACTIONS` → `local_not_allowlisted`（fail closed）
+- [x] dry-run 不 shell advance；`agent-review-final --apply` 仍被 advance 拒
+- [x] 测：`tests/test_workflow_w8_autopilot.py`
 
-回报口径：`实片 <path>` / `go W8` / `wrap only`。
+**默认推荐下一会话：**
+
+1. **实片 GO** — 给 film root，用 `dispatch` 走 next（吞吐门 + W8 autopilot 本地已接）  
+2. **收尾档案** — 本机跑 `artifacts/session-wrap-finish.sh`（agent shell 挂时）
+
+回报口径：`实片 <path>` / `wrap only`。
 
 ---
 
@@ -163,7 +169,7 @@ D 仅当 final 再炸
 |------|------|------|
 | `2026-08-03-roi-optimization-plan` | A–E DONE | 工程绿线；本计划不重复 |
 | `2026-08-03-process-slim-phase2` | P0–P5 DONE · P6 未开 | 文档税；本计划吃 **成片吞吐** |
-| 本档 | **Wave A–F 已落地** (v2.31.23) | 拍片主流程 ROI + agent 回路胶合 |
+| 本档 | **Wave A–H + W8 已落地** (→v2.31.35) | 拍片主流程 ROI + agent/autopilot 回路 |
 
 ---
 

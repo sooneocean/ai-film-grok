@@ -29,7 +29,18 @@
     "recommended_lane": { "type": ["string", "null"] },
     "recommended_provider": { "type": ["string", "null"] },
     "recommended_weapon": { "type": ["string", "null"] },
+    "recommended_still_provider": { "type": ["string", "null"] },
     "h3_enabled": { "type": "boolean" },
+    "difficulty_flags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "route_reasons": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "heat_phase": { "type": ["string", "null"] },
+    "wardrobe_state": { "type": ["string", "null"] },
     "max_duration_sec": { "type": ["number", "null"] },
     "parent_shot_id": { "type": ["string", "null"] },
     "broll_kind": { "type": ["string", "null"], "enum": ["env", "insert", "reaction", null] },

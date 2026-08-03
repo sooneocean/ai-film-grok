@@ -626,9 +626,9 @@ def test_restricted_identity_shot_routes_local_and_rejects_cloud(
                 priority=100,
             ),
             _capability(
-                "wan-local",
-                provider="comfy-wan22",
-                model="wan22-i2v",
+                "h3-local",
+                provider="comfy-h3",
+                model="minimax-h3-i2v",
                 operations=["image_to_video"],
                 shot_roles=["hero"],
                 content_classes=["general", "restricted_local"],
@@ -641,7 +641,8 @@ def test_restricted_identity_shot_routes_local_and_rejects_cloud(
 
     assert report["intent"]["content_class"] == "restricted_local"
     assert report["intent"]["identity_lock"] is True
-    assert report["selected"]["capability_id"] == "wan-local"
+    assert report["intent"]["provider_lock"] == "comfy-h3"
+    assert report["selected"]["capability_id"] == "h3-local"
     rejected = {item["capability_id"]: item["reasons"] for item in report["rejected"]}
     assert "CONTENT_CLASS_UNSUPPORTED" in rejected["grok-hero"]
 
@@ -675,8 +676,8 @@ def test_sensitive_shot_fields_fail_closed_even_when_genre_is_mislabeled(
             ),
             _capability(
                 "local-restricted",
-                provider="comfy-wan22",
-                model="wan22-i2v",
+                provider="comfy-h3",
+                model="minimax-h3-i2v",
                 operations=["image_to_video"],
                 shot_roles=["hero"],
                 content_classes=["restricted_local"],
@@ -688,6 +689,8 @@ def test_sensitive_shot_fields_fail_closed_even_when_genre_is_mislabeled(
     report = explain_route(tmp_path, shot_id="shot01", now=NOW)
 
     assert report["intent"]["content_class"] == "restricted_local"
+    # hybrid_h3 / dual-lane soft-locks restricted meat to comfy-h3 (not retired wan22).
+    assert report["intent"]["provider_lock"] == "comfy-h3"
     assert report["selected"]["capability_id"] == "local-restricted"
     rejected = {item["capability_id"]: item["reasons"] for item in report["rejected"]}
     assert "CONTENT_CLASS_UNSUPPORTED" in rejected["cloud-general"]

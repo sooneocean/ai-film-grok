@@ -211,9 +211,7 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
                         notes=str(getattr(args, "notes", "") or "") or None,
                         human_minutes=getattr(args, "human_minutes", None),
                         write=True,
-                        write_assist_input=not bool(
-                            getattr(args, "no_assist_input", False)
-                        ),
+                        write_assist_input=not bool(getattr(args, "no_assist_input", False)),
                     )
             except AgentReviewFinalError as exc:
                 _emit({"ok": False, "error": str(exc), "auto_approved": False})

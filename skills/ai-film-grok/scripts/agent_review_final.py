@@ -215,11 +215,7 @@ def _collect_l0(root: Path, *, final: dict[str, Any] | None, duration: float) ->
     dims["escalation"] = {
         "pass": esc_pass,
         "source": "l0",
-        "note": (
-            f"heat active hard_fail={heat_hard}"
-            if heat_active
-            else "heat inactive or clear"
-        ),
+        "note": (f"heat active hard_fail={heat_hard}" if heat_active else "heat inactive or clear"),
         "fail_code": None if esc_pass else "INVENTORY_INCOMPLETE",
     }
 
@@ -232,7 +228,9 @@ def _collect_l0(root: Path, *, final: dict[str, Any] | None, duration: float) ->
         "note": (
             "quality audio pass"
             if audio_q is True
-            else ("quality audio fail" if audio_q is False else "no audio quality gate — provisional")
+            else (
+                "quality audio fail" if audio_q is False else "no audio quality gate — provisional"
+            )
         ),
         "fail_code": None if audio_pass else "AUDIO_MISSING",
     }
@@ -249,9 +247,7 @@ def _collect_l0(root: Path, *, final: dict[str, Any] | None, duration: float) ->
     dims["subs"] = {
         "pass": subs_pass,
         "source": "l0",
-        "note": (
-            f"srt={'yes' if srt_ok else 'no'}; quality_subs={subs_q}"
-        ),
+        "note": (f"srt={'yes' if srt_ok else 'no'}; quality_subs={subs_q}"),
         "fail_code": None if subs_pass else "SUBTITLE_DOUBLE_BURN",
     }
 
@@ -286,7 +282,9 @@ def _collect_l0(root: Path, *, final: dict[str, Any] | None, duration: float) ->
                         else "no editorial — provisional on L0"
                     )
                 ),
-                "fail_code": None if (ed_ok or (editorial.get("ok") is None and objective_all)) else "DURATION_INVALID",
+                "fail_code": None
+                if (ed_ok or (editorial.get("ok") is None and objective_all))
+                else "DURATION_INVALID",
             }
             continue
         # provisional pass only when objective L0 all green
@@ -307,9 +305,7 @@ def _collect_l0(root: Path, *, final: dict[str, Any] | None, duration: float) ->
         row = dims[dim]
         row["timestamp_sec"] = _ts(i, len(ordered), duration)
         row["grade"] = 4 if row["pass"] and row.get("source") == "l0" else (3 if row["pass"] else 1)
-        row["evidence_note"] = (
-            f"[{row.get('source')}] {row.get('note')}"
-        )[:480]
+        row["evidence_note"] = (f"[{row.get('source')}] {row.get('note')}")[:480]
 
     return {
         "objective_all_pass": objective_all,
@@ -350,10 +346,7 @@ def _build_evidence(l0: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 def _build_grades(l0: dict[str, Any]) -> dict[str, int]:
     dims = l0.get("dimensions") or {}
-    return {
-        dim: int((dims.get(dim) or {}).get("grade") or 1)
-        for dim in SCORECARD_DIMENSIONS
-    }
+    return {dim: int((dims.get(dim) or {}).get("grade") or 1) for dim in SCORECARD_DIMENSIONS}
 
 
 def _build_fail_reasons(l0: dict[str, Any]) -> dict[str, list[str]]:
@@ -442,7 +435,9 @@ def build_agent_review_final(
     note_text = (notes or "").strip() or (
         "Agent assist draft from L0 receipts — human confirms full-film watch"
     )
-    minutes = human_minutes if human_minutes is not None else max(1.0, round(duration / 60.0, 2) or 1.0)
+    minutes = (
+        human_minutes if human_minutes is not None else max(1.0, round(duration / 60.0, 2) or 1.0)
+    )
     if not (0 < float(minutes) <= 1440):
         minutes = 1.0
 
@@ -644,9 +639,7 @@ def apply_agent_review_final(
     payload["ok"] = process.returncode == 0
     payload["applied"] = process.returncode == 0
     if process.returncode == 0:
-        payload["note"] = (
-            "review-final accepted assist package; final_complete depends on gates"
-        )
+        payload["note"] = "review-final accepted assist package; final_complete depends on gates"
     else:
         payload["error"] = (
             "review-final rejected assist (technical/editorial gates still apply). "

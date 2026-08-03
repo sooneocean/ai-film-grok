@@ -135,7 +135,11 @@ def select_weapon(
                 "local MiniMax H3 motion pilot requires explicit experimental authorization "
                 "(--allow-experimental) until a weapon is production-promoted"
             )
-        if not promoted and normalized == "adult-meat-motion-i2v" and normalized_stage == "production":
+        if (
+            not promoted
+            and normalized == "adult-meat-motion-i2v"
+            and normalized_stage == "production"
+        ):
             raise ComfyArmoryError(
                 "no promoted local weapon meets the adult meat-motion production gate"
             )
@@ -528,9 +532,7 @@ def compile_weapon_workflow(
             graph[node_id]["inputs"][bindings["steps_input"]] = selected_steps
     if "input_node" in bindings:
         if not input_image_name:
-            raise ComfyArmoryError(
-                f"weapon {weapon_id} requires an uploaded input image name"
-            )
+            raise ComfyArmoryError(f"weapon {weapon_id} requires an uploaded input image name")
         input_image_name = _validate_relative_media_name(input_image_name, label="input image name")
         graph[bindings["input_node"]]["inputs"][bindings["input_image_input"]] = input_image_name
     for node in graph.values():

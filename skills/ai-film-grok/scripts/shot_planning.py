@@ -3,6 +3,7 @@
 Extracted from story_plan.py to separate shot-planning logic from
 beat extraction and graph construction.
 """
+
 from __future__ import annotations
 
 import re
@@ -45,6 +46,7 @@ DRAMATIC_FUNCS = (
     "afterglow",
     "bridge",
 )
+
 
 def _vertical_composition(order: int, df: str) -> str:
     if df in {"hook", "action"}:
@@ -448,5 +450,3 @@ def plan_shots(
             }
         )
     return shots
-
-

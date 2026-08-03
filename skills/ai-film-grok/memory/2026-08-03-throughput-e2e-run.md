@@ -19,7 +19,7 @@
 - [x] media-queue add 过 pilot-go + bulk 门  
 - [x] closeout → review-final 人审门  
 - [ ] 真片 film root 同一路径（用户点名）  
-- [ ] W8 autopilot allowlist（未开）
+- [x] W8 autopilot allowlist（v2.31.35）
 
 ## 注意（冒烟坑）
 - soft fixture 须：**独立 still 字节**、**keyframe 704×1280 9:16**、state generate_plan 空，否则 bulk 挂 geometry/still_uniqueness/state_index。  

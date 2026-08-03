@@ -27,10 +27,119 @@ SELECTION_POLICY = [
 ]
 _RESTRICTED_PHASES = frozenset({"foreplay", "act", "climax", "afterglow"})
 _RESTRICTED_WARDROBE = frozenset({"partial", "undressed", "bare"})
+# Hard difficulty: route to local H3 even when heat_phase was left blank.
+_DIFFICULTY_COITUS = frozenset(
+    {
+        "deep_thrust",
+        "internal_peak",
+        "creampie_release",
+        "creampie",
+        "penetration",
+        "union",
+        "rhythm",
+        "lock",
+    }
+)
+_DIFFICULTY_SEX_ARC = frozenset(
+    {
+        "penetration",
+        "climax_release",
+        "climax",
+        "deep_thrust",
+        "internal_peak",
+        "creampie",
+    }
+)
+_L4_SIZES = frozenset({"l4", "ecu", "extreme_close", "extreme_closeup", "insert_l4"})
 _SUPPORTED_QUALITY_TIERS = frozenset({"draft", "select", "hero"})
 _SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "schemas"
 _MIN_LOCAL_RAM_BYTES = 12 * 1024**3
 _MIN_LOCAL_VRAM_BYTES = 24 * 1024**3
+
+
+def _shot_difficulty_flags(shot: dict[str, Any], dsl: dict[str, Any]) -> list[str]:
+    """Return difficulty reason codes that push a shot toward local H3."""
+    flags: list[str] = []
+    coitus = (
+        str(shot.get("coitus_beat") or dsl.get("coitus_beat") or shot.get("coitus") or "")
+        .strip()
+        .lower()
+    )
+    if coitus in _DIFFICULTY_COITUS:
+        flags.append(f"coitus_beat:{coitus}")
+    sex_arc = str(shot.get("sex_arc_beat") or dsl.get("sex_arc_beat") or "").strip().lower()
+    if sex_arc in _DIFFICULTY_SEX_ARC:
+        flags.append(f"sex_arc_beat:{sex_arc}")
+    camera = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
+    shot_size = (
+        str(shot.get("shot_size") or dsl.get("shot_size") or camera.get("shot_size") or "")
+        .strip()
+        .lower()
+    )
+    contact = shot.get("contact") if shot.get("contact") is not None else dsl.get("contact")
+    has_contact = contact is True or (
+        isinstance(contact, str) and contact.strip().lower() not in {"", "none", "false", "0"}
+    )
+    if shot_size in _L4_SIZES and has_contact:
+        flags.append(f"l4_contact:{shot_size}")
+    sex_pose = str(shot.get("sex_pose") or dsl.get("sex_pose") or "").strip().lower()
+    heat = str(shot.get("heat_phase") or dsl.get("heat_phase") or "").strip().lower()
+    if (
+        sex_pose
+        and sex_pose not in {"none", "embrace", "hug", "kiss", "clothed"}
+        and heat in _RESTRICTED_PHASES
+    ):
+        flags.append(f"sex_pose:{sex_pose}")
+    try:
+        duration = float(shot.get("duration_sec") or dsl.get("duration_sec") or 0)
+    except (TypeError, ValueError):
+        duration = 0.0
+    if duration >= 8.0 and heat in {"act", "climax"}:
+        flags.append(f"long_meat:{duration:g}s")
+    if shot.get("force_local_h3") is True or str(shot.get("motion_lane") or "").lower() in {
+        "local_h3",
+        "comfy-h3",
+        "h3",
+    }:
+        flags.append("explicit_local_h3")
+    return flags
+
+
+def classify_shot_content(
+    shot: dict[str, Any],
+    *,
+    dsl: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Classify general vs restricted_local with heat/wardrobe + difficulty signals."""
+    body = (
+        dsl
+        if isinstance(dsl, dict)
+        else (shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {})
+    )
+    heat_phase = str(shot.get("heat_phase") or body.get("heat_phase") or "").lower()
+    wardrobe = str(shot.get("wardrobe_state") or body.get("wardrobe_state") or "").lower()
+    reasons: list[str] = []
+    if heat_phase in _RESTRICTED_PHASES:
+        reasons.append(f"heat_phase:{heat_phase}")
+    if wardrobe in _RESTRICTED_WARDROBE:
+        reasons.append(f"wardrobe:{wardrobe}")
+    difficulty = _shot_difficulty_flags(shot, body)
+    reasons.extend(difficulty)
+    hard_difficulty = any(
+        flag.startswith(("coitus_beat:", "sex_arc_beat:", "explicit_local_h3", "l4_contact:"))
+        for flag in difficulty
+    )
+    restricted = bool(reasons) and (
+        heat_phase in _RESTRICTED_PHASES or wardrobe in _RESTRICTED_WARDROBE or hard_difficulty
+    )
+    return {
+        "content_class": "restricted_local" if restricted else "general",
+        "restricted": restricted,
+        "heat_phase": heat_phase or None,
+        "wardrobe_state": wardrobe or None,
+        "difficulty_flags": difficulty,
+        "reasons": reasons,
+    }
 
 
 def _dialogue_competition(
@@ -213,9 +322,10 @@ def build_shot_intent(
     if role not in {"hero", "env", "bridge", "insert"}:
         role = "hero"
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
-    heat_phase = str(shot.get("heat_phase") or dsl.get("heat_phase") or "").lower()
-    wardrobe = str(shot.get("wardrobe_state") or dsl.get("wardrobe_state") or "").lower()
-    restricted = heat_phase in _RESTRICTED_PHASES or wardrobe in _RESTRICTED_WARDROBE
+    classification = classify_shot_content(shot, dsl=dsl)
+    heat_phase = str(classification.get("heat_phase") or "")
+    wardrobe = str(classification.get("wardrobe_state") or "")
+    restricted = bool(classification.get("restricted"))
     identity_lock = role == "hero"
     operation = "image_to_video" if identity_lock else "text_to_video"
     unlocked_values = {"", "auto", "default", "unlocked"}
@@ -249,7 +359,10 @@ def build_shot_intent(
         }
     film_profile = str(spec.get("_i2v_profile") or "").strip().lower()
     h3_raw = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
-    h3_enabled = h3_raw.get("enabled") is True or film_profile == "hybrid_h3"
+    # Prefer resolved config (adult-max auto-enable) over raw film-spec only.
+    h3_enabled = (
+        bool(h3_cfg.get("enabled")) or h3_raw.get("enabled") is True or film_profile == "hybrid_h3"
+    )
     lanes = spec.get("motion_lanes") if isinstance(spec.get("motion_lanes"), dict) else {}
     dialogue = bool(
         shot.get("lipsync") is True
@@ -280,6 +393,7 @@ def build_shot_intent(
     elif identity_lock:
         recommended_lane = str(lanes.get("setup_non_sensitive") or "cloud_grok")
         recommended_provider = "grok"
+    recommended_still = "comfy_lan" if restricted and identity_lock else "grok"
     return {
         "schema_version": 1,
         "kind": "ai-film-shot-intent",
@@ -294,12 +408,19 @@ def build_shot_intent(
         "recommended_lane": recommended_lane,
         "recommended_provider": recommended_provider,
         "recommended_weapon": recommended_weapon,
+        "recommended_still_provider": recommended_still,
         "h3_enabled": bool(h3_enabled),
-        "max_duration_sec": float(h3_cfg.get("max_duration_sec") or 8) if recommended_provider == "comfy-h3" else None,
+        "difficulty_flags": list(classification.get("difficulty_flags") or []),
+        "route_reasons": list(classification.get("reasons") or []),
+        "max_duration_sec": float(h3_cfg.get("max_duration_sec") or 8)
+        if recommended_provider == "comfy-h3"
+        else None,
         "parent_shot_id": parent_shot_id,
         "broll_kind": broll_kind,
         "editorial_only": parent_shot_id is not None,
         "audio_policy": audio_policy,
+        "heat_phase": heat_phase or None,
+        "wardrobe_state": wardrobe or None,
     }
 
 
