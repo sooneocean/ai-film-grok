@@ -29,9 +29,8 @@ from util import utc_now, write_json
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    """Strict-local: missing/invalid JSON becomes {} (stage receipts)."""
-    data = _util_read_json(path)
-    return data if isinstance(data, dict) else {}
+    """Soft local: missing/invalid JSON becomes {} (stage receipts)."""
+    return _util_read_json(path) or {}
 
 
 def inspect_hf_caption_export(root: Path) -> dict[str, Any]:

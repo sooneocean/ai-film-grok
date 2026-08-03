@@ -34,7 +34,6 @@ from security_policy import (
     safe_output_path,
     safe_workspace_directory,
 )
-from util import read_json as _util_read_json
 from util import utc_now, write_json
 
 SCHEMA_VERSION = 1
@@ -45,11 +44,14 @@ class ComposeRenderError(RuntimeError):
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Strict read_json — raises ComposeRenderError on missing (unlike util.read_json's None)."""
-    data = _util_read_json(path)
-    if data is None:
-        raise ComposeRenderError(f"Missing JSON: {path}")
-    return data
+    """Strict JSON via util.require_json; map FilmError → ComposeRenderError."""
+    from util import require_json
+    from util.errors import FilmError
+
+    try:
+        return require_json(path)
+    except FilmError as exc:
+        raise ComposeRenderError(str(exc)) from exc
 
 
 def run(

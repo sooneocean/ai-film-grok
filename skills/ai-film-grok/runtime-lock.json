@@ -114,7 +114,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "c3c0317997975d8dd4aba7529920b447b395ceeff07445c4e3870021a008057b"
+      "sha256": "4077030df033a71601039709b4674462eb9f6713d0c64776cdb033ab102f37d1"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -410,7 +410,7 @@
     },
     {
       "path": "scripts/compose_render.py",
-      "sha256": "9312c92fbe4f757bbb17f526f89f0b69ac5cf76be709c9e73e6d0ca0e26c4169"
+      "sha256": "3d11af8672f7857ea8596437f0dd777d5dfbc66f5fcf4516a1862c6c7aa668f8"
     },
     {
       "path": "scripts/config_loader.py",
@@ -582,7 +582,7 @@
     },
     {
       "path": "scripts/export_composition.py",
-      "sha256": "7afe143ee413d787a8d78d136b3659e8519ac584824b20e45c6e7e826160937b"
+      "sha256": "3605e850947126b2ff3701100e3616ee322ac10b860e74432460fe07cae58b93"
     },
     {
       "path": "scripts/external_review.py",
@@ -610,7 +610,7 @@
     },
     {
       "path": "scripts/final_stages.py",
-      "sha256": "1279660dc293b488b3262d9799a6623c03c4884c4f8601ab89c70adeea32695b"
+      "sha256": "ab335fc4aa59d4c7dd6ce29ca3ec642db554c6374397b746db34a495667549bd"
     },
     {
       "path": "scripts/framing_lint.py",
@@ -854,7 +854,7 @@
     },
     {
       "path": "scripts/pilot_review.py",
-      "sha256": "b26eb2d40819186c67bc21e3645e7c528ec7f2647cad58b95fd544af9ca9cb29"
+      "sha256": "e10ccd244320c459c06bc52ebeb1e7c5fb268354157c5466bdce9c73347e991d"
     },
     {
       "path": "scripts/pipeline_events.py",
@@ -982,7 +982,7 @@
     },
     {
       "path": "scripts/render_final.py",
-      "sha256": "fd189d1da5bc7d9ffc3a0f8dda44e615cd9047fc25ad89d50ad646ebab7cb4af"
+      "sha256": "a623f39c21e20a5a482bea9f2b9300fdebed56eed4a3374997c8790612d5db7e"
     },
     {
       "path": "scripts/render_workspace.py",
@@ -1182,7 +1182,7 @@
     },
     {
       "path": "scripts/util/__init__.py",
-      "sha256": "cd023a44d1df34494a6cb3b99c7c18ff423b67a0402e6f7958a1d33e884fe839"
+      "sha256": "48d3d2dc46ca98b995e5fca430db421bc32fdddf9bf2cd7c022708fc72f58ecf"
     },
     {
       "path": "scripts/util/errors.py",
@@ -1190,7 +1190,7 @@
     },
     {
       "path": "scripts/util/json_io.py",
-      "sha256": "cbe461542ae8961196e4d17a4ededcc2aea26e146dcf304c80d67737ed5314b1"
+      "sha256": "763e7691093fa07b55f3cbde971f0e55f04582335cf936cf91252948fc70fd8c"
     },
     {
       "path": "scripts/util/subprocess.py",

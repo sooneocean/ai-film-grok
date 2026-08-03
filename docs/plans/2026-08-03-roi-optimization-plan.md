@@ -1,20 +1,21 @@
 # ai-film-grok ROI 优化计划 — 2026-08-03
 
-**Status:** A–E DONE · G partial · F deferred · **P4b artifacts media untrack** · **v2.31.17**  
+**Status:** **CLOSED** · A–E + Phase2 + light pre-push · **v2.31.18+ on origin**  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok`  
-**version:** `2.31.15` · **branch:** `main`（ahead origin；本批 commit 后工作区应收干净）  
+**Loop:** `make check-all` → bump → `make lock-runtime`（若改 scripts）→ `make sync-docs` → commit → `git push`（light）  
 **Method:** 实跑基线（pytest / ruff / doctor / project_audit），按 impact×likelihood÷cost 排序
 
-### Session closeout (2026-08-03 · 全面优化)
+### Session closeout (2026-08-03 · 全面优化 · 已打通)
 
 | Batch | Result |
 |-------|--------|
-| A runtime-lock | DONE — `aifilm lock-runtime`；doctor `core_readiness.ok=true` |
-| B story dual-path | DONE — `story_plan` ~−650 行；beat APIs re-export `beat_extraction`；`draft_story_contract` in `story_contract` |
-| C docs | DONE earlier + this CHANGELOG 2.31.13 |
-| D final contracts | DONE earlier (`test_final_hotpath_contracts`)；本轮补 re-export 同一性测 |
-| E util | DONE earlier + `final_stages` write 直连 util |
-| Verify | fast suite **2502 passed** · ruff scripts clean · doctor core green · strict advisory only |
+| A runtime-lock | DONE — doctor `core_readiness.ok=true` |
+| B story dual-path | DONE — `story_plan` re-export `beat_extraction`；`draft_story_contract` |
+| C docs | DONE · CHANGELOG 跟版 |
+| D final contracts | DONE · `test_final_hotpath_contracts` |
+| E util | DONE · `require_json` 硬读 + 热路径委托 |
+| Phase2 | DONE · token/制度/memory/artifacts |
+| Push path | DONE · pre-push light（full 可选） |
 
 ---
 

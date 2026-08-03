@@ -1,35 +1,32 @@
-"""Strict JSON I/O — raises on missing, atomic writes."""
+"""Strict JSON I/O — thin facade over ``util`` for legacy imports.
+
+Prefer::
+
+    from util import read_json, require_json, write_json
+
+``read_json`` here is **strict** (raises FilmError) for backward compatibility
+with early util.json_io callers; package-level ``util.read_json`` stays soft.
+"""
 
 from __future__ import annotations
 
-import json
-import os
-import tempfile
 from pathlib import Path
 from typing import Any
 
-from util.errors import FilmError
-
-
-def write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=path.parent, delete=False
-    ) as handle:
-        json.dump(data, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-        temp = Path(handle.name)
-    os.replace(temp, path)
+from util import require_json, write_json
+from util.errors import FilmError  # noqa: F401 — re-export
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        raise FilmError(f"Missing JSON: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    """Strict read (legacy name on this module)."""
+    return require_json(path)
 
 
 def atomic_write_text(path: Path, content: str, *, encoding: str = "utf-8") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    import os
+    import tempfile
+
     temp: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -42,3 +39,6 @@ def atomic_write_text(path: Path, content: str, *, encoding: str = "utf-8") -> N
     finally:
         if temp is not None and temp.exists():
             temp.unlink()
+
+
+__all__ = ["FilmError", "atomic_write_text", "read_json", "write_json"]

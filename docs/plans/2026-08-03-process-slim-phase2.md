@@ -1,7 +1,7 @@
 # ai-film-grok 流程瘦身 Phase 2 — 2026-08-03
 
-**Status:** **P0–P5 VERIFIED DONE** · 2026-08-03 · **v2.31.16–17**  
-**Remote:** 2.31.16 已在 origin；**2.31.17**（untrack canary media）本地领先 origin（需你 `push`）  
+**Status:** **P0–P5 VERIFIED DONE** · 2026-08-03 · **v2.31.16–18 on origin**  
+**Remote:** Phase2 + light pre-push 已推送；开发环见 Makefile `check-all` / `release-light`  
 **前置:** ROI A–E + release 2.31.15；见 `2026-08-03-roi-optimization-plan.md`  
 **目标:** 更有效率、更稳定——**少重复真相、少 token 税、少流程名词、少仓内垃圾**
 

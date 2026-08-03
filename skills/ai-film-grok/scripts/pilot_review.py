@@ -44,7 +44,7 @@ class PilotReviewError(RuntimeError):
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Permissive read_json — returns {} on missing/error (unlike util.read_json's None)."""
+    """Soft JSON — missing/invalid becomes ``{}``."""
     return _util_read_json(path) or {}
 
 

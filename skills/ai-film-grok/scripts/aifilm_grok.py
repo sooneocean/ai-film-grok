@@ -100,11 +100,10 @@ EXPORT_METADATA_FILES = (
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Strict read_json — raises FilmError on missing file (unlike util.read_json's None)."""
-    data = _util_read_json(path)
-    if data is None:
-        raise FilmError(f"Missing JSON: {path}")
-    return data
+    """Strict JSON read — delegates to ``util.require_json``."""
+    from util import require_json
+
+    return require_json(path)
 
 
 def slugify(text: str) -> str:

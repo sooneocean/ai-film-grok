@@ -46,32 +46,28 @@ ai-film-grok/                    ← plugin root / git root
 
 细则见 skill 内 `references/pipeline-methodology.md` · `references/hard-defaults.md`。
 
-## 迭代循环（agent 默认）
+## 迭代循环（agent 默认 · 已打通）
 
 ```bash
 ROOT="$(git rev-parse --show-toplevel)"
-SKILL="$ROOT/skills/ai-film-grok"
-AIFILM="$SKILL/scripts/aifilm"
+# 或一键：make check-all && make release-light
 
 # 1) 改源码（仅 $ROOT）
-# 2) 校验包装
-grok plugin validate "$ROOT"
+# 2–5) 日常绿线（与 make check-all 等价）
+make -C "$ROOT" check-all          # validate + ruff + doctor + pytest -m 'not slow'
 
-# 3) Ruff lint + format check
-ruff check "$SKILL/scripts/" && ruff format --check "$SKILL/scripts/"
-
-# 4) 机位 / 门禁
-"$AIFILM" doctor
-
-# 5) 相关测试（fast path: 排除 slow）
-cd "$SKILL" && python3 -m pytest tests/ -q --tb=line -m "not slow"
-
-# 6) 功能变更 → bump plugin.json version（semver）
-# 7) 刷新本机 installed 副本
+# 6) 功能变更 → bump plugin.json version（semver）+ CHANGELOG
+# 7) 若改了 scripts 指纹：make lock-runtime
+# 8) make sync-docs（版本指针）
+# 9) 刷新本机 installed 副本
 grok plugin update ai-film-grok
 
-# 8) commit（message 英文）+ push origin main
+# 10) commit（message 英文）
+# 11) push：pre-push 默认 light（docs+doctor core）；重测用 AIFILM_RELEASE_GATE=full
+git push origin main
 ```
+
+JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmError）；新代码勿再复制 `_read_json`。
 
 ## 硬规则（指针 · 正文在 hard-defaults / stages）
 

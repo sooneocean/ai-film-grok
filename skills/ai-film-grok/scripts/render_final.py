@@ -81,7 +81,6 @@ from sound_plan import (
     validate_audio_tracks_contract,
 )
 from transition_ops import TransitionOperationError, bind_transition_operations_to_timeline
-from util import read_json as _util_read_json
 from util import utc_now, write_json
 
 # local sibling import
@@ -345,15 +344,16 @@ class RenderError(RuntimeError):
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Read JSON — delegates to util.read_json, raises on missing/invalid."""
-    data = _util_read_json(path)
-    if data is None:
-        # util.read_json returns None for missing/invalid; render_final callers
-        # expect an exception (original raised FileNotFoundError/JSONDecodeError)
+    """Strict JSON via util.require_json; map FilmError → FileNotFound/ValueError."""
+    from util import require_json
+    from util.errors import FilmError
+
+    try:
+        return require_json(path)
+    except FilmError as exc:
         if not path.is_file():
-            raise FileNotFoundError(f"Missing JSON: {path}")
-        raise ValueError(f"Invalid JSON: {path}")
-    return data
+            raise FileNotFoundError(f"Missing JSON: {path}") from exc
+        raise ValueError(f"Invalid JSON: {path}") from exc
 
 
 

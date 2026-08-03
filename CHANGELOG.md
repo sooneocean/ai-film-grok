@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.31.19] - 2026-08-03
+
+### Changed
+- **Optimization loop wired end-to-end:** `make check-all` / `make test-fast` / `make release-light` / `make lock-runtime` documented in Makefile + AGENTS.
+- `util.require_json` strict read; soft `read_json` / atomic `write_json` remain the package API. Hot paths (`aifilm_grok`, `render_final`, `compose_render`, `export_composition`) delegate instead of local copies.
+- `util.json_io` is a legacy strict facade over `require_json`/`write_json`.
+
+### Added
+- `tests/test_util_json_contract.py` locks soft vs strict JSON behavior.
+
+
 ## [2.31.18] - 2026-08-03
 
 ### Changed

@@ -40,7 +40,6 @@ from transition_ops import (
     assert_hyperframes_safe_operations,
     bind_transition_operations_to_timeline,
 )
-from util import read_json as _util_read_json
 from util import utc_now, write_json
 
 SCHEMA_VERSION = 1
@@ -67,11 +66,14 @@ def write_text(path: Path, text: str) -> None:
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Strict read_json — raises ComposeExportError on missing (unlike util.read_json's None)."""
-    data = _util_read_json(path)
-    if data is None:
-        raise ComposeExportError(f"Missing JSON: {path}")
-    return data
+    """Strict JSON via util.require_json; map FilmError → ComposeExportError."""
+    from util import require_json
+    from util.errors import FilmError
+
+    try:
+        return require_json(path)
+    except FilmError as exc:
+        raise ComposeExportError(str(exc)) from exc
 
 
 def final_delivery_has_burned_subtitles(root: Path) -> bool:

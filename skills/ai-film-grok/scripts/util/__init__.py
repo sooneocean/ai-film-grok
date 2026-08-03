@@ -1,4 +1,11 @@
-"""Shared I/O and general-purpose utilities for the ai-film-grok pipeline."""
+"""Shared I/O and general-purpose utilities for the ai-film-grok pipeline.
+
+JSON contract (single entry for new code):
+
+- ``read_json(path)`` → soft: missing/invalid → ``None`` (use ``or {}``)
+- ``require_json(path)`` → strict: missing/invalid → ``FilmError``
+- ``write_json(path, data)`` → atomic UTF-8 pretty write
+"""
 
 from __future__ import annotations
 
@@ -12,6 +19,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from util.errors import FilmError
 from util.subprocess import run, run_compose_env  # noqa: F401
 from util.time import utc_now  # noqa: F401
 from util.validators import (  # noqa: F401
@@ -40,12 +48,7 @@ def sha256_file(path: Path) -> str:
 
 
 def read_json(path: Path) -> dict[str, Any] | None:
-    """Read and parse a JSON file.
-
-    Returns the parsed dict on success, or *None* if the file is missing,
-    unreadable, or contains invalid JSON.  Callers that expect a default
-    empty dict should write ``read_json(p) or {}``.
-    """
+    """Soft read: missing/invalid/non-object → ``None`` (use ``or {}``)."""
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         return raw if isinstance(raw, dict) else None
@@ -53,12 +56,18 @@ def read_json(path: Path) -> dict[str, Any] | None:
         return None
 
 
-def write_json(path: Path, data: Any) -> None:
-    """Serialise *data* as pretty-printed JSON and write to *path*.
+def require_json(path: Path) -> dict[str, Any]:
+    """Strict read: missing or invalid JSON raises ``FilmError``."""
+    data = read_json(path)
+    if data is None:
+        if not path.is_file():
+            raise FilmError(f"Missing JSON: {path}")
+        raise FilmError(f"Invalid JSON: {path}")
+    return data
 
-    Creates parent directories automatically.  Uses ``ensure_ascii=False``
-    so Unicode characters are written verbatim.
-    """
+
+def write_json(path: Path, data: Any) -> None:
+    """Atomic pretty-print JSON write (``ensure_ascii=False``)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
     with tempfile.NamedTemporaryFile(
