@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.31.31] - 2026-08-03
+
+### Changed
+- **P0 gate automation:** demote local no-spend delivery helpers from `human_required` → `none`:
+  - `export-desktop`, `dailies`, skill `export.package`
+  - `pilot pack` / `pilot-pack` GO evidence write (approve remains human)
+- `advance` allowlists `export-desktop` (no `--force`); export name derived from film title (no `<中文名>` placeholder)
+- `review-final` / `pilot approve` / paid+external spend stay human-gated
+
+### Added
+- Tests: `tests/test_workflow_p0_gates.py`
+
 ## [2.31.30] - 2026-08-03
 
 ### Added
@@ -13,6 +25,9 @@
 
 ### Tests
 - `tests/test_h3_workflow.py` (CLI dispatch, plan/list, audio prefer/keep/strip decisions).
+
+### Verified
+- 5090 e2e: `aifilm h3 run` I2V + `prefer_native` → keep_native (mean_volume -19.1 dB, aac stereo), register candidate (`artifacts/…/h3-workflow-e2e/e2e-report.json`).
 
 ## [2.31.29] - 2026-08-03
 
