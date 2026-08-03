@@ -26,10 +26,24 @@
     "continuity_required": { "type": "boolean" },
     "quality_tier": { "enum": ["draft", "select", "hero"] },
     "provider_lock": { "type": ["string", "null"] },
+    "recommended_lane": { "type": ["string", "null"] },
+    "recommended_provider": { "type": ["string", "null"] },
+    "recommended_weapon": { "type": ["string", "null"] },
+    "h3_enabled": { "type": "boolean" },
+    "max_duration_sec": { "type": ["number", "null"] },
     "parent_shot_id": { "type": ["string", "null"] },
     "broll_kind": { "type": ["string", "null"], "enum": ["env", "insert", "reaction", null] },
     "editorial_only": { "type": "boolean" },
-    "audio_policy": { "type": ["string", "null"], "enum": ["carry_parent_dialogue", null] }
+    "audio_policy": {
+      "type": ["string", "null"],
+      "enum": [
+        "carry_parent_dialogue",
+        "strip_native_use_tts_bgm",
+        "keep_native",
+        "mute_native",
+        null
+      ]
+    }
   },
   "additionalProperties": false
 }

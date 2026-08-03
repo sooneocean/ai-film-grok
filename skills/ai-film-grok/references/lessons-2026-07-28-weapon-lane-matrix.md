@@ -8,7 +8,7 @@
 | 层 | 镜头类型 | 主武器 | 备胎 | 禁止 |
 |---|---|---|---|---|
 | **L0 静帧** | 人脸/衣着/bare 锚 | **Comfy Qwen i2i 5090**（+ 日后 FRW img2image 双打） | Grok image_edit（易审） | 全装 cast 当 bare 源 |
-| **L1 人物戏** | hero / 对白 / 肉戏 I2V | **5090 Wan**（先 480 turbo 通片→再升） | Grok 1.5 仅 **非露** setup | 肉戏硬塞 Grok |
+| **L1 人物戏** | hero / 对白 / 肉戏 I2V | **对白 FRW LTX**；**肉戏 5090 MiniMax H3**（pilot · ≤8s · mp0.2） | Grok 1.5 仅 **非露** setup | 肉戏硬塞 Grok；Wan 本地退役 |
 | **L2 场景/空气** | env / bridge / insert / 墙外/白板空镜 | **FRW `ltx-t2v` / text2video** | classic t2v · Seedance t2v | 用 T2V 冒充脸一致 |
 
 ## 并行时间轴（真省墙钟）
@@ -47,4 +47,4 @@
 - 单卡 Wan 禁止双开当真并行
 
 ## 最大力量一句话
-**脸与衣着：5090；空气与场景：FRW T2V；轻人物非露：Grok 1.5；声音本地 TTS——四车道时间重叠，GPU 只打最贵的仗。**
+**脸与衣着与尺度：5090（Qwen+H3）；空气：FRW T2V；轻人物非露：Grok；对白：LTX；声音：Edge+rnb——GPU 只打最贵的仗。**

@@ -1,4 +1,9 @@
-# 混合火力 · API × 本地（2026-07-28 强化）
+# 混合火力 · API × 本地（2026-07-28 强化 · **2026-08-03 H3 更新**）
+
+> **2026-08-03**：本地动作主武器由退役的 Wan 2.2 I2V 换为 **MiniMax H3**（`comfy-h3` · T2V/I2V pilot；R2V 待 ref2va）。  
+> 配置：`AIFILM_I2V_PROFILE=hybrid_h3` 或片级 `h3.enabled=true`。云 bulk 仍默认 Grok；敏感/肉戏 soft-lock H3。  
+> 成片默认 `h3.audio_policy=strip_native_use_tts_bgm`（Edge TTS + rnb）。
+
 
 ## 用户原话
 还有 Grok Imagine、FRW API；**API 与本地交叉使用可以迸发更大力量** — 请思考。
@@ -9,8 +14,9 @@
 | 能力 | 用途 | 成本/墙钟 |
 |---|---|---|
 | Qwen Image Edit i2i | bare 补图、卸装不回穿、pose 改 | 免费 · 中速 |
-| Wan I2V official turbo | 通片人物/肉戏 低压 | 免费 · 中快 |
-| Wan adult-motion quality | 二轮升画质肉戏 | 免费 · 慢 |
+| **MiniMax H3 I2V**（`minimax-h3-i2v-pilot`） | 人物/肉戏/敏感 I2V（pilot） | 免费 · 中速 |
+| **MiniMax H3 T2V** | 本地环境/气氛（可与 FRW 并行策略择一） | 免费 · 中速 |
+| MiniMax H3 R2V | 多 ref 锁脸/风格（待 ref2va 权重） | 免费 · 较慢 |
 | （日后）本地 upscale | selects 后抬分辨率 | 免费 |
 
 **独占理由**：尺度、无审核、无限重试、脸+衣着可控。
@@ -58,6 +64,7 @@
    - Grok moderated → 不重试烧钱 → 落 5090
    - FRW 404/积分 → 本地 Wan 环境镜降级（远景/弱人物）
    - 本地挂 → SSH 自启；仍挂 → Grok 非露顶一阵
+   - H3 OOM → free-memory；降 mp/duration；单 client
 
 5. **时间重叠 > 单引擎极限**
    ```
@@ -65,7 +72,7 @@
        FRW：env T2V 全扔队列
        Grok：setup 非露 I2V（限流内 1–2 并发）
        本机：TTS/BGM
-   t1  本地：Wan 肉戏串行 turbo
+   t1  本地：H3 肉戏 I2V 串行（≤8s · draft mp0.2）
        FRW：query 回收 env
        Grok：query 回收
    t2  人工/门禁：衣着连贯 + 运动门
@@ -79,11 +86,11 @@
 
 | 镜头语义 | 首选编队 | 交叉补强 |
 |---|---|---|
-| 主角近景 / 表情 / 露乳 | 本地 still → Wan | Grok 禁；FRW 仅补空镜垫 |
-| 办事 / 定器 / climax | 本地 only | — |
-| setup 未露 / 走路推镜 | Grok 1.5 I2V | 失败→Wan turbo |
+| 主角近景 / 表情 / 露乳 | 本地 still → **H3 I2V** | Grok 禁；FRW 仅补空镜垫 |
+| 办事 / 定器 / climax | 本地 only（**comfy-h3**） | — |
+| setup 未露 / 走路推镜 | Grok 1.5 I2V | 失败→H3 I2V pilot |
 | 墙外、灯、白板、实验室空气 | FRW T2V | 本地做一张 style still 作文字锚（可选） |
-| 转场 A→B | FRW FLF 或 本地 last→next still + Wan | — |
+| 转场 A→B | FRW FLF 或 本地 last→next still + **H3 I2V** | 禁 60s 超长一镜占卡 |
 | 静帧尺度抬升 | 本地 Qwen **主** + FRW i2i **并行 A/B** | 择优（dual-lane 已定） |
 | 概念分镜/look | Grok image 快扫 | 定妆后锁本地 cast |
 

@@ -930,7 +930,7 @@
     },
     {
       "path": "scripts/production_router.py",
-      "sha256": "cee9758f4c3caa3db7ddd90da96f648e962b9c85ae06988ea4bdb70e2b47aac8"
+      "sha256": "146a03ac92ec7220db28850df19af26db006abda27383c894d568e1ab09fdcc4"
     },
     {
       "path": "scripts/production_team.py",

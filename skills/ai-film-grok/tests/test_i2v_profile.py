@@ -20,15 +20,16 @@ from film_spec import (  # noqa: E402
 
 class I2VProfileTests(unittest.TestCase):
     def test_grok_primary_default(self) -> None:
-        env = {
-            k: v
-            for k, v in os.environ.items()
-            if k not in {"AIFILM_I2V_PROFILE", "AIFILM_SEEDANCE_AVAILABLE"}
-        }
-        with mock.patch.dict(os.environ, env, clear=True):
-            # clear those keys
-            os.environ.pop("AIFILM_I2V_PROFILE", None)
-            os.environ.pop("AIFILM_SEEDANCE_AVAILABLE", None)
+        # Explicit env wins over skill config.env (which may set hybrid_h3 for ops).
+        import config_loader as cl
+
+        with mock.patch.dict(
+            os.environ,
+            {"AIFILM_I2V_PROFILE": "grok_primary"},
+            clear=False,
+        ):
+            cl._CONFIG = None
+            cl._CONFIG_ENV_FINGERPRINT = None
             self.assertEqual(resolve_i2v_profile(), "grok_primary")
             self.assertEqual(default_i2v_provider(), "grok")
 
@@ -43,6 +44,11 @@ class I2VProfileTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "ltx23_primary"}):
             self.assertEqual(resolve_i2v_profile(), "ltx23_primary")
             self.assertEqual(default_i2v_provider(), "frw-ltx23")
+
+    def test_hybrid_h3_profile_opt_in(self) -> None:
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "hybrid_h3"}):
+            self.assertEqual(resolve_i2v_profile(), "hybrid_h3")
+            self.assertEqual(default_i2v_provider(), "grok")
 
     def test_write_spec_auto_to_grok(self) -> None:
         with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}):

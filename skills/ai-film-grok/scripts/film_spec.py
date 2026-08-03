@@ -92,8 +92,8 @@ TTS_BACKENDS = frozenset(
 )
 # Motion provider profile. FRW LTX 2.3 is the production action primary.
 # ``seedance_first`` and ``grok_primary`` remain readable compatibility inputs.
-I2V_PROVIDERS = frozenset({"frw", "frw-ltx23", "grok", "auto"})
-I2V_PROFILES = frozenset({"ltx23_primary", "seedance_first", "grok_primary"})
+I2V_PROVIDERS = frozenset({"frw", "frw-ltx23", "grok", "comfy-h3", "auto"})
+I2V_PROFILES = frozenset({"ltx23_primary", "seedance_first", "grok_primary", "hybrid_h3"})
 # Native resolution for 9:16 shorts. FRW LTX may return 704x1280 and must
 # preserve that native pair; conforming is a later delivery decision.
 DEFAULT_FRW_ASPECT = "9:16"
@@ -152,9 +152,51 @@ def resolve_i2v_profile() -> str:
 
 def default_i2v_provider() -> str:
     profile = resolve_i2v_profile()
-    if profile == "grok_primary":
+    if profile in {"grok_primary", "hybrid_h3"}:
+        # hybrid_h3 keeps Grok as the bulk auto lock; restricted shots route to
+        # comfy-h3 via production_router / shot intent, not a film-wide lock.
         return "grok"
     return "frw-ltx23" if profile == "ltx23_primary" else "frw"
+
+
+DEFAULT_H3_CONFIG: dict[str, object] = {
+    "enabled": False,
+    "stage": "pilot",
+    "max_duration_sec": 8,
+    "megapixels_draft": 0.2,
+    "megapixels_select": 0.6,
+    "audio_policy": "strip_native_use_tts_bgm",
+    "allow_bulk": False,
+}
+
+
+def resolve_h3_config(spec: dict | None = None) -> dict[str, object]:
+    """Merge film-spec h3 block with profile defaults (hybrid_h3 opts in)."""
+    profile = resolve_i2v_profile()
+    raw = (spec or {}).get("h3") if isinstance(spec, dict) else None
+    merged = dict(DEFAULT_H3_CONFIG)
+    if profile == "hybrid_h3":
+        merged["enabled"] = True
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            if key in DEFAULT_H3_CONFIG or key in {"notes"}:
+                merged[key] = value
+    # clamp duration hard top for GPU safety
+    try:
+        max_dur = float(merged.get("max_duration_sec") or 8)
+    except (TypeError, ValueError):
+        max_dur = 8.0
+    merged["max_duration_sec"] = max(3.0, min(max_dur, 15.0))
+    try:
+        mp = float(merged.get("megapixels_draft") or 0.2)
+    except (TypeError, ValueError):
+        mp = 0.2
+    merged["megapixels_draft"] = max(0.1, min(mp, 1.0))
+    audio = str(merged.get("audio_policy") or "strip_native_use_tts_bgm").strip()
+    if audio not in {"strip_native_use_tts_bgm", "keep_native", "mute_native"}:
+        audio = "strip_native_use_tts_bgm"
+    merged["audio_policy"] = audio
+    return merged
 
 
 def default_frw_video_model() -> str:
@@ -790,11 +832,17 @@ def validate_film_spec(
                 "auto→grok (AIFILM_I2V_PROFILE=grok_primary / Seedance unavailable: "
                 "bulk image_to_video; still=image_edit cast; register image_to_video)"
             )
+        elif i2v_profile == "hybrid_h3":
+            i2v_notes.append(
+                "auto→grok bulk primary + hybrid_h3 lanes: restricted/meat → comfy-h3 pilot; "
+                "env → FRW ltx-t2v; dialogue → FRW LTX; setup non-sensitive → Grok; "
+                "H3 native audio stripped for final TTS/BGM by default"
+            )
         else:
             i2v_notes.append("auto→frw-ltx23 (compatibility profile normalized to LTX primary)")
         spec["_i2v_notes"] = i2v_notes
     # Explicit legacy FRW remains readable for a deliberate recovery run.
-    if i2v_profile == "grok_primary" and i2v_provider == "frw":
+    if i2v_profile in {"grok_primary", "hybrid_h3"} and i2v_provider == "frw":
         i2v_notes = list(spec.get("_i2v_notes") or [])
         i2v_notes.append(
             "NOTE explicit i2v_provider=frw — allowed only for a recorded technical fallback; "
@@ -802,6 +850,17 @@ def validate_film_spec(
         )
         spec["_i2v_notes"] = i2v_notes
     spec["i2v_provider"] = i2v_provider
+    # Dual-lane MiniMax H3 defaults (opt-in via hybrid_h3 or explicit h3.enabled).
+    h3_cfg = resolve_h3_config(spec)
+    spec["h3"] = h3_cfg
+    if h3_cfg.get("enabled") is True and not isinstance(spec.get("motion_lanes"), dict):
+        spec["motion_lanes"] = {
+            "default": "cloud",
+            "restricted_local": "comfy-h3",
+            "env": "frw_ltx_t2v",
+            "dialogue": "frw_ltx23",
+            "setup_non_sensitive": "grok",
+        }
     # FRW video model (Seedance/LTX path). auto → seedance id kept as aspirational label
     raw_fvm = spec.get("frw_video_model", default_frw_video_model())
     if not isinstance(raw_fvm, str) or raw_fvm.lower() not in FRW_VIDEO_MODELS:

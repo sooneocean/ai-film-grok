@@ -107,8 +107,36 @@
       "description": "Still-image provider lock. auto leaves per-demand armory selection unlocked."
     },
     "i2v_provider": {
-      "enum": ["frw", "frw-ltx23", "grok", "auto"],
-      "description": "Bulk motion provider. auto resolves to reviewed FRW LTX 2.3 native-audio I2V; explicit values preserve an existing project lock."
+      "enum": ["frw", "frw-ltx23", "grok", "comfy-h3", "auto"],
+      "description": "Bulk motion provider. auto follows AIFILM_I2V_PROFILE (grok_primary/hybrid_h3 → grok; ltx23_primary → frw-ltx23). comfy-h3 is the local MiniMax H3 pilot lock; restricted shots may soft-lock to comfy-h3 under hybrid_h3 without changing film-wide auto bulk."
+    },
+    "motion_lanes": {
+      "type": "object",
+      "description": "Optional dual-lane owners: cloud vs local MiniMax H3.",
+      "properties": {
+        "default": { "type": "string" },
+        "restricted_local": { "type": "string" },
+        "env": { "type": "string" },
+        "dialogue": { "type": "string" },
+        "setup_non_sensitive": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "h3": {
+      "type": "object",
+      "description": "Local MiniMax H3 lane controls (enabled by hybrid_h3 profile or explicit true).",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "stage": { "type": "string" },
+        "max_duration_sec": { "type": "number" },
+        "megapixels_draft": { "type": "number" },
+        "megapixels_select": { "type": "number" },
+        "audio_policy": {
+          "enum": ["strip_native_use_tts_bgm", "keep_native", "mute_native"]
+        },
+        "allow_bulk": { "type": "boolean" }
+      },
+      "additionalProperties": true
     },
     "frw_video_model": {
       "enum": [

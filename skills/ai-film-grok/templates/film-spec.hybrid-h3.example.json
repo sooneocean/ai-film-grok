@@ -1,0 +1,31 @@
+{
+  "title": "hybrid-h3-example",
+  "genre": "adult",
+  "aspect_ratio": "9:16",
+  "vo_mode": "storyteller",
+  "tts_backend": "edge",
+  "i2v_provider": "auto",
+  "still_provider": "comfy_lan",
+  "h3": {
+    "enabled": true,
+    "stage": "pilot",
+    "max_duration_sec": 8,
+    "megapixels_draft": 0.2,
+    "megapixels_select": 0.6,
+    "audio_policy": "strip_native_use_tts_bgm",
+    "allow_bulk": false
+  },
+  "motion_lanes": {
+    "default": "cloud",
+    "restricted_local": "comfy-h3",
+    "env": "frw_ltx_t2v",
+    "dialogue": "frw_ltx23",
+    "setup_non_sensitive": "grok"
+  },
+  "notes": [
+    "AIFILM_I2V_PROFILE=hybrid_h3 (or keep grok_primary and set h3.enabled true).",
+    "Restricted/meat hero shots soft-lock to comfy-h3 pilot; bulk auto stays Grok.",
+    "H3 native stereo is stripped for final; Edge TTS + rnb BGM remain owners.",
+    "Do not allow_bulk until user-approved pilot and weapon promote."
+  ]
+}

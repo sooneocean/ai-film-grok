@@ -234,6 +234,52 @@ def build_shot_intent(
     )
     parent_shot_id = str(shot.get("_dialogue_broll_parent") or "").strip() or None
     broll_kind = str(shot.get("kind") or "").strip().lower() or None
+    # Dual-lane recommendation (cloud Grok/FRW vs local MiniMax H3).
+    # Soft-lock only when the *film* opts in (h3.enabled or film _i2v_profile),
+    # not merely because the process env profile is hybrid_h3.
+    try:
+        from film_spec import resolve_h3_config
+
+        h3_cfg = resolve_h3_config(spec)
+    except Exception:
+        h3_cfg = {
+            "enabled": False,
+            "audio_policy": "strip_native_use_tts_bgm",
+            "max_duration_sec": 8,
+        }
+    film_profile = str(spec.get("_i2v_profile") or "").strip().lower()
+    h3_raw = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
+    h3_enabled = h3_raw.get("enabled") is True or film_profile == "hybrid_h3"
+    lanes = spec.get("motion_lanes") if isinstance(spec.get("motion_lanes"), dict) else {}
+    dialogue = bool(
+        shot.get("lipsync") is True
+        or shot.get("speaker_on_camera") is True
+        or str(shot.get("screen_mode") or "") == "on_camera"
+    )
+    recommended_lane = "cloud_grok"
+    recommended_provider = "grok"
+    recommended_weapon: str | None = None
+    audio_policy = "carry_parent_dialogue" if parent_shot_id is not None else None
+    if dialogue and identity_lock:
+        recommended_lane = "cloud_dialogue_ltx"
+        recommended_provider = "frw-ltx23"
+    elif restricted and identity_lock:
+        recommended_lane = str(lanes.get("restricted_local") or "local_h3")
+        recommended_provider = "comfy-h3"
+        recommended_weapon = "minimax-h3-i2v-pilot"
+        audio_policy = str(h3_cfg.get("audio_policy") or "strip_native_use_tts_bgm")
+        # Soft-lock restricted meat to H3 only when hybrid/h3 is enabled and film
+        # did not already lock another provider.
+        if h3_enabled and not provider_lock:
+            provider_lock = "comfy-h3"
+    elif role in {"env", "bridge", "insert"} and not identity_lock:
+        recommended_lane = str(lanes.get("env") or "cloud_env")
+        recommended_provider = "frw"
+        recommended_weapon = None
+        operation = "text_to_video"
+    elif identity_lock:
+        recommended_lane = str(lanes.get("setup_non_sensitive") or "cloud_grok")
+        recommended_provider = "grok"
     return {
         "schema_version": 1,
         "kind": "ai-film-shot-intent",
@@ -245,10 +291,15 @@ def build_shot_intent(
         "continuity_required": str(dsl.get("chain_mode") or "").lower() == "continue",
         "quality_tier": tier,
         "provider_lock": provider_lock or None,
+        "recommended_lane": recommended_lane,
+        "recommended_provider": recommended_provider,
+        "recommended_weapon": recommended_weapon,
+        "h3_enabled": bool(h3_enabled),
+        "max_duration_sec": float(h3_cfg.get("max_duration_sec") or 8) if recommended_provider == "comfy-h3" else None,
         "parent_shot_id": parent_shot_id,
         "broll_kind": broll_kind,
         "editorial_only": parent_shot_id is not None,
-        "audio_policy": "carry_parent_dialogue" if parent_shot_id is not None else None,
+        "audio_policy": audio_policy,
     }
 
 
