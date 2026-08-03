@@ -502,7 +502,7 @@
     },
     {
       "path": "scripts/dialogue_screenplay.py",
-      "sha256": "6fc5c6a25d1f8f79e0ac7b5c1d31ac6658d7451b709738070e719ec29b81bb46"
+      "sha256": "c186138fb3d126ff659eb9c1723effda52f00ca710f833d2b74281fb79df2fe1"
     },
     {
       "path": "scripts/director_cli.py",
@@ -926,7 +926,7 @@
     },
     {
       "path": "scripts/prompt_injector.py",
-      "sha256": "0cc7b8a9b5a6fa14a896be5eb6244f80fca01608cc00b89f5a14ca70c99140a9"
+      "sha256": "3055d5706a40fae744b25ff480f671020ca73d6932a95430c6640008a90fc38a"
     },
     {
       "path": "scripts/provider_canary.py",

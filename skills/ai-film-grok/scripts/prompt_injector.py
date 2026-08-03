@@ -643,8 +643,9 @@ class PromptInjector:
         negatives = self.bible.get("negative_hints", "")
         anatomy_no = (
             "futa, female penis, penis on woman, wrong genital anatomy, lactation, milk spray, "
-            "breast milk, neon genital symbol, glowing genitals, wet nipples, 伪娘阴茎, 女体阴茎, "
-            "喷奶, 乳汁, 霓虹生殖器, 发光性器官, 湿乳头"
+            "breast milk, neon genital symbol, glowing genitals, wet nipples, neon light explosion, "
+            "glowing orb on genitals, neon sphere at contact point, 伪娘阴茎, 女体阴茎, "
+            "喷奶, 乳汁, 霓虹生殖器, 发光性器官, 湿乳头, 结合处霓虹光, 霓虹光球, 结合部爆光"
         )
         if str(self.bible.get("heat_scale") or "").strip().lower() == "max":
             negatives = f"{negatives}, {anatomy_no}" if negatives else anatomy_no

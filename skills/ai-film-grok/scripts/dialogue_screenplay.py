@@ -66,6 +66,68 @@ def _select_mode(normalized: dict[str, Any]) -> tuple[str, str | None]:
     return "dialogue_drama", None
 
 
+DIALOGUE_TURN_QUESTIONS: dict[str, tuple[str, ...]] = {
+    "hook": (
+        "这句对白如何在第一秒抓住观众注意力？",
+        "说话人的真实意图是什么——表面意思之下藏着什么？",
+    ),
+    "approach": (
+        "角色在这句对白中试图拉近/推远与对方的关系？",
+        "对白中的潜台词是什么？",
+    ),
+    "sensory": (
+        "这句对白如何调动观众的感官（触觉/嗅觉/听觉）？",
+        "角色的身体反应是什么（呼吸、颤抖、停顿）？",
+    ),
+    "reaction": (
+        "角色听到对方的话后，情绪如何转变？",
+        "这句对白是反击、退让还是沉默？",
+    ),
+    "action": (
+        "对白如何推动剧情向前（而非原地打转）？",
+        "角色在这句对白中做出了什么不可撤回的选择？",
+    ),
+    "afterglow": (
+        "这句对白在情感上留下什么余韵？",
+        "观众看完这句对白后会想什么？",
+    ),
+}
+
+
+def _turn_authoring_questions(
+    turn: dict[str, Any],
+    scene_context: dict[str, Any],
+    prev_turn: dict[str, Any] | None,
+) -> list[str]:
+    """Per-turn authoring questions based on dramatic function and context."""
+    questions: list[str] = []
+    df = scene_context.get("dramatic_function", "approach")
+    questions.extend(DIALOGUE_TURN_QUESTIONS.get(df, ()))
+
+    # Emotion contrast check
+    if (
+        prev_turn
+        and prev_turn.get("emotion")
+        and prev_turn["emotion"]
+        not in (
+            "待确认",
+            "",
+        )
+    ):
+        questions.append(f"情绪对比：上一句是「{prev_turn['emotion']}」，这一句如何转折？")
+
+    # Subtext check
+    subtext = _text(turn.get("subtext"))
+    if subtext and subtext not in ("待确认", ""):
+        questions.append(f"潜台词校验：对白的潜台词「{subtext}」是否与角色意图一致？")
+
+    # Speaker continuity
+    if prev_turn and prev_turn.get("speaker") == turn.get("speaker"):
+        questions.append("同一角色连续发言：是否有情绪递进或态度转变？")
+
+    return questions
+
+
 def _source_refs(normalized: dict[str, Any], reception: dict[str, Any] | None) -> list[str]:
     refs = _strings(normalized.get("source_evidence_refs"))
     if isinstance(reception, dict):
@@ -196,6 +258,24 @@ def build_dialogue_screenplay(
         ]
         if mode == "dialogue_drama" and not turns and body:
             turns = [_prose_candidate(body, f"line_{scene_index:03d}_001", refs)]
+
+        # Inject per-turn authoring questions
+        scene_df = _dramatic_function_for_purpose(
+            _text(chunk.get("dramatic_purpose")) or "advance story"
+        )
+        scene_context = {
+            "dramatic_function": scene_df,
+            "goal": _text(chunk.get("scene_goal") or chunk.get("goal")),
+        }
+        for ti, turn in enumerate(turns):
+            if isinstance(turn, dict):
+                prev_turn = turns[ti - 1] if ti > 0 else None
+                turn["authoring_questions"] = _turn_authoring_questions(
+                    turn,
+                    scene_context=scene_context,
+                    prev_turn=prev_turn,
+                )
+
         scenes.append(
             {
                 "scene_id": scene_id,
@@ -290,28 +370,48 @@ def _turn_authoring_questions(
     questions.extend(DIALOGUE_TURN_QUESTIONS.get(df, ()))
 
     # Emotion contrast check
-    if prev_turn and prev_turn.get("emotion") and prev_turn["emotion"] not in (
-        "待确认",
-        "",
-    ):
-        questions.append(
-            f"情绪对比：上一句是「{prev_turn['emotion']}」，这一句如何转折？"
+    if (
+        prev_turn
+        and prev_turn.get("emotion")
+        and prev_turn["emotion"]
+        not in (
+            "待确认",
+            "",
         )
+    ):
+        questions.append(f"情绪对比：上一句是「{prev_turn['emotion']}」，这一句如何转折？")
 
     # Subtext check
     subtext = _text(turn.get("subtext"))
     if subtext and subtext not in ("待确认", ""):
-        questions.append(
-            f"潜台词校验：对白的潜台词「{subtext}」是否与角色意图一致？"
-        )
+        questions.append(f"潜台词校验：对白的潜台词「{subtext}」是否与角色意图一致？")
 
     # Speaker continuity
     if prev_turn and prev_turn.get("speaker") == turn.get("speaker"):
-        questions.append(
-            "同一角色连续发言：是否有情绪递进或态度转变？"
-        )
+        questions.append("同一角色连续发言：是否有情绪递进或态度转变？")
 
     return questions
+
+
+def _dramatic_function_for_purpose(purpose: str) -> str:
+    """Map a scene's dramatic_purpose to a dramatic_function key."""
+    purpose_lower = purpose.lower()
+    if "hook" in purpose_lower or "opening" in purpose_lower:
+        return "hook"
+    if "approach" in purpose_lower or "advance" in purpose_lower:
+        return "approach"
+    if "sensory" in purpose_lower or "atmosphere" in purpose_lower:
+        return "sensory"
+    if "reaction" in purpose_lower or "response" in purpose_lower:
+        return "reaction"
+    if "action" in purpose_lower or "climax" in purpose_lower or "peak" in purpose_lower:
+        return "action"
+    if "afterglow" in purpose_lower or "ending" in purpose_lower or "closure" in purpose_lower:
+        return "afterglow"
+    return "approach"
+
+
+def _issue(code: str, message: str, node_ref: str) -> dict[str, str]:
     return {"code": code, "message": message, "node_ref": node_ref}
 
 
