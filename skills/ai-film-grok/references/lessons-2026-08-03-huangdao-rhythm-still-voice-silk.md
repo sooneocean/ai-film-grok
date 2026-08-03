@@ -64,18 +64,54 @@
 当 `aifilm final` 被 wardrobe/rehearsal 等 **与已齐 clips 无关** 的门卡住，且用户要看片：
 
 1. **Plate 层**：VO-fit 分镜 → 变长 xfade(0.22–0.50) + acrossfade → rnb 侧链 + loudnorm → `out/*-plate-silk.mp4`  
-2. **Post 层**：**HyperFrames** underlay + 中文 `caption_text` 淡入淡出 + 轻 grade；`plate subs=off`  
-3. 交付命名：`*-silk-final.mp4`；`receipts/delivery-final.json`；**诚实 PARTIAL**（非 `final_complete`）  
-4. **禁止** 把 ship-cut 标成 gate 全绿 master；完整 closeout 仍走 review-final → post-audit → export-desktop  
+2. **字幕层（P0 · v3）**：**默认 PIL/像素硬烧** 中文 `caption_text`（字号≥36–40@704、深色底、底栏安全区上移）；**禁止** 仅靠 HF `opacity:0` + GSAP 当唯一字幕（用户会报「没有字幕」即便 JSON 有 cue）  
+3. **Post 层（可选）**：HyperFrames underlay 仅作 grade/title；`plate subs=off` 若字已在 plate 硬烧  
+4. 交付命名：`*-silk-v3.mp4` / `film_final.mp4`；`receipts/delivery-final.json`；**诚实 PARTIAL**  
+5. **禁止** 把 ship-cut 标成 gate 全绿 master；完整 closeout 仍走 review-final → post-audit → export-desktop  
+6. 覆盖桌面后提醒用户 **关播放器重开**（缓存旧片）
+
+### G. 字幕像素交付（P0 · 2026-08-03 v3 · 用户「没有字幕」）
+
+| 错 | 对 |
+|---|---|
+| HF caption `opacity:0`，靠 GSAP seek 淡入 | 对白镜 **硬烧进像素**；opacity 动画可作锦上添花不可作唯一 |
+| 验收 = `caption_text` 在 ledger | 验收 = **抽帧人眼可读**（每条对白 cue 至少 1 帧） |
+| 字贴底边 / 字号过小 | 字号 ≥36–40@704；底栏留安全区（约 H-h-70 级） |
+| 用户说没字幕立刻重渲 HF | 先抽帧：有字→查安全区/缓存；无字→硬烧重出 |
+
+### H. 肉戏身份 · 体位 · continue 污染（P0 · v3 · 用户「肉戏很多问题」）
+
+1. **邻镜差异**：肉戏窗相邻镜禁止同一主构图/同一机位读成「复读」；须换体位或景别或机位（脸 CU / 结合 / reverse 至少轮换）。  
+2. **speaker = 画面主体**：`screen_mode=on_camera` 且 `speaker=澜汐` → 画面须以澜汐脸/口型为主；**禁止** 高潮句配纯男主肉身（荒岛 sh09）。  
+3. **afterglow**：余韵镜须 **双人关系可读**；禁止无对象单人站桩冒充完成拍（荒岛 sh10）。  
+4. **continue promote 条件**：仅当叙事 hard/soft continue；**smash / 跨空间 / 跨 wardrobe 大跳** 勿盲 `promote-keyframe`，否则沙滩静像会污染洞穴肉戏 keyframe → H3 复读。  
+5. **应急剪辑**：reverse+crop 可拉开「读法」但 **PARTIAL**，不替代真多体位 I2V。  
+
+### I. 用户投诉决策树
+
+```text
+用户说「没有字幕」
+  ├─ 抽帧对白时间点
+  │    ├─ 有字 → 安全区/字号/请用户重开文件（缓存）
+  │    └─ 无字 → PIL 硬烧 caption_text 重出 final
+  └─ 禁止只改 HF CSS 宣称「已修好」
+
+用户说「肉戏有问题」
+  ├─ 邻镜同 pose？ → 换体位/景别 re-I2V 或 H3
+  ├─ speaker≠画面？ → 对白镜换该角色脸 CU
+  ├─ 余韵单人站桩？ → 双人 afterglow
+  └─ keyframe 被 promote 污染？ → smash 重生，勿续错链
+```
 
 ## 代码与门禁挂点
 
 | 位置 | 行为 |
 |---|---|
-| `media_qa.lint_still_not_character_sheet` | approved still 启发式拦 multi-panel sheet |
+| `media_qa.lint_still_not_character_sheet` | approved still 路径 sheet 硬拦 / 多格 soft |
 | `register-still` | approved 失败码 `STILL_LOOKS_LIKE_CHARACTER_SHEET` |
-| hard-defaults / stages/visual·voice·post | 本课 P0 行 |
+| hard-defaults / stages/visual·voice·post | 本课 P0 行（含字幕硬烧、speaker 锁、肉戏差异） |
 | 既有 | `extract-frame --promote-keyframe` · VO drag soft · HF caption owner |
+| ship 惯例 | plate 上 **PIL 硬烧** 中文字幕再混 BGM；抽帧入 `out/*_cap_*.jpg` 或 receipts |
 
 ## Agent 自检（final 前 60 秒）
 
@@ -84,12 +120,14 @@
 [ ] cast_voices 语言 = dialogue_spoken_lang
 [ ] 对白镜 vo/plate ≥ 0.55 或已 VO-fit 重剪
 [ ] 无 Ken Burns 静图当 hero clip
-[ ] 邻镜 last→promote 已跑（或 smash 已记）
-[ ] 交付片路径 + 抽帧可见中文字幕
+[ ] 邻镜 last→promote 已跑（或 smash 已记，且未污染肉戏）
+[ ] 交付片：每条对白 cue 抽帧可见中文字幕（硬烧优先）
+[ ] 肉戏邻镜 pose/机位有可读差；on_camera speaker=画面主体
+[ ] afterglow 非无对象单人站桩
 [ ] 若跳过 aifilm final 门：PARTIAL + delivery receipt
 ```
 
 ## 片例路径
 
-- 成片：`huangdao-99-ep01/out/huangdao-99-ep01-silk-final.mp4`  
-- 回执：`receipts/cinematic-silk-plate.json` · `receipts/delivery-final.json` · `receipts/silk-continuity-hf.json`
+- 成片 v3：`huangdao-99-ep01/out/huangdao-99-ep01-silk-v3.mp4` · `Desktop/huangdao-99-ep01-final.mp4`  
+- 回执：`receipts/cinematic-silk-plate.json` · `receipts/delivery-final.json` · `receipts/iter2-silk.json` · `out/v3_cap_*.jpg`

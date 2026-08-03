@@ -22,9 +22,12 @@
 | **Keyframe-first · 状态照** | **产品硬底**（2026-07-21）：先状态照索引 `cast_state_masters` → 再 keyframe → 再 I2V；视频坏先改 keyframe/状态照；prompt 注入 `State photo ref`；见 [keyframe-first-state-index](keyframe-first-state-index.md) |
 | **一镜一静帧 · still 去重（P0 · 2026-07-29）** | **产品硬底**：approved still **禁止跨 shot 字节复用**（同 sha 多镜 = 成片「画面重复」）。`register-still --status approved` 撞 sha **硬失败**；`stills_complete` / `final_complete` 依赖 `still_uniqueness.ok`。连续亲密弧须换景别/相位/机位，禁 `cp A.png B.png`。见 [still-unique-no-reuse](lessons-2026-07-29-still-unique-no-reuse.md) |
 | **静帧内容 · 禁设定拼图（P0 · 2026-08-03 荒岛案）** | keyframe **必须** 单场景连续叙事静帧（可读 `playable_action`）。**禁止** turnaround / 多格表情板 / ORTHO 设定拼图入 `keyframes/` 再 I2V。`register-still approved`：`lint_still_not_character_sheet`（路径含 sheet/turnaround/ortho **硬拦** `STILL_LOOKS_LIKE_CHARACTER_SHEET`；多格布局 **soft** 警示，agent 须肉眼拒）。见 [huangdao-rhythm-still-voice-silk](lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) |
-| **对白节奏 VO-fit（P0 · 2026-08-03 荒岛案）** | `dialogue_drama`：**对白镜**时长 ≈ pre+VO+post，**禁止** 短口白硬贴等长 6s plate（死气 PPT）。动作/silence 按 beat 变长；总片优先「看得下去」。门红可 ship：**VO-fit plate + xfade + HF 字幕**，receipt **PARTIAL**。见同上 + [vo-drag-motion-snap](lessons-2026-07-20-vo-drag-motion-snap.md) |
+| **对白节奏 VO-fit（P0 · 2026-08-03 荒岛案）** | `dialogue_drama`：**对白镜**时长 ≈ pre+VO+post，**禁止** 短口白硬贴等长 6s plate（死气 PPT）。动作/silence 按 beat 变长；总片优先「看得下去」。门红可 ship：**VO-fit plate + xfade + 硬烧字幕**，receipt **PARTIAL**。见同上 + [vo-drag-motion-snap](lessons-2026-07-20-vo-drag-motion-snap.md) |
+| **字幕 ship 硬烧（P0 · 2026-08-03 v3）** | 用户可见 = **像素里有中文**，不是 ledger 有 `caption_text`。ship 默认 **PIL/底片硬烧**（≥36–40@704、深底、安全区）；**禁止** 仅 HF `opacity:0`+GSAP 当唯一字幕。交付前每条对白 cue **抽帧证明**。正式 master 仍可 HF owner；ship/门红路径硬烧优先。见 [huangdao §G](lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) · [memory](../memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md) |
+| **对白镜 speaker=画面主体（P0 · 同 v3）** | `on_camera` + 具名 `speaker` → 画面主读该角色脸/口型；**禁止** 角色 A 的台词配角色 B 全身肉戏特写（荒岛 climax「到了」配男主）。 |
+| **肉戏邻镜差异 + afterglow（P0 · 同 v3）** | 肉戏窗邻镜禁同主构图复读；须换体位/景别/机位。afterglow **禁** 无对象单人站桩。见 [shot-variety](lessons-2026-07-29-shot-variety-anti-boring.md) + 荒岛 §H。 |
 | **要影片不要图（P0 · 2026-08-03）** | 用户拒静图：hero clip **禁止** Ken Burns / still-motion 冒充 I2V。moderated → 末帧 continue + H3/真 I2V；记 PARTIAL，禁静默 still 过交付。 |
-| **末帧 promote 默认（P0 · 强化 2026-08-03）** | register 后 `extract-frame --which last --promote-keyframe NEXT`；下镜 I2V 从 seed 开，禁 cast 重起（smash 除外）。丝滑先帧链后 xfade。 |
+| **末帧 promote 默认（P0 · 强化 2026-08-03）** | register 后 `extract-frame --which last --promote-keyframe NEXT`；下镜 I2V 从 seed 开，禁 cast 重起。**smash / 跨空间 / 跨大 wardrobe** 勿盲 promote（防沙滩链污染洞穴肉戏）。丝滑先帧链后 xfade。 |
 | **画面抗重复·抗无聊（P0 · 2026-07-29 · 后面不要再犯）** | **门禁绿 ≠ 好看**。相邻 act/climax **禁止**同一 `dsl.motion` 主句；每镜换一维运动（轴/节奏/部位/镜头动）。`shot_size`≡`dsl.camera.shot_size` 真变；禁 insert 塞满头肩套话。主戏 **片上 ≥4.5–6s**。见 [shot-variety-anti-boring](lessons-2026-07-29-shot-variety-anti-boring.md) |
 | **肉戏体位·特写·运镜（P0 · 2026-07-29 强化 · 后面不要再犯）** | 用户原话：**不同体位 + 不同特写 + 运镜**。肉戏窗 **≥4 可读体位**（骑/传教/后入/侧/站…像素一致，禁只改字段）；**≥2 脸反应 CU + ≥2 定器 L4 insert + ≥2 体位关系镜**；相邻 I2V **禁止**同 camera（池：locked / push-in / pull-back / orbit / tilt-up / low-angle / handheld）。禁止 7 镜全是半身拥抱。contact 须能说「这是后入」「这是腰特写」。优先级：尺度弧 ＞ 体位/特写/运镜差 ＞ mean。见 [shot-variety-anti-boring](lessons-2026-07-29-shot-variety-anti-boring.md) §F–H · [memory](../memory/2026-07-29-shot-variety-anti-boring.md) |
 | **生成 first/last** | **产品硬底**（2026-07-21）：`register-clip` 后自动 last→next first（continue/卸装/max）；下镜 I2V 禁 cast 重起；按真实末帧衣着/姿势写 prompt；**末帧须先过 W8 不回穿门**；见 first-last-gen · i2v-endframe-no-redress |
@@ -79,7 +82,7 @@
 | 规则 | 默认 |
 |---|---|
 | TTS | 中文成片 **edge**；storyteller `auto`→edge |
-| **人物对白 / 口白语言** | **P0**（**08-03 中文主链**）：默认 **角色开口=中文**（`dialogue_spoken_lang=zh`，女 `zh-CN-XiaoyiNeural` / 男 `zh-CN-YunxiNeural`）；**字幕中文** `caption_text`（**仅 HyperFrames**，plate `subs=off`）。日文仅显式 `ja`。无对白=纯画面。见 [dialogue-first-workflow](dialogue-first-workflow.md) · [voices.md](voices.md) |
+| **人物对白 / 口白语言** | **P0**（**08-03 中文主链**）：默认 **角色开口=中文**（`dialogue_spoken_lang=zh`，女 `zh-CN-XiaoyiNeural` / 男 `zh-CN-YunxiNeural`）；**字幕中文** `caption_text`。正式 master=HF owner（plate `subs=off`）；**ship/门红=硬烧优先**（见上行「字幕 ship 硬烧」）。日文仅显式 `ja`。无对白=纯画面。见 [dialogue-first-workflow](dialogue-first-workflow.md) · [voices.md](voices.md) |
 | **cast_voices 与 spoken_lang 同锁（P0 · 2026-08-03 荒岛案）** | `dialogue_spoken_lang=zh` 时 **禁止** `cast_voices` 仍挂 `ja-JP-*` / 英声；ledger 须有 `spoken_text`/`spoken_text_zh`。TTS 前打印 `speaker\|voice\|spoken_lang`。见 [huangdao-rhythm-still-voice-silk](lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) |
 | **final / SRT** | **P0**（2026-07-24；07-29 长片 v1）：`sub_lead=0` 或写盘前非重叠钳制；`aifilm final` 默认按时长/镜数/lipsync 动态 timeout，长片不再固定 1200s；plate 后中文硬烧。见 [ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md) · [longform](longform-workflow.md) |
 | Voicebox | **质量升级 + opt-in 本地兜底**（非默认替换 edge）；固定 `VOICEBOX_PROFILE`；`AIFILM_TTS_VOICEBOX_FALLBACK=1` 才 edge 失败再试 |
@@ -91,7 +94,7 @@
 | VO 预算 | `nar` ≤55 字（快节奏 ≤28）；`est_vo_sec ≤ duration_sec+0.5`；日文对白按 `nar_ja` 估长 |
 | loop | hook/action 永不 stream_loop |
 | 一角一声 | 固定 `vo_voice` / `cast_voices`；显式 TTS 失败不静默跨商降级 |
-| **声线主导** | **对白主链·中文**：角色中文 `spoken_text` + HF 字幕 `caption_text` + BGM duck；无对白=静镜。第三人称 `nar` **仅 gap**。`vocal_color` 默认关；见 [voice-tracks.md](voice-tracks.md) |
+| **声线主导** | **对白主链·中文**：角色中文 `spoken_text` + 中文 `caption_text`（正式 HF / ship 硬烧）+ BGM duck；无对白=静镜。第三人称 `nar` **仅 gap**。`vocal_color` 默认关；见 [voice-tracks.md](voice-tracks.md) |
 
 ## 视觉与一致性
 

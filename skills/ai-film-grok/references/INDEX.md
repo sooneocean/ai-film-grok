@@ -144,7 +144,9 @@
 
 | 文件 | 主题 |
 |---|---|
-| [huangdao-rhythm-still-voice-silk](lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) | 禁设定拼图 keyframe · VO-fit 节奏 · 口白 lang 锁 · 末帧链 · HF 丝滑 ship |
+| [huangdao-rhythm-still-voice-silk](lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) | 禁设定拼图 · VO-fit · 口白锁 · 末帧链 · **§G 字幕硬烧** · **§H 肉戏 speaker/体位** |
+| [caption-hardburn-meat](../memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md) | v3 短卡：硬烧字幕 + speaker=画面 + 肉戏差异 |
+| [huangdao-rhythm short](../memory/2026-08-03-huangdao-rhythm-still-voice-silk.md) | 节奏/静帧/口白短卡 |
 | [dialogue-primary-chain](../memory/2026-08-03-dialogue-primary-chain.md) | 对白主链中文（memory 短卡） |
 
 ### 2026-07-29

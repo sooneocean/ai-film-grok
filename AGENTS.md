@@ -78,6 +78,7 @@ JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmErr
 5. **阶段卡**：`references/stages/*`（dispatch 默认 context）；长课 `lessons-*` 按需，**不**默认整页进 context。
 6. **短记忆卡**：`memory/*` 仅原话+三句+清单+链 lesson；见 `memory/README.md`。
 7. **声线 / 成人 / 毒镜 / final**：见 SKILL P0 短列表 + hard-defaults；勿在本档复写长段 IRON。
+8. **字幕 ship 硬烧 + 肉戏 speaker/体位（2026-08-03 荒岛 v3）**：用户可见=像素有中文；`on_camera` speaker=画面主体；肉戏邻镜差异 + afterglow 禁单人站桩 → [huangdao lesson](skills/ai-film-grok/references/lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) · [memory](skills/ai-film-grok/memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md)。
 8. **文档分层**：SKILL 短 → hard-defaults 硬表 → stages 回合卡 → memory 速查 → lessons 复盘。
 9. **完成定义**：doctor 绿 + 相关 pytest 绿 +（若改 CLI）`plugin validate` 过；不是「改完文件」。
 10. **对外**：PR / release 文案给人过目后再发；本仓默认 private。

@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.33.2] - 2026-08-03
+
+### Changed
+- **Huangdao v3 caption + meat gates:** ship/PARTIAL path defaults to **PIL pixel hard-burn** captions (ban HF `opacity:0`+GSAP as sole subtitles); acceptance = frame-extract readable Chinese.
+- **on_camera speaker = on-screen subject:** forbid climax line on wrong-character meat body.
+- **Meat neighbor variety + afterglow:** no same-pose re-read across adjacent meat shots; afterglow must read as couple (ban solo stand-in).
+- **Continue promote guard:** smash / cross-space / wardrobe jump must not blind-promote (beach→cave pollution).
+- Dual-path captions documented in SKILL P0 #10, hard-defaults, stages post/visual/voice; lesson §G/H/I + memory short card.
+
+### Docs
+- `lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md` §G/H/I
+- `memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md`
+- Agents.md pointer #8
+
 ## [2.33.1] - 2026-08-03
 
 ### Added

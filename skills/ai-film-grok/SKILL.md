@@ -42,8 +42,8 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 8. **声线**：默认对白主链·**中文**（有对白=角色中文口型；无对白=纯画面；禁第三人称旁白）。Edge；BGM=rnb。[对白](references/dialogue-first-workflow.md)·[BGM](references/bgm-generation.md)
 9. **成人 MAX**：肉戏≥50%·亲密≥60%·setup≤20%；extreme；四拍+bare；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V。
-10. **字幕**：owner=**仅 HyperFrames**（plate `subs=off`；禁 FFmpeg/PIL 交付烧字）。`caption_text` 中文；`caption_mode`+`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)·[stages/post](references/stages/post.md)。
-11. **后期单责**：title/sub/end 单引擎；plate `subs=off`。[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)
+10. **字幕**：`caption_text` 中文。**正式 master** = HyperFrames owner（plate `subs=off`）。**Ship / 门红 PARTIAL** = **PIL 像素硬烧优先**（禁仅 HF `opacity:0`+GSAP）；交付前对白 cue **抽帧人眼可读**。[huangdao §G](references/lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md)·[stages/post](references/stages/post.md)
+11. **后期单责**：title/sub/end 正式链单引擎；plate 默认可 `subs=off`（字已硬烧或 HF 后烧）。[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)
 11b. **连载**：`serial validate`；圣经/事件/钩子可审计。[workflow](references/serial-narrative-workflow.md)
 12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐。
 13. **安全**：凭据本机；日志禁 token/prompt；外部不自动重试花费。

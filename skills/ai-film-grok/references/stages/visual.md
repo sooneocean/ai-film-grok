@@ -17,6 +17,8 @@
 - **MEDIUM LOCK（P0 · 同案）**：每条 I2V 源= style-locked still；prompt 首段 cel 动漫锁；高动/连戏不得漂半写实；装片竞标 motion×medium 双过。
 - **禁设定拼图 keyframe（P0 · 2026-08-03 荒岛）**：turnaround/多格表情板 **不得** 入 `keyframes/` 再 I2V；`register-still approved` 硬拦 `STILL_LOOKS_LIKE_CHARACTER_SHEET`。一镜一连续叙事静帧。
 - **要影片不要图**：禁 Ken Burns/still-motion 当 hero；moderated → 末帧 continue + 真 I2V/H3。
-- **末帧链**：`extract-frame --promote-keyframe NEXT` 默认；下镜从 seed 开，禁 cast 重起（smash 除外）。
+- **末帧链**：`extract-frame --promote-keyframe NEXT` 默认；下镜从 seed 开，禁 cast 重起。**smash/跨空间勿盲 promote**（防沙滩污染洞穴肉戏）。
+- **对白镜 speaker=画面（P0 · v3）**：`on_camera` 台词角色须占画面主读（脸/口型）；禁 A 台词 + B 肉身。
+- **肉戏邻镜差异 + afterglow**：邻镜禁同构图复读；余韵禁无对象单人站桩。见 [huangdao §H](../lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md)。
 
-深入资料：[weapon-lane-matrix.md](../weapon-lane-matrix.md) · [consistency.md](../consistency.md) · [keyframe-first-state-index.md](../keyframe-first-state-index.md) · [i2v-grok-primary.md](../i2v-grok-primary.md) · [frw-degrade-dispatch.md](../frw-degrade-dispatch.md) · [high-motion-style-lock](../lessons-2026-07-27-high-motion-style-lock-final.md) · **[huangdao-rhythm-still-voice-silk](../lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md)**
+深入资料：[weapon-lane-matrix.md](../weapon-lane-matrix.md) · [consistency.md](../consistency.md) · [keyframe-first-state-index.md](../keyframe-first-state-index.md) · [i2v-grok-primary.md](../i2v-grok-primary.md) · [frw-degrade-dispatch.md](../frw-degrade-dispatch.md) · [high-motion-style-lock](../lessons-2026-07-27-high-motion-style-lock-final.md) · **[huangdao-rhythm-still-voice-silk](../lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md)** · **[caption-hardburn-meat](../memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md)**
