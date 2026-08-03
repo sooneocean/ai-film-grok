@@ -275,3 +275,43 @@ def test_builder_output_conforms_to_dialogue_screenplay_schema():
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
     jsonschema.Draft202012Validator(schema).validate(build_dialogue_screenplay(_normalized()))
+
+
+def test_storyteller_ja_forbidden_and_character_ja_required():
+    screenplay = _approved_screenplay()
+    # Add storyteller turn with dialogue_ja -> should fail with STORYTELLER_JA_FORBIDDEN
+    screenplay["scenes"][0]["dialogue_turns"].append({
+        "line_id": "dlg_03",
+        "speaker": "storyteller",
+        "addressee": "audience",
+        "dialogue_zh": "夜色渐深。",
+        "subtitle_zh": "夜色渐深。",
+        "dialogue_ja": "夜が深まる。",
+        "translation_status": "ready",
+        "emotion": "平静",
+        "subtext": "环境描述",
+        "actions": {"before": "", "during": "", "after": ""},
+        "screen_mode": "off_camera",
+        "lipsync_required": False,
+        "scene_state_id": "state_dlg_03",
+        "gaze": "camera",
+        "props": [],
+        "state_delta": "atmosphere set",
+        "duration_sec": 2.0,
+        "provenance": "source_supported",
+        "source_evidence": {
+            "source_refs": ["source:story.txt"],
+            "source_excerpt": "夜色渐深",
+            "provenance": "source_supported",
+        },
+        "review_status": "approved",
+    })
+    # Remove dialogue_ja from character turn -> should fail with CHARACTER_DIALOGUE_JA_REQUIRED in strict mode
+    screenplay["scenes"][0]["dialogue_turns"][0]["dialogue_ja"] = ""
+
+    report = validate_dialogue_screenplay(screenplay, strict=True)
+    codes = {issue["code"] for issue in report["issues"]}
+
+    assert "STORYTELLER_JA_FORBIDDEN" in codes
+    assert "CHARACTER_DIALOGUE_JA_REQUIRED" in codes
+

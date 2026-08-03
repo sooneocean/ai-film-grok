@@ -98,7 +98,9 @@ class TestStoryContractProtagonist:
         assert "protagonist_want" in contract
         assert "protagonist_need" in contract
         assert "protagonist_arc" in contract
-        assert contract["protagonist_want"] == ""
+        # draft_suggested status means genre templates pre-fill the fields
+        assert contract["status"] == "draft_suggested"
+        assert contract["protagonist_want"] != ""
 
     def test_draft_has_act_structure(self):
         normalized = {"logline": "test", "genre": "drama"}

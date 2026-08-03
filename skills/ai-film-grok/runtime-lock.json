@@ -506,7 +506,7 @@
     },
     {
       "path": "scripts/dialogue_screenplay.py",
-      "sha256": "c3cf0a140dcc4b725238204828b25e3eebc9d51d12479891939c20d6fcd678b7"
+      "sha256": "e136e1376f6423081e712e764c50c6fe961e96f875f15940a0a21e335020ff36"
     },
     {
       "path": "scripts/dialogue_style.py",
@@ -1093,8 +1093,12 @@
       "sha256": "3b4f73f4a93717d9da315360926204ac6d36f53b6a1901ed935c09e4d1e3fb47"
     },
     {
+      "path": "scripts/story_contract.py",
+      "sha256": "85c2d6c82f9777cf758491e530f68dc49c3b642c31d4be8c4893864122645300"
+    },
+    {
       "path": "scripts/story_plan.py",
-      "sha256": "0aff3dd109ad3ae73045855b85c84f5ab533d99249bb9544b5f98cd59b4b5a87"
+      "sha256": "9f1d6fd521781461c2cbee2816efac834ee67a85dc58526150850607b3df6c34"
     },
     {
       "path": "scripts/story_reception.py",

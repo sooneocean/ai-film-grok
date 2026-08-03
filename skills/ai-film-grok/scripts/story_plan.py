@@ -1567,7 +1567,11 @@ def normalize_story(
 
 
 def _draft_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:
-    """Create an honest story contract; unknown intent stays blank/draft."""
+    """Create an honest story contract; unknown intent stays blank/draft.
+
+    If genre-specific suggestions are available, they are pre-filled
+    as draft_suggested so the author can review and confirm.
+    """
     logline = str(normalized.get("logline") or "")
     genre = str(normalized.get("genre") or "adult")
     contract = {
@@ -1608,6 +1612,31 @@ def _draft_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:
             "结尾留下什么未解决问题？",
         ],
     }
+    # Apply genre-based suggestions as draft guidance
+    from story_contract import suggest_story_contract
+
+    suggestions = suggest_story_contract(normalized)
+    for key in (
+        "theme",
+        "protagonist_goal",
+        "protagonist_want",
+        "protagonist_need",
+        "protagonist_arc",
+        "opposition",
+        "stakes",
+        "climax_choice",
+        "ending_hook",
+        "emotional_arc",
+        "act_structure",
+    ):
+        val = suggestions.get(key)
+        if val not in (None, "", [], {}):
+            contract[key] = copy.deepcopy(val)
+    if suggestions.get("status") == "draft_suggested":
+        contract["status"] = "draft_suggested"
+        contract["authoring_questions"] = (
+            suggestions.get("authoring_questions") or contract["authoring_questions"]
+        )
     seed = normalized.get("story_contract_seed")
     if isinstance(seed, dict):
         for key, value in seed.items():

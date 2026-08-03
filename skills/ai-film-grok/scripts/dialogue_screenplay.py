@@ -649,6 +649,26 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
                             turn_ref,
                         )
                     )
+            # P0 rule: storyteller must be Chinese only (no nar_ja/dialogue_ja); character dialogue requires Japanese (dialogue_ja)
+            speaker = _text(turn.get("speaker")).lower()
+            if speaker in {"storyteller", "narrator", "说书人", "旁白"}:
+                if _text(turn.get("dialogue_ja")):
+                    issues.append(
+                        _issue(
+                            "STORYTELLER_JA_FORBIDDEN",
+                            "storyteller/narrator must remain Chinese only and cannot specify Japanese dialogue",
+                            turn_ref,
+                        )
+                    )
+            elif strict and mode == "dialogue_drama" and not _pending(turn.get("speaker")):
+                if not _text(turn.get("dialogue_ja")):
+                    issues.append(
+                        _issue(
+                            "CHARACTER_DIALOGUE_JA_REQUIRED",
+                            f"Character speaker '{turn.get('speaker')}' requires Japanese spoken dialogue (dialogue_ja)",
+                            turn_ref,
+                        )
+                    )
 
     # Dialogue-story alignment check (strict mode, dialogue_drama only)
     if strict and mode == "dialogue_drama":
