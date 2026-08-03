@@ -3382,6 +3382,42 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             "uniqueness": uniqueness,
         }
     )
+    # MiniMax H3: prefer native diegetic audio when usable (prefer_native default).
+    _H3_REGISTER_ENDPOINTS = frozenset(
+        {
+            "local_minimax_h3_t2v",
+            "local_minimax_h3_i2v",
+            "local_minimax_h3_r2v",
+        }
+    )
+    if endpoint in _H3_REGISTER_ENDPOINTS:
+        h3_audio = "prefer_native"
+        try:
+            film_spec_raw = read_json(root / "film-spec.json") or {}
+            h3_block = (
+                film_spec_raw.get("h3") if isinstance(film_spec_raw.get("h3"), dict) else {}
+            )
+            candidate = str(h3_block.get("audio_policy") or "").strip()
+            if candidate in {
+                "prefer_native",
+                "keep_native",
+                "strip_native_use_tts_bgm",
+                "mute_native",
+            }:
+                h3_audio = candidate
+        except Exception:
+            pass
+        record["provider"] = "comfy-h3"
+        record["h3"] = True
+        record["audio_policy"] = h3_audio
+        # Prefer keep when stream has audio; only force off for explicit strip/mute.
+        if h3_audio in {"strip_native_use_tts_bgm", "mute_native"}:
+            record["use_clip_audio"] = False
+        elif h3_audio == "keep_native":
+            record["use_clip_audio"] = True
+        else:
+            # prefer_native: use clip audio when QA sees a track, else TTS/BGM path.
+            record["use_clip_audio"] = bool(qa.get("has_audio"))
     if args.status == "approved":
         # Always build quality_evidence on approved (never skip first approve).
         # Motion generation evidence is required when --queue-job-id is present;
@@ -7681,6 +7717,15 @@ def cmd_comfy(args: argparse.Namespace) -> int:
     return run_comfy(args)
 
 
+def cmd_h3(args: argparse.Namespace) -> int:
+    """MiniMax H3 local motion lane (plan / run / list)."""
+    from cli_h3 import run_h3
+
+    report = run_h3(args)
+    emit(report)
+    return 0 if report.get("ok") is not False else 1
+
+
 def cmd_workflow(args: argparse.Namespace) -> int:
     """Wave A–C throughput: closeout / pilot-pack / bulk-preflight / lease / tunnel."""
     from cli_workflow import run_workflow_cmd
@@ -10505,8 +10550,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_interactive_parsers(sub)
 
     from cli_comfy import add_comfy_parsers
+    from cli_h3 import add_h3_parsers
 
     add_comfy_parsers(sub)
+    add_h3_parsers(sub)
     from cli_node import add_node_parsers
 
     add_node_parsers(sub)
@@ -10656,6 +10703,7 @@ def main(argv: list[str] | None = None) -> int:
             "vibevoice-asr": cmd_vibevoice_asr,
             "speech-preview": cmd_speech_preview,
             "comfy": cmd_comfy,
+            "h3": cmd_h3,
             "node": cmd_node,
             "weapon": cmd_weapon,
             "route": cmd_route,

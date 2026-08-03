@@ -14,6 +14,16 @@ from util import read_json, utc_now, write_json
 RECEIPT_REL = Path("receipts/closeout.json")
 
 
+def _export_name(root: Path) -> str:
+    """Desktop folder name without placeholders (advance-safe)."""
+    try:
+        from next_actions import _export_desktop_name
+
+        return _export_desktop_name(root)
+    except Exception:
+        return "GrokFilm"
+
+
 class CloseoutError(RuntimeError):
     """Hard stop with a single next action for agents."""
 
@@ -147,7 +157,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "next_cmd": (
                 None
                 if gates.get("desktop_exported")
-                else f'aifilm export-desktop --root "{base}" --name "<中文名>"'
+                else f'aifilm export-desktop --root "{base}" --name "{_export_name(base)}"'
             ),
         },
     ]
@@ -160,6 +170,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
 
     blocked = next((s for s in steps if not s["ok"] and s["id"] != "desktop_exported"), None)
     delivery_ready = all(s["ok"] for s in steps if s["id"] != "desktop_exported")
+    export_cmd = f'aifilm export-desktop --root "{base}" --name "{_export_name(base)}"'
     return {
         "kind": "closeout-status",
         "schema_version": 1,
@@ -187,7 +198,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "id": f"closeout-{(blocked or {}).get('id') or 'done'}",
             "cmd": (blocked or {}).get("next_cmd")
             or (
-                f'aifilm export-desktop --root "{base}" --name "<中文名>"'
+                export_cmd
                 if not gates.get("desktop_exported")
                 else f'aifilm status --root "{base}"'
             ),
@@ -318,8 +329,8 @@ def closeout_run(
                 "ok": False,
                 "stopped_at": "export_desktop",
                 "ran": ran,
-                "next_cmd": f'aifilm export-desktop --root "{base}" --name "<中文名>"',
-                "required_proof": "export name from user",
+                "next_cmd": f'aifilm export-desktop --root "{base}" --name "{_export_name(base)}"',
+                "required_proof": "export name (derived from film title when available)",
             }
             if write_receipt:
                 write_json(base / RECEIPT_REL, payload)

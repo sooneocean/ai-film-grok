@@ -244,7 +244,7 @@ def build_shot_intent(
     except Exception:
         h3_cfg = {
             "enabled": False,
-            "audio_policy": "strip_native_use_tts_bgm",
+            "audio_policy": "prefer_native",
             "max_duration_sec": 8,
         }
     film_profile = str(spec.get("_i2v_profile") or "").strip().lower()
@@ -267,7 +267,7 @@ def build_shot_intent(
         recommended_lane = str(lanes.get("restricted_local") or "local_h3")
         recommended_provider = "comfy-h3"
         recommended_weapon = "minimax-h3-i2v-pilot"
-        audio_policy = str(h3_cfg.get("audio_policy") or "strip_native_use_tts_bgm")
+        audio_policy = str(h3_cfg.get("audio_policy") or "prefer_native")
         # Soft-lock restricted meat to H3 only when hybrid/h3 is enabled and film
         # did not already lock another provider.
         if h3_enabled and not provider_lock:

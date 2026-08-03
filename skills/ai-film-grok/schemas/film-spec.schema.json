@@ -132,7 +132,13 @@
         "megapixels_draft": { "type": "number" },
         "megapixels_select": { "type": "number" },
         "audio_policy": {
-          "enum": ["strip_native_use_tts_bgm", "keep_native", "mute_native"]
+          "enum": [
+            "prefer_native",
+            "keep_native",
+            "strip_native_use_tts_bgm",
+            "mute_native"
+          ],
+          "description": "H3 native stereo: prefer_native keeps usable diegetic audio; strip only when forced or unusable."
         },
         "allow_bulk": { "type": "boolean" }
       },

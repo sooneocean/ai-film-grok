@@ -41,6 +41,7 @@ _ACTION_STAGE: dict[str, str] = {
     "pilot-approve": "agent",
     "director-notes": "visual",
     "queue-or-register": "visual",
+    "h3-lane": "visual",
     "pilot-window": "visual",
     "tts-rehearse": "voice",
     "compose-preview": "design",
@@ -161,6 +162,24 @@ def _post_audit_current(root: Path) -> bool:
         return audit_freshness(root, receipt).get("stale") is False
     except (ImportError, OSError, ValueError):
         return False
+
+
+def _export_desktop_name(root: Path) -> str:
+    """Stable Desktop folder name without placeholders (advance-safe argv)."""
+    import re
+
+    for rel in ("film-spec.json", "brief.json", "manifest.json"):
+        data = read_json(root / rel) or {}
+        if not isinstance(data, dict):
+            continue
+        raw = str(data.get("title") or data.get("name") or "").strip()
+        if raw:
+            # Keep CJK/letters/digits; collapse other runs to single hyphen.
+            cleaned = re.sub(r"[^\w\u4e00-\u9fff\-]+", "-", raw, flags=re.UNICODE)
+            cleaned = re.sub(r"-{2,}", "-", cleaned).strip("-.")
+            if cleaned:
+                return cleaned[:80]
+    return "GrokFilm"
 
 
 def detect_pipeline_stage(
@@ -407,7 +426,7 @@ def build_next_actions(
     if not pilot_ok:
         add(
             "pilot-pack",
-            f'aifilm pilot pack --root "{r}"',
+            f'aifilm pilot-pack --root "{r}"',
             "pilot GO 证据包（媒体+三拍+state+heat）— 一屏看是否可 bulk",
         )
         add("pilot-report", f'aifilm pilot report --root "{r}"', "查看 pilot 三镜素材与评分状态")
@@ -470,16 +489,31 @@ def build_next_actions(
                         f'aifilm bulk-preflight --root "{r}" --no-tunnel',
                         "bulk 单门未绿 — 先 bulk-preflight 再 media-queue",
                     )
+            # Hybrid H3: restricted/meat soft-lock → local MiniMax, not Grok bulk.
+            h3_enabled = False
+            try:
+                h3_block = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
+                film_profile = str(spec.get("_i2v_profile") or "").strip().lower()
+                h3_enabled = bool(h3_block.get("enabled") is True or film_profile == "hybrid_h3")
+            except Exception:
+                h3_enabled = False
+            if h3_enabled:
+                add(
+                    "h3-lane",
+                    f'aifilm h3 list --root "{r}" && aifilm h3 plan --root "{r}" --shot-id <id> '
+                    f'&& aifilm h3 run --root "{r}" --shot-id <id> --register --allow-experimental',
+                    "hybrid_h3：敏感/肉戏走本地 MiniMax H3（pilot；禁静默 bulk；原声可用则 keep）",
+                )
             add(
                 "queue-or-register",
                 f'media-queue add --root "{r}" --shot-id <id> --operation image_to_video … '
                 f'&& aifilm register-clip --root "{r}" …',
-                "镜头未齐：队列生成 + register-clip",
+                "镜头未齐：云 bulk 用 Grok 队列 + register-clip；H3 镜用 aifilm h3 run",
             )
         else:
             add(
                 "pilot-pack",
-                f'aifilm pilot pack --root "{r}"',
+                f'aifilm pilot-pack --root "{r}"',
                 "pilot GO 证据包：三镜/卸装三拍/score/heat/state — bulk 前一屏",
             )
             add(
@@ -609,10 +643,11 @@ def build_next_actions(
 
     if gates.get("final_complete") and not gates.get("desktop_exported"):
         if _post_audit_current(root):
+            export_name = _export_desktop_name(root)
             add(
                 "export-desktop",
-                f'aifilm export-desktop --root "{r}" --name "<中文名>"',
-                "正式审批和 post-audit 完成 → 导出桌面",
+                f'aifilm export-desktop --root "{r}" --name "{export_name}"',
+                "正式审批和 post-audit 完成 → 导出桌面（本地无花费，advance 可跑）",
             )
         else:
             add(

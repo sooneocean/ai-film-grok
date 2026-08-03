@@ -159,13 +159,24 @@ def default_i2v_provider() -> str:
     return "frw-ltx23" if profile == "ltx23_primary" else "frw"
 
 
+# H3 ships stereo diegetic audio; prefer keeping it when usable.
+# strip_native_use_tts_bgm remains available when VO-only plates are wanted.
+H3_AUDIO_POLICIES = frozenset(
+    {
+        "prefer_native",  # default: keep if usable, else strip for TTS/BGM
+        "keep_native",  # always keep H3 native track
+        "strip_native_use_tts_bgm",
+        "mute_native",
+    }
+)
+
 DEFAULT_H3_CONFIG: dict[str, object] = {
     "enabled": False,
     "stage": "pilot",
     "max_duration_sec": 8,
     "megapixels_draft": 0.2,
     "megapixels_select": 0.6,
-    "audio_policy": "strip_native_use_tts_bgm",
+    "audio_policy": "prefer_native",
     "allow_bulk": False,
 }
 
@@ -192,9 +203,9 @@ def resolve_h3_config(spec: dict | None = None) -> dict[str, object]:
     except (TypeError, ValueError):
         mp = 0.2
     merged["megapixels_draft"] = max(0.1, min(mp, 1.0))
-    audio = str(merged.get("audio_policy") or "strip_native_use_tts_bgm").strip()
-    if audio not in {"strip_native_use_tts_bgm", "keep_native", "mute_native"}:
-        audio = "strip_native_use_tts_bgm"
+    audio = str(merged.get("audio_policy") or "prefer_native").strip()
+    if audio not in H3_AUDIO_POLICIES:
+        audio = "prefer_native"
     merged["audio_policy"] = audio
     return merged
 

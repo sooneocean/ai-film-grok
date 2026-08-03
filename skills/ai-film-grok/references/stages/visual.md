@@ -11,6 +11,7 @@
 - **Bulk 单门**：`aifilm bulk-preflight`；**pilot 已批后 media-queue 默认硬拦**（逃生 `AIFILM_SKIP_BULK_PREFLIGHT=1` / `--allow-without-pilot`）。
 - **设计期 variety**：`aifilm variety-precheck`（体位/脸 CU/邻镜 motion）— bulk 前改 spec 比重渲便宜。
 - **5090**：`aifilm gpu-lease acquire|heartbeat|release`；`tunnel-probe`（18188→8188）；进度只认 `queue-progress` 非空 takes。
+- **MiniMax H3（hybrid_h3 / 片级 h3.enabled）**：敏感/肉戏本地 lane → `aifilm h3 list|plan|run --register`（pilot 闸；禁静默 bulk；**原声 prefer_native**：可用则保留，不可用再 strip→TTS）。云 bulk 仍 Grok media-queue。
 - **高动态常态（P0 · 2026-07-27）**：I2V 后逐镜 mean 平常≥18、肉戏≥20；多 take 取最高动且时长够；肉戏 10s 优先 6s×2。禁止 Ken Burns/微抖装片。见 [high-motion-style-lock](../lessons-2026-07-27-high-motion-style-lock-final.md)。
 - **MEDIUM LOCK（P0 · 同案）**：每条 I2V 源= style-locked still；prompt 首段 cel 动漫锁；高动/连戏不得漂半写实；装片竞标 motion×medium 双过。
 

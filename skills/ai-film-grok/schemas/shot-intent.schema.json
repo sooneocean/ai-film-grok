@@ -38,8 +38,9 @@
       "type": ["string", "null"],
       "enum": [
         "carry_parent_dialogue",
-        "strip_native_use_tts_bgm",
+        "prefer_native",
         "keep_native",
+        "strip_native_use_tts_bgm",
         "mute_native",
         null
       ]

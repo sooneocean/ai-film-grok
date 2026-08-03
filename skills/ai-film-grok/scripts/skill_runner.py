@@ -306,8 +306,10 @@ RUNNERS: dict[str, RunnerSpec] = {
     "timeline.compose": _spec("assemble", "assemble"),
     "rhythm.evaluate": _spec("preflight", "preflight"),
     "video.render": _spec("final", "final", spend="external", approval="human_required"),
+    # review-final scorecard remains human_required (artistic full-film sign-off).
     "quality.inspect": _spec("review-final", "review-final", approval="human_required"),
-    "export.package": _spec("export-desktop", "export-desktop", approval="human_required"),
+    # P0: desktop package is local + gated by final_complete/post-audit inside the command.
+    "export.package": _spec("export-desktop", "export-desktop", approval="none"),
     "dispatch.orchestrate": _spec("dispatch", "dispatch", runner=_dispatch),
     "story.validate": _spec("plan.validate", "plan", "validate", "--strict"),
     "beat.validate": _spec("plan.validate", "plan", "validate", "--strict"),

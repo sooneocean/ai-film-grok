@@ -38,18 +38,23 @@ _ACTION_SKILLS = {
     "pilot-pack": "quality.inspect",
     "variety-precheck": "story.validate",
     "select-shortlist": "projection.verify",
+    "export-desktop": "export.package",
+    "dailies_review-evidence": "dispatch.orchestrate",
 }
 _SKILL_POLICIES = {
     "keyframe.generate": ("external", "human_required"),
     "image.animate": ("paid", "human_required"),
     "voice.synthesize": ("external", "human_required"),
     "video.render": ("external", "human_required"),
+    # quality.inspect stays human: skill_runner maps it to review-final scorecard.
     "quality.inspect": ("local", "human_required"),
-    "export.package": ("local", "human_required"),
+    # P0: local package copy after final_complete + post-audit (command still fail-closed).
+    "export.package": ("local", "none"),
 }
 _COMMAND_POLICIES = {
-    "dailies": ("local", "human_required"),
-    "export-desktop": ("local", "human_required"),
+    # P0: local read-only / post-gate delivery helpers (no spend, no artistic approve).
+    "dailies": ("local", "none"),
+    "export-desktop": ("local", "none"),
     "final": ("external", "human_required"),
     # closeout run = local post-audit ladder (does NOT auto-approve review-final)
     "closeout": ("local", "none"),
@@ -129,12 +134,20 @@ def structured_next_action(
         return None
     operation = argv[0] if argv else str(action.get("id") or "status")
     action_id = str(action.get("id") or "")
+    # P0: `aifilm pilot pack` shares the pilot CLI but only writes GO evidence.
+    if operation == "pilot" and len(argv) >= 2 and argv[1] == "pack":
+        operation = "pilot-pack"
+        if not action_id or action_id == "pilot":
+            action_id = "pilot-pack"
     skill_id = _ACTION_SKILLS.get(action_id, "dispatch.orchestrate")
     spend_class, approval_class = _SKILL_POLICIES.get(skill_id, ("local", "none"))
     command_policy = _COMMAND_POLICIES.get(operation)
     if command_policy is not None:
         spend_class, approval_class = command_policy
     if operation == "plan" and "lock" in argv:
+        approval_class = "human_required"
+    # pilot approve/score/report stay human; only pack is local-none (above remap).
+    if operation == "pilot":
         approval_class = "human_required"
     payload = {
         "skill_id": skill_id,
@@ -435,6 +448,14 @@ def build_dispatch(
                     "grok-i2v-bulk",
                     f"# Media: i2v_provider=grok · image_edit(cast) still → media-queue image_to_video 720p → register-clip --source-endpoint image_to_video  (profile={i2v_profile}; Seedance off)",
                     "Grok 为人物动主力；FRW 仅在明确技术失败后 fallback，不提交默认 FRW bulk",
+                    "visual",
+                )
+        elif i2v_profile == "hybrid_h3":
+            if craft_stage in {"shots", "media"}:
+                pre(
+                    "hybrid-h3-lanes",
+                    f"# Dual lane (profile={i2v_profile}): bulk Grok media-queue · restricted/meat → aifilm h3 plan|run --register (comfy-h3 pilot ≤8s; prefer_native audio; no silent H3 bulk)",
+                    "云 bulk 仍 Grok；敏感/肉戏 soft-lock 本地 MiniMax H3 pilot；原声可用则保留",
                     "visual",
                 )
         else:

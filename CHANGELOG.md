@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.31.30] - 2026-08-03
+
+### Added
+- **H3 film workflow CLI**: `aifilm h3 plan|run|list` (plan → 5090 generate → audio decision → queue bookkeeping → register-clip).
+- Dispatch / next-actions / visual stage pointers for hybrid_h3 dual-lane production.
+
+### Changed
+- H3 **native audio default is `prefer_native`**: keep usable diegetic stereo; strip only when unusable or explicit `strip_native_use_tts_bgm` / `mute_native`.
+- H3 prompts ask for natural diegetic ambience/foley instead of silence.
+- register-clip marks H3 clips with `use_clip_audio` from policy + QA `has_audio`.
+
+### Tests
+- `tests/test_h3_workflow.py` (CLI dispatch, plan/list, audio prefer/keep/strip decisions).
+
 ## [2.31.29] - 2026-08-03
 
 ### Added

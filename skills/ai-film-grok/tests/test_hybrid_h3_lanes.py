@@ -23,7 +23,7 @@ def test_hybrid_h3_profile_keeps_grok_bulk_auto() -> None:
         assert default_i2v_provider() == "grok"
         h3 = resolve_h3_config({})
         assert h3["enabled"] is True
-        assert h3["audio_policy"] == "strip_native_use_tts_bgm"
+        assert h3["audio_policy"] == "prefer_native"
         assert float(h3["max_duration_sec"]) <= 15
 
 
@@ -47,7 +47,7 @@ def test_restricted_shot_soft_locks_comfy_h3_when_enabled() -> None:
     assert intent["provider_lock"] == "comfy-h3"
     assert intent["recommended_provider"] == "comfy-h3"
     assert intent["recommended_weapon"] == "minimax-h3-i2v-pilot"
-    assert intent["audio_policy"] == "strip_native_use_tts_bgm"
+    assert intent["audio_policy"] == "prefer_native"
     assert intent["max_duration_sec"] is not None
     assert float(intent["max_duration_sec"]) <= 15
 

@@ -1,8 +1,9 @@
 # 混合火力 · API × 本地（2026-07-28 强化 · **2026-08-03 H3 更新**）
 
-> **2026-08-03**：本地动作主武器由退役的 Wan 2.2 I2V 换为 **MiniMax H3**（`comfy-h3` · T2V/I2V pilot；R2V 待 ref2va）。  
+> **2026-08-03**：本地动作主武器由退役的 Wan 2.2 I2V 换为 **MiniMax H3**（`comfy-h3` · T2V/I2V/R2V pilot 均已 canary）。  
 > 配置：`AIFILM_I2V_PROFILE=hybrid_h3` 或片级 `h3.enabled=true`。云 bulk 仍默认 Grok；敏感/肉戏 soft-lock H3。  
-> 成片默认 `h3.audio_policy=strip_native_use_tts_bgm`（Edge TTS + rnb）。
+> 成片默认 `h3.audio_policy=prefer_native`（H3 立体声可用则直接用；不可用或显式 strip 才 Edge TTS + rnb）。  
+> **工作流入口**：`aifilm h3 list|plan|run --register`（非仅 armory canary）。
 
 
 ## 用户原话
@@ -16,7 +17,7 @@
 | Qwen Image Edit i2i | bare 补图、卸装不回穿、pose 改 | 免费 · 中速 |
 | **MiniMax H3 I2V**（`minimax-h3-i2v-pilot`） | 人物/肉戏/敏感 I2V（pilot） | 免费 · 中速 |
 | **MiniMax H3 T2V** | 本地环境/气氛（可与 FRW 并行策略择一） | 免费 · 中速 |
-| MiniMax H3 R2V | 多 ref 锁脸/风格（待 ref2va 权重） | 免费 · 较慢 |
+| MiniMax H3 R2V | 多 ref 锁脸/风格（ref2va pilot 已 canary） | 免费 · 较慢 |
 | （日后）本地 upscale | selects 后抬分辨率 | 免费 |
 
 **独占理由**：尺度、无审核、无限重试、脸+衣着可控。

@@ -94,13 +94,20 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
     ),
     "pilot-pack": AdvancePolicy(
         ("quality.inspect", "dispatch.orchestrate"),
-        ("pilot", "pack"),
-        verifier=("pilot", "pack"),
+        ("pilot-pack",),
+        verifier=("pilot-pack",),
     ),
     "select-shortlist": AdvancePolicy(
         ("projection.verify", "dispatch.orchestrate"),
         ("select-shortlist",),
         verifier=("select-shortlist",),
+    ),
+    # P0: post-audit green + final_complete → local desktop package (no artistic approve).
+    "export-desktop": AdvancePolicy(
+        ("export.package", "dispatch.orchestrate"),
+        ("export-desktop",),
+        value_flags=("--root", "--name"),
+        verifier=("status",),
     ),
     "quality-gate-repair": AdvancePolicy(
         ("dispatch.orchestrate",),
