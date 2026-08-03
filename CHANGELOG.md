@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.31.25] - 2026-08-03
+
+### Added
+- **Local MiniMax H3 (ComfyUI native) pilot lane** on the private RTX 5090:
+  - Armory weapons: `minimax-h3-t2v-pilot`, `minimax-h3-i2v-pilot`, `minimax-h3-r2v-pilot`
+  - API templates under `templates/comfy/minimax-h3-*-api.json`
+  - Provider `comfy-h3` with endpoints `local_minimax_h3_{t2v,i2v,r2v}`
+  - Weapon router maps unlocked motion demand to H3 experimental (pilot-gated, no silent bulk)
+- Real T2V/I2V canaries under `artifacts/5090-evaluation/minimax-h3-canary/`
+- Tests: armory H3 routing, weapon_router, provider registration
+
+### Changed
+- Local Wan 2.2 I2V stays retired; H3 is a new local path, not a Wan un-retire
+- Comfy capacity: failed driver VRAM SSH probe no longer hard-blocks when ComfyUI free-VRAM metrics are valid
+- Docs: comfy-weapon-armory + hard-defaults H3 pointers
+
 ## [2.31.24] - 2026-08-03
 
 ### Changed
