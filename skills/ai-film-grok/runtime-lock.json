@@ -794,7 +794,7 @@
     },
     {
       "path": "scripts/narrative_control.py",
-      "sha256": "7645a12998f79295c82896e7b73fcaf59cc827125d02a33d2eaecf91b246f3de"
+      "sha256": "6293285cd9fa80393692c0278bac1bd094cb9094c72d6ca441cd5b6b33d3a5bc"
     },
     {
       "path": "scripts/narrative_evidence.py",

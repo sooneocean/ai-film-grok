@@ -912,6 +912,157 @@ def validate_narrative_contract(
     return issues
 
 
+def validate_character_consistency(
+    graph: dict[str, Any], *, strict: bool = False
+) -> list[dict[str, Any]]:
+    """Validate character attribute consistency across episodes."""
+    if not strict:
+        return []
+    episodes = _episode_tree(graph)
+    issues: list[dict[str, Any]] = []
+    character_attrs: dict[str, dict[str, Any]] = {}
+    for episode_id, episode in episodes.items():
+        if not isinstance(episode, dict):
+            continue
+        board = episode.get("director_board")
+        if not isinstance(board, dict):
+            continue
+        characters = board.get("characters")
+        if not isinstance(characters, list):
+            continue
+        for char in characters:
+            if not isinstance(char, dict):
+                continue
+            char_id = str(char.get("character_id") or "")
+            if not char_id:
+                continue
+            if char_id not in character_attrs:
+                character_attrs[char_id] = {
+                    "wardrobe_states": set(),
+                    "viewpoints": set(),
+                    "focal_characters": set(),
+                }
+            attrs = character_attrs[char_id]
+            ws = str(char.get("wardrobe_state") or "")
+            if ws:
+                attrs["wardrobe_states"].add(ws)
+            vp = str(char.get("viewpoint") or "")
+            if vp:
+                attrs["viewpoints"].add(vp)
+            fc = str(char.get("focal_character") or "")
+            if fc:
+                attrs["focal_characters"].add(fc)
+    for char_id, attrs in character_attrs.items():
+        for key, values in attrs.items():
+            if len(values) > 1:
+                issues.append(
+                    _issue(
+                        "CHARACTER_ATTR_INCONSISTENT",
+                        f"character {char_id} {key} inconsistent across episodes: {sorted(values)}",
+                        node_ref=char_id,
+                    )
+                )
+    return issues
+
+
+def validate_heat_arc_alignment(
+    graph: dict[str, Any], *, strict: bool = False
+) -> list[dict[str, Any]]:
+    """Validate that heat_phase aligns with dramatic_function per beat."""
+    if not strict:
+        return []
+    canonical = int(graph.get("schema_version") or 0) >= GRAPH_SCHEMA_VERSION
+    if not canonical:
+        return []
+
+    HEAT_DRAMATIC = {"conflict", "escalation", "peak", "twist", "confrontation", "resolution"}
+
+    episodes = _episode_tree(graph)
+    issues: list[dict[str, Any]] = []
+
+    for episode_id, episode in episodes.items():
+        if not isinstance(episode, dict):
+            continue
+        beats = episode.get("beats") if isinstance(episode.get("beats"), list) else []
+        for beat in beats:
+            if not isinstance(beat, dict):
+                continue
+            beat_index = int(beat.get("index") or 0)
+            heat_phase = str(beat.get("heat_phase") or "").strip()
+            dramatic_function = str(beat.get("dramatic_function") or "").strip()
+
+            if heat_phase in {"arousal", "climax"} and dramatic_function not in HEAT_DRAMATIC:
+                issues.append(
+                    _issue(
+                        "HEAT_ARC_MISMATCH",
+                        f"beat {beat_index} in episode {episode_id} has heat_phase '{heat_phase}' but dramatic_function '{dramatic_function}' "
+                        f"(expected one of: {sorted(HEAT_DRAMATIC)})",
+                        node_ref=str(beat.get("id") or beat_index),
+                    )
+                )
+            if heat_phase == "resolution" and dramatic_function in {"conflict", "escalation", "twist"}:
+                issues.append(
+                    _issue(
+                        "HEAT_ARC_MISMATCH",
+                        f"beat {beat_index} in episode {episode_id} has resolution heat_phase but dramatic_function '{dramatic_function}' "
+                        f"(resolution beats should not introduce new conflict)",
+                        node_ref=str(beat.get("id") or beat_index),
+                    )
+                )
+            if heat_phase == "setup" and dramatic_function in {"peak", "climax"}:
+                issues.append(
+                    _issue(
+                        "HEAT_ARC_MISMATCH",
+                        f"beat {beat_index} in episode {episode_id} has setup heat_phase but dramatic_function '{dramatic_function}' "
+                        f"(setup beats should not peak yet)",
+                        node_ref=str(beat.get("id") or beat_index),
+                    )
+                )
+    return issues
+
+
+def compute_narrative_health(graph: dict[str, Any]) -> dict[str, Any]:
+    """Compute a composite narrative health score (0-100).
+
+    Aggregates validate_narrative_graph issues:
+    - hard errors = -20 each
+    - warnings = -3 each
+    """
+    semantic = validate_narrative_graph(graph, strict=True)
+    all_issues = semantic.get("issues") or []
+
+    hard_errors = [i for i in all_issues if i.get("severity") == "hard"]
+    warnings = [i for i in all_issues if i.get("severity") != "hard"]
+
+    issue_codes = semantic.get("issue_codes") or []
+    character_code_count = sum(1 for i in all_issues if i.get("code") == "CHARACTER_ATTR_INCONSISTENT")
+    heat_arc_count = sum(1 for i in all_issues if i.get("code") == "HEAT_ARC_MISMATCH")
+    contract_count = len(all_issues) - character_code_count - heat_arc_count
+
+    score = 100.0
+    score -= len(hard_errors) * 20.0
+    score -= len(warnings) * 3.0
+
+    story = graph.get("story") if isinstance(graph.get("story"), dict) else {}
+    points = story.get("plot_points") if isinstance(story.get("plot_points"), list) else []
+    if len(points) >= 3:
+        score = min(100.0, score + 5.0)
+
+    score = max(0.0, min(100.0, score))
+
+    return {
+        "ok": score >= 70.0,
+        "score": round(score, 1),
+        "total_issues": len(all_issues),
+        "hard_errors": len(hard_errors),
+        "warnings": len(warnings),
+        "character_consistency_violations": character_code_count,
+        "heat_arc_misalignments": heat_arc_count,
+        "contract_violations": max(0, contract_count),
+        "issue_codes": issue_codes,
+    }
+
+
 def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> dict[str, Any]:
     """Validate narrative meaning in addition to graph shape."""
     issues: list[dict[str, Any]] = []
@@ -1089,6 +1240,8 @@ def validate_narrative_graph(graph: dict[str, Any], *, strict: bool = False) -> 
                     previous = re.sub(r"\s+", " ", action)
 
     issues.extend(validate_narrative_contract(graph, strict=strict))
+    issues.extend(validate_character_consistency(graph, strict=strict))
+    issues.extend(validate_heat_arc_alignment(graph, strict=strict))
 
     hard = [item for item in issues if item.get("severity") == "hard"]
     return {
