@@ -225,6 +225,10 @@
       "sha256": "5f32da697722ac99b2734f4142b26c5d4263b4dd15e485c7c2297fd003672555"
     },
     {
+      "path": "scripts/beat_spine.py",
+      "sha256": "d777266dd53059996fbfc9cdc0e0ad32764a721f6e6f85cf9f0a85c0e071eb6c"
+    },
+    {
       "path": "scripts/benchmark.py",
       "sha256": "7f6e40fefe94662a94180c3f486752afb4fb612ff702bf21f6d1be482b7155f5"
     },
@@ -938,7 +942,7 @@
     },
     {
       "path": "scripts/provider_canary.py",
-      "sha256": "d518852aa6a45bfce9281319b13ffcbec0e516dd56ce26c545a1f3f5c4b6adab"
+      "sha256": "4f7ae1da0ec87687bc4d4833e030af2db43a6b62b4972c0dd5a056690f023ecb"
     },
     {
       "path": "scripts/quality_check_video.py",
@@ -1098,7 +1102,7 @@
     },
     {
       "path": "scripts/story_plan.py",
-      "sha256": "9f1d6fd521781461c2cbee2816efac834ee67a85dc58526150850607b3df6c34"
+      "sha256": "8056da254e277d49eea13765250b9cf2d6f4308d348eb4bfd3dc0af359d566ae"
     },
     {
       "path": "scripts/story_reception.py",

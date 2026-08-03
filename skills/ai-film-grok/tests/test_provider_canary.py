@@ -66,8 +66,34 @@ class TestRecordCanary(unittest.TestCase):
                 identity_ok=True,
                 motion_ok=True,
             )
+            self.assertTrue((root / "receipts" / "provider-canary.json").is_file())
             self.assertTrue((root / "receipts" / "seedance-canary.json").is_file())
             self.assertFalse((root / "receipts" / "grok-i2v-canary.json").is_file())
+
+    def test_frw_providers_write_specific_receipts(self):
+        """FRW providers write frw-ltx23-canary.json and frw-api-i2v-canary.json."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "receipts").mkdir(parents=True)
+            media = root / "out" / "canary.mp4"
+            media.parent.mkdir(parents=True)
+            media.write_bytes(b"frw media")
+
+            rep1 = record_canary(
+                root, provider="frw-ltx23", output=str(media), reviewer="dex", identity_ok=True, motion_ok=True
+            )
+            self.assertTrue(rep1["ok"])
+            self.assertEqual(rep1["provider_model"], "ltx-2.3")
+            self.assertTrue((root / "receipts" / "frw-ltx23-canary.json").is_file())
+
+            rep2 = record_canary(
+                root, provider="frw-api-i2v", output=str(media), reviewer="dex", identity_ok=True, motion_ok=True
+            )
+            self.assertTrue(rep2["ok"])
+            self.assertEqual(rep2["provider_model"], "img2video")
+            self.assertTrue((root / "receipts" / "frw-api-i2v-canary.json").is_file())
 
     def test_rejects_invalid_provider(self):
         """Invalid provider raises ValueError."""

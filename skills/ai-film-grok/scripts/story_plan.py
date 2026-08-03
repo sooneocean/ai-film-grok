@@ -35,49 +35,8 @@ DRAMATIC_FUNCS = (
     "bridge",
 )
 
-# Default vertical short-form beat spine (hook → ending hook)
-DEFAULT_BEAT_SPINE: list[dict[str, Any]] = [
-    {
-        "key": "hook",
-        "dramatic_function": "hook",
-        "importance": "climax",
-        "objective": "开场钩子：异常/欲望/冲突入口",
-        "weight": 0.12,
-        "shots_n": 1,
-    },
-    {
-        "key": "setup",
-        "dramatic_function": "approach",
-        "importance": "supporting",
-        "objective": "建立人物关系与空间",
-        "weight": 0.18,
-        "shots_n": 1,
-    },
-    {
-        "key": "escalate",
-        "dramatic_function": "sensory",
-        "importance": "important",
-        "objective": "情绪/信息升级",
-        "weight": 0.22,
-        "shots_n": 2,
-    },
-    {
-        "key": "peak",
-        "dramatic_function": "action",
-        "importance": "climax",
-        "objective": "高潮或关键决定",
-        "weight": 0.28,
-        "shots_n": 2,
-    },
-    {
-        "key": "button",
-        "dramatic_function": "afterglow",
-        "importance": "supporting",
-        "objective": "余韵与下一集钩子",
-        "weight": 0.20,
-        "shots_n": 1,
-    },
-]
+# Beat spines are now loaded from JSON files in schemas/beat-spines/
+# via beat_spine.load_spine(). See schemas/beat-spines/ for available spines.
 
 # Minimal machine-readable defaults used by hard-default contract consumers.
 # Full projects receive their complete spec from ``run_plan``.
@@ -86,206 +45,6 @@ DEFAULT_SPEC: dict[str, Any] = {"sex_floor_strict": True}
 # ``schema_version`` describes the normalized-story receipt and remains stable
 # for existing readers. This marker describes the graph nesting contract.
 STORY_PLAN_SCHEMA_VERSION = 2
-
-# Adult max spine: setup short → foreplay undress → act multi → climax → hook
-# Duration weights reserve ≥35% for act+climax (product floor 20%; hardcore 40%)
-ADULT_MAX_BEAT_SPINE: list[dict[str, Any]] = [
-    {
-        "key": "hook",
-        "dramatic_function": "hook",
-        "importance": "important",
-        "objective": "落锁/边界关闭：今晚只办你",
-        "weight": 0.08,
-        "shots_n": 1,
-        "heat_phase": "setup",
-        "coitus_beat": "entry",
-        "wardrobe_state": "full",
-    },
-    {
-        "key": "foreplay",
-        "dramatic_function": "sensory",
-        "importance": "important",
-        "objective": "前戏失序：卸甲/脱衣到半裸",
-        "weight": 0.12,
-        "shots_n": 1,
-        "heat_phase": "foreplay",
-        "coitus_beat": "undress",
-        "wardrobe_state": "partial",
-    },
-    {
-        "key": "foreplay2",
-        "dramatic_function": "approach",
-        "importance": "supporting",
-        "objective": "贴身权力：拽入跨坐起势",
-        "weight": 0.10,
-        "shots_n": 1,
-        "heat_phase": "foreplay",
-        "coitus_beat": "entry",
-        "wardrobe_state": "partial",
-    },
-    {
-        "key": "union",
-        "dramatic_function": "action",
-        "importance": "climax",
-        "objective": "结合：跨坐落稳骨盆咬合",
-        "weight": 0.12,
-        "shots_n": 1,
-        "heat_phase": "act",
-        "coitus_beat": "union",
-        "wardrobe_state": "undressed",
-        "duration_boost": 8.0,
-    },
-    {
-        "key": "rhythm",
-        "dramatic_function": "action",
-        "importance": "climax",
-        "objective": "节奏：沉腰顶磨至少两次起伏",
-        "weight": 0.18,
-        "shots_n": 2,
-        "heat_phase": "act",
-        "coitus_beat": "rhythm",
-        "wardrobe_state": "undressed",
-        "duration_boost": 8.0,
-    },
-    {
-        "key": "lock",
-        "dramatic_function": "sensory",
-        "importance": "important",
-        "objective": "锁紧：腿锁腰/攥布特写",
-        "weight": 0.10,
-        "shots_n": 1,
-        "heat_phase": "act",
-        "coitus_beat": "lock",
-        "wardrobe_state": "bare",
-    },
-    {
-        "key": "climax",
-        "dramatic_function": "action",
-        "importance": "climax",
-        "objective": "办完：失声拱背腿软",
-        "weight": 0.14,
-        "shots_n": 1,
-        "heat_phase": "climax",
-        "coitus_beat": "finish",
-        "wardrobe_state": "bare",
-        "duration_boost": 8.0,
-    },
-    {
-        "key": "button",
-        "dramatic_function": "afterglow",
-        "importance": "supporting",
-        "objective": "余韵钩子：下一场换你顶",
-        "weight": 0.06,
-        "shots_n": 1,
-        "heat_phase": "afterglow",
-        "coitus_beat": "hook",
-        "wardrobe_state": "bare",
-    },
-]
-
-HARDCORE_MALE_BEAT_SPINE: list[dict[str, Any]] = [
-    {**ADULT_MAX_BEAT_SPINE[0], "weight": 0.06},
-    {**ADULT_MAX_BEAT_SPINE[1], "weight": 0.08},
-    {**ADULT_MAX_BEAT_SPINE[2], "weight": 0.08},
-    {**ADULT_MAX_BEAT_SPINE[3], "weight": 0.12, "shots_n": 1},
-    {**ADULT_MAX_BEAT_SPINE[4], "weight": 0.22, "shots_n": 2},  # more rhythm
-    {
-        "key": "rhythm2",
-        "dramatic_function": "action",
-        "importance": "climax",
-        "objective": "第二轮节奏：换姿再沉腰",
-        "weight": 0.12,
-        "shots_n": 1,
-        "heat_phase": "act",
-        "coitus_beat": "rhythm",
-        "wardrobe_state": "bare",
-        "duration_boost": 8.0,
-    },
-    {**ADULT_MAX_BEAT_SPINE[5], "weight": 0.08},
-    {**ADULT_MAX_BEAT_SPINE[6], "weight": 0.14, "shots_n": 1},
-    {
-        "key": "climax2",
-        "dramatic_function": "reaction",
-        "importance": "climax",
-        "objective": "完成脸/余颤反应",
-        "weight": 0.06,
-        "shots_n": 1,
-        "heat_phase": "climax",
-        "coitus_beat": "finish",
-        "wardrobe_state": "bare",
-    },
-    {**ADULT_MAX_BEAT_SPINE[7], "weight": 0.04},
-]
-
-# 90–120s dual-round: second union/rhythm/finish after brief breath
-DUAL_CLIMAX_BEAT_SPINE: list[dict[str, Any]] = [
-    {**ADULT_MAX_BEAT_SPINE[0], "weight": 0.05},
-    {**ADULT_MAX_BEAT_SPINE[1], "weight": 0.07},
-    {**ADULT_MAX_BEAT_SPINE[2], "weight": 0.06},
-    {**ADULT_MAX_BEAT_SPINE[3], "weight": 0.10, "shots_n": 1},
-    {**ADULT_MAX_BEAT_SPINE[4], "weight": 0.14, "shots_n": 2},
-    {**ADULT_MAX_BEAT_SPINE[5], "weight": 0.06},
-    {
-        "key": "climax1",
-        "dramatic_function": "action",
-        "importance": "climax",
-        "objective": "第一轮办完：失声腿软",
-        "weight": 0.08,
-        "shots_n": 1,
-        "heat_phase": "climax",
-        "coitus_beat": "finish",
-        "wardrobe_state": "bare",
-        "duration_boost": 8.0,
-    },
-    {
-        "key": "breath",
-        "dramatic_function": "sensory",
-        "importance": "supporting",
-        "objective": "喘息换姿：未完加办",
-        "weight": 0.05,
-        "shots_n": 1,
-        "heat_phase": "foreplay",
-        "coitus_beat": "entry",
-        "wardrobe_state": "bare",
-    },
-    {
-        "key": "union2",
-        "dramatic_function": "action",
-        "importance": "climax",
-        "objective": "第二轮结合：换姿再落稳",
-        "weight": 0.09,
-        "shots_n": 1,
-        "heat_phase": "act",
-        "coitus_beat": "union",
-        "wardrobe_state": "bare",
-        "duration_boost": 8.0,
-    },
-    {
-        "key": "rhythm3",
-        "dramatic_function": "action",
-        "importance": "climax",
-        "objective": "第二轮节奏：更深沉腰",
-        "weight": 0.14,
-        "shots_n": 2,
-        "heat_phase": "act",
-        "coitus_beat": "rhythm",
-        "wardrobe_state": "bare",
-        "duration_boost": 8.0,
-    },
-    {
-        "key": "climax2",
-        "dramatic_function": "action",
-        "importance": "climax",
-        "objective": "第二轮办穿：拱背余颤",
-        "weight": 0.10,
-        "shots_n": 1,
-        "heat_phase": "climax",
-        "coitus_beat": "finish",
-        "wardrobe_state": "bare",
-        "duration_boost": 8.0,
-    },
-    {**ADULT_MAX_BEAT_SPINE[7], "weight": 0.06},
-]
 
 # Brief signals → heat (adult max IRON · 2026-07-24: pin max when adult evidence)
 _HEAT_MAX_MARKERS: tuple[str, ...] = (
@@ -649,10 +408,14 @@ def select_beat_spine(
 
     P0-1 · 2026-07-23: multi-genre support. Non-adult genres use GENRE_SPINES.
     P0 · 2026-07-29: genre=adult (or default) pins ADULT_MAX unless heat soft/medium.
+
+    Spines are loaded from JSON files in schemas/beat-spines/ via beat_spine.load_spine().
     """
+    from beat_spine import load_spine
+
     # Non-adult genre: use genre spine directly
-    if genre and genre != "adult" and genre in GENRE_SPINES:
-        return [dict(b) for b in GENRE_SPINES[genre]]
+    if genre and genre != "adult" and genre in GENRE_NAMES:
+        return [dict(b) for b in load_spine(genre)]
 
     h = heat or {}
     scale = str(h.get("heat_scale") or "").strip().lower()
@@ -660,12 +423,12 @@ def select_beat_spine(
     if scale in {"soft", "medium"}:
         _ = multi_scene
         _ = target_duration
-        return list(DEFAULT_BEAT_SPINE)
+        return [dict(b) for b in load_spine("default")]
     # Explicit dual only — never infer solely from duration
     if h.get("spine") == "dual_climax" or h.get("dual_climax"):
-        return list(DUAL_CLIMAX_BEAT_SPINE)
+        return [dict(b) for b in load_spine("dual_climax")]
     if h.get("spine") == "hardcore_male" or h.get("hardcore"):
-        return list(HARDCORE_MALE_BEAT_SPINE)
+        return [dict(b) for b in load_spine("hardcore_male")]
     # Adult default IRON: always ADULT_MAX (max / unset / adult_max spine)
     if (
         not genre
@@ -674,10 +437,10 @@ def select_beat_spine(
         or h.get("spine") == "adult_max"
         or h.get("evidence_max")
     ):
-        return list(ADULT_MAX_BEAT_SPINE)
+        return [dict(b) for b in load_spine("adult_max")]
     _ = multi_scene  # reserved for future scene-local spines
     _ = target_duration
-    return list(DEFAULT_BEAT_SPINE)
+    return [dict(b) for b in load_spine("default")]
 
 
 AUTHORING_PLACEHOLDER = "needs_authoring"
@@ -765,210 +528,23 @@ _GENRE_MARKERS: dict[str, tuple[str, ...]] = {
     ),
 }
 
-# Genre-specific beat spines. All dramatic_function values must be in DRAMATIC_FUNCS.
-# Each beat: key / dramatic_function / importance / objective / weight / shots_n
-GENRE_SPINES: dict[str, list[dict[str, Any]]] = {
-    "drama": [
-        {
-            "key": "hook",
-            "dramatic_function": "hook",
-            "importance": "climax",
-            "objective": "建立人物处境与核心张力",
-            "weight": 0.12,
-            "shots_n": 1,
-        },
-        {
-            "key": "setup",
-            "dramatic_function": "approach",
-            "importance": "supporting",
-            "objective": "人物关系与空间建立",
-            "weight": 0.18,
-            "shots_n": 1,
-        },
-        {
-            "key": "rising",
-            "dramatic_function": "action",
-            "importance": "important",
-            "objective": "冲突升级，主角行动推进",
-            "weight": 0.22,
-            "shots_n": 2,
-        },
-        {
-            "key": "turn",
-            "dramatic_function": "reaction",
-            "importance": "important",
-            "objective": "转折点：反应/抉择/觉醒",
-            "weight": 0.20,
-            "shots_n": 1,
-        },
-        {
-            "key": "climax",
-            "dramatic_function": "action",
-            "importance": "climax",
-            "objective": "高潮：决定性对抗或选择",
-            "weight": 0.18,
-            "shots_n": 1,
-        },
-        {
-            "key": "resolution",
-            "dramatic_function": "afterglow",
-            "importance": "supporting",
-            "objective": "结果沉淀与新常态",
-            "weight": 0.10,
-            "shots_n": 1,
-        },
-    ],
-    "mystery": [
-        {
-            "key": "hook",
-            "dramatic_function": "hook",
-            "importance": "climax",
-            "objective": "谜面/异常事件抛出",
-            "weight": 0.14,
-            "shots_n": 1,
-        },
-        {
-            "key": "investigate",
-            "dramatic_function": "approach",
-            "importance": "important",
-            "objective": "调查深入，信息逼近",
-            "weight": 0.20,
-            "shots_n": 2,
-        },
-        {
-            "key": "clue",
-            "dramatic_function": "sensory",
-            "importance": "important",
-            "objective": "关键线索/物证特写",
-            "weight": 0.16,
-            "shots_n": 1,
-        },
-        {
-            "key": "red_herring",
-            "dramatic_function": "reaction",
-            "importance": "supporting",
-            "objective": "误导/假线索反应",
-            "weight": 0.14,
-            "shots_n": 1,
-        },
-        {
-            "key": "reveal",
-            "dramatic_function": "action",
-            "importance": "climax",
-            "objective": "真相揭露/行动推进",
-            "weight": 0.24,
-            "shots_n": 2,
-        },
-        {
-            "key": "aftermath",
-            "dramatic_function": "afterglow",
-            "importance": "supporting",
-            "objective": "余波与新疑问",
-            "weight": 0.12,
-            "shots_n": 1,
-        },
-    ],
-    "arthouse": [
-        {
-            "key": "mood_open",
-            "dramatic_function": "hook",
-            "importance": "important",
-            "objective": "建立氛围与情绪基调",
-            "weight": 0.16,
-            "shots_n": 1,
-        },
-        {
-            "key": "observe",
-            "dramatic_function": "sensory",
-            "importance": "climax",
-            "objective": "静观：人物/环境的感官凝视",
-            "weight": 0.22,
-            "shots_n": 2,
-        },
-        {
-            "key": "gesture",
-            "dramatic_function": "approach",
-            "importance": "important",
-            "objective": "微妙接近/关系微变",
-            "weight": 0.18,
-            "shots_n": 1,
-        },
-        {
-            "key": "silence",
-            "dramatic_function": "reaction",
-            "importance": "important",
-            "objective": "留白/沉默中的情绪涌动",
-            "weight": 0.18,
-            "shots_n": 1,
-        },
-        {
-            "key": "shift",
-            "dramatic_function": "action",
-            "importance": "supporting",
-            "objective": "情绪转折（非情节转折）",
-            "weight": 0.14,
-            "shots_n": 1,
-        },
-        {
-            "key": "echo",
-            "dramatic_function": "afterglow",
-            "importance": "supporting",
-            "objective": "回响/未决的余韵",
-            "weight": 0.12,
-            "shots_n": 1,
-        },
-    ],
-    "documentary": [
-        {
-            "key": "premise",
-            "dramatic_function": "hook",
-            "importance": "important",
-            "objective": "主题/问题引入",
-            "weight": 0.14,
-            "shots_n": 1,
-        },
-        {
-            "key": "context",
-            "dramatic_function": "approach",
-            "importance": "supporting",
-            "objective": "背景/语境建立",
-            "weight": 0.18,
-            "shots_n": 1,
-        },
-        {
-            "key": "evidence",
-            "dramatic_function": "sensory",
-            "importance": "climax",
-            "objective": "事实/数据/物证呈现",
-            "weight": 0.22,
-            "shots_n": 2,
-        },
-        {
-            "key": "perspective",
-            "dramatic_function": "reaction",
-            "importance": "important",
-            "objective": "观点/访谈/立场",
-            "weight": 0.20,
-            "shots_n": 1,
-        },
-        {
-            "key": "conclusion",
-            "dramatic_function": "action",
-            "importance": "important",
-            "objective": "结论/推论推进",
-            "weight": 0.16,
-            "shots_n": 1,
-        },
-        {
-            "key": "coda",
-            "dramatic_function": "afterglow",
-            "importance": "supporting",
-            "objective": "余思/开放问题",
-            "weight": 0.10,
-            "shots_n": 1,
-        },
-    ],
-}
+# Genre names available for beat spine selection.
+GENRE_NAMES = frozenset(GENRES)
+
+
+# Genre-specific beat spines are loaded from JSON files at runtime via
+# beat_spine.load_spine(). This keeps spines file-based and extensible
+# without modifying Python code.
+def _genre_spine(genre: str) -> list[dict[str, Any]]:
+    """Load a genre spine from JSON. Falls back to default."""
+    from beat_spine import load_spine, spine_exists
+
+    if spine_exists(genre):
+        return load_spine(genre)
+    return load_spine("default")
+
+
+# Authoring prompts for non-adult genre beat keys (parallel to _BEAT_AUTHORING_PROMPTS)
 
 # Authoring prompts for non-adult genre beat keys (parallel to _BEAT_AUTHORING_PROMPTS)
 _GENRE_BEAT_PROMPTS: dict[str, dict[str, tuple[str, ...]]] = {
@@ -1678,6 +1254,146 @@ def _sentences(body: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
+# Keywords that signal a sentence's narrative weight for a given beat key.
+# Used to distribute sentences across beats by relevance rather than even split.
+_SENTENCE_BEAT_KEYWORDS: dict[str, dict[str, tuple[str, ...]]] = {
+    "hook": (
+        "异常",
+        "危险",
+        "欲望",
+        "冲突",
+        "意外",
+        "震惊",
+        "不可",
+        "必须",
+        "突然",
+        "绝不",
+        "不可能",
+        "秘密",
+        "危险",
+    ),
+    "approach": (
+        "靠近",
+        "接近",
+        "尝试",
+        "决定",
+        "选择",
+        "策略",
+        "计划",
+        "打算",
+        "关系",
+        "空间",
+        "进入",
+        "面对",
+    ),
+    "sensory": (
+        "感觉",
+        "感受",
+        "触摸",
+        "气味",
+        "声音",
+        "呼吸",
+        "心跳",
+        "颤抖",
+        "温暖",
+        "寒冷",
+        "疼痛",
+        "柔软",
+        "眼神",
+    ),
+    "reaction": (
+        "反应",
+        "回应",
+        "震惊",
+        "愤怒",
+        "悲伤",
+        "喜悦",
+        "犹豫",
+        "退缩",
+        "沉默",
+        "转身",
+        "离开",
+        "停下",
+    ),
+    "action": (
+        "行动",
+        "决定",
+        "选择",
+        "冲击",
+        "突破",
+        "对抗",
+        "抵抗",
+        "反击",
+        "进攻",
+        "防守",
+        "争夺",
+        "抢夺",
+        "推开",
+        "抓住",
+    ),
+    "afterglow": (
+        "余韵",
+        "回味",
+        "留下",
+        "结束",
+        "之后",
+        "终于",
+        "结果",
+        "后果",
+        "未完",
+        "待续",
+        "钩子",
+    ),
+}
+
+
+def _sentence_relevance(sentence: str, beat_key: str) -> float:
+    """Score how relevant a sentence is to a given beat key (0.0–1.0)."""
+    text = sentence.lower()
+    keywords = _SENTENCE_BEAT_KEYWORDS.get(beat_key, ())
+    if not keywords:
+        return 0.5
+    hits = sum(1 for kw in keywords if kw in text)
+    return min(1.0, hits / max(1, len(keywords)) * 2)
+
+
+def _assign_sentences_to_beat(
+    sents: list[str],
+    spine: list[dict[str, Any]],
+    beat_index: int,
+    spine_len: int,
+    scene_budget_sec: float,
+) -> list[str]:
+    """Assign sentences to a beat using narrative weight scoring.
+
+    Instead of evenly splitting sentences, this scores each sentence
+    against the beat's dramatic_function and assigns the most relevant
+    ones, weighted by the beat's weight in the spine.
+    """
+    if spine_len == 1:
+        return list(sents)
+
+    sp = spine[beat_index]
+    beat_key = sp.get("key", "approach")
+    beat_weight = float(sp.get("weight", 0.2))
+
+    # Score each sentence against this beat's key
+    scored: list[tuple[float, int, str]] = [
+        (_sentence_relevance(s, beat_key), i, s) for i, s in enumerate(sents)
+    ]
+
+    # Sort by relevance descending
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    # Target number of sentences proportional to beat weight
+    total_weight = sum(float(b.get("weight", 0.2)) for b in spine)
+    target_count = max(1, round(len(sents) * beat_weight / total_weight))
+
+    # Pick top-ranked sentences, preserving original order
+    selected = sorted(scored[:target_count], key=lambda x: x[1])
+    return [s for _, _, s in selected]
+
+
 def segment_scenes(
     normalized: dict[str, Any],
     episode: dict[str, Any],
@@ -1919,29 +1635,29 @@ def extract_beats(
             multi_scene=not is_only_scene,
         )
     # short scene: fewer beats (only for non-adult genre spines + default drama)
-    is_genre_spine = genre and genre != "adult" and genre in GENRE_SPINES
+    is_genre_spine = genre and genre != "adult" and genre in GENRE_NAMES
     if not adult:
         if not is_only_scene and len(sents) <= 2:
             # Drop the 2nd beat (setup/context) for short multi-scene
             if len(spine) >= 5:
                 spine = [spine[0], spine[2], spine[3], spine[4]]
         elif len(sents) == 1 and is_only_scene:
-            spine = list(DEFAULT_BEAT_SPINE) if not is_genre_spine else spine
+            from beat_spine import load_spine
 
-    # distribute sentences across beats
+            spine = [dict(b) for b in load_spine("default")] if not is_genre_spine else spine
+
+    # distribute sentences across beats using narrative weight scoring
     if not sents:
         sents = [str(scene.get("synopsis") or scene.get("title") or "画面推进")]
 
     beats: list[dict[str, Any]] = []
     n = len(spine)
     for bi, sp in enumerate(spine):
-        # assign sentence slice
+        # assign sentence slice using narrative weight scoring
         if n == 1:
             chunk_sents = sents
         else:
-            start = int(round(bi * len(sents) / n))
-            end = int(round((bi + 1) * len(sents) / n))
-            chunk_sents = sents[start:end] or [sents[min(bi, len(sents) - 1)]]
+            chunk_sents = _assign_sentences_to_beat(sents, spine, bi, n, scene_budget_sec)
         action_text = " ".join(chunk_sents)
         dur = max(2.0, round(float(scene_budget_sec) * float(sp["weight"]), 1))
         boost = sp.get("duration_boost")

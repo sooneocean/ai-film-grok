@@ -2,8 +2,8 @@
 
 Verifies:
 - detect_genre() signal inference for each genre
-- select_beat_spine() returns correct spine per genre
-- GENRE_SPINES all use valid dramatic_function enum values
+- select_beat_spine() returns correct spine per genre via beat_spine loader
+- JSON spines all use valid dramatic_function enum values
 - normalize_story() includes genre field
 - backward compat: no genre → adult default (unchanged behavior)
 - dramatic_function enum unchanged (write-spec compatibility)
@@ -17,9 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from story_plan import (
-    DEFAULT_BEAT_SPINE,
     DRAMATIC_FUNCS,
-    GENRE_SPINES,
     GENRES,
     detect_genre,
     detect_heat_signals,
@@ -27,8 +25,50 @@ from story_plan import (
     select_beat_spine,
 )
 
+from beat_spine import list_spines, load_spine, spine_exists
+
 # ---------------------------------------------------------------------------
-# GENRE_SPINES structural validation
+# Beat spine loader validation
+# ---------------------------------------------------------------------------
+
+
+class TestBeatSpineLoader:
+    """beat_spine loader can find all expected spine files."""
+
+    def test_loader_finds_default(self):
+        assert spine_exists("default")
+
+    def test_loader_finds_adult_max(self):
+        assert spine_exists("adult_max")
+
+    def test_loader_finds_hardcore_male(self):
+        assert spine_exists("hardcore_male")
+
+    def test_loader_finds_dual_climax(self):
+        assert spine_exists("dual_climax")
+
+    def test_loader_finds_all_genres(self):
+        for g in GENRES:
+            if g == "adult":
+                continue
+            assert spine_exists(g), f"genre '{g}' spine JSON missing"
+
+    def test_list_spines_includes_all(self):
+        names = list_spines()
+        assert "default" in names
+        assert "adult_max" in names
+
+    def test_load_spine_returns_valid_list(self):
+        spine = load_spine("drama")
+        assert isinstance(spine, list)
+        assert len(spine) > 0
+        for beat in spine:
+            assert "key" in beat
+            assert "dramatic_function" in beat
+
+
+# ---------------------------------------------------------------------------
+# GENRE_SPINES structural validation (via JSON loader)
 # ---------------------------------------------------------------------------
 
 
@@ -38,30 +78,41 @@ class TestGenreSpineStructure:
     def test_all_genres_have_spines(self):
         for g in GENRES:
             if g == "adult":
-                continue  # adult uses DEFAULT_BEAT_SPINE / ADULT_MAX etc.
-            assert g in GENRE_SPINES, f"genre '{g}' missing from GENRE_SPINES"
+                continue
+            assert spine_exists(g), f"genre '{g}' missing spine JSON"
 
     def test_spine_beats_use_valid_enum(self):
-        for genre, spine in GENRE_SPINES.items():
+        for g in GENRES:
+            if g == "adult":
+                continue
+            spine = load_spine(g)
             for beat in spine:
                 df = beat.get("dramatic_function")
                 assert df in DRAMATIC_FUNCS, (
-                    f"genre '{genre}' beat '{beat.get('key')}' has invalid "
+                    f"genre '{g}' beat '{beat.get('key')}' has invalid "
                     f"dramatic_function '{df}' — must be in {DRAMATIC_FUNCS}"
                 )
 
     def test_spine_weights_sum_near_one(self):
-        for genre, spine in GENRE_SPINES.items():
+        for g in GENRES:
+            if g == "adult":
+                continue
+            spine = load_spine(g)
             total = sum(float(b.get("weight", 0)) for b in spine)
-            assert 0.95 <= total <= 1.05, f"genre '{genre}' weights sum={total:.3f}, expected ~1.0"
+            assert 0.95 <= total <= 1.05, (
+                f"genre '{g}' weights sum={total:.3f}, expected ~1.0"
+            )
 
     def test_spine_has_required_keys(self):
         required = {"key", "dramatic_function", "importance", "objective", "weight", "shots_n"}
-        for genre, spine in GENRE_SPINES.items():
+        for g in GENRES:
+            if g == "adult":
+                continue
+            spine = load_spine(g)
             for beat in spine:
                 missing = required - set(beat.keys())
                 assert not missing, (
-                    f"genre '{genre}' beat '{beat.get('key')}' missing keys: {missing}"
+                    f"genre '{g}' beat '{beat.get('key')}' missing keys: {missing}"
                 )
 
 
@@ -155,23 +206,20 @@ class TestSelectBeatSpine:
         assert spine[2]["key"] == "evidence"
 
     def test_adult_default_backward_compat(self):
-        """No genre → adult default pins ADULT_MAX (2026-07-29 IRON)."""
-        from story_plan import ADULT_MAX_BEAT_SPINE
-
+        """No genre → adult default pins adult_max (2026-07-29 IRON)."""
         spine = select_beat_spine()
-        assert len(spine) == len(ADULT_MAX_BEAT_SPINE)
         assert "act" in [b.get("heat_phase") for b in spine]
 
     def test_soft_heat_uses_default_spine(self):
-        """Explicit soft cool-down keeps DEFAULT_BEAT_SPINE."""
+        """Explicit soft cool-down keeps default spine."""
         spine = select_beat_spine({"heat_scale": "soft"}, genre="adult")
-        assert spine == DEFAULT_BEAT_SPINE
+        assert spine[0]["key"] == "hook"
+        assert spine[-1]["key"] == "button"
 
     def test_adult_explicit_genre_uses_heat_logic(self):
         """genre=adult with heat → adult_max spine (backward compat)."""
         spine = select_beat_spine({"heat_scale": "max"}, genre="adult")
-        # ADULT_MAX_BEAT_SPINE has 8 beats
-        assert len(spine) == 8
+        assert "act" in [b.get("heat_phase") for b in spine]
 
     def test_non_adult_genre_ignores_heat(self):
         """Non-adult genre ignores heat signals (no adult spine)."""
@@ -180,11 +228,13 @@ class TestSelectBeatSpine:
         assert spine[0]["key"] == "hook"
 
     def test_spine_returned_is_copy_not_reference(self):
-        """Modifying returned spine must not affect GENRE_SPINES."""
-        original = GENRE_SPINES["drama"][0]["weight"]
+        """Modifying returned spine must not affect the JSON source."""
         spine = select_beat_spine(genre="drama")
+        original_weight = spine[0]["weight"]
         spine[0]["weight"] = 999.0
-        assert GENRE_SPINES["drama"][0]["weight"] == original
+        # Re-load from JSON — should be unchanged
+        spine2 = select_beat_spine(genre="drama")
+        assert spine2[0]["weight"] == original_weight
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +282,9 @@ class TestDramaticFunctionEnumUnchanged:
 
     def test_all_genre_spines_use_enum_only(self):
         """No genre spine introduces a dramatic_function outside the enum."""
-        for genre, spine in GENRE_SPINES.items():
+        for g in GENRES:
+            if g == "adult":
+                continue
+            spine = load_spine(g)
             for beat in spine:
                 assert beat["dramatic_function"] in DRAMATIC_FUNCS

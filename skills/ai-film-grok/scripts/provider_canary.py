@@ -30,10 +30,14 @@ def record_canary(
     provider_model: str = "",
     notes: str = "",
 ) -> dict[str, Any]:
-    if provider not in {"grok", "seedance"}:
-        raise ValueError("provider must be grok|seedance")
+    if provider not in {"grok", "seedance", "frw-api-i2v", "frw-ltx23"}:
+        raise ValueError("provider must be grok|seedance|frw-api-i2v|frw-ltx23")
     if provider == "grok" and not provider_model.strip():
         provider_model = "grok-imagine-video-1.5"
+    elif provider == "frw-ltx23" and not provider_model.strip():
+        provider_model = "ltx-2.3"
+    elif provider == "frw-api-i2v" and not provider_model.strip():
+        provider_model = "img2video"
     base = Path(root).expanduser().resolve()
     media = Path(output).expanduser()
     if not media.is_absolute():
@@ -58,8 +62,12 @@ def record_canary(
     write_json(base / "receipts" / "provider-canary.json", report)
     if provider == "grok":
         write_json(base / "receipts" / "grok-i2v-canary.json", report)
-    else:
+    elif provider == "seedance":
         write_json(base / "receipts" / "seedance-canary.json", report)
+    elif provider == "frw-ltx23":
+        write_json(base / "receipts" / "frw-ltx23-canary.json", report)
+    elif provider == "frw-api-i2v":
+        write_json(base / "receipts" / "frw-api-i2v-canary.json", report)
     return report
 
 
