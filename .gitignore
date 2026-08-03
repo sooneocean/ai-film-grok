@@ -50,8 +50,9 @@
 **/*.bak-*
 **/*~pre-*
 
-# transient locks emitted while canary evidence is being assembled
+# transient locks & temporary test queues emitted during run
 artifacts/**/*.lock
+artifacts/lipdub-queue-*
 
 # session / run-continuation tooling artifacts (never commit)
 .omo/
