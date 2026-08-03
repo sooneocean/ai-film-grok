@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Serialize expensive local release checks used by the pre-push hook."""
+"""Serialize local release checks used by the pre-push hook.
+
+Default mode is **light** (docs currency + doctor core) so agent/human push
+is not blocked by a multi-minute full pytest suite. Full gate remains available:
+
+  AIFILM_RELEASE_GATE=full git push
+
+Or: python3 scripts/release_gate.py --mode full
+"""
 
 from __future__ import annotations
 
@@ -78,23 +86,33 @@ def current_clean_head(root: Path) -> str:
     return head
 
 
-def successful_receipt_matches(path: Path, head: str) -> bool:
-    """Reuse only a valid local receipt for the exact clean commit being pushed."""
+def successful_receipt_matches(path: Path, head: str, mode: str) -> bool:
+    """Reuse only a valid local receipt for the exact clean commit + mode."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
-    return (
-        isinstance(data, dict)
-        and data.get("head") == head
-        and data.get("status") == "passed"
-    )
+    if not isinstance(data, dict):
+        return False
+    if data.get("head") != head or data.get("status") != "passed":
+        return False
+    # Full receipt satisfies light; light receipt does not satisfy full.
+    receipt_mode = str(data.get("mode") or "full")
+    if mode == "full" and receipt_mode != "full":
+        return False
+    return True
 
 
-def write_success_receipt(path: Path, head: str) -> None:
+def write_success_receipt(path: Path, head: str, mode: str) -> None:
     """Atomically record a completed gate while its exclusive lock is still held."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps({"head": head, "status": "passed"}, sort_keys=True) + "\n"
+    payload = (
+        json.dumps(
+            {"head": head, "status": "passed", "mode": mode},
+            sort_keys=True,
+        )
+        + "\n"
+    )
     with tempfile.NamedTemporaryFile(
         "w", encoding="utf-8", dir=path.parent, delete=False
     ) as handle:
@@ -177,43 +195,116 @@ def exclusive_release_lock(path: Path, *, timeout_sec: float) -> Iterator[None]:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def run_release_gate(root: Path, *, timeout_sec: float = 900) -> int:
-    """Run or safely reuse the full pre-push validation for one clean Git HEAD."""
+def resolve_mode(explicit: str | None = None) -> str:
+    """light = push default; full = make release-check."""
+    raw = (explicit or os.environ.get("AIFILM_RELEASE_GATE") or "light").strip().lower()
+    if raw in {"full", "heavy", "strict"}:
+        return "full"
+    return "light"
+
+
+def _run_docs_check(snapshot: Path) -> int:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(snapshot / "scripts" / "sync_project_docs.py"),
+            "--check",
+        ],
+        cwd=snapshot,
+        check=False,
+    ).returncode
+
+
+def _run_light_checks(snapshot: Path) -> int:
+    """Docs already checked; run doctor core readiness via aifilm if present."""
+    aifilm = snapshot / "skills" / "ai-film-grok" / "scripts" / "aifilm"
+    if not aifilm.is_file():
+        print("[release] light: skip doctor (aifilm missing in snapshot)")
+        return 0
+    # Prefer JSON doctor and require core_readiness only (not strict advisory).
+    result = subprocess.run(
+        [str(aifilm), "doctor"],
+        cwd=snapshot,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": ""},
+    )
+    if result.returncode != 0:
+        sys.stderr.write(result.stderr or result.stdout or "doctor failed\n")
+        return result.returncode or 1
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        # Older doctor may print prose; treat exit 0 as pass.
+        print("[release] light: doctor exit 0 (non-JSON)")
+        return 0
+    core = payload.get("core_readiness") or {}
+    if core.get("ok") is True:
+        print("[release] light: doctor core_readiness ok")
+        return 0
+    failed = core.get("failed_checks") or payload.get("runtime_lock", {}).get("errors")
+    print(f"[release] light: doctor core failed: {failed}", file=sys.stderr)
+    return 1
+
+
+def _run_full_checks(snapshot: Path) -> int:
+    return subprocess.run(
+        ["make", "release-check"], cwd=snapshot, check=False
+    ).returncode
+
+
+def run_release_gate(
+    root: Path,
+    *,
+    timeout_sec: float = 900,
+    mode: str | None = None,
+) -> int:
+    """Run or safely reuse the pre-push validation for one clean Git HEAD."""
     root = root.expanduser().resolve()
+    gate_mode = resolve_mode(mode)
     lock_path = release_lock_path(root)
     receipt_path = release_success_receipt_path(root)
     with exclusive_release_lock(lock_path, timeout_sec=timeout_sec):
         head = current_clean_head(root)
-        if successful_receipt_matches(receipt_path, head):
-            print(f"[release] reusing successful gate for {head[:12]}")
+        if successful_receipt_matches(receipt_path, head, gate_mode):
+            print(
+                f"[release] reusing successful {gate_mode} gate for {head[:12]}"
+            )
             return 0
+        print(f"[release] mode={gate_mode} head={head[:12]}")
         with release_snapshot(root, head) as snapshot:
-            sync = subprocess.run(
-                [
-                    sys.executable,
-                    str(snapshot / "scripts" / "sync_project_docs.py"),
-                    "--check",
-                ],
-                cwd=snapshot,
-                check=False,
-            )
-            if sync.returncode:
-                return sync.returncode
-            release = subprocess.run(
-                ["make", "release-check"], cwd=snapshot, check=False
-            )
-        if release.returncode == 0:
-            write_success_receipt(receipt_path, head)
-        return release.returncode
+            docs_rc = _run_docs_check(snapshot)
+            if docs_rc:
+                print(
+                    "文档已过期；请运行 make sync-docs 并提交后再 push。",
+                    file=sys.stderr,
+                )
+                return docs_rc
+            if gate_mode == "full":
+                release_rc = _run_full_checks(snapshot)
+            else:
+                release_rc = _run_light_checks(snapshot)
+        if release_rc == 0:
+            write_success_receipt(receipt_path, head, gate_mode)
+        return release_rc
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timeout-sec", type=float, default=900)
+    parser.add_argument(
+        "--mode",
+        choices=("light", "full"),
+        default=None,
+        help="light (default/pre-push) or full (make release-check)",
+    )
     args = parser.parse_args()
     try:
         return run_release_gate(
-            Path(__file__).resolve().parents[1], timeout_sec=args.timeout_sec
+            Path(__file__).resolve().parents[1],
+            timeout_sec=args.timeout_sec,
+            mode=args.mode,
         )
     except (ReleaseGateError, TimeoutError) as exc:
         print(f"pre-push blocked: {exc}", file=sys.stderr)

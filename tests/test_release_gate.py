@@ -90,7 +90,10 @@ def test_release_gate_reuses_only_matching_success_receipt(
     lock = tmp_path / "release.lock"
     receipt = tmp_path / "success.json"
     head = "a" * 40
-    receipt.write_text(json.dumps({"head": head, "status": "passed"}), encoding="utf-8")
+    receipt.write_text(
+        json.dumps({"head": head, "status": "passed", "mode": "light"}),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(release_gate, "release_lock_path", lambda _: lock)
     monkeypatch.setattr(release_gate, "release_success_receipt_path", lambda _: receipt)
     monkeypatch.setattr(release_gate, "current_clean_head", lambda _: head)
@@ -98,19 +101,50 @@ def test_release_gate_reuses_only_matching_success_receipt(
         release_gate, "release_snapshot", lambda *_: nullcontext(tmp_path)
     )
 
-    assert release_gate.run_release_gate(tmp_path, timeout_sec=0) == 0
+    assert release_gate.run_release_gate(tmp_path, timeout_sec=0, mode="light") == 0
 
     monkeypatch.setattr(release_gate, "current_clean_head", lambda _: "b" * 40)
     calls: list[list[str]] = []
 
     def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
         calls.append(command)
-        return subprocess.CompletedProcess(command, 0)
+        # docs check returns JSON-ish empty success; doctor path uses capture
+        return subprocess.CompletedProcess(command, 0, stdout='{"core_readiness":{"ok":true}}', stderr="")
 
     monkeypatch.setattr(release_gate.subprocess, "run", fake_run)
-    assert release_gate.run_release_gate(tmp_path, timeout_sec=0) == 0
-    assert calls[-1] == ["make", "release-check"]
+    assert release_gate.run_release_gate(tmp_path, timeout_sec=0, mode="light") == 0
+    # light path: docs --check then aifilm doctor (no make release-check)
+    assert any("sync_project_docs.py" in " ".join(c) for c in calls)
+    assert not any(c == ["make", "release-check"] for c in calls)
     assert json.loads(receipt.read_text(encoding="utf-8"))["head"] == "b" * 40
+    assert json.loads(receipt.read_text(encoding="utf-8"))["mode"] == "light"
+
+
+def test_light_receipt_does_not_satisfy_full_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    lock = tmp_path / "release.lock"
+    receipt = tmp_path / "success.json"
+    head = "a" * 40
+    receipt.write_text(
+        json.dumps({"head": head, "status": "passed", "mode": "light"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(release_gate, "release_lock_path", lambda _: lock)
+    monkeypatch.setattr(release_gate, "release_success_receipt_path", lambda _: receipt)
+    monkeypatch.setattr(release_gate, "current_clean_head", lambda _: head)
+    monkeypatch.setattr(
+        release_gate, "release_snapshot", lambda *_: nullcontext(tmp_path)
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(release_gate.subprocess, "run", fake_run)
+    assert release_gate.run_release_gate(tmp_path, timeout_sec=0, mode="full") == 0
+    assert calls[-1] == ["make", "release-check"]
 
 
 def test_release_snapshot_stays_on_the_checked_head_after_root_advances(

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.31.18] - 2026-08-03
+
+### Changed
+- **pre-push light gate (default):** docs currency + doctor core only; full pytest suite no longer blocks every push.
+- `AIFILM_RELEASE_GATE=full git push` or `python3 scripts/release_gate.py --mode full` keeps the previous heavy gate.
+- Gate receipts are mode-aware (full satisfies light; light does not satisfy full).
+
+### Fixed
+- pre-push pins `core.fsmonitor=false` so gitea-publish secret scan is not blocked by local fsmonitor config.
+
+
 ## [2.31.17] - 2026-08-03
 
 ### Changed
