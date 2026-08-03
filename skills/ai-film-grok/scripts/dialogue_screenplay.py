@@ -5,6 +5,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from dialogue_rhythm import analyze_dialogue_rhythm
+from dialogue_style import style_guidance_for_scene
+
 SCHEMA_VERSION = 1
 KIND = "dialogue-screenplay"
 NARRATION_LIMIT = 0.15
@@ -316,6 +319,16 @@ def build_dialogue_screenplay(
                     or "creative_suggestion",
                 },
                 "dialogue_turns": turns if mode == "dialogue_drama" else [],
+                "dialogue_style_guide": style_guidance_for_scene(
+                    {"dramatic_purpose": _text(chunk.get("dramatic_purpose")) or "advance story"},
+                    genre=_text(normalized.get("genre") or "adult"),
+                ),
+                "dialogue_rhythm": analyze_dialogue_rhythm(
+                    {
+                        "dialogue_turns": turns,
+                        "dramatic_purpose": _text(chunk.get("dramatic_purpose")) or "advance story",
+                    }
+                ),
                 "coverage_intent": {
                     "shot_reverse_shot": mode == "dialogue_drama",
                     "over_shoulder": mode == "dialogue_drama",
@@ -347,6 +360,66 @@ def build_dialogue_screenplay(
         if mode == "dialogue_drama"
         else [],
     }
+
+
+def _check_dialogue_story_alignment(
+    screenplay: dict[str, Any], issues: list[dict[str, str]]
+) -> None:
+    """Validate that dialogue advances the story, not just fills time."""
+    for scene in screenplay.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        scene_id = _text(scene.get("scene_id")) or "unknown"
+        conflict = _text(scene.get("conflict"))
+        turns = scene.get("dialogue_turns") or []
+        if not isinstance(turns, list) or len(turns) < 2:
+            continue
+
+        prev_emotion = ""
+        has_state_change = False
+
+        for ti, turn in enumerate(turns):
+            if not isinstance(turn, dict):
+                continue
+            subtext = _text(turn.get("subtext"))
+            if subtext and subtext not in ("待确认", ""):
+                if conflict and subtext == conflict:
+                    issues.append(
+                        _issue(
+                            "DIALOGUE_SUBTEXT_REDUNDANT",
+                            f"Turn {ti + 1} subtext repeats scene conflict verbatim — "
+                            "subtext should reveal what is hidden, not restate it",
+                            node_ref=f"scenes/{scene_id}/turns/{ti}",
+                        )
+                    )
+
+            emotion = _text(turn.get("emotion"))
+            if prev_emotion and emotion and emotion not in ("待确认", ""):
+                if emotion == prev_emotion and ti > 0:
+                    issues.append(
+                        _issue(
+                            "DIALOGUE_EMOTION_FLAT",
+                            f"Turn {ti + 1} emotion「{emotion}」same as previous — "
+                            "dialogue should show emotional shift or escalation",
+                            node_ref=f"scenes/{scene_id}/turns/{ti}",
+                        )
+                    )
+            if emotion and emotion not in ("待确认", ""):
+                prev_emotion = emotion
+
+            state_delta = _text(turn.get("state_delta"))
+            if state_delta and state_delta not in ("待确认", ""):
+                has_state_change = True
+
+        if not has_state_change and len(turns) >= 2:
+            issues.append(
+                _issue(
+                    "DIALOGUE_NO_STATE_CHANGE",
+                    f"Scene {scene_id}: no turn has a state_delta — "
+                    "dialogue must change something (relationship, info, power)",
+                    node_ref=f"scenes/{scene_id}",
+                )
+            )
 
 
 def _issue(code: str, message: str, node_ref: str) -> dict[str, str]:
@@ -576,6 +649,10 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
                             turn_ref,
                         )
                     )
+
+    # Dialogue-story alignment check (strict mode, dialogue_drama only)
+    if strict and mode == "dialogue_drama":
+        _check_dialogue_story_alignment(screenplay, issues)
 
     narration_duration = 0.0
     gaps = _gaps(screenplay)

@@ -497,12 +497,20 @@
       "sha256": "ebdbf844f829a0624561d620362f950749eb5f5faf15a836da50635b09c10e72"
     },
     {
+      "path": "scripts/dialogue_rhythm.py",
+      "sha256": "558b3e4eab3c3b861e053bb7a476e58b04318f9a04bd006ec0eaca783b2ffd5d"
+    },
+    {
       "path": "scripts/dialogue_scene_package.py",
       "sha256": "cd82ffcb1ded6f353080795e9c7b0cf34fb2b44ba6bf277858cd5ba9ee9a182c"
     },
     {
       "path": "scripts/dialogue_screenplay.py",
-      "sha256": "ca061731db066c2067e268e0f7e2ffbd64b43786c40c195a8e190bb00bfbce15"
+      "sha256": "c3cf0a140dcc4b725238204828b25e3eebc9d51d12479891939c20d6fcd678b7"
+    },
+    {
+      "path": "scripts/dialogue_style.py",
+      "sha256": "45253d9769cf5fc76e71dc24152e9c2413661befec20e779c298caf396db1507"
     },
     {
       "path": "scripts/director_cli.py",

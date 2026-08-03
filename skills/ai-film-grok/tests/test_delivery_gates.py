@@ -18,9 +18,14 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import aifilm_grok  # noqa: E402
+from asset_registry import sync_assets  # noqa: E402
+from drama_graph import derive_graph  # noqa: E402
 from manifest_truth import migrate_manifest  # noqa: E402
 from media_qa import analyze_media  # noqa: E402
+from narrative_control import LOCK_SCOPES, lock_scope  # noqa: E402
+from production_chain import build_shot_contract  # noqa: E402
 from shot_review import create_shot_review  # noqa: E402
+from util import sha256_file, write_json  # noqa: E402
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg required")
@@ -90,8 +95,9 @@ class DeliveryGateTests(unittest.TestCase):
             )
         migration = migrate_manifest(self.root, write=True)
         self.assertTrue(migration["ok"], migration)
-        self.motion = self.base / "motion.mp4"
-        self.final_source = self.base / "final-source.mp4"
+        self.motion = self.root / "clips" / "motion.mp4"
+        self.final_source = self.root / "clips" / "final-source.mp4"
+        self.motion.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(
             [
                 "ffmpeg",
@@ -145,6 +151,7 @@ class DeliveryGateTests(unittest.TestCase):
             "identity_approved": True,
             "motion_approved": True,
             "review_note": "Identity, wardrobe, motion, and first frame checked.",
+            "queue_job_id": "job_shot01_test",
         }
         values.update(overrides)
         source = Path(str(values["source"]))
@@ -165,6 +172,51 @@ class DeliveryGateTests(unittest.TestCase):
             approve=True,
         )
         values["review_receipt"] = review["path"]
+        (self.root / "receipts").mkdir(exist_ok=True)
+        write_json(
+            self.root / "receipts" / "visual-text-audit.json",
+            {
+                "kind": "visual-text-audit",
+                "status": "clean",
+                "clip": {"sha256": sha256_file(source)},
+                "findings": [],
+            },
+        )
+        queue_contract = {
+            "kind": "shot-production-contract",
+            "mode": "legacy-unbound",
+            "shot_id": values["shot_id"],
+        }
+        write_json(
+            self.root / "receipts" / "media-queue.json",
+            {
+                "schema_version": 1,
+                "jobs": [
+                    {
+                        "id": values["queue_job_id"],
+                        "shot_id": values["shot_id"],
+                        "operation": values["source_endpoint"],
+                        "status": "succeeded",
+                        "inputs": [{"sha256": "0" * 64}],
+                        "source_contract": queue_contract,
+                        "receipt": {
+                            "output_sha256": sha256_file(source),
+                            "qa": {"ok": True},
+                        },
+                    }
+                ],
+            },
+        )
+        write_json(
+            self.root / "receipts" / f"motion-evidence-{values['shot_id']}.json",
+            {
+                "kind": "motion-generation-evidence",
+                "shot_id": values["shot_id"],
+                "queue_job_id": values["queue_job_id"],
+                "source_endpoint": values["source_endpoint"],
+                "output": {"sha256": sha256_file(source)},
+            },
+        )
         return argparse.Namespace(**values)
 
     def test_write_spec_refreshes_manifest_truth_contract(self) -> None:

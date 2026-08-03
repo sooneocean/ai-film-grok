@@ -328,7 +328,7 @@ class RegisterFinalTests(unittest.TestCase):
                 root,
                 src,
                 out_name="film_final.mp4",
-                post_engine="hyperframes",
+                post_engine="ffmpeg",
                 force=True,
             )
             self.assertTrue(result["ok"])
@@ -336,7 +336,7 @@ class RegisterFinalTests(unittest.TestCase):
             man = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
             ff = man["outputs"]["final_film"]
             self.assertEqual(ff["path"], "film_final.mp4")
-            self.assertEqual(ff["post_engine"], "hyperframes")
+            self.assertEqual(ff["post_engine"], "ffmpeg")
             self.assertEqual(ff["sha256"], result["output_sha256"])
             self.assertTrue((root / "out" / "film_final.mp4").is_file())
             self.assertTrue((root / "out" / "final-delivery.json").is_file())

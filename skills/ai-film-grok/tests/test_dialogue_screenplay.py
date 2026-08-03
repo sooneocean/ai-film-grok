@@ -75,6 +75,7 @@ def _approved_screenplay():
                 "review_status": "approved",
                 "duration_sec": 2.0,
                 "scene_state_id": f"state_{turn['line_id']}",
+                "state_delta": "information revealed" if turn["line_id"] == "dlg_02" else "suspicion grows",
             }
         )
     return screenplay
