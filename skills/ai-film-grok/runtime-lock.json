@@ -1110,7 +1110,7 @@
     },
     {
       "path": "scripts/story_plan.py",
-      "sha256": "8056da254e277d49eea13765250b9cf2d6f4308d348eb4bfd3dc0af359d566ae"
+      "sha256": "be4558db7dc10d0f5a29b01d52bf9ac72c8f63c94555bfc74a6bc6eb674e0eda"
     },
     {
       "path": "scripts/story_quality.py",

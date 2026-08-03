@@ -3423,6 +3423,23 @@ def _ensure_film_root_skeleton(root: Path, *, title: str, theme: str) -> None:
         )
 
 
+def _apply_plan_feedback(normalized: dict[str, Any], root: Path) -> None:
+    """Apply execution feedback from previous runs to inform this planning run.
+
+    Reads narrative-evidence.json if it exists and uses duration deviations
+    to adjust beat weight suggestions. The adjustments are stored in
+    normalized["plan_feedback"] for downstream consumers to inspect.
+    """
+    try:
+        from plan_feedback import plan_adjustments_for_next_run
+
+        feedback = plan_adjustments_for_next_run(root=str(root))
+        if feedback.get("status") == "adjustments_available":
+            normalized["plan_feedback"] = feedback
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def run_plan(
     root: Path,
     raw: str,
@@ -3522,6 +3539,10 @@ def run_plan(
             if override:
                 candidate["id"] = override
                 candidate["source"] = "intake"
+
+    # Apply execution feedback from previous runs (if any evidence exists)
+    _apply_plan_feedback(normalized, root)
+
     _ensure_film_root_skeleton(
         root,
         title=str(normalized.get("title") or "untitled"),
