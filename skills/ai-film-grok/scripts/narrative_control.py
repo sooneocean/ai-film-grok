@@ -1166,6 +1166,9 @@ def lock_scope(graph: dict[str, Any], scope: str, *, user_phrase: str) -> dict[s
             "lock requires a non-empty user phrase", code="USER_APPROVAL_REQUIRED"
         )
     validation = validate_narrative_graph(graph, strict=True)
+    # Optional story quality gate — runs before scope error check
+    # so authors get quality feedback even when locking partial scopes.
+    quality = _check_story_quality(graph)
     scope_prefixes = {
         "story": ("STORY_",),
         "beats": ("BEAT_", "SCENE_", "DIRECTOR_BOARD_"),
@@ -1197,6 +1200,10 @@ def lock_scope(graph: dict[str, Any], scope: str, *, user_phrase: str) -> dict[s
     graph["lock_scopes"] = [s for s in LOCK_SCOPES if s in scopes]
     graph["state"] = "locked" if len(graph["lock_scopes"]) == len(LOCK_SCOPES) else "review"
     bump_graph_revision(graph, reason=f"lock:{scope}")
+    # Attach quality result to graph for downstream visibility
+    quality = _check_story_quality(graph)
+    if quality:
+        graph["quality_check"] = quality
     return graph
 
 
@@ -1312,3 +1319,13 @@ def write_revision_receipt(
         },
     )
     return path
+
+
+def _check_story_quality(graph: dict[str, Any]) -> dict[str, Any]:
+    """Run story quality check. Returns quality result or empty dict on error."""
+    try:
+        from story_quality import check_story_quality
+
+        return check_story_quality(graph)
+    except Exception:
+        return {}

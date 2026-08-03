@@ -770,7 +770,7 @@
     },
     {
       "path": "scripts/narrative_control.py",
-      "sha256": "501ec7a1805eb86b06fe65b7f7950caad4513839c2dfe222801a321f63ff62d7"
+      "sha256": "5f6717681b57246c6ba1910b00eef715433dabaa389d229f1e3e5fc2d634797a"
     },
     {
       "path": "scripts/narrative_evidence.py",
@@ -855,6 +855,10 @@
     {
       "path": "scripts/pipeline_events.py",
       "sha256": "aacb81344ab4ca11c63b5f82e60ce82ade28af1621219a6b3b94512b05cc4af0"
+    },
+    {
+      "path": "scripts/plan_feedback.py",
+      "sha256": "64b7b80523b14f7f47913bceab33397a591a743dfe6cdf1105c490bf4b269d9b"
     },
     {
       "path": "scripts/planning_autopilot.py",
@@ -1101,8 +1105,16 @@
       "sha256": "85c2d6c82f9777cf758491e530f68dc49c3b642c31d4be8c4893864122645300"
     },
     {
+      "path": "scripts/story_normalize.py",
+      "sha256": "3630607f36a930f14753a725040961689c2c76e1ed7fff8a644ec1c2806bb766"
+    },
+    {
       "path": "scripts/story_plan.py",
       "sha256": "8056da254e277d49eea13765250b9cf2d6f4308d348eb4bfd3dc0af359d566ae"
+    },
+    {
+      "path": "scripts/story_quality.py",
+      "sha256": "f12be8f5926dc91555ef6b623ee22cb5351f114bec39eff6024713918d023f5f"
     },
     {
       "path": "scripts/story_reception.py",
