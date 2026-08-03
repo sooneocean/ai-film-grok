@@ -398,7 +398,7 @@
     },
     {
       "path": "scripts/comfy_armory.py",
-      "sha256": "533fb146ad68bd419c812e13c1a2a79d069b54b3174d2c732d84714d8f75126c"
+      "sha256": "f1bcdd2911c8a4d79bf152e0c7ab5a6767510427fa611af616df951492e7d883"
     },
     {
       "path": "scripts/comfy_broker_service.py",
@@ -410,7 +410,7 @@
     },
     {
       "path": "scripts/comfy_video.py",
-      "sha256": "2cedf7fba5a588a7f9688188481f5f5e917f0e4ce37e6d09b01eaa7473dd6e6f"
+      "sha256": "9c4fe6caeaf12fb391150c8bb882de04631f2ca3bda2ffaa2a6baca88b2a2c0b"
     },
     {
       "path": "scripts/compose_preview.py",
@@ -1258,7 +1258,7 @@
     },
     {
       "path": "scripts/weapon_router.py",
-      "sha256": "2323db1befd61c971e1e18992f84e1297d9e0fb107bf51161005b576a9b3ec33"
+      "sha256": "db99f16a4694ecc3ff27f5b23b457f87e7650a5daf92814ac94963be551af593"
     },
     {
       "path": "scripts/workflow_pack.py",

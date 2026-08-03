@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "ai-film-comfy-weapon-armory",
-  "updated_at": "2026-07-29",
+  "updated_at": "2026-08-03",
   "default_node": "rtx5090-main",
   "nodes": {
     "rtx5090-main": {
@@ -842,6 +842,222 @@
         "zero_text_artifacts",
         "human_review"
       ]
+    },
+    {
+      "id": "minimax-h3-t2v-pilot",
+      "display_name": "MiniMax H3 local text-to-video pilot",
+      "status": "experimental",
+      "priority": 95,
+      "provider": "comfy-h3",
+      "source_endpoint": "local_minimax_h3_t2v",
+      "node": "rtx5090-main",
+      "intents": [
+        "text-to-video",
+        "t2v",
+        "minimax-h3-t2v",
+        "env-plate",
+        "bridge-insert"
+      ],
+      "quality_tiers": [
+        "standard",
+        "max_practical"
+      ],
+      "workflow_template": "templates/comfy/minimax-h3-t2v-api.json",
+      "bindings": {
+        "prompt_node": "8",
+        "prompt_input": "prompt",
+        "sampler_node": "10",
+        "seed_input": "noise_seed",
+        "steps_node": "12",
+        "steps_input": "steps",
+        "save_node": "18",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "minimax_h3_fl2va_pruned_int8_convrot.safetensors"
+        ],
+        "text_encoders": [
+          "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"
+        ],
+        "vae": [
+          "minimax_h3_video_vae_fp16.safetensors",
+          "minimax_h3_audio_vae_fp32.safetensors"
+        ]
+      },
+      "defaults": {
+        "duration_sec": 5.0,
+        "steps": 20,
+        "fps": 24
+      },
+      "tuning": {
+        "steps": {
+          "allowed": [
+            20
+          ]
+        }
+      },
+      "capabilities": {
+        "text_to_video": true,
+        "native_stereo_audio": true,
+        "identity_lock_supported": false,
+        "pilot_only": true,
+        "human_approval_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "production_promoted": false,
+        "workflow_template_sha256": "e689527dcf5be5ac8e17c80b17e0ecaf80186c6f60d13e27e135d01613547725",
+        "output_sha256": "2ed7bbace35cc9953777d92946234f7282f8844d5fa18c4f1cfe9f1834776851",
+        "decode_ok": true,
+        "independent_verifier": "ACCEPT_TECHNICAL_PILOT"
+      }
+    },
+    {
+      "id": "minimax-h3-i2v-pilot",
+      "display_name": "MiniMax H3 local image-to-video pilot",
+      "status": "experimental",
+      "priority": 96,
+      "provider": "comfy-h3",
+      "source_endpoint": "local_minimax_h3_i2v",
+      "node": "rtx5090-main",
+      "intents": [
+        "image-to-video",
+        "i2v",
+        "general-i2v",
+        "adult-intimacy-i2v",
+        "adult-meat-motion-i2v",
+        "minimax-h3-i2v"
+      ],
+      "quality_tiers": [
+        "standard",
+        "max_practical"
+      ],
+      "workflow_template": "templates/comfy/minimax-h3-i2v-api.json",
+      "bindings": {
+        "prompt_node": "8",
+        "prompt_input": "prompt",
+        "input_node": "19",
+        "input_image_input": "image",
+        "sampler_node": "10",
+        "seed_input": "noise_seed",
+        "steps_node": "12",
+        "steps_input": "steps",
+        "save_node": "18",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "minimax_h3_fl2va_pruned_int8_convrot.safetensors"
+        ],
+        "text_encoders": [
+          "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"
+        ],
+        "vae": [
+          "minimax_h3_video_vae_fp16.safetensors",
+          "minimax_h3_audio_vae_fp32.safetensors"
+        ]
+      },
+      "defaults": {
+        "duration_sec": 5.0,
+        "steps": 20,
+        "fps": 24
+      },
+      "tuning": {
+        "steps": {
+          "allowed": [
+            20
+          ]
+        }
+      },
+      "capabilities": {
+        "image_to_video": true,
+        "first_last_frame": true,
+        "native_stereo_audio": true,
+        "identity_lock_supported": true,
+        "pilot_only": true,
+        "human_approval_required": true,
+        "external_api_required": false
+      },
+      "verified": {
+        "real_pilot": true,
+        "production_promoted": false,
+        "workflow_template_sha256": "ae7de7060925cdd6bd2db73775e89fc30b745ecd3680c1236ad929ee9a670974",
+        "output_sha256": "c93621704ea871d978789bca3f94532a673b259e1bb89c6dbb9545550c6df812",
+        "decode_ok": true,
+        "independent_verifier": "ACCEPT_TECHNICAL_PILOT"
+      }
+    },
+    {
+      "id": "minimax-h3-r2v-pilot",
+      "display_name": "MiniMax H3 local reference-to-video pilot",
+      "status": "experimental",
+      "priority": 94,
+      "provider": "comfy-h3",
+      "source_endpoint": "local_minimax_h3_r2v",
+      "node": "rtx5090-main",
+      "intents": [
+        "reference-to-video",
+        "r2v",
+        "minimax-h3-r2v"
+      ],
+      "quality_tiers": [
+        "standard",
+        "max_practical"
+      ],
+      "workflow_template": "templates/comfy/minimax-h3-r2v-api.json",
+      "bindings": {
+        "prompt_node": "8",
+        "prompt_input": "prompt",
+        "input_node": "19",
+        "input_image_input": "image",
+        "sampler_node": "10",
+        "seed_input": "noise_seed",
+        "steps_node": "12",
+        "steps_input": "steps",
+        "save_node": "18",
+        "filename_prefix_input": "filename_prefix"
+      },
+      "requirements": {
+        "diffusion_models": [
+          "minimax_h3_ref2va_pruned_int8_convrot.safetensors"
+        ],
+        "text_encoders": [
+          "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"
+        ],
+        "vae": [
+          "minimax_h3_video_vae_fp16.safetensors",
+          "minimax_h3_audio_vae_fp32.safetensors"
+        ]
+      },
+      "defaults": {
+        "duration_sec": 5.0,
+        "steps": 20,
+        "fps": 24
+      },
+      "tuning": {
+        "steps": {
+          "allowed": [
+            20
+          ]
+        }
+      },
+      "capabilities": {
+        "reference_to_video": true,
+        "native_stereo_audio": true,
+        "identity_lock_supported": true,
+        "pilot_only": true,
+        "human_approval_required": true,
+        "external_api_required": false,
+        "blocked_until_weights": true
+      },
+      "verified": {
+        "real_pilot": false,
+        "production_promoted": false,
+        "workflow_template_sha256": "97e2163ea1753f86035650929719a65347ae4c5d56d42b37a99ff3edac6dfc3e",
+        "quality_note": "API graph registered; blocked until ref2va weights + canary"
+      }
     }
   ],
   "research_weapons": [
