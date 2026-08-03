@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.31.14] - 2026-08-03
+
+### Changed
+- Extracted `plan_shots` + shot-planning helpers (`_camera_axis`, `_vertical_composition`, `_motion_text`, `_production_mode`, `_clip_nar`, `_duration_for_nar`) into `shot_planning.py`; `story_plan.py` imports from it.
+- `DRAMATIC_FUNCS` now lives in `shot_planning.py` (re-exported via import).
+
+### Fixed
+- Fixed broken imports in `shot_planning.py` (was referencing non-existent `dialogue_screenplay` functions).
+- Fixed zcode test assertions in `test_shot_planning.py` (`_camera_axis` idx math, `plan_shots` count for `shots_n=1`).
+- Restored `grok` CLI symlink (was broken `/var/folders/…/grok-wrap-…` → `~/.grok/bin/grok`).
+
+
+## [2.31.13] - 2026-08-03
+
+### Changed
+- I2V 默认运营 profile 从 `ltx23_primary` 切换到 `grok_primary`：bulk 动作主链 Grok `image_to_video`；对白讲话镜仍锁 FRW LTX 2.3 原生有声。
+- `film_spec.resolve_i2v_profile()` / `default_i2v_provider()`、`i2v_provider.preferred()`、`capability_report` 默认/回退改为 grok-first；`ltx23_primary` 仅显式 opt-in。
+- README / SKILL / hard-defaults / config.env.example 同步 grok-first 文档与默认值。
+- **ROI 优化 · story 单一真相**：`story_plan` 删除与 `beat_extraction` 重复的 spine/extract/rebalance 实现，改为 re-export；`draft_story_contract` 收口到 `story_contract`（`story_plan` / `story_normalize` 薄别名）。
+- `final_stages` 写 JSON 直接走 `util.write_json`（去掉薄包装）。
+- 刷新 `runtime-lock.json` 脚本指纹（doctor `core_readiness` 绿）。
+
+### Added
+- `story_plan` 重新导出 `DRAMATIC_FUNCS`（自 `shot_planning`）恢复向后兼容 public API。
+- `story_contract.draft_story_contract` 正式 API + 契约单测（re-export 同一性、seed 覆盖）。
+- `test_shot_planning.py`：shot_planning 模块单测（相机轴 anti-boring 与实现一致）。
+
+### Fixed
+- `test_genre_beat_spines` 收集错误：`DRAMATIC_FUNCS` 迁移到 `shot_planning` 后补回 `story_plan` re-export。
+- `test_shot_planning` 相机轴断言与 `idx % 3 == 1 → ecu_hold` 实现不一致导致的假红。
+
 ## [2.31.12] - 2026-08-03
 
 ### Changed
