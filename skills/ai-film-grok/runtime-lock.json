@@ -862,7 +862,7 @@
     },
     {
       "path": "scripts/plan_feedback.py",
-      "sha256": "64b7b80523b14f7f47913bceab33397a591a743dfe6cdf1105c490bf4b269d9b"
+      "sha256": "d6aeb27ade77a44ad5384ea89ec2ff0ecaf471da7c44413a0cfd65d940b1d280"
     },
     {
       "path": "scripts/planning_autopilot.py",
@@ -1114,7 +1114,7 @@
     },
     {
       "path": "scripts/story_plan.py",
-      "sha256": "cbcbd647884722fcf0663daf4da6e04c3356c12ebdf834809cb4866c948b9b2a"
+      "sha256": "58a4c3c177f90d456c4ab41f740163eac98e65518f822090eb6c7e2f05d791cd"
     },
     {
       "path": "scripts/story_quality.py",

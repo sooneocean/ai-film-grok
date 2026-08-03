@@ -14,11 +14,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-from beat_extraction import (
-    AUTHORING_PLACEHOLDER,
-    _sentences,
-    extract_beats,
-)
 from dialogue_broll import default_dialogue_broll
 from narrative_control import (
     GRAPH_SCHEMA_VERSION,
@@ -29,6 +24,16 @@ from narrative_control import (
 )
 from util import read_json, utc_now, write_json
 
+# film-spec dramatic_function enum
+DRAMATIC_FUNCS = (
+    "hook",
+    "approach",
+    "sensory",
+    "reaction",
+    "action",
+    "afterglow",
+    "bridge",
+)
 
 # Beat spines are now loaded from JSON files in schemas/beat-spines/
 # via beat_spine.load_spine(). See schemas/beat-spines/ for available spines.
@@ -399,11 +404,7 @@ def select_beat_spine(
     target_duration: float | None = None,
     multi_scene: bool = False,
 ) -> list[dict[str, Any]]:
-    """Pick beat spine. Single implementation lives in beat_extraction.
-
-    P0-1 · 2026-07-23: multi-genre support via schemas/beat-spines JSON.
-    P0 · 2026-07-29: genre=adult (or default) pins adult_max unless heat soft/medium.
-    """
+    """Pick beat spine. Single implementation lives in beat_extraction."""
     from beat_extraction import select_beat_spine as _select_beat_spine
 
     return _select_beat_spine(

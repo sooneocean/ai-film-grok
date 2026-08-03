@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.31.10] - 2026-08-03
+
+### Fixed
+- Restored a clean `aifilm` runtime for package/version probes: strip host-agent `PYTHONPATH` in the launcher, Makefile, and check-all; query lock packages via a clean subprocess so Hermes/venv contamination cannot fail doctor.
+- Recovered `story_plan` after a bad partial extraction: re-exported `DRAMATIC_FUNCS`, restored `AUTHORING_PLACEHOLDER=needs_authoring`, and kept `select_beat_spine` as a thin delegate to `beat_extraction` (single spine source of truth).
+- Rebuilt `runtime-lock.json` fingerprints after script repairs.
+
+### Added
+- ROI optimization plan: `docs/plans/2026-08-03-roi-optimization-plan.md`.
+- Unit coverage for story contract / quality / beat-spine / plan feedback (prior commits in this train).
+
+### Changed
+- Pinned skill requirements to the verified clean runtime: edge-tts==7.2.8, jsonschema==4.23.0 (with numpy/Pillow unchanged).
+
+
 All notable changes to **ai-film-grok** are documented here.  
 Format: [Keep a Changelog](https://keepachangelog.com/) · versioning: [SemVer](https://semver.org/) (mirrors `plugin.json`).
 
