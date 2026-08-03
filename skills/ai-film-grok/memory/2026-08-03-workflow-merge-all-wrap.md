@@ -1,7 +1,7 @@
 # Memory · 2026-08-03 · Workflow merge-all wrap
 
 **Plan：** `docs/plans/2026-08-03-workflow-optimize-todo.md` → **Wave A–H + W8 SHIPPED**  
-**plugin：** `2.31.35`（W8 autopilot local throughput）
+**plugin：** `2.31.36`（W8 + dual-lane H3 matrix）
 
 ## 三句话
 
@@ -32,6 +32,7 @@ aifilm autopilot --root …              # W8：本地吞吐 + 预算技能；�
 - [x] 2.31.22 Wave D final engineering  
 - [x] 2.31.23–26 Wave F–H agent glue / bulk 硬门 / shortlist  
 - [x] 2.31.35 Wave W8 autopilot local throughput allowlist  
+- [x] 2.31.36 dual-lane weapon matrix + H3 geometry floor  
 - [x] e2e 冒烟 → [2026-08-03-throughput-e2e-run.md](./2026-08-03-throughput-e2e-run.md)  
 - [ ] 真片 root 同一路径（用户点名）  
 - [ ] push origin（需授权时）· `grok plugin update`
@@ -45,5 +46,5 @@ aifilm autopilot --root …              # W8：本地吞吐 + 预算技能；�
 
 ## 关联
 
-- Changelog `[2.31.20]`–`[2.31.35]`  
+- Changelog `[2.31.20]`–`[2.31.36]`  
 - Closeout IRON · Bulk→final IRON（2026-07-29 memory）
