@@ -502,7 +502,7 @@
     },
     {
       "path": "scripts/dialogue_screenplay.py",
-      "sha256": "c186138fb3d126ff659eb9c1723effda52f00ca710f833d2b74281fb79df2fe1"
+      "sha256": "ca061731db066c2067e268e0f7e2ffbd64b43786c40c195a8e190bb00bfbce15"
     },
     {
       "path": "scripts/director_cli.py",
