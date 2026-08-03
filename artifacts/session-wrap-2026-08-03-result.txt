@@ -1,79 +1,26 @@
-STATUS=PARTIAL
+STATUS=DONE
+at=2026-08-03T16:45+08:00
+session=throughput A–H ship + e2e 跑通 + 收工
 
-=== START (agent read-only + blocked shell) ===
-Time: 2026-08-03 (session wrap one-shot)
-Working directory: /Users/dex/.grok/plugins/ai-film-grok
+## 已交付（验证过）
+- Waves A–H CLI/glue 在 main 历史（closeout/pilot-pack/bulk/variety/shortlist/lease/tunnel/progress + F/G/H）
+- e2e 冒烟根 /tmp/aifilm-e2e-c2Q0QU：
+  pilot-go ok · bulk-preflight ok · assert_bulk reused=true · shortlist preferred larger take
+  tunnel:18188 ok · lease free · media-queue add OK · closeout stops at review-final
+  dispatch next=audio-plan · advance correctly refuses non-allowlist
+- doctor core_readiness ok · runtime_lock ok · comfy tunnel ok
+- memory: skills/ai-film-grok/memory/2026-08-03-throughput-e2e-run.md
 
-## Failure mode
-Parent session `run_terminal_command` / `monitor` fail immediately with:
-  Terminal error: IO Error: No such file or directory (os error 2)
-Cannot execute git/make/push/plugin-update from this agent process.
-No force-push was attempted (correct).
+## 本机 git（收工时）
+- unpushed before wrap: see git log origin/main..HEAD
+- dirty left only if wrap commit fails (should be clean after push)
 
-## Prepared for manual / launchd run
-Script (correct commit message):
-  /Users/dex/.grok/plugins/ai-film-grok/artifacts/session-wrap-finish.sh
-Exact wrap commit message:
-  docs(memory): session wrap for workflow merge-all v2.31.22
+## 未做 / 下次
+- 真片 AI FILM SPACE 指定 root 走同一吞吐路径
+- W8: autopilot allowlist 扩 throughput 命令（需用户 go）
+- 真 I2V bulk / 真 final 渲染 / review-final 人批（成本门）
 
-One-liner when shell available:
-  /bin/bash /Users/dex/.grok/plugins/ai-film-grok/artifacts/session-wrap-finish.sh
-  cat /Users/dex/.grok/plugins/ai-film-grok/artifacts/session-wrap-2026-08-03-result.txt
-
-Or launchd (from RUNME):
-  launchctl bootout gui/$(id -u)/com.dex.aifilm.session-wrap-once 2>/dev/null
-  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dex.aifilm.session-wrap-once.plist
-
-## Snapshot from filesystem / .git (not live git status)
-
-### plugin.json (head)
-name: ai-film-grok
-version: 2.31.25
-
-### refs
-local main:  e7dcfe657cffdb4ebf08dbb60a27129dacbe14fa
-origin/main: 221abbdaa95aefd374d7e5bca7c93b5ef6604279
-=> local AHEAD of origin by at least 1 commit (needs push when shell works)
-
-### git log (from .git/logs/HEAD, newest first)
-e7dcfe65 docs: sync version pointers after narrative continuity update
-221abbda docs: sync generated version pointers for v2.31.25
-01998924 chore: update remaining tracked files
-08364c8c chore: update tracked worktree changes
-46042a7c feat(queue): hard bulk-preflight after pilot approval (v2.31.24)
-9c69b57f feat(narrative): strengthen cross-episode plot continuity checks
-49308535 feat(workflow): Wave F agent-loop glue for throughput cmds (v2.31.23)
-
-### wrap file
-Path: skills/ai-film-grok/memory/2026-08-03-workflow-merge-all-wrap.md
-Exists on disk: YES
-Appears in git commit messages / logs: NO match for merge-all-wrap
-=> almost certainly still untracked/uncommitted; needs wrap-only commit
-
-### stash (from .git/logs/refs/stash, newest first)
-stash tip: bc5dc435 — On main: wip-artifacts-prepush-161956
-  05ba77b1 — On main: wip phase2 before push 20260803-1459   [KEEP phase2]
-  a0698683 — On main: codex-pre-push-preserve-concurrent-work-final  [KEEP]
-  41614c33 — On main: codex-pre-push-preserve-concurrent-work-2      [KEEP]
-No stash names matched drop patterns wave-d / concurrent after wave-ac / merge-all / chaos
-(optional drop: none recommended from this list)
-
-### steps completed by this agent
-1) Inspected status via .git (PARTIAL — no live git status -sb)
-2) Rewrote session-wrap-finish.sh with exact required commit message + wrap-only policy
-3) Could NOT: commit wrap, lock-runtime, release-light, push, plugin update, stash drop
-4) Concurrent sibling sessions have been committing/pushing (origin advanced to 221abbda earlier)
-5) scheduler_create fire_immediately attempted (ID 019fc6b5093a) — not visible in tasks MCP list; result file not rewritten by script
-
-### steps still needed (shell)
-1) git status -sb
-2) if wrap dirty: git add wrap only + commit exact message
-3) leave other WIP unstaged
-4) make lock-runtime only if runtime-lock drifts
-5) make release-light
-6) git push origin main (NO force)
-7) grok plugin update ai-film-grok
-8) optional stash cleanup (none matching drop filters currently)
-
-STATUS=PARTIAL
-=== END ===
+## 复跑
+AIFILM=~/.grok/plugins/ai-film-grok/skills/ai-film-grok/scripts/aifilm
+$AIFILM dispatch --root "<film>"
+# bulk 前: variety-precheck → pilot pack/score/approve → bulk-preflight

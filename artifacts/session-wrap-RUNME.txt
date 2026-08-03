@@ -1,26 +1,18 @@
-# 推进收尾（agent shell 不可用时）
+# 收工后 / 下 session 接续
 
-当前预期：main 已有 Wave A–F（plugin ≥2.31.23）。
+## 已完成
+- 吞吐 Wave A–H 代码在 main
+- e2e 冒烟：`/tmp/aifilm-e2e-c2Q0QU`（见 memory/2026-08-03-throughput-e2e-run.md）
+- 结果条：`artifacts/session-wrap-2026-08-03-result.txt`
 
-## 最快
+## 下次推进（选一）
+1. **真片**：给 film root → `aifilm dispatch --root …` 按 next 走 pilot→bulk→closeout  
+2. **W8**：autopilot allowlist 扩 throughput（需你说 go）  
+3. **不要**再拆第四套阶段名 / 自批 pilot / 静默降 heat
 
+## 命令
 ```bash
-/bin/bash /Users/dex/.grok/plugins/ai-film-grok/artifacts/session-wrap-finish.sh
-cat /Users/dex/.grok/plugins/ai-film-grok/artifacts/session-wrap-2026-08-03-result.txt
+AIFILM=~/.grok/plugins/ai-film-grok/skills/ai-film-grok/scripts/aifilm
+$AIFILM doctor
+$AIFILM dispatch --root "$ROOT"
 ```
-
-或：
-
-```bash
-launchctl bootout gui/$(id -u)/com.dex.aifilm.session-wrap-once 2>/dev/null
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dex.aifilm.session-wrap-once.plist
-# 几秒后：
-cat /Users/dex/.grok/plugins/ai-film-grok/artifacts/session-wrap-2026-08-03-result.txt
-launchctl bootout gui/$(id -u)/com.dex.aifilm.session-wrap-once
-```
-
-## 下一功能推进
-
-- **实片**：给我 film root → `aifilm dispatch --root …` 按 next 走。  
-- **W8 autopilot allowlist**：吞吐命令进 autopilot（需你说 go）。  
-- **不要**再拆第四套阶段名 / 自批 pilot。

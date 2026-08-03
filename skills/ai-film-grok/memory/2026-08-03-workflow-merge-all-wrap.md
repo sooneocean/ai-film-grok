@@ -30,8 +30,10 @@ aifilm dispatch --root …           # next 会推 throughput 门
 - [x] 2.31.21 Wave B–C preflight/variety/lease/tunnel/progress  
 - [x] 2.31.22 Wave D final engineering + genre spine  
 - [x] 2.31.23 Wave F agent-loop glue  
-- [ ] memory wrap commit + release-light + push（若仍脏）  
-- [ ] `grok plugin update ai-film-grok`  
+- [x] Wave G–H bulk 硬门 + preflight 收据复用 + shortlist inject  
+- [x] e2e 冒烟跑通 → [2026-08-03-throughput-e2e-run.md](./2026-08-03-throughput-e2e-run.md)  
+- [ ] 真片 root 同一路径（用户点名）  
+- [ ] `grok plugin update` 收工后若本地 installed 落后  
 
 ## 下一刀 ROI（未开）
 
