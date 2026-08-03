@@ -23,6 +23,7 @@ class AdvanceAllowlistTests(unittest.TestCase):
             "variety-precheck",
             "pilot-pack",
             "export-desktop",  # P0
+            "agent-review-final",  # P1
         ):
             self.assertIn(aid, ADVANCE_ACTIONS)
 
