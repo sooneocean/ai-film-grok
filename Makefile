@@ -26,19 +26,19 @@ validate:
 	grok plugin validate "$(ROOT)"
 
 doctor:
-	"$(AIFILM)" doctor
+	env -u PYTHONPATH "$(AIFILM)" doctor
 
 test:
-	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m pytest tests/ -q --tb=line
-	"$$($(RUNTIME_PYTHON))" -m pytest skills/ai-film-project/tests tests/test_premium_pipeline_contracts.py -q --tb=line
+	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m pytest tests/ -q --tb=line
+	env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m pytest skills/ai-film-project/tests tests/test_premium_pipeline_contracts.py -q --tb=line
 
 test-fast:
-	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m pytest tests/test_dispatch.py tests/test_craft_spine.py tests/test_delivery_gates.py -q --tb=line
+	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m pytest tests/test_dispatch.py tests/test_craft_spine.py tests/test_delivery_gates.py -q --tb=line
 
 coverage:
-	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m coverage run --source=scripts -m pytest tests/ -q --tb=line -m "not slow"
-	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m coverage report --fail-under=58
-	cd "$(SKILL)" && "$$($(RUNTIME_PYTHON))" -m coverage json -o coverage.json
+	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m coverage run --source=scripts -m pytest tests/ -q --tb=line -m "not slow"
+	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m coverage report --fail-under=58
+	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m coverage json -o coverage.json
 
 audit:
 	@"$$($(RUNTIME_PYTHON))" "$(ROOT)/scripts/project_audit.py" --run-tests --write-baseline

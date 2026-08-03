@@ -4,4 +4,9 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PYTHON=$("$SCRIPT_DIR/runtime-python")
 
+# Host agents (Hermes, etc.) often inject their venv via PYTHONPATH. That makes
+# package/version probes and imports disagree with the skill's real runtime.
+# Always start aifilm from a clean import path; aifilm_grok.py adds scripts/.
+unset PYTHONPATH || true
+
 exec "$PYTHON" "$SCRIPT_DIR/aifilm_grok.py" "$@"

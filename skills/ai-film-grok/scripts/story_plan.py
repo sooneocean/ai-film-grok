@@ -14,6 +14,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from beat_extraction import (
+    AUTHORING_PLACEHOLDER,
+    _sentences,
+    extract_beats,
+)
 from dialogue_broll import default_dialogue_broll
 from narrative_control import (
     GRAPH_SCHEMA_VERSION,
@@ -24,16 +29,6 @@ from narrative_control import (
 )
 from util import read_json, utc_now, write_json
 
-# film-spec dramatic_function enum
-DRAMATIC_FUNCS = (
-    "hook",
-    "approach",
-    "sensory",
-    "reaction",
-    "action",
-    "afterglow",
-    "bridge",
-)
 
 # Beat spines are now loaded from JSON files in schemas/beat-spines/
 # via beat_spine.load_spine(). See schemas/beat-spines/ for available spines.
@@ -404,43 +399,19 @@ def select_beat_spine(
     target_duration: float | None = None,
     multi_scene: bool = False,
 ) -> list[dict[str, Any]]:
-    """Pick beat spine. Genre takes priority; adult defaults to ADULT_MAX.
+    """Pick beat spine. Single implementation lives in beat_extraction.
 
-    P0-1 · 2026-07-23: multi-genre support. Non-adult genres use GENRE_SPINES.
-    P0 · 2026-07-29: genre=adult (or default) pins ADULT_MAX unless heat soft/medium.
-
-    Spines are loaded from JSON files in schemas/beat-spines/ via beat_spine.load_spine().
+    P0-1 · 2026-07-23: multi-genre support via schemas/beat-spines JSON.
+    P0 · 2026-07-29: genre=adult (or default) pins adult_max unless heat soft/medium.
     """
-    from beat_spine import load_spine
+    from beat_extraction import select_beat_spine as _select_beat_spine
 
-    # Non-adult genre: use genre spine directly
-    if genre and genre != "adult" and genre in GENRE_NAMES:
-        return [dict(b) for b in load_spine(genre)]
-
-    h = heat or {}
-    scale = str(h.get("heat_scale") or "").strip().lower()
-    # Explicit cool-down only escape from adult max spine
-    if scale in {"soft", "medium"}:
-        _ = multi_scene
-        _ = target_duration
-        return [dict(b) for b in load_spine("default")]
-    # Explicit dual only — never infer solely from duration
-    if h.get("spine") == "dual_climax" or h.get("dual_climax"):
-        return [dict(b) for b in load_spine("dual_climax")]
-    if h.get("spine") == "hardcore_male" or h.get("hardcore"):
-        return [dict(b) for b in load_spine("hardcore_male")]
-    # Adult default IRON: always ADULT_MAX (max / unset / adult_max spine)
-    if (
-        not genre
-        or genre == "adult"
-        or scale == "max"
-        or h.get("spine") == "adult_max"
-        or h.get("evidence_max")
-    ):
-        return [dict(b) for b in load_spine("adult_max")]
-    _ = multi_scene  # reserved for future scene-local spines
-    _ = target_duration
-    return [dict(b) for b in load_spine("default")]
+    return _select_beat_spine(
+        heat,
+        genre=genre,
+        target_duration=target_duration,
+        multi_scene=multi_scene,
+    )
 
 
 AUTHORING_PLACEHOLDER = "needs_authoring"
@@ -931,6 +902,783 @@ def _extract_plot_point_candidates(
     for index, sentence in enumerate(sentences):
         matched: list[tuple[str, str]] = []
         for point_type, markers in _PLOT_POINT_MARKERS:
+            hits = [marker for marker in markers if marker in sentence]
+            if hits:
+                matched.append((point_type, hits[0]))
+        if not matched:
+            continue
+        # One sentence yields one point; priority follows the marker table.
+        point_type, marker = matched[0]
+        key = (point_type, sentence)
+        if key in seen:
+            continue
+        seen.add(key)
+        confidence = 0.92 if matched else 0.0
+        source_ref = refs[min(index, len(refs) - 1)]
+        candidates.append(
+            {
+                "candidate_id": f"candidate_{point_type}_{index + 1:03d}",
+                "point_type": point_type,
+                "marker": marker,
+                "source_refs": [source_ref],
+                "source_excerpt": _clip_nar(sentence, 160),
+                "audience_question": _plot_point_question(point_type, genre, sentence),
+                "visible_evidence": _clip_nar(sentence, 120),
+                "confidence": confidence,
+                "authoring_status": "confirmed" if confidence >= 0.85 else "candidate",
+                "episode_hint": episode_hint,
+                "source_index": index,
+            }
+        )
+    # Keep the authoring surface bounded: a paragraph may contain many
+    # keywords, but only the first three source-grounded promises enter the
+    # automatic episode plan. The remaining ambiguity stays out of the lock.
+    return candidates[:3]
+
+
+def _scene_chunks(raw: str) -> list[dict[str, str]]:
+    """Split source into scene-sized text chunks.
+
+    Prefers explicit headers / 【time】 sections so multi-beat user scripts
+    stay independent scenes (not one mush + template spine).
+    """
+    text = (raw or "").strip()
+    if not text:
+        return [{"title": "main", "body": ""}]
+
+    # Explicit scene headers
+    matches = list(_SCENE_HDR.finditer(text))
+    if matches:
+        chunks: list[dict[str, str]] = []
+        for i, m in enumerate(matches):
+            start = m.end()
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            body = text[start:end].strip()
+            title = m.group(1).strip()[:40] if m.lastindex else f"Scene {i + 1}"
+            # A heading is production metadata, not a playable scene. Do not
+            # turn it into VO/shot material merely to keep the plan non-empty.
+            if body and not _is_non_story_section(title):
+                chunks.append({"title": title or f"Scene {i + 1}", "body": body})
+        if chunks:
+            return chunks
+
+    # 【00:00-00:10 …】 / ### 第N集 / **第N集** time-bracket sections
+    sec_matches = list(_TIME_OR_BRACKET_SECTION.finditer(text))
+    if len(sec_matches) >= 2:
+        chunks = []
+        for i, m in enumerate(sec_matches):
+            title = m.group(0).strip().strip("#*").strip()[:40] or f"S{i + 1}"
+            start = m.end()
+            end = sec_matches[i + 1].start() if i + 1 < len(sec_matches) else len(text)
+            body = text[start:end].strip()
+            # Never manufacture a scene from a timing/format/character heading.
+            # A heading alone has neither observable action nor narration.
+            if not body or _is_non_story_section(title):
+                continue
+            chunks.append({"title": title, "body": body})
+        if chunks:
+            return chunks[:8]
+
+    paras = _split_paragraphs(text)
+    if len(paras) == 1:
+        # one-liner or single block → one scene
+        return [{"title": "Main", "body": paras[0]}]
+    if len(paras) <= 4:
+        return [{"title": f"S{i + 1}", "body": p} for i, p in enumerate(paras)]
+    # merge into ~3 scenes
+    n = 3
+    size = max(1, (len(paras) + n - 1) // n)
+    chunks = []
+    for i in range(0, len(paras), size):
+        group = paras[i : i + size]
+        chunks.append({"title": f"S{len(chunks) + 1}", "body": "\n\n".join(group)})
+    return chunks[:6]
+
+
+def _episode_chunks(raw: str, *, source_refs: list[str] | None = None) -> list[dict[str, Any]]:
+    """Prefer explicit episode/chapter headers; otherwise keep one episode."""
+    text = (raw or "").strip()
+    matches = list(_EPISODE_HEADER.finditer(text))
+    if len(matches) < 2:
+        return [{"title": "Episode 1", "body": text, "source_refs": list(source_refs or [])}]
+    chunks: list[dict[str, Any]] = []
+    refs = list(source_refs or [])
+    for i, match in enumerate(matches):
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        title_suffix = match.group(1).strip()
+        body = text[start:end].strip()
+        if not body:
+            continue
+        ref = refs[min(i, len(refs) - 1)] if refs else f"source:episode_{i + 1:02d}"
+        chunks.append(
+            {"title": title_suffix or f"Episode {i + 1}", "body": body, "source_refs": [ref]}
+        )
+    return chunks or [{"title": "Episode 1", "body": text, "source_refs": list(source_refs or [])}]
+
+
+def normalize_story(
+    raw: str,
+    *,
+    title_hint: str | None = None,
+    source_path: str | None = None,
+    source_evidence_refs: list[str] | None = None,
+) -> dict[str, Any]:
+    """story.normalize — structured story package (no LLM)."""
+    raw = (raw or "").strip()
+    title = _extract_title(raw, title_hint)
+    chars = _character_candidates(raw)
+    locs = _location_candidates(raw)
+    dialogues = _dialogue_blocks(raw)
+    chunks = _scene_chunks(raw)
+    episode_chunks = _episode_chunks(raw, source_refs=source_evidence_refs)
+    logline = _clip_nar(raw.replace("\n", " "), 80)
+    if len(raw) > 80:
+        # prefer first sentence
+        first = re.split(r"[。！？\n]", raw)[0].strip()
+        if first:
+            logline = _clip_nar(first, 80)
+
+    warnings: list[str] = []
+    if len(raw) < 8:
+        warnings.append("source very short — planner will use vertical beat template")
+    if not dialogues:
+        warnings.append("no dialogue lines detected — default storyteller VO")
+
+    heat = detect_heat_signals(raw)
+    genre_info = detect_genre(raw, heat=heat)
+    genre = genre_info["genre"]
+    # genre=adult pins max + extreme unless brief explicitly soft/medium (P0 · 2026-07-29)
+    scale_now = str(heat.get("heat_scale") or "").strip().lower()
+    if genre == "adult" and scale_now not in {"soft", "medium"}:
+        if scale_now != "max":
+            spine = str(heat.get("spine") or "default")
+            if spine in {"", "default"}:
+                spine = "adult_max"
+            heat = {
+                **heat,
+                "heat_scale": "max",
+                "spice_level": heat.get("spice_level") or "extreme",
+                "spine": spine,
+                "evidence_max": True,
+                "pinned_by": "genre_adult_default",
+            }
+        elif not heat.get("spice_level"):
+            heat = {**heat, "spice_level": "extreme"}
+        warnings.append(
+            f"adult genre pin → spine={heat.get('spine')} heat_scale={heat.get('heat_scale')} "
+            f"spice={heat.get('spice_level')}"
+        )
+    elif heat.get("evidence_max"):
+        warnings.append(
+            f"adult heat signals → spine={heat.get('spine')} heat_scale={heat.get('heat_scale')}"
+        )
+    for gw in genre_info.get("warnings", []):
+        warnings.append(gw)
+    plot_point_candidates = _extract_plot_point_candidates(
+        raw,
+        genre=genre,
+        source_refs=source_evidence_refs,
+    )
+
+    return {
+        "schema_version": 1,
+        "kind": "normalized-story",
+        "at": utc_now(),
+        "title": title,
+        "logline": logline,
+        "genre": genre,
+        "raw_excerpt": raw[:2000],
+        "source_path": source_path,
+        "source_chars": len(raw),
+        "character_candidates": chars,
+        "location_candidates": locs,
+        "dialogue_blocks": dialogues,
+        "scene_chunks": chunks,
+        "episode_chunks": episode_chunks,
+        "source_evidence_refs": list(source_evidence_refs or []),
+        "plot_point_candidates": plot_point_candidates,
+        # A source that already declares speakers should keep those turns as
+        # the editorial clock.  ``character`` remains available for manually
+        # authored specs, while the planner emits the stricter dialogue-first
+        # package below.
+        "vo_mode_suggest": "dialogue_drama" if dialogues else "storyteller",
+        "heat_signals": heat,
+        "genre_evidence": genre_info["evidence"],
+        "warnings": warnings,
+        "source_map": {
+            "method": "deterministic_v1",
+            "note": "Agent may refine; this is structure-only normalize",
+        },
+    }
+
+
+def _draft_story_contract(normalized: dict[str, Any]) -> dict[str, Any]:
+    """Create an honest story contract; unknown intent stays blank/draft.
+
+    If genre-specific suggestions are available, they are pre-filled
+    as draft_suggested so the author can review and confirm.
+    """
+    logline = str(normalized.get("logline") or "")
+    genre = str(normalized.get("genre") or "adult")
+    contract = {
+        "genre": genre,
+        "premise": logline,
+        "logline": logline,
+        "theme": "",
+        "protagonist_ids": [
+            str(c.get("id"))
+            for c in (normalized.get("character_candidates") or [])
+            if isinstance(c, dict) and c.get("id")
+        ][:2],
+        "protagonist_goal": "",
+        "protagonist_want": "",
+        "protagonist_need": "",
+        "protagonist_arc": "",
+        "opposition": "",
+        "stakes": "",
+        "climax_choice": "",
+        "ending_hook": "",
+        "emotional_arc": [],
+        "act_structure": {
+            "setup": "",
+            "confrontation": "",
+            "resolution": "",
+            "setup_ratio": 0.20,
+            "confrontation_ratio": 0.50,
+            "resolution_ratio": 0.30,
+        },
+        "pace_chart": [],
+        "constraints": [],
+        "status": "needs_authoring",
+        "authoring_questions": [
+            "主角想要什么？",
+            "谁或什么阻止他？",
+            "失败的代价是什么？",
+            "本集的关键选择是什么？",
+            "结尾留下什么未解决问题？",
+        ],
+    }
+    # Apply genre-based suggestions as draft guidance
+    from story_contract import suggest_story_contract
+
+    suggestions = suggest_story_contract(normalized)
+    for key in (
+        "theme",
+        "protagonist_goal",
+        "protagonist_want",
+        "protagonist_need",
+        "protagonist_arc",
+        "opposition",
+        "stakes",
+        "climax_choice",
+        "ending_hook",
+        "emotional_arc",
+        "act_structure",
+    ):
+        val = suggestions.get(key)
+        if val not in (None, "", [], {}):
+            contract[key] = copy.deepcopy(val)
+    if suggestions.get("status") == "draft_suggested":
+        contract["status"] = "draft_suggested"
+        contract["authoring_questions"] = (
+            suggestions.get("authoring_questions") or contract["authoring_questions"]
+        )
+    seed = normalized.get("story_contract_seed")
+    if isinstance(seed, dict):
+        for key, value in seed.items():
+            if key in contract and value not in (None, "", [], {}):
+                contract[key] = copy.deepcopy(value)
+    return contract
+
+
+def structure_episode(
+    normalized: dict[str, Any],
+    *,
+    target_duration: float = 45.0,
+    episode_number: int = 1,
+) -> dict[str, Any]:
+    """episode.structure — single vertical short episode."""
+    target_duration = max(12.0, min(180.0, float(target_duration or 45)))
+    title = str(normalized.get("title") or "ep")
+    logline = str(normalized.get("logline") or "")
+    return {
+        "id": f"ep{episode_number:02d}",
+        "episodeNumber": episode_number,
+        "title": title,
+        "targetDuration": target_duration,
+        "openingHook": logline,
+        "centralConflict": AUTHORING_PLACEHOLDER,
+        "climax": AUTHORING_PLACEHOLDER,
+        "endingHook": AUTHORING_PLACEHOLDER,
+        "aspectRatio": "9:16",
+        "status": "planning",
+        "vo_mode": normalized.get("vo_mode_suggest") or "storyteller",
+    }
+
+
+def _sentences(body: str) -> list[str]:
+    body = (body or "").strip()
+    if not body:
+        return []
+    parts = re.split(r"(?<=[。！？!?])\s*|\n+", body)
+    return [p.strip() for p in parts if p.strip()]
+
+
+# Keywords that signal a sentence's narrative weight for a given beat key.
+# Used to distribute sentences across beats by relevance rather than even split.
+_SENTENCE_BEAT_KEYWORDS: dict[str, dict[str, tuple[str, ...]]] = {
+    "hook": (
+        "异常",
+        "危险",
+        "欲望",
+        "冲突",
+        "意外",
+        "震惊",
+        "不可",
+        "必须",
+        "突然",
+        "绝不",
+        "不可能",
+        "秘密",
+        "危险",
+    ),
+    "approach": (
+        "靠近",
+        "接近",
+        "尝试",
+        "决定",
+        "选择",
+        "策略",
+        "计划",
+        "打算",
+        "关系",
+        "空间",
+        "进入",
+        "面对",
+    ),
+    "sensory": (
+        "感觉",
+        "感受",
+        "触摸",
+        "气味",
+        "声音",
+        "呼吸",
+        "心跳",
+        "颤抖",
+        "温暖",
+        "寒冷",
+        "疼痛",
+        "柔软",
+        "眼神",
+    ),
+    "reaction": (
+        "反应",
+        "回应",
+        "震惊",
+        "愤怒",
+        "悲伤",
+        "喜悦",
+        "犹豫",
+        "退缩",
+        "沉默",
+        "转身",
+        "离开",
+        "停下",
+    ),
+    "action": (
+        "行动",
+        "决定",
+        "选择",
+        "冲击",
+        "突破",
+        "对抗",
+        "抵抗",
+        "反击",
+        "进攻",
+        "防守",
+        "争夺",
+        "抢夺",
+        "推开",
+        "抓住",
+    ),
+    "afterglow": (
+        "余韵",
+        "回味",
+        "留下",
+        "结束",
+        "之后",
+        "终于",
+        "结果",
+        "后果",
+        "未完",
+        "待续",
+        "钩子",
+    ),
+}
+
+
+def _sentence_relevance(sentence: str, beat_key: str) -> float:
+    """Score how relevant a sentence is to a given beat key (0.0–1.0)."""
+    text = sentence.lower()
+    keywords = _SENTENCE_BEAT_KEYWORDS.get(beat_key, ())
+    if not keywords:
+        return 0.5
+    hits = sum(1 for kw in keywords if kw in text)
+    return min(1.0, hits / max(1, len(keywords)) * 2)
+
+
+def _assign_sentences_to_beat(
+    sents: list[str],
+    spine: list[dict[str, Any]],
+    beat_index: int,
+    spine_len: int,
+    scene_budget_sec: float,
+) -> list[str]:
+    """Assign sentences to a beat using narrative weight scoring.
+
+    Instead of evenly splitting sentences, this scores each sentence
+    against the beat's dramatic_function and assigns the most relevant
+    ones, weighted by the beat's weight in the spine.
+    """
+    if spine_len == 1:
+        return list(sents)
+
+    sp = spine[beat_index]
+    beat_key = sp.get("key", "approach")
+    beat_weight = float(sp.get("weight", 0.2))
+
+    # Score each sentence against this beat's key
+    scored: list[tuple[float, int, str]] = [
+        (_sentence_relevance(s, beat_key), i, s) for i, s in enumerate(sents)
+    ]
+
+    # Sort by relevance descending
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    # Target number of sentences proportional to beat weight
+    total_weight = sum(float(b.get("weight", 0.2)) for b in spine)
+    target_count = max(1, round(len(sents) * beat_weight / total_weight))
+
+    # Pick top-ranked sentences, preserving original order
+    selected = sorted(scored[:target_count], key=lambda x: x[1])
+    return [s for _, _, s in selected]
+
+
+def segment_scenes(
+    normalized: dict[str, Any],
+    episode: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """scene.segment"""
+    chunks = normalized.get("scene_chunks") or [
+        {"title": "Main", "body": normalized.get("raw_excerpt") or ""}
+    ]
+    locs = normalized.get("location_candidates") or []
+    loc_id = locs[0]["id"] if locs else None
+    char_ids = [c["id"] for c in (normalized.get("character_candidates") or []) if c.get("id")]
+
+    scenes: list[dict[str, Any]] = []
+    for i, ch in enumerate(chunks, start=1):
+        if not isinstance(ch, dict):
+            continue
+        body = str(ch.get("body") or "")
+        scenes.append(
+            {
+                "id": f"sc{i:02d}_{_slug(str(ch.get('title') or f's{i}'), f'sc{i}')}",
+                "order": i,
+                "title": str(ch.get("title") or f"Scene {i}")[:60],
+                "synopsis": _clip_nar(body, 100),
+                "body": body,
+                "locationId": loc_id,
+                "characterIds": char_ids[:4],
+                "dramaticPurpose": "advance story",
+                "purpose": "",
+                "conflict": "",
+                "entry_state": "",
+                "exit_state": "",
+                "emotionalStart": "",
+                "emotionalEnd": "",
+                "productionMode": "hybrid",
+                "status": "planned",
+                "targetDuration": None,  # filled after beats
+            }
+        )
+    if not scenes:
+        scenes.append(
+            {
+                "id": "sc01_main",
+                "order": 1,
+                "title": "Main",
+                "synopsis": str(episode.get("openingHook") or ""),
+                "body": str(normalized.get("raw_excerpt") or ""),
+                "locationId": loc_id,
+                "characterIds": char_ids[:4],
+                "productionMode": "hybrid",
+                "status": "planned",
+            }
+        )
+    return scenes
+
+
+def _compact_adult_spine_for_scene(body: str) -> list[dict[str, Any]]:
+    """Multi-scene adult: one short local arc per scene (no full dual-climax clone)."""
+    b = body or ""
+    # Map content keywords → local heat arc length 3–5
+    has_sex = bool(re.search(r"办事|沉腰|交合|野战|狂干|揉胸|卸装|半裸|缠绵|后入", b))
+    has_hook = bool(re.search(r"旁白|诗|钩子|开场|字幕", b))
+    spine: list[dict[str, Any]] = []
+    if has_hook or not has_sex:
+        spine.append(
+            {
+                "key": "hook",
+                "dramatic_function": "hook",
+                "objective": "local hook from user section",
+                "importance": "high",
+                "weight": 0.2,
+                "shots_n": 1,
+                "heat_phase": "setup",
+                "wardrobe_state": "full",
+            }
+        )
+    spine.append(
+        {
+            "key": "setup",
+            "dramatic_function": "approach",
+            "objective": "advance this section only",
+            "importance": "med",
+            "weight": 0.25,
+            "shots_n": 1,
+            "heat_phase": "foreplay" if has_sex else "setup",
+            "coitus_beat": "entry" if has_sex else None,
+            "wardrobe_state": "partial" if has_sex else "full",
+        }
+    )
+    if has_sex:
+        # Multi-scene must still carry 转→合 (penetration + climax bare) — not act-only
+        spine.append(
+            {
+                "key": "act",
+                "dramatic_function": "action",
+                "objective": "section peak action: 沉腰抽送",
+                "importance": "high",
+                "weight": 0.28,
+                "shots_n": 1,
+                "heat_phase": "act",
+                "coitus_beat": "rhythm",
+                "wardrobe_state": "undressed",
+                "duration_boost": 8.0,
+            }
+        )
+        spine.append(
+            {
+                "key": "climax",
+                "dramatic_function": "action",
+                "objective": "section climax: 办穿/射出",
+                "importance": "climax",
+                "weight": 0.22,
+                "shots_n": 1,
+                "heat_phase": "climax",
+                "coitus_beat": "finish",
+                "wardrobe_state": "bare",
+                "duration_boost": 6.0,
+            }
+        )
+        spine.append(
+            {
+                "key": "button",
+                "dramatic_function": "afterglow",
+                "objective": "section exit / hook out",
+                "importance": "med",
+                "weight": 0.15,
+                "shots_n": 1,
+                "heat_phase": "afterglow",
+                "coitus_beat": "hook",
+                "wardrobe_state": "bare",
+            }
+        )
+    else:
+        spine.append(
+            {
+                "key": "button",
+                "dramatic_function": "bridge",
+                "objective": "leave section with next-beat pressure",
+                "importance": "med",
+                "weight": 0.3,
+                "shots_n": 1,
+                "heat_phase": "setup",
+                "wardrobe_state": "full",
+            }
+        )
+    # drop None coitus_beat keys for cleaner graph
+    for sp in spine:
+        if sp.get("coitus_beat") is None:
+            sp.pop("coitus_beat", None)
+    return spine
+
+
+def rebalance_adult_beat_durations(
+    beats: list[dict[str, Any]],
+    *,
+    scene_budget_sec: float,
+    sex_floor: float = 0.50,
+) -> list[dict[str, Any]]:
+    """Ensure act+climax share of beat duration ≥ sex_floor (adult max plan-time).
+
+    Extends meat beats first; does not invent new beats.
+    """
+    if not beats or scene_budget_sec <= 0:
+        return beats
+    meat_keys = {"act", "climax"}
+    total = sum(float(b.get("targetDuration") or 0) for b in beats) or 0.0
+    if total <= 0:
+        return beats
+    meat = sum(
+        float(b.get("targetDuration") or 0)
+        for b in beats
+        if str(b.get("heat_phase") or "").lower() in meat_keys
+    )
+    ratio = meat / total
+    if ratio + 1e-9 >= sex_floor:
+        return beats
+    need = sex_floor * total - meat
+    meat_beats = [b for b in beats if str(b.get("heat_phase") or "").lower() in meat_keys]
+    if not meat_beats:
+        return beats
+    # Prefer lengthening rhythm/climax over union
+    meat_beats_sorted = sorted(
+        meat_beats,
+        key=lambda b: (
+            0 if str(b.get("coitus_beat") or "") in {"rhythm", "finish"} else 1,
+            -float(b.get("targetDuration") or 0),
+        ),
+    )
+    each = need / len(meat_beats_sorted)
+    for b in meat_beats_sorted:
+        b["targetDuration"] = round(float(b.get("targetDuration") or 0) + each, 1)
+        b["_duration_rebalanced"] = True
+    # Cap total near scene budget by shrinking setup only
+    new_total = sum(float(b.get("targetDuration") or 0) for b in beats)
+    if new_total > scene_budget_sec * 1.15:
+        setup_beats = [
+            b
+            for b in beats
+            if str(b.get("heat_phase") or "").lower() in {"setup", "afterglow", "bridge"}
+        ]
+        overflow = new_total - scene_budget_sec
+        for b in setup_beats:
+            if overflow <= 0:
+                break
+            cur = float(b.get("targetDuration") or 0)
+            cut = min(overflow, max(0.0, cur - 2.5))
+            b["targetDuration"] = round(cur - cut, 1)
+            overflow -= cut
+    return beats
+
+
+def extract_beats(
+    scene: dict[str, Any],
+    *,
+    scene_budget_sec: float,
+    is_only_scene: bool,
+    heat: dict[str, Any] | None = None,
+    target_duration: float | None = None,
+    genre: str | None = None,
+) -> list[dict[str, Any]]:
+    """beat.extract — map scene body onto vertical beat spine (genre-aware).
+
+    P0-1 · 2026-07-23: non-adult genres use GENRE_SPINES via select_beat_spine.
+    Adult genre preserves backward-compat heat-signal logic.
+    """
+    body = str(scene.get("body") or scene.get("synopsis") or "")
+    sents = _sentences(body)
+    heat = heat or {}
+    # Adult IRON: genre adult is max spine unless soft/medium cool-down
+    _scale = str(heat.get("heat_scale") or "").strip().lower()
+    adult = (genre or "adult") == "adult" and _scale not in {"soft", "medium"}
+    # Multi-scene user scripts: compact per-scene arc (prevents 3× full adult template)
+    if adult and not is_only_scene:
+        spine = _compact_adult_spine_for_scene(body)
+    else:
+        spine = select_beat_spine(
+            heat,
+            genre=genre,
+            target_duration=target_duration or scene_budget_sec,
+            multi_scene=not is_only_scene,
+        )
+    # short scene: fewer beats (only for non-adult genre spines + default drama)
+    is_genre_spine = genre and genre != "adult" and genre in GENRE_NAMES
+    if not adult:
+        if not is_only_scene and len(sents) <= 2:
+            # Drop the 2nd beat (setup/context) for short multi-scene
+            if len(spine) >= 5:
+                spine = [spine[0], spine[2], spine[3], spine[4]]
+        elif len(sents) == 1 and is_only_scene:
+            from beat_spine import load_spine
+
+            spine = [dict(b) for b in load_spine("default")] if not is_genre_spine else spine
+
+    # distribute sentences across beats using narrative weight scoring
+    if not sents:
+        sents = [str(scene.get("synopsis") or scene.get("title") or "画面推进")]
+
+    beats: list[dict[str, Any]] = []
+    n = len(spine)
+    for bi, sp in enumerate(spine):
+        # assign sentence slice using narrative weight scoring
+        if n == 1:
+            chunk_sents = sents
+        else:
+            chunk_sents = _assign_sentences_to_beat(sents, spine, bi, n, scene_budget_sec)
+        action_text = " ".join(chunk_sents)
+        dur = max(2.0, round(float(scene_budget_sec) * float(sp["weight"]), 1))
+        boost = sp.get("duration_boost")
+        if boost is not None:
+            dur = max(dur, float(boost) * int(sp.get("shots_n") or 1))
+        beat_id = f"{scene['id']}_bt{bi + 1:02d}_{sp['key']}"
+        beat_obj: dict[str, Any] = {
+            "id": beat_id,
+            "order": bi + 1,
+            "key": sp["key"],
+            "objective": sp["objective"],
+            "action": _clip_nar(action_text, 120),
+            "outcome": "",
+            "emotionalShift": {"from": "", "to": ""},
+            "importance": sp["importance"],
+            "dramatic_function": sp["dramatic_function"],
+            "heat_phase": sp.get("heat_phase"),
+            "coitus_beat": sp.get("coitus_beat"),
+            "targetDuration": dur,
+            # Do not manufacture a second spoken take from the same source
+            # sentence. Additional coverage needs its own authored beat.
+            "shots_n": min(int(sp["shots_n"]), max(1, len(chunk_sents))),
+            "source_text": action_text,
+            "obstacle": AUTHORING_PLACEHOLDER,
+            "tactic": AUTHORING_PLACEHOLDER,
+            "turn": AUTHORING_PLACEHOLDER,
+            "state_delta": AUTHORING_PLACEHOLDER,
+            "audience_question": AUTHORING_PLACEHOLDER,
+            "emotional_turn": AUTHORING_PLACEHOLDER,
+            "authoring_questions": list(
+                (_GENRE_BEAT_PROMPTS.get(genre or "", {}) or _BEAT_AUTHORING_PROMPTS).get(
+                    sp["key"], ()
+                )
+            ),
+        }
+        if sp.get("heat_phase"):
+            beat_obj["heat_phase"] = sp["heat_phase"]
+        if sp.get("coitus_beat"):
+            beat_obj["coitus_beat"] = sp["coitus_beat"]
+        if sp.get("wardrobe_state"):
+            beat_obj["wardrobe_state"] = sp["wardrobe_state"]
+        beats.append(beat_obj)
+    # Adult max: pre-allocate meat seconds before write-spec fails (Wave 2)
+    if adult:
+        floor = 0.55 if heat.get("hardcore") else 0.50
+        beats = rebalance_adult_beat_durations(
+            beats, scene_budget_sec=scene_budget_sec, sex_floor=floor
+        )
+    return beats
+
 
 def _vertical_composition(order: int, df: str) -> str:
     if df in {"hook", "action"}:

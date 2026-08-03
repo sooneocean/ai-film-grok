@@ -13,9 +13,10 @@ ruff check "$SKILL_DIR/scripts/"
 ruff format --check "$SKILL_DIR/scripts/"
 
 echo "=== [3/4] Aifilm Doctor Diagnosis ==="
-"$AIFILM" doctor
+env -u PYTHONPATH "$AIFILM" doctor
 
 echo "=== [4/4] Pytest (Fast Path) ==="
-(cd "$SKILL_DIR" && python3 -m pytest tests/ -q --tb=line -m "not slow")
+# Drop host-agent PYTHONPATH so package pins match aifilm's clean runtime.
+(cd "$SKILL_DIR" && env -u PYTHONPATH python3 -m pytest tests/ -q --tb=line -m "not slow")
 
 echo "=== All checks passed successfully! ==="

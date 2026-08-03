@@ -110,7 +110,7 @@
     },
     {
       "path": "scripts/aifilm",
-      "sha256": "97f131b75cd6954e6aed0c8a7a05387bd45499e110226dd13df8cb6af4f996e9"
+      "sha256": "fd4201dcae8988f26fa9d2afcc65cfc1a5c40c4efba4036ab65ebcb9d8d90de8"
     },
     {
       "path": "scripts/aifilm_grok.py",
@@ -226,7 +226,7 @@
     },
     {
       "path": "scripts/beat_extraction.py",
-      "sha256": "468f701794d4485c66bcdfdee9a8b9613330744e17ed5dc88a133a3ac766d7fa"
+      "sha256": "2db8e1bd96cfe5c2e4202e1ce5a4e3b7f1064642a1b13918c5d235ce8a197cfe"
     },
     {
       "path": "scripts/beat_spine.py",
@@ -1006,7 +1006,7 @@
     },
     {
       "path": "scripts/runtime_policy.py",
-      "sha256": "2bb38f5bb9df92b4f86eddbce6e502db3cc6f219517049a43005f05009657f47"
+      "sha256": "bf083fe0cb44a6f9f7ec8353f1235f2b50d0afa054a43f227e9e3b9a8fb72173"
     },
     {
       "path": "scripts/scene_sound.py",
@@ -1114,7 +1114,7 @@
     },
     {
       "path": "scripts/story_plan.py",
-      "sha256": "be4558db7dc10d0f5a29b01d52bf9ac72c8f63c94555bfc74a6bc6eb674e0eda"
+      "sha256": "cbcbd647884722fcf0663daf4da6e04c3356c12ebdf834809cb4866c948b9b2a"
     },
     {
       "path": "scripts/story_quality.py",
@@ -1249,5 +1249,5 @@
       "sha256": "8fbd7f94f5b7641cd558dca6086adf4c58b7d6378157442b05d812e0265bd2e1"
     }
   ],
-  "requirements_sha256": "f838edfba26f348d5c4aa08e96fb2439a7796ac1ef6a8479ad399b853959fcf7"
+  "requirements_sha256": "f8c098495135ea53c62cfd94778efcf059f16c8e83852303f900c3eea5615001"
 }

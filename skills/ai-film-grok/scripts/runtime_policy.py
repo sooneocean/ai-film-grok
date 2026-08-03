@@ -8,6 +8,7 @@ import json
 import platform
 import shutil
 import subprocess
+import sys
 from collections.abc import Iterable
 from importlib import metadata
 from pathlib import Path
@@ -143,9 +144,8 @@ def _package_versions(names: Iterable[str]) -> dict[str, str | None]:
     Falls back to in-process ``importlib.metadata`` only if the clean probe fails.
     """
     ordered = list(names)
-    empty = {name: None for name in ordered}
     if not ordered:
-        return empty
+        return {}
     probe = (
         "import json,sys\n"
         "from importlib import metadata\n"
