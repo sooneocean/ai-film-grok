@@ -1,7 +1,11 @@
 # Craft Spine · 八环工序主脊
 
-> 2026-07-21 · **Idea → Verified MP4**
-> 与工具四层正交：本文件管**叙事/决策分层**；工具见 [pipeline-methodology.md](pipeline-methodology.md)。
+> **内部证据 / 诊断投影** —— 不是用户可见的「主进度」。  
+> 对外唯一进度见 [SKILL.md](../SKILL.md) 七步：定义故事 → 设计演出 → Pilot → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付。  
+> dispatch stage 名（idea…verified）与本表对齐；勿再发明第四套阶段名。
+
+> 2026-07-21 · **Idea → Verified MP4**  
+> 与工具四层正交：本文件管**叙事/决策分层**；工具见 [pipeline-methodology.md](pipeline-methodology.md)。  
 > 原则：每环 = 问题 + 输入 + 产出 + 门禁强度 + 失败回退；前环未确认不 bulk。
 
 ## 八环总表

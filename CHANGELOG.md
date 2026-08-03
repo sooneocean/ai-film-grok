@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.31.16] - 2026-08-03
+
+### Changed
+- **Process slim Phase 2:** document single-truth layering (hard-defaults → stages → memory → lessons); voice pipeline context no longer requires full ep2 lesson.
+- Slim plugin `AGENTS.md` hard-rules to pointers; global Agents film IRON → one-line pointers (host file; backup under `~/.grok/backups/*process-slim`).
+- SKILL / INDEX / craft-spine / generative-film-craft: clarify 7-step user progress vs internal stages.
+
+### Added
+- `memory/README.md` short-card contract; process-slim plan session result; `docs/reports/2026-08-03-artifacts-inventory.md` (list-only).
+
+
 ## [2.31.15] - 2026-08-03
 
 ### Fixed

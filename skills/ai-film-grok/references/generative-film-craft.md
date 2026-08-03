@@ -1,5 +1,7 @@
 # 生成式电影制作工序（想法 → 成片）
 
+> **内部方法论** —— 非用户主进度。对外 7 步见 [SKILL.md](../SKILL.md)；八环投影见 [craft-spine](craft-spine.md)。
+
 > 2026-07-21 · 与工程四层（视觉/语音/设计/FFmpeg）**正交**：本文件管**叙事与决策分层**；工具顺序见 [pipeline-methodology.md](pipeline-methodology.md)。  
 > **弹性**：短片可压缩步骤，**不可跳过「前一层确认」**——故事未锁就 bulk 生成 = 漂亮但无法组装的废料。
 

@@ -1,8 +1,19 @@
 # ai-film-grok 流程瘦身 Phase 2 — 2026-08-03
 
-**Status:** PROPOSED（等用户批批次）  
-**前置:** ROI 计划 A–E 本 session 已落地（未全量 commit）；见 `2026-08-03-roi-optimization-plan.md`  
+**Status:** P0–P5 DONE 2026-08-03 · v2.31.16 · not pushed  
+**前置:** ROI A–E + release 2.31.15 已合入；见 `2026-08-03-roi-optimization-plan.md`  
 **目标:** 更有效率、更稳定——**少重复真相、少 token 税、少流程名词、少仓内垃圾**
+
+### Session result
+
+| Batch | Result |
+|-------|--------|
+| P0 | ruff + fast suite + doctor core green；story/shot extract 已在 2.31.14–15 |
+| P1 | voice lesson `required:false`；stages/voice 自洽（2.31.15 已含部分） |
+| P2 | `~/.grok/Agents.md` 102→85 行指针（备份 process-slim）；plugin AGENTS 硬规则改指针 |
+| P3 | `memory/README.md` 契约；18 对 memory 已是短卡 |
+| P4 | `docs/reports/2026-08-03-artifacts-inventory.md` 清单 only |
+| P5 | craft-spine / generative-film-craft / INDEX / SKILL 七步映射 |
 
 ---
 

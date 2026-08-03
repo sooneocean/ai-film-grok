@@ -22,12 +22,13 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 `autopilot`：仅 allowlist 预算动作；整数 tick+实时就绪；人工/质量/容量关即停并写 receipt。
 
-主流程（对外唯一进度）：**定义故事 → 设计演出 → Pilot 样片 → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付**。
-Professional 11-stage 与八环只保留为内部证据／诊断投影，不要求用户同时理解多套阶段名称。
-小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。
-创作会诊：[creative-workshop](references/creative-workshop.md)（默认只编译，`apply` 才写图）。
+主流程（对外唯一进度）：**定义故事 → 设计演出 → Pilot 样片 → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付**。  
+映射：idea/story/beats→agent · shots/media→visual · rough/voice→voice+post · verified→deliver。  
+八环 / Professional 11-stage = 内部证据；规则正文 `hard-defaults`；默认 context 只 stages；lessons 按需。
 
-长片 v1：`plan run --production-mode longform --target-duration 480..900`；锁 graph 后 project→write-spec。9:16、三幕、≤90s 单元、故事/animatic→pilot→全片观看三闸；禁静默换 provider。[longform](references/longform-workflow.md)
+小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；原文不覆盖，lock 须用户确认。  
+创作会诊：[creative-workshop](references/creative-workshop.md)（默认只编译，`apply` 才写图）。  
+长片 v1：`plan run --production-mode longform --target-duration 480..900`；[longform](references/longform-workflow.md)
 
 ## P0
 

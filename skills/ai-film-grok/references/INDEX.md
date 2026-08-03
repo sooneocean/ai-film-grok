@@ -1,11 +1,13 @@
 # References 索引
 
-> 123 个 reference Markdown 文件的分类导航。agent 按需加载时先查此表定位,再读目标文件。
-> 踩坑 lessons（61 个）见末节,按日期归档;新规则须标 P 码 + 层。
+> **165** 个 reference Markdown 的分类导航（含 stages / lessons）。agent 按需加载时先查此表，再读目标文件。  
+> 踩坑 lessons **76** 个，见末节按日期归档；新规则须标 P 码 + 层。  
+> **文档分层（2026-08-03）**：`hard-defaults`（机读）→ `stages/*`（回合默认）→ `memory/*`（短卡）→ `lessons-*`（按需复盘）。勿在 Agents 复写 IRON 正文。  
+> **用户主进度只有 7 步**（SKILL）；八环 / Professional 11-stage 为内部投影。
 
 ---
 
-## 每回合阶段卡（Token 精简入口）
+## 每回合阶段卡（Token 精简入口 · dispatch 默认）
 
 | 文件 | 主题 |
 |---|---|
