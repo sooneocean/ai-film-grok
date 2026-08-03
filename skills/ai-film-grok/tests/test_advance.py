@@ -114,7 +114,10 @@ def test_advance_executes_one_safe_local_action_then_stops_cycle(tmp_path: Path)
     assert calls[1][0] == "preflight"
 
 
-def test_advance_stops_before_human_or_external_action(tmp_path: Path) -> None:
+def test_advance_may_run_local_none_but_never_pilot_approve_or_paid(
+    tmp_path: Path,
+) -> None:
+    """P0: variety/pilot-pack/export are local-none; pilot approve + paid stay blocked."""
     (tmp_path / "brief.json").write_text('{"title":"t"}\n', encoding="utf-8")
     (tmp_path / "film-spec.json").write_text(
         '{"title":"t","shots":[{"id":"shot01","nar":"x"}]}\n',
@@ -122,23 +125,33 @@ def test_advance_stops_before_human_or_external_action(tmp_path: Path) -> None:
     )
     calls: list[list[str]] = []
 
-    def should_not_run(argv: list[str]) -> dict[str, object]:
-        calls.append(argv)
-        return {"ok": True}
+    def record(argv: list[str]) -> dict[str, object]:
+        calls.append(list(argv))
+        return {"ok": True, "returncode": 0, "stdout": "", "stderr": ""}
 
     report = advance_local(
         tmp_path,
         gates={"brief": True, "style_locked": True, "spec": True},
         max_local=3,
-        runner=should_not_run,
+        runner=record,
     )
-    assert report["executed_count"] == 0
+    # May execute local-none throughput cmds; must stop before human/paid/unknown.
     assert report["stop_reason"] in {
         "human_approval_required",
         "unsafe_or_unknown_action",
         "no_executable_action",
+        "max_local_reached",
+        "cycle_detected",
+        "duplicate_transaction",
+        "paid_or_external",
+        "action_failed",
     }
-    assert calls == []
+    forbidden_heads = {"media-queue", "final", "review-final", "grok-oauth", "queue-run-oauth"}
+    for argv in calls:
+        assert argv[0] not in forbidden_heads
+        # pilot approve must never auto-run (pack is pilot-pack hyphen).
+        if argv[0] == "pilot":
+            assert "approve" not in argv
 
 
 @pytest.mark.parametrize(

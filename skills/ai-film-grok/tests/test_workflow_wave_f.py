@@ -17,7 +17,13 @@ from dispatch import structured_next_action  # noqa: E402
 
 class AdvanceAllowlistTests(unittest.TestCase):
     def test_throughput_actions_registered(self) -> None:
-        for aid in ("closeout-run", "bulk-preflight", "variety-precheck", "pilot-pack"):
+        for aid in (
+            "closeout-run",
+            "bulk-preflight",
+            "variety-precheck",
+            "pilot-pack",
+            "export-desktop",  # P0
+        ):
             self.assertIn(aid, ADVANCE_ACTIONS)
 
     def test_bulk_preflight_argv_validates(self) -> None:
