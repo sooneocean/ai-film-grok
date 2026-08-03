@@ -410,7 +410,7 @@
     },
     {
       "path": "scripts/comfy_video.py",
-      "sha256": "2cedf7fba5a588a7f9688188481f5f5e917f0e4ce37e6d09b01eaa7473dd6e6f"
+      "sha256": "9c4fe6caeaf12fb391150c8bb882de04631f2ca3bda2ffaa2a6baca88b2a2c0b"
     },
     {
       "path": "scripts/compose_preview.py",
@@ -782,7 +782,7 @@
     },
     {
       "path": "scripts/narrative_control.py",
-      "sha256": "37a19483f26a1fa7a321adca8fa1d00dd9b92438c215f45e35fba0ca662b8cb1"
+      "sha256": "62ca18b6f0906d601d0b449782a2d865806f18b06671731fc7e36578b8583ffb"
     },
     {
       "path": "scripts/narrative_evidence.py",
