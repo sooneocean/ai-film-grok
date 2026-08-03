@@ -829,6 +829,35 @@ def validate_narrative_contract(
                         node_ref=episode_id,
                     )
                 )
+            # Cross-episode continuity: every non-first episode must have
+            # a predecessor ending hook that is carried forward and resolved.
+            if not previous_point and previous_hook:
+                issues.append(
+                    _issue(
+                        "ENDING_HOOK_NO_POINT",
+                        f"previous episode {previous_id} ending_hook has no point_id",
+                        node_ref=previous_id,
+                    )
+                )
+            if previous_point and not carry:
+                issues.append(
+                    _issue(
+                        "CARRY_IN_EMPTY",
+                        f"episode {episode_id} has no carry_in_points despite prior hook",
+                        node_ref=episode_id,
+                    )
+                )
+            if previous_point:
+                prev_point = points.get(previous_point)
+                if isinstance(prev_point, dict) and prev_point.get("status") not in {"carried", "season_hook"}:
+                    issues.append(
+                        _issue(
+                            "CARRY_POINT_STATUS_INVALID",
+                            f"ending hook point {previous_point} status must be "
+                            f"carried or season_hook, got {prev_point.get('status')}",
+                            node_ref=previous_id,
+                        )
+                    )
         for point_id in contract.get("payoff_points") or []:
             point = points.get(str(point_id))
             if not point:
