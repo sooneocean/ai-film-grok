@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.31.11] - 2026-08-03
+
+### Added
+- Final hot-path contract tests (`test_final_hotpath_contracts.py`): stages receipt plate `subs off` + HyperFrames ownership wording; HF caption gate fails closed when pixel probe is hard-false; heat final/media gates fail closed if `heat_check` cannot import; double-burn underlay plate guard on the fast path.
+
+### Changed
+- CHANGELOG backfill for the gap after 2.25.0: rollups for 2.25.1–2.25.6, 2.26.2, 2.27.0, 2.28.x (no pin), 2.29.0, 2.30.0, and 2.31.0–2.31.9.
+
+
 ## [2.31.10] - 2026-08-03
 
 ### Fixed
@@ -13,6 +22,77 @@
 
 ### Changed
 - Pinned skill requirements to the verified clean runtime: edge-tts==7.2.8, jsonschema==4.23.0 (with numpy/Pillow unchanged).
+
+
+## [2.25.1–2.25.6] - 2026-07-30
+
+_Rollup of patch releases after 2.25.0 (see git history for per-patch subjects)._
+
+### Added
+
+- Guarded offline Kokoro TTS route; InfiniteTalk pilot duration defaults.
+- Expanded guarded audio/FRW controls and verified dialogue audio workflows.
+
+### Changed
+
+- Dialogue production evidence gates tightened across 2.25.x patches.
+
+### Fixed
+
+- Private semantic retrieval hardening.
+
+## [2.26.2] - 2026-07-31
+
+### Added
+
+- Cinematic evidence requirements threaded through production gates.
+
+### Changed
+
+- Production paths fail closed when cinematic proof is missing.
+
+## [2.27.0] - 2026-07-31
+
+### Changed
+
+- LTX native-audio I2V becomes the dialogue-primary motion route.
+
+## [2.28.x] - 2026-07-31
+
+_No distinct `plugin.json` pin found between 2.27 and 2.29 in this repo history._
+
+## [2.29.0] - 2026-07-31
+
+### Added
+
+- Hardened cinematic audit controls and audio production guardrails.
+
+## [2.30.0] - 2026-07-31
+
+### Added
+
+- Gated I2V provider chain with canary-bound routing (LTX/FRW/Grok lanes).
+
+## [2.31.0–2.31.9] - 2026-08-03
+
+_Summary of 2.31 train before 2.31.10 (detailed entry above). Missing intermediate patch numbers had no separate plugin.json pin._
+
+### Added
+
+- Production optimization + interactive production controls.
+- Canonical delivery-contract hardening and HyperFrames caption ownership enforcement.
+- Beat-spine system with genre JSON spines, story contract/quality, and plan feedback.
+- Devops check-all target; story-plan unit tests and recovery after partial extraction damage.
+
+### Changed
+
+- Consolidated 2026-07-29 poison-shot / Comfy GPU / lipsync lessons into hard-defaults.
+
+### Fixed
+
+- Dialogue screenplay NameErrors and speaker-language P0 validation.
+- Delivery-gate tests aligned to production chain contracts.
+- Provider canary receipts for frw-api-i2v / frw-ltx23.
 
 
 All notable changes to **ai-film-grok** are documented here.  
