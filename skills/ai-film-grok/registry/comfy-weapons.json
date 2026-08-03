@@ -900,18 +900,28 @@
       "capabilities": {
         "text_to_video": true,
         "native_stereo_audio": true,
+        "prefer_native_audio": true,
         "identity_lock_supported": false,
         "pilot_only": true,
         "human_approval_required": true,
-        "external_api_required": false
+        "external_api_required": false,
+        "film_workflow_cli": "aifilm h3"
       },
+      "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json",
       "verified": {
         "real_pilot": true,
+        "armory_admitted": true,
+        "armory_admitted_at": "2026-08-03",
         "production_promoted": false,
         "workflow_template_sha256": "e689527dcf5be5ac8e17c80b17e0ecaf80186c6f60d13e27e135d01613547725",
         "output_sha256": "2ed7bbace35cc9953777d92946234f7282f8844d5fa18c4f1cfe9f1834776851",
         "decode_ok": true,
-        "independent_verifier": "ACCEPT_TECHNICAL_PILOT"
+        "geometry": "352x608",
+        "duration_s": 5.167,
+        "native_audio": "aac_stereo",
+        "audio_policy_default": "prefer_native",
+        "independent_verifier": "ACCEPT_TECHNICAL_PILOT",
+        "quality_note": "Armory-admitted pilot T2V; film path aifilm h3; not production-promoted bulk"
       }
     },
     {
@@ -975,18 +985,30 @@
         "image_to_video": true,
         "first_last_frame": true,
         "native_stereo_audio": true,
+        "prefer_native_audio": true,
         "identity_lock_supported": true,
         "pilot_only": true,
         "human_approval_required": true,
-        "external_api_required": false
+        "external_api_required": false,
+        "film_workflow_cli": "aifilm h3"
       },
+      "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json",
       "verified": {
         "real_pilot": true,
+        "armory_admitted": true,
+        "armory_admitted_at": "2026-08-03",
         "production_promoted": false,
         "workflow_template_sha256": "ae7de7060925cdd6bd2db73775e89fc30b745ecd3680c1236ad929ee9a670974",
         "output_sha256": "c93621704ea871d978789bca3f94532a673b259e1bb89c6dbb9545550c6df812",
+        "film_workflow_e2e_output_sha256": "9d975b491ba8b62a568e321f09de493f8629b6c17d2e9c70958ee8ab9c350ed6",
         "decode_ok": true,
-        "independent_verifier": "ACCEPT_TECHNICAL_PILOT"
+        "geometry": "352x608",
+        "duration_s": 5.167,
+        "native_audio": "aac_stereo",
+        "audio_policy_default": "prefer_native",
+        "native_mean_volume_db_e2e": -19.1,
+        "independent_verifier": "ACCEPT_TECHNICAL_PILOT",
+        "quality_note": "Armory-admitted pilot I2V; aifilm h3 run e2e kept prefer_native stereo; not production-promoted bulk"
       }
     },
     {
@@ -1046,23 +1068,30 @@
       "capabilities": {
         "reference_to_video": true,
         "native_stereo_audio": true,
+        "prefer_native_audio": true,
         "identity_lock_supported": true,
         "pilot_only": true,
         "human_approval_required": true,
         "external_api_required": false,
-        "blocked_until_weights": false
+        "blocked_until_weights": false,
+        "film_workflow_cli": "aifilm h3"
       },
+      "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json",
       "verified": {
         "real_pilot": true,
+        "armory_admitted": true,
+        "armory_admitted_at": "2026-08-03",
         "production_promoted": false,
         "workflow_template_sha256": "97e2163ea1753f86035650929719a65347ae4c5d56d42b37a99ff3edac6dfc3e",
         "output_sha256": "f6432dcfa6d929e8ba996c9787cbdb9bf3b05771c3d8b9fd8c27d7a6327f1d03",
         "decode_ok": true,
         "geometry": "352x608",
         "duration_s": 5.167,
+        "native_audio": "aac_stereo",
+        "audio_policy_default": "prefer_native",
         "independent_verifier": "ACCEPT_TECHNICAL_PILOT",
         "prompt_id": "4bcfee95-a7d8-448d-be8c-832d94bdec81",
-        "quality_note": "5s 9:16 R2V canary with single ref image + native AAC; not production-promoted"
+        "quality_note": "Armory-admitted pilot R2V (ref2va); single-ref canary + native AAC; not production-promoted"
       }
     }
   ],

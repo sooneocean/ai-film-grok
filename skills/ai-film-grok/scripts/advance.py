@@ -109,6 +109,14 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
         value_flags=("--root", "--name"),
         verifier=("status",),
     ),
+    # P1: L0 assist draft for review-final (never --approve).
+    "agent-review-final": AdvancePolicy(
+        ("quality.inspect", "dispatch.orchestrate"),
+        ("agent-review-final",),
+        value_flags=("--root", "--reviewer", "--notes", "--human-minutes"),
+        bool_flags=("--no-assist-input",),
+        verifier=("agent-review-final",),
+    ),
     "quality-gate-repair": AdvancePolicy(
         ("dispatch.orchestrate",),
         ("preflight",),

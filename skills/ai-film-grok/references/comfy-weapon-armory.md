@@ -43,8 +43,8 @@ generation.
 |---|---|---|---|
 | Highest practical local text-to-image quality | `text-to-image`, `keyframe`, `character-still`, `poster`, `chinese-text` | `qwen-image-2512-quality` | 928x1664, 50 steps, CFG 4, Euler/simple, shift 3.1 |
 | Local wardrobe/color/object edit with identity retention | `local-image-edit`, `wardrobe-edit`, `color-edit`, `identity-preserving-edit` | `qwen-image-edit-2511-local` | FP8 mixed + verified 4-step edit LoRA |
-| Local I2V / T2V / R2V | `image-to-video`, `text-to-video`, `reference-to-video` | `minimax-h3-*-pilot` | MiniMax H3 native ComfyUI; **experimental pilot only** until production promote; Wan 2.2 local I2V stays retired |
-| Local env T2V | `text-to-video`, `env-plate` | `minimax-h3-t2v-pilot` | 9:16 preview defaults; native stereo audio; do not treat as face-lock |
+| Local I2V / T2V / R2V | `image-to-video`, `text-to-video`, `reference-to-video` | `minimax-h3-*-pilot` | **Armory-admitted pilot** (`comfy-h3`); film path `aifilm h3 plan\|run\|list`; prefer_native stereo; no silent bulk; Wan 2.2 local I2V stays retired |
+| Local env T2V | `text-to-video`, `env-plate` | `minimax-h3-t2v-pilot` | 9:16 preview defaults; native stereo when usable; do not treat as face-lock |
 | Stable talking-avatar pilot | `talking-avatar-stable-pilot` | `infinite-talk-stable-pilot` | 640², 20 steps, audio scale 1; identity stable but Japanese mouth articulation still needs review |
 | Expressive talking-avatar pilot | `talking-avatar-expressive-pilot` | `fantasy-talking-6step-pilot` | 640², 6-step technical canary; strong motion with known identity/color drift |
 
@@ -97,6 +97,12 @@ aifilm comfy route --intent text-to-image
 aifilm comfy route --intent local-image-edit --identity-lock
 aifilm comfy route --intent image-to-video
 aifilm comfy route --intent adult-intimacy-i2v
+
+# MiniMax H3 film lane (preferred for hybrid_h3 restricted/meat shots)
+aifilm h3 list --root "$ROOT"
+aifilm h3 plan --root "$ROOT" --shot-id <id>
+aifilm h3 run --root "$ROOT" --shot-id <id> --register --allow-experimental
+# evidence: registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json
 
 # Compile without submitting. The receipt stores only hashes, not the prompt.
 aifilm comfy prepare \

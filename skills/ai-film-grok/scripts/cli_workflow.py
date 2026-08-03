@@ -88,6 +88,26 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
     )
     qp.add_argument("--root", required=True)
 
+    # P1 · agent assist for review-final (never auto-approves)
+    ar = sub.add_parser(
+        "agent-review-final",
+        help="L0 assist draft for review-final scorecard (never auto-approves)",
+    )
+    ar.add_argument("--root", required=True)
+    ar.add_argument("--reviewer", default="", help="Bind human reviewer into assist input JSON")
+    ar.add_argument("--notes", default="", help="Notes stored in assist package")
+    ar.add_argument(
+        "--human-minutes",
+        type=float,
+        default=None,
+        help="Screening minutes for review-file path (default from duration)",
+    )
+    ar.add_argument(
+        "--no-assist-input",
+        action="store_true",
+        help="Only write agent-review-final.json (skip final-review-input.assist.json)",
+    )
+
 
 def run_workflow_cmd(args: argparse.Namespace) -> int:
     """Dispatch workflow-related top-level cmds. Returns process exit code."""
@@ -151,6 +171,25 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
             report = queue_progress_honest(args.root)
             _emit(report)
             return 0
+
+        if cmd == "agent-review-final":
+            from agent_review_final import AgentReviewFinalError, build_agent_review_final
+
+            try:
+                report = build_agent_review_final(
+                    args.root,
+                    reviewer=str(getattr(args, "reviewer", "") or "") or None,
+                    notes=str(getattr(args, "notes", "") or "") or None,
+                    human_minutes=getattr(args, "human_minutes", None),
+                    write=True,
+                    write_assist_input=not bool(getattr(args, "no_assist_input", False)),
+                )
+            except AgentReviewFinalError as exc:
+                _emit({"ok": False, "error": str(exc), "auto_approved": False})
+                return 2
+            _emit(report)
+            # 0 = package written; still never final_complete without human review-final
+            return 0 if report.get("ok") else 2
 
     except WorkflowPackError as exc:
         _emit({"ok": False, "error": str(exc)})

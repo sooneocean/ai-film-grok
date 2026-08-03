@@ -10716,6 +10716,7 @@ def main(argv: list[str] | None = None) -> int:
             "gpu-lease": cmd_workflow,
             "tunnel-probe": cmd_workflow,
             "queue-progress": cmd_workflow,
+            "agent-review-final": cmd_workflow,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:

@@ -40,6 +40,7 @@ _ACTION_SKILLS = {
     "select-shortlist": "projection.verify",
     "export-desktop": "export.package",
     "dailies_review-evidence": "dispatch.orchestrate",
+    "agent-review-final": "quality.inspect",
 }
 _SKILL_POLICIES = {
     "keyframe.generate": ("external", "human_required"),
@@ -68,6 +69,8 @@ _COMMAND_POLICIES = {
     "queue-progress": ("local", "none"),
     "tunnel-probe": ("local", "none"),
     "gpu-lease": ("local", "none"),
+    # P1: write assist draft only — never sets final_complete
+    "agent-review-final": ("local", "none"),
     "queue-run-oauth": ("paid", "human_required"),
     "review-ui": ("local", "human_required"),
     "review-final": ("local", "human_required"),
@@ -630,6 +633,21 @@ def build_dispatch(
             "final delivery requires a current post-audit receipt with no hard failures",
             "post",
         )
+    # P1: after plate, if final not human-approved, fill assist scorecard (local none)
+    if plate_exists and not gates.get("final_complete"):
+        assist_rec = read_json(root / "receipts" / "agent-review-final.json") or {}
+        assist_fresh = (
+            isinstance(assist_rec, dict)
+            and assist_rec.get("kind") == "agent-review-final"
+            and assist_rec.get("ok") is True
+        )
+        if not assist_fresh:
+            pre(
+                "agent-review-final",
+                f'aifilm agent-review-final --root "{r}"',
+                "P1 L0 assist draft for review-final (never auto-approve; human still signs)",
+                "post",
+            )
     # Wave F · design-time variety + bulk door before media (agent loop glue)
     if craft_stage in {"shots", "agent"} and gates.get("spec") and not gates.get("clips_complete"):
         variety_rec = read_json(root / "receipts" / "variety-precheck.json") or {}

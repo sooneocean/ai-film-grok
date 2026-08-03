@@ -51,6 +51,7 @@ _ACTION_STAGE: dict[str, str] = {
     "final-audio": "post",
     "external-review": "post",
     "review-final": "post",
+    "agent-review-final": "post",
     "closeout-run": "post",
     "pilot-pack": "agent",
     "post-audit": "post",
@@ -614,13 +615,44 @@ def build_next_actions(
                     f'aifilm external-review run --root "{r}" --video "{final_path}" --purpose final',
                     "可选外部审片：候选问题写入 receipt，不取代本地 QA 或人工终审",
                 )
-            add(
-                "review-final",
-                f'aifilm review-final --root "{r}" --approve --reviewer <you> --notes "已完整观看…" '
-                "--score-identity pass --score-style pass --score-motion pass "
-                "--score-escalation pass --score-audio pass --score-subs pass --score-dead-air pass",
-                "[层4·后处理] 成片已渲，待十一维 scorecard 审批",
-            )
+            # P1: fill scorecard draft from L0 before human review-final
+            try:
+                from agent_review_final import agent_review_stale
+
+                assist_stale = agent_review_stale(root)
+            except Exception:
+                assist_stale = True
+            if assist_stale:
+                add(
+                    "agent-review-final",
+                    f'aifilm agent-review-final --root "{r}"',
+                    "[P1] L0 自动填 review-final 记分卡草案（不自动批；人看完一点确认）",
+                )
+            else:
+                assist = read_json(root / "receipts" / "agent-review-final.json") or {}
+                next_human = str(assist.get("next_cmd") or "").strip()
+                if next_human and "<" not in next_human and "YOU" not in next_human:
+                    add(
+                        "review-final",
+                        next_human if next_human.startswith("aifilm ") else f"aifilm {next_human}",
+                        "[P1] assist 已写好 — 完整观看后执行（或改 --reviewer）",
+                    )
+                else:
+                    add(
+                        "review-final",
+                        f'aifilm review-final --root "{r}" --approve --watched-full '
+                        f'--reviewer YOU --notes "已完整观看" '
+                        f'--review-file "{r}/receipts/final-review-input.assist.json"',
+                        "[P1] assist 草案已在；补 --reviewer 后 review-final（不自批）",
+                    )
+            if assist_stale:
+                add(
+                    "review-final",
+                    f'aifilm review-final --root "{r}" --approve --reviewer <you> --notes "已完整观看…" '
+                    "--score-identity pass --score-style pass --score-motion pass "
+                    "--score-escalation pass --score-audio pass --score-subs pass --score-dead-air pass",
+                    "[层4·后处理] 成片已渲，待 scorecard 审批（建议先 agent-review-final）",
+                )
 
     # Evidence: sound_plan intent without mix/final when clips ready
     if gates.get("clips_complete") and not gates.get("final_complete"):

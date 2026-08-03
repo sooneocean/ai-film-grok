@@ -127,16 +127,13 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
                 None
                 if gates.get("final_complete")
                 else (
-                    f'aifilm review-final --root "{base}" --approve --reviewer <you> '
-                    '--notes "已完整观看…" --score-identity pass --score-style pass '
-                    "--score-motion pass --score-escalation pass --score-audio pass "
-                    "--score-subs pass --score-dead-air pass --score-rhythm pass "
-                    "--score-emotion pass --score-theme pass --score-performance pass"
+                    # P1: prefer assist draft (local none); human still runs review-final
+                    f'aifilm agent-review-final --root "{base}"'
                 )
             ),
             "required_proof": None
             if gates.get("final_complete")
-            else "receipts: outputs.final_review + gates.final_complete",
+            else "agent-review-final assist → human review-final (never auto)",
         },
         {
             "id": "post_audit",

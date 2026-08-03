@@ -17,6 +17,28 @@ def test_armory_contains_no_wan22_i2v_weapon() -> None:
     assert all("wan22" not in str(weapon.get("id") or "") for weapon in armory["weapons"])
 
 
+def test_armory_admits_minimax_h3_with_intake_evidence() -> None:
+    armory = load_armory()
+    by_id = {w["id"]: w for w in armory["weapons"]}
+    for wid in (
+        "minimax-h3-t2v-pilot",
+        "minimax-h3-i2v-pilot",
+        "minimax-h3-r2v-pilot",
+    ):
+        weapon = by_id[wid]
+        assert weapon["status"] == "experimental"
+        assert weapon["provider"] == "comfy-h3"
+        assert weapon["verified"]["real_pilot"] is True
+        assert weapon["verified"]["armory_admitted"] is True
+        assert weapon["verified"]["production_promoted"] is False
+        assert weapon["capabilities"].get("prefer_native_audio") is True
+        assert weapon["capabilities"].get("film_workflow_cli") == "aifilm h3"
+        receipt = Path(__file__).resolve().parents[1] / weapon["latest_canary_receipt_path"]
+        assert receipt.is_file(), f"missing intake evidence for {wid}"
+    i2v = by_id["minimax-h3-i2v-pilot"]
+    assert i2v["verified"].get("film_workflow_e2e_output_sha256")
+
+
 def test_armory_registers_minimax_h3_weapons() -> None:
     armory = load_armory()
     ids = {weapon["id"] for weapon in armory["weapons"]}

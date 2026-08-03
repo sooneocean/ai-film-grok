@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.31.32] - 2026-08-03
+
+### Added
+- **MiniMax H3 armory admission:** `registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json`; T2V/I2V/R2V pilots marked `armory_admitted` (still experimental; not production-promoted); `film_workflow_cli=aifilm h3`; audio `prefer_native`.
+- **P1 agent-review-final assist:** `aifilm agent-review-final --root` builds L0 scorecard + dim@sec evidence draft (`receipts/agent-review-final.json`).
+- Optional `--reviewer` writes `receipts/final-review-input.assist.json` for one-command `review-final --review-file` (still human-gated).
+- dispatch / next_actions / closeout / advance wire the assist step before human `review-final`.
+- Tests: `tests/test_comfy_armory.py` armory-admitted H3; `tests/test_agent_review_final.py`.
+
+### Changed
+- comfy-weapon-armory docs point film H3 lane to `aifilm h3 plan|run|list`.
+- Does **not** auto-approve `review-final` or set `final_complete`; pilot approve / paid spend unchanged; H3 bulk still pilot-gated.
+
 ## [2.31.31] - 2026-08-03
 
 ### Changed

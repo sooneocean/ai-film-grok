@@ -106,7 +106,11 @@
     },
     {
       "path": "scripts/advance.py",
-      "sha256": "a67d779cbfeeac099ae3ac9f4917a7e1dead2c9fc163345768ca75850421d4c1"
+      "sha256": "d6e77c71304f5dc7c24e5651b92d5fd229ede19ca0f26ea2360558658131aee7"
+    },
+    {
+      "path": "scripts/agent_review_final.py",
+      "sha256": "6aa455d95d46d439700c83e1082674e8448c1926faabda2bd3bff9366825a474"
     },
     {
       "path": "scripts/aifilm",
@@ -114,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "3dc921214b777c326094df97322cc7e6d1c3281e475b5217a1edf1cd9dcc50d9"
+      "sha256": "51b4d5488714de19a3b64ce63eaca736e7e0627debbb6ba25eebc079d04d3e2a"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -378,7 +382,7 @@
     },
     {
       "path": "scripts/cli_workflow.py",
-      "sha256": "f5e84fbe2513e27a75c206b3876a1346a9318f76f68b60be77ca048e73aa1865"
+      "sha256": "ad1992b76f029bc192c1a00a8e95236d63e6f14fcd69c2d228c375a49fefbe09"
     },
     {
       "path": "scripts/cli_workshop.py",
@@ -390,7 +394,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "182eeec65902728098c20a188ec721c61017a140bb7802b15ae31bfb423a8647"
+      "sha256": "50fb81f3f9a16d5489c4380afc468eaff0b50da253d6d9cb88bc391211d1df9a"
     },
     {
       "path": "scripts/cloud_media_download.py",
@@ -550,7 +554,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "8920445974ae0750d3d471edce9d190ba53ce207e536f7d9e9fbb90bf9dc89d1"
+      "sha256": "e81c6423924e57925ca1d1750717fbf8519802106b0948149c59144bc91a48cf"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -806,7 +810,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "2ef1f0a27618c52ad3c4e451561e3d1c7a3482edbc1bb2c112a5320f729450dc"
+      "sha256": "c8f255e12be30a569f92045901acfff57b41ed3fa48425b3e923a52530399c4e"
     },
     {
       "path": "scripts/node/backend_probe.py",
