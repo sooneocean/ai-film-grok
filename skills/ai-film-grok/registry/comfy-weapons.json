@@ -909,7 +909,7 @@
         "film_lane_ready": true,
         "bulk_requires_pilot_approval": true
       },
-      "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json",
+      "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-film-lane-open-20260803.json",
       "verified": {
         "real_pilot": true,
         "armory_admitted": true,
@@ -998,7 +998,7 @@
         "film_lane_ready": true,
         "bulk_requires_pilot_approval": true
       },
-      "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json",
+      "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-film-lane-open-20260803.json",
       "verified": {
         "real_pilot": true,
         "armory_admitted": true,
@@ -1086,7 +1086,7 @@
         "film_lane_ready": true,
         "bulk_requires_pilot_approval": true
       },
-      "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json",
+      "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-film-lane-open-20260803.json",
       "verified": {
         "real_pilot": true,
         "armory_admitted": true,
