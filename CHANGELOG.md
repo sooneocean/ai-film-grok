@@ -3,14 +3,13 @@
 ## [2.31.29] - 2026-08-03
 
 ### Added
-- MiniMax H3 **R2V pilot verified** on private RTX 5090 ( real_pilot + output hash).
-- Canary:  (352x608, ~5.2s, h264+aac).
+- MiniMax H3 **R2V pilot verified** on private RTX 5090 (`minimax-h3-r2v-pilot` real_pilot + output hash).
+- Canary under `skills/ai-film-grok/artifacts/5090-evaluation/minimax-h3-canary/` (352x608, ~5.2s, h264+aac).
 
-## [2.31.28]
+## [2.31.28] - 2026-08-03
 
 ### Added
 - Dual-lane **hybrid_h3** profile + MiniMax H3 local motion routing (restricted soft-lock, film-scoped).
- - 2026-08-03
 
 ### Fixed
 - `runtime_policy` now resolves the skill's pinned runtime Python (via `runtime-python` script) instead of using `sys.executable` / `platform.python_version()` which reflected the host agent's Python, not the skill's. Fixes doctor `runtime_lock` false drift when run from inside Hermes.
