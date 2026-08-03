@@ -1,162 +1,17 @@
-STATUS=FAILED
-at=2026-08-03T17:32:04+0800
---- run log ---
-=== START 2026-08-03T17:32:02+0800 ===
-=== 1) status / log ===
-## main...origin/main
- M CHANGELOG.md
- M README.md
- M artifacts/session-wrap-2026-08-03-result.txt
- M artifacts/session-wrap-finish.sh
- M docs/GRAPH.md
- M docs/plans/2026-08-03-workflow-optimize-todo.md
- M plugin.json
- M skills/ai-film-grok/README.md
- M skills/ai-film-grok/SKILL.md
- M skills/ai-film-grok/memory/2026-08-03-throughput-e2e-run.md
- M skills/ai-film-grok/memory/2026-08-03-workflow-merge-all-wrap.md
- M skills/ai-film-grok/references/hard-defaults.md
- M skills/ai-film-grok/references/stages/visual.md
- M skills/ai-film-grok/runtime-lock.json
- M skills/ai-film-grok/schemas/shot-intent.schema.json
- M skills/ai-film-grok/scripts/agent_review_final.py
- M skills/ai-film-grok/scripts/aifilm_grok.py
- M skills/ai-film-grok/scripts/autopilot.py
- M skills/ai-film-grok/scripts/cli_h3.py
- M skills/ai-film-grok/scripts/cli_workflow.py
- M skills/ai-film-grok/scripts/closeout.py
- M skills/ai-film-grok/scripts/comfy_armory.py
- M skills/ai-film-grok/scripts/config_loader.py
- M skills/ai-film-grok/scripts/dispatch.py
- M skills/ai-film-grok/scripts/film_spec.py
- M skills/ai-film-grok/scripts/h3_workflow.py
- M skills/ai-film-grok/scripts/media_queue.py
- M skills/ai-film-grok/scripts/narrative_control.py
- M skills/ai-film-grok/scripts/plan_feedback.py
- M skills/ai-film-grok/scripts/production_router.py
- M skills/ai-film-grok/scripts/render_final.py
- M skills/ai-film-grok/scripts/runtime_policy.py
- M skills/ai-film-grok/scripts/shot_planning.py
- M skills/ai-film-grok/scripts/story_plan.py
- M skills/ai-film-grok/scripts/weapon_router.py
- M skills/ai-film-grok/tests/test_comfy_video.py
- M skills/ai-film-grok/tests/test_h3_workflow.py
- M skills/ai-film-grok/tests/test_hybrid_h3_lanes.py
- M skills/ai-film-grok/tests/test_production_router.py
-?? skills/ai-film-grok/references/weapon-lane-matrix.md
-?? skills/ai-film-grok/tests/test_workflow_w8_autopilot.py
-79dd207e chore: sync v2.31.34 docs and H3 film-lane open receipt
-713b501d feat: one-shot review-final apply and H3 film-lane open
-{
-  "name": "ai-film-grok",
-  "version": "2.31.36",
-  "description": "Grok Build 专业 AI 电影导演系统：Graph/Bible/Production Book、脸服场景连续性、Dailies、声音音乐、Picture/Master Lock 与可验证交付；成人等类型规则以 Genre Pack 独立启用。",
-  "author": {
-=== 2) commit wrap (exact message) ===
-{
-  "files_scanned": 1,
-  "findings": [],
-  "hook": "pre-commit",
-  "ok": true,
-  "repo": "/Users/dex/.grok/plugins/ai-film-grok",
-  "warnings": []
-}
-[main c7a6ef6] docs(memory): session wrap for workflow merge-all v2.31.22
- 1 file changed, 14 insertions(+), 14 deletions(-)
-=== 3) porcelain after wrap / cleanup ===
- M CHANGELOG.md
- M README.md
- M artifacts/session-wrap-finish.sh
- M docs/GRAPH.md
- M docs/plans/2026-08-03-workflow-optimize-todo.md
- M plugin.json
- M skills/ai-film-grok/README.md
- M skills/ai-film-grok/SKILL.md
- M skills/ai-film-grok/memory/2026-08-03-throughput-e2e-run.md
- M skills/ai-film-grok/references/hard-defaults.md
- M skills/ai-film-grok/references/stages/visual.md
- M skills/ai-film-grok/runtime-lock.json
- M skills/ai-film-grok/schemas/shot-intent.schema.json
- M skills/ai-film-grok/scripts/agent_review_final.py
- M skills/ai-film-grok/scripts/aifilm_grok.py
- M skills/ai-film-grok/scripts/autopilot.py
- M skills/ai-film-grok/scripts/cli_h3.py
- M skills/ai-film-grok/scripts/cli_workflow.py
- M skills/ai-film-grok/scripts/closeout.py
- M skills/ai-film-grok/scripts/comfy_armory.py
- M skills/ai-film-grok/scripts/config_loader.py
- M skills/ai-film-grok/scripts/dispatch.py
- M skills/ai-film-grok/scripts/film_spec.py
- M skills/ai-film-grok/scripts/h3_workflow.py
- M skills/ai-film-grok/scripts/media_queue.py
- M skills/ai-film-grok/scripts/narrative_control.py
- M skills/ai-film-grok/scripts/plan_feedback.py
- M skills/ai-film-grok/scripts/production_router.py
- M skills/ai-film-grok/scripts/render_final.py
- M skills/ai-film-grok/scripts/runtime_policy.py
- M skills/ai-film-grok/scripts/shot_planning.py
- M skills/ai-film-grok/scripts/story_plan.py
- M skills/ai-film-grok/scripts/weapon_router.py
- M skills/ai-film-grok/tests/test_comfy_video.py
- M skills/ai-film-grok/tests/test_h3_workflow.py
- M skills/ai-film-grok/tests/test_hybrid_h3_lanes.py
- M skills/ai-film-grok/tests/test_production_router.py
-?? skills/ai-film-grok/references/weapon-lane-matrix.md
-?? skills/ai-film-grok/tests/test_workflow_w8_autopilot.py
-main=c7a6ef6c4f6191af9f3843db3994250133d7bed0
-origin/main=79dd207eb15521efea68ae7a8af2e981becb8ae7
-=== 4) make release-light (need push path) ===
-pre-push blocked: tracked worktree changes are present; commit or stash them before pushing
-make: *** [release-light] Error 1
-release-light FAILED
-=== 6) grok plugin update ===
-ai-film-grok-37e029ef: local symlink, already live
-plugin update OK
-=== FINAL ===
-## main...origin/main [領先 1]
- M CHANGELOG.md
- M README.md
- M artifacts/session-wrap-finish.sh
- M docs/GRAPH.md
- M docs/plans/2026-08-03-workflow-optimize-todo.md
- M plugin.json
- M skills/ai-film-grok/README.md
- M skills/ai-film-grok/SKILL.md
- M skills/ai-film-grok/memory/2026-08-03-throughput-e2e-run.md
- M skills/ai-film-grok/references/hard-defaults.md
- M skills/ai-film-grok/references/stages/visual.md
- M skills/ai-film-grok/runtime-lock.json
- M skills/ai-film-grok/schemas/shot-intent.schema.json
- M skills/ai-film-grok/scripts/agent_review_final.py
- M skills/ai-film-grok/scripts/aifilm_grok.py
- M skills/ai-film-grok/scripts/autopilot.py
- M skills/ai-film-grok/scripts/cli_h3.py
- M skills/ai-film-grok/scripts/cli_workflow.py
- M skills/ai-film-grok/scripts/closeout.py
- M skills/ai-film-grok/scripts/comfy_armory.py
- M skills/ai-film-grok/scripts/config_loader.py
- M skills/ai-film-grok/scripts/dispatch.py
- M skills/ai-film-grok/scripts/film_spec.py
- M skills/ai-film-grok/scripts/h3_workflow.py
- M skills/ai-film-grok/scripts/media_queue.py
- M skills/ai-film-grok/scripts/narrative_control.py
- M skills/ai-film-grok/scripts/plan_feedback.py
- M skills/ai-film-grok/scripts/production_router.py
- M skills/ai-film-grok/scripts/render_final.py
- M skills/ai-film-grok/scripts/runtime_policy.py
- M skills/ai-film-grok/scripts/shot_planning.py
- M skills/ai-film-grok/scripts/story_plan.py
- M skills/ai-film-grok/scripts/weapon_router.py
- M skills/ai-film-grok/tests/test_comfy_video.py
- M skills/ai-film-grok/tests/test_h3_workflow.py
- M skills/ai-film-grok/tests/test_hybrid_h3_lanes.py
- M skills/ai-film-grok/tests/test_production_router.py
-?? skills/ai-film-grok/references/weapon-lane-matrix.md
-?? skills/ai-film-grok/tests/test_workflow_w8_autopilot.py
-c7a6ef6c docs(memory): session wrap for workflow merge-all v2.31.22
-main=c7a6ef6c4f6191af9f3843db3994250133d7bed0
-origin/main=79dd207eb15521efea68ae7a8af2e981becb8ae7
-main_eq_origin=no
-clean_head=0
-STATUS=FAILED
-=== END 2026-08-03T17:32:04+0800 ===
+STATUS=DONE
+at=2026-08-03T17:37:16+0800
+main=dd74ad4fba26038f6ae1f3aaabac088f35bba361
+origin/main=dd74ad4fba26038f6ae1f3aaabac088f35bba361
+main_eq_origin=yes
+push=eac8e2df..dd74ad4f  main -> main
+no_force=yes
+source=session-wrap-finish (maintenance 17:37)
+tip=docs(memory): mark W8 and dual-lane shipped at 2.31.36
+--- run log (final) ---
+release-light OK
+pre-push ok
+To https://github.com/sooneocean/ai-film-grok.git
+   eac8e2df..dd74ad4f  main -> main
+push OK
+main_eq_origin=yes
+STATUS=DONE
