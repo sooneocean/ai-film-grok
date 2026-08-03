@@ -1,0 +1,26 @@
+# 推进收尾（agent shell 不可用时）
+
+当前预期：main 已有 Wave A–F（plugin ≥2.31.23）。
+
+## 最快
+
+```bash
+/bin/bash /Users/dex/.grok/plugins/ai-film-grok/artifacts/session-wrap-finish.sh
+cat /Users/dex/.grok/plugins/ai-film-grok/artifacts/session-wrap-2026-08-03-result.txt
+```
+
+或：
+
+```bash
+launchctl bootout gui/$(id -u)/com.dex.aifilm.session-wrap-once 2>/dev/null
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dex.aifilm.session-wrap-once.plist
+# 几秒后：
+cat /Users/dex/.grok/plugins/ai-film-grok/artifacts/session-wrap-2026-08-03-result.txt
+launchctl bootout gui/$(id -u)/com.dex.aifilm.session-wrap-once
+```
+
+## 下一功能推进
+
+- **实片**：给我 film root → `aifilm dispatch --root …` 按 next 走。  
+- **W8 autopilot allowlist**：吞吐命令进 autopilot（需你说 go）。  
+- **不要**再拆第四套阶段名 / 自批 pilot。

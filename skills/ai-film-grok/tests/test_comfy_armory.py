@@ -17,10 +17,46 @@ def test_armory_contains_no_wan22_i2v_weapon() -> None:
     assert all("wan22" not in str(weapon.get("id") or "") for weapon in armory["weapons"])
 
 
-@pytest.mark.parametrize("operation", ["image-to-video", "i2v", "adult-meat-motion-i2v"])
-def test_local_i2v_is_retired(operation: str) -> None:
-    with pytest.raises(ComfyArmoryError, match="WAN22_I2V_RETIRED"):
-        select_weapon(operation, stage="pilot", allow_experimental=True)
+def test_armory_registers_minimax_h3_weapons() -> None:
+    armory = load_armory()
+    ids = {weapon["id"] for weapon in armory["weapons"]}
+    assert "minimax-h3-t2v-pilot" in ids
+    assert "minimax-h3-i2v-pilot" in ids
+    assert "minimax-h3-r2v-pilot" in ids
+
+
+def test_local_i2v_routes_to_h3_experimental_pilot() -> None:
+    selected = select_weapon(
+        "image-to-video",
+        stage="pilot",
+        allow_experimental=True,
+    )
+    assert selected["weapon"]["id"] == "minimax-h3-i2v-pilot"
+    assert selected["weapon"]["provider"] == "comfy-h3"
+
+
+def test_local_t2v_routes_to_h3_experimental_pilot() -> None:
+    selected = select_weapon(
+        "text-to-video",
+        stage="pilot",
+        allow_experimental=True,
+    )
+    assert selected["weapon"]["id"] == "minimax-h3-t2v-pilot"
+
+
+def test_local_i2v_pilot_requires_experimental_flag() -> None:
+    with pytest.raises(ComfyArmoryError, match="experimental authorization"):
+        select_weapon("image-to-video", stage="pilot", allow_experimental=False)
+
+
+def test_local_i2v_production_fail_closed_until_promoted() -> None:
+    with pytest.raises(ComfyArmoryError, match="no verified weapon"):
+        select_weapon("image-to-video", stage="production")
+
+
+def test_adult_meat_production_still_fail_closed() -> None:
+    with pytest.raises(ComfyArmoryError, match="adult meat-motion production gate"):
+        select_weapon("adult-meat-motion-i2v", stage="production", allow_experimental=True)
 
 
 def test_local_identity_edit_remains_available() -> None:

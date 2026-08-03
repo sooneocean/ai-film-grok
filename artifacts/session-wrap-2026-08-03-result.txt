@@ -1,0 +1,5 @@
+=== START (agent attempt) ===
+Status: PENDING — invoking shell via subagent
+Working directory: /Users/dex/.grok/plugins/ai-film-grok
+Note: parent session run_terminal_command returns IO Error; subagent may succeed.
+===

@@ -37,6 +37,9 @@ ALLOWED_VIDEO_ENDPOINTS = frozenset(
         "local_infinite_talk",  # pilot-only private RTX talking-avatar generation
         "local_fantasy_talking",  # pilot-only private RTX expressive avatar generation
         "local_latentsync",  # private RTX post-lipsync replacement, hash-bound to source/video
+        "local_minimax_h3_t2v",  # pilot-only private MiniMax H3 text-to-video
+        "local_minimax_h3_i2v",  # pilot-only private MiniMax H3 image-to-video
+        "local_minimax_h3_r2v",  # pilot-only private MiniMax H3 reference-to-video
         "external",  # generic offline/external clip (must reencode)
     }
 )

@@ -130,8 +130,13 @@ C1–C3 运维并行（lease / 隧道 / 进度诚实）
 D 仅当 final 再炸
 ```
 
-**默认推荐下一会话：`Wave A`（A1+A2+A3）。**  
-回报口径：`GO` / `只 A1` / `A+B` / `全开 Wave A–C`。
+**默认推荐下一会话（A–F 已 ship）：**
+
+1. **实片 GO** — 给 film root，用 `dispatch` 走 next（吞吐门已接）  
+2. **W8** — autopilot allowlist 扩 closeout/bulk-preflight/variety（说 `go W8`）  
+3. **收尾档案** — 本机跑 `artifacts/session-wrap-finish.sh`（agent shell 挂时）
+
+回报口径：`实片 <path>` / `go W8` / `wrap only`。
 
 ---
 

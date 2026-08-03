@@ -1203,8 +1203,206 @@ def registry_report(*, root: Path | None = None) -> dict[str, Any]:
     }
 
 
+class LocalComfyH3Provider(I2VProvider):
+    """Private-LAN MiniMax H3 motion lane on the RTX 5090 ComfyUI node.
+
+    Uses armory-compiled native MiniMaxH3 workflows (T2V/I2V/R2V). Does not
+    revive the retired Wan 2.2 local I2V path. Generation remains pilot-gated
+    until weapons are production-promoted.
+    """
+
+    name = "comfy-h3"
+    command_timeout_sec = 3600
+    endpoints = frozenset(
+        {
+            "local_minimax_h3_t2v",
+            "local_minimax_h3_i2v",
+            "local_minimax_h3_r2v",
+        }
+    )
+
+    def _base_url(self) -> str:
+        from config_loader import get_config
+
+        return get_config().comfyui_base_url.strip()
+
+    @staticmethod
+    def _resolve_weapon(mode: str) -> tuple[str, str]:
+        normalized = str(mode or "i2v").strip().lower()
+        if normalized in {"t2v", "text-to-video", "text_to_video"}:
+            return "text-to-video", "minimax-h3-t2v-pilot"
+        if normalized in {"r2v", "reference-to-video", "reference_to_video"}:
+            return "reference-to-video", "minimax-h3-r2v-pilot"
+        return "image-to-video", "minimax-h3-i2v-pilot"
+
+    def probe(self, *, root: Path | None = None) -> CapabilityReport:
+        del root
+        base_url = self._base_url()
+        if not base_url:
+            return CapabilityReport(
+                provider=self.name,
+                ok=False,
+                available=False,
+                reason="AIFILM_COMFYUI_BASE_URL is not configured.",
+                models=[],
+                profile="explicit_local_h3",
+            )
+        try:
+            from comfy_armory import probe_armory
+            from comfy_video import probe, submission_capacity
+
+            detail = probe(base_url)
+            capacity = submission_capacity(base_url)
+            armory = probe_armory(base_url)
+        except Exception as exc:
+            return CapabilityReport(
+                provider=self.name,
+                ok=False,
+                available=False,
+                reason=f"MiniMax H3 probe failed: {exc}",
+                models=[],
+                profile="explicit_local_h3",
+            )
+        ready = [
+            item["id"]
+            for item in armory.get("ready", [])
+            if str(item.get("id") or "").startswith("minimax-h3-")
+        ]
+        available = bool(detail.get("ok") and ready)
+        return CapabilityReport(
+            provider=self.name,
+            ok=available,
+            available=available,
+            reason=(
+                f"MiniMax H3 ready weapons: {', '.join(ready)}"
+                if available
+                else "MiniMax H3 weapons missing weights or live probe failed"
+            ),
+            models=ready,
+            profile="explicit_local_h3",
+            detail={
+                **detail,
+                "submission_capacity": capacity,
+                "ready_h3_weapons": ready,
+                "armory_blocked": armory.get("blocked"),
+            },
+        )
+
+    def build_command(
+        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
+    ) -> list[str]:
+        raise I2VProviderError(
+            "comfy-h3 does not expose a raw shell command; call generate() which uses "
+            "armory compile + comfy run-workflow"
+        )
+
+    def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        import secrets
+
+        from comfy_armory import (
+            assert_registered_weapon_workflow,
+            authorize_weapon_execution,
+            compile_weapon_workflow,
+            select_weapon,
+        )
+        from comfy_video import download_result, submit, upload_image, wait_for_result
+
+        base_url = self._base_url()
+        if not base_url:
+            raise I2VProviderError("AIFILM_COMFYUI_BASE_URL is required for comfy-h3")
+        out = kwargs.get("out")
+        if not out:
+            raise I2VProviderError("comfy-h3 requires an explicit output path")
+        out_path = Path(out).expanduser().resolve()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        mode = str(kwargs.get("mode") or kwargs.get("operation") or "i2v")
+        intent, weapon_id = self._resolve_weapon(mode)
+        allow_experimental = bool(kwargs.get("allow_experimental", True))
+        stage = str(kwargs.get("production_stage") or "pilot")
+        try:
+            select_weapon(
+                intent,
+                stage=stage,
+                allow_experimental=allow_experimental,
+            )
+            authorize_weapon_execution(
+                weapon_id,
+                stage=stage,
+                allow_experimental=allow_experimental,
+            )
+            input_image_name = kwargs.get("input_image_name")
+            if intent != "text-to-video":
+                if not input_image_name:
+                    remote = upload_image(base_url, Path(keyframe).expanduser().resolve())
+                    input_image_name = remote.get("name") if isinstance(remote, dict) else remote
+                if not input_image_name:
+                    raise I2VProviderError("comfy-h3 failed to resolve uploaded input image name")
+            graph = compile_weapon_workflow(
+                weapon_id,
+                prompt=prompt,
+                seed=int(kwargs.get("seed", 20260803)),
+                input_image_name=str(input_image_name) if input_image_name else None,
+                filename_prefix=str(
+                    kwargs.get("filename_prefix") or f"aifilm/h3/{weapon_id.replace('-', '_')}"
+                ),
+                steps=kwargs.get("steps"),
+            )
+            assert_registered_weapon_workflow(base_url, weapon_id, graph)
+            client_id = f"aifilm-h3-{secrets.token_hex(6)}"
+            prompt_id = submit(
+                base_url,
+                graph,
+                client_id=client_id,
+                weapon_id=weapon_id,
+                allow_queue=bool(kwargs.get("enqueue", False)),
+            )
+            result = wait_for_result(
+                base_url,
+                prompt_id,
+                client_id=client_id,
+                timeout_sec=int(kwargs.get("timeout_sec", 1800)),
+            )
+            artifacts = result.get("artifacts") or []
+            if not artifacts:
+                raise I2VProviderError("comfy-h3 completed without downloadable artifacts")
+            downloaded = download_result(base_url, artifacts[0], out_path)
+        except Exception as exc:
+            raise I2VProviderError(f"comfy-h3 generate failed: {exc}") from exc
+        receipt = {
+            "schema_version": 1,
+            "kind": "local-minimax-h3-generation",
+            "ok": True,
+            "provider": self.name,
+            "weapon_id": weapon_id,
+            "intent": intent,
+            "prompt_id": prompt_id,
+            "output": downloaded,
+            "source_endpoint": (
+                "local_minimax_h3_t2v"
+                if intent == "text-to-video"
+                else "local_minimax_h3_r2v"
+                if intent == "reference-to-video"
+                else "local_minimax_h3_i2v"
+            ),
+        }
+        receipt_path = out_path.with_suffix(out_path.suffix + ".receipt.json")
+        write_json(receipt_path, receipt)
+        return {
+            "provider": self.name,
+            "ok": True,
+            "returncode": 0,
+            "stdout": str(out_path),
+            "stderr": "",
+            "receipt": str(receipt_path),
+            "prompt_id": prompt_id,
+            "weapon_id": weapon_id,
+            "source_endpoint": receipt["source_endpoint"],
+        }
+
+
 # Default registrations (importable side-effect)
 register(GrokI2VProvider())
 register(SeedanceProvider())
 register(FrwImg2VideoProvider())
 register(FrwLtx23AudioProvider())
+register(LocalComfyH3Provider())
