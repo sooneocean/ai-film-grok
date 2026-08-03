@@ -382,8 +382,20 @@ def bulk_preflight(
     return out
 
 
-def assert_bulk_preflight(root: Path | str, *, require: bool = True) -> dict[str, Any]:
-    report = bulk_preflight(root, write=True)
+def assert_bulk_preflight(
+    root: Path | str,
+    *,
+    require: bool = True,
+    probe_tunnel: bool = False,
+    check_lease: bool = False,
+) -> dict[str, Any]:
+    """Fail-closed bulk door. Default skips tunnel/lease (queue-friendly)."""
+    report = bulk_preflight(
+        root,
+        write=True,
+        probe_tunnel=probe_tunnel,
+        check_lease=check_lease,
+    )
     if require and not report.get("ok"):
         raise WorkflowPackError(
             "bulk preflight failed: "

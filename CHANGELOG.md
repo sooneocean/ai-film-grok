@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.31.24] - 2026-08-03
+
+### Changed
+- **Wave G bulk door hard by default:** after user pilot approval, `media-queue add` requires bulk-preflight ok (tunnel/lease not required at enqueue). Escape: `AIFILM_SKIP_BULK_PREFLIGHT=1` or `--allow-without-pilot`. Canary jobs skip. Force always: `--require-preflight`.
+
 ## [2.31.23] - 2026-08-03
 
 ### Added

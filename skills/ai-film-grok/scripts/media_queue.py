@@ -492,15 +492,38 @@ class MediaQueue:
                 assert_heat_allows_media(self.root)
             except ProductionGateError as exc:
                 raise QueueError(str(exc)) from exc
-            # Wave B1: optional bulk-preflight hard gate
-            want_pf = require_preflight or os.environ.get(
+            # Wave G: pilot-approved bulk defaults to bulk-preflight hard gate
+            # (pilot window ≤3 shots without approval stays open; canary/skip env opt-out).
+            skip_pf = os.environ.get("AIFILM_SKIP_BULK_PREFLIGHT", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+            force_pf = require_preflight or os.environ.get(
                 "AIFILM_REQUIRE_BULK_PREFLIGHT", ""
             ).strip().lower() in {"1", "true", "yes", "on"}
-            if want_pf and not allow_without_pilot:
+            pilot_bulk = False
+            try:
+                from production_gates import load_pilot_approval, pilot_is_user_approved
+
+                pilot_bulk = pilot_is_user_approved(load_pilot_approval(self.root))
+            except Exception:
+                pilot_bulk = False
+            want_pf = (force_pf or (pilot_bulk and not is_canary and not skip_pf)) and (
+                not allow_without_pilot
+            )
+            if want_pf:
                 try:
                     from workflow_pack import WorkflowPackError, assert_bulk_preflight
 
-                    assert_bulk_preflight(self.root, require=True)
+                    # queue path: no tunnel/lease — those are bulk-time capacity, not job-enqueue
+                    assert_bulk_preflight(
+                        self.root,
+                        require=True,
+                        probe_tunnel=False,
+                        check_lease=False,
+                    )
                 except WorkflowPackError as exc:
                     raise QueueError(str(exc)) from exc
                 except Exception as exc:  # noqa: BLE001
@@ -959,7 +982,10 @@ def main(argv: list[str] | None = None) -> int:
     add.add_argument(
         "--require-preflight",
         action="store_true",
-        help="Require receipts/bulk-preflight ok (or run it); also AIFILM_REQUIRE_BULK_PREFLIGHT=1",
+        help=(
+            "Force bulk-preflight even outside pilot-approved bulk. "
+            "Default: already hard when pilot user-approved (skip: AIFILM_SKIP_BULK_PREFLIGHT=1)"
+        ),
     )
     add.add_argument(
         "--assembly-receipt", help="Path to prompt_assembly_shot.json receipt for traceability"

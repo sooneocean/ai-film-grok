@@ -1,6 +1,6 @@
 # 流程优化 Todo Plan — 2026-08-03
 
-**Status:** **Wave A–F SHIPPED** (v2.31.20–23)  
+**Status:** **Wave A–G SHIPPED** (v2.31.20–24)  
 **视角：** 你怎么把一集从故事做到桌面成片（不是再拆 CLI 行数）。  
 **前置已完成：** ROI A–E · Process slim P0–P5（v2.31.16–19）  
 **方法：** 7 步主流程 × 近两周片例 PARTIAL × 门禁密度  
@@ -99,6 +99,11 @@
 - [x] dispatch 注入 variety-precheck / bulk-preflight  
 - [x] next_actions bulk 前 bulk-preflight  
 - [x] advance allowlist closeout / bulk-preflight / variety / pilot-pack  
+
+### Wave G — bulk-preflight 默认硬拦 · **DONE (v2.31.24)**
+
+- [x] pilot 已批后 media-queue add 默认 assert_bulk_preflight（无 tunnel/lease）
+- [x] 逃生 AIFILM_SKIP_BULK_PREFLIGHT / allow-without-pilot；canary 跳过
 
 ### Wave E — 明确不做 / 延后
 
