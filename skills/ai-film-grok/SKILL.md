@@ -50,6 +50,7 @@ Professional 11-stage 与八环只保留为内部证据／诊断投影，不要�
 15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
 16. **5090**：未锁视觉走 `weapon_route`；未验 fail closed。
 16b. **5090/OOM**：本机仅 1 个 `comfy_video.py`；禁 `pgrep -f` 自杀；邻镜禁静默顶替。[lesson](references/lessons-2026-07-29-comfy-multifilm-contention-oom.md)
+17. **口型路由**：默认 off（说书）；近景对白必须人工批准后走 RTX `LatentSync 1.6` → `MuseTalk 1.5`，质差禁切 FRW。[lipsync](references/lipsync.md)
 
 ## 阶段
 
