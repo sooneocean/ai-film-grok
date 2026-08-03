@@ -130,8 +130,11 @@ def build_weapon_route(
         if edit_demand
         else "text-to-image"
     )
-    # Local MiniMax H3 motion is pilot/experimental until production promotion.
-    production_stage = "pilot" if (stage == "pilot_approval" or motion_demand) else "production"
+    # H3 film-lane is production-selectable when production_promoted; bulk still
+    # requires user pilot approval via media-queue / h3 film gates (not silent).
+    production_stage = "production" if motion_demand else "production"
+    if stage == "pilot_approval":
+        production_stage = "pilot"
     allow_experimental = bool(motion_demand)
     try:
         route = select_weapon(
@@ -160,6 +163,17 @@ def build_weapon_route(
     pilot_only = bool((weapon.get("capabilities") or {}).get("pilot_only")) or str(
         weapon.get("status") or ""
     ) == "experimental"
+    promoted = bool((weapon.get("verified") or {}).get("production_promoted"))
+    # Motion film-lane: select free, never auto-bulk-execute (queue/h3 run is explicit).
+    auto_execute = (not pilot_only) and not motion_demand
+    film_cli = str((weapon.get("capabilities") or {}).get("film_workflow_cli") or "").strip()
+    if motion_demand and film_cli == "aifilm h3":
+        command = "aifilm h3 plan|run --register"
+    else:
+        command = (
+            f"aifilm comfy route --intent {operation}"
+            + (" --allow-experimental" if pilot_only else "")
+        )
     return {
         **common,
         "status": "ready",
@@ -168,22 +182,25 @@ def build_weapon_route(
         "weapon_id": weapon["id"],
         "provider": str(weapon.get("provider") or "comfy_lan"),
         "source_endpoint": weapon.get("source_endpoint"),
-        "command": (
-            f"aifilm comfy route --intent {operation}"
-            + (" --allow-experimental" if pilot_only else "")
-        ),
+        "command": command,
         "auto_select": True,
-        "auto_execute_when_requested": not pilot_only,
+        "auto_execute_when_requested": auto_execute,
         "requires_live_probe": True,
         "pilot_only": pilot_only,
+        "production_promoted": promoted,
         "pilot_verified": bool((weapon.get("verified") or {}).get("real_pilot")),
         "reason": (
-            "unlocked visual demand maps to the highest-priority local weapon; "
-            "experimental MiniMax H3 motion is pilot-gated and never silent bulk"
-            if pilot_only
+            "unlocked visual demand maps to MiniMax H3 film-lane (hybrid restricted/meat); "
+            "explicit aifilm h3 / media-queue — bulk still needs user pilot approval"
+            if motion_demand and promoted
             else (
-                "unlocked visual demand maps to the highest-priority pilot-verified local weapon; "
-                "the execution command performs current model read-back"
+                "unlocked visual demand maps to the highest-priority local weapon; "
+                "experimental motion is pilot-gated and never silent bulk"
+                if pilot_only
+                else (
+                    "unlocked visual demand maps to the highest-priority pilot-verified local weapon; "
+                    "the execution command performs current model read-back"
+                )
             )
         ),
     }

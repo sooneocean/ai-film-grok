@@ -110,7 +110,7 @@
     },
     {
       "path": "scripts/agent_review_final.py",
-      "sha256": "6aa455d95d46d439700c83e1082674e8448c1926faabda2bd3bff9366825a474"
+      "sha256": "2e6990c6f126b3ed86e339c70d7c109a10d1dfae5964299d39afc12e0e75f19b"
     },
     {
       "path": "scripts/aifilm",
@@ -306,7 +306,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "19205e03de519dbaaad7593ac586f7fe993222f14cf47fb5654fa48732c8ed9f"
+      "sha256": "84ee9854bcfc26ee4219bb911fd517964bed0054d4eb02db269a0ae5ee79bc17"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -382,7 +382,7 @@
     },
     {
       "path": "scripts/cli_workflow.py",
-      "sha256": "ad1992b76f029bc192c1a00a8e95236d63e6f14fcd69c2d228c375a49fefbe09"
+      "sha256": "d7e474fc00bec9b55d0d83064120b687c1ddb7dc88749fd16666b2b98de04e86"
     },
     {
       "path": "scripts/cli_workshop.py",
@@ -394,7 +394,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "50fb81f3f9a16d5489c4380afc468eaff0b50da253d6d9cb88bc391211d1df9a"
+      "sha256": "367d654a0e2d2f46d399807cfd2060643dda77f6ad1cd6a7c2da80e941ebd37f"
     },
     {
       "path": "scripts/cloud_media_download.py",
@@ -406,7 +406,7 @@
     },
     {
       "path": "scripts/comfy_armory.py",
-      "sha256": "f1bcdd2911c8a4d79bf152e0c7ab5a6767510427fa611af616df951492e7d883"
+      "sha256": "b02cbf2bddf6b0df5a773b671f0438098ccfeaadd304a7adce74b86ceb928b38"
     },
     {
       "path": "scripts/comfy_broker_service.py",
@@ -554,7 +554,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "e81c6423924e57925ca1d1750717fbf8519802106b0948149c59144bc91a48cf"
+      "sha256": "95931654704179d82f47b74014009fad6bef2fb2731215bab15d5b6000b0d366"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -670,7 +670,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "336d771b10f9f63a82c5849c63011b6a86af8827b80dd91a144946b1cb43e9bb"
+      "sha256": "d379f4e009577fbf7beb2072584a1a174e88fb9b7f9450e8b948b83f57f7530b"
     },
     {
       "path": "scripts/heat_check.py",
@@ -810,7 +810,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "c8f255e12be30a569f92045901acfff57b41ed3fa48425b3e923a52530399c4e"
+      "sha256": "3d01bd914db75446a9f362574f8d567d89c3f2df07763e08d41e378cfdd5405c"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -1270,7 +1270,7 @@
     },
     {
       "path": "scripts/weapon_router.py",
-      "sha256": "db99f16a4694ecc3ff27f5b23b457f87e7650a5daf92814ac94963be551af593"
+      "sha256": "66f31c9229dbd3b9671fd243663444de9ee8cc1e22ceb64c783d15338cd3d028"
     },
     {
       "path": "scripts/workflow_pack.py",

@@ -107,6 +107,21 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
         action="store_true",
         help="Only write agent-review-final.json (skip final-review-input.assist.json)",
     )
+    ar.add_argument(
+        "--apply",
+        action="store_true",
+        help="After L0 all-pass, run review-final with assist input (needs --reviewer + --user-phrase)",
+    )
+    ar.add_argument(
+        "--user-phrase",
+        default="",
+        help='Verbatim user approval for --apply (e.g. "可以" / "做完"); never invent',
+    )
+    ar.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="With --apply: validate and write apply receipt without running review-final",
+    )
 
 
 def run_workflow_cmd(args: argparse.Namespace) -> int:
@@ -173,22 +188,40 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
             return 0
 
         if cmd == "agent-review-final":
-            from agent_review_final import AgentReviewFinalError, build_agent_review_final
+            from agent_review_final import (
+                AgentReviewFinalError,
+                apply_agent_review_final,
+                build_agent_review_final,
+            )
 
             try:
-                report = build_agent_review_final(
-                    args.root,
-                    reviewer=str(getattr(args, "reviewer", "") or "") or None,
-                    notes=str(getattr(args, "notes", "") or "") or None,
-                    human_minutes=getattr(args, "human_minutes", None),
-                    write=True,
-                    write_assist_input=not bool(getattr(args, "no_assist_input", False)),
-                )
+                if bool(getattr(args, "apply", False)):
+                    report = apply_agent_review_final(
+                        args.root,
+                        reviewer=str(getattr(args, "reviewer", "") or ""),
+                        user_phrase=str(getattr(args, "user_phrase", "") or ""),
+                        notes=str(getattr(args, "notes", "") or "") or None,
+                        human_minutes=getattr(args, "human_minutes", None),
+                        dry_run=bool(getattr(args, "dry_run", False)),
+                    )
+                else:
+                    report = build_agent_review_final(
+                        args.root,
+                        reviewer=str(getattr(args, "reviewer", "") or "") or None,
+                        notes=str(getattr(args, "notes", "") or "") or None,
+                        human_minutes=getattr(args, "human_minutes", None),
+                        write=True,
+                        write_assist_input=not bool(
+                            getattr(args, "no_assist_input", False)
+                        ),
+                    )
             except AgentReviewFinalError as exc:
                 _emit({"ok": False, "error": str(exc), "auto_approved": False})
                 return 2
             _emit(report)
-            # 0 = package written; still never final_complete without human review-final
+            if bool(getattr(args, "apply", False)):
+                return 0 if report.get("ok") else 2
+            # draft-only: 0 = package written; final_complete still needs review-final
             return 0 if report.get("ok") else 2
 
     except WorkflowPackError as exc:

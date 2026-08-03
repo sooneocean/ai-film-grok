@@ -845,8 +845,8 @@
     },
     {
       "id": "minimax-h3-t2v-pilot",
-      "display_name": "MiniMax H3 local text-to-video pilot",
-      "status": "experimental",
+      "display_name": "MiniMax H3 local text-to-video film lane",
+      "status": "verified",
       "priority": 95,
       "provider": "comfy-h3",
       "source_endpoint": "local_minimax_h3_t2v",
@@ -902,17 +902,19 @@
         "native_stereo_audio": true,
         "prefer_native_audio": true,
         "identity_lock_supported": false,
-        "pilot_only": true,
+        "pilot_only": false,
         "human_approval_required": true,
         "external_api_required": false,
-        "film_workflow_cli": "aifilm h3"
+        "film_workflow_cli": "aifilm h3",
+        "film_lane_ready": true,
+        "bulk_requires_pilot_approval": true
       },
       "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json",
       "verified": {
         "real_pilot": true,
         "armory_admitted": true,
         "armory_admitted_at": "2026-08-03",
-        "production_promoted": false,
+        "production_promoted": true,
         "workflow_template_sha256": "e689527dcf5be5ac8e17c80b17e0ecaf80186c6f60d13e27e135d01613547725",
         "output_sha256": "2ed7bbace35cc9953777d92946234f7282f8844d5fa18c4f1cfe9f1834776851",
         "decode_ok": true,
@@ -921,13 +923,15 @@
         "native_audio": "aac_stereo",
         "audio_policy_default": "prefer_native",
         "independent_verifier": "ACCEPT_TECHNICAL_PILOT",
-        "quality_note": "Armory-admitted pilot T2V; film path aifilm h3; not production-promoted bulk"
+        "quality_note": "Production film-lane for hybrid_h3 restricted/meat + explicit local H3; bulk still needs user pilot approval; not silent film-wide default over Grok",
+        "production_promoted_at": "2026-08-03",
+        "production_scope": "hybrid_h3_restricted_and_explicit_local"
       }
     },
     {
       "id": "minimax-h3-i2v-pilot",
-      "display_name": "MiniMax H3 local image-to-video pilot",
-      "status": "experimental",
+      "display_name": "MiniMax H3 local image-to-video film lane",
+      "status": "verified",
       "priority": 96,
       "provider": "comfy-h3",
       "source_endpoint": "local_minimax_h3_i2v",
@@ -987,17 +991,19 @@
         "native_stereo_audio": true,
         "prefer_native_audio": true,
         "identity_lock_supported": true,
-        "pilot_only": true,
+        "pilot_only": false,
         "human_approval_required": true,
         "external_api_required": false,
-        "film_workflow_cli": "aifilm h3"
+        "film_workflow_cli": "aifilm h3",
+        "film_lane_ready": true,
+        "bulk_requires_pilot_approval": true
       },
       "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json",
       "verified": {
         "real_pilot": true,
         "armory_admitted": true,
         "armory_admitted_at": "2026-08-03",
-        "production_promoted": false,
+        "production_promoted": true,
         "workflow_template_sha256": "ae7de7060925cdd6bd2db73775e89fc30b745ecd3680c1236ad929ee9a670974",
         "output_sha256": "c93621704ea871d978789bca3f94532a673b259e1bb89c6dbb9545550c6df812",
         "film_workflow_e2e_output_sha256": "9d975b491ba8b62a568e321f09de493f8629b6c17d2e9c70958ee8ab9c350ed6",
@@ -1008,13 +1014,15 @@
         "audio_policy_default": "prefer_native",
         "native_mean_volume_db_e2e": -19.1,
         "independent_verifier": "ACCEPT_TECHNICAL_PILOT",
-        "quality_note": "Armory-admitted pilot I2V; aifilm h3 run e2e kept prefer_native stereo; not production-promoted bulk"
+        "quality_note": "Production film-lane for hybrid_h3 restricted/meat + explicit local H3; bulk still needs user pilot approval; not silent film-wide default over Grok",
+        "production_promoted_at": "2026-08-03",
+        "production_scope": "hybrid_h3_restricted_and_explicit_local"
       }
     },
     {
       "id": "minimax-h3-r2v-pilot",
-      "display_name": "MiniMax H3 local reference-to-video pilot",
-      "status": "experimental",
+      "display_name": "MiniMax H3 local reference-to-video film lane",
+      "status": "verified",
       "priority": 94,
       "provider": "comfy-h3",
       "source_endpoint": "local_minimax_h3_r2v",
@@ -1070,18 +1078,20 @@
         "native_stereo_audio": true,
         "prefer_native_audio": true,
         "identity_lock_supported": true,
-        "pilot_only": true,
+        "pilot_only": false,
         "human_approval_required": true,
         "external_api_required": false,
         "blocked_until_weights": false,
-        "film_workflow_cli": "aifilm h3"
+        "film_workflow_cli": "aifilm h3",
+        "film_lane_ready": true,
+        "bulk_requires_pilot_approval": true
       },
       "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-armory-intake-20260803.json",
       "verified": {
         "real_pilot": true,
         "armory_admitted": true,
         "armory_admitted_at": "2026-08-03",
-        "production_promoted": false,
+        "production_promoted": true,
         "workflow_template_sha256": "97e2163ea1753f86035650929719a65347ae4c5d56d42b37a99ff3edac6dfc3e",
         "output_sha256": "f6432dcfa6d929e8ba996c9787cbdb9bf3b05771c3d8b9fd8c27d7a6327f1d03",
         "decode_ok": true,
@@ -1091,7 +1101,9 @@
         "audio_policy_default": "prefer_native",
         "independent_verifier": "ACCEPT_TECHNICAL_PILOT",
         "prompt_id": "4bcfee95-a7d8-448d-be8c-832d94bdec81",
-        "quality_note": "Armory-admitted pilot R2V (ref2va); single-ref canary + native AAC; not production-promoted"
+        "quality_note": "Production film-lane for hybrid_h3 restricted/meat + explicit local H3; bulk still needs user pilot approval; not silent film-wide default over Grok",
+        "production_promoted_at": "2026-08-03",
+        "production_scope": "hybrid_h3_restricted_and_explicit_local"
       }
     }
   ],

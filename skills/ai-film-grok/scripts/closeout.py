@@ -127,13 +127,16 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
                 None
                 if gates.get("final_complete")
                 else (
-                    # P1: prefer assist draft (local none); human still runs review-final
+                    # Draft if missing; apply path needs user phrase (shown in human_next)
                     f'aifilm agent-review-final --root "{base}"'
                 )
             ),
             "required_proof": None
             if gates.get("final_complete")
-            else "agent-review-final assist → human review-final (never auto)",
+            else (
+                "agent-review-final → --apply --reviewer … --user-phrase 可以 "
+                "(never forge phrase; technical gates still apply)"
+            ),
         },
         {
             "id": "post_audit",

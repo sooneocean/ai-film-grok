@@ -178,7 +178,7 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
         "allow_bulk": bool(h3.get("allow_bulk")),
         "command": (
             f'aifilm h3 run --root "{base}" --shot-id {shot_id} '
-            f"--mode {mode} --register --allow-experimental"
+            f"--mode {mode} --register"
         ),
     }
 
@@ -333,14 +333,19 @@ def run_h3_shot(
     mode: str | None = None,
     register: bool = False,
     status: str = "candidate",
-    allow_experimental: bool = True,
+    allow_experimental: bool | None = None,
     seed: int = 20260803,
     timeout_sec: int = 1800,
     enqueue_queue: bool = True,
+    production_stage: str | None = None,
 ) -> dict[str, Any]:
     """Generate one H3 clip for a film shot and optionally register it."""
     base = _root(root)
     plan = plan_h3_shot(base, shot_id)
+    # Film-lane default: production when weapon is promoted; experimental only if needed.
+    stage = (production_stage or "production").strip().lower()
+    if allow_experimental is None:
+        allow_experimental = stage == "pilot"
     if mode:
         mode_norm = mode.strip().lower()
         if mode_norm not in {"t2v", "i2v", "r2v"}:
@@ -383,8 +388,8 @@ def run_h3_shot(
         mode=plan["mode"],
         seed=seed,
         timeout_sec=timeout_sec,
-        allow_experimental=allow_experimental,
-        production_stage="pilot",
+        allow_experimental=bool(allow_experimental),
+        production_stage=stage,
         filename_prefix=f"aifilm/h3/{shot_id}",
     )
     if not result.get("ok"):

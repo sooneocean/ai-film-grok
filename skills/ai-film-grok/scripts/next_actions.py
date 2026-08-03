@@ -502,8 +502,8 @@ def build_next_actions(
                 add(
                     "h3-lane",
                     f'aifilm h3 list --root "{r}" && aifilm h3 plan --root "{r}" --shot-id <id> '
-                    f'&& aifilm h3 run --root "{r}" --shot-id <id> --register --allow-experimental',
-                    "hybrid_h3：敏感/肉戏走本地 MiniMax H3（pilot；禁静默 bulk；原声可用则 keep）",
+                    f'&& aifilm h3 run --root "{r}" --shot-id <id> --register',
+                    "hybrid_h3：敏感/肉戏走本地 MiniMax H3 film-lane（片级 pilot 批准后 bulk；原声 prefer_native）",
                 )
             add(
                 "queue-or-register",
@@ -630,6 +630,13 @@ def build_next_actions(
                 )
             else:
                 assist = read_json(root / "receipts" / "agent-review-final.json") or {}
+                if assist.get("all_pass_suggested") is True:
+                    add(
+                        "agent-review-final-apply",
+                        f'aifilm agent-review-final --root "{r}" --apply '
+                        f'--reviewer <you> --user-phrase "可以" --notes "已完整观看"',
+                        "[打通] L0 绿 — 完整观看后一条 --apply（需用户原话，禁 agent 自拟）",
+                    )
                 next_human = str(assist.get("next_cmd") or "").strip()
                 if next_human and "<" not in next_human and "YOU" not in next_human:
                     add(
@@ -640,10 +647,9 @@ def build_next_actions(
                 else:
                     add(
                         "review-final",
-                        f'aifilm review-final --root "{r}" --approve --watched-full '
-                        f'--reviewer YOU --notes "已完整观看" '
-                        f'--review-file "{r}/receipts/final-review-input.assist.json"',
-                        "[P1] assist 草案已在；补 --reviewer 后 review-final（不自批）",
+                        f'aifilm agent-review-final --root "{r}" --apply '
+                        f'--reviewer <you> --user-phrase "可以"',
+                        "[打通] 用 --apply 代替手搓 16 维 score（仍需用户原话）",
                     )
             if assist_stale:
                 add(

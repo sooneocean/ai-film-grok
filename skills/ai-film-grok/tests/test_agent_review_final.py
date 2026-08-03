@@ -138,6 +138,48 @@ class AgentReviewFinalCore(unittest.TestCase):
                 build_agent_review_final(root)
 
 
+class AgentReviewFinalApply(unittest.TestCase):
+    def test_apply_rejects_missing_phrase(self) -> None:
+        from agent_review_final import AgentReviewFinalError, apply_agent_review_final
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_minimal_film(root)
+            with self.assertRaises(AgentReviewFinalError):
+                apply_agent_review_final(root, reviewer="dex", user_phrase="")
+
+    def test_apply_rejects_forged_agent_phrase(self) -> None:
+        from agent_review_final import AgentReviewFinalError, apply_agent_review_final
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_minimal_film(root)
+            with self.assertRaises(AgentReviewFinalError):
+                apply_agent_review_final(
+                    root, reviewer="dex", user_phrase="agent self-approve"
+                )
+
+    def test_apply_dry_run_with_ok_phrase(self) -> None:
+        from agent_review_final import apply_agent_review_final
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_minimal_film(root)
+            report = apply_agent_review_final(
+                root,
+                reviewer="dex",
+                user_phrase="可以",
+                notes="已完整观看",
+                dry_run=True,
+            )
+            self.assertTrue(report["ok"])
+            self.assertFalse(report["applied"])
+            self.assertTrue(report["dry_run"])
+            self.assertFalse(report["auto_forged"])
+            self.assertTrue((root / "receipts" / "agent-review-final-apply.json").is_file())
+            self.assertTrue((root / "receipts" / "final-review-input.assist.json").is_file())
+
+
 class AgentReviewFinalPolicy(unittest.TestCase):
     def test_dispatch_policy_local_none(self) -> None:
         act = structured_next_action(

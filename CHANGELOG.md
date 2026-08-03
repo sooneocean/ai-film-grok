@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.31.34] - 2026-08-03
+
+### Changed
+- **MiniMax H3 film-lane open (打通):** `minimax-h3-{t2v,i2v,r2v}-pilot` → `status=verified` + `production_promoted=true`.
+- Production armory select works without `--allow-experimental` (incl. adult-meat-motion-i2v).
+- `aifilm h3 run` defaults to `--stage production`; weapon_router points motion demand to `aifilm h3`.
+- **Bulk still requires user pilot approval** (auto_execute stays false for motion).
+
+### Tests
+- Armory/weapon_router tests updated for film-lane promotion.
+
+## [2.31.33] - 2026-08-03
+
+### Added
+- **打通路径:** `aifilm agent-review-final --apply --reviewer … --user-phrase "可以"` rebuilds L0 assist and runs `review-final --review-file` in one step.
+- Phrase gate reuses pilot whitelist (`可以`/`ok`/`做完`/`一路做完`); agent-forged phrases rejected.
+- `--dry-run` validates without calling review-final; receipt `agent-review-final-apply.json`.
+
+### Changed
+- next/closeout point humans at `--apply` instead of hand-typing 16 score flags.
+- Still fail-closed on review-final technical/editorial gates; never silent auto-approve.
+
 ## [2.31.32] - 2026-08-03
 
 ### Added

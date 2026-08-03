@@ -35,7 +35,18 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     run.add_argument("--mode", choices=["t2v", "i2v", "r2v"], default=None)
     run.add_argument("--register", action="store_true")
     run.add_argument("--status", default="candidate", choices=["candidate", "approved", "rejected"])
-    run.add_argument("--allow-experimental", action="store_true", default=True)
+    run.add_argument(
+        "--allow-experimental",
+        action="store_true",
+        default=False,
+        help="Only needed for non-promoted experimental weapons (H3 film-lane is production)",
+    )
+    run.add_argument(
+        "--stage",
+        choices=["production", "pilot"],
+        default="production",
+        help="Armory execution stage (default production for promoted H3 film-lane)",
+    )
     run.add_argument("--seed", type=int, default=20260803)
     run.add_argument("--timeout", type=int, default=1800)
     run.add_argument("--no-queue", action="store_true")
@@ -60,10 +71,11 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 mode=args.mode,
                 register=bool(args.register),
                 status=str(args.status),
-                allow_experimental=bool(args.allow_experimental),
+                allow_experimental=bool(args.allow_experimental) or None,
                 seed=int(args.seed),
                 timeout_sec=int(args.timeout),
                 enqueue_queue=not bool(args.no_queue),
+                production_stage=str(getattr(args, "stage", None) or "production"),
             )
         else:
             raise H3WorkflowError(f"unknown h3 action: {action}")

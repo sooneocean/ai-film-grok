@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import contextlib
 import shlex
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,7 @@ from util import read_json, sha256_file, utc_now, write_json
 
 RECEIPT_REL = Path("receipts/agent-review-final.json")
 ASSIST_INPUT_REL = Path("receipts/final-review-input.assist.json")
+APPLY_RECEIPT_REL = Path("receipts/agent-review-final-apply.json")
 
 # Dimensions with direct machine-readable proxies on the film root.
 _OBJECTIVE: frozenset[str] = frozenset(
@@ -513,10 +516,16 @@ def build_agent_review_final(
         "reviewer_bound": bool(rev),
         "next_cmd": cmd,
         "human_next": (
-            "完整观看成片后执行 next_cmd（或 review-final --review-file assist）；"
-            "本命令绝不自动 --approve"
+            f'aifilm agent-review-final --root "{base}" --apply '
+            f'--reviewer <你> --user-phrase "可以" --notes "已完整观看"'
             if all_pass
             else "L0 有红项：先按 fail_reasons 修片，再重跑 agent-review-final"
+        ),
+        "apply_cmd": (
+            f'aifilm agent-review-final --root "{base}" --apply '
+            f'--reviewer REVIEWER --user-phrase "可以" --notes "已完整观看"'
+            if all_pass
+            else None
         ),
         "receipt_path": str(base / RECEIPT_REL),
         "assist_input_path": str(assist_path) if assist_path else None,
@@ -543,3 +552,112 @@ def agent_review_stale(root: Path | str) -> bool:
     if not final:
         return True
     return str((rec.get("final") or {}).get("sha256") or "") != str(final.get("sha256") or "")
+
+
+def apply_agent_review_final(
+    root: Path | str,
+    *,
+    reviewer: str,
+    user_phrase: str,
+    notes: str | None = None,
+    human_minutes: float | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """One-shot: rebuild assist + run review-final when user phrase is real approval.
+
+    Still fail-closed on technical gates inside review-final. Never forges a
+    phrase; never applies without ``user_phrase_is_approval``.
+    """
+    from pilot_review import user_phrase_is_approval
+
+    base = _root(root)
+    rev = (reviewer or "").strip()
+    phrase = (user_phrase or "").strip()
+    if not rev:
+        raise AgentReviewFinalError("--apply requires --reviewer (human name)")
+    if not phrase or not user_phrase_is_approval(phrase):
+        raise AgentReviewFinalError(
+            "--apply requires a verbatim user approval phrase "
+            '(e.g. "可以" / "ok" / "做完" / "一路做完"); agent must not invent one'
+        )
+
+    note_text = (notes or "").strip() or f"已完整观看；用户原话确认：{phrase}"
+    draft = build_agent_review_final(
+        base,
+        reviewer=rev,
+        notes=note_text,
+        human_minutes=human_minutes,
+        write=True,
+        write_assist_input=True,
+    )
+    if not draft.get("all_pass_suggested"):
+        raise AgentReviewFinalError(
+            "assist scorecard is not all-pass; fix L0 fail_reasons before --apply"
+        )
+    if not draft.get("objective_all_pass"):
+        raise AgentReviewFinalError("objective L0 not green; refuse --apply")
+    assist_path = draft.get("assist_input_path")
+    if not assist_path or not Path(str(assist_path)).is_file():
+        raise AgentReviewFinalError("assist input JSON missing after rebuild")
+
+    argv = [
+        str(Path(sys.executable).resolve()),
+        str(Path(__file__).with_name("aifilm_grok.py").resolve()),
+        "review-final",
+        "--root",
+        str(base),
+        "--review-file",
+        str(assist_path),
+    ]
+    payload: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "agent-review-final-apply",
+        "at": utc_now(),
+        "root": str(base),
+        "reviewer": rev,
+        "user_phrase": phrase,
+        "assist_input_path": str(assist_path),
+        "draft_receipt": draft.get("receipt_path"),
+        "all_pass_suggested": True,
+        "objective_all_pass": True,
+        "dry_run": dry_run,
+        "auto_forged": False,
+        "argv": argv[2:],
+    }
+    if dry_run:
+        payload["ok"] = True
+        payload["applied"] = False
+        payload["note"] = "dry-run only; review-final not executed"
+        write_json(base / APPLY_RECEIPT_REL, payload)
+        return payload
+
+    process = subprocess.run(
+        argv,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    payload["returncode"] = process.returncode
+    payload["stdout_tail"] = (process.stdout or "")[-3000:]
+    payload["stderr_tail"] = (process.stderr or "")[-3000:]
+    payload["ok"] = process.returncode == 0
+    payload["applied"] = process.returncode == 0
+    if process.returncode == 0:
+        payload["note"] = (
+            "review-final accepted assist package; final_complete depends on gates"
+        )
+    else:
+        payload["error"] = (
+            "review-final rejected assist (technical/editorial gates still apply). "
+            "Inspect stderr_tail; fix then re-run --apply."
+        )
+    write_json(base / APPLY_RECEIPT_REL, payload)
+    # refresh main assist receipt with apply pointer
+    main = read_json(base / RECEIPT_REL) or {}
+    if isinstance(main, dict):
+        main["apply_receipt"] = str(base / APPLY_RECEIPT_REL)
+        main["last_apply_ok"] = payload["ok"]
+        main["last_apply_at"] = payload["at"]
+        write_json(base / RECEIPT_REL, main)
+    return payload

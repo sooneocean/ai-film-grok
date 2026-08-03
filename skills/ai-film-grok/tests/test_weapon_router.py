@@ -74,7 +74,7 @@ def test_non_visual_stage_does_not_route_weapon(tmp_path: Path) -> None:
     assert route["demand_detected"] is False
 
 
-def test_bulk_motion_demand_routes_h3_experimental_pilot(tmp_path: Path) -> None:
+def test_bulk_motion_demand_routes_h3_film_lane(tmp_path: Path) -> None:
     route = build_weapon_route(
         tmp_path,
         workflow=_workflow("bulk"),
@@ -84,12 +84,15 @@ def test_bulk_motion_demand_routes_h3_experimental_pilot(tmp_path: Path) -> None
     assert route["status"] == "ready"
     assert route["weapon_id"] == "minimax-h3-i2v-pilot"
     assert route["provider"] == "comfy-h3"
-    assert route["pilot_only"] is True
+    assert route["pilot_only"] is False
+    assert route["production_promoted"] is True
+    # Explicit film path — never silent auto bulk execute
     assert route["auto_execute_when_requested"] is False
-    assert "allow-experimental" in route["command"]
+    assert "aifilm h3" in route["command"]
+    assert "allow-experimental" not in route["command"]
 
 
-def test_adult_bulk_motion_routes_h3_but_stays_pilot_gated(tmp_path: Path) -> None:
+def test_adult_bulk_motion_routes_h3_film_lane_no_auto_bulk(tmp_path: Path) -> None:
     (tmp_path / "film-spec.json").write_text(
         json.dumps({"genre": "adult"}),
         encoding="utf-8",
@@ -104,7 +107,8 @@ def test_adult_bulk_motion_routes_h3_but_stays_pilot_gated(tmp_path: Path) -> No
     assert route["status"] == "ready"
     assert route["weapon_id"] == "minimax-h3-i2v-pilot"
     assert route["operation"] == "adult-meat-motion-i2v"
-    assert route["pilot_only"] is True
+    assert route["pilot_only"] is False
+    assert route["production_promoted"] is True
     assert route["auto_execute_when_requested"] is False
 
 

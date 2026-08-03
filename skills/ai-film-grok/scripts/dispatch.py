@@ -457,8 +457,8 @@ def build_dispatch(
             if craft_stage in {"shots", "media"}:
                 pre(
                     "hybrid-h3-lanes",
-                    f"# Dual lane (profile={i2v_profile}): bulk Grok media-queue · restricted/meat → aifilm h3 plan|run --register (comfy-h3 pilot ≤8s; prefer_native audio; no silent H3 bulk)",
-                    "云 bulk 仍 Grok；敏感/肉戏 soft-lock 本地 MiniMax H3 pilot；原声可用则保留",
+                    f"# Dual lane (profile={i2v_profile}): bulk Grok media-queue · restricted/meat → aifilm h3 plan|run --register (comfy-h3 film-lane ≤8s; prefer_native; pilot approval for bulk)",
+                    "云 bulk 仍 Grok；敏感/肉戏 soft-lock 本地 MiniMax H3 film-lane；原声可用则保留",
                     "visual",
                 )
         else:

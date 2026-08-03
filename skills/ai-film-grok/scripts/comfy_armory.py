@@ -107,12 +107,9 @@ def select_weapon(
     normalized_stage = str(stage).strip().lower()
     if normalized_stage not in {"pilot", "production"}:
         raise ComfyArmoryError(f"unsupported production stage: {stage}")
-    # Local Wan 2.2 I2V remains retired. MiniMax H3 experimental pilots own the
-    # local motion intents when registered; production still requires promotion.
-    if normalized == "adult-meat-motion-i2v" and normalized_stage == "production":
-        raise ComfyArmoryError(
-            "no promoted local weapon meets the adult meat-motion production gate"
-        )
+    # Local Wan 2.2 I2V remains retired. MiniMax H3 owns local motion intents
+    # when production-promoted (hybrid restricted/meat + explicit aifilm h3).
+    # Unpromoted experimental H3 still requires --allow-experimental at pilot.
     if normalized in {
         "image-to-video",
         "i2v",
@@ -126,11 +123,22 @@ def select_weapon(
         "minimax-h3-t2v",
         "minimax-h3-i2v",
         "minimax-h3-r2v",
-    } and normalized_stage == "pilot" and not allow_experimental:
-        raise ComfyArmoryError(
-            "local MiniMax H3 motion pilot requires explicit experimental authorization "
-            "(--allow-experimental) until a weapon is production-promoted"
+    }:
+        promoted = any(
+            str(item.get("id") or "").startswith("minimax-h3-")
+            and (item.get("verified") or {}).get("production_promoted") is True
+            and str(item.get("status") or "") in _VERIFIED_STATUSES
+            for item in load_armory()["weapons"]
         )
+        if not promoted and normalized_stage == "pilot" and not allow_experimental:
+            raise ComfyArmoryError(
+                "local MiniMax H3 motion pilot requires explicit experimental authorization "
+                "(--allow-experimental) until a weapon is production-promoted"
+            )
+        if not promoted and normalized == "adult-meat-motion-i2v" and normalized_stage == "production":
+            raise ComfyArmoryError(
+                "no promoted local weapon meets the adult meat-motion production gate"
+            )
     if normalized in {
         "talking-avatar-stable-pilot",
         "talking-avatar-expressive-pilot",

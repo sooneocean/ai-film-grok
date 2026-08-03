@@ -38,7 +38,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **动作供应商**：`grok_primary` 云主链：**Grok I2V → FRW API I2V → FRW LTX 2.3**（对白锁 LTX 有声）。**`hybrid_h3`**：bulk 仍 Grok；restricted/肉戏 soft-lock **本地 MiniMax H3**（`comfy-h3` pilot，禁静默 bulk；`aifilm h3 plan|run`）。禁 Seedance 与 Wan 2.2 本地 I2V。H3 **原声可用则保留**（`prefer_native`）；仅不可用或显式 `strip_native_use_tts_bgm` 才走 Edge TTS/rnb。
+7. **动作供应商**：`grok_primary` 云主链：**Grok I2V → FRW API I2V → FRW LTX 2.3**（对白锁 LTX 有声）。**`hybrid_h3`**：云 bulk 仍 Grok；restricted/肉戏 soft-lock **本地 MiniMax H3 film-lane**（`comfy-h3` verified；`aifilm h3 plan|run`，无需 experimental 旗；**bulk 仍要用户 pilot 批准**）。禁 Seedance 与 Wan 2.2 本地 I2V。H3 **原声可用则保留**（`prefer_native`）。
 8. **声线**：口白中文 Edge；角色日文 Edge；字幕中文。禁无 speaker 中日乒乓、说书 `nar_ja`、清空日文轨。BGM=rnb；缺已批 edit/bridge 则 `final` 阻塞。[BGM](references/bgm-generation.md)
 9. **成人 MAX**：肉戏≥50%、亲密≥60%、setup≤20%；extreme；四拍+bare；impact≥A；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V、毒 clip 禁 final。
