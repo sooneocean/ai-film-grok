@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.38.2] - 2026-08-04
+
+### Fixed / Added (human-safe ship-prep + fill-idle cycle)
+- **ship-prep**: multi-take **defers promote** by default (was mean-auto-promoting before human PK). Escape `AIFILM_SHIP_PROMOTE_FORCE=1`.
+- **pk-compare**: writes `receipts/pk-dailies.md`.
+- **`aifilm h3 cycle`**: evidence → run-next → evidence → pk peek (never promote).
+- **next_actions**: Fill-Idle points at `h3 cycle --execute --max 5`.
+- Tests: promote defer · cycle dry.
+
 ## [2.38.1] - 2026-08-04
 
 ### Changed (C1/C2 CLI post extract + hotpath + INDEX)

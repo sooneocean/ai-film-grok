@@ -1031,16 +1031,52 @@ def ship_prep(
             }
         )
 
-    sel = select_shortlist(root, write=write, promote=promote, measure_missing=measure)
+    # 2.38.2 · human-safe: never mean-promote multi-take before PK (unless force)
+    force_promote = os.environ.get("AIFILM_SHIP_PROMOTE_FORCE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    # Peek multi-take cheaply (takes dirs only) before any promote write
+    multi_take_peek = False
+    takes_root = root / "takes"
+    if takes_root.is_dir():
+        for shot_dir in takes_root.iterdir():
+            if not shot_dir.is_dir():
+                continue
+            n = sum(
+                1
+                for p in shot_dir.rglob("*")
+                if p.is_file() and p.suffix.lower() in {".mp4", ".webm", ".mov"}
+            )
+            if n >= 2:
+                multi_take_peek = True
+                break
+    promote_effective = bool(promote)
+    promote_deferred = False
+    if promote and multi_take_peek and not force_promote:
+        promote_effective = False
+        promote_deferred = True
+
+    sel = select_shortlist(
+        root, write=write, promote=promote_effective, measure_missing=measure
+    )
     steps.append(
         {
             "id": "select_shortlist",
             "ok": True,
             "detail": (
                 f"shots={len(sel.get('shots') or [])} promoted={len(sel.get('promoted') or [])}"
+                + ("; multi-take → promote deferred for human PK" if promote_deferred else "")
             ),
-            "next_cmd": None,
+            "next_cmd": (
+                f'aifilm select-shortlist --root "{root}" --promote  # after human PK'
+                if promote_deferred
+                else None
+            ),
             "promoted": sel.get("promoted") or [],
+            "promote_deferred_human_pk": promote_deferred,
         }
     )
 
@@ -1065,7 +1101,7 @@ def ship_prep(
         try:
             from h3_fill_idle import next_fill_idle_job, pk_compare
 
-            pk = pk_compare(root, measure_missing=False)
+            pk = pk_compare(root, measure_missing=False, write_dailies=write)
             multi = [
                 s
                 for s in (pk.get("shots") or [])
@@ -1081,6 +1117,7 @@ def ship_prep(
                         "recommended_lane": rec.get("lane"),
                         "recommended_mean": rec.get("mean"),
                         "recommended_path": rec.get("path"),
+                        "pk_score": rec.get("pk_score"),
                         "caution": list(s.get("caution") or []),
                     }
                 )
@@ -1094,6 +1131,7 @@ def ship_prep(
                         "human_required": True,
                         "multi_take_count": len(multi),
                         "shots": human_rows,
+                        "dailies_path": str(root / "receipts" / "pk-dailies.md"),
                         "note": "advisory only — human select-shortlist --promote / pk-ledger",
                     },
                 )
@@ -1110,12 +1148,15 @@ def ship_prep(
                     ),
                     "next_cmd": (
                         f'aifilm h3 pk-compare --root "{root}"; '
-                        f'aifilm select-shortlist --root "{root}"  # then human --promote'
+                        f'aifilm select-shortlist --root "{root}" --promote  # human OK only'
                         if multi
                         else None
                     ),
                     "multi_take_count": len(multi),
                     "shots": human_rows,
+                    "dailies_path": (
+                        str(root / "receipts" / "pk-dailies.md") if multi and write else None
+                    ),
                 }
             )
             # Pending Fill-Idle work (P0 meat still not burned) — advisory only
@@ -1266,7 +1307,9 @@ def ship_prep(
         ),
         "human_pk_required": any(
             s.get("id") == "pk_compare" and s.get("human_required") for s in steps
-        ),
+        )
+        or promote_deferred,
+        "promote_deferred_human_pk": promote_deferred,
     }
     if write:
         write_json(root / "receipts" / "ship-prep.json", out)

@@ -159,6 +159,21 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     evidence.add_argument("--notes", default="")
     evidence.add_argument("--receipt", type=Path, default=None)
 
+    cycle = actions.add_parser(
+        "cycle",
+        help="Fill-Idle one cycle: evidence → run-next → evidence → pk peek (never promote)",
+    )
+    cycle.add_argument("--root", type=Path, required=True)
+    cycle.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually run H3 jobs (default dry: only plan + evidence)",
+    )
+    cycle.add_argument("--max", type=int, default=5, dest="max_jobs")
+    cycle.add_argument("--no-challenge", action="store_true")
+    cycle.add_argument("--notes", default="")
+    cycle.add_argument("--receipt", type=Path, default=None)
+
 
 def run_h3(args: argparse.Namespace) -> dict[str, Any]:
     action = str(args.h3_action)
@@ -221,6 +236,16 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
 
             report = write_fill_idle_evidence(
                 args.root,
+                notes=str(getattr(args, "notes", "") or ""),
+            )
+        elif action == "cycle":
+            from h3_fill_idle import fill_idle_cycle
+
+            report = fill_idle_cycle(
+                args.root,
+                execute=bool(getattr(args, "execute", False)),
+                max_jobs=int(getattr(args, "max_jobs", 5) or 5),
+                include_challenge=not bool(getattr(args, "no_challenge", False)),
                 notes=str(getattr(args, "notes", "") or ""),
             )
         elif action == "run":

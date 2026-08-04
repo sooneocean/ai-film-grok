@@ -982,11 +982,13 @@ class MediaQueue:
         if endpoint in {"image_to_video", "reference_to_video"} and media.is_file():
             try:
                 sid = str(job.get("shot_id") or "")
-                contract = job.get("generation_contract") if isinstance(job.get("generation_contract"), dict) else {}
+                contract = (
+                    job.get("generation_contract")
+                    if isinstance(job.get("generation_contract"), dict)
+                    else {}
+                )
                 provider = str(
-                    (contract or {}).get("provider")
-                    or job.get("provider")
-                    or ""
+                    (contract or {}).get("provider") or job.get("provider") or ""
                 ).lower()
                 params = (
                     contract.get("parameters")

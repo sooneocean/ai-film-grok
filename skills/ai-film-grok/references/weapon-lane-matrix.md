@@ -69,13 +69,13 @@ aifilm comfy capacity                # ready · VRAM≥24GiB · queue idle
 aifilm h3 list --root "<film>"                    # P0 primary（restricted）
 aifilm h3 list --root "<film>" --challenge        # + P1/P2 Fill-Idle 挑战队列
 aifilm h3 next --root "<film>"                    # 下一条 + capacity_ready（P0→P1→P2 mean 最低）
-aifilm h3 run-next --root "<film>" --execute [--max 5]  # P2=pilot；换模 free-memory；非 daemon
-aifilm h3 pk-compare --root "<film>" [--shot-id]       # pk_score 复合分 + dailies_md（禁 auto promote）
-aifilm h3 evidence --root "<film>"                     # Wave α 指标收据 fill-idle-evidence.json
-aifilm h3 pk-ledger --root "<film>" [--append …]       # 人审账本
-aifilm ship-prep --root "<film>"                       # 挂 human_pk_required
-# baseline: takes/ 或 manifest.clips；Grok complete → takes/<id>/grok_*
-# dual 粘连；I2V 够强可跳过盲 R2V（显式 h3_prefer:dual 除外）
+aifilm h3 cycle --root "<film>" --execute --max 5      # 一循环 evidence→run-next→pk（禁 promote）
+aifilm h3 run-next --root "<film>" --execute [--max 5] # P2=pilot；换模 free-memory；非 daemon
+aifilm h3 pk-compare --root "<film>"                   # pk_score + receipts/pk-dailies.md
+aifilm h3 evidence --root "<film>"                     # fill-idle-evidence.json
+aifilm ship-prep --root "<film>"                       # 多 take 自动 defer promote（人审后再 --promote）
+# baseline: takes/ 或 manifest.clips；Grok → takes/<id>/grok_*
+# dual 粘连；够动可停盲 R2V
 aifilm h3 plan --root "<film>" --shot-id shot03
 aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --no-queue
 # restricted 误入 Grok queue → QueueError；逃生 AIFILM_ALLOW_CLOUD_RESTRICTED=1

@@ -323,6 +323,18 @@ def test_evidence_writes_receipt(tmp_path: Path) -> None:
     assert (root / "receipts" / "fill-idle-evidence.json").is_file()
 
 
+def test_cycle_dry_never_promote(tmp_path: Path) -> None:
+    from h3_fill_idle import fill_idle_cycle
+
+    root = _film(tmp_path)
+    rep = fill_idle_cycle(root, execute=False, max_jobs=2, notes="dry")
+    assert rep["ok"] is True
+    assert rep["execute"] is False
+    assert rep["run"]["skipped_reason"] == "dry_run_pass_execute"
+    assert "never auto-promote" in (rep.get("note") or "")
+    assert (root / "receipts" / "fill-idle-evidence.json").is_file()
+
+
 def test_cli_pk_ledger_parses() -> None:
     parser = build_parser()
     a = parser.parse_args(

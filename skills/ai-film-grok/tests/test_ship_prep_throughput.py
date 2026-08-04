@@ -168,6 +168,59 @@ class ShipPrepTests(unittest.TestCase):
             self.assertGreaterEqual(int(pk.get("multi_take_count") or 0), 1)
             self.assertTrue(rep.get("human_pk_required"))
             self.assertTrue((root / "receipts" / "pk-compare-ship-prep.json").is_file())
+            self.assertTrue((root / "receipts" / "pk-dailies.md").is_file())
+
+    def test_ship_prep_defers_promote_on_multi_take(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write(
+                root,
+                "film-spec.json",
+                {
+                    "title": "defer",
+                    "heat_scale": "soft",
+                    "h3": {"enabled": True},
+                    "director_intent": {"protagonist_want": "x"},
+                    "scenes": [
+                        {
+                            "shots": [
+                                {
+                                    "id": "s1",
+                                    "shot_role": "hero",
+                                    "heat_phase": "setup",
+                                    "dramatic_function": "reaction",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            )
+            takes = root / "takes" / "s1"
+            takes.mkdir(parents=True)
+            a = takes / "grok_a.mp4"
+            b = takes / "h3_i2v_b.mp4"
+            a.write_bytes(b"\x00" * 120_000)
+            b.write_bytes(b"\x00" * 150_000)
+            write_mean_sidecar(a, 12.0)
+            write_mean_sidecar(b, 22.0)
+            _write(root, "manifest.json", {"clips": {}, "stills": {}})
+            with mock.patch(
+                "workflow_pack.variety_precheck",
+                return_value={"ok": True, "issues": []},
+            ), mock.patch(
+                "cli_motion.i2v_motion_gate_from_rows",
+                return_value={"ok": True, "row_count": 1},
+            ), mock.patch(
+                "workflow_pack.film_core_closeout_audit",
+                return_value={"ok": True, "issues": []},
+            ):
+                # promote=True would mean-auto-pick H3 — multi-take must defer
+                rep = ship_prep(root, measure=False, promote=True, skip_variety=True)
+            self.assertTrue(rep.get("promote_deferred_human_pk"))
+            self.assertTrue(rep.get("human_pk_required"))
+            man = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            # deferred → clips not auto-written by promote
+            self.assertFalse(bool((man.get("clips") or {}).get("s1")))
 
     def test_ship_prep_steps_and_blocks_on_variety(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

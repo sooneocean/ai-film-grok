@@ -18,6 +18,8 @@
 - baseline mean ≥ floor+6 → 可不进 P2（省队列）。
 
 ## 检查清单
+- [ ] `aifilm h3 cycle --root --execute --max 5`（2.38.2 一循环）
+- [ ] multi-take 时 ship-prep **不**静默 promote
 - [ ] `aifilm h3 evidence --root` 写 metrics
 - [ ] `h3 run-next --execute --max 5`（P2=pilot；换模 free-memory）
 - [ ] `h3 pk-compare` 看 `pk_score` + `dailies_md`

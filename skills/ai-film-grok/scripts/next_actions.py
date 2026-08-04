@@ -502,15 +502,13 @@ def build_next_actions(
             if h3_enabled:
                 add(
                     "h3-fill-idle",
-                    f'aifilm comfy free-memory --confirm; aifilm h3 next --root "{r}"',
-                    "Fill-Idle：aifilm h3 next（P0→P1→P2 mean最低）；再 h3 run；pk-compare 仅建议",
+                    f'aifilm h3 cycle --root "{r}" --execute --max 5',
+                    "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）",
                 )
                 add(
                     "h3-lane",
-                    f'aifilm comfy free-memory --confirm; aifilm h3 list --root "{r}" '
-                    f'&& aifilm h3 plan --root "{r}" --shot-id <id> '
-                    f'&& aifilm h3 run --root "{r}" --shot-id <id> --register',
-                    "hybrid_h3：list 带 mode；plan.command / command_alt；续镜 continue；bulk 要 pilot",
+                    f'aifilm h3 list --root "{r}" --challenge; aifilm h3 next --root "{r}"',
+                    "hybrid_h3：list/next 看 P0–P2；dual 粘连；P2=pilot",
                 )
             add(
                 "queue-or-register",
@@ -538,7 +536,7 @@ def build_next_actions(
             add(
                 "ship-prep",
                 f'aifilm ship-prep --root "{r}"',
-                "clips 齐 — ship-prep：means→variety→shortlist→motion-gate→film_core",
+                "clips 齐 — ship-prep：多 take 会 defer promote，等人 PK 后再 --promote",
             )
         elif gate_rec.get("ok") is not True:
             add(

@@ -29,7 +29,13 @@ PRIORITY_RANK = {
 
 # Dual second leg sorts ahead of other same-rank pending (γ2 stickiness)
 _DUAL_STICKY_REASONS = frozenset(
-    {"dual_need_r2v", "dual_need_i2v", "dual_need_second_mode", "dual_second_leg_r2v", "dual_second_leg_i2v"}
+    {
+        "dual_need_r2v",
+        "dual_need_i2v",
+        "dual_need_second_mode",
+        "dual_second_leg_r2v",
+        "dual_second_leg_i2v",
+    }
 )
 
 _H3_NAME_MARKERS = ("h3", "minimax", "r2v", "local_minimax", "comfy-h3", "ref2va", "fl2va")
@@ -780,8 +786,8 @@ def _soft_identity_penalty(
             if not frame.is_file():
                 return penalty, caution
             try:
-                from PIL import Image
                 import numpy as np
+                from PIL import Image
 
                 a = np.asarray(Image.open(still).convert("L").resize((64, 64)), dtype=float)
                 b = np.asarray(Image.open(frame).convert("L").resize((64, 64)), dtype=float)
@@ -822,9 +828,7 @@ def score_take_for_pk(
         lane_bonus = 1.0
     elif lane == "grok":
         lane_bonus = 0.5
-    id_pen, id_caut = _soft_identity_penalty(
-        root, shot_id, str(take.get("path") or ""), lane=lane
-    )
+    id_pen, id_caut = _soft_identity_penalty(root, shot_id, str(take.get("path") or ""), lane=lane)
     score = motion_pts + lane_bonus - id_pen
     caution = list(id_caut)
     if mean is not None and mean_f + 1e-9 < floor_f:
@@ -845,6 +849,7 @@ def pk_compare(
     *,
     shot_id: str | None = None,
     measure_missing: bool = False,
+    write_dailies: bool = True,
 ) -> dict[str, Any]:
     """Multi-take machine recommendation only — never writes preferred/promote."""
     base = _root(root)
@@ -864,7 +869,7 @@ def pk_compare(
         man = read_json(base / "manifest.json") or {}
         clips = man.get("clips") if isinstance(man, dict) else {}
         if isinstance(clips, dict):
-            found.update(str(k) for k in clips.keys())
+            found.update(str(k) for k in clips)
         shot_ids = sorted(found)
 
     shot_map = {str(s.get("id")): s for s in _iter_shots(spec)}
@@ -891,9 +896,7 @@ def pk_compare(
         best = _best_mean(takes)
         below_probe, floor = _motion_below_floor(sh, best)
         del below_probe
-        scored = [
-            score_take_for_pk(t, floor=floor, root=base, shot_id=sid) for t in takes
-        ]
+        scored = [score_take_for_pk(t, floor=floor, root=base, shot_id=sid) for t in takes]
         scored.sort(
             key=lambda x: (
                 -float(x.get("pk_score") or 0.0),
@@ -921,9 +924,7 @@ def pk_compare(
             if alt is not None:
                 caution.append("recommended_downgraded_identity")
                 recommended = alt
-                caution = list(recommended.get("pk_caution") or []) + [
-                    "identity_prefer_safer_take"
-                ]
+                caution = list(recommended.get("pk_caution") or []) + ["identity_prefer_safer_take"]
         rows.append(
             {
                 "shot_id": sid,
@@ -957,6 +958,14 @@ def pk_compare(
         )
         dailies_lines.append(f"  path: {rec.get('path')}")
 
+    dailies_md = "\n".join(dailies_lines) + "\n"
+    dailies_path = base / "receipts" / "pk-dailies.md"
+    if write_dailies and rows:
+        try:
+            dailies_path.parent.mkdir(parents=True, exist_ok=True)
+            dailies_path.write_text(dailies_md, encoding="utf-8")
+        except OSError:
+            pass
     return {
         "schema_version": 1,
         "kind": "ai-film-h3-pk-compare",
@@ -966,10 +975,70 @@ def pk_compare(
         "count": len(rows),
         "shots": rows,
         "policy": "machine_suggest_human_promote",
-        "dailies_md": "\n".join(dailies_lines) + "\n",
+        "dailies_md": dailies_md,
+        "dailies_path": str(dailies_path) if write_dailies and rows else None,
         "next_cmd": (
-            f'aifilm select-shortlist --root "{base}"  # review then --promote' if rows else None
+            f'aifilm select-shortlist --root "{base}" --promote  # review then promote'
+            if rows
+            else None
         ),
+    }
+
+
+def fill_idle_cycle(
+    root: Path | str,
+    *,
+    execute: bool = False,
+    max_jobs: int = 5,
+    include_challenge: bool = True,
+    notes: str = "",
+) -> dict[str, Any]:
+    """One agent-facing cycle: evidence → run-next (optional) → evidence again → pk peek.
+
+    Never auto-promotes. Not a daemon (``max_jobs`` capped by run_next).
+    """
+    base = _root(root)
+    before = write_fill_idle_evidence(base, notes=f"cycle-before {notes}".strip())
+    run_rep = run_next_fill_idle(
+        base,
+        include_challenge=include_challenge,
+        execute=bool(execute),
+        max_jobs=int(max_jobs or 5),
+        free_memory_on_mode_switch=True,
+    )
+    after = write_fill_idle_evidence(base, notes=f"cycle-after {notes}".strip())
+    pk = pk_compare(base, measure_missing=False, write_dailies=True)
+    multi = sum(1 for s in (pk.get("shots") or []) if int(s.get("take_count") or 0) >= 2)
+    return {
+        "schema_version": 1,
+        "kind": "ai-film-fill-idle-cycle",
+        "ok": bool(run_rep.get("ok") is not False),
+        "root": str(base),
+        "execute": bool(execute),
+        "before": before.get("metrics"),
+        "run": {
+            "jobs_ran": run_rep.get("jobs_ran"),
+            "skipped_reason": run_rep.get("skipped_reason"),
+            "next_after": run_rep.get("next_after"),
+            "command_after": run_rep.get("command_after"),
+            "capacity_ready": (run_rep.get("next_report") or {}).get("capacity_ready"),
+        },
+        "after": after.get("metrics"),
+        "pk_multi_take": multi,
+        "dailies_path": pk.get("dailies_path"),
+        "human_next": (
+            [
+                f'aifilm h3 pk-compare --root "{base}"',
+                f'aifilm select-shortlist --root "{base}" --promote  # only after human OK',
+                f'aifilm ship-prep --root "{base}"',
+            ]
+            if multi
+            else [
+                f'aifilm h3 run-next --root "{base}" --execute --max {max_jobs}',
+                f'aifilm ship-prep --root "{base}"',
+            ]
+        ),
+        "note": "never auto-promote; cycle is scheduling + evidence only",
     }
 
 
