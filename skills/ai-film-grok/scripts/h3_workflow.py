@@ -840,67 +840,106 @@ def register_h3_clip(
     }
 
 
-def list_h3_eligible_shots(root: Path | str) -> dict[str, Any]:
-    """List shots that hybrid/H3 intent would send to local MiniMax.
+def list_h3_eligible_shots(
+    root: Path | str,
+    *,
+    include_challenge: bool = False,
+    include_done: bool = False,
+) -> dict[str, Any]:
+    """List H3 jobs: primary restricted by default; ``include_challenge`` adds Fill-Idle P2.
 
-    Each row includes max-effect mode (I2V/R2V/T2V) so agents do not default
-    every meat plate to soft I2V.
+    Each row includes max-effect mode (I2V/R2V/T2V) + Fill-Idle priority (P0a–P2).
     """
+    from h3_fill_idle import build_fill_idle_queue
+
     base = _root(root)
-    spec = _load_spec(base)
+    queue = build_fill_idle_queue(
+        base,
+        include_challenge=include_challenge,
+        include_done=include_done,
+    )
+    if not queue.get("ok"):
+        return {
+            "schema_version": 1,
+            "kind": "ai-film-h3-eligible-shots",
+            "ok": False,
+            "error": queue.get("error"),
+            "count": 0,
+            "shots": [],
+            "policy": "h3_max_effect_v1+fill_idle_v1",
+        }
+
+    # Shape rows for backward-compatible consumers + new priority fields
     rows = []
-    for shot in _iter_shots(spec):
-        sid = str(shot.get("id") or "")
-        intent = build_shot_intent(spec, shot)
-        if not (
-            intent.get("recommended_provider") == "comfy-h3"
-            or intent.get("provider_lock") == "comfy-h3"
-        ):
+    for row in queue.get("shots") or []:
+        if not include_challenge and not row.get("primary_h3"):
             continue
-        still = _approved_still(base, sid)
-        cont = resolve_continue_handoff(base, sid, shot=shot, spec=spec)
-        has_still = still is not None or (
-            bool(cont.get("ok"))
-            and bool(cont.get("end_frame"))
-            and bool(cont.get("wants_continue"))
-        )
-        mode_res = resolve_h3_mode(
-            shot,
-            intent=intent,
-            has_still=has_still,
-            wants_continue=bool(cont.get("wants_continue")),
-        )
-        mode = str(mode_res.get("mode") or "i2v")
+        if not include_done and row.get("status") in {"done", "skip", "poison_blocked"}:
+            # primary pending/retry only when not include_done
+            if row.get("status") != "retry":
+                if not row.get("command"):
+                    continue
+        sid = row["shot_id"]
+        mode = row.get("mode") or "i2v"
         rows.append(
             {
                 "shot_id": sid,
-                "content_class": intent.get("content_class"),
-                "provider_lock": intent.get("provider_lock"),
+                "content_class": row.get("content_class"),
+                "provider_lock": row.get("provider_lock"),
                 "mode": mode,
-                "mode_reasons": list(mode_res.get("reasons") or []),
-                "alt_mode": mode_res.get("alt_mode"),
-                "alt_reasons": list(mode_res.get("alt_reasons") or []),
-                "weapon_id": mode_res.get("weapon_id") or intent.get("recommended_weapon"),
-                "recommended_weapon": mode_res.get("weapon_id") or intent.get("recommended_weapon"),
-                "audio_policy": intent.get("audio_policy"),
-                "has_still": bool(has_still),
-                "spoken_text": bool(intent.get("spoken_text")),
-                "motion_tier": intent.get("motion_tier"),
-                "command": (
-                    f'aifilm h3 run --root "{base}" --shot-id {sid} --mode {mode} --register'
-                ),
+                "mode_reasons": list(row.get("mode_reasons") or []),
+                "alt_mode": row.get("alt_mode"),
+                "alt_reasons": list(row.get("alt_reasons") or []),
+                "weapon_id": row.get("weapon_id"),
+                "recommended_weapon": row.get("weapon_id"),
+                "audio_policy": None,
+                "has_still": row.get("has_still"),
+                "spoken_text": row.get("spoken_text"),
+                "motion_tier": row.get("motion_tier"),
+                "command": row.get("command")
+                or f'aifilm h3 run --root "{base}" --shot-id {sid} --mode {mode} --register',
+                "command_alt": row.get("command_alt"),
+                # Fill-Idle
+                "priority": row.get("priority"),
+                "priority_rank": row.get("priority_rank"),
+                "lane": row.get("lane"),
+                "status": row.get("status"),
+                "primary_h3": row.get("primary_h3"),
+                "fill_reasons": list(row.get("reasons") or []),
+                "best_mean": row.get("best_mean"),
+                "below_floor": row.get("below_floor"),
+                "take_count": row.get("take_count"),
+                "has_h3_take": row.get("has_h3_take"),
             }
         )
+
+    # re-sort (queue already sorted; filter may have changed)
+    rows.sort(
+        key=lambda r: (
+            int(r.get("priority_rank") or 99),
+            float(r["best_mean"])
+            if r.get("priority") == "P2" and r.get("best_mean") is not None
+            else 0.0,
+            str(r.get("shot_id") or ""),
+        )
+    )
+    pending = [r for r in rows if r.get("command") and r.get("status") not in {"done", "skip"}]
     return {
         "schema_version": 1,
         "kind": "ai-film-h3-eligible-shots",
         "ok": True,
         "count": len(rows),
-        "policy": "h3_max_effect_v1",
+        "pending_count": len(pending),
+        "by_priority": queue.get("by_priority"),
+        "next": queue.get("next") if include_challenge else (pending[0] if pending else None),
+        "policy": "h3_max_effect_v1+fill_idle_v1",
+        "include_challenge": include_challenge,
         "shots": rows,
         "ops_reminder": [
             "aifilm comfy free-memory --confirm  # before mode switch",
             "I2V lock face · R2V energy/mouth · T2V faceless only",
+            "Fill-Idle: P0 primary → P1 weak → P2 challenge (lowest mean first)",
             "continue → endframe I2V; bulk needs pilot approve",
+            "PK: aifilm h3 pk-compare then human select-shortlist --promote",
         ],
     }

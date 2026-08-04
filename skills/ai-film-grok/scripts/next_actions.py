@@ -41,6 +41,7 @@ _ACTION_STAGE: dict[str, str] = {
     "pilot-approve": "agent",
     "director-notes": "visual",
     "queue-or-register": "visual",
+    "h3-fill-idle": "visual",
     "h3-lane": "visual",
     "pilot-window": "visual",
     "tts-rehearse": "voice",
@@ -500,13 +501,16 @@ def build_next_actions(
                 h3_enabled = False
             if h3_enabled:
                 add(
+                    "h3-fill-idle",
+                    f'aifilm comfy free-memory --confirm; aifilm h3 next --root "{r}"',
+                    "Fill-Idle：aifilm h3 next（P0→P1→P2 mean最低）；再 h3 run；pk-compare 仅建议",
+                )
+                add(
                     "h3-lane",
                     f'aifilm comfy free-memory --confirm; aifilm h3 list --root "{r}" '
                     f'&& aifilm h3 plan --root "{r}" --shot-id <id> '
                     f'&& aifilm h3 run --root "{r}" --shot-id <id> --register',
-                    "hybrid_h3：list 已带 max-effect 模式（I2V锁脸/R2V高动大嘴/T2V无脸）；"
-                    "plan.mode 可直接 run；能量不够用 plan.command_alt 或 --mode r2v；"
-                    "续镜 chain_mode=continue；原声 prefer_native；bulk 要 pilot 批",
+                    "hybrid_h3：list 带 mode；plan.command / command_alt；续镜 continue；bulk 要 pilot",
                 )
             add(
                 "queue-or-register",

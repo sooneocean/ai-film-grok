@@ -306,7 +306,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "9514b5d9ca5d967756f1329b57cada92a10afaf9b0d7de0d2d0eaae2bb813b7d"
+      "sha256": "d23ee914f012b2bf8916ca8e1af3338b6867b2de7ec3d1c222721eebdd7a2ffa"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -677,12 +677,16 @@
       "sha256": "cc6b88ddd18877fede38d2377b5489fda3e7f89a84f41502ba05a166350f3529"
     },
     {
+      "path": "scripts/h3_fill_idle.py",
+      "sha256": "d857ab471ba5a8e1adeff671c75f1358ba80c756f6963b6fe83aa778b42fcd10"
+    },
+    {
       "path": "scripts/h3_mode.py",
       "sha256": "af4e33908634b7b3ce23cd3f8fb380768c7476a30597b6c3f3f00900e8422a77"
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "8159bc9c652a72030fc3e8f4c027f91ae6e85addd4ad2800a76e33e5a5f869c4"
+      "sha256": "07e132f225b290380bf58aa8d2210e7ea279f778b263dc14d4b7a6adebd16fb7"
     },
     {
       "path": "scripts/heat_check.py",
@@ -826,7 +830,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "15c620a26ac17d95e5b2b310751d5cbf1d50ed1c981f29d8bc9d493b17e34acb"
+      "sha256": "50954fbbb4db41f4d39fa214732fd0f0a5bffbb13dc473a55b876aed03e730ce"
     },
     {
       "path": "scripts/node/backend_probe.py",

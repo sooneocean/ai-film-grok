@@ -10,7 +10,7 @@
 ## 三句话
 1. **Grok 铺 soft baseline**；**restricted 主轨 H3**；5090 **P0→P1→P2 填空**（空闲挑战 Grok，禁抢 P0）。
 2. **R2V 占满能量位**（大嘴/高难/I2V 静）；锁脸与续镜 **I2V**；不是全片默认 R2V。
-3. **PK**：shortlist 机读建议 → **人 promote**；final **不**等 P2 烧完。
+3. **PK**：`h3 next`/`pk-compare` 机读建议 → **人** `select-shortlist --promote`；final **不**等 P2 烧完。
 
 ## 补定策（用户 agree all · 2026-08-04）
 1. **P2 排序**：同级填空按 **mean 最低优先**（最弱 Grok 先挑战）；并列再按时间轴。
@@ -18,6 +18,8 @@
 3. **跨集**：R2V/I2V 胜率 **不** 自动跨集复用；人记 / 片级 dailies 即可。
 
 ## 检查清单
+- [ ] `aifilm h3 next --root` / `h3 list --challenge` 看 P0→P2
+- [ ] `aifilm h3 pk-compare --root` 只建议，禁静默 promote
 - [ ] 非 restricted：Grok 先有 take；H3 作挑战（P2）
 - [ ] restricted：`h3 list` P0 先于任何 P2
 - [ ] 续镜只 I2V 末帧；能量镜跟 list 的 r2v/alt

@@ -157,7 +157,7 @@ class PlanListH3ModeTests(unittest.TestCase):
             meat = report["shots"][0]
             self.assertIn(meat["mode"], {"i2v", "r2v"})
             self.assertIn("--mode", meat["command"])
-            self.assertEqual(report.get("policy"), "h3_max_effect_v1")
+            self.assertIn("h3_max_effect_v1", str(report.get("policy") or ""))
 
 
 if __name__ == "__main__":

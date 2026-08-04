@@ -66,7 +66,10 @@
 ```bash
 aifilm comfy free-memory --confirm   # 换模式 / 开跑前
 aifilm comfy capacity                # ready · VRAM≥24GiB · queue idle
-aifilm h3 list --root "<film>"       # 应走 H3 的镜（restricted 为主）
+aifilm h3 list --root "<film>"                    # P0 primary（restricted）
+aifilm h3 list --root "<film>" --challenge        # + P1/P2 Fill-Idle 挑战队列
+aifilm h3 next --root "<film>"                    # 下一条命令（P0→P1→P2 mean 最低）
+aifilm h3 pk-compare --root "<film>" [--shot-id]  # 多 take 机读建议（禁自动 promote）
 aifilm h3 plan --root "<film>" --shot-id shot03
 aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --no-queue
 # restricted 误入 Grok queue → QueueError；逃生 AIFILM_ALLOW_CLOUD_RESTRICTED=1

@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.37.5] - 2026-08-04
+
+### Added (Fill-Idle machine queue · H3 next/pk)
+- **`scripts/h3_fill_idle.py`**: P0a–P2 challenge queue (restricted primary first; P2 lowest mean); `next_fill_idle_job` + `pk_compare` (never auto-promote).
+- **CLI**: `aifilm h3 list --challenge` · `aifilm h3 next` · `aifilm h3 pk-compare`.
+- **next_actions**: surfaces `h3 next` Fill-Idle step when hybrid_h3.
+- **SKILL.md** under 6k budget (P0 action line compact).
+- Tests: `tests/test_h3_fill_idle.py` · `tests/test_fill_idle.py`; h3 list policy assert allows fill_idle suffix.
+
+### Docs
+- memory fill-idle checklist machine commands; weapon-lane pointer if needed.
+
 ## [2.37.4] - 2026-08-04
 
 ### Docs (Fill-Idle · Grok baseline + H3 challenge)
