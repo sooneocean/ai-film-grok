@@ -322,7 +322,7 @@
     },
     {
       "path": "scripts/cli_media.py",
-      "sha256": "f9deddd28e601e9b87dac4c03add635a01344bca8fc25d76d07d2d14dedb47ea"
+      "sha256": "57165b37921176f7176b0a6fa305cc55b45751b0cf6e635561001734d4bbd3ba"
     },
     {
       "path": "scripts/cli_motion.py",

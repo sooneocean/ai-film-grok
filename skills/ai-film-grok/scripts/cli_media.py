@@ -969,7 +969,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         from quality_gates import shot_role
         from true_video_policy import TrueVideoPolicyError, assert_hero_clip_source
 
-        role = shot_role(root, str(args.shot_id))
+        role = shot_role(root, str(getattr(args, "shot_id", "") or ""))
         tags = getattr(args, "tags", None)
         tag_list = [str(t) for t in tags] if isinstance(tags, (list, tuple)) else []
         assert_hero_clip_source(

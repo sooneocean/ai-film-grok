@@ -45,7 +45,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 10. **字幕**：`caption_mode`+`caption_text` 中文；`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)；Ship=PIL 像素硬烧。
 11. **后期单责**：title/sub/end 正式链单引擎；plate 默认可 `subs=off`（plate-cards blank 字已硬烧或 HF 后烧）。[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)
 11b. **连载**：`serial validate`；圣经/事件/钩子可审计。[workflow](references/serial-narrative-workflow.md)
-12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐；**`cinematic-gate` 绿** 才桌面 export。
+12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐；**`gate-auto`/`cinematic-gate` 绿** 才桌面 export（机读过闸，禁人工点闸循环）。
 13. **安全**：凭据本机；日志禁 token/prompt；外部不自动重试花费。
 14. **高动**：mean≥18、肉戏≥20；桌面 final 仅 motion-gate ok。
 15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
@@ -53,7 +53,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 17. **口型**：默认 off；近景对白须人批后 LatentSync→MuseTalk，质差禁切 FRW。[lipsync](references/lipsync.md)
 18. **零旁白 IRON**：`dialogue_drama` 默认 `zero_narration_strict:true`；`nar` 占比硬底 0%；替代=对白/道具特写/Foley。[详情](references/hard-defaults.md)
 19. **DP 光影+5-Track**：景别自动注入焦段/三点式光影/Teal&Orange；对白三相表演（Pre-Speech·口型·Afterglow）；5-Track DX/FX/BG/MX/SUB；-16 LUFS。[optics](references/hollywood-optics-prompts.md)·[5track](references/5track-audio-master.md)
-20. **真片+电影闸（α–ε）**：**运镜只在 Grok I2V / H3 生成视频内**；still 永不进 timeline。`dialogue_drama` 默认 VO-fit；`aifilm cinematic-gate` = true-video+inventory+i2v+variety+five-track。见 [memory](memory/2026-08-04-cinematic-ship-closeout.md)
+20. **真片+电影闸（α–ε + gate-auto）**：**运镜只在 Grok I2V / H3 生成视频内**；still 永不进 timeline。`dialogue_drama` 默认 VO-fit。**`aifilm gate-auto`** 一键机写：mean→i2v-final→sex_sfx→five-track→true-video→variety→cinematic；closeout 红时自动跑。仅 pilot / 多 take PK / review-final 仍须人。见 [memory](memory/2026-08-04-gate-auto.md)·[cinematic-ship](memory/2026-08-04-cinematic-ship-closeout.md)
 
 ## 阶段
 
@@ -70,10 +70,11 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" bulk-preflight --root "<film>"
 # 用户批准后 bulk → 交付闸 → final
 "$AIFILM" ship-prep --root "<film>"
-"$AIFILM" cinematic-gate --root "<film>"
+"$AIFILM" gate-auto --root "<film>"   # 机读过闸（优先于手工 cinematic-gate）
+"$AIFILM" cinematic-gate --root "<film>"  # 只读复核；auto_i2v 默开
 "$AIFILM" final --root "<film>" --post-engine hyperframes --lipsync off --music-mood rnb --tts-backend edge
-"$AIFILM" closeout run --root "<film>"
-"$AIFILM" review-final --root "<film>"
+"$AIFILM" closeout run --root "<film>"   # 红时自动 gate-auto
+"$AIFILM" review-final --root "<film>"   # 仍须人审
 # export-desktop 要求 cinematic-gate + i2v-final-gate + post-audit 齐绿
 ```
 
