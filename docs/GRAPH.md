@@ -169,7 +169,6 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_dispatch_compact.py`
 - `skills/ai-film-grok/tests/test_doctor_readiness.py`
 - `skills/ai-film-grok/tests/test_drama_graph.py`
-- `skills/ai-film-grok/tests/test_dramatic_meaning.py`
 - `skills/ai-film-grok/tests/test_duration_advisory.py`
 - `skills/ai-film-grok/tests/test_edit_edl_merge.py`
 - `skills/ai-film-grok/tests/test_edit_policy.py`
