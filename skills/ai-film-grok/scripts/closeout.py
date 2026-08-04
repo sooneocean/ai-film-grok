@@ -166,8 +166,33 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         steps[0]["next_cmd"] = heat.get("next_cmd") or f'aifilm heat boost --root "{base}" --apply'
         steps[0]["required_proof"] = "heat_agent_status.hard_fail cleared"
 
-    blocked = next((s for s in steps if not s["ok"] and s["id"] != "desktop_exported"), None)
-    delivery_ready = all(s["ok"] for s in steps if s["id"] != "desktop_exported")
+    # P2 film-core audit (advisory — does not block delivery_ready alone)
+    core_audit: dict[str, Any] = {}
+    try:
+        from workflow_pack import film_core_closeout_audit
+
+        core_audit = film_core_closeout_audit(base, write=True)
+        steps.append(
+            {
+                "id": "film_core",
+                "ok": bool(core_audit.get("ok")),
+                "detail": (
+                    "motion core DF/want/dialogue aligned"
+                    if core_audit.get("ok")
+                    else f"issues={len(core_audit.get('issues') or [])}"
+                ),
+                "next_cmd": core_audit.get("next_cmd"),
+                "advisory": True,
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        core_audit = {"ok": True, "skipped": True, "error": str(exc)[:160]}
+
+    blocked = next(
+        (s for s in steps if not s["ok"] and s["id"] not in {"desktop_exported", "film_core"}),
+        None,
+    )
+    delivery_ready = all(s["ok"] for s in steps if s["id"] not in {"desktop_exported", "film_core"})
     export_cmd = f'aifilm export-desktop --root "{base}" --name "{_export_name(base)}"'
     return {
         "kind": "closeout-status",
@@ -176,6 +201,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         "at": utc_now(),
         "ok": blocked is None and delivery_ready,
         "delivery_ready": delivery_ready,
+        "film_core": core_audit,
         "gates": {
             "final_complete": bool(gates.get("final_complete")),
             "desktop_exported": bool(gates.get("desktop_exported")),

@@ -348,6 +348,27 @@ def bulk_preflight(
         note=progress.get("note"),
     )
 
+    # variety (design anti-boring) — hard door for bulk (P1 · 2026-08-04)
+    skip_variety = os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if skip_variety:
+        add("variety", True, skipped=True, escape="AIFILM_SKIP_VARIETY_PREFLIGHT=1")
+    else:
+        try:
+            var_report = variety_precheck(root, write=True)
+            add(
+                "variety",
+                bool(var_report.get("ok")),
+                issue_count=len(var_report.get("issues") or []),
+                issues=[i.get("code") for i in (var_report.get("issues") or [])[:8]],
+            )
+        except Exception as exc:  # noqa: BLE001
+            add("variety", False, error=str(exc)[:240])
+
     failed = [c for c in checks if not c.get("ok")]
     ok = not failed
     next_cmd = None
@@ -363,6 +384,7 @@ def bulk_preflight(
             "tunnel": f"aifilm tunnel-probe --port {tunnel_port}",
             "local_comfy_client": "stop extra comfy_video.py clients (one only)",
             "gpu_lease": f'aifilm gpu-lease status --root "{root}"',
+            "variety": f'aifilm variety-precheck --root "{root}"  # fix ADJACENT_MOTION / poses',
         }
         next_cmd = cmd_map.get(first, f'aifilm bulk-preflight --root "{root}"')
 
@@ -559,6 +581,149 @@ def variety_precheck(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         (root / "receipts" / "variety-matrix.md").write_text(
             out["matrix_md"] + "\n", encoding="utf-8"
         )
+    return out
+
+
+def assert_variety_preflight(
+    root: Path | str,
+    *,
+    require: bool = True,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    """Fail-closed variety door for bulk / H3 register (P1 · 2026-08-04).
+
+    Escape: ``AIFILM_SKIP_VARIETY_PREFLIGHT=1``.
+    Reuses green receipt when film-spec mtime is not newer.
+    """
+    if os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        return {
+            "ok": True,
+            "skipped": True,
+            "escape": "AIFILM_SKIP_VARIETY_PREFLIGHT=1",
+        }
+    root_p = _root(root)
+    receipt_path = root_p / "receipts" / VARIETY_NAME
+    spec_path = root_p / "film-spec.json"
+    if not force_refresh and receipt_path.is_file():
+        cached = read_json(receipt_path) or {}
+        if cached.get("ok") is True:
+            try:
+                rec_mtime = receipt_path.stat().st_mtime
+                spec_mtime = spec_path.stat().st_mtime if spec_path.is_file() else 0.0
+                if rec_mtime + 1e-6 >= spec_mtime:
+                    return {**cached, "reused": True, "source": "receipt"}
+            except OSError:
+                pass
+    report = variety_precheck(root_p, write=True)
+    if require and not report.get("ok"):
+        codes = [str(i.get("code") or "") for i in (report.get("issues") or [])[:6]]
+        raise WorkflowPackError(
+            "variety preflight failed: "
+            + ",".join(codes or ["UNKNOWN"])
+            + f" — next: {report.get('next_cmd')}"
+        )
+    return report
+
+
+def film_core_closeout_audit(root: Path | str, *, write: bool = True) -> dict[str, Any]:
+    """P2 · Audit whether motion clips still carry film core (DF/want/dialogue).
+
+    Does not re-render — reads film-spec + spine receipts + manifest clips.
+    """
+    root_p = _root(root)
+    spec = read_json(root_p / "film-spec.json") or {}
+    man = read_json(root_p / "manifest.json") or {}
+    clips = man.get("clips") if isinstance(man, dict) else {}
+    if not isinstance(clips, dict):
+        clips = {}
+    shots = _shots_from_spec(spec)
+    issues: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
+    di = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+    has_want = bool(
+        str(di.get("protagonist_want") or di.get("want") or di.get("theme") or "").strip()
+    )
+    if not has_want and shots:
+        issues.append(
+            {
+                "code": "CORE_WANT_MISSING",
+                "message": "director_intent lacks protagonist_want/theme — motion spine thin",
+            }
+        )
+    for shot in shots:
+        sid = str(shot.get("id") or "")
+        if not sid:
+            continue
+        df = str(shot.get("dramatic_function") or "").strip()
+        role = str(shot.get("shot_role") or "hero").strip().lower()
+        has_clip = isinstance(clips.get(sid), dict) and clips[sid].get("path")
+        spine_path = root_p / "receipts" / "prompts" / f"{sid}.h3.spine.txt"
+        spine_txt = spine_path.read_text(encoding="utf-8") if spine_path.is_file() else ""
+        row = {
+            "shot_id": sid,
+            "role": role,
+            "dramatic_function": df or None,
+            "has_clip": bool(has_clip),
+            "has_spine_receipt": bool(spine_txt),
+            "spine_has_df": bool(df and df in spine_txt) if spine_txt else None,
+        }
+        rows.append(row)
+        if role == "hero" and has_clip and not df:
+            issues.append(
+                {
+                    "code": "CORE_DF_MISSING",
+                    "shot_id": sid,
+                    "message": f"{sid} hero clip without dramatic_function",
+                }
+            )
+        if has_clip and spine_txt and df and f"Dramatic function: {df}" not in spine_txt:
+            issues.append(
+                {
+                    "code": "CORE_SPINE_DF_DRIFT",
+                    "shot_id": sid,
+                    "message": f"{sid} H3 spine receipt missing DF {df}",
+                }
+            )
+        # dialogue shot must have spoken text in spine if on_camera
+        cues = shot.get("audio_cues") if isinstance(shot.get("audio_cues"), list) else []
+        spoken = ""
+        for c in cues:
+            if (
+                isinstance(c, dict)
+                and c.get("line_type") == "dialogue"
+                and str(c.get("spoken_text") or "").strip()
+            ):
+                spoken = str(c["spoken_text"]).strip()
+                break
+        if spoken and has_clip and spine_txt and spoken not in spine_txt:
+            issues.append(
+                {
+                    "code": "CORE_DIALOGUE_SPINE_MISS",
+                    "shot_id": sid,
+                    "message": f"{sid} dialogue not in H3 spine receipt",
+                }
+            )
+    ok = not issues
+    out = {
+        "schema_version": 1,
+        "kind": "film-core-closeout-audit",
+        "at": utc_now(),
+        "root": str(root_p),
+        "ok": ok,
+        "has_director_want": has_want,
+        "shots": rows,
+        "issues": issues,
+        "next_cmd": (
+            None if ok else f'aifilm write-spec --root "{root_p}"  # fill DF/want then re-h3'
+        ),
+    }
+    if write:
+        write_json(root_p / "receipts" / "film-core-closeout.json", out)
     return out
 
 

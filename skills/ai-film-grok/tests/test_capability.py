@@ -71,12 +71,13 @@ class SuggestI2VTests(unittest.TestCase):
     @pytest.mark.slow
     def test_no_receipt(self) -> None:
         # Grok primary: session image_to_video is available without a FRW canary.
-        s = suggest_i2v_from_canary(None)
-        self.assertFalse(s["has_canary"])
-        self.assertTrue(s["ok"])
-        self.assertEqual(s["patch"].get("i2v_provider"), "grok")
-        self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
-        self.assertTrue(s["recommendations"])
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}):
+            s = suggest_i2v_from_canary(None)
+            self.assertFalse(s["has_canary"])
+            self.assertTrue(s["ok"])
+            self.assertEqual(s["patch"].get("i2v_provider"), "grok")
+            self.assertEqual(s["patch"].get("frw_env_model"), "ltx-t2v")
+            self.assertTrue(s["recommendations"])
 
     @pytest.mark.slow
     def test_summarize(self) -> None:

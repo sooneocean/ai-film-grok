@@ -394,7 +394,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "78986d19d1fcf51bfbf79a27c3379530143846fbde68eead0fd6ed8a8d7c71bd"
+      "sha256": "c0aa9a0fc5ae1a8eea8a9f2f1e200f742b1355df70869a5f85adb820e13ac306"
     },
     {
       "path": "scripts/cloud_media_download.py",
@@ -670,7 +670,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "f2a6b2607791c22a007c25e0683268e277ce3b2ff66107e9345d21364363299c"
+      "sha256": "ee7b10de11c5e264caa25552a4268936bccb11f511a4623646c5722e4c92de79"
     },
     {
       "path": "scripts/heat_check.py",
@@ -678,7 +678,7 @@
     },
     {
       "path": "scripts/i2v_motion_gate.py",
-      "sha256": "ef3ff0de70af2a95d683f5882c7f09352e3f023b8206bf67e69d8549f2852030"
+      "sha256": "7821424d7c837acabdd904a76cab656e0eb56acb6140be6d39a610cd14dede5a"
     },
     {
       "path": "scripts/i2v_provider.py",
@@ -786,7 +786,7 @@
     },
     {
       "path": "scripts/motion_prompt_spine.py",
-      "sha256": "a2bb5602eb8bf7cba7803bd0128c83c82ffc40bd324d26e84f62e9e14bf988d3"
+      "sha256": "29e7176a72ab260da99de0f4f211c42448b3dcb11a380894d586c1896c8ee4f0"
     },
     {
       "path": "scripts/music_cue.py",
@@ -1278,7 +1278,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "efdf5c1806fbaa59cc38df10d1a98f06d0bb7670985f0996438a61be9351f969"
+      "sha256": "e136c9c5c01114bcff2156885771b41bcfb54f1a47204de34277f19d6bd27033"
     },
     {
       "path": "scripts/workflow_spine.py",

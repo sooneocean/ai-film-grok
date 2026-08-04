@@ -55,7 +55,16 @@
         "mute_native",
         null
       ]
-    }
+    },
+    "dramatic_function": { "type": ["string", "null"] },
+    "want_beat": { "type": ["string", "null"] },
+    "motion_tier": { "type": ["string", "null"] },
+    "spoken_text": { "type": ["string", "null"] },
+    "screen_mode": { "type": ["string", "null"] },
+    "speaker": { "type": ["string", "null"] },
+    "has_action_core": { "type": ["boolean", "null"] },
+    "action_summary": { "type": ["string", "null"] },
+    "camera_prompt": { "type": ["string", "null"] }
   },
   "additionalProperties": false
 }

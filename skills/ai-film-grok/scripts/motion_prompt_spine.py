@@ -123,10 +123,16 @@ def dsl_action_parts(shot: dict[str, Any]) -> list[str]:
         val = str(dsl.get(key) or "").strip()
         if val and val.lower() not in {"needs_authoring", "tbd", "todo", "n/a"}:
             parts.append(val)
-    nar = str(shot.get("nar") or "").strip()
-    # Only append short nar as visual fallback when dsl empty (avoid VO dump).
-    if not parts and nar and len(nar) <= 120:
-        parts.append(nar)
+    try:
+        from content_channels import visual_prompt_action
+
+        v_act = visual_prompt_action(shot)
+        if v_act and v_act not in parts:
+            parts.append(v_act)
+    except Exception:
+        nar = str(shot.get("nar") or "").strip()
+        if not parts and nar and len(nar) <= 120:
+            parts.append(nar)
     return parts
 
 

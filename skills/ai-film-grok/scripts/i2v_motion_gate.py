@@ -24,6 +24,9 @@ MEAN_NORMAL_FLOOR = 18.0
 MEAN_MEAT_FLOOR = 20.0
 MEAN_MEAT_TARGET = 24.0
 MEAN_ENVELOPE_FLOOR = 18.0
+# DF-aware floors (P1 · 2026-08-04): reaction/soft may pass with micro-performance
+MEAN_SOFT_FLOOR = 10.0
+MEAN_MEDIUM_FLOOR = 16.0
 
 # Sample geometry documented for mean_absdiff (not enforced here; callers may match)
 MEAN_ABSDIFF_FPS = 5
@@ -31,7 +34,9 @@ MEAN_ABSDIFF_WIDTH = 140
 MEAN_ABSDIFF_HEIGHT = 248
 
 MEAT_PHASES = frozenset({"act", "climax"})
-MOTION_TIERS = frozenset({"meat", "normal"})
+SOFT_DFS = frozenset({"reaction", "afterglow", "bridge", "insert", "sensory"})
+HIGH_DFS = frozenset({"action", "climax", "hook", "impact", "peak"})
+MOTION_TIERS = frozenset({"meat", "high", "normal", "medium", "soft"})
 
 # Source tags that must never count as a passing high-motion take
 FORBIDDEN_SOURCE_TAGS = frozenset(
@@ -50,6 +55,8 @@ FORBIDDEN_SOURCE_TAGS = frozenset(
 
 CODE_MEAT_MEAN_LOW = "I2V_MEAT_MEAN_LOW"
 CODE_NORMAL_MEAN_LOW = "I2V_NORMAL_MEAN_LOW"
+CODE_SOFT_MEAN_LOW = "I2V_SOFT_MEAN_LOW"
+CODE_MEDIUM_MEAN_LOW = "I2V_MEDIUM_MEAN_LOW"
 CODE_FORBIDDEN_SOURCE = "I2V_FORBIDDEN_SOURCE"
 CODE_ENVELOPE_LOW = "I2V_ENVELOPE_MEAN_LOW"
 CODE_RAW_INCOMPLETE = "I2V_RAW_INCOMPLETE"
@@ -65,17 +72,57 @@ def motion_tier_for_phase(heat_phase: str | None) -> str:
     return "normal"
 
 
+def motion_tier_for_shot(
+    *,
+    heat_phase: str | None = None,
+    dramatic_function: str | None = None,
+    spine_tier: str | None = None,
+    wardrobe_state: str | None = None,
+) -> str:
+    """Resolve optical tier from heat + DF + optional spine motion_tier.
+
+    Precedence: bare/act/climax meat → high DF → soft DF → spine soft/medium/high → phase.
+    """
+    heat = str(heat_phase or "").strip().lower()
+    df = str(dramatic_function or "").strip().lower()
+    wardrobe = str(wardrobe_state or "").strip().lower()
+    spine = str(spine_tier or "").strip().lower()
+
+    if wardrobe in {"bare", "undressed", "nude"} or heat in MEAT_PHASES:
+        if df in SOFT_DFS and heat in {"afterglow"}:
+            return "medium"
+        return "meat"
+    if df in HIGH_DFS:
+        return "meat" if df in {"action", "climax", "impact", "peak"} else "high"
+    if df in SOFT_DFS:
+        return "soft"
+    if spine in MOTION_TIERS:
+        # Map spine high → meat floor for optical gate consistency
+        if spine == "high":
+            return "meat"
+        return spine
+    return motion_tier_for_phase(heat)
+
+
 def floor_for_tier(tier: str) -> float:
     t = str(tier or "normal").strip().lower()
-    if t == "meat":
+    if t in {"meat", "high"}:
         return MEAN_MEAT_FLOOR
+    if t == "medium":
+        return MEAN_MEDIUM_FLOOR
+    if t == "soft":
+        return MEAN_SOFT_FLOOR
     return MEAN_NORMAL_FLOOR
 
 
 def target_for_tier(tier: str) -> float:
     t = str(tier or "normal").strip().lower()
-    if t == "meat":
+    if t in {"meat", "high"}:
         return MEAN_MEAT_TARGET
+    if t == "medium":
+        return MEAN_MEDIUM_FLOOR + 2.0
+    if t == "soft":
+        return MEAN_SOFT_FLOOR + 4.0  # soft target ~14 micro-performance
     return MEAN_NORMAL_FLOOR + 2.0  # normal soft target 20
 
 
@@ -122,11 +169,25 @@ def source_is_forbidden(source: str | None, *, tags: list[str] | None = None) ->
     return False
 
 
+def _low_code_for_tier(tier: str) -> str:
+    t = str(tier or "normal").strip().lower()
+    if t in {"meat", "high"}:
+        return CODE_MEAT_MEAN_LOW
+    if t == "soft":
+        return CODE_SOFT_MEAN_LOW
+    if t == "medium":
+        return CODE_MEDIUM_MEAN_LOW
+    return CODE_NORMAL_MEAN_LOW
+
+
 def evaluate_shot_motion(
     mean: float | None,
     *,
     heat_phase: str | None = None,
     tier: str | None = None,
+    dramatic_function: str | None = None,
+    spine_tier: str | None = None,
+    wardrobe_state: str | None = None,
     source: str | None = None,
     source_tags: list[str] | None = None,
     shot_id: str | None = None,
@@ -135,7 +196,15 @@ def evaluate_shot_motion(
 
     Returns stable fields: ok, tier, mean, floor, target, codes, issues.
     """
-    resolved_tier = (tier or motion_tier_for_phase(heat_phase)).strip().lower()
+    if tier:
+        resolved_tier = str(tier).strip().lower()
+    else:
+        resolved_tier = motion_tier_for_shot(
+            heat_phase=heat_phase,
+            dramatic_function=dramatic_function,
+            spine_tier=spine_tier,
+            wardrobe_state=wardrobe_state,
+        )
     if resolved_tier not in MOTION_TIERS:
         resolved_tier = "normal"
     floor = floor_for_tier(resolved_tier)
@@ -162,7 +231,7 @@ def evaluate_shot_motion(
         )
 
     if mean_f is None:
-        code = CODE_MEAT_MEAN_LOW if resolved_tier == "meat" else CODE_NORMAL_MEAN_LOW
+        code = _low_code_for_tier(resolved_tier)
         codes.append(code)
         issues.append(
             {
@@ -172,7 +241,7 @@ def evaluate_shot_motion(
             }
         )
     elif mean_f + 1e-9 < floor:
-        code = CODE_MEAT_MEAN_LOW if resolved_tier == "meat" else CODE_NORMAL_MEAN_LOW
+        code = _low_code_for_tier(resolved_tier)
         codes.append(code)
         issues.append(
             {
@@ -191,6 +260,9 @@ def evaluate_shot_motion(
         "id": shot_id,
         "tier": resolved_tier,
         "heat_phase": (str(heat_phase).strip().lower() if heat_phase else None),
+        "dramatic_function": (
+            str(dramatic_function).strip().lower() if dramatic_function else None
+        ),
         "mean": mean_f,
         "floor": floor,
         "target": target,
@@ -232,6 +304,9 @@ def build_high_motion_audit(
             mean_raw if mean_raw is None else float(mean_raw),
             heat_phase=raw.get("heat_phase") or raw.get("phase"),
             tier=raw.get("tier"),
+            dramatic_function=raw.get("dramatic_function") or raw.get("df"),
+            spine_tier=raw.get("spine_tier") or raw.get("motion_tier"),
+            wardrobe_state=raw.get("wardrobe_state"),
             source=str(raw.get("source") or "") or None,
             source_tags=tag_list,
             shot_id=sid or None,

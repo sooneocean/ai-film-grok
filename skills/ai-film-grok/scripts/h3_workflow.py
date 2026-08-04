@@ -460,6 +460,73 @@ def resolve_h3_deliver_audio(
     }
 
 
+def _write_continue_handoff(
+    root: Path,
+    *,
+    shot_id: str,
+    shot: dict[str, Any],
+    deliver: Path,
+    mode: str,
+    seed: int,
+) -> dict[str, Any]:
+    """Extract end frame + dramatic packet for next-shot I2V continue (P2)."""
+    from motion_prompt_spine import core_fields, dramatic_function_of, heat_phase_of
+
+    handoff_dir = root / "receipts" / "continue-handoff"
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+    end_png = handoff_dir / f"{shot_id}_end.png"
+    meta: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "h3-continue-handoff",
+        "shot_id": shot_id,
+        "mode": mode,
+        "seed": seed,
+        "source_clip": str(deliver),
+        "end_frame": None,
+        "dramatic_function": dramatic_function_of(shot) or None,
+        "heat_phase": heat_phase_of(shot) or None,
+        "core": core_fields(None, shot),
+        "ok": False,
+    }
+    if not deliver.is_file():
+        write_json(handoff_dir / f"{shot_id}.json", meta)
+        return meta
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-sseof",
+                "-0.12",
+                "-i",
+                str(deliver),
+                "-frames:v",
+                "1",
+                "-q:v",
+                "2",
+                str(end_png),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode == 0 and end_png.is_file():
+            meta["end_frame"] = str(end_png)
+            meta["ok"] = True
+            # Convenience copy for next stills/ if author wants
+            stills = root / "stills"
+            stills.mkdir(parents=True, exist_ok=True)
+            # do not overwrite approved stills silently — only write handoff copy
+            meta["note"] = f"For continue: cp {end_png} stills/<next_id>.png then h3 run --mode i2v"
+    except Exception as exc:  # noqa: BLE001
+        meta["error"] = str(exc)[:200]
+    write_json(handoff_dir / f"{shot_id}.json", meta)
+    return meta
+
+
 def run_h3_shot(
     root: Path | str,
     shot_id: str,
@@ -502,6 +569,17 @@ def run_h3_shot(
             f"H3 {plan['mode']} requires an approved still/keyframe for {shot_id}"
         )
 
+    # Variety door when registering candidates (bulk path) — skip via env escape.
+    if register:
+        try:
+            from workflow_pack import WorkflowPackError, assert_variety_preflight
+
+            assert_variety_preflight(base, require=True)
+        except WorkflowPackError as exc:
+            raise H3WorkflowError(str(exc)) from exc
+        except Exception:
+            pass
+
     spec = _load_spec(base)
     shot = _find_shot(spec, shot_id)
     prompt = _prompt_for_shot(base, shot, mode=str(plan["mode"]), spec=spec)
@@ -542,6 +620,16 @@ def run_h3_shot(
     audio_decision = resolve_h3_deliver_audio(geometry_path, plate_out, audio_policy=audio_policy)
     deliver = Path(audio_decision["deliver_path"])
     stripped = bool(audio_decision["audio_stripped"])
+
+    # P2 · dramatic continue handoff (endframe + DF + heat for next shot)
+    handoff = _write_continue_handoff(
+        base,
+        shot_id=shot_id,
+        shot=shot,
+        deliver=deliver,
+        mode=str(plan["mode"]),
+        seed=seed,
+    )
     use_clip_audio = bool(audio_decision["use_clip_audio"])
     audio_policy_effective = str(audio_decision["audio_policy_effective"])
 
@@ -565,6 +653,7 @@ def run_h3_shot(
         "use_clip_audio": use_clip_audio,
         "native_audio_meta": audio_decision.get("native_audio_meta"),
         "prompt_sha256": __import__("hashlib").sha256(prompt.encode("utf-8")).hexdigest(),
+        "continue_handoff": handoff,
     }
     receipt_path = base / "receipts" / f"h3-run-{shot_id}.json"
     write_json(receipt_path, receipt)
