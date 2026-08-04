@@ -978,6 +978,63 @@ class MediaQueue:
             )
         except OSError:
             pass
+        # γ4 · tag Grok I2V outputs into takes/<sid>/grok_* for Fill-Idle lane detect
+        if endpoint in {"image_to_video", "reference_to_video"} and media.is_file():
+            try:
+                sid = str(job.get("shot_id") or "")
+                contract = job.get("generation_contract") if isinstance(job.get("generation_contract"), dict) else {}
+                provider = str(
+                    (contract or {}).get("provider")
+                    or job.get("provider")
+                    or ""
+                ).lower()
+                params = (
+                    contract.get("parameters")
+                    if isinstance(contract, dict) and isinstance(contract.get("parameters"), dict)
+                    else {}
+                )
+                endpoint_name = str(
+                    (params or {}).get("source_endpoint") or job.get("endpoint") or ""
+                ).lower()
+                is_grok = (
+                    "grok" in provider
+                    or "xai" in provider
+                    or "grok" in endpoint_name
+                    or "imagine" in endpoint_name
+                )
+                # Prefer explicit grok markers; avoid re-tagging H3
+                if (
+                    sid
+                    and is_grok
+                    and "h3" not in media.name.lower()
+                    and "minimax" not in media.name.lower()
+                ):
+                    takes_dir = self.root / "takes" / sid
+                    takes_dir.mkdir(parents=True, exist_ok=True)
+                    dest = takes_dir / f"grok_{media.name}"
+                    if not dest.exists() and media.resolve() != dest.resolve():
+                        import shutil
+
+                        try:
+                            dest.hardlink_to(media)
+                        except OSError:
+                            shutil.copy2(media, dest)
+                        # provider sidecar for lane detect
+                        side = Path(str(dest) + ".json")
+                        if not side.is_file():
+                            from util import write_json as _wj
+
+                            _wj(
+                                side,
+                                {
+                                    "provider": "grok",
+                                    "lane": "grok",
+                                    "source_output": str(media),
+                                    "from": "media_queue.complete",
+                                },
+                            )
+            except Exception:
+                pass
         # go4 · Grok bulk continue handoff write (parity H3)
         if endpoint in {"image_to_video", "reference_to_video"}:
             try:

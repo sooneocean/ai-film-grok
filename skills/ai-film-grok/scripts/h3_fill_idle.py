@@ -27,6 +27,11 @@ PRIORITY_RANK = {
     "done": 100,
 }
 
+# Dual second leg sorts ahead of other same-rank pending (γ2 stickiness)
+_DUAL_STICKY_REASONS = frozenset(
+    {"dual_need_r2v", "dual_need_i2v", "dual_need_second_mode", "dual_second_leg_r2v", "dual_second_leg_i2v"}
+)
+
 _H3_NAME_MARKERS = ("h3", "minimax", "r2v", "local_minimax", "comfy-h3", "ref2va", "fl2va")
 _GROK_NAME_MARKERS = ("grok", "imagine", "media-queue", "xai")
 
@@ -383,6 +388,9 @@ def classify_fill_idle_shot(
             # Need both I2V (identity) and R2V (energy) for high-value PK
             has_i2v = "i2v" in h3_modes or ("h3" in h3_modes and "r2v" not in h3_modes)
             has_r2v = "r2v" in h3_modes
+            explicit_dual = _explicit_dual_flag(shot, intent)
+            # γ3: auto-dual only — if I2V already well above floor, skip blind R2V
+            i2v_strong = _i2v_mean_strong_enough(takes, floor=floor, best=best)
             if has_i2v and has_r2v:
                 status = "done"
                 reasons.append("h3_dual_complete")
@@ -390,8 +398,12 @@ def classify_fill_idle_shot(
                 status = "pending"
                 reasons.append("dual_need_i2v")
             elif has_i2v and not has_r2v:
-                status = "pending"
-                reasons.append("dual_need_r2v")
+                if i2v_strong and not explicit_dual:
+                    status = "done"
+                    reasons.append("skip_r2v_i2v_strong_enough")
+                else:
+                    status = "pending"
+                    reasons.append("dual_need_r2v")
             else:
                 status = "pending"
                 reasons.append("dual_need_second_mode")
@@ -413,10 +425,15 @@ def classify_fill_idle_shot(
             priority, lane, status = "P1", "challenge_weak", "retry"
             reasons.append("challenge_below_floor")
         else:
-            priority, lane, status = "P2", "challenge_grok", "pending"
-            reasons.append("fill_idle_challenge")
-            if has_grok or any(t.get("lane") == "unknown" for t in takes):
-                reasons.append("has_baseline_take")
+            # γ3: baseline already strong → skip low-ROI P2 burn
+            if floor is not None and best is not None and float(best) >= float(floor) + 6.0:
+                priority, lane, status = "done", "challenge_grok", "done"
+                reasons.append("skip_p2_baseline_strong")
+            else:
+                priority, lane, status = "P2", "challenge_grok", "pending"
+                reasons.append("fill_idle_challenge")
+                if has_grok or any(t.get("lane") == "unknown" for t in takes):
+                    reasons.append("has_baseline_take")
     elif has_still and not has_any and not primary:
         priority, lane, status = "P3", "skip", "wait_grok_baseline"
         reasons.append("wait_for_grok_baseline")
@@ -491,7 +508,43 @@ def classify_fill_idle_shot(
             if mode_res.get("alt_mode") and cmd
             else None
         ),
+        "dual_sticky": bool(_DUAL_STICKY_REASONS.intersection(reasons)),
     }
+
+
+def _explicit_dual_flag(shot: dict[str, Any], intent: dict[str, Any]) -> bool:
+    prefer = (
+        str(shot.get("h3_prefer") or shot.get("h3_dual") or intent.get("h3_prefer") or "")
+        .strip()
+        .lower()
+    )
+    if prefer in {"dual", "i2v+r2v", "both", "true", "1", "yes"}:
+        return True
+    return bool(shot.get("force_dual") is True or intent.get("force_dual") is True)
+
+
+def _i2v_mean_strong_enough(
+    takes: list[dict[str, Any]],
+    *,
+    floor: float | None,
+    best: float | None,
+) -> bool:
+    """True when an I2V (or generic h3) take is comfortably above motion floor."""
+    if floor is None:
+        return False
+    thr = float(floor) + 4.0
+    for t in takes:
+        if t.get("lane") != "h3":
+            continue
+        blob = str(t.get("path") or "").lower()
+        if "r2v" in blob:
+            continue
+        m = t.get("mean")
+        if m is not None and float(m) >= thr:
+            return True
+    if best is not None and float(best) >= thr + 2.0:
+        return True
+    return False
 
 
 def build_fill_idle_queue(
@@ -547,15 +600,16 @@ def build_fill_idle_queue(
             continue
         rows.append(row)
 
-    # P2 order: mean lowest first; missing mean last within P2
+    # P0 dual sticky first within rank; P2 lowest mean first
     def sort_key(r: dict[str, Any]) -> tuple:
         rank = int(r.get("priority_rank") or 99)
+        sticky = 0 if r.get("dual_sticky") else 1
         mean = r.get("best_mean")
         if r.get("priority") == "P2":
             mean_key = float(mean) if mean is not None else 1e9
         else:
             mean_key = 0.0
-        return (rank, mean_key, str(r.get("shot_id") or ""))
+        return (rank, sticky, mean_key, str(r.get("shot_id") or ""))
 
     rows.sort(key=sort_key)
 
@@ -676,6 +730,116 @@ def next_fill_idle_job(
     }
 
 
+def _soft_identity_penalty(
+    root: Path,
+    shot_id: str,
+    take_path: str,
+    *,
+    lane: str,
+) -> tuple[float, list[str]]:
+    """Best-effort midframe vs still similarity (0=good, higher=worse). Never hard-fails."""
+    caution: list[str] = []
+    penalty = 0.0
+    blob = take_path.lower()
+    if "r2v" in blob or lane == "h3" and "r2v" in blob:
+        penalty += 2.0
+        caution.append("r2v_energy_check_identity")
+    try:
+        from h3_workflow import _approved_still
+
+        still = _approved_still(root, shot_id)
+        if still is None or not Path(take_path).is_file():
+            return penalty, caution
+        # Extract one midframe via ffmpeg when available
+        import shutil
+        import subprocess
+        import tempfile
+
+        if not shutil.which("ffmpeg"):
+            return penalty, caution
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = Path(tmp) / "mid.png"
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-ss",
+                    "0.5",
+                    "-i",
+                    take_path,
+                    "-frames:v",
+                    "1",
+                    str(frame),
+                ],
+                check=False,
+                capture_output=True,
+            )
+            if not frame.is_file():
+                return penalty, caution
+            try:
+                from PIL import Image
+                import numpy as np
+
+                a = np.asarray(Image.open(still).convert("L").resize((64, 64)), dtype=float)
+                b = np.asarray(Image.open(frame).convert("L").resize((64, 64)), dtype=float)
+                l1 = float(np.mean(np.abs(a - b)))
+                # empirical: similar still~clip mid often <25; drift higher
+                if l1 > 45:
+                    penalty += 12.0
+                    caution.append("identity_l1_high")
+                elif l1 > 30:
+                    penalty += 5.0
+                    caution.append("identity_l1_soft")
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return penalty, caution
+
+
+def score_take_for_pk(
+    take: dict[str, Any],
+    *,
+    floor: float | None,
+    root: Path,
+    shot_id: str,
+) -> dict[str, Any]:
+    """Composite advisory score: motion minus identity penalties (β1)."""
+    mean = take.get("mean")
+    mean_f = float(mean) if mean is not None else 0.0
+    floor_f = float(floor) if floor is not None else 18.0
+    motion_pts = mean_f
+    if mean is not None and mean_f + 1e-9 < floor_f:
+        motion_pts -= 15.0  # below floor heavy
+    elif mean is not None:
+        motion_pts += min(8.0, max(0.0, mean_f - floor_f))  # bonus above floor
+    lane = str(take.get("lane") or "unknown")
+    lane_bonus = 0.0
+    if lane == "h3":
+        lane_bonus = 1.0
+    elif lane == "grok":
+        lane_bonus = 0.5
+    id_pen, id_caut = _soft_identity_penalty(
+        root, shot_id, str(take.get("path") or ""), lane=lane
+    )
+    score = motion_pts + lane_bonus - id_pen
+    caution = list(id_caut)
+    if mean is not None and mean_f + 1e-9 < floor_f:
+        caution.append("below_motion_floor")
+    if lane == "h3":
+        caution.append("verify_same_face_before_promote")
+    return {
+        **take,
+        "pk_score": round(score, 3),
+        "pk_motion": round(motion_pts, 3),
+        "pk_identity_penalty": round(id_pen, 3),
+        "pk_caution": caution,
+    }
+
+
 def pk_compare(
     root: Path | str,
     *,
@@ -697,6 +861,10 @@ def pk_compare(
                 if p.is_file() and p.suffix.lower() in {".mp4", ".webm", ".mov"}:
                     sid = p.parent.name if p.parent != takes_root else p.stem.split("_")[0]
                     found.add(sid)
+        man = read_json(base / "manifest.json") or {}
+        clips = man.get("clips") if isinstance(man, dict) else {}
+        if isinstance(clips, dict):
+            found.update(str(k) for k in clips.keys())
         shot_ids = sorted(found)
 
     shot_map = {str(s.get("id")): s for s in _iter_shots(spec)}
@@ -718,26 +886,44 @@ def pk_compare(
                         pass
         if not takes:
             continue
-        scored = sorted(
-            takes,
+        sh = shot_map.get(sid) or {}
+        # floor from best mean first for scoring context
+        best = _best_mean(takes)
+        below_probe, floor = _motion_below_floor(sh, best)
+        del below_probe
+        scored = [
+            score_take_for_pk(t, floor=floor, root=base, shot_id=sid) for t in takes
+        ]
+        scored.sort(
             key=lambda x: (
+                -float(x.get("pk_score") or 0.0),
                 -(float(x["mean"]) if x.get("mean") is not None else -1.0),
                 -int(x.get("bytes") or 0),
-            ),
+            )
         )
         recommended = scored[0]
-        sh = shot_map.get(sid) or {}
-        below, floor = _motion_below_floor(
+        below, floor2 = _motion_below_floor(
             sh, recommended.get("mean") if recommended.get("mean") is not None else None
         )
-        # identity caution when recommended is R2V/H3 energy and baseline is grok
-        caution: list[str] = []
+        floor = floor2 if floor2 is not None else floor
+        caution = list(recommended.get("pk_caution") or [])
         if recommended.get("lane") == "h3" and any(t.get("lane") == "grok" for t in takes):
-            caution.append("verify_same_face_before_promote")
-        if "r2v" in str(recommended.get("path") or "").lower():
-            caution.append("r2v_energy_check_identity")
-        if below:
+            if "verify_same_face_before_promote" not in caution:
+                caution.append("verify_same_face_before_promote")
+        if below and "below_motion_floor" not in caution:
             caution.append("below_motion_floor")
+        # veto recommended if identity_l1_high and another take has lower penalty
+        if "identity_l1_high" in caution and len(scored) > 1:
+            alt = next(
+                (c for c in scored[1:] if "identity_l1_high" not in (c.get("pk_caution") or [])),
+                None,
+            )
+            if alt is not None:
+                caution.append("recommended_downgraded_identity")
+                recommended = alt
+                caution = list(recommended.get("pk_caution") or []) + [
+                    "identity_prefer_safer_take"
+                ]
         rows.append(
             {
                 "shot_id": sid,
@@ -748,9 +934,28 @@ def pk_compare(
                 "floor": floor,
                 "caution": caution,
                 "human_required": True,
-                "note": "advisory only — do not auto-promote; run select-shortlist --promote after human OK",
+                "pk_policy": "composite_motion_minus_identity_v1",
+                "note": (
+                    "advisory only — do not auto-promote; "
+                    "run select-shortlist --promote after human OK"
+                ),
             }
         )
+
+    dailies_lines = [
+        f"# PK dailies · {base.name}",
+        f"shots_with_takes={len(rows)} · human_required=all · never auto-promote",
+        "",
+    ]
+    for r in rows:
+        rec = r.get("recommended") or {}
+        dailies_lines.append(
+            f"- {r['shot_id']}: takes={r['take_count']} "
+            f"rec={rec.get('lane')} mean={rec.get('mean')} "
+            f"pk_score={rec.get('pk_score')} "
+            f"caution={','.join(r.get('caution') or []) or '—'}"
+        )
+        dailies_lines.append(f"  path: {rec.get('path')}")
 
     return {
         "schema_version": 1,
@@ -761,10 +966,63 @@ def pk_compare(
         "count": len(rows),
         "shots": rows,
         "policy": "machine_suggest_human_promote",
+        "dailies_md": "\n".join(dailies_lines) + "\n",
         "next_cmd": (
             f'aifilm select-shortlist --root "{base}"  # review then --promote' if rows else None
         ),
     }
+
+
+def write_fill_idle_evidence(
+    root: Path | str,
+    *,
+    notes: str = "",
+) -> dict[str, Any]:
+    """Wave α · snapshot queue + multi-take stats for film evidence (no GPU)."""
+    base = _root(root)
+    queue = build_fill_idle_queue(base, include_challenge=True, include_done=True)
+    pk = pk_compare(base, measure_missing=False)
+    multi = [s for s in (pk.get("shots") or []) if int(s.get("take_count") or 0) >= 2]
+    pending = [r for r in (queue.get("shots") or []) if r.get("command")]
+    by_pri = queue.get("by_priority") or {}
+    evidence = {
+        "schema_version": 1,
+        "kind": "ai-film-fill-idle-evidence",
+        "ok": True,
+        "at": utc_now(),
+        "root": str(base),
+        "notes": notes,
+        "metrics": {
+            "p0_pending": sum(int(by_pri.get(k) or 0) for k in ("P0a", "P0b", "P0c")),
+            "p1_pending": int(by_pri.get("P1") or 0),
+            "p2_pending": int(by_pri.get("P2") or 0),
+            "pending_jobs": len(pending),
+            "multi_take_shots": len(multi),
+            "by_priority": by_pri,
+        },
+        "checklist": {
+            "fill_p0_first": True,
+            "human_promote_only": True,
+            "final_ok_with_p2_incomplete": True,
+            "film_case_path": str(base),
+        },
+        "next_ops": [
+            f'aifilm h3 run-next --root "{base}" --execute --max 5',
+            f'aifilm ship-prep --root "{base}"',
+            f'aifilm h3 pk-compare --root "{base}"',
+        ],
+        "dailies_md": pk.get("dailies_md"),
+    }
+    path = base / "receipts" / "fill-idle-evidence.json"
+    try:
+        from util import write_json
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, evidence)
+        evidence["path"] = str(path)
+    except Exception as exc:
+        evidence["write_error"] = str(exc)[:160]
+    return evidence
 
 
 def _stage_for_fill_idle_job(nxt: dict[str, Any]) -> str:
@@ -780,6 +1038,33 @@ def _stage_for_fill_idle_job(nxt: dict[str, Any]) -> str:
     return "production"
 
 
+def _maybe_free_memory_for_mode_switch(
+    *,
+    prev_mode: str | None,
+    next_mode: str,
+    enabled: bool,
+) -> dict[str, Any] | None:
+    """γ1 · free Comfy VRAM when switching I2V/R2V/T2V (best-effort)."""
+    if not enabled:
+        return None
+    if prev_mode and prev_mode == next_mode:
+        return {"skipped": True, "reason": "same_mode"}
+    try:
+        import os
+
+        from comfy_video import free_memory, normalize_base_url
+
+        raw = (
+            os.environ.get("AIFILM_COMFYUI_BASE_URL")
+            or os.environ.get("AIFILM_COMFY_BASE_URL")
+            or "http://127.0.0.1:18188"
+        ).strip()
+        base_url = normalize_base_url(raw)
+        return free_memory(base_url)
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)[:200]}
+
+
 def run_next_fill_idle(
     root: Path | str,
     *,
@@ -790,6 +1075,7 @@ def run_next_fill_idle(
     seed: int = 20260804,
     timeout_sec: int = 1800,
     max_jobs: int = 1,
+    free_memory_on_mode_switch: bool = True,
 ) -> dict[str, Any]:
     """Fill-Idle worker: plan next job; optionally run when capacity ready.
 
@@ -813,7 +1099,9 @@ def run_next_fill_idle(
         "skipped_reason": None,
         "run_result": None,
         "next_report": None,
+        "free_memory_on_mode_switch": bool(free_memory_on_mode_switch),
     }
+    prev_mode: str | None = None
 
     for job_i in range(max_jobs):
         nxt_rep = next_fill_idle_job(base, include_challenge=include_challenge, check_capacity=True)
@@ -836,6 +1124,11 @@ def run_next_fill_idle(
         sid = str(nxt.get("shot_id") or "")
         mode = str(nxt.get("mode") or "i2v")
         stage = _stage_for_fill_idle_job(nxt)
+        fm = _maybe_free_memory_for_mode_switch(
+            prev_mode=prev_mode,
+            next_mode=mode,
+            enabled=bool(free_memory_on_mode_switch) and (job_i > 0 or prev_mode is not None),
+        )
         last_out["jobs_attempted"] = int(last_out["jobs_attempted"]) + 1
         try:
             from h3_workflow import run_h3_shot
@@ -851,6 +1144,7 @@ def run_next_fill_idle(
                 enqueue_queue=False,
                 production_stage=stage,
             )
+            prev_mode = mode
             run_row = {
                 "shot_id": sid,
                 "mode": mode,
@@ -859,6 +1153,7 @@ def run_next_fill_idle(
                 "stage": stage,
                 "ok": bool(result.get("ok")),
                 "deliver_path": result.get("deliver_path"),
+                "free_memory": fm,
             }
             runs.append(run_row)
             last_out["ran"] = True

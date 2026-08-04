@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.38.0] - 2026-08-04
+
+### Added (Fill-Idle Wave αβγ · effect optimization)
+- **α evidence**: `aifilm h3 evidence --root` → `receipts/fill-idle-evidence.json` + dailies metrics (no GPU).
+- **β PK quality**: composite `pk_score` (motion − identity penalty); soft midframe L1; `dailies_md`; identity can demote recommended.
+- **β shortlist**: multi-take rows attach `pk_advisory` (never auto-promote).
+- **γ dual sticky**: dual second leg sorts ahead of other same-rank jobs.
+- **γ enough-motion**: skip blind R2V when I2V strong (unless `h3_prefer: dual`); skip P2 when baseline ≥ floor+6.
+- **γ free-memory**: `run-next` frees Comfy VRAM on mode switch (`--no-free-memory` escape).
+- **γ Grok tag**: media-queue complete hardlinks `takes/<sid>/grok_*` when provider is Grok.
+- Tests: pk composite · evidence; fill-idle threshold fixtures.
+
+## [2.37.14] - 2026-08-04
+
+### Changed (C1/C2 CLI post extract + hotpath marker + INDEX)
+- **`cli_post.py`**: extract final / review-final / compose-* / register-final / closeout / export-desktop / post-plan / post-quality (~1.5k LOC); `aifilm_grok` re-exports (public cmds unchanged).
+- **`docs/plans/cli-extract-map.md`** + **`2026-08-04-project-refactor-active.md`** active tracker.
+- **INDEX**: Active P0 lessons block; archive rule pointer.
+- **`@pytest.mark.hotpath`** + **`make test-hotpath`** for final/compose/gates fail-mode suite.
+- Monolith `aifilm_grok.py` ~11200 → ~9650 lines.
+
 ## [2.37.13] - 2026-08-04
 
 ### Changed (P1a · util JSON hotpath)

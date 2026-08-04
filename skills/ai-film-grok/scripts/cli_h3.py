@@ -108,6 +108,11 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
         help="Execute even when capacity probe is not ready",
     )
     run_next.add_argument("--no-register", action="store_true")
+    run_next.add_argument(
+        "--no-free-memory",
+        action="store_true",
+        help="Do not free Comfy VRAM when switching I2V/R2V/T2V mid-batch",
+    )
     run_next.add_argument("--seed", type=int, default=20260804)
     run_next.add_argument("--timeout", type=int, default=1800)
     run_next.add_argument("--receipt", type=Path, default=None)
@@ -146,6 +151,14 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     ledger.add_argument("--note", default="")
     ledger.add_argument("--receipt", type=Path, default=None)
 
+    evidence = actions.add_parser(
+        "evidence",
+        help="Wave α · write fill-idle evidence metrics receipt (no GPU)",
+    )
+    evidence.add_argument("--root", type=Path, required=True)
+    evidence.add_argument("--notes", default="")
+    evidence.add_argument("--receipt", type=Path, default=None)
+
 
 def run_h3(args: argparse.Namespace) -> dict[str, Any]:
     action = str(args.h3_action)
@@ -177,6 +190,7 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 seed=int(getattr(args, "seed", 20260804) or 20260804),
                 timeout_sec=int(getattr(args, "timeout", 1800) or 1800),
                 max_jobs=int(getattr(args, "max_jobs", 1) or 1),
+                free_memory_on_mode_switch=not bool(getattr(args, "no_free_memory", False)),
             )
         elif action == "pk-ledger":
             from h3_fill_idle import append_pk_ledger, load_pk_ledger
@@ -201,6 +215,13 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 args.root,
                 shot_id=getattr(args, "shot_id", None),
                 measure_missing=bool(getattr(args, "measure", False)),
+            )
+        elif action == "evidence":
+            from h3_fill_idle import write_fill_idle_evidence
+
+            report = write_fill_idle_evidence(
+                args.root,
+                notes=str(getattr(args, "notes", "") or ""),
             )
         elif action == "run":
             report = run_h3_shot(

@@ -306,7 +306,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "44aa0ec7f0504d6a801bf2e176f7acb43fa6cc343801b4ca4da3fc025cfb0eef"
+      "sha256": "249eb6785b60279446477415b5eee074edfa7e85c7c83df2b6e9235c6f8daec1"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -682,7 +682,7 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "f77b910d148b500b109268abf68717cb39bcce295a30c9949b4ba4a634198e30"
+      "sha256": "eb2c72b5607a5229e25dfe35f02d47a9c74aa72bdadea2ea7bf5e457e33d0566"
     },
     {
       "path": "scripts/h3_mode.py",
@@ -786,7 +786,7 @@
     },
     {
       "path": "scripts/media_queue.py",
-      "sha256": "fe12c6a1ae515d3043d178c9528bc68e881e7a0a4b698a8afd0a41f1a21e3b70"
+      "sha256": "f7003e05a2d676b1321070309c22da0235cd39804e034367158e62d242f29c42"
     },
     {
       "path": "scripts/mmaudio_adapter.py",
@@ -1298,7 +1298,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "5df6cd9605005e4d0a71eb25de1299e4b82de9b7cb96f7795e605df6de3105a5"
+      "sha256": "9ad5c5c2f72d6a2658b35dedfa17ecc9e9c52eabea46e9d68bccbfcda2a1afaa"
     },
     {
       "path": "scripts/workflow_spine.py",

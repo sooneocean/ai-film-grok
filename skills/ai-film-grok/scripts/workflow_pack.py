@@ -883,6 +883,24 @@ def select_shortlist(
                 below_floor = not bool(ev.get("ok"))
             except Exception:  # noqa: BLE001
                 below_floor = False
+        # β3 · attach pk-compare advisory (never changes preferred selection)
+        pk_note: dict[str, Any] | None = None
+        if len(scored) >= 2:
+            try:
+                from h3_fill_idle import pk_compare as _pk
+
+                pk_one = _pk(root, shot_id=sid, measure_missing=False)
+                shots_pk = pk_one.get("shots") or []
+                if shots_pk:
+                    pk_note = {
+                        "recommended_path": (shots_pk[0].get("recommended") or {}).get("path"),
+                        "pk_score": (shots_pk[0].get("recommended") or {}).get("pk_score"),
+                        "caution": shots_pk[0].get("caution"),
+                        "human_required": True,
+                        "note": "advisory — shortlist preferred may differ; human promotes",
+                    }
+            except Exception:  # noqa: BLE001
+                pk_note = None
         row = {
             "shot_id": sid,
             "take_count": len(scored),
@@ -891,6 +909,7 @@ def select_shortlist(
             "manifest_clip": clips.get(sid),
             "below_floor": below_floor,
             "floor": floor_val,
+            "pk_advisory": pk_note,
         }
         rows.append(row)
 
