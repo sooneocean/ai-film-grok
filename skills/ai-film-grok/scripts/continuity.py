@@ -23,6 +23,7 @@ CODE_FRAME_CHAIN_GAP = "FRAME_CHAIN_GAP"
 CODE_FRAME_CHAIN_ORPHAN = "FRAME_CHAIN_ORPHAN"
 # Meaningful motion: dynamics must carry story (lessons-2026-07-20-meaningful-motion)
 CODE_MOTION_NO_MEANING = "MOTION_NO_MEANING"
+CODE_CAMERA_WITHOUT_EVENT = "CAMERA_WITHOUT_EVENT"
 CODE_BEAT_SEMANTICS_MISS = "BEAT_SEMANTICS_MISS"
 CODE_VISIBLE_CHANGE_MISSING = "VISIBLE_CHANGE_MISSING"
 # P1-5: scene must have locationId (was hardcoded None in derive_graph)
@@ -713,7 +714,7 @@ def lint_meaningful_motion(shots: list[dict[str, Any]]) -> dict[str, Any]:
                 issues.append(
                     {
                         "code": CODE_VISIBLE_CHANGE_MISSING,
-                        "severity": "warning",
+                        "severity": "error",
                         "message": (
                             f"{sid}: add dsl.visible_change (what changes in-world this shot) "
                             "or dsl.story_beat (one-line dramatic meaning)."
@@ -722,14 +723,55 @@ def lint_meaningful_motion(shots: list[dict[str, Any]]) -> dict[str, Any]:
                     }
                 )
 
+        # 4) Camera must serve an event — not drive-beat empty push-in
+        cam_blob = " ".join(
+            [
+                str(dsl.get("camera_prompt") or ""),
+                str((dsl.get("camera") or {}).get("prompt") or "")
+                if isinstance(dsl.get("camera"), dict)
+                else "",
+                str(dsl.get("camera_axis") or ""),
+                str(shot.get("camera_axis") or ""),
+            ]
+        ).lower()
+        cam_only = any(
+            k in cam_blob or k in blob
+            for k in ("push-in", "push_in", "pushin", "dolly", "zoom", "ken burns")
+        )
+        if (
+            fn in need_body
+            and cam_only
+            and not visible
+            and not story_beat
+            and not _has_primary_action(shot)
+        ):
+            issues.append(
+                {
+                    "code": CODE_CAMERA_WITHOUT_EVENT,
+                    "severity": "error",
+                    "message": (
+                        f"{sid} beat={fn}: camera move without in-world event — "
+                        "author dsl.visible_change / action first; camera serves the change"
+                    ),
+                    "shot_ids": [sid],
+                }
+            )
+
+    # Aesthetic-only MOTION_NO_MEANING: elevate to error for story drives
+    for iss in issues:
+        if iss.get("code") == CODE_MOTION_NO_MEANING:
+            iss["severity"] = "error"
+
     codes = sorted({iss["code"] for iss in issues})
+    errors = [i for i in issues if str(i.get("severity") or "") == "error"]
+    warnings = [i for i in issues if str(i.get("severity") or "") != "error"]
     return {
-        "ok": len(issues) == 0,
+        "ok": len(errors) == 0,
         "issues": issues,
         "codes": codes,
-        "error_count": 0,
-        "warning_count": len(issues),
-        "blocking": [],
+        "error_count": len(errors),
+        "warning_count": len(warnings),
+        "blocking": sorted({str(i["code"]) for i in errors}),
     }
 
 

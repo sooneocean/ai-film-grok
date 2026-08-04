@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.39.4] - 2026-08-04
+
+### Added / Changed (Camera serves event · cinematic motion β)
+- **No silent push-in pad** in `build_motion_prompt`; empty core fails `assert_motion_prompt_core`.
+- **MOTION_CORE_CAMERA_ONLY**: hero I2V rejects camera filler without body/prop action or dialogue.
+- **lint_meaningful_motion**: `CAMERA_WITHOUT_EVENT`; elevate `MOTION_NO_MEANING` / missing visible_change to error.
+- **variety-precheck**: `ADJACENT_FRAMING_COLLISION` + `ADJACENT_TRIPLE_COLLISION` for meat neighbors.
+- **H3 plan**: `mode_policy` follows list/plan command; run records `mode_cli_override` when CLI differs.
+- Docs: hard-defaults + visual stage. Tests: `test_camera_serves_event.py`.
+
 ## [2.39.3] - 2026-08-04
 
 ### Added (True-video-only hero · ban still-as-camera)

@@ -479,6 +479,8 @@ def variety_precheck(root: Path | str, *, write: bool = True) -> dict[str, Any]:
 
     motion_collisions: list[dict[str, str]] = []
     cam_collisions: list[dict[str, str]] = []
+    triple_collisions: list[dict[str, str]] = []
+    framing_collisions: list[dict[str, str]] = []
     for a, b in zip(meat, meat[1:], strict=False):
         ma, mb = _motion_primary(a), _motion_primary(b)
         if ma and mb and ma == mb:
@@ -496,6 +498,38 @@ def variety_precheck(root: Path | str, *, write: bool = True) -> dict[str, Any]:
                     "a": str(a.get("id")),
                     "b": str(b.get("id")),
                     "camera": ca,
+                }
+            )
+        sa, sb = _shot_size(a), _shot_size(b)
+        # Adjacent act/climax: same camera + same size = framing clone (anti-boring)
+        if ca and cb and ca == cb and sa and sb and sa == sb:
+            framing_collisions.append(
+                {
+                    "a": str(a.get("id")),
+                    "b": str(b.get("id")),
+                    "camera": ca,
+                    "shot_size": sa,
+                }
+            )
+        # Triple: same motion primary + camera + size — strongest anti-clone
+        if (
+            ma
+            and mb
+            and ma == mb
+            and ca
+            and cb
+            and ca == cb
+            and sa
+            and sb
+            and sa == sb
+        ):
+            triple_collisions.append(
+                {
+                    "a": str(a.get("id")),
+                    "b": str(b.get("id")),
+                    "motion": ma,
+                    "camera": ca,
+                    "shot_size": sa,
                 }
             )
 
@@ -541,6 +575,26 @@ def variety_precheck(root: Path | str, *, write: bool = True) -> dict[str, Any]:
                 "message": f"{c['a']}→{c['b']} same camera {c['camera']!r}",
             }
         )
+    for c in framing_collisions:
+        issues.append(
+            {
+                "code": "ADJACENT_FRAMING_COLLISION",
+                "message": (
+                    f"{c['a']}→{c['b']} same camera {c['camera']!r} + "
+                    f"shot_size {c['shot_size']!r}"
+                ),
+            }
+        )
+    for c in triple_collisions:
+        issues.append(
+            {
+                "code": "ADJACENT_TRIPLE_COLLISION",
+                "message": (
+                    f"{c['a']}→{c['b']} same motion+camera+size "
+                    f"({c['motion']!r}/{c['camera']!r}/{c['shot_size']!r})"
+                ),
+            }
+        )
     for sid in short_meat:
         issues.append(
             {
@@ -563,6 +617,8 @@ def variety_precheck(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         "l4_insert_count": l4,
         "motion_collisions": motion_collisions,
         "camera_collisions": cam_collisions,
+        "framing_collisions": framing_collisions,
+        "triple_collisions": triple_collisions,
         "short_meat": short_meat,
         "floors": {
             "poses": POSE_MIN_UNIQUE,

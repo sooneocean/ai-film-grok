@@ -438,8 +438,10 @@ def build_motion_prompt(
 ) -> str:
     """Full motion prompt for H3 (or Grok body) when no author file."""
     body = " ".join(motion_core_clauses(spec, shot, include_audio=True)).strip()
+    # No silent "subtle push-in" pad — empty body must fail assert_motion_prompt_core
+    # (camera motion only serves in-world visible_change, never PPT push-in alone).
     if not body:
-        body = "subtle camera push-in, natural motion, readable physical change."
+        body = ""
     # F2 · story beat prefix (source_quote / playable_action)
     try:
         from input_fidelity import inject_story_beat_into_prompt
@@ -544,27 +546,41 @@ def assert_motion_prompt_core(
         "reference_to_video",
     }:
         has_visual = bool(actions) or bool(dialogue)
-        # Author may put action only in free text — accept if prompt has motion verbs
-        # or explicit dramatic function.
+        # Author may put action only in free text — accept body/prop verbs, not camera fillers.
         df = dramatic_function_of(shot)
+        low = compact.lower()
         free_ok = any(
-            k in compact.lower()
+            k in low
             for k in (
-                "motion",
-                "push",
                 "turn",
                 "lean",
                 "walk",
+                "reach",
+                "grasp",
                 "speak",
                 "mouth",
-                "breath",
                 "hand",
+                "hip",
                 "body",
                 "gaze",
+                "kiss",
+                "thrust",
                 "dramatic function",
                 "advances want",
+                "visible change",
+                "story beat",
             )
         )
+        # Camera-only filler (push-in / blink / breath) is NOT enough for hero I2V
+        camera_only = any(
+            k in low for k in ("push-in", "push in", "dolly", "ken burns", "zoom")
+        ) and not has_visual
+        if camera_only and not free_ok:
+            raise MotionCoreError(
+                f"MOTION_CORE_CAMERA_ONLY: shot {shot.get('id')!r} has camera filler "
+                f"without body/prop action or dialogue — camera serves visible_change, "
+                f"does not replace it"
+            )
         if not has_visual and not free_ok and not df:
             raise MotionCoreError(
                 f"MOTION_CORE_NO_ACTION: shot {shot.get('id')!r} hero motion needs "

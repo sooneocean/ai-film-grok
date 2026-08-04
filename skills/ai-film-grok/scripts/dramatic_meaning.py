@@ -750,6 +750,7 @@ def lint_dramatic_meaning(
             CODE_MOTION_NO_MEANING,
             CODE_BEAT_SEMANTICS_MISS,
             CODE_VISIBLE_CHANGE_MISSING,
+            "CAMERA_WITHOUT_EVENT",
         ],
         "note": (
             "Every shot needs dramatic_function + world-change; motion must answer "

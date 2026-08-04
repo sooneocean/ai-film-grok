@@ -279,6 +279,15 @@ def plan_h3_shot(
         "shot_id": shot_id,
         "mode": mode,
         "mode_resolve": mode_res,
+        "mode_policy": {
+            "truth": "h3 list/plan mode is the default truth",
+            "follow_command": cmd,
+            "alt_when_energy_low": cmd_alt,
+            "note": (
+                "Do not default whole film to R2V. Use resolve_h3_mode; "
+                "CLI --mode only when overriding after pilot/energy fail."
+            ),
+        },
         "weapon_id": weapon,
         "source_endpoint": endpoint,
         "provider": "comfy-h3",
@@ -630,11 +639,19 @@ def run_h3_shot(
                 f"H3 flf requires a last frame for {shot_id} "
                 f"(--last-frame or stills/{shot_id}_end.png)"
             )
+        resolved = str(plan.get("mode") or "")
         plan["mode"] = mode_norm
         plan["weapon_id"] = H3_MODE_WEAPON[mode_norm]
         plan["source_endpoint"] = H3_MODE_ENDPOINT[mode_norm]
         plan["requires_still"] = mode_norm in {"i2v", "flf", "r2v"}
         plan["requires_last"] = mode_norm == "flf"
+        # Record CLI override vs list/plan truth (energy/pilot recovery only)
+        if resolved and mode_norm != resolved:
+            plan["mode_cli_override"] = {
+                "resolved": resolved,
+                "cli": mode_norm,
+                "note": "CLI --mode overrode h3 list/plan resolve; prefer resolve unless energy fail",
+            }
 
     if plan["requires_still"] and not plan.get("still_path"):
         raise H3WorkflowError(

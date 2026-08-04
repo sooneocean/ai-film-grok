@@ -9,10 +9,11 @@
 ## 三句话
 1. **Still = 定妆输入**；**运镜只在 Grok/H3 生成视频内**；禁止 Ken Burns/zoompan/panel 当 hero。
 2. **机读**：`register-clip` / `preflight` / `final` / `ship-prep` 扫 `TRUE_VIDEO_*`；panel 仅 `production_mode=panel`。
-3. **电影规格后续**：β 意涵运镜 · γ VO-fit · δ 5 轨声 · ε cinematic-gate（见 plan）。
+3. **β 运镜服务事件（2.39.4）**：禁空 push-in；邻镜 framing/triple 碰撞；H3 跟 list mode。
 
 ## 检查清单
-- [ ] `pytest tests/test_true_video_policy.py`
+- [x] `pytest tests/test_true_video_policy.py` + `test_camera_serves_event.py`
 - [ ] drama 项目无 panel motion-plan
 - [ ] approved clip 全是 mp4 + 生成 endpoint
 - [ ] ship-prep step `true_video` 绿再 final
+- [ ] variety-precheck 无 ADJACENT_TRIPLE / FRAMING 红

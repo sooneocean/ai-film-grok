@@ -458,7 +458,7 @@
     },
     {
       "path": "scripts/continuity.py",
-      "sha256": "17e9575d969d8617605f9c167358a4def4ba357e9f92faff1c212d8d1a96d090"
+      "sha256": "3d9113b82b67a85edb4e22ebe0bb24b15b033dadb487e190c1edd739bbd85fa2"
     },
     {
       "path": "scripts/continuity_chain.py",
@@ -586,7 +586,7 @@
     },
     {
       "path": "scripts/dramatic_meaning.py",
-      "sha256": "d7da8be24ea1bab93a70acb7f584622ce73a5a669f56657cd25e73d20905a208"
+      "sha256": "8d3536bbc2a0b4e58ba8c33e8fb7e478b75ff633ed2722648a26c077079108c7"
     },
     {
       "path": "scripts/edit_edl_merge.py",
@@ -714,7 +714,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "8195803c2f32c4ebc0998941a647e73bca75accea757312f73418b8254b1d9c7"
+      "sha256": "0099e616d3cb9b63065d68360a78513efb224ff8533e4d60f65646c6ecef4f57"
     },
     {
       "path": "scripts/heat_check.py",
@@ -810,7 +810,7 @@
     },
     {
       "path": "scripts/media_qa.py",
-      "sha256": "fc662b57d84dbd21e7d1f3da207a0a73c42df91d1345824457457717604f4cfc"
+      "sha256": "a1020cd3e6c6d3fe547702e2700883067967319253f4ec74af957fe8c7be4515"
     },
     {
       "path": "scripts/media_queue.py",
@@ -834,7 +834,7 @@
     },
     {
       "path": "scripts/motion_prompt_spine.py",
-      "sha256": "3945b042de1ebd748de603ea5c5e9746a1d1b3fe40ed21f2ca4461586b44fd14"
+      "sha256": "95cdfffb9202e25272ebfe9e930c94661eba4d869ddcfd35dda42cf7a91a5093"
     },
     {
       "path": "scripts/music_cue.py",
@@ -1058,7 +1058,7 @@
     },
     {
       "path": "scripts/render_final.py",
-      "sha256": "5fbcab59719a23b821420ddd8fc04dfb4629c710f88f0ed805d4096b0e7467cb"
+      "sha256": "5e1c535bfc0d629b98571307b3c98ee6e0201b2e929b42ada234e58ec8dd40d7"
     },
     {
       "path": "scripts/render_final_music.py",
@@ -1258,7 +1258,7 @@
     },
     {
       "path": "scripts/true_video_policy.py",
-      "sha256": "b8ca0332a87caeeb959b3c96fc071066a9059c4c0dd2494dce71e744fe8ad922"
+      "sha256": "d08f5ffae1b5b96a9d69bb56941c673952a1a96b51b61eeee8fa7cde2242c3bd"
     },
     {
       "path": "scripts/tts_ab.py",
@@ -1342,7 +1342,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "1403158402cb911ceb6b33f65365a370bbca9543d04aa8b85837599a789b8732"
+      "sha256": "54e6ae22c7e14bc6c2f01fe934bbaaa43d3287cc3cc58ace458e9849c53798c7"
     },
     {
       "path": "scripts/workflow_spine.py",

@@ -16,6 +16,7 @@
 - **H3 效果最大化（2026-08-04 · 2.37.3 自动 mode）**：**I2V** 锁脸默认；**R2V** 高能量·对白大嘴 CU；**T2V** 仅无脸 env。`h3 list|plan` 调 `resolve_h3_mode` 写 `mode`/`command`/`alt_mode`。续镜=末帧→I2V。换模式前 `comfy free-memory --confirm`。见 [h3-max-effect](../lessons-2026-08-04-h3-max-effect.md)·[weapon-lane-matrix](../weapon-lane-matrix.md)。
 - **Fill-Idle（2.38.2）**：`h3 cycle --execute --max 5` 一循环；多 take 时 ship-prep **defer promote**；`pk-dailies.md`；dual 粘连/够动停/free-memory。见 [fill-idle memory](../../memory/2026-08-04-h3-fill-idle-challenge.md)。
 - **Motion Prompt Spine（P0）**：每镜动向必须带 `dramatic_function` + want 一句 + 可见动作 +（对白则台词）。`h3 run`/`media-queue` 空核拒跑；Grok I2V 与 H3 共用 `motion_prompt_spine.py`。
+- **运镜服务事件（β）**：先写 `visible_change`/action，再写 camera；禁空 push-in。邻镜肉戏换 camera **或** shot_size **或** motion 主句。H3：`aifilm h3 list` 的 mode/command 为真相。
 - **高动态常态（P0 · 2026-07-27）**：I2V 后逐镜 mean 平常≥18、肉戏≥20；多 take 取最高动且时长够；肉戏 10s 优先 6s×2。禁止 Ken Burns/微抖装片。见 [high-motion-style-lock](../lessons-2026-07-27-high-motion-style-lock-final.md)。
 - **MEDIUM LOCK（P0 · 同案）**：每条 I2V 源= style-locked still；prompt 首段 cel 动漫锁；高动/连戏不得漂半写实；装片竞标 motion×medium 双过。
 - **禁设定拼图 keyframe（P0 · 2026-08-03 荒岛）**：turnaround/多格表情板 **不得** 入 `keyframes/` 再 I2V；`register-still approved` 硬拦 `STILL_LOOKS_LIKE_CHARACTER_SHEET`。一镜一连续叙事静帧。
