@@ -1,0 +1,195 @@
+{
+  "kind": "script-value-debrief",
+  "version": 1,
+  "film_title": "示例·雨夜门廊",
+  "source_reception_sha256": "<optional-link-to-story-reception>",
+  "confirmed_by_user": false,
+  "assumptions": [
+    "竖屏 9:16，目标约 60s，对白主链，零旁白"
+  ],
+  "user_brief": {
+    "audience_profile": "general",
+    "platform": "vertical_short",
+    "target_duration_sec": 60,
+    "must_have": [
+      "女主主动拉门闩的选择可见",
+      "片尾未说破的对视钩子"
+    ],
+    "must_not": [
+      "第三人称旁白",
+      "毒镜解剖夸张"
+    ],
+    "success_looks_like": "30 秒内建立拉扯，高潮是她开门而非 rap 说明"
+  },
+  "writer": {
+    "protagonist_goal": "确认门外的人是否仍可信",
+    "opposition": "信任裂痕与暴雨夜的不安",
+    "stakes": "开门=关系重启；不开=彻底断",
+    "climax_choice": "手按上门闩却最终拉开",
+    "ending_hook": "门外只余空廊与未干的脚印",
+    "theme_one_line": "信任是一次可见的动作，不是一句保证",
+    "information_state": {
+      "audience_knows": "两人曾有过节，今夜他突然回来",
+      "character_knows": "女主不知他是否改过"
+    },
+    "setup_payoff_pairs": [
+      {
+        "setup_ref": "beat_hook_latch",
+        "payoff_ref": "beat_climax_unlatch",
+        "note": "开场门闩特写 → 高潮同一动作反向"
+      }
+    ],
+    "scene_necessity": {
+      "sc01_porch": "hard",
+      "sc02_flash_cut": "soft"
+    }
+  },
+  "viewer_promise": "一个暴雨夜，她必须决定是否再为他开门",
+  "open_hook": "特写：门闩与窗外闪电同闪",
+  "must_keep_beat_ids": ["beat_hook_latch", "beat_climax_unlatch"],
+  "audience_journey": [
+    {
+      "slot": "0_3s",
+      "beat_id": "beat_hook_latch",
+      "what_viewer_gets": "危险夜 + 门的边界"
+    },
+    {
+      "slot": "first_20pct",
+      "beat_id": "beat_goal_listen",
+      "what_viewer_gets": "她想听清门外是谁"
+    },
+    {
+      "slot": "mid",
+      "beat_id": "beat_mid_hesitate",
+      "what_viewer_gets": "手停在闩上的权力拉扯"
+    },
+    {
+      "slot": "climax",
+      "beat_id": "beat_climax_unlatch",
+      "what_viewer_gets": "选择被画面完成"
+    },
+    {
+      "slot": "end",
+      "beat_id": "beat_end_empty",
+      "what_viewer_gets": "空廊脚印：钩子/余韵"
+    }
+  ],
+  "retention_hooks": [
+    "中段：门外一声旧称呼，信息差翻转"
+  ],
+  "dead_air_risks": [
+    "若连续两镜只有呼吸+推镜无 visible_change → 砍或合并"
+  ],
+  "beat_cards": [
+    {
+      "beat_id": "beat_hook_latch",
+      "objective": "建立门=边界",
+      "state_in": "室内安全假象",
+      "state_out": "边界被敲响",
+      "visual_event": "闪电照亮门闩",
+      "visible_change": "闩上光影从暗到亮",
+      "audio_load": "foley",
+      "coverage_min": "ecu_prop→wide",
+      "performance_beat": "pre",
+      "join": "cut_on_sound",
+      "poison_risk": "none",
+      "value_rank": 5,
+      "dramatic_function": "hook",
+      "dialogue_function": null
+    },
+    {
+      "beat_id": "beat_goal_listen",
+      "objective": "欲望：听清是谁",
+      "state_in": "惊醒",
+      "state_out": "贴门倾听",
+      "visual_event": "耳贴门板",
+      "visible_change": "身体贴近门",
+      "audio_load": "silence",
+      "coverage_min": "ms→cu",
+      "performance_beat": "peak",
+      "join": "hard",
+      "poison_risk": "headroom",
+      "value_rank": 3,
+      "dramatic_function": "setup",
+      "dialogue_function": null
+    },
+    {
+      "beat_id": "beat_mid_hesitate",
+      "objective": "阻力具象化",
+      "state_in": "想开",
+      "state_out": "不敢开",
+      "visual_event": "手指按住闩又松开",
+      "visible_change": "手离闩再按上",
+      "audio_load": "dialogue",
+      "coverage_min": "cu→insert",
+      "performance_beat": "peak",
+      "join": "continue",
+      "poison_risk": "none",
+      "value_rank": 4,
+      "dramatic_function": "confrontation",
+      "dialogue_function": "relationship"
+    },
+    {
+      "beat_id": "beat_climax_unlatch",
+      "objective": "高潮选择",
+      "state_in": "僵持",
+      "state_out": "门开一线",
+      "visual_event": "拉开门闩",
+      "visible_change": "闩从锁到开",
+      "audio_load": "foley",
+      "coverage_min": "cu→ms",
+      "performance_beat": "peak",
+      "join": "hard",
+      "poison_risk": "none",
+      "value_rank": 5,
+      "dramatic_function": "climax",
+      "dialogue_function": null
+    },
+    {
+      "beat_id": "beat_end_empty",
+      "objective": "钩子/余韵",
+      "state_in": "门开",
+      "state_out": "无人，只留痕迹",
+      "visual_event": "空廊积水脚印",
+      "visible_change": "从人影预期到空",
+      "audio_load": "foley",
+      "coverage_min": "wide",
+      "performance_beat": "afterglow",
+      "join": "hold",
+      "poison_risk": "none",
+      "value_rank": 5,
+      "dramatic_function": "resolution",
+      "dialogue_function": "hook"
+    }
+  ],
+  "pilot_shortlist_beat_ids": [
+    "beat_hook_latch",
+    "beat_climax_unlatch",
+    "beat_end_empty"
+  ],
+  "weapon_bias": [
+    {
+      "beat_id": "beat_mid_hesitate",
+      "suggest": "dialogue_i2v",
+      "why": "有对白+手部表演，走对白主链"
+    },
+    {
+      "beat_id": "beat_climax_unlatch",
+      "suggest": "i2v_high_value",
+      "why": "value_rank=5 动作清晰，优先样片"
+    }
+  ],
+  "compress_candidates": [
+    {
+      "beat_id": "beat_goal_listen",
+      "why": "rank=3 可与 hesitate 合并若超时"
+    }
+  ],
+  "provenance": {
+    "viewer_promise": "creative_suggestion",
+    "user_brief.must_have": "user_choice",
+    "writer.climax_choice": "source_supported"
+  },
+  "unknowns": [],
+  "adult_note": null
+}

@@ -1,0 +1,193 @@
+{
+  "kind": "script-value-debrief",
+  "version": 1,
+  "film_title": "示例·成人MAX短片骨架",
+  "confirmed_by_user": false,
+  "assumptions": [
+    "adult MAX：肉戏时长硬底服从 hard-defaults；关系因果可见；bare 阶梯前进"
+  ],
+  "user_brief": {
+    "audience_profile": "hardcore_male",
+    "platform": "vertical_short",
+    "target_duration_sec": 60,
+    "must_have": [
+      "至少 4 个体位/构图变化",
+      "≥2 脸部 CU 反应",
+      "高潮选择=继续/失控可见",
+      "对白中文 on_camera"
+    ],
+    "must_not": [
+      "futa/喷奶/霓虹生殖器",
+      "卸装回穿",
+      "setup 占比过高",
+      "第三人称 nar"
+    ],
+    "success_looks_like": "前 20% 内进入亲密推进；观众记住一次主动邀请+一次失控峰值"
+  },
+  "writer": {
+    "protagonist_goal": "今晚把暧昧做成事实",
+    "opposition": "对方最后的犹豫/规则",
+    "stakes": "拒绝则关系停在半吊；接受则越界不可逆",
+    "climax_choice": "她按住他的手往下（主动可见）",
+    "ending_hook": "afterglow 对视+一句未完的对白",
+    "theme_one_line": "欲望兑现必须是人物选择，不是无结构刺激",
+    "setup_payoff_pairs": [
+      {
+        "setup_ref": "beat_boundary",
+        "payoff_ref": "beat_invite",
+        "note": "边界台词 → 主动邀请同一道具/空间"
+      }
+    ],
+    "scene_necessity": {
+      "setup": "hard",
+      "intimacy_ladder": "hard",
+      "afterglow": "hard"
+    }
+  },
+  "viewer_promise": "两个人从边界试探走到不可退回的身体选择",
+  "open_hook": "空间变窄：门落锁/距离一步",
+  "must_keep_beat_ids": ["beat_invite", "beat_peak_pose_change", "beat_afterglow_hook"],
+  "audience_journey": [
+    {"slot": "0_3s", "beat_id": "beat_hook_space", "what_viewer_gets": "私密空间+压迫感"},
+    {"slot": "first_20pct", "beat_id": "beat_boundary", "what_viewer_gets": "规则/犹豫一句对白"},
+    {"slot": "mid", "beat_id": "beat_ladder", "what_viewer_gets": "卸装阶梯+体位变化"},
+    {"slot": "climax", "beat_id": "beat_peak_pose_change", "what_viewer_gets": "峰值动作+脸 CU"},
+    {"slot": "end", "beat_id": "beat_afterglow_hook", "what_viewer_gets": "余韵对白钩，禁单人站桩"}
+  ],
+  "retention_hooks": [
+    "邻镜体位/景别差",
+    "对白 speaker=画面主体"
+  ],
+  "dead_air_risks": [
+    "连续同体位无 L4 变化",
+    "afterglow 单人站桩"
+  ],
+  "beat_cards": [
+    {
+      "beat_id": "beat_hook_space",
+      "objective": "私密边界",
+      "state_in": "门外公共",
+      "state_out": "落锁私密",
+      "visual_event": "落锁",
+      "visible_change": "门从开到关",
+      "audio_load": "foley",
+      "coverage_min": "ms→cu_prop",
+      "performance_beat": "pre",
+      "join": "hard",
+      "poison_risk": "none",
+      "value_rank": 4,
+      "dramatic_function": "hook"
+    },
+    {
+      "beat_id": "beat_boundary",
+      "objective": "规则/犹豫",
+      "state_in": "试探",
+      "state_out": "口头边界清晰",
+      "visual_event": "对视+一句对白",
+      "visible_change": "距离缩短",
+      "audio_load": "dialogue",
+      "coverage_min": "ms→cu",
+      "performance_beat": "peak",
+      "join": "hard",
+      "poison_risk": "headroom",
+      "value_rank": 4,
+      "dramatic_function": "setup",
+      "dialogue_function": "relationship"
+    },
+    {
+      "beat_id": "beat_invite",
+      "objective": "主动选择",
+      "state_in": "僵持",
+      "state_out": "邀请成立",
+      "visual_event": "手引导/吻/解扣之一",
+      "visible_change": "接触升级一档",
+      "audio_load": "dialogue",
+      "coverage_min": "cu",
+      "performance_beat": "peak",
+      "join": "continue",
+      "poison_risk": "anatomy",
+      "value_rank": 5,
+      "dramatic_function": "approach",
+      "dialogue_function": "advance"
+    },
+    {
+      "beat_id": "beat_ladder",
+      "objective": "亲密阶梯",
+      "state_in": "半着",
+      "state_out": "bare 前进",
+      "visual_event": "逐件状态变化",
+      "visible_change": "wardrobe 只前进",
+      "audio_load": "mixed",
+      "coverage_min": "variety≥4",
+      "performance_beat": "peak",
+      "join": "cut_variety",
+      "poison_risk": "anatomy",
+      "value_rank": 5,
+      "dramatic_function": "act"
+    },
+    {
+      "beat_id": "beat_peak_pose_change",
+      "objective": "峰值+变化",
+      "state_in": "高强度",
+      "state_out": "失控峰值",
+      "visual_event": "体位切换+脸 CU",
+      "visible_change": "构图与动作峰",
+      "audio_load": "dialogue",
+      "coverage_min": "cu_face+insert",
+      "performance_beat": "peak",
+      "join": "hard",
+      "poison_risk": "anatomy",
+      "value_rank": 5,
+      "dramatic_function": "climax"
+    },
+    {
+      "beat_id": "beat_afterglow_hook",
+      "objective": "余韵钩",
+      "state_in": "峰值后",
+      "state_out": "关系新状态",
+      "visual_event": "双人 afterglow 对视/一句未完对白",
+      "visible_change": "从激烈到静的接触",
+      "audio_load": "dialogue",
+      "coverage_min": "ms_two_shot",
+      "performance_beat": "afterglow",
+      "join": "hold",
+      "poison_risk": "none",
+      "value_rank": 5,
+      "dramatic_function": "afterglow",
+      "dialogue_function": "hook"
+    }
+  ],
+  "pilot_shortlist_beat_ids": [
+    "beat_invite",
+    "beat_peak_pose_change",
+    "beat_afterglow_hook"
+  ],
+  "weapon_bias": [
+    {
+      "beat_id": "beat_boundary",
+      "suggest": "dialogue_i2v",
+      "why": "对白镜 FRW/LTX 主链"
+    },
+    {
+      "beat_id": "beat_ladder",
+      "suggest": "h3_r2v_or_i2v",
+      "why": "高动肉戏 value_rank 高，Fill-Idle/H3 建议"
+    },
+    {
+      "beat_id": "beat_peak_pose_change",
+      "suggest": "h3_primary",
+      "why": "全片灵魂动作"
+    }
+  ],
+  "compress_candidates": [],
+  "provenance": {
+    "viewer_promise": "creative_suggestion",
+    "user_brief": "user_choice"
+  },
+  "unknowns": [],
+  "adult_note": {
+    "relation_causal": true,
+    "sex_arc_aligned_hard_defaults": true,
+    "viewer_payoff_is_choice": true
+  }
+}
