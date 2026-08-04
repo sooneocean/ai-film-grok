@@ -66,6 +66,29 @@ def require_json(path: Path) -> dict[str, Any]:
     return data
 
 
+def soft_json(path: Path) -> dict[str, Any]:
+    """Soft read always returning a dict (missing / invalid / non-object → ``{}``)."""
+    return read_json(path) or {}
+
+
+def require_json_as(path: Path, error_cls: type[BaseException]) -> dict[str, Any]:
+    """Strict ``require_json`` remapping ``FilmError`` → ``error_cls(str)``."""
+    try:
+        return require_json(path)
+    except FilmError as exc:
+        raise error_cls(str(exc)) from exc
+
+
+def require_json_fnv(path: Path) -> dict[str, Any]:
+    """Strict read raising ``FileNotFoundError`` / ``ValueError`` (legacy final path)."""
+    try:
+        return require_json(path)
+    except FilmError as exc:
+        if not path.is_file():
+            raise FileNotFoundError(f"Missing JSON: {path}") from exc
+        raise ValueError(f"Invalid JSON: {path}") from exc
+
+
 def write_json(path: Path, data: Any) -> None:
     """Atomic pretty-print JSON write (``ensure_ascii=False``)."""
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -44,14 +44,10 @@ class ComposeRenderError(RuntimeError):
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Strict JSON via util.require_json; map FilmError → ComposeRenderError."""
-    from util import require_json
-    from util.errors import FilmError
+    """Strict JSON — util.require_json remapped to ComposeRenderError."""
+    from util import require_json_as
 
-    try:
-        return require_json(path)
-    except FilmError as exc:
-        raise ComposeRenderError(str(exc)) from exc
+    return require_json_as(path, ComposeRenderError)
 
 
 def run(

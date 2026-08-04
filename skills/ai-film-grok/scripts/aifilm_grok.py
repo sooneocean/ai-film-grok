@@ -100,7 +100,7 @@ EXPORT_METADATA_FILES = (
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Strict JSON read — delegates to ``util.require_json``."""
+    """Strict JSON read — alias of ``util.require_json`` (no local load logic)."""
     from util import require_json
 
     return require_json(path)

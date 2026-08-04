@@ -23,14 +23,8 @@ from pathlib import Path
 from typing import Any
 
 from security_policy import minimal_subprocess_env
-from util import read_json as _util_read_json
 from util import sha256_file as _sha256
-from util import utc_now, write_json
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    """Soft local: missing/invalid JSON becomes {} (stage receipts)."""
-    return _util_read_json(path) or {}
+from util import soft_json, utc_now, write_json
 
 
 def inspect_hf_caption_export(root: Path) -> dict[str, Any]:
@@ -39,7 +33,7 @@ def inspect_hf_caption_export(root: Path) -> dict[str, Any]:
     receipt = root / "compose" / "hyperframes" / "media-stage-receipt.json"
     index = root / "compose" / "hyperframes" / "index.html"
     placed = 0
-    receipt_data = _read_json(receipt)
+    receipt_data = soft_json(receipt)
     if isinstance(receipt_data.get("captions_placed"), int):
         placed = int(receipt_data["captions_placed"])
     html_caps = 0
@@ -235,7 +229,7 @@ def ensure_captions_after_hf(root: Path, *, final_mp4: Path) -> dict[str, Any]:
 
 def patch_delivery_burned_in(root: Path, *, burned_in: bool, owner: str) -> dict[str, Any]:
     path = root / "out" / "final-delivery.json"
-    data = _read_json(path)
+    data = soft_json(path)
     subs = data.get("subtitles") if isinstance(data.get("subtitles"), dict) else {}
     subs["burned_in"] = burned_in
     subs["caption_owner"] = owner

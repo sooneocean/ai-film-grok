@@ -372,16 +372,10 @@ class RenderError(RuntimeError):
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Strict JSON via util.require_json; map FilmError → FileNotFound/ValueError."""
-    from util import require_json
-    from util.errors import FilmError
+    """Strict JSON — util.require_json_fnv (FileNotFoundError / ValueError)."""
+    from util import require_json_fnv
 
-    try:
-        return require_json(path)
-    except FilmError as exc:
-        if not path.is_file():
-            raise FileNotFoundError(f"Missing JSON: {path}") from exc
-        raise ValueError(f"Invalid JSON: {path}") from exc
+    return require_json_fnv(path)
 
 
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:

@@ -31,7 +31,6 @@ from production_gates import (
 from runtime_policy import sha256
 from security_policy import (
     SecurityPolicyError,
-    atomic_write_text,
     safe_output_path,
     safe_workspace_directory,
     validate_identifier,
@@ -229,17 +228,22 @@ class MediaQueue:
                 "policy": {"max_concurrency": 1, "budget_units": self.budget_units},
                 "jobs": [],
             }
+        from util import require_json
+        from util.errors import FilmError
+
         try:
-            value = json.loads(self.path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
+            value = require_json(self.path)
+        except FilmError as exc:
             raise QueueError(f"media queue is corrupt: {exc}") from exc
-        if not isinstance(value, dict) or not isinstance(value.get("jobs"), list):
+        if not isinstance(value.get("jobs"), list):
             raise QueueError("media queue has invalid shape")
         return value
 
     def _write(self, state: dict[str, Any]) -> None:
+        from util import write_json
+
         state["updated_at"] = utc_now()
-        atomic_write_text(self.path, json.dumps(state, ensure_ascii=False, indent=2) + "\n")
+        write_json(self.path, state)
 
     def state(self) -> dict[str, Any]:
         with self._locked():
@@ -400,10 +404,11 @@ class MediaQueue:
             except NarrativeControlError as exc:
                 raise QueueError(f"{exc.code}: {exc}") from exc
             try:
-                import json as _json
+                from util import require_json
+                from util.errors import FilmError
 
-                raw_spec = _json.loads(spec_path.read_text(encoding="utf-8"))
-            except (OSError, ValueError) as exc:
+                raw_spec = require_json(spec_path)
+            except FilmError as exc:
                 raise QueueError(f"cannot read film-spec.json: {exc}") from exc
             known_ids: set[str] = set()
             if isinstance(raw_spec, dict):
@@ -1022,14 +1027,14 @@ def record_capability(root: Path | str, *, endpoint: str, media: Path) -> dict[s
         "media_sha256": sha256(media),
         "qa": qa,
     }
-    state = (
-        json.loads(path.read_text(encoding="utf-8"))
-        if path.is_file()
-        else {"schema_version": 1, "checks": []}
-    )
+    from util import soft_json, write_json
+
+    state = soft_json(path) if path.is_file() else {"schema_version": 1, "checks": []}
+    if not state:
+        state = {"schema_version": 1, "checks": []}
     state.setdefault("checks", []).append(result)
     state["latest"] = result
-    atomic_write_text(path, json.dumps(state, ensure_ascii=False, indent=2) + "\n")
+    write_json(path, state)
     if not qa.get("ok"):
         raise QueueError(f"capability canary failed decode/duration/motion QA: {qa.get('errors')}")
     return result

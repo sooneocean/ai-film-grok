@@ -66,14 +66,10 @@ def write_text(path: Path, text: str) -> None:
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Strict JSON via util.require_json; map FilmError → ComposeExportError."""
-    from util import require_json
-    from util.errors import FilmError
+    """Strict JSON — util.require_json remapped to ComposeExportError."""
+    from util import require_json_as
 
-    try:
-        return require_json(path)
-    except FilmError as exc:
-        raise ComposeExportError(str(exc)) from exc
+    return require_json_as(path, ComposeExportError)
 
 
 def final_delivery_has_burned_subtitles(root: Path) -> bool:

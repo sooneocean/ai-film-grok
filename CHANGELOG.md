@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.37.13] - 2026-08-04
+
+### Changed (P1a · util JSON hotpath)
+- **`util.soft_json` / `require_json_as` / `require_json_fnv`**: single load path; domain modules stop re-implementing `json.loads`.
+- **final_stages**: drop `_read_json`; use `soft_json`.
+- **render_final / compose_render / export_composition / pilot_review / aifilm_grok**: thin aliases → util.
+- **media_queue**: queue state + film-spec + capability canary via util read/write.
+- Tests: `test_util_json_contract` covers soft/as/fnv + final_stages no local def.
+
 ## [2.37.12] - 2026-08-04
 
 ### Fixed / Added (Fill-Idle run-next production stage + batch)

@@ -20,8 +20,7 @@ from production_gates import (
     pilot_is_user_approved,
 )
 from security_policy import SecurityPolicyError, safe_workspace_directory
-from util import read_json as _util_read_json
-from util import utc_now, write_json
+from util import soft_json, utc_now, write_json
 
 # Pilot scorecard is the pre-batch gate — three dimensions, not full final seven.
 PILOT_SCORE_DIMS: tuple[str, ...] = ("identity", "style", "motion")
@@ -44,8 +43,8 @@ class PilotReviewError(RuntimeError):
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Soft JSON — missing/invalid becomes ``{}``."""
-    return _util_read_json(path) or {}
+    """Soft JSON — missing/invalid becomes ``{}`` (alias of util.soft_json)."""
+    return soft_json(path)
 
 
 def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:

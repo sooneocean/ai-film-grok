@@ -816,9 +816,7 @@ def run_next_fill_idle(
     }
 
     for job_i in range(max_jobs):
-        nxt_rep = next_fill_idle_job(
-            base, include_challenge=include_challenge, check_capacity=True
-        )
+        nxt_rep = next_fill_idle_job(base, include_challenge=include_challenge, check_capacity=True)
         last_out["next_report"] = nxt_rep
         nxt = nxt_rep.get("next") if isinstance(nxt_rep.get("next"), dict) else None
         if not nxt:
@@ -897,9 +895,7 @@ def run_next_fill_idle(
 
     # Chain hint after last successful/attempted job
     try:
-        after = next_fill_idle_job(
-            base, include_challenge=include_challenge, check_capacity=False
-        )
+        after = next_fill_idle_job(base, include_challenge=include_challenge, check_capacity=False)
         last_out["next_after"] = after.get("next")
         last_out["command_after"] = after.get("command")
         last_out["pending_after"] = after.get("pending_count")
