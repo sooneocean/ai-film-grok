@@ -4286,6 +4286,15 @@ def cmd_h3(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") is not False else 1
 
 
+def cmd_still_challenge(args: argparse.Namespace) -> int:
+    """FRW i2i still-material challenge (≥30s/unit) for better I2V/R2V sources."""
+    from cli_still_challenge import run_still_challenge_cli
+
+    report = run_still_challenge_cli(args)
+    emit(report)
+    return 0 if report.get("ok") is not False else 1
+
+
 def cmd_workflow(args: argparse.Namespace) -> int:
     """Wave A–C throughput: closeout / pilot-pack / bulk-preflight / lease / tunnel."""
     from cli_workflow import run_workflow_cmd
@@ -7120,9 +7129,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     from cli_comfy import add_comfy_parsers
     from cli_h3 import add_h3_parsers
+    from cli_still_challenge import add_still_challenge_parsers
 
     add_comfy_parsers(sub)
     add_h3_parsers(sub)
+    add_still_challenge_parsers(sub)
     from cli_node import add_node_parsers
 
     add_node_parsers(sub)
@@ -7273,6 +7284,7 @@ def main(argv: list[str] | None = None) -> int:
             "speech-preview": cmd_speech_preview,
             "comfy": cmd_comfy,
             "h3": cmd_h3,
+            "still-challenge": cmd_still_challenge,
             "node": cmd_node,
             "weapon": cmd_weapon,
             "route": cmd_route,

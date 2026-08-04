@@ -721,6 +721,22 @@ def next_fill_idle_job(
         )
     elif nxt and capacity.get("ready") is True:
         note = "Capacity ready — run command now"
+    still_hint = None
+    try:
+        from still_challenge import still_challenge_hint_for_fill_idle
+
+        still_hint = still_challenge_hint_for_fill_idle(
+            root, nxt if isinstance(nxt, dict) else None
+        )
+    except Exception:  # noqa: BLE001
+        still_hint = None
+    if still_hint and still_hint.get("prefer_still_challenge_first"):
+        note = (
+            "Prefer still-challenge (FRW i2i ≥30s) before more I2V/R2V — "
+            "weak take often needs better source still"
+        )
+        if not cmd and still_hint.get("command"):
+            cmd = still_hint.get("command")
     return {
         "schema_version": 1,
         "kind": "ai-film-h3-fill-idle-next",
@@ -732,6 +748,7 @@ def next_fill_idle_job(
         "command": cmd,
         "capacity": capacity,
         "capacity_ready": capacity.get("ready"),
+        "still_challenge_hint": still_hint,
         "note": note,
     }
 

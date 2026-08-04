@@ -33,15 +33,20 @@ class FrwDispatchSubprocessTests(unittest.TestCase):
     def test_dispatch_returns_child_exit_code_and_timeout(self) -> None:
         root = Path("/tmp/frw-root")
         root / "img-video-frw" / "scripts" / "dispatch.py"
-        with mock.patch.object(frw_dispatch, "resolve_frw_root", return_value=root):
-            with mock.patch.object(frw_dispatch, "resolve_python", return_value="python"):
-                with mock.patch.object(frw_dispatch, "load_dotenv"):
-                    with mock.patch.object(
-                        frw_dispatch.subprocess,
-                        "run",
-                        return_value=mock.Mock(returncode=9),
-                    ) as run:
-                        result = frw_dispatch.main(["newvideo", "--wait"])
+        with mock.patch.dict(
+            "os.environ",
+            {"AIFILM_FRW_RATE_LIMIT": "0"},
+            clear=False,
+        ):
+            with mock.patch.object(frw_dispatch, "resolve_frw_root", return_value=root):
+                with mock.patch.object(frw_dispatch, "resolve_python", return_value="python"):
+                    with mock.patch.object(frw_dispatch, "load_dotenv"):
+                        with mock.patch.object(
+                            frw_dispatch.subprocess,
+                            "run",
+                            return_value=mock.Mock(returncode=9),
+                        ) as run:
+                            result = frw_dispatch.main(["newvideo", "--wait"])
 
         self.assertEqual(result, 9)
         self.assertEqual(run.call_args.kwargs["timeout"], 60)

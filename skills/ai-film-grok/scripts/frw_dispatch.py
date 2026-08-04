@@ -223,9 +223,21 @@ def main(argv: list[str] | None = None) -> int:
     # Avoid PYTHONPATH ABI leaks into frw venv
     env["PYTHONPATH"] = ""
 
-    cmd = build_dispatch_command(root, argv)
+    # Platform hard limit: image ≥30s, video ≥5min (shared with ai-film-frw).
     try:
-        proc = subprocess.run(cmd, env=env, cwd=str(root), timeout=60)
+        from frw_rate_limit import classify_frw_op, wait_frw_rate_limit
+
+        kind = classify_frw_op(argv)
+        if kind:
+            wait_frw_rate_limit(kind)
+    except Exception as rate_exc:  # noqa: BLE001 — never block auth help on rate module bugs
+        print(f"frw_dispatch: rate-limit warn: {rate_exc}", file=sys.stderr)
+
+    cmd = build_dispatch_command(root, argv)
+    # Default 60s keeps CLI snappy for help/catalog; long polls set FRW_DISPATCH_TIMEOUT.
+    timeout_s = int(os.environ.get("FRW_DISPATCH_TIMEOUT", "60") or "60")
+    try:
+        proc = subprocess.run(cmd, env=env, cwd=str(root), timeout=max(1, timeout_s))
     except OSError as exc:
         print(
             f"frw_dispatch: failed to exec FRW launcher: {exc}",

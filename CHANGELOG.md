@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.38.5] - 2026-08-04
+
+### Added (FRW i2i still-material challenge · 30s rate limit)
+- **`frw_rate_limit.py`**: shared image ≥30s / video ≥5min state (`~/.hermes/cache/ai-film-frw-frw-rate.json`); wired into `frw_dispatch`.
+- **`still_challenge.py` + `aifilm still-challenge`**: plan/next/run/list/promote for FRW img2image candidate stills that improve I2V/R2V sources (unit=1, no silent promote, skip poison/continue).
+- **H3**: `--still` override on plan/run; `still_challenge_candidates` on plan; `h3 next` may surface `still_challenge_hint`.
+- Docs: hard-defaults · weapon-lane · memory `2026-08-04-frw-i2i-still-challenge.md`.
+- Tests: `test_frw_rate_limit` · `test_still_challenge`.
+
 ## [2.38.4] - 2026-08-04
 
 ### Changed (C4 · status/doctor + giant module split + disk hygiene)

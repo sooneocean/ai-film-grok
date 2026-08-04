@@ -38,7 +38,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **动作**：Grok bulk→LTX 对白；**`hybrid_h3`** meat→5090 H3（pilot 批）。I2V锁脸·R2V高动·T2V无脸；续镜末帧I2V；**Fill-Idle** P0→P2（mean最低先挑战）。Motion Spine 空核 fail closed。禁 Seedance/Wan。[h3-max](references/lessons-2026-08-04-h3-max-effect.md)·[fill-idle](memory/2026-08-04-h3-fill-idle-challenge.md)·[矩阵](references/weapon-lane-matrix.md)
+7. **动作**：Grok bulk→LTX 对白；**`hybrid_h3`** meat→5090 H3（pilot 批）。I2V锁脸·R2V高动·T2V无脸；续镜末帧I2V；**Fill-Idle** P0→P2（mean最低先挑战）。弱 take 可先 **FRW i2i still-challenge**（≥30s/次·unit=1·人 promote）再 I2V/R2V。Motion Spine 空核 fail closed。禁 Seedance/Wan。[h3-max](references/lessons-2026-08-04-h3-max-effect.md)·[fill-idle](memory/2026-08-04-h3-fill-idle-challenge.md)·[still-i2i](memory/2026-08-04-frw-i2i-still-challenge.md)·[矩阵](references/weapon-lane-matrix.md)
 8. **声线·对白优先**：默认对白主链·**中文**；**场硬闸=每场≥1 on/off_camera 台词；无对白场拒收**；对白镜=说话者主体；肉戏对白走 H3 i2v/r2v。Edge；BGM=rnb。[对白](references/dialogue-first-workflow.md)
 9. **成人 MAX**：肉戏≥50%·亲密≥60%·setup≤20%；extreme；四拍+bare；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V。

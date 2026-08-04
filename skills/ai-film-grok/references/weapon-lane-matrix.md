@@ -8,7 +8,7 @@
 
 - **对白镜画面必须可见「人在讲」**（on_camera>嘴动+近景；肉戏对白→H3 i2v/r2v 注入 Mandarin 台词）。
 - **禁全场纯 silence/action_cover 或纯 nar**：每场 ≥1 条 on/off_camera 对白；逃生 `narration_reason`（见 [hard-defaults](hard-defaults.md) 对白场景级规）。
-- 工具组 = `grok i2v`（安全 setup/只做 bulk） · `5090 H3 i2v/r2v`（restricted/肉戏/对白restricted） · `FRW LTX`（安全对白棚） · `Qwen`（状态照）。
+- 工具组 = `grok i2v`（安全 setup/只做 bulk） · `5090 H3 i2v/r2v`（restricted/肉戏/对白restricted） · `FRW LTX`（安全对白棚） · `Qwen`（状态照） · **`FRW img2image`（静帧素材挑战 · ≥30s/次）**。
 
 ## 默认
 
@@ -31,6 +31,26 @@
 | Env / bridge | 可选 | FRW env 或 **H3 T2V**（无脸） | 环境 |
 | 续镜 / continue | **批准末帧** | **H3 I2V** | 原声或沿用策略 |
 | 毒镜 | Qwen 解剖修 | **禁 I2V** | — |
+| **Still 素材挑战** | **FRW `img2image`**（云 · 不占 5090）或 Qwen 修片 | promote 后 **I2V/R2V 重跑** | 续镜 endframe；毒 still |
+
+### FRW i2i 静帧挑战（2026-08-04 · ≥30s unit）
+
+> 类比：Fill-Idle 换引擎比片；**still-challenge 先换零件再试跑**。  
+> 短卡：[memory/2026-08-04-frw-i2i-still-challenge.md](../memory/2026-08-04-frw-i2i-still-challenge.md)
+
+```bash
+aifilm still-challenge plan --root "<film>"
+aifilm still-challenge next --root "<film>"          # 1 unit + image_wait_s
+aifilm still-challenge run  --root "<film>" --shot-id s01 --execute --max-submits 1
+# 人审后：
+aifilm still-challenge promote --root "<film>" --shot-id s01 \
+  --identity-approved --anatomy-safe --review-note "frw-i2i id-ok"
+aifilm h3 run --root "<film>" --shot-id s01 --mode i2v --register --stage pilot
+# 试用未 promote 的 candidate：
+aifilm h3 plan --root "<film>" --shot-id s01 --still takes/s01/still_frw_*.png
+```
+
+硬规则：共享限流 image≥30s / video≥5min；candidate ≠ approved；`h3 next` 可带 `still_challenge_hint`（弱 take 先换 still）。
 
 ## H3 三模式 · 效果最大化（2026-08-04 实机 · 2.37.3 自动选型）
 

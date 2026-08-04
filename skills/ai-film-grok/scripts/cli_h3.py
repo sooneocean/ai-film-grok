@@ -49,7 +49,19 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     run.add_argument("--seed", type=int, default=20260803)
     run.add_argument("--timeout", type=int, default=1800)
     run.add_argument("--no-queue", action="store_true")
+    run.add_argument(
+        "--still",
+        type=Path,
+        default=None,
+        help="Explicit still path override (pilot / still-challenge trial; does not auto-promote)",
+    )
     run.add_argument("--receipt", type=Path, default=None)
+    plan.add_argument(
+        "--still",
+        type=Path,
+        default=None,
+        help="Plan against an explicit still path (still-challenge candidate trial)",
+    )
 
     lst = actions.add_parser(
         "list",
@@ -179,7 +191,11 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
     action = str(args.h3_action)
     try:
         if action == "plan":
-            report = plan_h3_shot(args.root, args.shot_id)
+            report = plan_h3_shot(
+                args.root,
+                args.shot_id,
+                still_override=getattr(args, "still", None),
+            )
         elif action == "list":
             report = list_h3_eligible_shots(
                 args.root,
@@ -260,6 +276,7 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 timeout_sec=int(args.timeout),
                 enqueue_queue=not bool(args.no_queue),
                 production_stage=str(getattr(args, "stage", None) or "production"),
+                still_override=getattr(args, "still", None),
             )
         else:
             raise H3WorkflowError(f"unknown h3 action: {action}")

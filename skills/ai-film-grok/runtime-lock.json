@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "6336403fb85e6b45ae553700b94f622ae947410c8218d3a88aeb739423fd3f68"
+      "sha256": "a04820b508b0017e1a3fc70c4b0e9953cb95d71176d0d686467ed4ce319b232e"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -306,7 +306,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "3a080f0fce9ce18c8b33a0cdd1d6a023a7bf03f62e13f3fafcf610529e7a2669"
+      "sha256": "68f7329062fe3a56f5986ad7a94b76bb179c45d3695122f0a36b51a71c0156f3"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -379,6 +379,10 @@
     {
       "path": "scripts/cli_status.py",
       "sha256": "62211de19ead6cd587a599042306f6c45fe8be3ac5d9cb322cfd0467eb508675"
+    },
+    {
+      "path": "scripts/cli_still_challenge.py",
+      "sha256": "a759f089ff073983c8d7f0f0f6011a8396e3feb6745b8fb35041c17a527a8ff3"
     },
     {
       "path": "scripts/cli_team.py",
@@ -666,11 +670,15 @@
     },
     {
       "path": "scripts/frw_dispatch.py",
-      "sha256": "d24a736245af9437aed6e1bec2147aa6ca0e199ccc43e8f8f64745e474ff9f3b"
+      "sha256": "930a09bab8f0f776fa4f19dd4734abee5a04ca256cf6c114a1a8166a7f44b40d"
     },
     {
       "path": "scripts/frw_lipsync.py",
       "sha256": "ff33c4e5dde94c02b22b78db336799e4f78d0cbabd56a0511bde2dcac5485af4"
+    },
+    {
+      "path": "scripts/frw_rate_limit.py",
+      "sha256": "4ac17ee25e5eb1ab14035477ecd9b67ac404d637482285882f00645215e6c307"
     },
     {
       "path": "scripts/frw_upload.py",
@@ -694,7 +702,7 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "d8d2c665ccaf83f0c1a0da43a04084a822303fb8d699b52be447f380a7f9eb9b"
+      "sha256": "1fbc3077d78bae87da878e159b7a3b58695838f36635649f7867da35219a4193"
     },
     {
       "path": "scripts/h3_mode.py",
@@ -702,7 +710,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "73bfd7bbede613d458035cb0e3e94e9d8e8edcee0e848627d5ba1bfbbe8be6fc"
+      "sha256": "27e72b3642540e5cca7c271c154c3d33951514cf54f9c4237082339161b748cc"
     },
     {
       "path": "scripts/heat_check.py",
@@ -1167,6 +1175,10 @@
     {
       "path": "scripts/state_index_gate.py",
       "sha256": "f9014064da2ed36b1eebb8b4460ff0eed4acb0474a4fe5ed0a77497bd4d7403a"
+    },
+    {
+      "path": "scripts/still_challenge.py",
+      "sha256": "4f242fc0c9432907570100bc0affc4585af8470f35112f78499ffa8295e48526"
     },
     {
       "path": "scripts/still_uniqueness.py",

@@ -187,7 +187,12 @@ def _prompt_for_shot(
     return prompt
 
 
-def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
+def plan_h3_shot(
+    root: Path | str,
+    shot_id: str,
+    *,
+    still_override: Path | str | None = None,
+) -> dict[str, Any]:
     """Return a machine-readable H3 execution plan for one shot."""
     base = _root(root)
     spec = _load_spec(base)
@@ -206,6 +211,12 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
     cont = resolve_continue_handoff(base, shot_id, shot=shot, spec=spec)
     still: Path | None = approved
     still_source: str | None = "approved" if approved else None
+    # Explicit still override (pilot / still-challenge candidate trial only)
+    if still_override is not None:
+        ov = Path(still_override).expanduser().resolve()
+        if ov.is_file():
+            still = ov
+            still_source = "explicit_override"
     # Phase C: chain_mode=continue → prefer previous endframe; never clobber approved file on disk
     if cont.get("ok") and cont.get("end_frame"):
         end_p = Path(str(cont["end_frame"]))
@@ -266,7 +277,17 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
         "command": cmd,
         "command_alt": cmd_alt,
         "effect_tips": _h3_effect_tips(mode, mode_res),
+        "still_challenge_candidates": _still_challenge_candidates(base, shot_id),
     }
+
+
+def _still_challenge_candidates(root: Path, shot_id: str) -> list[dict[str, Any]]:
+    try:
+        from still_challenge import list_candidates
+
+        return list_candidates(root, shot_id)
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def _strip_audio(src: Path, dest: Path) -> Path:
@@ -552,10 +573,11 @@ def run_h3_shot(
     timeout_sec: int = 1800,
     enqueue_queue: bool = True,
     production_stage: str | None = None,
+    still_override: Path | str | None = None,
 ) -> dict[str, Any]:
     """Generate one H3 clip for a film shot and optionally register it."""
     base = _root(root)
-    plan = plan_h3_shot(base, shot_id)
+    plan = plan_h3_shot(base, shot_id, still_override=still_override)
     # Film-lane default: production when weapon is promoted; experimental only if needed.
     stage = (production_stage or "production").strip().lower()
     if allow_experimental is None:
