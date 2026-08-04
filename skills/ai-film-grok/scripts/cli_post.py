@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -57,35 +56,23 @@ EXPORT_METADATA_FILES = (
 )
 
 
-def emit(obj: dict[str, Any]) -> None:
-    if sys.stdout.isatty() or os.environ.get("AIFILM_PRETTY_JSON", "").lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
-        print(json.dumps(obj, ensure_ascii=False, indent=2))
-    else:
-        print(json.dumps(obj, ensure_ascii=False, separators=(",", ":")))
-
-
-def read_json(path: Path) -> dict[str, Any]:
-    from util import require_json
-
-    return require_json(path)
-
-
-def load_manifest(root: Path) -> dict[str, Any]:
-    p = root / MANIFEST_NAME
-    if not p.is_file():
-        raise FilmError(f"No manifest at {p}; run init first")
-    return read_json(p)
-
-
 def _ag():
+    """Lazy aifilm_grok — helpers stay patchable on the monolith for tests."""
     import aifilm_grok as ag
 
     return ag
+
+
+def emit(obj: dict[str, Any]) -> None:
+    return _ag().emit(obj)
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    return _ag().read_json(path)
+
+
+def load_manifest(root: Path) -> dict[str, Any]:
+    return _ag().load_manifest(root)
 
 
 def save_manifest(root: Path, manifest: dict[str, Any]) -> None:

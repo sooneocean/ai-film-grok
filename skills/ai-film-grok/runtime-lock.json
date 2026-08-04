@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "f56d74310d77133ffbc5001665c20b7a9cef5ea680544b375baffc1836671172"
+      "sha256": "4e1a979127bce2f99ce54fb3a9c01c2a95cbd3cefdc099156d2895720b8ae5ca"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -350,7 +350,7 @@
     },
     {
       "path": "scripts/cli_post.py",
-      "sha256": "59eb7fdb6a13e4a5793c444d1fbdc2b107b6c40c5357fb8e3346d4d637ba140f"
+      "sha256": "7f40ef2b67f4b82aaf3fd7336e5f108f76c8e00e78c22118e2d2f78a5dc7f57b"
     },
     {
       "path": "scripts/cli_quality.py",
@@ -1302,7 +1302,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "8f413bc29f26bbffb0591b6726d6fcf988e1a424d23d72b690b40ee7c03597ae"
+      "sha256": "e0aabda5d24312bea85b9bdde4b8397d7df815810097b25586b036cc5c89439c"
     },
     {
       "path": "scripts/workflow_spine.py",

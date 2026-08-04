@@ -1059,9 +1059,7 @@ def ship_prep(
         promote_effective = False
         promote_deferred = True
 
-    sel = select_shortlist(
-        root, write=write, promote=promote_effective, measure_missing=measure
-    )
+    sel = select_shortlist(root, write=write, promote=promote_effective, measure_missing=measure)
     steps.append(
         {
             "id": "select_shortlist",

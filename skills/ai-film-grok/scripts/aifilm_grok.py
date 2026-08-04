@@ -1764,7 +1764,8 @@ def cmd_promotion_report(args: argparse.Namespace) -> int:
 
 
 from cli_longform import cmd_longform  # noqa: E402
-from cli_post import (  # noqa: E402
+from cli_post import (  # noqa: E402, F401
+    _commit_selected_bgm_usage,
     cmd_closeout,
     cmd_compose_preview,
     cmd_compose_render,
