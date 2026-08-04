@@ -104,14 +104,31 @@ Grok 与 H3 **同一拼装顺序**（`scripts/motion_prompt_spine.py`）：
 `build_shot_intent` 输出 `motion_tier` / `want_beat` / `has_action_core`。  
 空核 → `MOTION_CORE_*` fail closed（h3 run + media-queue）。
 
+## Fill-Idle 运营（2026-08-04 定策 · 与模式选型互补）
+
+> 用户要：Grok 主轴 + 本地免费 PK；能烧就烧；R2V 能量位；人拍板替换。  
+> 正文表与调度：[weapon-lane-matrix · Fill-Idle](weapon-lane-matrix.md) · 短卡 `memory/2026-08-04-h3-fill-idle-challenge.md`
+
+| 级 | 烧什么 | 要点 |
+|----|--------|------|
+| P0 | restricted 主生成 + 续链 | **永不**被 soft 挑战挤掉 |
+| P1 | gate 失败弱镜 | I2V 狠 prompt → R2V |
+| P2 | 已有 Grok、idle 填空 | 先 I2V 挑战；仍闷再 R2V；短 pilot |
+| 发布 | final | **不**阻塞于 P2 100% 完成 |
+
+**纠正「尽可能多 R2V」**：R2V 应 **占满高能量/大嘴/高难槽**，不是把默认 mode 改成全 R2V（锁脸会漂、续缝会断）。
+
+**PK**：`select-shortlist` 建议 → 人 dailies → `--promote`。禁 mean 静默 preferred。
+
 ## 不要做
 
-- 安全 setup 硬塞 H3（浪费 5090）  
+- 安全 setup **在 P0 未完时**硬塞 H3 填空（饿死肉戏）——P0 清空后的 P2 填空除外  
 - T2V 锁脸  
 - 毒 still 进任何 H3  
 - 用 `s_*.i2v.txt` 写「no speech」又期望台词（现已强制注入台词，但会与作者 ambient 叠句——对白镜请别写 no speech）  
-- 静默 bulk / 静默改 `i2v_provider`  
-- 无 DF/动作/对白的「空核」prompt 进 queue
+- 静默 bulk / 静默改 `i2v_provider` / **mean 静默 promote**  
+- 无 DF/动作/对白的「空核」prompt 进 queue  
+- 全局默认 mode 改 R2V（违反能量位优先定策）
 
 ## 片级开关
 

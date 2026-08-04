@@ -74,18 +74,71 @@ aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --
 
 ## 产能日历
 
-1. 云：Grok setup + 非敏感 pilot  
+1. 云：Grok setup + 非敏感 pilot / bulk baseline  
 2. 本地：Qwen 卸装 / bare state masters  
-3. **5090 独占**：H3 meat 串行（`gpu-lease` + 单 comfy client + **每 job free-memory**）  
-4. 云：桥接 / 对白 LTX  
-5. select → final（HyperFrames）
+3. **5090 独占**：H3 按 **Fill-Idle 优先级** 串行（下节）  
+4. 云：桥接 / 对白 LTX（安全近景）  
+5. `select-shortlist` 建议 → **人审** promote → ship-prep → final（HyperFrames）
+
+## Fill-Idle · Grok 主轴 + H3 挑战（2026-08-04 定策）
+
+> 类比：Grok = 流水线铺底；H3 = 重工 + **空闲就去 PK**。  
+> 短卡：[memory/2026-08-04-h3-fill-idle-challenge.md](../memory/2026-08-04-h3-fill-idle-challenge.md) · 模式细则见上「H3 三模式」与 [h3-max-effect](lessons-2026-08-04-h3-max-effect.md)
+
+### 已定策三句
+
+1. **Soft / 已有 Grok take：能烧就烧**——5090 空闲就填挑战；**不得**抢 P0。  
+2. **R2V = 能量位优先**（大嘴 CU / 高难体位 / I2V 偏静）——**不是**全片默认 R2V。  
+3. **机读建议 + 人最终拍板**——shortlist/mean 可推荐；`preferred` / approved **必须人一眼**（防换人、毒、回穿）。
+
+### 谁是主轨
+
+| 镜类 | 主生成 | H3 角色 |
+|------|--------|---------|
+| restricted / bare / 高难 | **H3** | 主轨（云硬拦） |
+| 非 restricted setup/soft | **Grok** | **填空挑战者** |
+| env 无脸 | FRW / H3 T2V | 气氛；不进锁脸 PK |
+
+### 优先级（硬顺序）
+
+| 级 | 内容 | 默认 mode | 可被 P2 挤掉？ |
+|----|------|-----------|----------------|
+| **P0a** | restricted 肉戏主生成 | I2V；高难 flag → R2V | **否** |
+| **P0b** | restricted 对白近景 | R2V 或 I2V+台词注入 | **否** |
+| **P0c** | 续镜链 / 毒后重生 | **仅 I2V** 末帧 | **否** |
+| **P1** | 已有 take 但 gate 失败（mean 低 / 嘴死） | I2V 狠 prompt → 仍低则 R2V | 仅次 P0 |
+| **P2 填空** | 已有 Grok、尚无 H3 take、capacity idle | **先 I2V 挑战**；仍闷 → R2V | 新 P0/P1 可抢占 |
+| **P3 跳过** | 毒 still、空核、无 still 锁脸、T2V 挂人 | — | 永不入队 |
+
+**调度**：先耗尽 P0→P1 → idle 且 ready 才拉 P2 → 新 P0 **立即暂停 P2**。进度只认 `takes/` + register 收据。
+
+### 填空挑战口诀
+
+```text
+挑战 Grok soft：先 I2V（锁脸公平）→ 仍闷再 R2V
+P0 能量位：高难/大嘴/I2V 不够 → R2V 占满这些槽
+P2 优先短 pilot；人说值得再 bulk 加长
+final 不阻塞于「P2 100% 完成」（能烧就烧=质量上限，≠发布门）
+```
+
+### PK（替换）
+
+```bash
+aifilm select-shortlist --root "<film>"              # 机读建议，不写 preferred
+# 人 dailies 一眼后：
+aifilm select-shortlist --root "<film>" --promote
+aifilm ship-prep --root "<film>"
+```
+
+人审 30s：同人？体位可读？有事件？对白嘴动？——否决权高于 mean。
 
 ## 质量门分车道
 
 - Grok：mean ≥18/20 + MEDIUM LOCK cel  
 - H3：解剖安全 + 接触可读 + 几何 ≥704×1280（run 时自动 upscale）+ 原声可用性 +（肉戏）motion-gate  
 - 毒 still：禁任何 I2V  
-- candidate ≠ bulk：人审后才 approved
+- candidate ≠ bulk：人审后才 approved  
+- **Fill-Idle PK**：机读可建议 preferred；**禁** mean 静默 promote；身份/毒否决 > 能量
 
 ## Motion Prompt Spine（电影核 → 动向 · P0 + 整合 A · 2.36.0）
 

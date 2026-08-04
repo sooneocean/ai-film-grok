@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.37.4] - 2026-08-04
+
+### Docs (Fill-Idle · Grok baseline + H3 challenge)
+- **weapon-lane-matrix**: Fill-Idle section — P0→P1→P2 queue, energy-slot R2V, shortlist+human promote.
+- **hard-defaults** / **AGENTS** 8c / **SKILL** P0 action: pointer to Fill-Idle policy.
+- **memory** `2026-08-04-h3-fill-idle-challenge.md`; lesson h3-max-effect append operational table.
+- No code path change (scheduling CLI E2+ deferred).
+
 ## [2.37.3] - 2026-08-04
 
 ### Added (H3 max-effect auto mode)
