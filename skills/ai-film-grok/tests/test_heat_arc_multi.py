@@ -133,17 +133,8 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True
                 wardrobe_state = "bare"
                 coitus_beat = "hook"
                 partner_ws = "undressed"
-        beat_motion = _BEAT_MOTION.get(ph, _BEAT_MOTION["bridge"])
-        # Combine phase action with beat-semantic tokens so meaning gate passes.
-        action_full = f"{action}; {beat_motion}"
-        arc_node = {
-            "setup": "起",
-            "foreplay": "承",
-            "act": "转",
-            "climax": "转",
-            "afterglow": "转",
-            "bridge": "转",
-        }.get(ph, "转")
+            beat_motion = _BEAT_MOTION.get(ph, _BEAT_MOTION["bridge"])
+        # (no arc_node/emotion field — the heat-arc/wardrobe tests rely on gate being neutral)
         dsl = {
             "subject": subject,
             "action": action_full,
@@ -170,8 +161,6 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True
             "id": f"shot{i:02d}",
             "dramatic_function": df_map.get(ph, "bridge"),
             "heat_phase": ph,
-            "arc_node": arc_node,
-            "emotion": arc_node,
             "nar": nar,
             "lipsync": False,
             "duration_sec": 6,

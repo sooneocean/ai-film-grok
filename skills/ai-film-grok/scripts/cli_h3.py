@@ -19,7 +19,7 @@ from util import write_json
 def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = sub.add_parser(
         "h3",
-        help="MiniMax H3 local motion lane (plan/run/list/next/pk-compare)",
+        help="MiniMax H3 local motion lane (plan/run/list/next/run-next/pk-compare/pk-ledger)",
     )
     actions = parser.add_subparsers(dest="h3_action", required=True)
 
@@ -80,6 +80,31 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     )
     nxt.add_argument("--receipt", type=Path, default=None)
 
+    run_next = actions.add_parser(
+        "run-next",
+        help="One-shot Fill-Idle worker: next job; --execute runs when capacity ready",
+    )
+    run_next.add_argument("--root", type=Path, required=True)
+    run_next.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually run H3 for next job when capacity ready",
+    )
+    run_next.add_argument(
+        "--no-challenge",
+        action="store_true",
+        help="Skip P2 soft challenges",
+    )
+    run_next.add_argument(
+        "--allow-without-capacity",
+        action="store_true",
+        help="Execute even when capacity probe is not ready",
+    )
+    run_next.add_argument("--no-register", action="store_true")
+    run_next.add_argument("--seed", type=int, default=20260804)
+    run_next.add_argument("--timeout", type=int, default=1800)
+    run_next.add_argument("--receipt", type=Path, default=None)
+
     pk = actions.add_parser(
         "pk-compare",
         help="Multi-take PK suggestion only (never auto-promote)",
@@ -112,6 +137,34 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 args.root,
                 include_challenge=not bool(getattr(args, "no_challenge", False)),
             )
+        elif action == "run-next":
+            from h3_fill_idle import run_next_fill_idle
+
+            report = run_next_fill_idle(
+                args.root,
+                include_challenge=not bool(getattr(args, "no_challenge", False)),
+                execute=bool(getattr(args, "execute", False)),
+                register=not bool(getattr(args, "no_register", False)),
+                require_capacity=not bool(getattr(args, "allow_without_capacity", False)),
+                seed=int(getattr(args, "seed", 20260804) or 20260804),
+                timeout_sec=int(getattr(args, "timeout", 1800) or 1800),
+            )
+        elif action == "pk-ledger":
+            from h3_fill_idle import append_pk_ledger, load_pk_ledger
+
+            if getattr(args, "append", False):
+                if not args.shot_id or not args.winner:
+                    raise H3WorkflowError("pk-ledger --append needs --shot-id and --winner")
+                report = append_pk_ledger(
+                    args.root,
+                    shot_id=str(args.shot_id),
+                    winner_path=str(args.winner),
+                    winner_lane=getattr(args, "lane", None),
+                    mean=getattr(args, "mean", None),
+                    note=str(getattr(args, "note", "") or ""),
+                )
+            else:
+                report = load_pk_ledger(args.root)
         elif action == "pk-compare":
             from h3_fill_idle import pk_compare
 

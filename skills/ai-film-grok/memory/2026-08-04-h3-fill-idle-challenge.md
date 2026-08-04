@@ -19,6 +19,8 @@
 
 ## 检查清单
 - [ ] `aifilm h3 next --root` / `h3 list --challenge` 看 P0→P2
+- [ ] 空闲：`aifilm h3 run-next --root --execute`（产能绿才跑；非 daemon）
+- [ ] 人审后：`h3 pk-ledger --append` 记 dailies（不跨片自动）
 - [ ] `h3 next` 的 `capacity_ready`（offline 也可仍给 command）
 - [ ] baseline 在 **takes/** 或 **manifest.clips** 都能解锁 P2（v2.37.7）
 - [ ] `aifilm h3 pk-compare --root` 只建议，禁静默 promote

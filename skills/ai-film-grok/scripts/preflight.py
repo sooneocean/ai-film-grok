@@ -754,6 +754,53 @@ def run_preflight(root: Path) -> dict[str, Any]:
             else:
                 soft.append(mm_issue)
 
+        # Speaker ↔ picture (on_camera): soft by default; hard on max dialogue_drama
+        try:
+            from dialogue_speaker_frame_gate import lint_dialogue_speaker_frame
+
+            sf_hard = (
+                spec.get("speaker_frame_strict") is True
+                or spec.get("dialogue_window_strict") is True
+                or (
+                    str(spec.get("vo_mode") or "") == "dialogue_drama"
+                    and str(spec.get("heat_scale") or "").lower() in {"max", "hot", "extreme"}
+                )
+            )
+            sf_rep = lint_dialogue_speaker_frame(spec)
+            bad_n = len(sf_rep.get("violations") or []) + len(sf_rep.get("window_violations") or [])
+            if bad_n:
+                codes = sorted(
+                    {
+                        str(v.get("code"))
+                        for v in list(sf_rep.get("violations") or [])
+                        + list(sf_rep.get("window_violations") or [])
+                        if v.get("code")
+                    }
+                )
+                sf_issue = _issue(
+                    "hard" if sf_hard else "soft",
+                    "speaker_frame",
+                    f"speaker-frame {'hard' if sf_hard else 'soft'} lint: {codes} (n={bad_n})",
+                    fix=(
+                        "on_camera 台词镜 speaker 必须=画面主体(dsl.subject/cast)且与 "
+                        "audio_cues.speaker 一致；同 beat 热窗内禁 speaker 翻转。"
+                        "逃生: speaker_frame_strict:false / dialogue_window_strict:false"
+                    ),
+                )
+                if sf_hard:
+                    hard.append(sf_issue)
+                else:
+                    soft.append(sf_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "speaker_frame_probe_error",
+                    f"speaker-frame probe failed: {exc}"[:200],
+                    fix="check dialogue_speaker_frame_gate",
+                )
+            )
+
         # Dramatic meaning stack (shot / motion / dialogue purpose / emotional_arc)
         try:
             from dramatic_meaning import lint_dramatic_meaning, meaning_gate_enabled

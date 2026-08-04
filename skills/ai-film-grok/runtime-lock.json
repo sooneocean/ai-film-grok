@@ -306,7 +306,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "d23ee914f012b2bf8916ca8e1af3338b6867b2de7ec3d1c222721eebdd7a2ffa"
+      "sha256": "ab0da8f5f5e967bd53fadb5281c055fc24a8f27258ce1031278bec483f287e82"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -537,6 +537,10 @@
       "sha256": "d1ddfba28e414d3032161bb49c7a28dc7a560d4ef96603f786d603dadcdae675"
     },
     {
+      "path": "scripts/dialogue_speaker_frame_gate.py",
+      "sha256": "ab5cb59c40ed84da37ac4409f50bc811b2a3a50215030dfdbc357672c409d2fd"
+    },
+    {
       "path": "scripts/dialogue_style.py",
       "sha256": "45253d9769cf5fc76e71dc24152e9c2413661befec20e779c298caf396db1507"
     },
@@ -678,7 +682,7 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "44cdcdedaa58937ec989ebc0d48a086b864c6ad08630b86dc2046a9190e4820a"
+      "sha256": "4c94330817badb98c4731e8bd5cde64fdf7a98ab705b9c3cc509ad5b277d9df9"
     },
     {
       "path": "scripts/h3_mode.py",
@@ -934,7 +938,7 @@
     },
     {
       "path": "scripts/preflight.py",
-      "sha256": "cf13351acd17d57181c13a78dd378df002f81eb20e8b8726b5ca84898d0fe29e"
+      "sha256": "b0b3680361d12fc3d13049f85da2bacb6c22c28a3571d570ff317eecc8c90f50"
     },
     {
       "path": "scripts/product_brief.py",

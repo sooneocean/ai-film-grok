@@ -140,9 +140,12 @@ def list_shot_takes(root: Path | str, shot_id: str) -> list[dict[str, Any]]:
         if lane == "unknown" and hint:
             if any(m in hint for m in _H3_NAME_MARKERS) or "comfy-h3" in hint:
                 lane = "h3"
-            elif any(m in hint for m in _GROK_NAME_MARKERS) or "grok" in hint:
-                lane = "grok"
-            elif "media-queue" in hint or "select-shortlist" in hint:
+            elif (
+                any(m in hint for m in _GROK_NAME_MARKERS)
+                or "grok" in hint
+                or "media-queue" in hint
+                or "select-shortlist" in hint
+            ):
                 lane = "grok"
         out.append(
             {
@@ -685,3 +688,150 @@ def pk_compare(
             f'aifilm select-shortlist --root "{base}"  # review then --promote' if rows else None
         ),
     }
+
+
+def run_next_fill_idle(
+    root: Path | str,
+    *,
+    include_challenge: bool = True,
+    execute: bool = False,
+    register: bool = True,
+    require_capacity: bool = True,
+    seed: int = 20260804,
+    timeout_sec: int = 1800,
+) -> dict[str, Any]:
+    """One-shot Fill-Idle worker: plan next job; optionally run when capacity ready.
+
+    Not a daemon — call from cron/agent loop. Never auto-promotes PK winners.
+    """
+    base = _root(root)
+    nxt_rep = next_fill_idle_job(base, include_challenge=include_challenge, check_capacity=True)
+    out: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "ai-film-h3-fill-idle-run-next",
+        "ok": True,
+        "root": str(base),
+        "execute": bool(execute),
+        "next_report": nxt_rep,
+        "ran": False,
+        "skipped_reason": None,
+        "run_result": None,
+    }
+    nxt = nxt_rep.get("next") if isinstance(nxt_rep.get("next"), dict) else None
+    if not nxt:
+        out["skipped_reason"] = "queue_empty"
+        return out
+    if not execute:
+        out["skipped_reason"] = "dry_run_pass_execute"
+        out["command"] = nxt.get("command")
+        return out
+    if require_capacity and nxt_rep.get("capacity_ready") is False:
+        out["skipped_reason"] = "capacity_not_ready"
+        out["ok"] = True  # advisory skip, not hard fail
+        return out
+
+    sid = str(nxt.get("shot_id") or "")
+    mode = str(nxt.get("mode") or "i2v")
+    try:
+        from h3_workflow import run_h3_shot
+
+        result = run_h3_shot(
+            base,
+            sid,
+            mode=mode,
+            register=bool(register),
+            status="candidate",
+            seed=int(seed),
+            timeout_sec=int(timeout_sec),
+            enqueue_queue=False,
+            production_stage="production",
+        )
+        out["ran"] = True
+        out["run_result"] = {
+            k: result.get(k)
+            for k in (
+                "ok",
+                "shot_id",
+                "mode",
+                "deliver_path",
+                "receipt",
+                "weapon_id",
+            )
+        }
+        out["ok"] = bool(result.get("ok"))
+    except Exception as exc:  # noqa: BLE001
+        out["ok"] = False
+        out["skipped_reason"] = "run_failed"
+        out["error"] = str(exc)[:300]
+    # write receipt
+    try:
+        from util import write_json
+
+        rec = base / "receipts" / "fill-idle-run-next.json"
+        rec.parent.mkdir(parents=True, exist_ok=True)
+        write_json(rec, out)
+        out["receipt"] = str(rec)
+    except Exception:
+        pass
+    return out
+
+
+def pk_ledger_path(root: Path | str) -> Path:
+    return _root(root) / "receipts" / "pk-ledger.json"
+
+
+def load_pk_ledger(root: Path | str) -> dict[str, Any]:
+    path = pk_ledger_path(root)
+    data = read_json(path) if path.is_file() else None
+    if isinstance(data, dict) and data.get("kind") == "ai-film-h3-pk-ledger":
+        return data
+    return {
+        "schema_version": 1,
+        "kind": "ai-film-h3-pk-ledger",
+        "ok": True,
+        "root": str(_root(root)),
+        "entries": [],
+        "policy": "advisory_only_never_auto_promote_or_cross_film",
+    }
+
+
+def append_pk_ledger(
+    root: Path | str,
+    *,
+    shot_id: str,
+    winner_path: str,
+    winner_lane: str | None = None,
+    mean: float | None = None,
+    note: str = "",
+    human: str = "user",
+) -> dict[str, Any]:
+    """Append a human PK decision for dailies — never mutates manifest.clips."""
+    base = _root(root)
+    ledger = load_pk_ledger(base)
+    entries = list(ledger.get("entries") or [])
+    entry = {
+        "at": utc_now(),
+        "shot_id": shot_id,
+        "winner_path": winner_path,
+        "winner_lane": winner_lane,
+        "mean": mean,
+        "note": note,
+        "human": human,
+        "auto_applied": False,
+    }
+    entries.append(entry)
+    ledger["entries"] = entries
+    ledger["count"] = len(entries)
+    ledger["updated_at"] = utc_now()
+    from util import write_json
+
+    path = pk_ledger_path(base)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(path, ledger)
+    ledger["path"] = str(path)
+    ledger["ok"] = True
+    ledger["note"] = (
+        "Ledger is advisory/dailies only — does not promote clips or carry "
+        "win-rate into other films (agree-all 2026-08-04)."
+    )
+    return ledger

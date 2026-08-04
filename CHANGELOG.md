@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.37.8] - 2026-08-04
+
+### Added (Speaker-frame + Fill-Idle run-next + PK ledger)
+- **`dialogue_speaker_frame_gate`**: on_camera speaker must match cue + dsl.subject/cast; heat-window beat flip gate; preflight soft/hard.
+- **`aifilm h3 run-next`**: one-shot worker (capacity-aware); `--execute` runs next H3 job — not a daemon; never auto-promotes.
+- **`aifilm h3 pk-ledger`**: advisory dailies ledger only (no cross-film auto win-rate; agree-all).
+- Tests: `test_dialogue_speaker_frame_gate.py` · `test_fill_idle_run_next_ledger.py`.
+
 ## [2.37.7] - 2026-08-04
 
 ### Fixed / Added (Fill-Idle production closed loop)
