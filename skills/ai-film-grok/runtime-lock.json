@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "d9c444d09a1fd1adece54a5bee0494eb1bee86759a5759605a5c6031be2b89f9"
+      "sha256": "b3b64137a06e436b2da99a57e0fd7b8314054896093092d5285c2922c263f041"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -394,7 +394,7 @@
     },
     {
       "path": "scripts/cli_workflow.py",
-      "sha256": "a0dc3d88b77779d2e9844a04a552eb9ec171a1a31b1bf260a2458eb8178578aa"
+      "sha256": "cdf427b8056ef780035544b10d4a5f31c2a6a31b471a1fe2e3c0d1f30951af04"
     },
     {
       "path": "scripts/cli_workshop.py",
@@ -702,19 +702,19 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "1fbc3077d78bae87da878e159b7a3b58695838f36635649f7867da35219a4193"
+      "sha256": "cf79c41169786e4fbf0f2c0fe99d69d2282eaf41dd7f3a47104c488212738749"
     },
     {
       "path": "scripts/h3_media_pack.py",
-      "sha256": "211a93307e300d8d5d37a2ef29ec9d4f710574ebbdecc9f4c1d3175e7b3e3acd"
+      "sha256": "0f7f7b61575d10ee3ae2d31e28e89417fd7b2b77948207aa30cb3c03e462f9c3"
     },
     {
       "path": "scripts/h3_mode.py",
-      "sha256": "b6e6e01b5acd7e3c99d56928c700be9d9f3006f4aa22ef1debfc14f8abc48d2a"
+      "sha256": "2d37aba994972b461b8e605d2064394bfbb867b2e11dd72ad9c62bfa023276db"
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "3c6f9df99a267feab66350cc2ba21fa585d63ffe07638da6accd8f1dcd3ded33"
+      "sha256": "8195803c2f32c4ebc0998941a647e73bca75accea757312f73418b8254b1d9c7"
     },
     {
       "path": "scripts/heat_check.py",
@@ -727,6 +727,10 @@
     {
       "path": "scripts/i2v_provider.py",
       "sha256": "a0d395223f7cee65b1c6411152cbd8b98f7b8536e73581fed841773e659b87e5"
+    },
+    {
+      "path": "scripts/input_fidelity.py",
+      "sha256": "b5caa33c9656336df70ecbce53c4e5484c3daa148bf219573f093b1c1ef95f25"
     },
     {
       "path": "scripts/intake.py",
@@ -830,7 +834,7 @@
     },
     {
       "path": "scripts/motion_prompt_spine.py",
-      "sha256": "a6ee0028b3cc95c901bca8f3946094dbf6ee18007c801d72b6779dd090aadb03"
+      "sha256": "60afa5295b41cf6a473888b86e03605b407eae8f31c868bea7b43a968439099c"
     },
     {
       "path": "scripts/music_cue.py",
@@ -858,7 +862,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "4093a3a81776c363ad4657bacd41a861361ff31bcb874e5ad5de79aba8a26cee"
+      "sha256": "d5adf07ecebd7003dad06f3756bc89aa6a3633e6522a1f1f61078e67c0b0fc36"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -1094,7 +1098,7 @@
     },
     {
       "path": "scripts/script_value_debrief.py",
-      "sha256": "e2adb56927310b935099573cdeff85028458ca6d1ae3cc218c045e366338ff15"
+      "sha256": "4c94f15c143067d4e5a0739ca6df05da346bbf19181fbd5d570db6e144580270"
     },
     {
       "path": "scripts/security_policy.py",

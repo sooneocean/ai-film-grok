@@ -160,11 +160,75 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
         help="With --apply: validate and write apply receipt without running review-final",
     )
 
+    # Input fidelity (Wave F0 · input→pixel correlation score)
+    fid = sub.add_parser(
+        "fidelity",
+        help="Input fidelity: how much plan/media still matches user source (status|check)",
+    )
+    fid_sub = fid.add_subparsers(dest="fidelity_action", required=True)
+    for action, help_text in (
+        ("status", "Recompute fidelity report (no force-write unless --write)"),
+        ("check", "Write receipts/input-fidelity.json and exit 2 if not ok"),
+    ):
+        p = fid_sub.add_parser(action, help=help_text)
+        p.add_argument("--root", required=True)
+        p.add_argument(
+            "--strict",
+            action="store_true",
+            help="Treat pollution/entity/protected/must_keep codes as blocking",
+        )
+        p.add_argument(
+            "--soft",
+            action="store_true",
+            help="Force soft mode (never block on warning codes)",
+        )
+        if action == "status":
+            p.add_argument(
+                "--write",
+                action="store_true",
+                help="Also write receipts/input-fidelity.json",
+            )
+        if action == "check":
+            p.add_argument(
+                "--no-write",
+                action="store_true",
+                help="Do not write receipt (print only)",
+            )
+
 
 def run_workflow_cmd(args: argparse.Namespace) -> int:
     """Dispatch workflow-related top-level cmds. Returns process exit code."""
     cmd = str(getattr(args, "cmd", "") or "")
     try:
+        if cmd == "fidelity":
+            from input_fidelity import fidelity_check, fidelity_status
+
+            action = str(getattr(args, "fidelity_action", "") or "")
+            strict: bool | None = None
+            if bool(getattr(args, "strict", False)):
+                strict = True
+            elif bool(getattr(args, "soft", False)):
+                strict = False
+            if action == "status":
+                if bool(getattr(args, "write", False)):
+                    report = fidelity_check(args.root, strict=strict, write=True)
+                else:
+                    report = fidelity_status(args.root)
+                    if strict is not None:
+                        report = fidelity_check(args.root, strict=strict, write=False)
+                _emit(report)
+                return 0 if report.get("ok") else 2
+            if action == "check":
+                report = fidelity_check(
+                    args.root,
+                    strict=strict,
+                    write=not bool(getattr(args, "no_write", False)),
+                )
+                _emit(report)
+                return 0 if report.get("ok") else 2
+            _emit({"ok": False, "error": f"unknown fidelity action: {action}"})
+            return 2
+
         if cmd == "pilot-pack":
             from pilot_pack import pilot_pack
 

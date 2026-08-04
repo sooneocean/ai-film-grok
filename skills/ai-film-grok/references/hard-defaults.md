@@ -35,6 +35,7 @@
 | **生成 first/last** | **产品硬底**（2026-07-21）：`register-clip` 后自动 last→next first（continue/卸装/max）；下镜 I2V 禁 cast 重起；按真实末帧衣着/姿势写 prompt；**末帧须先过 W8 不回穿门**；见 first-last-gen · i2v-endframe-no-redress |
 | **旁白荤梗** | **产品硬底**（2026-07-21）：max 办事剧 **每镜 nar 须含荤梗**；act/climax 须办事动词（沉腰/办穿/吃进…）；禁纯文艺灯暗句；默认 `sex_vo_strict` |
 | **用户原文保真** | **P0**（2026-07-22 金瓶梅案）：用户剧本/诗白是脊柱；`_SPICY_NAR` 仅无用户句时兜底；**禁止**整句盖成「展厅落锁」；多段剧本禁止 dual-climax 自动×N 克隆；`user_source_fidelity_strict`（max 默认）→ `USER_SOURCE_NAR_POLLUTED`；见 [user-source-fidelity](lessons-2026-07-22-user-source-fidelity.md) |
+| **Input Fidelity 总分（P0 · 2026-08-04）** | **尺子先于生成**：`aifilm fidelity status\|check --root` → `receipts/input-fidelity.json`（污染 + 实体覆盖 + 保护台词 + must_keep 映射 + debrief）。plan 后建议 ≥0.75。默认 soft；`max`+`user_source_fidelity_strict`+debrief 已确认 或 `AIFILM_FIDELITY_STRICT=1` → hard。final 逃生 `AIFILM_SKIP_FIDELITY_FINAL_GATE=1`（F3 接线）。≠ dramatic_meaning（戏是否成立）；本闸=**像不像用户稿**。模板 [input-fidelity.example.json](../templates/input-fidelity.example.json) · [memory](../memory/2026-08-04-input-fidelity.md) |
 | heat_phase | 可选；`heat_phase_auto` 时从 dramatic_function 填，**不猜 climax** |
 | 女主 | **默认 single**；multi 仅证据（Prompt/多图/显式字段）；勿臆造 |
 | 定妆 | style-v1 + cast masters + lookbook → pilot 3 镜用户批准 → bulk |

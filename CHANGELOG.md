@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.38.9] - 2026-08-04
+
+### Added (Input Fidelity · Wave F0)
+- **`input_fidelity.py`**: aggregate score + codes (pollution, entity coverage, protected dialogue, must_keep map, debrief, source anchors) → `receipts/input-fidelity.json`.
+- **`aifilm fidelity status|check --root`**: `--strict` / `--soft`; env `AIFILM_FIDELITY_STRICT`.
+- Template + hard-defaults row + memory `2026-08-04-input-fidelity.md`; SKILL plan-chain hook.
+- Tests: `test_input_fidelity.py`. Backlog F1–F3/S in `docs/plans/2026-08-04-input-fidelity-flow.md`.
+
+### Changed (H3 I2V/R2V first+last primary · quality)
+- **Policy `h3_max_effect_v2_first_last`**: first+last both present → **FLF primary** (including restricted dialogue-CU / high-motion); energy becomes `alt_mode=r2v`. `force_r2v` still R2V (last as pose ref).
+- **Fill-Idle**: passes `has_last`; tracks `_flf_` as identity leg; dual prefer FLF; commands include `--last-frame`.
+- **R2V first/last input**: last still is first multi-ref (pose land) + land prompt; plan/receipt/queue carry last for r2v.
+- Docs: weapon-lane matrix · memory `2026-08-04-h3-flf-first-last.md`; SKILL P0 #7.
+- Tests: energy+last→flf · force_r2v+last · 53 H3 tests green.
+
+## [2.38.8] - 2026-08-04
+
+### Added (script-value-debrief routing + smarter seed)
+- **`next_actions`**: story intake → force `plan-debrief` / `plan-debrief-confirm` first (early return); pipeline stage flag `script_value_debrief_pending`; skip once pilot/media past planning.
+- **`seed_from_reception`**: infer dramatic_function/rank; guarantee climax/ending; setup→climax pairs; `needs_agent_fill` only when state/visible incomplete.
+- **Schema**: `schemas/script-value-debrief.schema.json` + soft stamp on write (`_schema_ok` / `_schema_validation`).
+- **context-routing**: optional debrief ref on story/beats stages.
+- Tests: next_actions debrief gate + richer seed/confirm coverage.
+
 ## [2.38.7] - 2026-08-04
 
 ### Added (H3 FLF + media-pack + multi-ref full chain)

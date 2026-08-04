@@ -1,0 +1,55 @@
+{
+  "kind": "input-fidelity",
+  "ok": true,
+  "score": 0.86,
+  "plan_floor": 0.75,
+  "strict": false,
+  "codes": [],
+  "blocking_codes": [],
+  "issues": [],
+  "source_sha": "<utf8-sha256-of-raw_text>",
+  "has_source": true,
+  "promise_ref": "3 秒内可懂的观看承诺（来自 debrief.viewer_promise）",
+  "must_keep": ["beat_hook", "beat_climax"],
+  "protected_dialogue_coverage": {
+    "score": 1.0,
+    "total": 2,
+    "missing": [],
+    "rows": [
+      { "text": "今夜别走", "ok": true }
+    ]
+  },
+  "entity_coverage": {
+    "score": 0.875,
+    "hit": ["西门庆", "潘金莲", "狮子街"],
+    "miss": []
+  },
+  "must_keep_map": {
+    "score": 1.0,
+    "unmapped": [],
+    "rows": [
+      { "must_keep_beat_id": "beat_hook", "shot_ids": ["shot01"], "ok": true }
+    ]
+  },
+  "source_anchors": {
+    "score": 0.2,
+    "anchored": 1,
+    "shot_count": 5
+  },
+  "user_source_fidelity": {
+    "ok": true,
+    "pollution_ratio": 0.0,
+    "codes": [],
+    "polluted_shots": []
+  },
+  "debrief": {
+    "present": true,
+    "confirmed": true,
+    "viewer_promise": "…",
+    "must_keep_count": 2
+  },
+  "shot_count": 5,
+  "next_cmd": "aifilm dispatch --root \"<film>\"",
+  "generated_at": "2026-08-04T00:00:00Z",
+  "note": "Input fidelity = how much the plan still looks like user input"
+}
