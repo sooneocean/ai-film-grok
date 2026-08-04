@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.10] - 2026-08-04
+
+### Changed (Gate-auto deep wire · advance / dispatch / ship-prep / export)
+- **advance** + **autopilot W8**: `gate-auto` and `cinematic-gate` on `ADVANCE_ACTIONS` + `LOCAL_THROUGHPUT_NEXT_IDS` so `aifilm advance` / autopilot can run the machine ladder without human click.
+- **dispatch**: clips 齐后优先 `gate-auto`（机写 mean/i2v-final/cinematic）；`_COMMAND_POLICIES` local/none.
+- **ship-prep** end stamp uses `run_gate_auto` (falls back to cinematic auto_i2v).
+- **export-desktop** assert: missing/red cinematic → `gate-auto` once then re-check.
+- Tests: advance argv + W8 allowlist cases. Escape unchanged (`AIFILM_SKIP_GATE_AUTO` / `AIFILM_SKIP_CINEMATIC_GATE`).
+
 ## [2.39.9] - 2026-08-04
 
 ### Added (Gate-auto machine verification · no human click-loop)

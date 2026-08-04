@@ -1413,42 +1413,97 @@ def ship_prep(
             }
         )
 
-    # Wave ε · stamp cinematic-gate after ladder (composite truth for export)
+    # Wave ε+ · gate-auto (measure+write + cinematic) after ladder — no hand-click
     try:
-        from cinematic_gate import run_cinematic_gate
+        from gate_auto import run_gate_auto
 
-        cin = run_cinematic_gate(
+        auto = run_gate_auto(
             root,
             write=write,
-            run_ship_prep=False,
-            skip_variety=True,  # already ran variety step
-            skip_five_track=True,  # already ran five_track step
+            fix_sex_sfx=True,
+            measure_i2v=True,
+            promote_single=False,  # ship-prep already shortlisted
+            run_variety=False,  # already ran variety step
+            run_cinematic=True,
         )
         steps.append(
             {
-                "id": "cinematic_gate",
-                "ok": bool(cin.get("ok")),
-                "detail": f"blocked_by={cin.get('blocked_by')} soft={cin.get('soft_issues')}",
+                "id": "gate_auto",
+                "ok": bool(auto.get("ok")),
+                "detail": (
+                    f"blocked_by={auto.get('blocked_by')} human={auto.get('human_pending')}"
+                )[:180],
                 "hard": True,
-                "next_cmd": cin.get("next_cmd"),
+                "next_cmd": auto.get("next_cmd") or f'aifilm gate-auto --root "{root}"',
+                "human_pending": auto.get("human_pending"),
             }
         )
+        # surface cinematic sub-step for readers of ship-prep receipt
+        cin_ok = True
+        for st in auto.get("steps") or []:
+            if isinstance(st, dict) and st.get("id") == "cinematic_gate":
+                cin_ok = bool(st.get("ok"))
+                steps.append(
+                    {
+                        "id": "cinematic_gate",
+                        "ok": cin_ok,
+                        "detail": st.get("detail")
+                        or f"via gate-auto blocked={auto.get('blocked_by')}",
+                        "hard": True,
+                        "next_cmd": st.get("next_cmd"),
+                    }
+                )
+                break
+        if not any(s.get("id") == "cinematic_gate" for s in steps):
+            steps.append(
+                {
+                    "id": "cinematic_gate",
+                    "ok": bool(auto.get("ok")),
+                    "detail": "via gate-auto (no cinematic sub-step)",
+                    "hard": True,
+                    "next_cmd": auto.get("next_cmd"),
+                }
+            )
     except Exception as exc:  # noqa: BLE001
-        steps.append(
-            {
-                "id": "cinematic_gate",
-                "ok": True,
-                "detail": f"skip: {exc}"[:160],
-                "advisory": True,
-                "skipped": True,
-            }
-        )
+        try:
+            from cinematic_gate import run_cinematic_gate
+
+            cin = run_cinematic_gate(
+                root,
+                write=write,
+                run_ship_prep=False,
+                skip_variety=True,
+                skip_five_track=True,
+                auto_i2v=True,
+            )
+            steps.append(
+                {
+                    "id": "cinematic_gate",
+                    "ok": bool(cin.get("ok")),
+                    "detail": f"blocked_by={cin.get('blocked_by')} soft={cin.get('soft_issues')}",
+                    "hard": True,
+                    "next_cmd": cin.get("next_cmd"),
+                }
+            )
+        except Exception as exc2:  # noqa: BLE001
+            steps.append(
+                {
+                    "id": "cinematic_gate",
+                    "ok": True,
+                    "detail": f"skip: {exc}; {exc2}"[:160],
+                    "advisory": True,
+                    "skipped": True,
+                }
+            )
 
     hard_failed = [
         s
         for s in steps
         if not s.get("ok")
-        and (s.get("hard") or s["id"] in {"variety", "i2v_motion_gate", "cinematic_gate"})
+        and (
+            s.get("hard")
+            or s["id"] in {"variety", "i2v_motion_gate", "cinematic_gate", "gate_auto"}
+        )
     ]
     # soft fail film_core when not hard
     soft_only = [s for s in steps if not s.get("ok") and s.get("advisory") and not s.get("hard")]

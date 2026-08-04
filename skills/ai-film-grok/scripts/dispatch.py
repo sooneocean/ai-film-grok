@@ -41,6 +41,8 @@ _ACTION_SKILLS = {
     "film-core-closeout": "projection.verify",
     "select-shortlist": "projection.verify",
     "ship-prep": "projection.verify",
+    "gate-auto": "projection.verify",
+    "cinematic-gate": "projection.verify",
     "export-desktop": "export.package",
     "dailies_review-evidence": "dispatch.orchestrate",
     "agent-review-final": "quality.inspect",
@@ -72,6 +74,8 @@ _COMMAND_POLICIES = {
     "film-core-closeout": ("local", "none"),
     "select-shortlist": ("local", "none"),
     "ship-prep": ("local", "none"),
+    "gate-auto": ("local", "none"),
+    "cinematic-gate": ("local", "none"),
     "queue-progress": ("local", "none"),
     "tunnel-probe": ("local", "none"),
     "gpu-lease": ("local", "none"),
@@ -722,22 +726,28 @@ def build_dispatch(
                 "clips 齐且有 takes — 先 select-shortlist 标 preferred（不删 take）再粗剪/final",
                 "visual",
             )
-    # Phase B/2.37 · ship-prep or motion gate after clips
+    # Phase B/2.37 + gate-auto · machine ladder after clips (no human click-loop)
     if craft_stage in {"selects", "media", "rough", "post"} and gates.get("clips_complete"):
         ship_rec = read_json(root / "receipts" / "ship-prep.json") or {}
         gate_rec = read_json(root / "receipts" / "i2v-final-gate.json") or {}
+        cin_rec = read_json(root / "receipts" / "cinematic-gate.json") or {}
+        auto_rec = read_json(root / "receipts" / "gate-auto.json") or {}
         if ship_rec.get("ok") is not True and gate_rec.get("ok") is not True:
             pre(
                 "ship-prep",
                 f'aifilm ship-prep --root "{r}"',
-                "clips 齐 — 一键 means+variety+shortlist+motion-gate+film_core（优于散敲）",
+                "clips 齐 — 一键 means+variety+shortlist+motion-gate+gate-auto（优于散敲）",
                 "visual",
             )
-        elif gate_rec.get("ok") is not True:
+        elif (
+            cin_rec.get("ok") is not True
+            or gate_rec.get("ok") is not True
+            or auto_rec.get("ok") is not True
+        ):
             pre(
-                "i2v-motion-gate",
-                f'aifilm i2v-motion-gate --root "{r}" --write',
-                "clips 齐但 i2v-final-gate 未绿 — 从 film-spec 自动填 DF 后跑 motion gate",
+                "gate-auto",
+                f'aifilm gate-auto --root "{r}"',
+                "clips 齐 — gate-auto 机写 mean/i2v-final/sex_sfx/cinematic（无需人工点闸）",
                 "visual",
             )
     if craft_stage in {"post", "deliver", "rough"} and (

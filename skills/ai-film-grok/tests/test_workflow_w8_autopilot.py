@@ -54,6 +54,8 @@ def test_w8_core_ops_validate_argv(tmp_path: Path) -> None:
         ("closeout-run", ["closeout", "run", "--root", str(root)], "projection.verify"),
         ("pilot-pack", ["pilot-pack", "--root", str(root)], "quality.inspect"),
         ("select-shortlist", ["select-shortlist", "--root", str(root)], "projection.verify"),
+        ("gate-auto", ["gate-auto", "--root", str(root)], "projection.verify"),
+        ("ship-prep", ["ship-prep", "--root", str(root)], "projection.verify"),
     )
     for next_id, argv, skill_id in cases:
         _validate_argv(

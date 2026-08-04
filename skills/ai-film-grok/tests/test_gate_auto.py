@@ -80,3 +80,33 @@ def test_gate_auto_skip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     assert rep.get("skipped") is True
     assert rep.get("ok") is True
     monkeypatch.delenv("AIFILM_SKIP_GATE_AUTO", raising=False)
+
+
+def test_gate_auto_on_advance_and_w8_allowlist() -> None:
+    from advance import ADVANCE_ACTIONS
+    from autopilot import LOCAL_THROUGHPUT_NEXT_IDS
+    from dispatch import _ACTION_SKILLS, _COMMAND_POLICIES
+
+    assert "gate-auto" in ADVANCE_ACTIONS
+    assert "gate-auto" in LOCAL_THROUGHPUT_NEXT_IDS
+    assert "cinematic-gate" in ADVANCE_ACTIONS
+    assert "cinematic-gate" in LOCAL_THROUGHPUT_NEXT_IDS
+    assert _ACTION_SKILLS.get("gate-auto") == "projection.verify"
+    assert _COMMAND_POLICIES.get("gate-auto") == ("local", "none")
+    assert _COMMAND_POLICIES.get("cinematic-gate") == ("local", "none")
+
+
+def test_gate_auto_advance_argv(tmp_path: Path) -> None:
+    from advance import _validate_argv
+
+    root = tmp_path.resolve()
+    _validate_argv(
+        root=root,
+        action_id="gate-auto",
+        action={
+            "spend_class": "local",
+            "approval_class": "none",
+            "skill_id": "projection.verify",
+            "argv": ["gate-auto", "--root", str(root)],
+        },
+    )

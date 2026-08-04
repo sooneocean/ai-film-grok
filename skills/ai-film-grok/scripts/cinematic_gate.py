@@ -414,23 +414,31 @@ def _write_receipt(root: Path, report: dict[str, Any]) -> Path:
 
 
 def assert_cinematic_gate_for_export(root: Path | str) -> dict[str, Any]:
-    """Hard block export-desktop when cinematic-gate not ok (missing = fail)."""
+    """Hard block export-desktop when cinematic-gate not ok (missing = fail).
+
+    Before fail: run gate-auto once (measure means / inject / rewrite receipts),
+    then refresh cinematic-gate — agents need not hand-click the ladder.
+    """
     base = Path(root).expanduser().resolve()
     if skip_enabled():
         return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_CINEMATIC_GATE=1"}
     path = base / "receipts" / RECEIPT_NAME
-    if not path.is_file():
-        # auto-run once
-        report = run_cinematic_gate(base, write=True)
-    else:
-        report = read_json(path) or {}
-        if not isinstance(report, dict) or report.get("ok") is not True:
-            # re-run to refresh
-            report = run_cinematic_gate(base, write=True)
+    report = read_json(path) if path.is_file() else None
+    if isinstance(report, dict) and report.get("ok") is True:
+        return {"ok": True, "gate": report, "path": str(path)}
+
+    # Deep auto: full machine ladder then re-read cinematic
+    try:
+        from gate_auto import run_gate_auto
+
+        run_gate_auto(base, write=True)
+    except Exception:
+        pass
+    report = run_cinematic_gate(base, write=True, auto_i2v=True)
     if not isinstance(report, dict) or report.get("ok") is not True:
         raise CinematicGateError(
             "Desktop export blocked by cinematic-gate (ok!=true); "
-            f'run: aifilm cinematic-gate --root "{base}". '
+            f'run: aifilm gate-auto --root "{base}". '
             f"blocked_by={report.get('blocked_by') if isinstance(report, dict) else None}. "
             "Escape: AIFILM_SKIP_CINEMATIC_GATE=1"
         )

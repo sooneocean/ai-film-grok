@@ -121,6 +121,27 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
         bool_flags=("--no-measure", "--no-promote", "--skip-variety"),
         verifier=("ship-prep",),
     ),
+    # Machine gate ladder — no human click-loop (pilot/PK/review still human)
+    "gate-auto": AdvancePolicy(
+        ("projection.verify", "dispatch.orchestrate"),
+        ("gate-auto",),
+        value_flags=("--root",),
+        bool_flags=(
+            "--no-write",
+            "--no-sex-sfx",
+            "--no-promote-single",
+            "--no-variety",
+            "--no-cinematic",
+        ),
+        verifier=("gate-auto",),
+    ),
+    "cinematic-gate": AdvancePolicy(
+        ("projection.verify", "dispatch.orchestrate"),
+        ("cinematic-gate",),
+        value_flags=("--root",),
+        bool_flags=("--ship-prep", "--skip-variety", "--skip-five-track", "--no-write"),
+        verifier=("cinematic-gate",),
+    ),
     # Input fidelity (read-only check + local apply stamp; no pilot/debrief sign)
     "fidelity-check": AdvancePolicy(
         ("story.validate", "dispatch.orchestrate"),

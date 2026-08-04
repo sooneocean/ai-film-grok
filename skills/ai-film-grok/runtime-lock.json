@@ -106,7 +106,7 @@
     },
     {
       "path": "scripts/advance.py",
-      "sha256": "9b148fce71d8201cc8c6fa2c04bef55ed611a0d029e631fe4ee2519e0f12efe3"
+      "sha256": "b5c99a9b6cb786042433360c31a6e5b50e1fbe49fa6fd45dfe860ef3b941875c"
     },
     {
       "path": "scripts/agent_review_final.py",
@@ -210,7 +210,7 @@
     },
     {
       "path": "scripts/autopilot.py",
-      "sha256": "f2fc76a1ee647f9eceda7da0e66b1a66be6e80aace7eef93fe20af50dd96f37d"
+      "sha256": "158d16a3c942b39277f0087cc770d0624ad4374902c77056d230eb61e4a1680f"
     },
     {
       "path": "scripts/autopilot_notify.py",
@@ -278,7 +278,7 @@
     },
     {
       "path": "scripts/cinematic_gate.py",
-      "sha256": "4fc1a425bcdda49834e83357a03a6cd68a9bcaaf96bf774e576ba2f5d184de58"
+      "sha256": "2e9e03c2b41653a2ef964d272f638f949785c8cf94b6997486b6c893772d7687"
     },
     {
       "path": "scripts/cli/__init__.py",
@@ -578,7 +578,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "6f7cbbcde7433572b2f0439bca3556c5c4d137202a7c9958815e3d77f756c4e0"
+      "sha256": "3852e082ac4754eb95a391596b40a237e31485daff6ec500232a1517d911e1ad"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -874,7 +874,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "e5fc557cc2280ef052332da720093774550bb6090a26b51f86c54ba282247009"
+      "sha256": "1383f42dad9a42a5364b2f9fa30c19bb32e62d530fe3bd594c2938d1db625354"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -1354,7 +1354,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "a1ade5e843c1e36e421d8b622ced519e17cb6cc623efc9e4e2e86c0fa9c13991"
+      "sha256": "58d028c730b703008286c175d1437a81932d9a1ceb785d4d5f0347cafd1ce1ae"
     },
     {
       "path": "scripts/workflow_spine.py",

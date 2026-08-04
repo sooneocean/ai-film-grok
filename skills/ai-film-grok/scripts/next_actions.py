@@ -62,6 +62,9 @@ _ACTION_STAGE: dict[str, str] = {
     "design-go": "agent",
     "post-audit": "post",
     "cinematic-gate": "post",
+    "gate-auto": "post",
+    "ship-prep": "post",
+    "i2v-motion-gate": "post",
     "export-desktop": "deliver",
     "done": "done",
 }
