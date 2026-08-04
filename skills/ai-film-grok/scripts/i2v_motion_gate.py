@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""I2V high-motion product gate (P0 · 2026-07-27).
+"""I2V high-motion product gate (P0 · 2026-07-27 · DF tiers P1 · 2026-08-04).
 
 Pixel kinetic floors (mean_absdiff · fps=5 · 140×248 gray per lesson):
+  - soft (reaction/afterglow/insert DF): mean ≥ 10
+  - medium (bare recovery / soft under wardrobe): mean ≥ 16
   - normal (non-act/climax): mean ≥ 18
-  - meat (act/climax): mean ≥ 20 (target ≥ 24)
+  - meat/high (act/climax or high DF): mean ≥ 20 (target ≥ 24)
   - envelope after 60s / meat window: mean ≥ 18
 
 Ken Burns / micro-breath / weak raw cannot pass as meat or final plate.
@@ -81,15 +83,20 @@ def motion_tier_for_shot(
 ) -> str:
     """Resolve optical tier from heat + DF + optional spine motion_tier.
 
-    Precedence: bare/act/climax meat → high DF → soft DF → spine soft/medium/high → phase.
+    Precedence: act/climax meat → bare (meat, or medium if soft/afterglow DF)
+    → high DF → soft DF → spine soft/medium/high → phase.
     """
     heat = str(heat_phase or "").strip().lower()
     df = str(dramatic_function or "").strip().lower()
     wardrobe = str(wardrobe_state or "").strip().lower()
     spine = str(spine_tier or "").strip().lower()
 
-    if wardrobe in {"bare", "undressed", "nude"} or heat in MEAT_PHASES:
-        if df in SOFT_DFS and heat in {"afterglow"}:
+    # Meat heat always thrash floor (do not relax act/climax for soft DF tags)
+    if heat in MEAT_PHASES:
+        return "meat"
+    # Bare wardrobe: default meat; afterglow/soft recovery uses medium floor
+    if wardrobe in {"bare", "undressed", "nude"}:
+        if df in SOFT_DFS or heat == "afterglow" or df == "afterglow":
             return "medium"
         return "meat"
     if df in HIGH_DFS:

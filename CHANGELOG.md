@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.35.2] - 2026-08-04
+
+### Added
+- **Motion Core P1 — variety on bulk:** `bulk_preflight` and `h3 run --register` fail-closed on `variety-precheck` (`assert_variety_preflight`). Escape: `AIFILM_SKIP_VARIETY_PREFLIGHT=1`.
+- **Motion Core P1 — DF-aware motion gate:** `motion_tier_for_shot` + floors soft≥10 / medium≥16 / normal≥18 / meat·high≥20; act/climax never demoted by soft DF; bare afterglow → medium.
+- **Motion Core P2 min:** H3 `_write_continue_handoff` → `receipts/continue-handoff/`; closeout advisory `film_core` via `film_core_closeout_audit` → `receipts/film-core-closeout.json`.
+
+### Tests
+- `tests/test_motion_core_p1.py`
+
+### Docs
+- hard-defaults Motion Core P1/P2 row + high-motion DF floors
+
 ## [2.35.1] - 2026-08-04
 
 ### Added
