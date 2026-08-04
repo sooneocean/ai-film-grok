@@ -20,6 +20,12 @@
    `creative_suggestion`。不可把推断包装成原文事实。
 5. 对用户回显标题、logline、关键选择、成人向处理（若有）与 `unknowns`；随后可直接
    写草案，但在 story lock 前等待用户确认。
+6. **呈现价值拆解（强制，lock 前）**：在 reception 落盘后，写
+   `receipts/script-value-debrief.json`（L0 用户契约 · L1 编剧 · L2 Beat Value Card ·
+   L3 观众旅程 · L4 pilot/武器建议）。向用户回显 `viewer_promise`、must_have/must_not、
+   ≥2 不可砍 beat；确认前不得 story lock。字段与仲裁见
+   [script-value-debrief.md](script-value-debrief.md)；模板
+   [script-value-debrief.example.json](../templates/script-value-debrief.example.json)。
 
 ## 成人向增强
 

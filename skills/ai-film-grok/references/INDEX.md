@@ -28,6 +28,8 @@
 | [craft-spine.md](craft-spine.md) | 八环工序主脊 Idea→Verified |
 | [generative-film-craft.md](generative-film-craft.md) | 生成式电影工序（Beat/Coverage/五锁） |
 | [directors-lens.md](directors-lens.md) | Director's Lens 文本→故事→Storyboard→film-spec |
+| [script-value-debrief.md](script-value-debrief.md) | 剧本呈现价值拆解 L0–L4（用户/编剧/导演/观众/生产）lock 前门 |
+| [story-reception.md](story-reception.md) | 小说/剧本接收器（原文 sha + 导演处理包） |
 | [beat-spines.md](beat-spines.md) | 多类型节拍骨架总纲 |
 | [pipeline-methodology.md](pipeline-methodology.md) | 工具层 + 工序层方法论 |
 | [longform-workflow.md](longform-workflow.md) | 8–15 分钟竖屏长片合约、单元与恢复 |

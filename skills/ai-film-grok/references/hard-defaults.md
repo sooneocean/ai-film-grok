@@ -185,7 +185,7 @@
 ## 权威链接
 
 - [pipeline-methodology.md](pipeline-methodology.md) · [principles.md](principles.md)
-- [directors-lens.md](directors-lens.md) · [film-spec.md](film-spec.md) · [consistency.md](consistency.md)
+- [directors-lens.md](directors-lens.md) · [script-value-debrief.md](script-value-debrief.md) · [film-spec.md](film-spec.md) · [consistency.md](consistency.md)
 - [continuity_chain.md](continuity_chain.md) · [post-compose.md](post-compose.md) · [production-discipline.md](production-discipline.md)
 - [editor-cut-pass.md](editor-cut-pass.md) · [ecchi-story.md](ecchi-story.md) · [voices.md](voices.md)
 - [frw-degrade-dispatch.md](frw-degrade-dispatch.md) · [lessons-2026-07-21-frw-key-capability.md](lessons-2026-07-21-frw-key-capability.md)

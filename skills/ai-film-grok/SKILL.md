@@ -26,7 +26,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 映射：idea/story/beats→agent · shots/media→visual · rough/voice→voice+post · verified→deliver。  
 八环/11-stage=内部；规则 `hard-defaults`；context 只 stages。
 
-小说/剧本：[story.receive](references/story-reception.md) → `plan run --received-file`；lock 须用户确认。  
+小说/剧本：[story.receive](references/story-reception.md) → [script-value-debrief](references/script-value-debrief.md)（promise/不可砍 beat）→ `plan run --received-file`；lock 须用户确认。  
 会诊：[creative-workshop](references/creative-workshop.md)（默认编译，`apply` 才写图）。  
 长片：`plan run --production-mode longform`；[longform](references/longform-workflow.md)
 

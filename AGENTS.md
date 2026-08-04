@@ -82,6 +82,7 @@ JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmErr
 8b. **H3 效果最大化（2026-08-04）**：I2V 锁脸默认 · R2V 高动/大嘴 · T2V 无脸 env；续镜末帧→I2V；对白注入合并自定义 prompt → [h3-max lesson](skills/ai-film-grok/references/lessons-2026-08-04-h3-max-effect.md) · [memory](skills/ai-film-grok/memory/2026-08-04-h3-max-effect.md) · [weapon-lane-matrix](skills/ai-film-grok/references/weapon-lane-matrix.md)。
 8c. **Fill-Idle 挑战（2026-08-04）**：Grok 铺 soft；restricted 主轨 H3；5090 P0→P1→P2 空闲挑战（能烧就烧、禁抢 P0）；R2V=能量位；PK=shortlist 建议+人 promote；P2=mean 最低优先；final 不等 P2 / 高光不强制挑战；跨集胜率不自动 → [weapon-lane Fill-Idle](skills/ai-film-grok/references/weapon-lane-matrix.md) · [memory](skills/ai-film-grok/memory/2026-08-04-h3-fill-idle-challenge.md)。
 8. **文档分层**：SKILL 短 → hard-defaults 硬表 → stages 回合卡 → memory 速查 → lessons 复盘。
+8d. **剧本呈现价值（2026-08-04）**：story.receive 后、lock 前写 `receipts/script-value-debrief.json`（用户/编剧/导演/观众/生产 L0–L4）；确认 promise+不可砍 beat 才 lock → [script-value-debrief](skills/ai-film-grok/references/script-value-debrief.md) · [memory](skills/ai-film-grok/memory/2026-08-04-script-value-debrief.md)。
 9. **完成定义**：doctor 绿 + 相关 pytest 绿 +（若改 CLI）`plugin validate` 过；不是「改完文件」。
 10. **对外**：PR / release 文案给人过目后再发；本仓默认 private。
 
