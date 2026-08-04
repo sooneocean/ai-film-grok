@@ -440,6 +440,13 @@ def build_motion_prompt(
     body = " ".join(motion_core_clauses(spec, shot, include_audio=True)).strip()
     if not body:
         body = "subtle camera push-in, natural motion, readable physical change."
+    # F2 · story beat prefix (source_quote / playable_action)
+    try:
+        from input_fidelity import inject_story_beat_into_prompt
+
+        body = inject_story_beat_into_prompt(body, shot)
+    except Exception:
+        pass
     if include_provider_prefix:
         return f"{provider_prefix(mode)} {body}".strip()
     return body
@@ -456,6 +463,12 @@ def ensure_motion_core_in_prompt(
         return build_motion_prompt(spec, shot, mode="i2v", include_provider_prefix=False)
 
     out = base
+    try:
+        from input_fidelity import inject_story_beat_into_prompt
+
+        out = inject_story_beat_into_prompt(out, shot)
+    except Exception:
+        pass
     df = dramatic_function_of(shot)
     if (
         df

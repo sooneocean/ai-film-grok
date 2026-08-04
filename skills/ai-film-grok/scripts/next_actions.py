@@ -57,6 +57,9 @@ _ACTION_STAGE: dict[str, str] = {
     "pilot-pack": "agent",
     "plan-debrief": "agent",
     "plan-debrief-confirm": "agent",
+    "fidelity-check": "agent",
+    "fidelity-apply": "agent",
+    "design-go": "agent",
     "post-audit": "post",
     "export-desktop": "deliver",
     "done": "done",
@@ -485,6 +488,33 @@ def build_next_actions(
             f'aifilm write-spec --root "{r}"  # framing_lint: {codes or "crop risk"}',
             "构图裁头风险：改 framing/motion 去 ECU/fill-frame 后重 write-spec",
         )
+
+    # Input fidelity (after debrief+spec, before pilot bulk)
+    if gates.get("spec") or (root / "film-spec.json").is_file():
+        try:
+            from input_fidelity import fidelity_status
+
+            fid = fidelity_status(root)
+            if not fid.get("ok") and fid.get("has_source"):
+                codes = ",".join(str(c) for c in (fid.get("codes") or [])[:4])
+                add(
+                    "fidelity-apply",
+                    f'aifilm fidelity apply --root "{r}"',
+                    f"input 相关性不足 score={fid.get('score')} codes={codes or '—'}",
+                )
+                add(
+                    "fidelity-check",
+                    f'aifilm fidelity check --root "{r}"',
+                    "重算 input-fidelity 回执",
+                )
+            elif fid.get("has_source") and not _pilot_user_ok(root):
+                add(
+                    "design-go",
+                    f'aifilm design-go --root "{r}"',
+                    "设计期 GO：debrief+fidelity+variety 一页（不代签 pilot）",
+                )
+        except Exception:
+            pass
 
     # Pilot path (before bulk clips)
     pilot_approval = read_json(root / "receipts" / "pilot-approval.json") or {}

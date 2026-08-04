@@ -121,6 +121,27 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
         bool_flags=("--no-measure", "--no-promote", "--skip-variety"),
         verifier=("ship-prep",),
     ),
+    # Input fidelity (read-only check + local apply stamp; no pilot/debrief sign)
+    "fidelity-check": AdvancePolicy(
+        ("story.validate", "dispatch.orchestrate"),
+        ("fidelity", "check"),
+        value_flags=("--root",),
+        bool_flags=("--soft",),
+        verifier=("fidelity", "status"),
+    ),
+    "fidelity-apply": AdvancePolicy(
+        ("shot.plan", "dispatch.orchestrate"),
+        ("fidelity", "apply"),
+        value_flags=("--root",),
+        bool_flags=("--force",),
+        verifier=("fidelity", "check"),
+    ),
+    "design-go": AdvancePolicy(
+        ("story.validate", "dispatch.orchestrate"),
+        ("design-go",),
+        value_flags=("--root",),
+        verifier=("design-go",),
+    ),
     # P0: post-audit green + final_complete → local desktop package (no artistic approve).
     "export-desktop": AdvancePolicy(
         ("export.package", "dispatch.orchestrate"),

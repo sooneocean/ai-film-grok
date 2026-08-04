@@ -160,15 +160,16 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
         help="With --apply: validate and write apply receipt without running review-final",
     )
 
-    # Input fidelity (Wave F0 · input→pixel correlation score)
+    # Input fidelity (Wave F0–F3 · input→pixel correlation)
     fid = sub.add_parser(
         "fidelity",
-        help="Input fidelity: how much plan/media still matches user source (status|check)",
+        help="Input fidelity: status|check|apply (how plan still matches user source)",
     )
     fid_sub = fid.add_subparsers(dest="fidelity_action", required=True)
     for action, help_text in (
         ("status", "Recompute fidelity report (no force-write unless --write)"),
         ("check", "Write receipts/input-fidelity.json and exit 2 if not ok"),
+        ("apply", "F1 stamp source_quote / must_keep / protected dialogue onto film-spec"),
     ):
         p = fid_sub.add_parser(action, help=help_text)
         p.add_argument("--root", required=True)
@@ -194,6 +195,18 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
                 action="store_true",
                 help="Do not write receipt (print only)",
             )
+        if action == "apply":
+            p.add_argument(
+                "--force",
+                action="store_true",
+                help="Overwrite existing source_quote / spoken_text anchors",
+            )
+
+    dgo = sub.add_parser(
+        "design-go",
+        help="Design-phase GO pack: debrief + fidelity + variety (never signs pilot)",
+    )
+    dgo.add_argument("--root", required=True)
 
 
 def run_workflow_cmd(args: argparse.Namespace) -> int:
@@ -201,7 +214,12 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
     cmd = str(getattr(args, "cmd", "") or "")
     try:
         if cmd == "fidelity":
-            from input_fidelity import fidelity_check, fidelity_status
+            from input_fidelity import (
+                InputFidelityError,
+                apply_fidelity_to_spec,
+                fidelity_check,
+                fidelity_status,
+            )
 
             action = str(getattr(args, "fidelity_action", "") or "")
             strict: bool | None = None
@@ -226,8 +244,26 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
                 )
                 _emit(report)
                 return 0 if report.get("ok") else 2
+            if action == "apply":
+                try:
+                    report = apply_fidelity_to_spec(
+                        args.root,
+                        force=bool(getattr(args, "force", False)),
+                    )
+                except InputFidelityError as exc:
+                    _emit({"ok": False, "error": str(exc)})
+                    return 2
+                _emit(report)
+                return 0 if report.get("ok") is not False else 2
             _emit({"ok": False, "error": f"unknown fidelity action: {action}"})
             return 2
+
+        if cmd == "design-go":
+            from input_fidelity import design_go
+
+            report = design_go(args.root, write=True)
+            _emit(report)
+            return 0 if report.get("ok") else 2
 
         if cmd == "pilot-pack":
             from pilot_pack import pilot_pack

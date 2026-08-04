@@ -356,6 +356,40 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
             "estimator": "utf8_bytes_div_4",
         },
     }
+    # F0/S1 · input fidelity one-liner (score + worst code)
+    try:
+        root_s = str(packet.get("root") or "")
+        if root_s:
+            from input_fidelity import fidelity_status, human_fidelity_summary
+
+            _fid = fidelity_status(root_s)
+            if _fid.get("has_source") or _fid.get("shot_count"):
+                codes = _fid.get("codes") or []
+                worst = str(codes[0]) if codes else "ok"
+                compact["fidelity"] = {
+                    "ok": bool(_fid.get("ok")),
+                    "score": _fid.get("score"),
+                    "worst_code": worst,
+                    "summary": _bounded_text(
+                        human_fidelity_summary(_fid).replace("\n", " | "),
+                        max_bytes=240,
+                    ),
+                }
+                if not _fid.get("ok") and "FIDELITY_NOT_OK" not in issue_codes:
+                    attention.append(
+                        {
+                            "code": "FIDELITY_NOT_OK",
+                            "severity": "info",
+                            "summary": (
+                                f"input fidelity score={_fid.get('score')} "
+                                f"codes={','.join(str(c) for c in codes[:3]) or '—'}"
+                            ),
+                        }
+                    )
+                    compact["attention"] = attention[:8]
+    except Exception:
+        pass
+
     # Wave 5: slim heat surface for agent loops (only when adult-max active)
     heat = packet.get("heat") if isinstance(packet.get("heat"), dict) else None
     if heat and heat.get("active"):

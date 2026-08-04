@@ -64,9 +64,8 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" doctor
 "$AIFILM" plan run --root "<film>" --text "<story>" --title "<title>" --target-duration 60
 "$AIFILM" write-spec --root "<film>"
-"$AIFILM" fidelity check --root "<film>"
+"$AIFILM" fidelity apply --root "<film>"; "$AIFILM" design-go --root "<film>"
 "$AIFILM" pilot pack --root "<film>"
-"$AIFILM" variety-precheck --root "<film>"
 "$AIFILM" bulk-preflight --root "<film>"
 # 用户批准后 bulk → final
 "$AIFILM" final --root "<film>" --post-engine hyperframes --lipsync off --music-mood rnb --tts-backend edge

@@ -251,9 +251,80 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             }
         )
 
-    soft_ids = {"desktop_exported"}
+    # F3 · input fidelity ladder step (soft unless strict mode / score hard floor)
+    fid_step: dict[str, Any] = {
+        "id": "input_fidelity",
+        "ok": True,
+        "detail": "skipped (no report)",
+        "next_cmd": f'aifilm fidelity check --root "{base}"',
+        "advisory": True,
+    }
+    try:
+        from input_fidelity import (
+            assert_fidelity_allows_final,
+            fidelity_check,
+            human_fidelity_summary,
+        )
+
+        fid_rep = fidelity_check(base, write=True)
+        summary = human_fidelity_summary(fid_rep)
+        hard_fid = bool(fid_rep.get("strict"))
+        if hard_fid:
+            try:
+                assert_fidelity_allows_final(base)
+                fid_step = {
+                    "id": "input_fidelity",
+                    "ok": True,
+                    "detail": f"score={fid_rep.get('score')} strict ok\n{summary}",
+                    "next_cmd": None,
+                    "advisory": False,
+                    "hard": True,
+                    "human_summary": summary,
+                }
+            except Exception as exc:  # noqa: BLE001
+                fid_step = {
+                    "id": "input_fidelity",
+                    "ok": False,
+                    "detail": str(exc)[:240],
+                    "next_cmd": (
+                        f'aifilm fidelity apply --root "{base}" && '
+                        f'aifilm fidelity check --root "{base}" --strict'
+                    ),
+                    "advisory": False,
+                    "hard": True,
+                    "human_summary": summary,
+                }
+        else:
+            fid_step = {
+                "id": "input_fidelity",
+                "ok": bool(fid_rep.get("ok")),
+                "detail": f"score={fid_rep.get('score')} (advisory)\n{summary}",
+                "next_cmd": (
+                    None
+                    if fid_rep.get("ok")
+                    else f'aifilm fidelity apply --root "{base}"'
+                ),
+                "advisory": True,
+                "hard": False,
+                "human_summary": summary,
+            }
+    except Exception as exc:  # noqa: BLE001
+        fid_step = {
+            "id": "input_fidelity",
+            "ok": True,
+            "detail": f"fidelity skip error: {exc}"[:160],
+            "next_cmd": f'aifilm fidelity check --root "{base}"',
+            "advisory": True,
+            "skipped": True,
+        }
+    steps.append(fid_step)
+
+    soft_ids = {"desktop_exported", "input_fidelity"}
     if not film_core_hard:
         soft_ids.add("film_core")
+    # hard fidelity when marked hard and not ok
+    if fid_step.get("hard") and not fid_step.get("ok"):
+        soft_ids.discard("input_fidelity")
     blocked = next(
         (s for s in steps if not s["ok"] and s["id"] not in soft_ids),
         None,

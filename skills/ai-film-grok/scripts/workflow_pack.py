@@ -1269,6 +1269,41 @@ def ship_prep(
             }
         )
 
+    # F3 · input fidelity (advisory unless strict)
+    try:
+        from input_fidelity import fidelity_check, human_fidelity_summary
+
+        fid_rep = fidelity_check(root, write=write)
+        fid_hard = bool(fid_rep.get("strict"))
+        steps.append(
+            {
+                "id": "input_fidelity",
+                "ok": bool(fid_rep.get("ok")),
+                "detail": (
+                    f"score={fid_rep.get('score')} "
+                    + human_fidelity_summary(fid_rep).replace("\n", " | ")
+                )[:220],
+                "next_cmd": (
+                    None
+                    if fid_rep.get("ok")
+                    else f'aifilm fidelity apply --root "{root}"'
+                ),
+                "hard": fid_hard,
+                "advisory": not fid_hard,
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "input_fidelity",
+                "ok": True,
+                "detail": f"fidelity skipped: {exc}"[:160],
+                "next_cmd": f'aifilm fidelity check --root "{root}"',
+                "advisory": True,
+                "skipped": True,
+            }
+        )
+
     hard_failed = [
         s
         for s in steps
@@ -1301,7 +1336,7 @@ def ship_prep(
         },
         "note": (
             "means→variety→shortlist→pk_compare(advisory)→fill_idle(advisory)"
-            "→motion-gate→film_core; then closeout/export"
+            "→motion-gate→film_core→input_fidelity; then closeout/export"
         ),
         "human_pk_required": any(
             s.get("id") == "pk_compare" and s.get("human_required") for s in steps

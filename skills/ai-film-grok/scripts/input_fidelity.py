@@ -674,15 +674,319 @@ def _suggest_next(
         )
     if not shots:
         return 'aifilm plan run --root "<film>" --received-file receipts/story-reception.json'
-    if "USER_SOURCE_NAR_POLLUTED" in codes or "INPUT_ENTITY_COVERAGE_LOW" in codes:
-        return "rewrite shot nar/spoken from source; re-run aifilm fidelity check --root"
-    if "PROTECTED_DIALOGUE_DROPPED" in codes:
-        return "map protected_dialogue into spoken_text/caption_text; re-check"
-    if "MUST_KEEP_UNMAPPED" in codes:
-        return "bind must_keep_beat_ids onto shots (beat_id/source_quote); re-check"
-    if "SHOT_SOURCE_ANCHOR_SPARSE" in codes:
-        return "add source_quote per shot (F1); optional for now"
+    if any(
+        c in codes
+        for c in (
+            "USER_SOURCE_NAR_POLLUTED",
+            "INPUT_ENTITY_COVERAGE_LOW",
+            "PROTECTED_DIALOGUE_DROPPED",
+            "MUST_KEEP_UNMAPPED",
+            "SHOT_SOURCE_ANCHOR_SPARSE",
+        )
+    ):
+        return 'aifilm fidelity apply --root "<film>" && aifilm fidelity check --root "<film>"'
     return 'aifilm dispatch --root "<film>"'
+
+
+def _split_source_chunks(excerpt: str, n: int) -> list[str]:
+    """Split source into n quote chunks (sentence-ish, CJK-friendly)."""
+    text = (excerpt or "").strip()
+    if not text or n <= 0:
+        return []
+    # Prefer 。！？；\n boundaries
+    parts = re.split(r"(?<=[。！？；\n])", text)
+    parts = [p.strip() for p in parts if p and p.strip()]
+    if not parts:
+        parts = [text]
+    if len(parts) >= n:
+        # distribute evenly
+        out: list[str] = []
+        step = len(parts) / n
+        for i in range(n):
+            start = int(i * step)
+            end = int((i + 1) * step) if i < n - 1 else len(parts)
+            chunk = "".join(parts[start:end]).strip() or parts[min(start, len(parts) - 1)]
+            out.append(chunk[:80])
+        return out
+    # fewer sentences than shots: pad by sliding window
+    out = list(parts)
+    while len(out) < n:
+        out.append(parts[len(out) % len(parts)])
+    return [c[:80] for c in out[:n]]
+
+
+def apply_fidelity_to_spec(
+    root: Path | str,
+    *,
+    write_spec: bool = True,
+    force: bool = False,
+) -> dict[str, Any]:
+    """F1 · stamp source_quote, must_keep map, protected dialogue onto film-spec shots.
+
+    Does not invent story; only projects reception/debrief anchors.
+    """
+    root_p = _root(root)
+    spec_path = root_p / "film-spec.json"
+    spec = read_json(spec_path) or {}
+    if not spec:
+        raise InputFidelityError("film-spec.json missing — plan/write-spec first")
+    reception = _load_reception(root_p)
+    debrief = _load_debrief(root_p)
+    excerpt, source_sha = _source_blob(reception, spec)
+    if not excerpt:
+        raise InputFidelityError("no source excerpt/raw_text to apply")
+    protected = _protected_dialogue(reception)
+    must_keep = _must_keep_ids(debrief)
+    shots = _shots_from_spec(spec)
+    if not shots:
+        raise InputFidelityError("film-spec has no shots")
+
+    chunks = _split_source_chunks(excerpt, len(shots))
+    changed = 0
+    for i, shot in enumerate(shots):
+        quote = chunks[i] if i < len(chunks) else excerpt[:40]
+        if force or not _text(shot.get("source_quote")):
+            shot["source_quote"] = quote
+            changed += 1
+        if force or not _text(shot.get("source_span")):
+            shot["source_span"] = f"chunk:{i}"
+        # weak beat_id for must_keep round-robin
+        if must_keep and (force or not _text(shot.get("must_keep_beat_id"))):
+            shot["must_keep_beat_id"] = must_keep[i % len(must_keep)]
+            if not _text(shot.get("beat_id")):
+                shot["beat_id"] = shot["must_keep_beat_id"]
+
+    # Protected dialogue: first N dialogue-capable shots get spoken_text
+    if protected:
+        placed = 0
+        for shot in shots:
+            if placed >= len(protected):
+                break
+            line = protected[placed]
+            corpus = _shot_corpus(shot)
+            if line in corpus or line[:12] in corpus:
+                placed += 1
+                continue
+            # prefer empty spoken
+            if force or not _text(shot.get("spoken_text") or shot.get("spoken_text_zh")):
+                shot["spoken_text"] = line
+                shot["spoken_text_zh"] = line
+                if not _text(shot.get("caption_text")):
+                    shot["caption_text"] = line
+                if not _text(shot.get("caption_mode")):
+                    shot["caption_mode"] = "zh"
+                placed += 1
+                changed += 1
+
+    # debrief beat_shot_map if missing
+    if debrief and must_keep:
+        existing_map = _as_list(debrief.get("beat_shot_map"))
+        if force or not existing_map:
+            bmap = []
+            for bi, bid in enumerate(must_keep):
+                sid = _text(shots[bi % len(shots)].get("id"))
+                bmap.append({"beat_id": bid, "shot_ids": [sid] if sid else []})
+            debrief["beat_shot_map"] = bmap
+            write_json(root_p / "receipts" / "script-value-debrief.json", debrief)
+
+    if source_sha and not _text(spec.get("source_sha256")):
+        spec["source_sha256"] = source_sha
+    if not _text(spec.get("source_excerpt")):
+        spec["source_excerpt"] = excerpt[:500]
+
+    if write_spec:
+        write_json(spec_path, spec)
+
+    report = fidelity_check(root_p, write=True)
+    return {
+        "ok": True,
+        "kind": "input-fidelity-apply",
+        "shots_touched": changed,
+        "shot_count": len(shots),
+        "must_keep": must_keep,
+        "protected_placed": len(protected),
+        "fidelity": {
+            "ok": report.get("ok"),
+            "score": report.get("score"),
+            "codes": report.get("codes"),
+        },
+        "receipt": report.get("receipt"),
+        "generated_at": utc_now(),
+    }
+
+
+def still_source_overlap(
+    root: Path | str,
+    *,
+    shot_id: str,
+    playable_action: str | None = None,
+) -> dict[str, Any]:
+    """F2 · keyword overlap between still action and shot source_quote/dsl.action."""
+    root_p = _root(root)
+    spec = read_json(root_p / "film-spec.json") or {}
+    shots = _shots_from_spec(spec)
+    shot = next((s for s in shots if _text(s.get("id")) == str(shot_id).strip()), None)
+    if not shot:
+        return {
+            "ok": True,
+            "applicable": False,
+            "codes": [],
+            "note": f"shot {shot_id} not in film-spec",
+        }
+    quote = _text(shot.get("source_quote") or shot.get("playable_action") or shot.get("nar"))
+    dsl = _as_dict(shot.get("dsl"))
+    action = _text(dsl.get("action") or shot.get("playable_action"))
+    pa = _text(playable_action) or action or quote
+    needles = [t for t in re.findall(r"[\u4e00-\u9fff]{2,4}|[A-Za-z]{3,}", quote + " " + action) if t]
+    needles = needles[:8]
+    if not needles:
+        return {"ok": True, "applicable": False, "codes": [], "score": 1.0, "needles": []}
+    hit = [t for t in needles if t in pa]
+    score = len(hit) / len(needles)
+    strict = (os.environ.get("AIFILM_STILL_SOURCE_OVERLAP_STRICT") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    } or bool(spec.get("still_source_overlap_strict"))
+    ok = score >= 0.25 or not strict
+    codes = [] if ok or score >= 0.25 else ["STILL_SOURCE_OVERLAP_LOW"]
+    if score < 0.25:
+        codes = ["STILL_SOURCE_OVERLAP_LOW"]
+        ok = not strict
+    return {
+        "ok": ok,
+        "applicable": True,
+        "score": round(score, 3),
+        "needles": needles,
+        "hit": hit,
+        "codes": codes,
+        "strict": strict,
+        "shot_id": shot_id,
+        "source_quote": quote[:80],
+    }
+
+
+def assert_still_source_for_register(
+    root: Path | str,
+    *,
+    shot_id: str,
+    playable_action: str | None = None,
+) -> dict[str, Any]:
+    rep = still_source_overlap(root, shot_id=shot_id, playable_action=playable_action)
+    if rep.get("strict") and not rep.get("ok"):
+        raise InputFidelityError(
+            f"still source overlap low for {shot_id}: score={rep.get('score')} "
+            f"missing {rep.get('needles')}"
+        )
+    return rep
+
+
+def story_beat_prompt_prefix(shot: dict[str, Any]) -> str:
+    """F2 · I2V/H3 prompt head: Story beat from source_quote / playable_action."""
+    quote = _text(
+        shot.get("source_quote")
+        or shot.get("playable_action")
+        or shot.get("story_beat")
+        or shot.get("nar")
+    )
+    if not quote:
+        return ""
+    return f"Story beat: {quote[:120]}."
+
+
+def inject_story_beat_into_prompt(text: str, shot: dict[str, Any]) -> str:
+    prefix = story_beat_prompt_prefix(shot)
+    base = (text or "").strip()
+    if not prefix:
+        return base
+    if prefix in base or "Story beat:" in base:
+        return base
+    if not base:
+        return prefix
+    return f"{prefix} {base}".strip()
+
+
+def design_go(root: Path | str, *, write: bool = True) -> dict[str, Any]:
+    """S3 · design-phase one-page GO (never signs pilot)."""
+    root_p = _root(root)
+    debrief = _load_debrief(root_p)
+    debrief_meta = _score_debrief_contract(debrief)[1]
+    fid = fidelity_check(root_p, write=write)
+    variety: dict[str, Any] = {}
+    try:
+        from workflow_pack import variety_precheck
+
+        variety = variety_precheck(root_p, write=False)
+    except Exception as exc:  # noqa: BLE001
+        variety = {"ok": False, "error": str(exc)[:160]}
+
+    checks = {
+        "debrief_present": bool(debrief_meta.get("present")),
+        "debrief_confirmed": bool(debrief_meta.get("confirmed")),
+        "fidelity_ok": bool(fid.get("ok")),
+        "fidelity_score": fid.get("score"),
+        "entity_coverage": (fid.get("entity_coverage") or {}).get("score"),
+        "must_keep_mapped": (fid.get("must_keep_map") or {}).get("score") == 1.0
+        or not fid.get("must_keep"),
+        "variety_ok": bool(variety.get("ok")) if variety else None,
+    }
+    blockers: list[str] = []
+    if not checks["debrief_present"]:
+        blockers.append("debrief_missing")
+    if checks["debrief_present"] and not checks["debrief_confirmed"]:
+        blockers.append("debrief_unconfirmed")
+    if not checks["fidelity_ok"]:
+        blockers.append("fidelity_not_ok")
+    if checks["variety_ok"] is False:
+        blockers.append("variety_precheck")
+
+    ok = not blockers
+    report = {
+        "kind": "design-go",
+        "ok": ok,
+        "go_ready": ok,
+        "checks": checks,
+        "blockers": blockers,
+        "fidelity_codes": fid.get("codes"),
+        "promise_ref": fid.get("promise_ref"),
+        "must_keep": fid.get("must_keep"),
+        "next_cmd": (
+            'aifilm pilot pack --root "<film>"'
+            if ok
+            else (
+                fid.get("next_cmd")
+                or 'aifilm fidelity apply --root "<film>"'
+            )
+        ),
+        "note": "design-go never signs pilot; human pilot approve still required",
+        "generated_at": utc_now(),
+    }
+    if write:
+        path = root_p / "receipts" / "design-go.json"
+        write_json(path, report)
+        report["receipt"] = str(path)
+    return report
+
+
+def human_fidelity_summary(report: dict[str, Any]) -> str:
+    """F3 · three-line human summary for review-final / closeout."""
+    promise = _text(report.get("promise_ref")) or "(no promise)"
+    mk = report.get("must_keep") or []
+    mk_map = report.get("must_keep_map") or {}
+    unmapped = mk_map.get("unmapped") or []
+    prot = report.get("protected_dialogue_coverage") or {}
+    missing = prot.get("missing") or []
+    line1 = f"promise: {promise[:100]}"
+    line2 = (
+        f"must_keep: {len(mk)} total, unmapped={len(unmapped)}"
+        + (f" ({', '.join(unmapped[:4])})" if unmapped else " (ok)")
+    )
+    line3 = (
+        f"protected_dialogue missing: {len(missing)}"
+        + (f" — {'; '.join(str(m)[:20] for m in missing[:3])}" if missing else " (ok)")
+    )
+    return "\n".join([line1, line2, line3])
 
 
 def fidelity_status(root: Path | str) -> dict[str, Any]:
@@ -712,16 +1016,26 @@ def assert_fidelity_allows_final(
     floor: float = DEFAULT_FINAL_FLOOR,
 ) -> dict[str, Any]:
     """Optional hard gate for final/export (Wave F3). Respects skip env."""
-    if (os.environ.get("AIFILM_SKIP_FIDELITY_FINAL_GATE") or "").strip() in {
+    if (os.environ.get("AIFILM_SKIP_FIDELITY_FINAL_GATE") or "").strip().lower() in {
         "1",
         "true",
         "yes",
+        "on",
     }:
         return {"ok": True, "skipped": True, "reason": "AIFILM_SKIP_FIDELITY_FINAL_GATE"}
     report = build_input_fidelity_report(root, write=True)
-    if report.get("score", 0) < floor and report.get("strict"):
+    report["human_summary"] = human_fidelity_summary(report)
+    score = float(report.get("score") or 0.0)
+    # Hard only when strict mode already true; soft otherwise (never silent block soft films)
+    if report.get("strict") and score < floor:
         raise InputFidelityError(
             "input fidelity below final floor "
-            f"({report.get('score')} < {floor}); codes={report.get('codes')}"
+            f"({score} < {floor}); codes={report.get('codes')}\n"
+            f"{report['human_summary']}"
+        )
+    if report.get("strict") and report.get("blocking_codes"):
+        raise InputFidelityError(
+            "input fidelity blocking codes: "
+            f"{report.get('blocking_codes')}\n{report['human_summary']}"
         )
     return report

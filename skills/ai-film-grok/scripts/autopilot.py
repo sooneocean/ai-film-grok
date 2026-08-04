@@ -46,6 +46,9 @@ LOCAL_THROUGHPUT_NEXT_IDS = frozenset(
         "write-spec",
         "quality-gate-repair",
         "dailies_review-evidence",
+        "fidelity-check",  # read-only score; never debrief/pilot sign
+        "fidelity-apply",  # local stamp only
+        "design-go",
         "done",
     }
 )

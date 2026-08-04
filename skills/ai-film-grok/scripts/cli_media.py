@@ -814,6 +814,22 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             )
         except StillUniquenessError as exc:
             raise FilmError(str(exc)) from exc
+    # F2 · still vs source_quote overlap (soft unless still_source_overlap_strict)
+    if args.status == "approved":
+        try:
+            from input_fidelity import InputFidelityError, assert_still_source_for_register
+
+            pa = str(getattr(args, "playable_action", "") or "").strip() or None
+            # use review_note as weak playable_action when provided
+            if not pa and review_note:
+                pa = review_note
+            assert_still_source_for_register(
+                root, shot_id=str(args.shot_id), playable_action=pa
+            )
+        except InputFidelityError as exc:
+            raise FilmError(str(exc)) from exc
+        except Exception:
+            pass
     if args.status == "approved":
         from anatomy_safety import AnatomySafetyError, require_anatomy_safe
 

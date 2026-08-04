@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.39.0] - 2026-08-04
+
+### Added (Input Fidelity full chain · F0–F3 + S)
+- **`fidelity apply`**: stamp `source_quote` / must_keep / protected dialogue onto film-spec.
+- **`design-go`**: debrief + fidelity + variety one-page (never signs pilot).
+- **I2V**: `Story beat:` prefix via `motion_prompt_spine`.
+- **register-still**: optional source overlap (strict via env/spec).
+- **closeout / ship-prep**: `input_fidelity` ladder step + human summary.
+- **dispatch compact** fidelity one-liner; **next_actions** fidelity-apply/design-go.
+- **advance / autopilot** allowlist: fidelity-check|apply, design-go (no debrief/pilot sign).
+- Tests: expanded `test_input_fidelity.py`.
+
 ## [2.38.9] - 2026-08-04
 
 ### Added (Input Fidelity · Wave F0)

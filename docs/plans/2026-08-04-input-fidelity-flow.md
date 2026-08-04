@@ -1,27 +1,29 @@
 # Input Fidelity + Flow · 2026-08-04
 
-**Status:** F0 SHIPPED (v2.38.8) · F1–F3 / S backlog  
-**Full plan:** session plan `input-fidelity-flow` (链路优化 · 更顺 + 与 input 更相关)
+**Status:** **F0–F3 + S SHIPPED** (v2.39.0)  
 
 ## Shipped
 
-| ID | Item |
-|----|------|
-| F0.1 | `receipts/input-fidelity.json` schema via `input_fidelity.py` |
-| F0.2 | `aifilm fidelity status\|check` |
-| F0.3 | hard-defaults + memory + SKILL pointer + tests |
-
-## Next
-
-- **F1** plan `source_quote` / must_keep project / entity hard paths  
-- **F2** still/I2V source anchors  
-- **F3** closeout/final fidelity step  
-- **S** dispatch compact line + `design-go`
+| Wave | Item |
+|------|------|
+| F0 | `input_fidelity.py` score · `fidelity status\|check` · receipt |
+| F1 | `fidelity apply` source_quote / must_keep / protected dialogue |
+| F2 | Story beat I2V prefix · still source overlap on register-still |
+| F3 | closeout + ship-prep `input_fidelity` step · assert final optional hard |
+| S | design-go · dispatch compact fidelity · next_actions · advance/autopilot allowlist |
 
 ## Commands
 
 ```bash
-aifilm fidelity status --root "<film>"
+aifilm fidelity apply --root "<film>"
 aifilm fidelity check --root "<film>"
-aifilm fidelity check --root "<film>" --strict
+aifilm design-go --root "<film>"
+aifilm ship-prep --root "<film>"
+aifilm closeout status --root "<film>"
 ```
+
+## Env
+
+- `AIFILM_FIDELITY_STRICT=1`
+- `AIFILM_STILL_SOURCE_OVERLAP_STRICT=1`
+- `AIFILM_SKIP_FIDELITY_FINAL_GATE=1`
