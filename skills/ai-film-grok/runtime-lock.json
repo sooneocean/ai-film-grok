@@ -306,7 +306,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "68f7329062fe3a56f5986ad7a94b76bb179c45d3695122f0a36b51a71c0156f3"
+      "sha256": "04cb01ca21149a5d8d30b10381f428ef023d0c1b223e169994751a84ca3597df"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -714,7 +714,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "27e72b3642540e5cca7c271c154c3d33951514cf54f9c4237082339161b748cc"
+      "sha256": "e3834e481b352acd9c5a56c1c21afc22c55e2ac0f53f231195ffc1fc20c12ee8"
     },
     {
       "path": "scripts/heat_check.py",
@@ -830,7 +830,7 @@
     },
     {
       "path": "scripts/motion_prompt_spine.py",
-      "sha256": "8673add5324aad23d7b9f06647cc86e1e119cefd12adb2709f9f66a821812680"
+      "sha256": "a6ee0028b3cc95c901bca8f3946094dbf6ee18007c801d72b6779dd090aadb03"
     },
     {
       "path": "scripts/music_cue.py",
