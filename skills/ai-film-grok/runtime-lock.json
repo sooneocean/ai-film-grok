@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "4e1a979127bce2f99ce54fb3a9c01c2a95cbd3cefdc099156d2895720b8ae5ca"
+      "sha256": "f56d74310d77133ffbc5001665c20b7a9cef5ea680544b375baffc1836671172"
     },
     {
       "path": "scripts/ambience_candidates.py",
