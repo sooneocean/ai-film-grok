@@ -80,6 +80,81 @@ def _approved_still(root: Path, shot_id: str) -> Path | None:
     return path if path.is_file() else None
 
 
+def _shot_screen_mode(shot: dict[str, Any]) -> str:
+    """Prefer shot.screen_mode; fall back to first dialogue cue screen_mode."""
+    mode = str(shot.get("screen_mode") or "").strip()
+    if mode:
+        return mode
+    cues = shot.get("audio_cues")
+    if not isinstance(cues, list):
+        return ""
+    for cue in cues:
+        if not isinstance(cue, dict):
+            continue
+        if (
+            cue.get("kind") == "voice"
+            and cue.get("line_type") == "dialogue"
+            and str(cue.get("spoken_text") or "").strip()
+        ):
+            return str(cue.get("screen_mode") or "").strip()
+    return ""
+
+
+def _audio_clause_for_shot(shot: dict[str, Any]) -> str:
+    """Mandarin dialogue inject or ambient foley clause for H3 native audio."""
+    dialogue_text = _spoken_dialogue_text(shot)
+    screen_mode = _shot_screen_mode(shot)
+    if dialogue_text and screen_mode == "off_camera":
+        return (
+            f"Audio: the character continues this line off camera while the picture "
+            f"holds the reverse or coverage shot; spoken in natural Mandarin; "
+            f"line: 「{dialogue_text}」."
+        )
+    if dialogue_text and screen_mode == "on_camera":
+        return (
+            f"Audio: the visible character speaks this line in natural Mandarin on camera; "
+            f"mouth visibly articulates the line, lip sync priority; line: 「{dialogue_text}」."
+        )
+    if dialogue_text:
+        # Dialogue present but screen_mode unset — still inject on-camera default
+        # so custom prompt files cannot silently drop speech.
+        return (
+            f"Audio: the visible character speaks this line in natural Mandarin on camera; "
+            f"mouth visibly articulates the line, lip sync priority; line: 「{dialogue_text}」."
+        )
+    return (
+        "Audio: natural diegetic ambience and soft foley matched to the action; "
+        "no on-screen speech unless the shot is clearly dialogue."
+    )
+
+
+def _merge_prompt_with_audio(base: str, shot: dict[str, Any]) -> str:
+    """Append dialogue/ambience clause when missing from an author prompt file.
+
+    Custom ``receipts/prompts/<id>.i2v.txt`` used to early-return and kill
+    Mandarin inject (2026-08-04 stress canary). Always ensure dialogue line
+    lands; only skip ambient fallback when author already wrote an Audio: block.
+    """
+    text = (base or "").strip()
+    if not text:
+        return text
+    audio = _audio_clause_for_shot(shot)
+    dialogue_text = _spoken_dialogue_text(shot)
+    if dialogue_text:
+        if dialogue_text in text and "lip sync" in text.lower():
+            return text
+        # Drop a stale ambient Audio: block before injecting dialogue.
+        if "Audio:" in text and dialogue_text not in text:
+            # Keep body; force dialogue audio at end.
+            return f"{text.rstrip()} {audio}"
+        if dialogue_text not in text:
+            return f"{text.rstrip()} {audio}"
+        return text
+    if "Audio:" in text:
+        return text
+    return f"{text.rstrip()} {audio}"
+
+
 def _prompt_for_shot(root: Path, shot: dict[str, Any], *, mode: str) -> str:
     sid = str(shot.get("id") or "shot")
     prompt_paths = [
@@ -91,7 +166,7 @@ def _prompt_for_shot(root: Path, shot: dict[str, Any], *, mode: str) -> str:
         if path.is_file():
             text = path.read_text(encoding="utf-8").strip()
             if text:
-                return text
+                return _merge_prompt_with_audio(text, shot)
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
     parts = [
         str(dsl.get("action") or "").strip(),
@@ -114,25 +189,7 @@ def _prompt_for_shot(root: Path, shot: dict[str, Any], *, mode: str) -> str:
         )
     # Dialogue-first: a shot carrying a dialogue cue must show the character
     # visibly speaking it on camera (user rule — every v shot looks like talking).
-    dialogue_text = _spoken_dialogue_text(shot)
-    screen_mode = str(shot.get("screen_mode") or "")
-    if dialogue_text and screen_mode == "off_camera":
-        audio = (
-            f"Audio: the character continues this line off camera while the picture "
-            f"holds the reverse or coverage shot; spoken in natural Mandarin; "
-            f"line: 「{dialogue_text}」."
-        )
-    elif dialogue_text and screen_mode == "on_camera":
-        audio = (
-            f"Audio: the visible character speaks this line in natural Mandarin on camera; "
-            f"mouth visibly articulates the line, lip sync priority; line: 「{dialogue_text}」."
-        )
-    else:
-        # H3 generates usable stereo diegetic audio; ask for natural room/SFX, not silence.
-        audio = (
-            "Audio: natural diegetic ambience and soft foley matched to the action; "
-            "no on-screen speech unless the shot is clearly dialogue."
-        )
+    audio = _audio_clause_for_shot(shot)
     return f"{prefix}{body or 'subtle camera push-in, natural motion.'} {audio}"
 
 

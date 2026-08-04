@@ -1,6 +1,7 @@
 # 混合火力 · API × 本地（2026-07-28 强化 · **2026-08-03 H3 更新**）
 
 > **2026-08-03**：本地动作主武器由退役的 Wan 2.2 I2V 换为 **MiniMax H3**（`comfy-h3` · T2V/I2V/R2V pilot 均已 canary）。  
+> **2026-08-04**：效果最大化实机课 → [lessons-2026-08-04-h3-max-effect.md](lessons-2026-08-04-h3-max-effect.md)（I2V 锁脸 · R2V 高动/大嘴 · T2V 无脸 · 续镜末帧 · free-memory）。  
 > 配置：`AIFILM_I2V_PROFILE=hybrid_h3` 或片级 `h3.enabled=true`。云 bulk 仍默认 Grok；敏感/肉戏 soft-lock H3。  
 > 成片默认 `h3.audio_policy=prefer_native`（H3 立体声可用则直接用；不可用或显式 strip 才 Edge TTS + rnb）。  
 > **工作流入口**：`aifilm h3 list|plan|run --register`（非仅 armory canary）。

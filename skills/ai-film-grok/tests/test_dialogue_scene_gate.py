@@ -281,3 +281,55 @@ def test_h3_r2v_prefix_pairs_with_dialogue(tmp_path: Path) -> None:
     prompt = _prompt_for_shot(root, shot, mode="r2v")
     assert "<Picture 1>" in prompt
     assert "我到了。" in prompt
+
+
+def test_h3_prompt_file_still_injects_dialogue(tmp_path: Path) -> None:
+    """Custom receipts/prompts/*.i2v.txt must not kill Mandarin inject (2026-08-04)."""
+    root = tmp_path
+    (root / "receipts" / "prompts").mkdir(parents=True)
+    (root / "receipts" / "prompts" / "shot05.i2v.txt").write_text(
+        "Vertical 9:16 close-up. Keep identity. Soft push-in.\n",
+        encoding="utf-8",
+    )
+    shot = {
+        "id": "shot05",
+        "screen_mode": "on_camera",
+        "audio_cues": [
+            {
+                "kind": "voice",
+                "line_type": "dialogue",
+                "spoken_text": "过来，靠近一点。",
+                "language": "zh",
+                "speaker": "hero",
+            }
+        ],
+    }
+    prompt = _prompt_for_shot(root, shot, mode="i2v")
+    assert "Keep identity" in prompt
+    assert "过来，靠近一点。" in prompt
+    assert "lip sync priority" in prompt
+
+
+def test_h3_prompt_file_with_audio_block_still_gets_missing_line(tmp_path: Path) -> None:
+    root = tmp_path
+    (root / "receipts" / "prompts").mkdir(parents=True)
+    (root / "receipts" / "prompts" / "shot06.i2v.txt").write_text(
+        "Vertical 9:16. Keep identity. Audio: quiet room tone; no speech.\n",
+        encoding="utf-8",
+    )
+    shot = {
+        "id": "shot06",
+        "screen_mode": "on_camera",
+        "audio_cues": [
+            {
+                "kind": "voice",
+                "line_type": "dialogue",
+                "spoken_text": "看着我。",
+                "language": "zh",
+                "speaker": "hero",
+            }
+        ],
+    }
+    prompt = _prompt_for_shot(root, shot, mode="i2v")
+    assert "看着我。" in prompt
+    assert "lip sync priority" in prompt

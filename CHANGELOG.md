@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.34.1] - 2026-08-04
+
+### Fixed
+- **H3 dialogue inject survives custom prompt files:** `h3_workflow._prompt_for_shot` no longer early-returns from `receipts/prompts/<id>.i2v.txt` without Mandarin inject. New `_merge_prompt_with_audio` appends lip-sync dialogue lines when `audio_cues` present (2026-08-04 stress canary regression).
+
+### Docs
+- **H3 max-effect playbook** from 5090 live matrix (quality A/B, high-motion, dialogue, e2e register, 7 framing angles + continuity endframe chain L1≈7.7).
+- `references/lessons-2026-08-04-h3-max-effect.md` · `memory/2026-08-04-h3-max-effect.md`
+- `references/weapon-lane-matrix.md` expanded: I2V/R2V/T2V selection, framing cheatsheet, free-memory ops, continue SOP
+- hard-defaults P0 row · stages/visual · SKILL P0 #7/#8 · AGENTS 8b
+
+### Tests
+- `test_h3_prompt_file_still_injects_dialogue` · `test_h3_prompt_file_with_audio_block_still_gets_missing_line`
+
 ## [2.34.0] - 2026-08-03
 
 ### Added
