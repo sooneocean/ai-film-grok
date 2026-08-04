@@ -537,10 +537,6 @@
       "sha256": "d1ddfba28e414d3032161bb49c7a28dc7a560d4ef96603f786d603dadcdae675"
     },
     {
-      "path": "scripts/dialogue_speaker_frame_gate.py",
-      "sha256": "fd204634ba16e59eca358e591b9ca7ee5420d3521214b63470b5e8f756af759c"
-    },
-    {
       "path": "scripts/dialogue_style.py",
       "sha256": "45253d9769cf5fc76e71dc24152e9c2413661befec20e779c298caf396db1507"
     },

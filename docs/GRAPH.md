@@ -157,7 +157,6 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_dialogue_scene_gate.py`
 - `skills/ai-film-grok/tests/test_dialogue_scene_package.py`
 - `skills/ai-film-grok/tests/test_dialogue_screenplay.py`
-- `skills/ai-film-grok/tests/test_dialogue_speaker_frame_gate.py`
 - `skills/ai-film-grok/tests/test_dialogue_workflow_hardening.py`
 - `skills/ai-film-grok/tests/test_director_coverage_and_review.py`
 - `skills/ai-film-grok/tests/test_director_intent.py`

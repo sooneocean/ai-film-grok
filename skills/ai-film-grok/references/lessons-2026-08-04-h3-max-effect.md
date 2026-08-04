@@ -33,7 +33,7 @@
 安全 bulk        → Grok
 ```
 
-### 机读自动选型（v2.37.2 · `scripts/h3_mode.py`）
+### 机读自动选型（v2.37.3 · `scripts/h3_mode.py`）
 
 `aifilm h3 plan|list` 调 `resolve_h3_mode`：显式 `h3_mode` > 续镜 I2V > env T2V > 对白 CU/高难 flag R2V > 默认 I2V（高动带 `alt_mode=r2v`）。  
 `plan.command` / `list[].command` 已带 `--mode`；能量不够跟 `command_alt`。测：`tests/test_h3_mode.py`。
