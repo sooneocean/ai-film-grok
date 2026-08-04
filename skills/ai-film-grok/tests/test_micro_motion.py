@@ -62,6 +62,7 @@ class MicroMotionTests(unittest.TestCase):
         spec = {
             "title": "micro-motion-spec",
             "vo_mode": "storyteller",
+            "dramatic_meaning_strict": False,
             "director_intent": {
                 "logline": "近景反应也要有可见微动。",
                 "tone": "测试",

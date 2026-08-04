@@ -65,6 +65,7 @@ def _spec(scenes: list[dict] | None = None) -> dict:
     return {
         "title": "T",
         "vo_mode": "storyteller",
+        "dramatic_meaning_strict": False,
         "director_intent": {
             "logline": "测试一句话足够长的命题。",
             "tone": "test",

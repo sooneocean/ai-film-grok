@@ -189,6 +189,15 @@ def validate_native_stage_evidence(root: Path | str, stage: str) -> dict[str, st
                 "shot/animatic lock requires ordered shot ids and positive durations "
                 "in film-spec and timeline"
             )
+        # Professional-rigor stage-lock preflight: fail closed when meaning gate applies.
+        from dramatic_meaning import lint_dramatic_meaning, meaning_gate_enabled
+
+        graph = read_json(base / "drama-graph.json")
+        shot_list = [s for s in planned if isinstance(s, dict)]
+        meaning = lint_dramatic_meaning(spec, shots=shot_list, graph=graph or {})
+        if meaning_gate_enabled(spec) and not meaning.get("ok"):
+            codes = ",".join(meaning.get("codes") or ["SHOT_MEANING_EMPTY"])
+            raise ValueError("shot/animatic lock requires dramatic meaning (fail-closed): " + codes)
     elif stage == "pilot_approval":
         from production_gates import load_pilot_approval, pilot_is_user_approved
 

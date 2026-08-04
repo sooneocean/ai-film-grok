@@ -79,6 +79,7 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
         spec = {
             "title": "silk-test",
             "vo_mode": "storyteller",
+            "dramatic_meaning_strict": False,
             "director_intent": {
                 "logline": "丝滑转场与构图默认验证用 logline。",
                 "tone": "smooth",
@@ -162,6 +163,7 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
         spec = {
             "title": "continue-op",
             "vo_mode": "storyteller",
+            "dramatic_meaning_strict": False,
             "director_intent": {
                 "logline": "连续动作的转场操作验证。",
                 "tone": "drama",
@@ -204,6 +206,7 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
         spec = {
             "title": "invalid-op-metadata",
             "vo_mode": "storyteller",
+            "dramatic_meaning_strict": False,
             "director_intent": {
                 "logline": "人工转场锁定字段型别验证。",
                 "tone": "drama",
@@ -265,6 +268,7 @@ class WriteSpecAutoJoinsTests(unittest.TestCase):
         spec = {
             "title": "overlay-craft",
             "vo_mode": "storyteller",
+            "dramatic_meaning_strict": False,
             "director_intent": {
                 "logline": "换场视觉胶水验证。",
                 "tone": "drama",

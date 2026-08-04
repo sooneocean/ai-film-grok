@@ -297,3 +297,48 @@ def test_shot_animatic_lock_requires_matching_ids_and_durations(tmp_path: Path) 
 
     with pytest.raises(ValueError, match="ordered shot ids"):
         validate_native_stage_evidence(tmp_path, "shot_animatic_lock")
+
+
+def test_shot_animatic_lock_fails_closed_on_missing_dramatic_meaning(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "drama-graph.json").write_text('{"schema_version":2}\n', encoding="utf-8")
+    spec = {
+        "dramatic_meaning_strict": True,
+        "scenes": [{"shots": [{"id": "s001", "duration_sec": 4}]}],
+    }
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+    (tmp_path / "timeline.json").write_text(
+        json.dumps({"shots": [{"id": "s001", "duration_sec": 4}]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="dramatic meaning"):
+        validate_native_stage_evidence(tmp_path, "shot_animatic_lock")
+
+
+def test_shot_animatic_lock_accepts_meaningful_shot(tmp_path: Path) -> None:
+    (tmp_path / "drama-graph.json").write_text('{"schema_version":2}\n', encoding="utf-8")
+    spec = {
+        "dramatic_meaning_strict": True,
+        "scenes": [
+            {
+                "shots": [
+                    {
+                        "id": "s001",
+                        "duration_sec": 4,
+                        "dramatic_function": "action",
+                        "dsl": {"visible_change": "door swings open"},
+                    }
+                ]
+            }
+        ],
+    }
+    (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+    (tmp_path / "timeline.json").write_text(
+        json.dumps({"shots": [{"id": "s001", "duration_sec": 4}]}),
+        encoding="utf-8",
+    )
+
+    refs = validate_native_stage_evidence(tmp_path, "shot_animatic_lock")
+    assert refs

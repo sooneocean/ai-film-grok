@@ -206,6 +206,7 @@ def _comp_spec(shots):
         "title": "comp-test",
         "vo_mode": "storyteller",
         "aspect": "9:16",
+        "dramatic_meaning_strict": False,
         "director_intent": {
             "logline": "A test about composition rules.",
             "tone": "neutral",

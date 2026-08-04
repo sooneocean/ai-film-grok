@@ -23,6 +23,7 @@ def _minimal(nar: str) -> dict:
     return {
         "title": "vo-budget-test",
         "vo_mode": "storyteller",
+        "dramatic_meaning_strict": False,
         "director_intent": {
             "logline": "雨夜后座升温的完整承诺句。",
             "tone": "色气",

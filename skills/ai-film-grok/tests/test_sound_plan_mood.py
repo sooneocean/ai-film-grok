@@ -22,6 +22,7 @@ def _spec(tone: str, sound_plan=None) -> dict:
         "title": "Kei后宫",
         "description": "暗黑同人里番",
         "vo_mode": "storyteller",
+        "dramatic_meaning_strict": False,
         "director_intent": {
             "logline": "银白仿生少女掠夺教师后宫。",
             "tone": tone,

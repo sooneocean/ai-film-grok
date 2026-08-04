@@ -155,6 +155,7 @@ class CaptionFormatTests(unittest.TestCase):
         spec = {
             "title": "测试片名足够长了",
             "vo_mode": "storyteller",
+            "dramatic_meaning_strict": False,
             "director_intent": {
                 "logline": "一句话卖点要够八个字以上",
                 "tone": "色气·俏皮",

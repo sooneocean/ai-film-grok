@@ -2296,9 +2296,9 @@ def validate_film_spec(
         )
 
     # Dramatic meaning stack (shot / motion / dialogue purpose / emotional_arc).
-    # Report always written; fail-closed when meaning_gate_enabled (heat_scale=max /
-    # premium_vertical / dramatic_meaning_strict). write-spec also hard-fails via
-    # cinematic_audit regardless of this flag.
+    # Report always written; fail-closed by default (every genre pack) when
+    # meaning_gate_enabled. write-spec also hard-fails via cinematic_audit
+    # regardless of this flag.
     from dramatic_meaning import lint_dramatic_meaning, meaning_gate_enabled
 
     meaning = lint_dramatic_meaning(spec, shots=shots)

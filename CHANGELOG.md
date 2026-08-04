@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.37.6] - 2026-08-04
+
+### Changed (Dramatic meaning default-on · every genre)
+- **`meaning_gate_enabled`**: fail-closed for **every** genre pack by default (was heat=max / premium only).
+- Escape: `dramatic_meaning_strict: false` (per film) or `AIFILM_SKIP_MEANING_GATE=1` (env; `strict:true` still wins).
+- **shot/animatic stage-lock**: `director_cli.validate_native_stage_evidence` fail-closes when meaning gate applies.
+- Isolation fixtures for other craft gates set `dramatic_meaning_strict: false`.
+- Tests: `test_meaning_gate_default_on_every_genre` · director stage meaning lock tests.
+
 ## [2.37.5] - 2026-08-04
 
 ### Added (Fill-Idle machine queue · H3 next/pk)

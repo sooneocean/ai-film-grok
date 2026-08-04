@@ -24,6 +24,7 @@ def _base_spec(*, scenes: list) -> dict:
         "narration_spoken_lang": "zh",
         "aspect": "9:16",
         "heat_scale": "soft",
+        "dramatic_meaning_strict": False,
         "director_intent": {
             "logline": "Her voice carries every scene; narration never speaks for her.",
             "tone": "drama",

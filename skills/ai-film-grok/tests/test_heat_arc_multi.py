@@ -37,6 +37,15 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True
         "afterglow": "afterglow",
         "bridge": "bridge",
     }
+    # beat-semantic motion tokens (continuity._BEAT_SEMANTIC_MARKERS)
+    _BEAT_MOTION = {
+        "setup": "enter step open arrive walk turn reveal door threshold, initial contact",
+        "foreplay": "caress touch skin breath tremble shiver heat rise drip shine pulse rise",
+        "act": "push press grip lock thrust plant deep unhook slam strike lean grab",
+        "climax": "thrust spasm slam lock press exhale burst settle peak drop lift",
+        "afterglow": "hold settle exhale soften linger residual blink still slow",
+        "bridge": "pan track transition follow dolly cross pass connector corridor",
+    }
     nar_map = {
         "setup": "展厅落锁。今晚只加演你一场。",
         "foreplay": "肩带一滑，规矩失效。",
@@ -124,12 +133,23 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True
                 wardrobe_state = "bare"
                 coitus_beat = "hook"
                 partner_ws = "undressed"
+        beat_motion = _BEAT_MOTION.get(ph, _BEAT_MOTION["bridge"])
+        # Combine phase action with beat-semantic tokens so meaning gate passes.
+        action_full = f"{action}; {beat_motion}"
+        arc_node = {
+            "setup": "起",
+            "foreplay": "承",
+            "act": "转",
+            "climax": "转",
+            "afterglow": "转",
+            "bridge": "转",
+        }.get(ph, "转")
         dsl = {
             "subject": subject,
-            "action": action,
-            "motion": "decisive body motion continuous",
-            "story_beat": "beat",
-            "visible_change": "A to B",
+            "action": action_full,
+            "motion": beat_motion,
+            "story_beat": f"{ph} beat",
+            "visible_change": f"{ph}: body state advances A→B",
             "focal_character": "kei",
             "camera": camera,
         }
@@ -150,6 +170,8 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True
             "id": f"shot{i:02d}",
             "dramatic_function": df_map.get(ph, "bridge"),
             "heat_phase": ph,
+            "arc_node": arc_node,
+            "emotion": arc_node,
             "nar": nar,
             "lipsync": False,
             "duration_sec": 6,
@@ -627,21 +649,30 @@ class ResolveCastModeTests(unittest.TestCase):
 class ValidateFilmSpecHeatTests(unittest.TestCase):
     @pytest.mark.slow
     def test_write_spec_does_not_auto_pin_heat_max(self) -> None:
+        arcs = ["起", "承", "转", "转"]
+        motions = [
+            "enter step open arrive walk turn reveal door",
+            "touch skin breath tremble heat rise drip pulse",
+            "push press grip plant lean walk turn",
+            "hold settle exhale linger residual blink still",
+        ]
         shots = []
         for i in range(1, 5):
             shots.append(
                 {
                     "id": f"shot{i:02d}",
-                    "dramatic_function": "hook",
+                    "dramatic_function": "hook" if i == 1 else "approach",
+                    "arc_node": arcs[i - 1],
+                    "emotion": arcs[i - 1],
                     "nar": "短句旁白测试。",
                     "lipsync": False,
                     "duration_sec": 6,
                     "dsl": {
                         "subject": "adult anime woman",
-                        "action": "turns head slightly",
-                        "motion": "fingers turn latch, body angles, continuous mid-action idle not speaking",
-                        "story_beat": "looks",
-                        "visible_change": "eyes open to close",
+                        "action": f"steps and turns with {motions[i - 1]}",
+                        "motion": motions[i - 1],
+                        "story_beat": f"beat {arcs[i - 1]}",
+                        "visible_change": f"body advances into {arcs[i - 1]}",
                         "camera": {"shot_size": "medium full", "angle": "eye level"},
                     },
                 }
@@ -675,6 +706,8 @@ class ValidateFilmSpecHeatTests(unittest.TestCase):
             "vo_mode": "storyteller",
             "tts_backend": "edge",
             "heat_scale": "max",
+            # isolate sex-floor gate from meaning arc coverage
+            "dramatic_meaning_strict": False,
             "director_intent": {
                 "logline": "成人max但无性爱段",
                 "tone": "成人",

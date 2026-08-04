@@ -98,11 +98,18 @@ def _dc_shot(sid="shot01", *, contracts=None):
         "id": sid,
         "dramatic_function": "approach",
         "nar": f"旁白{sid}。",
+        "emotion": "wary",
+        "subtext": "她靠近门却仍不确定",
+        "narrative_purpose": "推进接近",
+        "performance_delta": "她从走廊中段走到门前",
         "dsl": {
             "subject": "woman",
             "cast": ["heroine"],
             "camera": {"shot_size": "medium"},
-            "motion": "idle",
+            "action": "steps closer to the door and reaches",
+            "motion": "she steps forward, hand rises toward the handle",
+            "visible_change": "她从走廊中段走到门前",
+            "story_beat": "approach threshold",
         },
     }
     if contracts is not None:
@@ -119,9 +126,9 @@ def _dc_spec(shots):
         "narration_spoken_lang": "zh",
         "aspect": "9:16",
         "director_intent": {
-            "logline": "Test dialogue contracts.",
+            "logline": "Test dialogue contracts for gate isolation.",
             "tone": "neutral",
-            "emotional_arc": ["a", "b", "c"],
+            "emotional_arc": ["接近", "触碰", "停顿"],
         },
         "transition_sec": 0.25,
         "transition_default": "soft",

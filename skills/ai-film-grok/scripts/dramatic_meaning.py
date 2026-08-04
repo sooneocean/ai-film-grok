@@ -12,6 +12,7 @@ See references/lessons-2026-07-20-meaningful-motion.md and hard-defaults (dramat
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from continuity import (
@@ -673,26 +674,34 @@ def lint_emotional_arc_stack(
 def meaning_gate_enabled(spec: dict[str, Any] | None) -> bool:
     """Whether dramatic meaning fails closed on validate/preflight.
 
-    Explicit dramatic_meaning_strict wins.
-    Default-on for heat_scale=max, premium_vertical, or adult_max_iron profiles.
-    write-spec still fail-closes via cinematic_audit (always applies meaning issues).
+    Fail-closed by default for every genre pack (Temple-AV director bar:
+    every shot / camera move / dialogue must carry story purpose).
+
+    Escape hatches, in precedence order:
+      1. env ``AIFILM_SKIP_MEANING_GATE=1`` — CI/local override; never ships
+         into committed film-spec. ``dramatic_meaning_strict: true`` still wins.
+      2. explicit ``dramatic_meaning_strict: false`` — per-project opt-out.
+      3. ``dramatic_meaning_strict: true`` — force hard (incl. under env skip).
+
+    write-spec still fail-closes via cinematic_audit (always applies meaning
+    issues) regardless of this flag.
     """
+    if os.environ.get("AIFILM_SKIP_MEANING_GATE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        flag = spec.get("dramatic_meaning_strict") if isinstance(spec, dict) else None
+        return flag is True
     if not isinstance(spec, dict):
-        return False
+        return True
     flag = spec.get("dramatic_meaning_strict")
     if flag is True:
         return True
     if flag is False:
         return False
-    heat = _norm(spec.get("heat_scale"))
-    if heat == "max":
-        return True
-    qt = _norm(spec.get("quality_target"))
-    if qt in {"premium_vertical", "premium", "max"}:
-        return True
-    if spec.get("adult_max_iron") is True:
-        return True
-    return False
+    return True
 
 
 def lint_dramatic_meaning(
@@ -745,6 +754,7 @@ def lint_dramatic_meaning(
         "note": (
             "Every shot needs dramatic_function + world-change; motion must answer "
             "the beat; dialogue needs purpose; shots must stack through emotional_arc. "
-            "Fail-closed when dramatic_meaning_strict is on (default for production)."
+            "Fail-closed by default for every genre pack; escape via "
+            "AIFILM_SKIP_MEANING_GATE=1 or dramatic_meaning_strict:false."
         ),
     }

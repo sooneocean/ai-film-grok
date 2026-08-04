@@ -106,6 +106,7 @@ def _minimal_spec(shots: list[dict]) -> dict:
         "title": "test",
         "vo_mode": "storyteller",
         "aspect": "9:16",
+        "dramatic_meaning_strict": False,
         "director_intent": {
             "logline": "A test film about consistency.",
             "tone": "neutral",

@@ -72,7 +72,7 @@
 | | **VO 荤话**：act 阶段 `sex_vo_strict` 强制 `dirty talk`（`deep inside / 塞进去 / 顶进去`）；climax 阶段强制 peak vocalization（娇喘+抽搐描述）
 | | **SFX**：act/climax 自动叠加 wet SFX + rhythmic impact；`aifilm audio add-sfx --category explicit` |
 | 导演门禁 | `director_intent` + 每镜 `dramatic_function` 过 `write-spec` 才 queue |
-| **殿堂级意涵堆叠（P0 · 2026-08-04）** | 每镜须有 `dramatic_function` + `visible_change`/`story_beat`；运镜禁 drive-beat 空转（blink/push-in）；对白须 speaker+text+subtext/emotion/purpose；ordered shots 须穿过 `director_intent.emotional_arc`（覆盖+非平）。`dramatic_meaning_strict` 默认随 `heat_scale=max` / `premium_vertical` 硬拦；`write-spec` 经 `cinematic_audit` 始终 fail-closed。码：`SHOT_MEANING_EMPTY` · `MOTION_NO_MEANING` · `DIALOGUE_PURPOSE_EMPTY` · `ARC_STACK_FLAT`/`ARC_NODE_ORPHAN`。代码：`scripts/dramatic_meaning.py`。见 [meaningful-motion](lessons-2026-07-20-meaningful-motion.md) |
+| **殿堂级意涵堆叠（P0 · 2026-08-04 · 2.37.6 全包默认）** | 每镜须有 `dramatic_function` + `visible_change`/`story_beat`；运镜禁 drive-beat 空转（blink/push-in）；对白须 speaker+text+subtext/emotion/purpose；ordered shots 须穿过 `director_intent.emotional_arc`（覆盖+非平）。**validate/preflight 默认 fail-closed（全 genre）**；逃生 `dramatic_meaning_strict:false` 或 `AIFILM_SKIP_MEANING_GATE=1`（`strict:true` 仍硬）。`write-spec` 经 `cinematic_audit` 始终 fail-closed。码：`SHOT_MEANING_EMPTY` · `MOTION_NO_MEANING` · `DIALOGUE_PURPOSE_EMPTY` · `ARC_STACK_FLAT`/`ARC_NODE_ORPHAN`。代码：`scripts/dramatic_meaning.py`。见 [meaningful-motion](lessons-2026-07-20-meaningful-motion.md) |
 | 口白·动作 | `nar` 动词 = `dsl.action` = `dsl.motion` 首要运动 |
 | 防腻 | 连续 3 镜 ≥2 维变化（景别·主动词·`camera_axis`） |
 | 长片接戏 | Continuity Chain；continue **hard**；`cut_on: mid_motion`；字节 promote |

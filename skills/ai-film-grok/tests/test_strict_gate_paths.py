@@ -22,6 +22,7 @@ def _base_spec(shots: list[dict]) -> dict:
         "title": "strict-test",
         "vo_mode": "storyteller",
         "aspect": "9:16",
+        "dramatic_meaning_strict": False,
         "director_intent": {
             "logline": "A test for strict gate paths.",
             "tone": "neutral",

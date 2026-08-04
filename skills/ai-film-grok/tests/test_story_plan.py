@@ -219,6 +219,7 @@ class StoryPlanTests(unittest.TestCase):
             spec["erotic_impact_strict"] = False
             spec["sex_floor_strict"] = False
             spec["heat_scale"] = "soft"
+            spec["dramatic_meaning_strict"] = False
             validate_film_spec(spec, assign_missing_ids=False)
             self.assertGreater((spec.get("_dialogue_drama") or {}).get("coverage_shots", 0), 0)
             missing_beat = speaking[0].get("beat_id") or speaking[0].get("dialogue_line_id")

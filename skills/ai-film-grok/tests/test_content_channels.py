@@ -66,6 +66,7 @@ def test_strict_spec_rejects_text_as_action() -> None:
         "title": "频道契约",
         "vo_mode": "storyteller",
         "tts_backend": "edge",
+        "dramatic_meaning_strict": False,
         "director_intent": {
             "logline": "这是一个足够长的频道契约测试。",
             "tone": "test",

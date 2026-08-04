@@ -375,11 +375,26 @@ def test_composite_bad_aesthetic_and_dialogue_and_flat_arc():
     assert CODE_ARC_STACK_FLAT in codes or CODE_ARC_STACK_NO_MAPPING in codes
 
 
-def test_meaning_gate_default_on_for_heat_max():
+def test_meaning_gate_default_on_every_genre():
+    """2.37.5: every genre pack fail-closed unless explicit opt-out."""
+    import os
+
+    assert meaning_gate_enabled({}) is True
+    assert meaning_gate_enabled({"heat_scale": "soft"}) is True
     assert meaning_gate_enabled({"heat_scale": "max"}) is True
+    assert meaning_gate_enabled({"quality_target": "premium_vertical"}) is True
     assert meaning_gate_enabled({"heat_scale": "medium", "dramatic_meaning_strict": False}) is False
     assert meaning_gate_enabled({"heat_scale": "medium", "dramatic_meaning_strict": True}) is True
-    assert meaning_gate_enabled({"quality_target": "premium_vertical"}) is True
+    prev = os.environ.get("AIFILM_SKIP_MEANING_GATE")
+    try:
+        os.environ["AIFILM_SKIP_MEANING_GATE"] = "1"
+        assert meaning_gate_enabled({"heat_scale": "max"}) is False
+        assert meaning_gate_enabled({"dramatic_meaning_strict": True}) is True
+    finally:
+        if prev is None:
+            os.environ.pop("AIFILM_SKIP_MEANING_GATE", None)
+        else:
+            os.environ["AIFILM_SKIP_MEANING_GATE"] = prev
 
 
 def test_validate_film_spec_hard_fails_on_max_empty_meaning():

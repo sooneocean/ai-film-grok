@@ -42,6 +42,7 @@ class BeatCoverageDefaultsTests(unittest.TestCase):
         spec = {
             "title": "cov",
             "vo_mode": "storyteller",
+            "dramatic_meaning_strict": False,
             "director_intent": {
                 "logline": "感官特写默认景别测试用 logline。",
                 "tone": "test",

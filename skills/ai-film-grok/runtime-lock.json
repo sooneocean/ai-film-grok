@@ -542,7 +542,7 @@
     },
     {
       "path": "scripts/director_cli.py",
-      "sha256": "2716c5daac58454ac2396ea76a8783d2a6a6fdde9742cfcfa53ccb86fd122598"
+      "sha256": "097bf5b935980a9a8209c01b9b5b883a355b8c44bc70b638d52b5d32d7fba00c"
     },
     {
       "path": "scripts/director_ledger.py",
@@ -570,7 +570,7 @@
     },
     {
       "path": "scripts/dramatic_meaning.py",
-      "sha256": "675192bf70ee83983c1e94aaf1f271955f971b4cfaf1b8d893b152a6bfb06cbf"
+      "sha256": "d7da8be24ea1bab93a70acb7f584622ce73a5a669f56657cd25e73d20905a208"
     },
     {
       "path": "scripts/edit_edl_merge.py",
@@ -622,7 +622,7 @@
     },
     {
       "path": "scripts/film_spec.py",
-      "sha256": "1b2f3b266f66be5e0fd6d80535c77c37f37b8b591205ca0e0f422548f96404a6"
+      "sha256": "d7cc554b01fb840e5a2eeee975daa9cc6acf5a552277b36ce9b30db78251d351"
     },
     {
       "path": "scripts/final_editorial_review.py",
@@ -934,7 +934,7 @@
     },
     {
       "path": "scripts/preflight.py",
-      "sha256": "aa9980bf2645ee171fc8b9d7a00aaae8d7b5a0a35f558f8d04e2b22dfb1e67a5"
+      "sha256": "cf13351acd17d57181c13a78dd378df002f81eb20e8b8726b5ca84898d0fe29e"
     },
     {
       "path": "scripts/product_brief.py",

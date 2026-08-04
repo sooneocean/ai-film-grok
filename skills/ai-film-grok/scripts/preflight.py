@@ -771,10 +771,6 @@ def run_preflight(root: Path) -> dict[str, Any]:
             dm_codes = list(dm.get("codes") or [])
             if dm_codes:
                 dm_strict = meaning_gate_enabled(spec)
-                if spec.get("dramatic_meaning_strict") is True:
-                    dm_strict = True
-                if spec.get("dramatic_meaning_strict") is False:
-                    dm_strict = False
                 dm_msg = (
                     f"殿堂级意涵堆叠 {'hard' if dm_strict else 'soft'} lint: {dm_codes} "
                     f"(errors={dm.get('error_count')})"
