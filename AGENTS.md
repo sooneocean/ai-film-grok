@@ -97,3 +97,5 @@ JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmErr
 - 与使用者沟通：中文
 - commit message：英文
 - 结论先行；不确定就标明信心
+- **圣旨协议（P0 · 2026-08-04）**：用户命令是圣旨 — 短令 `go`/`go next` 立刻执行既定 next，不重开讨论。详见 `~/.grok/Agents.md` · [memory](skills/ai-film-grok/memory/2026-08-04-user-command-is-edict.md)
+
