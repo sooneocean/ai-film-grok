@@ -112,13 +112,15 @@ aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --
 
 **调度**：先耗尽 P0→P1 → idle 且 ready 才拉 P2 → 新 P0 **立即暂停 P2**。进度只认 `takes/` + register 收据。
 
+**P2 排序（agree all · 2026-08-04）**：**mean 最低优先**（最弱 Grok 先挑战）→ 并列按时间轴。跨集 **不** 自动记 R2V/I2V 胜率。
+
 ### 填空挑战口诀
 
 ```text
 挑战 Grok soft：先 I2V（锁脸公平）→ 仍闷再 R2V
 P0 能量位：高难/大嘴/I2V 不够 → R2V 占满这些槽
-P2 优先短 pilot；人说值得再 bulk 加长
-final 不阻塞于「P2 100% 完成」（能烧就烧=质量上限，≠发布门）
+P2 优先 mean 最低；短 pilot；人说值得再 bulk 加长
+final 不阻塞于「P2 100% 完成」（能烧就烧=质量上限，≠发布门；高光不强制挑战）
 ```
 
 ### PK（替换）
