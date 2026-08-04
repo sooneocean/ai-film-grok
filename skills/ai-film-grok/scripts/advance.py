@@ -92,6 +92,18 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
         ("variety-precheck",),
         verifier=("variety-precheck",),
     ),
+    "i2v-motion-gate": AdvancePolicy(
+        ("projection.verify", "dispatch.orchestrate"),
+        ("i2v-motion-gate",),
+        value_flags=("--root",),
+        bool_flags=("--write",),
+        verifier=("i2v-motion-gate",),
+    ),
+    "film-core-closeout": AdvancePolicy(
+        ("projection.verify", "dispatch.orchestrate"),
+        ("closeout", "status"),
+        verifier=("closeout", "status"),
+    ),
     "pilot-pack": AdvancePolicy(
         ("quality.inspect", "dispatch.orchestrate"),
         ("pilot-pack",),

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -108,6 +109,113 @@ class MediaQueueNoSilentPass(unittest.TestCase):
         from media_queue import QueueError
 
         self.assertTrue(issubclass(QueueError, Exception))
+
+
+class PhaseBAutoGateAndSurface(unittest.TestCase):
+    def test_collect_rows_fills_df(self) -> None:
+        from i2v_motion_gate import collect_motion_gate_rows
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "film-spec.json").write_text(
+                json.dumps(
+                    {
+                        "scenes": [
+                            {
+                                "shots": [
+                                    {
+                                        "id": "r1",
+                                        "heat_phase": "setup",
+                                        "dramatic_function": "reaction",
+                                        "wardrobe_state": "",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "takes" / "r1").mkdir(parents=True)
+            side = root / "takes" / "r1" / "r1.mp4.json"
+            side.write_text(json.dumps({"mean": 12.0}), encoding="utf-8")
+            # empty mp4 path not required for mean sidecar lookup by name pattern
+            rows = collect_motion_gate_rows(root)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["dramatic_function"], "reaction")
+            # mean only from sidecar next to mp4 — create dummy mp4+json
+            mp4 = root / "takes" / "r1" / "r1.mp4"
+            mp4.write_bytes(b"\x00")
+            (Path(str(mp4) + ".json")).write_text(
+                json.dumps({"mean": 12.0}), encoding="utf-8"
+            )
+            rows2 = collect_motion_gate_rows(root)
+            self.assertEqual(rows2[0]["mean"], 12.0)
+
+    def test_soft_df_auto_gate_passes_mean12(self) -> None:
+        from cli_motion import i2v_motion_gate_from_rows
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "film-spec.json").write_text(
+                json.dumps(
+                    {
+                        "scenes": [
+                            {
+                                "shots": [
+                                    {
+                                        "id": "r1",
+                                        "heat_phase": "setup",
+                                        "dramatic_function": "reaction",
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            takes = root / "takes" / "r1"
+            takes.mkdir(parents=True)
+            mp4 = takes / "r1.mp4"
+            mp4.write_bytes(b"\x00")
+            (Path(str(mp4) + ".json")).write_text(
+                json.dumps({"mean": 12.0}), encoding="utf-8"
+            )
+            rep = i2v_motion_gate_from_rows(
+                [],
+                root=root,
+                write_receipts=True,
+                auto_from_root=True,
+            )
+            self.assertTrue(rep["ok"], rep.get("audit"))
+            self.assertTrue((root / "receipts" / "i2v-final-gate.json").is_file())
+            per = (rep.get("audit") or {}).get("per_shot") or []
+            self.assertEqual(per[0].get("tier"), "soft")
+
+    def test_grok_spine_written_by_injector(self) -> None:
+        inj = PromptInjector(
+            {
+                "schema_version": 1,
+                "state": "locked",
+                "style_signature": "cel anime",
+                "heat_scale": "soft",
+            },
+            template_version="I2V",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "film-spec.json").write_text("{}", encoding="utf-8")
+            shot = {
+                "id": "g9",
+                "shot_role": "hero",
+                "dramatic_function": "bridge",
+                "dsl": {"action": "she walks toward the door slowly"},
+            }
+            inj.assemble(shot, root)
+            spine = root / "receipts" / "prompts" / "g9.grok.spine.txt"
+            self.assertTrue(spine.is_file())
+            self.assertIn("Dramatic function: bridge", spine.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

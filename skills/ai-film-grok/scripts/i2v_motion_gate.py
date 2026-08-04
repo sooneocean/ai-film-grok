@@ -482,8 +482,11 @@ def build_i2v_final_gate(
         "shot_count": shot_count,
         "raw_ok_count": raw_ok_count,
         "floors": {
+            "soft": MEAN_SOFT_FLOOR,
+            "medium": MEAN_MEDIUM_FLOOR,
             "normal": MEAN_NORMAL_FLOOR,
             "meat": MEAN_MEAT_FLOOR,
+            "high": MEAN_MEAT_FLOOR,
             "meat_target": MEAN_MEAT_TARGET,
         },
         "desktop_final_allowed": ok,
@@ -510,6 +513,111 @@ def write_motion_gate_receipts(
         )
         out["gate"] = str(gate_path)
     return out
+
+
+def collect_motion_gate_rows(root: Path | str) -> list[dict[str, Any]]:
+    """Phase B · Auto-build gate rows from film-spec + mean sources (DF/wardrobe filled).
+
+    Mean resolution order per shot:
+      1) receipts/i2v-high-motion-audit.json per_shot
+      2) takes/<id>/*.mp4.json sidecar mean|mean_absdiff|motion_mean
+      3) manifest clips[id] mean fields
+    Missing mean → row still emitted (gate will flag MEAN missing / fail floor).
+    """
+    base = Path(root).expanduser().resolve()
+    try:
+        from util import read_json
+    except Exception:  # noqa: BLE001
+        def read_json(path: Path) -> dict[str, Any] | None:  # type: ignore[misc]
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                return None
+
+    spec = read_json(base / "film-spec.json") or {}
+    shots: list[dict[str, Any]] = []
+    if isinstance(spec.get("scenes"), list):
+        for scene in spec["scenes"]:
+            if not isinstance(scene, dict):
+                continue
+            for sh in scene.get("shots") or []:
+                if isinstance(sh, dict):
+                    shots.append(sh)
+    if not shots and isinstance(spec.get("shots"), list):
+        shots = [s for s in spec["shots"] if isinstance(s, dict)]
+
+    man = read_json(base / "manifest.json") or {}
+    clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
+    audit = read_json(base / "receipts" / "i2v-high-motion-audit.json") or {}
+    per = audit.get("per_shot") if isinstance(audit.get("per_shot"), list) else []
+    mean_by_id: dict[str, float] = {}
+    for row in per:
+        if not isinstance(row, dict):
+            continue
+        sid = str(row.get("id") or row.get("shot_id") or "")
+        m = row.get("mean")
+        if m is None:
+            m = row.get("mean_absdiff")
+        if sid and m is not None:
+            try:
+                mean_by_id[sid] = float(m)
+            except (TypeError, ValueError):
+                pass
+
+    rows: list[dict[str, Any]] = []
+    for sh in shots:
+        sid = str(sh.get("id") or "").strip()
+        if not sid:
+            continue
+        dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+        df = str(sh.get("dramatic_function") or dsl.get("dramatic_function") or "").strip()
+        wardrobe = str(sh.get("wardrobe_state") or "").strip()
+        heat = str(sh.get("heat_phase") or "").strip()
+        mean: float | None = mean_by_id.get(sid)
+        if mean is None:
+            takes_dir = base / "takes" / sid
+            if takes_dir.is_dir():
+                for p in sorted(takes_dir.glob("*.mp4")):
+                    for side in (Path(str(p) + ".json"), p.with_suffix(".json")):
+                        if not side.is_file():
+                            continue
+                        data = read_json(side) or {}
+                        for key in ("mean", "mean_absdiff", "motion_mean"):
+                            if data.get(key) is None:
+                                continue
+                            try:
+                                mean = float(data[key])
+                                break
+                            except (TypeError, ValueError):
+                                continue
+                        if mean is not None:
+                            break
+                    if mean is not None:
+                        break
+        if mean is None and isinstance(clips.get(sid), dict):
+            c = clips[sid]
+            for key in ("mean", "mean_absdiff", "motion_mean"):
+                if c.get(key) is None:
+                    continue
+                try:
+                    mean = float(c[key])
+                    break
+                except (TypeError, ValueError):
+                    continue
+        source = None
+        if isinstance(clips.get(sid), dict):
+            source = clips[sid].get("source") or clips[sid].get("provider")
+        rows.append(
+            {
+                "id": sid,
+                "heat_phase": heat or None,
+                "dramatic_function": df or None,
+                "wardrobe_state": wardrobe or None,
+                "mean": mean,
+                "source": str(source).strip() if source else None,
+            }
+        )
+    return rows
 
 
 def still_source_allows_full_cast(wardrobe_state: str | None) -> bool:

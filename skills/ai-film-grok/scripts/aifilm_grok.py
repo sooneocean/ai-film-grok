@@ -5910,36 +5910,44 @@ def cmd_motion_plan(args: argparse.Namespace) -> int:
 
 
 def cmd_i2v_motion_gate(args: argparse.Namespace) -> int:
-    """High-motion audit + final gate from mean rows (meat≥20 normal≥18)."""
+    """High-motion audit + final gate (rows JSON and/or --root auto DF enrich)."""
     import json as _json
 
     from cli_motion import i2v_motion_gate_from_rows
 
     rows_path = getattr(args, "rows", None) or getattr(args, "from_json", None)
-    if not rows_path:
-        raise FilmError(
-            "i2v-motion-gate requires --rows JSON "
-            "(list of {id,heat_phase,mean[,dramatic_function,wardrobe_state,tier]})"
-        )
-    path = Path(rows_path).expanduser().resolve()
-    try:
-        data = _json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, _json.JSONDecodeError) as exc:
-        raise FilmError(f"cannot read --rows: {exc}") from exc
-    if isinstance(data, dict) and isinstance(data.get("shots"), list):
-        shots = data["shots"]
-    elif isinstance(data, list):
-        shots = data
-    else:
-        raise FilmError("--rows must be a JSON list or {shots:[...]}")
     root = getattr(args, "root", None)
+    shots: list = []
+    auto = False
+    if rows_path:
+        path = Path(rows_path).expanduser().resolve()
+        try:
+            data = _json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, _json.JSONDecodeError) as exc:
+            raise FilmError(f"cannot read --rows: {exc}") from exc
+        if isinstance(data, dict) and isinstance(data.get("shots"), list):
+            shots = data["shots"]
+        elif isinstance(data, list):
+            shots = data
+        else:
+            raise FilmError("--rows must be a JSON list or {shots:[...]}")
+    elif root:
+        auto = True
+    else:
+        raise FilmError(
+            "i2v-motion-gate requires --rows JSON or --root "
+            "(auto: film-spec DF/wardrobe + takes/audit means)"
+        )
+    # --root alone defaults to writing receipts (agent loop)
+    write = bool(getattr(args, "write", False)) or (auto and not rows_path)
     rep = i2v_motion_gate_from_rows(
         shots,
         root=root,
-        write_receipts=bool(getattr(args, "write", False)),
+        write_receipts=write,
         raw_complete=not bool(getattr(args, "raw_incomplete", False)),
         kb_fallback=bool(getattr(args, "kb_fallback", False)),
         style_ok=not bool(getattr(args, "style_fail", False)),
+        auto_from_root=auto,
     )
     emit(rep)
     return 0 if rep.get("ok") else 1
@@ -7907,23 +7915,29 @@ def build_parser() -> argparse.ArgumentParser:
     img = sub.add_parser(
         "i2v-motion-gate",
         help=(
-            "High-motion product gate: meat mean≥20 / normal≥18 → "
-            "i2v-high-motion-audit + i2v-final-gate (desktop final only if ok)"
+            "High-motion product gate (soft≥10 medium≥16 normal≥18 meat≥20); "
+            "--root auto-fills DF from film-spec; writes audit+final-gate"
         ),
     )
     img.add_argument(
         "--rows",
-        required=True,
+        required=False,
+        default=None,
         help=(
-            "JSON list of {id,heat_phase,mean|mean_absdiff"
-            "[,dramatic_function,wardrobe_state,tier,source]}"
+            "Optional JSON list of {id,heat_phase,mean|mean_absdiff"
+            "[,dramatic_function,wardrobe_state,tier,source]}; "
+            "omit when using --root auto-collect"
         ),
     )
-    img.add_argument("--root", default=None, help="Film root when --write")
+    img.add_argument(
+        "--root",
+        default=None,
+        help="Film root: auto-collect rows from film-spec + means; required for --write",
+    )
     img.add_argument(
         "--write",
         action="store_true",
-        help="Write receipts/i2v-high-motion-audit.json + i2v-final-gate.json",
+        help="Write receipts (default on when only --root is passed)",
     )
     img.add_argument("--raw-incomplete", action="store_true")
     img.add_argument("--kb-fallback", action="store_true")

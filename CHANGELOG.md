@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.36.1] - 2026-08-04
+
+### Added (Motion Core deep integration · Phase B)
+- **`i2v-motion-gate --root`**: auto-collect rows from film-spec (DF/wardrobe/heat) + takes/audit means; `--rows` optional; `--root` alone writes receipts.
+- **Grok spine receipt**: `prompt_injector` I2V writes `receipts/prompts/<id>.grok.spine.txt`.
+- **film_core dual spine**: closeout audit accepts `.motion` / `.h3` / `.grok.spine.txt`; missing hero spine → `CORE_SPINE_MISSING`.
+- **dispatch / next / autopilot**: surface `i2v-motion-gate` and `film-core-closeout` when clips/final ready.
+
+### Tests
+- integrate_a: auto-gate soft DF mean=12; grok spine write; p1 grok-only closeout
+
 ## [2.36.0] - 2026-08-04
 
 ### Changed (Motion Core deep integration · Phase A)

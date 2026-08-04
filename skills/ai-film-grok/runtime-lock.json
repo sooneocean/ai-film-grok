@@ -106,7 +106,7 @@
     },
     {
       "path": "scripts/advance.py",
-      "sha256": "d6e77c71304f5dc7c24e5651b92d5fd229ede19ca0f26ea2360558658131aee7"
+      "sha256": "9d8b555f58a6c753d7d31eefe23bdb970237af85cddfa35c4c8a403c83f52f90"
     },
     {
       "path": "scripts/agent_review_final.py",
@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "05b2debac5265ad1ea611cab03c34a9f9ffc988d46611829be25be7028dfcc55"
+      "sha256": "fcac9ee8be9978d2842c4b053046bdbfd8f19f1762cde0a0c52a5d6a8a88364a"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -210,7 +210,7 @@
     },
     {
       "path": "scripts/autopilot.py",
-      "sha256": "d730fc883ae365ccf19858876e812ebb6740d36c3e744e9b8eeacc0223b7e61b"
+      "sha256": "5e1243c2cdf3ef49fb269c9a06a853d0833e16d1cd581eac0c3b5853c6402dcb"
     },
     {
       "path": "scripts/autopilot_notify.py",
@@ -318,7 +318,7 @@
     },
     {
       "path": "scripts/cli_motion.py",
-      "sha256": "005c80708667d0c9834f2409b62985037642983ee4ab92187b6ca5a03f26714e"
+      "sha256": "251a07b80bf42c5426fdaedf0320ef2db5debf7406d2b4ebce6a284d4ccb5072"
     },
     {
       "path": "scripts/cli_node.py",
@@ -554,7 +554,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "febd7127c75e59e119d390be95b9a6436a3450b1fc6d2bbb9e993a84e8574a01"
+      "sha256": "1b5465bf3a432edd70c6c3f9e2bb7f1edb938e60bf0fdc1ef1ec257bf1e77cdc"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -678,7 +678,7 @@
     },
     {
       "path": "scripts/i2v_motion_gate.py",
-      "sha256": "550408f51ec767791773fe3fa756d18a1342b138edf306642c23f910b53de098"
+      "sha256": "2efc261ecf06a8b2078a9a4e3fcd3909146cc4f5d368118eb37959aeb11ed7ce"
     },
     {
       "path": "scripts/i2v_provider.py",
@@ -814,7 +814,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "3d01bd914db75446a9f362574f8d567d89c3f2df07763e08d41e378cfdd5405c"
+      "sha256": "f672aaa58aa45f8f41bdb0dc531148cfd3399c7c4ae353195a6d5a365bdd84aa"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -974,7 +974,7 @@
     },
     {
       "path": "scripts/prompt_injector.py",
-      "sha256": "f8eeea66f31823bc9deac983a9f8f1964d90e658b6ee71814a22a11ee623733f"
+      "sha256": "74391fbeebabbbf7c885ac4f6b9275d837b9f676f85768b9491cd6fd7bf61c9b"
     },
     {
       "path": "scripts/provider_canary.py",
@@ -1278,7 +1278,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "e136c9c5c01114bcff2156885771b41bcfb54f1a47204de34277f19d6bd27033"
+      "sha256": "80e10b5eec204df771a6e0577f16d4b018cf99904b2a9d8f3c71dd935f94a681"
     },
     {
       "path": "scripts/workflow_spine.py",

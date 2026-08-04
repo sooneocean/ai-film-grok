@@ -72,32 +72,60 @@ def i2v_motion_gate_from_rows(
     raw_complete: bool = True,
     kb_fallback: bool = False,
     style_ok: bool = True,
+    auto_from_root: bool = False,
 ) -> dict[str, Any]:
     """Shipped entry: grade mean rows → high-motion audit + final gate.
 
     Each shot: id, heat_phase, mean|mean_absdiff, optional source,
     dramatic_function|df, wardrobe_state, motion_tier|spine_tier, tier.
+
+    When ``auto_from_root`` and root is set with empty shots, rows are collected
+    from film-spec + takes/audit (Phase B).
     """
     from i2v_motion_gate import (
         build_high_motion_audit,
         build_i2v_final_gate,
+        collect_motion_gate_rows,
         write_motion_gate_receipts,
     )
 
-    audit = build_high_motion_audit(shots)
+    rows = list(shots or [])
+    if auto_from_root and root is not None and not rows:
+        rows = collect_motion_gate_rows(root)
+    elif root is not None and rows:
+        # Enrich sparse author rows with DF/wardrobe/mean from film root
+        auto_map = {
+            str(r.get("id") or ""): r
+            for r in collect_motion_gate_rows(root)
+            if r.get("id")
+        }
+        enriched: list[dict[str, Any]] = []
+        for raw in rows:
+            if not isinstance(raw, dict):
+                continue
+            sid = str(raw.get("id") or raw.get("shot_id") or "")
+            base = dict(auto_map.get(sid) or {})
+            base.update({k: v for k, v in raw.items() if v is not None and v != ""})
+            if sid:
+                base["id"] = sid
+            enriched.append(base)
+        rows = enriched
+    audit = build_high_motion_audit(rows)
     gate = build_i2v_final_gate(
         audit,
         raw_complete=raw_complete,
         kb_fallback=kb_fallback,
         style_ok=style_ok,
-        shot_count=len(shots),
-        raw_ok_count=len(shots) if raw_complete else 0,
+        shot_count=len(rows),
+        raw_ok_count=len(rows) if raw_complete else 0,
     )
     out: dict[str, Any] = {
         "kind": "i2v-motion-gate",
         "ok": gate.get("ok") is True,
         "audit": audit,
         "gate": gate,
+        "row_count": len(rows),
+        "auto_from_root": bool(auto_from_root and root is not None),
     }
     if write_receipts and root is not None:
         out["receipts"] = write_motion_gate_receipts(root, audit, gate)

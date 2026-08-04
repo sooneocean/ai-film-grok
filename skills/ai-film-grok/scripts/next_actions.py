@@ -524,6 +524,14 @@ def build_next_actions(
             )
 
     if gates.get("clips_complete") and not gates.get("final_complete"):
+        # Phase B · DF motion gate before final when clips ready
+        gate_rec = read_json(root / "receipts" / "i2v-final-gate.json") or {}
+        if gate_rec.get("ok") is not True:
+            add(
+                "i2v-motion-gate",
+                f'aifilm i2v-motion-gate --root "{r}" --write',
+                "clips 齐 — 先 i2v-motion-gate（--root 自动 DF）再 final/closeout",
+            )
         # Wave H: multi-take shortlist before post when takes exist
         sel_rec = read_json(root / "receipts" / "select-shortlist.json") or {}
         takes_dir = root / "takes"
@@ -606,6 +614,14 @@ def build_next_actions(
                 f'aifilm closeout run --root "{r}"',
                 "[交付] 成片/plate 已在 → closeout：heat→review-final→post-audit（不自动批分）",
             )
+            # Phase B · film_core advisory on closeout ladder
+            fc = read_json(root / "receipts" / "film-core-closeout.json") or {}
+            if fc.get("ok") is False:
+                add(
+                    "film-core-closeout",
+                    f'aifilm closeout status --root "{r}"',
+                    "[advisory] 电影核 DF/want/spine 未齐 — 修 spec 或补 *.grok/*.h3.spine.txt",
+                )
             external_configured = bool(
                 os.environ.get("GROQ_API_KEY") or os.environ.get("GEMINI_API_KEY")
             )

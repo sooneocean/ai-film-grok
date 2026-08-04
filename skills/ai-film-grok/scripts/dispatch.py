@@ -37,6 +37,8 @@ _ACTION_SKILLS = {
     "bulk-preflight": "image.animate",
     "pilot-pack": "quality.inspect",
     "variety-precheck": "story.validate",
+    "i2v-motion-gate": "projection.verify",
+    "film-core-closeout": "projection.verify",
     "select-shortlist": "projection.verify",
     "export-desktop": "export.package",
     "dailies_review-evidence": "dispatch.orchestrate",
@@ -65,6 +67,8 @@ _COMMAND_POLICIES = {
     "pilot-pack": ("local", "none"),  # GO evidence write; approve remains human
     "bulk-preflight": ("local", "none"),
     "variety-precheck": ("local", "none"),
+    "i2v-motion-gate": ("local", "none"),
+    "film-core-closeout": ("local", "none"),
     "select-shortlist": ("local", "none"),
     "queue-progress": ("local", "none"),
     "tunnel-probe": ("local", "none"),
@@ -687,6 +691,34 @@ def build_dispatch(
                 f'aifilm select-shortlist --root "{r}"',
                 "clips 齐且有 takes — 先 select-shortlist 标 preferred（不删 take）再粗剪/final",
                 "visual",
+            )
+    # Phase B · motion-core surface: DF-aware gate + film-core advisory after clips
+    if craft_stage in {"selects", "media", "rough", "post"} and gates.get("clips_complete"):
+        gate_rec = read_json(root / "receipts" / "i2v-final-gate.json") or {}
+        if gate_rec.get("ok") is not True:
+            pre(
+                "i2v-motion-gate",
+                f'aifilm i2v-motion-gate --root "{r}" --write',
+                "clips 齐但 i2v-final-gate 未绿 — 从 film-spec 自动填 DF 后跑 motion gate",
+                "visual",
+            )
+    if craft_stage in {"post", "deliver", "rough"} and (
+        gates.get("clips_complete") or gates.get("final_complete")
+    ):
+        fc = read_json(root / "receipts" / "film-core-closeout.json") or {}
+        if fc and fc.get("ok") is False:
+            pre(
+                "film-core-closeout",
+                f'aifilm closeout status --root "{r}"  # film_core advisory',
+                "电影核审计未绿（DF/want/spine）— advisory，修 spec 或重装 spine 收据",
+                "post",
+            )
+        elif not fc and gates.get("final_complete"):
+            pre(
+                "film-core-closeout",
+                f'aifilm closeout status --root "{r}"',
+                "final 已齐但尚无 film-core-closeout — closeout status 会写 advisory 审计",
+                "post",
             )
     quality = _quality_summary(root)
     if quality["failed_count"]:

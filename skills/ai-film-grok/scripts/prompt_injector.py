@@ -723,6 +723,18 @@ class PromptInjector:
                 role=str(shot.get("shot_role") or "hero"),
             )
 
+        # Phase B: Grok spine receipt (film_core_closeout dual-track)
+        if self.template_version == "I2V" and root is not None:
+            try:
+                sid = str(shot.get("id") or "unknown")
+                spine_dir = Path(root) / "receipts" / "prompts"
+                spine_dir.mkdir(parents=True, exist_ok=True)
+                (spine_dir / f"{sid}.grok.spine.txt").write_text(
+                    final_prompt.rstrip() + "\n", encoding="utf-8"
+                )
+            except OSError:
+                pass
+
         # Traceability receipt
         receipt = {
             "shot_id": shot.get("id"),

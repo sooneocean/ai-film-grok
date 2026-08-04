@@ -279,6 +279,38 @@ class FilmCoreCloseoutTests(unittest.TestCase):
             audit = film_core_closeout_audit(root, write=True)
             self.assertTrue(audit["ok"], audit.get("issues"))
 
+    def test_grok_spine_only_ok(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write(
+                root,
+                "film-spec.json",
+                {
+                    "title": "x",
+                    "director_intent": {"protagonist_want": "survive"},
+                    "scenes": [
+                        {
+                            "shots": [
+                                {
+                                    "id": "g1",
+                                    "shot_role": "hero",
+                                    "dramatic_function": "reaction",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            )
+            _write(root, "manifest.json", {"clips": {"g1": {"path": "clips/g1.mp4"}}})
+            _write(
+                root,
+                "receipts/prompts/g1.grok.spine.txt",
+                "Dramatic function: reaction\nThis beat advances want (reaction): survive\n",
+            )
+            audit = film_core_closeout_audit(root, write=True)
+            self.assertTrue(audit["ok"], audit.get("issues"))
+            self.assertEqual(audit["shots"][0].get("spine_engine"), "grok")
+
 
 class ContinueHandoffMetaTests(unittest.TestCase):
     def test_write_continue_handoff_missing_clip(self) -> None:

@@ -90,7 +90,9 @@ dramatic_function → want_beat → action/motion/visible_change
 | `build_shot_intent` | 带出 `want_beat` / `motion_tier` / `optical_tier` / `spoken_text` |
 | `h3 run` | 空核拒跑；写 `receipts/prompts/<id>.h3.spine.txt`；register 时 variety 硬门 |
 | `media-queue` | 入队前 enrich + fail closed（**不 silent pass**） |
-| `prompt_injector` I2V | 注入 spine + **assert 空核**（与 H3 对齐） |
+| `prompt_injector` I2V | 注入 spine + **assert 空核**；写 `*.grok.spine.txt` |
+| `i2v-motion-gate --root` | 自动 DF + mean → audit/final-gate（Phase B） |
+| closeout film_core | 审 `.motion/.h3/.grok` spine（advisory） |
 
 **prompt_tier**（进 prompt）：`soft` · `medium` · `high`（act/bare/action 加 HIGH MOTION）  
 **optical_tier**（mean 门）：soft≥10 · medium≥16 · normal≥18 · meat/high≥20  

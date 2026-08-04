@@ -29,6 +29,8 @@ LOCAL_THROUGHPUT_NEXT_IDS = frozenset(
         "closeout-run",
         "bulk-preflight",
         "variety-precheck",
+        "i2v-motion-gate",
+        "film-core-closeout",
         "pilot-pack",
         "select-shortlist",
         "export-desktop",

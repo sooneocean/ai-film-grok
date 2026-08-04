@@ -662,14 +662,31 @@ def film_core_closeout_audit(root: Path | str, *, write: bool = True) -> dict[st
         df = str(shot.get("dramatic_function") or "").strip()
         role = str(shot.get("shot_role") or "hero").strip().lower()
         has_clip = isinstance(clips.get(sid), dict) and clips[sid].get("path")
-        spine_path = root_p / "receipts" / "prompts" / f"{sid}.h3.spine.txt"
-        spine_txt = spine_path.read_text(encoding="utf-8") if spine_path.is_file() else ""
+        # Phase B · dual spine: prefer unified motion, then H3, then Grok
+        spine_txt = ""
+        spine_engine: str | None = None
+        prompts_dir = root_p / "receipts" / "prompts"
+        for eng, name in (
+            ("motion", f"{sid}.motion.spine.txt"),
+            ("h3", f"{sid}.h3.spine.txt"),
+            ("grok", f"{sid}.grok.spine.txt"),
+        ):
+            p = prompts_dir / name
+            if p.is_file():
+                try:
+                    spine_txt = p.read_text(encoding="utf-8")
+                except OSError:
+                    spine_txt = ""
+                if spine_txt:
+                    spine_engine = eng
+                    break
         row = {
             "shot_id": sid,
             "role": role,
             "dramatic_function": df or None,
             "has_clip": bool(has_clip),
             "has_spine_receipt": bool(spine_txt),
+            "spine_engine": spine_engine,
             "spine_has_df": bool(df and df in spine_txt) if spine_txt else None,
         }
         rows.append(row)
@@ -681,12 +698,23 @@ def film_core_closeout_audit(root: Path | str, *, write: bool = True) -> dict[st
                     "message": f"{sid} hero clip without dramatic_function",
                 }
             )
+        if role == "hero" and has_clip and not spine_txt:
+            issues.append(
+                {
+                    "code": "CORE_SPINE_MISSING",
+                    "shot_id": sid,
+                    "message": (
+                        f"{sid} hero clip without spine receipt "
+                        f"(.motion/.h3/.grok.spine.txt)"
+                    ),
+                }
+            )
         if has_clip and spine_txt and df and f"Dramatic function: {df}" not in spine_txt:
             issues.append(
                 {
                     "code": "CORE_SPINE_DF_DRIFT",
                     "shot_id": sid,
-                    "message": f"{sid} H3 spine receipt missing DF {df}",
+                    "message": f"{sid} {spine_engine or 'spine'} receipt missing DF {df}",
                 }
             )
         # dialogue shot must have spoken text in spine if on_camera
@@ -705,7 +733,7 @@ def film_core_closeout_audit(root: Path | str, *, write: bool = True) -> dict[st
                 {
                     "code": "CORE_DIALOGUE_SPINE_MISS",
                     "shot_id": sid,
-                    "message": f"{sid} dialogue not in H3 spine receipt",
+                    "message": f"{sid} dialogue not in {spine_engine or 'spine'} receipt",
                 }
             )
     ok = not issues
@@ -719,7 +747,12 @@ def film_core_closeout_audit(root: Path | str, *, write: bool = True) -> dict[st
         "shots": rows,
         "issues": issues,
         "next_cmd": (
-            None if ok else f'aifilm write-spec --root "{root_p}"  # fill DF/want then re-h3'
+            None
+            if ok
+            else (
+                f'aifilm write-spec --root "{root_p}"  # fill DF/want; '
+                f"re-assemble Grok or h3 run for spine"
+            )
         ),
     }
     if write:
