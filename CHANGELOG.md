@@ -2,11 +2,12 @@
 
 ## [2.37.8] - 2026-08-04
 
-### Added (Speaker-frame + Fill-Idle run-next + PK ledger)
+### Added (Speaker-frame + Fill-Idle run-next + PK ledger + dual-take)
 - **`dialogue_speaker_frame_gate`**: on_camera speaker must match cue + dsl.subject/cast; heat-window beat flip gate; preflight soft/hard.
-- **`aifilm h3 run-next`**: one-shot worker (capacity-aware); `--execute` runs next H3 job — not a daemon; never auto-promotes.
-- **`aifilm h3 pk-ledger`**: advisory dailies ledger only (no cross-film auto win-rate; agree-all).
-- Tests: `test_dialogue_speaker_frame_gate.py` · `test_fill_idle_run_next_ledger.py`.
+- **`aifilm h3 run-next`**: one-shot worker (capacity-aware); `--execute` runs next H3 job — not a daemon; never auto-promotes; returns `next_after` after run.
+- **`aifilm h3 pk-ledger`**: advisory dailies ledger only (no cross-film auto win-rate; agree-all). CLI subparser complete.
+- **Dual-take P0**: climax / dialogue-CU meat / `h3_prefer: dual` → after I2V, queue second leg **R2V** (and reverse) before marking done.
+- Tests: `test_dialogue_speaker_frame_gate.py` · `test_fill_idle_run_next_ledger.py` · dual-leg in `test_h3_fill_idle.py`.
 
 ## [2.37.7] - 2026-08-04
 

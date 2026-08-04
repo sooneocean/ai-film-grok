@@ -245,6 +245,65 @@ def test_next_capacity_soft_offline(tmp_path: Path) -> None:
     assert nxt["command"]
 
 
+def test_dual_take_second_leg_r2v(tmp_path: Path) -> None:
+    """Climax primary with only I2V take should queue dual second leg R2V."""
+    root = tmp_path / "film"
+    root.mkdir()
+    (root / "stills").mkdir()
+    still = root / "stills" / "s_climax.png"
+    still.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
+    tdir = root / "takes" / "s_climax"
+    tdir.mkdir(parents=True)
+    i2v = tdir / "s_climax_h3_i2v_1.mp4"
+    i2v.write_bytes(b"\x00" * 200_000)
+    (tdir / "s_climax_h3_i2v_1.mp4.json").write_text(
+        json.dumps({"mean_absdiff": 24.0}), encoding="utf-8"
+    )
+    (root / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "title": "dual",
+                "h3": {"enabled": True},
+                "_i2v_profile": "hybrid_h3",
+                "scenes": [
+                    {
+                        "shots": [
+                            {
+                                "id": "s_climax",
+                                "shot_role": "hero",
+                                "heat_phase": "climax",
+                                "wardrobe_state": "bare",
+                                "dramatic_function": "climax",
+                            }
+                        ]
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "manifest.json").write_text(
+        json.dumps(
+            {"stills": {"s_climax": {"path": str(still), "status": "approved"}}}
+        ),
+        encoding="utf-8",
+    )
+    q = build_fill_idle_queue(root, include_challenge=False)
+    row = next(r for r in q["shots"] if r["shot_id"] == "s_climax")
+    assert row["status"] == "pending"
+    assert "dual_need_r2v" in row["reasons"]
+    assert row["mode"] == "r2v"
+    assert row["command"] and "--mode r2v" in row["command"]
+
+
+def test_cli_pk_ledger_parses() -> None:
+    parser = build_parser()
+    a = parser.parse_args(
+        ["h3", "pk-ledger", "--root", "/tmp/x", "--append", "--shot-id", "s1", "--winner", "/w.mp4"]
+    )
+    assert a.h3_action == "pk-ledger" and a.append is True
+
+
 def test_classify_wait_grok_without_take(tmp_path: Path) -> None:
     root = _film(tmp_path)
     # remove soft2 takes → wait_grok_baseline

@@ -118,6 +118,27 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     )
     pk.add_argument("--receipt", type=Path, default=None)
 
+    ledger = actions.add_parser(
+        "pk-ledger",
+        help="Advisory PK dailies ledger (never promotes; no cross-film win-rate)",
+    )
+    ledger.add_argument("--root", type=Path, required=True)
+    ledger.add_argument(
+        "--append",
+        action="store_true",
+        help="Append a human winner decision",
+    )
+    ledger.add_argument("--shot-id", default=None)
+    ledger.add_argument(
+        "--winner",
+        default=None,
+        help="Winning take path (required with --append)",
+    )
+    ledger.add_argument("--lane", default=None, help="Winner lane hint (h3/grok/…)")
+    ledger.add_argument("--mean", type=float, default=None)
+    ledger.add_argument("--note", default="")
+    ledger.add_argument("--receipt", type=Path, default=None)
+
 
 def run_h3(args: argparse.Namespace) -> dict[str, Any]:
     action = str(args.h3_action)

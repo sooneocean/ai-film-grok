@@ -193,6 +193,51 @@ def _has_lane(takes: list[dict[str, Any]], lane: str) -> bool:
     return any(t.get("lane") == lane for t in takes)
 
 
+def h3_modes_in_takes(takes: list[dict[str, Any]]) -> set[str]:
+    """Infer which H3 modes already exist from path names (_i2v_ / _r2v_ / _t2v_)."""
+    modes: set[str] = set()
+    for t in takes:
+        if t.get("lane") != "h3":
+            continue
+        blob = str(t.get("path") or "").lower()
+        if "_r2v_" in blob or "r2v" in blob.split("/")[-1]:
+            modes.add("r2v")
+        elif "_t2v_" in blob or "t2v" in blob.split("/")[-1]:
+            modes.add("t2v")
+        elif "_i2v_" in blob or "i2v" in blob.split("/")[-1]:
+            modes.add("i2v")
+        else:
+            modes.add("h3")
+    return modes
+
+
+def wants_dual_take(
+    shot: dict[str, Any],
+    *,
+    intent: dict[str, Any] | None = None,
+    primary: bool = False,
+    on_cam_close: bool = False,
+) -> bool:
+    """High-value dual I2V+R2V (opt-in flag or auto for climax / dialogue CU meat)."""
+    sh = shot if isinstance(shot, dict) else {}
+    intent = intent if isinstance(intent, dict) else {}
+    prefer = str(
+        sh.get("h3_prefer") or sh.get("h3_dual") or intent.get("h3_prefer") or ""
+    ).strip().lower()
+    if prefer in {"dual", "i2v+r2v", "both", "true", "1", "yes"}:
+        return True
+    if sh.get("force_dual") is True or intent.get("force_dual") is True:
+        return True
+    if not primary:
+        return False
+    heat = str(intent.get("heat_phase") or sh.get("heat_phase") or "").strip().lower()
+    if heat == "climax":
+        return True
+    if on_cam_close and heat in {"act", "climax", "foreplay"}:
+        return True
+    return False
+
+
 def _motion_below_floor(
     shot: dict[str, Any],
     mean: float | None,
@@ -321,13 +366,36 @@ def classify_fill_idle_shot(
         else:
             priority = "P0a"
             reasons.append("restricted_primary")
-        if has_h3 and not below:
-            status = "done"
-            reasons.append("h3_take_ok")
-        elif has_h3 and below:
+        h3_modes = h3_modes_in_takes(takes)
+        dual = wants_dual_take(
+            shot,
+            intent=intent,
+            primary=True,
+            on_cam_close=bool(on_cam and close),
+        )
+        if has_h3 and below:
             priority = "P1"
             status = "retry"
             reasons.append("h3_below_floor")
+        elif has_h3 and not below and dual:
+            # Need both I2V (identity) and R2V (energy) for high-value PK
+            has_i2v = "i2v" in h3_modes or ("h3" in h3_modes and "r2v" not in h3_modes)
+            has_r2v = "r2v" in h3_modes
+            if has_i2v and has_r2v:
+                status = "done"
+                reasons.append("h3_dual_complete")
+            elif has_r2v and not has_i2v:
+                status = "pending"
+                reasons.append("dual_need_i2v")
+            elif has_i2v and not has_r2v:
+                status = "pending"
+                reasons.append("dual_need_r2v")
+            else:
+                status = "pending"
+                reasons.append("dual_need_second_mode")
+        elif has_h3 and not below:
+            status = "done"
+            reasons.append("h3_take_ok")
         else:
             status = "pending"
             reasons.append("needs_h3_primary")
@@ -358,8 +426,15 @@ def classify_fill_idle_shot(
         shot, intent=intent, has_still=has_still, wants_continue=wants_continue
     )
     mode = str(mode_res.get("mode") or "i2v")
+    # Dual second leg: pick the missing mode explicitly
+    if primary and "dual_need_r2v" in reasons:
+        mode = "r2v"
+        reasons.append("dual_second_leg_r2v")
+    elif primary and "dual_need_i2v" in reasons:
+        mode = "i2v"
+        reasons.append("dual_second_leg_i2v")
     # P2 soft challenges: default I2V first (policy); keep alt_mode from resolver
-    if lane == "challenge_grok" and status.startswith("pending") and mode == "r2v":
+    elif lane == "challenge_grok" and status.startswith("pending") and mode == "r2v":
         # still allow r2v if energy flags, but soft fill prefers i2v when alt exists
         if not primary and mode_res.get("alt_mode") != "i2v":
             pass  # keep r2v for true energy
@@ -759,6 +834,15 @@ def run_next_fill_idle(
             )
         }
         out["ok"] = bool(result.get("ok"))
+        # Chain hint: what to burn next (dual second leg / next P0…)
+        try:
+            after = next_fill_idle_job(
+                base, include_challenge=include_challenge, check_capacity=False
+            )
+            out["next_after"] = after.get("next")
+            out["command_after"] = after.get("command")
+        except Exception:
+            out["next_after"] = None
     except Exception as exc:  # noqa: BLE001
         out["ok"] = False
         out["skipped_reason"] = "run_failed"

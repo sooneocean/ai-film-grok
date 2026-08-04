@@ -306,7 +306,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "ab0da8f5f5e967bd53fadb5281c055fc24a8f27258ce1031278bec483f287e82"
+      "sha256": "e94f29c648ab920be6a48e3187e5964d426db2374bf16cb4db49e6e51574ec57"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -682,7 +682,7 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "4c94330817badb98c4731e8bd5cde64fdf7a98ab705b9c3cc509ad5b277d9df9"
+      "sha256": "1d69164e3db7291ff69f15ac7d4268be18d72b67df471b60c2616d4460c8812e"
     },
     {
       "path": "scripts/h3_mode.py",
