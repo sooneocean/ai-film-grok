@@ -571,14 +571,12 @@ def run_h3_shot(
 
     # Variety door when registering candidates (bulk path) — skip via env escape.
     if register:
-        try:
-            from workflow_pack import WorkflowPackError, assert_variety_preflight
+        from workflow_pack import WorkflowPackError, assert_variety_preflight
 
+        try:
             assert_variety_preflight(base, require=True)
         except WorkflowPackError as exc:
             raise H3WorkflowError(str(exc)) from exc
-        except Exception:
-            pass
 
     spec = _load_spec(base)
     shot = _find_shot(spec, shot_id)

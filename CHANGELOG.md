@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.36.0] - 2026-08-04
+
+### Changed (Motion Core deep integration · Phase A)
+- **Single tier resolver:** `motion_prompt_spine.motion_tier_resolve` is the only source for `prompt_tier` (soft|medium|high) and `optical_tier` (soft|medium|normal|meat|high). `motion_tier_for` + `i2v_motion_gate.motion_tier_for_shot` both delegate.
+- **Grok I2V fail-closed:** `prompt_injector` asserts motion core after assemble (parity with H3 / media-queue). Escape: `AIFILM_SKIP_MOTION_CORE=1`.
+- **No silent pass:** media_queue motion enrich + restricted routing re-raise as `QueueError`; H3 `--register` variety no longer swallows exceptions.
+- **Audit floors** include soft/medium; CLI help documents DF/wardrobe fields.
+
+### Tests
+- `tests/test_motion_core_integrate_a.py` (table-driven tier parity + injector empty core)
+- `test_media_queue` pilot unlock isolates variety via escape
+
+### Docs
+- hard-defaults Motion Core 整合 A · weapon-lane tier table
+
 ## [2.35.2] - 2026-08-04
 
 ### Added

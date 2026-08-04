@@ -5917,7 +5917,10 @@ def cmd_i2v_motion_gate(args: argparse.Namespace) -> int:
 
     rows_path = getattr(args, "rows", None) or getattr(args, "from_json", None)
     if not rows_path:
-        raise FilmError("i2v-motion-gate requires --rows JSON (list of {id,heat_phase,mean})")
+        raise FilmError(
+            "i2v-motion-gate requires --rows JSON "
+            "(list of {id,heat_phase,mean[,dramatic_function,wardrobe_state,tier]})"
+        )
     path = Path(rows_path).expanduser().resolve()
     try:
         data = _json.loads(path.read_text(encoding="utf-8"))
@@ -7911,7 +7914,10 @@ def build_parser() -> argparse.ArgumentParser:
     img.add_argument(
         "--rows",
         required=True,
-        help="JSON list of {id,heat_phase,mean|mean_absdiff[,source]}",
+        help=(
+            "JSON list of {id,heat_phase,mean|mean_absdiff"
+            "[,dramatic_function,wardrobe_state,tier,source]}"
+        ),
     )
     img.add_argument("--root", default=None, help="Film root when --write")
     img.add_argument(

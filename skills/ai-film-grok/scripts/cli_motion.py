@@ -75,7 +75,8 @@ def i2v_motion_gate_from_rows(
 ) -> dict[str, Any]:
     """Shipped entry: grade mean rows → high-motion audit + final gate.
 
-    Each shot: id, heat_phase, mean|mean_absdiff, optional source.
+    Each shot: id, heat_phase, mean|mean_absdiff, optional source,
+    dramatic_function|df, wardrobe_state, motion_tier|spine_tier, tier.
     """
     from i2v_motion_gate import (
         build_high_motion_audit,

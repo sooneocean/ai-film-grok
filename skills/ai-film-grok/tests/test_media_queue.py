@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -8,6 +9,7 @@ import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -174,12 +176,14 @@ class MediaQueueTests(unittest.TestCase):
                 inputs=[self.frame],
             )
         self._approve_pilot()
-        job = queue.add_job(
-            shot_id="shot04",
-            operation="image_to_video",
-            prompt_file=self.prompt,
-            inputs=[self.frame],
-        )
+        # Variety is a separate bulk door; this test isolates pilot unlock only.
+        with mock.patch.dict(os.environ, {"AIFILM_SKIP_VARIETY_PREFLIGHT": "1"}):
+            job = queue.add_job(
+                shot_id="shot04",
+                operation="image_to_video",
+                prompt_file=self.prompt,
+                inputs=[self.frame],
+            )
         self.assertEqual(job["shot_id"], "shot04")
 
     @pytest.mark.slow

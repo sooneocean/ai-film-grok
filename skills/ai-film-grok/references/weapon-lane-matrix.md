@@ -74,7 +74,7 @@ aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --
 - 毒 still：禁任何 I2V  
 - candidate ≠ bulk：人审后才 approved
 
-## Motion Prompt Spine（电影核 → 动向 · P0）
+## Motion Prompt Spine（电影核 → 动向 · P0 + 整合 A · 2.36.0）
 
 生成顺序（Grok 与 H3 **同一套**）：
 
@@ -85,13 +85,17 @@ dramatic_function → want_beat → action/motion/visible_change
 
 | 机制 | 行为 |
 |------|------|
+| `motion_tier_resolve` | **单一真相**：`prompt_tier` + `optical_tier` + floor 映射 |
 | `motion_prompt_spine.py` | 共用拼装 + `assert_motion_prompt_core` |
-| `build_shot_intent` | 带出 `want_beat` / `motion_tier` / `spoken_text` / `has_action_core` |
-| `h3 run` | 空核拒跑；写 `receipts/prompts/<id>.h3.spine.txt` |
-| `media-queue` | 入队前 enrich + fail closed |
-| `prompt_injector` I2V | 注入 spine 子句（与 H3 对齐） |
+| `build_shot_intent` | 带出 `want_beat` / `motion_tier` / `optical_tier` / `spoken_text` |
+| `h3 run` | 空核拒跑；写 `receipts/prompts/<id>.h3.spine.txt`；register 时 variety 硬门 |
+| `media-queue` | 入队前 enrich + fail closed（**不 silent pass**） |
+| `prompt_injector` I2V | 注入 spine + **assert 空核**（与 H3 对齐） |
 
-`motion_tier`：`soft`（reaction）· `medium` · `high`（act/bare/action）— 高动提示自动加 HIGH MOTION。
+**prompt_tier**（进 prompt）：`soft` · `medium` · `high`（act/bare/action 加 HIGH MOTION）  
+**optical_tier**（mean 门）：soft≥10 · medium≥16 · normal≥18 · meat/high≥20  
+
+逃生：`AIFILM_SKIP_MOTION_CORE=1` · `AIFILM_SKIP_VARIETY_PREFLIGHT=1`
 
 ## 代码入口
 

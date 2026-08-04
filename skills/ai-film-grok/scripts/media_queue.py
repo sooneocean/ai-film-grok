@@ -478,34 +478,45 @@ class MediaQueue:
                                     f"--register. Escape: AIFILM_ALLOW_CLOUD_RESTRICTED=1 "
                                     f"(not recommended for bare/meat)."
                                 )
-                        # Motion Prompt Spine: enrich + fail-closed empty core (P0).
-                        try:
-                            from motion_prompt_spine import (
-                                MotionCoreError,
-                                assert_motion_prompt_core,
-                                ensure_motion_core_in_prompt,
-                            )
+                        # Motion Prompt Spine: enrich + fail-closed empty core (P0/A).
+                        from motion_prompt_spine import (
+                            MotionCoreError,
+                            assert_motion_prompt_core,
+                            ensure_motion_core_in_prompt,
+                            motion_core_skip_enabled,
+                        )
 
-                            raw_prompt = prompt.read_text(encoding="utf-8")
-                            enriched = ensure_motion_core_in_prompt(raw_prompt, raw_spec, shot_row)
-                            if enriched.strip() != raw_prompt.strip():
-                                prompt.write_text(enriched.rstrip() + "\n", encoding="utf-8")
-                            assert_motion_prompt_core(
-                                enriched,
-                                shot_row,
-                                mode=operation,
-                                role=str(shot_row.get("shot_role") or "hero"),
-                            )
-                        except MotionCoreError as exc:
-                            raise QueueError(str(exc)) from exc
-                        except QueueError:
-                            raise
-                        except Exception:
-                            pass
+                        if not motion_core_skip_enabled():
+                            try:
+                                raw_prompt = prompt.read_text(encoding="utf-8")
+                                enriched = ensure_motion_core_in_prompt(
+                                    raw_prompt, raw_spec, shot_row
+                                )
+                                if enriched.strip() != raw_prompt.strip():
+                                    prompt.write_text(
+                                        enriched.rstrip() + "\n", encoding="utf-8"
+                                    )
+                                assert_motion_prompt_core(
+                                    enriched,
+                                    shot_row,
+                                    mode=operation,
+                                    role=str(shot_row.get("shot_role") or "hero"),
+                                )
+                            except MotionCoreError as exc:
+                                raise QueueError(str(exc)) from exc
+                            except QueueError:
+                                raise
+                            except Exception as exc:
+                                raise QueueError(
+                                    f"motion core enrich failed for {shot_id}: {exc}"
+                                ) from exc
                 except QueueError:
                     raise
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # Restricted / H3 routing must not silent-pass into cloud bulk
+                    raise QueueError(
+                        f"restricted/local motion routing failed for {shot_id}: {exc}"
+                    ) from exc
         try:
             source_contract = build_shot_contract(self.root, shot_id)
             if not source_contract["ok"]:

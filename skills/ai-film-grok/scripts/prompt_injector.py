@@ -557,16 +557,20 @@ class PromptInjector:
             shot_action = str(dsl.get("action") or "").strip()
 
         # 6a. Motion Prompt Spine (shared with H3): DF + want_beat + tier + dialogue
+        # I2V fail-closed (Phase A); escape AIFILM_SKIP_MOTION_CORE=1
         spine_clauses: list[str] = []
-        try:
-            from motion_prompt_spine import motion_core_clauses
-            from util import read_json
+        film_spec: dict[str, Any] = {}
+        from motion_prompt_spine import (
+            MotionCoreError,
+            motion_core_clauses,
+            motion_core_skip_enabled,
+        )
+        from util import read_json
 
-            film_spec = {}
+        try:
             if root is not None:
                 film_spec = read_json(Path(root) / "film-spec.json") or {}
-            # include_audio=False here: Grok path may use separate VO; dialogue
-            # lip-sync still injected for on_camera so bulk stays speech-aware.
+            # Dialogue lip-sync still injected for on_camera so bulk stays speech-aware.
             spine_clauses = motion_core_clauses(
                 film_spec if isinstance(film_spec, dict) else {},
                 shot,
@@ -581,7 +585,12 @@ class PromptInjector:
                     )
                 ),
             )
-        except Exception:
+        except Exception as exc:
+            if self.template_version == "I2V" and not motion_core_skip_enabled():
+                raise MotionCoreError(
+                    f"MOTION_CORE_SPINE_BUILD: failed to build motion core for "
+                    f"{shot.get('id')!r}: {exc}"
+                ) from exc
             spine_clauses = []
 
         # 6b. Tone tags = performance manner (still/I2V face/body acting)
@@ -702,6 +711,17 @@ class PromptInjector:
         final_prompt = "\n".join(parts)
         if negatives:
             final_prompt += f"\n--no {negatives}"
+
+        # Phase A: Grok I2V same fail-closed core as H3 / media-queue
+        if self.template_version == "I2V" and not motion_core_skip_enabled():
+            from motion_prompt_spine import assert_motion_prompt_core
+
+            assert_motion_prompt_core(
+                final_prompt,
+                shot,
+                mode="i2v",
+                role=str(shot.get("shot_role") or "hero"),
+            )
 
         # Traceability receipt
         receipt = {

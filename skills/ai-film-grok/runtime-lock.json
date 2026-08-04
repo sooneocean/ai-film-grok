@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "e99c5cdad89d67b58b28ee9278672504e6ff1c27872d6f9bee87768572d84a02"
+      "sha256": "05b2debac5265ad1ea611cab03c34a9f9ffc988d46611829be25be7028dfcc55"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -318,7 +318,7 @@
     },
     {
       "path": "scripts/cli_motion.py",
-      "sha256": "161d33bbb26c4996659d789b8d95ba9d484481c05331ae4266dd20d342c1962f"
+      "sha256": "005c80708667d0c9834f2409b62985037642983ee4ab92187b6ca5a03f26714e"
     },
     {
       "path": "scripts/cli_node.py",
@@ -670,7 +670,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "ee7b10de11c5e264caa25552a4268936bccb11f511a4623646c5722e4c92de79"
+      "sha256": "7482905f87d6adc0e22bfa17e810782db17ce5bbf96ccaa4a589bc4cdb85251a"
     },
     {
       "path": "scripts/heat_check.py",
@@ -678,7 +678,7 @@
     },
     {
       "path": "scripts/i2v_motion_gate.py",
-      "sha256": "0cfac20a48370740fe4e4d980454f6194ebdfcd51ca89f0c6d4621f9c71d4bf0"
+      "sha256": "550408f51ec767791773fe3fa756d18a1342b138edf306642c23f910b53de098"
     },
     {
       "path": "scripts/i2v_provider.py",
@@ -766,7 +766,7 @@
     },
     {
       "path": "scripts/media_queue.py",
-      "sha256": "a9118ba6cfd8551aad930960457b8cccdffc98c8be9119e3e121bec6b70e93e4"
+      "sha256": "04023c9c79b567811934003a33eb16117013bd6b32be5e170616a18318ae8583"
     },
     {
       "path": "scripts/mmaudio_adapter.py",
@@ -786,7 +786,7 @@
     },
     {
       "path": "scripts/motion_prompt_spine.py",
-      "sha256": "29e7176a72ab260da99de0f4f211c42448b3dcb11a380894d586c1896c8ee4f0"
+      "sha256": "b703508885915548164084583cdb6e16a75d5c298c7f2051956919017765fe92"
     },
     {
       "path": "scripts/music_cue.py",
@@ -974,7 +974,7 @@
     },
     {
       "path": "scripts/prompt_injector.py",
-      "sha256": "e96299769cd847675abff89ca2d818bbb3f75370db9f71d08f5c9a94019bd08f"
+      "sha256": "f8eeea66f31823bc9deac983a9f8f1964d90e658b6ee71814a22a11ee623733f"
     },
     {
       "path": "scripts/provider_canary.py",

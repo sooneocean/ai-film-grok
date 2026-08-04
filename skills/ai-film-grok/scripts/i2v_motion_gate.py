@@ -81,34 +81,39 @@ def motion_tier_for_shot(
     spine_tier: str | None = None,
     wardrobe_state: str | None = None,
 ) -> str:
-    """Resolve optical tier from heat + DF + optional spine motion_tier.
+    """Resolve optical tier — delegates to motion_prompt_spine.motion_tier_resolve."""
+    try:
+        from motion_prompt_spine import motion_tier_resolve
 
-    Precedence: act/climax meat → bare (meat, or medium if soft/afterglow DF)
-    → high DF → soft DF → spine soft/medium/high → phase.
-    """
-    heat = str(heat_phase or "").strip().lower()
-    df = str(dramatic_function or "").strip().lower()
-    wardrobe = str(wardrobe_state or "").strip().lower()
-    spine = str(spine_tier or "").strip().lower()
-
-    # Meat heat always thrash floor (do not relax act/climax for soft DF tags)
-    if heat in MEAT_PHASES:
-        return "meat"
-    # Bare wardrobe: default meat; afterglow/soft recovery uses medium floor
-    if wardrobe in {"bare", "undressed", "nude"}:
-        if df in SOFT_DFS or heat == "afterglow" or df == "afterglow":
-            return "medium"
-        return "meat"
-    if df in HIGH_DFS:
-        return "meat" if df in {"action", "climax", "impact", "peak"} else "high"
-    if df in SOFT_DFS:
-        return "soft"
-    if spine in MOTION_TIERS:
-        # Map spine high → meat floor for optical gate consistency
-        if spine == "high":
+        return str(
+            motion_tier_resolve(
+                heat_phase=heat_phase,
+                dramatic_function=dramatic_function,
+                spine_tier=spine_tier,
+                wardrobe_state=wardrobe_state,
+            )["optical_tier"]
+        )
+    except Exception:
+        # Offline fallback (import cycle / partial tree) — keep product floors usable
+        heat = str(heat_phase or "").strip().lower()
+        df = str(dramatic_function or "").strip().lower()
+        wardrobe = str(wardrobe_state or "").strip().lower()
+        spine = str(spine_tier or "").strip().lower()
+        if heat in MEAT_PHASES:
             return "meat"
-        return spine
-    return motion_tier_for_phase(heat)
+        if heat == "afterglow" or df == "afterglow":
+            return "medium"
+        if wardrobe in {"bare", "undressed", "nude"}:
+            if df in SOFT_DFS:
+                return "medium"
+            return "meat"
+        if df in HIGH_DFS:
+            return "meat" if df in {"action", "climax", "impact", "peak"} else "high"
+        if df in SOFT_DFS:
+            return "soft"
+        if spine in MOTION_TIERS:
+            return "meat" if spine == "high" else spine
+        return motion_tier_for_phase(heat)
 
 
 def floor_for_tier(tier: str) -> float:
@@ -288,8 +293,8 @@ def build_high_motion_audit(
     """Build receipts/i2v-high-motion-audit.json payload from per-shot mean rows.
 
     Each shot dict may include:
-      id, heat_phase, tier, mean | mean_absdiff, source, source_tags,
-      t_start_sec (for envelope after 60s)
+      id, heat_phase, dramatic_function|df, wardrobe_state, motion_tier|spine_tier,
+      tier, mean | mean_absdiff, source, source_tags, t_start_sec (for envelope after 60s)
     """
     per_shot: list[dict[str, Any]] = []
     all_codes: list[str] = []
@@ -357,8 +362,11 @@ def build_high_motion_audit(
         "ok": ok,
         "metric": metric,
         "floors": {
+            "soft": MEAN_SOFT_FLOOR,
+            "medium": MEAN_MEDIUM_FLOOR,
             "normal": MEAN_NORMAL_FLOOR,
             "meat": MEAN_MEAT_FLOOR,
+            "high": MEAN_MEAT_FLOOR,
             "meat_target": MEAN_MEAT_TARGET,
             "envelope": MEAN_ENVELOPE_FLOOR,
         },
@@ -378,8 +386,8 @@ def build_high_motion_audit(
         "envelope_ok": envelope_ok,
         "meat_window_ok": meat_window_ok,
         "note": (
-            "高动态常态: normal≥18 meat≥20(target≥24); "
-            "禁 Ken Burns/微抖/弱 raw 装片; 多 take 取最高 mean 且时长够"
+            "高动态: soft≥10 medium≥16 normal≥18 meat/high≥20(target≥24); "
+            "DF-aware via motion_tier_resolve; 禁 Ken Burns/微抖/弱 raw; 多 take 取最高 mean"
         ),
     }
 

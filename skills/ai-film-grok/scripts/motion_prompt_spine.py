@@ -10,6 +10,7 @@ Fail-closed rules live in ``assert_motion_prompt_core``.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 
@@ -17,9 +18,120 @@ class MotionCoreError(ValueError):
     """Raised when a motion prompt is missing film-core payload."""
 
 
-_HIGH_HEAT = frozenset({"act", "climax", "peak", "afterglow"})
+# Shared DF / heat sets — single source for spine prompts + optical gate.
+MEAT_PHASES = frozenset({"act", "climax"})
+_HIGH_HEAT = frozenset({"act", "climax", "peak"})  # thrash inject; not afterglow
 _HIGH_DF = frozenset({"action", "climax", "hook", "impact", "peak"})
 _SOFT_DF = frozenset({"reaction", "afterglow", "bridge", "insert", "sensory"})
+_BARE_WARDROBE = frozenset({"bare", "undressed", "nude"})
+_PROMPT_TIERS = frozenset({"soft", "medium", "high"})
+_OPTICAL_TIERS = frozenset({"soft", "medium", "normal", "meat", "high"})
+
+
+def motion_core_skip_enabled() -> bool:
+    """Escape hatch for legacy films / emergency bulk (AIFILM_SKIP_MOTION_CORE=1)."""
+    return os.environ.get("AIFILM_SKIP_MOTION_CORE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def motion_tier_resolve(
+    shot: dict[str, Any] | None = None,
+    *,
+    heat_phase: str | None = None,
+    dramatic_function: str | None = None,
+    spine_tier: str | None = None,
+    wardrobe_state: str | None = None,
+    spoken_dialogue: bool | None = None,
+    screen_mode: str | None = None,
+) -> dict[str, Any]:
+    """Single tier truth for prompts + pixel gate (Phase A · 2026-08-04).
+
+    Returns:
+      prompt_tier: soft | medium | high  (language for motion prompts)
+      optical_tier: soft | medium | normal | meat | high  (mean floors)
+    """
+    sh = shot if isinstance(shot, dict) else {}
+    heat = str(heat_phase if heat_phase is not None else heat_phase_of(sh)).strip().lower()
+    df = str(
+        dramatic_function
+        if dramatic_function is not None
+        else dramatic_function_of(sh)
+    ).strip().lower()
+    wardrobe = str(
+        wardrobe_state
+        if wardrobe_state is not None
+        else (sh.get("wardrobe_state") or "")
+    ).strip().lower()
+    spine = str(spine_tier or "").strip().lower()
+    if spoken_dialogue is None:
+        has_dlg = bool(spoken_dialogue_text(sh))
+    else:
+        has_dlg = bool(spoken_dialogue)
+    if screen_mode is None:
+        screen = shot_screen_mode(sh)
+    else:
+        screen = str(screen_mode or "").strip()
+
+    optical = "normal"
+    # 1) Meat heat never demoted by soft DF tags
+    if heat in MEAT_PHASES:
+        optical = "meat"
+    # 2) Afterglow recovery: medium floor (not thrash)
+    elif heat == "afterglow" or df == "afterglow":
+        optical = "medium"
+    # 3) Bare wardrobe: meat unless soft/afterglow recovery
+    elif wardrobe in _BARE_WARDROBE:
+        if df in _SOFT_DF:
+            optical = "medium"
+        else:
+            optical = "meat"
+    # 4) High DF
+    elif df in _HIGH_DF:
+        optical = "meat" if df in {"action", "climax", "impact", "peak"} else "high"
+    # 5) Soft DF
+    elif df in _SOFT_DF:
+        optical = "soft"
+    # 6) Explicit spine/prompt tier already on the row
+    elif spine in _OPTICAL_TIERS:
+        optical = "meat" if spine == "high" else spine
+    elif spine in _PROMPT_TIERS:
+        optical = {"soft": "soft", "medium": "medium", "high": "meat"}[spine]
+    # 7) On-camera dialogue micro-performance
+    elif has_dlg and screen in {"on_camera", ""}:
+        optical = "medium"
+    # 8) Build / foreplay energy without meat heat
+    elif heat in {"foreplay", "build"}:
+        optical = "medium"
+    else:
+        optical = "normal"
+
+    if optical not in _OPTICAL_TIERS:
+        optical = "normal"
+
+    prompt_map = {
+        "soft": "soft",
+        "medium": "medium",
+        "normal": "medium",
+        "meat": "high",
+        "high": "high",
+    }
+    prompt_tier = prompt_map.get(optical, "medium")
+    return {
+        "prompt_tier": prompt_tier,
+        "optical_tier": optical,
+        "dramatic_function": df or None,
+        "heat_phase": heat or None,
+        "wardrobe_state": wardrobe or None,
+    }
+
+
+def motion_tier_for(shot: dict[str, Any]) -> str:
+    """soft | medium | high — prompt-language tier (delegates to motion_tier_resolve)."""
+    return str(motion_tier_resolve(shot)["prompt_tier"])
 
 
 def spoken_dialogue_text(shot: dict[str, Any]) -> str:
@@ -97,25 +209,6 @@ def want_beat_line(spec: dict[str, Any] | None, shot: dict[str, Any]) -> str:
     return ""
 
 
-def motion_tier_for(shot: dict[str, Any]) -> str:
-    """soft | medium | high — optical energy expectation for gates/prompts."""
-    heat = heat_phase_of(shot)
-    df = dramatic_function_of(shot)
-    wardrobe = str(shot.get("wardrobe_state") or "").strip().lower()
-    if wardrobe in {"bare", "undressed", "nude"} or heat in _HIGH_HEAT:
-        if df in _SOFT_DF and heat in {"afterglow"}:
-            return "medium"
-        return "high"
-    if df in _HIGH_DF or heat in {"foreplay", "build"}:
-        return "high" if df in {"action", "climax", "hook"} else "medium"
-    if df in _SOFT_DF:
-        return "soft"
-    dialogue = bool(spoken_dialogue_text(shot))
-    if dialogue and shot_screen_mode(shot) in {"on_camera", ""}:
-        return "medium"
-    return "medium"
-
-
 def dsl_action_parts(shot: dict[str, Any]) -> list[str]:
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
     parts: list[str] = []
@@ -179,11 +272,13 @@ def core_fields(spec: dict[str, Any] | None, shot: dict[str, Any]) -> dict[str, 
     df = dramatic_function_of(shot)
     heat = heat_phase_of(shot)
     actions = dsl_action_parts(shot)
+    resolved = motion_tier_resolve(shot)
     return {
         "dramatic_function": df or None,
         "heat_phase": heat or None,
         "want_beat": want_beat_line(spec, shot) or None,
-        "motion_tier": motion_tier_for(shot),
+        "motion_tier": resolved["prompt_tier"],
+        "optical_tier": resolved["optical_tier"],
         "spoken_text": dialogue or None,
         "screen_mode": shot_screen_mode(shot) or None,
         "speaker": str(shot.get("speaker") or "").strip() or None,
@@ -291,7 +386,7 @@ def ensure_motion_core_in_prompt(
     tier = motion_tier_for(shot)
     if tier == "high" and "HIGH MOTION" not in out.upper():
         heat = heat_phase_of(shot)
-        if heat in _HIGH_HEAT or dramatic_function_of(shot) in _HIGH_DF:
+        if heat in _HIGH_HEAT or heat in MEAT_PHASES or dramatic_function_of(shot) in _HIGH_DF:
             out = f"{out.rstrip()} HIGH MOTION priority: large visible body/pose change."
 
     cam = camera_clause(shot)
