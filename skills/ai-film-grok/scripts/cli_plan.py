@@ -93,6 +93,11 @@ def add_plan_parsers(subparsers: Any) -> None:
     lock.add_argument("--root", required=True)
     lock.add_argument("--scope", choices=("story", "beats", "shots", "panels"), required=True)
     lock.add_argument("--user-phrase", required=True)
+    lock.add_argument(
+        "--strict",
+        action="store_true",
+        help="Story scope: require script-value-debrief present+confirmed (or AIFILM_DEBRIEF_STRICT=1)",
+    )
     unlock = plan_sub.add_parser("unlock", help="Unlock one narrative scope with an audit reason")
     unlock.add_argument("--root", required=True)
     unlock.add_argument("--scope", choices=("story", "beats", "shots", "panels"), required=True)
@@ -108,6 +113,140 @@ def add_plan_parsers(subparsers: Any) -> None:
     status_parser = plan_sub.add_parser("status", help="Plan + graph status for film root")
     status_parser.add_argument("--root", required=True)
 
+    debrief = plan_sub.add_parser(
+        "debrief",
+        help="Script-value-debrief: status|seed|write|confirm|validate (L0–L4 pre-lock)",
+    )
+    debrief.add_argument("--root", required=True, help="Film root")
+    debrief.add_argument(
+        "--action",
+        choices=("status", "seed", "write", "confirm", "validate"),
+        default="status",
+        help="status=check receipt; seed=from story-reception; write=from --file; "
+        "confirm=human sign-off; validate=structure check",
+    )
+    debrief.add_argument(
+        "--file",
+        default=None,
+        help="Agent-authored debrief JSON (write) or reception JSON (seed override)",
+    )
+    debrief.add_argument(
+        "--user-phrase",
+        default=None,
+        help="Required for confirm — human-visible sign-off (agent must not invent)",
+    )
+    debrief.add_argument("--strict", action="store_true", help="Hard-fail missing/invalid")
+    debrief.add_argument(
+        "--force",
+        action="store_true",
+        help="write: overwrite; confirm: allow confirm despite structure warnings",
+    )
+    debrief.add_argument("--receipt", type=Path, default=None, help="Optional copy of report JSON")
+
+
+def run_debrief(args: Namespace, root: Path) -> tuple[dict[str, Any], int]:
+    """CLI body for plan debrief."""
+    from script_value_debrief import (
+        check_root,
+        confirm_debrief,
+        load_debrief,
+        receipt_path,
+        seed_from_reception,
+        user_facing_summary,
+        validate_debrief,
+        write_debrief,
+    )
+    from util import write_json
+
+    action = str(getattr(args, "action", "status") or "status")
+    strict = bool(getattr(args, "strict", False))
+    report: dict[str, Any]
+
+    if action == "status":
+        report = check_root(root, strict=strict)
+        deb = load_debrief(root)
+        if deb:
+            report["user_summary"] = user_facing_summary(deb)
+            report["confirmed_by_user"] = deb.get("confirmed_by_user") is True
+    elif action == "validate":
+        deb = load_debrief(root)
+        report = validate_debrief(deb, strict=strict, require_confirmed=strict)
+        report["root"] = str(root)
+        report["receipt"] = str(receipt_path(root))
+        if deb:
+            report["user_summary"] = user_facing_summary(deb)
+    elif action == "seed":
+        from story_reception import ReceptionError, load_story_reception
+
+        recv_path = getattr(args, "file", None)
+        path = (
+            Path(str(recv_path)).expanduser().resolve()
+            if recv_path
+            else root / "receipts" / "story-reception.json"
+        )
+        try:
+            reception = load_story_reception(path)
+        except ReceptionError as exc:
+            return {"ok": False, "action": "seed", "error": str(exc)}, 1
+        draft = seed_from_reception(reception)
+        out = write_debrief(root, draft)
+        report = {
+            "ok": True,
+            "action": "seed",
+            "path": str(out),
+            "note": "draft only — fill beat_cards + must_keep then confirm",
+            "user_summary": user_facing_summary(draft),
+            "validation": validate_debrief(draft, strict=False),
+        }
+    elif action == "write":
+        file_s = getattr(args, "file", None)
+        if not file_s:
+            return {"ok": False, "action": "write", "error": "--file required"}, 1
+        src = Path(str(file_s)).expanduser().resolve()
+        if not src.is_file():
+            return {"ok": False, "action": "write", "error": f"file not found: {src}"}, 1
+        existing = receipt_path(root)
+        if existing.is_file() and not bool(getattr(args, "force", False)):
+            return {
+                "ok": False,
+                "action": "write",
+                "error": f"{existing} exists; pass --force to overwrite",
+            }, 1
+        payload = read_json(src) or {}
+        if not isinstance(payload, dict):
+            return {"ok": False, "action": "write", "error": "debrief file must be object"}, 1
+        out = write_debrief(root, payload)
+        loaded = load_debrief(root)
+        report = {
+            "ok": True,
+            "action": "write",
+            "path": str(out),
+            "validation": validate_debrief(loaded, strict=strict),
+            "user_summary": user_facing_summary(loaded or {}),
+        }
+        if strict and not report["validation"].get("ok"):
+            report["ok"] = False
+    elif action == "confirm":
+        phrase = getattr(args, "user_phrase", None)
+        try:
+            report = confirm_debrief(
+                root,
+                user_phrase=str(phrase or ""),
+                force=bool(getattr(args, "force", False)),
+            )
+            report["action"] = "confirm"
+        except (FileNotFoundError, ValueError) as exc:
+            return {"ok": False, "action": "confirm", "error": str(exc)}, 1
+    else:
+        return {"ok": False, "error": f"unknown debrief action {action!r}"}, 1
+
+    report.setdefault("action", action)
+    report.setdefault("root", str(root))
+    if getattr(args, "receipt", None):
+        write_json(Path(args.receipt).expanduser().resolve(), report)
+        report["receipt_out"] = str(Path(args.receipt).expanduser().resolve())
+    return report, 0 if report.get("ok") is not False else 1
+
 
 def validate(args: Namespace, root: Path) -> tuple[dict[str, Any], int]:
     status = control_status(root)
@@ -121,6 +260,25 @@ def validate(args: Namespace, root: Path) -> tuple[dict[str, Any], int]:
         )
     report["strict_requested"] = strict
     report.update({"action": "validate", "root": str(root), "control": status})
+    try:
+        from script_value_debrief import attach_to_plan_validate
+
+        report = attach_to_plan_validate(report, root, strict=strict)
+    except Exception as exc:  # noqa: BLE001
+        report["script_value_debrief"] = {
+            "ok": True,
+            "present": False,
+            "warnings": [{"code": "DEBRIEF_CHECK_ERROR", "message": str(exc)[:200]}],
+        }
+    # Story quality overlay when graph exists
+    if graph_path.is_file():
+        try:
+            from story_quality import check_story_quality
+
+            graph = read_json(graph_path) or {}
+            report["story_quality"] = check_story_quality(graph, root=root)
+        except Exception as exc:  # noqa: BLE001
+            report["story_quality"] = {"ok": True, "error": str(exc)[:160]}
     return report, 0 if report.get("ok") else 1
 
 

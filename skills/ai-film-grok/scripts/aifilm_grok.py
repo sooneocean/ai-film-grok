@@ -3315,6 +3315,15 @@ def cmd_plan(args: argparse.Namespace) -> int:
         )
         emit(report)
         return code
+    if action == "debrief":
+        from cli_plan import run_debrief
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan debrief requires --root")
+        report, code = run_debrief(args, Path(root_s).expanduser().resolve())
+        emit(report)
+        return code
     if action == "normalize":
         from cli_plan_normalize import PlanNormalizeError, run
 

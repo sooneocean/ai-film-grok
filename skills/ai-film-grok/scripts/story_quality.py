@@ -7,11 +7,13 @@ Scores are heuristic-based (no LLM required) and cover:
 - Arc completeness
 - Payoff satisfaction
 - Pacing balance
+- Presentation-value (optional script-value-debrief dimensions)
 - Overall score
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 # Required story fields for a complete narrative.
@@ -26,15 +28,34 @@ REQUIRED_STORY_FIELDS = (
 # Minimum emotional arc length for a complete arc.
 MIN_ARC_LENGTH = 3
 
-# Scoring weights for each dimension.
+# Scoring weights for each dimension (core narrative; debrief dims optional overlay).
 DIMENSION_WEIGHTS = {
-    "hook_strength": 0.15,
-    "conflict_clarity": 0.20,
-    "arc_completeness": 0.25,
-    "payoff_satisfaction": 0.20,
-    "pacing_balance": 0.10,
+    "hook_strength": 0.12,
+    "conflict_clarity": 0.16,
+    "arc_completeness": 0.18,
+    "payoff_satisfaction": 0.14,
+    "pacing_balance": 0.08,
+    "promise_clarity": 0.10,
+    "beat_value_coverage": 0.12,
+    "setup_payoff_pair_count": 0.06,
+    "dead_air_risk": 0.04,
     "overall": 1.0,
 }
+
+CORE_DIMENSIONS = (
+    "hook_strength",
+    "conflict_clarity",
+    "arc_completeness",
+    "payoff_satisfaction",
+    "pacing_balance",
+)
+
+VALUE_DIMENSIONS = (
+    "promise_clarity",
+    "beat_value_coverage",
+    "setup_payoff_pair_count",
+    "dead_air_risk",
+)
 
 
 def _text(value: object) -> str:
@@ -116,14 +137,77 @@ def score_pacing(story: dict[str, Any]) -> float:
     return max(0.0, 1.0 - deviation * 2.0)
 
 
-def score_story(graph: dict[str, Any]) -> dict[str, Any]:
+def _debrief_from_graph_or_root(
+    graph: dict[str, Any],
+    *,
+    root: Path | str | None = None,
+    debrief: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    if isinstance(debrief, dict):
+        return debrief
+    embedded = graph.get("script_value_debrief")
+    if isinstance(embedded, dict):
+        return embedded
+    if root is not None:
+        try:
+            from script_value_debrief import load_debrief
+
+            return load_debrief(root)
+        except Exception:
+            return None
+    return None
+
+
+def score_value_dims(debrief: dict[str, Any] | None) -> dict[str, float]:
+    """Presentation-value dimensions; neutral 0.5 when debrief absent (no hard punish)."""
+    if not debrief:
+        return {
+            "promise_clarity": 0.5,
+            "beat_value_coverage": 0.5,
+            "setup_payoff_pair_count": 0.5,
+            "dead_air_risk": 0.5,
+            "debrief_present": 0.0,
+        }
+    try:
+        from script_value_debrief import (
+            score_beat_value_coverage,
+            score_dead_air_awareness,
+            score_promise_clarity,
+            score_setup_payoff,
+        )
+
+        return {
+            "promise_clarity": score_promise_clarity(debrief),
+            "beat_value_coverage": score_beat_value_coverage(debrief),
+            "setup_payoff_pair_count": score_setup_payoff(debrief),
+            # Invert awareness: high awareness = low dead-air risk score channel name
+            "dead_air_risk": score_dead_air_awareness(debrief),
+            "debrief_present": 1.0,
+        }
+    except Exception:
+        return {
+            "promise_clarity": 0.5,
+            "beat_value_coverage": 0.5,
+            "setup_payoff_pair_count": 0.5,
+            "dead_air_risk": 0.5,
+            "debrief_present": 0.0,
+        }
+
+
+def score_story(
+    graph: dict[str, Any],
+    *,
+    root: Path | str | None = None,
+    debrief: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Score a story graph for narrative quality.
 
     Returns a dict with per-dimension scores and an overall score.
+    When a script-value-debrief is available, folds presentation-value dims into overall.
     """
     story = graph.get("story") if isinstance(graph.get("story"), dict) else {}
 
-    scores = {
+    scores: dict[str, Any] = {
         "hook_strength": score_hook(story),
         "conflict_clarity": score_conflict(story),
         "arc_completeness": score_arc(story),
@@ -131,33 +215,53 @@ def score_story(graph: dict[str, Any]) -> dict[str, Any]:
         "pacing_balance": score_pacing(story),
     }
 
-    # Overall = weighted average
+    deb = _debrief_from_graph_or_root(graph, root=root, debrief=debrief)
+    value = score_value_dims(deb)
+    scores.update({k: value[k] for k in VALUE_DIMENSIONS})
+    scores["debrief_present"] = value.get("debrief_present", 0.0)
+
     overall = sum(
-        scores.get(dim, 0.0) * DIMENSION_WEIGHTS.get(dim, 0.0)
-        for dim in (
-            "hook_strength",
-            "conflict_clarity",
-            "arc_completeness",
-            "payoff_satisfaction",
-            "pacing_balance",
-        )
+        float(scores.get(dim, 0.0)) * float(DIMENSION_WEIGHTS.get(dim, 0.0))
+        for dim in CORE_DIMENSIONS + VALUE_DIMENSIONS
     )
     scores["overall"] = round(overall, 2)
 
     return scores
 
 
-def check_story_quality(graph: dict[str, Any], threshold: float = 0.4) -> dict[str, Any]:
+def check_story_quality(
+    graph: dict[str, Any],
+    threshold: float = 0.4,
+    *,
+    root: Path | str | None = None,
+    debrief: dict[str, Any] | None = None,
+    require_debrief: bool = False,
+) -> dict[str, Any]:
     """Check story quality against a threshold.
 
     Returns {ok, scores, issues} where issues lists dimensions below threshold.
     """
-    scores = score_story(graph)
+    scores = score_story(graph, root=root, debrief=debrief)
     overall = scores.get("overall", 0.0)
-    issues = [dim for dim, score in scores.items() if dim != "overall" and score < threshold]
+    issues = [
+        dim
+        for dim, score in scores.items()
+        if dim not in {"overall", "debrief_present"}
+        and isinstance(score, (int, float))
+        and score < threshold
+    ]
+    # Neutral 0.5 value dims without debrief should not fail core quality
+    if not scores.get("debrief_present"):
+        issues = [i for i in issues if i not in VALUE_DIMENSIONS]
+        if require_debrief:
+            issues.append("debrief_missing")
+    ok = overall >= threshold and not issues
+    if require_debrief and not scores.get("debrief_present"):
+        ok = False
     return {
-        "ok": overall >= threshold and not issues,
+        "ok": ok,
         "scores": scores,
         "issues": issues,
         "threshold": threshold,
+        "require_debrief": require_debrief,
     }

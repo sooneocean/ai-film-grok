@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.38.6] - 2026-08-04
+
+### Added (Script value debrief · presentation-value pre-lock)
+- **`script_value_debrief.py`**: L0–L4 validate/score/seed/confirm/summary; soft missing / strict hard; pilot shortlist + beat→shot map.
+- **`aifilm plan debrief`**: `--action status|seed|write|confirm|validate` (human confirm via `--user-phrase`).
+- **`story_quality`**: folds promise_clarity / beat_value_coverage / setup_payoff / dead_air when debrief present.
+- **`plan validate`**: attaches `script_value_debrief` + `story_quality`; `--strict` fails on missing/bad debrief.
+- **`plan lock --scope story --strict`** / `AIFILM_DEBRIEF_STRICT=1`: block unconfirmed debrief.
+- **`pilot pack`**: prefers debrief value_rank shortlist (`script_value_preference` on pilot-go receipt).
+- Docs/templates/memory: `script-value-debrief.md`, example + adult-max JSON, agent/reception/SKILL hooks.
+- Tests: `test_script_value_debrief.py` (15).
+
 ## [2.38.5] - 2026-08-04
 
 ### Added (FRW i2i still-material challenge · 30s rate limit)

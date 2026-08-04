@@ -22,8 +22,23 @@
   → pilot（优先 value_rank≥4）
 ```
 
+## CLI
+
+```bash
+aifilm plan debrief --root "<film>" --action status
+aifilm plan debrief --root "<film>" --action seed          # 从 story-reception 草稿
+aifilm plan debrief --root "<film>" --action write --file debrief.json --force
+aifilm plan debrief --root "<film>" --action confirm --user-phrase "确认 promise 与不可砍 beat"
+aifilm plan validate --root "<film>" --strict              # 缺 debrief hard-fail
+aifilm plan lock --root "<film>" --scope story --strict --user-phrase "…"
+# 或: AIFILM_DEBRIEF_STRICT=1
+```
+
 - Agent **不得**代签确认。  
-- 缺 debrief 时：新片默认 **warn**；`--strict` / 上线后可 hard（见 story_quality 扩展，P2）。  
+- 缺 debrief 时：新片默认 **warn**；`aifilm plan validate --strict` 对缺失或结构错误 **hard**。
+- CLI：`aifilm plan debrief --root … --action status|seed|write|confirm|validate`
+- story lock：`--strict` 或 `AIFILM_DEBRIEF_STRICT=1` 时要求 debrief 存在且 `confirmed_by_user`
+- 机读：`scripts/script_value_debrief.py` · `story_quality` 折叠 promise/beat_value/setup_payoff/dead_air；`pilot pack` 优先 value shortlist  
 - 禁止用 debrief 覆盖 `source.raw_text` 或静默改用户保护台词。
 
 ## 三视角冲突仲裁
@@ -155,12 +170,13 @@
 | adult-max / hard-defaults | 比例与毒镜仍唯一机读正文；debrief 只对齐检查 |
 | weapon-lane | L4 只写 suggest |
 
-## 完成定义
+## 完成定义（机读已落地 · 2026-08-04）
 
-- [ ] `receipts/script-value-debrief.json` 存在且含 L0–L4 最小字段  
-- [ ] 用户已确认 promise + must_keep  
-- [ ] 无 `must_not` 冲突  
-- [ ] 每个 beat 有 `visual_event` + `value_rank`  
-- [ ] 才进入 story lock / 媒体  
+- [x] 模块 `script_value_debrief.py` + `plan debrief` CLI  
+- [x] `plan validate` 挂载 soft/strict 检查  
+- [x] `story_quality` 折叠呈现价值维度（缺 debrief 中性 0.5）  
+- [x] `pilot pack` 优先 value shortlist → shot map  
+- [x] `plan lock --scope story --strict` 可硬拦未确认  
+- [ ] 每片实例：`receipts/script-value-debrief.json` 存在且用户确认后才 media  
 
 离线回放：可对既有 `drama-graph` 事后填 rank，验证高 rank 是否=成片高光。

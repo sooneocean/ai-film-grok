@@ -101,6 +101,43 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
     report = pilot_report(base, shots=shots)
     picked = list(report.get("shots") or [])
     spec = read_json(base / "film-spec.json") or {}
+    # Prefer script-value-debrief shortlist (value_rank≥4) when present
+    value_pref: dict[str, Any] = {"applied": False}
+    try:
+        from script_value_debrief import (
+            load_debrief,
+            map_beats_to_shot_ids,
+            merge_pilot_shot_preference,
+            pilot_shortlist_from_debrief,
+        )
+
+        debrief = load_debrief(base)
+        if debrief and not shots:
+            mapped = map_beats_to_shot_ids(debrief, spec)
+            if mapped:
+                suggested = list(report.get("suggested_shots") or pick_pilot_shots(spec))
+                merged = merge_pilot_shot_preference(suggested, mapped, n=max(len(suggested), 3))
+                # Re-run report with preferred pilot set when caller did not pin shots
+                report = pilot_report(base, shots=merged)
+                picked = list(report.get("shots") or merged)
+                value_pref = {
+                    "applied": True,
+                    "beat_shortlist": pilot_shortlist_from_debrief(debrief),
+                    "mapped_shot_ids": mapped,
+                    "merged_shots": merged,
+                    "weapon_bias": debrief.get("weapon_bias") or [],
+                }
+            else:
+                value_pref = {
+                    "applied": False,
+                    "beat_shortlist": pilot_shortlist_from_debrief(debrief),
+                    "mapped_shot_ids": [],
+                    "reason": "no_shot_map",
+                    "weapon_bias": debrief.get("weapon_bias") or [],
+                }
+    except Exception as exc:  # noqa: BLE001
+        value_pref = {"applied": False, "error": str(exc)[:160]}
+
     heat_scale = str(spec.get("heat_scale") or "").strip().lower()
     coverage = _coitus_coverage(spec, picked)
     state = _state_index_gaps(base)
@@ -167,6 +204,7 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
         "pilot_go": {"ok": ok, "blockers": blockers},
         "shots": picked,
         "suggested_shots": report.get("suggested_shots") or pick_pilot_shots(spec),
+        "script_value_preference": value_pref,
         "media": report.get("media"),
         "ready_count": report.get("ready_count"),
         "all_media_ready": media_ok,

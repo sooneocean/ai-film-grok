@@ -62,18 +62,51 @@ def run(args: Namespace, root: Path) -> tuple[dict[str, Any], int]:
                 "receipt_path": str(receipt),
             }, 0
         if action == "lock":
+            # Story lock: script-value-debrief soft by default; hard when
+            # --strict or AIFILM_DEBRIEF_STRICT=1 (present structure + confirmed).
+            debrief_gate: dict[str, Any] | None = None
+            if str(args.scope) == "story":
+                import os
+
+                strict_deb = bool(getattr(args, "strict", False)) or os.environ.get(
+                    "AIFILM_DEBRIEF_STRICT", ""
+                ).lower() in {"1", "true", "yes", "on"}
+                try:
+                    from script_value_debrief import check_root
+
+                    debrief_gate = check_root(
+                        root,
+                        strict=strict_deb,
+                        require_confirmed=strict_deb,
+                    )
+                    if strict_deb and not debrief_gate.get("ok"):
+                        raise PlanMutationError(
+                            "script-value-debrief blocks story lock (strict): "
+                            + ", ".join(
+                                str(e.get("code") or e.get("message"))
+                                for e in (debrief_gate.get("errors") or [])
+                            ),
+                            "DEBRIEF_LOCK_BLOCKED",
+                        )
+                except PlanMutationError:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    debrief_gate = {"ok": True, "soft_error": str(exc)[:160]}
             graph = lock_scope(graph, str(args.scope), user_phrase=str(args.user_phrase))
             write_json(graph_path, graph)
             receipt = write_revision_receipt(
                 root, graph, action="lock", reason=str(args.user_phrase)
             )
-            return {
+            out: dict[str, Any] = {
                 "ok": True,
                 "action": action,
                 "scope": args.scope,
                 "revision": graph.get("revision"),
                 "receipt_path": str(receipt),
-            }, 0
+            }
+            if debrief_gate is not None:
+                out["script_value_debrief"] = debrief_gate
+            return out, 0
         if action == "unlock":
             graph = unlock_scope(graph, str(args.scope), reason=str(args.reason))
             write_json(graph_path, graph)

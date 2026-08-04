@@ -1517,6 +1517,11 @@ def _check_story_quality(graph: dict[str, Any]) -> dict[str, Any]:
     try:
         from story_quality import check_story_quality
 
-        return check_story_quality(graph)
+        # Prefer film root on graph meta when present for debrief load
+        root = None
+        meta = graph.get("_film") if isinstance(graph.get("_film"), dict) else {}
+        if meta.get("root"):
+            root = meta.get("root")
+        return check_story_quality(graph, root=root)
     except Exception:
         return {}
