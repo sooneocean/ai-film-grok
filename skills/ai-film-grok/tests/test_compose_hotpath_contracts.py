@@ -11,6 +11,8 @@ Locks fail-closed surfaces that must never regress on the designed-post path:
 
 from __future__ import annotations
 
+import pytest
+
 import json
 import sys
 import tempfile
@@ -20,6 +22,8 @@ from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+
+pytestmark = pytest.mark.hotpath
 
 from compose_render import (  # noqa: E402
     ComposeRenderError,

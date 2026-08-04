@@ -13,12 +13,13 @@ SKILL := $(ROOT)/skills/ai-film-grok
 AIFILM := $(SKILL)/scripts/aifilm
 RUNTIME_PYTHON := $(SKILL)/scripts/runtime-python
 
-.PHONY: help setup dev test test-fast check-all clean validate doctor coverage audit audit-full lessons-audit release-check release-light update inspect version sync-docs sync install-hooks lock-runtime
+.PHONY: help setup dev test test-fast test-hotpath check-all clean validate doctor coverage audit audit-full lessons-audit release-check release-light update inspect version sync-docs sync install-hooks lock-runtime
 
 help:
 	@echo "ai-film-grok make targets"
 	@echo "  check-all       validate + ruff + doctor + pytest -m 'not slow'"
 	@echo "  test-fast       same fast pytest as agents (not slow)"
+	@echo "  test-hotpath    final/compose/gates fail-mode contracts only"
 	@echo "  test            full pytest (includes slow)"
 	@echo "  doctor          aifilm doctor"
 	@echo "  release-light   docs + doctor core (pre-push default)"
@@ -53,6 +54,9 @@ test:
 # Real agent fast path (exclude @pytest.mark.slow)
 test-fast:
 	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m pytest tests/ -q --tb=line -m "not slow"
+
+test-hotpath:
+	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m pytest tests/ -q --tb=line -m "hotpath and not slow"
 
 coverage:
 	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m coverage run --source=scripts -m pytest tests/ -q --tb=line -m "not slow"

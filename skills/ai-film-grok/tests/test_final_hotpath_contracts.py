@@ -13,6 +13,8 @@ without re-testing happy-path bulk.
 
 from __future__ import annotations
 
+import pytest
+
 import json
 import sys
 import tempfile
@@ -22,6 +24,8 @@ from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+
+pytestmark = pytest.mark.hotpath
 
 import final_stages  # noqa: E402
 from compose_render import ComposeRenderError, assert_underlay_not_double_burn  # noqa: E402

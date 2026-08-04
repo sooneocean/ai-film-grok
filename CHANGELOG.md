@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.38.1] - 2026-08-04
+
+### Changed (C1/C2 CLI post extract + hotpath + INDEX)
+- **`cli_post.py`**: extract final/compose/closeout/export-desktop handlers (~1.5k LOC off `aifilm_grok`); public cmds unchanged.
+- **`docs/plans/cli-extract-map.md`**, **`2026-08-04-project-refactor-active.md`**.
+- INDEX Active P0 block; `@pytest.mark.hotpath` + `make test-hotpath`.
+
 ## [2.38.0] - 2026-08-04
 
 ### Added (Fill-Idle Wave αβγ · effect optimization)

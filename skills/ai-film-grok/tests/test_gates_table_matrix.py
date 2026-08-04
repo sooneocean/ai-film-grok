@@ -20,6 +20,8 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+pytestmark = pytest.mark.hotpath
+
 from dramatic_meaning import meaning_gate_enabled  # noqa: E402
 from film_spec import zero_narration_gate  # noqa: E402
 from i2v_motion_gate import I2VMotionGateError, assert_i2v_final_gate_for_export  # noqa: E402

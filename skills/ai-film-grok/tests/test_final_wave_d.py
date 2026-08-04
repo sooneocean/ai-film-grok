@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import argparse
 import json
 import sys
@@ -11,6 +13,8 @@ from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+
+pytestmark = pytest.mark.hotpath
 
 from longform import estimate_plate_timeout  # noqa: E402
 from render_final import (  # noqa: E402

@@ -1,7 +1,7 @@
 ---
 title: ai-film-grok Codebase Optimization
 type: refactor
-status: active
+status: superseded
 date: 2026-07-21
 origin: docs/brainstorms/2026-07-21-plugin-analysis-requirements.md
 ---

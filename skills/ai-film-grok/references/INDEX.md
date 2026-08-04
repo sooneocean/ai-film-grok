@@ -140,6 +140,23 @@
 
 > 新规则须标 P 码 + 层。验证稳定后可晋升到上方稳定 references。
 
+### Active P0（优先读 · 未归档）
+
+| 主题 | 入口 |
+|---|---|
+| 成人 MAX / 毒镜 / 高动 | hard-defaults + 2026-07-27…29 lessons |
+| 字幕硬烧 + 肉戏 speaker | huangdao lesson §G/H |
+| H3 max + Fill-Idle | lessons-2026-08-04-h3-max-effect · weapon-lane-matrix |
+| 对白主链中文 | dialogue-first-workflow |
+
+**Archive 规则**：晋升 hard-defaults 且 >90 天无新引用 → 仅保留 INDEX 日期区。
+
+### 2026-08-04
+
+| 文件 | 主题 |
+|---|---|
+| [h3-max-effect](lessons-2026-08-04-h3-max-effect.md) | I2V 锁脸 · R2V 高动 · Fill-Idle |
+
 ### 2026-08-03
 
 | 文件 | 主题 |
