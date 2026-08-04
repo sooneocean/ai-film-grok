@@ -918,7 +918,7 @@
     },
     {
       "path": "scripts/preflight.py",
-      "sha256": "dad3297bfb319e56f80d98bdce55e098a49564ff1c6db6cb6d23a73ace5809d5"
+      "sha256": "493f0080ae48f2436713105914fc7d698a8247e5ee7e9c75ac786ad9c0037aa3"
     },
     {
       "path": "scripts/product_brief.py",
