@@ -3374,6 +3374,20 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         status=args.status,
         prompt_file=Path(args.prompt_file).expanduser().resolve() if args.prompt_file else None,
     )
+    # go4 · write continue handoff for next chain_mode=continue (Grok+H3 shared)
+    try:
+        from continue_handoff import maybe_write_for_clip
+
+        eng = "h3" if "minimax_h3" in str(endpoint or "") or "h3" in str(endpoint or "").lower() else "grok"
+        maybe_write_for_clip(
+            root,
+            str(args.shot_id),
+            Path(record.get("path") or source),
+            engine=eng,
+            mode="i2v",
+        )
+    except Exception:
+        pass
     try:
         record["duration_sec"] = media_duration(Path(record["path"]))
     except Exception:

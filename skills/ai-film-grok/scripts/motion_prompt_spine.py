@@ -229,15 +229,105 @@ def dsl_action_parts(shot: dict[str, Any]) -> list[str]:
     return parts
 
 
+# DP optics matrix (hard-defaults / dp-optics): shot_size → prime mm phrase.
+# Author lens_mm / camera_prompt with "mm" always wins over auto inject.
+_SHOT_SIZE_FOCAL: dict[str, tuple[int, str]] = {
+    "wide": (35, "35mm wide establishing plate"),
+    "ws": (35, "35mm wide establishing plate"),
+    "w": (35, "35mm wide establishing plate"),
+    "full": (35, "35mm full-body readable plate"),
+    "fs": (35, "35mm full-body readable plate"),
+    "long": (35, "35mm long shot"),
+    "ls": (35, "35mm long shot"),
+    "ms": (50, "50mm medium two-shot / torso"),
+    "medium": (50, "50mm medium two-shot / torso"),
+    "m": (50, "50mm medium two-shot / torso"),
+    "mcu": (50, "50mm medium close-up"),
+    "medium_close": (50, "50mm medium close-up"),
+    "cu": (85, "85mm close-up face/reaction"),
+    "close": (85, "85mm close-up face/reaction"),
+    "closeup": (85, "85mm close-up face/reaction"),
+    "close_up": (85, "85mm close-up face/reaction"),
+    "close-up": (85, "85mm close-up face/reaction"),
+    "ecu": (105, "105mm extreme close-up / macro insert"),
+    "extreme_close": (105, "105mm extreme close-up / macro insert"),
+    "extreme_closeup": (105, "105mm extreme close-up / macro insert"),
+    "insert": (105, "105mm insert / L4 detail"),
+    "l4": (105, "105mm insert / L4 detail"),
+    "insert_l4": (105, "105mm insert / L4 detail"),
+    "macro": (105, "105mm macro insert"),
+}
+
+
+def shot_size_of(shot: dict[str, Any]) -> str:
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    cam = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
+    raw = (
+        shot.get("shot_size")
+        or cam.get("shot_size")
+        or dsl.get("shot_size")
+        or shot.get("framing")
+        or dsl.get("framing")
+        or ""
+    )
+    return str(raw).strip().lower().replace(" ", "_")
+
+
+def focal_clause(shot: dict[str, Any]) -> str:
+    """One-line DP lens inject (go5 · 2.37.2). Skip if author already set lens."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    cam = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
+    # Author explicit lens
+    for key in ("lens_mm", "focal_length", "focal_mm"):
+        for src in (dsl, cam, shot):
+            if not isinstance(src, dict):
+                continue
+            val = src.get(key)
+            if val is None or val == "":
+                continue
+            try:
+                mm = int(float(val))
+            except (TypeError, ValueError):
+                mm = None
+            if mm:
+                return f"Lens: {mm}mm cinematic prime (author lock)."
+    author_cam = str(dsl.get("camera_prompt") or cam.get("prompt") or "").lower()
+    if "mm" in author_cam and any(ch.isdigit() for ch in author_cam):
+        return ""  # already in camera_prompt
+    size = shot_size_of(shot)
+    if not size:
+        return ""
+    # normalize common tokens
+    token = size.split("/")[0].split(",")[0].strip()
+    hit = _SHOT_SIZE_FOCAL.get(token)
+    if not hit:
+        # partial match e.g. medium_full → medium family
+        for key, pair in _SHOT_SIZE_FOCAL.items():
+            if key in token or token in key:
+                hit = pair
+                break
+    if not hit:
+        return ""
+    mm, phrase = hit
+    return f"Lens: {mm}mm ({phrase})."
+
+
 def camera_clause(shot: dict[str, Any]) -> str:
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
     cam = str(dsl.get("camera_prompt") or "").strip()
+    focal = focal_clause(shot)
     if cam:
+        # Append focal only if not already implied
+        if focal and "mm" not in cam.lower():
+            return f"{cam} {focal}".strip()
         return cam
     framing = str(shot.get("framing") or dsl.get("framing") or "").strip()
+    parts: list[str] = []
     if framing:
-        return f"Framing: {framing}"
-    return ""
+        parts.append(f"Framing: {framing}")
+    if focal:
+        parts.append(focal)
+    return " ".join(parts).strip()
 
 
 def audio_clause(shot: dict[str, Any]) -> str:
@@ -285,6 +375,8 @@ def core_fields(spec: dict[str, Any] | None, shot: dict[str, Any]) -> dict[str, 
         "has_action_core": bool(actions) or bool(dialogue),
         "action_summary": ". ".join(actions) if actions else None,
         "camera_prompt": camera_clause(shot) or None,
+        "focal_clause": focal_clause(shot) or None,
+        "shot_size": shot_size_of(shot) or None,
         "continuity_required": str(
             (shot.get("dsl") or {}).get("chain_mode") if isinstance(shot.get("dsl"), dict) else ""
         ).lower()

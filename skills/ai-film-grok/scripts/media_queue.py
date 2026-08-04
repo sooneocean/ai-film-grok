@@ -975,6 +975,19 @@ class MediaQueue:
             )
         except OSError:
             pass
+        # go4 · Grok bulk continue handoff write (parity H3)
+        if endpoint in {"image_to_video", "reference_to_video"}:
+            try:
+                from continue_handoff import maybe_write_for_clip
+
+                sid = str(job.get("shot_id") or "")
+                if sid and media.is_file():
+                    mode = "r2v" if endpoint == "reference_to_video" else "i2v"
+                    maybe_write_for_clip(
+                        self.root, sid, media, engine="grok", mode=mode
+                    )
+            except Exception:
+                pass
         return job
 
     def reconcile(self, *, stale_after_seconds: int = 1800, now: str | None = None) -> list[str]:

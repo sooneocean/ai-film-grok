@@ -1,13 +1,21 @@
 # Changelog
 
+## [2.37.2] - 2026-08-04
+
+### Added (go4 continue Grok + go5 DP optics)
+- **Shared continue handoff:** `scripts/continue_handoff.py` used by H3 + Grok. Write on `media-queue complete` (I2V/R2V), `register-clip`, and H3 run. Read in `plan_h3_shot` + `prompt_injector` I2V (CONTINUE clause; never overwrite approved stills).
+- **DP focal inject:** `focal_clause` / extended `camera_clause` maps shot_size → 35/50/85/105mm phrase into motion spine (author `lens_mm` wins).
+
+### Tests
+- `tests/test_continue_and_dp_optics.py`
+
+### Docs
+- hard-defaults go4/go5 row
+
 ## [2.37.1] - 2026-08-04
 
-### Added (H3 max-effect auto mode · T2V/I2V/R2V)
-- **`scripts/h3_mode.py`**: single-source `resolve_h3_mode` — explicit → continue I2V → env T2V → dialogue-CU/hard-flag R2V → default I2V (+ R2V alt on soft high motion).
-- **`h3 plan`**: `mode_resolve`, `effect_tips`, `command`/`command_alt` with chosen `--mode`.
-- **`h3 list`**: each row has `mode`, reasons, `alt_mode`, ready `command`, ops reminder.
-- **next_actions** hybrid lane points at auto mode + free-memory + alt thrash.
-- Tests: `tests/test_h3_mode.py`. Docs: weapon-lane-matrix / h3-max lesson / memory / stages visual.
+### Notes
+- Version pointer bump; H3 auto-mode package may land separately (`h3_mode` WIP in stash if present).
 
 ## [2.37.0] - 2026-08-04
 

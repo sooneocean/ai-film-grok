@@ -7,8 +7,6 @@ plan → generate on 5090 → optional silent plate → queue complete → regis
 
 from __future__ import annotations
 
-import os
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -84,26 +82,15 @@ def _approved_still(root: Path, shot_id: str) -> Path | None:
 
 def _shot_wants_continue(shot: dict[str, Any]) -> bool:
     """True when this shot is an endframe-continue link."""
-    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
-    chain = str(dsl.get("chain_mode") or shot.get("chain_mode") or "").strip().lower()
-    if chain == "continue":
-        return True
-    if str(shot.get("parent_shot_id") or "").strip():
-        return True
-    return False
+    from continue_handoff import shot_wants_continue
+
+    return shot_wants_continue(shot)
 
 
 def _previous_shot_id(spec: dict[str, Any], shot_id: str, shot: dict[str, Any]) -> str | None:
-    parent = str(shot.get("parent_shot_id") or "").strip()
-    if parent:
-        return parent
-    ids = [str(s.get("id")) for s in _iter_shots(spec)]
-    if shot_id not in ids:
-        return None
-    idx = ids.index(shot_id)
-    if idx <= 0:
-        return None
-    return ids[idx - 1]
+    from continue_handoff import previous_shot_id
+
+    return previous_shot_id(spec, shot_id, shot)
 
 
 def resolve_continue_handoff(
@@ -113,15 +100,12 @@ def resolve_continue_handoff(
     shot: dict[str, Any] | None = None,
     spec: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Phase C · Read previous-shot continue handoff (endframe + DF packet).
+    """Phase C · Read previous-shot continue handoff (shared H3+Grok module)."""
+    from continue_handoff import resolve_continue_handoff as _resolve
 
-    Never overwrites approved stills. Optional copy into stills/ only when
-    the still is missing AND ``AIFILM_CONTINUE_COPY_STILL=1``.
-    """
-    base = _root(root)
     if not isinstance(spec, dict):
         try:
-            spec = _load_spec(base)
+            spec = _load_spec(_root(root))
         except H3WorkflowError:
             spec = {}
     if not isinstance(shot, dict):
@@ -129,66 +113,7 @@ def resolve_continue_handoff(
             shot = _find_shot(spec, shot_id) if spec else {}
         except H3WorkflowError:
             shot = {}
-    prev_id = _previous_shot_id(spec or {}, shot_id, shot or {})
-    out: dict[str, Any] = {
-        "schema_version": 1,
-        "kind": "h3-continue-handoff-resolve",
-        "shot_id": shot_id,
-        "prev_shot_id": prev_id,
-        "wants_continue": _shot_wants_continue(shot or {}),
-        "ok": False,
-        "end_frame": None,
-        "handoff_meta": None,
-        "copied_to_stills": False,
-        "still_dest": None,
-    }
-    if not prev_id:
-        out["note"] = "no previous/parent shot for continue handoff"
-        return out
-    handoff_dir = base / "receipts" / "continue-handoff"
-    meta_path = handoff_dir / f"{prev_id}.json"
-    end_png = handoff_dir / f"{prev_id}_end.png"
-    meta = read_json(meta_path) if meta_path.is_file() else {}
-    if isinstance(meta, dict) and meta:
-        out["handoff_meta"] = {
-            k: meta.get(k)
-            for k in (
-                "shot_id",
-                "mode",
-                "dramatic_function",
-                "heat_phase",
-                "core",
-                "ok",
-                "end_frame",
-            )
-        }
-        ef = meta.get("end_frame")
-        if ef and Path(str(ef)).is_file():
-            end_png = Path(str(ef))
-    if not end_png.is_file():
-        out["note"] = f"missing continue end frame for prev={prev_id}"
-        return out
-    out["end_frame"] = str(end_png)
-    out["ok"] = True
-    # Optional: fill empty stills/ slot only (never overwrite approved)
-    copy_on = os.environ.get("AIFILM_CONTINUE_COPY_STILL", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    still_dest = base / "stills" / f"{shot_id}.png"
-    out["still_dest"] = str(still_dest)
-    if copy_on and not still_dest.is_file():
-        try:
-            still_dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(end_png, still_dest)
-            out["copied_to_stills"] = True
-        except OSError as exc:
-            out["copy_error"] = str(exc)[:160]
-    elif still_dest.is_file():
-        out["note"] = "approved/existing still present — not overwritten by handoff"
-    return out
+    return _resolve(root, shot_id, shot=shot, spec=spec)
 
 
 def _spoken_dialogue_text(shot: dict[str, Any]) -> str:
@@ -602,62 +527,18 @@ def _write_continue_handoff(
     mode: str,
     seed: int,
 ) -> dict[str, Any]:
-    """Extract end frame + dramatic packet for next-shot I2V continue (P2)."""
-    from motion_prompt_spine import core_fields, dramatic_function_of, heat_phase_of
+    """Extract end frame + dramatic packet (shared continue_handoff module)."""
+    from continue_handoff import write_continue_handoff
 
-    handoff_dir = root / "receipts" / "continue-handoff"
-    handoff_dir.mkdir(parents=True, exist_ok=True)
-    end_png = handoff_dir / f"{shot_id}_end.png"
-    meta: dict[str, Any] = {
-        "schema_version": 1,
-        "kind": "h3-continue-handoff",
-        "shot_id": shot_id,
-        "mode": mode,
-        "seed": seed,
-        "source_clip": str(deliver),
-        "end_frame": None,
-        "dramatic_function": dramatic_function_of(shot) or None,
-        "heat_phase": heat_phase_of(shot) or None,
-        "core": core_fields(None, shot),
-        "ok": False,
-    }
-    if not deliver.is_file():
-        write_json(handoff_dir / f"{shot_id}.json", meta)
-        return meta
-    try:
-        proc = subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-sseof",
-                "-0.12",
-                "-i",
-                str(deliver),
-                "-frames:v",
-                "1",
-                "-q:v",
-                "2",
-                str(end_png),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if proc.returncode == 0 and end_png.is_file():
-            meta["end_frame"] = str(end_png)
-            meta["ok"] = True
-            # Read side: plan_h3_shot / resolve_continue_handoff (no silent stills overwrite)
-            meta["note"] = (
-                f"Next shot chain_mode=continue → plan uses {end_png} automatically; "
-                f"optional AIFILM_CONTINUE_COPY_STILL=1 copies only if stills/<next>.png missing"
-            )
-    except Exception as exc:  # noqa: BLE001
-        meta["error"] = str(exc)[:200]
-    write_json(handoff_dir / f"{shot_id}.json", meta)
-    return meta
+    return write_continue_handoff(
+        root,
+        shot_id=shot_id,
+        deliver=deliver,
+        shot=shot,
+        mode=mode,
+        engine="h3",
+        seed=seed,
+    )
 
 
 def run_h3_shot(

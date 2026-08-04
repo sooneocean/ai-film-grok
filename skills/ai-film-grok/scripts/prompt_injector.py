@@ -640,6 +640,19 @@ class PromptInjector:
                 cl = str(clause).strip()
                 if cl and cl not in parts and (not shot_action or cl != shot_action):
                     parts.append(cl)
+            # go4 · Grok continue handoff (read previous endframe packet into prompt)
+            try:
+                from continue_handoff import resolve_continue_handoff
+
+                cont = resolve_continue_handoff(
+                    root, str(shot.get("id") or ""), shot=shot
+                )
+                if cont.get("ok") and cont.get("wants_continue") and cont.get("prompt_clause"):
+                    pc = str(cont["prompt_clause"])
+                    if pc not in parts:
+                        parts.insert(0, pc)
+            except Exception:
+                pass
             if shot_action and f"Motion/Action: {shot_action}" not in parts:
                 # Avoid duplicating action already present via spine dsl join
                 if shot_action not in " ".join(parts):
