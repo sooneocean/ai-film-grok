@@ -85,6 +85,24 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
         help="Do not auto-measure missing mean sidecars",
     )
 
+    # cinematic-gate composite (Wave ε)
+    cg = sub.add_parser(
+        "cinematic-gate",
+        help=(
+            "Composite cinema gate: true-video + inventory + i2v-final + variety "
+            "+ five-track + edit-rhythm → receipts/cinematic-gate.json"
+        ),
+    )
+    cg.add_argument("--root", required=True)
+    cg.add_argument(
+        "--ship-prep",
+        action="store_true",
+        help="Run ship-prep ladder first",
+    )
+    cg.add_argument("--skip-variety", action="store_true")
+    cg.add_argument("--skip-five-track", action="store_true")
+    cg.add_argument("--no-write", action="store_true")
+
     # ship-prep one-shot
     sp = sub.add_parser(
         "ship-prep",
@@ -328,6 +346,19 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
             )
             _emit(report)
             return 0
+
+        if cmd == "cinematic-gate":
+            from cinematic_gate import run_cinematic_gate
+
+            report = run_cinematic_gate(
+                args.root,
+                write=not bool(getattr(args, "no_write", False)),
+                run_ship_prep=bool(getattr(args, "ship_prep", False)),
+                skip_variety=bool(getattr(args, "skip_variety", False)),
+                skip_five_track=bool(getattr(args, "skip_five_track", False)),
+            )
+            _emit(report)
+            return 0 if report.get("ok") else 2
 
         if cmd == "ship-prep":
             report = ship_prep(

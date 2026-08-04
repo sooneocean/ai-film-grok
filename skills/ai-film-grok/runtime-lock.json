@@ -277,6 +277,10 @@
       "sha256": "59cdb417381cf86d0a4316d4687c7dbb3adcd35c7068468b5681862a537deb1e"
     },
     {
+      "path": "scripts/cinematic_gate.py",
+      "sha256": "bc613fc2b8cc871f5f2748f45c509b2bf4adf5397f4f0f1a9c8ed5bb0bcda4f1"
+    },
+    {
       "path": "scripts/cli/__init__.py",
       "sha256": "95e4301bc9910914b62f49cfa402f3e7ea22ea888f8f78bcde4debc9ed205677"
     },
@@ -354,7 +358,7 @@
     },
     {
       "path": "scripts/cli_post.py",
-      "sha256": "c9349d21b6afe54f9ce2b8db05d1929e4095e0b9ccbc7e73f7a401d83e086db8"
+      "sha256": "1ad67d1e684cbae531e01b430f482d1907a4b57379497383820720bfa30844ed"
     },
     {
       "path": "scripts/cli_quality.py",
@@ -394,7 +398,7 @@
     },
     {
       "path": "scripts/cli_workflow.py",
-      "sha256": "e47457ef7956095e424aeee76543cdb283912a4f2ea31b9b0b394124d3420035"
+      "sha256": "8188b18c0f59b1d679b393a5a3937dcc5a753d25c7123afc4bfd227e1fe90829"
     },
     {
       "path": "scripts/cli_workshop.py",
@@ -866,7 +870,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "0be16ce48dd1db97e8fac9eb7aca21a9d34aa831c8594522402b687470307ac4"
+      "sha256": "39bb1944b7f2bad0e0beec20493b69404bc4114380a9a4b8eef6311cb273bd0f"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -1346,7 +1350,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "01ec0d3aecf1f926cefdb86d10945e66c9be970b9c9972667be719883c4487c8"
+      "sha256": "b550b9dd8516b46521e750963764a75b8c904eaa05905fe0e0d5f7e90d7ac338"
     },
     {
       "path": "scripts/workflow_spine.py",

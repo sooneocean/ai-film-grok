@@ -1533,6 +1533,13 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
         assert_i2v_final_gate_for_export(root)
     except I2VMotionGateError as exc:
         raise FilmError(str(exc)) from exc
+    # Wave ε · composite cinema gate (true-video / variety / five-track / inventory)
+    try:
+        from cinematic_gate import CinematicGateError, assert_cinematic_gate_for_export
+
+        assert_cinematic_gate_for_export(root)
+    except CinematicGateError as exc:
+        raise FilmError(str(exc)) from exc
     dirs = film_dirs(root)
     try:
         reject_symlinks(dest, field="Desktop export destination")

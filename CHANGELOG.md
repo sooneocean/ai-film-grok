@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.7] - 2026-08-04
+
+### Added (Cinematic-gate composite · Wave ε)
+- **`cinematic_gate.py`**: one-shot true_video + inventory + i2v-final + variety + five_track + edit_rhythm → `receipts/cinematic-gate.json`.
+- **CLI** `aifilm cinematic-gate [--ship-prep]`; ship-prep stamps gate; **export-desktop** requires ok.
+- **dispatch/next**: after clips complete, push cinematic-gate before final.
+- Escape: `AIFILM_SKIP_CINEMATIC_GATE=1`. Tests: `test_cinematic_gate.py`.
+
 ## [2.39.6] - 2026-08-04
 
 ### Added (5-Track cinema mix MVP · Wave δ)

@@ -1426,10 +1426,42 @@ def ship_prep(
             }
         )
 
+    # Wave ε · stamp cinematic-gate after ladder (composite truth for export)
+    try:
+        from cinematic_gate import run_cinematic_gate
+
+        cin = run_cinematic_gate(
+            root,
+            write=write,
+            run_ship_prep=False,
+            skip_variety=True,  # already ran variety step
+            skip_five_track=True,  # already ran five_track step
+        )
+        steps.append(
+            {
+                "id": "cinematic_gate",
+                "ok": bool(cin.get("ok")),
+                "detail": f"blocked_by={cin.get('blocked_by')} soft={cin.get('soft_issues')}",
+                "hard": True,
+                "next_cmd": cin.get("next_cmd"),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "cinematic_gate",
+                "ok": True,
+                "detail": f"skip: {exc}"[:160],
+                "advisory": True,
+                "skipped": True,
+            }
+        )
+
     hard_failed = [
         s
         for s in steps
-        if not s.get("ok") and (s.get("hard") or s["id"] in {"variety", "i2v_motion_gate"})
+        if not s.get("ok")
+        and (s.get("hard") or s["id"] in {"variety", "i2v_motion_gate", "cinematic_gate"})
     ]
     # soft fail film_core when not hard
     soft_only = [s for s in steps if not s.get("ok") and s.get("advisory") and not s.get("hard")]

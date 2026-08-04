@@ -61,6 +61,7 @@ _ACTION_STAGE: dict[str, str] = {
     "fidelity-apply": "agent",
     "design-go": "agent",
     "post-audit": "post",
+    "cinematic-gate": "post",
     "export-desktop": "deliver",
     "done": "done",
 }
@@ -639,6 +640,7 @@ def build_next_actions(
         # 2.37 · prefer ship-prep one-shot; fall back to motion-gate alone
         ship_rec = read_json(root / "receipts" / "ship-prep.json") or {}
         gate_rec = read_json(root / "receipts" / "i2v-final-gate.json") or {}
+        cin_rec = read_json(root / "receipts" / "cinematic-gate.json") or {}
         if ship_rec.get("ok") is not True and gate_rec.get("ok") is not True:
             add(
                 "ship-prep",
@@ -650,6 +652,13 @@ def build_next_actions(
                 "i2v-motion-gate",
                 f'aifilm i2v-motion-gate --root "{r}" --write',
                 "clips 齐 — 先 i2v-motion-gate（--root 自动 DF）再 final/closeout",
+            )
+        # Wave ε · composite cinema gate before final
+        if cin_rec.get("ok") is not True:
+            add(
+                "cinematic-gate",
+                f'aifilm cinematic-gate --root "{r}"',
+                "clips 齐 — cinematic-gate（true-video/variety/five-track/i2v）再 final",
             )
         # Wave H: multi-take shortlist before post when takes exist
         sel_rec = read_json(root / "receipts" / "select-shortlist.json") or {}
