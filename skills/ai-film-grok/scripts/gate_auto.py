@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Automated machine-verifiable gate ladder (2026-08-04).
+"""Automated machine-verifiable gate ladder (2026-08-04 · opt 2.39.11).
 
 Runs everything that can be proven without a human eyeball:
   means → i2v-final-gate write → five_track ensure + sex_sfx inject
@@ -7,6 +7,10 @@ Runs everything that can be proven without a human eyeball:
 
 Does **not** replace:
   pilot user approval · multi-take human PK · review-final scorecard
+
+Optimizations:
+  · fast_path when gate-auto + i2v-final + cinematic already green (unless force)
+  · i2v hard only when there are motion rows / approved clips to grade
 
 Class analogy: airport auto-checklist for instruments; pilot still boards.
 """
@@ -20,6 +24,8 @@ from typing import Any
 from util import read_json, utc_now, write_json
 
 RECEIPT = "gate-auto.json"
+I2V_RECEIPT = "i2v-final-gate.json"
+CIN_RECEIPT = "cinematic-gate.json"
 
 # Still requires a human (never auto-green these as "DONE")
 HUMAN_ONLY = (
@@ -41,6 +47,34 @@ def skip_enabled() -> bool:
         "yes",
         "on",
     }
+
+
+def machine_receipts_green(root: Path | str) -> dict[str, Any]:
+    """True when machine ladder receipts are already ok (no re-measure needed)."""
+    base = Path(root).expanduser().resolve()
+    auto = read_json(base / "receipts" / RECEIPT) or {}
+    i2v = read_json(base / "receipts" / I2V_RECEIPT) or {}
+    cin = read_json(base / "receipts" / CIN_RECEIPT) or {}
+    auto_ok = isinstance(auto, dict) and auto.get("ok") is True and not auto.get("skipped")
+    i2v_ok = isinstance(i2v, dict) and i2v.get("ok") is True
+    cin_ok = isinstance(cin, dict) and cin.get("ok") is True
+    green = bool(auto_ok and i2v_ok and cin_ok)
+    return {
+        "ok": green,
+        "gate_auto": auto_ok,
+        "i2v_final": i2v_ok,
+        "cinematic": cin_ok,
+        "human_pending": list(auto.get("human_pending") or []) if isinstance(auto, dict) else [],
+    }
+
+
+def _has_approved_clips(root: Path) -> bool:
+    man = read_json(root / "manifest.json") or {}
+    clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
+    for rec in clips.values():
+        if isinstance(rec, dict) and str(rec.get("status") or "") == "approved":
+            return True
+    return False
 
 
 def _step(
@@ -170,8 +204,13 @@ def run_gate_auto(
     promote_single: bool = True,
     run_variety: bool = True,
     run_cinematic: bool = True,
+    force: bool = False,
 ) -> dict[str, Any]:
-    """Full machine ladder. Returns red/green with human_only remaining list."""
+    """Full machine ladder. Returns red/green with human_only remaining list.
+
+    ``force=False`` (default): if gate-auto + i2v-final + cinematic already green,
+    return a fast_path receipt without re-measuring means (export/closeout thrash).
+    """
     base = Path(root).expanduser().resolve()
     if skip_enabled():
         out = {
@@ -186,6 +225,27 @@ def run_gate_auto(
         if write:
             write_json(base / "receipts" / RECEIPT, out)
         return out
+
+    if not force:
+        status = machine_receipts_green(base)
+        if status.get("ok"):
+            prev = read_json(base / "receipts" / RECEIPT) or {}
+            out = {
+                **(prev if isinstance(prev, dict) else {}),
+                "schema_version": 1,
+                "kind": "gate-auto",
+                "ok": True,
+                "fast_path": True,
+                "at": utc_now(),
+                "root": str(base),
+                "machine_verified": True,
+                "human_pending": status.get("human_pending") or [],
+                "human_only_forever": list(HUMAN_ONLY),
+                "note": "fast_path: machine receipts already green (pass force=True to re-measure)",
+            }
+            if write:
+                write_json(base / "receipts" / RECEIPT, out)
+            return out
 
     steps: list[dict[str, Any]] = []
     r = str(base)
@@ -255,19 +315,28 @@ def run_gate_auto(
     # 3) i2v motion gate auto measure+write
     if measure_i2v:
         mg = auto_i2v_motion_gate(base, write=write)
+        rows = int(mg.get("row_count") or 0)
+        has_clips = _has_approved_clips(base)
+        # Soft when nothing to grade (empty pilot / pre-media root)
+        if rows == 0 and not has_clips:
+            i2v_ok = True
+            i2v_hard = False
+            i2v_detail = "no approved clips / zero rows — i2v gate soft skip"
+        else:
+            i2v_ok = bool(mg.get("ok"))
+            i2v_hard = True
+            i2v_detail = f"rows={rows} means={mg.get('means')} gate={mg.get('gate')}" + (
+                f" err={mg.get('error')}" if mg.get("error") else ""
+            )
         steps.append(
             _step(
                 "i2v_motion",
-                ok=bool(mg.get("ok")),
-                detail=(
-                    f"rows={mg.get('row_count')} means={mg.get('means')} "
-                    f"gate={mg.get('gate')}"
-                    + (f" err={mg.get('error')}" if mg.get("error") else "")
-                ),
-                hard=True,
+                ok=i2v_ok,
+                detail=i2v_detail,
+                hard=i2v_hard,
                 next_cmd=(
                     None
-                    if mg.get("ok")
+                    if i2v_ok
                     else f'aifilm i2v-motion-gate --root "{r}" --write  # fix weak means'
                 ),
                 codes=list(mg.get("codes") or []),
@@ -390,6 +459,8 @@ def run_gate_auto(
             else (human_pending[0].get("next_cmd") if human_pending else None)
         ),
         "machine_verified": ok,
+        "fast_path": False,
+        "force": bool(force),
         "note": (
             "Machine ladder only. Still needs human for pilot / multi-take PK / "
             "review-final. Does not fake motion floors."
@@ -397,4 +468,17 @@ def run_gate_auto(
     }
     if write:
         write_json(base / "receipts" / RECEIPT, out)
+        # Compact pointer for dispatch/next_actions (avoid re-reading three files)
+        write_json(
+            base / "receipts" / "machine-ready.json",
+            {
+                "schema_version": 1,
+                "kind": "machine-ready",
+                "ok": ok,
+                "at": out["at"],
+                "blocked_by": out.get("blocked_by"),
+                "human_pending": out.get("human_pending"),
+                "gate_auto": ok,
+            },
+        )
     return out

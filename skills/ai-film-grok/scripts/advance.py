@@ -132,6 +132,7 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
             "--no-promote-single",
             "--no-variety",
             "--no-cinematic",
+            "--force",
         ),
         verifier=("gate-auto",),
     ),

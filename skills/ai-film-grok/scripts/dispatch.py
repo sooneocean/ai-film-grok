@@ -732,6 +732,10 @@ def build_dispatch(
         gate_rec = read_json(root / "receipts" / "i2v-final-gate.json") or {}
         cin_rec = read_json(root / "receipts" / "cinematic-gate.json") or {}
         auto_rec = read_json(root / "receipts" / "gate-auto.json") or {}
+        ready = read_json(root / "receipts" / "machine-ready.json") or {}
+        machine_green = ready.get("ok") is True or (
+            auto_rec.get("ok") is True and cin_rec.get("ok") is True and gate_rec.get("ok") is True
+        )
         if ship_rec.get("ok") is not True and gate_rec.get("ok") is not True:
             pre(
                 "ship-prep",
@@ -739,11 +743,7 @@ def build_dispatch(
                 "clips 齐 — 一键 means+variety+shortlist+motion-gate+gate-auto（优于散敲）",
                 "visual",
             )
-        elif (
-            cin_rec.get("ok") is not True
-            or gate_rec.get("ok") is not True
-            or auto_rec.get("ok") is not True
-        ):
+        elif not machine_green:
             pre(
                 "gate-auto",
                 f'aifilm gate-auto --root "{r}"',

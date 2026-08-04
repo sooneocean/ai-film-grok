@@ -657,7 +657,12 @@ def build_next_actions(
                 "clips 齐 — 先 i2v-motion-gate（--root 自动 DF）再 final/closeout",
             )
         # Wave ε · gate-auto absorbs cinematic (one slot; no dual add — actions capped at 8)
-        if cin_rec.get("ok") is not True or gate_rec.get("ok") is not True:
+        ready = read_json(root / "receipts" / "machine-ready.json") or {}
+        auto_rec = read_json(root / "receipts" / "gate-auto.json") or {}
+        machine_green = ready.get("ok") is True or (
+            auto_rec.get("ok") is True and cin_rec.get("ok") is True and gate_rec.get("ok") is True
+        )
+        if not machine_green and (cin_rec.get("ok") is not True or gate_rec.get("ok") is not True):
             add(
                 "gate-auto",
                 f'aifilm gate-auto --root "{r}"',

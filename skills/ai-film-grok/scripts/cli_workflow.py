@@ -100,6 +100,11 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
     ga.add_argument("--no-promote-single", action="store_true")
     ga.add_argument("--no-variety", action="store_true")
     ga.add_argument("--no-cinematic", action="store_true")
+    ga.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-measure even when machine receipts already green (skip fast_path)",
+    )
 
     # cinematic-gate composite (Wave ε)
     cg = sub.add_parser(
@@ -373,6 +378,7 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
                 promote_single=not bool(getattr(args, "no_promote_single", False)),
                 run_variety=not bool(getattr(args, "no_variety", False)),
                 run_cinematic=not bool(getattr(args, "no_cinematic", False)),
+                force=bool(getattr(args, "force", False)),
             )
             _emit(report)
             # exit 0 when machine-verified; human_pending does not fail CI if hard ok

@@ -427,11 +427,15 @@ def assert_cinematic_gate_for_export(root: Path | str) -> dict[str, Any]:
     if isinstance(report, dict) and report.get("ok") is True:
         return {"ok": True, "gate": report, "path": str(path)}
 
-    # Deep auto: full machine ladder then re-read cinematic
+    # Deep auto: full machine ladder (fast_path if already green) then re-read cinematic
     try:
         from gate_auto import run_gate_auto
 
-        run_gate_auto(base, write=True)
+        auto = run_gate_auto(base, write=True, force=False)
+        if auto.get("ok") and auto.get("fast_path"):
+            report = read_json(path) if path.is_file() else None
+            if isinstance(report, dict) and report.get("ok") is True:
+                return {"ok": True, "gate": report, "path": str(path), "via": "gate-auto-fast"}
     except Exception:
         pass
     report = run_cinematic_gate(base, write=True, auto_i2v=True)

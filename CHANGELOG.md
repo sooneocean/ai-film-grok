@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.11] - 2026-08-05
+
+### Changed (Gate-auto optimize · fast_path + soft empty i2v)
+- **fast_path**: when `gate-auto` + `i2v-final` + `cinematic` already ok, `run_gate_auto(force=False)` returns immediately (export/closeout/ship-prep thrash).
+- **CLI** `gate-auto --force` to re-measure; advance allowlist includes `--force`.
+- **i2v_motion** soft-skip when zero rows and no approved clips (empty pre-media root).
+- **machine-ready.json** compact pointer; dispatch/next_actions skip re-push when green.
+- export assert uses fast_path before full cinematic re-run.
+
 ## [2.39.10] - 2026-08-04
 
 ### Changed (Gate-auto deep wire · advance / dispatch / ship-prep / export)

@@ -1425,6 +1425,7 @@ def ship_prep(
             promote_single=False,  # ship-prep already shortlisted
             run_variety=False,  # already ran variety step
             run_cinematic=True,
+            force=False,  # reuse green receipts; ship ladder already measured means
         )
         steps.append(
             {
