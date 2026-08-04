@@ -32,7 +32,10 @@ Grok bulk → still 先验 → run-next --max 5 → evidence
 → ship-prep → pk-compare → 人 promote → final（可 P2 未完）
 ```
 
-## 片例（Wave α · 填路径）
-- 证据收据：`<film>/receipts/fill-idle-evidence.json`
-- 记账五项：P0 数 / P2 挑战数 / 人换 H3 比例 / mean 提升 / 重做次数  
-- （跑完真片后把 root 写这里）
+## 片例（Wave α · 2026-08-04 GO 实跑）
+- **片根**：`/Users/dex/Desktop/e-virus-ch04-shelter/简报`（第4章：避难所的建立 · heat=max）
+- 证据：`receipts/fill-idle-evidence.json` · 摘要：`receipts/fill-idle-alpha-run-2026-08-04.json`
+- 插件副本：`artifacts/fill-idle-alpha-evirus-ch04/alpha-run-summary.json`
+- **五项**：P0=**13** · P2=**1** · 人换 H3 比例=**n/a（尚无 multi-take）** · mean 提升=**n/a（clips 未测 mean）** · 重做=**0**
+- **next 作业**：`ep01_s02_sh01` P0a I2V（`capacity_ready=false` 故未 --execute）
+- **发现**：12×P0c 续链等首镜 I2V；多镜 grok clip 对 still 有 `identity_l1_high`；成片已有 film_final 但仍可 H3 挑战重做
