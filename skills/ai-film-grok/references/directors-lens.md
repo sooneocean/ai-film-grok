@@ -66,7 +66,7 @@
 |---|---|
 | 片长形态 | 默认竖屏短片 **6–12 镜** × 约 6s（色气骨架见 [ecchi-story.md](ecchi-story.md)）；长片 ≥6 镜 / ≥36s 走 [continuity_chain.md](continuity_chain.md) |
 | 场景数 | 短片 **1–4 个 scene** 即可（不必硬凑 5–15）；长片可 5–15 |
-| 旁白 | 每镜 `nar` **≤55 字**；推荐 ≤28–42；一镜一句一动作 |
+| 旁白 | 【**Zero-Narration Strict**】`dialogue_drama` 默认 `zero_narration_strict:true`；第三人称说书 `nar` 占比硬底 **0%**；静默时改写为对白/道具特写/Foley SFX；仅非 `dialogue_drama` 类型才可使用常规 `nar`（上限 5%）；见 [hard-defaults 零旁白 IRON](hard-defaults.md) |
 | 构图 | **禁止** `extreme close-up` / `fills frame` / `push-in on face` 等裁头词 → 用 `close-up` 且保留 headroom；见 framing lint |
 | ECU 改写 | 方法论里的 ECU → 本 skill 用 **close-up + 物件/局部主体**（锁、水珠、指尖），不要写 face fills frame |
 | 身份 | 角色镜必须能接到 cast master；禁止每镜换服换模 |
@@ -229,6 +229,40 @@ Scene 1 · 雨夜出租车 · 压迫→靠近→感官→余韵
 | 眩晕/顿悟 | dolly zoom **仅高潮 1 镜** |
 
 **三镜防腻**：连续 3 镜 ≥2 维变化（景别 · 主动词 · 机位轴）。见 [lessons-2026-07-17-vo-motion-link.md](lessons-2026-07-17-vo-motion-link.md)。
+
+### DP 电影焦段与光影矩阵（P0 · 2026-08-04 好莱坞导入）
+
+根据景别自动注入焦段与光影描述词到 Prompt 首行：
+
+| 景别 (`shot_size`) | 焦段默认注入 | 光影默认注入 |
+|---|---|---|
+| `close-up` / `cu` | `85mm focal length, f/1.4, creamy bokeh, shallow depth of field` | `cinematic key light 45° side, soft fill light 4:1 ratio, rim backlight separates subject from background` |
+| `medium` / `medium full` | `50mm focal length, f/2.8, moderate depth of field` | `3-point lighting: key + fill + hair light, balanced exposure` |
+| `wide` / `establishing` | `35mm focal length, f/4.0, deep focus, full environment` | `ambient light motivated by scene, natural shadows, no hard light artifacts` |
+| `insert` / `sensory` | `105mm macro, extreme shallow depth, subject fills 80%` | `single accent light, high contrast, deep shadow surround` |
+
+**三点式光影词表**（直接拼入 keyframe / I2V Prompt）：
+
+```text
+Key Light: 45° side hard/soft light, sculpting facial contour
+Fill Light: shadow side low intensity, 4:1 (dramatic) / 3:1 (warm) ratio
+Rim/Hair Light: strong backlight, separates character from background, cinematic silhouette
+Color Grade: teal shadows, warm amber skin tones (Teal & Orange contrast)
+```
+
+**禁止**：平光/正面均光无层次（除非 genre=documentary）；细节注入禁过长影响主要 motion 词。
+
+### 对白三相表演注入（P0 · 2026-08-04）
+
+对白镜头（`on_camera` / `off_camera`）在 Keyframe 状态照与 I2V Prompt 中必须包含三相表演结构：
+
+| 阶段 | 时长 | Prompt 关键词 |
+|---|---|---|
+| **Pre-Speech 前置反应** | 0.15–0.25s | `subtle intake of breath, eyes shift focus, slight lip part before speaking` |
+| **Spoken Delivery 口型动态** | VO 全长 | `mouth visibly articulates the line, natural facial muscle movement, eye contact` |
+| **Afterglow Breath 话后余韵** | 0.35–0.70s | `gentle exhale after speaking, expression lingers, eyes settle` |
+
+`pre_speech_cue` 与 `afterglow_breath` 字段可写入 shot DSL；`dialogue-production-plan` 自动将其合并至 TTS 词头/词尾停顿。大段口白（>4.5s）自动拆分为 **说话者主镜 + 听者反应切镜**（音轨不断）。
 
 ## Phase D — Storyboard 面板 → film-spec 一镜模板
 

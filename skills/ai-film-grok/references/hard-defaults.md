@@ -2,6 +2,7 @@
 
 > 从 SKILL.md 抽出。
 > **工程门禁**（pilot / VO 预算 / continue / 双烧）= 硬。
+> **零旁白（2026-08-04 IRON）** = **硬**：`dialogue_drama` 默认 `zero_narration_strict`；无用户句时禁说书 `nar` 抢时钟；仅 `narration_reason` 逃生通道。
 > **成人尺度（2026-07-24 IRON）** = **硬**：肉戏拉满、能脱就脱、能露就露。
 > 女主人数 / 非成人 genre = 仍跟用户；显式 `heat_scale:soft` / `adult_max_iron:false` 才降火。
 
@@ -77,6 +78,7 @@
 | 转场 | silk；continue 强制 hard；满 60s 靠加镜 |
 | 立场 | `focal_character` + `viewpoint` + `look_axis` |
 | 双字幕 | `caption_mode: zh\|zh_en\|en`；`nar_en` 可只上字幕 |
+| **零旁白 IRON（P0 · 2026-08-04）** | `dialogue_drama` 默认 `zero_narration_strict:true`：全片 `nar`（第三人称说书）占比硬底 **0%**；`write-spec` 检测到 `narration_ratio>0.0` → 报 `NAR_BUDGET_VIOLATION` 并阻断。**替代方案**：① 将心理活动改写为角色对白/潜台词；② 背景信息改写为道具特写 (`dramatic_function: sensory/insert`)；③ 气氛烘托改写为 Foley SFX 事件。逃生：单场景 `{"silent_scene":true,"narration_reason":"…"}` 或 spec `zero_narration_strict:false`（须交代原因）。影响：`nar` 字段仍可写 gap-fill 旁白（≤5% 全片），但 `dialogue_drama` 默认硬封，非对白片类才解封。 |
 
 ## 语音与混音
 
@@ -96,6 +98,7 @@
 | loop | hook/action 永不 stream_loop |
 | 一角一声 | 固定 `vo_voice` / `cast_voices`；显式 TTS 失败不静默跨商降级 |
 | **声线主导** | **对白主链·中文**：角色中文 `spoken_text` + 中文 `caption_text`（正式 HF / ship 硬烧）+ BGM duck；无对白=静镜。第三人称 `nar` **仅 gap**。`vocal_color` 默认关；见 [voice-tracks.md](voice-tracks.md) |
+| **5-Track 影院级混音（P0 · 2026-08-04）** | 全片默认 5 轨合成：**DX**（对白/居中/-16LUFS）· **FX**（Foley 点缀/服装摩擦/脚步）· **BG**（环境底噪/Room Tone 全程贯穿·绝不静音）· **MX**（BGM Score·DX 出现自动 sidechain -4~-6dB）· **SUB**（LFE 低频脉冲·剧情转折触发）。BG 轨禁止出现零值静音段（>200ms 纯 0）；DX 与 BG 合并 → `-16 LUFS (±1.5dB)` 最终响度；见 [bgm-generation.md](bgm-generation.md) · [5track-audio-master.md](5track-audio-master.md) |
 
 ## 视觉与一致性
 

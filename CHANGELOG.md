@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.35.0] - 2026-08-04
+
+### Added
+- **Zero-Narration IRON (P0):** `dialogue_drama` now defaults to `zero_narration_strict:true`. Third-person narrator `nar` is hard-capped at 0% of runtime; `write-spec` raises `NAR_BUDGET_VIOLATION` if any narration ratio detected. Replacement paths: ① rewrite inner-monologue as character dialogue/subtext; ② background exposition as prop insert (`dramatic_function: sensory/insert`); ③ atmosphere as Foley SFX events. Escape: `{"silent_scene":true,"narration_reason":"…"}` or spec `zero_narration_strict:false` (reason required). Non-`dialogue_drama` genres retain legacy nar with ≤5% cap.
+- **Hollywood DP Optics & Three-Phase Acting (P0):** Shot-size-to-focal-length auto-injection matrix (35mm wide → 50mm medium → 85mm CU → 105mm macro insert). Three-point lighting presets per scene tone (warm/tense/dramatic/afterglow/neutral) with Teal & Orange color grade default. Dialogue shots require three-phase acting prompt coverage: Pre-Speech (0.15–0.25s breath/eye shift) · Spoken Delivery (lip sync + eye contact) · Afterglow Breath (0.35–0.70s expression release). Lines >4.5s auto-split into speaker shot + listener reaction cutaway (DX audio continuous).
+- **5-Track Cinematic Audio Master (P0):** Full-film default 5-track mix: DX (dialogue, center, -16 LUFS) · FX (Foley spot effects, L/R panned) · BG (Room Tone ambience bed, continuous, no silence >200ms) · MX (BGM Score, auto sidechain -4dB~-6dB on DX) · SUB (LFE pulse, drama beats only). Final loudness target: -16 LUFS ±1.5dB; peak ≤-1dBTP.
+
+### Docs
+- `references/hard-defaults.md`: two new P0 rows — 零旁白 IRON (2026-08-04) and 5-Track 影院级混音 (2026-08-04); header updated with Zero-Narration IRON note.
+- `references/directors-lens.md`: narration constraint updated to Zero-Narration Strict; new sections — DP 电影焦段与光影矩阵 and 对白三相表演注入 (P0 · 2026-08-04).
+- `references/hollywood-optics-prompts.md` [NEW]: focal length matrix, 3-point lighting matrix, Teal & Orange grade, three-phase acting prompt library, self-check checklist.
+- `references/5track-audio-master.md` [NEW]: 5-track definition, mix order CLI, acceptance criteria, pipeline compatibility, zero_narration linkage.
+- `SKILL.md`: P0 #18 (零旁白 IRON) and #19 (好莱坞 DP 光影+5-Track 混音) added; deep-dive links updated.
+
 ## [2.34.1] - 2026-08-04
 
 ### Fixed
