@@ -333,7 +333,7 @@ class TestWriteSpecDialogueContractGate:
         spec["scenes"][0]["shots"][0]["audio_cues"][0]["language"] = "zh"
         for shot in spec["scenes"][0]["shots"]:
             shot.pop("nar", None)
-        with pytest.raises(FilmSpecError, match="narration budget"):
+        with pytest.raises(FilmSpecError, match="NAR_BUDGET_VIOLATION|narration budget"):
             validate_film_spec(spec, assign_missing_ids=False)
 
 

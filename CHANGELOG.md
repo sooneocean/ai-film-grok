@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.37.3] - 2026-08-04
+
+### Added (H3 max-effect auto mode)
+- **`scripts/h3_mode.py`**: `resolve_h3_mode` — explicit → continue I2V → env T2V → dialogue-CU/hard-flag R2V → default I2V (+ R2V alt).
+- **`h3 plan` / `h3 list`**: `mode_resolve`, `effect_tips`, `command`/`command_alt`.
+- Tests: `tests/test_h3_mode.py`. Docs: weapon-lane / h3-max lesson / hard-defaults.
+
 ## [2.37.2] - 2026-08-04
 
 ### Added (go4 continue Grok + go5 DP optics)
@@ -15,7 +22,7 @@
 ## [2.37.1] - 2026-08-04
 
 ### Notes
-- Version pointer bump; H3 auto-mode package may land separately (`h3_mode` WIP in stash if present).
+- Version pointer / notes; H3 auto-mode implemented in **2.37.3**.
 
 ## [2.37.0] - 2026-08-04
 

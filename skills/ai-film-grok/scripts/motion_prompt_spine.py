@@ -56,25 +56,19 @@ def motion_tier_resolve(
     """
     sh = shot if isinstance(shot, dict) else {}
     heat = str(heat_phase if heat_phase is not None else heat_phase_of(sh)).strip().lower()
-    df = str(
-        dramatic_function
-        if dramatic_function is not None
-        else dramatic_function_of(sh)
-    ).strip().lower()
-    wardrobe = str(
-        wardrobe_state
-        if wardrobe_state is not None
-        else (sh.get("wardrobe_state") or "")
-    ).strip().lower()
+    df = (
+        str(dramatic_function if dramatic_function is not None else dramatic_function_of(sh))
+        .strip()
+        .lower()
+    )
+    wardrobe = (
+        str(wardrobe_state if wardrobe_state is not None else (sh.get("wardrobe_state") or ""))
+        .strip()
+        .lower()
+    )
     spine = str(spine_tier or "").strip().lower()
-    if spoken_dialogue is None:
-        has_dlg = bool(spoken_dialogue_text(sh))
-    else:
-        has_dlg = bool(spoken_dialogue)
-    if screen_mode is None:
-        screen = shot_screen_mode(sh)
-    else:
-        screen = str(screen_mode or "").strip()
+    has_dlg = bool(spoken_dialogue_text(sh)) if spoken_dialogue is None else bool(spoken_dialogue)
+    screen = shot_screen_mode(sh) if screen_mode is None else str(screen_mode or "").strip()
 
     optical = "normal"
     # 1) Meat heat never demoted by soft DF tags
@@ -85,10 +79,7 @@ def motion_tier_resolve(
         optical = "medium"
     # 3) Bare wardrobe: meat unless soft/afterglow recovery
     elif wardrobe in _BARE_WARDROBE:
-        if df in _SOFT_DF:
-            optical = "medium"
-        else:
-            optical = "meat"
+        optical = "medium" if df in _SOFT_DF else "meat"
     # 4) High DF
     elif df in _HIGH_DF:
         optical = "meat" if df in {"action", "climax", "impact", "peak"} else "high"
@@ -101,10 +92,7 @@ def motion_tier_resolve(
     elif spine in _PROMPT_TIERS:
         optical = {"soft": "soft", "medium": "medium", "high": "meat"}[spine]
     # 7) On-camera dialogue micro-performance
-    elif has_dlg and screen in {"on_camera", ""}:
-        optical = "medium"
-    # 8) Build / foreplay energy without meat heat
-    elif heat in {"foreplay", "build"}:
+    elif has_dlg and screen in {"on_camera", ""} or heat in {"foreplay", "build"}:
         optical = "medium"
     else:
         optical = "normal"

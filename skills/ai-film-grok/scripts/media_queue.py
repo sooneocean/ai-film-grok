@@ -493,9 +493,7 @@ class MediaQueue:
                                     raw_prompt, raw_spec, shot_row
                                 )
                                 if enriched.strip() != raw_prompt.strip():
-                                    prompt.write_text(
-                                        enriched.rstrip() + "\n", encoding="utf-8"
-                                    )
+                                    prompt.write_text(enriched.rstrip() + "\n", encoding="utf-8")
                                 assert_motion_prompt_core(
                                     enriched,
                                     shot_row,
@@ -983,9 +981,7 @@ class MediaQueue:
                 sid = str(job.get("shot_id") or "")
                 if sid and media.is_file():
                     mode = "r2v" if endpoint == "reference_to_video" else "i2v"
-                    maybe_write_for_clip(
-                        self.root, sid, media, engine="grok", mode=mode
-                    )
+                    maybe_write_for_clip(self.root, sid, media, engine="grok", mode=mode)
             except Exception:
                 pass
         return job

@@ -3378,7 +3378,11 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     try:
         from continue_handoff import maybe_write_for_clip
 
-        eng = "h3" if "minimax_h3" in str(endpoint or "") or "h3" in str(endpoint or "").lower() else "grok"
+        eng = (
+            "h3"
+            if "minimax_h3" in str(endpoint or "") or "h3" in str(endpoint or "").lower()
+            else "grok"
+        )
         maybe_write_for_clip(
             root,
             str(args.shot_id),

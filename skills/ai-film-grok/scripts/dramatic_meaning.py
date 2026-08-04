@@ -261,9 +261,7 @@ def _iter_spoken_lines(shot: dict[str, Any], shot_id: str) -> list[dict[str, Any
     dialogue = _text(shot.get("dialogue") or shot.get("dialogue_ja") or shot.get("dialogue_zh"))
     if dialogue:
         perf = (
-            shot.get("performance_state")
-            if isinstance(shot.get("performance_state"), dict)
-            else {}
+            shot.get("performance_state") if isinstance(shot.get("performance_state"), dict) else {}
         )
         lines.append(
             {

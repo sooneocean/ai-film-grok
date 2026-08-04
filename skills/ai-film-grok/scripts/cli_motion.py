@@ -95,9 +95,7 @@ def i2v_motion_gate_from_rows(
     elif root is not None and rows:
         # Enrich sparse author rows with DF/wardrobe/mean from film root
         auto_map = {
-            str(r.get("id") or ""): r
-            for r in collect_motion_gate_rows(root)
-            if r.get("id")
+            str(r.get("id") or ""): r for r in collect_motion_gate_rows(root) if r.get("id")
         }
         enriched: list[dict[str, Any]] = []
         for raw in rows:

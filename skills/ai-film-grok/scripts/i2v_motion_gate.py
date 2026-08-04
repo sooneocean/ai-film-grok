@@ -16,6 +16,7 @@ Pure functions first — measure mean elsewhere (ffmpeg) and feed numbers here.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 from pathlib import Path
@@ -552,9 +553,7 @@ def assert_i2v_final_gate_for_export(root: Path | str) -> dict[str, Any]:
     try:
         gate = json.loads(gate_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise I2VMotionGateError(
-            f"Desktop export cannot read i2v-final-gate.json: {exc}"
-        ) from exc
+        raise I2VMotionGateError(f"Desktop export cannot read i2v-final-gate.json: {exc}") from exc
     if not isinstance(gate, dict) or gate.get("ok") is not True:
         raise I2VMotionGateError(
             "Desktop export blocked by i2v-final-gate (ok!=true); "
@@ -623,7 +622,7 @@ def measure_mean_absdiff(
             break
         # mean abs pixel delta
         s = 0
-        for a, b in zip(prev, cur):
+        for a, b in zip(prev, cur, strict=False):
             s += a - b if a >= b else b - a
         total += s / float(frame_size)
         pairs += 1
@@ -732,6 +731,7 @@ def collect_motion_gate_rows(
     try:
         from util import read_json
     except Exception:  # noqa: BLE001
+
         def read_json(path: Path) -> dict[str, Any] | None:  # type: ignore[misc]
             try:
                 return json.loads(path.read_text(encoding="utf-8"))
@@ -766,10 +766,8 @@ def collect_motion_gate_rows(
         if m is None:
             m = row.get("mean_absdiff")
         if sid and m is not None:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 mean_by_id[sid] = float(m)
-            except (TypeError, ValueError):
-                pass
 
     rows: list[dict[str, Any]] = []
     for sh in shots:

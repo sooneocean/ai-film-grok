@@ -704,8 +704,7 @@ def film_core_closeout_audit(root: Path | str, *, write: bool = True) -> dict[st
                     "code": "CORE_SPINE_MISSING",
                     "shot_id": sid,
                     "message": (
-                        f"{sid} hero clip without spine receipt "
-                        f"(.motion/.h3/.grok.spine.txt)"
+                        f"{sid} hero clip without spine receipt (.motion/.h3/.grok.spine.txt)"
                     ),
                 }
             )
@@ -934,11 +933,7 @@ def select_shortlist(
             if promote
             else "preferred is advisory; pass --promote to write manifest.clips"
         ),
-        "next_cmd": (
-            f'aifilm i2v-motion-gate --root "{root}" --write'
-            if rows
-            else None
-        ),
+        "next_cmd": (f'aifilm i2v-motion-gate --root "{root}" --write' if rows else None),
     }
     if write:
         write_json(root / "receipts" / SELECT_SHORTLIST_NAME, out)
@@ -1009,26 +1004,19 @@ def ship_prep(
             {
                 "id": "variety",
                 "ok": bool(var.get("ok")),
-                "detail": (
-                    "ok"
-                    if var.get("ok")
-                    else f"issues={len(var.get('issues') or [])}"
-                ),
+                "detail": ("ok" if var.get("ok") else f"issues={len(var.get('issues') or [])}"),
                 "next_cmd": var.get("next_cmd"),
                 "hard": True,
             }
         )
 
-    sel = select_shortlist(
-        root, write=write, promote=promote, measure_missing=measure
-    )
+    sel = select_shortlist(root, write=write, promote=promote, measure_missing=measure)
     steps.append(
         {
             "id": "select_shortlist",
             "ok": True,
             "detail": (
-                f"shots={len(sel.get('shots') or [])} "
-                f"promoted={len(sel.get('promoted') or [])}"
+                f"shots={len(sel.get('shots') or [])} promoted={len(sel.get('promoted') or [])}"
             ),
             "next_cmd": None,
             "promoted": sel.get("promoted") or [],
@@ -1084,11 +1072,7 @@ def ship_prep(
             {
                 "id": "film_core",
                 "ok": bool(core.get("ok")),
-                "detail": (
-                    "ok"
-                    if core.get("ok")
-                    else f"issues={len(core.get('issues') or [])}"
-                ),
+                "detail": ("ok" if core.get("ok") else f"issues={len(core.get('issues') or [])}"),
                 "next_cmd": core.get("next_cmd"),
                 "hard": film_core_hard,
                 "advisory": not film_core_hard,
@@ -1108,14 +1092,12 @@ def ship_prep(
         )
 
     hard_failed = [
-        s for s in steps if not s.get("ok") and (s.get("hard") or s["id"] in {"variety", "i2v_motion_gate"})
-    ]
-    # soft fail film_core when not hard
-    soft_only = [
         s
         for s in steps
-        if not s.get("ok") and s.get("advisory") and not s.get("hard")
+        if not s.get("ok") and (s.get("hard") or s["id"] in {"variety", "i2v_motion_gate"})
     ]
+    # soft fail film_core when not hard
+    soft_only = [s for s in steps if not s.get("ok") and s.get("advisory") and not s.get("hard")]
     ok = not hard_failed
     blocked = hard_failed[0] if hard_failed else None
     next_cmd = (blocked or {}).get("next_cmd") or (

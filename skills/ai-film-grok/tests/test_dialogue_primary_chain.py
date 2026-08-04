@@ -160,7 +160,7 @@ def test_dialogue_drama_rejects_storyteller_nar() -> None:
             }
         ],
     }
-    with pytest.raises(FilmSpecError, match="forbids third-person storyteller nar"):
+    with pytest.raises(FilmSpecError, match="NAR_BUDGET_VIOLATION|forbids third-person storyteller nar"):
         validate_film_spec(spec, assign_missing_ids=False)
 
 

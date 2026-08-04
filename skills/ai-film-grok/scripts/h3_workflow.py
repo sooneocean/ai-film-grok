@@ -11,6 +11,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from h3_mode import effect_tips as _h3_effect_tips
+from h3_mode import resolve_h3_mode
 from production_router import build_shot_intent
 from util import read_json, sha256_file, write_json
 
@@ -200,28 +202,6 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
         "spoken_text": intent.get("spoken_text"),
         "has_action_core": intent.get("has_action_core"),
     }
-    mode = "i2v"
-    op = str(intent.get("operation") or "image_to_video")
-    if op == "text_to_video":
-        mode = "t2v"
-    if str(shot.get("h3_mode") or "").strip().lower() in {"t2v", "i2v", "r2v"}:
-        mode = str(shot.get("h3_mode")).strip().lower()
-    elif str(shot.get("operation") or "").strip().lower() in {
-        "reference_to_video",
-        "reference-to-video",
-        "r2v",
-    }:
-        mode = "r2v"
-    weapon = {
-        "t2v": "minimax-h3-t2v-pilot",
-        "i2v": "minimax-h3-i2v-pilot",
-        "r2v": "minimax-h3-r2v-pilot",
-    }[mode]
-    endpoint = {
-        "t2v": "local_minimax_h3_t2v",
-        "i2v": "local_minimax_h3_i2v",
-        "r2v": "local_minimax_h3_r2v",
-    }[mode]
     approved = _approved_still(base, shot_id)
     cont = resolve_continue_handoff(base, shot_id, shot=shot, spec=spec)
     still: Path | None = approved
@@ -243,15 +223,32 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
         if filled.is_file():
             still = filled
             still_source = "stills_after_continue_copy"
+    mode_res = resolve_h3_mode(
+        shot,
+        intent=intent,
+        has_still=still is not None,
+        wants_continue=bool(cont.get("wants_continue")),
+    )
+    mode = str(mode_res["mode"])
+    weapon = str(mode_res["weapon_id"])
+    endpoint = str(mode_res["source_endpoint"])
     audio_policy = str(intent.get("audio_policy") or h3.get("audio_policy") or "prefer_native")
     max_dur = float(intent.get("max_duration_sec") or h3.get("max_duration_sec") or 8)
     enabled = bool(intent.get("h3_enabled") or h3.get("enabled") is True)
+    alt = mode_res.get("alt_mode")
+    cmd = f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {mode} --register'
+    cmd_alt = (
+        f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {alt} --register'
+        if alt
+        else None
+    )
     return {
         "schema_version": 1,
         "kind": "ai-film-h3-shot-plan",
         "ok": True,
         "shot_id": shot_id,
         "mode": mode,
+        "mode_resolve": mode_res,
         "weapon_id": weapon,
         "source_endpoint": endpoint,
         "provider": "comfy-h3",
@@ -261,12 +258,14 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
         "still_path": str(still) if still else None,
         "still_source": still_source,
         "continue_handoff": cont,
-        "requires_still": mode in {"i2v", "r2v"},
+        "requires_still": bool(mode_res.get("requires_still")),
         "audio_policy": audio_policy,
         "max_duration_sec": max_dur,
         "megapixels_draft": float(h3.get("megapixels_draft") or 0.2),
         "allow_bulk": bool(h3.get("allow_bulk")),
-        "command": (f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {mode} --register'),
+        "command": cmd,
+        "command_alt": cmd_alt,
+        "effect_tips": _h3_effect_tips(mode, mode_res),
     }
 
 
@@ -842,29 +841,66 @@ def register_h3_clip(
 
 
 def list_h3_eligible_shots(root: Path | str) -> dict[str, Any]:
-    """List shots that hybrid/H3 intent would send to local MiniMax."""
+    """List shots that hybrid/H3 intent would send to local MiniMax.
+
+    Each row includes max-effect mode (I2V/R2V/T2V) so agents do not default
+    every meat plate to soft I2V.
+    """
     base = _root(root)
     spec = _load_spec(base)
     rows = []
     for shot in _iter_shots(spec):
+        sid = str(shot.get("id") or "")
         intent = build_shot_intent(spec, shot)
-        if (
+        if not (
             intent.get("recommended_provider") == "comfy-h3"
             or intent.get("provider_lock") == "comfy-h3"
         ):
-            rows.append(
-                {
-                    "shot_id": shot.get("id"),
-                    "content_class": intent.get("content_class"),
-                    "provider_lock": intent.get("provider_lock"),
-                    "recommended_weapon": intent.get("recommended_weapon"),
-                    "audio_policy": intent.get("audio_policy"),
-                }
-            )
+            continue
+        still = _approved_still(base, sid)
+        cont = resolve_continue_handoff(base, sid, shot=shot, spec=spec)
+        has_still = still is not None or (
+            bool(cont.get("ok"))
+            and bool(cont.get("end_frame"))
+            and bool(cont.get("wants_continue"))
+        )
+        mode_res = resolve_h3_mode(
+            shot,
+            intent=intent,
+            has_still=has_still,
+            wants_continue=bool(cont.get("wants_continue")),
+        )
+        mode = str(mode_res.get("mode") or "i2v")
+        rows.append(
+            {
+                "shot_id": sid,
+                "content_class": intent.get("content_class"),
+                "provider_lock": intent.get("provider_lock"),
+                "mode": mode,
+                "mode_reasons": list(mode_res.get("reasons") or []),
+                "alt_mode": mode_res.get("alt_mode"),
+                "alt_reasons": list(mode_res.get("alt_reasons") or []),
+                "weapon_id": mode_res.get("weapon_id") or intent.get("recommended_weapon"),
+                "recommended_weapon": mode_res.get("weapon_id") or intent.get("recommended_weapon"),
+                "audio_policy": intent.get("audio_policy"),
+                "has_still": bool(has_still),
+                "spoken_text": bool(intent.get("spoken_text")),
+                "motion_tier": intent.get("motion_tier"),
+                "command": (
+                    f'aifilm h3 run --root "{base}" --shot-id {sid} --mode {mode} --register'
+                ),
+            }
+        )
     return {
         "schema_version": 1,
         "kind": "ai-film-h3-eligible-shots",
         "ok": True,
         "count": len(rows),
+        "policy": "h3_max_effect_v1",
         "shots": rows,
+        "ops_reminder": [
+            "aifilm comfy free-memory --confirm  # before mode switch",
+            "I2V lock face · R2V energy/mouth · T2V faceless only",
+            "continue → endframe I2V; bulk needs pilot approve",
+        ],
     }

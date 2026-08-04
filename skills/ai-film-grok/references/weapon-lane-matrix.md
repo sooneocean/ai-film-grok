@@ -32,13 +32,26 @@
 | 续镜 / continue | **批准末帧** | **H3 I2V** | 原声或沿用策略 |
 | 毒镜 | Qwen 解剖修 | **禁 I2V** | — |
 
-## H3 三模式 · 效果最大化（2026-08-04 实机）
+## H3 三模式 · 效果最大化（2026-08-04 实机 · 2.37.2 自动选型）
 
 | 模式 | 一句话 | 用 | 不用 |
 |------|--------|----|------|
 | **I2V** | 定妆 still 动起来 | 主角、肉戏、反应镜、**续镜硬接** | 无 still；无脸垫片 |
 | **R2V** | 参考演一版 | 高能量、换构图、对白大嘴 ECU | 必须像素贴 still 时（优先 I2V） |
 | **T2V** | 纯文生 | 无脸 env/bridge | **任何锁脸 hero** |
+
+**自动选型（v2.37.2 · `scripts/h3_mode.py` · `resolve_h3_mode`）**：写进 `h3 plan` / `h3 list`。
+
+| 优先级 | 条件 | mode |
+|--------|------|------|
+| 1 | `shot.h3_mode` / `operation` 显式 | 该值 |
+| 2 | `chain_mode=continue` / parent 续镜 | **i2v** |
+| 3 | `shot_role=env|bridge` | **t2v** |
+| 4 | insert + still | **i2v**（alt r2v） |
+| 5 | restricted + 对白 CU/ECU；或 high + 高难度 flag；`force_r2v` | **r2v**（alt i2v） |
+| 6 | 默认有 still | **i2v**（高动 soft → `alt_mode=r2v`） |
+
+`list` 每行带 `mode`/`command`/`alt_mode`；`plan` 带 `mode_resolve` + `effect_tips` + `command_alt`。CLI `--mode` 可覆盖。
 
 **景别速查**：WS 环境→T2V · MS 在场→I2V · MCU 反应→I2V 低动 · CU 对白→I2V/R2V · ECU 插入→I2V+细节 still · 体位高动→I2V 狠 prompt（不够再 R2V）。
 

@@ -140,6 +140,9 @@ def test_desktop_export_copies_production_report_artifacts(tmp_path: Path) -> No
     (root / "receipts").mkdir()
     (root / "manifest.json").write_text("{}")
     (root / "receipts" / "post-audit.json").write_text('{"delivery_ready":true}')
+    (root / "receipts" / "i2v-final-gate.json").write_text(
+        '{"ok": true, "schema_version": 1, "kind": "i2v-final-gate"}'
+    )
     (dirs["out"] / "production-report.html").write_text("<h1>report</h1>")
     (root / "receipts" / "production-report.json").write_text('{"kind":"production-report"}')
     final = dirs["out"] / "custom-final.mp4"

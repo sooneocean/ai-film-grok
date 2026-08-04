@@ -9,11 +9,11 @@
 ## 三句话
 1. **I2V 锁脸主责**（主角/肉戏/续镜）；**R2V 补能量与狠嘴 CU**；**T2V 只做无脸环境**。
 2. **高动靠狠 prompt + 状态 still**（I2V 可从 ~4 提到 ~23），不是改走 T2V；续镜 = **末帧→I2V**（接缝 L1≈7.7）。
-3. **Motion Spine** 把 DF/want/动作/运镜/对白钉进 Grok+H3；空核 `MOTION_CORE_*` 拒跑；换模式前 free-memory。
+3. **v2.37.2**：`h3 list/plan` 自动选 mode（`h3_mode.py`）；跟 `command` 跑，不够能量用 `alt_mode`/r2v；Motion Spine 空核拒跑；换模式前 free-memory。
 
 ## 检查清单
-- [ ] restricted 镜 `aifilm h3 list` 可见
-- [ ] 有 still → `--mode i2v`；参考链/大嘴 → `r2v`；env → `t2v`
+- [ ] restricted 镜 `aifilm h3 list` 可见且带 `mode`/`command`
+- [ ] 默认跟 list 的 mode；显式可 `h3_mode` 或 CLI `--mode`
 - [ ] 对白镜有 `audio_cues.spoken_text` + on_camera；跑后 prompt 含「line:「…」」
 - [ ] 续镜：抽末帧写入下一镜 still 再 I2V
 - [ ] 每镜前 `comfy free-memory --confirm`；capacity ready

@@ -644,9 +644,7 @@ class PromptInjector:
             try:
                 from continue_handoff import resolve_continue_handoff
 
-                cont = resolve_continue_handoff(
-                    root, str(shot.get("id") or ""), shot=shot
-                )
+                cont = resolve_continue_handoff(root, str(shot.get("id") or ""), shot=shot)
                 if cont.get("ok") and cont.get("wants_continue") and cont.get("prompt_clause"):
                     pc = str(cont["prompt_clause"])
                     if pc not in parts:

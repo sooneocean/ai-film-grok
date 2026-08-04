@@ -185,6 +185,9 @@ class PipelineValidationTests(unittest.TestCase):
                             "reaction_trigger": "听见脚步",
                         },
                         "dialogue_ja": "行く",
+                        "emotion": "defensive",
+                        "subtext": "她用离开结束对话",
+                        "narrative_purpose": "拒绝继续纠缠",
                         "dsl": {
                             "subject": "an adult woman",
                             "action": "turns away",
@@ -202,6 +205,9 @@ class PipelineValidationTests(unittest.TestCase):
                         "speaker": "heroine",
                         "nar": "她停在门边。",
                         "dialogue_ja": "行く",
+                        "emotion": "wary",
+                        "subtext": "门边停步是给对方最后机会",
+                        "narrative_purpose": "余韵停顿",
                         "dsl": {"subject": "an adult woman", "action": "stops", "motion": "still"},
                     },
                 ]

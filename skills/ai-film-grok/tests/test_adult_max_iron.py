@@ -396,6 +396,22 @@ class AdultMaxIronStillSource(unittest.TestCase):
         "bridge": "bridge",
     }
 
+    _MOTION = {
+        # beat_semantics_map: beat → token list (continuity.py _BEAT_SEMANTIC_MARKERS)
+        # hook: enter/step/open/appear/pull/reveal/arrive/door/walk/turn/emerge
+        "setup": "unlatch door enter arrive reveal, threshold walk turn, initial read",
+        # sensory: breath/sweat/bead/tremble/shiver/pulse/hair/skin/collarbone/heat/drip/shine/rise
+        "foreplay": "touch skin breath tremble shiver heat rise sweat drip pulse trace",
+        # action: plant/lean/push/pull/grab/press/lock/unhook/grip/slam/strike/throw/lift/drop/table
+        "act": "push press grip lock thrust plant deep unhook slam strike lean grab",
+        # action (climax subset incl. spasm-terms via afterglow-flavored finish)
+        "climax": "thrust spasm slam lock press exhale burst settle peak drop lift",
+        # afterglow: hold/blink/linger/residual/settle/pull_back/soften/still/exhale
+        "afterglow": "hold settle exhale soften linger residual blink still slow",
+        # bridge: pan/track/pass/cross/corridor/transition/dolly/follow
+        "bridge": "pan track transition follow dolly cross pass connector corridor",
+    }
+
     def _base_shot(
         self,
         sid: str,
@@ -413,11 +429,12 @@ class AdultMaxIronStillSource(unittest.TestCase):
             "wardrobe_state": wardrobe,
             "duration_sec": duration,
             "lipsync": False,
+            "emotion": phase,
             "nar": "沉腰办穿锁腰高潮顶弄吃进",
             "dsl": {
                 "subject": f"{wardrobe} bare skin already undressed clothes discarded",
-                "action": "strips hips-sink removes undress arch-finish",
-                "motion": "thrust continuous body",
+                "action": self._MOTION[phase],
+                "motion": self._MOTION[phase],
                 "story_beat": phase,
                 "visible_change": "undress A to B",
                 "camera": {"shot_size": "medium full", "angle": "eye level"},

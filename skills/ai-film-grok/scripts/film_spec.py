@@ -876,10 +876,7 @@ def zero_narration_gate(
             isinstance(c, dict)
             and c.get("kind") == "voice"
             and c.get("line_type") == "dialogue"
-            and (
-                str(c.get("spoken_text") or "").strip()
-                or float(c.get("duration_sec") or 0) > 0
-            )
+            and (str(c.get("spoken_text") or "").strip() or float(c.get("duration_sec") or 0) > 0)
             for c in cues
         )
         has_dialogue = has_dialogue or has_dialogue_voice
@@ -897,8 +894,7 @@ def zero_narration_gate(
             nar
             and not has_dialogue
             and not (
-                shot.get("silent_scene") is True
-                and str(shot.get("narration_reason") or "").strip()
+                shot.get("silent_scene") is True and str(shot.get("narration_reason") or "").strip()
             )
         ):
             nar_shots += 1
@@ -1738,9 +1734,10 @@ def validate_film_spec(
                     continue
                 if has_narration_voice and str(shot.get("narration_reason") or "").strip():
                     continue
-                if str(shot.get("narration_reason") or "").strip() and shot.get(
-                    "silent_scene"
-                ) is True:
+                if (
+                    str(shot.get("narration_reason") or "").strip()
+                    and shot.get("silent_scene") is True
+                ):
                     continue
                 raise FilmSpecError(
                     f"NAR_BUDGET_VIOLATION: {sid}: dialogue_drama forbids third-person "
