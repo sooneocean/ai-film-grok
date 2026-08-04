@@ -213,6 +213,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_grok_oauth_pack.py`
 - `skills/ai-film-grok/tests/test_grok_reference_video_adapter.py`
 - `skills/ai-film-grok/tests/test_h3_fill_idle.py`
+- `skills/ai-film-grok/tests/test_h3_flf_media_pack.py`
 - `skills/ai-film-grok/tests/test_h3_mode.py`
 - `skills/ai-film-grok/tests/test_h3_workflow.py`
 - `skills/ai-film-grok/tests/test_hard_defaults.py`
