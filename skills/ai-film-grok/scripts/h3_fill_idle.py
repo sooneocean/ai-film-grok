@@ -221,9 +221,11 @@ def wants_dual_take(
     """High-value dual I2V+R2V (opt-in flag or auto for climax / dialogue CU meat)."""
     sh = shot if isinstance(shot, dict) else {}
     intent = intent if isinstance(intent, dict) else {}
-    prefer = str(
-        sh.get("h3_prefer") or sh.get("h3_dual") or intent.get("h3_prefer") or ""
-    ).strip().lower()
+    prefer = (
+        str(sh.get("h3_prefer") or sh.get("h3_dual") or intent.get("h3_prefer") or "")
+        .strip()
+        .lower()
+    )
     if prefer in {"dual", "i2v+r2v", "both", "true", "1", "yes"}:
         return True
     if sh.get("force_dual") is True or intent.get("force_dual") is True:
