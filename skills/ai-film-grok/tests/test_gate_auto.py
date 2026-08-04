@@ -143,6 +143,29 @@ def test_machine_receipts_green_and_fast_path(tmp_path: Path) -> None:
     assert rep2.get("fast_path") is not True
 
 
+def test_fast_path_reuse_skips_rewrite(tmp_path: Path) -> None:
+    rec = tmp_path / "receipts"
+    rec.mkdir(parents=True)
+    stamp = {
+        "ok": True,
+        "kind": "gate-auto",
+        "fast_path": True,
+        "at": "frozen",
+        "steps": [],
+    }
+    (rec / "gate-auto.json").write_text(json.dumps(stamp), encoding="utf-8")
+    (rec / "i2v-final-gate.json").write_text(
+        json.dumps({"ok": True, "kind": "i2v-final-gate"}), encoding="utf-8"
+    )
+    (rec / "cinematic-gate.json").write_text(
+        json.dumps({"ok": True, "kind": "cinematic-gate"}), encoding="utf-8"
+    )
+    rep = run_gate_auto(tmp_path, write=True, force=False)
+    assert rep.get("fast_path") is True
+    assert rep.get("at") == "frozen"  # no rewrite
+    assert "reuse" in str(rep.get("note") or "")
+
+
 def test_i2v_soft_when_no_clips(tmp_path: Path) -> None:
     (tmp_path / "manifest.json").write_text(
         json.dumps({"clips": {}, "gates": {}}), encoding="utf-8"

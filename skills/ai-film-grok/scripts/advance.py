@@ -391,13 +391,15 @@ def advance_local(
         stop_detail = ""
         full_packet: dict[str, Any] | None = None
         for _ in range(max_local):
+            # use_state_cache=True: gate receipt timestamp thrash no longer busts hash
+            # (ok-flag-only hashing in compute_state_hash) → skip full rebuilds
             full_packet = build_dispatch(
                 root,
                 gates=gates,
                 open_reshoot_count=open_reshoot_count,
                 include_capability=False,
                 write_receipt=True,
-                use_state_cache=False,
+                use_state_cache=True,
             )
             action = (
                 full_packet.get("next_action")

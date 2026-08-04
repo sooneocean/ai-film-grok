@@ -21,7 +21,26 @@ _STATE_IGNORES = {
     "orchestration-usage.jsonl",
     "pipeline_stage.json",
     "scene-sound-status.json",
+    # Pure orchestration telemetry / rewrite thrash (ok-flag handled specially)
+    "closeout.json",
+    "advance.json",
 }
+# Receipts rewritten often with new `at` / steps dumps — hash only ok/blocked signal
+_STATE_OK_ONLY = frozenset(
+    {
+        "gate-auto.json",
+        "machine-ready.json",
+        "cinematic-gate.json",
+        "i2v-final-gate.json",
+        "i2v-high-motion-audit.json",
+        "ship-prep.json",
+        "five-track-plan.json",
+        "variety-precheck.json",
+        "select-shortlist.json",
+        "pk-compare-ship-prep.json",
+        "film-core-closeout.json",
+    }
+)
 HARD_GATE_CODES = [
     "WRITE_SPEC_REQUIRED",
     "PILOT_USER_APPROVAL_REQUIRED",
@@ -118,6 +137,30 @@ def compute_state_hash(
                         separators=(",", ":"),
                     ).encode("utf-8")
                 )
+            elif path.name in _STATE_OK_ONLY:
+                # Ignore at/steps thrash; track only machine-green signal
+                try:
+                    body = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, ValueError, json.JSONDecodeError):
+                    digest.update(b"unreadable")
+                else:
+                    if isinstance(body, dict):
+                        slim = {
+                            "ok": body.get("ok"),
+                            "blocked_by": body.get("blocked_by"),
+                            "kind": body.get("kind"),
+                            "skipped": body.get("skipped"),
+                        }
+                        digest.update(
+                            json.dumps(
+                                slim,
+                                ensure_ascii=False,
+                                sort_keys=True,
+                                separators=(",", ":"),
+                            ).encode("utf-8")
+                        )
+                    else:
+                        digest.update(b"non-object")
             else:
                 digest.update(path.read_bytes())
             digest.update(b"\0")
@@ -356,10 +399,11 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
             "estimator": "utf8_bytes_div_4",
         },
     }
-    # F0/S1 · input fidelity one-liner (score + worst code)
+    # F0/S1 · fidelity one-liner only on post/deliver (skip early stages = less I/O+tokens)
     try:
         root_s = str(packet.get("root") or "")
-        if root_s:
+        pipe = str(packet.get("pipeline_stage") or "")
+        if root_s and pipe in {"post", "deliver", "design"}:
             from input_fidelity import fidelity_status, human_fidelity_summary
 
             _fid = fidelity_status(root_s)
@@ -372,7 +416,7 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
                     "worst_code": worst,
                     "summary": _bounded_text(
                         human_fidelity_summary(_fid).replace("\n", " | "),
-                        max_bytes=240,
+                        max_bytes=180,
                     ),
                 }
                 if not _fid.get("ok") and "FIDELITY_NOT_OK" not in issue_codes:
@@ -386,7 +430,7 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
                             ),
                         }
                     )
-                    compact["attention"] = attention[:8]
+                    compact["attention"] = attention[:6]
     except Exception:
         pass
 
@@ -409,9 +453,18 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
         compact["metrics"]["heat_final_ok"] = bool(heat.get("final_ok"))
     compact["metrics"]["output_bytes"] = _json_bytes(compact)
     compact["metrics"]["estimated_tokens"] = estimated_tokens(compact)
-    if compact["metrics"]["output_bytes"] > 5000:
-        compact["next_cmd"] = _bounded_text(compact.get("next_cmd"), max_bytes=512)
-        compact["next_why"] = "内容过长；详见完整回执。"
+    # Tight token budget for agent turns (prefer short next + proof)
+    if compact["metrics"]["output_bytes"] > 4200:
+        compact["next_cmd"] = _bounded_text(compact.get("next_cmd"), max_bytes=400)
+        compact["next_why"] = _bounded_text(
+            compact.get("next_why") or "内容过长；详见完整回执。", max_bytes=200
+        )
+        if len(compact.get("attention") or []) > 4:
+            compact["attention"] = list(compact["attention"])[:4]
+        # hard_gate_codes is a fixed catalog — keep ids only, drop if still fat
+        if compact["metrics"]["output_bytes"] > 4800:
+            compact.pop("hard_gate_codes", None)
+            compact["metrics"]["hard_gate_codes_omitted"] = True
         compact["metrics"]["output_bytes"] = _json_bytes(compact)
         compact["metrics"]["estimated_tokens"] = estimated_tokens(compact)
     return compact

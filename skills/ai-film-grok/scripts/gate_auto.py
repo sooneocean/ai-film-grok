@@ -230,6 +230,20 @@ def run_gate_auto(
         status = machine_receipts_green(base)
         if status.get("ok"):
             prev = read_json(base / "receipts" / RECEIPT) or {}
+            # No rewrite when already green+fast — saves I/O and state-hash churn
+            if (
+                isinstance(prev, dict)
+                and prev.get("ok") is True
+                and prev.get("fast_path") is True
+                and write
+            ):
+                return {
+                    **prev,
+                    "fast_path": True,
+                    "machine_verified": True,
+                    "root": str(base),
+                    "note": "fast_path_reuse: green receipts unchanged",
+                }
             out = {
                 **(prev if isinstance(prev, dict) else {}),
                 "schema_version": 1,
@@ -245,6 +259,18 @@ def run_gate_auto(
             }
             if write:
                 write_json(base / "receipts" / RECEIPT, out)
+                ready_path = base / "receipts" / "machine-ready.json"
+                if not ready_path.is_file():
+                    write_json(
+                        ready_path,
+                        {
+                            "schema_version": 1,
+                            "kind": "machine-ready",
+                            "ok": True,
+                            "at": out["at"],
+                            "gate_auto": True,
+                        },
+                    )
             return out
 
     steps: list[dict[str, Any]] = []

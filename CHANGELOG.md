@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.39.12] - 2026-08-05
+
+### Changed (Orchestration timing + token efficiency)
+- **state hash**: gate receipts (`gate-auto`/`cinematic`/`i2v-final`/…) hash only `ok`/`blocked_by` — timestamp thrash no longer busts dispatch cache.
+- **advance**: `use_state_cache=True` in local loop (fewer full rebuilds per step).
+- **gate-auto fast_path_reuse**: green+fast already written → no re-write (less I/O).
+- **ship-prep**: skip gate-auto body when `machine_receipts_green`.
+- **context-routing**: `max_refs` 3→2, `max_bytes` 8k→4k; `projection.verify` → deliver stage only.
+- **compact_dispatch**: fidelity only on post/deliver/design; tighter 4.2kB trim budget.
+
 ## [2.39.11] - 2026-08-05
 
 ### Changed (Gate-auto optimize · fast_path + soft empty i2v)

@@ -1413,20 +1413,29 @@ def ship_prep(
             }
         )
 
-    # Wave ε+ · gate-auto (measure+write + cinematic) after ladder — no hand-click
+    # Wave ε+ · gate-auto after ladder (fast_path / skip if already machine-green)
     try:
-        from gate_auto import run_gate_auto
+        from gate_auto import machine_receipts_green, run_gate_auto
 
-        auto = run_gate_auto(
-            root,
-            write=write,
-            fix_sex_sfx=True,
-            measure_i2v=True,
-            promote_single=False,  # ship-prep already shortlisted
-            run_variety=False,  # already ran variety step
-            run_cinematic=True,
-            force=False,  # reuse green receipts; ship ladder already measured means
-        )
+        if machine_receipts_green(root).get("ok"):
+            auto = {
+                "ok": True,
+                "fast_path": True,
+                "blocked_by": None,
+                "human_pending": [],
+                "steps": [{"id": "cinematic_gate", "ok": True, "detail": "pre-green"}],
+            }
+        else:
+            auto = run_gate_auto(
+                root,
+                write=write,
+                fix_sex_sfx=True,
+                measure_i2v=True,
+                promote_single=False,  # ship-prep already shortlisted
+                run_variety=False,  # already ran variety step
+                run_cinematic=True,
+                force=False,
+            )
         steps.append(
             {
                 "id": "gate_auto",

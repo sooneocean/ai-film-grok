@@ -106,7 +106,7 @@
     },
     {
       "path": "scripts/advance.py",
-      "sha256": "b538920ec7ea2dce262e3bbeafb1f707307e0f6eaa22665c8e279a062f1ca9f2"
+      "sha256": "f6a711c421e168aa802b90b4b2442d4bd652c71d91e4f5a27594f4d3d0c71329"
     },
     {
       "path": "scripts/agent_review_final.py",
@@ -582,7 +582,7 @@
     },
     {
       "path": "scripts/dispatch_compact.py",
-      "sha256": "1c8ee85d14cd6d689f6bd9b9a2263fb101b0fd718587e16d1aeb7d87bdca749c"
+      "sha256": "4731927198d6f8a0eb86e3f4f13b8a401528061ec4f25949f417ea0d0233dd37"
     },
     {
       "path": "scripts/drama_graph.py",
@@ -694,7 +694,7 @@
     },
     {
       "path": "scripts/gate_auto.py",
-      "sha256": "2b80bf37023022dad9684753c22940228f7b96f4d55535aa39313c7394ef4fe9"
+      "sha256": "1f42885f2bb225d3867e21d2214da01e29e0b2f170853431772703e50e6021b5"
     },
     {
       "path": "scripts/generation_usage.py",
@@ -1354,7 +1354,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "415a29b30d99615ac65985ffd64ca74fb633f675479babbb584dbd527fee6be1"
+      "sha256": "dbc19963d6f7740c8a4fb18cff0eb814ddaafbd006af17d0b5454f9c73fbb018"
     },
     {
       "path": "scripts/workflow_spine.py",

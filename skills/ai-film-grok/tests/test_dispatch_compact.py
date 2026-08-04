@@ -61,7 +61,7 @@ def test_compact_packet_is_small_and_keeps_execution_contract(tmp_path: Path) ->
     ):
         assert compact["next_action"][key] == full["next_action"][key]
     assert compact["state_hash"] == full["state_hash"]
-    assert len(compact["context_refs"]) <= 3
+    assert len(compact["context_refs"]) <= 2
     assert "generation_usage" not in compact
     assert "jobs_summary" not in compact
     assert "routing" not in compact
@@ -267,6 +267,36 @@ def test_state_hash_ignores_dispatch_telemetry_but_tracks_control_inputs(
     assert compute_state_hash(tmp_path) != first
 
 
+def test_state_hash_ignores_gate_receipt_timestamp_thrash(tmp_path: Path) -> None:
+    """gate-auto / cinematic rewrites with same ok must not bust dispatch cache."""
+    _film(tmp_path)
+    receipts = tmp_path / "receipts"
+    receipts.mkdir(exist_ok=True)
+    (receipts / "gate-auto.json").write_text(
+        '{"ok":true,"kind":"gate-auto","at":"t1","steps":[1,2,3]}\n',
+        encoding="utf-8",
+    )
+    (receipts / "cinematic-gate.json").write_text(
+        '{"ok":true,"kind":"cinematic-gate","at":"t1"}\n',
+        encoding="utf-8",
+    )
+    first = compute_state_hash(tmp_path)
+    (receipts / "gate-auto.json").write_text(
+        '{"ok":true,"kind":"gate-auto","at":"t2","steps":[9,9,9],"fast_path":true}\n',
+        encoding="utf-8",
+    )
+    (receipts / "cinematic-gate.json").write_text(
+        '{"ok":true,"kind":"cinematic-gate","at":"t2"}\n',
+        encoding="utf-8",
+    )
+    assert compute_state_hash(tmp_path) == first
+    (receipts / "gate-auto.json").write_text(
+        '{"ok":false,"kind":"gate-auto","blocked_by":"i2v_motion"}\n',
+        encoding="utf-8",
+    )
+    assert compute_state_hash(tmp_path) != first
+
+
 def test_state_hash_tracks_only_manifest_referenced_media(tmp_path: Path) -> None:
     clip = tmp_path / "clips" / "s001.mp4"
     clip.parent.mkdir(parents=True)
@@ -289,8 +319,8 @@ def test_context_router_enforces_count_and_byte_budgets() -> None:
         skill_id="image.animate",
         issue_codes=["HUMAN_APPROVAL_REQUIRED"],
     )
-    assert 1 <= len(refs) <= 3
-    assert sum(int(item["bytes"]) for item in refs) <= 8192
+    assert 1 <= len(refs) <= 2
+    assert sum(int(item["bytes"]) for item in refs) <= 4096
     assert all((Path(__file__).resolve().parents[1] / item["path"]).is_file() for item in refs)
 
 
@@ -382,8 +412,8 @@ def test_skill_entry_and_compact_context_stay_inside_token_budgets() -> None:
     skill_root = Path(__file__).resolve().parents[1]
     assert (skill_root / "SKILL.md").stat().st_size <= 6000
     routing = json.loads((skill_root / "registry" / "context-routing.json").read_text())
-    assert routing["max_refs"] == 3
-    assert routing["max_bytes"] == 8192
+    assert routing["max_refs"] == 2
+    assert routing["max_bytes"] == 4096
     for stage in ("agent", "visual", "voice", "post", "deliver", "approval"):
         assert (skill_root / "references" / "stages" / f"{stage}.md").is_file()
 
