@@ -24,7 +24,7 @@ from tts_rehearsal import (  # noqa: E402
 )
 
 
-def test_dialogue_rehearsal_uses_japanese_voice_cue_not_chinese_caption():
+def test_dialogue_rehearsal_uses_voice_cue_not_chinese_caption():
     script = _voice_script_for_shot(
         {
             "nar": "你为什么还没下车？",
@@ -32,9 +32,9 @@ def test_dialogue_rehearsal_uses_japanese_voice_cue_not_chinese_caption():
                 {
                     "kind": "voice",
                     "line_type": "dialogue",
-                    "language": "ja",
-                    "voice": "ja-JP-NanamiNeural",
-                    "spoken_text": "まだ降りないの？",
+                    "language": "zh",
+                    "voice": "zh-CN-XiaoyiNeural",
+                    "spoken_text": "你为什么还没下车？",
                     "caption_text": "你为什么还没下车？",
                 }
             ],
@@ -42,28 +42,28 @@ def test_dialogue_rehearsal_uses_japanese_voice_cue_not_chinese_caption():
         fallback_voice="zh-CN-XiaoxiaoNeural",
     )
     assert script == {
-        "text": "まだ降りないの？",
+        "text": "你为什么还没下车？",
         "text_kind": "dialogue",
-        "language": "ja",
-        "voice": "ja-JP-NanamiNeural",
+        "language": "zh",
+        "voice": "zh-CN-XiaoyiNeural",
     }
 
 
-def test_dialogue_rehearsal_defaults_japanese_voice_for_a_japanese_cue():
+def test_dialogue_rehearsal_defaults_chinese_voice_for_dialogue_cue():
     script = _voice_script_for_shot(
         {
             "audio_cues": [
                 {
                     "kind": "voice",
                     "line_type": "dialogue",
-                    "language": "ja",
-                    "spoken_text": "行く。",
+                    "language": "zh",
+                    "spoken_text": "走吧。",
                 }
             ]
         },
         fallback_voice="zh-CN-XiaoxiaoNeural",
     )
-    assert script["voice"] == "ja-JP-NanamiNeural"
+    assert script["voice"] == "zh-CN-XiaoxiaoNeural"
 
 
 def test_rehearsal_locks_dialogue_shot_duration_to_measured_audio(tmp_path: Path) -> None:
@@ -77,7 +77,7 @@ def test_rehearsal_locks_dialogue_shot_duration_to_measured_audio(tmp_path: Path
                     {
                         "id": "talk01",
                         "screen_mode": "on_camera",
-                        "dialogue_ja": "行く。",
+                        "dialogue": "走吧。",
                         "duration_sec": 5,
                         "audio_cues": [
                             {
@@ -141,7 +141,7 @@ def test_rehearsal_skips_silent_dialogue_coverage(
     spec = {
         "title": "dialogue with coverage",
         "vo_mode": "dialogue_drama",
-        "dialogue_spoken_lang": "ja",
+        "dialogue_spoken_lang": "zh",
         "narration_spoken_lang": "zh",
         "director_intent": {
             "logline": "雨夜里两人决定离开旧家。",
@@ -158,14 +158,14 @@ def test_rehearsal_skips_silent_dialogue_coverage(
                             {
                                 "kind": "voice",
                                 "line_type": "dialogue",
-                                "language": "ja",
-                                "voice": "ja-JP-NanamiNeural",
-                                "spoken_text": "行く。",
+                                "language": "zh",
+                                "voice": "zh-CN-XiaoyiNeural",
+                                "spoken_text": "走吧。",
                                 "caption_text": "我要走。",
                                 "translation_status": "ready",
                             }
                         ],
-                        "dialogue_ja": "行く。",
+                        "dialogue": "走吧。",
                     },
                     {
                         "id": "cover01",

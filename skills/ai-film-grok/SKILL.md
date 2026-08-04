@@ -39,7 +39,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
 7. **动作**：Grok bulk→LTX 对白；**`hybrid_h3`** meat→5090 H3（pilot 批）。**有 end still→FLF first+last 主轨**；无 last→I2V；R2V 高动且 last 作 pose land ref；T2V 无脸；续镜末帧 first（+last→FLF）；**Fill-Idle** P0→P2。弱 take 可先 **FRW i2i still-challenge** 再 I2V/FLF/R2V。禁 Seedance/Wan。[h3-max](references/lessons-2026-08-04-h3-max-effect.md)·[flf](memory/2026-08-04-h3-flf-first-last.md)·[fill-idle](memory/2026-08-04-h3-fill-idle-challenge.md)·[矩阵](references/weapon-lane-matrix.md)
-8. **声线·对白优先**：默认对白主链·**中文**；**场硬闸=每场≥1 on/off_camera 台词；无对白场拒收**；对白镜=说话者主体；肉戏对白走 H3 i2v/r2v。Edge；BGM=rnb。[对白](references/dialogue-first-workflow.md)
+8. **声线·对白优先（中文唯一）**：**口白=中文 only**（`dialogue_spoken_lang=zh`；禁 `ja`/`dialogue_ja`/`ja-JP-*`）；**场硬闸=每场≥1 on/off_camera 台词；无对白场拒收**；对白镜=说话者主体；肉戏对白走 H3 i2v/r2v。Edge；BGM=rnb。[对白](references/dialogue-first-workflow.md)
 9. **成人 MAX**：肉戏≥50%·亲密≥60%·setup≤20%；extreme；四拍+bare；禁静默降 heat。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V。
 10. **字幕**：`caption_mode`+`caption_text` 中文；`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)；Ship=PIL 像素硬烧。

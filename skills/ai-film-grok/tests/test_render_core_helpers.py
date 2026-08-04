@@ -51,11 +51,11 @@ def test_shot_text_and_voice_follow_language_contract() -> None:
         "nar": "中文",
         "dialogue": "别走。",
         "caption_text": "别走。",
-        "dialogue_ja": "行く",
+        "dialogue_ja": "行く",  # retired — ignored
     }
     assert caption_text_for_shot(character) == "别走。"
     assert spoken_text_for_shot(character) == "别走。"
-    assert spoken_text_for_shot(character, dialogue_spoken_lang="ja") == "行く"
+    assert spoken_text_for_shot(character, dialogue_spoken_lang="zh") == "别走。"
     assert voice_for_shot(
         character,
         default_voice="default",
@@ -63,7 +63,8 @@ def test_shot_text_and_voice_follow_language_contract() -> None:
         vo_mode="character",
         dialogue_spoken_lang="zh",
     ).startswith("zh-CN-")
-    assert caption_text_for_shot({"nar": "中文", "nar_ja": "日本語"}, caption_lang="ja") == "日本語"
+    # caption_lang ja is ignored; Chinese fields win
+    assert caption_text_for_shot({"nar": "中文", "nar_ja": "日本語"}, caption_lang="ja") == "中文"
 
 
 def test_metadata_is_not_promoted_to_spoken_narration() -> None:
@@ -72,7 +73,7 @@ def test_metadata_is_not_promoted_to_spoken_narration() -> None:
         validate_linear_narration(
             [{"id": "metadata", "title": "角色表"}],
             vo_mode="storyteller",
-            dialogue_spoken_lang="ja",
+            dialogue_spoken_lang="zh",
             narration_spoken_lang="zh",
         )
 
@@ -85,7 +86,7 @@ def test_linear_narration_rejects_replayed_causal_beat() -> None:
                 {"id": "shot02", "nar": "她 推开门，雨声扑面而来！"},
             ],
             vo_mode="storyteller",
-            dialogue_spoken_lang="ja",
+            dialogue_spoken_lang="zh",
             narration_spoken_lang="zh",
         )
 
@@ -94,11 +95,21 @@ def test_linear_narration_uses_actual_character_tts_text() -> None:
     with pytest.raises(RenderError, match="repeats narration from shot01"):
         validate_linear_narration(
             [
-                {"id": "shot01", "speaker": "heroine", "nar": "她点头", "dialogue_ja": "行く"},
-                {"id": "shot02", "speaker": "heroine", "nar": "她转身", "dialogue_ja": "行く"},
+                {
+                    "id": "shot01",
+                    "speaker": "heroine",
+                    "dialogue": "别走。",
+                    "caption_text": "别走。",
+                },
+                {
+                    "id": "shot02",
+                    "speaker": "heroine",
+                    "dialogue": "别走。",
+                    "caption_text": "别走。",
+                },
             ],
             vo_mode="character",
-            dialogue_spoken_lang="ja",
+            dialogue_spoken_lang="zh",
             narration_spoken_lang="zh",
         )
 
@@ -111,7 +122,7 @@ def test_linear_narration_allows_silent_dialogue_coverage() -> None:
             {"id": "silence", "screen_mode": "silence"},
         ],
         vo_mode="dialogue_drama",
-        dialogue_spoken_lang="ja",
+        dialogue_spoken_lang="zh",
         narration_spoken_lang="zh",
     )
 
@@ -124,7 +135,7 @@ def test_linear_narration_does_not_hide_authored_coverage_voice() -> None:
                 {"id": "cover02", "screen_mode": "reaction", "nar": "门外传来脚步声。"},
             ],
             vo_mode="dialogue_drama",
-            dialogue_spoken_lang="ja",
+            dialogue_spoken_lang="zh",
             narration_spoken_lang="zh",
         )
 
@@ -216,8 +227,8 @@ def test_voice_resolution_keeps_character_and_storyteller_defaults_distinct() ->
 def test_locked_voice_roles_ignore_per_shot_override() -> None:
     cast = {
         "storyteller": "zh-CN-XiaoxiaoNeural",
-        "heroine": "ja-JP-NanamiNeural",
-        "partner": "ja-JP-KeitaNeural",
+        "heroine": "zh-CN-XiaoyiNeural",
+        "partner": "zh-CN-YunxiNeural",
     }
     assert (
         voice_for_shot(
@@ -235,7 +246,7 @@ def test_locked_voice_roles_ignore_per_shot_override() -> None:
             cast_voices=cast,
             vo_mode="hybrid",
         )
-        == "ja-JP-NanamiNeural"
+        == "zh-CN-XiaoyiNeural"
     )
     assert (
         voice_for_shot(
@@ -244,15 +255,15 @@ def test_locked_voice_roles_ignore_per_shot_override() -> None:
             cast_voices=cast,
             vo_mode="hybrid",
         )
-        == "ja-JP-KeitaNeural"
+        == "zh-CN-YunxiNeural"
     )
 
 
-def test_lead_dialogue_locks_require_japanese_script_and_language() -> None:
+def test_lead_dialogue_locks_require_chinese_script_and_language() -> None:
     with pytest.raises(RenderError, match="not per-shot vo_voice"):
         validate_voice_language_locks(
             [{"id": "n02", "speaker": "narrator", "nar": "中文", "vo_voice": "other"}],
-            dialogue_spoken_lang="ja",
+            dialogue_spoken_lang="zh",
         )
     with pytest.raises(RenderError, match="not per-shot tts_backend"):
         validate_voice_language_locks(
@@ -260,11 +271,12 @@ def test_lead_dialogue_locks_require_japanese_script_and_language() -> None:
                 {
                     "id": "m02",
                     "speaker": "male_hero",
-                    "dialogue_ja": "行く",
+                    "dialogue": "别走。",
+                    "caption_text": "别走。",
                     "tts_backend": "edge",
                 }
             ],
-            dialogue_spoken_lang="ja",
+            dialogue_spoken_lang="zh",
         )
     validate_voice_language_locks(
         [{"id": "f01", "speaker": "heroine", "dialogue": "别走。", "caption_text": "别走。"}],
@@ -275,10 +287,10 @@ def test_lead_dialogue_locks_require_japanese_script_and_language() -> None:
             [{"id": "f01b", "speaker": "heroine", "dialogue_ja": "行かないで"}],
             dialogue_spoken_lang="zh",
         )
-    with pytest.raises(RenderError, match="needs nar_ja/dialogue_ja/spoken_ja"):
+    with pytest.raises(RenderError, match="needs Chinese spoken"):
         validate_voice_language_locks(
-            [{"id": "m01", "speaker": "male_hero", "nar": "中文"}],
-            dialogue_spoken_lang="ja",
+            [{"id": "m01", "speaker": "male_hero", "nar": "ok"}],
+            dialogue_spoken_lang="zh",
         )
     with pytest.raises(RenderError, match="not per-shot vo_voice"):
         validate_voice_language_locks(
@@ -286,24 +298,25 @@ def test_lead_dialogue_locks_require_japanese_script_and_language() -> None:
                 {
                     "id": "f02",
                     "speaker": "heroine",
-                    "dialogue_ja": "行く",
-                    "vo_voice": "ja-JP-OtherNeural",
+                    "dialogue": "别走。",
+                    "caption_text": "别走。",
+                    "vo_voice": "zh-CN-OtherNeural",
                 }
             ],
-            dialogue_spoken_lang="ja",
+            dialogue_spoken_lang="zh",
         )
-    with pytest.raises(RenderError, match="must contain Japanese kana"):
+    with pytest.raises(RenderError, match="retired"):
         validate_voice_language_locks(
-            [{"id": "f04", "speaker": "heroine", "dialogue_ja": "中文"}],
+            [{"id": "f04", "speaker": "heroine", "dialogue": "别走。"}],
             dialogue_spoken_lang="ja",
         )
     validate_voice_language_locks(
         [
             {"id": "n01", "speaker": "narrator", "nar": "中文"},
-            {"id": "f03", "speaker": "heroine", "dialogue_ja": "行く"},
-            {"id": "m03", "speaker": "male_hero", "dialogue_ja": "待って"},
+            {"id": "f03", "speaker": "heroine", "dialogue": "别走。", "caption_text": "别走。"},
+            {"id": "m03", "speaker": "male_hero", "dialogue": "等等。", "caption_text": "等等。"},
         ],
-        dialogue_spoken_lang="ja",
+        dialogue_spoken_lang="zh",
     )
 
 

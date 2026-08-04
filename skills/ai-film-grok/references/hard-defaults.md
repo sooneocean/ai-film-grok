@@ -90,8 +90,8 @@
 | 规则 | 默认 |
 |---|---|
 | TTS | 中文成片 **edge**；storyteller `auto`→edge |
-| **人物对白 / 口白语言** | **P0**（**08-03 中文主链**）：默认 **角色开口=中文**（`dialogue_spoken_lang=zh`，女 `zh-CN-XiaoyiNeural` / 男 `zh-CN-YunxiNeural`）；**字幕中文** `caption_text`。正式 master=HF owner（plate `subs=off`）；**ship/门红=硬烧优先**（见上行「字幕 ship 硬烧」）。日文仅显式 `ja`。无对白=纯画面。见 [dialogue-first-workflow](dialogue-first-workflow.md) · [voices.md](voices.md) |
-| **cast_voices 与 spoken_lang 同锁（P0 · 2026-08-03 荒岛案）** | `dialogue_spoken_lang=zh` 时 **禁止** `cast_voices` 仍挂 `ja-JP-*` / 英声；ledger 须有 `spoken_text`/`spoken_text_zh`。TTS 前打印 `speaker\|voice\|spoken_lang`。见 [huangdao-rhythm-still-voice-silk](lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) |
+| **人物对白 / 口白语言** | **P0**（**08-04 中文唯一**）：**角色开口=中文 only**（`dialogue_spoken_lang=zh` 硬锁；女 `zh-CN-XiaoyiNeural` / 男 `zh-CN-YunxiNeural`）；**字幕中文** `caption_text`。**日文路径已退役**（禁 `ja` / `dialogue_ja` / `ja-JP-*` 生产）。正式 master=HF owner（plate `subs=off`）；**ship/门红=硬烧优先**。无对白=纯画面。见 [dialogue-first-workflow](dialogue-first-workflow.md) · [voices.md](voices.md) |
+| **cast_voices 与 spoken_lang 同锁（P0 · 2026-08-04）** | 仅 `zh`；**禁止** `cast_voices` 挂 `ja-JP-*` / 英声（运行时自动改回中文池）；ledger 须有中文 `spoken_text`。TTS 前打印 `speaker\|voice\|spoken_lang=zh`。见 [huangdao-rhythm-still-voice-silk](lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) |
 | **final / SRT** | **P0**（2026-07-24；07-29 长片 v1）：`sub_lead=0` 或写盘前非重叠钳制；`aifilm final` 默认按时长/镜数/lipsync 动态 timeout，长片不再固定 1200s；plate 后中文硬烧。见 [ep2-voice-heat-final](lessons-2026-07-24-ep2-voice-heat-final.md) · [longform](longform-workflow.md) |
 | Voicebox | **质量升级 + opt-in 本地兜底**（非默认替换 edge）；固定 `VOICEBOX_PROFILE`；`AIFILM_TTS_VOICEBOX_FALLBACK=1` 才 edge 失败再试 |
 | 机位 | 开场 **`aifilm dispatch`**（craft+capability+next）；或 `capability`；`--suggest-i2v` / `--apply` 改 I2V 须显式 |
@@ -99,7 +99,7 @@
 | 语速 | `vo_rate +0%`（色气 +5%~+8%；禁 -3% 拖腔） |
 | VO 增益 | ~1.32；BGM 侧链；优先 `audio/mixed.wav` |
 | BGM | 色气 **rnb**（禁 dark 除非 horror）；**硬兜底=程序 v3 multi-style**；**听感兜底=纯乐器曲库池**；`--music-seed` / `audio_policy.music_seed`；`audio_recipe` 调床厚薄；auto_sfx；见 [bgm-generation.md](bgm-generation.md) |
-| VO 预算 | `nar` ≤55 字（快节奏 ≤28）；`est_vo_sec ≤ duration_sec+0.5`；日文对白按 `nar_ja` 估长 |
+| VO 预算 | `nar` / 中文对白 ≤55 字（快节奏 ≤28）；`est_vo_sec ≤ duration_sec+0.5` |
 | loop | hook/action 永不 stream_loop |
 | 一角一声 | 固定 `vo_voice` / `cast_voices`；显式 TTS 失败不静默跨商降级 |
 | **声线主导** | **对白主链·中文**：角色中文 `spoken_text` + 中文 `caption_text`（正式 HF / ship 硬烧）+ BGM duck；无对白=静镜。第三人称 `nar` **仅 gap**。`vocal_color` 默认关；见 [voice-tracks.md](voice-tracks.md) |

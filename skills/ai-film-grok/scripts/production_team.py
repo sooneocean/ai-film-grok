@@ -256,9 +256,9 @@ def snapshot_capabilities(
     edge_ready = bool((tts.get("backends") or {}).get("edge"))
     capabilities.append(
         _capability(
-            capability_id="edge-ja",
+            capability_id="edge",
             provider="edge",
-            model="ja-JP-NanamiNeural",
+            model="zh-CN-XiaoyiNeural",
             domains=["voice"],
             status="ready" if edge_ready else "blocked",
             pilot_verified=edge_ready,

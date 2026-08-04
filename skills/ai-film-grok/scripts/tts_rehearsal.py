@@ -89,12 +89,14 @@ def _voice_script_for_shot(shot: dict[str, Any], *, fallback_voice: str) -> dict
         text = str(cue.get("spoken_text") or "").strip()
         if not text:
             continue
-        language = str(cue.get("language") or "").strip().lower()
-        default_voice = "ja-JP-NanamiNeural" if language == "ja" else fallback_voice
+        language = str(cue.get("language") or "zh").strip().lower()
+        if language in {"ja", "jp", "japanese"}:
+            language = "zh"  # Japanese retired; Chinese-only product path
+        default_voice = fallback_voice or "zh-CN-XiaoxiaoNeural"
         return {
             "text": text,
             "text_kind": str(cue.get("line_type") or "voice").strip().lower(),
-            "language": language,
+            "language": language if language else "zh",
             "voice": str(cue.get("voice") or default_voice).strip() or default_voice,
         }
     voice_channel = resolve_content_channels(shot)["voice"]

@@ -87,15 +87,23 @@ def test_timeline_allows_bracketed_dialogue_that_mentions_sound_or_subtitles():
 @pytest.mark.parametrize(
     ("event", "expected"),
     [
-        # Product default 2026-08-03: Chinese dialogue primary (ja only when authored).
+        # Chinese-only product (2026-08-04): all vocal types resolve to zh.
         ({"type": "dialogue", "speaker": "hero"}, "zh"),
         ({"type": "inner_voice", "speaker": "hero"}, "zh"),
         ({"type": "media_voice", "speaker": "hero"}, "zh"),
-        ({"type": "dialogue", "speaker": "hero", "language": "ja"}, "ja"),
-        ({"type": "inner_voice", "speaker": "hero", "spoken_lang": "ja"}, "ja"),
+        ({"type": "dialogue", "speaker": "hero", "language": "zh"}, "zh"),
+        ({"type": "inner_voice", "speaker": "hero", "spoken_lang": "zh"}, "zh"),
         ({"type": "narration", "speaker": "narrator"}, "zh"),
         ({"type": "media_voice", "speaker": "broadcast"}, "zh"),
     ],
 )
 def test_event_language_keeps_character_voice_language_across_carriers(event, expected):
     assert event_language(event) == expected
+
+
+def test_event_language_rejects_japanese():
+    import pytest
+    from voice_cast_profiles import VoiceCastError
+
+    with pytest.raises(VoiceCastError, match="retired"):
+        event_language({"type": "dialogue", "speaker": "hero", "language": "ja"})

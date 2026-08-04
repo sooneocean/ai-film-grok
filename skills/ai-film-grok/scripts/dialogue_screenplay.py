@@ -143,20 +143,19 @@ def _source_refs(normalized: dict[str, Any], reception: dict[str, Any] | None) -
 
 def _explicit_turn(block: dict[str, Any], index: int, refs: list[str]) -> dict[str, Any]:
     raw = _text(block.get("text") or block.get("dialogue") or block.get("dialogue_zh"))
-    language = _text(block.get("language")).lower()
-    dialogue_ja = _text(block.get("dialogue_ja"))
-    if not dialogue_ja and (language.startswith("ja") or _has_kana(raw)):
-        dialogue_ja = raw
+    # Japanese retired 2026-08-04: ignore dialogue_ja / kana as production speech.
     subtitle_zh = _text(block.get("subtitle_zh") or block.get("caption_text"))
-    dialogue_zh = _text(block.get("dialogue_zh"))
-    if not dialogue_zh and not dialogue_ja:
-        dialogue_zh = raw
+    dialogue_zh = _text(block.get("dialogue_zh")) or raw
     subtitle_zh = subtitle_zh or dialogue_zh
     excerpt = _text(block.get("source_excerpt")) or raw or subtitle_zh
     block_refs = _strings(block.get("source_refs")) or refs
     provenance = _text(block.get("provenance")) or "source_supported"
     if provenance not in PROVENANCE:
         provenance = "creative_suggestion"
+    zh_ready = bool(
+        (dialogue_zh or subtitle_zh)
+        and re.search(r"[\u4e00-\u9fff]", dialogue_zh or subtitle_zh or "")
+    )
     return {
         "line_id": _text(block.get("id") or block.get("line_id")) or f"line_{index:03d}",
         "speaker": _text(block.get("speaker")) or "pending_cast",
@@ -164,14 +163,9 @@ def _explicit_turn(block: dict[str, Any], index: int, refs: list[str]) -> dict[s
         "dialogue_zh": dialogue_zh or subtitle_zh,
         "subtitle_zh": subtitle_zh,
         "spoken_zh": dialogue_zh or subtitle_zh,
-        "dialogue_ja": dialogue_ja,
+        "dialogue_ja": "",  # retired field; kept empty for schema compat
         "translation_status": _text(block.get("translation_status"))
-        or (
-            "ready"
-            if (dialogue_zh or subtitle_zh)
-            and re.search(r"[\u4e00-\u9fff]", dialogue_zh or subtitle_zh or "")
-            else ("ready" if dialogue_ja and subtitle_zh else "pending")
-        ),
+        or ("ready" if zh_ready else "pending"),
         "emotion": _text(block.get("emotion")) or "待确认",
         "subtext": _text(block.get("subtext")) or "待确认",
         "actions": {
@@ -422,7 +416,7 @@ def build_dialogue_screenplay(
         "authoring_questions": [
             "确认场景目标、冲突、情绪转折与时空",
             "确认说话人、受话人、表演动作与状态变化",
-            "审核中文对白并完成日文口语翻译",
+            "审核中文对白与字幕（日文路径已退役）",
         ]
         if mode == "dialogue_drama"
         else [],
@@ -656,7 +650,6 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
                 "addressee",
                 "dialogue_zh",
                 "subtitle_zh",
-                "dialogue_ja",
                 "emotion",
                 "subtext",
                 "actions",
@@ -672,7 +665,7 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
                     issues.append(_issue("DIALOGUE_FIELD_REQUIRED", f"{key} is required", turn_ref))
             dialogue_texts.update(
                 re.sub(r"\s+", "", _text(turn.get(key)))
-                for key in ("dialogue_zh", "subtitle_zh", "dialogue_ja")
+                for key in ("dialogue_zh", "subtitle_zh", "spoken_zh")
                 if _text(turn.get(key))
             )
             try:
@@ -685,13 +678,19 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
                     issues.append(
                         _issue("DIALOGUE_PARTICIPANT_REQUIRED", "participants unresolved", turn_ref)
                     )
+                zh_line = _text(turn.get("dialogue_zh") or turn.get("spoken_zh"))
                 if (
                     _text(turn.get("translation_status")) != "ready"
-                    or not _text(turn.get("dialogue_ja"))
+                    or not zh_line
+                    or not re.search(r"[\u4e00-\u9fff]", zh_line)
                     or not _text(turn.get("subtitle_zh"))
                 ):
                     issues.append(
-                        _issue("DIALOGUE_TRANSLATION_PENDING", "translation not ready", turn_ref)
+                        _issue(
+                            "DIALOGUE_TRANSLATION_PENDING",
+                            "Chinese dialogue/subtitle not ready",
+                            turn_ref,
+                        )
                     )
                 if _text(turn.get("review_status")) not in APPROVED:
                     issues.append(_issue("DIALOGUE_REVIEW_REQUIRED", "turn not reviewed", turn_ref))
@@ -716,23 +715,28 @@ def validate_dialogue_screenplay(screenplay: object, strict: bool = False) -> di
                             turn_ref,
                         )
                     )
-            # P0 rule: storyteller must be Chinese only (no nar_ja/dialogue_ja); character dialogue requires Japanese (dialogue_ja)
-            speaker = _text(turn.get("speaker")).lower()
-            if speaker in {"storyteller", "narrator", "说书人", "旁白"}:
-                if _text(turn.get("dialogue_ja")):
-                    issues.append(
-                        _issue(
-                            "STORYTELLER_JA_FORBIDDEN",
-                            "storyteller/narrator must remain Chinese only and cannot specify Japanese dialogue",
-                            turn_ref,
-                        )
+            # P0 · 2026-08-04: Chinese-only — reject any residual Japanese dialogue_ja on any speaker
+            if _text(turn.get("dialogue_ja")):
+                issues.append(
+                    _issue(
+                        "DIALOGUE_JA_RETIRED",
+                        "Japanese dialogue_ja is retired; use dialogue_zh / spoken_zh only",
+                        turn_ref,
                     )
-            elif strict and mode == "dialogue_drama" and not _pending(turn.get("speaker")):
-                if not _text(turn.get("dialogue_ja")):
+                )
+            speaker = _text(turn.get("speaker")).lower()
+            if (
+                strict
+                and mode == "dialogue_drama"
+                and speaker not in {"storyteller", "narrator", "说书人", "旁白"}
+                and not _pending(turn.get("speaker"))
+            ):
+                zh_line = _text(turn.get("dialogue_zh") or turn.get("spoken_zh"))
+                if not zh_line or not re.search(r"[\u4e00-\u9fff]", zh_line):
                     issues.append(
                         _issue(
-                            "CHARACTER_DIALOGUE_JA_REQUIRED",
-                            f"Character speaker '{turn.get('speaker')}' requires Japanese spoken dialogue (dialogue_ja)",
+                            "CHARACTER_DIALOGUE_ZH_REQUIRED",
+                            f"Character speaker '{turn.get('speaker')}' requires Chinese dialogue_zh",
                             turn_ref,
                         )
                     )

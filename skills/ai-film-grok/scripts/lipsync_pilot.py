@@ -63,7 +63,7 @@ def create_pilot(
     destination = _receipt(base)
     if destination.exists():
         raise LipsyncPilotError(f"pilot receipt already exists: {destination}")
-    audio = _regular_file(japanese_audio, "Japanese dialogue audio")
+    audio = _regular_file(japanese_audio, "Chinese dialogue audio")
     videos = {
         "front_closeup": _regular_file(front_video, "front close-up video"),
         "three_quarter_closeup": _regular_file(three_quarter_video, "three-quarter close-up video"),
@@ -77,11 +77,11 @@ def create_pilot(
     approved_videos = approval.get("videos") if isinstance(approval.get("videos"), dict) else {}
     approved_audio = approval.get("audio") if isinstance(approval.get("audio"), dict) else {}
     if (
-        approved_audio.get("language") != "ja"
+        str(approved_audio.get("language") or "").lower() not in {"zh", "cn", "chinese", "zh-cn"}
         or approved_audio.get("role") != "final_character_dialogue"
     ):
         raise LipsyncPilotError(
-            "approved-input receipt must bind Japanese final character dialogue"
+            "approved-input receipt must bind Chinese final character dialogue"
         )
     if approved_audio.get("sha256") != sha256(audio):
         raise LipsyncPilotError("approved-input receipt audio checksum does not match")

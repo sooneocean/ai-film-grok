@@ -25,8 +25,8 @@ def _timeline():
                             "kind": "voice",
                             "line_type": "dialogue",
                             "speaker": "hero",
-                            "spoken_text": "行こう",
-                            "language": "ja",
+                            "spoken_text": "走吧",
+                            "language": "zh",
                             "start_offset_sec": 0,
                             "duration_sec": 1,
                         },
@@ -47,7 +47,7 @@ def _timeline():
 
 
 def _cast():
-    return {"profiles": assign_profiles([{"speaker_id": "hero", "language": "ja"}])}
+    return {"profiles": assign_profiles([{"speaker_id": "hero", "language": "zh"}])}
 
 
 def test_manifest_contains_one_provenanced_job_per_vocal_event():
@@ -55,7 +55,7 @@ def test_manifest_contains_one_provenanced_job_per_vocal_event():
 
     assert len(manifest["jobs"]) == 1
     job = manifest["jobs"][0]
-    assert job["language"] == "ja"
+    assert job["language"] == "zh"
     assert job["asset_path"].endswith(".wav")
     assert len(job["request_sha256"]) == 64
 

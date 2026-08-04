@@ -582,7 +582,7 @@ def build_dispatch(
                 pre(
                     "tts-rehearse",
                     f'aifilm tts-rehearse --root "{r}" --backend edge',
-                    "Professional 10/11：先锁定中文旁白/日文角色的实测声音时间",
+                    "Professional 10/11：先锁定中文对白/旁白的实测声音时间",
                     "voice",
                 )
             else:
@@ -1041,7 +1041,7 @@ def build_dispatch(
             "tools": "web_search · x_* · shell/aifilm · optional MCP collections",
             "image": "image_gen · image_edit(cast); batch: grok-oauth image|image-edit",
             "video": "SECOND: image_to_video after FRW LTX; batch OAuth: grok-oauth video --image kf --wait",
-            "voice": "session chat ≠ VO; default Edge（旁白中文、角色日文）；其他后端须显式选择并留回执",
+            "voice": "session chat ≠ VO; default Edge 中文对白/旁白；其他后端须显式选择并留回执",
             "memory": "film-root + receipts (project RAG default)",
             "sdk_optional": "OAuth first; XAI_API_KEY only if no auth.json",
             "matrix": "references/grok-build-sdk.md · references/grok-oauth.md",

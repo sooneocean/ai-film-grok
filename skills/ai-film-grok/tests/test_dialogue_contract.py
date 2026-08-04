@@ -267,7 +267,7 @@ class TestWriteSpecDialogueContractGate:
         bad["screen_mode"] = "on_camera"
         spec = _dc_spec([talking, cover_b0, bad])
         spec["vo_mode"] = "dialogue_drama"
-        spec["dialogue_spoken_lang"] = "ja"
+        spec["dialogue_spoken_lang"] = "zh"
         spec["narration_spoken_lang"] = "zh"
         with pytest.raises(FilmSpecError, match="audio_cues"):
             validate_film_spec(spec, assign_missing_ids=False)
@@ -326,7 +326,7 @@ class TestWriteSpecDialogueContractGate:
             ]
         )
         spec["vo_mode"] = "dialogue_drama"
-        spec["dialogue_spoken_lang"] = "ja"
+        spec["dialogue_spoken_lang"] = "zh"
         spec["narration_spoken_lang"] = "zh"
         spec["scenes"][0]["shots"][0].update(
             {

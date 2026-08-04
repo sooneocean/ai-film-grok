@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Shared timeline guards used before persistence and before final rendering."""
+"""Shared timeline guards used before persistence and before final rendering.
+
+Chinese-only product path (2026-08-04): Japanese dialogue fields are ignored.
+"""
 
 from __future__ import annotations
 
@@ -24,37 +27,42 @@ def _is_character_speech(shot: dict[str, Any]) -> bool:
     if speaker:
         return True
     return any(
-        isinstance(shot.get(key), str) and shot[key].strip()
-        for key in ("dialogue", "dialogue_ja", "nar_ja", "spoken_ja")
+        isinstance(shot.get(key), str)
+        and shot[key].strip()
+        and re.search(r"[\u4e00-\u9fff]", shot[key])
+        for key in ("dialogue", "dialogue_zh", "spoken_zh", "caption_text")
     )
 
 
 def spoken_text_for_shot(
     shot: dict[str, Any],
     *,
-    dialogue_spoken_lang: str = "ja",
+    dialogue_spoken_lang: str = "zh",
     narration_spoken_lang: str = "zh",
     vo_mode: str = "storyteller",
 ) -> str:
-    """Resolve exactly the text that the TTS stage will receive."""
+    """Resolve exactly the text that the TTS stage will receive (Chinese-only)."""
+    del dialogue_spoken_lang, narration_spoken_lang, vo_mode  # policy fixed to zh
     character = _is_character_speech(shot)
-    if character and dialogue_spoken_lang.strip().lower() in {"ja", "jp", "japanese"}:
-        for key in ("nar_ja", "dialogue_ja", "spoken_ja", "dialogue"):
+    if character:
+        for key in (
+            "spoken_zh",
+            "dialogue_zh",
+            "dialogue",
+            "caption_text",
+            "nar",
+            "spoken_text",
+        ):
             value = shot.get(key)
-            if isinstance(value, str) and value.strip():
-                text = value.strip()
-                if key != "dialogue" or any("\u3040" <= char <= "\u30ff" for char in text):
-                    return text
-        for key in ("dialogue", "nar", "narration"):
-            value = shot.get(key)
-            if isinstance(value, str) and value.strip():
+            if isinstance(value, str) and value.strip() and re.search(r"[\u4e00-\u9fff]", value):
                 return value.strip()
-    if narration_spoken_lang.strip().lower() in {"ja", "jp", "japanese"} and not character:
-        for key in ("nar_ja", "nar", "narration"):
-            value = shot.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-    for key in ("nar", "narration", "nar_zh", "dialogue", "vo", "caption"):
+        for cue in shot.get("audio_cues") or []:
+            if not isinstance(cue, dict) or cue.get("kind") != "voice":
+                continue
+            text = str(cue.get("spoken_text") or "").strip()
+            if text and re.search(r"[\u4e00-\u9fff]", text):
+                return text
+    for key in ("nar", "narration", "nar_zh", "dialogue", "vo", "caption", "caption_text"):
         value = shot.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
@@ -62,11 +70,7 @@ def spoken_text_for_shot(
 
 
 def _is_non_vo_coverage_shot(shot: dict[str, Any]) -> bool:
-    """Reaction / action_cover / silence inserts may legitimately carry no TTS line.
-
-    dialogue_drama auto-inserts these after a speaking beat (see story_plan).
-    They must not force empty-VO failures or invent filler narration.
-    """
+    """Reaction / action_cover / silence inserts may legitimately carry no TTS line."""
     screen_mode = str(shot.get("screen_mode") or shot.get("coverage_role") or "").strip().lower()
     if screen_mode not in {"reaction", "action_cover", "silence"}:
         return False
@@ -81,15 +85,14 @@ def _is_non_vo_coverage_shot(shot: dict[str, Any]) -> bool:
             "nar",
             "narration",
             "nar_zh",
-            "nar_ja",
             "dialogue",
-            "dialogue_ja",
-            "spoken_ja",
+            "dialogue_zh",
+            "spoken_zh",
             "vo",
             "caption",
+            "caption_text",
         )
     )
-    # Continuing off-camera dialogue on coverage still needs authored spoken text.
     return not has_voice and not has_authored_speech
 
 
@@ -97,7 +100,7 @@ def validate_linear_narration(
     shots: list[dict[str, Any]],
     *,
     vo_mode: str,
-    dialogue_spoken_lang: str = "ja",
+    dialogue_spoken_lang: str = "zh",
     narration_spoken_lang: str = "zh",
 ) -> None:
     """Each real TTS line must advance the story rather than replay it."""

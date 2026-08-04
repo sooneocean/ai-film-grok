@@ -45,7 +45,7 @@ def _approval(tmp_path: Path, inputs: dict[str, Path]) -> Path:
                 },
                 "audio": {
                     "role": "final_character_dialogue",
-                    "language": "ja",
+                    "language": "zh",
                     "sha256": sha256(inputs["audio"].read_bytes()).hexdigest(),
                 },
             }

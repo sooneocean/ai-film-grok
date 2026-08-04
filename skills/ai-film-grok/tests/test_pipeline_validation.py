@@ -179,6 +179,7 @@ class PipelineValidationTests(unittest.TestCase):
                 [
                     {
                         "id": "shot02",
+                        "beat_id": "beat02",
                         "title": "转身",
                         "dramatic_function": "action",
                         "speaker": "heroine",
@@ -189,7 +190,8 @@ class PipelineValidationTests(unittest.TestCase):
                             "playable_action": "转身",
                             "reaction_trigger": "听见脚步",
                         },
-                        "dialogue_ja": "行く",
+                        "dialogue": "走吧。",
+                        "caption_text": "走吧。",
                         "emotion": "靠近",
                         "arc_node": "靠近",
                         "subtext": "她用离开结束对话",
@@ -207,32 +209,48 @@ class PipelineValidationTests(unittest.TestCase):
                     },
                     {
                         "id": "shot03",
+                        "beat_id": "beat03",
                         "title": "回应",
                         "dramatic_function": "reaction",
                         "speaker": "heroine",
                         "nar": "她停在门边。",
-                        "dialogue_ja": "行く",
+                        "dialogue": "走吧。",
+                        "caption_text": "走吧。",
                         "emotion": "余韵",
                         "arc_node": "余韵",
                         "subtext": "门边停步是给对方最后机会",
                         "narrative_purpose": "余韵停顿",
                         "performance_delta": "她从行走停在门边",
+                        "performance": {
+                            "subtext": "犹豫",
+                            "playable_action": "停步回望",
+                            "reaction_trigger": "脚步停住",
+                        },
                         "dsl": {
                             "subject": "an adult woman",
                             "action": "stops at the door, looks back, and holds",
                             "motion": "she stops, glances back over her shoulder, flinches then holds",
                             "visible_change": "她从行走停在门边并回望",
                             "story_beat": "linger reaction",
+                            "camera_axis": "hold",
+                            "lighting": "cold streetlamp",
                             "camera": {"shot_size": "medium", "lens_mm": "50"},
                         },
                     },
                 ]
             )
+            # hard cuts avoid frame-chain pose requirements so TTS-repeat gate is visible
+            spec["transition_intents"] = ["hard", "hard"]
             rc, result = self.write_spec(root, spec)
-            self.assertEqual(rc, 2)
+            self.assertEqual(rc, 2, result)
             self.assertIn("repeats narration", result["error"])
 
             shots.pop()
+            # after pop only shot01+shot02 remain — make shot02 unique spoken line
+            shots[-1]["dialogue"] = "别回头。"
+            shots[-1]["caption_text"] = "别回头。"
+            shots[-1]["nar"] = "她低声说别回头。"
+            spec["transition_intents"] = ["hard"]  # n_shots-1 = 1
             spec["sound_plan"] = {
                 "mood": "rnb",
                 "events": [{"type": "sfx_accent", "kind": "chime", "shot_id": "missing"}],
@@ -242,7 +260,6 @@ class PipelineValidationTests(unittest.TestCase):
             self.assertIn("unknown shot_id", result["error"])
 
             spec["sound_plan"]["events"][0]["shot_id"] = "shot02"  # type: ignore[index]
-            spec["transition_intents"] = ["hard"]
             rc, result = self.write_spec(root, spec)
             self.assertEqual(rc, 0, result)
 

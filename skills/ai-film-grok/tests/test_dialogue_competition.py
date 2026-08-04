@@ -25,7 +25,8 @@ def _shot() -> dict[str, object]:
         "id": "shot-dialogue-01",
         "shot_type": "speaking",
         "speaker": "heroine",
-        "dialogue_ja": "ここにいる。",
+        "dialogue": "我就在这里。",
+        "caption_text": "我就在这里。",
         "performance_intent": "quiet resolve, direct eyeline",
         "performance_state": {
             "status": "approved",
@@ -33,7 +34,7 @@ def _shot() -> dict[str, object]:
         },
         "tts": {
             "status": "final",
-            "language": "ja",
+            "language": "zh",
             "audio_sha256": AUDIO_HASH,
         },
     }
@@ -62,7 +63,7 @@ def _capability(
 def _capabilities(*, infinite_promotion: str = "pilot") -> list[dict[str, object]]:
     return [
         _capability("qwen-image-i2i", lane="state_i2i"),
-        _capability("edge-ja", lane="tts"),
+        _capability("edge", lane="tts"),
         _capability("grok-imagine-video", lane="grok_imagine_video"),
         _capability("latentsync-1.6", lane="grok_lipsync"),
         _capability(
@@ -85,7 +86,7 @@ def test_current_preferred_tts_capability_cannot_be_overwritten_by_unverified_ba
     )
 
     assert plan["ok"] is True
-    assert plan["capability_bindings"]["tts"]["id"] == "edge-ja"
+    assert plan["capability_bindings"]["tts"]["id"] == "edge"
 
 
 def _candidate(

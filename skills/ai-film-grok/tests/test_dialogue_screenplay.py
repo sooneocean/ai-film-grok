@@ -63,15 +63,11 @@ def _approved_screenplay():
             "review_status": "approved",
         }
     )
-    for turn, japanese in zip(
-        scene["dialogue_turns"],
-        ("どうしてまだ降りないの？", "写真の裏に君の名前があるから。"),
-        strict=True,
-    ):
+    for turn in scene["dialogue_turns"]:
         turn.update(
             {
                 "addressee": "对方",
-                "dialogue_ja": japanese,
+                "dialogue_ja": "",
                 "translation_status": "ready",
                 "review_status": "approved",
                 "duration_sec": 2.0,
@@ -122,9 +118,9 @@ def test_explicit_dialogue_round_trips_speaker_and_source_text():
                     "id": "line_b",
                     "speaker": "莲",
                     "addressee": "阿澄",
-                    "text": "行かなければならない。",
+                    "text": "我必须走。",
                     "subtitle_zh": "我必须走。",
-                    "language": "ja",
+                    "language": "zh",
                 },
             ],
         )
@@ -135,7 +131,8 @@ def test_explicit_dialogue_round_trips_speaker_and_source_text():
     assert [turn["speaker"] for turn in turns] == ["阿澄", "莲"]
     assert turns[0]["dialogue_zh"] == "别走。"
     assert turns[0]["translation_status"] == "ready"
-    assert turns[1]["dialogue_ja"] == "行かなければならない。"
+    assert turns[1]["dialogue_ja"] == ""
+    assert turns[1]["dialogue_zh"] == "我必须走。"
     assert turns[1]["subtitle_zh"] == "我必须走。"
     assert turns[1]["translation_status"] == "ready"
     assert turns[1]["provenance"] == "source_supported"
@@ -279,41 +276,19 @@ def test_builder_output_conforms_to_dialogue_screenplay_schema():
     jsonschema.Draft202012Validator(schema).validate(build_dialogue_screenplay(_normalized()))
 
 
-def test_storyteller_ja_forbidden_and_character_ja_required():
+def test_dialogue_ja_retired_and_chinese_required():
     screenplay = _approved_screenplay()
-    # Add storyteller turn with dialogue_ja -> should fail with STORYTELLER_JA_FORBIDDEN
-    screenplay["scenes"][0]["dialogue_turns"].append({
-        "line_id": "dlg_03",
-        "speaker": "storyteller",
-        "addressee": "audience",
-        "dialogue_zh": "夜色渐深。",
-        "subtitle_zh": "夜色渐深。",
-        "dialogue_ja": "夜が深まる。",
-        "translation_status": "ready",
-        "emotion": "平静",
-        "subtext": "环境描述",
-        "actions": {"before": "", "during": "", "after": ""},
-        "screen_mode": "off_camera",
-        "lipsync_required": False,
-        "scene_state_id": "state_dlg_03",
-        "gaze": "camera",
-        "props": [],
-        "state_delta": "atmosphere set",
-        "duration_sec": 2.0,
-        "provenance": "source_supported",
-        "source_evidence": {
-            "source_refs": ["source:story.txt"],
-            "source_excerpt": "夜色渐深",
-            "provenance": "source_supported",
-        },
-        "review_status": "approved",
-    })
-    # Remove dialogue_ja from character turn -> should fail with CHARACTER_DIALOGUE_JA_REQUIRED in strict mode
-    screenplay["scenes"][0]["dialogue_turns"][0]["dialogue_ja"] = ""
-
+    # Residual Japanese field must fail closed
+    screenplay["scenes"][0]["dialogue_turns"][0]["dialogue_ja"] = "まだ。"
     report = validate_dialogue_screenplay(screenplay, strict=True)
     codes = {issue["code"] for issue in report["issues"]}
+    assert "DIALOGUE_JA_RETIRED" in codes
 
-    assert "STORYTELLER_JA_FORBIDDEN" in codes
-    assert "CHARACTER_DIALOGUE_JA_REQUIRED" in codes
+    screenplay = _approved_screenplay()
+    screenplay["scenes"][0]["dialogue_turns"][0]["dialogue_zh"] = "hello"
+    screenplay["scenes"][0]["dialogue_turns"][0]["spoken_zh"] = "hello"
+    screenplay["scenes"][0]["dialogue_turns"][0]["subtitle_zh"] = "hello"
+    report = validate_dialogue_screenplay(screenplay, strict=True)
+    codes = {issue["code"] for issue in report["issues"]}
+    assert "CHARACTER_DIALOGUE_ZH_REQUIRED" in codes or "DIALOGUE_TRANSLATION_PENDING" in codes
 

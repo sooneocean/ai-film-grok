@@ -259,7 +259,7 @@ def test_snapshot_projects_dialogue_motion_operations_for_router(
     assert capabilities["rtx5090-infinite-talk-stable-pilot"]["operations"] == [
         "face_animation_to_audio"
     ]
-    assert capabilities["edge-ja"]["operations"] == ["text_to_speech"]
+    assert capabilities["edge"]["operations"] == ["text_to_speech"]
     assert capabilities["rtx5090-lipsync-latentsync"]["operations"] == ["video_lip_sync"]
     assert capabilities["grok-video-1-5"]["pilot_verified"] is False
 
@@ -286,7 +286,7 @@ def test_snapshot_projects_dialogue_motion_operations_for_router(
                                 },
                                 "tts": {
                                     "status": "final",
-                                    "language": "ja",
+                                    "language": "zh",
                                     "audio_sha256": "b" * 64,
                                 },
                             }

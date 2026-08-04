@@ -27,27 +27,30 @@ class VoiceLangAndSrtClampTests(unittest.TestCase):
         self.assertFalse(is_character_speech_shot(shot))
         spoken = spoken_text_for_shot(
             shot,
-            dialogue_spoken_lang="ja",
+            dialogue_spoken_lang="zh",
             narration_spoken_lang="zh",
             vo_mode="hybrid",
         )
         self.assertIn("实验室", spoken)
         self.assertNotIn("だめ", spoken)
 
-    def test_heroine_uses_nar_ja(self) -> None:
+    def test_heroine_uses_chinese_dialogue_not_legacy_ja(self) -> None:
         shot = {
             "speaker": "heroine",
             "nar": "她咬唇抑制，身体已经失控。",
-            "nar_ja": "だめ…もう抑えられない…",
+            "dialogue": "别…我已经控制不住了。",
+            "caption_text": "别…我已经控制不住了。",
+            "nar_ja": "だめ…もう抑えられない…",  # retired field — ignored
         }
         self.assertTrue(is_character_speech_shot(shot))
         spoken = spoken_text_for_shot(
             shot,
-            dialogue_spoken_lang="ja",
+            dialogue_spoken_lang="zh",
             narration_spoken_lang="zh",
             vo_mode="hybrid",
         )
-        self.assertIn("だめ", spoken)
+        self.assertIn("控制不住", spoken)
+        self.assertNotIn("だめ", spoken)
 
     def test_subtitle_cues_clamp_overlap(self) -> None:
         # Two dense units with positive sub_lead would previously overlap

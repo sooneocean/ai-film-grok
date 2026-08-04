@@ -39,7 +39,7 @@ def _files(root: Path) -> tuple[dict[str, Path], Path, Path]:
         path = root / f"{fixture_id}.mp4"
         path.write_bytes(fixture_id.encode())
         fixtures[fixture_id] = path
-    audio = root / "dialogue-ja.wav"
+    audio = root / "dialogue-zh.wav"
     audio.write_bytes(b"audio")
     approval = root / "approval.json"
     approval.write_text(
@@ -48,7 +48,7 @@ def _files(root: Path) -> tuple[dict[str, Path], Path, Path]:
                 "approved": True,
                 "audio": {
                     "sha256": HASHES["audio"],
-                    "language": "ja",
+                    "language": "zh",
                     "role": "final_character_dialogue",
                 },
                 "fixtures": {

@@ -343,19 +343,15 @@ def test_style_rules_and_caption_bindings_are_event_bound():
 
 def test_stable_voice_profiles_respect_locks_and_language():
     first = assign_profiles(
-        [{"speaker_id": "hero", "language": "ja"}, {"speaker_id": "narrator", "language": "zh"}]
+        [{"speaker_id": "hero", "language": "zh"}, {"speaker_id": "narrator", "language": "zh"}]
     )
-    again = assign_profiles([{"speaker_id": "hero", "language": "ja"}], first)
+    again = assign_profiles([{"speaker_id": "hero", "language": "zh"}], first)
     assert first["hero"]["voice_id"] == again["hero"]["voice_id"]
-    # Default dialogue is zh; ja profiles need explicit event.language=ja.
-    validate_event_language(
-        {"id": "x", "type": "dialogue", "language": "ja"}, first["hero"]
-    )
-    with pytest.raises(VoiceCastError, match="requires ja"):
-        validate_event_language(
-            {"id": "x", "type": "dialogue", "language": "ja"}, first["narrator"]
-        )
+    assert first["hero"]["voice_id"].startswith("zh-CN-")
+    validate_event_language({"id": "x", "type": "dialogue", "language": "zh"}, first["hero"])
     validate_event_language({"id": "y", "type": "dialogue"}, first["narrator"])
+    with pytest.raises(VoiceCastError, match="retired"):
+        assign_profiles([{"speaker_id": "hero", "language": "ja"}])
 
 
 def test_asset_requires_hash_and_license_in_v1():
@@ -668,8 +664,8 @@ def test_audio_plan_writes_timeline_and_deterministic_voice_cast(tmp_path: Path)
                 "kind": "voice",
                 "line_type": "dialogue",
                 "speaker": "hero",
-                "spoken_text": "行こう",
-                "language": "ja",  # opt-in JA; default product dialogue is zh
+                "spoken_text": "走吧",
+                "language": "zh",
                 "start_offset_sec": 0,
                 "duration_sec": 1,
             }
@@ -682,5 +678,5 @@ def test_audio_plan_writes_timeline_and_deterministic_voice_cast(tmp_path: Path)
     assert report["audio_timeline"]["event_count"] == 1
     assert (tmp_path / "audio" / "audio-timeline.json").is_file()
     profile = report["voice_cast"]["profiles"]["hero"]
-    assert profile["language"] == "ja"
-    assert profile["voice_id"].startswith("ja-JP-")
+    assert profile["language"] == "zh"
+    assert profile["voice_id"].startswith("zh-CN-")

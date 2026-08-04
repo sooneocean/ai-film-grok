@@ -229,17 +229,17 @@ def create_challenge(
     _, approval = _json_object(approval_receipt, "approval receipt")
     if approval.get("approved") is not True:
         raise LipsyncChallengeError("approval receipt does not approve these fixtures")
-    audio_path = _regular_file(japanese_audio, "Japanese dialogue audio")
+    audio_path = _regular_file(japanese_audio, "Chinese dialogue audio")
     audio_hash = sha256(audio_path)
     audio_approval = approval.get("audio")
     if (
         not isinstance(audio_approval, dict)
         or audio_approval.get("sha256") != audio_hash
-        or audio_approval.get("language") != "ja"
+        or str(audio_approval.get("language") or "").lower() not in {"zh", "cn", "chinese", "zh-cn"}
         or audio_approval.get("role") != "final_character_dialogue"
     ):
-        raise LipsyncChallengeError("approval receipt does not bind the Japanese dialogue audio")
-    audio = {**_probe_audio(audio_path), "sha256": audio_hash, "language": "ja"}
+        raise LipsyncChallengeError("approval receipt does not bind the Chinese dialogue audio")
+    audio = {**_probe_audio(audio_path), "sha256": audio_hash, "language": "zh"}
     fixture_approvals = approval.get("fixtures")
     if not isinstance(fixture_approvals, dict):
         raise LipsyncChallengeError("approval receipt fixture bindings are missing")

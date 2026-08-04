@@ -367,26 +367,21 @@ def _validate_dialogue_drama_shot(
             raise FilmSpecError(
                 f"{shot_id}: on_camera voice must be a dialogue cue with spoken_text"
             )
-        voice_lang = str(voice.get("language") or "").lower()
-        if voice_lang not in {"zh", "ja"}:
+        voice_lang = str(voice.get("language") or "zh").lower()
+        if voice_lang in {"ja", "jp", "japanese"}:
             raise FilmSpecError(
-                f"{shot_id}: character dialogue voice language must be zh (default) or ja (opt-in)"
+                f"{shot_id}: Japanese dialogue is retired; set language=zh and Chinese spoken_text"
             )
-        if voice_lang == "ja":
-            if str(shot.get("translation_status") or "").lower() != "ready":
-                raise FilmSpecError(
-                    f"{shot_id}: Japanese dialogue translation is pending; "
-                    "fill dialogue_ja before TTS/lipsync"
-                )
-            if not re.search(r"[\u3040-\u30ff]", str(shot.get("dialogue_ja") or "")):
-                raise FilmSpecError(f"{shot_id}: dialogue_ja must contain Japanese kana")
-        else:
-            spoken = str(voice.get("spoken_text") or "").strip()
-            caption = str(shot.get("caption_text") or spoken).strip()
-            if not re.search(r"[\u4e00-\u9fff]", spoken + caption):
-                raise FilmSpecError(
-                    f"{shot_id}: Chinese dialogue requires Han characters in spoken_text/caption_text"
-                )
+        if voice_lang not in {"", "zh", "cn", "chinese", "zh-cn", "zh_cn"}:
+            raise FilmSpecError(
+                f"{shot_id}: character dialogue voice language must be zh (Chinese-only product)"
+            )
+        spoken = str(voice.get("spoken_text") or "").strip()
+        caption = str(shot.get("caption_text") or spoken).strip()
+        if not re.search(r"[\u4e00-\u9fff]", spoken + caption):
+            raise FilmSpecError(
+                f"{shot_id}: Chinese dialogue requires Han characters in spoken_text/caption_text"
+            )
         if not str(shot.get("caption_text") or "").strip():
             raise FilmSpecError(
                 f"{shot_id}: dialogue requires Chinese caption_text (HyperFrames subtitle owner)"
@@ -944,11 +939,13 @@ def validate_film_spec(
         raise FilmSpecError("dialogue_broll is only supported when vo_mode=dialogue_drama")
     if mode == "dialogue_drama":
         dlang = str(spec.get("dialogue_spoken_lang") or "zh").lower()
-        if dlang not in {"zh", "ja"}:
+        if dlang in {"ja", "jp", "japanese"}:
             raise FilmSpecError(
-                "dialogue_drama requires dialogue_spoken_lang=zh (default) or ja (opt-in)"
+                "Japanese dialogue is retired; dialogue_drama requires dialogue_spoken_lang=zh"
             )
-        spec["dialogue_spoken_lang"] = dlang
+        if dlang not in {"zh", "cn", "chinese", "zh-cn", "zh_cn"}:
+            raise FilmSpecError("dialogue_drama requires dialogue_spoken_lang=zh (Chinese-only)")
+        spec["dialogue_spoken_lang"] = "zh"
         if str(spec.get("narration_spoken_lang") or "zh").lower() != "zh":
             raise FilmSpecError("dialogue_drama requires narration_spoken_lang=zh")
         spec["narration_spoken_lang"] = "zh"
@@ -2371,7 +2368,7 @@ def validate_film_spec(
                 dialogue_spoken_lang=str(
                     spec.get("dialogue_spoken_lang")
                     or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
-                    or "ja"
+                    or "zh"
                 ),
                 narration_spoken_lang=str(
                     spec.get("narration_spoken_lang")

@@ -238,8 +238,11 @@ def build_dialogue_competition_plan(
         _issues(plan).append({"code": "STATE_NOT_APPROVED", "message": "state is not approved"})
     if (shot.get("tts") or {}).get("status") != "final":
         _issues(plan).append({"code": "TTS_NOT_FINAL", "message": "TTS is not final"})
-    if (shot.get("tts") or {}).get("language") != "ja":
-        _issues(plan).append({"code": "TTS_LANGUAGE_INVALID", "message": "TTS must be Japanese"})
+    tts_lang = str((shot.get("tts") or {}).get("language") or "zh").strip().lower()
+    if tts_lang not in {"zh", "cn", "chinese", "zh-cn", "zh_cn"}:
+        _issues(plan).append(
+            {"code": "TTS_LANGUAGE_INVALID", "message": "TTS must be Chinese (ja retired)"}
+        )
     if not _SHA256.fullmatch(state):
         _issues(plan).append({"code": "STATE_HASH_INVALID", "message": "state hash is invalid"})
     if not _SHA256.fullmatch(audio):
@@ -247,7 +250,7 @@ def build_dialogue_competition_plan(
     caps = _capabilities(capabilities or [], current)
     aliases = {
         "state_i2i": "qwen-image-i2i",
-        "tts": "edge-ja",
+        "tts": "edge",
         "infinite_talk": "infinitetalk",
         "grok_imagine_video": "grok-imagine-video",
         "grok_lipsync": "latentsync-1.6",

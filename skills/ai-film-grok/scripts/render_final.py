@@ -132,12 +132,9 @@ except ImportError:  # pragma: no cover
 # TTS 质量与稳定声线分开选择；跨服务商降级必须显式开启。
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"  # edge 显式后端默认女声
 STORYTELLER_VOICE = "zh-CN-XiaoxiaoNeural"
-# P0 · 2026-08-03: character dialogue defaults to Chinese edge voices
+# P0 · 2026-08-04: Chinese-only character dialogue (Japanese retired)
 HEROINE_ZH_VOICE = "zh-CN-XiaoyiNeural"
 PARTNER_ZH_VOICE = "zh-CN-YunxiNeural"
-# Opt-in Japanese when dialogue_spoken_lang=ja
-HEROINE_JA_VOICE = "ja-JP-NanamiNeural"
-PARTNER_JA_VOICE = "ja-JP-KeitaNeural"
 _NARRATOR_SPEAKERS = frozenset({"storyteller", "narrator", "vo", "旁白", "os", "inner", "内心"})
 _HEROINE_SPEAKERS = frozenset(
     {"heroine", "female", "fufu", "girl", "woman", "she", "女主", "沈筱", "astra"}
@@ -162,12 +159,15 @@ def _locked_voice_role(shot: dict[str, Any]) -> str | None:
 def validate_voice_language_locks(
     shots: list[dict[str, Any]], *, dialogue_spoken_lang: str
 ) -> None:
-    """Fail closed if a named lead loses its language-locked spoken track.
+    """Fail closed if a named lead loses its Chinese-locked spoken track.
 
-    Product default 2026-08-03: Chinese dialogue primary. Japanese is opt-in
-    via dialogue_spoken_lang=ja.
+    Product policy 2026-08-04: Chinese-only. Japanese is retired.
     """
     dlang = (dialogue_spoken_lang or "zh").strip().lower()
+    if dlang in {"ja", "jp", "japanese"}:
+        raise RenderError(
+            "Japanese dialogue is retired; set dialogue_spoken_lang=zh and Chinese spoken text"
+        )
     for shot in shots:
         role = _locked_voice_role(shot)
         if role is None:
@@ -184,25 +184,6 @@ def validate_voice_language_locks(
                 f"Shot {sid} ({role}) must use its cast_tts_backends lock, not per-shot tts_backend"
             )
         if role == "storyteller":
-            continue
-        if dlang in {"ja", "jp", "japanese"}:
-            japanese_line = next(
-                (
-                    str(shot[key]).strip()
-                    for key in ("nar_ja", "dialogue_ja", "spoken_ja")
-                    if isinstance(shot.get(key), str) and shot[key].strip()
-                ),
-                "",
-            )
-            if not japanese_line:
-                raise RenderError(
-                    f"Shot {sid} ({role}) needs nar_ja/dialogue_ja/spoken_ja; "
-                    "do not synthesize a Chinese fallback for Japanese-locked dialogue"
-                )
-            if not re.search(r"[\u3040-\u30ff\u31f0-\u31ff]", japanese_line):
-                raise RenderError(
-                    f"Shot {sid} ({role}) Japanese-locked dialogue must contain Japanese kana"
-                )
             continue
         chinese_line = next(
             (
@@ -231,7 +212,7 @@ def validate_voice_language_locks(
         if not chinese_line or not re.search(r"[\u4e00-\u9fff]", chinese_line):
             raise RenderError(
                 f"Shot {sid} ({role}) needs Chinese spoken/caption text; "
-                "dialogue_spoken_lang=zh is the product default"
+                "dialogue_spoken_lang=zh only (Japanese retired)"
             )
 
 
@@ -1178,22 +1159,18 @@ def _shot_speaker_key(shot: dict[str, Any]) -> str:
 def is_character_speech_shot(shot: dict[str, Any]) -> bool:
     """True when this plate should use character-dialogue TTS (not pure storyteller).
 
-    P0 · 2026-07-24: explicit narrator/storyteller speaker **always** wins over
-    stray ``nar_ja`` / ``dialogue_ja`` fields so 口白 stays Chinese and we do not
-    randomly flip ZH↔JA because an agent left Japanese fields on a 说书镜.
+    Chinese-only product: narrator speaker always wins; character speakers and
+    Chinese dialogue/caption fields mark character speech. Legacy ja fields are ignored.
     """
     sp = _shot_speaker_key(shot)
     if sp in _NARRATOR_SPEAKERS:
         return False
     if sp and sp not in _NARRATOR_SPEAKERS:
         return True
-    for key in ("dialogue", "dialogue_ja", "nar_ja", "spoken_ja"):
+    for key in ("dialogue", "dialogue_zh", "spoken_zh", "caption_text"):
         val = shot.get(key)
-        if isinstance(val, str) and val.strip():
+        if isinstance(val, str) and val.strip() and re.search(r"[\u4e00-\u9fff]", val):
             return True
-    explicit = str(shot.get("vo_voice") or shot.get("voice") or "")
-    if explicit.startswith("ja-JP-") or explicit.startswith("ja-"):
-        return True
     return False
 
 
@@ -1261,13 +1238,7 @@ def validate_linear_narration(
 
 
 def caption_text_for_shot(shot: dict[str, Any], *, caption_lang: str = "zh") -> str:
-    """On-screen subtitle text for HyperFrames (sole designed-caption owner)."""
-    lang = (caption_lang or "zh").strip().lower()
-    if lang in {"ja", "jp", "japanese"}:
-        for key in ("nar_ja", "dialogue_ja", "spoken_ja", "nar", "narration"):
-            val = shot.get(key)
-            if isinstance(val, str) and val.strip():
-                return val.strip()
+    """On-screen subtitle text for HyperFrames (sole designed-caption owner). Chinese-only."""
     for key in (
         "caption_text",
         "subtitle_zh",
@@ -1289,10 +1260,6 @@ def caption_text_for_shot(shot: dict[str, Any], *, caption_lang: str = "zh") -> 
             val = cue.get(key)
             if isinstance(val, str) and val.strip() and re.search(r"[\u4e00-\u9fff]", val):
                 return val.strip()
-    for key in ("nar_ja", "dialogue_ja"):
-        val = shot.get(key)
-        if isinstance(val, str) and val.strip():
-            return val.strip()
     return narration_for_shot(shot)
 
 
@@ -1303,11 +1270,13 @@ def spoken_text_for_shot(
     narration_spoken_lang: str = "zh",
     vo_mode: str = "storyteller",
 ) -> str:
-    """Text fed to TTS. Character lines prefer Chinese when policy is zh (default)."""
+    """Text fed to TTS. Chinese-only product path (Japanese retired)."""
     dlang = (dialogue_spoken_lang or "zh").strip().lower()
-    nlang = (narration_spoken_lang or "zh").strip().lower()
+    if dlang in {"ja", "jp", "japanese"}:
+        # Soft: ignore ja policy; still speak Chinese if present.
+        dlang = "zh"
     character = is_character_speech_shot(shot)
-    if character and dlang in {"zh", "cn", "chinese", "zh-cn", "zh_cn"}:
+    if character:
         for key in (
             "spoken_zh",
             "dialogue_zh",
@@ -1325,28 +1294,9 @@ def spoken_text_for_shot(
                 and cue.get("kind") == "voice"
                 and str(cue.get("spoken_text") or "").strip()
             ):
-                return str(cue.get("spoken_text")).strip()
-    if character and dlang in {"ja", "jp", "japanese"}:
-        for key in ("nar_ja", "dialogue_ja", "spoken_ja", "dialogue"):
-            val = shot.get(key)
-            if isinstance(val, str) and val.strip():
-                # Prefer Japanese scripts; skip pure CJK Chinese if ja field missing
-                text = val.strip()
-                if key in {"nar_ja", "dialogue_ja", "spoken_ja"}:
+                text = str(cue.get("spoken_text")).strip()
+                if re.search(r"[\u4e00-\u9fff]", text):
                     return text
-                # dialogue field may be Chinese — only use if no ja and looks JP-ish
-                if any("\u3040" <= ch <= "\u30ff" or "\u31f0" <= ch <= "\u31ff" for ch in text):
-                    return text
-        # Soft fallback: Chinese dialogue still spoken (agent should fill nar_ja)
-        for key in ("dialogue", "nar", "narration"):
-            val = shot.get(key)
-            if isinstance(val, str) and val.strip():
-                return val.strip()
-    if nlang in {"ja", "jp", "japanese"} and not character:
-        for key in ("nar_ja", "nar", "narration"):
-            val = shot.get(key)
-            if isinstance(val, str) and val.strip():
-                return val.strip()
     return narration_for_shot(shot)
 
 
@@ -1358,26 +1308,19 @@ def voice_for_shot(
     vo_mode: str,
     dialogue_spoken_lang: str = "zh",
 ) -> str:
-    """Resolve one stable voice id for this shot — 一角一声.
-
-    Default character voices are Chinese (2026-08-03); ja only when policy is ja.
-    """
+    """Resolve one stable voice id for this shot — 一角一声 (Chinese-only)."""
     cast_voices = cast_voices or {}
-    dlang = (dialogue_spoken_lang or "zh").strip().lower()
-    ja_mode = dlang in {"ja", "jp", "japanese"}
-    heroine_default = HEROINE_JA_VOICE if ja_mode else HEROINE_ZH_VOICE
-    partner_default = PARTNER_JA_VOICE if ja_mode else PARTNER_ZH_VOICE
     locked_role = _locked_voice_role(shot)
     if locked_role == "storyteller":
         return cast_voices.get("storyteller") or STORYTELLER_VOICE
     if locked_role == "heroine":
-        return cast_voices.get("heroine") or heroine_default
+        return cast_voices.get("heroine") or HEROINE_ZH_VOICE
     if locked_role == "partner":
         return (
             cast_voices.get("partner")
             or cast_voices.get("male_hero")
             or cast_voices.get("hero")
-            or partner_default
+            or PARTNER_ZH_VOICE
         )
     explicit = shot.get("vo_voice") or shot.get("voice")
     if isinstance(explicit, str) and explicit.strip():
@@ -1997,21 +1940,20 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         for k, v in cast_voices_raw.items():
             if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
                 cast_voices[k.strip()] = v.strip()
-    # P0 · 2026-07-23: default JA character voices when dialogue_spoken_lang=ja
-    _dlg_lang = (
-        str(
-            spec.get("dialogue_spoken_lang")
-            or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
-            or "ja"
-        )
-        .strip()
-        .lower()
-    )
-    if _dlg_lang in {"ja", "jp", "japanese"}:
-        cast_voices.setdefault("heroine", HEROINE_JA_VOICE)
-        cast_voices.setdefault("partner", PARTNER_JA_VOICE)
-        cast_voices.setdefault("male_hero", PARTNER_JA_VOICE)
+    # Chinese-only cast defaults (Japanese retired 2026-08-04)
+    cast_voices.setdefault("heroine", HEROINE_ZH_VOICE)
+    cast_voices.setdefault("partner", PARTNER_ZH_VOICE)
+    cast_voices.setdefault("male_hero", PARTNER_ZH_VOICE)
     cast_voices.setdefault("storyteller", STORYTELLER_VOICE)
+    # Strip legacy ja-JP locks so Chinese TTS never inherits Japanese voice ids.
+    for _role, _vid in list(cast_voices.items()):
+        if isinstance(_vid, str) and (_vid.startswith("ja-JP-") or _vid.startswith("ja-")):
+            if _role in {"heroine"}:
+                cast_voices[_role] = HEROINE_ZH_VOICE
+            elif _role in {"partner", "male_hero", "hero"}:
+                cast_voices[_role] = PARTNER_ZH_VOICE
+            else:
+                cast_voices[_role] = STORYTELLER_VOICE
     vo_rate = str(getattr(args, "vo_rate", None) or spec.get("vo_rate") or DEFAULT_VO_RATE)
     vo_pitch = str(getattr(args, "vo_pitch", None) or spec.get("vo_pitch") or DEFAULT_VO_PITCH)
     vo_tts_vol = str(getattr(args, "vo_tts_volume", None) or spec.get("vo_tts_volume") or "+0%")
@@ -2117,8 +2059,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     dialogue_spoken_lang = str(
         spec.get("dialogue_spoken_lang")
         or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
-        or "ja"
+        or "zh"
     )
+    if dialogue_spoken_lang.strip().lower() in {"ja", "jp", "japanese"}:
+        raise RenderError(
+            "Japanese dialogue is retired; set dialogue_spoken_lang=zh (Chinese-only product)"
+        )
+    dialogue_spoken_lang = "zh"
     narration_spoken_lang = str(
         spec.get("narration_spoken_lang")
         or (spec.get("voice_policy") or {}).get("narration_spoken_lang")
@@ -2213,13 +2160,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         if not text:
             raise RenderError(
                 f"Shot {sid} has no spoken text for VO "
-                f"(need nar/nar_ja/dialogue; character lines prefer nar_ja when "
-                f"dialogue_spoken_lang=ja)"
+                f"(need Chinese nar/dialogue/caption_text or voice.spoken_text)"
             )
         max_chars = int(
             getattr(args, "sub_max_chars", DEFAULT_SUB_MAX_CHARS) or DEFAULT_SUB_MAX_CHARS
         )
-        # Subtitles use caption language (default zh); TTS may be Japanese
+        # Subtitles + TTS: Chinese-only product path
         units = split_units(caption_text, max_len=max_chars)
         try:
             mp3 = safe_output_path(

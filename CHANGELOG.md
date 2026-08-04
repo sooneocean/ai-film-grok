@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.39.2] - 2026-08-04
+
+### Changed (Chinese-only dialogue · Japanese retired)
+- **Product**: `dialogue_spoken_lang=zh` hard lock; **reject** `ja` / `dialogue_ja` production path.
+- **voice_cast_profiles**: ZH_POOL only; JA_POOL removed; `ja` language raises; strip legacy `ja-JP-*` voice ids.
+- **film_spec / render_final / narrative_timeline / tts_rehearsal**: Chinese spoken/caption only; no JA voice defaults.
+- **dialogue_screenplay**: ready = Chinese dialogue+subtitle; `DIALOGUE_JA_RETIRED` gate.
+- **lipsync_challenge / lipsync_pilot**: approval binds **Chinese** final character dialogue.
+- **hard-defaults / dispatch**: copy updated to 中文唯一.
+- Tests: dialogue/voice/lipsync fixtures converted to zh.
+
 ## [2.39.1] - 2026-08-04
 
 ### Fixed / Changed (Chinese dialogue primary + TTS multi-provider + music import)

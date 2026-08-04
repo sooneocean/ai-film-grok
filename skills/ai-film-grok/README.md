@@ -1,7 +1,7 @@
 # ai-film-grok（skill 本体）
 
 > **安装 / 使用逻辑 / 架构图 / 可插拔模型** → 仓库根 [README.md](../../README.md)（对外主文档）。  
-> **版本**：**`2.39.1`** · 变更 [CHANGELOG](../../CHANGELOG.md) · 本季要点见根 README「v2.39 本季要点」。
+> **版本**：**`2.39.2`** · 变更 [CHANGELOG](../../CHANGELOG.md) · 本季要点见根 README「v2.39 本季要点」。
 
 **一句话**：把「从灵感到可发布的 AI 动态短片」收成**可恢复、可验收**的七段流程——定义故事 → 设计演出 → Pilot → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付。
 
@@ -432,10 +432,10 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.39.1`
+- 插件版本：`2.39.2`
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
-- Python 脚本：`330` 个
+- Python 脚本：`331` 个
 - pytest 文件：`365` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)

@@ -21,7 +21,6 @@ def _on_camera_shot() -> dict:
         "lipsync_required": True,
         "performance_state_id": "heroine-sc02-door",
         "translation_status": "ready",
-        "dialogue_ja": "行く。",
         "caption_text": "我要走了。",
         "performance_state": {"head_angle": "three-quarter"},
         "audio_cues": [
@@ -29,8 +28,8 @@ def _on_camera_shot() -> dict:
                 "kind": "voice",
                 "line_type": "dialogue",
                 "speaker": "heroine",
-                "spoken_text": "行く。",
-                "language": "ja",
+                "spoken_text": "我要走了。",
+                "language": "zh",
                 "duration_sec": 1,
             }
         ],
@@ -42,7 +41,7 @@ def test_on_camera_requires_short_near_state_locked_performance() -> None:
     shot = _on_camera_shot()
     _validate_dialogue_drama_shot(shot, shot_id="talk01")
 
-    shot["audio_cues"][0]["spoken_text"] = "あ" * 43
+    shot["audio_cues"][0]["spoken_text"] = "啊" * 43
     with pytest.raises(FilmSpecError, match="exceeds"):
         _validate_dialogue_drama_shot(shot, shot_id="talk01")
 

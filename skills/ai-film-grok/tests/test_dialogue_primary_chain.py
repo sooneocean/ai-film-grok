@@ -52,11 +52,10 @@ def test_chinese_spoken_and_hf_caption_preference() -> None:
         "speaker": "heroine",
         "dialogue": "别走。",
         "caption_text": "别走。",
-        "dialogue_ja": "行かないで。",
+        "dialogue_ja": "行かないで。",  # retired — ignored
     }
     assert caption_text_for_shot(shot) == "别走。"
     assert spoken_text_for_shot(shot, dialogue_spoken_lang="zh") == "别走。"
-    assert spoken_text_for_shot(shot, dialogue_spoken_lang="ja") == "行かないで。"
     v = voice_for_shot(
         shot,
         default_voice="zh-CN-XiaoxiaoNeural",
