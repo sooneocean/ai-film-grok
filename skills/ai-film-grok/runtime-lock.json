@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "023d47acb85dea68c741852882c237280c8c85951af17ac95302742bf9cf3b99"
+      "sha256": "9587741537ea53e39ea7ea67f92d978b056d95731d8d6b38c5d4f4acecb9aa25"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -186,7 +186,7 @@
     },
     {
       "path": "scripts/audio_timeline.py",
-      "sha256": "ab4ec10114ef95aa129df79fd390dc1d18a91ff254becda58783978bfe043d03"
+      "sha256": "74de2dbcbc2d9124e057a5a1da3ca5a706c1fde76273415a9d4e45b17c0ee6fd"
     },
     {
       "path": "scripts/audio_tts_manifest.py",
@@ -278,7 +278,7 @@
     },
     {
       "path": "scripts/cinematic_gate.py",
-      "sha256": "bc613fc2b8cc871f5f2748f45c509b2bf4adf5397f4f0f1a9c8ed5bb0bcda4f1"
+      "sha256": "f00183559484728154a34c82310bc1852162dd69fc73a1d57e85cc99f0f9aff5"
     },
     {
       "path": "scripts/cli/__init__.py",
@@ -322,7 +322,7 @@
     },
     {
       "path": "scripts/cli_media.py",
-      "sha256": "2bd57197ebca0f0418246848401f311442aceba1b8c58971c81444ba52f012ce"
+      "sha256": "f9deddd28e601e9b87dac4c03add635a01344bca8fc25d76d07d2d14dedb47ea"
     },
     {
       "path": "scripts/cli_motion.py",
@@ -358,7 +358,7 @@
     },
     {
       "path": "scripts/cli_post.py",
-      "sha256": "1ad67d1e684cbae531e01b430f482d1907a4b57379497383820720bfa30844ed"
+      "sha256": "2601c4bf172e6f4f030636cff71f4b38ec62b8f32e6ca3af869e079c1db52f3a"
     },
     {
       "path": "scripts/cli_quality.py",
@@ -382,7 +382,7 @@
     },
     {
       "path": "scripts/cli_status.py",
-      "sha256": "62211de19ead6cd587a599042306f6c45fe8be3ac5d9cb322cfd0467eb508675"
+      "sha256": "44ea474eb3d8877da70e1b63546f79aa5a5a554e03e7fe13d21c49499767b429"
     },
     {
       "path": "scripts/cli_still_challenge.py",
@@ -398,7 +398,7 @@
     },
     {
       "path": "scripts/cli_workflow.py",
-      "sha256": "8188b18c0f59b1d679b393a5a3937dcc5a753d25c7123afc4bfd227e1fe90829"
+      "sha256": "9a95eed016531de2ec347a2859a16435098c117b11e0b43f6f365a1102320b9c"
     },
     {
       "path": "scripts/cli_workshop.py",
@@ -410,7 +410,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "cb088d43ac103d8f0b8da29767b4574ec828204583a865d7f53086941ce79ce2"
+      "sha256": "cf4df34deb842cb1c5854ef54d668cfe602436ad35738e75ccd0c5fd8aa5a2c7"
     },
     {
       "path": "scripts/cloud_media_download.py",
@@ -630,7 +630,7 @@
     },
     {
       "path": "scripts/export_composition.py",
-      "sha256": "14cc571d404a38bcf92d9ea664cd94a5bb181d1ec92413450ac51608aab8db6a"
+      "sha256": "6adc951c540b6e4a9883342bbddb5d01463d02b58440cffd72b47737576dd3e2"
     },
     {
       "path": "scripts/external_review.py",
@@ -662,7 +662,7 @@
     },
     {
       "path": "scripts/five_track.py",
-      "sha256": "7c8693ef7d2cc44d90f8381594463fad012462caf7b34292ce0f78d20d320135"
+      "sha256": "17d7377dadbd21cefd0b461b4ed518961cecaafcd8d8134da3b539ea5f39c28e"
     },
     {
       "path": "scripts/framing_lint.py",
@@ -691,6 +691,10 @@
     {
       "path": "scripts/frw_upload.py",
       "sha256": "60526b325c80f2a690df7af08ad9bc3935813cea42f5d9d7cca49c157ae8c05d"
+    },
+    {
+      "path": "scripts/gate_auto.py",
+      "sha256": "b0de3a51aa817e4a5029958c899cff0a7efea0480109616f8fc3e0651ada114a"
     },
     {
       "path": "scripts/generation_usage.py",
@@ -738,7 +742,7 @@
     },
     {
       "path": "scripts/input_fidelity.py",
-      "sha256": "d886c7eee5f2e13a7fc7ab3631cbb4cfd9bad5fc3035a5ef930c7356d10886eb"
+      "sha256": "5731be1c89637445c07e912e0f8f48bc7d934d5d66dab17df11a4fccac810a0f"
     },
     {
       "path": "scripts/intake.py",
@@ -770,7 +774,7 @@
     },
     {
       "path": "scripts/lipsync_pilot.py",
-      "sha256": "2ecc74d05980921da57d2d38f0e555bb75ecf453818d91b1d4f76f7756dd57a7"
+      "sha256": "95acb375a879b318a024d1a3809fb179465a2cb400237733086e7bcdd0aa563b"
     },
     {
       "path": "scripts/local_llm.py",
@@ -842,7 +846,7 @@
     },
     {
       "path": "scripts/motion_prompt_spine.py",
-      "sha256": "95cdfffb9202e25272ebfe9e930c94661eba4d869ddcfd35dda42cf7a91a5093"
+      "sha256": "318798a0a1b4daee6fc02d9b41cdcddbb0cd4e48ce7b2026627872e7600730a1"
     },
     {
       "path": "scripts/music_cue.py",
@@ -870,7 +874,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "39bb1944b7f2bad0e0beec20493b69404bc4114380a9a4b8eef6311cb273bd0f"
+      "sha256": "bb67a954d4b52392c88790dc3e3f4646a0a45b8b155993b1a377e6c82bcbe308"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -974,7 +978,7 @@
     },
     {
       "path": "scripts/preflight.py",
-      "sha256": "a21aad008c384c68133856de3dd90139ae0abce9e16be78669b84767c417fb9d"
+      "sha256": "a05edd11ffe1bed2293f3d66b3f882d2da1040c47a2be9db063fb5819c5c05bf"
     },
     {
       "path": "scripts/product_brief.py",
@@ -1266,7 +1270,7 @@
     },
     {
       "path": "scripts/true_video_policy.py",
-      "sha256": "d08f5ffae1b5b96a9d69bb56941c673952a1a96b51b61eeee8fa7cde2242c3bd"
+      "sha256": "ce143f21e4a918f469e46412b050a269f79e24a381c55ab898520649ec83322e"
     },
     {
       "path": "scripts/tts_ab.py",
@@ -1290,7 +1294,7 @@
     },
     {
       "path": "scripts/util/json_io.py",
-      "sha256": "763e7691093fa07b55f3cbde971f0e55f04582335cf936cf91252948fc70fd8c"
+      "sha256": "3911ca7e7181676d7317107dc12c81fbdebcb50d991b1fc7102ee38715230293"
     },
     {
       "path": "scripts/util/subprocess.py",
@@ -1334,7 +1338,7 @@
     },
     {
       "path": "scripts/voice_cast_profiles.py",
-      "sha256": "ae0ee0beb3509ca79b4791cffa16f963da67153e4e88d613916cc6ff3e856ca0"
+      "sha256": "3e939c5fefee3076aca76a301873cad5adf329fd9b0bf64087bc1fb4534d777d"
     },
     {
       "path": "scripts/voice_tracks.py",
@@ -1350,7 +1354,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "b550b9dd8516b46521e750963764a75b8c904eaa05905fe0e0d5f7e90d7ac338"
+      "sha256": "a1ade5e843c1e36e421d8b622ced519e17cb6cc623efc9e4e2e86c0fa9c13991"
     },
     {
       "path": "scripts/workflow_spine.py",

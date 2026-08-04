@@ -60,8 +60,13 @@ def run_cinematic_gate(
     run_ship_prep: bool = False,
     skip_variety: bool = False,
     skip_five_track: bool = False,
+    auto_i2v: bool = True,
 ) -> dict[str, Any]:
-    """Evaluate composite cinema readiness. Returns receipt-shaped report."""
+    """Evaluate composite cinema readiness. Returns receipt-shaped report.
+
+    ``auto_i2v`` (default True): when i2v-final-gate missing/red, machine-measure
+    means and rewrite the gate receipt so agents need not hand-run the step.
+    """
     base = Path(root).expanduser().resolve()
     if skip_enabled():
         rep = {
@@ -159,7 +164,11 @@ def run_cinematic_gate(
                     for sh in scene.get("shots") or []:
                         if isinstance(sh, dict) and sh.get("id"):
                             shot_ids.append(str(sh["id"]))
-        inv = check_shot_inventory(shot_ids, approved) if shot_ids else {"ok": False, "codes": ["NO_SHOTS"]}
+        inv = (
+            check_shot_inventory(shot_ids, approved)
+            if shot_ids
+            else {"ok": False, "codes": ["NO_SHOTS"]}
+        )
         gates = man.get("gates") if isinstance(man.get("gates"), dict) else {}
         clips_ok = bool(gates.get("clips_complete")) or bool(inv.get("complete"))
         steps.append(
@@ -172,9 +181,7 @@ def run_cinematic_gate(
                     f"missing={inv.get('missing_clips')}"
                 ),
                 next_cmd=(
-                    None
-                    if clips_ok or inv.get("ok")
-                    else f'aifilm register-clip --root "{r}" …'
+                    None if clips_ok or inv.get("ok") else f'aifilm register-clip --root "{r}" …'
                 ),
                 codes=list(inv.get("codes") or []),
             )
@@ -182,7 +189,7 @@ def run_cinematic_gate(
     except Exception as exc:  # noqa: BLE001
         steps.append(_step("inventory", ok=False, detail=str(exc)[:200]))
 
-    # 3) i2v final gate receipt
+    # 3) i2v final gate receipt (auto-measure when missing/red)
     gate_path = base / "receipts" / "i2v-final-gate.json"
     gate = read_json(gate_path) if gate_path.is_file() else None
     if isinstance(gate, dict) and gate.get("ok") is True:
@@ -194,32 +201,54 @@ def run_cinematic_gate(
             )
         )
     else:
-        # try auto-run motion gate when clips exist
         auto_ok = False
         detail = "missing or ok!=true"
+        codes: list[str] = ["I2V_FINAL_GATE_NOT_OK"]
         try:
             from i2v_motion_gate import i2v_motion_gate_skip_enabled
 
             if i2v_motion_gate_skip_enabled():
                 auto_ok = True
                 detail = "AIFILM_SKIP_I2V_MOTION_GATE"
+                codes = []
+            elif auto_i2v and write:
+                from cli_motion import i2v_motion_gate_from_rows
+                from i2v_motion_gate import ensure_take_means
+
+                ensure_take_means(base, recompute=False, write_sidecars=True)
+                mg = i2v_motion_gate_from_rows(
+                    [],
+                    root=base,
+                    write_receipts=True,
+                    auto_from_root=True,
+                )
+                auto_ok = bool(mg.get("ok"))
+                detail = (
+                    f"auto-wrote gate ok={auto_ok} rows={mg.get('row_count')}"
+                )
+                codes = list((mg.get("gate") or {}).get("codes") or []) or (
+                    [] if auto_ok else ["I2V_FINAL_GATE_NOT_OK"]
+                )
             else:
-                # lightweight: only read; agent runs --write separately
                 detail = (
                     "missing receipt"
                     if not gate_path.is_file()
                     else f"ok={None if not isinstance(gate, dict) else gate.get('ok')}"
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            detail = f"auto_i2v failed: {exc}"[:200]
         steps.append(
             _step(
                 "i2v_final",
                 ok=auto_ok,
                 hard=True,
                 detail=detail,
-                next_cmd=f'aifilm i2v-motion-gate --root "{r}" --write',
-                codes=["I2V_FINAL_GATE_NOT_OK"] if not auto_ok else [],
+                next_cmd=(
+                    None
+                    if auto_ok
+                    else f'aifilm i2v-motion-gate --root "{r}" --write  # or gate-auto'
+                ),
+                codes=codes,
             )
         )
 
@@ -242,12 +271,10 @@ def run_cinematic_gate(
                     ok=bool(var.get("ok")),
                     hard=True,
                     detail=f"issues={len(var.get('issues') or [])}",
-                    next_cmd=(
-                        None
-                        if var.get("ok")
-                        else f'aifilm variety-precheck --root "{r}"'
-                    ),
-                    codes=[str(i.get("code")) for i in (var.get("issues") or []) if isinstance(i, dict)],
+                    next_cmd=(None if var.get("ok") else f'aifilm variety-precheck --root "{r}"'),
+                    codes=[
+                        str(i.get("code")) for i in (var.get("issues") or []) if isinstance(i, dict)
+                    ],
                 )
             )
         except Exception as exc:  # noqa: BLE001
@@ -319,18 +346,12 @@ def run_cinematic_gate(
                 ok=bool(ppt.get("ok")),
                 hard=False,
                 detail=f"visual_fit={fit} ppt_ok={ppt.get('ok')}",
-                next_cmd=(
-                    None
-                    if ppt.get("ok")
-                    else "set visual_fit=vo or vary duration_sec"
-                ),
+                next_cmd=(None if ppt.get("ok") else "set visual_fit=vo or vary duration_sec"),
                 codes=list(ppt.get("codes") or []),
             )
         )
     except Exception as exc:  # noqa: BLE001
-        steps.append(
-            _step("edit_rhythm", ok=True, hard=False, detail=str(exc)[:120], skipped=True)
-        )
+        steps.append(_step("edit_rhythm", ok=True, hard=False, detail=str(exc)[:120], skipped=True))
 
     # 7) film_core advisory receipt if present
     fc = read_json(base / "receipts" / "film-core-closeout.json") or {}
@@ -346,7 +367,9 @@ def run_cinematic_gate(
         )
 
     hard_failed = [s for s in steps if not s.get("ok") and s.get("hard") and not s.get("skipped")]
-    soft_failed = [s for s in steps if not s.get("ok") and not s.get("hard") and not s.get("skipped")]
+    soft_failed = [
+        s for s in steps if not s.get("ok") and not s.get("hard") and not s.get("skipped")
+    ]
     ok = not hard_failed
     blocked = hard_failed[0] if hard_failed else None
     next_cmd = (blocked or {}).get("next_cmd")

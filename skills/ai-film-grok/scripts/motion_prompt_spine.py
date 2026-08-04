@@ -572,9 +572,10 @@ def assert_motion_prompt_core(
             )
         )
         # Camera-only filler (push-in / blink / breath) is NOT enough for hero I2V
-        camera_only = any(
-            k in low for k in ("push-in", "push in", "dolly", "ken burns", "zoom")
-        ) and not has_visual
+        camera_only = (
+            any(k in low for k in ("push-in", "push in", "dolly", "ken burns", "zoom"))
+            and not has_visual
+        )
         if camera_only and not free_ok:
             raise MotionCoreError(
                 f"MOTION_CORE_CAMERA_ONLY: shot {shot.get('id')!r} has camera filler "

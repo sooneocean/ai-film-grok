@@ -45,14 +45,16 @@ from prompt_injector import PromptConflictError, PromptInjector
 from runtime_policy import build_runtime_lock, sha256, verify_runtime_lock
 from security_policy import (
     SecurityPolicyError,
-    minimal_subprocess_env,
     safe_existing_file,
     safe_output_path,
     safe_workspace_directory,
     validate_identifier,
 )
+from util import require_json as read_json
 from util import sha256_file, utc_now, write_json
 from util.errors import FilmError  # noqa: E402 — re-exported for backward compat
+from util.subprocess import run
+from util.validators import aspect_dims
 from visual_bible import load_bible
 
 SCHEMA_VERSION = 2
@@ -81,51 +83,6 @@ EXPORT_METADATA_FILES = (
     "README.md",
     "post-plan.json",
 )
-
-
-def read_json(path: Path) -> dict[str, Any]:
-    """Strict JSON read — alias of ``util.require_json`` (no local load logic)."""
-    from util import require_json
-
-    return require_json(path)
-
-
-def slugify(text: str) -> str:
-    text = text.strip().lower()
-    text = re.sub(r"[\s_/]+", "-", text)
-    text = re.sub(r"[^a-z0-9\-\u4e00-\u9fff]+", "", text)
-    text = re.sub(r"-+", "-", text).strip("-")
-    return text or "film"
-
-
-def aspect_dims(aspect: str) -> tuple[int, int]:
-    table = {
-        "9:16": (720, 1280),
-        "16:9": (1280, 720),
-        "1:1": (1024, 1024),
-        "3:4": (768, 1024),
-        "4:3": (1024, 768),
-    }
-    if aspect not in table:
-        raise FilmError(f"Unsupported aspect {aspect!r}; use one of {sorted(table)}")
-    return table[aspect]
-
-
-def run(
-    cmd: list[str],
-    *,
-    check: bool = True,
-    timeout: int | float | None = 60,
-) -> subprocess.CompletedProcess[str]:
-    """Subprocess helper. Default 60s; pass timeout=None or large value for long renders (final)."""
-    return subprocess.run(
-        cmd,
-        timeout=timeout,
-        check=check,
-        capture_output=True,
-        text=True,
-        env=minimal_subprocess_env(),
-    )
 
 
 def media_duration(path: Path) -> float:

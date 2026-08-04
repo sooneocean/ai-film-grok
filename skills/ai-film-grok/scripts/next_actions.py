@@ -653,7 +653,13 @@ def build_next_actions(
                 f'aifilm i2v-motion-gate --root "{r}" --write',
                 "clips 齐 — 先 i2v-motion-gate（--root 自动 DF）再 final/closeout",
             )
-        # Wave ε · composite cinema gate before final
+        # Wave ε · prefer gate-auto (machine measure+write) then cinematic
+        if cin_rec.get("ok") is not True or gate_rec.get("ok") is not True:
+            add(
+                "gate-auto",
+                f'aifilm gate-auto --root "{r}"',
+                "clips 齐 — gate-auto 自动测 mean/写 i2v-final/sex_sfx/cinematic（无需人工点闸）",
+            )
         if cin_rec.get("ok") is not True:
             add(
                 "cinematic-gate",

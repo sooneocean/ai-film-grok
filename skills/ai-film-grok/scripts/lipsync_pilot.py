@@ -80,9 +80,7 @@ def create_pilot(
         str(approved_audio.get("language") or "").lower() not in {"zh", "cn", "chinese", "zh-cn"}
         or approved_audio.get("role") != "final_character_dialogue"
     ):
-        raise LipsyncPilotError(
-            "approved-input receipt must bind Chinese final character dialogue"
-        )
+        raise LipsyncPilotError("approved-input receipt must bind Chinese final character dialogue")
     if approved_audio.get("sha256") != sha256(audio):
         raise LipsyncPilotError("approved-input receipt audio checksum does not match")
     for name, video in videos.items():

@@ -2,8 +2,8 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-PUBLISH_SCRIPT="/Users/dex/.agents/skills/gitea-publish/scripts/gitea_publish.py"
-PUBLISH_HOOKS="/Users/dex/.agents/skills/gitea-publish/hooks"
+PUBLISH_SCRIPT="${GITEA_PUBLISH_SCRIPT:-${HOME}/.agents/skills/gitea-publish/scripts/gitea_publish.py}"
+PUBLISH_HOOKS="${GITEA_PUBLISH_HOOKS:-${HOME}/.agents/skills/gitea-publish/hooks}"
 
 GIT_CONFIG_COUNT=1 \
 GIT_CONFIG_KEY_0=core.hooksPath \

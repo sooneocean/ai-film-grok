@@ -207,12 +207,16 @@ def compile_timeline(spec: dict[str, Any], *, root: Path | None = None) -> dict[
                 }
                 if event_type in VOCAL_TYPES:
                     # Carry authored language so voice-cast does not fall back to stale JA default.
-                    lang = str(
-                        cue.get("language")
-                        or cue.get("spoken_lang")
-                        or cue.get("dialogue_spoken_lang")
-                        or ""
-                    ).strip().lower()
+                    lang = (
+                        str(
+                            cue.get("language")
+                            or cue.get("spoken_lang")
+                            or cue.get("dialogue_spoken_lang")
+                            or ""
+                        )
+                        .strip()
+                        .lower()
+                    )
                     if lang in {"jp", "japanese"}:
                         lang = "ja"
                     if lang in {"cn", "chinese"}:

@@ -70,3 +70,7 @@ artifacts/**/*.flac
 .omo/
 .zcode/
 coverage.json
+
+# local dev artifacts (should never be committed)
+.kilo/
+backups-skills/

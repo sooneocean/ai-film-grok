@@ -9,8 +9,8 @@ cd "$ROOT"
 # gitea-publish hard-fails if core.fsmonitor is not false — pin local repo.
 git config --local core.fsmonitor false >/dev/null 2>&1 || true
 
-PUBLISH_SCRIPT="/Users/dex/.agents/skills/gitea-publish/scripts/gitea_publish.py"
-PUBLISH_HOOKS="/Users/dex/.agents/skills/gitea-publish/hooks"
+PUBLISH_SCRIPT="${GITEA_PUBLISH_SCRIPT:-${HOME}/.agents/skills/gitea-publish/scripts/gitea_publish.py}"
+PUBLISH_HOOKS="${GITEA_PUBLISH_HOOKS:-${HOME}/.agents/skills/gitea-publish/hooks}"
 
 if [ -f "$PUBLISH_SCRIPT" ]; then
   GIT_CONFIG_COUNT=1 \

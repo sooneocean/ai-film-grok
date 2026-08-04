@@ -39,8 +39,10 @@ from security_policy import (
     safe_workspace_directory,
 )
 from util import read_json as _util_read_json
+from util import require_json as read_json
 from util import sha256_file, utc_now, write_json
 from util.errors import FilmError
+from util.subprocess import run
 from util.validators import film_output_path
 
 MANIFEST_NAME = "manifest.json"
@@ -67,10 +69,6 @@ def emit(obj: dict[str, Any]) -> None:
     return _ag().emit(obj)
 
 
-def read_json(path: Path) -> dict[str, Any]:
-    return _ag().read_json(path)
-
-
 def load_manifest(root: Path) -> dict[str, Any]:
     return _ag().load_manifest(root)
 
@@ -90,10 +88,6 @@ def film_dirs(root: Path) -> dict[str, Path]:
 def record_file_matches(*args: Any, **kwargs: Any) -> bool:
     # aifilm_grok signature: (root, record, *, field=...)
     return _ag().record_file_matches(*args, **kwargs)
-
-
-def run(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    return _ag().run(cmd, **kwargs)
 
 
 def which_npx_safe() -> str | None:

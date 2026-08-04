@@ -30,9 +30,9 @@ def cmd_status(args: argparse.Namespace) -> int:
         _pipeline_bundle,
         emit,
         load_manifest,
-        read_json,
         recompute_gates,
     )
+    from util import require_json as read_json
 
     root = Path(args.root).expanduser().resolve()
     try:
@@ -190,7 +190,7 @@ def _status_evidence(root: Path) -> dict[str, Any]:
 
 def _status_audio_summary(root: Path) -> dict[str, Any]:
     """Phase F: surface TTS / sound_plan / mix_report for agent routing."""
-    from aifilm_grok import read_json
+    from util import require_json as read_json
 
     out: dict[str, Any] = {
         "tts_backend": None,
@@ -306,9 +306,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     from aifilm_grok import (
         emit,
         grok_permission_mode,
-        read_json,
     )
     from runtime_policy import verify_requirements_lock, verify_runtime_lock
+    from util import require_json as read_json
 
     skill_dir = Path(__file__).resolve().parents[1]
     edge_ok = False

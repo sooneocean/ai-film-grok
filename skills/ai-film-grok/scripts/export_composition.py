@@ -637,7 +637,9 @@ def _fluency_export_meta(
     try:
         from edit_policy import default_visual_fit
 
-        visual_fit = str(spec.get("visual_fit") or default_visual_fit(spec) or "slot").strip().lower()
+        visual_fit = (
+            str(spec.get("visual_fit") or default_visual_fit(spec) or "slot").strip().lower()
+        )
     except Exception:
         visual_fit = str(spec.get("visual_fit") or "slot").strip().lower()
     long_form = bool(spec.get("long_form") or spec.get("require_continuity_chain"))

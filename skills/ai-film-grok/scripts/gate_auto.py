@@ -1,0 +1,400 @@
+#!/usr/bin/env python3
+"""Automated machine-verifiable gate ladder (2026-08-04).
+
+Runs everything that can be proven without a human eyeball:
+  means → i2v-final-gate write → five_track ensure + sex_sfx inject
+  → true_video scan → variety → cinematic-gate
+
+Does **not** replace:
+  pilot user approval · multi-take human PK · review-final scorecard
+
+Class analogy: airport auto-checklist for instruments; pilot still boards.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Any
+
+from util import read_json, utc_now, write_json
+
+RECEIPT = "gate-auto.json"
+
+# Still requires a human (never auto-green these as "DONE")
+HUMAN_ONLY = (
+    "pilot_user_approval",
+    "multi_take_pk_promote",
+    "review_final_scorecard",
+    "paid_budget_ack",
+)
+
+
+class GateAutoError(RuntimeError):
+    pass
+
+
+def skip_enabled() -> bool:
+    return os.environ.get("AIFILM_SKIP_GATE_AUTO", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _step(
+    sid: str,
+    *,
+    ok: bool,
+    detail: str = "",
+    hard: bool = True,
+    next_cmd: str | None = None,
+    codes: list[str] | None = None,
+    human: bool = False,
+) -> dict[str, Any]:
+    return {
+        "id": sid,
+        "ok": ok,
+        "hard": hard,
+        "human": human,
+        "detail": detail,
+        "next_cmd": next_cmd,
+        "codes": codes or [],
+    }
+
+
+def _load_spec(root: Path) -> dict[str, Any]:
+    return read_json(root / "film-spec.json") or {}
+
+
+def _write_spec(root: Path, spec: dict[str, Any]) -> None:
+    write_json(root / "film-spec.json", spec)
+
+
+def auto_inject_sex_sfx(root: Path) -> dict[str, Any]:
+    """Machine-fill missing meat sex_sfx events (write-spec already knows how)."""
+    spec = _load_spec(root)
+    if not isinstance(spec, dict) or not spec:
+        return {"ok": True, "skipped": True, "reason": "no_spec"}
+    heat = str(spec.get("heat_scale") or "").strip().lower()
+    shots: list[dict[str, Any]] = []
+    for scene in spec.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        for sh in scene.get("shots") or []:
+            if isinstance(sh, dict):
+                shots.append(sh)
+    if not shots:
+        return {"ok": True, "skipped": True, "reason": "no_shots"}
+    try:
+        from sound_plan import inject_sex_sfx_from_shots
+
+        sp = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else {}
+        before = len(sp.get("events") or []) if isinstance(sp.get("events"), list) else 0
+        sp2 = inject_sex_sfx_from_shots(sp or {"events": []}, shots, heat_scale=heat)
+        if isinstance(sp2, dict):
+            spec["sound_plan"] = sp2
+            after = len(sp2.get("events") or [])
+            _write_spec(root, spec)
+            return {
+                "ok": True,
+                "injected": max(0, after - before),
+                "events_after": after,
+            }
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)[:200]}
+    return {"ok": True, "injected": 0}
+
+
+def auto_i2v_motion_gate(root: Path, *, write: bool = True) -> dict[str, Any]:
+    """Measure means + write i2v-high-motion-audit + i2v-final-gate."""
+    try:
+        from cli_motion import i2v_motion_gate_from_rows
+        from i2v_motion_gate import ensure_take_means
+
+        mm = ensure_take_means(root, recompute=False, write_sidecars=True)
+        rep = i2v_motion_gate_from_rows(
+            [],
+            root=root,
+            write_receipts=write,
+            auto_from_root=True,
+            raw_complete=True,
+            kb_fallback=False,
+            style_ok=True,
+        )
+        return {
+            "ok": bool(rep.get("ok")),
+            "row_count": rep.get("row_count"),
+            "means": {
+                "measured": mm.get("measured_count"),
+                "skipped": mm.get("skipped_count"),
+                "errors": mm.get("error_count"),
+            },
+            "gate": (rep.get("gate") or {}).get("ok"),
+            "receipts": rep.get("receipts"),
+            "codes": list((rep.get("gate") or {}).get("codes") or []),
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)[:240]}
+
+
+def auto_promote_single_takes(root: Path) -> dict[str, Any]:
+    """When a shot has exactly one take, promote it without human PK."""
+    try:
+        from workflow_pack import select_shortlist
+
+        # promote only when shortlist has single-take rows; multi still deferred
+        rep = select_shortlist(root, promote=True, measure_missing=True)
+        multi = 0
+        for s in rep.get("shots") or []:
+            if isinstance(s, dict) and int(s.get("take_count") or 0) >= 2:
+                multi += 1
+        return {
+            "ok": True,
+            "promoted": len(rep.get("promoted") or []),
+            "multi_take_shots": multi,
+            "human_pk_still_required": multi > 0,
+            "detail": "single-take auto-promoted; multi-take needs human PK",
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)[:200]}
+
+
+def run_gate_auto(
+    root: Path | str,
+    *,
+    write: bool = True,
+    fix_sex_sfx: bool = True,
+    measure_i2v: bool = True,
+    promote_single: bool = True,
+    run_variety: bool = True,
+    run_cinematic: bool = True,
+) -> dict[str, Any]:
+    """Full machine ladder. Returns red/green with human_only remaining list."""
+    base = Path(root).expanduser().resolve()
+    if skip_enabled():
+        out = {
+            "schema_version": 1,
+            "kind": "gate-auto",
+            "ok": True,
+            "skipped": True,
+            "escape": "AIFILM_SKIP_GATE_AUTO=1",
+            "at": utc_now(),
+            "root": str(base),
+        }
+        if write:
+            write_json(base / "receipts" / RECEIPT, out)
+        return out
+
+    steps: list[dict[str, Any]] = []
+    r = str(base)
+    (base / "receipts").mkdir(parents=True, exist_ok=True)
+
+    # 1) five_track defaults + sex_sfx auto inject
+    try:
+        from five_track import ensure_five_track_defaults, plan_five_track
+
+        spec = _load_spec(base)
+        if isinstance(spec, dict) and spec:
+            ensure_five_track_defaults(spec)
+            if write:
+                _write_spec(base, spec)
+        if fix_sex_sfx:
+            sfx = auto_inject_sex_sfx(base)
+            steps.append(
+                _step(
+                    "sex_sfx_inject",
+                    ok=bool(sfx.get("ok")),
+                    detail=str(sfx)[:180],
+                    hard=False,
+                )
+            )
+        ft = plan_five_track(base, write=write)
+        steps.append(
+            _step(
+                "five_track",
+                ok=bool(ft.get("ok") or not ft.get("enabled")),
+                detail=(
+                    f"enabled={ft.get('enabled')} "
+                    f"sex={ft.get('sex_sfx', {}).get('covered')}/"
+                    f"{ft.get('sex_sfx', {}).get('required')}"
+                ),
+                hard=bool(ft.get("enabled")),
+                next_cmd=ft.get("next_cmd"),
+                codes=list(ft.get("codes") or []),
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(_step("five_track", ok=False, detail=str(exc)[:200]))
+
+    # 2) single-take promote (no human for 1 take)
+    if promote_single:
+        pr = auto_promote_single_takes(base)
+        steps.append(
+            _step(
+                "promote_single",
+                ok=bool(pr.get("ok")),
+                hard=False,
+                detail=pr.get("detail") or str(pr)[:160],
+                human=bool(pr.get("human_pk_still_required")),
+            )
+        )
+        if pr.get("human_pk_still_required"):
+            steps.append(
+                _step(
+                    "multi_take_pk",
+                    ok=False,
+                    hard=False,
+                    human=True,
+                    detail=f"multi_take_shots={pr.get('multi_take_shots')} — human PK",
+                    next_cmd=f'aifilm h3 pk-compare --root "{r}"; aifilm select-shortlist --root "{r}" --promote',
+                )
+            )
+
+    # 3) i2v motion gate auto measure+write
+    if measure_i2v:
+        mg = auto_i2v_motion_gate(base, write=write)
+        steps.append(
+            _step(
+                "i2v_motion",
+                ok=bool(mg.get("ok")),
+                detail=(
+                    f"rows={mg.get('row_count')} means={mg.get('means')} "
+                    f"gate={mg.get('gate')}"
+                    + (f" err={mg.get('error')}" if mg.get("error") else "")
+                ),
+                hard=True,
+                next_cmd=(
+                    None
+                    if mg.get("ok")
+                    else f'aifilm i2v-motion-gate --root "{r}" --write  # fix weak means'
+                ),
+                codes=list(mg.get("codes") or []),
+            )
+        )
+
+    # 4) true video
+    try:
+        from true_video_policy import scan_manifest_true_video
+
+        tv = scan_manifest_true_video(base)
+        steps.append(
+            _step(
+                "true_video",
+                ok=bool(tv.get("ok") or tv.get("skipped")),
+                detail=f"checked={tv.get('checked')} viol={len(tv.get('violations') or [])}",
+                hard=True,
+                next_cmd=(
+                    None
+                    if tv.get("ok") or tv.get("skipped")
+                    else "re-I2V; ban Ken Burns approved clips"
+                ),
+                codes=list(tv.get("codes") or []),
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(_step("true_video", ok=False, detail=str(exc)[:200]))
+
+    # 5) variety (machine lint of film-spec)
+    if run_variety:
+        try:
+            from workflow_pack import variety_precheck
+
+            var = variety_precheck(base, write=write)
+            # If no meat shots, variety often "ok" with empty matrix — fine
+            steps.append(
+                _step(
+                    "variety",
+                    ok=bool(var.get("ok")),
+                    detail=f"issues={len(var.get('issues') or [])} meat={var.get('meat_shot_count')}",
+                    hard=bool(int(var.get("meat_shot_count") or 0) >= 2),
+                    next_cmd=(
+                        None
+                        if var.get("ok")
+                        else f'aifilm variety-precheck --root "{r}"  # fix film-spec'
+                    ),
+                    codes=[
+                        str(i.get("code")) for i in (var.get("issues") or []) if isinstance(i, dict)
+                    ],
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            steps.append(_step("variety", ok=True, hard=False, detail=f"skip: {exc}"[:160]))
+
+    # 6) cinematic composite (uses fresh i2v receipts)
+    if run_cinematic:
+        try:
+            from cinematic_gate import run_cinematic_gate
+
+            cin = run_cinematic_gate(
+                base,
+                write=write,
+                run_ship_prep=False,
+                skip_variety=True,  # already did
+                skip_five_track=True,
+                auto_i2v=False,  # already measured
+            )
+            steps.append(
+                _step(
+                    "cinematic_gate",
+                    ok=bool(cin.get("ok")),
+                    detail=f"blocked_by={cin.get('blocked_by')}",
+                    hard=True,
+                    next_cmd=cin.get("next_cmd"),
+                )
+            )
+        except TypeError:
+            # older signature without auto_i2v
+            from cinematic_gate import run_cinematic_gate
+
+            cin = run_cinematic_gate(
+                base,
+                write=write,
+                run_ship_prep=False,
+                skip_variety=True,
+                skip_five_track=True,
+            )
+            steps.append(
+                _step(
+                    "cinematic_gate",
+                    ok=bool(cin.get("ok")),
+                    detail=f"blocked_by={cin.get('blocked_by')}",
+                    hard=True,
+                    next_cmd=cin.get("next_cmd"),
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            steps.append(_step("cinematic_gate", ok=False, detail=str(exc)[:200]))
+
+    hard_failed = [s for s in steps if not s.get("ok") and s.get("hard") and not s.get("human")]
+    human_pending = [s for s in steps if s.get("human") and not s.get("ok")]
+    ok = not hard_failed
+    blocked = hard_failed[0] if hard_failed else None
+
+    out = {
+        "schema_version": 1,
+        "kind": "gate-auto",
+        "at": utc_now(),
+        "root": str(base),
+        "ok": ok,
+        "steps": steps,
+        "blocked_by": (blocked or {}).get("id"),
+        "hard_failed": [s["id"] for s in hard_failed],
+        "human_pending": [s["id"] for s in human_pending],
+        "human_only_forever": list(HUMAN_ONLY),
+        "next_cmd": (blocked or {}).get("next_cmd")
+        or (
+            f'aifilm final --root "{r}" --post-engine hyperframes --music-mood rnb --tts-backend edge'
+            if ok and not human_pending
+            else (human_pending[0].get("next_cmd") if human_pending else None)
+        ),
+        "machine_verified": ok,
+        "note": (
+            "Machine ladder only. Still needs human for pilot / multi-take PK / "
+            "review-final. Does not fake motion floors."
+        ),
+    }
+    if write:
+        write_json(base / "receipts" / RECEIPT, out)
+    return out

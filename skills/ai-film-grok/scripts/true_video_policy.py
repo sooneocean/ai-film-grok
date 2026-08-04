@@ -142,18 +142,24 @@ def production_mode_of(root: Path | str | None = None, spec: dict[str, Any] | No
         spec = read_json(base / "film-spec.json") or {}
     spec = spec if isinstance(spec, dict) else {}
     timeline = spec.get("timeline") if isinstance(spec.get("timeline"), dict) else {}
-    mode = str(
-        spec.get("production_mode")
-        or timeline.get("production_mode")
-        or spec.get("content_channel")
-        or ""
-    ).strip().lower()
+    mode = (
+        str(
+            spec.get("production_mode")
+            or timeline.get("production_mode")
+            or spec.get("content_channel")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
     if root is not None and not mode:
         book = read_json(Path(root).expanduser().resolve() / "production-book.json") or {}
         if isinstance(book, dict):
-            mode = str(
-                book.get("production_mode") or book.get("content_channel") or ""
-            ).strip().lower()
+            mode = (
+                str(book.get("production_mode") or book.get("content_channel") or "")
+                .strip()
+                .lower()
+            )
     return mode
 
 
@@ -352,7 +358,12 @@ def assert_hero_clip_source(
                 }
             )
 
-    if status == "approved" and ep and ep not in HERO_VIDEO_ENDPOINTS and ep not in FORBIDDEN_HERO_ENDPOINTS:
+    if (
+        status == "approved"
+        and ep
+        and ep not in HERO_VIDEO_ENDPOINTS
+        and ep not in FORBIDDEN_HERO_ENDPOINTS
+    ):
         # Unknown endpoint: allow only if not still-like; soft for candidate, hard for approved
         codes.append(CODE_FORBIDDEN_ENDPOINT)
         issues.append(
@@ -459,13 +470,13 @@ def scan_manifest_true_video(
     }
 
 
-def assert_manifest_true_video(root: Path | str, *, manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+def assert_manifest_true_video(
+    root: Path | str, *, manifest: dict[str, Any] | None = None
+) -> dict[str, Any]:
     report = scan_manifest_true_video(root, manifest=manifest)
     if not report.get("ok"):
         vids = report.get("violations") or []
-        sample = "; ".join(
-            f"{v.get('shot_id')}: {v.get('error')}" for v in vids[:5]
-        )
+        sample = "; ".join(f"{v.get('shot_id')}: {v.get('error')}" for v in vids[:5])
         raise TrueVideoPolicyError(
             f"True-video policy failed on {len(vids)} approved clip(s): {sample}. "
             "Re-I2V with Grok/H3; ban Ken Burns / panel still-motion on hero track."

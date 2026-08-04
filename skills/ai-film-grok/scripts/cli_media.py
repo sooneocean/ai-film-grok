@@ -32,8 +32,10 @@ from security_policy import (
     safe_output_path,
     safe_workspace_directory,
 )
+from util import require_json as read_json
 from util import sha256_file, utc_now, write_json
 from util.errors import FilmError
+from util.subprocess import run
 from util.validators import film_output_path, valid_shot_id
 from visual_bible import load_bible
 
@@ -53,10 +55,6 @@ def _ag():
 
 def emit(obj: dict[str, Any]) -> None:
     return _ag().emit(obj)
-
-
-def read_json(path: Path) -> dict[str, Any]:
-    return _ag().read_json(path)
 
 
 def load_manifest(root: Path) -> dict[str, Any]:
@@ -79,20 +77,12 @@ def record_file_matches(record: dict[str, Any], path: Path) -> bool:
     return _ag().record_file_matches(record, path)
 
 
-def run(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    return _ag().run(cmd, **kwargs)
-
-
 def which_npx_safe() -> str | None:
     return _ag().which_npx_safe()
 
 
-def aspect_dims(aspect: str) -> tuple[int, int]:
-    return _ag().aspect_dims(aspect)
-
-
-def slugify(text: str) -> str:
-    return _ag().slugify(text)
+def probe_native_audio_mean_volume(path: Path) -> float | None:
+    return _ag().probe_native_audio_mean_volume(path)
 
 
 def ensure_tree(root: Path) -> dict[str, Path]:
@@ -105,10 +95,6 @@ def normalize_clip(root: Path, *args: Any, **kwargs: Any) -> Any:
 
 def media_duration(path: Path) -> float:
     return _ag().media_duration(path)
-
-
-def probe_native_audio_mean_volume(path: Path) -> float | None:
-    return _ag().probe_native_audio_mean_volume(path)
 
 
 def _register_media(*args: Any, **kwargs: Any) -> dict[str, Any]:
@@ -823,9 +809,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             # use review_note as weak playable_action when provided
             if not pa and review_note:
                 pa = review_note
-            assert_still_source_for_register(
-                root, shot_id=str(args.shot_id), playable_action=pa
-            )
+            assert_still_source_for_register(root, shot_id=str(args.shot_id), playable_action=pa)
         except InputFidelityError as exc:
             raise FilmError(str(exc)) from exc
         except Exception:

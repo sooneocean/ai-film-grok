@@ -13,6 +13,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from security_policy import atomic_write_text
+
 from util import require_json, write_json
 from util.errors import FilmError  # noqa: F401 — re-export
 
@@ -20,25 +22,6 @@ from util.errors import FilmError  # noqa: F401 — re-export
 def read_json(path: Path) -> dict[str, Any]:
     """Strict read (legacy name on this module)."""
     return require_json(path)
-
-
-def atomic_write_text(path: Path, content: str, *, encoding: str = "utf-8") -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    import os
-    import tempfile
-
-    temp: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            "w", encoding=encoding, dir=path.parent, delete=False
-        ) as handle:
-            handle.write(content)
-            temp = Path(handle.name)
-        os.replace(temp, path)
-        temp = None
-    finally:
-        if temp is not None and temp.exists():
-            temp.unlink()
 
 
 __all__ = ["FilmError", "atomic_write_text", "read_json", "write_json"]

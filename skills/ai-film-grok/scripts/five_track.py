@@ -257,9 +257,7 @@ def _sex_sfx_coverage(spec: dict[str, Any]) -> dict[str, Any]:
     covered = {
         str(e.get("shot_id"))
         for e in events
-        if isinstance(e, dict)
-        and e.get("sex_sfx") is True
-        and str(e.get("shot_id") or "").strip()
+        if isinstance(e, dict) and e.get("sex_sfx") is True and str(e.get("shot_id") or "").strip()
     }
     missing = [str(s.get("id")) for s in meat if str(s.get("id")) not in covered]
     return {
@@ -291,7 +289,11 @@ def plan_five_track(root: Path | str, *, write: bool = True) -> dict[str, Any]:
             "required": tid != "sub",
         }
     mixed = _stem_present(audio_dir, STEM_FILES["mixed"])
-    mix_report = read_json(audio_dir / "mix_report.json") if (audio_dir / "mix_report.json").is_file() else {}
+    mix_report = (
+        read_json(audio_dir / "mix_report.json")
+        if (audio_dir / "mix_report.json").is_file()
+        else {}
+    )
     loudness = {}
     if isinstance(mix_report, dict):
         loudness = mix_report.get("loudness") or mix_report.get("loudness_after") or {}
@@ -319,9 +321,7 @@ def plan_five_track(root: Path | str, *, write: bool = True) -> dict[str, Any]:
             {
                 "code": "FIVE_TRACK_FX_SEX_SFX_MISSING",
                 "severity": "error" if five_track_enabled(spec) else "warning",
-                "message": (
-                    f"meat shots missing sex_sfx: {sex.get('missing')}"
-                ),
+                "message": (f"meat shots missing sex_sfx: {sex.get('missing')}"),
             }
         )
     if mixed and not arts:
@@ -392,8 +392,5 @@ def audit_five_track(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         return {**report, "ok": True, "skipped": True}
     if report.get("enabled") and not report.get("ok"):
         codes = ",".join(report.get("codes") or [])
-        raise FiveTrackError(
-            f"five-track audit failed: {codes}. "
-            f"next: {report.get('next_cmd')}"
-        )
+        raise FiveTrackError(f"five-track audit failed: {codes}. next: {report.get('next_cmd')}")
     return report

@@ -85,6 +85,22 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
         help="Do not auto-measure missing mean sidecars",
     )
 
+    # gate-auto: machine verification ladder (no human pilot/PK/review)
+    ga = sub.add_parser(
+        "gate-auto",
+        help=(
+            "Auto machine gates: measure means, write i2v-final, inject sex_sfx, "
+            "five-track, true-video, variety, cinematic-gate "
+            "(does NOT replace pilot / multi-take PK / review-final)"
+        ),
+    )
+    ga.add_argument("--root", required=True)
+    ga.add_argument("--no-write", action="store_true")
+    ga.add_argument("--no-sex-sfx", action="store_true", help="Skip auto sex_sfx inject")
+    ga.add_argument("--no-promote-single", action="store_true")
+    ga.add_argument("--no-variety", action="store_true")
+    ga.add_argument("--no-cinematic", action="store_true")
+
     # cinematic-gate composite (Wave ε)
     cg = sub.add_parser(
         "cinematic-gate",
@@ -347,6 +363,21 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
             _emit(report)
             return 0
 
+        if cmd == "gate-auto":
+            from gate_auto import run_gate_auto
+
+            report = run_gate_auto(
+                args.root,
+                write=not bool(getattr(args, "no_write", False)),
+                fix_sex_sfx=not bool(getattr(args, "no_sex_sfx", False)),
+                promote_single=not bool(getattr(args, "no_promote_single", False)),
+                run_variety=not bool(getattr(args, "no_variety", False)),
+                run_cinematic=not bool(getattr(args, "no_cinematic", False)),
+            )
+            _emit(report)
+            # exit 0 when machine-verified; human_pending does not fail CI if hard ok
+            return 0 if report.get("ok") else 2
+
         if cmd == "cinematic-gate":
             from cinematic_gate import run_cinematic_gate
 
@@ -356,6 +387,7 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
                 run_ship_prep=bool(getattr(args, "ship_prep", False)),
                 skip_variety=bool(getattr(args, "skip_variety", False)),
                 skip_five_track=bool(getattr(args, "skip_five_track", False)),
+                auto_i2v=True,
             )
             _emit(report)
             return 0 if report.get("ok") else 2

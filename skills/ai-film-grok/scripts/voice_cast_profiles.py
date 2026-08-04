@@ -34,9 +34,16 @@ def _normalize_lang(raw: str) -> str:
 
 def event_language(event: dict[str, Any]) -> str:
     """Resolve language — Chinese-only product path."""
-    explicit = str(
-        event.get("language") or event.get("spoken_lang") or event.get("dialogue_spoken_lang") or ""
-    ).strip().lower()
+    explicit = (
+        str(
+            event.get("language")
+            or event.get("spoken_lang")
+            or event.get("dialogue_spoken_lang")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
     if explicit:
         return _normalize_lang(explicit)
     event_type = str(event.get("type") or "").strip().lower()

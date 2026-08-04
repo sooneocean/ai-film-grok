@@ -270,9 +270,11 @@ def run_preflight(root: Path) -> dict[str, Any]:
             try:
                 from edit_policy import default_visual_fit
 
-                global_fit = str(
-                    spec.get("visual_fit") or default_visual_fit(spec) or "slot"
-                ).strip().lower()
+                global_fit = (
+                    str(spec.get("visual_fit") or default_visual_fit(spec) or "slot")
+                    .strip()
+                    .lower()
+                )
             except Exception:
                 global_fit = str(spec.get("visual_fit") or "slot").strip().lower()
             for scene in spec.get("scenes") or []:
@@ -335,7 +337,8 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         "soft",
                         "EQUAL_SLOT_PPT_RISK",
                         "; ".join(
-                            str(i.get("message") or i.get("code")) for i in (ppt.get("issues") or [])
+                            str(i.get("message") or i.get("code"))
+                            for i in (ppt.get("issues") or [])
                         ),
                         fix="set visual_fit:vo (dialogue_drama default) or vary duration_sec / re-I2V",
                     )

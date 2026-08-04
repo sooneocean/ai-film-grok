@@ -512,17 +512,7 @@ def variety_precheck(root: Path | str, *, write: bool = True) -> dict[str, Any]:
                 }
             )
         # Triple: same motion primary + camera + size — strongest anti-clone
-        if (
-            ma
-            and mb
-            and ma == mb
-            and ca
-            and cb
-            and ca == cb
-            and sa
-            and sb
-            and sa == sb
-        ):
+        if ma and mb and ma == mb and ca and cb and ca == cb and sa and sb and sa == sb:
             triple_collisions.append(
                 {
                     "a": str(a.get("id")),
@@ -580,8 +570,7 @@ def variety_precheck(root: Path | str, *, write: bool = True) -> dict[str, Any]:
             {
                 "code": "ADJACENT_FRAMING_COLLISION",
                 "message": (
-                    f"{c['a']}→{c['b']} same camera {c['camera']!r} + "
-                    f"shot_size {c['shot_size']!r}"
+                    f"{c['a']}→{c['b']} same camera {c['camera']!r} + shot_size {c['shot_size']!r}"
                 ),
             }
         )
@@ -1406,9 +1395,7 @@ def ship_prep(
                     + human_fidelity_summary(fid_rep).replace("\n", " | ")
                 )[:220],
                 "next_cmd": (
-                    None
-                    if fid_rep.get("ok")
-                    else f'aifilm fidelity apply --root "{root}"'
+                    None if fid_rep.get("ok") else f'aifilm fidelity apply --root "{root}"'
                 ),
                 "hard": fid_hard,
                 "advisory": not fid_hard,

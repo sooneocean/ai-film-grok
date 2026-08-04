@@ -837,7 +837,9 @@ def still_source_overlap(
     dsl = _as_dict(shot.get("dsl"))
     action = _text(dsl.get("action") or shot.get("playable_action"))
     pa = _text(playable_action) or action or quote
-    needles = [t for t in re.findall(r"[\u4e00-\u9fff]{2,4}|[A-Za-z]{3,}", quote + " " + action) if t]
+    needles = [
+        t for t in re.findall(r"[\u4e00-\u9fff]{2,4}|[A-Za-z]{3,}", quote + " " + action) if t
+    ]
     needles = needles[:8]
     if not needles:
         return {"ok": True, "applicable": False, "codes": [], "score": 1.0, "needles": []}
@@ -954,10 +956,7 @@ def design_go(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         "next_cmd": (
             'aifilm pilot pack --root "<film>"'
             if ok
-            else (
-                fid.get("next_cmd")
-                or 'aifilm fidelity apply --root "<film>"'
-            )
+            else (fid.get("next_cmd") or 'aifilm fidelity apply --root "<film>"')
         ),
         "note": "design-go never signs pilot; human pilot approve still required",
         "generated_at": utc_now(),
@@ -978,13 +977,11 @@ def human_fidelity_summary(report: dict[str, Any]) -> str:
     prot = report.get("protected_dialogue_coverage") or {}
     missing = prot.get("missing") or []
     line1 = f"promise: {promise[:100]}"
-    line2 = (
-        f"must_keep: {len(mk)} total, unmapped={len(unmapped)}"
-        + (f" ({', '.join(unmapped[:4])})" if unmapped else " (ok)")
+    line2 = f"must_keep: {len(mk)} total, unmapped={len(unmapped)}" + (
+        f" ({', '.join(unmapped[:4])})" if unmapped else " (ok)"
     )
-    line3 = (
-        f"protected_dialogue missing: {len(missing)}"
-        + (f" — {'; '.join(str(m)[:20] for m in missing[:3])}" if missing else " (ok)")
+    line3 = f"protected_dialogue missing: {len(missing)}" + (
+        f" — {'; '.join(str(m)[:20] for m in missing[:3])}" if missing else " (ok)"
     )
     return "\n".join([line1, line2, line3])
 
