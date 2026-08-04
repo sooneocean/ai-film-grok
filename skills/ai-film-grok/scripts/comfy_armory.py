@@ -248,6 +248,7 @@ def _allowed_binding_slots(bindings: Mapping[str, Any]) -> set[tuple[str, str]]:
         ("save_node", "filename_prefix_input"),
         ("input_node", "input_image_input"),
         ("audio_node", "audio_input"),
+        ("last_input_node", "last_image_input"),
     )
     slots = {
         (str(bindings[node_key]), str(bindings[input_key]))
@@ -260,7 +261,19 @@ def _allowed_binding_slots(bindings: Mapping[str, Any]) -> set[tuple[str, str]]:
     ):
         if key in bindings and input_key in bindings:
             slots.update((str(node), str(bindings[input_key])) for node in bindings[key])
+    if "last_frame_node" in bindings and "last_frame_input" in bindings:
+        slots.add((str(bindings["last_frame_node"]), str(bindings["last_frame_input"])))
+    for node_id in bindings.get("ref_input_nodes") or []:
+        slots.add((str(node_id), str(bindings.get("ref_image_input") or "image")))
     return slots
+
+
+def _optional_last_frame_nodes(bindings: Mapping[str, Any]) -> set[str]:
+    """Nodes that may be injected when last_frame is bound (not in base template)."""
+    out: set[str] = set()
+    if bindings.get("last_input_node"):
+        out.add(str(bindings["last_input_node"]))
+    return out
 
 
 def _matches_registered_template(
@@ -271,30 +284,42 @@ def _matches_registered_template(
         template = json.loads(_template_path(dict(weapon)).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    if set(graph) != set(template):
+    bindings = weapon.get("bindings") or {}
+    optional_nodes = _optional_last_frame_nodes(bindings)
+    if set(graph) - optional_nodes != set(template):
         return False
-    allowed_slots = _allowed_binding_slots(weapon.get("bindings") or {})
+    if not set(template).issubset(set(graph)):
+        return False
+    allowed_slots = _allowed_binding_slots(bindings)
     for node_id, expected_node in template.items():
         actual_node = graph.get(node_id)
-        if (
-            not isinstance(actual_node, Mapping)
-            or set(actual_node) != set(expected_node)
-            or actual_node.get("class_type") != expected_node.get("class_type")
-        ):
+        if not isinstance(actual_node, Mapping) or actual_node.get(
+            "class_type"
+        ) != expected_node.get("class_type"):
+            return False
+        if set(actual_node) != set(expected_node):
             return False
         actual_inputs = actual_node.get("inputs")
         expected_inputs = expected_node.get("inputs")
-        if (
-            not isinstance(actual_inputs, Mapping)
-            or not isinstance(expected_inputs, Mapping)
-            or set(actual_inputs) != set(expected_inputs)
-        ):
+        if not isinstance(actual_inputs, Mapping) or not isinstance(expected_inputs, Mapping):
+            return False
+        extra = set(actual_inputs) - set(expected_inputs)
+        missing = set(expected_inputs) - set(actual_inputs)
+        if missing:
+            return False
+        if extra and any((str(node_id), str(name)) not in allowed_slots for name in extra):
             return False
         if any(
             actual_inputs[input_name] != expected_value
             and (str(node_id), str(input_name)) not in allowed_slots
             for input_name, expected_value in expected_inputs.items()
         ):
+            return False
+    for node_id in set(graph) - set(template):
+        if node_id not in optional_nodes:
+            return False
+        node = graph.get(node_id)
+        if not isinstance(node, Mapping) or node.get("class_type") != "LoadImage":
             return False
     return True
 
@@ -361,9 +386,13 @@ def assert_registered_weapon_workflow(
         str(audio_extension.get("source_node") or ""),
         str(audio_extension.get("encode_node") or ""),
     } - {""}
-    if set(graph) != set(template) | extension_nodes:
-        raise ComfyArmoryError("unapproved workflow mutation: node set changed")
     bindings = weapon.get("bindings") or {}
+    optional_last_nodes = _optional_last_frame_nodes(bindings)
+    allowed_extra_nodes = extension_nodes | optional_last_nodes
+    if not set(template).issubset(set(graph)):
+        raise ComfyArmoryError("unapproved workflow mutation: node set changed")
+    if not set(graph).issubset(set(template) | allowed_extra_nodes):
+        raise ComfyArmoryError("unapproved workflow mutation: node set changed")
     allowed_slots = _allowed_binding_slots(bindings)
     if extension_nodes:
         latent_node = str(audio_extension.get("latent_node") or "")
@@ -373,16 +402,21 @@ def assert_registered_weapon_workflow(
             allowed_slots.add((str(frame_node), str(frame_input)))
     for node_id, expected_node in template.items():
         actual_node = graph.get(node_id)
-        if not isinstance(actual_node, Mapping) or set(actual_node) != set(expected_node):
+        if not isinstance(actual_node, Mapping):
+            raise ComfyArmoryError(f"unapproved workflow mutation at node {node_id}")
+        if set(actual_node) != set(expected_node):
             raise ComfyArmoryError(f"unapproved workflow mutation at node {node_id}")
         if actual_node.get("class_type") != expected_node.get("class_type"):
             raise ComfyArmoryError(f"unapproved workflow mutation at node {node_id}")
         actual_inputs = actual_node.get("inputs")
         expected_inputs = expected_node.get("inputs")
-        if (
-            not isinstance(actual_inputs, Mapping)
-            or not isinstance(expected_inputs, Mapping)
-            or set(actual_inputs) != set(expected_inputs)
+        if not isinstance(actual_inputs, Mapping) or not isinstance(expected_inputs, Mapping):
+            raise ComfyArmoryError(f"unapproved workflow mutation at node {node_id}")
+        if set(expected_inputs) - set(actual_inputs):
+            raise ComfyArmoryError(f"unapproved workflow mutation at node {node_id}")
+        extra_inputs = set(actual_inputs) - set(expected_inputs)
+        if extra_inputs and any(
+            (str(node_id), str(name)) not in allowed_slots for name in extra_inputs
         ):
             raise ComfyArmoryError(f"unapproved workflow mutation at node {node_id}")
         for input_name, expected_value in expected_inputs.items():
@@ -391,6 +425,18 @@ def assert_registered_weapon_workflow(
                 and (str(node_id), str(input_name)) not in allowed_slots
             ):
                 raise ComfyArmoryError(f"unapproved workflow mutation at {node_id}.{input_name}")
+    for node_id in set(graph) & optional_last_nodes:
+        node = graph.get(node_id)
+        if not isinstance(node, Mapping) or node.get("class_type") != "LoadImage":
+            raise ComfyArmoryError(f"unapproved last-frame LoadImage at node {node_id}")
+        img = (node.get("inputs") or {}).get("image")
+        _validate_relative_media_name(str(img), label="last frame image name")
+        frame_node = str(bindings.get("last_frame_node") or "")
+        frame_input = str(bindings.get("last_frame_input") or "last_frame")
+        if frame_node:
+            link = (graph.get(frame_node) or {}).get("inputs", {}).get(frame_input)
+            if link != [node_id, 0]:
+                raise ComfyArmoryError("last_frame link must point at last LoadImage node")
 
     if extension_nodes:
         source_node = str(audio_extension["source_node"])
@@ -492,11 +538,17 @@ def compile_weapon_workflow(
     prompt: str,
     seed: int,
     input_image_name: str | None = None,
+    last_image_name: str | None = None,
+    ref_image_names: list[str] | None = None,
     input_audio_name: str | None = None,
     filename_prefix: str = "aifilm/armory",
     steps: int | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Bind a verified image workflow template without submitting it."""
+    """Bind a verified image workflow template without submitting it.
+
+    Optional ``last_image_name`` injects MiniMax H3 first/last-frame (FLF) wiring
+    when the weapon declares ``last_input_node`` / ``last_frame_node`` bindings.
+    """
     if not str(prompt).strip():
         raise ComfyArmoryError("prompt must not be empty")
     if not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed < 2**64:
@@ -546,6 +598,47 @@ def compile_weapon_workflow(
                 inputs[key] = prompt
             if value == "__AIFILM_INPUT_IMAGE__" and input_image_name:
                 inputs[key] = input_image_name
+            if value == "__AIFILM_LAST_IMAGE__" and last_image_name:
+                inputs[key] = last_image_name
+    # Optional last-frame (FLF): inject LoadImage + last_frame link when requested.
+    if last_image_name:
+        last_node = str(bindings.get("last_input_node") or "").strip()
+        frame_node = str(bindings.get("last_frame_node") or "").strip()
+        frame_input = str(bindings.get("last_frame_input") or "last_frame")
+        last_img_key = str(bindings.get("last_image_input") or "image")
+        if not last_node or not frame_node:
+            raise ComfyArmoryError(
+                f"weapon {weapon_id} does not declare last_frame bindings; cannot bind last image"
+            )
+        last_image_name = _validate_relative_media_name(
+            last_image_name, label="last frame image name"
+        )
+        if last_node in graph and graph[last_node].get("class_type") == "LoadImage":
+            graph[last_node]["inputs"][last_img_key] = last_image_name
+        else:
+            graph[last_node] = {
+                "class_type": "LoadImage",
+                "inputs": {last_img_key: last_image_name},
+            }
+        if frame_node not in graph:
+            raise ComfyArmoryError(f"weapon {weapon_id} missing last_frame node {frame_node}")
+        graph[frame_node]["inputs"][frame_input] = [last_node, 0]
+    if ref_image_names:
+        ref_nodes = [str(n) for n in (bindings.get("ref_input_nodes") or [])]
+        ref_key = str(bindings.get("ref_image_input") or "image")
+        if not ref_nodes and "input_node" not in bindings:
+            raise ComfyArmoryError(
+                f"weapon {weapon_id} has no ref_input_nodes for multi-reference binding"
+            )
+        for idx, ref_name in enumerate(ref_image_names):
+            if idx >= len(ref_nodes):
+                break
+            node_id = ref_nodes[idx]
+            safe = _validate_relative_media_name(str(ref_name), label=f"ref image {idx}")
+            if node_id in graph and graph[node_id].get("class_type") == "LoadImage":
+                graph[node_id]["inputs"][ref_key] = safe
+            else:
+                graph[node_id] = {"class_type": "LoadImage", "inputs": {ref_key: safe}}
     if "audio_node" in bindings:
         if not input_audio_name:
             raise ComfyArmoryError("talking-avatar workflow requires an uploaded audio name")

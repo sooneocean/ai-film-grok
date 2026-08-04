@@ -1331,17 +1331,46 @@ class LocalComfyH3Provider(I2VProvider):
                 allow_experimental=allow_experimental,
             )
             input_image_name = kwargs.get("input_image_name")
+            last_image_name = kwargs.get("last_image_name")
+            last_frame = kwargs.get("last_frame") or kwargs.get("last_image")
+            ref_image_names = kwargs.get("ref_image_names")
+            reference_images = kwargs.get("reference_images") or []
+            if isinstance(reference_images, (str, Path)):
+                reference_images = [reference_images]
             if intent != "text-to-video":
                 if not input_image_name:
                     remote = upload_image(base_url, Path(keyframe).expanduser().resolve())
                     input_image_name = remote.get("name") if isinstance(remote, dict) else remote
                 if not input_image_name:
                     raise I2VProviderError("comfy-h3 failed to resolve uploaded input image name")
+                if last_frame and not last_image_name:
+                    last_path = Path(last_frame).expanduser().resolve()
+                    if not last_path.is_file():
+                        raise I2VProviderError(f"comfy-h3 last_frame missing: {last_path}")
+                    remote_last = upload_image(base_url, last_path)
+                    last_image_name = (
+                        remote_last.get("name") if isinstance(remote_last, dict) else remote_last
+                    )
+                if reference_images and not ref_image_names:
+                    uploaded_refs: list[str] = []
+                    for ref in reference_images:
+                        ref_path = Path(ref).expanduser().resolve()
+                        if not ref_path.is_file():
+                            raise I2VProviderError(f"comfy-h3 reference image missing: {ref_path}")
+                        remote_ref = upload_image(base_url, ref_path)
+                        name = (
+                            remote_ref.get("name") if isinstance(remote_ref, dict) else remote_ref
+                        )
+                        if name:
+                            uploaded_refs.append(str(name))
+                    ref_image_names = uploaded_refs or None
             graph = compile_weapon_workflow(
                 weapon_id,
                 prompt=prompt,
                 seed=int(kwargs.get("seed", 20260803)),
                 input_image_name=str(input_image_name) if input_image_name else None,
+                last_image_name=str(last_image_name) if last_image_name else None,
+                ref_image_names=list(ref_image_names) if ref_image_names else None,
                 filename_prefix=str(
                     kwargs.get("filename_prefix") or f"aifilm/h3/{weapon_id.replace('-', '_')}"
                 ),
@@ -1368,6 +1397,7 @@ class LocalComfyH3Provider(I2VProvider):
             downloaded = download_result(base_url, artifacts[0], out_path)
         except Exception as exc:
             raise I2VProviderError(f"comfy-h3 generate failed: {exc}") from exc
+        last_frame_path = kwargs.get("last_frame") or kwargs.get("last_image")
         receipt = {
             "schema_version": 1,
             "kind": "local-minimax-h3-generation",
@@ -1375,6 +1405,7 @@ class LocalComfyH3Provider(I2VProvider):
             "provider": self.name,
             "weapon_id": weapon_id,
             "intent": intent,
+            "mode": mode,
             "prompt_id": prompt_id,
             "output": downloaded,
             "source_endpoint": (
@@ -1384,6 +1415,16 @@ class LocalComfyH3Provider(I2VProvider):
                 if intent == "reference-to-video"
                 else "local_minimax_h3_i2v"
             ),
+            "input_provenance": {
+                "first_image": str(Path(keyframe).expanduser().resolve()) if keyframe else None,
+                "last_image": str(Path(last_frame_path).expanduser().resolve())
+                if last_frame_path
+                else None,
+                "has_last_frame": bool(last_frame_path),
+                "ref_count": len(
+                    kwargs.get("reference_images") or kwargs.get("ref_image_names") or []
+                ),
+            },
         }
         receipt_path = out_path.with_suffix(out_path.suffix + ".receipt.json")
         write_json(receipt_path, receipt)
@@ -1397,6 +1438,7 @@ class LocalComfyH3Provider(I2VProvider):
             "prompt_id": prompt_id,
             "weapon_id": weapon_id,
             "source_endpoint": receipt["source_endpoint"],
+            "input_provenance": receipt["input_provenance"],
         }
 
 

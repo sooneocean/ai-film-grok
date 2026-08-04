@@ -959,7 +959,11 @@
         "steps_node": "12",
         "steps_input": "steps",
         "save_node": "18",
-        "filename_prefix_input": "filename_prefix"
+        "filename_prefix_input": "filename_prefix",
+        "last_input_node": "20",
+        "last_image_input": "image",
+        "last_frame_node": "8",
+        "last_frame_input": "last_frame"
       },
       "requirements": {
         "diffusion_models": [

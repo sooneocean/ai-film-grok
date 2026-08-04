@@ -27,11 +27,37 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     plan.add_argument("--root", type=Path, required=True)
     plan.add_argument("--shot-id", required=True)
     plan.add_argument("--receipt", type=Path, default=None)
+    plan.add_argument(
+        "--still",
+        type=Path,
+        default=None,
+        help="Plan against an explicit still path (still-challenge candidate trial)",
+    )
+    plan.add_argument(
+        "--last-frame",
+        type=Path,
+        default=None,
+        dest="last_frame",
+        help="End/last keyframe for first-last-frame (FLF) mode",
+    )
+    plan.add_argument(
+        "--ref",
+        type=Path,
+        action="append",
+        default=None,
+        dest="refs",
+        help="Optional reference image (repeatable; Phase 3 R2V multi-ref)",
+    )
 
     run = actions.add_parser("run", help="Generate H3 clip for one shot on the 5090")
     run.add_argument("--root", type=Path, required=True)
     run.add_argument("--shot-id", required=True)
-    run.add_argument("--mode", choices=["t2v", "i2v", "r2v"], default=None)
+    run.add_argument(
+        "--mode",
+        choices=["t2v", "i2v", "flf", "r2v"],
+        default=None,
+        help="t2v | i2v | flf (first+last on I2V weapon) | r2v",
+    )
     run.add_argument("--register", action="store_true")
     run.add_argument("--status", default="candidate", choices=["candidate", "approved", "rejected"])
     run.add_argument(
@@ -55,13 +81,22 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
         default=None,
         help="Explicit still path override (pilot / still-challenge trial; does not auto-promote)",
     )
-    run.add_argument("--receipt", type=Path, default=None)
-    plan.add_argument(
-        "--still",
+    run.add_argument(
+        "--last-frame",
         type=Path,
         default=None,
-        help="Plan against an explicit still path (still-challenge candidate trial)",
+        dest="last_frame",
+        help="End/last keyframe for FLF (also auto from stills/<id>_end.png)",
     )
+    run.add_argument(
+        "--ref",
+        type=Path,
+        action="append",
+        default=None,
+        dest="refs",
+        help="Optional reference image (repeatable)",
+    )
+    run.add_argument("--receipt", type=Path, default=None)
 
     lst = actions.add_parser(
         "list",
@@ -195,6 +230,8 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 args.root,
                 args.shot_id,
                 still_override=getattr(args, "still", None),
+                last_override=getattr(args, "last_frame", None),
+                refs_override=getattr(args, "refs", None),
             )
         elif action == "list":
             report = list_h3_eligible_shots(
@@ -277,6 +314,8 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 enqueue_queue=not bool(args.no_queue),
                 production_stage=str(getattr(args, "stage", None) or "production"),
                 still_override=getattr(args, "still", None),
+                last_override=getattr(args, "last_frame", None),
+                refs_override=getattr(args, "refs", None),
             )
         else:
             raise H3WorkflowError(f"unknown h3 action: {action}")

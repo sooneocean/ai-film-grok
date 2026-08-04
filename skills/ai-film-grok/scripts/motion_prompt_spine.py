@@ -417,6 +417,12 @@ def provider_prefix(mode: str) -> str:
         )
     if m == "t2v":
         return "Vertical 9:16 text-to-video plate."
+    if m in {"flf", "first_last", "first_last_frame", "i2v_flf"}:
+        return (
+            "Vertical 9:16. First-last-frame image-to-video with medium cel-anime style lock. "
+            "Animate from the first keyframe toward the last keyframe; land on the last pose "
+            "and wardrobe; keep identity fixed."
+        )
     return (
         "Vertical 9:16. Animate the start frame with medium cel-anime style lock. "
         "Keep identity and wardrobe fixed."
@@ -516,7 +522,7 @@ def assert_motion_prompt_core(
         )
 
     # Hero / identity motion needs observable action OR dialogue performance.
-    if role_n in {"hero", ""} and mode_n in {"i2v", "r2v", "image_to_video", "reference_to_video"}:
+    if role_n in {"hero", ""} and mode_n in {"i2v", "flf", "r2v", "image_to_video", "first_last_frame", "reference_to_video"}:
         has_visual = bool(actions) or bool(dialogue)
         # Author may put action only in free text — accept if prompt has motion verbs
         # or explicit dramatic function.

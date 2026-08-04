@@ -192,14 +192,17 @@ def plan_h3_shot(
     shot_id: str,
     *,
     still_override: Path | str | None = None,
+    last_override: Path | str | None = None,
+    refs_override: list[Path | str] | None = None,
 ) -> dict[str, Any]:
     """Return a machine-readable H3 execution plan for one shot."""
+    from h3_media_pack import resolve_media_pack
+
     base = _root(root)
     spec = _load_spec(base)
     shot = _find_shot(spec, shot_id)
     intent = build_shot_intent(spec, shot)
     h3 = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
-    # Surface motion-core fields on plan for receipts / agent routing.
     plan_core = {
         "dramatic_function": intent.get("dramatic_function"),
         "want_beat": intent.get("want_beat"),
@@ -209,35 +212,47 @@ def plan_h3_shot(
     }
     approved = _approved_still(base, shot_id)
     cont = resolve_continue_handoff(base, shot_id, shot=shot, spec=spec)
-    still: Path | None = approved
-    still_source: str | None = "approved" if approved else None
-    # Explicit still override (pilot / still-challenge candidate trial only)
-    if still_override is not None:
-        ov = Path(still_override).expanduser().resolve()
-        if ov.is_file():
-            still = ov
-            still_source = "explicit_override"
-    # Phase C: chain_mode=continue → prefer previous endframe; never clobber approved file on disk
-    if cont.get("ok") and cont.get("end_frame"):
-        end_p = Path(str(cont["end_frame"]))
-        if end_p.is_file():
-            if cont.get("wants_continue"):
-                still = end_p
-                still_source = "continue_handoff"
-            elif approved is None:
-                still = end_p
-                still_source = "continue_handoff_fallback"
-            # If approved exists and not continue: keep approved (identity lock)
-    # After optional env copy, re-check stills/ for empty-slot fill
+    media_pack = resolve_media_pack(
+        base,
+        shot_id,
+        shot=shot,
+        still_override=still_override,
+        last_override=last_override,
+        approved_still=approved,
+        continue_end_frame=cont.get("end_frame"),
+        wants_continue=bool(cont.get("wants_continue")),
+        refs_override=refs_override,
+    )
+    first = media_pack.get("first") if isinstance(media_pack.get("first"), dict) else None
+    last = media_pack.get("last") if isinstance(media_pack.get("last"), dict) else None
+    still: Path | None = Path(str(first["path"])) if first and first.get("path") else None
+    still_source: str | None = str(first.get("source")) if first else None
+    last_path: Path | None = Path(str(last["path"])) if last and last.get("path") else None
+    last_source: str | None = str(last.get("source")) if last else None
     if still is None:
         filled = base / "stills" / f"{shot_id}.png"
         if filled.is_file():
             still = filled
             still_source = "stills_after_continue_copy"
+            media_pack = resolve_media_pack(
+                base,
+                shot_id,
+                shot=shot,
+                still_override=still,
+                last_override=last_override,
+                approved_still=still,
+                continue_end_frame=cont.get("end_frame"),
+                wants_continue=bool(cont.get("wants_continue")),
+                refs_override=refs_override,
+            )
+            last = media_pack.get("last") if isinstance(media_pack.get("last"), dict) else None
+            last_path = Path(str(last["path"])) if last and last.get("path") else None
+            last_source = str(last.get("source")) if last else None
     mode_res = resolve_h3_mode(
         shot,
         intent=intent,
         has_still=still is not None,
+        has_last=last_path is not None,
         wants_continue=bool(cont.get("wants_continue")),
     )
     mode = str(mode_res["mode"])
@@ -247,7 +262,8 @@ def plan_h3_shot(
     max_dur = float(intent.get("max_duration_sec") or h3.get("max_duration_sec") or 8)
     enabled = bool(intent.get("h3_enabled") or h3.get("enabled") is True)
     alt = mode_res.get("alt_mode")
-    cmd = f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {mode} --register'
+    last_cli = f' --last-frame "{last_path}"' if last_path and mode == "flf" else ""
+    cmd = f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {mode}{last_cli} --register'
     cmd_alt = (
         f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {alt} --register'
         if alt
@@ -268,8 +284,12 @@ def plan_h3_shot(
         "h3_enabled": enabled,
         "still_path": str(still) if still else None,
         "still_source": still_source,
+        "last_path": str(last_path) if last_path else None,
+        "last_source": last_source,
+        "media_pack": media_pack,
         "continue_handoff": cont,
         "requires_still": bool(mode_res.get("requires_still")),
+        "requires_last": bool(mode_res.get("requires_last")),
         "audio_policy": audio_policy,
         "max_duration_sec": max_dur,
         "megapixels_draft": float(h3.get("megapixels_draft") or 0.2),
@@ -574,34 +594,47 @@ def run_h3_shot(
     enqueue_queue: bool = True,
     production_stage: str | None = None,
     still_override: Path | str | None = None,
+    last_override: Path | str | None = None,
+    refs_override: list[Path | str] | None = None,
 ) -> dict[str, Any]:
     """Generate one H3 clip for a film shot and optionally register it."""
+    from h3_mode import H3_MODE_ENDPOINT, H3_MODE_WEAPON
+    from h3_media_pack import flf_prompt_clause
+
     base = _root(root)
-    plan = plan_h3_shot(base, shot_id, still_override=still_override)
-    # Film-lane default: production when weapon is promoted; experimental only if needed.
+    plan = plan_h3_shot(
+        base,
+        shot_id,
+        still_override=still_override,
+        last_override=last_override,
+        refs_override=refs_override,
+    )
     stage = (production_stage or "production").strip().lower()
     if allow_experimental is None:
         allow_experimental = stage == "pilot"
     if mode:
         mode_norm = mode.strip().lower()
-        if mode_norm not in {"t2v", "i2v", "r2v"}:
-            raise H3WorkflowError("mode must be t2v, i2v, or r2v")
+        if mode_norm not in {"t2v", "i2v", "flf", "r2v"}:
+            raise H3WorkflowError("mode must be t2v, i2v, flf, or r2v")
+        if mode_norm == "flf" and not plan.get("last_path"):
+            raise H3WorkflowError(
+                f"H3 flf requires a last frame for {shot_id} "
+                f"(--last-frame or stills/{shot_id}_end.png)"
+            )
         plan["mode"] = mode_norm
-        plan["weapon_id"] = {
-            "t2v": "minimax-h3-t2v-pilot",
-            "i2v": "minimax-h3-i2v-pilot",
-            "r2v": "minimax-h3-r2v-pilot",
-        }[mode_norm]
-        plan["source_endpoint"] = {
-            "t2v": "local_minimax_h3_t2v",
-            "i2v": "local_minimax_h3_i2v",
-            "r2v": "local_minimax_h3_r2v",
-        }[mode_norm]
-        plan["requires_still"] = mode_norm in {"i2v", "r2v"}
+        plan["weapon_id"] = H3_MODE_WEAPON[mode_norm]
+        plan["source_endpoint"] = H3_MODE_ENDPOINT[mode_norm]
+        plan["requires_still"] = mode_norm in {"i2v", "flf", "r2v"}
+        plan["requires_last"] = mode_norm == "flf"
 
     if plan["requires_still"] and not plan.get("still_path"):
         raise H3WorkflowError(
             f"H3 {plan['mode']} requires an approved still/keyframe for {shot_id}"
+        )
+    if plan.get("requires_last") and not plan.get("last_path"):
+        raise H3WorkflowError(
+            f"H3 flf requires last frame for {shot_id} "
+            f"(--last-frame or stills/{shot_id}_end.png)"
         )
 
     # Variety door when registering candidates (bulk path) — skip via env escape.
@@ -616,7 +649,10 @@ def run_h3_shot(
     spec = _load_spec(base)
     shot = _find_shot(spec, shot_id)
     prompt = _prompt_for_shot(base, shot, mode=str(plan["mode"]), spec=spec)
-    # Persist assembled spine for audit / Grok parity review.
+    if plan["mode"] == "flf":
+        clause = flf_prompt_clause()
+        if "first-last-frame" not in prompt.lower() and "last keyframe" not in prompt.lower():
+            prompt = f"{prompt.rstrip()} {clause}"
     prompt_dir = base / "receipts" / "prompts"
     prompt_dir.mkdir(parents=True, exist_ok=True)
     (prompt_dir / f"{shot_id}.h3.spine.txt").write_text(prompt + "\n", encoding="utf-8")
@@ -629,18 +665,21 @@ def run_h3_shot(
 
     provider = LocalComfyH3Provider()
     keyframe = Path(plan["still_path"]) if plan.get("still_path") else base / "film-spec.json"
-    # T2V still needs a path object; provider only uploads for i2v/r2v.
-    result = provider.generate(
-        keyframe=keyframe,
-        prompt=prompt,
-        out=raw_out,
-        mode=plan["mode"],
-        seed=seed,
-        timeout_sec=timeout_sec,
-        allow_experimental=bool(allow_experimental),
-        production_stage=stage,
-        filename_prefix=f"aifilm/h3/{shot_id}",
-    )
+    last_frame = Path(plan["last_path"]) if plan.get("last_path") and plan["mode"] == "flf" else None
+    gen_kwargs: dict[str, Any] = {
+        "keyframe": keyframe,
+        "prompt": prompt,
+        "out": raw_out,
+        "mode": "i2v" if plan["mode"] == "flf" else plan["mode"],
+        "seed": seed,
+        "timeout_sec": timeout_sec,
+        "allow_experimental": bool(allow_experimental),
+        "production_stage": stage,
+        "filename_prefix": f"aifilm/h3/{shot_id}",
+    }
+    if last_frame is not None:
+        gen_kwargs["last_frame"] = last_frame
+    result = provider.generate(**gen_kwargs)
     if not result.get("ok"):
         raise H3WorkflowError(f"H3 generate failed: {result.get('stderr') or result}")
 
@@ -687,6 +726,10 @@ def run_h3_shot(
         "native_audio_meta": audio_decision.get("native_audio_meta"),
         "prompt_sha256": __import__("hashlib").sha256(prompt.encode("utf-8")).hexdigest(),
         "continue_handoff": handoff,
+        "media_pack": plan.get("media_pack"),
+        "first_path": plan.get("still_path"),
+        "last_path": plan.get("last_path") if plan.get("mode") == "flf" else None,
+        "input_provenance": result.get("input_provenance"),
     }
     receipt_path = base / "receipts" / f"h3-run-{shot_id}.json"
     write_json(receipt_path, receipt)
@@ -718,11 +761,14 @@ def run_h3_shot(
             # generation_contract.parameters.source_endpoint for register-clip.
             if plan["mode"] != "t2v" and plan.get("still_path"):
                 op = "reference_to_video" if plan["mode"] == "r2v" else "image_to_video"
+                inputs = [Path(plan["still_path"])]
+                if plan.get("mode") == "flf" and plan.get("last_path"):
+                    inputs.append(Path(str(plan["last_path"])))
                 job = mq.add_job(
                     shot_id=shot_id,
                     operation=op,
                     prompt_file=prompt_file,
-                    inputs=[Path(plan["still_path"])],
+                    inputs=inputs,
                     allow_without_pilot=True,
                     is_canary=False,
                     generation_contract={
@@ -733,6 +779,9 @@ def run_h3_shot(
                             "source_endpoint": plan["source_endpoint"],
                             "audio_policy": audio_policy,
                             "mode": plan["mode"],
+                            "has_last_frame": bool(
+                                plan.get("mode") == "flf" and plan.get("last_path")
+                            ),
                         },
                     },
                 )
