@@ -95,6 +95,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_bulk_preflight_hard_gate.py`
 - `skills/ai-film-grok/tests/test_burn_srt_pil.py`
 - `skills/ai-film-grok/tests/test_cache.py`
+- `skills/ai-film-grok/tests/test_camera_serves_event.py`
 - `skills/ai-film-grok/tests/test_capability.py`
 - `skills/ai-film-grok/tests/test_caption_frame_audit.py`
 - `skills/ai-film-grok/tests/test_cast_hair_makeup_locks.py`
