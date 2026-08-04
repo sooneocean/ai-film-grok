@@ -347,9 +347,15 @@ def test_stable_voice_profiles_respect_locks_and_language():
     )
     again = assign_profiles([{"speaker_id": "hero", "language": "ja"}], first)
     assert first["hero"]["voice_id"] == again["hero"]["voice_id"]
-    validate_event_language({"id": "x", "type": "dialogue"}, first["hero"])
+    # Default dialogue is zh; ja profiles need explicit event.language=ja.
+    validate_event_language(
+        {"id": "x", "type": "dialogue", "language": "ja"}, first["hero"]
+    )
     with pytest.raises(VoiceCastError, match="requires ja"):
-        validate_event_language({"id": "x", "type": "dialogue"}, first["narrator"])
+        validate_event_language(
+            {"id": "x", "type": "dialogue", "language": "ja"}, first["narrator"]
+        )
+    validate_event_language({"id": "y", "type": "dialogue"}, first["narrator"])
 
 
 def test_asset_requires_hash_and_license_in_v1():
@@ -663,6 +669,7 @@ def test_audio_plan_writes_timeline_and_deterministic_voice_cast(tmp_path: Path)
                 "line_type": "dialogue",
                 "speaker": "hero",
                 "spoken_text": "行こう",
+                "language": "ja",  # opt-in JA; default product dialogue is zh
                 "start_offset_sec": 0,
                 "duration_sec": 1,
             }

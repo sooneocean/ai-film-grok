@@ -26,6 +26,7 @@ def _timeline():
                             "line_type": "dialogue",
                             "speaker": "hero",
                             "spoken_text": "行こう",
+                            "language": "ja",
                             "start_offset_sec": 0,
                             "duration_sec": 1,
                         },

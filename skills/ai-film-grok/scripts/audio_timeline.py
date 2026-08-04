@@ -206,6 +206,17 @@ def compile_timeline(spec: dict[str, Any], *, root: Path | None = None) -> dict[
                     "locked": bool(cue.get("locked", False)),
                 }
                 if event_type in VOCAL_TYPES:
+                    # Carry authored language so voice-cast does not fall back to stale JA default.
+                    lang = str(
+                        cue.get("language")
+                        or cue.get("spoken_lang")
+                        or cue.get("dialogue_spoken_lang")
+                        or ""
+                    ).strip().lower()
+                    if lang in {"jp", "japanese"}:
+                        lang = "ja"
+                    if lang in {"cn", "chinese"}:
+                        lang = "zh"
                     event.update(
                         {
                             "speaker": str(cue.get("speaker") or ""),
@@ -216,6 +227,8 @@ def compile_timeline(spec: dict[str, Any], *, root: Path | None = None) -> dict[
                             or {},
                         }
                     )
+                    if lang in {"ja", "zh"}:
+                        event["language"] = lang
                 if event_type in ASSET_TYPES:
                     event.update(
                         {

@@ -1,9 +1,18 @@
 # Changelog
 
-## [Unreleased]
+## [2.39.1] - 2026-08-04
+
+### Fixed / Changed (Chinese dialogue primary + TTS multi-provider + music import)
+- **voice_cast_profiles**: default vocal language for dialogue/inner/media is **zh** (was ja); ja only via explicit `language` / `spoken_lang` / `dialogue_spoken_lang`.
+- **audio_timeline**: carry authored `language` onto compiled vocal events so cast does not fall back to stale JA.
+- **audio_tts_render**: honor locked provider from manifest (`edge` / `grok` / `mimo` / `fish` / `minimax` / `voicebox` / `qwen3` / `external`); no longer force `edge` only.
+- **voice_cast_profiles**: locked profile always keeps `voice_id` (一角一声); normalize jp/cn aliases.
+- **local_llm**: allow vision models `zai-org/glm-4.6v-flash` + `nvidia/nemotron-3-nano-omni` for omni / visual-text audit.
+- **render_final_music**: local `SR` / `run` / `RenderError` to break circular import with `render_final`.
+- Tests: event-language defaults + JA opt-in fixtures updated.
 
 ### Docs
-- Root + skill **README** rewritten for **v2.39.0**: debrief / input fidelity / design-go / hybrid_h3 FLF / Fill-Idle / still-challenge; Gitea remotes; updated minimal path and I2V matrix.
+- Root + skill **README** rewritten for **v2.39**: debrief / input fidelity / design-go / hybrid_h3 FLF / Fill-Idle / still-challenge; Gitea remotes; updated minimal path and I2V matrix.
 
 ## [2.39.0] - 2026-08-04
 

@@ -16,10 +16,39 @@ from typing import Any
 
 import numpy as np
 from logger import log
-from render_final import SR, RenderError, run
 from runtime_policy import sha256
 from sound_plan import resolve_music_template_timeline
 from util import write_json
+
+# Local defs — avoid circular import with render_final (which re-exports this module).
+SR = 44100
+
+
+class RenderError(RuntimeError):
+    pass
+
+
+def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    argv = list(cmd)
+    executable = Path(argv[0]).name if argv else ""
+    if executable == "ffmpeg" and "-nostdin" not in argv:
+        argv.insert(1, "-nostdin")
+    if executable == "ffmpeg":
+        try:
+            ff_timeout = float(os.environ.get("AIFILM_FFMPEG_TIMEOUT") or 1800)
+        except (TypeError, ValueError):
+            ff_timeout = 1800.0
+        ff_timeout = max(120.0, ff_timeout)
+    else:
+        ff_timeout = 60.0
+    return subprocess.run(
+        argv,
+        check=check,
+        text=True,
+        capture_output=True,
+        timeout=ff_timeout,
+    )
+
 
 try:
     from music_cue import motif_seed

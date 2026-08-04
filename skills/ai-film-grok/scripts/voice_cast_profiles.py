@@ -12,7 +12,9 @@ JA_POOL = ("ja-JP-NanamiNeural", "ja-JP-KeitaNeural", "ja-JP-AoiNeural", "ja-JP-
 NARRATOR_SPEAKERS = frozenset(
     {"narrator", "storyteller", "broadcast", "announcer", "radio", "system"}
 )
-VOCAL_LANGUAGE = {"dialogue": "ja", "inner_voice": "ja", "media_voice": "ja", "narration": "zh"}
+# Product default 2026-08-03: Chinese dialogue primary (dialogue_spoken_lang=zh).
+# Japanese is opt-in via explicit event.language / film-spec dialogue_spoken_lang=ja.
+VOCAL_LANGUAGE = {"dialogue": "zh", "inner_voice": "zh", "media_voice": "zh", "narration": "zh"}
 
 
 class VoiceCastError(ValueError):
@@ -22,17 +24,21 @@ class VoiceCastError(ValueError):
 def event_language(event: dict[str, Any]) -> str:
     """Resolve language by speaker identity, not a phone/inner-voice effect.
 
-    Narration remains Chinese.  A named character keeps Japanese dialogue when
-    their line becomes inner voice, phone, off-screen, or voice message.
+    Default is Chinese for character dialogue (2026-08-03). Explicit event.language
+    or spoken_lang wins; Japanese remains opt-in when authored as ja.
     """
-    explicit = str(event.get("language") or "").strip().lower()
-    if explicit in {"ja", "zh"}:
-        return explicit
+    explicit = str(
+        event.get("language") or event.get("spoken_lang") or event.get("dialogue_spoken_lang") or ""
+    ).strip().lower()
+    if explicit in {"ja", "jp", "japanese"}:
+        return "ja"
+    if explicit in {"zh", "cn", "chinese"}:
+        return "zh"
     event_type = str(event.get("type") or "").strip().lower()
     speaker = str(event.get("speaker") or event.get("speaker_id") or "").strip().lower()
     if event_type == "narration" or speaker in NARRATOR_SPEAKERS:
         return "zh"
-    return VOCAL_LANGUAGE.get(event_type, "ja")
+    return VOCAL_LANGUAGE.get(event_type, "zh")
 
 
 def profile_hash(profile: dict[str, Any]) -> str:
@@ -66,12 +72,21 @@ def assign_profiles(
             raise VoiceCastError(
                 f"{speaker_id} is locked to {old_language}; create a new voice profile before changing language"
             )
-        language = requested_language or old_language or "ja"
+        language = requested_language or old_language or "zh"
+        if language in {"jp", "japanese"}:
+            language = "ja"
+        if language in {"cn", "chinese"}:
+            language = "zh"
         if language not in {"ja", "zh"}:
             raise VoiceCastError(f"{speaker_id}.language must be ja or zh")
         pool = JA_POOL if language == "ja" else ZH_POOL
         locked = bool(old.get("locked", item.get("locked", False)))
-        voice = str(old.get("voice_id") or item.get("voice_id") or "") if locked else ""
+        # Locked profile always wins (一角一声); never re-pool while locked.
+        voice = ""
+        if locked:
+            voice = str(old.get("voice_id") or item.get("voice_id") or "").strip()
+        if not voice:
+            voice = str(item.get("voice_id") or old.get("voice_id") or "").strip()
         if not voice:
             offset = int(hashlib.sha256(speaker_id.encode("utf-8")).hexdigest(), 16) % len(pool)
             voice = next(
@@ -82,10 +97,13 @@ def assign_profiles(
                 ),
                 pool[offset],
             )
+        provider = str(
+            item.get("provider") or old.get("provider") or ("edge" if language == "zh" else "edge")
+        ).strip().lower()
         profile = {
             "speaker_id": speaker_id,
             "language": language,
-            "provider": str(item.get("provider") or old.get("provider") or "edge"),
+            "provider": provider,
             "voice_id": voice,
             "tags": list(item.get("tags") or old.get("tags") or []),
             "rate": str(item.get("rate") or old.get("rate") or "+0%"),

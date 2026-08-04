@@ -186,7 +186,7 @@
     },
     {
       "path": "scripts/audio_timeline.py",
-      "sha256": "1b52e6c078056cc64807b363a0f0a2b68ee60622b21b390f99c771b801a46897"
+      "sha256": "ab4ec10114ef95aa129df79fd390dc1d18a91ff254becda58783978bfe043d03"
     },
     {
       "path": "scripts/audio_tts_manifest.py",
@@ -194,7 +194,7 @@
     },
     {
       "path": "scripts/audio_tts_render.py",
-      "sha256": "81bd34a0f3d3311233ce4b79ab9752430f204c5a038269292f198deb3f093aff"
+      "sha256": "5853172d133f42c858c8bb783da6ac80257d5bc34c458ac9d48ef7150d22e368"
     },
     {
       "path": "scripts/audio_visual_alignment.py",
@@ -766,7 +766,7 @@
     },
     {
       "path": "scripts/local_llm.py",
-      "sha256": "f1043dc43aa5648bb7c19a30529b44afeb3fba84834f6d325e1a40edc5bc993f"
+      "sha256": "3de379180305d904f0687ab1c58b87d45ab49f22774e529e5990f9046e5ee68b"
     },
     {
       "path": "scripts/local_omni_review.py",
@@ -1062,7 +1062,7 @@
     },
     {
       "path": "scripts/render_final_music.py",
-      "sha256": "35d1b7a738cacc63efdc1ba1ae5ecf5f74b91ca83b4c46bb1d4cf3a08f91c69d"
+      "sha256": "872355fb9a2dd7e7a2fd95f429c90f5cd2388343d2fb883610d02517c66d8ae1"
     },
     {
       "path": "scripts/render_workspace.py",
@@ -1322,7 +1322,7 @@
     },
     {
       "path": "scripts/voice_cast_profiles.py",
-      "sha256": "c0f7adea3e3161729c645d42a605567fc050864b5da9ee74618c23b28142776a"
+      "sha256": "12400a23160a4811a6a83a22188aa1753a7b90a4c46e8e74aded2f069283f1c7"
     },
     {
       "path": "scripts/voice_tracks.py",

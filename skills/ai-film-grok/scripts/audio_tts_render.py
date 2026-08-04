@@ -65,7 +65,19 @@ def render_tts_events(root: Path) -> dict[str, Any]:
         event_id = str(job.get("audio_event_id") or "")
         if not event_id:
             raise AudioTTSRenderError("tts-manifest job requires audio_event_id")
-        if str(job.get("provider") or "") != "edge":
+        provider = str(job.get("provider") or "").strip().lower()
+        # Locked providers that synthesize() already routes (一角一声 / no silent fallback).
+        supported = {
+            "edge",
+            "grok",
+            "mimo",
+            "fish",
+            "minimax",
+            "voicebox",
+            "qwen3",
+            "external",
+        }
+        if provider not in supported:
             raise AudioTTSRenderError(
                 f"{event_id}: provider {job.get('provider')} requires an explicit adapter"
             )
@@ -79,7 +91,7 @@ def render_tts_events(root: Path) -> dict[str, Any]:
             meta = synthesize(
                 str(job["text"]),
                 mp3,
-                backend="edge",
+                backend=provider,
                 voice=str(job["voice_id"]),
                 rate=str(job.get("rate") or "+0%"),
                 pitch=str(job.get("pitch") or "+0Hz"),

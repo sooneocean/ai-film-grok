@@ -17,7 +17,14 @@ from urllib.parse import urlsplit
 from jsonschema import Draft202012Validator, ValidationError
 
 DEFAULT_MODEL = "openai/gpt-oss-20b"
-ALLOWED_MODELS = frozenset({DEFAULT_MODEL})
+# Vision models allowed for visual-text-audit / omni review on 5090 LM Studio pool.
+ALLOWED_MODELS = frozenset(
+    {
+        DEFAULT_MODEL,
+        "zai-org/glm-4.6v-flash",
+        "nvidia/nemotron-3-nano-omni",
+    }
+)
 _MAX_RESPONSE_BYTES = 1_048_576
 _MAX_PROMPT_CHARS = 12_000
 _PRIVATE_NETWORKS = (

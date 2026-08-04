@@ -87,9 +87,12 @@ def test_timeline_allows_bracketed_dialogue_that_mentions_sound_or_subtitles():
 @pytest.mark.parametrize(
     ("event", "expected"),
     [
-        ({"type": "dialogue", "speaker": "hero"}, "ja"),
-        ({"type": "inner_voice", "speaker": "hero"}, "ja"),
-        ({"type": "media_voice", "speaker": "hero"}, "ja"),
+        # Product default 2026-08-03: Chinese dialogue primary (ja only when authored).
+        ({"type": "dialogue", "speaker": "hero"}, "zh"),
+        ({"type": "inner_voice", "speaker": "hero"}, "zh"),
+        ({"type": "media_voice", "speaker": "hero"}, "zh"),
+        ({"type": "dialogue", "speaker": "hero", "language": "ja"}, "ja"),
+        ({"type": "inner_voice", "speaker": "hero", "spoken_lang": "ja"}, "ja"),
         ({"type": "narration", "speaker": "narrator"}, "zh"),
         ({"type": "media_voice", "speaker": "broadcast"}, "zh"),
     ],
