@@ -669,6 +669,19 @@ def run_h3_shot(
     receipt_path = base / "receipts" / f"h3-run-{shot_id}.json"
     write_json(receipt_path, receipt)
 
+    # Fill-Idle PK needs mean sidecars on H3 takes (best-effort; never block run)
+    try:
+        from i2v_motion_gate import measure_mean_absdiff, write_mean_sidecar
+
+        mean_v = measure_mean_absdiff(deliver)
+        if mean_v is not None:
+            write_mean_sidecar(deliver, mean_v)
+            receipt["mean_absdiff"] = mean_v
+            write_json(receipt_path, receipt)
+    except Exception as exc:  # noqa: BLE001
+        receipt["mean_measure_error"] = str(exc)[:200]
+        write_json(receipt_path, receipt)
+
     queue_job_id = None
     if enqueue_queue:
         try:

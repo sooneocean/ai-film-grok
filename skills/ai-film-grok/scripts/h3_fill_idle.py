@@ -68,40 +68,89 @@ def guess_take_lane(path: Path) -> str:
 
 
 def list_shot_takes(root: Path | str, shot_id: str) -> list[dict[str, Any]]:
-    """Discover video takes for one shot under takes/."""
+    """Discover video takes under takes/ **and** manifest.clips (Grok baseline)."""
     base = _root(root)
     takes_root = base / "takes"
     files: list[Path] = []
-    if not takes_root.is_dir():
-        return []
-    shot_dir = takes_root / shot_id
-    if shot_dir.is_dir():
-        for p in shot_dir.rglob("*"):
-            if p.is_file() and p.suffix.lower() in {".mp4", ".webm", ".mov"}:
+    meta_by_path: dict[str, dict[str, Any]] = {}
+
+    if takes_root.is_dir():
+        shot_dir = takes_root / shot_id
+        if shot_dir.is_dir():
+            for p in shot_dir.rglob("*"):
+                if p.is_file() and p.suffix.lower() in {".mp4", ".webm", ".mov"}:
+                    files.append(p)
+        for p in takes_root.iterdir():
+            if not p.is_file():
+                continue
+            if p.suffix.lower() not in {".mp4", ".webm", ".mov"}:
+                continue
+            stem = p.stem
+            if stem == shot_id or stem.startswith(f"{shot_id}_"):
                 files.append(p)
-    for p in takes_root.iterdir():
-        if not p.is_file():
-            continue
-        if p.suffix.lower() not in {".mp4", ".webm", ".mov"}:
-            continue
-        stem = p.stem
-        if stem == shot_id or stem.startswith(f"{shot_id}_"):
-            files.append(p)
+
+    # Baseline often lives only in manifest.clips after media-queue / register-clip
+    man = read_json(base / "manifest.json") or {}
+    clips = man.get("clips") if isinstance(man, dict) else {}
+    clip = clips.get(shot_id) if isinstance(clips, dict) else None
+    if isinstance(clip, dict):
+        raw = clip.get("path") or clip.get("file") or clip.get("video")
+        if raw:
+            p = Path(str(raw))
+            if not p.is_absolute():
+                p = base / p
+            if p.is_file():
+                files.append(p)
+                lane_hint = str(
+                    clip.get("lane")
+                    or clip.get("provider")
+                    or clip.get("source_endpoint")
+                    or clip.get("preferred_from")
+                    or ""
+                ).lower()
+                mean_hint = clip.get("mean_absdiff")
+                if mean_hint is None:
+                    mean_hint = clip.get("mean")
+                meta_by_path[str(p.resolve())] = {
+                    "lane_hint": lane_hint,
+                    "mean_hint": mean_hint,
+                    "source": "manifest.clips",
+                }
+
     # unique
     seen: set[str] = set()
     out: list[dict[str, Any]] = []
     for f in sorted(files, key=lambda x: str(x)):
-        key = str(f.resolve())
+        try:
+            key = str(f.resolve())
+        except OSError:
+            key = str(f)
         if key in seen:
             continue
         seen.add(key)
         mean = _read_mean(f)
+        meta = meta_by_path.get(key) or {}
+        if mean is None and meta.get("mean_hint") is not None:
+            try:
+                mean = float(meta["mean_hint"])
+            except (TypeError, ValueError):
+                mean = None
+        lane = guess_take_lane(f)
+        hint = str(meta.get("lane_hint") or "")
+        if lane == "unknown" and hint:
+            if any(m in hint for m in _H3_NAME_MARKERS) or "comfy-h3" in hint:
+                lane = "h3"
+            elif any(m in hint for m in _GROK_NAME_MARKERS) or "grok" in hint:
+                lane = "grok"
+            elif "media-queue" in hint or "select-shortlist" in hint:
+                lane = "grok"
         out.append(
             {
                 "path": str(f),
                 "mean": mean,
-                "lane": guess_take_lane(f),
+                "lane": lane,
                 "bytes": f.stat().st_size if f.is_file() else 0,
+                "source": meta.get("source") or "takes",
             }
         )
     return out
@@ -471,10 +520,67 @@ def build_fill_idle_queue(
     }
 
 
-def next_fill_idle_job(root: Path | str, *, include_challenge: bool = True) -> dict[str, Any]:
+def probe_comfy_capacity_soft() -> dict[str, Any]:
+    """Best-effort 5090 readiness (never raises; offline → ready=None)."""
+    import os
+
+    try:
+        from comfy_video import normalize_base_url, submission_capacity
+
+        raw = (
+            os.environ.get("AIFILM_COMFYUI_BASE_URL")
+            or os.environ.get("AIFILM_COMFY_BASE_URL")
+            or "http://127.0.0.1:18188"
+        ).strip()
+        base_url = normalize_base_url(raw)
+        cap = submission_capacity(base_url)
+        ready = bool(cap.get("ok")) and str(cap.get("status") or "") == "ready"
+        if not ready and not cap.get("blockers") and cap.get("ok"):
+            ready = True
+        observed = cap.get("observed") if isinstance(cap.get("observed"), dict) else {}
+        device = observed.get("device") if isinstance(observed.get("device"), dict) else {}
+        vram = device.get("vram_free_bytes")
+        return {
+            "ok": True,
+            "ready": ready,
+            "status": cap.get("status"),
+            "vram_free_bytes": vram,
+            "blockers": list(cap.get("blockers") or []),
+            "base_url": base_url,
+            "source": "submission_capacity",
+        }
+    except Exception as exc:  # noqa: BLE001 — capacity is advisory
+        return {
+            "ok": False,
+            "ready": None,
+            "error": str(exc)[:200],
+            "source": "submission_capacity",
+        }
+
+
+def next_fill_idle_job(
+    root: Path | str,
+    *,
+    include_challenge: bool = True,
+    check_capacity: bool = True,
+) -> dict[str, Any]:
     """Return the single next H3 job (P0→P1→P2 mean-first)."""
     queue = build_fill_idle_queue(root, include_challenge=include_challenge, include_done=False)
     nxt = queue.get("next")
+    capacity = probe_comfy_capacity_soft() if check_capacity else {"ok": False, "ready": None}
+    cmd = (nxt or {}).get("command") if isinstance(nxt, dict) else None
+    note = (
+        "Queue empty — P0/P1/P2 all clear or nothing eligible"
+        if not nxt
+        else "Run command; free-memory on mode switch"
+    )
+    if nxt and capacity.get("ready") is False:
+        note = (
+            "Comfy capacity not ready (VRAM/queue) — free-memory or wait; "
+            "command is still the next Fill-Idle job"
+        )
+    elif nxt and capacity.get("ready") is True:
+        note = "Capacity ready — run command now"
     return {
         "schema_version": 1,
         "kind": "ai-film-h3-fill-idle-next",
@@ -483,12 +589,10 @@ def next_fill_idle_job(root: Path | str, *, include_challenge: bool = True) -> d
         "pending_count": queue.get("pending_count"),
         "by_priority": queue.get("by_priority"),
         "next": nxt,
-        "command": (nxt or {}).get("command") if isinstance(nxt, dict) else None,
-        "note": (
-            "Run command when comfy capacity ready; free-memory on mode switch"
-            if nxt
-            else "Queue empty — P0/P1/P2 all clear or nothing eligible"
-        ),
+        "command": cmd,
+        "capacity": capacity,
+        "capacity_ready": capacity.get("ready"),
+        "note": note,
     }
 
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.37.7] - 2026-08-04
+
+### Fixed / Added (Fill-Idle production closed loop)
+- **`list_shot_takes`**: discover baseline from **`manifest.clips`** (not only `takes/`) so Grok-only paths unlock P2.
+- **`h3 next`**: soft **Comfy capacity** probe (`capacity_ready` / blockers; offline non-fatal).
+- **`h3 run`**: best-effort **mean sidecar** on deliver path for PK/shortlist.
+- **dispatch**: surfaces `h3 next` Fill-Idle while hybrid_h3 active.
+- Tests: manifest baseline + capacity soft path.
+
 ## [2.37.6] - 2026-08-04
 
 ### Changed (Dramatic meaning default-on · every genre)

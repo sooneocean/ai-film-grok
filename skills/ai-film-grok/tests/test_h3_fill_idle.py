@@ -15,6 +15,7 @@ from h3_fill_idle import (  # noqa: E402
     build_fill_idle_queue,
     classify_fill_idle_shot,
     guess_take_lane,
+    list_shot_takes,
     next_fill_idle_job,
     pk_compare,
 )
@@ -173,6 +174,75 @@ def test_cli_parses_challenge_next_pk() -> None:
     assert b.h3_action == "next"
     c = parser.parse_args(["h3", "pk-compare", "--root", "/tmp/x", "--shot-id", "s1"])
     assert c.h3_action == "pk-compare" and c.shot_id == "s1"
+
+
+def test_manifest_clips_count_as_baseline(tmp_path: Path) -> None:
+    """Grok often leaves path only in manifest.clips — must unlock P2."""
+    root = tmp_path / "film"
+    root.mkdir()
+    (root / "stills").mkdir()
+    still = root / "stills" / "s_only_man.png"
+    still.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
+    clip = root / "renders" / "s_only_man_grok.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"\x00" * 150_000)
+    (root / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "title": "man-only",
+                "h3": {"enabled": True},
+                "_i2v_profile": "hybrid_h3",
+                "scenes": [
+                    {
+                        "shots": [
+                            {
+                                "id": "s_only_man",
+                                "shot_role": "hero",
+                                "heat_phase": "setup",
+                                "wardrobe_state": "clothed",
+                                "dramatic_function": "bridge",
+                            }
+                        ]
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "stills": {"s_only_man": {"path": str(still), "status": "approved"}},
+                "clips": {
+                    "s_only_man": {
+                        "path": str(clip),
+                        "mean": 22.0,
+                        "provider": "grok",
+                        "status": "candidate",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    takes = list_shot_takes(root, "s_only_man")
+    assert len(takes) == 1
+    assert takes[0]["lane"] == "grok"
+    assert takes[0]["mean"] == 22.0
+    q = build_fill_idle_queue(root, include_challenge=True)
+    row = next(r for r in q["shots"] if r["shot_id"] == "s_only_man")
+    assert row["priority"] == "P2"
+    assert row["lane"] == "challenge_grok"
+    assert row["command"]
+
+
+def test_next_capacity_soft_offline(tmp_path: Path) -> None:
+    root = _film(tmp_path)
+    nxt = next_fill_idle_job(root, check_capacity=True)
+    assert "capacity" in nxt
+    # offline tunnel → ready is None or False; must still return meat command
+    assert nxt["next"]["shot_id"] == "s_meat"
+    assert nxt["command"]
 
 
 def test_classify_wait_grok_without_take(tmp_path: Path) -> None:

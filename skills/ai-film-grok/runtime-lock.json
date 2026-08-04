@@ -558,7 +558,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "9d1bc1caca11764c2f2617e32038c06a93e686c3c67fc14f63f26910d1522420"
+      "sha256": "1d99e0a3c071ac5b6d19b5c33b62bc86b4e1caf9066d837d46f6737bb811a177"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -678,7 +678,7 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "d857ab471ba5a8e1adeff671c75f1358ba80c756f6963b6fe83aa778b42fcd10"
+      "sha256": "44cdcdedaa58937ec989ebc0d48a086b864c6ad08630b86dc2046a9190e4820a"
     },
     {
       "path": "scripts/h3_mode.py",
@@ -686,7 +686,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "07e132f225b290380bf58aa8d2210e7ea279f778b263dc14d4b7a6adebd16fb7"
+      "sha256": "73bfd7bbede613d458035cb0e3e94e9d8e8edcee0e848627d5ba1bfbbe8be6fc"
     },
     {
       "path": "scripts/heat_check.py",

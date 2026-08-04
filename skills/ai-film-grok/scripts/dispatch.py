@@ -682,6 +682,34 @@ def build_dispatch(
                     "pilot 已批但 bulk-preflight 未绿 — 单门过闸后再 media-queue bulk",
                     "visual",
                 )
+    # Fill-Idle: while clips incomplete (or hybrid active), surface next H3 job
+    if craft_stage in {"media", "visual", "rough", "selects"}:
+        try:
+            from film_spec import resolve_h3_config
+
+            h3_cfg = resolve_h3_config(read_json(root / "film-spec.json") or {})
+            h3_on = bool(h3_cfg.get("enabled")) if isinstance(h3_cfg, dict) else False
+        except Exception:
+            h3_on = False
+            try:
+                sp = read_json(root / "film-spec.json") or {}
+                h3_on = bool(
+                    isinstance(sp, dict)
+                    and (
+                        (isinstance(sp.get("h3"), dict) and sp["h3"].get("enabled"))
+                        or str(sp.get("_i2v_profile") or "") == "hybrid_h3"
+                    )
+                )
+            except Exception:
+                h3_on = False
+        if h3_on:
+            pre(
+                "h3-fill-idle",
+                f'aifilm comfy free-memory --confirm; aifilm h3 next --root "{r}"',
+                "Fill-Idle：h3 next（P0 meat→P1 弱镜→P2 mean最低挑战）；pk-compare 仅建议",
+                "visual",
+            )
+
     # Wave H · after clips: select-shortlist once (multi-take preferred, never deletes)
     if craft_stage in {"selects", "media", "rough"} and gates.get("clips_complete"):
         sel_rec = read_json(root / "receipts" / "select-shortlist.json") or {}

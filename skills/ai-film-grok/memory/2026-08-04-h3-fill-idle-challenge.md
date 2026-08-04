@@ -19,11 +19,12 @@
 
 ## 检查清单
 - [ ] `aifilm h3 next --root` / `h3 list --challenge` 看 P0→P2
+- [ ] `h3 next` 的 `capacity_ready`（offline 也可仍给 command）
+- [ ] baseline 在 **takes/** 或 **manifest.clips** 都能解锁 P2（v2.37.7）
 - [ ] `aifilm h3 pk-compare --root` 只建议，禁静默 promote
-- [ ] 非 restricted：Grok 先有 take；H3 作挑战（P2）
+- [ ] 非 restricted：Grok 先有 baseline；H3 作挑战（P2）
 - [ ] restricted：`h3 list` P0 先于任何 P2
 - [ ] 续镜只 I2V 末帧；能量镜跟 list 的 r2v/alt
-- [ ] capacity idle 才填 P2；新 P0 插队
 - [ ] P2 优先 mean 最低的 Grok 镜
 - [ ] `select-shortlist` 看建议 → 人一眼 → 才 `--promote`
 - [ ] 禁 mean 静默换片；毒/换人一票否决
