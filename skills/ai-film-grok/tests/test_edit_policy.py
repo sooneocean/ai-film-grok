@@ -587,6 +587,8 @@ class FilmSpecMotionTests(unittest.TestCase):
         return {
             "title": "t",
             "vo_mode": "storyteller",
+            # Motion-coverage unit tests — not meaning-gate fixtures
+            "dramatic_meaning_strict": False,
             "director_intent": {
                 "logline": "夜里靠近的完整 logline。",
                 "tone": "quiet heat",
@@ -599,7 +601,12 @@ class FilmSpecMotionTests(unittest.TestCase):
                             "id": "shot01",
                             "dramatic_function": "hook",
                             "nar": "夜里。",
-                            "dsl": {"subject": "woman", "action": "stands"},
+                            "dsl": {
+                                "subject": "woman",
+                                "action": "stands in doorway",
+                                "visible_change": "door opens; she enters the room",
+                                "story_beat": "她进门占场",
+                            },
                         }
                     ]
                 }

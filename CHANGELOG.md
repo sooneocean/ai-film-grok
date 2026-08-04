@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.39.5] - 2026-08-04
+
+### Added / Changed (Edit rhythm VO-fit · Wave γ anti-PPT)
+- **`dialogue_drama` default `visual_fit=vo`** via `edit_policy.default_visual_fit` / `resolve_shot_visual_fit` (spoken + mid_motion → vo).
+- **Drive shots** auto `dsl.cut_on=mid_motion` when blank (hook/approach/action/act/climax).
+- **Freeze pad** tightened: ≤0.15s (no-loop ≤0.20s) — no long still pad as fake length.
+- **preflight** soft `EQUAL_SLOT_PPT_RISK`; film-spec writes `_edit_rhythm`.
+- render_final / export-compose / preflight use shared defaults.
+- Tests: `test_edit_rhythm_gamma.py`.
+
 ## [2.39.4] - 2026-08-04
 
 ### Added / Changed (Camera serves event · cinematic motion β)

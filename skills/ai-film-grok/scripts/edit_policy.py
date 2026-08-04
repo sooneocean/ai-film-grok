@@ -16,10 +16,12 @@ MIN_SPEED = 0.88
 # P0 · 2026-07-23: was 1.15 — I2V 6s→7–8s plate triggered stream_loop (= “跑两遍”)
 # Only allow loop when target truly needs multi-cycle (e.g. long VO chapter bed).
 LOOP_STRETCH_RATIO = 1.55
-MAX_FREEZE_PAD_SEC = 0.25  # hard cap; prefer clamp plate over loop/freeze mush
-# When loop is forbidden (hook/action), keep freeze short — long freeze reads as stuck cut
-# (was 1.25s → “断在奇怪的地方”). Prefer clamp plate or re-I2V 10s.
-MAX_FREEZE_PAD_NO_LOOP_SEC = 0.40
+# P0 · 2026-08-04 γ: tighten freeze — long tpad clone reads as still/PPT pad
+MAX_FREEZE_PAD_SEC = 0.15  # hard cap; prefer clamp plate / re-I2V over freeze mush
+# When loop is forbidden (hook/action), keep freeze micro — was 0.40
+MAX_FREEZE_PAD_NO_LOOP_SEC = 0.20
+# Drive beats default cut_on=mid_motion (kinetic cut, not settle-hold)
+DRIVE_CUT_FUNCTIONS = frozenset({"hook", "approach", "action", "climax", "impact", "peak"})
 # Beats that must never stream_loop (product rule; mirrored in film_spec)
 # P0 · 2026-07-23: expand — short-form I2V almost never wants a full replay.
 NO_LOOP_DRAMATIC_FUNCTIONS = frozenset(
@@ -620,6 +622,204 @@ def plan_stretch(
         "src_dur": src_dur,
         "target": target,
         "forbid_loop": False,
+    }
+
+
+def default_visual_fit(spec: dict[str, Any] | None) -> str:
+    """Film-level visual_fit default (Wave γ · anti-PPT).
+
+    dialogue_drama / voice_coupled / punchy → ``vo`` (plate follows speech length).
+    Otherwise ``slot`` (duration_sec locks plate; VO atempo).
+    """
+    spec = spec if isinstance(spec, dict) else {}
+    explicit = str(spec.get("visual_fit") or "").strip().lower()
+    if explicit in {"vo", "slot"}:
+        return explicit
+    vo_mode = str(spec.get("vo_mode") or "").strip().lower()
+    if vo_mode == "dialogue_drama":
+        return "vo"
+    es = spec.get("edit_strategy") if isinstance(spec.get("edit_strategy"), dict) else {}
+    es_mode = str(es.get("mode") or "").strip().lower()
+    if es_mode in {"voice_coupled", "punchy"}:
+        return "vo"
+    # Genre pack: dialogue-first product
+    genre = str(spec.get("genre") or "").strip().lower()
+    if genre in {"dialogue", "dialogue_drama", "adult"} and vo_mode in {
+        "character",
+        "hybrid",
+        "dialogue_drama",
+        "",
+    }:
+        # adult without explicit mode still often dialogue — prefer vo when spoken heavy
+        if vo_mode == "dialogue_drama" or genre == "dialogue_drama":
+            return "vo"
+    return "slot"
+
+
+def shot_has_spoken_dialogue(shot: dict[str, Any] | None) -> bool:
+    if not isinstance(shot, dict):
+        return False
+    if str(shot.get("spoken_text") or "").strip():
+        return True
+    sm = str(shot.get("screen_mode") or "").strip().lower()
+    if sm in {"on_camera", "off_camera"}:
+        return True
+    for cue in shot.get("audio_cues") or []:
+        if not isinstance(cue, dict):
+            continue
+        kind = str(cue.get("kind") or "voice").strip().lower()
+        if kind not in {"voice", "dialogue", ""}:
+            continue
+        lt = str(cue.get("line_type") or "dialogue").strip().lower()
+        if lt == "narration":
+            continue
+        line = str(cue.get("spoken_text") or cue.get("text") or "").strip()
+        if line:
+            return True
+    return False
+
+
+def resolve_shot_visual_fit(
+    spec: dict[str, Any] | None,
+    shot: dict[str, Any] | None,
+) -> str:
+    """Per-shot plate fit: vo | slot (Wave γ).
+
+    Priority: shot.visual_fit → mid_motion cut_on → spoken dialogue → film default.
+    """
+    shot = shot if isinstance(shot, dict) else {}
+    shot_fit = str(shot.get("visual_fit") or "").strip().lower()
+    if shot_fit in {"vo", "slot"}:
+        return shot_fit
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    cut_on = str(dsl.get("cut_on") or "").strip().lower()
+    if cut_on in {"mid_motion", "mid-action", "action", "mid-motion"}:
+        return "vo"
+    if shot_has_spoken_dialogue(shot):
+        return "vo"
+    return default_visual_fit(spec)
+
+
+def default_cut_on_for_shot(shot: dict[str, Any] | None) -> str | None:
+    """Suggest cut_on for drive beats (mid_motion) when author left blank."""
+    if not isinstance(shot, dict):
+        return None
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    existing = str(dsl.get("cut_on") or "").strip().lower()
+    if existing:
+        return existing
+    fn = str(shot.get("dramatic_function") or "").strip().lower()
+    if fn in DRIVE_CUT_FUNCTIONS:
+        return "mid_motion"
+    heat = str(shot.get("heat_phase") or "").strip().lower()
+    if heat in {"act", "climax"}:
+        return "mid_motion"
+    return None
+
+
+def apply_shot_edit_rhythm_defaults(shot: dict[str, Any]) -> dict[str, Any]:
+    """Fill missing dsl.cut_on for drive shots (mutates shot). Returns notes."""
+    notes: dict[str, Any] = {"cut_on_applied": False}
+    if not isinstance(shot, dict):
+        return notes
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else None
+    if dsl is None:
+        return notes
+    suggested = default_cut_on_for_shot(shot)
+    existing = str(dsl.get("cut_on") or "").strip()
+    if not existing and suggested:
+        dsl["cut_on"] = suggested
+        shot["dsl"] = dsl
+        notes["cut_on_applied"] = True
+        notes["cut_on"] = suggested
+    return notes
+
+
+def apply_film_edit_rhythm_defaults(spec: dict[str, Any]) -> dict[str, Any]:
+    """Film-level visual_fit + per-shot cut_on defaults (mutates spec)."""
+    applied: list[str] = []
+    if not isinstance(spec, dict):
+        return {"ok": False, "applied": []}
+    if not str(spec.get("visual_fit") or "").strip():
+        fit = default_visual_fit(spec)
+        # Only write when dialogue_drama / voice_coupled would choose vo,
+        # or leave unset for slot default at render time.
+        if fit == "vo":
+            spec["visual_fit"] = "vo"
+            applied.append("visual_fit=vo")
+    shots_touched = 0
+    for scene in spec.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        for shot in scene.get("shots") or []:
+            if not isinstance(shot, dict):
+                continue
+            n = apply_shot_edit_rhythm_defaults(shot)
+            if n.get("cut_on_applied"):
+                shots_touched += 1
+    if shots_touched:
+        applied.append(f"cut_on_mid_motion×{shots_touched}")
+    report = {
+        "ok": True,
+        "applied": applied,
+        "visual_fit": str(spec.get("visual_fit") or default_visual_fit(spec)),
+        "cut_on_drive_default": "mid_motion",
+        "max_freeze_pad_sec": MAX_FREEZE_PAD_SEC,
+        "max_freeze_no_loop_sec": MAX_FREEZE_PAD_NO_LOOP_SEC,
+        "note": (
+            "Wave γ: dialogue_drama default visual_fit=vo; drive cut_on=mid_motion; "
+            "freeze pad ≤0.15s (no long still pad)"
+        ),
+    }
+    spec["_edit_rhythm"] = report
+    return report
+
+
+def lint_equal_duration_ppt(
+    shots: list[dict[str, Any]],
+    *,
+    visual_fit: str = "slot",
+    equal_tol: float = 0.05,
+    min_shots: int = 4,
+) -> dict[str, Any]:
+    """Flag equal-length slots that read as PPT when not VO-fit."""
+    issues: list[dict[str, Any]] = []
+    if visual_fit == "vo":
+        return {"ok": True, "issues": [], "codes": []}
+    durs = []
+    for s in shots:
+        if not isinstance(s, dict):
+            continue
+        try:
+            durs.append(float(s.get("duration_sec") or 0))
+        except (TypeError, ValueError):
+            continue
+    if len(durs) < min_shots:
+        return {"ok": True, "issues": [], "codes": []}
+    # majority equal (~6s classic pad)
+    from collections import Counter
+
+    rounded = [round(d, 1) for d in durs if d > 0]
+    if not rounded:
+        return {"ok": True, "issues": [], "codes": []}
+    common, count = Counter(rounded).most_common(1)[0]
+    if count >= min_shots and count / len(rounded) >= 0.75 and abs(common - 6.0) < 0.6:
+        issues.append(
+            {
+                "code": "EQUAL_SLOT_PPT_RISK",
+                "message": (
+                    f"{count}/{len(rounded)} shots share ~{common}s duration — "
+                    "reads as equal-length PPT; set visual_fit=vo for dialogue "
+                    "or vary duration_sec / re-I2V length"
+                ),
+            }
+        )
+    return {
+        "ok": not issues,
+        "issues": issues,
+        "codes": [i["code"] for i in issues],
+        "common_duration": common if rounded else None,
+        "equal_count": count if rounded else 0,
     }
 
 

@@ -48,6 +48,7 @@ from logger import log
 from media_qa import MediaQAError, analyze_media, approved_clip_record
 from narrative_timeline import (
     NarrativeTimelineError,
+    _is_non_vo_coverage_shot,
     validate_sfx_scene_bindings,
 )
 from narrative_timeline import (
@@ -2159,16 +2160,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 vo_mode=vo_mode,
             )
         caption_text = caption_text_for_shot(shot, caption_lang=caption_lang) or text
-        if not text:
-            raise RenderError(
-                f"Shot {sid} has no spoken text for VO "
-                f"(need Chinese nar/dialogue/caption_text or voice.spoken_text)"
-            )
+        # dialogue_drama coverage (reaction / action_cover / silence without voice cue)
+        # may legitimately carry no TTS line — plate is ambience/foley only.
+        non_vo_coverage = _is_non_vo_coverage_shot(shot) and not text
         max_chars = int(
             getattr(args, "sub_max_chars", DEFAULT_SUB_MAX_CHARS) or DEFAULT_SUB_MAX_CHARS
         )
         # Subtitles + TTS: Chinese-only product path
-        units = split_units(caption_text, max_len=max_chars)
+        units = split_units(caption_text, max_len=max_chars) if caption_text else []
         try:
             mp3 = safe_output_path(
                 audio_dir, f"{sid}_vo.mp3", suffixes={".mp3"}, field=f"VO output for {sid}"
@@ -2178,58 +2177,112 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             )
         except SecurityPolicyError as exc:
             raise RenderError(str(exc)) from exc
-        log(f"TTS {sid}: {text[:40]}...")
-        voice_source = {**shot, "speaker": voice_cue.get("speaker")} if voice_cue else shot
-        shot_voice = voice_for_shot(
-            voice_source,
-            default_voice=voice,
-            cast_voices=cast_voices,
-            vo_mode=vo_mode,
-            dialogue_spoken_lang=dialogue_spoken_lang,
-        )
-        shot_tts_backend = tts_backend_for_shot(
-            shot,
-            default_backend=str(tts_backend),
-            cast_tts_backends=cast_tts_backends,
-        )
-        wav, dur, tts_meta = tts_to_wav(
-            text,
-            mp3,
-            shot_voice,
-            rate=vo_rate,
-            volume=vo_tts_vol,
-            pitch=vo_pitch,
-            backend=None if shot_tts_backend == "auto" else shot_tts_backend,
-            allow_network_fallback=tts_allow_network_fallback,
-            usage_root=root,
-            shot_id=sid,
-            performance=(
-                voice_cue.get("performance")
-                if voice_cue and isinstance(voice_cue.get("performance"), dict)
-                else normalize_performance_cue(
-                    shot.get("performance_cue"), tone_tags=shot.get("tone_tags")
+        if non_vo_coverage:
+            try:
+                plate_slot = float(shot.get("duration_sec") or 0.0)
+            except (TypeError, ValueError):
+                plate_slot = 0.0
+            if plate_slot <= 0.05:
+                plate_slot = 1.0
+            silent_wav = work / f"vo_silent_{i:02d}_{sid}.wav"
+            silence_wav(silent_wav, plate_slot)
+            # keep mp3 companion for downstream path expectations (empty AAC ok via ffmpeg)
+            run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(silent_wav),
+                    "-c:a",
+                    "libmp3lame",
+                    "-q:a",
+                    "4",
+                    str(mp3),
+                ]
+            )
+            wav = silent_wav
+            dur = plate_slot
+            tts_meta = {
+                "backend": "silence",
+                "voice": "none",
+                "note": "non_vo_coverage",
+                "duration_sec": plate_slot,
+            }
+            text = ""
+            caption_text = ""
+            units = []
+            shot_voice = "none"
+            shot_tts_backend = "silence"
+            log(f"silence VO {sid}: coverage plate {plate_slot:.2f}s (no TTS)")
+            color_wav = None
+            color_dur = 0.0
+            color_meta = None
+            color_payload = {}
+            color_text = ""
+            color_gain = 0.0
+        else:
+            if not text:
+                raise RenderError(
+                    f"Shot {sid} has no spoken text for VO "
+                    f"(need Chinese nar/dialogue/caption_text or voice.spoken_text)"
                 )
-                if normalize_performance_cue is not None
-                else None
-            ),
-        )
-        log(
-            f"  tts backend={tts_meta.get('backend')} voice={tts_meta.get('voice') or shot_voice} "
-            f"dur={dur:.2f}s"
-        )
-        # Independent 娇喘/语助词 stem (not mixed into nar text)
-        color_wav: Path | None = None
-        color_dur = 0.0
-        color_meta: dict[str, Any] | None = None
-        color_payload: dict[str, Any] = {}
-        if resolve_shot_vocal_color is not None and voice_policy.get("enabled", False):
+            log(f"TTS {sid}: {text[:40]}...")
+            voice_source = {**shot, "speaker": voice_cue.get("speaker")} if voice_cue else shot
+            shot_voice = voice_for_shot(
+                voice_source,
+                default_voice=voice,
+                cast_voices=cast_voices,
+                vo_mode=vo_mode,
+                dialogue_spoken_lang=dialogue_spoken_lang,
+            )
+            shot_tts_backend = tts_backend_for_shot(
+                shot,
+                default_backend=str(tts_backend),
+                cast_tts_backends=cast_tts_backends,
+            )
+            wav, dur, tts_meta = tts_to_wav(
+                text,
+                mp3,
+                shot_voice,
+                rate=vo_rate,
+                volume=vo_tts_vol,
+                pitch=vo_pitch,
+                backend=None if shot_tts_backend == "auto" else shot_tts_backend,
+                allow_network_fallback=tts_allow_network_fallback,
+                usage_root=root,
+                shot_id=sid,
+                performance=(
+                    voice_cue.get("performance")
+                    if voice_cue and isinstance(voice_cue.get("performance"), dict)
+                    else normalize_performance_cue(
+                        shot.get("performance_cue"), tone_tags=shot.get("tone_tags")
+                    )
+                    if normalize_performance_cue is not None
+                    else None
+                ),
+            )
+            log(
+                f"  tts backend={tts_meta.get('backend')} voice={tts_meta.get('voice') or shot_voice} "
+                f"dur={dur:.2f}s"
+            )
+            # Independent 娇喘/语助词 stem (not mixed into nar text)
+            color_wav: Path | None = None
+            color_dur = 0.0
+            color_meta: dict[str, Any] | None = None
+            color_payload: dict[str, Any] = {}
+        if (
+            not non_vo_coverage
+            and resolve_shot_vocal_color is not None
+            and voice_policy.get("enabled", False)
+        ):
             try:
                 color_payload = resolve_shot_vocal_color(shot, policy=voice_policy, seed=i * 17)
             except Exception:
                 color_payload = {}
-        color_text = str(color_payload.get("text") or "").strip()
-        color_gain = float(color_payload.get("gain") or film_vocal_color_gain or 0.0)
-        if color_text and color_gain > 0 and film_vocal_color_gain > 0:
+        if not non_vo_coverage:
+            color_text = str(color_payload.get("text") or "").strip()
+            color_gain = float(color_payload.get("gain") or film_vocal_color_gain or 0.0)
+        if (not non_vo_coverage) and color_text and color_gain > 0 and film_vocal_color_gain > 0:
             try:
                 c_mp3 = safe_output_path(
                     audio_dir,
@@ -2278,30 +2331,42 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 f"({dur:.2f}s > {cue_window:.2f}s); shorten text or enlarge audio_cues duration"
             )
         # shorter tail — snappier cut to next shot
-        pad = float(getattr(args, "vo_pad", 0.12) or 0.12)
-        target = dur + pad
+        # non-vo coverage: silence already matches plate; no VO pad stretch
+        if non_vo_coverage:
+            pad = 0.0
+            target = float(dur)
+        else:
+            pad = float(getattr(args, "vo_pad", 0.12) or 0.12)
+            target = dur + pad
         # visual_fit: "slot" locks to duration_sec; "vo" follows VO length.
-        # P0 · 2026-07-23: default for voice_coupled / short I2V is vo-timed so we
-        # do not pad 6s clips to 7–8s plates (stream_loop double-play / long freeze).
+        # Wave γ · dialogue_drama / spoken / mid_motion → vo (anti equal-length PPT).
         # See lessons-2026-07-20-action-fluency.md · shortform_no_double_play.
-        es = spec.get("edit_strategy") if isinstance(spec.get("edit_strategy"), dict) else {}
-        es_mode = str(es.get("mode") or "").strip().lower()
-        default_fit = "vo" if es_mode in {"voice_coupled", "punchy"} else "slot"
+        try:
+            from edit_policy import default_visual_fit, resolve_shot_visual_fit
+
+            default_fit = default_visual_fit(spec)
+            use_fit = resolve_shot_visual_fit(spec, shot)
+        except Exception:
+            es = spec.get("edit_strategy") if isinstance(spec.get("edit_strategy"), dict) else {}
+            es_mode = str(es.get("mode") or "").strip().lower()
+            default_fit = "vo" if es_mode in {"voice_coupled", "punchy"} else "slot"
+            visual_fit = str(spec.get("visual_fit") or default_fit).strip().lower()
+            shot_fit = str(shot.get("visual_fit") or "").strip().lower()
+            dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+            cut_on = str(dsl.get("cut_on") or "").strip().lower()
+            if shot_fit in {"vo", "slot"}:
+                use_fit = shot_fit
+            elif visual_fit == "vo" or cut_on == "mid_motion":
+                use_fit = "vo"
+            else:
+                use_fit = visual_fit if visual_fit in {"vo", "slot"} else default_fit
         visual_fit = str(spec.get("visual_fit") or default_fit).strip().lower()
         try:
             slot = float(shot.get("duration_sec") or 0)
         except (TypeError, ValueError):
             slot = 0.0
-        # Per-shot override: shot.visual_fit or continue mid_motion prefers vo-timed
-        shot_fit = str(shot.get("visual_fit") or "").strip().lower()
         dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
         cut_on = str(dsl.get("cut_on") or "").strip().lower()
-        if shot_fit in {"vo", "slot"}:
-            use_fit = shot_fit
-        elif visual_fit == "vo" or cut_on == "mid_motion":
-            use_fit = "vo"
-        else:
-            use_fit = visual_fit if visual_fit in {"vo", "slot"} else default_fit
 
         vo_atempo_plan: dict[str, Any] | None = None
         raw_vo_dur = float(dur)

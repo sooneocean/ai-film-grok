@@ -634,7 +634,12 @@ def _fluency_export_meta(
     intents = [str(x).lower() for x in (story_intents or [])]
     hard_n = sum(1 for x in intents if x == "hard")
     soft_n = sum(1 for x in intents if x in {"soft", "hold"})
-    visual_fit = str(spec.get("visual_fit") or "slot").strip().lower()
+    try:
+        from edit_policy import default_visual_fit
+
+        visual_fit = str(spec.get("visual_fit") or default_visual_fit(spec) or "slot").strip().lower()
+    except Exception:
+        visual_fit = str(spec.get("visual_fit") or "slot").strip().lower()
     long_form = bool(spec.get("long_form") or spec.get("require_continuity_chain"))
     # Heuristic: mostly-hard joins + vo fit → continue-chain style plate
     continue_chain = long_form or (visual_fit == "vo" and hard_n >= max(1, soft_n))

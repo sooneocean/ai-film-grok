@@ -267,7 +267,14 @@ def run_preflight(root: Path) -> dict[str, Any]:
         # be slowed (atempo≪1) and felt 卡. Code now pads; still soft-warn dead-air risk.
         try:
             drag_shots: list[str] = []
-            global_fit = str(spec.get("visual_fit") or "slot").strip().lower()
+            try:
+                from edit_policy import default_visual_fit
+
+                global_fit = str(
+                    spec.get("visual_fit") or default_visual_fit(spec) or "slot"
+                ).strip().lower()
+            except Exception:
+                global_fit = str(spec.get("visual_fit") or "slot").strip().lower()
             for scene in spec.get("scenes") or []:
                 if not isinstance(scene, dict):
                     continue
@@ -304,6 +311,33 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             "prefer visual_fit:vo for snappy shorts; or lengthen nar / add shots "
                             "for full 60s; do NOT force atempo≪1. See lessons-2026-07-20-vo-drag-motion-snap.md"
                         ),
+                    )
+                )
+        except Exception:
+            pass
+
+        # --- Equal-slot PPT risk (Wave γ · 2026-08-04) ---
+        try:
+            from edit_policy import default_visual_fit, lint_equal_duration_ppt
+
+            fit = str(spec.get("visual_fit") or default_visual_fit(spec) or "slot").strip().lower()
+            flat: list[dict[str, Any]] = []
+            for scene in spec.get("scenes") or []:
+                if not isinstance(scene, dict):
+                    continue
+                for sh in scene.get("shots") or []:
+                    if isinstance(sh, dict):
+                        flat.append(sh)
+            ppt = lint_equal_duration_ppt(flat, visual_fit=fit)
+            if not ppt.get("ok"):
+                soft.append(
+                    _issue(
+                        "soft",
+                        "EQUAL_SLOT_PPT_RISK",
+                        "; ".join(
+                            str(i.get("message") or i.get("code")) for i in (ppt.get("issues") or [])
+                        ),
+                        fix="set visual_fit:vo (dialogue_drama default) or vary duration_sec / re-I2V",
                     )
                 )
         except Exception:

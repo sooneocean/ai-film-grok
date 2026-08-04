@@ -1536,6 +1536,13 @@ def validate_film_spec(
                 dsl["motion"] = validate_motion(motion, field=f"{shot_id}.dsl.motion")
             except PolicyError as exc:
                 raise FilmSpecError(str(exc)) from exc
+            # Wave γ · drive beats default cut_on=mid_motion (kinetic, not settle-hold)
+            try:
+                from edit_policy import apply_shot_edit_rhythm_defaults
+
+                apply_shot_edit_rhythm_defaults(shot)
+            except Exception:
+                pass
             duration = shot.get("duration_sec")
             if duration is None:
                 duration_value = DEFAULT_DURATION_SEC
@@ -1881,6 +1888,29 @@ def validate_film_spec(
             "hook/action never stream_loop in final. Grow runtime by adding shots."
         ),
     }
+
+    # Wave γ · edit rhythm: dialogue_drama visual_fit=vo; drive cut_on; anti-PPT note
+    try:
+        from edit_policy import (
+            apply_film_edit_rhythm_defaults,
+            default_visual_fit,
+            lint_equal_duration_ppt,
+        )
+
+        rhythm = apply_film_edit_rhythm_defaults(spec)
+        ppt = lint_equal_duration_ppt(
+            shots,
+            visual_fit=str(spec.get("visual_fit") or default_visual_fit(spec)),
+        )
+        if not ppt.get("ok"):
+            notes = list(spec.get("_edit_rhythm_warnings") or [])
+            for iss in ppt.get("issues") or []:
+                notes.append(str(iss.get("message") or iss.get("code")))
+            spec["_edit_rhythm_warnings"] = notes
+            rhythm = {**(spec.get("_edit_rhythm") or rhythm), "ppt_lint": ppt}
+            spec["_edit_rhythm"] = rhythm
+    except Exception as exc:  # noqa: BLE001
+        spec["_edit_rhythm_errors"] = [str(exc)[:200]]
 
     # Validate or auto-suggest story join intents now that shot count is known
     expected = max(0, len(shots) - 1)

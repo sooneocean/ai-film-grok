@@ -20,7 +20,7 @@
 | `review-shot --approve` 未变 approved | 换片后 **再** `register-clip --status approved --review-receipt`（sha 对齐） |
 | plate 无字当交付 | 正式链：plate `subs=off` → **HyperFrames** 真烧中文。**Ship/门红链（2026-08-03 v3）**：优先 **PIL 硬烧** 进 plate 像素；禁止只靠 HF `opacity:0`+GSAP |
 | 用户说「没有字幕」 | 先抽帧：有字→安全区/缓存/重开文件；无字→硬烧重出。验收=人眼可读，≠ ledger 有字段 |
-| 等长 6s PPT 感 | **VO-fit** 对白镜 + 变长 xfade；先帧链 promote 再 dissolve |
+| 等长 6s PPT 感 | **VO-fit** 默认（dialogue_drama `visual_fit=vo`）+ 驱动 `cut_on=mid_motion` + 变长 xfade；freeze≤0.15s；先帧链 promote 再 dissolve |
 | final 门红但用户要看片 | plate-xfade + rnb + **硬烧中文字幕** → `*-silk-v3.mp4`；**PARTIAL** 回执，不标 final_complete |
 | 静图/Ken Burns 装片 | **硬拒**（true_video_policy）：final/ship-prep 扫 approved clips；须 Grok/H3 生成 mp4 再剪（2026-08-03 荒岛 · 2026-08-04 强化） |
 
