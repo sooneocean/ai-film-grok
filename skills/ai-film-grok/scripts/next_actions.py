@@ -501,9 +501,12 @@ def build_next_actions(
             if h3_enabled:
                 add(
                     "h3-lane",
-                    f'aifilm h3 list --root "{r}" && aifilm h3 plan --root "{r}" --shot-id <id> '
+                    f'aifilm comfy free-memory --confirm; aifilm h3 list --root "{r}" '
+                    f'&& aifilm h3 plan --root "{r}" --shot-id <id> '
                     f'&& aifilm h3 run --root "{r}" --shot-id <id> --register',
-                    "hybrid_h3：敏感/肉戏走本地 MiniMax H3 film-lane（片级 pilot 批准后 bulk；原声 prefer_native）",
+                    "hybrid_h3：list 已带 max-effect 模式（I2V锁脸/R2V高动大嘴/T2V无脸）；"
+                    "plan.mode 可直接 run；能量不够用 plan.command_alt 或 --mode r2v；"
+                    "续镜 chain_mode=continue；原声 prefer_native；bulk 要 pilot 批",
                 )
             add(
                 "queue-or-register",
@@ -524,9 +527,16 @@ def build_next_actions(
             )
 
     if gates.get("clips_complete") and not gates.get("final_complete"):
-        # Phase B · DF motion gate before final when clips ready
+        # 2.37 · prefer ship-prep one-shot; fall back to motion-gate alone
+        ship_rec = read_json(root / "receipts" / "ship-prep.json") or {}
         gate_rec = read_json(root / "receipts" / "i2v-final-gate.json") or {}
-        if gate_rec.get("ok") is not True:
+        if ship_rec.get("ok") is not True and gate_rec.get("ok") is not True:
+            add(
+                "ship-prep",
+                f'aifilm ship-prep --root "{r}"',
+                "clips 齐 — ship-prep：means→variety→shortlist→motion-gate→film_core",
+            )
+        elif gate_rec.get("ok") is not True:
             add(
                 "i2v-motion-gate",
                 f'aifilm i2v-motion-gate --root "{r}" --write',

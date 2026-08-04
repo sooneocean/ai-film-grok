@@ -81,6 +81,7 @@
 | 双字幕 | `caption_mode: zh\|zh_en\|en`；`nar_en` 可只上字幕 |
 | **零旁白 IRON（P0 · 2026-08-04 · 真门 2.36.4）** | `dialogue_drama` 默认 `zero_narration_strict:true`：全片第三人称 `nar` 占比硬底 **0%**。代码：`film_spec.zero_narration_gate` → `validate_film_spec` 报 **`NAR_BUDGET_VIOLATION`**。**替代**：① 角色对白/潜台词；② 道具特写 `dramatic_function: sensory/insert`；③ Foley。逃生：`zero_narration_strict:false` 或镜级 `silent_scene+narration_reason`。解封后回落 `narration_budget_ratio`（默认 5%）。测：`tests/test_zero_narration_gate.py`（真函数，非 stand-in）。 |
 | **Delivery Truth（P0 · 2.36.4）** | **桌面拷贝硬拦**：`export-desktop` 要求 `receipts/i2v-final-gate.json` **ok=true**（缺收据=红）。`closeout` 阶梯加 `i2v_motion` 步。**film_core**：异常≠通过；`heat_scale=max` / `premium_vertical` / `dramatic_meaning_strict` 时 film_core **挡** `delivery_ready`。逃生：`AIFILM_SKIP_I2V_MOTION_GATE=1`。测：`tests/test_delivery_truth.py`。 |
+| **Throughput 一键（P0 · 2.37.0）** | **`aifilm ship-prep --root`**：自动 mean（ffmpeg）→ variety → shortlist（`--promote` 写 preferred 进 manifest）→ motion-gate → film_core。clips 齐后 dispatch 优先推 ship-prep。mean 规格：fps=5 · 140×248 gray。逃生：`--skip-variety` / `AIFILM_SKIP_VARIETY_PREFLIGHT` / `AIFILM_SKIP_I2V_MOTION_GATE`。测：`test_ship_prep_throughput.py`。 |
 
 ## 语音与混音
 

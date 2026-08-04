@@ -791,13 +791,44 @@ def _variety_matrix_md(
 # ---------------------------------------------------------------------------
 
 
-def select_shortlist(root: Path | str, *, write: bool = True) -> dict[str, Any]:
-    """Multi-take preferred pick: motion mean × style/medium heuristics; never delete takes."""
+def select_shortlist(
+    root: Path | str,
+    *,
+    write: bool = True,
+    promote: bool = False,
+    measure_missing: bool = True,
+) -> dict[str, Any]:
+    """Multi-take preferred pick by mean; optional promote into manifest clips (v2.37).
+
+    Never deletes takes. ``promote=True`` sets clips[sid].path to highest-mean take
+    that has a mean (still records below_floor when under DF floors).
+    """
     root = _root(root)
+    if measure_missing:
+        try:
+            from i2v_motion_gate import ensure_take_means
+
+            ensure_take_means(root, recompute=False, write_sidecars=True)
+        except Exception:  # noqa: BLE001
+            pass
     takes_root = root / "takes"
     man = read_json(root / "manifest.json") or {}
+    if not isinstance(man, dict):
+        man = {}
     clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
+    if not isinstance(clips, dict):
+        clips = {}
     rows: list[dict[str, Any]] = []
+    promoted: list[dict[str, Any]] = []
+
+    shot_meta: dict[str, dict[str, Any]] = {}
+    spec = read_json(root / "film-spec.json") or {}
+    for scene in (spec.get("scenes") or []) if isinstance(spec, dict) else []:
+        if not isinstance(scene, dict):
+            continue
+        for sh in scene.get("shots") or []:
+            if isinstance(sh, dict) and sh.get("id"):
+                shot_meta[str(sh["id"])] = sh
 
     shot_dirs: dict[str, list[Path]] = {}
     if takes_root.is_dir():
@@ -814,6 +845,15 @@ def select_shortlist(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         scored: list[dict[str, Any]] = []
         for f in files:
             mean = _read_motion_mean(root, sid, f)
+            if mean is None and measure_missing:
+                try:
+                    from i2v_motion_gate import measure_mean_absdiff, write_mean_sidecar
+
+                    mean = measure_mean_absdiff(f)
+                    if mean is not None:
+                        write_mean_sidecar(f, mean)
+                except Exception:  # noqa: BLE001
+                    mean = None
             size = f.stat().st_size if f.is_file() else 0
             score = (mean or 0.0) * 1.0 + (1.0 if size > 100_000 else 0.0)
             scored.append(
@@ -826,17 +866,60 @@ def select_shortlist(root: Path | str, *, write: bool = True) -> dict[str, Any]:
             )
         scored.sort(key=lambda x: (-float(x["score"]), -int(x["bytes"])))
         preferred = scored[0] if scored else None
-        rows.append(
-            {
-                "shot_id": sid,
-                "take_count": len(scored),
-                "preferred": preferred,
-                "candidates": scored,
-                "manifest_clip": clips.get(sid),
-            }
-        )
+        below_floor = False
+        floor_val = None
+        if preferred and preferred.get("mean") is not None:
+            sh = shot_meta.get(sid) or {}
+            try:
+                from i2v_motion_gate import evaluate_shot_motion
 
-    # also surface shots with multiple clips registered under quality takes field
+                ev = evaluate_shot_motion(
+                    float(preferred["mean"]),
+                    heat_phase=sh.get("heat_phase"),
+                    dramatic_function=sh.get("dramatic_function"),
+                    wardrobe_state=sh.get("wardrobe_state"),
+                    shot_id=sid,
+                )
+                floor_val = ev.get("floor")
+                below_floor = not bool(ev.get("ok"))
+            except Exception:  # noqa: BLE001
+                below_floor = False
+        row = {
+            "shot_id": sid,
+            "take_count": len(scored),
+            "preferred": preferred,
+            "candidates": scored,
+            "manifest_clip": clips.get(sid),
+            "below_floor": below_floor,
+            "floor": floor_val,
+        }
+        rows.append(row)
+
+        if promote and preferred and preferred.get("path"):
+            prev = clips.get(sid) if isinstance(clips.get(sid), dict) else {}
+            new_clip = {
+                **(prev or {}),
+                "path": preferred["path"],
+                "mean": preferred.get("mean"),
+                "mean_absdiff": preferred.get("mean"),
+                "preferred_from": "select-shortlist",
+                "promoted_at": utc_now(),
+                "status": prev.get("status") or "candidate",
+            }
+            clips[sid] = new_clip
+            promoted.append(
+                {
+                    "shot_id": sid,
+                    "path": preferred["path"],
+                    "mean": preferred.get("mean"),
+                    "below_floor": below_floor,
+                }
+            )
+
+    if promote and promoted:
+        man["clips"] = clips
+        write_json(root / "manifest.json", man)
+
     out = {
         "schema_version": 1,
         "kind": "select-shortlist",
@@ -844,34 +927,253 @@ def select_shortlist(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         "root": str(root),
         "ok": True,
         "shots": rows,
-        "note": "preferred is advisory; other takes retained",
-        "next_cmd": f'aifilm selects --root "{root}"' if rows else None,
+        "promoted": promoted,
+        "promote": promote,
+        "note": (
+            "preferred promoted into manifest.clips (takes retained)"
+            if promote
+            else "preferred is advisory; pass --promote to write manifest.clips"
+        ),
+        "next_cmd": (
+            f'aifilm i2v-motion-gate --root "{root}" --write'
+            if rows
+            else None
+        ),
     }
     if write:
         write_json(root / "receipts" / SELECT_SHORTLIST_NAME, out)
     return out
 
 
+def ship_prep(
+    root: Path | str,
+    *,
+    write: bool = True,
+    measure: bool = True,
+    promote: bool = True,
+    skip_variety: bool = False,
+) -> dict[str, Any]:
+    """One-shot pre-delivery ladder (v2.37): means → variety → shortlist → motion-gate → film_core.
+
+    Hard fails: variety (unless skip), i2v_motion_gate.
+    film_core hard only for max/premium (else advisory).
+    """
+    root = _root(root)
+    steps: list[dict[str, Any]] = []
+
+    if measure:
+        try:
+            from i2v_motion_gate import ensure_take_means
+
+            mm = ensure_take_means(root, recompute=False, write_sidecars=True)
+            steps.append(
+                {
+                    "id": "measure_means",
+                    "ok": True,
+                    "detail": (
+                        f"measured={mm.get('measured_count', 0)} "
+                        f"skipped={mm.get('skipped_count', 0)} "
+                        f"errors={mm.get('error_count', 0)}"
+                    ),
+                    "next_cmd": None,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            steps.append(
+                {
+                    "id": "measure_means",
+                    "ok": False,
+                    "detail": str(exc)[:200],
+                    "next_cmd": f'aifilm i2v-motion-gate --root "{root}" --write',
+                }
+            )
+
+    if skip_variety or os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        steps.append(
+            {
+                "id": "variety",
+                "ok": True,
+                "skipped": True,
+                "detail": "AIFILM_SKIP_VARIETY_PREFLIGHT or --skip-variety",
+                "next_cmd": None,
+            }
+        )
+    else:
+        var = variety_precheck(root, write=write)
+        steps.append(
+            {
+                "id": "variety",
+                "ok": bool(var.get("ok")),
+                "detail": (
+                    "ok"
+                    if var.get("ok")
+                    else f"issues={len(var.get('issues') or [])}"
+                ),
+                "next_cmd": var.get("next_cmd"),
+                "hard": True,
+            }
+        )
+
+    sel = select_shortlist(
+        root, write=write, promote=promote, measure_missing=measure
+    )
+    steps.append(
+        {
+            "id": "select_shortlist",
+            "ok": True,
+            "detail": (
+                f"shots={len(sel.get('shots') or [])} "
+                f"promoted={len(sel.get('promoted') or [])}"
+            ),
+            "next_cmd": None,
+            "promoted": sel.get("promoted") or [],
+        }
+    )
+
+    gate_rep: dict[str, Any] = {}
+    try:
+        from cli_motion import i2v_motion_gate_from_rows
+
+        gate_rep = i2v_motion_gate_from_rows(
+            [],
+            root=root,
+            write_receipts=write,
+            auto_from_root=True,
+        )
+        steps.append(
+            {
+                "id": "i2v_motion_gate",
+                "ok": bool(gate_rep.get("ok")),
+                "detail": "i2v-final-gate ok" if gate_rep.get("ok") else "gate red",
+                "next_cmd": (
+                    None
+                    if gate_rep.get("ok")
+                    else f'aifilm i2v-motion-gate --root "{root}" --write'
+                ),
+                "hard": True,
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "i2v_motion_gate",
+                "ok": False,
+                "detail": str(exc)[:200],
+                "next_cmd": f'aifilm i2v-motion-gate --root "{root}" --write',
+                "hard": True,
+            }
+        )
+
+    core: dict[str, Any] = {}
+    film_core_hard = False
+    try:
+        _spec = read_json(root / "film-spec.json") or {}
+        heat_scale = str(_spec.get("heat_scale") or "").strip().lower()
+        film_core_hard = (
+            heat_scale == "max"
+            or _spec.get("dramatic_meaning_strict") is True
+            or _spec.get("premium_vertical") is True
+        )
+        core = film_core_closeout_audit(root, write=write)
+        steps.append(
+            {
+                "id": "film_core",
+                "ok": bool(core.get("ok")),
+                "detail": (
+                    "ok"
+                    if core.get("ok")
+                    else f"issues={len(core.get('issues') or [])}"
+                ),
+                "next_cmd": core.get("next_cmd"),
+                "hard": film_core_hard,
+                "advisory": not film_core_hard,
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        core = {"ok": False, "error": str(exc)[:160]}
+        steps.append(
+            {
+                "id": "film_core",
+                "ok": False,
+                "detail": str(exc)[:200],
+                "next_cmd": f'aifilm closeout status --root "{root}"',
+                "hard": film_core_hard,
+                "advisory": not film_core_hard,
+            }
+        )
+
+    hard_failed = [
+        s for s in steps if not s.get("ok") and (s.get("hard") or s["id"] in {"variety", "i2v_motion_gate"})
+    ]
+    # soft fail film_core when not hard
+    soft_only = [
+        s
+        for s in steps
+        if not s.get("ok") and s.get("advisory") and not s.get("hard")
+    ]
+    ok = not hard_failed
+    blocked = hard_failed[0] if hard_failed else None
+    next_cmd = (blocked or {}).get("next_cmd") or (
+        f'aifilm closeout run --root "{root}"' if ok else None
+    )
+    out = {
+        "schema_version": 1,
+        "kind": "ship-prep",
+        "at": utc_now(),
+        "root": str(root),
+        "ok": ok,
+        "steps": steps,
+        "blocked_by": (blocked or {}).get("id"),
+        "soft_issues": [s["id"] for s in soft_only],
+        "next_cmd": next_cmd,
+        "gate": {
+            "ok": gate_rep.get("ok") if gate_rep else None,
+            "row_count": gate_rep.get("row_count"),
+        },
+        "film_core": {
+            "ok": core.get("ok") if core else None,
+            "hard": film_core_hard,
+        },
+        "note": "means→variety→shortlist→motion-gate→film_core; then closeout/export",
+    }
+    if write:
+        write_json(root / "receipts" / "ship-prep.json", out)
+    return out
+
+
 def _read_motion_mean(root: Path, shot_id: str, take: Path) -> float | None:
     # look for sidecar or i2v-high-motion-audit
     audit = read_json(root / "receipts" / "i2v-high-motion-audit.json") or {}
-    rows = audit.get("rows") if isinstance(audit.get("rows"), list) else []
+    per = audit.get("per_shot") if isinstance(audit.get("per_shot"), list) else []
+    rows = audit.get("rows") if isinstance(audit.get("rows"), list) else per
     for row in rows:
         if not isinstance(row, dict):
             continue
         if str(row.get("shot_id") or row.get("id") or "") != shot_id:
             continue
-        try:
-            return float(row.get("mean") or row.get("motion_mean") or 0)
-        except (TypeError, ValueError):
-            return None
-    side = take.with_suffix(take.suffix + ".json")
-    if side.is_file():
+        for key in ("mean", "mean_absdiff", "motion_mean"):
+            if row.get(key) is None:
+                continue
+            try:
+                return float(row[key])
+            except (TypeError, ValueError):
+                return None
+    for side in (Path(str(take) + ".json"), take.with_suffix(take.suffix + ".json")):
+        if not side.is_file():
+            continue
         data = read_json(side) or {}
-        try:
-            return float(data.get("mean") or data.get("motion_mean") or 0)
-        except (TypeError, ValueError):
-            return None
+        for key in ("mean", "mean_absdiff", "motion_mean"):
+            if data.get(key) is None:
+                continue
+            try:
+                return float(data[key])
+            except (TypeError, ValueError):
+                return None
     return None
 
 

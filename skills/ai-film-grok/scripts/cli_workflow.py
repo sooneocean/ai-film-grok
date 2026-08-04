@@ -16,6 +16,7 @@ from workflow_pack import (
     gpu_lease_status,
     queue_progress_honest,
     select_shortlist,
+    ship_prep,
     tunnel_probe,
     variety_precheck,
 )
@@ -55,9 +56,37 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
     # select shortlist
     ss = sub.add_parser(
         "select-shortlist",
-        help="Multi-take preferred shortlist (advisory; never deletes takes)",
+        help="Multi-take preferred shortlist by mean (optional --promote into manifest)",
     )
     ss.add_argument("--root", required=True)
+    ss.add_argument(
+        "--promote",
+        action="store_true",
+        help="Write preferred take path+mean into manifest.clips (never deletes takes)",
+    )
+    ss.add_argument(
+        "--no-measure",
+        action="store_true",
+        help="Do not auto-measure missing mean sidecars",
+    )
+
+    # ship-prep one-shot
+    sp = sub.add_parser(
+        "ship-prep",
+        help="Pre-delivery ladder: means → variety → shortlist → motion-gate → film_core",
+    )
+    sp.add_argument("--root", required=True)
+    sp.add_argument("--no-measure", action="store_true", help="Skip ffmpeg mean scan")
+    sp.add_argument(
+        "--no-promote",
+        action="store_true",
+        help="Do not promote preferred takes into manifest.clips",
+    )
+    sp.add_argument(
+        "--skip-variety",
+        action="store_true",
+        help="Skip variety hard door (or set AIFILM_SKIP_VARIETY_PREFLIGHT=1)",
+    )
 
     # gpu-lease
     gl = sub.add_parser("gpu-lease", help="5090 one-owner lease (global ~/.grok/run)")
@@ -153,9 +182,23 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
             return 0 if report.get("ok") else 2
 
         if cmd == "select-shortlist":
-            report = select_shortlist(args.root)
+            report = select_shortlist(
+                args.root,
+                promote=bool(getattr(args, "promote", False)),
+                measure_missing=not bool(getattr(args, "no_measure", False)),
+            )
             _emit(report)
             return 0
+
+        if cmd == "ship-prep":
+            report = ship_prep(
+                args.root,
+                measure=not bool(getattr(args, "no_measure", False)),
+                promote=not bool(getattr(args, "no_promote", False)),
+                skip_variety=bool(getattr(args, "skip_variety", False)),
+            )
+            _emit(report)
+            return 0 if report.get("ok") else 2
 
         if cmd == "gpu-lease":
             action = str(getattr(args, "lease_action", "") or "")

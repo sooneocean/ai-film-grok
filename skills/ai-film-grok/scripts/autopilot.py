@@ -33,6 +33,7 @@ LOCAL_THROUGHPUT_NEXT_IDS = frozenset(
         "film-core-closeout",
         "pilot-pack",
         "select-shortlist",
+        "ship-prep",
         "export-desktop",
         "agent-review-final",  # L0 assist only; advance rejects --apply
         "post-audit-gate",

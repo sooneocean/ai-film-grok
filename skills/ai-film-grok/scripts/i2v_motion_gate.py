@@ -564,13 +564,168 @@ def assert_i2v_final_gate_for_export(root: Path | str) -> dict[str, Any]:
     return {"ok": True, "gate": gate, "path": str(gate_path)}
 
 
-def collect_motion_gate_rows(root: Path | str) -> list[dict[str, Any]]:
-    """Phase B · Auto-build gate rows from film-spec + mean sources (DF/wardrobe filled).
+def measure_mean_absdiff(
+    path: Path | str,
+    *,
+    timeout_sec: float = 90.0,
+) -> float | None:
+    """Compute mean_absdiff (fps=5, 140×248 gray) for one clip via ffmpeg rawvideo.
+
+    Returns None if ffmpeg missing, decode fails, or <2 frames.
+    """
+    import array
+    import shutil
+    import subprocess
+
+    video = Path(path).expanduser().resolve()
+    if not video.is_file():
+        return None
+    if not shutil.which("ffmpeg"):
+        return None
+    w, h, fps = MEAN_ABSDIFF_WIDTH, MEAN_ABSDIFF_HEIGHT, MEAN_ABSDIFF_FPS
+    frame_size = int(w * h)
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(video),
+        "-vf",
+        f"fps={fps},scale={w}:{h},format=gray",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "gray",
+        "-",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    raw = proc.stdout or b""
+    if proc.returncode != 0 or len(raw) < frame_size * 2:
+        return None
+    n_frames = len(raw) // frame_size
+    if n_frames < 2:
+        return None
+    total = 0.0
+    pairs = 0
+    prev = array.array("B", raw[0:frame_size])
+    for i in range(1, n_frames):
+        cur = array.array("B", raw[i * frame_size : (i + 1) * frame_size])
+        if len(cur) < frame_size:
+            break
+        # mean abs pixel delta
+        s = 0
+        for a, b in zip(prev, cur):
+            s += a - b if a >= b else b - a
+        total += s / float(frame_size)
+        pairs += 1
+        prev = cur
+    if pairs <= 0:
+        return None
+    return round(total / pairs, 4)
+
+
+def write_mean_sidecar(video: Path, mean: float, **extra: Any) -> Path:
+    """Write takes/.../clip.mp4.json with mean_absdiff for gate / shortlist."""
+    side = Path(str(video) + ".json")
+    payload: dict[str, Any] = {
+        "kind": "mean-absdiff-sidecar",
+        "path": str(video),
+        "mean": mean,
+        "mean_absdiff": mean,
+        "metric": "mean_absdiff",
+        "sample": {
+            "fps": MEAN_ABSDIFF_FPS,
+            "width": MEAN_ABSDIFF_WIDTH,
+            "height": MEAN_ABSDIFF_HEIGHT,
+            "format": "gray",
+        },
+    }
+    payload.update(extra)
+    side.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return side
+
+
+def ensure_take_means(
+    root: Path | str,
+    *,
+    recompute: bool = False,
+    write_sidecars: bool = True,
+    max_clips: int = 80,
+) -> dict[str, Any]:
+    """Scan takes/**/*.mp4 and measure mean when sidecar missing (v2.37 throughput)."""
+    base = Path(root).expanduser().resolve()
+    takes_root = base / "takes"
+    measured: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    if not takes_root.is_dir():
+        return {
+            "ok": True,
+            "measured": [],
+            "skipped": [],
+            "errors": [],
+            "note": "no takes/",
+        }
+    videos: list[Path] = []
+    for p in sorted(takes_root.rglob("*")):
+        if p.is_file() and p.suffix.lower() in {".mp4", ".webm", ".mov"}:
+            videos.append(p)
+        if len(videos) >= max_clips:
+            break
+    for video in videos:
+        side = Path(str(video) + ".json")
+        existing: float | None = None
+        if side.is_file() and not recompute:
+            try:
+                data = json.loads(side.read_text(encoding="utf-8"))
+                for key in ("mean", "mean_absdiff", "motion_mean"):
+                    if data.get(key) is not None:
+                        existing = float(data[key])
+                        break
+            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                existing = None
+        if existing is not None:
+            skipped.append({"path": str(video), "mean": existing, "reason": "sidecar"})
+            continue
+        mean = measure_mean_absdiff(video)
+        if mean is None:
+            errors.append({"path": str(video), "error": "measure_failed"})
+            continue
+        if write_sidecars:
+            write_mean_sidecar(video, mean)
+        measured.append({"path": str(video), "mean": mean})
+    return {
+        "ok": True,
+        "measured_count": len(measured),
+        "skipped_count": len(skipped),
+        "error_count": len(errors),
+        "measured": measured[:40],
+        "skipped": skipped[:20],
+        "errors": errors[:20],
+    }
+
+
+def collect_motion_gate_rows(
+    root: Path | str,
+    *,
+    measure_missing: bool = True,
+) -> list[dict[str, Any]]:
+    """Phase B/2.37 · Auto-build gate rows from film-spec + means (measure if missing).
 
     Mean resolution order per shot:
       1) receipts/i2v-high-motion-audit.json per_shot
       2) takes/<id>/*.mp4.json sidecar mean|mean_absdiff|motion_mean
-      3) manifest clips[id] mean fields
+      3) measure takes (write sidecars) — pick max mean
+      4) manifest clips[id] mean or measure clip path
     Missing mean → row still emitted (gate will flag MEAN missing / fail floor).
     """
     base = Path(root).expanduser().resolve()
@@ -582,6 +737,9 @@ def collect_motion_gate_rows(root: Path | str) -> list[dict[str, Any]]:
                 return json.loads(path.read_text(encoding="utf-8"))
             except Exception:
                 return None
+
+    if measure_missing:
+        ensure_take_means(base, recompute=False, write_sidecars=True)
 
     spec = read_json(base / "film-spec.json") or {}
     shots: list[dict[str, Any]] = []
@@ -623,10 +781,13 @@ def collect_motion_gate_rows(root: Path | str) -> list[dict[str, Any]]:
         wardrobe = str(sh.get("wardrobe_state") or "").strip()
         heat = str(sh.get("heat_phase") or "").strip()
         mean: float | None = mean_by_id.get(sid)
+        mean_path: str | None = None
         if mean is None:
             takes_dir = base / "takes" / sid
+            best_mean: float | None = None
             if takes_dir.is_dir():
                 for p in sorted(takes_dir.glob("*.mp4")):
+                    m_local: float | None = None
                     for side in (Path(str(p) + ".json"), p.with_suffix(".json")):
                         if not side.is_file():
                             continue
@@ -635,14 +796,20 @@ def collect_motion_gate_rows(root: Path | str) -> list[dict[str, Any]]:
                             if data.get(key) is None:
                                 continue
                             try:
-                                mean = float(data[key])
+                                m_local = float(data[key])
                                 break
                             except (TypeError, ValueError):
                                 continue
-                        if mean is not None:
+                        if m_local is not None:
                             break
-                    if mean is not None:
-                        break
+                    if m_local is None and measure_missing:
+                        m_local = measure_mean_absdiff(p)
+                        if m_local is not None:
+                            write_mean_sidecar(p, m_local)
+                    if m_local is not None and (best_mean is None or m_local > best_mean):
+                        best_mean = m_local
+                        mean_path = str(p)
+            mean = best_mean
         if mean is None and isinstance(clips.get(sid), dict):
             c = clips[sid]
             for key in ("mean", "mean_absdiff", "motion_mean"):
@@ -653,6 +820,17 @@ def collect_motion_gate_rows(root: Path | str) -> list[dict[str, Any]]:
                     break
                 except (TypeError, ValueError):
                     continue
+            if mean is None and measure_missing:
+                raw_path = c.get("path") or c.get("file")
+                if raw_path:
+                    cp = Path(str(raw_path))
+                    if not cp.is_absolute():
+                        cp = base / cp
+                    if cp.is_file():
+                        mean = measure_mean_absdiff(cp)
+                        if mean is not None:
+                            write_mean_sidecar(cp, mean)
+                            mean_path = str(cp)
         source = None
         if isinstance(clips.get(sid), dict):
             source = clips[sid].get("source") or clips[sid].get("provider")
@@ -664,6 +842,7 @@ def collect_motion_gate_rows(root: Path | str) -> list[dict[str, Any]]:
                 "wardrobe_state": wardrobe or None,
                 "mean": mean,
                 "source": str(source).strip() if source else None,
+                "mean_path": mean_path,
             }
         )
     return rows

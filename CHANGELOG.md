@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.37.1] - 2026-08-04
+
+### Added (H3 max-effect auto mode · T2V/I2V/R2V)
+- **`scripts/h3_mode.py`**: single-source `resolve_h3_mode` — explicit → continue I2V → env T2V → dialogue-CU/hard-flag R2V → default I2V (+ R2V alt on soft high motion).
+- **`h3 plan`**: `mode_resolve`, `effect_tips`, `command`/`command_alt` with chosen `--mode`.
+- **`h3 list`**: each row has `mode`, reasons, `alt_mode`, ready `command`, ops reminder.
+- **next_actions** hybrid lane points at auto mode + free-memory + alt thrash.
+- Tests: `tests/test_h3_mode.py`. Docs: weapon-lane-matrix / h3-max lesson / memory / stages visual.
+
+## [2.37.0] - 2026-08-04
+
+### Added (Throughput + Effect Loop)
+- **`aifilm ship-prep --root`**: one-shot ladder means → variety → select-shortlist → i2v-motion-gate → film_core → single `next_cmd`. Receipt: `receipts/ship-prep.json`.
+- **Auto mean_absdiff**: `measure_mean_absdiff` + `ensure_take_means` (ffmpeg fps=5 140×248 gray); writes take sidecars; `i2v-motion-gate --root` / collect rows measure missing means.
+- **`select-shortlist --promote`**: highest-mean take → `manifest.clips[id]` (takes retained; marks below_floor vs DF floors).
+- dispatch / next / advance / autopilot surface `ship-prep` after clips.
+
+### Tests
+- `tests/test_ship_prep_throughput.py`
+
+### Docs
+- hard-defaults Throughput 2.37 row
+
 ## [2.36.4] - 2026-08-04
 
 ### Added (Delivery Truth)

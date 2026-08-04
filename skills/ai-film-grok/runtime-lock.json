@@ -106,7 +106,7 @@
     },
     {
       "path": "scripts/advance.py",
-      "sha256": "9d8b555f58a6c753d7d31eefe23bdb970237af85cddfa35c4c8a403c83f52f90"
+      "sha256": "04a71ec76347062b9eb30ec77a4a1ef47f9aca4886aa68c587d19c0104799611"
     },
     {
       "path": "scripts/agent_review_final.py",
@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "76f7a2d52b461529561ad44d2c94f846d08d4f58581aaaf986cb2060b9d6ddb3"
+      "sha256": "1824afd79025b6d7a0415c3da5c94a58a560b9d859fb01ddd69137a97121f1a4"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -210,7 +210,7 @@
     },
     {
       "path": "scripts/autopilot.py",
-      "sha256": "5e1243c2cdf3ef49fb269c9a06a853d0833e16d1cd581eac0c3b5853c6402dcb"
+      "sha256": "c1066e6d3c0f88168fe2c5882ae36002097884e8ac7f137155252e9732616bec"
     },
     {
       "path": "scripts/autopilot_notify.py",
@@ -382,7 +382,7 @@
     },
     {
       "path": "scripts/cli_workflow.py",
-      "sha256": "4010a94effac4fc4642f651c2e11a09037b885e4f49c80df03cc3394e2da028f"
+      "sha256": "a544608fe29989240b1f1bd58214fa241012a5186745dde77bfabbc3b7aace8c"
     },
     {
       "path": "scripts/cli_workshop.py",
@@ -554,7 +554,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "1b5465bf3a432edd70c6c3f9e2bb7f1edb938e60bf0fdc1ef1ec257bf1e77cdc"
+      "sha256": "9d1bc1caca11764c2f2617e32038c06a93e686c3c67fc14f63f26910d1522420"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -682,7 +682,7 @@
     },
     {
       "path": "scripts/i2v_motion_gate.py",
-      "sha256": "1223cd41ec32781cf578c487c4da6c394dd4dfc946b69af5edd22f1ef6191cc6"
+      "sha256": "773a89e0e6836f4870d71b971c22ab31f9a609f93a5fdda7ed04805a1a155000"
     },
     {
       "path": "scripts/i2v_provider.py",
@@ -818,7 +818,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "f672aaa58aa45f8f41bdb0dc531148cfd3399c7c4ae353195a6d5a365bdd84aa"
+      "sha256": "15c620a26ac17d95e5b2b310751d5cbf1d50ed1c981f29d8bc9d493b17e34acb"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -1282,7 +1282,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "80e10b5eec204df771a6e0577f16d4b018cf99904b2a9d8f3c71dd935f94a681"
+      "sha256": "3967643187ec8f8253731b2589a188fe331ded8af28eefb319ff73f103532e89"
     },
     {
       "path": "scripts/workflow_spine.py",

@@ -40,6 +40,7 @@ _ACTION_SKILLS = {
     "i2v-motion-gate": "projection.verify",
     "film-core-closeout": "projection.verify",
     "select-shortlist": "projection.verify",
+    "ship-prep": "projection.verify",
     "export-desktop": "export.package",
     "dailies_review-evidence": "dispatch.orchestrate",
     "agent-review-final": "quality.inspect",
@@ -70,6 +71,7 @@ _COMMAND_POLICIES = {
     "i2v-motion-gate": ("local", "none"),
     "film-core-closeout": ("local", "none"),
     "select-shortlist": ("local", "none"),
+    "ship-prep": ("local", "none"),
     "queue-progress": ("local", "none"),
     "tunnel-probe": ("local", "none"),
     "gpu-lease": ("local", "none"),
@@ -692,10 +694,18 @@ def build_dispatch(
                 "clips 齐且有 takes — 先 select-shortlist 标 preferred（不删 take）再粗剪/final",
                 "visual",
             )
-    # Phase B · motion-core surface: DF-aware gate + film-core advisory after clips
+    # Phase B/2.37 · ship-prep or motion gate after clips
     if craft_stage in {"selects", "media", "rough", "post"} and gates.get("clips_complete"):
+        ship_rec = read_json(root / "receipts" / "ship-prep.json") or {}
         gate_rec = read_json(root / "receipts" / "i2v-final-gate.json") or {}
-        if gate_rec.get("ok") is not True:
+        if ship_rec.get("ok") is not True and gate_rec.get("ok") is not True:
+            pre(
+                "ship-prep",
+                f'aifilm ship-prep --root "{r}"',
+                "clips 齐 — 一键 means+variety+shortlist+motion-gate+film_core（优于散敲）",
+                "visual",
+            )
+        elif gate_rec.get("ok") is not True:
             pre(
                 "i2v-motion-gate",
                 f'aifilm i2v-motion-gate --root "{r}" --write',
