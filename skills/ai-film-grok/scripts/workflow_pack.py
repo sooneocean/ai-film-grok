@@ -1085,8 +1085,7 @@ def ship_prep(
                     "advisory": True,
                     "human_required": bool(multi),
                     "detail": (
-                        f"multi_take={len(multi)} "
-                        f"(human review recommended)"
+                        f"multi_take={len(multi)} (human review recommended)"
                         if multi
                         else "no multi-take shots"
                     ),
@@ -1102,9 +1101,7 @@ def ship_prep(
             )
             # Pending Fill-Idle work (P0 meat still not burned) — advisory only
             try:
-                nxt = next_fill_idle_job(
-                    root, include_challenge=True, check_capacity=False
-                )
+                nxt = next_fill_idle_job(root, include_challenge=True, check_capacity=False)
                 pending = int(nxt.get("pending_count") or 0)
                 n = nxt.get("next") if isinstance(nxt.get("next"), dict) else None
                 steps.append(

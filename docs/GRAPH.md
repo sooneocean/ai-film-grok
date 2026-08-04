@@ -125,7 +125,6 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_comfy_h3_provider.py`
 - `skills/ai-film-grok/tests/test_comfy_recovery.py`
 - `skills/ai-film-grok/tests/test_comfy_video.py`
-- `skills/ai-film-grok/tests/test_compose_hotpath_contracts.py`
 - `skills/ai-film-grok/tests/test_compose_preview.py`
 - `skills/ai-film-grok/tests/test_compose_render.py`
 - `skills/ai-film-grok/tests/test_composition_rules.py`
@@ -205,7 +204,6 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_frw_lipsync.py`
 - `skills/ai-film-grok/tests/test_frw_subprocess_contract.py`
 - `skills/ai-film-grok/tests/test_frw_upload.py`
-- `skills/ai-film-grok/tests/test_gates_table_matrix.py`
 - `skills/ai-film-grok/tests/test_gaze_tracking.py`
 - `skills/ai-film-grok/tests/test_generation_usage.py`
 - `skills/ai-film-grok/tests/test_genre_beat_spines.py`
