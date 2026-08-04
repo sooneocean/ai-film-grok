@@ -2605,6 +2605,39 @@ def resolve_subtitle_mode(args: argparse.Namespace) -> str:
     return subs_mode
 
 
+def write_final_mix_partial_receipt(
+    root: Path | str,
+    *,
+    prior_sc: str,
+    error: str,
+    mixed: Path | str,
+    reason: str = "sidechain_mix_failed_amix_fallback",
+) -> Path:
+    """Persist sidechain→amix PARTIAL so closeout/agents never treat it as silent OK.
+
+    Fail-mode contract (Wave D / H1): kind=final-mix-partial, partial=True, from/to set.
+    """
+    base = Path(root).expanduser().resolve()
+    path = base / "receipts" / "final-mix-partial.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(
+        path,
+        {
+            "kind": "final-mix-partial",
+            "schema_version": 1,
+            "at": utc_now(),
+            "ok": True,
+            "partial": True,
+            "reason": str(reason),
+            "from": str(prior_sc),
+            "to": "amix_simple",
+            "error": str(error)[:300],
+            "mixed": str(mixed),
+        },
+    )
+    return path
+
+
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
     try:
@@ -4339,22 +4372,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         mix_spotting["partial_reason"] = "sidechain_mix_failed_amix_fallback"
         # Persist PARTIAL receipt for closeout / agents (not silent quality pass)
         try:
-            partial_path = root / "receipts" / "final-mix-partial.json"
-            partial_path.parent.mkdir(parents=True, exist_ok=True)
-            write_json(
-                partial_path,
-                {
-                    "kind": "final-mix-partial",
-                    "schema_version": 1,
-                    "at": utc_now(),
-                    "ok": True,
-                    "partial": True,
-                    "reason": "sidechain_mix_failed_amix_fallback",
-                    "from": prior_sc,
-                    "to": "amix_simple",
-                    "error": str(mix_exc)[:300],
-                    "mixed": str(mixed),
-                },
+            partial_path = write_final_mix_partial_receipt(
+                root,
+                prior_sc=str(prior_sc),
+                error=str(mix_exc),
+                mixed=mixed,
             )
             mix_spotting["partial_receipt"] = str(partial_path)
         except Exception as rec_exc:  # noqa: BLE001

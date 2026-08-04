@@ -1,7 +1,9 @@
-"""Wave D: plate timeout floors, stable SRT paths, sidechain→amix fallback unit."""
+"""Wave D / H1: plate timeout floors, stable SRT paths, mix PARTIAL, plate subs modes."""
 
 from __future__ import annotations
 
+import argparse
+import json
 import sys
 import tempfile
 import unittest
@@ -11,7 +13,12 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from longform import estimate_plate_timeout  # noqa: E402
-from render_final import stable_path_for_ffmpeg_filter  # noqa: E402
+from render_final import (  # noqa: E402
+    RenderError,
+    resolve_subtitle_mode,
+    stable_path_for_ffmpeg_filter,
+    write_final_mix_partial_receipt,
+)
 
 
 class TimeoutFloorTests(unittest.TestCase):
@@ -26,6 +33,22 @@ class TimeoutFloorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             n = estimate_plate_timeout(Path(tmp), duration_sec=500, shot_count=20)
             self.assertGreaterEqual(n, 1800)
+
+    def test_longform_mode_forces_1800_even_when_duration_short(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "film-spec.json").write_text(
+                json.dumps({"production_mode": "longform"}),
+                encoding="utf-8",
+            )
+            n = estimate_plate_timeout(root, duration_sec=60, shot_count=4)
+            self.assertGreaterEqual(n, 1800)
+
+    def test_timeout_capped_at_21600(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            # Huge estimate: 600 + duration*3 + count*20 → force above cap
+            n = estimate_plate_timeout(Path(tmp), duration_sec=100_000, shot_count=5000)
+            self.assertEqual(n, 21600)
 
 
 class StableSrtPathTests(unittest.TestCase):
@@ -52,7 +75,6 @@ class SidechainFallbackContractTests(unittest.TestCase):
     """Contract: fallback writes partial receipt shape (no full render required)."""
 
     def test_partial_receipt_schema_fields(self) -> None:
-        # Document expected keys written by render_final on sidechain failure path
         required = {
             "kind",
             "partial",
@@ -69,6 +91,48 @@ class SidechainFallbackContractTests(unittest.TestCase):
             "to": "amix_simple",
         }
         self.assertTrue(required.issubset(sample.keys()))
+
+    def test_write_final_mix_partial_receipt_on_disk(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mixed = root / "out" / "mixed.wav"
+            mixed.parent.mkdir(parents=True, exist_ok=True)
+            mixed.write_bytes(b"RIFF")
+            path = write_final_mix_partial_receipt(
+                root,
+                prior_sc="sidechain_compress",
+                error="ffmpeg died: filter graph",
+                mixed=mixed,
+            )
+            self.assertTrue(path.is_file())
+            self.assertEqual(path.name, "final-mix-partial.json")
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(data["kind"], "final-mix-partial")
+            self.assertTrue(data["partial"])
+            self.assertTrue(data["ok"])
+            self.assertEqual(data["from"], "sidechain_compress")
+            self.assertEqual(data["to"], "amix_simple")
+            self.assertEqual(data["reason"], "sidechain_mix_failed_amix_fallback")
+            self.assertIn("ffmpeg died", data["error"])
+            self.assertEqual(data["mixed"], str(mixed))
+            self.assertIn("at", data)
+            self.assertEqual(data["schema_version"], 1)
+
+
+class PlateSubsModeTests(unittest.TestCase):
+    def test_subs_off_default_for_hf_plate(self) -> None:
+        args = argparse.Namespace(subs="off")
+        self.assertEqual(resolve_subtitle_mode(args), "off")
+
+    def test_subs_burn_allowed(self) -> None:
+        args = argparse.Namespace(subs="burn")
+        self.assertEqual(resolve_subtitle_mode(args), "burn")
+
+    def test_subs_invalid_fails_closed(self) -> None:
+        args = argparse.Namespace(subs="soft")
+        with self.assertRaises(RenderError) as ctx:
+            resolve_subtitle_mode(args)
+        self.assertIn("burn|off", str(ctx.exception))
 
 
 if __name__ == "__main__":

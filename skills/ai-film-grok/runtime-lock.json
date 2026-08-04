@@ -1030,7 +1030,7 @@
     },
     {
       "path": "scripts/render_final.py",
-      "sha256": "80b33f1dd1a83dc8afecad6210a8b12b6abde01fcf06f0aec79d429d1696961e"
+      "sha256": "1450d9ddde7ff9c2911aee5e401a472c2e00954e1a2070aebf98feea399556fa"
     },
     {
       "path": "scripts/render_workspace.py",

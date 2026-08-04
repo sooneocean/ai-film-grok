@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.37.9] - 2026-08-04
+
+### Fixed / Added (Wave Z + H1 · maintainability)
+- **`write_final_mix_partial_receipt`**: extract sidechain→amix PARTIAL receipt writer; closeout/agents can unit-test fail-mode without full final.
+- **H1 tests** (`test_final_wave_d`): longform mode timeout floor 1800, cap 21600, on-disk partial receipt, plate `subs` burn|off fail-closed.
+- **Disk hygiene inventory** (list only, no delete): `docs/reports/2026-08-04-disk-hygiene.md`.
+- Greenline: check-all (2709+ passed); baseline refreshable via `make audit`.
+
 ## [2.37.8] - 2026-08-04
 
 ### Added (Speaker-frame + Fill-Idle run-next + PK ledger + dual-take)
