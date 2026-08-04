@@ -9,7 +9,7 @@
 ## 三句话
 1. **I2V 锁脸主责**（主角/肉戏/续镜）；**R2V 补能量与狠嘴 CU**；**T2V 只做无脸环境**。
 2. **高动靠狠 prompt + 状态 still**（I2V 可从 ~4 提到 ~23），不是改走 T2V；续镜 = **末帧→I2V**（接缝 L1≈7.7）。
-3. 换模式前 **free-memory**；对白注入现已与自定义 prompt **合并**（禁再被 `s_*.i2v.txt` 吃掉）。
+3. **Motion Spine** 把 DF/want/动作/运镜/对白钉进 Grok+H3；空核 `MOTION_CORE_*` 拒跑；换模式前 free-memory。
 
 ## 检查清单
 - [ ] restricted 镜 `aifilm h3 list` 可见

@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.35.1] - 2026-08-04
+
+### Added
+- **Motion Prompt Spine (P0):** shared `scripts/motion_prompt_spine.py` carries film core into Grok + H3 motion — `dramatic_function` → `want_beat` → action → camera → dialogue/foley; `motion_tier` soft/medium/high.
+- `build_shot_intent` emits `want_beat`, `motion_tier`, `spoken_text`, `has_action_core`, `action_summary`, `camera_prompt`.
+- Fail-closed empty core on `aifilm h3 run` and `media-queue` (`MOTION_CORE_*`); H3 writes `receipts/prompts/<id>.h3.spine.txt`.
+- `prompt_injector` I2V injects the same spine clauses (Grok parity).
+
+### Tests
+- `tests/test_motion_prompt_spine.py`
+
+### Docs
+- hard-defaults · weapon-lane-matrix · stages/visual · SKILL P0 #7 · h3-max-effect lesson
+
 ## [2.35.0] - 2026-08-04
 
 ### Added

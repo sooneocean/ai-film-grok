@@ -405,6 +405,16 @@ def build_shot_intent(
         recommended_lane = str(lanes.get("setup_non_sensitive") or "cloud_grok")
         recommended_provider = "grok"
     recommended_still = "comfy_lan" if restricted and identity_lock else "grok"
+    # Film-core payload for motion prompt spine (shared Grok/H3).
+    try:
+        from motion_prompt_spine import core_fields
+
+        core = core_fields(spec, shot)
+    except Exception:
+        core = {}
+    continuity = str(dsl.get("chain_mode") or "").lower() == "continue" or bool(
+        core.get("continuity_required")
+    )
     return {
         "schema_version": 1,
         "kind": "ai-film-shot-intent",
@@ -413,7 +423,7 @@ def build_shot_intent(
         "operation": operation,
         "content_class": "restricted_local" if restricted else "general",
         "identity_lock": identity_lock,
-        "continuity_required": str(dsl.get("chain_mode") or "").lower() == "continue",
+        "continuity_required": continuity,
         "quality_tier": tier,
         "provider_lock": provider_lock or None,
         "recommended_lane": recommended_lane,
@@ -432,6 +442,16 @@ def build_shot_intent(
         "audio_policy": audio_policy,
         "heat_phase": heat_phase or None,
         "wardrobe_state": wardrobe or None,
+        # Motion core (P0 · 2026-08-04) — consumed by prompt spine / gates
+        "dramatic_function": core.get("dramatic_function"),
+        "want_beat": core.get("want_beat"),
+        "motion_tier": core.get("motion_tier"),
+        "spoken_text": core.get("spoken_text"),
+        "screen_mode": core.get("screen_mode"),
+        "speaker": core.get("speaker"),
+        "has_action_core": core.get("has_action_core"),
+        "action_summary": core.get("action_summary"),
+        "camera_prompt": core.get("camera_prompt"),
     }
 
 

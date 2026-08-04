@@ -74,9 +74,28 @@ aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --
 - 毒 still：禁任何 I2V  
 - candidate ≠ bulk：人审后才 approved
 
+## Motion Prompt Spine（电影核 → 动向 · P0）
+
+生成顺序（Grok 与 H3 **同一套**）：
+
+```text
+dramatic_function → want_beat → action/motion/visible_change
+→ camera_prompt → 对白 lip-sync 或 foley →（provider 前缀）
+```
+
+| 机制 | 行为 |
+|------|------|
+| `motion_prompt_spine.py` | 共用拼装 + `assert_motion_prompt_core` |
+| `build_shot_intent` | 带出 `want_beat` / `motion_tier` / `spoken_text` / `has_action_core` |
+| `h3 run` | 空核拒跑；写 `receipts/prompts/<id>.h3.spine.txt` |
+| `media-queue` | 入队前 enrich + fail closed |
+| `prompt_injector` I2V | 注入 spine 子句（与 H3 对齐） |
+
+`motion_tier`：`soft`（reaction）· `medium` · `high`（act/bare/action）— 高动提示自动加 HIGH MOTION。
+
 ## 代码入口
 
 - `production_router.build_shot_intent` / `classify_shot_content`  
 - `film_spec.resolve_h3_config`（成人自动 dual-lane）  
-- `media_queue.add_job`（restricted → 硬拦云）  
-- `h3_workflow.ensure_h3_delivery_geometry` · `_prompt_for_shot` / `_merge_prompt_with_audio`  
+- `media_queue.add_job`（restricted → 硬拦云 · motion core）  
+- `motion_prompt_spine` · `h3_workflow._prompt_for_shot` · `prompt_injector.assemble`  

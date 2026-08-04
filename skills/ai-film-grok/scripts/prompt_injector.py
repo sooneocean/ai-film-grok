@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# Path used by motion spine film-spec load (root may be Path | str).
+
 
 def utc_now() -> str:
     return datetime.now(UTC).isoformat()
@@ -554,6 +556,34 @@ class PromptInjector:
             content = {}
             shot_action = str(dsl.get("action") or "").strip()
 
+        # 6a. Motion Prompt Spine (shared with H3): DF + want_beat + tier + dialogue
+        spine_clauses: list[str] = []
+        try:
+            from motion_prompt_spine import motion_core_clauses
+            from util import read_json
+
+            film_spec = {}
+            if root is not None:
+                film_spec = read_json(Path(root) / "film-spec.json") or {}
+            # include_audio=False here: Grok path may use separate VO; dialogue
+            # lip-sync still injected for on_camera so bulk stays speech-aware.
+            spine_clauses = motion_core_clauses(
+                film_spec if isinstance(film_spec, dict) else {},
+                shot,
+                include_audio=bool(
+                    str(shot.get("screen_mode") or "") in {"on_camera", "off_camera"}
+                    or any(
+                        isinstance(c, dict)
+                        and c.get("line_type") == "dialogue"
+                        and str(c.get("spoken_text") or "").strip()
+                        for c in (shot.get("audio_cues") or [])
+                        if isinstance(shot.get("audio_cues"), list)
+                    )
+                ),
+            )
+        except Exception:
+            spine_clauses = []
+
         # 6b. Tone tags = performance manner (still/I2V face/body acting)
         #     Sound cues = ambient/SFX description (must NOT be spoken as nar)
         tone_line = ""
@@ -596,8 +626,15 @@ class PromptInjector:
                 parts.append(f"Continuity: {', '.join(active_states)}")
             if start_pose:
                 parts.append(f"Start already: {start_pose}")
-            if shot_action:
-                parts.append(f"Motion/Action: {shot_action}")
+            # Spine first so DF/want/tier frame the action (parity with H3).
+            for clause in spine_clauses:
+                cl = str(clause).strip()
+                if cl and cl not in parts and (not shot_action or cl != shot_action):
+                    parts.append(cl)
+            if shot_action and f"Motion/Action: {shot_action}" not in parts:
+                # Avoid duplicating action already present via spine dsl join
+                if shot_action not in " ".join(parts):
+                    parts.append(f"Motion/Action: {shot_action}")
             voice = content.get("voice") if isinstance(content, dict) else {}
             if (
                 isinstance(voice, dict)

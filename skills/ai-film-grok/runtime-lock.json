@@ -670,7 +670,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "a703920ab0b83aa4e3db75ea2c2bd5c4cadf43ec05267248f34f9d55e9ca7c73"
+      "sha256": "f2a6b2607791c22a007c25e0683268e277ce3b2ff66107e9345d21364363299c"
     },
     {
       "path": "scripts/heat_check.py",
@@ -766,7 +766,7 @@
     },
     {
       "path": "scripts/media_queue.py",
-      "sha256": "7bb830295ffeb5e40561a19d5616fee82ca6813095a25ce91b612dbfb73c2337"
+      "sha256": "a9118ba6cfd8551aad930960457b8cccdffc98c8be9119e3e121bec6b70e93e4"
     },
     {
       "path": "scripts/mmaudio_adapter.py",
@@ -783,6 +783,10 @@
     {
       "path": "scripts/motion_plan.py",
       "sha256": "a60d7b06bbb463128dc67f6d19a466f4df4f550f152cc4ae1b71abc4df4df2ed"
+    },
+    {
+      "path": "scripts/motion_prompt_spine.py",
+      "sha256": "a2bb5602eb8bf7cba7803bd0128c83c82ffc40bd324d26e84f62e9e14bf988d3"
     },
     {
       "path": "scripts/music_cue.py",
@@ -914,7 +918,7 @@
     },
     {
       "path": "scripts/preflight.py",
-      "sha256": "493f0080ae48f2436713105914fc7d698a8247e5ee7e9c75ac786ad9c0037aa3"
+      "sha256": "dad3297bfb319e56f80d98bdce55e098a49564ff1c6db6cb6d23a73ace5809d5"
     },
     {
       "path": "scripts/product_brief.py",
@@ -942,7 +946,7 @@
     },
     {
       "path": "scripts/production_router.py",
-      "sha256": "1e365b3cc0c830cdb4acbf6087a7852aa5efccb8b89eacac1493b22b77bc14aa"
+      "sha256": "aaab63988c04c683906d3ff89e01a19b4281ff27fca2cb5e526b3c8d1cd831c9"
     },
     {
       "path": "scripts/production_team.py",
@@ -970,7 +974,7 @@
     },
     {
       "path": "scripts/prompt_injector.py",
-      "sha256": "3055d5706a40fae744b25ff480f671020ca73d6932a95430c6640008a90fc38a"
+      "sha256": "e96299769cd847675abff89ca2d818bbb3f75370db9f71d08f5c9a94019bd08f"
     },
     {
       "path": "scripts/provider_canary.py",

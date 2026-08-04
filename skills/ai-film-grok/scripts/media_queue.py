@@ -478,6 +478,30 @@ class MediaQueue:
                                     f"--register. Escape: AIFILM_ALLOW_CLOUD_RESTRICTED=1 "
                                     f"(not recommended for bare/meat)."
                                 )
+                        # Motion Prompt Spine: enrich + fail-closed empty core (P0).
+                        try:
+                            from motion_prompt_spine import (
+                                MotionCoreError,
+                                assert_motion_prompt_core,
+                                ensure_motion_core_in_prompt,
+                            )
+
+                            raw_prompt = prompt.read_text(encoding="utf-8")
+                            enriched = ensure_motion_core_in_prompt(raw_prompt, raw_spec, shot_row)
+                            if enriched.strip() != raw_prompt.strip():
+                                prompt.write_text(enriched.rstrip() + "\n", encoding="utf-8")
+                            assert_motion_prompt_core(
+                                enriched,
+                                shot_row,
+                                mode=operation,
+                                role=str(shot_row.get("shot_role") or "hero"),
+                            )
+                        except MotionCoreError as exc:
+                            raise QueueError(str(exc)) from exc
+                        except QueueError:
+                            raise
+                        except Exception:
+                            pass
                 except QueueError:
                     raise
                 except Exception:

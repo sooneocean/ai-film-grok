@@ -82,13 +82,28 @@ aifilm h3 run --root "$ROOT" --shot-id s_b --mode i2v --register --no-queue
 - 肉戏：仍过 motion-gate mean≥20（H3 样片要高动 prompt，勿用软肖像 prompt 交差）  
 - bulk：candidate ≠ approved；人审后才批
 
+## Motion Prompt Spine（v2.35 · 电影核进动向）
+
+Grok 与 H3 **同一拼装顺序**（`scripts/motion_prompt_spine.py`）：
+
+1. `dramatic_function`  
+2. `want_beat`（`director_intent.protagonist_want` / theme）  
+3. dsl action / motion / visible_change  
+4. `camera_prompt`  
+5. 对白 lip-sync 或 foley  
+6. 高 heat/DF → `HIGH MOTION priority…`
+
+`build_shot_intent` 输出 `motion_tier` / `want_beat` / `has_action_core`。  
+空核 → `MOTION_CORE_*` fail closed（h3 run + media-queue）。
+
 ## 不要做
 
 - 安全 setup 硬塞 H3（浪费 5090）  
 - T2V 锁脸  
 - 毒 still 进任何 H3  
 - 用 `s_*.i2v.txt` 写「no speech」又期望台词（现已强制注入台词，但会与作者 ambient 叠句——对白镜请别写 no speech）  
-- 静默 bulk / 静默改 `i2v_provider`
+- 静默 bulk / 静默改 `i2v_provider`  
+- 无 DF/动作/对白的「空核」prompt 进 queue
 
 ## 片级开关
 

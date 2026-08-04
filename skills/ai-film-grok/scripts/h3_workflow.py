@@ -80,134 +80,73 @@ def _approved_still(root: Path, shot_id: str) -> Path | None:
     return path if path.is_file() else None
 
 
-def _shot_screen_mode(shot: dict[str, Any]) -> str:
-    """Prefer shot.screen_mode; fall back to first dialogue cue screen_mode."""
-    mode = str(shot.get("screen_mode") or "").strip()
-    if mode:
-        return mode
-    cues = shot.get("audio_cues")
-    if not isinstance(cues, list):
-        return ""
-    for cue in cues:
-        if not isinstance(cue, dict):
-            continue
-        if (
-            cue.get("kind") == "voice"
-            and cue.get("line_type") == "dialogue"
-            and str(cue.get("spoken_text") or "").strip()
-        ):
-            return str(cue.get("screen_mode") or "").strip()
-    return ""
+def _spoken_dialogue_text(shot: dict[str, Any]) -> str:
+    """Extract the spoken dialogue line for a shot's audio_cues, if any."""
+    from motion_prompt_spine import spoken_dialogue_text
+
+    return spoken_dialogue_text(shot)
 
 
-def _audio_clause_for_shot(shot: dict[str, Any]) -> str:
-    """Mandarin dialogue inject or ambient foley clause for H3 native audio."""
-    dialogue_text = _spoken_dialogue_text(shot)
-    screen_mode = _shot_screen_mode(shot)
-    if dialogue_text and screen_mode == "off_camera":
-        return (
-            f"Audio: the character continues this line off camera while the picture "
-            f"holds the reverse or coverage shot; spoken in natural Mandarin; "
-            f"line: 「{dialogue_text}」."
-        )
-    if dialogue_text and screen_mode == "on_camera":
-        return (
-            f"Audio: the visible character speaks this line in natural Mandarin on camera; "
-            f"mouth visibly articulates the line, lip sync priority; line: 「{dialogue_text}」."
-        )
-    if dialogue_text:
-        # Dialogue present but screen_mode unset — still inject on-camera default
-        # so custom prompt files cannot silently drop speech.
-        return (
-            f"Audio: the visible character speaks this line in natural Mandarin on camera; "
-            f"mouth visibly articulates the line, lip sync priority; line: 「{dialogue_text}」."
-        )
-    return (
-        "Audio: natural diegetic ambience and soft foley matched to the action; "
-        "no on-screen speech unless the shot is clearly dialogue."
+def _prompt_for_shot(
+    root: Path,
+    shot: dict[str, Any],
+    *,
+    mode: str,
+    spec: dict[str, Any] | None = None,
+) -> str:
+    """Build H3 motion prompt with shared film-core spine (DF/want/camera/dialogue)."""
+    from motion_prompt_spine import (
+        MotionCoreError,
+        assert_motion_prompt_core,
+        build_motion_prompt,
+        ensure_motion_core_in_prompt,
+        provider_prefix,
     )
 
-
-def _merge_prompt_with_audio(base: str, shot: dict[str, Any]) -> str:
-    """Append dialogue/ambience clause when missing from an author prompt file.
-
-    Custom ``receipts/prompts/<id>.i2v.txt`` used to early-return and kill
-    Mandarin inject (2026-08-04 stress canary). Always ensure dialogue line
-    lands; only skip ambient fallback when author already wrote an Audio: block.
-    """
-    text = (base or "").strip()
-    if not text:
-        return text
-    audio = _audio_clause_for_shot(shot)
-    dialogue_text = _spoken_dialogue_text(shot)
-    if dialogue_text:
-        if dialogue_text in text and "lip sync" in text.lower():
-            return text
-        # Drop a stale ambient Audio: block before injecting dialogue.
-        if "Audio:" in text and dialogue_text not in text:
-            # Keep body; force dialogue audio at end.
-            return f"{text.rstrip()} {audio}"
-        if dialogue_text not in text:
-            return f"{text.rstrip()} {audio}"
-        return text
-    if "Audio:" in text:
-        return text
-    return f"{text.rstrip()} {audio}"
-
-
-def _prompt_for_shot(root: Path, shot: dict[str, Any], *, mode: str) -> str:
+    if isinstance(spec, dict):
+        film = spec
+    else:
+        try:
+            film = _load_spec(root)
+        except H3WorkflowError:
+            # Unit tests / prompt-only calls may lack film-spec; spine still works.
+            film = {}
     sid = str(shot.get("id") or "shot")
     prompt_paths = [
         root / "receipts" / "prompts" / f"{sid}.i2v.txt",
         root / "receipts" / "prompts" / f"{sid}.txt",
         root / "prompts" / f"{sid}.txt",
     ]
+    author = ""
     for path in prompt_paths:
         if path.is_file():
             text = path.read_text(encoding="utf-8").strip()
             if text:
-                return _merge_prompt_with_audio(text, shot)
-    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
-    parts = [
-        str(dsl.get("action") or "").strip(),
-        str(dsl.get("motion") or "").strip(),
-        str(dsl.get("visible_change") or "").strip(),
-        str(shot.get("nar") or "").strip(),
-    ]
-    body = ". ".join(p for p in parts if p)
-    if mode == "r2v":
-        prefix = (
-            "Vertical 9:16. Use <Picture 1> as identity and style reference. "
-            "Keep identity and wardrobe fixed. "
-        )
-    elif mode == "t2v":
-        prefix = "Vertical 9:16 text-to-video plate. "
-    else:
-        prefix = (
-            "Vertical 9:16. Animate the start frame with medium cel-anime style lock. "
-            "Keep identity and wardrobe fixed. "
-        )
-    # Dialogue-first: a shot carrying a dialogue cue must show the character
-    # visibly speaking it on camera (user rule — every v shot looks like talking).
-    audio = _audio_clause_for_shot(shot)
-    return f"{prefix}{body or 'subtle camera push-in, natural motion.'} {audio}"
-
-
-def _spoken_dialogue_text(shot: dict[str, Any]) -> str:
-    """Extract the spoken dialogue line for a shot's audio_cues, if any."""
-    cues = shot.get("audio_cues")
-    if not isinstance(cues, list):
-        return ""
-    for cue in cues:
-        if not isinstance(cue, dict):
-            continue
-        if (
-            cue.get("kind") == "voice"
-            and cue.get("line_type") == "dialogue"
-            and str(cue.get("spoken_text") or "").strip()
+                author = text
+                break
+    if author:
+        # Keep author geometry/style; merge missing DF/want/dialogue/camera.
+        body = ensure_motion_core_in_prompt(author, film, shot)
+        # If author file had no geometry prefix, leave as-is; spine already has content.
+        if not any(
+            k in body.lower()
+            for k in ("vertical 9:16", "picture 1", "text-to-video", "animate the start")
         ):
-            return str(cue["spoken_text"]).strip()
-    return ""
+            prompt = f"{provider_prefix(mode)} {body}".strip()
+        else:
+            prompt = body
+    else:
+        prompt = build_motion_prompt(film, shot, mode=mode, include_provider_prefix=True)
+    try:
+        assert_motion_prompt_core(
+            prompt,
+            shot,
+            mode=mode,
+            role=str(shot.get("shot_role") or "hero"),
+        )
+    except MotionCoreError as exc:
+        raise H3WorkflowError(str(exc)) from exc
+    return prompt
 
 
 def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
@@ -217,6 +156,14 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
     shot = _find_shot(spec, shot_id)
     intent = build_shot_intent(spec, shot)
     h3 = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
+    # Surface motion-core fields on plan for receipts / agent routing.
+    plan_core = {
+        "dramatic_function": intent.get("dramatic_function"),
+        "want_beat": intent.get("want_beat"),
+        "motion_tier": intent.get("motion_tier"),
+        "spoken_text": intent.get("spoken_text"),
+        "has_action_core": intent.get("has_action_core"),
+    }
     mode = "i2v"
     op = str(intent.get("operation") or "image_to_video")
     if op == "text_to_video":
@@ -253,6 +200,7 @@ def plan_h3_shot(root: Path | str, shot_id: str) -> dict[str, Any]:
         "source_endpoint": endpoint,
         "provider": "comfy-h3",
         "intent": intent,
+        "motion_core": plan_core,
         "h3_enabled": enabled,
         "still_path": str(still) if still else None,
         "requires_still": mode in {"i2v", "r2v"},
@@ -556,7 +504,11 @@ def run_h3_shot(
 
     spec = _load_spec(base)
     shot = _find_shot(spec, shot_id)
-    prompt = _prompt_for_shot(base, shot, mode=str(plan["mode"]))
+    prompt = _prompt_for_shot(base, shot, mode=str(plan["mode"]), spec=spec)
+    # Persist assembled spine for audit / Grok parity review.
+    prompt_dir = base / "receipts" / "prompts"
+    prompt_dir.mkdir(parents=True, exist_ok=True)
+    (prompt_dir / f"{shot_id}.h3.spine.txt").write_text(prompt + "\n", encoding="utf-8")
     takes_dir = base / "takes" / shot_id
     takes_dir.mkdir(parents=True, exist_ok=True)
     raw_out = takes_dir / f"{shot_id}_h3_{plan['mode']}_{seed}.mp4"
