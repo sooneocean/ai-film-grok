@@ -318,7 +318,7 @@
     },
     {
       "path": "scripts/cli_media.py",
-      "sha256": "7a8924fd8cc206e98c5a69f618b0b52aab058a509e1ae7a2393f5e57aa611039"
+      "sha256": "2bd57197ebca0f0418246848401f311442aceba1b8c58971c81444ba52f012ce"
     },
     {
       "path": "scripts/cli_motion.py",
@@ -354,7 +354,7 @@
     },
     {
       "path": "scripts/cli_post.py",
-      "sha256": "7f40ef2b67f4b82aaf3fd7336e5f108f76c8e00e78c22118e2d2f78a5dc7f57b"
+      "sha256": "d6b40d05f8928e02845282b1f365533f66148bd45f1dfdbd292977b8359e59a9"
     },
     {
       "path": "scripts/cli_quality.py",
@@ -810,7 +810,7 @@
     },
     {
       "path": "scripts/media_qa.py",
-      "sha256": "9266b20ccdcef28c9dfb0a1e692851c64e38507a85a1f862595bdbf6cebe37e1"
+      "sha256": "fc662b57d84dbd21e7d1f3da207a0a73c42df91d1345824457457717604f4cfc"
     },
     {
       "path": "scripts/media_queue.py",
@@ -830,7 +830,7 @@
     },
     {
       "path": "scripts/motion_plan.py",
-      "sha256": "a60d7b06bbb463128dc67f6d19a466f4df4f550f152cc4ae1b71abc4df4df2ed"
+      "sha256": "142b1bb9c3089734fae6c04db8cb6252b0fd2babd0026ce61d92dfc3a0e62c48"
     },
     {
       "path": "scripts/motion_prompt_spine.py",
@@ -966,7 +966,7 @@
     },
     {
       "path": "scripts/preflight.py",
-      "sha256": "b0b3680361d12fc3d13049f85da2bacb6c22c28a3571d570ff317eecc8c90f50"
+      "sha256": "f14557598d654d5acc4cc8a91c9001745fc804979a5b38a5f8c587e03a2153b6"
     },
     {
       "path": "scripts/product_brief.py",
@@ -1042,7 +1042,7 @@
     },
     {
       "path": "scripts/quality_gates.py",
-      "sha256": "3c735b98262fdfd48533eda8c4acaab186693faf1027ed0053bac54f60059438"
+      "sha256": "e0ca56561b5e79cc755a1106c8ab46a031ea38399165d2a563f064190216534c"
     },
     {
       "path": "scripts/quality_ledger.py",
@@ -1257,6 +1257,10 @@
       "sha256": "ea79ad4307249a99bb17102a5ab7517fd400dd06a2c3df7897788c0f8ecffbbd"
     },
     {
+      "path": "scripts/true_video_policy.py",
+      "sha256": "b8ca0332a87caeeb959b3c96fc071066a9059c4c0dd2494dce71e744fe8ad922"
+    },
+    {
       "path": "scripts/tts_ab.py",
       "sha256": "4ad5e04516095021adf2e959733592bff37182839b1551222f613f44e1f91552"
     },
@@ -1338,7 +1342,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "2247f949a602272c6b20214b06f620e3b2c2fafad204037a7377f5954d9d6af3"
+      "sha256": "1403158402cb911ceb6b33f65365a370bbca9543d04aa8b85837599a789b8732"
     },
     {
       "path": "scripts/workflow_spine.py",

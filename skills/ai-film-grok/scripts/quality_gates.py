@@ -224,6 +224,27 @@ def evaluate_clip(
                 "clip requires a keyframe approved against the same uploaded style reference"
             )
             codes.append("STYLE_REFERENCE_KEYFRAME_EVIDENCE_MISSING")
+    # True-video-only (still / Ken Burns never pass hero or env timeline)
+    true_video: dict[str, Any] = {"ok": True, "codes": []}
+    try:
+        from true_video_policy import TrueVideoPolicyError, assert_hero_clip_source
+
+        clip_path = qa.get("path") if isinstance(qa, dict) else None
+        if clip_path:
+            true_video = assert_hero_clip_source(
+                clip_path,
+                endpoint=str(endpoint) if endpoint else None,
+                status="approved",
+                root=root,
+                role=role,
+            )
+    except TrueVideoPolicyError as exc:
+        errors.append(str(exc))
+        codes.append("TRUE_VIDEO_POLICY")
+        true_video = {"ok": False, "error": str(exc)}
+    except Exception:
+        true_video = {"ok": True, "skipped": True}
+
     if role == "environment":
         return {
             "schema_version": 1,
@@ -238,6 +259,7 @@ def evaluate_clip(
             "technical_qa": qa,
             "review": review,
             "style": style,
+            "true_video": true_video,
         }
     if not identity_approved:
         errors.append("hero clip requires identity approval")
@@ -278,6 +300,7 @@ def evaluate_clip(
         "technical_qa": qa,
         "review": review,
         "style": style,
+        "true_video": true_video,
         "continuity_joins_checked": len(joins),
     }
 

@@ -322,6 +322,14 @@ def cmd_final(args: argparse.Namespace) -> int:
     except InventoryError as exc:
         raise FilmError(str(exc)) from exc
 
+    # True-video-only: no Ken Burns / panel still-motion on hero timeline
+    try:
+        from true_video_policy import TrueVideoPolicyError, assert_manifest_true_video
+
+        assert_manifest_true_video(root)
+    except TrueVideoPolicyError as exc:
+        raise FilmError(str(exc)) from exc
+
     if args.out_name:
         film_output_path(root, args.out_name)
 

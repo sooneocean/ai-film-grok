@@ -1310,18 +1310,20 @@ def voice_for_shot(
 ) -> str:
     """Resolve one stable voice id for this shot — 一角一声 (Chinese-only)."""
     cast_voices = cast_voices or {}
+    heroine_default = cast_voices.get("heroine") or HEROINE_ZH_VOICE
+    partner_default = (
+        cast_voices.get("partner")
+        or cast_voices.get("male_hero")
+        or cast_voices.get("hero")
+        or PARTNER_ZH_VOICE
+    )
     locked_role = _locked_voice_role(shot)
     if locked_role == "storyteller":
         return cast_voices.get("storyteller") or STORYTELLER_VOICE
     if locked_role == "heroine":
-        return cast_voices.get("heroine") or HEROINE_ZH_VOICE
+        return heroine_default
     if locked_role == "partner":
-        return (
-            cast_voices.get("partner")
-            or cast_voices.get("male_hero")
-            or cast_voices.get("hero")
-            or PARTNER_ZH_VOICE
-        )
+        return partner_default
     explicit = shot.get("vo_voice") or shot.get("voice")
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()

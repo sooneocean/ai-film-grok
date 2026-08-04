@@ -326,7 +326,7 @@ def approved_clip_record(record: object) -> bool:
                 return False
         except (ImportError, OSError, ValueError):
             return False
-    return bool(
+    if not (
         record.get("status") == "approved"
         and record.get("source_endpoint") in ALLOWED_VIDEO_ENDPOINTS
         and record.get("identity_approved") is True
@@ -337,7 +337,27 @@ def approved_clip_record(record: object) -> bool:
         and qa.get("ok") is True
         and qa.get("decode_ok") is True
         and qa.get("motion_ok") is True
-    )
+    ):
+        return False
+    # True-video-only: reject still-motion / Ken Burns smuggled into approved clips
+    try:
+        from true_video_policy import path_looks_like_still, source_blob_forbidden
+
+        clip_path = str(record.get("path") or "")
+        if clip_path and path_looks_like_still(clip_path):
+            return False
+        tags = record.get("tags") if isinstance(record.get("tags"), list) else []
+        if source_blob_forbidden(
+            clip_path,
+            tags=[str(t) for t in tags],
+            provider=str(record.get("provider") or "") or None,
+            endpoint=str(record.get("source_endpoint") or "") or None,
+            review_note=str(record.get("review_note") or "") or None,
+        ):
+            return False
+    except Exception:
+        pass
+    return True
 
 
 def _probe_still_size(path: Path) -> tuple[int, int]:

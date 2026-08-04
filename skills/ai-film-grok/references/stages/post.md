@@ -22,7 +22,7 @@
 | 用户说「没有字幕」 | 先抽帧：有字→安全区/缓存/重开文件；无字→硬烧重出。验收=人眼可读，≠ ledger 有字段 |
 | 等长 6s PPT 感 | **VO-fit** 对白镜 + 变长 xfade；先帧链 promote 再 dissolve |
 | final 门红但用户要看片 | plate-xfade + rnb + **硬烧中文字幕** → `*-silk-v3.mp4`；**PARTIAL** 回执，不标 final_complete |
-| 静图/Ken Burns 装片 | 拒交付；真 I2V/H3 continue（2026-08-03 荒岛） |
+| 静图/Ken Burns 装片 | **硬拒**（true_video_policy）：final/ship-prep 扫 approved clips；须 Grok/H3 生成 mp4 再剪（2026-08-03 荒岛 · 2026-08-04 强化） |
 
 深入资料：[post-compose.md](../post-compose.md) · [postproduction.md](../postproduction.md) ·  
 [subs-always-burn-hard](../lessons-2026-07-23-subs-always-burn-hard.md) ·  

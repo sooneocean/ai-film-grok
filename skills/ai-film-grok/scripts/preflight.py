@@ -1297,6 +1297,39 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 )
             )
 
+    # True-video-only: approved clips must be generative video (not Ken Burns / still-motion)
+    true_video_report: dict[str, Any] | None = None
+    if approved_clips > 0:
+        try:
+            from true_video_policy import scan_manifest_true_video
+
+            true_video_report = scan_manifest_true_video(root, manifest=man)
+            if not true_video_report.get("ok") and not true_video_report.get("skipped"):
+                viol = true_video_report.get("violations") or []
+                hard.append(
+                    _issue(
+                        "hard",
+                        "true_video_policy",
+                        (
+                            f"hero track has {len(viol)} still-motion/non-video approved clip(s): "
+                            + ", ".join(str(v.get("shot_id")) for v in viol[:6])
+                        ),
+                        fix=(
+                            "re-I2V with Grok/H3; ban Ken Burns/panel zoompan on hero; "
+                            "stills are inputs only"
+                        ),
+                    )
+                )
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "true_video_probe_error",
+                    f"true_video scan failed: {exc}"[:200],
+                    fix="check true_video_policy.py",
+                )
+            )
+
     # Evidence separation soft risks (intent ≠ executed ≠ human)
     evidence: dict[str, Any] | None = None
     try:

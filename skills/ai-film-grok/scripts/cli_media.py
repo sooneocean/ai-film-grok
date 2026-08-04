@@ -980,6 +980,26 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     review_note = str(getattr(args, "review_note", "") or "").strip()
     anatomy_safe = getattr(args, "anatomy_safe", False) is True
     queue_job_id = str(getattr(args, "queue_job_id", "") or "").strip()
+    # P0 · true-video-only: stills / Ken Burns / panel motion never become hero clips
+    try:
+        from quality_gates import shot_role
+        from true_video_policy import TrueVideoPolicyError, assert_hero_clip_source
+
+        role = shot_role(root, str(args.shot_id))
+        tags = getattr(args, "tags", None)
+        tag_list = [str(t) for t in tags] if isinstance(tags, (list, tuple)) else []
+        assert_hero_clip_source(
+            source,
+            endpoint=str(endpoint) if endpoint else None,
+            status=str(args.status or "candidate"),
+            tags=tag_list,
+            provider=str(getattr(args, "provider", "") or "") or None,
+            review_note=review_note or None,
+            root=root,
+            role=role,
+        )
+    except TrueVideoPolicyError as exc:
+        raise FilmError(f"True-video policy: {exc}") from exc
     if args.status == "approved":
         from motion_evidence import MotionEvidenceError, require_queue_job_for_canonical_project
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.39.3] - 2026-08-04
+
+### Added (True-video-only hero · ban still-as-camera)
+- **`true_video_policy`**: hero timeline accepts **only generated video** (Grok I2V / H3 I2V|FLF|R2V / LTX). Stills never enter the cut.
+- **register-clip / evaluate_clip / approved_clip_record**: reject png stills, Ken Burns endpoints, panel/shortform still-motion tags; `external` needs generative provenance tags.
+- **preflight + final + ship-prep**: hard scan of approved clips; `PANEL_MOTION_NOT_HERO` on drama.
+- **motion_plan**: Ken Burns / panel plans forbidden unless `production_mode=panel`.
+- Docs: hard-defaults + stages visual/post. Escape: `AIFILM_SKIP_TRUE_VIDEO_POLICY=1`.
+- Tests: `tests/test_true_video_policy.py`.
+
 ## [2.39.2] - 2026-08-04
 
 ### Changed (Chinese-only dialogue · Japanese retired)

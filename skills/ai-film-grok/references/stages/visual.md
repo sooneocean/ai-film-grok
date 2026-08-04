@@ -19,7 +19,7 @@
 - **高动态常态（P0 · 2026-07-27）**：I2V 后逐镜 mean 平常≥18、肉戏≥20；多 take 取最高动且时长够；肉戏 10s 优先 6s×2。禁止 Ken Burns/微抖装片。见 [high-motion-style-lock](../lessons-2026-07-27-high-motion-style-lock-final.md)。
 - **MEDIUM LOCK（P0 · 同案）**：每条 I2V 源= style-locked still；prompt 首段 cel 动漫锁；高动/连戏不得漂半写实；装片竞标 motion×medium 双过。
 - **禁设定拼图 keyframe（P0 · 2026-08-03 荒岛）**：turnaround/多格表情板 **不得** 入 `keyframes/` 再 I2V；`register-still approved` 硬拦 `STILL_LOOKS_LIKE_CHARACTER_SHEET`。一镜一连续叙事静帧。
-- **要影片不要图**：禁 Ken Burns/still-motion 当 hero；moderated → 末帧 continue + 真 I2V/H3。
+- **要影片不要图（true-video）**：**运镜 = 模型生成视频内**；still 只作 I2V/R2V first 输入，**永不**进成片轨。禁 Ken Burns/zoompan/panel still-motion 当 hero。`register-clip`/`ship-prep`/`final` 走 `true_video_policy`。剧情片禁 `motion_plan` Ken Burns；仅 `production_mode=panel` 旁路。moderated → 末帧 continue + 真 I2V/H3。
 - **末帧链**：`extract-frame --promote-keyframe NEXT` 默认；下镜从 seed 开，禁 cast 重起。**smash/跨空间勿盲 promote**（防沙滩污染洞穴肉戏）。
 - **对白镜 speaker=画面（P0 · v3）**：`on_camera` 台词角色须占画面主读（脸/口型）；禁 A 台词 + B 肉身。
 - **DP 焦段自动注入（v2.35 P0）**：根据 `shot_size` 拼入焦段词 — wide: `35mm deep focus` · medium: `50mm f/2.8` · close-up: `85mm f/1.4 creamy bokeh` · insert: `105mm macro`。三点式光影预设按 `director_intent.tone` 自动匹配（warm/tense/dramatic/afterglow）；Teal&Orange 调色词默认拼入末行。禁正面均光/平光无层次。见 [hollywood-optics](../hollywood-optics-prompts.md)。

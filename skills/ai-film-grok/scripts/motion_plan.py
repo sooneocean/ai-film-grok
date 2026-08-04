@@ -17,6 +17,18 @@ class MotionPlanError(ValueError):
 def build_motion_plan(root: Path, shot_id: str) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
     spec = read_json(root / "film-spec.json") or {}
+    # Drama / dialogue films: panel Ken Burns is NOT a hero motion path
+    try:
+        from true_video_policy import is_panel_project
+
+        if not is_panel_project(root, spec):
+            raise MotionPlanError(
+                "panel-animation / Ken Burns motion plans are forbidden on drama hero tracks "
+                "(production_mode not panel). Use Grok I2V or H3 I2V|R2V|FLF generated video. "
+                "Escape only: set production_mode=panel or allow_panel_hero_motion=true."
+            )
+    except ImportError:
+        pass
     found: dict[str, Any] | None = None
     for scene in spec.get("scenes") or []:
         for shot in scene.get("shots") or []:
@@ -28,6 +40,7 @@ def build_motion_plan(root: Path, shot_id: str) -> dict[str, Any]:
     dsl = found.get("dsl") if isinstance(found.get("dsl"), dict) else {}
     channels = resolve_content_channels(found)
     motion = str(dsl.get("motion") or "hold").strip().lower().replace(" ", "_")
+    # ken_burns kept only for explicit panel packages (already gated above)
     allowed = {"hold", "push_in", "pull_back", "pan", "parallax", "ken_burns", "locked"}
     if motion not in allowed:
         motion = "hold"
@@ -52,7 +65,10 @@ def build_motion_plan(root: Path, shot_id: str) -> dict[str, Any]:
         "source_keyframe": str(root / "keyframes" / f"{shot_id}.png"),
         "human_motion_claim": False,
         "created_at": utc_now(),
-        "note": "Panel animation is deterministic post motion; it does not prove character performance or convert narration into acting.",
+        "note": (
+            "Panel animation is deterministic post motion for production_mode=panel only; "
+            "it does not prove character performance and must not enter drama hero timeline."
+        ),
     }
     out = root / "receipts" / "motion-plans" / f"{shot_id}.json"
     write_json(out, plan)

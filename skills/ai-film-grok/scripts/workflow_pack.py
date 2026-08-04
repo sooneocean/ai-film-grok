@@ -1004,6 +1004,41 @@ def ship_prep(
                 }
             )
 
+    # True-video-only (hard): ban Ken Burns / panel still-motion approved clips
+    try:
+        from true_video_policy import scan_manifest_true_video
+
+        tv = scan_manifest_true_video(root)
+        steps.append(
+            {
+                "id": "true_video",
+                "ok": bool(tv.get("ok") or tv.get("skipped")),
+                "detail": (
+                    "skipped"
+                    if tv.get("skipped")
+                    else (
+                        f"checked={tv.get('checked', 0)} violations={len(tv.get('violations') or [])}"
+                    )
+                ),
+                "hard": True,
+                "next_cmd": (
+                    None
+                    if tv.get("ok") or tv.get("skipped")
+                    else "re-I2V Grok/H3; remove still-motion approved clips"
+                ),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "true_video",
+                "ok": False,
+                "detail": str(exc)[:200],
+                "hard": True,
+                "next_cmd": "check true_video_policy / re-register generative clips",
+            }
+        )
+
     if skip_variety or os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
         "1",
         "true",
@@ -1335,7 +1370,7 @@ def ship_prep(
             "hard": film_core_hard,
         },
         "note": (
-            "means→variety→shortlist→pk_compare(advisory)→fill_idle(advisory)"
+            "means→true_video→variety→shortlist→pk_compare(advisory)→fill_idle(advisory)"
             "→motion-gate→film_core→input_fidelity; then closeout/export"
         ),
         "human_pk_required": any(
