@@ -7,24 +7,52 @@
 
 | | |
 |---|---|
-| **版本** | 见 [`plugin.json`](./plugin.json) |
-| **仓库** | https://github.com/sooneocean/ai-film-grok |
+| **版本** | **`2.39.0`**（见 [`plugin.json`](./plugin.json) · 变更 [`CHANGELOG.md`](./CHANGELOG.md)） |
+| **GitHub** | https://github.com/sooneocean/ai-film-grok |
+| **Gitea（个人）** | http://172.238.15.154:3000/Redredchen01/ai-film-grok |
+| **Gitea（aidev）** | http://172.238.15.154:3000/aidev/ai-film-grok |
 | **斜杠命令** | `/ai-film-grok` · `/aifilm` |
 | **CLI** | `skills/ai-film-grok/scripts/aifilm` |
 | **Agent 入口** | [`AGENTS.md`](./AGENTS.md) · skill 主脊 [`skills/ai-film-grok/SKILL.md`](./skills/ai-film-grok/SKILL.md) |
 
 ---
 
+## v2.39 本季要点（2026-08-04）
+
+一句话：**剧本先算呈现价值 → 输入保真写进镜表 → 双轨火力拍片（Grok 铺量 + 5090 H3 攻坚）→ 空闲挑战提升画质，人审才 promote。**
+
+| 能力 | 解决什么 | 命令 / 入口 |
+|------|----------|-------------|
+| **Script-value debrief** | 锁故事前先写「用户/编剧/导演/观众/生产」L0–L4 价值卡；确认 promise + 不可砍 beat | `aifilm plan debrief --action seed\|confirm\|validate` |
+| **Input Fidelity** | 源句、must_keep、受保护对白是否还在成片链上；污染/实体覆盖/锚点打分 | `aifilm fidelity status\|check\|apply` · 回执 `receipts/input-fidelity.json` |
+| **design-go** | debrief + fidelity + 抗无聊一页纸；**永不代签 pilot** | `aifilm design-go --root <film>` |
+| **hybrid_h3 双轨** | 安全 bulk 走 Grok；肉戏/高难/对白 CU 软锁本机 MiniMax H3（5090） | `AIFILM_I2V_PROFILE=hybrid_h3` · `aifilm h3 plan\|run` |
+| **FLF first+last** | 有首尾静帧时 H3 主轨优先 first+last frame；R2V 作能量位 / pose land | 有 end still 时自动 FLF；见 weapon-lane |
+| **Fill-Idle 挑战** | GPU 空闲时 P0→P1→P2 挑战（不抢 P0）；多 take 只给 shortlist，**人 promote** | `aifilm h3 next\|run-next\|cycle\|pk-compare\|evidence` |
+| **still-challenge** | 弱 take 可先 FRW i2i 刷更好静帧再 I2V/FLF/R2V（30s 限速；禁静默 promote） | `aifilm still-challenge plan\|run\|promote` |
+| **对白优先** | 场硬闸：每场 ≥1 句 on/off_camera；对白镜画面=说话者；中文 TTS 默认 edge | 见 hard-defaults · stages/voice |
+
+**推荐阅读顺序（agent / 维护者）**
+
+1. 主脊：[`skills/ai-film-grok/SKILL.md`](./skills/ai-film-grok/SKILL.md)  
+2. 硬表：[`references/hard-defaults.md`](./skills/ai-film-grok/references/hard-defaults.md)  
+3. 火力矩阵：[`references/weapon-lane-matrix.md`](./skills/ai-film-grok/references/weapon-lane-matrix.md)  
+4. 剧本价值：[`references/script-value-debrief.md`](./skills/ai-film-grok/references/script-value-debrief.md)  
+5. 版本明细：[`CHANGELOG.md`](./CHANGELOG.md) → `[2.39.0]` … `[2.38.0]`
+
+---
+
 ## 目录
 
-1. [安装](#安装)
-2. [使用逻辑（先读这个）](#使用逻辑先读这个)
-3. [架构图](#架构图)
-4. [可插拔模型一览](#可插拔模型一览)
-5. [最小成片路径](#最小成片路径)
-6. [配置](#配置)
-7. [本机开发 / 发版](#本机开发--发版)
-8. [验证](#验证)
+1. [v2.39 本季要点](#v239-本季要点2026-08-04)
+2. [安装](#安装)
+3. [使用逻辑（先读这个）](#使用逻辑先读这个)
+4. [架构图](#架构图)
+5. [可插拔模型一览](#可插拔模型一览)
+6. [最小成片路径](#最小成片路径)
+7. [配置](#配置)
+8. [本机开发 / 发版](#本机开发--发版)
+9. [验证](#验证)
 
 ---
 
@@ -127,11 +155,11 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 | 阶段 | 通过证据 | 典型下一步 |
 |------|----------|------------|
-| 定义故事 | 主题、故事来源与叙事图已确认 | `plan run` / Lens / narrative lock |
+| 定义故事 | 主题、debrief 已确认、叙事图与 **input fidelity** 过关 | `plan debrief` · `plan run` · `fidelity apply` · `design-go` |
 | 设计演出 | 画风、状态、镜头与时长计划已锁定 | `lock-style` · `write-spec` |
 | Pilot 样片 | 代表镜完整审看，用户明确批准 | `pilot report` / `pilot approve` |
-| 批量制作 | 所需镜头已生成、审查、登记 | `media-queue` · `register-clip` |
-| 选片与粗剪 | 选择集、接戏、节奏有当前证据 | `selects` · `editor-cut` |
+| 批量制作 | 所需镜头已生成、审查、登记（可含 H3 / Fill-Idle 挑战） | `media-queue` · `h3 run` · `register-clip` |
+| 选片与粗剪 | 选择集、接戏、节奏有当前证据；多 take 人 promote | `selects` · `h3 pk-compare` · `editor-cut` |
 | 后期母版 | 字幕、混音、final review、post-audit 已绑定 | `tts-rehearse` · `final` · `review-final` |
 | 审片与交付 | 完整观看、解码、hash、导出回读完成 | `export-desktop` |
 
@@ -306,19 +334,29 @@ final --post-engine hyperframes
 
 | 插槽 | 默认（当前季） | 可切换 | 怎么换 |
 |------|----------------|--------|--------|
-| **运营 profile** | `grok_primary` | `ltx23_primary`（仅旧项目锁定） | `AIFILM_I2V_PROFILE=…` |
-| **L1 人物 I2V** | Grok `image_to_video`（对白讲话镜锁 FRW LTX 2.3 有声） | FRW API `img2video` → FRW LTX 2.3 | 每路均需影片级 approved canary；仅分类技术失败可切换 |
+| **运营 profile** | `grok_primary`（纯云） | **`hybrid_h3`**（推荐有 5090 时）· `ltx23_primary`（仅旧项目） | `AIFILM_I2V_PROFILE=…` |
+| **L1 安全 bulk** | Grok `image_to_video` | FRW API I2V（分类技术失败 + canary） | 影片级 approved canary；禁静默换 provider |
+| **对白讲话镜（安全向）** | FRW **LTX 2.3** 原生有声 | Grok fallback | 锁 FRW 后同镜不回切 |
+| **肉戏 / 高难 / 受限对白** | `hybrid_h3` → **本机 MiniMax H3**（I2V / R2V / FLF） | Grok 仅 soft 铺量 | `aifilm h3 plan\|run` · pilot 批 |
+| **FLF first+last** | 有首+尾静帧 → H3 **FLF 主轨** | 无 last → I2V；`force_r2v` → R2V（last 作 pose ref） | media-pack / end still |
+| **Fill-Idle** | GPU 空闲 P0→P1→P2 挑战 | 永不自动 promote | `h3 next` · `h3 cycle` · `pk-compare` |
+| **弱 still 刷新** | FRW i2i still-challenge | 人 `promote` 后才进 I2V | `still-challenge run\|promote` |
 | OAuth 批 I2V | `queue-run-oauth` / `grok-oauth video --wait` | 视频模型 env | `AIFILM_GROK_VIDEO_MODEL`（默认 `grok-imagine-video`） |
 | L2 无脸环境床 | FRW **`ltx-t2v`**（`env-plate`） | — | `aifilm env-plate` · register `frw_ltx_t2v` |
 | 会话工具 | `image_to_video` | `reference_to_video`（少用） | 无原生 T2V |
 
 ```bash
-# 当前默认
+# 默认：纯云 Grok 主链
 AIFILM_I2V_PROFILE=grok_primary
+
+# 有私有 RTX 5090 时：Grok 铺量 + H3 攻坚（推荐成人/高动片）
+# AIFILM_I2V_PROFILE=hybrid_h3
 
 # 仅旧项目显式锁定时使用 LTX-first 兼容路径
 # AIFILM_I2V_PROFILE=ltx23_primary
 ```
+
+火力矩阵全文：[`weapon-lane-matrix.md`](./skills/ai-film-grok/references/weapon-lane-matrix.md)。
 
 ### 3 · TTS（旁白）
 
@@ -404,6 +442,20 @@ ROOT="/path/to/my-film"   # 绝对路径
 
 "$AIFILM" doctor
 "$AIFILM" init --theme "都市雨夜重逢" --title "雨停之前" --aspect 9:16 --root "$ROOT"
+
+# ── 1) 故事：receive → 价值 debrief（锁前必确认）→ plan ──
+# "$AIFILM" plan receive --root "$ROOT" --from "<reception.json>"
+"$AIFILM" plan debrief --root "$ROOT" --action seed
+# 人读 receipts/script-value-debrief.json 后：
+"$AIFILM" plan debrief --root "$ROOT" --action confirm --user-phrase "确认 promise 与不可砍 beat"
+"$AIFILM" plan run --root "$ROOT" --text "<story>" --title "雨停之前" --target-duration 60
+
+# ── 2) 输入保真 + 设计一页（不签 pilot）──
+"$AIFILM" fidelity apply --root "$ROOT"
+"$AIFILM" fidelity check --root "$ROOT"
+"$AIFILM" design-go --root "$ROOT"
+
+# ── 3) 定妆 / 镜表 ──
 # … 写 Director’s Lens / style / cast 后：
 "$AIFILM" lock-style --root "$ROOT" --canonical "<style-v1.png>" \
   --cast-master "<cast/id-v1.png>" --signature "<signature_block>"
@@ -411,6 +463,15 @@ ROOT="/path/to/my-film"   # 绝对路径
 "$AIFILM" pilot pick --root "$ROOT" && "$AIFILM" pilot report --root "$ROOT"
 # 用户原话批准后：
 "$AIFILM" pilot approve --root "$ROOT" --user-phrase "可以" --shots shot01,shot02,shot03
+
+# ── 4) 视觉 bulk ──
+# Grok：会话 image_to_video 或 OAuth 队列 → register-clip
+# hybrid_h3 时肉戏/高难：
+#   "$AIFILM" h3 plan --root "$ROOT" --shot shot03
+#   "$AIFILM" h3 run  --root "$ROOT" --shot shot03 --execute
+# GPU 空闲挑战（不自动 promote）：
+#   "$AIFILM" h3 cycle --root "$ROOT" --execute --max 5
+# 弱 still 可先 still-challenge 再 I2V
 
 # 批量前：完整看片并建立带抽帧、时间点与评分的镜头审片回执
 "$AIFILM" review-shot --root "$ROOT" --shot-id shot01 --source "<clip.mp4>" \
@@ -423,7 +484,7 @@ ROOT="/path/to/my-film"   # 绝对路径
 # 每步都可：
 "$AIFILM" dispatch --root "$ROOT"
 
-# 视觉 bulk（会话 image_to_video 或 OAuth 队列）后 register-clip …
+# ── 5) 声音 + 成片 ──
 "$AIFILM" tts-rehearse --root "$ROOT" --backend edge
 "$AIFILM" final --root "$ROOT" --post-engine hyperframes \
   --lipsync off --music-mood rnb --tts-backend edge --compose-preset auto
@@ -445,7 +506,9 @@ v1.6 新项目还需为 final 的七个维度各提供 `--screening-evidence "�
 | 变量 | 默认 | 含义 |
 |------|------|------|
 | `AIFILM_TTS_BACKEND` | `edge` | TTS 后端 |
-| `AIFILM_I2V_PROFILE` | `grok_primary` | I2V 运营季；LTX-first 仅旧项目显式锁定 |
+| `AIFILM_I2V_PROFILE` | `grok_primary` | `grok_primary` · **`hybrid_h3`** · `ltx23_primary`（旧） |
+| `AIFILM_FIDELITY_STRICT` | off | `1` 时 fidelity check 失败退出 2 |
+| `AIFILM_DEBRIEF_STRICT` | off | `1` 时 story lock 要求已 confirm debrief |
 | `AIFILM_LIPSYNC_BACKEND` | `off` | 口型 |
 | `AIFILM_GROK_AUTH` | `auto` | OAuth / API key |
 | `AIFILM_GROK_CHAT_MODEL` | `grok-4.5` | OAuth chat |
@@ -461,8 +524,10 @@ v1.6 新项目还需为 final 的七个维度各提供 `--screening-evidence "�
 
 - 中文 final TTS → **edge**  
 - 色气 BGM → **rnb**（`dark` 仅恐怖）  
-- I2V → **`grok_primary`**（Grok image_to_video 主链；对白讲话镜锁 FRW LTX 2.3 有声；每路须当前影片 canary）
-- pilot 须用户批准才 bulk  
+- I2V → **`grok_primary`**（有 5090 成人/高动片建议 **`hybrid_h3`**）  
+- 对白讲话镜 → FRW LTX 2.3 有声；肉戏对白 → H3；每路须当前影片 canary  
+- pilot 须用户批准才 bulk；Fill-Idle / still-challenge **不**静默 promote  
+- ship 字幕默认像素硬烧中文（见 hard-defaults）
 
 ---
 
@@ -470,20 +535,27 @@ v1.6 新项目还需为 final 的七个维度各提供 `--screening-evidence "�
 
 ```bash
 cd ~/.grok/plugins/ai-film-grok
-# 1) 只改本树
-# 2) make release-check（统一使用 Python 3.11+；含 doctor、plugin validate、全量 pytest）
-# 3) 行为变更 → bump plugin.json semver
-# 4) make update
-# 5) git commit（message 英文）&& git push origin main
+# 1) 只改本树（单一真相）
+# 2) make check-all   # 或 make release-check（Python 3.11+ · doctor · validate · pytest）
+# 3) 行为变更 → bump plugin.json semver + CHANGELOG
+# 4) make sync-docs   # 刷新版本指针 / GRAPH
+# 5) make update / grok plugin update ai-film-grok
+# 6) git commit（message 英文）
+# 7) 远端：
+#    git push origin main          # GitHub
+#    git push gitea main           # Gitea 个人 Redredchen01/ai-film-grok
+#    git push gitea-aidev main     # Gitea 组织 aidev/ai-film-grok
 ```
 
 | 路径 | 用途 |
 |------|------|
-| `plugin.json` | 插件元数据 / 版本 |
+| `plugin.json` | 插件元数据 / 版本 **`2.39.0`** |
+| `CHANGELOG.md` | 版本明细（本季从 2.38→2.39 的 debrief / fidelity / H3 FLF / Fill-Idle） |
 | `commands/` | `/ai-film-grok` · `/aifilm` |
 | `skills/ai-film-grok/SKILL.md` | Agent 主脊（短） |
 | `skills/ai-film-grok/scripts/` | `aifilm` CLI + 适配器 |
-| `skills/ai-film-grok/references/` | 稳定规则 |
+| `skills/ai-film-grok/references/` | 稳定规则 · hard-defaults · weapon-lane · stages |
+| `skills/ai-film-grok/memory/` | 短记忆卡（会话索引，非长课） |
 | `skills/ai-film-grok/tests/` | pytest |
 | `.github/workflows/ci.yml` | validate + 全量 pytest |
 

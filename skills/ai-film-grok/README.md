@@ -1,10 +1,22 @@
 # ai-film-grok（skill 本体）
 
-> **安装 / 使用逻辑 / 架构图 / 可插拔模型** → 仓库根 [README.md](../../README.md)（对外主文档）。
+> **安装 / 使用逻辑 / 架构图 / 可插拔模型** → 仓库根 [README.md](../../README.md)（对外主文档）。  
+> **版本**：**`2.39.0`** · 变更 [CHANGELOG](../../CHANGELOG.md) · 本季要点见根 README「v2.39 本季要点」。
 
 **一句话**：把「从灵感到可发布的 AI 动态短片」收成**可恢复、可验收**的七段流程——定义故事 → 设计演出 → Pilot → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付。
 
 正式交付必须是**真实动态成片**（I2V 验收），不是静图轮播、Ken Burns 或只有关键帧。
+
+### v2.39 本 skill 增量（相对 2.37 以前）
+
+| 模块 | 做什么 | CLI |
+|------|--------|-----|
+| Script-value debrief | 锁 story 前 L0–L4 呈现价值 + 人确认 | `plan debrief` |
+| Input Fidelity | 源句 / must_keep / 保护对白打分与 stamp | `fidelity status\|check\|apply` |
+| design-go | debrief+fidelity+variety 一页；不签 pilot | `design-go` |
+| hybrid_h3 + FLF | Grok 铺量；5090 H3 攻坚；有首尾帧 FLF 主轨 | `h3 plan\|run` · profile `hybrid_h3` |
+| Fill-Idle | 空闲 P0→P2 挑战；PK shortlist；人 promote | `h3 next\|run-next\|cycle\|pk-*` |
+| still-challenge | FRW i2i 刷更好静帧再 I2V | `still-challenge` |
 
 ### 四层方法论（主脊）
 
@@ -12,11 +24,15 @@
 用户 Prompt / 剧本
         ↓
 Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
+  · plan debrief → fidelity apply → design-go（锁前）
         ↓
-1. 视觉生成     Grok Imagine 静帧 + I2V（默认 grok_primary：对白讲话镜锁 FRW LTX 原生有声 → Grok 主链）
+1. 视觉生成     静帧 Grok；I2V 默认 grok_primary
+                · 对白讲话镜 → FRW LTX 2.3 有声
+                · hybrid_h3：肉戏/高难/受限对白 → 5090 MiniMax H3（FLF/R2V）
+                · 空闲 → Fill-Idle 挑战（不自动 promote）
 2. 语音生成     Edge TTS（可插拔 voicebox / grok / minimax / fish / external）
 3. 动态合成     HyperFrames（优先） / Remotion（备选）
-4. 最终后处理   FFmpeg（拼板 · 混音 · 导出）
+4. 最终后处理   FFmpeg（拼板 · 混音 · 导出 · 字幕硬烧）
         ↓
 最终 MP4 + 预览 + 可下载资产
 ```
@@ -24,7 +40,9 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 **Skill 入口**：[`SKILL.md`](SKILL.md) 主脊 + 阶段路由 + 命令  
 - **电影工序**：[`references/generative-film-craft.md`](references/generative-film-craft.md)  
 - **工具四层**：[`references/pipeline-methodology.md`](references/pipeline-methodology.md)  
-- 弹性默认：[`references/hard-defaults.md`](references/hard-defaults.md)
+- **硬默认**：[`references/hard-defaults.md`](references/hard-defaults.md)  
+- **火力矩阵**：[`references/weapon-lane-matrix.md`](references/weapon-lane-matrix.md)  
+- **剧本价值**：[`references/script-value-debrief.md`](references/script-value-debrief.md)
 
 运行时：优先 `aifilm dispatch` 的 **`phase`**；`status|next|preflight|stage` 的 `pipeline_stage` 仅供 HUD／旧项目诊断。
 
@@ -32,7 +50,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 ![ai-film-grok 四层流水线](docs/architecture.png)
 
-> 当前季默认 **I2V = grok_primary**；`ltx23_primary` 仅保留给已锁定的旧项目。完整插拔矩阵与安装步骤见仓库根 README。
+> 当前季默认 **I2V = `grok_primary`**；有私有 5090 时成人/高动片建议 **`hybrid_h3`**。`ltx23_primary` 仅旧项目。完整插拔矩阵见仓库根 README。
 
 ---
 
@@ -73,22 +91,25 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 ## 技术栈（你实际在用什么）
 
-### 核心生成：FRW LTX primary + 证据化 fallback
+### 核心生成：四武器 + 证据化路由（v2.39）
 
 | 能力 | 在本 skill 中的角色 | 入口 |
 |------|---------------------|------|
 | **Grok Imagine（图像）** | 文生图 / 图生图：风格样张、定妆、每镜关键帧 | `image_gen`、`image_edit` |
-| **Grok Imagine Video** | 当前 `grok_primary` 第一动作路线（对白讲话镜锁 FRW LTX 有声）；需影片级 approved canary | `image_to_video` |
-| **FRW LTX 2.3** | 对白讲话镜原生有声主链；否则分类技术失败后的备选路线；需影片级 approved canary | `"$AIFILM" frw img2video-audio --model ltx2.3` |
-| **FRW API I2V** | 无对白动作在 Grok 不可用后的备选路线；需影片级 approved canary | `"$AIFILM" frw img2video` |
+| **Grok Imagine Video** | `grok_primary` / hybrid 安全 bulk 主链；需影片级 approved canary | `image_to_video` · OAuth video |
+| **FRW LTX 2.3** | **安全向**对白讲话镜原生有声；分类技术失败 fallback | `"$AIFILM" frw img2video-audio --model ltx2.3` |
+| **FRW API I2V / i2i** | Grok 不可用后的 I2V 备选；**still-challenge** 刷更好静帧 | `frw img2video` · `still-challenge` |
+| **本机 MiniMax H3（5090）** | `hybrid_h3`：肉戏/高难/受限对白；**FLF** 首尾帧；R2V 能量位 | `aifilm h3 plan\|run\|next\|cycle` |
+| **Qwen I2I（状态照）** | 衣着/状态前进的状态照链 | 见 stages/visual · state-index |
 
 要点：
 
-- **分层**：静帧默认 **Grok**；bulk 动画主链为 **Grok → FRW API I2V → FRW LTX**（对白讲话镜直接锁 FRW LTX 原生有声），每次切换都须分类技术失败并写 provider-switch receipt。
-- FRW fallback 必须区分 `FRW_API_KEY`（任务 API）与 `FRW_TOKEN`（上传 JWT）；上传前执行 `upload-probe`。
-- **禁止** 默认 legacy `img2video`；**禁止** 576 生成再放大到 720 当高清。  
-- Python **不内嵌 key**：Grok 工具由 agent 调；FRW 经 `frw_dispatch` + frwclaw `.env`；本仓库负责 **规格、队列、QA、成片门禁**。  
-- **单镜头 provider 原则**：同一 shot 一旦切到 FRW fallback，后续重试固定 FRW；不得把切换隐藏在 manifest 中。
+- **分层（当前季）**：静帧默认 **Grok**；动作 **Grok bulk** → 对白安全向 **FRW LTX** → 受限/肉戏 **H3**；切换写 receipt，禁静默换 provider。  
+- **FLF**：首+尾静帧齐 → H3 优先 first+last frame；无 last → I2V；`force_r2v` 时 last 作 pose land。  
+- **Fill-Idle**：GPU 空闲才 P0→P1→P2；多 take 只 **pk shortlist**，**人 promote**；final 不等 P2。  
+- FRW 须区分 `FRW_API_KEY`（任务）与 `FRW_TOKEN`（上传 JWT）；上传前 `upload-probe`；i2i 全局限速 ≥30s。  
+- Python **不内嵌 key**：Grok 由 agent / OAuth；FRW 经 `frw_dispatch`；H3 经 Comfy 隧道；本仓负责 **规格、队列、QA、成片门禁**。  
+- **单镜头 provider 原则**：同 shot 一旦 fallback 到 FRW/H3，后续重试固定该轨。
 ### 本地控制台与成片
 
 高质量竖屏项目可显式启用 authored creative gates：
@@ -112,11 +133,13 @@ aifilm quality-closure report --root <film-root>
 
 | 组件 | 用途 |
 |------|------|
-| **`aifilm` CLI** | init / lock-style / write-spec / register / final / review / export / next / preflight / doctor |
+| **`aifilm` CLI** | dispatch / plan / fidelity / design-go / h3 / still-challenge / final / review / doctor … |
 | **`media-queue`** | 本地 I2V 任务队列：add → claim → complete/fail → requeue；串行防 429 |
 | **film-spec JSON + schema** | 导演意图、分镜 beat、旁白、运镜 DSL、转场与 sound_plan |
+| **script-value-debrief** | 锁 story 前 L0–L4 价值卡（`receipts/script-value-debrief.json`） |
+| **input-fidelity** | 源句/must_keep/保护对白评分（`receipts/input-fidelity.json`） |
 | **style-bible** | medium / palette / signature_block / identity_lock / cast_masters / 上传画风图 SHA-256 锚 |
-| **FFmpeg + PIL** | 拼接、xfade、stretch/hold、VO 混音、BGM duck、字幕烧录 |
+| **FFmpeg + PIL** | 拼接、xfade、stretch/hold、VO 混音、BGM duck、字幕硬烧 |
 | **Edge TTS（默认中文）** | 说书 `write-spec` 钉 edge；支持 shot-level `performance_cue`；禁止 Neural 名塞 ElevenLabs |
 | **表达式 TTS（显式）** | `qwen3` 本机 voice design/clone；`higgs` 可信 adapter；未就绪不静默替换 |
 | **程序化 R&B + 听感** | rnb / auto_sfx / sidechain / loudnorm auto；本地 `audio/bgm.wav` 模板曲 |
@@ -167,13 +190,17 @@ OAuth/API 路径传 `--root` 后会自动保存每次请求的真实
 
 ---
 
-## 端到端流水线（技术细节）
+## 端到端流水线（技术细节 · v2.39）
 
 ```text
-用户意图 / 角色参考图
+用户意图 / 剧本 / 角色参考图
         │
         ▼
    aifilm init + style-bible（anime/色气须改 medium，禁默认 photoreal）
+        │
+        ▼
+   plan debrief（L0–L4 呈现价值 · 人确认）→ plan run
+   fidelity apply/check → design-go（一页纸，不签 pilot）
         │
         ▼
    Grok Imagine：style-v1 + cast master + lookbook
@@ -182,16 +209,17 @@ OAuth/API 路径传 `--root` 后会自动保存每次请求的真实
    lock-style  →  write-spec（intent / beat / vo_budget / vo_pacing）
         │
         ▼
-   Pilot 三镜：Imagine 静帧 → Imagine Video 1.5 I2V → pilot score → 用户批准
+   Pilot 三镜：静帧 → I2V（Grok 或 H3）→ pilot score → 用户批准
         │
         ▼  (run_to_completion: 可一路做完)
-   批量 remaining：image_edit(cast锚) → queue → image_to_video（串行）
+   批量：Grok bulk ｜ hybrid_h3 肉戏 → h3 run（FLF）｜ 空闲 Fill-Idle
+   弱 still → still-challenge（人 promote）→ 再 I2V
         │
         ▼
    register-still / register-clip（身份 + motion QA）
         │
         ▼
-   aifilm final（edge TTS + rnb BGM + 字幕 + duration_sec 槽位）
+   aifilm final（edge TTS + rnb BGM + 字幕硬烧 + duration_sec 槽位）
         │
         ▼
    review-final 十一维 → export-desktop
@@ -242,27 +270,34 @@ OAuth/API 路径传 `--root` 后会自动保存每次请求的真实
 
 ## 安装
 
+**推荐**：按仓库根 README 用 **Grok plugin** 安装（`grok plugin install` / 本机 symlink）。  
+本机源码真相：`~/.grok/plugins/ai-film-grok`（skill 在其下 `skills/ai-film-grok`）。
+
 ```bash
-# 用户级 skill（Grok Build 会加载 ~/.grok/skills/*/SKILL.md）
-git clone http://<gitea-host>/Redredchen01/ai-film-grok.git \
-  ~/.grok/skills/ai-film-grok
+# 从 Gitea 拉源码（开发机）
+git clone http://172.238.15.154:3000/Redredchen01/ai-film-grok.git \
+  ~/.grok/plugins/ai-film-grok
+# 或组织仓：http://172.238.15.154:3000/aidev/ai-film-grok.git
 
-cd ~/.grok/skills/ai-film-grok
-cp config.env.example config.env
-chmod 600 config.env
-# 按需填 TTS key；中文成片可保持 AIFILM_TTS_BACKEND=edge 无需 key
+cd ~/.grok/plugins/ai-film-grok
+ln -sfn "$(pwd)/skills/ai-film-grok" ~/.grok/skills/ai-film-grok
 
-python3 -m pip install -r requirements.lock   # 建议 pyenv 3.11
+cp skills/ai-film-grok/config.env.example skills/ai-film-grok/config.env
+chmod 600 skills/ai-film-grok/config.env
+# 按需填 TTS / FRW / Comfy 隧道；中文成片可保持 AIFILM_TTS_BACKEND=edge
 
-./scripts/aifilm doctor
-./scripts/aifilm lock-runtime   # 改过 scripts 后再锁指纹
+python3 -m pip install -r skills/ai-film-grok/requirements.lock   # 建议 3.11+
+
+skills/ai-film-grok/scripts/aifilm doctor
+# 改过 scripts 后：
+# skills/ai-film-grok/scripts/aifilm lock-runtime
 ```
 
-**运行时依赖**：本机 **ffmpeg / ffprobe**；Grok Build 会话内可用 **Imagine 图像 + Imagine Video 1.5** 工具。
+**运行时依赖**：本机 **ffmpeg / ffprobe**；Grok Build 会话内 **Imagine 图像 + Video**；可选 **FRW**、**RTX 5090 Comfy（H3）**。
 
 ### 触发方式
 
-- 对话：`/ai-film-grok`  
+- 对话：`/ai-film-grok` · `/aifilm`  
 - 意图：AI 电影、漫剧、分镜成片、色气竖屏剧、角色一致性短片、配音后期  
 
 Agent 应同时加载 Grok 的 **Imagine / Imagine Video** 工具能力（本 skill 的 Python **不**代发 Imagine 付费请求）。
@@ -272,31 +307,41 @@ Agent 应同时加载 Grok 的 **Imagine / Imagine Video** 工具能力（本 sk
 ## 最小生产命令
 
 ```bash
-SKILL_DIR="$HOME/.grok/skills/ai-film-grok"
+SKILL_DIR="${HOME}/.grok/plugins/ai-film-grok/skills/ai-film-grok"
+[ -d "$SKILL_DIR" ] || SKILL_DIR="$HOME/.grok/skills/ai-film-grok"
 AIFILM="$SKILL_DIR/scripts/aifilm"
-MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
+ROOT="/abs/path/film"
 
 "$AIFILM" doctor
-"$AIFILM" init --theme "色气里番 竖屏" --title "片名" --aspect 9:16 --root "/abs/path/film"
-# 编辑 style-bible.json + film-spec.json
-# Agent：Imagine 定妆/静帧 → Imagine Video 1.5 I2V → register
-"$AIFILM" write-spec --root "/abs/path/film"
-"$AIFILM" pilot pick --root "/abs/path/film"
+"$AIFILM" init --theme "色气里番 竖屏" --title "片名" --aspect 9:16 --root "$ROOT"
+
+# 故事价值 → 保真 → 设计一页（锁前）
+"$AIFILM" plan debrief --root "$ROOT" --action seed
+"$AIFILM" plan debrief --root "$ROOT" --action confirm --user-phrase "确认"
+"$AIFILM" fidelity apply --root "$ROOT"
+"$AIFILM" design-go --root "$ROOT"
+
+# 定妆 + 镜表 + pilot（用户批准后 bulk）
+"$AIFILM" write-spec --root "$ROOT"
+"$AIFILM" pilot pick --root "$ROOT"
 # … pilot score / approve …
-"$AIFILM" final --root "/abs/path/film" --lipsync off --music-mood rnb --tts-backend edge
-"$AIFILM" review-final --root "/abs/path/film" --approve --reviewer "you" \
+# hybrid_h3 时：aifilm h3 plan|run；空闲：h3 cycle
+
+"$AIFILM" final --root "$ROOT" --post-engine hyperframes \
+  --lipsync off --music-mood rnb --tts-backend edge
+"$AIFILM" review-final --root "$ROOT" --approve --reviewer "you" \
   --notes "完整观看通过" \
   --score-identity pass --score-style pass --score-motion pass \
   --score-escalation pass --score-audio pass --score-subs pass --score-dead-air pass
-"$AIFILM" export-desktop --root "/abs/path/film" --name "中文片名"
+"$AIFILM" export-desktop --root "$ROOT" --name "中文片名"
 ```
 
 开场三连：
 
 ```bash
 "$AIFILM" doctor
-"$AIFILM" preflight --root "<root>"
-"$AIFILM" next --root "<root>"
+"$AIFILM" dispatch --root "<root>"   # 优先：读 next_action
+"$AIFILM" next --root "<root>"       # 旧兼容
 ```
 
 ---
@@ -305,16 +350,19 @@ MEDIA_QUEUE="$SKILL_DIR/scripts/media-queue"
 
 | 路径 | 说明 |
 |------|------|
-| `docs/architecture.png` | 架构总览图（Imagine + Video 1.5 + 本地流水线） |
-| `SKILL.md` | Agent 执行规范（流程、门禁、禁区） |
+| `docs/architecture.png` | 架构总览图（Imagine + Video + 本地流水线） |
+| `SKILL.md` | Agent 执行规范（流程、门禁、禁区 · 短主脊） |
 | `scripts/aifilm` | 统一 CLI 入口（锁 pyenv） |
 | `scripts/media-queue` | I2V 任务队列 |
+| `scripts/input_fidelity.py` · `script_value_debrief.py` | 输入保真 / 剧本价值 |
+| `scripts/h3_workflow.py` · `still_challenge.py` | 5090 H3 + FRW still 挑战 |
 | `scripts/render_final.py` | 成片：stretch 槽位、TTS、BGM、字幕 |
 | `scripts/pilot_review.py` | pilot scorecard / 批准词 / run_to_completion |
 | `scripts/production_gates.py` | pilot / loop-risk 等硬门禁 |
-| `references/` | film-spec、consistency、voices、lessons… |
-| `templates/` | film-spec / style-bible 示例 |
-| `schemas/film-spec.schema.json` | 规格 schema |
+| `references/` | hard-defaults · weapon-lane · stages · lessons… |
+| `memory/` | 短记忆卡（会话索引） |
+| `templates/` | film-spec / style-bible / debrief 示例 |
+| `schemas/` | film-spec · script-value-debrief 等 |
 | `tests/` | 门禁与流程单测 |
 | `config.env.example` | 本地配置模板（**无密钥**） |
 
@@ -372,12 +420,14 @@ Private skill for team use unless otherwise stated.
 
 ## 致谢 / 模型标注
 
-本流水线的**画面与运动生成**默认建立在：
+本流水线的**画面与运动生成**建立在可插拔多轨上：
 
 - **Grok Imagine** — 关键帧与角色/画风锁定（text-to-image / image-edit）  
-- **Grok Imagine Video 1.5** — 关键帧驱动的真实镜头运动（image-to-video）  
+- **Grok Imagine Video** — 安全 bulk 镜头运动（image-to-video）  
+- **FRW LTX 2.3** — 安全向对白原生有声  
+- **本机 MiniMax H3（RTX 5090）** — 肉戏/高难/FLF/R2V 攻坚  
 
-本地侧负责导演规格、一致性门禁、队列编排、音画合成与验收——让你把算力花在「拍片」，而不是重复踩坑。
+本地侧负责导演规格、输入保真、火力路由、一致性门禁、队列编排、音画合成与验收——让你把算力花在「拍片」，而不是重复踩坑。
 
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）

@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Docs
+- Root + skill **README** rewritten for **v2.39.0**: debrief / input fidelity / design-go / hybrid_h3 FLF / Fill-Idle / still-challenge; Gitea remotes; updated minimal path and I2V matrix.
+
 ## [2.39.0] - 2026-08-04
 
 ### Added (Input Fidelity full chain · F0–F3 + S)
