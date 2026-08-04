@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.37.10] - 2026-08-04
+
+### Added (ship-prep × Fill-Idle PK)
+- **`ship-prep`**: advisory steps `pk_compare` + `fill_idle_pending` after shortlist (never auto-promote).
+- Receipt `receipts/pk-compare-ship-prep.json` when multi-take exists; `human_pk_required` flag.
+- CLI `--skip-pk` / env `AIFILM_SKIP_SHIP_PK=1`.
+- Tests: `test_ship_prep_includes_pk_compare_advisory`.
+
 ## [2.37.9] - 2026-08-04
 
 ### Fixed / Added (Wave Z + H1 · maintainability)

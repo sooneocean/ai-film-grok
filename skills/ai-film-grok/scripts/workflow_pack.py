@@ -947,11 +947,13 @@ def ship_prep(
     measure: bool = True,
     promote: bool = True,
     skip_variety: bool = False,
+    skip_pk: bool = False,
 ) -> dict[str, Any]:
-    """One-shot pre-delivery ladder (v2.37): means → variety → shortlist → motion-gate → film_core.
+    """One-shot pre-delivery ladder: means → variety → shortlist → pk → motion-gate → film_core.
 
     Hard fails: variety (unless skip), i2v_motion_gate.
     film_core hard only for max/premium (else advisory).
+    pk_compare is **always advisory** (never auto-promote).
     """
     root = _root(root)
     steps: list[dict[str, Any]] = []
@@ -1022,6 +1024,127 @@ def ship_prep(
             "promoted": sel.get("promoted") or [],
         }
     )
+
+    # Fill-Idle / multi-take PK advisory (never hard-fail; never auto-promote)
+    if skip_pk or os.environ.get("AIFILM_SKIP_SHIP_PK", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        steps.append(
+            {
+                "id": "pk_compare",
+                "ok": True,
+                "skipped": True,
+                "advisory": True,
+                "detail": "AIFILM_SKIP_SHIP_PK or --skip-pk",
+                "next_cmd": None,
+            }
+        )
+    else:
+        try:
+            from h3_fill_idle import next_fill_idle_job, pk_compare
+
+            pk = pk_compare(root, measure_missing=False)
+            multi = [
+                s
+                for s in (pk.get("shots") or [])
+                if isinstance(s, dict) and int(s.get("take_count") or 0) >= 2
+            ]
+            human_rows: list[dict[str, Any]] = []
+            for s in multi[:40]:
+                rec = s.get("recommended") if isinstance(s.get("recommended"), dict) else {}
+                human_rows.append(
+                    {
+                        "shot_id": s.get("shot_id"),
+                        "take_count": s.get("take_count"),
+                        "recommended_lane": rec.get("lane"),
+                        "recommended_mean": rec.get("mean"),
+                        "recommended_path": rec.get("path"),
+                        "caution": list(s.get("caution") or []),
+                    }
+                )
+            if write and multi:
+                write_json(
+                    root / "receipts" / "pk-compare-ship-prep.json",
+                    {
+                        "schema_version": 1,
+                        "kind": "ai-film-pk-compare-ship-prep",
+                        "ok": True,
+                        "human_required": True,
+                        "multi_take_count": len(multi),
+                        "shots": human_rows,
+                        "note": "advisory only — human select-shortlist --promote / pk-ledger",
+                    },
+                )
+            steps.append(
+                {
+                    "id": "pk_compare",
+                    "ok": True,
+                    "advisory": True,
+                    "human_required": bool(multi),
+                    "detail": (
+                        f"multi_take={len(multi)} "
+                        f"(human review recommended)"
+                        if multi
+                        else "no multi-take shots"
+                    ),
+                    "next_cmd": (
+                        f'aifilm h3 pk-compare --root "{root}"; '
+                        f'aifilm select-shortlist --root "{root}"  # then human --promote'
+                        if multi
+                        else None
+                    ),
+                    "multi_take_count": len(multi),
+                    "shots": human_rows,
+                }
+            )
+            # Pending Fill-Idle work (P0 meat still not burned) — advisory only
+            try:
+                nxt = next_fill_idle_job(
+                    root, include_challenge=True, check_capacity=False
+                )
+                pending = int(nxt.get("pending_count") or 0)
+                n = nxt.get("next") if isinstance(nxt.get("next"), dict) else None
+                steps.append(
+                    {
+                        "id": "fill_idle_pending",
+                        "ok": True,
+                        "advisory": True,
+                        "detail": (
+                            f"pending={pending}"
+                            + (f" next={n.get('shot_id')}/{n.get('priority')}" if n else "")
+                        ),
+                        "next_cmd": (
+                            f'aifilm h3 run-next --root "{root}" --execute'
+                            if pending and n
+                            else None
+                        ),
+                        "pending_count": pending,
+                        "next_shot": n,
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001
+                steps.append(
+                    {
+                        "id": "fill_idle_pending",
+                        "ok": True,
+                        "advisory": True,
+                        "detail": f"skip:{str(exc)[:120]}",
+                        "next_cmd": None,
+                    }
+                )
+        except Exception as exc:  # noqa: BLE001
+            steps.append(
+                {
+                    "id": "pk_compare",
+                    "ok": True,
+                    "advisory": True,
+                    "detail": f"skip:{str(exc)[:160]}",
+                    "next_cmd": f'aifilm h3 pk-compare --root "{root}"',
+                }
+            )
 
     gate_rep: dict[str, Any] = {}
     try:
@@ -1121,7 +1244,13 @@ def ship_prep(
             "ok": core.get("ok") if core else None,
             "hard": film_core_hard,
         },
-        "note": "means→variety→shortlist→motion-gate→film_core; then closeout/export",
+        "note": (
+            "means→variety→shortlist→pk_compare(advisory)→fill_idle(advisory)"
+            "→motion-gate→film_core; then closeout/export"
+        ),
+        "human_pk_required": any(
+            s.get("id") == "pk_compare" and s.get("human_required") for s in steps
+        ),
     }
     if write:
         write_json(root / "receipts" / "ship-prep.json", out)

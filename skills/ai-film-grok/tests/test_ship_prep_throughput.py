@@ -112,6 +112,63 @@ class ShortlistPromoteTests(unittest.TestCase):
 
 
 class ShipPrepTests(unittest.TestCase):
+    def test_ship_prep_includes_pk_compare_advisory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write(
+                root,
+                "film-spec.json",
+                {
+                    "title": "pk",
+                    "heat_scale": "soft",
+                    "h3": {"enabled": True},
+                    "director_intent": {"protagonist_want": "x"},
+                    "scenes": [
+                        {
+                            "shots": [
+                                {
+                                    "id": "s1",
+                                    "shot_role": "hero",
+                                    "heat_phase": "setup",
+                                    "dramatic_function": "reaction",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            )
+            takes = root / "takes" / "s1"
+            takes.mkdir(parents=True)
+            a = takes / "grok_a.mp4"
+            b = takes / "h3_i2v_b.mp4"
+            a.write_bytes(b"\x00" * 120_000)
+            b.write_bytes(b"\x00" * 150_000)
+            write_mean_sidecar(a, 12.0)
+            write_mean_sidecar(b, 22.0)
+            _write(root, "manifest.json", {"clips": {}, "stills": {}})
+            with mock.patch(
+                "workflow_pack.variety_precheck",
+                return_value={"ok": True, "issues": []},
+            ), mock.patch(
+                "cli_motion.i2v_motion_gate_from_rows",
+                return_value={"ok": True, "row_count": 1},
+            ), mock.patch(
+                "workflow_pack.film_core_closeout_audit",
+                return_value={"ok": True, "issues": []},
+            ):
+                rep = ship_prep(
+                    root, measure=False, promote=False, skip_variety=True
+                )
+            ids = [s["id"] for s in rep["steps"]]
+            self.assertIn("pk_compare", ids)
+            self.assertIn("fill_idle_pending", ids)
+            pk = next(s for s in rep["steps"] if s["id"] == "pk_compare")
+            self.assertTrue(pk.get("advisory"))
+            self.assertTrue(pk.get("human_required"))
+            self.assertGreaterEqual(int(pk.get("multi_take_count") or 0), 1)
+            self.assertTrue(rep.get("human_pk_required"))
+            self.assertTrue((root / "receipts" / "pk-compare-ship-prep.json").is_file())
+
     def test_ship_prep_steps_and_blocks_on_variety(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

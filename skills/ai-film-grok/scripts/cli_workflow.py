@@ -73,7 +73,10 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
     # ship-prep one-shot
     sp = sub.add_parser(
         "ship-prep",
-        help="Pre-delivery ladder: means → variety → shortlist → motion-gate → film_core",
+        help=(
+            "Pre-delivery ladder: means → variety → shortlist → pk(advisory) "
+            "→ motion-gate → film_core"
+        ),
     )
     sp.add_argument("--root", required=True)
     sp.add_argument("--no-measure", action="store_true", help="Skip ffmpeg mean scan")
@@ -86,6 +89,11 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
         "--skip-variety",
         action="store_true",
         help="Skip variety hard door (or set AIFILM_SKIP_VARIETY_PREFLIGHT=1)",
+    )
+    sp.add_argument(
+        "--skip-pk",
+        action="store_true",
+        help="Skip advisory pk-compare / fill-idle pending steps",
     )
 
     # gpu-lease
@@ -196,6 +204,7 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
                 measure=not bool(getattr(args, "no_measure", False)),
                 promote=not bool(getattr(args, "no_promote", False)),
                 skip_variety=bool(getattr(args, "skip_variety", False)),
+                skip_pk=bool(getattr(args, "skip_pk", False)),
             )
             _emit(report)
             return 0 if report.get("ok") else 2

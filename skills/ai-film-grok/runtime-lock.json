@@ -382,7 +382,7 @@
     },
     {
       "path": "scripts/cli_workflow.py",
-      "sha256": "a544608fe29989240b1f1bd58214fa241012a5186745dde77bfabbc3b7aace8c"
+      "sha256": "a0dc3d88b77779d2e9844a04a552eb9ec171a1a31b1bf260a2458eb8178578aa"
     },
     {
       "path": "scripts/cli_workshop.py",
@@ -1298,7 +1298,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "7ac383f406ac55e4c658d26153a4c2b71fa41b82df6d7755e68af8915f5b3f0b"
+      "sha256": "62f0fd8a5b12f10b76bc9453d199a6041506a3acb86763a94bd839eb7b490102"
     },
     {
       "path": "scripts/workflow_spine.py",
