@@ -337,5 +337,114 @@ class ContinueHandoffMetaTests(unittest.TestCase):
             )
 
 
+class ContinueHandoffReadTests(unittest.TestCase):
+    """Phase C · plan_h3_shot consumes previous endframe without overwriting stills."""
+
+    def _film(self, root: Path, *, continue_b: bool = True) -> None:
+        shots = [
+            {
+                "id": "a1",
+                "heat_phase": "act",
+                "dramatic_function": "action",
+                "shot_role": "hero",
+            },
+            {
+                "id": "b1",
+                "heat_phase": "act",
+                "dramatic_function": "action",
+                "shot_role": "hero",
+                "parent_shot_id": "a1",
+                "dsl": {"chain_mode": "continue" if continue_b else "cut"},
+            },
+        ]
+        if not continue_b:
+            shots[1].pop("parent_shot_id", None)
+            shots[1]["dsl"] = {"chain_mode": "cut"}
+        _write(
+            root,
+            "film-spec.json",
+            {
+                "title": "continue-test",
+                "h3": {"enabled": True},
+                "director_intent": {"protagonist_want": "escape"},
+                "scenes": [{"shots": shots}],
+            },
+        )
+
+    def test_plan_uses_prev_endframe_on_continue(self) -> None:
+        from h3_workflow import plan_h3_shot, resolve_continue_handoff
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._film(root, continue_b=True)
+            handoff = root / "receipts" / "continue-handoff"
+            handoff.mkdir(parents=True)
+            end = handoff / "a1_end.png"
+            end.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
+            _write(
+                root,
+                "receipts/continue-handoff/a1.json",
+                {
+                    "ok": True,
+                    "shot_id": "a1",
+                    "end_frame": str(end),
+                    "dramatic_function": "action",
+                },
+            )
+            resolved = resolve_continue_handoff(root, "b1")
+            self.assertTrue(resolved["ok"])
+            self.assertEqual(resolved["prev_shot_id"], "a1")
+            plan = plan_h3_shot(root, "b1")
+            self.assertEqual(plan.get("still_source"), "continue_handoff")
+            self.assertEqual(Path(plan["still_path"]).resolve(), end.resolve())
+            # must not invent stills/b1.png
+            self.assertFalse((root / "stills" / "b1.png").is_file())
+
+    def test_approved_still_not_overwritten(self) -> None:
+        from h3_workflow import resolve_continue_handoff
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._film(root, continue_b=True)
+            stills = root / "stills"
+            stills.mkdir(parents=True)
+            approved = stills / "b1.png"
+            approved.write_bytes(b"APPROVED")
+            handoff = root / "receipts" / "continue-handoff"
+            handoff.mkdir(parents=True)
+            end = handoff / "a1_end.png"
+            end.write_bytes(b"ENDFRAME")
+            _write(
+                root,
+                "receipts/continue-handoff/a1.json",
+                {"ok": True, "shot_id": "a1", "end_frame": str(end)},
+            )
+            with mock.patch.dict(os.environ, {"AIFILM_CONTINUE_COPY_STILL": "1"}):
+                resolved = resolve_continue_handoff(root, "b1")
+            self.assertTrue(resolved["ok"])
+            self.assertFalse(resolved.get("copied_to_stills"))
+            self.assertEqual(approved.read_bytes(), b"APPROVED")
+
+    def test_copy_still_only_when_missing_and_flag(self) -> None:
+        from h3_workflow import resolve_continue_handoff
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._film(root, continue_b=True)
+            handoff = root / "receipts" / "continue-handoff"
+            handoff.mkdir(parents=True)
+            end = handoff / "a1_end.png"
+            end.write_bytes(b"ENDFRAME")
+            _write(
+                root,
+                "receipts/continue-handoff/a1.json",
+                {"ok": True, "shot_id": "a1", "end_frame": str(end)},
+            )
+            with mock.patch.dict(os.environ, {"AIFILM_CONTINUE_COPY_STILL": "1"}):
+                resolved = resolve_continue_handoff(root, "b1")
+            self.assertTrue(resolved.get("copied_to_stills"))
+            self.assertTrue((root / "stills" / "b1.png").is_file())
+
+
 if __name__ == "__main__":
     unittest.main()

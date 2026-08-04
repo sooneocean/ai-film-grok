@@ -46,7 +46,7 @@
 
 **对白注入**：`audio_cues.spoken_text` 必写入 prompt（v2.34.1 起与 `receipts/prompts/*.i2v.txt` **合并**，不再被覆盖吃掉）。对白镜勿在自定义 prompt 写「no speech」。
 
-**续镜 SOP**：`h3 run A` → `ffmpeg -sseof -0.15` 抽末帧 → `stills/B.png` → `h3 run B --mode i2v`（接缝 L1≈7.7 已证）。
+**续镜 SOP（2.36.2）**：`h3 run A` 自动写 `receipts/continue-handoff/A_end.png` → 镜 B 设 `dsl.chain_mode=continue`（或 `parent_shot_id`）→ `h3 plan/run B --mode i2v` **自动读** endframe（**不覆盖**已批 `stills/B.png`）。可选 `AIFILM_CONTINUE_COPY_STILL=1` 仅在 still 空缺时复制。接缝 L1≈7.7 已证。
 
 ## CLI
 
@@ -93,6 +93,7 @@ dramatic_function → want_beat → action/motion/visible_change
 | `prompt_injector` I2V | 注入 spine + **assert 空核**；写 `*.grok.spine.txt` |
 | `i2v-motion-gate --root` | 自动 DF + mean → audit/final-gate（Phase B） |
 | closeout film_core | 审 `.motion/.h3/.grok` spine（advisory） |
+| continue-handoff | H3 写 endframe；下一镜 `chain_mode=continue` 自动读（Phase C；不覆盖 stills） |
 
 **prompt_tier**（进 prompt）：`soft` · `medium` · `high`（act/bare/action 加 HIGH MOTION）  
 **optical_tier**（mean 门）：soft≥10 · medium≥16 · normal≥18 · meat/high≥20  

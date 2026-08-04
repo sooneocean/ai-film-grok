@@ -670,7 +670,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "7482905f87d6adc0e22bfa17e810782db17ce5bbf96ccaa4a589bc4cdb85251a"
+      "sha256": "a05ec130aec39ea8506a58807640401ce8ebd1b5fb4a4b2656a1672d12c88c7c"
     },
     {
       "path": "scripts/heat_check.py",

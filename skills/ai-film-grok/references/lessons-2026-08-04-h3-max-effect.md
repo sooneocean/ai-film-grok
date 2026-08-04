@@ -54,13 +54,16 @@
 
 ## 续镜硬接 SOP
 
+**自动（2.36.2+）**：`h3 run s_a` 写 `receipts/continue-handoff/s_a_end.png`；`s_b` 设 `dsl.chain_mode=continue` 或 `parent_shot_id=s_a` → `h3 plan/run s_b` 自动用 endframe（**不覆盖**已批 stills）。
+
 ```bash
-# 1) 跑 A
+# 1) 跑 A（自动 handoff）
 aifilm h3 run --root "$ROOT" --shot-id s_a --mode i2v --register --no-queue
-# 2) 抽末帧作 B 的 still
-ffmpeg -y -sseof -0.15 -i takes/s_a/*_704x1280.mp4 -frames:v 1 stills/s_b.png
-# 3) 跑 B（prompt 写 CONTINUE from this exact end frame）
+# 2) film-spec: s_b.dsl.chain_mode=continue （或 parent_shot_id）
+aifilm h3 plan --root "$ROOT" --shot-id s_b   # still_source=continue_handoff
 aifilm h3 run --root "$ROOT" --shot-id s_b --mode i2v --register --no-queue
+# 可选：仅 still 空缺时复制
+# AIFILM_CONTINUE_COPY_STILL=1 aifilm h3 plan --root "$ROOT" --shot-id s_b
 ```
 
 ## 5090 运维（效果=稳定性）

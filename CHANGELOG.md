@@ -1,6 +1,23 @@
 # Changelog
 
+## [2.36.2] - 2026-08-04
+
+### Added (Motion Core deep integration · Phase C)
+- **Continue handoff read path:** `resolve_continue_handoff` + `plan_h3_shot` prefer previous `receipts/continue-handoff/<prev>_end.png` when `chain_mode=continue` or `parent_shot_id` set.
+- **Never overwrite approved stills;** optional fill only if `stills/<id>.png` missing and `AIFILM_CONTINUE_COPY_STILL=1`.
+- Plan surfaces `still_source` + `continue_handoff` packet for agents.
+
+### Tests
+- `ContinueHandoffReadTests` in `test_motion_core_p1.py`
+
 ## [2.36.1] - 2026-08-04
+
+### Added (Temple-AV dramatic meaning stack)
+- **`scripts/dramatic_meaning.py`**: pure gates for shot world-change, beat-serving motion, dialogue purpose (speaker+text+subtext/emotion), and `director_intent.emotional_arc` stacking (coverage + non-flat).
+- Stable codes: `SHOT_MEANING_EMPTY`, `DIALOGUE_PURPOSE_EMPTY` / `DIALOGUE_SPEAKER_MISSING` / `DIALOGUE_TEXT_EMPTY`, `ARC_STACK_FLAT` / `ARC_NODE_ORPHAN` / `ARC_STACK_NO_MAPPING` (+ reuses `MOTION_NO_MEANING` / `BEAT_SEMANTICS_MISS`).
+- Production path: `cinematic_audit` (write-spec) always fail-closes; `validate_film_spec` / `preflight` hard when `dramatic_meaning_strict` or `heat_scale=max` / `premium_vertical`.
+- Schema flag `dramatic_meaning_strict`; hard-defaults + meaningful-motion lesson pointers.
+- Tests: `tests/test_dramatic_meaning.py` (good pass / bad fail for all four outcomes + audit/preflight/API).
 
 ### Added (Motion Core deep integration · Phase B)
 - **`i2v-motion-gate --root`**: auto-collect rows from film-spec (DF/wardrobe/heat) + takes/audit means; `--rows` optional; `--root` alone writes receipts.
