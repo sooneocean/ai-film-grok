@@ -2,6 +2,9 @@
 
 ## [2.38.6] - 2026-08-04
 
+### Added (H3 FLF first+last frame · docs/tests closeout)
+- **FLF mode** already in runtime (`h3_mode`/`h3_media_pack`/`--last-frame`); docs: weapon-lane + memory; tests: `test_h3_flf_media_pack`.
+
 ### Added (Script value debrief · presentation-value pre-lock)
 - **`script_value_debrief.py`**: L0–L4 validate/score/seed/confirm/summary; soft missing / strict hard; pilot shortlist + beat→shot map.
 - **`aifilm plan debrief`**: `--action status|seed|write|confirm|validate` (human confirm via `--user-phrase`).

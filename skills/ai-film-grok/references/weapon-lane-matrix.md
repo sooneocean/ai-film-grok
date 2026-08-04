@@ -57,19 +57,25 @@ aifilm h3 plan --root "<film>" --shot-id s01 --still takes/s01/still_frw_*.png
 | 模式 | 一句话 | 用 | 不用 |
 |------|--------|----|------|
 | **I2V** | 定妆 still 动起来 | 主角、肉戏、反应镜、**续镜硬接** | 无 still；无脸垫片 |
-| **R2V** | 参考演一版 | 高能量、换构图、对白大嘴 ECU | 必须像素贴 still 时（优先 I2V） |
+| **FLF** | 首帧→尾帧插值（同 fl2va I2V + `last_frame`） | 位姿 A→B、卸装落点、插入对准、续镜+本镜终点 | 无可信 end still；反应微动 |
+| **R2V** | 参考演一版 | 高能量、换构图、对白大嘴 ECU | 必须像素贴 still 时（优先 I2V/FLF） |
 | **T2V** | 纯文生 | 无脸 env/bridge | **任何锁脸 hero** |
 
 **自动选型（v2.37.3 · `scripts/h3_mode.py` · `resolve_h3_mode`）**：写进 `h3 plan` / `h3 list`。
 
 | 优先级 | 条件 | mode |
 |--------|------|------|
-| 1 | `shot.h3_mode` / `operation` 显式 | 该值 |
-| 2 | `chain_mode=continue` / parent 续镜 | **i2v** |
-| 3 | `shot_role=env|bridge` | **t2v** |
-| 4 | insert + still | **i2v**（alt r2v） |
-| 5 | restricted + 对白 CU/ECU；或 high + 高难度 flag；`force_r2v` | **r2v**（alt i2v） |
-| 6 | 默认有 still | **i2v**（高动 soft → `alt_mode=r2v`） |
+| 1 | `shot.h3_mode` / `operation` 显式 | 该值（`flf` 无 last → 回退 i2v） |
+| 2 | `chain_mode=continue` + **有 last** | **flf** |
+| 3 | `chain_mode=continue` 无 last | **i2v** |
+| 4 | `shot_role=env|bridge` | **t2v** |
+| 5 | insert + first+last | **flf** |
+| 6 | insert + still only | **i2v**（alt r2v） |
+| 7 | restricted + 对白 CU/ECU；或 high + 高难度 flag；`force_r2v` | **r2v**（alt flf/i2v） |
+| 8 | 有 still **且** 有 last（`stills/<id>_end.png` / `--last-frame`） | **flf** |
+| 9 | 默认有 still | **i2v**（高动 soft → `alt_mode=r2v`） |
+
+**FLF 用法**：`aifilm h3 plan|run --last-frame PATH` 或约定 `stills/<shot>_end.png`；receipt 含 `media_pack` / `last_path`。
 
 `list` 每行带 `mode`/`command`/`alt_mode`；`plan` 带 `mode_resolve` + `effect_tips` + `command_alt`。CLI `--mode` 可覆盖。
 
