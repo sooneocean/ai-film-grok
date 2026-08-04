@@ -223,9 +223,7 @@ def run_cinematic_gate(
                     auto_from_root=True,
                 )
                 auto_ok = bool(mg.get("ok"))
-                detail = (
-                    f"auto-wrote gate ok={auto_ok} rows={mg.get('row_count')}"
-                )
+                detail = f"auto-wrote gate ok={auto_ok} rows={mg.get('row_count')}"
                 codes = list((mg.get("gate") or {}).get("codes") or []) or (
                     [] if auto_ok else ["I2V_FINAL_GATE_NOT_OK"]
                 )

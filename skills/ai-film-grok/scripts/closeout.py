@@ -528,8 +528,7 @@ def closeout_run(
                         "stopped_at": "cinematic_gate",
                         "ran": ran,
                         "cinematic_gate": report,
-                        "next_cmd": report.get("next_cmd")
-                        or f'aifilm gate-auto --root "{base}"',
+                        "next_cmd": report.get("next_cmd") or f'aifilm gate-auto --root "{base}"',
                         "required_proof": "receipts/cinematic-gate.json ok=true",
                     }
                     if write_receipt:

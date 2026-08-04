@@ -278,7 +278,7 @@
     },
     {
       "path": "scripts/cinematic_gate.py",
-      "sha256": "f00183559484728154a34c82310bc1852162dd69fc73a1d57e85cc99f0f9aff5"
+      "sha256": "2a01e1f5e28737fc7850f1b9a3bdb13b9ea4ef055dd1e92db693c86dd668eaee"
     },
     {
       "path": "scripts/cli/__init__.py",
@@ -410,7 +410,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "cf4df34deb842cb1c5854ef54d668cfe602436ad35738e75ccd0c5fd8aa5a2c7"
+      "sha256": "8b99f93187bd8b1bea656887d36e76f7d5c953765305498e12ad74bd356305f1"
     },
     {
       "path": "scripts/cloud_media_download.py",
