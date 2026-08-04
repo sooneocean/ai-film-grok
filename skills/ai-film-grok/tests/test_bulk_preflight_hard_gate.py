@@ -75,9 +75,7 @@ class BulkPreflightHardGateTests(unittest.TestCase):
                         ):
                             with mock.patch(
                                 "workflow_pack.assert_bulk_preflight",
-                                side_effect=WorkflowPackError(
-                                    "bulk preflight failed: pilot"
-                                ),
+                                side_effect=WorkflowPackError("bulk preflight failed: pilot"),
                             ):
                                 q = MediaQueue(root, budget_units=5)
                                 with self.assertRaises(QueueError) as ctx:

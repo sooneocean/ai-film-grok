@@ -27,33 +27,32 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 八环/11-stage=内部；规则 `hard-defaults`；context 只 stages。
 
 小说/剧本：[receive](references/story-reception.md)→[debrief](references/script-value-debrief.md)→`plan run`→`fidelity check`；lock 须确认。  
-会诊：[creative-workshop](references/creative-workshop.md)（编译；`apply` 写图）。  
-长片：`plan run --production-mode longform`；[longform](references/longform-workflow.md)
+会诊：[creative-workshop](references/creative-workshop.md)。长片：`plan run --production-mode longform`；[longform](references/longform-workflow.md)
 
 ## P0
 
-1. **真相**：graph 真、spec 投影；locks+hash 齐再媒体；先 Director’s Lens（[guide](references/directors-lens.md)·[lesson](references/lessons-2026-07-20-directors-lens.md)）。
+1. **真相**：graph 真、spec 投影；locks+hash 齐再媒体；先 Director’s Lens（[guide](references/directors-lens.md)）。
 2. **对白主链**：讲话镜=FRW LTX 2.3 I2V；[workflow](references/dialogue-first-workflow.md)
 3. **身份介质**：锁 medium/cast/face；still 只改已批源；moderated 禁 `image_gen` 绕脸；漫剧 manhua。
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
-5. **连续性**：`state-index check|plan|approve-state` 先于 bulk；衣着只前进（wardrobe ladder 逐件 I2I）；Continue 硬接批准末帧。
-6. **审批/用量**：pilot 用户批；付费绑 hash/预算；`generation-usage.json`；human/paid/external 暂停。
-7. **动作**：Grok bulk→LTX 对白；**`hybrid_h3`** meat→5090 H3（pilot 批）。**有 end still→FLF first+last 主轨**；无 last→I2V；R2V 高动且 last 作 pose land ref；T2V 无脸；续镜末帧 first（+last→FLF）；**Fill-Idle** P0→P2。弱 take 可先 **FRW i2i still-challenge** 再 I2V/FLF/R2V。禁 Seedance/Wan。[h3-max](references/lessons-2026-08-04-h3-max-effect.md)·[flf](memory/2026-08-04-h3-flf-first-last.md)·[fill-idle](memory/2026-08-04-h3-fill-idle-challenge.md)·[矩阵](references/weapon-lane-matrix.md)
-8. **声线·对白优先（中文唯一）**：**口白=中文 only**（`dialogue_spoken_lang=zh`；禁 `ja`/`dialogue_ja`/`ja-JP-*`）；**场硬闸=每场≥1 on/off_camera 台词；无对白场拒收**；对白镜=说话者主体；肉戏对白走 H3 i2v/r2v。Edge；BGM=rnb。[对白](references/dialogue-first-workflow.md)
-9. **成人 MAX**：肉戏≥50%·亲密≥60%·setup≤20%；extreme；四拍+bare；禁静默降 heat。[playbook](references/adult-max-playbook.md)
+5. **连续性**：`state-index` 先于 bulk；衣着只前进；Continue 硬接批准末帧。
+6. **审批/用量**：pilot 用户批；付费绑 hash/预算；human/paid/external 暂停。
+7. **动作**：Grok bulk→LTX 对白；**`hybrid_h3`** meat→H3。有 end still→FLF；无 last→I2V；R2V 高动；T2V 无脸；**Fill-Idle** P0→P2。禁 Seedance/Wan。[矩阵](references/weapon-lane-matrix.md)
+8. **声线（中文唯一）**：口白=中文；每场≥1 台词；Edge；BGM=rnb。[对白](references/dialogue-first-workflow.md)
+9. **成人 MAX**：肉戏≥50%·亲密≥60%·setup≤20%；extreme；四拍+bare。[playbook](references/adult-max-playbook.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V。
-10. **字幕**：`caption_mode`+`caption_text` 中文；`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)；Ship=PIL 像素硬烧。
-11. **后期单责**：title/sub/end 正式链单引擎；plate 默认可 `subs=off`（plate-cards blank 字已硬烧或 HF 后烧）。[title-double-burn](references/lessons-2026-07-20-title-double-burn.md)
-11b. **连载**：`serial validate`；圣经/事件/钩子可审计。[workflow](references/serial-narrative-workflow.md)
-12. **完成**：`final`≠`final_complete`；review/audit/字幕/export 齐；**`gate-auto`/`cinematic-gate` 绿** 才桌面 export（机读过闸，禁人工点闸循环）。
-13. **安全**：凭据本机；日志禁 token/prompt；外部不自动重试花费。
+10. **字幕**：`caption_mode`+`caption_text` 中文硬烧；`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)
+11. **后期单责**：title/sub/end 单引擎；plate 可 `subs=off`。
+11b. **连载**：`serial validate`。[workflow](references/serial-narrative-workflow.md)
+12. **完成**：`final`≠`final_complete`；**`gate-auto`/`cinematic-gate` 绿** 才 export（机读过闸，禁手点循环）。
+13. **安全**：凭据本机；日志禁 token；外部不自动重试花费。
 14. **高动**：mean≥18、肉戏≥20；桌面 final 仅 motion-gate ok。
 15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
-16. **5090**：未锁视觉走 `weapon_route`；未验 fail closed。本机仅 1×`comfy_video`；禁 pgrep 自杀。[oom](references/lessons-2026-07-29-comfy-multifilm-contention-oom.md)
-17. **口型**：默认 off；近景对白须人批后 LatentSync→MuseTalk，质差禁切 FRW。[lipsync](references/lipsync.md)
-18. **零旁白 IRON**：`dialogue_drama` 默认 `zero_narration_strict:true`；`nar` 占比硬底 0%；替代=对白/道具特写/Foley。[详情](references/hard-defaults.md)
-19. **DP 光影+5-Track**：景别自动注入焦段/三点式光影/Teal&Orange；对白三相表演（Pre-Speech·口型·Afterglow）；5-Track DX/FX/BG/MX/SUB；-16 LUFS。[optics](references/hollywood-optics-prompts.md)·[5track](references/5track-audio-master.md)
-20. **真片+电影闸（α–ε + gate-auto）**：**运镜只在 Grok I2V / H3 生成视频内**；still 永不进 timeline。`dialogue_drama` 默认 VO-fit。**`aifilm gate-auto`** 一键机写：mean→i2v-final→sex_sfx→five-track→true-video→variety→cinematic；closeout 红时自动跑。仅 pilot / 多 take PK / review-final 仍须人。见 [memory](memory/2026-08-04-gate-auto.md)·[cinematic-ship](memory/2026-08-04-cinematic-ship-closeout.md)
+16. **5090**：未锁视觉走 `weapon_route`；本机 1×`comfy_video`；禁 pgrep 自杀。
+17. **口型**：默认 off；近景对白人批后 LatentSync→MuseTalk。[lipsync](references/lipsync.md)
+18. **零旁白 IRON**：`dialogue_drama` 默认 `zero_narration_strict`；`nar` 硬底 0%。
+19. **DP+5-Track**：焦段/三点光；DX/FX/BG/MX/SUB；-16 LUFS。[5track](references/5track-audio-master.md)
+20. **真片+gate-auto**：**运镜只在 Grok/H3 视频内**；still 不进 timeline。`aifilm gate-auto` 机写 mean→i2v-final→sex_sfx→five-track→true-video→variety→cinematic。仅 pilot / 多 take PK / review-final 须人。[memory](memory/2026-08-04-gate-auto.md)
 
 ## 阶段
 
@@ -68,14 +67,12 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" fidelity apply --root "<film>"; "$AIFILM" design-go --root "<film>"
 "$AIFILM" pilot pack --root "<film>"
 "$AIFILM" bulk-preflight --root "<film>"
-# 用户批准后 bulk → 交付闸 → final
+# 用户批准后 bulk → gate-auto → final
 "$AIFILM" ship-prep --root "<film>"
-"$AIFILM" gate-auto --root "<film>"   # 机读过闸（优先于手工 cinematic-gate）
-"$AIFILM" cinematic-gate --root "<film>"  # 只读复核；auto_i2v 默开
-"$AIFILM" final --root "<film>" --post-engine hyperframes --lipsync off --music-mood rnb --tts-backend edge
-"$AIFILM" closeout run --root "<film>"   # 红时自动 gate-auto
-"$AIFILM" review-final --root "<film>"   # 仍须人审
-# export-desktop 要求 cinematic-gate + i2v-final-gate + post-audit 齐绿
+"$AIFILM" gate-auto --root "<film>"
+"$AIFILM" final --root "<film>" --post-engine hyperframes --music-mood rnb --tts-backend edge
+"$AIFILM" closeout run --root "<film>"
+"$AIFILM" review-final --root "<film>"
 ```
 
-深挖：[hard-defaults](references/hard-defaults.md) · [stages/deliver](references/stages/deliver.md) · [5track](references/5track-audio-master.md) · [weapon-lane](references/weapon-lane-matrix.md)
+深挖：[hard-defaults](references/hard-defaults.md) · [deliver](references/stages/deliver.md) · [5track](references/5track-audio-master.md) · [weapon-lane](references/weapon-lane-matrix.md)

@@ -128,9 +128,7 @@ def test_dialogue_drama_rejects_storyteller_nar() -> None:
         "screen_mode": "action_cover",
         "beat_id": "b1",
         "nar": "话说她把门落锁。",
-        "audio_cues": [
-            {"kind": "silence", "start_offset_sec": 0, "duration_sec": 3}
-        ],
+        "audio_cues": [{"kind": "silence", "start_offset_sec": 0, "duration_sec": 3}],
         "dsl": {
             "subject": "woman",
             "action": "close door carefully",
@@ -159,7 +157,9 @@ def test_dialogue_drama_rejects_storyteller_nar() -> None:
             }
         ],
     }
-    with pytest.raises(FilmSpecError, match="NAR_BUDGET_VIOLATION|forbids third-person storyteller nar"):
+    with pytest.raises(
+        FilmSpecError, match="NAR_BUDGET_VIOLATION|forbids third-person storyteller nar"
+    ):
         validate_film_spec(spec, assign_missing_ids=False)
 
 

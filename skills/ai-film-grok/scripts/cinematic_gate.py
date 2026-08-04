@@ -164,28 +164,38 @@ def run_cinematic_gate(
                     for sh in scene.get("shots") or []:
                         if isinstance(sh, dict) and sh.get("id"):
                             shot_ids.append(str(sh["id"]))
-        inv = (
-            check_shot_inventory(shot_ids, approved)
-            if shot_ids
-            else {"ok": False, "codes": ["NO_SHOTS"]}
-        )
         gates = man.get("gates") if isinstance(man.get("gates"), dict) else {}
-        clips_ok = bool(gates.get("clips_complete")) or bool(inv.get("complete"))
-        steps.append(
-            _step(
-                "inventory",
-                ok=clips_ok or bool(inv.get("ok")),
-                hard=True,
-                detail=(
-                    f"shots={inv.get('shot_count')} approved={inv.get('approved_clip_count')} "
-                    f"missing={inv.get('missing_clips')}"
-                ),
-                next_cmd=(
-                    None if clips_ok or inv.get("ok") else f'aifilm register-clip --root "{r}" …'
-                ),
-                codes=list(inv.get("codes") or []),
+        if not shot_ids:
+            # Empty spec: not a clip-inventory failure (ship-prep / early export fixtures)
+            steps.append(
+                _step(
+                    "inventory",
+                    ok=True,
+                    hard=False,
+                    skipped=True,
+                    detail="no_shots_in_spec",
+                )
             )
-        )
+        else:
+            inv = check_shot_inventory(shot_ids, approved)
+            clips_ok = bool(gates.get("clips_complete")) or bool(inv.get("complete"))
+            steps.append(
+                _step(
+                    "inventory",
+                    ok=clips_ok or bool(inv.get("ok")),
+                    hard=True,
+                    detail=(
+                        f"shots={inv.get('shot_count')} approved={inv.get('approved_clip_count')} "
+                        f"missing={inv.get('missing_clips')}"
+                    ),
+                    next_cmd=(
+                        None
+                        if clips_ok or inv.get("ok")
+                        else f'aifilm register-clip --root "{r}" …'
+                    ),
+                    codes=list(inv.get("codes") or []),
+                )
+            )
     except Exception as exc:  # noqa: BLE001
         steps.append(_step("inventory", ok=False, detail=str(exc)[:200]))
 

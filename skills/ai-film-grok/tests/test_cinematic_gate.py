@@ -37,7 +37,8 @@ def test_gate_writes_receipt(tmp_path: Path) -> None:
             {
                 "vo_mode": "storyteller",
                 "dramatic_meaning_strict": False,
-                "scenes": [{"shots": []}],
+                # shot present without approved clip → inventory hard red
+                "scenes": [{"shots": [{"id": "s1", "dsl": {"motion": "walks"}}]}],
             }
         ),
         encoding="utf-8",
@@ -50,10 +51,9 @@ def test_gate_writes_receipt(tmp_path: Path) -> None:
     )
     assert (tmp_path / "receipts" / "cinematic-gate.json").is_file()
     assert "steps" in rep
-    # empty inventory → not ok
-    assert rep["ok"] is False or any(
-        s.get("id") == "inventory" and not s.get("ok") for s in rep["steps"]
-    )
+    inv = next(s for s in rep["steps"] if s["id"] == "inventory")
+    assert inv["ok"] is False
+    assert rep["ok"] is False
 
 
 def test_true_video_step_flags_still(tmp_path: Path) -> None:
@@ -88,9 +88,7 @@ def test_true_video_step_flags_still(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    rep = run_cinematic_gate(
-        tmp_path, write=False, skip_variety=True, skip_five_track=True
-    )
+    rep = run_cinematic_gate(tmp_path, write=False, skip_variety=True, skip_five_track=True)
     tv = next(s for s in rep["steps"] if s["id"] == "true_video")
     assert tv["ok"] is False
 
@@ -98,12 +96,23 @@ def test_true_video_step_flags_still(tmp_path: Path) -> None:
 def test_assert_export_blocks_when_red(tmp_path: Path) -> None:
     (tmp_path / "receipts").mkdir(parents=True)
     (tmp_path / "receipts" / "cinematic-gate.json").write_text(
-        json.dumps({"ok": False, "blocked_by": "true_video"}),
+        json.dumps({"ok": False, "blocked_by": "inventory"}),
         encoding="utf-8",
     )
-    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
-    (tmp_path / "film-spec.json").write_text("{}", encoding="utf-8")
-    # re-run will still be red (empty project)
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({"clips": {}, "gates": {}}), encoding="utf-8"
+    )
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "vo_mode": "storyteller",
+                "dramatic_meaning_strict": False,
+                "scenes": [{"shots": [{"id": "s1", "dsl": {"motion": "walks"}}]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    # re-run still red: shot without approved clip
     with pytest.raises(CinematicGateError):
         assert_cinematic_gate_for_export(tmp_path)
 

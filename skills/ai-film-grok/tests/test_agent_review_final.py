@@ -67,7 +67,9 @@ def _write_minimal_film(root: Path, *, sha: str = "a" * 64) -> None:
         ),
         encoding="utf-8",
     )
-    (root / "out" / "final.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nhi\n", encoding="utf-8")
+    (root / "out" / "final.srt").write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\nhi\n", encoding="utf-8"
+    )
 
 
 class AgentReviewFinalCore(unittest.TestCase):
@@ -155,9 +157,7 @@ class AgentReviewFinalApply(unittest.TestCase):
             root = Path(tmp)
             _write_minimal_film(root)
             with self.assertRaises(AgentReviewFinalError):
-                apply_agent_review_final(
-                    root, reviewer="dex", user_phrase="agent self-approve"
-                )
+                apply_agent_review_final(root, reviewer="dex", user_phrase="agent self-approve")
 
     def test_apply_dry_run_with_ok_phrase(self) -> None:
         from agent_review_final import apply_agent_review_final
@@ -214,9 +214,7 @@ class AgentReviewFinalPolicy(unittest.TestCase):
                 "approval_class": "none",
                 "argv": ["agent-review-final", "--root", str(root)],
             }
-            policy, argv = _validate_argv(
-                root=root, action_id="agent-review-final", action=action
-            )
+            policy, argv = _validate_argv(root=root, action_id="agent-review-final", action=action)
             self.assertEqual(policy.prefix, ("agent-review-final",))
             self.assertEqual(argv[0], "agent-review-final")
 

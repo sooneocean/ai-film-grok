@@ -62,9 +62,7 @@ class FocalDpTests(unittest.TestCase):
 
 class ContinueSharedTests(unittest.TestCase):
     def test_wants_continue(self) -> None:
-        self.assertTrue(
-            shot_wants_continue({"dsl": {"chain_mode": "continue"}})
-        )
+        self.assertTrue(shot_wants_continue({"dsl": {"chain_mode": "continue"}}))
         self.assertTrue(shot_wants_continue({"parent_shot_id": "a1"}))
         self.assertFalse(shot_wants_continue({"dsl": {"chain_mode": "cut"}}))
 
@@ -80,9 +78,7 @@ class ContinueSharedTests(unittest.TestCase):
             )
             self.assertFalse(meta["ok"])
             self.assertEqual(meta["engine"], "grok")
-            self.assertTrue(
-                (root / "receipts" / "continue-handoff" / "a1.json").is_file()
-            )
+            self.assertTrue((root / "receipts" / "continue-handoff" / "a1.json").is_file())
 
     def test_resolve_uses_prev_endframe(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -97,9 +97,7 @@ def test_plan_sex_sfx_covered(tmp_path: Path) -> None:
         "vo_mode": "dialogue_drama",
         "heat_scale": "max",
         "sound_plan": {
-            "events": [
-                {"type": "sfx_accent", "shot_id": "m1", "sex_sfx": True, "kind": "impact"}
-            ]
+            "events": [{"type": "sfx_accent", "shot_id": "m1", "sex_sfx": True, "kind": "impact"}]
         },
         "scenes": [
             {
@@ -125,13 +123,7 @@ def test_audit_raises_when_enabled_and_bad(tmp_path: Path) -> None:
         "vo_mode": "dialogue_drama",
         "heat_scale": "max",
         "sound_plan": {"events": []},
-        "scenes": [
-            {
-                "shots": [
-                    {"id": "m1", "heat_phase": "climax", "dsl": {"motion": "peak"}}
-                ]
-            }
-        ],
+        "scenes": [{"shots": [{"id": "m1", "heat_phase": "climax", "dsl": {"motion": "peak"}}]}],
     }
     (tmp_path / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
     with pytest.raises(FiveTrackError):

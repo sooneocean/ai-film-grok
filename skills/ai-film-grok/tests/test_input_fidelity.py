@@ -228,9 +228,7 @@ class FidelityApplyAndPromptTests(unittest.TestCase):
             root = Path(tmp)
             write_json(
                 root / "film-spec.json",
-                _spec_with_shots(
-                    ["角色走近", "灯影摇晃", "街角无人", "夜色更深"]
-                ),
+                _spec_with_shots(["角色走近", "灯影摇晃", "街角无人", "夜色更深"]),
             )
             write_json(
                 root / "receipts" / "story-reception.json",

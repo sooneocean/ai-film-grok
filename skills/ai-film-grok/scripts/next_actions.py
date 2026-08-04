@@ -653,18 +653,12 @@ def build_next_actions(
                 f'aifilm i2v-motion-gate --root "{r}" --write',
                 "clips 齐 — 先 i2v-motion-gate（--root 自动 DF）再 final/closeout",
             )
-        # Wave ε · prefer gate-auto (machine measure+write) then cinematic
+        # Wave ε · gate-auto absorbs cinematic (one slot; no dual add — actions capped at 8)
         if cin_rec.get("ok") is not True or gate_rec.get("ok") is not True:
             add(
                 "gate-auto",
                 f'aifilm gate-auto --root "{r}"',
                 "clips 齐 — gate-auto 自动测 mean/写 i2v-final/sex_sfx/cinematic（无需人工点闸）",
-            )
-        if cin_rec.get("ok") is not True:
-            add(
-                "cinematic-gate",
-                f'aifilm cinematic-gate --root "{r}"',
-                "clips 齐 — cinematic-gate（true-video/variety/five-track/i2v）再 final",
             )
         # Wave H: multi-take shortlist before post when takes exist
         sel_rec = read_json(root / "receipts" / "select-shortlist.json") or {}

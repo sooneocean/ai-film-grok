@@ -298,12 +298,26 @@ class ShipPrepTests(unittest.TestCase):
             _write(
                 root,
                 "manifest.json",
-                {"clips": {"s1": {"path": "clips/s1.mp4"}}},
+                {
+                    "clips": {
+                        "s1": {
+                            "path": "clips/s1.mp4",
+                            "status": "approved",
+                            "source_endpoint": "image_to_video",
+                        }
+                    },
+                    "gates": {"clips_complete": True},
+                },
             )
             _write(
                 root,
                 "receipts/prompts/s1.grok.spine.txt",
                 "Dramatic function: reaction\nThis beat advances want (reaction): leave\n",
+            )
+            _write(
+                root,
+                "receipts/i2v-final-gate.json",
+                {"ok": True, "schema_version": 1, "kind": "i2v-final-gate"},
             )
             with mock.patch(
                 "workflow_pack.variety_precheck",
@@ -313,7 +327,11 @@ class ShipPrepTests(unittest.TestCase):
                     "cli_motion.i2v_motion_gate_from_rows",
                     return_value={"ok": True, "row_count": 1},
                 ):
-                    rep = ship_prep(root, measure=False, promote=False, skip_variety=False)
+                    with mock.patch(
+                        "true_video_policy.scan_manifest_true_video",
+                        return_value={"ok": True, "checked": 1, "violations": []},
+                    ):
+                        rep = ship_prep(root, measure=False, promote=False, skip_variety=False)
             self.assertTrue(rep["ok"], rep)
             self.assertTrue((root / "receipts" / "ship-prep.json").is_file())
 

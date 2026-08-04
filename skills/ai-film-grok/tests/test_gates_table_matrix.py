@@ -30,6 +30,7 @@ from production_gates import ProductionGateError, assert_heat_allows_final  # no
 
 # ── meaning_gate_enabled ─────────────────────────────────────────────────────
 
+
 @pytest.mark.parametrize(
     "spec,env_skip,expected",
     [
@@ -71,6 +72,7 @@ def test_meaning_gate_table(spec, env_skip, expected) -> None:
 
 
 # ── zero_narration_gate ──────────────────────────────────────────────────────
+
 
 def _zn_spec(
     *,
@@ -166,6 +168,7 @@ def test_zero_narration_table(builder_kwargs, expect_ok, expect_code) -> None:
 
 # ── motion ship (export gate) ────────────────────────────────────────────────
 
+
 class MotionShipGateTableTests(unittest.TestCase):
     def test_motion_ship_matrix(self) -> None:
         cases = [
@@ -184,11 +187,7 @@ class MotionShipGateTableTests(unittest.TestCase):
                         (root / "receipts" / "i2v-final-gate.json").write_text(
                             json.dumps(payload), encoding="utf-8"
                         )
-                    env = (
-                        {"AIFILM_SKIP_I2V_MOTION_GATE": "1"}
-                        if env_skip
-                        else {}
-                    )
+                    env = {"AIFILM_SKIP_I2V_MOTION_GATE": "1"} if env_skip else {}
                     with mock.patch.dict(os.environ, env, clear=False):
                         if not env_skip:
                             os.environ.pop("AIFILM_SKIP_I2V_MOTION_GATE", None)
@@ -201,6 +200,7 @@ class MotionShipGateTableTests(unittest.TestCase):
 
 
 # ── heat final gate (production_gates) ───────────────────────────────────────
+
 
 class HeatFinalGateTableTests(unittest.TestCase):
     def test_heat_final_matrix(self) -> None:
@@ -237,9 +237,7 @@ class HeatFinalGateTableTests(unittest.TestCase):
             with self.subTest(status=status):
                 with tempfile.TemporaryDirectory() as tmp:
                     root = Path(tmp)
-                    with mock.patch(
-                        "heat_check.heat_agent_status", return_value=status
-                    ):
+                    with mock.patch("heat_check.heat_agent_status", return_value=status):
                         if err_sub:
                             with self.assertRaises(ProductionGateError) as ctx:
                                 assert_heat_allows_final(root, env_skip=False)

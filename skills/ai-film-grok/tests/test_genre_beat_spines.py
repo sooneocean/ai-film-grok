@@ -103,9 +103,7 @@ class TestGenreSpineStructure:
                 continue
             spine = load_spine(g)
             total = sum(float(b.get("weight", 0)) for b in spine)
-            assert 0.95 <= total <= 1.05, (
-                f"genre '{g}' weights sum={total:.3f}, expected ~1.0"
-            )
+            assert 0.95 <= total <= 1.05, f"genre '{g}' weights sum={total:.3f}, expected ~1.0"
 
     def test_spine_has_required_keys(self):
         required = {"key", "dramatic_function", "importance", "objective", "weight", "shots_n"}
@@ -115,9 +113,7 @@ class TestGenreSpineStructure:
             spine = load_spine(g)
             for beat in spine:
                 missing = required - set(beat.keys())
-                assert not missing, (
-                    f"genre '{g}' beat '{beat.get('key')}' missing keys: {missing}"
-                )
+                assert not missing, f"genre '{g}' beat '{beat.get('key')}' missing keys: {missing}"
 
 
 # ---------------------------------------------------------------------------

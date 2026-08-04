@@ -79,9 +79,7 @@ def _action_cover_shot(sid: str, beat: str) -> dict:
         "screen_mode": "action_cover",
         "beat_id": beat,
         # no nar — storyteller gate forbids bare nar without matching narration voice cue
-        "audio_cues": [
-            {"kind": "silence", "start_offset_sec": 0, "duration_sec": 3}
-        ],
+        "audio_cues": [{"kind": "silence", "start_offset_sec": 0, "duration_sec": 3}],
         "dsl": {
             "subject": "her hand",
             "action": "fingers trail along fabric",
@@ -103,9 +101,7 @@ def _silence_shot(sid: str) -> dict:
         # NOTE: "nar" omitted entirely — in dialogue_drama a silence shot has no voice cue
         # and any non-empty nar would trip the third-person storyteller gate. Omit nar so
         # validate_nar_budget is skipped and est_vo_sec is zeroed.
-        "audio_cues": [
-            {"kind": "silence", "start_offset_sec": 0, "duration_sec": 2}
-        ],
+        "audio_cues": [{"kind": "silence", "start_offset_sec": 0, "duration_sec": 2}],
         "dsl": {
             "subject": "rain on window",
             "action": "rain streaks the glass",

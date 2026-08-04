@@ -573,6 +573,6 @@ def test_api_import_and_return_values():
     assert isinstance(motion["codes"], list)
     assert motion["ok"] is False
     stack = lint_emotional_arc_stack([], emotional_arc=["a", "b", "c"])
-    assert stack["ok"] is True or CODE_ARC_STACK_NO_MAPPING in stack["codes"] or stack.get(
-        "skipped"
+    assert (
+        stack["ok"] is True or CODE_ARC_STACK_NO_MAPPING in stack["codes"] or stack.get("skipped")
     )

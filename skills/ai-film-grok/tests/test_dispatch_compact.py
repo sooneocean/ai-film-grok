@@ -105,9 +105,7 @@ def test_compact_projects_professional_workflow_to_one_public_phase() -> None:
     assert compact["phase"]["id"] == "post_master"
     assert compact["phase"]["label_zh"] == "后期母版"
     assert compact["required_proof"] == "字幕、混音、最终审片与 post-audit 均绑定当前成片"
-    assert compact["optional_actions"] == [
-        {"id": "post-audit", "why": "审片后再做当前版本审计"}
-    ]
+    assert compact["optional_actions"] == [{"id": "post-audit", "why": "审片后再做当前版本审计"}]
     assert compact["blocked_by"] == [
         {
             "code": "HUMAN_APPROVAL_REQUIRED",

@@ -22,6 +22,7 @@ from dialogue_benchmark_queue import (  # noqa: E402
 from runtime_policy import sha256  # noqa: E402
 from util import write_json  # noqa: E402
 
+
 def _fixture(root: Path) -> None:
     write_json(root / "dialogue-scene-package.json", {"kind": "dialogue-scene-package"})
     write_json(

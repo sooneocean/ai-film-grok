@@ -483,7 +483,7 @@ def test_speaking_shot_selects_infinite_talk_and_exposes_grok_audio_linked_secon
                 },
                 "tts": {
                     "status": "final",
-                    "language": "ja",
+                    "language": "zh",
                     "audio_sha256": "b" * 64,
                 },
             }
@@ -500,9 +500,9 @@ def test_speaking_shot_selects_infinite_talk_and_exposes_grok_audio_linked_secon
                 shot_roles=["hero"],
             ),
             _capability(
-                "edge-ja",
+                "edge-zh",
                 provider="edge",
-                model="edge-ja",
+                model="edge-zh",
                 operations=["text_to_speech"],
                 shot_roles=["hero"],
             ),
@@ -536,7 +536,7 @@ def test_speaking_shot_selects_infinite_talk_and_exposes_grok_audio_linked_secon
 
     report = explain_route(tmp_path, shot_id="line01", now=NOW)
 
-    assert report["ok"] is True
+    assert report["ok"] is True, report
     assert report["selected"]["capability_id"] == "infinitetalk"
     assert report["selected"]["dialogue_motion_route"] == "infinite_talk"
     assert report["selected"]["route_chain"] == ["infinitetalk"]

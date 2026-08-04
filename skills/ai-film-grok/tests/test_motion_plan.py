@@ -19,6 +19,8 @@ class MotionPlanTests(unittest.TestCase):
             (root / "film-spec.json").write_text(
                 json.dumps(
                     {
+                        # Explicit panel package — Ken Burns only legal when panel
+                        "production_mode": "panel",
                         "scenes": [
                             {
                                 "shots": [
@@ -29,7 +31,7 @@ class MotionPlanTests(unittest.TestCase):
                                     }
                                 ]
                             }
-                        ]
+                        ],
                     }
                 ),
                 encoding="utf-8",

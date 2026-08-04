@@ -143,6 +143,9 @@ def test_desktop_export_copies_production_report_artifacts(tmp_path: Path) -> No
     (root / "receipts" / "i2v-final-gate.json").write_text(
         '{"ok": true, "schema_version": 1, "kind": "i2v-final-gate"}'
     )
+    (root / "receipts" / "cinematic-gate.json").write_text(
+        '{"ok": true, "schema_version": 1, "kind": "cinematic-gate", "desktop_export_allowed": true}'
+    )
     (dirs["out"] / "production-report.html").write_text("<h1>report</h1>")
     (root / "receipts" / "production-report.json").write_text('{"kind":"production-report"}')
     final = dirs["out"] / "custom-final.mp4"

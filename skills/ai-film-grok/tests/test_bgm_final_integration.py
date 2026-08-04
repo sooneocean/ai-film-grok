@@ -13,7 +13,7 @@ import pytest
 from aifilm_grok import _commit_selected_bgm_usage, build_parser, cmd_init
 from bgm_library import approve_candidate, stage_candidate
 from cli_bgm_library import cmd_bgm_library
-from render_final import RenderError, render_music_template_timeline
+from render_final_music import RenderError, render_music_template_timeline
 
 
 def _wav(path: Path, frequency: float = 220.0, duration: float = 1.0) -> Path:

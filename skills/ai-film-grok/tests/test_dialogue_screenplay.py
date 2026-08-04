@@ -72,7 +72,9 @@ def _approved_screenplay():
                 "review_status": "approved",
                 "duration_sec": 2.0,
                 "scene_state_id": f"state_{turn['line_id']}",
-                "state_delta": "information revealed" if turn["line_id"] == "dlg_02" else "suspicion grows",
+                "state_delta": "information revealed"
+                if turn["line_id"] == "dlg_02"
+                else "suspicion grows",
             }
         )
     return screenplay
@@ -291,4 +293,3 @@ def test_dialogue_ja_retired_and_chinese_required():
     report = validate_dialogue_screenplay(screenplay, strict=True)
     codes = {issue["code"] for issue in report["issues"]}
     assert "CHARACTER_DIALOGUE_ZH_REQUIRED" in codes or "DIALOGUE_TRANSLATION_PENDING" in codes
-

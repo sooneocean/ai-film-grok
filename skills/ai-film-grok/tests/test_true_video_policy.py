@@ -84,9 +84,7 @@ def test_assert_rejects_panel_tags_on_drama(tmp_path: Path) -> None:
 
 
 def test_panel_project_allows_panel_mode(tmp_path: Path) -> None:
-    (tmp_path / "film-spec.json").write_text(
-        '{"production_mode":"panel"}', encoding="utf-8"
-    )
+    (tmp_path / "film-spec.json").write_text('{"production_mode":"panel"}', encoding="utf-8")
     assert is_panel_project(tmp_path) is True
 
 
