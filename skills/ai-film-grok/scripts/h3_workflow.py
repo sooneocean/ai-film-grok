@@ -262,10 +262,13 @@ def plan_h3_shot(
     max_dur = float(intent.get("max_duration_sec") or h3.get("max_duration_sec") or 8)
     enabled = bool(intent.get("h3_enabled") or h3.get("enabled") is True)
     alt = mode_res.get("alt_mode")
-    last_cli = f' --last-frame "{last_path}"' if last_path and mode == "flf" else ""
+    last_cli = f' --last-frame "{last_path}"' if last_path and mode in {"flf", "r2v"} else ""
     cmd = f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {mode}{last_cli} --register'
+    alt_last = (
+        f' --last-frame "{last_path}"' if last_path and str(alt or "") in {"flf", "r2v"} else ""
+    )
     cmd_alt = (
-        f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {alt} --register'
+        f'aifilm h3 run --root "{base}" --shot-id {shot_id} --mode {alt}{alt_last} --register'
         if alt
         else None
     )
@@ -604,8 +607,8 @@ def run_h3_shot(
     refs_override: list[Path | str] | None = None,
 ) -> dict[str, Any]:
     """Generate one H3 clip for a film shot and optionally register it."""
-    from h3_mode import H3_MODE_ENDPOINT, H3_MODE_WEAPON
     from h3_media_pack import flf_prompt_clause, r2v_ref_prompt_clause
+    from h3_mode import H3_MODE_ENDPOINT, H3_MODE_WEAPON
 
     base = _root(root)
     plan = plan_h3_shot(
@@ -639,8 +642,7 @@ def run_h3_shot(
         )
     if plan.get("requires_last") and not plan.get("last_path"):
         raise H3WorkflowError(
-            f"H3 flf requires last frame for {shot_id} "
-            f"(--last-frame or stills/{shot_id}_end.png)"
+            f"H3 flf requires last frame for {shot_id} (--last-frame or stills/{shot_id}_end.png)"
         )
 
     # Variety door when registering candidates (bulk path) — skip via env escape.
@@ -660,17 +662,35 @@ def run_h3_shot(
         if "first-last-frame" not in prompt.lower() and "last keyframe" not in prompt.lower():
             prompt = f"{prompt.rstrip()} {clause}"
     if plan["mode"] == "r2v":
-        pack_refs = []
-        mp = plan.get("media_pack") if isinstance(plan.get("media_pack"), dict) else {}
-        pack_refs = list(mp.get("refs") or [])
-        # When last exists but mode is r2v, expose last as pose ref in prompt duties
+        pack_refs: list[dict[str, Any]] = []
+        # First-last R2V: last pose land ref first, then identity/style refs.
         if plan.get("last_path"):
-            pack_refs = list(pack_refs) + [
+            pack_refs.append(
                 {"path": plan["last_path"], "role": "pose", "source": "last_as_pose_ref"}
-            ]
+            )
+        mp = plan.get("media_pack") if isinstance(plan.get("media_pack"), dict) else {}
+        for ref in list(mp.get("refs") or []):
+            if not isinstance(ref, dict):
+                continue
+            p = str(ref.get("path") or "")
+            if (
+                plan.get("last_path")
+                and p
+                and Path(p).resolve() == Path(str(plan["last_path"])).resolve()
+            ):
+                continue
+            pack_refs.append(ref)
         r2v_clause = r2v_ref_prompt_clause(pack_refs)
         if r2v_clause and "<Picture" not in prompt:
             prompt = f"{prompt.rstrip()} {r2v_clause}"
+        if plan.get("last_path"):
+            land = (
+                "First-last reference control: start from the primary still (first frame); "
+                "drive motion so the final pose/composition lands on the end pose reference; "
+                "preserve identity; do not ignore the end frame."
+            )
+            if "end pose" not in prompt.lower() and "last keyframe" not in prompt.lower():
+                prompt = f"{prompt.rstrip()} {land}"
     prompt_dir = base / "receipts" / "prompts"
     prompt_dir.mkdir(parents=True, exist_ok=True)
     (prompt_dir / f"{shot_id}.h3.spine.txt").write_text(prompt + "\n", encoding="utf-8")
@@ -683,7 +703,9 @@ def run_h3_shot(
 
     provider = LocalComfyH3Provider()
     keyframe = Path(plan["still_path"]) if plan.get("still_path") else base / "film-spec.json"
-    last_frame = Path(plan["last_path"]) if plan.get("last_path") and plan["mode"] == "flf" else None
+    last_frame = (
+        Path(plan["last_path"]) if plan.get("last_path") and plan["mode"] == "flf" else None
+    )
     gen_kwargs: dict[str, Any] = {
         "keyframe": keyframe,
         "prompt": prompt,
@@ -697,18 +719,17 @@ def run_h3_shot(
     }
     if last_frame is not None:
         gen_kwargs["last_frame"] = last_frame
-    # R2V multi-ref: identity/style refs from media_pack (not the primary still).
+    # R2V multi-ref: last (pose land) first, then identity/style (not the primary still).
     if plan["mode"] == "r2v":
         ref_paths: list[Path] = []
-        for raw in plan.get("ref_paths") or []:
-            rp = Path(str(raw)).expanduser().resolve()
-            if rp.is_file() and rp != keyframe.resolve():
-                ref_paths.append(rp)
-        # Optional: last still as pose reference when not using FLF
         if plan.get("last_path"):
             lp = Path(str(plan["last_path"])).expanduser().resolve()
-            if lp.is_file() and lp != keyframe.resolve() and lp not in ref_paths:
+            if lp.is_file() and lp != keyframe.resolve():
                 ref_paths.append(lp)
+        for raw in plan.get("ref_paths") or []:
+            rp = Path(str(raw)).expanduser().resolve()
+            if rp.is_file() and rp != keyframe.resolve() and rp not in ref_paths:
+                ref_paths.append(rp)
         if ref_paths:
             gen_kwargs["reference_images"] = ref_paths[:2]  # template slots 21/22
     result = provider.generate(**gen_kwargs)
@@ -760,7 +781,7 @@ def run_h3_shot(
         "continue_handoff": handoff,
         "media_pack": plan.get("media_pack"),
         "first_path": plan.get("still_path"),
-        "last_path": plan.get("last_path") if plan.get("mode") == "flf" else None,
+        "last_path": (plan.get("last_path") if plan.get("mode") in {"flf", "r2v"} else None),
         "input_provenance": result.get("input_provenance"),
     }
     receipt_path = base / "receipts" / f"h3-run-{shot_id}.json"
@@ -794,7 +815,7 @@ def run_h3_shot(
             if plan["mode"] != "t2v" and plan.get("still_path"):
                 op = "reference_to_video" if plan["mode"] == "r2v" else "image_to_video"
                 inputs = [Path(plan["still_path"])]
-                if plan.get("mode") == "flf" and plan.get("last_path"):
+                if plan.get("mode") in {"flf", "r2v"} and plan.get("last_path"):
                     inputs.append(Path(str(plan["last_path"])))
                 job = mq.add_job(
                     shot_id=shot_id,

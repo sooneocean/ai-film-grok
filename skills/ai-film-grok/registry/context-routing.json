@@ -15,6 +15,11 @@
         "path": "references/stages/agent.md",
         "reason": "Story and Director's Lens",
         "required": true
+      },
+      {
+        "path": "references/script-value-debrief.md",
+        "reason": "Presentation-value L0–L4 before story lock",
+        "required": false
       }
     ],
     "beats": [
@@ -22,6 +27,11 @@
         "path": "references/stages/agent.md",
         "reason": "Beat and narrative structure",
         "required": true
+      },
+      {
+        "path": "references/script-value-debrief.md",
+        "reason": "Beat Value Cards and must_keep ranks",
+        "required": false
       }
     ],
     "shots": [

@@ -162,7 +162,7 @@ def _pack(
         "reasons": reasons,
         "alt_mode": alt_mode,
         "alt_reasons": list(alt_reasons or []),
-        "policy": "h3_max_effect_v1_flf",
+        "policy": "h3_max_effect_v2_first_last",
         "confidence": confidence,
     }
     if extra:
@@ -274,10 +274,12 @@ def resolve_h3_mode(
             tok in flag_blob for tok in ("sex_pose", "deep_thrust", "penetration", "l4_contact")
         ):
             energy_hits.append("meat_pose_energy")
-    if sh.get("force_r2v") is True or str(sh.get("h3_prefer") or "").lower() == "r2v":
+    force_r2v = sh.get("force_r2v") is True or str(sh.get("h3_prefer") or "").lower() == "r2v"
+    if force_r2v:
         energy_hits.append("force_r2v")
 
-    if energy_hits and has_still:
+    # force_r2v always energy lane (last still becomes pose ref in workflow, not FLF).
+    if force_r2v and has_still:
         alt = "flf" if has_last and not force_single else "i2v"
         alt_rs = ["fallback_flf_land"] if alt == "flf" else ["fallback_identity_lock"]
         return _pack(
@@ -286,18 +288,33 @@ def resolve_h3_mode(
             alt_mode=alt,
             alt_reasons=alt_rs,
             confidence="medium",
-            extra={"motion_tier": motion_tier, "shot_size": size or None, "restricted": True},
+            extra={
+                "motion_tier": motion_tier,
+                "shot_size": size or None,
+                "restricted": True,
+                "uses_last_as_pose_ref": bool(has_last),
+            },
         )
 
+    # First+last present → FLF primary (quality land). Energy is alt, not primary.
     if has_still and has_last and not force_single:
         alt_mode: str | None = None
         alt_reasons: list[str] = []
-        if restricted and motion_tier == "high":
+        if energy_hits or (restricted and motion_tier == "high"):
             alt_mode = "r2v"
-            alt_reasons = ["retry_if_motion_mean_low", "high_motion_tier"]
+            alt_reasons = (
+                list(energy_hits)
+                if energy_hits
+                else [
+                    "retry_if_motion_mean_low",
+                    "high_motion_tier",
+                ]
+            )
+            if "r2v_energy_lane" not in alt_reasons:
+                alt_reasons.append("r2v_energy_lane")
         return _pack(
             "flf",
-            reasons=["identity_still_flf", "last_frame_present"],
+            reasons=["identity_still_flf", "last_frame_present", "first_last_primary"],
             alt_mode=alt_mode,
             alt_reasons=alt_reasons,
             confidence="medium" if alt_mode else "hard",
@@ -306,6 +323,17 @@ def resolve_h3_mode(
                 "shot_size": size or None,
                 "restricted": bool(restricted),
             },
+        )
+
+    # No last frame: energy flags may still pick R2V (single-still / multi-ref path).
+    if energy_hits and has_still:
+        return _pack(
+            "r2v",
+            reasons=[*energy_hits, "r2v_energy_lane"],
+            alt_mode="i2v",
+            alt_reasons=["fallback_identity_lock", "produce_end_still_for_flf"],
+            confidence="medium",
+            extra={"motion_tier": motion_tier, "shot_size": size or None, "restricted": True},
         )
 
     alt_mode = None
@@ -345,20 +373,21 @@ def effect_tips(mode: str, mode_res: dict[str, Any] | None = None) -> list[str]:
         "产能: aifilm comfy capacity（free VRAM≥24GiB · queue idle）",
     ]
     if mode == "i2v":
-        tips.append("I2V 锁脸：源 still 须已是目标体位/状态；软肖像 prompt 会静")
+        tips.append("I2V 单首帧：源 still 须已是目标体位/状态；软肖像 prompt 会静")
+        tips.append("质量优先：补 stills/<id>_end.png 后自动升 FLF（first+last）")
         tips.append("高动写清 HIGH MOTION + 每秒可见变化；不够再 --mode r2v")
-        tips.append("有 end still 时用 --last-frame 或 stills/<id>_end.png → FLF")
         if mode_res.get("alt_mode") == "r2v":
             tips.append(f"能量备胎 R2V：{mode_res.get('alt_reasons')}")
     elif mode == "flf":
-        tips.append("FLF 首尾帧：first=开场 still，last=收场姿势；中间由模型插值")
+        tips.append("FLF 首尾帧：first=开场 still，last=收场姿势；fl2va last_frame 硬接")
         tips.append("禁 first 复制成 last；last 须过身份/毒镜门")
-        tips.append("落点不对 → 重做 end still；要自由高动 → --mode i2v 或 r2v")
+        tips.append("落点不对 → 重做 end still；要自由高动 → --mode r2v（last 作 pose ref）")
         if mode_res.get("alt_mode") == "r2v":
             tips.append(f"能量备胎 R2V：{mode_res.get('alt_reasons')}")
     elif mode == "r2v":
-        tips.append("R2V 参考演：身份弱于 I2V/FLF；要像素贴 still 请改 --mode i2v|flf")
-        tips.append("适合大嘴 CU / 邻镜换构图 / 体位高动")
+        tips.append("R2V：first=主 ref0；有 end still 时 last 优先作 pose land ref")
+        tips.append("身份弱于 I2V/FLF；要像素贴落点 → --mode flf + --last-frame")
+        tips.append("适合大嘴 CU / 邻镜换构图 / force_r2v 体位高动")
     elif mode == "t2v":
         tips.append("T2V 禁挂角色脸；只做无脸 env/bridge/气氛")
     tips.append("对白：audio_cues.spoken_text + on_camera → 自动注入 line:「…」")

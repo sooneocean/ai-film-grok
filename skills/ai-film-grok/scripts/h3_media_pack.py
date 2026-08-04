@@ -161,7 +161,9 @@ def _resolve_state_end_still(root: Path, shot: dict[str, Any]) -> Path | None:
     bible = read_json(root / "style-bible.json") or {}
     if not isinstance(bible, dict):
         return None
-    csm = bible.get("cast_state_masters") if isinstance(bible.get("cast_state_masters"), dict) else {}
+    csm = (
+        bible.get("cast_state_masters") if isinstance(bible.get("cast_state_masters"), dict) else {}
+    )
     wardrobe = str(shot.get("wardrobe_state") or shot.get("end_wardrobe_state") or "").strip()
     end_state = str(
         shot.get("end_state") or shot.get("end_wardrobe_state") or wardrobe or ""
@@ -350,7 +352,10 @@ def resolve_media_pack(
         refs = resolve_identity_refs(base, sh, max_refs=max_refs)
 
     # Drop refs that duplicate first/last bytes path
-    drop = {str(first_path.resolve()) if first_path else "", str(last_path.resolve()) if last_path else ""}
+    drop = {
+        str(first_path.resolve()) if first_path else "",
+        str(last_path.resolve()) if last_path else "",
+    }
     refs = [r for r in refs if r.get("path") not in drop][:max_refs]
 
     reasons: list[str] = []
@@ -404,7 +409,11 @@ def flf_prompt_clause() -> str:
 
 
 def r2v_ref_prompt_clause(refs: list[dict[str, Any]]) -> str:
-    """Build <Picture n> duty lines for MiniMax H3 R2V multi-ref."""
+    """Build <Picture n> duty lines for MiniMax H3 R2V multi-ref.
+
+    Convention for first/last quality: primary still is ref_image_0 (first frame);
+    additional refs should list pose/end land before identity when both exist.
+    """
     if not refs:
         return ""
     parts: list[str] = []
@@ -413,11 +422,11 @@ def r2v_ref_prompt_clause(refs: list[dict[str, Any]]) -> str:
         duty = {
             "identity": "identity lock (same face, hair, body)",
             "style": "style and medium lock",
-            "pose": "pose / composition target",
+            "pose": "end pose / composition land target (last frame)",
             "wardrobe_state": "wardrobe and body state",
             "contact": "contact / detail insert",
-            "last": "end pose land target",
-            "first": "start frame identity",
+            "last": "end pose land target (last frame)",
+            "first": "start frame identity (first frame)",
             "reference": "subject reference",
         }.get(role, "subject reference")
         parts.append(f"<Picture {i}> = {duty}")

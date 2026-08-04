@@ -57,9 +57,7 @@ def test_stage_project_candidate_keeps_reviewable_bytes_in_global_vault(
     _pending_candidate(project)
 
     staged = stage_project_candidate(project, "mmaudio-sfx-1-abc123", library_root=armory)
-    wav, receipt, record = candidate_asset(
-        "mmaudio-sfx-1-abc123", library_root=armory
-    )
+    wav, receipt, record = candidate_asset("mmaudio-sfx-1-abc123", library_root=armory)
 
     assert staged["source"] == "library:sfx/pending-noncommercial/mmaudio-sfx-1-abc123.wav"
     assert wav.is_file() and receipt.is_file()
@@ -82,11 +80,7 @@ def test_stage_project_candidate_rebinds_asr_evidence_to_global_vault(
         "library:sfx/reviews/candidates/mmaudio-sfx-1-abc123.vibevoice-asr-review.json"
     )
     assert (
-        armory
-        / "sfx"
-        / "reviews"
-        / "candidates"
-        / "mmaudio-sfx-1-abc123.vibevoice-asr-review.json"
+        armory / "sfx" / "reviews" / "candidates" / "mmaudio-sfx-1-abc123.vibevoice-asr-review.json"
     ).is_file()
 
 

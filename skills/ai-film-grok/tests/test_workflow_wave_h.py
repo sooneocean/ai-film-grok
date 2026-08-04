@@ -22,7 +22,7 @@ class BulkPreflightReuseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "receipts").mkdir()
-            (root / "film-spec.json").write_text("{\"title\": \"x\"}", encoding="utf-8")
+            (root / "film-spec.json").write_text('{"title": "x"}', encoding="utf-8")
             rec = root / "receipts" / "bulk-preflight.json"
             rec.write_text(
                 json.dumps({"ok": True, "kind": "bulk-preflight", "failed": []}),
@@ -49,7 +49,7 @@ class BulkPreflightReuseTests(unittest.TestCase):
             rec = root / "receipts" / "bulk-preflight.json"
             rec.write_text(json.dumps({"ok": True}), encoding="utf-8")
             time.sleep(0.02)
-            (root / "film-spec.json").write_text("{\"title\": \"y\"}", encoding="utf-8")
+            (root / "film-spec.json").write_text('{"title": "y"}', encoding="utf-8")
             with mock.patch(
                 "workflow_pack.bulk_preflight",
                 return_value={"ok": True, "failed": [], "next_cmd": None},

@@ -396,7 +396,38 @@ def check_root(
     return report
 
 
-def write_debrief(root: Path | str, debrief: dict[str, Any]) -> Path:
+def schema_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "schemas" / "script-value-debrief.schema.json"
+
+
+def validate_against_schema(debrief: dict[str, Any]) -> dict[str, Any]:
+    """JSON Schema check; soft if jsonschema missing or schema file absent."""
+    path = schema_path()
+    if not path.is_file():
+        return {"ok": True, "skipped": True, "reason": "schema_missing"}
+    try:
+        import jsonschema
+    except ImportError:
+        return {"ok": True, "skipped": True, "reason": "jsonschema_not_installed"}
+    try:
+        schema = read_json(path) or {}
+        jsonschema.validate(instance=debrief, schema=schema)
+        return {"ok": True, "skipped": False, "path": str(path)}
+    except Exception as exc:  # noqa: BLE001 — surface schema errors only
+        return {
+            "ok": False,
+            "skipped": False,
+            "path": str(path),
+            "error": str(exc)[:400],
+        }
+
+
+def write_debrief(
+    root: Path | str,
+    debrief: dict[str, Any],
+    *,
+    skip_schema: bool = False,
+) -> Path:
     """Write debrief receipt (agent/CLI helper)."""
     base = Path(root).expanduser().resolve()
     path = receipt_path(base)
@@ -404,8 +435,182 @@ def write_debrief(root: Path | str, debrief: dict[str, Any]) -> Path:
     payload.setdefault("kind", KIND)
     payload.setdefault("version", 1)
     payload["written_at"] = utc_now()
+    if not skip_schema:
+        sch = validate_against_schema(payload)
+        if not sch.get("ok") and not sch.get("skipped"):
+            # Still write but stamp schema_errors for agents; confirm will hard-fail structure
+            payload["_schema_validation"] = sch
+        else:
+            payload.pop("_schema_validation", None)
+            if sch.get("ok") and not sch.get("skipped"):
+                payload["_schema_ok"] = True
     write_json(path, payload)
     return path
+
+
+def _infer_dramatic_function(label: str, *, index: int, total: int) -> tuple[str, int]:
+    """Return (dramatic_function, value_rank) heuristics for seed cards.
+
+    Avoid overly broad tokens (e.g. bare 开门) that false-positive as climax.
+    Writer climax/ending fields are applied later in ``_ensure_writer_beats``.
+    """
+    low = label.lower()
+    zh = label
+    if any(k in zh or k in low for k in ("钩", "hook", "登场", "落锁", "开门见山", "开场")):
+        return "hook", 4
+    if any(k in zh or k in low for k in ("高潮", "climax", "抉择", "越界", "最终选择")):
+        return "climax", 5
+    if any(k in zh or k in low for k in ("余韵", "afterglow", "结尾", "ending", "尾声", "落幕")):
+        return "resolution", 5
+    if any(k in zh or k in low for k in ("对抗", "冲突", "hesitat", "僵持", "对峙")):
+        return "confrontation", 4
+    if index == 0:
+        return "hook", 4
+    if total >= 2 and index == total - 1:
+        return "resolution", 4
+    if total >= 3 and index == total // 2:
+        return "climax", 4
+    return "bridge", 3
+
+
+def _card_needs_agent_fill(card: dict[str, Any]) -> bool:
+    """Seed cards with tbd/empty state or blank visible_change still need fill."""
+    state_in = _text(card.get("state_in")).lower()
+    state_out = _text(card.get("state_out")).lower()
+    if state_in in {"", "tbd"} or state_out in {"", "tbd"}:
+        return True
+    if not _text(card.get("visible_change")):
+        return True
+    if not _text(card.get("visual_event")):
+        return True
+    if int(card.get("value_rank") or 0) < 3:
+        return True
+    return False
+
+
+def _label_matches_writer(label: str, visual: str, writer_text: str) -> bool:
+    """True when beat label/visual is the writer climax/ending (substring either way)."""
+    w = _text(writer_text)
+    if not w:
+        return False
+    lab = _text(label)
+    vis = _text(visual)
+    if not lab and not vis:
+        return False
+    if lab and (w in lab or lab in w):
+        return True
+    if vis and (w in vis or vis in w):
+        return True
+    return False
+
+
+def _ensure_writer_beats(
+    beat_cards: list[dict[str, Any]],
+    *,
+    climax: str,
+    ending: str,
+) -> list[dict[str, Any]]:
+    """Guarantee climax/ending cards exist and rank high when writer fields set."""
+    cards = list(beat_cards)
+
+    def _promote_one(match_fn, *, df: str, rank: int, ve_fallback: str) -> dict[str, Any] | None:
+        for c in cards:
+            if match_fn(c):
+                c["dramatic_function"] = df
+                c["value_rank"] = max(int(c.get("value_rank") or 0), rank)
+                if ve_fallback and not _text(c.get("visual_event")):
+                    c["visual_event"] = ve_fallback
+                c["needs_agent_fill"] = _card_needs_agent_fill(c)
+                return c
+        return None
+
+    def _demote_others(keep_id: str, dfs: set[str], fallback_df: str) -> None:
+        for c in cards:
+            if str(c.get("beat_id")) == keep_id:
+                continue
+            if str(c.get("dramatic_function") or "").lower() in dfs:
+                c["dramatic_function"] = fallback_df
+                c["value_rank"] = min(int(c.get("value_rank") or 3), 3)
+
+    if climax:
+        matched = _promote_one(
+            lambda c: _label_matches_writer(
+                str(c.get("objective") or ""),
+                str(c.get("visual_event") or ""),
+                climax,
+            ),
+            df="climax",
+            rank=5,
+            ve_fallback=climax,
+        )
+        if matched is None:
+            # Prefer elevating an existing heuristic climax before appending
+            for c in cards:
+                if str(c.get("dramatic_function") or "").lower() == "climax":
+                    c["value_rank"] = max(int(c.get("value_rank") or 0), 5)
+                    if not _text(c.get("visual_event")):
+                        c["visual_event"] = climax
+                    matched = c
+                    break
+        if matched is None:
+            matched = {
+                "beat_id": f"beat_{len(cards) + 1:02d}_climax",
+                "objective": climax,
+                "state_in": "僵持",
+                "state_out": "选择完成",
+                "visual_event": climax,
+                "visible_change": "选择被画面兑现",
+                "audio_load": "dialogue",
+                "value_rank": 5,
+                "dramatic_function": "climax",
+                "needs_agent_fill": False,
+            }
+            cards.append(matched)
+        _demote_others(str(matched["beat_id"]), {"climax"}, "confrontation")
+
+    if ending:
+        matched = _promote_one(
+            lambda c: _label_matches_writer(
+                str(c.get("objective") or ""),
+                str(c.get("visual_event") or ""),
+                ending,
+            ),
+            df="resolution",
+            rank=5,
+            ve_fallback=ending,
+        )
+        if matched is None:
+            for c in cards:
+                if str(c.get("dramatic_function") or "").lower() in {
+                    "resolution",
+                    "afterglow",
+                    "ending",
+                }:
+                    c["value_rank"] = max(int(c.get("value_rank") or 0), 5)
+                    if ending and not _text(c.get("visual_event")):
+                        c["visual_event"] = ending
+                    matched = c
+                    break
+        if matched is None:
+            matched = {
+                "beat_id": f"beat_{len(cards) + 1:02d}_ending",
+                "objective": ending,
+                "state_in": "高潮后",
+                "state_out": "钩子/余韵",
+                "visual_event": ending,
+                "visible_change": "末帧可拍钩子",
+                "audio_load": "foley",
+                "value_rank": 5,
+                "dramatic_function": "resolution",
+                "needs_agent_fill": False,
+            }
+            cards.append(matched)
+        _demote_others(
+            str(matched["beat_id"]),
+            {"resolution", "afterglow", "ending"},
+            "bridge",
+        )
+    return cards
 
 
 def seed_from_reception(
@@ -427,7 +632,12 @@ def seed_from_reception(
     title = film_title or _text(treatment.get("title")) or "untitled"
 
     scene_beats = _as_list(treatment.get("scene_beats"))
+    if not scene_beats:
+        # Minimal spine so seed is never empty when writer fields exist
+        scene_beats = [x for x in ("钩子", climax or "高潮选择", ending or "结尾钩") if x]
+
     beat_cards: list[dict[str, Any]] = []
+    total = min(len(scene_beats), 12)
     for i, raw in enumerate(scene_beats[:12], start=1):
         if isinstance(raw, dict):
             label = _text(raw.get("label") or raw.get("name") or raw.get("beat")) or f"beat_{i}"
@@ -436,23 +646,74 @@ def seed_from_reception(
             label = _text(raw) or f"beat_{i}"
             ve = label
         bid = f"beat_{i:02d}_{_slug(label)}"
-        beat_cards.append(
-            {
-                "beat_id": bid,
-                "objective": label,
-                "state_in": "tbd",
-                "state_out": "tbd",
-                "visual_event": ve,
-                "visible_change": "",
-                "audio_load": "dialogue",
-                "value_rank": 3,
-                "dramatic_function": "bridge",
-            }
-        )
+        df, rank = _infer_dramatic_function(label, index=i - 1, total=total)
+        card = {
+            "beat_id": bid,
+            "objective": label,
+            "state_in": "tbd",
+            "state_out": "tbd",
+            "visual_event": ve,
+            "visible_change": "",
+            "audio_load": "dialogue",
+            "value_rank": rank,
+            "dramatic_function": df,
+        }
+        card["needs_agent_fill"] = _card_needs_agent_fill(card)
+        beat_cards.append(card)
 
-    must_keep = [c["beat_id"] for c in beat_cards[:2]] if len(beat_cards) >= 2 else []
+    beat_cards = _ensure_writer_beats(beat_cards, climax=climax, ending=ending)
+    for c in beat_cards:
+        c["needs_agent_fill"] = _card_needs_agent_fill(c)
+
+    # must_keep: prefer climax + resolution, else top ranks
+    must_keep: list[str] = []
+    for prefer_df in ("climax", "resolution", "hook"):
+        for c in beat_cards:
+            if str(c.get("dramatic_function") or "").lower() != prefer_df:
+                continue
+            bid = _text(c.get("beat_id"))
+            if bid and bid not in must_keep:
+                must_keep.append(bid)
+            if len(must_keep) >= 2:
+                break
+        if len(must_keep) >= 2:
+            break
+    if len(must_keep) < 2:
+        ranked = sorted(
+            beat_cards,
+            key=lambda c: int(c.get("value_rank") or 0),
+            reverse=True,
+        )
+        for c in ranked:
+            bid = _text(c.get("beat_id"))
+            if bid and bid not in must_keep:
+                must_keep.append(bid)
+            if len(must_keep) >= 2:
+                break
+    if len(must_keep) < 2 and len(beat_cards) >= 2:
+        must_keep = [str(c["beat_id"]) for c in beat_cards[:2]]
+
+    pilot_ids = [
+        str(c["beat_id"])
+        for c in beat_cards
+        if int(c.get("value_rank") or 0) >= MIN_VALUE_RANK_PILOT
+    ] or list(must_keep)
+
     constraints = _as_list(fidelity.get("explicit_constraints"))
     unknowns = list(_as_list(fidelity.get("unknowns")))
+    if any(c.get("needs_agent_fill") for c in beat_cards):
+        unknowns = unknowns + [
+            "agent: fill state_in/out + visible_change on needs_agent_fill cards"
+        ]
+
+    climax_id = next(
+        (str(c["beat_id"]) for c in beat_cards if str(c.get("dramatic_function")) == "climax"),
+        must_keep[-1] if must_keep else "payoff",
+    )
+    setup_id = next(
+        (str(c["beat_id"]) for c in beat_cards if str(c.get("dramatic_function")) == "hook"),
+        must_keep[0] if must_keep else "setup",
+    )
 
     return {
         "kind": KIND,
@@ -460,12 +721,15 @@ def seed_from_reception(
         "film_title": title,
         "source_reception_sha256": sha or None,
         "confirmed_by_user": False,
-        "assumptions": ["seeded from story-reception; fill value_rank + must_keep before lock"],
+        "needs_agent_fill": any(c.get("needs_agent_fill") for c in beat_cards),
+        "assumptions": [
+            "seeded from story-reception; climax/ending auto-ranked — confirm ranks before lock"
+        ],
         "user_brief": {
             "audience_profile": "general",
             "platform": "vertical_short",
             "target_duration_sec": 60,
-            "must_have": [],
+            "must_have": [x for x in (climax, ending) if x][:4],
             "must_not": [str(x) for x in constraints if str(x).strip()][:12],
             "success_looks_like": logline or "",
         },
@@ -477,17 +741,28 @@ def seed_from_reception(
             "ending_hook": ending,
             "theme_one_line": _text(treatment.get("theme")),
             "information_state": {},
-            "setup_payoff_pairs": [],
+            "setup_payoff_pairs": (
+                [
+                    {
+                        "setup_ref": setup_id,
+                        "payoff_ref": climax_id,
+                        "note": "seed pair: hook → climax",
+                    }
+                ]
+                if climax
+                else []
+            ),
             "scene_necessity": {},
         },
         "viewer_promise": logline or goal or title,
-        "open_hook": _text(treatment.get("camera_intent")) or "",
+        "open_hook": _text(treatment.get("camera_intent"))
+        or (beat_cards[0].get("visual_event") if beat_cards else ""),
         "must_keep_beat_ids": must_keep,
         "audience_journey": [],
         "retention_hooks": [],
-        "dead_air_risks": [],
+        "dead_air_risks": ["连续无 visible_change 的 rank≤2 镜应合并"],
         "beat_cards": beat_cards,
-        "pilot_shortlist_beat_ids": list(must_keep),
+        "pilot_shortlist_beat_ids": pilot_ids[:6],
         "weapon_bias": [],
         "compress_candidates": [],
         "provenance": {

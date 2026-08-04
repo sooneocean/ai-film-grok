@@ -194,9 +194,7 @@ class BulkPreflightTests(unittest.TestCase):
             root = Path(tmp)
             _write(root, "film-spec.json", {"title": "x", "heat_scale": "soft", "scenes": []})
             _write(root, "manifest.json", {"stills": {}, "clips": {}})
-            report = bulk_preflight(
-                root, write=True, probe_tunnel=False, check_lease=False
-            )
+            report = bulk_preflight(root, write=True, probe_tunnel=False, check_lease=False)
             self.assertFalse(report["ok"])
             self.assertIn("pilot", report["failed"])
 

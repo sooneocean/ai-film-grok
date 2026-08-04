@@ -522,7 +522,14 @@ def assert_motion_prompt_core(
         )
 
     # Hero / identity motion needs observable action OR dialogue performance.
-    if role_n in {"hero", ""} and mode_n in {"i2v", "flf", "r2v", "image_to_video", "first_last_frame", "reference_to_video"}:
+    if role_n in {"hero", ""} and mode_n in {
+        "i2v",
+        "flf",
+        "r2v",
+        "image_to_video",
+        "first_last_frame",
+        "reference_to_video",
+    }:
         has_visual = bool(actions) or bool(dialogue)
         # Author may put action only in free text — accept if prompt has motion verbs
         # or explicit dramatic function.

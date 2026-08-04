@@ -81,21 +81,27 @@ def test_technical_failures_follow_cloud_order_and_are_signed() -> None:
         "frw-api-i2v": Provider("frw-api-i2v", "HTTP 429"),
         "grok": Provider("grok"),
     }
-    with tempfile.TemporaryDirectory() as raw, mock.patch.dict(
-        os.environ, {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32}, clear=False
-    ), mock.patch("i2v_provider.get", side_effect=lambda name: providers[name]):
+    with (
+        tempfile.TemporaryDirectory() as raw,
+        mock.patch.dict(os.environ, {"AIFILM_PROVIDER_SWITCH_RECEIPT_KEY": "k" * 32}, clear=False),
+        mock.patch("i2v_provider.get", side_effect=lambda name: providers[name]),
+    ):
         result = generate_with_fallback(
-            root=Path(raw), shot_id="shot01", keyframe=Path(raw) / "frame.png",
-            prompt="action", plan_sha256="a" * 64,
+            root=Path(raw),
+            shot_id="shot01",
+            keyframe=Path(raw) / "frame.png",
+            prompt="action",
+            plan_sha256="a" * 64,
         )
         assert all(provider_switch_receipt_is_valid(row) for row in result["provider_switches"])
     assert result["route"] == "grok_fallback"
     assert [row["provider"] for row in result["routing_attempts"]] == [
-        "frw-ltx23", "frw-api-i2v", "grok"
+        "frw-ltx23",
+        "frw-api-i2v",
+        "grok",
     ]
     assert [
-        (row["primary_provider"], row["fallback_provider"])
-        for row in result["provider_switches"]
+        (row["primary_provider"], row["fallback_provider"]) for row in result["provider_switches"]
     ] == [("frw-ltx23", "frw-api-i2v"), ("frw-api-i2v", "grok")]
 
 
@@ -112,8 +118,11 @@ def test_quality_failure_does_not_switch() -> None:
     with mock.patch("i2v_provider.get", return_value=Provider()):
         with pytest.raises(I2VProviderError):
             generate_with_fallback(
-                root=None, shot_id="shot01", keyframe=Path("/tmp/frame.png"),
-                prompt="action", plan_sha256="a" * 64,
+                root=None,
+                shot_id="shot01",
+                keyframe=Path("/tmp/frame.png"),
+                prompt="action",
+                plan_sha256="a" * 64,
             )
 
 

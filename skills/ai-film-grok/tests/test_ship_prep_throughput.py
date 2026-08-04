@@ -104,9 +104,7 @@ class ShortlistPromoteTests(unittest.TestCase):
             rep = select_shortlist(root, write=True, promote=True, measure_missing=False)
             self.assertTrue(rep.get("promoted"))
             man = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-            self.assertEqual(
-                Path(man["clips"]["s1"]["path"]).resolve(), strong.resolve()
-            )
+            self.assertEqual(Path(man["clips"]["s1"]["path"]).resolve(), strong.resolve())
             self.assertEqual(man["clips"]["s1"]["mean"], 22.0)
             self.assertEqual(man["clips"]["s1"]["preferred_from"], "select-shortlist")
 
@@ -146,19 +144,21 @@ class ShipPrepTests(unittest.TestCase):
             write_mean_sidecar(a, 12.0)
             write_mean_sidecar(b, 22.0)
             _write(root, "manifest.json", {"clips": {}, "stills": {}})
-            with mock.patch(
-                "workflow_pack.variety_precheck",
-                return_value={"ok": True, "issues": []},
-            ), mock.patch(
-                "cli_motion.i2v_motion_gate_from_rows",
-                return_value={"ok": True, "row_count": 1},
-            ), mock.patch(
-                "workflow_pack.film_core_closeout_audit",
-                return_value={"ok": True, "issues": []},
+            with (
+                mock.patch(
+                    "workflow_pack.variety_precheck",
+                    return_value={"ok": True, "issues": []},
+                ),
+                mock.patch(
+                    "cli_motion.i2v_motion_gate_from_rows",
+                    return_value={"ok": True, "row_count": 1},
+                ),
+                mock.patch(
+                    "workflow_pack.film_core_closeout_audit",
+                    return_value={"ok": True, "issues": []},
+                ),
             ):
-                rep = ship_prep(
-                    root, measure=False, promote=False, skip_variety=True
-                )
+                rep = ship_prep(root, measure=False, promote=False, skip_variety=True)
             ids = [s["id"] for s in rep["steps"]]
             self.assertIn("pk_compare", ids)
             self.assertIn("fill_idle_pending", ids)
@@ -204,15 +204,19 @@ class ShipPrepTests(unittest.TestCase):
             write_mean_sidecar(a, 12.0)
             write_mean_sidecar(b, 22.0)
             _write(root, "manifest.json", {"clips": {}, "stills": {}})
-            with mock.patch(
-                "workflow_pack.variety_precheck",
-                return_value={"ok": True, "issues": []},
-            ), mock.patch(
-                "cli_motion.i2v_motion_gate_from_rows",
-                return_value={"ok": True, "row_count": 1},
-            ), mock.patch(
-                "workflow_pack.film_core_closeout_audit",
-                return_value={"ok": True, "issues": []},
+            with (
+                mock.patch(
+                    "workflow_pack.variety_precheck",
+                    return_value={"ok": True, "issues": []},
+                ),
+                mock.patch(
+                    "cli_motion.i2v_motion_gate_from_rows",
+                    return_value={"ok": True, "row_count": 1},
+                ),
+                mock.patch(
+                    "workflow_pack.film_core_closeout_audit",
+                    return_value={"ok": True, "issues": []},
+                ),
             ):
                 # promote=True would mean-auto-pick H3 — multi-take must defer
                 rep = ship_prep(root, measure=False, promote=True, skip_variety=True)
@@ -257,9 +261,7 @@ class ShipPrepTests(unittest.TestCase):
                 "cli_motion.i2v_motion_gate_from_rows",
                 return_value={"ok": True, "row_count": 0},
             ):
-                rep = ship_prep(
-                    root, measure=False, promote=False, skip_variety=False
-                )
+                rep = ship_prep(root, measure=False, promote=False, skip_variety=False)
             ids = [s["id"] for s in rep["steps"]]
             self.assertIn("variety", ids)
             self.assertIn("i2v_motion_gate", ids)
@@ -311,9 +313,7 @@ class ShipPrepTests(unittest.TestCase):
                     "cli_motion.i2v_motion_gate_from_rows",
                     return_value={"ok": True, "row_count": 1},
                 ):
-                    rep = ship_prep(
-                        root, measure=False, promote=False, skip_variety=False
-                    )
+                    rep = ship_prep(root, measure=False, promote=False, skip_variety=False)
             self.assertTrue(rep["ok"], rep)
             self.assertTrue((root / "receipts" / "ship-prep.json").is_file())
 

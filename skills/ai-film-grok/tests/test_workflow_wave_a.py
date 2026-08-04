@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 import tempfile
 import unittest
@@ -114,7 +113,12 @@ class CloseoutTests(unittest.TestCase):
             write_json(root / "post-plan.json", {"owner": "hyperframes"})
             write_json(
                 root / "receipts" / "pilot-approval.json",
-                {"approved": True, "approved_by": "user", "user_phrase": "pilot 过", "shots": ["shot01"]},
+                {
+                    "approved": True,
+                    "approved_by": "user",
+                    "user_phrase": "pilot 过",
+                    "shots": ["shot01"],
+                },
             )
             gates = {
                 "brief": True,

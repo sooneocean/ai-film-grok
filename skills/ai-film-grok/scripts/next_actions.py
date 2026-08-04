@@ -55,6 +55,8 @@ _ACTION_STAGE: dict[str, str] = {
     "agent-review-final": "post",
     "closeout-run": "post",
     "pilot-pack": "agent",
+    "plan-debrief": "agent",
+    "plan-debrief-confirm": "agent",
     "post-audit": "post",
     "export-desktop": "deliver",
     "done": "done",
@@ -116,6 +118,69 @@ def _tts_rehearse_ok(root: Path) -> bool:
         and rehearse.get("ok") is True
         and (rehearse.get("shots") or rehearse.get("shot_count"))
     )
+
+
+def _story_intake_active(root: Path) -> bool:
+    """True when user story work has started (reception / graph / planning text)."""
+    return any(
+        (root / rel).is_file()
+        for rel in (
+            "receipts/story-reception.json",
+            "drama-graph.json",
+            "receipts/story-normalize.json",
+        )
+    )
+
+
+def _past_story_planning(root: Path) -> bool:
+    """Legacy/mid-production: do not block on debrief once media is underway."""
+    try:
+        from production_gates import load_pilot_approval, pilot_is_user_approved
+
+        if pilot_is_user_approved(load_pilot_approval(root)):
+            return True
+    except Exception:
+        pass
+    man = read_json(root / "manifest.json") or {}
+    clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
+    for rec in clips.values():
+        if isinstance(rec, dict) and rec.get("status") in {"approved", "ready", "ok"}:
+            return True
+    if (root / "receipts" / "final.json").is_file():
+        return True
+    if (root / "out" / "film_final.mp4").is_file():
+        return True
+    return False
+
+
+def _debrief_next_action(root: Path, root_s: str) -> dict[str, str] | None:
+    """If story intake exists (and production not past planning), require debrief."""
+    if not _story_intake_active(root):
+        return None
+    if _past_story_planning(root):
+        return None
+    try:
+        from script_value_debrief import load_debrief
+
+        deb = load_debrief(root)
+    except Exception:
+        deb = None
+    if not deb:
+        return {
+            "id": "plan-debrief",
+            "cmd": f'aifilm plan debrief --root "{root_s}" --action seed',
+            "why": "故事已接收：先 script-value-debrief（seed→填 beat/value_rank→confirm）再 lock",
+        }
+    if deb.get("confirmed_by_user") is not True:
+        return {
+            "id": "plan-debrief-confirm",
+            "cmd": (
+                f'aifilm plan debrief --root "{root_s}" --action confirm '
+                f'--user-phrase "确认 promise 与不可砍 beat"'
+            ),
+            "why": "debrief 未确认：回显 promise/must_keep 后由用户 confirm（agent 不可代签）",
+        }
+    return None
 
 
 def _final_record(root: Path) -> dict[str, Any] | None:
@@ -214,9 +279,14 @@ def detect_pipeline_stage(
     stage = "agent"
     detail = "init"
 
+    debrief_gap = _debrief_next_action(root, str(root))
+
     if not has_brief:
         stage, detail = "agent", "init"
         blockers.append("brief_missing")
+    elif debrief_gap is not None:
+        stage, detail = "agent", debrief_gap["id"]
+        blockers.append("script_value_debrief_pending")
     elif not style_ok:
         stage, detail = "agent", "lock-style"
         blockers.append("style_not_locked")
@@ -307,6 +377,7 @@ def detect_pipeline_stage(
         "checklist": checklist,
         "flags": {
             "brief": has_brief,
+            "script_value_debrief_pending": debrief_gap is not None,
             "style_locked": style_ok,
             "spec": spec_ok,
             "pilot_user_approved": pilot_ok,
@@ -386,6 +457,12 @@ def build_next_actions(
             f'aifilm init --theme "…" --title "…" --root "{r}" --aspect 9:16',
             "项目未初始化",
         )
+        return actions
+
+    # Script-value-debrief: when story intake or graph exists, force debrief path first.
+    debrief_action = _debrief_next_action(root, r)
+    if debrief_action is not None:
+        add(debrief_action["id"], debrief_action["cmd"], debrief_action["why"])
         return actions
 
     if not gates.get("style_locked"):

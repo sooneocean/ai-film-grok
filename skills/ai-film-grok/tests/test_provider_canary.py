@@ -82,14 +82,24 @@ class TestRecordCanary(unittest.TestCase):
             media.write_bytes(b"frw media")
 
             rep1 = record_canary(
-                root, provider="frw-ltx23", output=str(media), reviewer="dex", identity_ok=True, motion_ok=True
+                root,
+                provider="frw-ltx23",
+                output=str(media),
+                reviewer="dex",
+                identity_ok=True,
+                motion_ok=True,
             )
             self.assertTrue(rep1["ok"])
             self.assertEqual(rep1["provider_model"], "ltx-2.3")
             self.assertTrue((root / "receipts" / "frw-ltx23-canary.json").is_file())
 
             rep2 = record_canary(
-                root, provider="frw-api-i2v", output=str(media), reviewer="dex", identity_ok=True, motion_ok=True
+                root,
+                provider="frw-api-i2v",
+                output=str(media),
+                reviewer="dex",
+                identity_ok=True,
+                motion_ok=True,
             )
             self.assertTrue(rep2["ok"])
             self.assertEqual(rep2["provider_model"], "img2video")

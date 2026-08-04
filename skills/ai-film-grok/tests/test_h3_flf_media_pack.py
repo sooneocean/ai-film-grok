@@ -40,9 +40,7 @@ def _film(tmp_path: Path, *, with_end: bool = False, with_cast: bool = False) ->
         cast = _png(root / "cast" / "hero.png")
         bible = {
             "schema_version": 2,
-            "characters": {
-                "hero": {"reference_image": {"path": str(cast.relative_to(root))}}
-            },
+            "characters": {"hero": {"reference_image": {"path": str(cast.relative_to(root))}}},
             "cast_masters": {},
             "cast_state_masters": {},
         }
@@ -131,6 +129,20 @@ def test_mode_flf_when_last_present() -> None:
     }
     r = resolve_h3_mode(shot, has_still=True, has_last=True)
     assert r["mode"] == "flf"
+    assert "first_last_primary" in r["reasons"]
+
+
+def test_force_r2v_keeps_r2v_even_with_last() -> None:
+    shot = {
+        "id": "s1",
+        "shot_role": "hero",
+        "heat_phase": "act",
+        "wardrobe_state": "bare",
+        "force_r2v": True,
+    }
+    r = resolve_h3_mode(shot, has_still=True, has_last=True)
+    assert r["mode"] == "r2v"
+    assert r.get("uses_last_as_pose_ref") is True
 
 
 def test_mode_continue_with_last_is_flf() -> None:
@@ -213,9 +225,7 @@ def test_compile_r2v_multi_ref_injects_slots() -> None:
 
 
 def test_r2v_ref_prompt_clause() -> None:
-    clause = r2v_ref_prompt_clause(
-        [{"role": "identity"}, {"role": "pose"}]
-    )
+    clause = r2v_ref_prompt_clause([{"role": "identity"}, {"role": "pose"}])
     assert "<Picture 1>" in clause
     assert "<Picture 2>" in clause
     assert "identity" in clause.lower()

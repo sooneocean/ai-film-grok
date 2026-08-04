@@ -10,6 +10,7 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from h3_workflow import _prompt_for_shot  # noqa: E402
 from motion_prompt_spine import (  # noqa: E402
     MotionCoreError,
     assert_motion_prompt_core,
@@ -20,7 +21,6 @@ from motion_prompt_spine import (  # noqa: E402
     want_beat_line,
 )
 from production_router import build_shot_intent  # noqa: E402
-from h3_workflow import _prompt_for_shot  # noqa: E402
 
 
 def test_want_beat_from_director_intent() -> None:
@@ -90,9 +90,7 @@ def test_ensure_merges_dialogue_into_author_file() -> None:
         "id": "s_x",
         "screen_mode": "on_camera",
         "dramatic_function": "approach",
-        "audio_cues": [
-            {"kind": "voice", "line_type": "dialogue", "spoken_text": "看着我。"}
-        ],
+        "audio_cues": [{"kind": "voice", "line_type": "dialogue", "spoken_text": "看着我。"}],
         "dsl": {"action": "soft push-in"},
     }
     out = ensure_motion_core_in_prompt("Vertical 9:16. Keep face. Soft push.", {}, shot)
@@ -113,7 +111,11 @@ def test_intent_carries_motion_core_fields() -> None:
             "heat_phase": "act",
             "wardrobe_state": "bare",
             "dramatic_function": "action",
-            "dsl": {"action": "body rocks", "motion": "thrust rhythm", "visible_change": "weight shifts"},
+            "dsl": {
+                "action": "body rocks",
+                "motion": "thrust rhythm",
+                "visible_change": "weight shifts",
+            },
         },
     )
     assert intent["dramatic_function"] == "action"

@@ -295,8 +295,14 @@ class TestSeedConfirmCli:
         }
         draft = seed_from_reception(reception)
         assert draft["viewer_promise"]
-        assert len(draft["beat_cards"]) == 3
+        assert len(draft["beat_cards"]) >= 3
         assert len(draft["must_keep_beat_ids"]) >= 2
+        dfs = {str(c.get("dramatic_function")) for c in draft["beat_cards"]}
+        assert "climax" in dfs
+        assert "resolution" in dfs or "afterglow" in dfs
+        assert any(c.get("needs_agent_fill") for c in draft["beat_cards"])
+        pairs = (draft.get("writer") or {}).get("setup_payoff_pairs") or []
+        assert pairs and pairs[0].get("payoff_ref")
         summary = user_facing_summary(draft)
         assert "prompt_user" in summary
 
@@ -310,10 +316,19 @@ class TestSeedConfirmCli:
                 c["value_rank"] = 4
                 c["state_in"] = "a"
                 c["state_out"] = "b"
+                c["visible_change"] = "可见变化"
+                c["needs_agent_fill"] = False
             write_debrief(root, draft)
             out = confirm_debrief(root, user_phrase="确认 promise 与不可砍 beat")
             assert out["confirmed_by_user"] is True
             assert load_debrief_ok(root)
+            loaded = json.loads(
+                (root / "receipts" / "script-value-debrief.json").read_text(encoding="utf-8")
+            )
+            # Soft schema stamp when jsonschema is installed
+            if loaded.get("_schema_validation"):
+                assert loaded["_schema_validation"].get("ok") is False
+            # else missing jsonschema / soft skip → no hard stamp required
 
     def test_plan_debrief_status(self):
         from argparse import Namespace

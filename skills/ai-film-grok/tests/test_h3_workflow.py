@@ -7,18 +7,16 @@ import sys
 from pathlib import Path
 from unittest import mock
 
-import pytest
-
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from aifilm_grok import build_parser  # noqa: E402
 from h3_workflow import (  # noqa: E402
     ensure_h3_delivery_geometry,
     list_h3_eligible_shots,
     plan_h3_shot,
     resolve_h3_deliver_audio,
 )
-from aifilm_grok import build_parser  # noqa: E402
 
 
 def _film_root(tmp_path: Path, *, h3_enabled: bool = True) -> Path:
@@ -137,12 +135,8 @@ def test_explicit_strip_always_strips(tmp_path: Path) -> None:
     raw = tmp_path / "raw.mp4"
     plate = tmp_path / "plate.mp4"
     raw.write_bytes(b"fake")
-    with mock.patch(
-        "h3_workflow._strip_audio", side_effect=lambda s, d: d.write_bytes(b"p") or d
-    ):
-        decision = resolve_h3_deliver_audio(
-            raw, plate, audio_policy="strip_native_use_tts_bgm"
-        )
+    with mock.patch("h3_workflow._strip_audio", side_effect=lambda s, d: d.write_bytes(b"p") or d):
+        decision = resolve_h3_deliver_audio(raw, plate, audio_policy="strip_native_use_tts_bgm")
     assert decision["audio_stripped"] is True
     assert decision["use_clip_audio"] is False
 

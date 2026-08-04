@@ -170,7 +170,9 @@ class StoryPlanTests(unittest.TestCase):
             self.assertTrue(all(shot["lipsync"] is True for shot in speaking))
             self.assertTrue(all(shot["translation_status"] == "ready" for shot in speaking))
             self.assertTrue(
-                all((shot.get("audio_cues") or [{}])[0].get("language") == "zh" for shot in speaking)
+                all(
+                    (shot.get("audio_cues") or [{}])[0].get("language") == "zh" for shot in speaking
+                )
             )
             self.assertTrue(all(shot["dialogue_motion_route"] == "auto" for shot in speaking))
             self.assertTrue(

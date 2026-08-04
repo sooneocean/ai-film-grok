@@ -6,11 +6,10 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
-
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+from aifilm_grok import build_parser  # noqa: E402
 from h3_fill_idle import (  # noqa: E402
     build_fill_idle_queue,
     classify_fill_idle_shot,
@@ -20,7 +19,6 @@ from h3_fill_idle import (  # noqa: E402
     pk_compare,
 )
 from h3_workflow import list_h3_eligible_shots  # noqa: E402
-from aifilm_grok import build_parser  # noqa: E402
 
 
 def _film(tmp_path: Path) -> Path:
@@ -286,9 +284,7 @@ def test_dual_take_second_leg_r2v(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     (root / "manifest.json").write_text(
-        json.dumps(
-            {"stills": {"s_climax": {"path": str(still), "status": "approved"}}}
-        ),
+        json.dumps({"stills": {"s_climax": {"path": str(still), "status": "approved"}}}),
         encoding="utf-8",
     )
     q = build_fill_idle_queue(root, include_challenge=False)

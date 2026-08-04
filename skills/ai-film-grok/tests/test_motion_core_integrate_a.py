@@ -146,9 +146,7 @@ class PhaseBAutoGateAndSurface(unittest.TestCase):
             # mean only from sidecar next to mp4 — create dummy mp4+json
             mp4 = root / "takes" / "r1" / "r1.mp4"
             mp4.write_bytes(b"\x00")
-            (Path(str(mp4) + ".json")).write_text(
-                json.dumps({"mean": 12.0}), encoding="utf-8"
-            )
+            (Path(str(mp4) + ".json")).write_text(json.dumps({"mean": 12.0}), encoding="utf-8")
             rows2 = collect_motion_gate_rows(root)
             self.assertEqual(rows2[0]["mean"], 12.0)
 
@@ -179,9 +177,7 @@ class PhaseBAutoGateAndSurface(unittest.TestCase):
             takes.mkdir(parents=True)
             mp4 = takes / "r1.mp4"
             mp4.write_bytes(b"\x00")
-            (Path(str(mp4) + ".json")).write_text(
-                json.dumps({"mean": 12.0}), encoding="utf-8"
-            )
+            (Path(str(mp4) + ".json")).write_text(json.dumps({"mean": 12.0}), encoding="utf-8")
             rep = i2v_motion_gate_from_rows(
                 [],
                 root=root,

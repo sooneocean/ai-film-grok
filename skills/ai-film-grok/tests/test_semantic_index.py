@@ -60,9 +60,7 @@ def test_collect_documents_is_source_bound_and_redacts_secret_values(tmp_path: P
     assert all("/etc/hosts" not in item["text"] for item in documents)
     assert all("C:\\Users\\dex\\private.txt" not in item["text"] for item in documents)
     assert all("\\\\server\\share\\private.txt" not in item["text"] for item in documents)
-    assert all(
-        synthetic_github_token not in item["text"] for item in documents
-    )
+    assert all(synthetic_github_token not in item["text"] for item in documents)
     assert all("prefix(/Users/dex/private/story.txt)" not in item["text"] for item in documents)
     assert all("synthetic-secret-not-real" not in item["text"] for item in documents)
     assert all("ACCESS_SECRET_8" not in item["text"] for item in documents)

@@ -181,9 +181,7 @@ def test_autopilot_stops_when_local_next_not_on_advance(tmp_path: Path) -> None:
         report = autopilot_once(
             tmp_path,
             max_actions=1,
-            skill_executor=lambda *_a, **_k: (_ for _ in ()).throw(
-                AssertionError("must not run")
-            ),
+            skill_executor=lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("must not run")),
             notifier=lambda _: {"attempted": False},
         )
     assert report["stop_reason"] == "local_not_allowlisted"
@@ -208,9 +206,7 @@ def test_autopilot_still_stops_on_human_review_final(tmp_path: Path) -> None:
         report = autopilot_once(
             tmp_path,
             max_actions=1,
-            skill_executor=lambda *_a, **_k: (_ for _ in ()).throw(
-                AssertionError("must not run")
-            ),
+            skill_executor=lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("must not run")),
             notifier=lambda _: {"attempted": False},
         )
     assert report["stop_reason"] == "human_approval_required"

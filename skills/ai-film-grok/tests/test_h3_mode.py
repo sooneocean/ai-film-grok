@@ -44,7 +44,7 @@ class ResolveH3ModeTests(unittest.TestCase):
         r = resolve_h3_mode(_shot(), has_still=True)
         self.assertEqual(r["mode"], "i2v")
 
-    def test_dialogue_close_restricted_is_r2v(self) -> None:
+    def test_dialogue_close_restricted_is_r2v_without_last(self) -> None:
         r = resolve_h3_mode(
             _shot(
                 shot_size="cu",
@@ -59,10 +59,32 @@ class ResolveH3ModeTests(unittest.TestCase):
                 "motion_tier": "high",
             },
             has_still=True,
+            has_last=False,
         )
         self.assertEqual(r["mode"], "r2v")
 
-    def test_high_motion_difficulty_is_r2v(self) -> None:
+    def test_dialogue_close_with_last_prefers_flf(self) -> None:
+        r = resolve_h3_mode(
+            _shot(
+                shot_size="cu",
+                screen_mode="on_camera",
+                audio_cues=[{"spoken_text": "别停", "screen_mode": "on_camera"}],
+            ),
+            intent={
+                "content_class": "restricted_local",
+                "shot_role": "hero",
+                "spoken_text": "别停",
+                "screen_mode": "on_camera",
+                "motion_tier": "high",
+            },
+            has_still=True,
+            has_last=True,
+        )
+        self.assertEqual(r["mode"], "flf")
+        self.assertEqual(r["alt_mode"], "r2v")
+        self.assertIn("first_last_primary", r["reasons"])
+
+    def test_high_motion_difficulty_is_r2v_without_last(self) -> None:
         r = resolve_h3_mode(
             _shot(),
             intent={
@@ -73,8 +95,25 @@ class ResolveH3ModeTests(unittest.TestCase):
                 "difficulty_flags": ["coitus_beat:deep_thrust", "sex_pose:missionary"],
             },
             has_still=True,
+            has_last=False,
         )
         self.assertEqual(r["mode"], "r2v")
+
+    def test_high_motion_with_last_prefers_flf(self) -> None:
+        r = resolve_h3_mode(
+            _shot(),
+            intent={
+                "content_class": "restricted_local",
+                "shot_role": "hero",
+                "heat_phase": "act",
+                "motion_tier": "high",
+                "difficulty_flags": ["coitus_beat:deep_thrust", "sex_pose:missionary"],
+            },
+            has_still=True,
+            has_last=True,
+        )
+        self.assertEqual(r["mode"], "flf")
+        self.assertEqual(r["alt_mode"], "r2v")
 
     def test_soft_high_motion_keeps_i2v_with_r2v_alt(self) -> None:
         r = resolve_h3_mode(

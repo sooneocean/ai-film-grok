@@ -205,17 +205,21 @@ def _has_lane(takes: list[dict[str, Any]], lane: str) -> bool:
 
 
 def h3_modes_in_takes(takes: list[dict[str, Any]]) -> set[str]:
-    """Infer which H3 modes already exist from path names (_i2v_ / _r2v_ / _t2v_)."""
+    """Infer which H3 modes already exist from path names (_i2v_ / _flf_ / _r2v_ / _t2v_)."""
     modes: set[str] = set()
     for t in takes:
         if t.get("lane") != "h3":
             continue
         blob = str(t.get("path") or "").lower()
-        if "_r2v_" in blob or "r2v" in blob.split("/")[-1]:
+        name = blob.split("/")[-1]
+        if "_r2v_" in blob or "r2v" in name:
             modes.add("r2v")
-        elif "_t2v_" in blob or "t2v" in blob.split("/")[-1]:
+        elif "_flf_" in blob or "flf" in name:
+            modes.add("flf")
+            modes.add("i2v")  # FLF counts as identity/first-last I2V leg for dual
+        elif "_t2v_" in blob or "t2v" in name:
             modes.add("t2v")
-        elif "_i2v_" in blob or "i2v" in blob.split("/")[-1]:
+        elif "_i2v_" in blob or "i2v" in name:
             modes.add("i2v")
         else:
             modes.add("h3")
@@ -346,6 +350,20 @@ def classify_fill_idle_shot(
     )
     poison = _poison_blocked(base, sid)
 
+    # First/last media pack: FLF needs end still; R2V uses last as pose ref.
+    has_last = False
+    last_path: Path | None = None
+    try:
+        from h3_media_pack import resolve_last_frame_path
+
+        lp, _lsrc = resolve_last_frame_path(base, sid, shot=shot)
+        if lp is not None and lp.is_file():
+            has_last = True
+            last_path = lp
+    except Exception:
+        has_last = False
+        last_path = None
+
     reasons: list[str] = []
     priority = "P3"
     lane = "skip"
@@ -358,7 +376,11 @@ def classify_fill_idle_shot(
         # env stays out of lock-face challenge unless primary t2v path
         if not has_any:
             mode_res = resolve_h3_mode(
-                shot, intent=intent, has_still=has_still, wants_continue=wants_continue
+                shot,
+                intent=intent,
+                has_still=has_still,
+                has_last=has_last,
+                wants_continue=wants_continue,
             )
             if mode_res.get("mode") == "t2v":
                 priority, lane, status = "P2", "challenge_env", "pending"
@@ -391,11 +413,15 @@ def classify_fill_idle_shot(
             status = "retry"
             reasons.append("h3_below_floor")
         elif has_h3 and not below and dual:
-            # Need both I2V (identity) and R2V (energy) for high-value PK
-            has_i2v = "i2v" in h3_modes or ("h3" in h3_modes and "r2v" not in h3_modes)
+            # Dual: identity leg (I2V or FLF) + energy R2V for high-value PK
+            has_i2v = (
+                "i2v" in h3_modes
+                or "flf" in h3_modes
+                or ("h3" in h3_modes and "r2v" not in h3_modes)
+            )
             has_r2v = "r2v" in h3_modes
             explicit_dual = _explicit_dual_flag(shot, intent)
-            # γ3: auto-dual only — if I2V already well above floor, skip blind R2V
+            # γ3: auto-dual only — if I2V/FLF already well above floor, skip blind R2V
             i2v_strong = _i2v_mean_strong_enough(takes, floor=floor, best=best)
             if has_i2v and has_r2v:
                 status = "done"
@@ -403,6 +429,8 @@ def classify_fill_idle_shot(
             elif has_r2v and not has_i2v:
                 status = "pending"
                 reasons.append("dual_need_i2v")
+                if has_last:
+                    reasons.append("dual_prefer_flf")
             elif has_i2v and not has_r2v:
                 if i2v_strong and not explicit_dual:
                     status = "done"
@@ -413,6 +441,8 @@ def classify_fill_idle_shot(
             else:
                 status = "pending"
                 reasons.append("dual_need_second_mode")
+                if has_last:
+                    reasons.append("dual_prefer_flf")
         elif has_h3 and not below:
             status = "done"
             reasons.append("h3_take_ok")
@@ -448,7 +478,11 @@ def classify_fill_idle_shot(
         reasons.append("no_still_for_challenge")
 
     mode_res = resolve_h3_mode(
-        shot, intent=intent, has_still=has_still, wants_continue=wants_continue
+        shot,
+        intent=intent,
+        has_still=has_still,
+        has_last=has_last,
+        wants_continue=wants_continue,
     )
     mode = str(mode_res.get("mode") or "i2v")
     # Dual second leg: pick the missing mode explicitly
@@ -456,28 +490,35 @@ def classify_fill_idle_shot(
         mode = "r2v"
         reasons.append("dual_second_leg_r2v")
     elif primary and "dual_need_i2v" in reasons:
-        mode = "i2v"
-        reasons.append("dual_second_leg_i2v")
-    # P2 soft challenges: default I2V first (policy); keep alt_mode from resolver
+        # Prefer FLF identity leg when end still exists
+        mode = "flf" if has_last else "i2v"
+        reasons.append("dual_second_leg_flf" if has_last else "dual_second_leg_i2v")
+    # P2 soft challenges: default I2V/FLF first (policy); keep alt_mode from resolver
     elif lane == "challenge_grok" and status.startswith("pending") and mode == "r2v":
-        # still allow r2v if energy flags, but soft fill prefers i2v when alt exists
-        if not primary and mode_res.get("alt_mode") != "i2v":
+        # still allow r2v if energy flags, but soft fill prefers face lock when alt exists
+        if not primary and mode_res.get("alt_mode") not in {"i2v", "flf"}:
             pass  # keep r2v for true energy
         elif not primary:
-            # prefer i2v for fair face PK unless dialogue-close energy
+            # prefer flf/i2v for fair face PK unless dialogue-close energy
             if not (on_cam and close):
-                mode = "i2v"
-                reasons.append("p2_prefer_i2v_face_pk")
+                mode = "flf" if has_last else "i2v"
+                reasons.append("p2_prefer_flf_face_pk" if has_last else "p2_prefer_i2v_face_pk")
 
+    last_cli = f' --last-frame "{last_path}"' if last_path and mode in {"flf", "r2v"} else ""
     cmd = (
-        f'aifilm h3 run --root "{base}" --shot-id {sid} --mode {mode} --register'
+        f'aifilm h3 run --root "{base}" --shot-id {sid} --mode {mode}{last_cli} --register'
         if status not in {"skip", "done", "poison_blocked"} and priority != "P3"
         else None
     )
     if status in {"pending", "retry"} and priority == "P2":
         cmd = (
-            f'aifilm h3 run --root "{base}" --shot-id {sid} --mode {mode} --register --stage pilot'
+            f'aifilm h3 run --root "{base}" --shot-id {sid} --mode {mode}{last_cli} '
+            f"--register --stage pilot"
         )
+    alt_mode = mode_res.get("alt_mode")
+    alt_cli = ""
+    if alt_mode and last_path and str(alt_mode) in {"flf", "r2v"}:
+        alt_cli = f' --last-frame "{last_path}"'
 
     return {
         "shot_id": sid,
@@ -489,12 +530,14 @@ def classify_fill_idle_shot(
         "reasons": reasons,
         "mode": mode,
         "mode_reasons": list(mode_res.get("reasons") or []),
-        "alt_mode": mode_res.get("alt_mode"),
+        "alt_mode": alt_mode,
         "alt_reasons": list(mode_res.get("alt_reasons") or []),
         "weapon_id": mode_res.get("weapon_id"),
         "content_class": intent.get("content_class"),
         "provider_lock": intent.get("provider_lock"),
         "has_still": bool(has_still),
+        "has_last": bool(has_last),
+        "last_path": str(last_path) if last_path else None,
         "wants_continue": bool(wants_continue),
         "spoken_text": bool(spoken),
         "motion_tier": intent.get("motion_tier"),
@@ -507,11 +550,8 @@ def classify_fill_idle_shot(
         "has_baseline_take": has_any,
         "command": cmd,
         "command_alt": (
-            (
-                f'aifilm h3 run --root "{base}" --shot-id {sid} '
-                f"--mode {mode_res.get('alt_mode')} --register"
-            )
-            if mode_res.get("alt_mode") and cmd
+            (f'aifilm h3 run --root "{base}" --shot-id {sid} --mode {alt_mode}{alt_cli} --register')
+            if alt_mode and cmd
             else None
         ),
         "dual_sticky": bool(_DUAL_STICKY_REASONS.intersection(reasons)),
@@ -535,7 +575,7 @@ def _i2v_mean_strong_enough(
     floor: float | None,
     best: float | None,
 ) -> bool:
-    """True when an I2V (or generic h3) take is comfortably above motion floor."""
+    """True when an I2V/FLF (or generic h3) take is comfortably above motion floor."""
     if floor is None:
         return False
     thr = float(floor) + 4.0
@@ -545,6 +585,7 @@ def _i2v_mean_strong_enough(
         blob = str(t.get("path") or "").lower()
         if "r2v" in blob:
             continue
+        # flf / i2v / generic h3 all count as identity legs
         m = t.get("mean")
         if m is not None and float(m) >= thr:
             return True

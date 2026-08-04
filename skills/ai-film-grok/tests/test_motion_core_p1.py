@@ -15,11 +15,11 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from i2v_motion_gate import (  # noqa: E402
-    CODE_MEDIUM_MEAN_LOW,
     CODE_MEAT_MEAN_LOW,
+    CODE_MEDIUM_MEAN_LOW,
     CODE_SOFT_MEAN_LOW,
-    MEAN_MEDIUM_FLOOR,
     MEAN_MEAT_FLOOR,
+    MEAN_MEDIUM_FLOOR,
     MEAN_SOFT_FLOOR,
     evaluate_shot_motion,
     floor_for_tier,
@@ -30,7 +30,6 @@ from workflow_pack import (  # noqa: E402
     assert_variety_preflight,
     bulk_preflight,
     film_core_closeout_audit,
-    variety_precheck,
 )
 
 
@@ -96,9 +95,7 @@ class DfMotionTierTests(unittest.TestCase):
         self.assertEqual(r["floor"], MEAN_SOFT_FLOOR)
 
     def test_soft_df_below_floor(self) -> None:
-        r = evaluate_shot_motion(
-            8.0, heat_phase="setup", dramatic_function="insert", shot_id="i1"
-        )
+        r = evaluate_shot_motion(8.0, heat_phase="setup", dramatic_function="insert", shot_id="i1")
         self.assertFalse(r["ok"])
         self.assertIn(CODE_SOFT_MEAN_LOW, r["codes"])
 
@@ -107,9 +104,7 @@ class DfMotionTierTests(unittest.TestCase):
             motion_tier_for_shot(heat_phase="act", dramatic_function="reaction"),
             "meat",
         )
-        r = evaluate_shot_motion(
-            19.0, heat_phase="act", dramatic_function="reaction", shot_id="a1"
-        )
+        r = evaluate_shot_motion(19.0, heat_phase="act", dramatic_function="reaction", shot_id="a1")
         self.assertFalse(r["ok"])
         self.assertIn(CODE_MEAT_MEAN_LOW, r["codes"])
 
@@ -193,9 +188,7 @@ class VarietyBulkDoorTests(unittest.TestCase):
             _write(root, "manifest.json", {"stills": {}, "clips": {}})
             with mock.patch.dict(os.environ, {}, clear=False):
                 os.environ.pop("AIFILM_SKIP_VARIETY_PREFLIGHT", None)
-                report = bulk_preflight(
-                    root, write=True, probe_tunnel=False, check_lease=False
-                )
+                report = bulk_preflight(root, write=True, probe_tunnel=False, check_lease=False)
             names = [c["id"] for c in report.get("checks") or []]
             self.assertIn("variety", names)
             variety = next(c for c in report["checks"] if c["id"] == "variety")
@@ -332,9 +325,7 @@ class ContinueHandoffMetaTests(unittest.TestCase):
             )
             self.assertFalse(meta["ok"])
             self.assertEqual(meta["dramatic_function"], "action")
-            self.assertTrue(
-                (root / "receipts" / "continue-handoff" / "s9.json").is_file()
-            )
+            self.assertTrue((root / "receipts" / "continue-handoff" / "s9.json").is_file())
 
 
 class ContinueHandoffReadTests(unittest.TestCase):

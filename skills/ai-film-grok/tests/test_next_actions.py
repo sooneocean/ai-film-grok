@@ -49,6 +49,56 @@ def test_next_actions_publish_a_single_owner_per_stage(tmp_path: Path) -> None:
     }
 
 
+def test_next_actions_forces_plan_debrief_when_story_intake(tmp_path: Path) -> None:
+    (tmp_path / "brief.json").write_text('{"title":"t"}', encoding="utf-8")
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "story-reception.json").write_text(
+        '{"kind":"story-reception","treatment":{"title":"t"}}',
+        encoding="utf-8",
+    )
+    actions = build_next_actions(tmp_path, gates={"brief": True, "style_locked": False})
+    assert [a["id"] for a in actions] == ["plan-debrief"]
+    assert "plan debrief" in actions[0]["cmd"]
+    stage = detect_pipeline_stage(
+        tmp_path,
+        gates={
+            "brief": True,
+            "style_locked": False,
+            "spec": False,
+            "pilot_user_approved": False,
+            "clips_complete": False,
+            "audio_ready": False,
+            "final_present": False,
+        },
+    )
+    assert stage["detail"] == "plan-debrief"
+    assert stage["flags"]["script_value_debrief_pending"] is True
+
+
+def test_next_actions_skips_debrief_when_pilot_approved(tmp_path: Path) -> None:
+    (tmp_path / "brief.json").write_text('{"title":"t"}', encoding="utf-8")
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "story-reception.json").write_text('{"kind":"story-reception"}', encoding="utf-8")
+    (receipts / "pilot-approval.json").write_text(
+        json.dumps(
+            {
+                "kind": "pilot-approval",
+                "approved": True,
+                "approved_by": "user",
+                "user_phrase": "pilot go",
+                "approved_at": "2026-08-04T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    actions = build_next_actions(tmp_path, gates={"brief": True, "style_locked": False})
+    ids = [a["id"] for a in actions]
+    assert "plan-debrief" not in ids
+    assert "lock-style" in ids
+
+
 def test_clips_complete_prompts_to_lock_post_owner_before_design(tmp_path: Path) -> None:
     (tmp_path / "brief.json").write_text('{"title":"t"}', encoding="utf-8")
     actions = build_next_actions(

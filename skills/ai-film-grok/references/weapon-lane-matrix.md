@@ -52,16 +52,16 @@ aifilm h3 plan --root "<film>" --shot-id s01 --still takes/s01/still_frw_*.png
 
 硬规则：共享限流 image≥30s / video≥5min；candidate ≠ approved；`h3 next` 可带 `still_challenge_hint`（弱 take 先换 still）。
 
-## H3 三模式 · 效果最大化（2026-08-04 实机 · 2.37.3 自动选型）
+## H3 first/last 主链 · 效果最大化（2026-08-04 · v2 first_last）
 
-| 模式 | 一句话 | 用 | 不用 |
-|------|--------|----|------|
-| **I2V** | 定妆 still 动起来 | 主角、肉戏、反应镜、**续镜硬接** | 无 still；无脸垫片 |
-| **FLF** | 首帧→尾帧插值（同 fl2va I2V + `last_frame`） | 位姿 A→B、卸装落点、插入对准、续镜+本镜终点 | 无可信 end still；反应微动 |
-| **R2V** | 参考演一版 | 高能量、换构图、对白大嘴 ECU | 必须像素贴 still 时（优先 I2V/FLF） |
-| **T2V** | 纯文生 | 无脸 env/bridge | **任何锁脸 hero** |
+| 模式 | 一句话 | first | last | 用 | 不用 |
+|------|--------|-------|------|----|------|
+| **I2V** | 单首帧动起来 | 批准 still | — | 无 end still；反应微动 | 已有 end still（应升 FLF） |
+| **FLF** | 首帧→尾帧硬接（fl2va + `last_frame`） | 开场 still | 收场 end still | **默认质量主轨**：位姿 A→B、卸装落点、续镜+终点 | 无可信 end；`force_i2v_single` |
+| **R2V** | 参考演；有 last 时 last=pose land ref | ref0 主 still | 优先 pose ref | `force_r2v` / 无 last 的能量 CU | 必须像素贴落点（改 FLF） |
+| **T2V** | 纯文生 | — | — | 无脸 env/bridge | **任何锁脸 hero** |
 
-**自动选型（v2.37.3 · `scripts/h3_mode.py` · `resolve_h3_mode`）**：写进 `h3 plan` / `h3 list`。
+**自动选型（`scripts/h3_mode.py` · policy `h3_max_effect_v2_first_last`）**：写进 `h3 plan` / `h3 list` / Fill-Idle。
 
 | 优先级 | 条件 | mode |
 |--------|------|------|
@@ -71,15 +71,16 @@ aifilm h3 plan --root "<film>" --shot-id s01 --still takes/s01/still_frw_*.png
 | 4 | `shot_role=env|bridge` | **t2v** |
 | 5 | insert + first+last | **flf** |
 | 6 | insert + still only | **i2v**（alt r2v） |
-| 7 | restricted + 对白 CU/ECU；或 high + 高难度 flag；`force_r2v` | **r2v**（alt flf/i2v） |
-| 8 | 有 still **且** 有 last（`stills/<id>_end.png` / `--last-frame`） | **flf** |
-| 9 | 默认有 still | **i2v**（高动 soft → `alt_mode=r2v`） |
+| 7 | **`force_r2v` / `h3_prefer=r2v`** | **r2v**（有 last → pose ref；alt flf） |
+| 8 | 有 still **且** 有 last | **flf**（能量/对白 CU → `alt_mode=r2v`） |
+| 9 | 无 last + 能量 flag / 对白 CU restricted | **r2v**（alt i2v；hint 产 end still） |
+| 10 | 默认有 still | **i2v**（高动 soft → `alt_mode=r2v`） |
 
 **FLF 用法**：`aifilm h3 plan|run --last-frame PATH` 或约定 `stills/<shot>_end.png`；receipt 含 `media_pack` / `last_path`。
 
-**R2V multi-ref（Phase 3）**：`media_pack.refs` / `--ref` → 最多 2 张额外图 （`ref_images.ref_image_1/2`）；prompt 注入 `<Picture n>` 职责。
+**R2V first/last**：主 still = first；`--last-frame` 或 `_end.png` → **第一** extra ref（pose land）+ prompt land 句；identity 次之。Fill-Idle command 自动带 `--last-frame`。
 
-**End still 产线（Phase 4）**：`still-challenge promote --as end` → `stills/<id>_end.png`；plan 缺 last 时带 `missing_last_hint`。
+**End still 产线**：`still-challenge promote --as end` → `stills/<id>_end.png`；plan 缺 last 时带 `missing_last_hint`。
 
 `list` 每行带 `mode`/`command`/`alt_mode`；`plan` 带 `mode_resolve` + `effect_tips` + `command_alt`。CLI `--mode` 可覆盖。
 

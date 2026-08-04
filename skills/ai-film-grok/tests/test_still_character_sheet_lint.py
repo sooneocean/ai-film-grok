@@ -1,4 +1,5 @@
 """huangdao 2026-08-03: character sheet path hard-fail; story still passes."""
+
 from __future__ import annotations
 
 from pathlib import Path
