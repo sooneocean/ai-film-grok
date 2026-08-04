@@ -4,6 +4,7 @@ E病毒 ch4 批跑 / 解剖修毒 / Comfy 5090 / **收尾门禁** 时先扫本�
 
 | 主题 | 文件 | 要点 |
 |------|------|------|
+| **2026-08-04 全面优化收工** | [session-wrap-optimize](2026-08-04-session-wrap-optimize.md) · Fill-Idle 2.37.5 + meaning 2.37.6 | check-all 绿；push 齐 |
 | **用户命令是圣旨（P0 · 2026-08-04）** | [user-command-is-edict](2026-08-04-user-command-is-edict.md) · `~/.grok/Agents.md` 圣旨协议 | 短令=立刻办；go next 整条链；写入记忆当轮落档 |
 | **Agent 出货纪律 IRON（P0 · 后面不要再犯）** | [agent-ship-discipline-iron](2026-07-29-agent-ship-discipline-iron.md) · [lesson](../references/lessons-2026-07-29-agent-ship-skill-budget-push.md) | SKILL≤6k+锚点；runtime-lock；干净树再 push；heat A/S 分层；dialogue_drama；wardrobe ladder |
 | **画面抗重复·体位/特写/运镜 IRON（P0 · 后面不要再犯）** | [shot-variety-anti-boring](2026-07-29-shot-variety-anti-boring.md) · [lesson](../references/lessons-2026-07-29-shot-variety-anti-boring.md) | ≥4体位+≥2脸CU+≥2L4；运镜轮换；门绿≠好看；主戏≥4.5s |
