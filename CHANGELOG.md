@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.38.4] - 2026-08-04
+
+### Changed (C4 · status/doctor + giant module split + disk hygiene)
+- **`cli_status`**: extract `cmd_doctor` + `_classify_doctor_readiness` (~350 LOC); re-export from `aifilm_grok`.
+- **`edit_policy_heat.py`**: heat/wardrobe/sex/VO spice (~4k LOC) off `edit_policy`; public symbols re-exported.
+- **`render_final_music.py`**: BGM/WAV/loudness helpers (~700 LOC) off `render_final`; re-exported.
+- Monolith ~8070 → ~7720; `edit_policy` ~6360 → ~2470; `render_final` ~5020 → ~4340.
+- **Disk (user OK):** remove repo-root duplicate `g2pW` (152M) and `.local-runtimes` (~4.5G offline TTS; edge remains default). Skill-side `g2pW` kept.
+- **Tests:** fix `test_heat_arc_multi` `_spine` typos (`action_full` / `beat_motion` scope) so heat gates run again.
+
 ## [2.38.3] - 2026-08-04
 
 ### Changed (C3 · media CLI extract)

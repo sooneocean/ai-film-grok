@@ -133,11 +133,11 @@ def _spine(phases: list[str], *, wardrobe_ok: bool = True, vo_spice: bool = True
                 wardrobe_state = "bare"
                 coitus_beat = "hook"
                 partner_ws = "undressed"
-            beat_motion = _BEAT_MOTION.get(ph, _BEAT_MOTION["bridge"])
+        beat_motion = _BEAT_MOTION.get(ph, _BEAT_MOTION["bridge"])
         # (no arc_node/emotion field — the heat-arc/wardrobe tests rely on gate being neutral)
         dsl = {
             "subject": subject,
-            "action": action_full,
+            "action": action,
             "motion": beat_motion,
             "story_beat": f"{ph} beat",
             "visible_change": f"{ph}: body state advances A→B",

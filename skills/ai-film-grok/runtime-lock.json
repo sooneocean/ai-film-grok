@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "73a13c443624a6e8d02e219da51bacf482ac638caeaeaeeaf86fb2dcb5d643ae"
+      "sha256": "6336403fb85e6b45ae553700b94f622ae947410c8218d3a88aeb739423fd3f68"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -378,7 +378,7 @@
     },
     {
       "path": "scripts/cli_status.py",
-      "sha256": "17b95b8ea95a04c16eb7629f6c2681f7be109ee790280ceb0b1720e9780b7195"
+      "sha256": "62211de19ead6cd587a599042306f6c45fe8be3ac5d9cb322cfd0467eb508675"
     },
     {
       "path": "scripts/cli_team.py",
@@ -590,7 +590,11 @@
     },
     {
       "path": "scripts/edit_policy.py",
-      "sha256": "8de91e82c207a0be259321be21b7a48f6db0b2007ee752d4c257f5d1c74a33f7"
+      "sha256": "59a9f9dd25cc96ec8e1c6a0c3bc9ac1d1189a7275307a298732c430ddc4eeea4"
+    },
+    {
+      "path": "scripts/edit_policy_heat.py",
+      "sha256": "f736fc69c5f396fa74f1d68dc01de022536c599f64a19de6ea49962c18a82b57"
     },
     {
       "path": "scripts/edit_strategy.py",
@@ -1038,7 +1042,11 @@
     },
     {
       "path": "scripts/render_final.py",
-      "sha256": "b8bed385c310a6d0714326dd7c1cafd04295b563d3a7a4251c0d135e1728a486"
+      "sha256": "2508f8d510997070aa80c70c81ee98cb6289f6eb8be4c495b439de29765ea0b0"
+    },
+    {
+      "path": "scripts/render_final_music.py",
+      "sha256": "35d1b7a738cacc63efdc1ba1ae5ecf5f74b91ca83b4c46bb1d4cf3a08f91c69d"
     },
     {
       "path": "scripts/render_workspace.py",
