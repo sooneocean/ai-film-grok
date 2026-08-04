@@ -11,7 +11,9 @@ from typing import Any
 SPOT_EVENT_TYPES = frozenset(
     {"mute", "sfx_accent", "duck", "music_in", "music_out", "fade_in", "fade_out"}
 )
-SFX_KINDS = frozenset({"heartbeat", "whoosh", "chime", "impact", "breath", "generic"})
+SFX_KINDS = frozenset(
+    {"heartbeat", "whoosh", "chime", "impact", "breath", "generic", "foley_cloth"}
+)
 # Canonical BGM moods (render_final / make_sfx_bed)
 SOUND_MOODS = frozenset({"playful", "dark", "warm", "rnb", "sensual"})
 # Aliases → canonical (Kei 2026-07-16: user wants R&B/Soul seductive, not horror dark)
@@ -1121,7 +1123,8 @@ def sfx_clip_for_kind(kind: str, *, amp: float = 0.2) -> Any:
         return out
     if kind == "foley_cloth":
         # Simulate continuous cloth rustle with low-passed noise
-        n = int(sr * 1.5)
+        sr_local = 44100
+        n = int(sr_local * 1.5)
         t = np.linspace(0, 1.5, n, endpoint=False)
         noise = np.random.uniform(-1, 1, n)
         env = np.sin(np.pi * t / 1.5) ** 2

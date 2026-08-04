@@ -87,8 +87,9 @@ def film_dirs(root: Path) -> dict[str, Path]:
     return _ag().film_dirs(root)
 
 
-def record_file_matches(record: dict[str, Any], path: Path) -> bool:
-    return _ag().record_file_matches(record, path)
+def record_file_matches(*args: Any, **kwargs: Any) -> bool:
+    # aifilm_grok signature: (root, record, *, field=...)
+    return _ag().record_file_matches(*args, **kwargs)
 
 
 def run(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:

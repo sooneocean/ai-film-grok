@@ -1360,6 +1360,37 @@ def ship_prep(
             }
         )
 
+    # Wave δ · five-track plan (hard only when enabled + error severity)
+    try:
+        from five_track import plan_five_track
+
+        ft = plan_five_track(root, write=write)
+        ft_hard = bool(ft.get("enabled")) and not bool(ft.get("ok"))
+        steps.append(
+            {
+                "id": "five_track",
+                "ok": bool(ft.get("ok") or not ft.get("enabled")),
+                "detail": (
+                    f"enabled={ft.get('enabled')} issues={len(ft.get('issues') or [])} "
+                    f"sex_sfx={ft.get('sex_sfx', {}).get('covered')}/"
+                    f"{ft.get('sex_sfx', {}).get('required')}"
+                ),
+                "hard": ft_hard,
+                "advisory": not ft_hard,
+                "next_cmd": ft.get("next_cmd"),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "five_track",
+                "ok": True,
+                "detail": f"skipped: {exc}"[:160],
+                "advisory": True,
+                "skipped": True,
+            }
+        )
+
     # F3 · input fidelity (advisory unless strict)
     try:
         from input_fidelity import fidelity_check, human_fidelity_summary

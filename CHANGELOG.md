@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.6] - 2026-08-04
+
+### Added (5-Track cinema mix MVP · Wave δ)
+- **`five_track.py`**: DX/FX/BG/MX/SUB contract mapped to final stems; auto-enable for dialogue_drama / heat max / premium.
+- **LUFS**: default **lufs_strict** + **-16 ±1.5** (`-17.5…-14.5`) on cinema path; post-audit uses shared band.
+- **CLI** `aifilm five-track plan|audit`; ship-prep step; film-spec ensure defaults + meat `sex_sfx` inventory.
+- Docs: hard-defaults + 5track-audio-master MVP. Escape: `AIFILM_SKIP_FIVE_TRACK=1`.
+- Tests: `test_five_track.py`.
+
 ## [2.39.5] - 2026-08-04
 
 ### Added / Changed (Edit rhythm VO-fit · Wave γ anti-PPT)

@@ -354,7 +354,7 @@
     },
     {
       "path": "scripts/cli_post.py",
-      "sha256": "d6b40d05f8928e02845282b1f365533f66148bd45f1dfdbd292977b8359e59a9"
+      "sha256": "c9349d21b6afe54f9ce2b8db05d1929e4095e0b9ccbc7e73f7a401d83e086db8"
     },
     {
       "path": "scripts/cli_quality.py",
@@ -394,7 +394,7 @@
     },
     {
       "path": "scripts/cli_workflow.py",
-      "sha256": "4de5129e6fb444f9a7e5d70016ed495a4c13bd7393b25aaf1b1fa9d414c43522"
+      "sha256": "e47457ef7956095e424aeee76543cdb283912a4f2ea31b9b0b394124d3420035"
     },
     {
       "path": "scripts/cli_workshop.py",
@@ -626,7 +626,7 @@
     },
     {
       "path": "scripts/export_composition.py",
-      "sha256": "b1058c95dc952f5c327dc163f6540a38aa95ae057c5bd0d037ecfc4417dff91e"
+      "sha256": "14cc571d404a38bcf92d9ea664cd94a5bb181d1ec92413450ac51608aab8db6a"
     },
     {
       "path": "scripts/external_review.py",
@@ -642,7 +642,7 @@
     },
     {
       "path": "scripts/film_spec.py",
-      "sha256": "e90c19cdee8a0db3d100bcc4a419f4287bc184cd8f69445c23dfb441ad455126"
+      "sha256": "1d44adcbab8612ecb5afe3ca956be9b9b49e229fcf765746e772b986c1a4990b"
     },
     {
       "path": "scripts/final_editorial_review.py",
@@ -655,6 +655,10 @@
     {
       "path": "scripts/final_stages.py",
       "sha256": "ba39fde3d0f823fe220f0d0a96d5f5b65ea2d2e8d48c75ab279015aeedc2338c"
+    },
+    {
+      "path": "scripts/five_track.py",
+      "sha256": "7c8693ef7d2cc44d90f8381594463fad012462caf7b34292ce0f78d20d320135"
     },
     {
       "path": "scripts/framing_lint.py",
@@ -950,7 +954,7 @@
     },
     {
       "path": "scripts/post_audit.py",
-      "sha256": "2a471bc759879caf60b5f7cdcd68db726cd8ed94aac5fe47ab29d1f6e39ffee6"
+      "sha256": "2a0863c72d939a213713117455ea8b5bde8eb313e1a65030fdcc85f4aaae11bf"
     },
     {
       "path": "scripts/post_bible.py",
@@ -1166,7 +1170,7 @@
     },
     {
       "path": "scripts/sound_plan.py",
-      "sha256": "415becf80715d2e24b544594bd4319a36f0dc138a6ae2919ba782f11ef9dc836"
+      "sha256": "5af38f79cacb88844155aa9b1118d71b03eba802600ffa322abfe38b8e1f0aae"
     },
     {
       "path": "scripts/source_chain.py",
@@ -1342,7 +1346,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "54e6ae22c7e14bc6c2f01fe934bbaaa43d3287cc3cc58ace458e9849c53798c7"
+      "sha256": "01ec0d3aecf1f926cefdb86d10945e66c9be970b9c9972667be719883c4487c8"
     },
     {
       "path": "scripts/workflow_spine.py",

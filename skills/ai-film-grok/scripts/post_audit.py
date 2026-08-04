@@ -414,39 +414,58 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
             }
         )
 
-    # P3-4: LUFS hard gate — when lufs_strict, out-of-range LUFS is a hard failure
+    # P3-4 / Wave δ: LUFS hard gate — five_track cinema defaults -16±1.5
     spec_for_lufs = read_json(root / "film-spec.json") or {}
-    lufs_strict = (
-        bool(spec_for_lufs.get("lufs_strict")) if isinstance(spec_for_lufs, dict) else False
-    )
+    if not isinstance(spec_for_lufs, dict):
+        spec_for_lufs = {}
+    try:
+        from five_track import lufs_band_for_spec
+
+        band = lufs_band_for_spec(spec_for_lufs)
+        lufs_strict = bool(band.get("strict"))
+        lufs_min = float(band.get("lufs_min", -17.5))
+        lufs_max = float(band.get("lufs_max", -14.5))
+    except Exception:
+        lufs_strict = bool(spec_for_lufs.get("lufs_strict"))
+        lufs_min = float(spec_for_lufs.get("lufs_min", -23))
+        lufs_max = float(spec_for_lufs.get("lufs_max", -14))
     if loudness and isinstance(loudness, dict):
         integrated_lufs = loudness.get("integrated") or loudness.get("integrated_lufs")
         if integrated_lufs is not None:
             lufs_val = float(integrated_lufs)
-            # EBU R128: integrated should be in [-23, -14] for streaming short-form
-            lufs_min = (
-                float(spec_for_lufs.get("lufs_min", -23))
-                if isinstance(spec_for_lufs, dict)
-                else -23.0
-            )
-            lufs_max = (
-                float(spec_for_lufs.get("lufs_max", -14))
-                if isinstance(spec_for_lufs, dict)
-                else -14.0
-            )
             if lufs_val < lufs_min or lufs_val > lufs_max:
                 msg = (
-                    f"LUFS integrated={lufs_val:.1f} out of range [{lufs_min:.0f}, {lufs_max:.0f}]"
+                    f"LUFS integrated={lufs_val:.1f} out of range [{lufs_min:.1f}, {lufs_max:.1f}]"
+                    f" (target -16±1.5 when five_track)"
                 )
                 if lufs_strict:
                     hard.append(
                         {
                             "code": "LUFS_OUT_OF_RANGE",
-                            "message": msg + " (lufs_strict=true → hard fail)",
+                            "message": msg + " (lufs_strict → hard fail)",
                         }
                     )
                 else:
                     warnings.append({"code": "LUFS_OUT_OF_RANGE", "message": msg})
+    # Wave δ · five-track soft/hard inventory
+    try:
+        from five_track import plan_five_track
+
+        ft_rep = plan_five_track(root, write=True)
+        if ft_rep.get("enabled"):
+            for iss in ft_rep.get("issues") or []:
+                if not isinstance(iss, dict):
+                    continue
+                code = str(iss.get("code") or "FIVE_TRACK")
+                if code == "LUFS_OUT_OF_RANGE":
+                    continue  # already handled above
+                row = {"code": code, "message": str(iss.get("message") or code)}
+                if str(iss.get("severity") or "") == "error":
+                    hard.append(row)
+                else:
+                    warnings.append(row)
+    except Exception as exc:
+        warnings.append({"code": "FIVE_TRACK_PROBE", "message": str(exc)[:160]})
     spec = read_json(root / "film-spec.json") or {}
     shots = [
         shot

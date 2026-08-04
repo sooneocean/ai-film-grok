@@ -1912,6 +1912,16 @@ def validate_film_spec(
     except Exception as exc:  # noqa: BLE001
         spec["_edit_rhythm_errors"] = [str(exc)[:200]]
 
+    # Wave δ · 5-Track cinema mix defaults (DX/FX/BG/MX/SUB + -16 LUFS)
+    try:
+        from five_track import ensure_five_track_defaults
+
+        ft = ensure_five_track_defaults(spec)
+        if ft.get("enabled"):
+            spec["_five_track"] = ft
+    except Exception as exc:  # noqa: BLE001
+        spec["_five_track_errors"] = [str(exc)[:200]]
+
     # Validate or auto-suggest story join intents now that shot count is known
     expected = max(0, len(shots) - 1)
     chain_modes: list[str] = []

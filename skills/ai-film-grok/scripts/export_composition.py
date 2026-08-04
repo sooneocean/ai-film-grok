@@ -663,11 +663,13 @@ def _fluency_export_meta(
         ],
         "designed_post_must_not": [
             "ken_burns_stills_as_story",
+            "still_layer_camera_animation",
             "dissolve_or_xfade_on_underlay_at_byte_identical_joins",
             "replace_i2v_or_continuity_chain",
             "burned_in_plus_designed_subs_double_burn",
             "ffmpeg_title_glyphs_plus_designed_title_double_burn",
             "soft_xfade_on_continue_byte_chain",
+            "replace_five_track_mix_with_design_engine_audio",
         ],
         "agent_skills": {
             "hyperframes": ["/hyperframes", "/hyperframes-core", "/hyperframes-animation"],

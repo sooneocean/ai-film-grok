@@ -53,6 +53,21 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
     )
     vp.add_argument("--root", required=True)
 
+    # five-track (Wave δ)
+    ft = sub.add_parser(
+        "five-track",
+        help="5-Track cinema mix plan/status (DX/FX/BG/MX/SUB · -16 LUFS)",
+    )
+    ft.add_argument("--root", required=True)
+    ft.add_argument(
+        "five_track_action",
+        nargs="?",
+        default="plan",
+        choices=["plan", "status", "audit"],
+        help="plan|status (default plan) or audit (fail-closed)",
+    )
+    ft.add_argument("--no-write", action="store_true")
+
     # select shortlist
     ss = sub.add_parser(
         "select-shortlist",
@@ -288,6 +303,22 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
             report = variety_precheck(args.root)
             _emit(report)
             return 0 if report.get("ok") else 2
+
+        if cmd == "five-track":
+            from five_track import FiveTrackError, audit_five_track, plan_five_track
+
+            action = str(getattr(args, "five_track_action", None) or "plan").strip().lower()
+            write = not bool(getattr(args, "no_write", False))
+            if action == "audit":
+                try:
+                    report = audit_five_track(args.root, write=write)
+                except FiveTrackError as exc:
+                    _emit({"ok": False, "error": str(exc)})
+                    return 2
+            else:
+                report = plan_five_track(args.root, write=write)
+            _emit(report)
+            return 0 if report.get("ok") or not report.get("enabled") else 2
 
         if cmd == "select-shortlist":
             report = select_shortlist(

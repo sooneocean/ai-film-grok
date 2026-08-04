@@ -1,9 +1,9 @@
-# 5-Track 影院级混音主轨架构（2026-08-04）
+# 5-Track 影院级混音主轨架构（2026-08-04 · Wave δ MVP shipped）
 
-> **目标架构（Target architecture · 2026-08-04）**  
-> 下列 DX/FX/BG/MX/SUB 轨定义与响度目标为产品方向。  
-> **当前真路径**：`aifilm final` 的 VO+BGM sidechain + 可选 post-audit 响度检查（**尚无** `aifilm audio mix --tracks …` 全轨 CLI）。  
-> Delivery Truth 2.36.4 先保证运动/零旁白门诚实；5-Track 硬接线另开 sprint。
+> **MVP 已接线（v2.39.6）**  
+> 机读契约：`scripts/five_track.py` · CLI `aifilm five-track plan|audit`  
+> `dialogue_drama` / heat max / premium_vertical **自动** `five_track.enabled` + **lufs_strict** + 目标 **-16 LUFS ±1.5**。  
+> **真混音仍由** `aifilm final` 输出 stems（voice/sfx/ambience/bgm + sidechain）；本层负责 **默认值 + 验收**，不是第二套 mixer。
 
 ## 一、5 轨定义
 
@@ -25,18 +25,25 @@ Track 5 SUB — LFE Sub-bass Pulse (Dramatic Beats)
 
 ## 二、混音顺序
 
-**已接线：**
+**已接线（MVP）：**
 
 ```bash
+# write-spec / validate 自动 ensure five_track + LUFS band
+aifilm five-track plan --root "$ROOT"     # 写 receipts/five-track-plan.json
 aifilm final --root "$ROOT" --tts-backend edge --music-mood rnb --lipsync off
+aifilm five-track audit --root "$ROOT"    # meat sex_sfx + LUFS + stems
+aifilm ship-prep --root "$ROOT"           # 含 five_track 阶梯
 ```
 
-**规划中（下列 CLI 尚未实现，勿当 shipped）：**
+| 产品轨 | final stem |
+|--------|------------|
+| DX | voice concat / TTS / H3 native |
+| FX | `sfx_stereo.wav` + sound_plan sex_sfx |
+| BG | `ambience_stereo` + `scene_sound_stereo` |
+| MX | `bgm_stereo` + sidechain under DX |
+| SUB | 可选（plan only；未强制 LFE 文件） |
 
-```bash
-# aifilm audio add-sfx / add-ambience / bgm --sidechain-dx / add-lfe
-# aifilm audio mix --tracks dx,fx,bg,mx,sub --target-lufs -16
-```
+**后续（未强制）：** 独立 `audio mix --tracks` CLI、专用 LFE stem。
 
 ## 三、验收标准
 
