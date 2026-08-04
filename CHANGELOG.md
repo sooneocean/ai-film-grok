@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.8] - 2026-08-04
+
+### Added (Cinema ship closeout · α–ε final)
+- **closeout** ladder: hard `cinematic_gate` after i2v_motion; `closeout run` auto-refreshes gate.
+- **SKILL** P0 #20 + command path: ship-prep → cinematic-gate → final → closeout.
+- Memory: `2026-08-04-cinematic-ship-closeout.md` full-wave checklist.
+
 ## [2.39.7] - 2026-08-04
 
 ### Added (Cinematic-gate composite · Wave ε)

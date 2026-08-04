@@ -410,7 +410,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "8f6b6d82c0f7f2c6646c01ad770d3d6888adc91739a13bac46f43847aad11e17"
+      "sha256": "cb088d43ac103d8f0b8da29767b4574ec828204583a865d7f53086941ce79ce2"
     },
     {
       "path": "scripts/cloud_media_download.py",

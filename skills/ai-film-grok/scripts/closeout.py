@@ -206,6 +206,46 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     steps.append(motion_gate_step)
 
+    # Wave ε · composite cinematic-gate (true-video / variety / five-track / inventory)
+    cin_step: dict[str, Any] = {
+        "id": "cinematic_gate",
+        "ok": False,
+        "detail": "missing cinematic-gate",
+        "next_cmd": f'aifilm cinematic-gate --root "{base}"',
+        "advisory": False,
+    }
+    try:
+        from cinematic_gate import assert_cinematic_gate_for_export, skip_enabled
+
+        if skip_enabled():
+            cin_step = {
+                "id": "cinematic_gate",
+                "ok": True,
+                "detail": "skipped AIFILM_SKIP_CINEMATIC_GATE=1",
+                "next_cmd": None,
+                "advisory": False,
+                "skipped": True,
+            }
+        else:
+            g = assert_cinematic_gate_for_export(base)
+            cin_step = {
+                "id": "cinematic_gate",
+                "ok": True,
+                "detail": "cinematic-gate ok",
+                "next_cmd": None,
+                "advisory": False,
+                "path": g.get("path"),
+            }
+    except Exception as exc:  # noqa: BLE001
+        cin_step = {
+            "id": "cinematic_gate",
+            "ok": False,
+            "detail": str(exc)[:200],
+            "next_cmd": f'aifilm cinematic-gate --root "{base}"',
+            "advisory": False,
+        }
+    steps.append(cin_step)
+
     # film-core audit: max/premium/strict → hard; else advisory
     core_audit: dict[str, Any] = {}
     film_core_hard = False
@@ -439,6 +479,50 @@ def closeout_run(
         if write_receipt:
             write_json(base / RECEIPT_REL, payload)
         return payload
+
+    # cinematic-gate (auto-run refresh when red)
+    try:
+        cin = next(s for s in status["steps"] if s["id"] == "cinematic_gate")
+    except StopIteration:
+        cin = {"ok": True}
+    if not cin.get("ok") and not cin.get("skipped"):
+        try:
+            from cinematic_gate import run_cinematic_gate
+
+            report = run_cinematic_gate(base, write=True)
+            ran.append(
+                {
+                    "id": "cinematic_gate",
+                    "ok": bool(report.get("ok")),
+                    "blocked_by": report.get("blocked_by"),
+                }
+            )
+            if not report.get("ok"):
+                payload = {
+                    **status,
+                    "ok": False,
+                    "stopped_at": "cinematic_gate",
+                    "ran": ran,
+                    "cinematic_gate": report,
+                    "next_cmd": report.get("next_cmd")
+                    or f'aifilm cinematic-gate --root "{base}"',
+                    "required_proof": "receipts/cinematic-gate.json ok=true",
+                }
+                if write_receipt:
+                    write_json(base / RECEIPT_REL, payload)
+                return payload
+        except Exception as exc:  # noqa: BLE001
+            payload = {
+                **status,
+                "ok": False,
+                "stopped_at": "cinematic_gate",
+                "ran": ran,
+                "error": str(exc)[:300],
+                "next_cmd": f'aifilm cinematic-gate --root "{base}"',
+            }
+            if write_receipt:
+                write_json(base / RECEIPT_REL, payload)
+            return payload
 
     # post-audit
     post_step = next(s for s in status["steps"] if s["id"] == "post_audit")
