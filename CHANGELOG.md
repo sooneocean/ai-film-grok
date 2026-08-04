@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.37.11] - 2026-08-04
+
+### Added (H2/H3 · hotpath gate matrix on fast suite)
+- **`test_compose_hotpath_contracts`**: double-burn underlay/auto/multiclip + HF register caption fail-closed — **not** marked slow (was only under slow suite).
+- **`test_gates_table_matrix`**: table-driven meaning_gate × genre/escape, zero_narration, motion ship export, heat final hard_fail.
+- Complements Wave D / Delivery Truth without full render.
+
 ## [2.37.10] - 2026-08-04
 
 ### Added (ship-prep × Fill-Idle PK)
