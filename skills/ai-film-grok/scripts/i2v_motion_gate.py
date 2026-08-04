@@ -515,6 +515,55 @@ def write_motion_gate_receipts(
     return out
 
 
+def i2v_motion_gate_skip_enabled() -> bool:
+    import os
+
+    return os.environ.get("AIFILM_SKIP_I2V_MOTION_GATE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+class I2VMotionGateError(RuntimeError):
+    """Raised when desktop/export is blocked by i2v-final-gate."""
+
+
+def assert_i2v_final_gate_for_export(root: Path | str) -> dict[str, Any]:
+    """Delivery Truth · desktop export only when receipts/i2v-final-gate.json ok=true.
+
+    Escape: ``AIFILM_SKIP_I2V_MOTION_GATE=1``.
+    Missing receipt counts as fail (not silent pass).
+    """
+    base = Path(root).expanduser().resolve()
+    if i2v_motion_gate_skip_enabled():
+        return {
+            "ok": True,
+            "skipped": True,
+            "escape": "AIFILM_SKIP_I2V_MOTION_GATE=1",
+        }
+    gate_path = base / "receipts" / "i2v-final-gate.json"
+    if not gate_path.is_file():
+        raise I2VMotionGateError(
+            "Desktop export requires receipts/i2v-final-gate.json ok=true; "
+            f'run: aifilm i2v-motion-gate --root "{base}" --write'
+        )
+    try:
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise I2VMotionGateError(
+            f"Desktop export cannot read i2v-final-gate.json: {exc}"
+        ) from exc
+    if not isinstance(gate, dict) or gate.get("ok") is not True:
+        raise I2VMotionGateError(
+            "Desktop export blocked by i2v-final-gate (ok!=true); "
+            f'fix means then: aifilm i2v-motion-gate --root "{base}" --write. '
+            "Escape: AIFILM_SKIP_I2V_MOTION_GATE=1"
+        )
+    return {"ok": True, "gate": gate, "path": str(gate_path)}
+
+
 def collect_motion_gate_rows(root: Path | str) -> list[dict[str, Any]]:
     """Phase B · Auto-build gate rows from film-spec + mean sources (DF/wardrobe filled).
 

@@ -816,6 +816,120 @@ def lint_director_board(scenes: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def zero_narration_gate(
+    spec: dict[str, Any],
+    *,
+    shots: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Pure zero-narration IRON gate for dialogue_drama (Delivery Truth · 2.36.4).
+
+    Defaults ``zero_narration_strict=true`` when ``vo_mode=dialogue_drama``.
+    Ratio = max(shot-level third-person nar share, voice-cue narration duration share).
+    Does not raise — callers raise FilmSpecError with code NAR_BUDGET_VIOLATION.
+    """
+    if not isinstance(spec, dict):
+        return {"ok": True, "checked": False, "reason": "not_a_spec"}
+    vo_mode = str(spec.get("vo_mode") or "").strip().lower()
+    if vo_mode != "dialogue_drama":
+        return {
+            "ok": True,
+            "checked": False,
+            "reason": "not_dialogue_drama",
+            "zero_narration_strict": False,
+            "ratio": 0.0,
+        }
+    if "zero_narration_strict" in spec:
+        zero_strict = bool(spec.get("zero_narration_strict"))
+    else:
+        zero_strict = True  # IRON default
+    if not zero_strict:
+        return {
+            "ok": True,
+            "checked": True,
+            "zero_narration_strict": False,
+            "ratio": 0.0,
+            "escape": "zero_narration_strict:false",
+        }
+
+    if shots is None:
+        shots = []
+        for scene in spec.get("scenes") or []:
+            if not isinstance(scene, dict):
+                continue
+            for sh in scene.get("shots") or []:
+                if isinstance(sh, dict):
+                    shots.append(sh)
+        if not shots and isinstance(spec.get("shots"), list):
+            shots = [s for s in spec["shots"] if isinstance(s, dict)]
+
+    total = 0
+    nar_shots = 0
+    dialogue_sec = 0.0
+    narration_sec = 0.0
+    for shot in shots:
+        if not isinstance(shot, dict):
+            continue
+        total += 1
+        cues = shot.get("audio_cues") if isinstance(shot.get("audio_cues"), list) else []
+        has_dialogue = bool(str(shot.get("spoken_text") or "").strip())
+        has_dialogue_voice = any(
+            isinstance(c, dict)
+            and c.get("kind") == "voice"
+            and c.get("line_type") == "dialogue"
+            and (
+                str(c.get("spoken_text") or "").strip()
+                or float(c.get("duration_sec") or 0) > 0
+            )
+            for c in cues
+        )
+        has_dialogue = has_dialogue or has_dialogue_voice
+        for c in cues:
+            if not isinstance(c, dict) or c.get("kind") != "voice":
+                continue
+            dur = float(c.get("duration_sec") or 0)
+            if c.get("line_type") == "dialogue":
+                dialogue_sec += dur
+            elif c.get("line_type") == "narration":
+                narration_sec += dur
+        nar = str(shot.get("nar") or "").strip()
+        # silent_scene + narration_reason is an explicit gap escape
+        if (
+            nar
+            and not has_dialogue
+            and not (
+                shot.get("silent_scene") is True
+                and str(shot.get("narration_reason") or "").strip()
+            )
+        ):
+            nar_shots += 1
+
+    shot_ratio = (nar_shots / total) if total else 0.0
+    cue_ratio = narration_sec / max(dialogue_sec + narration_sec, 1.0)
+    ratio = max(shot_ratio, cue_ratio)
+    if ratio > 1e-9:
+        return {
+            "ok": False,
+            "checked": True,
+            "zero_narration_strict": True,
+            "code": "NAR_BUDGET_VIOLATION",
+            "ratio": round(ratio, 4),
+            "shot_ratio": round(shot_ratio, 4),
+            "cue_ratio": round(cue_ratio, 4),
+            "message": (
+                f"zero_narration_strict:true but narration_ratio={ratio:.2%}. "
+                "Replace third-person nar with character dialogue, prop inserts, or Foley SFX. "
+                "Escape: zero_narration_strict:false or silent_scene+narration_reason."
+            ),
+        }
+    return {
+        "ok": True,
+        "checked": True,
+        "zero_narration_strict": True,
+        "ratio": 0.0,
+        "code": None,
+    }
+
+
 def validate_film_spec(
     spec: dict[str, Any],
     *,
@@ -1582,12 +1696,24 @@ def validate_film_spec(
             and cue.get("line_type") == "narration"
         )
         narration_ratio = narration_sec / max(dialogue_sec + narration_sec, 1.0)
-        try:
-            narration_budget = float(spec.get("narration_budget_ratio") or 0.05)
-        except (TypeError, ValueError):
-            narration_budget = 0.05
-        narration_budget = max(0.0, min(0.15, narration_budget))
-        if spec.get("allow_storyteller_nar") is not True:
+        # Delivery Truth · zero_narration IRON (default on for dialogue_drama)
+        zn = zero_narration_gate(spec, shots=shots)
+        spec["_zero_narration"] = zn
+        zero_strict = bool(zn.get("zero_narration_strict"))
+        if zero_strict:
+            narration_budget = 0.0
+        else:
+            try:
+                narration_budget = float(spec.get("narration_budget_ratio") or 0.05)
+            except (TypeError, ValueError):
+                narration_budget = 0.05
+            narration_budget = max(0.0, min(0.15, narration_budget))
+        if not zn.get("ok"):
+            raise FilmSpecError(
+                f"NAR_BUDGET_VIOLATION: {zn.get('message') or 'zero narration strict failed'}"
+            )
+        # Legacy storyteller ban when IRON not escaped (zero_strict already covers)
+        if zero_strict and spec.get("allow_storyteller_nar") is not True:
             for shot in shots:
                 if not isinstance(shot, dict):
                     continue
@@ -1601,7 +1727,7 @@ def validate_film_spec(
                     and c.get("kind") == "voice"
                     and c.get("line_type") == "dialogue"
                     for c in cues
-                )
+                ) or bool(str(shot.get("spoken_text") or "").strip())
                 has_narration_voice = any(
                     isinstance(c, dict)
                     and c.get("kind") == "voice"
@@ -1612,10 +1738,15 @@ def validate_film_spec(
                     continue
                 if has_narration_voice and str(shot.get("narration_reason") or "").strip():
                     continue
+                if str(shot.get("narration_reason") or "").strip() and shot.get(
+                    "silent_scene"
+                ) is True:
+                    continue
                 raise FilmSpecError(
-                    f"{sid}: dialogue_drama forbids third-person storyteller nar as primary "
-                    "voice — use character dialogue cues, pure-visual silence/action_cover, "
-                    "or a justified narration gap. Escape: allow_storyteller_nar:true"
+                    f"NAR_BUDGET_VIOLATION: {sid}: dialogue_drama forbids third-person "
+                    "storyteller nar as primary voice — use character dialogue, pure-visual "
+                    "silence/action_cover, or escape zero_narration_strict:false / "
+                    "allow_storyteller_nar:true"
                 )
         spec["_dialogue_drama"] = {
             "on_camera_shots": len(on_camera),
@@ -1626,9 +1757,10 @@ def validate_film_spec(
             "missing_beat_coverage": missing_beat_coverage,
             "dialogue_sec": round(dialogue_sec, 3),
             "narration_sec": round(narration_sec, 3),
-            "narration_ratio": round(narration_ratio, 4),
+            "narration_ratio": round(float(zn.get("ratio") or narration_ratio), 4),
             "narration_target_ratio": 0.0,
             "narration_budget_ratio": narration_budget,
+            "zero_narration_strict": zero_strict,
             "coverage_ratio": round(
                 sum(float(s.get("duration_sec") or 0) for s in coverage)
                 / max(sum(float(s.get("duration_sec") or 0) for s in shots), 1.0),
@@ -1642,7 +1774,11 @@ def validate_film_spec(
             },
             "note": (
                 "Cinema dialogue primary: speech=character Chinese mouth; no speech=pure picture. "
-                f"Narration gap-only; target 0, hard cap {narration_budget:.0%}."
+                + (
+                    "Zero-narration IRON: nar hard cap 0%."
+                    if zero_strict
+                    else f"Narration gap-only; hard cap {narration_budget:.0%}."
+                )
             ),
         }
         broll = iter_dialogue_broll(spec)
@@ -1654,12 +1790,14 @@ def validate_film_spec(
             "note": "B-roll replaces only parent picture inside bounded cuts; dialogue/subtitle clocks stay on A-roll.",
         }
         if (
-            spec.get("narration_budget_strict") is not False
+            not zero_strict
+            and spec.get("narration_budget_strict") is not False
             and narration_ratio > narration_budget + 1e-9
         ):
             raise FilmSpecError(
-                f"dialogue_drama narration budget exceeded: {narration_ratio:.0%} > "
-                f"{narration_budget:.0%} (target 0; raise narration_budget_ratio or cut gap VO)"
+                f"NAR_BUDGET_VIOLATION: dialogue_drama narration budget exceeded: "
+                f"{narration_ratio:.0%} > {narration_budget:.0%} "
+                f"(raise narration_budget_ratio or cut gap VO)"
             )
 
     # Aggregate VO budget report (non-blocking summary for agents / status)

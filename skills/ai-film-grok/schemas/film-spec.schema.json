@@ -171,7 +171,17 @@
     },
     "narration_budget_strict": {
       "type": "boolean",
-      "description": "For dialogue_drama, reject narration above 15 percent of voiced duration."
+      "description": "For dialogue_drama, reject narration above narration_budget_ratio when zero_narration_strict is false."
+    },
+    "zero_narration_strict": {
+      "type": "boolean",
+      "description": "For dialogue_drama (default true): hard-cap third-person nar at 0% (NAR_BUDGET_VIOLATION). Escape false with reason, or silent_scene+narration_reason per shot."
+    },
+    "narration_budget_ratio": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.15,
+      "description": "Legacy gap-VO budget when zero_narration_strict is false (default 0.05)."
     },
     "narration_gap_strict": {
       "type": "boolean",

@@ -5706,6 +5706,13 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
         )
     if not post_receipt.get("delivery_ready"):
         raise FilmError("Desktop export blocked by post-audit hard failures")
+    # Delivery Truth · high-motion product gate (hard-defaults: only ok → desktop film_final)
+    try:
+        from i2v_motion_gate import I2VMotionGateError, assert_i2v_final_gate_for_export
+
+        assert_i2v_final_gate_for_export(root)
+    except I2VMotionGateError as exc:
+        raise FilmError(str(exc)) from exc
     dirs = film_dirs(root)
     try:
         reject_symlinks(dest, field="Desktop export destination")

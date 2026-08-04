@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.36.4] - 2026-08-04
+
+### Added (Delivery Truth)
+- **Zero-narration real gate:** `film_spec.zero_narration_gate` — `dialogue_drama` defaults `zero_narration_strict=true` (budget 0); raises `NAR_BUDGET_VIOLATION` on third-person nar ratio > 0. Schema fields + escape `false` / silent_scene+reason.
+- **`assert_i2v_final_gate_for_export`:** `export-desktop` hard-blocks without `receipts/i2v-final-gate.json` ok=true. Escape: `AIFILM_SKIP_I2V_MOTION_GATE=1`.
+- **closeout ladder:** `i2v_motion` step always hard; `film_core` hard for max/premium/dramatic_meaning_strict (never swallow exception as ok).
+- **agent-review L0:** max/premium no longer provisional-pass missing motion receipt.
+
+### Tests
+- `tests/test_zero_narration_gate.py` now calls real `zero_narration_gate` (stand-in removed)
+- `skills/ai-film-grok/tests/test_delivery_truth.py`
+
+### Docs
+- hard-defaults Delivery Truth + zero-nar true path; 5-Track marked target-arch where CLI not wired
+
 ## [2.36.3] - 2026-08-04
 
 ### Added (Temple-AV dramatic meaning stack · restore)

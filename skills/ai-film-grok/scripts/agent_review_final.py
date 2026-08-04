@@ -197,7 +197,23 @@ def _collect_l0(root: Path, *, final: dict[str, Any] | None, duration: float) ->
     elif motion_q is True or motion_gate_ok is True:
         motion_notes.append("motion quality/gate ok")
     else:
-        motion_notes.append("no motion receipt — provisional pass")
+        # Delivery Truth: max/premium must not provisional-pass missing gate
+        try:
+            from util import read_json as _rj_motion
+
+            _sp = _rj_motion(root / "film-spec.json") or {}
+            _strict_motion = (
+                str(_sp.get("heat_scale") or "").strip().lower() == "max"
+                or _sp.get("premium_vertical") is True
+                or _sp.get("dramatic_meaning_strict") is True
+            )
+        except Exception:  # noqa: BLE001
+            _strict_motion = False
+        if _strict_motion:
+            motion_pass = False
+            motion_notes.append("no motion receipt — fail for max/premium")
+        else:
+            motion_notes.append("no motion receipt — provisional pass")
     if quality.get("hard_fail") is True and motion_q is not True:
         # hard_fail elsewhere shouldn't auto-fail motion unless motion gate failed
         pass

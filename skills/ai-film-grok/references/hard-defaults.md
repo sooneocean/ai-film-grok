@@ -79,7 +79,8 @@
 | 转场 | silk；continue 强制 hard；满 60s 靠加镜 |
 | 立场 | `focal_character` + `viewpoint` + `look_axis` |
 | 双字幕 | `caption_mode: zh\|zh_en\|en`；`nar_en` 可只上字幕 |
-| **零旁白 IRON（P0 · 2026-08-04）** | `dialogue_drama` 默认 `zero_narration_strict:true`：全片 `nar`（第三人称说书）占比硬底 **0%**；`write-spec` 检测到 `narration_ratio>0.0` → 报 `NAR_BUDGET_VIOLATION` 并阻断。**替代方案**：① 将心理活动改写为角色对白/潜台词；② 背景信息改写为道具特写 (`dramatic_function: sensory/insert`)；③ 气氛烘托改写为 Foley SFX 事件。逃生：单场景 `{"silent_scene":true,"narration_reason":"…"}` 或 spec `zero_narration_strict:false`（须交代原因）。影响：`nar` 字段仍可写 gap-fill 旁白（≤5% 全片），但 `dialogue_drama` 默认硬封，非对白片类才解封。 |
+| **零旁白 IRON（P0 · 2026-08-04 · 真门 2.36.4）** | `dialogue_drama` 默认 `zero_narration_strict:true`：全片第三人称 `nar` 占比硬底 **0%**。代码：`film_spec.zero_narration_gate` → `validate_film_spec` 报 **`NAR_BUDGET_VIOLATION`**。**替代**：① 角色对白/潜台词；② 道具特写 `dramatic_function: sensory/insert`；③ Foley。逃生：`zero_narration_strict:false` 或镜级 `silent_scene+narration_reason`。解封后回落 `narration_budget_ratio`（默认 5%）。测：`tests/test_zero_narration_gate.py`（真函数，非 stand-in）。 |
+| **Delivery Truth（P0 · 2.36.4）** | **桌面拷贝硬拦**：`export-desktop` 要求 `receipts/i2v-final-gate.json` **ok=true**（缺收据=红）。`closeout` 阶梯加 `i2v_motion` 步。**film_core**：异常≠通过；`heat_scale=max` / `premium_vertical` / `dramatic_meaning_strict` 时 film_core **挡** `delivery_ready`。逃生：`AIFILM_SKIP_I2V_MOTION_GATE=1`。测：`tests/test_delivery_truth.py`。 |
 
 ## 语音与混音
 

@@ -166,8 +166,60 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         steps[0]["next_cmd"] = heat.get("next_cmd") or f'aifilm heat boost --root "{base}" --apply'
         steps[0]["required_proof"] = "heat_agent_status.hard_fail cleared"
 
-    # P2 film-core audit (advisory — does not block delivery_ready alone)
+    # Delivery Truth · i2v-final-gate must be green before delivery_ready
+    motion_gate_step: dict[str, Any] = {
+        "id": "i2v_motion",
+        "ok": False,
+        "detail": "missing i2v-final-gate",
+        "next_cmd": f'aifilm i2v-motion-gate --root "{base}" --write',
+        "advisory": False,
+    }
+    try:
+        from i2v_motion_gate import assert_i2v_final_gate_for_export, i2v_motion_gate_skip_enabled
+
+        if i2v_motion_gate_skip_enabled():
+            motion_gate_step = {
+                "id": "i2v_motion",
+                "ok": True,
+                "detail": "skipped AIFILM_SKIP_I2V_MOTION_GATE=1",
+                "next_cmd": None,
+                "advisory": False,
+                "skipped": True,
+            }
+        else:
+            g = assert_i2v_final_gate_for_export(base)
+            motion_gate_step = {
+                "id": "i2v_motion",
+                "ok": True,
+                "detail": "i2v-final-gate ok",
+                "next_cmd": None,
+                "advisory": False,
+                "path": g.get("path"),
+            }
+    except Exception as exc:  # noqa: BLE001 — gate miss/fail must not silent-pass
+        motion_gate_step = {
+            "id": "i2v_motion",
+            "ok": False,
+            "detail": str(exc)[:200],
+            "next_cmd": f'aifilm i2v-motion-gate --root "{base}" --write',
+            "advisory": False,
+        }
+    steps.append(motion_gate_step)
+
+    # film-core audit: max/premium/strict → hard; else advisory
     core_audit: dict[str, Any] = {}
+    film_core_hard = False
+    try:
+        _spec = read_json(base / "film-spec.json") or {}
+        heat_scale = str(_spec.get("heat_scale") or "").strip().lower()
+        film_core_hard = (
+            heat_scale == "max"
+            or _spec.get("dramatic_meaning_strict") is True
+            or _spec.get("premium_vertical") is True
+            or str(_spec.get("delivery_tier") or "").strip().lower() in {"max", "premium"}
+        )
+    except Exception:  # noqa: BLE001
+        film_core_hard = False
     try:
         from workflow_pack import film_core_closeout_audit
 
@@ -182,17 +234,31 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
                     else f"issues={len(core_audit.get('issues') or [])}"
                 ),
                 "next_cmd": core_audit.get("next_cmd"),
-                "advisory": True,
+                "advisory": not film_core_hard,
+                "hard": film_core_hard,
             }
         )
-    except Exception as exc:  # noqa: BLE001
-        core_audit = {"ok": True, "skipped": True, "error": str(exc)[:160]}
+    except Exception as exc:  # noqa: BLE001 — never mask as ok
+        core_audit = {"ok": False, "error": str(exc)[:160]}
+        steps.append(
+            {
+                "id": "film_core",
+                "ok": False,
+                "detail": f"film_core audit error: {exc}"[:200],
+                "next_cmd": f'aifilm closeout status --root "{base}"',
+                "advisory": not film_core_hard,
+                "hard": film_core_hard,
+            }
+        )
 
+    soft_ids = {"desktop_exported"}
+    if not film_core_hard:
+        soft_ids.add("film_core")
     blocked = next(
-        (s for s in steps if not s["ok"] and s["id"] not in {"desktop_exported", "film_core"}),
+        (s for s in steps if not s["ok"] and s["id"] not in soft_ids),
         None,
     )
-    delivery_ready = all(s["ok"] for s in steps if s["id"] not in {"desktop_exported", "film_core"})
+    delivery_ready = all(s["ok"] for s in steps if s["id"] not in soft_ids)
     export_cmd = f'aifilm export-desktop --root "{base}" --name "{_export_name(base)}"'
     return {
         "kind": "closeout-status",

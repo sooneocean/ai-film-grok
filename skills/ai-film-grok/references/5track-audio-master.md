@@ -1,7 +1,9 @@
 # 5-Track 影院级混音主轨架构（2026-08-04）
 
-> **P0 · 好莱坞 Hollywood 级 AI 电影混音标准**
-> 适用于所有 `dialogue_drama` 类型项目；非对白片类（纯 arthouse/ambient）可 opt-out。
+> **目标架构（Target architecture · 2026-08-04）**  
+> 下列 DX/FX/BG/MX/SUB 轨定义与响度目标为产品方向。  
+> **当前真路径**：`aifilm final` 的 VO+BGM sidechain + 可选 post-audit 响度检查（**尚无** `aifilm audio mix --tracks …` 全轨 CLI）。  
+> Delivery Truth 2.36.4 先保证运动/零旁白门诚实；5-Track 硬接线另开 sprint。
 
 ## 一、5 轨定义
 
@@ -23,24 +25,17 @@ Track 5 SUB — LFE Sub-bass Pulse (Dramatic Beats)
 
 ## 二、混音顺序
 
+**已接线：**
+
 ```bash
-# Step 1 — TTS + VO 时间轴 (DX)
-aifilm final --tts-backend edge  # 生成 audio/dialogue.wav
+aifilm final --root "$ROOT" --tts-backend edge --music-mood rnb --lipsync off
+```
 
-# Step 2 — Foley/SFX 叠加 (FX)
-aifilm audio add-sfx --category foley  # 服装、脚步、环境接触声
+**规划中（下列 CLI 尚未实现，勿当 shipped）：**
 
-# Step 3 — Ambience Bed (BG)
-aifilm audio add-ambience  # 填充 room tone，确保全程非零
-
-# Step 4 — BGM + Sidechain (MX)
-aifilm audio bgm --mood rnb --sidechain-dx  # DX 触发自动 duck
-
-# Step 5 — LFE Punch (SUB, opt-in)
-aifilm audio add-lfe --trigger-points climax,smash_cut
-
-# Step 6 — 5-Track Final Mix
-aifilm audio mix --tracks dx,fx,bg,mx,sub --target-lufs -16 --output audio/mixed_5track.wav
+```bash
+# aifilm audio add-sfx / add-ambience / bgm --sidechain-dx / add-lfe
+# aifilm audio mix --tracks dx,fx,bg,mx,sub --target-lufs -16
 ```
 
 ## 三、验收标准
