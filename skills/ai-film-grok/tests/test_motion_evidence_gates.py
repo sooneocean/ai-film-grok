@@ -75,11 +75,15 @@ def test_register_clip_calls_the_canonical_queue_gate(
         "control_status",
         lambda _root: {"canonical": True},
     )
+    # Dummy path must exist so true-video path check does not shadow queue-job gate
+    clip = tmp_path / "take.mp4"
+    clip.write_bytes(b"\x00\x00\x00\x18ftypmp42")
     args = Namespace(
         root=str(tmp_path),
-        source=str(tmp_path / "missing.mp4"),
+        source=str(clip),
         source_endpoint="image_to_video",
         status="approved",
+        shot_id="s01",
         queue_job_id=None,
     )
 

@@ -1,7 +1,7 @@
 # Memory · 2026-08-04 · 电影规格 α–ε 全波收口
 
 **代码**：`true_video_policy` · `edit_policy` γ · `five_track` · `cinematic_gate` · closeout 阶梯  
-**版本**：plugin **2.39.8**（α 3 … ε 7 + closeout 收口）
+**版本**：plugin **2.39.9**（α–ε + gate-auto 机读过闸）
 
 ## 用户原话
 > 工作流核心 grok i2v and h3 r2v i2v；不接受图片运镜；只接受生成视频剪辑；最终像电影规格  
@@ -22,6 +22,6 @@
 
 ## 作战序（成片）
 ```text
-bulk Grok+H3 → ship-prep → cinematic-gate
-→ final (HF+rnb) → review-final → closeout run → export-desktop
+bulk Grok+H3 → ship-prep → gate-auto → cinematic-gate
+→ final (HF+rnb) → review-final(人) → closeout run → export-desktop
 ```

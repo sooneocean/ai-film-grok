@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.39.9] - 2026-08-04
+
+### Added (Gate-auto machine verification · no human click-loop)
+- **`gate_auto.py`** + CLI `aifilm gate-auto`: measure means → write i2v-final → inject sex_sfx → five_track → single-take promote → true_video → variety → cinematic → `receipts/gate-auto.json`.
+- **closeout** auto-runs gate-auto when cinematic red; **next_actions** prefers gate-auto after clips complete.
+- **cinematic-gate** default `auto_i2v=True` (measure+write when receipt missing/red).
+- Human still required: pilot approval, multi-take PK, review-final, paid budget ack.
+- Escape: `AIFILM_SKIP_GATE_AUTO=1`. Tests: `test_gate_auto.py`.
+- Docs: hard-defaults · stages/deliver · SKILL · memory `2026-08-04-gate-auto.md`.
+- Fix: register-clip true-video path uses getattr shot_id; TTS loop-risk fixture disables dramatic_meaning_strict.
+
 ## [2.39.8] - 2026-08-04
 
 ### Added (Cinema ship closeout · α–ε final)
