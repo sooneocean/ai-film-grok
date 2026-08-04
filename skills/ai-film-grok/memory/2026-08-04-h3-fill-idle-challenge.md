@@ -19,7 +19,7 @@
 
 ## 检查清单
 - [ ] `aifilm h3 next --root` / `h3 list --challenge` 看 P0→P2
-- [ ] 空闲：`aifilm h3 run-next --root --execute`（产能绿才跑；非 daemon；看 `next_after`）
+- [ ] 空闲：`aifilm h3 run-next --root --execute [--max 5]`（产能绿才跑；P2=pilot；非 daemon；看 `next_after`）
 - [ ] climax/对白CU 肉戏：I2V 后自动排 **R2V 第二腿**（或 `h3_prefer: dual`）
 - [ ] 人审后：`h3 pk-ledger --append` 记 dailies（不跨片自动）
 - [ ] 成片前：`aifilm ship-prep --root` 看 `pk_compare` / `human_pk_required`（v2.37.10）

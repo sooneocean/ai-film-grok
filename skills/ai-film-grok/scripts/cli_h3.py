@@ -82,13 +82,20 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
 
     run_next = actions.add_parser(
         "run-next",
-        help="One-shot Fill-Idle worker: next job; --execute runs when capacity ready",
+        help="Fill-Idle worker: next job(s); --execute runs when capacity ready (not a daemon)",
     )
     run_next.add_argument("--root", type=Path, required=True)
     run_next.add_argument(
         "--execute",
         action="store_true",
-        help="Actually run H3 for next job when capacity ready",
+        help="Actually run H3 when capacity ready",
+    )
+    run_next.add_argument(
+        "--max",
+        type=int,
+        default=1,
+        dest="max_jobs",
+        help="Max jobs this call (default 1, hard cap 20) — still not a daemon",
     )
     run_next.add_argument(
         "--no-challenge",
@@ -169,6 +176,7 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 require_capacity=not bool(getattr(args, "allow_without_capacity", False)),
                 seed=int(getattr(args, "seed", 20260804) or 20260804),
                 timeout_sec=int(getattr(args, "timeout", 1800) or 1800),
+                max_jobs=int(getattr(args, "max_jobs", 1) or 1),
             )
         elif action == "pk-ledger":
             from h3_fill_idle import append_pk_ledger, load_pk_ledger

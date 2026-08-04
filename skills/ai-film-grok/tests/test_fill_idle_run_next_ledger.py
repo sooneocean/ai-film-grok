@@ -7,11 +7,30 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from h3_fill_idle import append_pk_ledger, load_pk_ledger, run_next_fill_idle
+from h3_fill_idle import (
+    _stage_for_fill_idle_job,
+    append_pk_ledger,
+    load_pk_ledger,
+    run_next_fill_idle,
+)
 from util import write_json
 
 
 class RunNextLedgerTests(unittest.TestCase):
+    def test_stage_pilot_for_p2_challenge(self) -> None:
+        self.assertEqual(
+            _stage_for_fill_idle_job({"priority": "P2", "lane": "challenge_grok"}),
+            "pilot",
+        )
+        self.assertEqual(
+            _stage_for_fill_idle_job({"priority": "P0a", "lane": "primary_h3"}),
+            "production",
+        )
+        self.assertEqual(
+            _stage_for_fill_idle_job({"priority": "P1", "lane": "challenge_weak"}),
+            "production",
+        )
+
     def test_run_next_dry_run_and_capacity_skip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -767,6 +767,19 @@ def pk_compare(
     }
 
 
+def _stage_for_fill_idle_job(nxt: dict[str, Any]) -> str:
+    """P2 soft challenges use pilot; primary P0/P1 stay production."""
+    pri = str(nxt.get("priority") or "")
+    lane = str(nxt.get("lane") or "")
+    if pri == "P2" or lane in {"challenge_grok", "challenge_env", "challenge_weak"}:
+        # challenge_weak / P1 may still be meat retry — keep production for P1
+        if pri == "P1" and lane == "challenge_weak":
+            return "production"
+        if pri == "P2" or lane in {"challenge_grok", "challenge_env"}:
+            return "pilot"
+    return "production"
+
+
 def run_next_fill_idle(
     root: Path | str,
     *,
@@ -776,90 +789,133 @@ def run_next_fill_idle(
     require_capacity: bool = True,
     seed: int = 20260804,
     timeout_sec: int = 1800,
+    max_jobs: int = 1,
 ) -> dict[str, Any]:
-    """One-shot Fill-Idle worker: plan next job; optionally run when capacity ready.
+    """Fill-Idle worker: plan next job; optionally run when capacity ready.
 
-    Not a daemon — call from cron/agent loop. Never auto-promotes PK winners.
+    Not a daemon — ``max_jobs`` caps how many runs in one call (default 1, hard max 20).
+    Never auto-promotes PK winners. P2 soft challenges use pilot stage.
     """
     base = _root(root)
-    nxt_rep = next_fill_idle_job(base, include_challenge=include_challenge, check_capacity=True)
-    out: dict[str, Any] = {
+    max_jobs = max(1, min(int(max_jobs or 1), 20))
+    runs: list[dict[str, Any]] = []
+    last_out: dict[str, Any] = {
         "schema_version": 1,
         "kind": "ai-film-h3-fill-idle-run-next",
         "ok": True,
         "root": str(base),
         "execute": bool(execute),
-        "next_report": nxt_rep,
+        "max_jobs": max_jobs,
+        "jobs_attempted": 0,
+        "jobs_ran": 0,
+        "runs": runs,
         "ran": False,
         "skipped_reason": None,
         "run_result": None,
+        "next_report": None,
     }
-    nxt = nxt_rep.get("next") if isinstance(nxt_rep.get("next"), dict) else None
-    if not nxt:
-        out["skipped_reason"] = "queue_empty"
-        return out
-    if not execute:
-        out["skipped_reason"] = "dry_run_pass_execute"
-        out["command"] = nxt.get("command")
-        return out
-    if require_capacity and nxt_rep.get("capacity_ready") is False:
-        out["skipped_reason"] = "capacity_not_ready"
-        out["ok"] = True  # advisory skip, not hard fail
-        return out
 
-    sid = str(nxt.get("shot_id") or "")
-    mode = str(nxt.get("mode") or "i2v")
-    try:
-        from h3_workflow import run_h3_shot
-
-        result = run_h3_shot(
-            base,
-            sid,
-            mode=mode,
-            register=bool(register),
-            status="candidate",
-            seed=int(seed),
-            timeout_sec=int(timeout_sec),
-            enqueue_queue=False,
-            production_stage="production",
+    for job_i in range(max_jobs):
+        nxt_rep = next_fill_idle_job(
+            base, include_challenge=include_challenge, check_capacity=True
         )
-        out["ran"] = True
-        out["run_result"] = {
-            k: result.get(k)
-            for k in (
-                "ok",
-                "shot_id",
-                "mode",
-                "deliver_path",
-                "receipt",
-                "weapon_id",
-            )
-        }
-        out["ok"] = bool(result.get("ok"))
-        # Chain hint: what to burn next (dual second leg / next P0…)
+        last_out["next_report"] = nxt_rep
+        nxt = nxt_rep.get("next") if isinstance(nxt_rep.get("next"), dict) else None
+        if not nxt:
+            last_out["skipped_reason"] = "queue_empty" if job_i == 0 else "queue_empty_after_runs"
+            break
+        if not execute:
+            last_out["skipped_reason"] = "dry_run_pass_execute"
+            last_out["command"] = nxt.get("command")
+            last_out["next"] = nxt
+            break
+        if require_capacity and nxt_rep.get("capacity_ready") is False:
+            last_out["skipped_reason"] = "capacity_not_ready"
+            last_out["ok"] = True  # advisory skip, not hard fail
+            last_out["command"] = nxt.get("command")
+            break
+
+        sid = str(nxt.get("shot_id") or "")
+        mode = str(nxt.get("mode") or "i2v")
+        stage = _stage_for_fill_idle_job(nxt)
+        last_out["jobs_attempted"] = int(last_out["jobs_attempted"]) + 1
         try:
-            after = next_fill_idle_job(
-                base, include_challenge=include_challenge, check_capacity=False
+            from h3_workflow import run_h3_shot
+
+            result = run_h3_shot(
+                base,
+                sid,
+                mode=mode,
+                register=bool(register),
+                status="candidate",
+                seed=int(seed) + job_i,
+                timeout_sec=int(timeout_sec),
+                enqueue_queue=False,
+                production_stage=stage,
             )
-            out["next_after"] = after.get("next")
-            out["command_after"] = after.get("command")
-        except Exception:
-            out["next_after"] = None
-    except Exception as exc:  # noqa: BLE001
-        out["ok"] = False
-        out["skipped_reason"] = "run_failed"
-        out["error"] = str(exc)[:300]
-    # write receipt
+            run_row = {
+                "shot_id": sid,
+                "mode": mode,
+                "priority": nxt.get("priority"),
+                "lane": nxt.get("lane"),
+                "stage": stage,
+                "ok": bool(result.get("ok")),
+                "deliver_path": result.get("deliver_path"),
+            }
+            runs.append(run_row)
+            last_out["ran"] = True
+            last_out["jobs_ran"] = int(last_out["jobs_ran"]) + 1
+            last_out["run_result"] = {
+                k: result.get(k)
+                for k in (
+                    "ok",
+                    "shot_id",
+                    "mode",
+                    "deliver_path",
+                    "receipt",
+                    "weapon_id",
+                )
+            }
+            last_out["ok"] = bool(result.get("ok"))
+            if not result.get("ok"):
+                last_out["skipped_reason"] = "run_failed"
+                break
+        except Exception as exc:  # noqa: BLE001
+            last_out["ok"] = False
+            last_out["skipped_reason"] = "run_failed"
+            last_out["error"] = str(exc)[:300]
+            runs.append(
+                {
+                    "shot_id": sid,
+                    "mode": mode,
+                    "stage": stage,
+                    "ok": False,
+                    "error": str(exc)[:200],
+                }
+            )
+            break
+
+    # Chain hint after last successful/attempted job
+    try:
+        after = next_fill_idle_job(
+            base, include_challenge=include_challenge, check_capacity=False
+        )
+        last_out["next_after"] = after.get("next")
+        last_out["command_after"] = after.get("command")
+        last_out["pending_after"] = after.get("pending_count")
+    except Exception:
+        last_out["next_after"] = None
+
     try:
         from util import write_json
 
         rec = base / "receipts" / "fill-idle-run-next.json"
         rec.parent.mkdir(parents=True, exist_ok=True)
-        write_json(rec, out)
-        out["receipt"] = str(rec)
+        write_json(rec, last_out)
+        last_out["receipt"] = str(rec)
     except Exception:
         pass
-    return out
+    return last_out
 
 
 def pk_ledger_path(root: Path | str) -> Path:

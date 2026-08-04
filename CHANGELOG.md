@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.37.12] - 2026-08-04
+
+### Fixed / Added (Fill-Idle run-next production stage + batch)
+- **`run-next`**: P2 soft challenges use **pilot** stage (was always production).
+- **`run-next --max N`**: run up to N jobs per call (default 1, hard cap 20) — still not a daemon.
+- Returns `jobs_ran` / `runs[]` / `pending_after`; stages/visual + memory updated.
+- Tests: stage matrix in `test_fill_idle_run_next_ledger`.
+
 ## [2.37.11] - 2026-08-04
 
 ### Added (H2/H3 · hotpath gate matrix on fast suite)
