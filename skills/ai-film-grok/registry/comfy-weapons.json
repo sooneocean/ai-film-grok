@@ -1051,7 +1051,17 @@
         "steps_node": "12",
         "steps_input": "steps",
         "save_node": "18",
-        "filename_prefix_input": "filename_prefix"
+        "filename_prefix_input": "filename_prefix",
+        "ref_input_nodes": [
+          "21",
+          "22"
+        ],
+        "ref_image_input": "image",
+        "ref_frame_node": "8",
+        "ref_frame_inputs": [
+          "ref_images.ref_image_1",
+          "ref_images.ref_image_2"
+        ]
       },
       "requirements": {
         "diffusion_models": [
@@ -1088,7 +1098,9 @@
         "blocked_until_weights": false,
         "film_workflow_cli": "aifilm h3",
         "film_lane_ready": true,
-        "bulk_requires_pilot_approval": true
+        "bulk_requires_pilot_approval": true,
+        "multi_reference": true,
+        "max_ref_images": 3
       },
       "latest_canary_receipt_path": "registry/evidence/h3-canaries/minimax-h3-film-lane-open-20260803.json",
       "verified": {

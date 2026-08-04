@@ -287,6 +287,12 @@ def plan_h3_shot(
         "last_path": str(last_path) if last_path else None,
         "last_source": last_source,
         "media_pack": media_pack,
+        "ref_paths": [
+            str(r["path"])
+            for r in (media_pack.get("refs") or [])
+            if isinstance(r, dict) and r.get("path")
+        ],
+        "missing_last_hint": media_pack.get("missing_last_hint"),
         "continue_handoff": cont,
         "requires_still": bool(mode_res.get("requires_still")),
         "requires_last": bool(mode_res.get("requires_last")),
@@ -599,7 +605,7 @@ def run_h3_shot(
 ) -> dict[str, Any]:
     """Generate one H3 clip for a film shot and optionally register it."""
     from h3_mode import H3_MODE_ENDPOINT, H3_MODE_WEAPON
-    from h3_media_pack import flf_prompt_clause
+    from h3_media_pack import flf_prompt_clause, r2v_ref_prompt_clause
 
     base = _root(root)
     plan = plan_h3_shot(
@@ -653,6 +659,18 @@ def run_h3_shot(
         clause = flf_prompt_clause()
         if "first-last-frame" not in prompt.lower() and "last keyframe" not in prompt.lower():
             prompt = f"{prompt.rstrip()} {clause}"
+    if plan["mode"] == "r2v":
+        pack_refs = []
+        mp = plan.get("media_pack") if isinstance(plan.get("media_pack"), dict) else {}
+        pack_refs = list(mp.get("refs") or [])
+        # When last exists but mode is r2v, expose last as pose ref in prompt duties
+        if plan.get("last_path"):
+            pack_refs = list(pack_refs) + [
+                {"path": plan["last_path"], "role": "pose", "source": "last_as_pose_ref"}
+            ]
+        r2v_clause = r2v_ref_prompt_clause(pack_refs)
+        if r2v_clause and "<Picture" not in prompt:
+            prompt = f"{prompt.rstrip()} {r2v_clause}"
     prompt_dir = base / "receipts" / "prompts"
     prompt_dir.mkdir(parents=True, exist_ok=True)
     (prompt_dir / f"{shot_id}.h3.spine.txt").write_text(prompt + "\n", encoding="utf-8")
@@ -679,6 +697,20 @@ def run_h3_shot(
     }
     if last_frame is not None:
         gen_kwargs["last_frame"] = last_frame
+    # R2V multi-ref: identity/style refs from media_pack (not the primary still).
+    if plan["mode"] == "r2v":
+        ref_paths: list[Path] = []
+        for raw in plan.get("ref_paths") or []:
+            rp = Path(str(raw)).expanduser().resolve()
+            if rp.is_file() and rp != keyframe.resolve():
+                ref_paths.append(rp)
+        # Optional: last still as pose reference when not using FLF
+        if plan.get("last_path"):
+            lp = Path(str(plan["last_path"])).expanduser().resolve()
+            if lp.is_file() and lp != keyframe.resolve() and lp not in ref_paths:
+                ref_paths.append(lp)
+        if ref_paths:
+            gen_kwargs["reference_images"] = ref_paths[:2]  # template slots 21/22
     result = provider.generate(**gen_kwargs)
     if not result.get("ok"):
         raise H3WorkflowError(f"H3 generate failed: {result.get('stderr') or result}")

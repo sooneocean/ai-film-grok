@@ -65,6 +65,13 @@ def add_still_challenge_parsers(sub: argparse._SubParsersAction[argparse.Argumen
     promote.add_argument("--identity-approved", action="store_true")
     promote.add_argument("--anatomy-safe", action="store_true")
     promote.add_argument("--review-note", default="")
+    promote.add_argument(
+        "--as",
+        dest="as_role",
+        default="first",
+        choices=["first", "end"],
+        help="Promote as start still (first) or FLF end still (end → stills/<id>_end.png)",
+    )
     promote.add_argument("--receipt", type=Path, default=None)
 
 
@@ -125,6 +132,7 @@ def run_still_challenge_cli(args: argparse.Namespace) -> dict[str, Any]:
                 anatomy_safe=bool(getattr(args, "anatomy_safe", False)),
                 review_note=str(getattr(args, "review_note", "") or ""),
                 status=str(getattr(args, "status", "approved") or "approved"),
+                as_role=str(getattr(args, "as_role", "first") or "first"),
             )
         else:
             raise StillChallengeError(f"unknown still-challenge action: {action}")

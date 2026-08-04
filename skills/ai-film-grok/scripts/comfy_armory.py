@@ -265,14 +265,23 @@ def _allowed_binding_slots(bindings: Mapping[str, Any]) -> set[tuple[str, str]]:
         slots.add((str(bindings["last_frame_node"]), str(bindings["last_frame_input"])))
     for node_id in bindings.get("ref_input_nodes") or []:
         slots.add((str(node_id), str(bindings.get("ref_image_input") or "image")))
+    # Multi-ref links on MiniMaxH3ReferenceToVideo (ref_images.ref_image_N)
+    frame_node = str(bindings.get("ref_frame_node") or bindings.get("prompt_node") or "")
+    for key in bindings.get("ref_frame_inputs") or []:
+        if frame_node:
+            slots.add((frame_node, str(key)))
     return slots
 
 
 def _optional_last_frame_nodes(bindings: Mapping[str, Any]) -> set[str]:
-    """Nodes that may be injected when last_frame is bound (not in base template)."""
+    """Nodes that may be injected for last_frame / multi-ref (not in base template)."""
     out: set[str] = set()
     if bindings.get("last_input_node"):
         out.add(str(bindings["last_input_node"]))
+    for node_id in bindings.get("ref_input_nodes") or []:
+        # Primary input_node is already in the template; only extras are optional.
+        if str(node_id) != str(bindings.get("input_node") or ""):
+            out.add(str(node_id))
     return out
 
 
@@ -626,6 +635,8 @@ def compile_weapon_workflow(
     if ref_image_names:
         ref_nodes = [str(n) for n in (bindings.get("ref_input_nodes") or [])]
         ref_key = str(bindings.get("ref_image_input") or "image")
+        frame_node = str(bindings.get("ref_frame_node") or bindings.get("prompt_node") or "")
+        frame_inputs = [str(x) for x in (bindings.get("ref_frame_inputs") or [])]
         if not ref_nodes and "input_node" not in bindings:
             raise ComfyArmoryError(
                 f"weapon {weapon_id} has no ref_input_nodes for multi-reference binding"
@@ -639,6 +650,9 @@ def compile_weapon_workflow(
                 graph[node_id]["inputs"][ref_key] = safe
             else:
                 graph[node_id] = {"class_type": "LoadImage", "inputs": {ref_key: safe}}
+            # Wire MiniMaxH3ReferenceToVideo.ref_images.ref_image_N when declared
+            if frame_node and idx < len(frame_inputs) and frame_node in graph:
+                graph[frame_node]["inputs"][frame_inputs[idx]] = [node_id, 0]
     if "audio_node" in bindings:
         if not input_audio_name:
             raise ComfyArmoryError("talking-avatar workflow requires an uploaded audio name")

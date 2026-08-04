@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.38.7] - 2026-08-04
+
+### Added (H3 FLF + media-pack + multi-ref full chain)
+- **Phase 2 media pack**: cast bible identity refs, state-master end still, still-challenge end candidates, `missing_last_hint` on plan.
+- **Phase 3 R2V multi-ref**: armory injects LoadImage 21/22 → `ref_images.ref_image_1/2`; `<Picture n>` duty clause; `h3 run --ref` / pack refs.
+- **Phase 4 end still**: `still-challenge promote --as end` → `stills/<id>_end.png` + manifest `*_end`.
+- **Phase 0 scaffold**: `artifacts/5090-evaluation/h3-flf-ab-scaffold/` (GPU busy at ship; offline recipe).
+- Tests: expanded `test_h3_flf_media_pack` (promote-as-end, multi-ref compile, identity refs).
+
 ## [2.38.6] - 2026-08-04
 
 ### Added (H3 FLF first+last frame · docs/tests closeout)

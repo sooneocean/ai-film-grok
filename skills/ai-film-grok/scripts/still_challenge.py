@@ -762,8 +762,14 @@ def promote_still_challenge(
     anatomy_safe: bool = False,
     review_note: str = "",
     status: str = "approved",
+    as_role: str = "first",
 ) -> dict[str, Any]:
-    """Promote a FRW candidate still into stills/ + manifest (human gates required)."""
+    """Promote a FRW candidate still into stills/ + manifest (human gates required).
+
+    as_role:
+      first — stills/<id>.png (default start still)
+      end   — stills/<id>_end.png (FLF last frame; Phase 4)
+    """
     base = _root(root)
     if status == "approved":
         if not identity_approved:
@@ -801,15 +807,24 @@ def promote_still_challenge(
     except Exception:  # noqa: BLE001 — optional gate modules
         geo = {"ok": True, "skipped": True}
 
+    role = str(as_role or "first").strip().lower()
+    if role in {"end", "last", "flf_end", "end_still"}:
+        role = "end"
+    elif role not in {"first", "start", "still"}:
+        raise StillChallengeError("as_role must be first or end")
+    else:
+        role = "first"
+
     dest_dir = base / "stills"
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / f"{shot_id}.png"
+    dest = dest_dir / (f"{shot_id}_end.png" if role == "end" else f"{shot_id}.png")
+    manifest_key = f"{shot_id}_end" if role == "end" else shot_id
     archive_dir = dest_dir / "_archive"
     archive_dir.mkdir(parents=True, exist_ok=True)
     archived = None
     if dest.is_file():
         ts = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        archived = archive_dir / f"{shot_id}_{ts}.png"
+        archived = archive_dir / f"{dest.stem}_{ts}.png"
         shutil.copy2(dest, archived)
 
     shutil.copy2(cand, dest)
@@ -822,10 +837,11 @@ def promote_still_challenge(
     if not isinstance(stills, dict):
         stills = {}
         man["stills"] = stills
-    stills[shot_id] = {
+    stills[manifest_key] = {
         "shot_id": shot_id,
         "path": _rel_or_abs(base, dest),
         "status": status,
+        "role": role,
         "provider": "frw_i2i",
         "source_endpoint": "frw_img2image",
         "sha256": _sha256(dest),
@@ -843,6 +859,7 @@ def promote_still_challenge(
         "ok": True,
         "shot_id": shot_id,
         "status": status,
+        "role": role,
         "still_path": str(dest),
         "candidate_path": str(cand),
         "archived_previous": str(archived) if archived else None,

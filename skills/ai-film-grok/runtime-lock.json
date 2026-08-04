@@ -382,7 +382,7 @@
     },
     {
       "path": "scripts/cli_still_challenge.py",
-      "sha256": "a759f089ff073983c8d7f0f0f6011a8396e3feb6745b8fb35041c17a527a8ff3"
+      "sha256": "656ca40a0cfe99c4b461f8e3a2017f690ee83f3c23e9de9b3bb308dc7b72b1c0"
     },
     {
       "path": "scripts/cli_team.py",
@@ -418,7 +418,7 @@
     },
     {
       "path": "scripts/comfy_armory.py",
-      "sha256": "f6f8f992bd7d9aeed03e17c8e14708cafedc6d7f21afa6f7e0c1f307625b9ded"
+      "sha256": "55b3c59b7ede5162e7f152d5827e1caef962937019cd94c64346fd9034f1d210"
     },
     {
       "path": "scripts/comfy_broker_service.py",
@@ -706,7 +706,7 @@
     },
     {
       "path": "scripts/h3_media_pack.py",
-      "sha256": "2b8cb0d0f47bc7d27c26a1515835cec3cb143ca48c8ba2f749d6a6a3cc6cef7c"
+      "sha256": "211a93307e300d8d5d37a2ef29ec9d4f710574ebbdecc9f4c1d3175e7b3e3acd"
     },
     {
       "path": "scripts/h3_mode.py",
@@ -714,7 +714,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "e3834e481b352acd9c5a56c1c21afc22c55e2ac0f53f231195ffc1fc20c12ee8"
+      "sha256": "3c6f9df99a267feab66350cc2ba21fa585d63ffe07638da6accd8f1dcd3ded33"
     },
     {
       "path": "scripts/heat_check.py",
@@ -1186,7 +1186,7 @@
     },
     {
       "path": "scripts/still_challenge.py",
-      "sha256": "4f242fc0c9432907570100bc0affc4585af8470f35112f78499ffa8295e48526"
+      "sha256": "afc32f0aada8a6a74f1d8b0a1b2c46b19d3aacf22f1680f2ec615fdb811ed472"
     },
     {
       "path": "scripts/still_uniqueness.py",

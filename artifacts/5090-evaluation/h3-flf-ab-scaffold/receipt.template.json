@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "kind": "h3-flf-ab-canary",
+  "status": "pending_gpu",
+  "blockers": ["COMFY_QUEUE_BUSY or VRAM/RAM floors"],
+  "protocol": "i2v_vs_flf_same_first_still",
+  "metrics": ["end_l1_vs_last", "mid_identity_l1", "mean_absdiff", "dailies"]
+}

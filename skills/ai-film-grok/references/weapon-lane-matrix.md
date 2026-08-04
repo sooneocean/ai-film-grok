@@ -77,6 +77,10 @@ aifilm h3 plan --root "<film>" --shot-id s01 --still takes/s01/still_frw_*.png
 
 **FLF 用法**：`aifilm h3 plan|run --last-frame PATH` 或约定 `stills/<shot>_end.png`；receipt 含 `media_pack` / `last_path`。
 
+**R2V multi-ref（Phase 3）**：`media_pack.refs` / `--ref` → 最多 2 张额外图 （`ref_images.ref_image_1/2`）；prompt 注入 `<Picture n>` 职责。
+
+**End still 产线（Phase 4）**：`still-challenge promote --as end` → `stills/<id>_end.png`；plan 缺 last 时带 `missing_last_hint`。
+
 `list` 每行带 `mode`/`command`/`alt_mode`；`plan` 带 `mode_resolve` + `effect_tips` + `command_alt`。CLI `--mode` 可覆盖。
 
 **景别速查**：WS 环境→T2V · MS 在场→I2V · MCU 反应→I2V 低动 · CU 对白→I2V/R2V · ECU 插入→I2V+细节 still · 体位高动→I2V 狠 prompt（不够再 R2V）。
