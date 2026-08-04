@@ -118,7 +118,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "4e1a979127bce2f99ce54fb3a9c01c2a95cbd3cefdc099156d2895720b8ae5ca"
+      "sha256": "73a13c443624a6e8d02e219da51bacf482ac638caeaeaeeaf86fb2dcb5d643ae"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -315,6 +315,10 @@
     {
       "path": "scripts/cli_longform.py",
       "sha256": "8c56191ac6942d218100a0498f68e499173ed6b025beb12fe8ed94cdb9befe2d"
+    },
+    {
+      "path": "scripts/cli_media.py",
+      "sha256": "5281fe712013643c5ebc88b97e95fb1645f103c442635514d9ff5e0c8bcaa20c"
     },
     {
       "path": "scripts/cli_motion.py",

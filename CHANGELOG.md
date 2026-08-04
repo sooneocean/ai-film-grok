@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.38.3] - 2026-08-04
+
+### Changed (C3 · media CLI extract)
+- **`cli_media.py`**: extract register-still/clip, style-lock, continuity, face-identity, assemble, reencode, shortform/ingest (~1.6k LOC).
+- **`aifilm_grok`**: re-exports; helpers proxy through monolith for monkeypatch.
+- Monolith ~9640 → ~8070 lines after C2+C3.
+
 ## [2.38.2] - 2026-08-04
 
 ### Fixed / Added (human-safe ship-prep + fill-idle cycle)
