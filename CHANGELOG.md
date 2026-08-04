@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.36.3] - 2026-08-04
+
+### Added (Temple-AV dramatic meaning stack · restore)
+- Ship `scripts/dramatic_meaning.py` + wire into `cinematic_audit` / `film_spec` / `preflight` fail-closed production path.
+- Tests: `tests/test_dramatic_meaning.py` (shot/motion/dialogue/arc good+bad).
+- Schema `dramatic_meaning_strict`; fixtures motion semantics migrated for heat=max.
+
 ## [2.36.2] - 2026-08-04
 
 ### Added (Motion Core deep integration · Phase C)

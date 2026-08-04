@@ -1847,6 +1847,10 @@
         "en"
       ],
       "description": "Designed subtitle language; HyperFrames is sole caption owner on final."
+    },
+    "dramatic_meaning_strict": {
+      "type": "boolean",
+      "description": "Hard-fail write-spec/preflight when dramatic meaning stack fails (shot world-change, motion non-filler, dialogue purpose, emotional_arc stacking). Default true when heat_scale=max or quality_target=premium_vertical. write-spec also always fail-closes via cinematic_audit. See scripts/dramatic_meaning.py · hard-defaults 殿堂级意涵堆叠."
     }
   },
   "allOf": [

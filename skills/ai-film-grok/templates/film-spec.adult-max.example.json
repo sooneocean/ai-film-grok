@@ -22,7 +22,7 @@
   "sex_detail_cu_strict": true,
   "both_undress_strict": true,
   "spice_level": "extreme",
-  "sex_min_duration_ratio": 0.50,
+  "sex_min_duration_ratio": 0.5,
   "coitus_strict": true,
   "size_ladder_strict": true,
   "pose_strict": true,
@@ -30,23 +30,50 @@
     "enabled": true,
     "mute_frame_test": true,
     "beats": {
-      "entry": ["shot01"],
-      "undress": ["shot02"],
-      "union": ["shot03"],
-      "rhythm": ["shot04", "shot05"],
-      "lock": ["shot06"],
-      "finish": ["shot07"],
-      "hook": ["shot08"]
+      "entry": [
+        "shot01"
+      ],
+      "undress": [
+        "shot02"
+      ],
+      "union": [
+        "shot03"
+      ],
+      "rhythm": [
+        "shot04",
+        "shot05"
+      ],
+      "lock": [
+        "shot06"
+      ],
+      "finish": [
+        "shot07"
+      ],
+      "hook": [
+        "shot08"
+      ]
     }
   },
   "director_intent": {
     "logline": "展厅落锁后，她卸甲跨坐，把规矩办穿，只留下一句换你顶。",
     "tone": "成人色气·办事完成·荤梗拉满",
     "audience": "成人短片观众",
-    "emotional_arc": ["落锁", "卸甲", "结合节奏", "办完钩子"],
+    "emotional_arc": [
+      "落锁",
+      "卸甲",
+      "结合节奏",
+      "办完钩子"
+    ],
     "theme": "边界失效后的诚实欲望",
-    "cast": ["heroine", "partner"],
-    "taboos": ["全装跨坐当办事", "纯文艺灯暗句", "脱完回穿"]
+    "cast": [
+      "heroine",
+      "partner"
+    ],
+    "taboos": [
+      "全装跨坐当办事",
+      "纯文艺灯暗句",
+      "脱完回穿"
+    ]
   },
   "scenes": [
     {
@@ -65,7 +92,10 @@
             "subject": "adult heroine full stage costume",
             "action": "pin partner to door latch close entry",
             "motion": "hand on latch door close weight step-in",
-            "camera": { "shot_size": "medium full", "angle": "eye level" },
+            "camera": {
+              "shot_size": "medium full",
+              "angle": "eye level"
+            },
             "visible_change": "door locks space narrows",
             "wardrobe_state": "full",
             "coitus_beat": "entry"
@@ -83,7 +113,10 @@
             "subject": "adult heroine partial undress bare shoulders",
             "action": "removes armor dress slides off shoulders undress",
             "motion": "straps slide dress peels bare skin expands",
-            "camera": { "shot_size": "medium", "angle": "eye level" },
+            "camera": {
+              "shot_size": "medium",
+              "angle": "eye level"
+            },
             "visible_change": "armor discarded bare skin",
             "wardrobe_state": "partial",
             "start_pose": "shoulder straps already slipping",
@@ -105,7 +138,10 @@
             "subject": "adult heroine bare skin partner pants discarded",
             "action": "straddle-seat hips settle pelvis-lock skin-to-skin",
             "motion": "union_settle straddle-seat hips settle pelvis-lock weight down",
-            "camera": { "shot_size": "medium full", "angle": "slight low" },
+            "camera": {
+              "shot_size": "medium full",
+              "angle": "slight low"
+            },
             "visible_change": "hips lock contact readable both undressed",
             "wardrobe_state": "bare",
             "partner_wardrobe_state": "undressed",
@@ -128,7 +164,10 @@
             "subject": "adult heroine bare skin cowgirl",
             "action": "hips-sink grind-forward thrust-rhythm twice",
             "motion": "rhythm_hips hips-sink twice grind-forward thrust-rhythm locked camera",
-            "camera": { "shot_size": "medium", "angle": "slight low" },
+            "camera": {
+              "shot_size": "medium",
+              "angle": "slight low"
+            },
             "visible_change": "two visible hip sinks thrust",
             "wardrobe_state": "bare",
             "partner_wardrobe_state": "undressed",
@@ -153,8 +192,11 @@
             "subject": "adult pair bare waist pelvis union close",
             "action": "hips-sink grind deeper thrust-rhythm pelvis-lock 定器",
             "motion": "rhythm_hips hips-sink grind-forward clutch",
-            "camera": { "shot_size": "close-up insert", "angle": "slight low" },
-          "framing": "union_closeup; full head and both shoulders inside frame, ample headroom, safe framing no cropping",
+            "camera": {
+              "shot_size": "close-up insert",
+              "angle": "slight low"
+            },
+            "framing": "union_closeup; full head and both shoulders inside frame, ample headroom, safe framing no cropping",
             "visible_change": "waist-pelvis union thrust readable",
             "wardrobe_state": "bare",
             "partner_wardrobe_state": "undressed",
@@ -176,9 +218,12 @@
           "nar": "腿锁腰。攥床单，再夹紧。",
           "dsl": {
             "subject": "adult limbs bare",
-            "action": "leg-wrap-waist clutch sheets micro-tremor",
-            "motion": "lock_clutch leg-wrap-waist clutch sheets micro-tremor",
-            "camera": { "shot_size": "close-up insert hands fabric", "angle": "eye level" },
+            "action": "leg-wrap-waist clutch sheets, micro-tremble, breath rises, sweat bead",
+            "motion": "lock_clutch leg-wrap-waist clutch sheets micro-tremble breath rise sweat bead",
+            "camera": {
+              "shot_size": "close-up insert hands fabric",
+              "angle": "eye level"
+            },
             "visible_change": "fingers white on fabric",
             "wardrobe_state": "bare",
             "partner_wardrobe_state": "undressed",
@@ -197,9 +242,12 @@
           "nar": "失声办穿。背一弓，腿软，射出余颤。",
           "dsl": {
             "subject": "adult heroine bare finish face",
-            "action": "arch-finish residual-tremor wet eyes 高潮 射出",
-            "motion": "finish_arch arch-finish residual-tremor breath static hold",
-            "camera": { "shot_size": "close-up full head", "angle": "eye level" },
+            "action": "arches and presses finish residual-tremor wet eyes 高潮 射出",
+            "motion": "finish_arch presses up residual-tremor breath static hold",
+            "camera": {
+              "shot_size": "close-up full head",
+              "angle": "eye level"
+            },
             "framing": "full head and both shoulders inside frame, ample headroom, safe framing no cropping",
             "visible_change": "spine arch climax release then softens",
             "wardrobe_state": "bare",
@@ -219,7 +267,10 @@
             "subject": "adult pair bare residual",
             "action": "ear whisper residual hold next round",
             "motion": "lean to ear residual pull-back hold",
-            "camera": { "shot_size": "medium", "angle": "eye level" },
+            "camera": {
+              "shot_size": "medium",
+              "angle": "eye level"
+            },
             "visible_change": "unfinished invitation",
             "wardrobe_state": "bare",
             "start_pose": "already bare after climax",

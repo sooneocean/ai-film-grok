@@ -18,6 +18,7 @@ from continuity import (
     lint_production_consistency,
     lint_vo_motion_link,
 )
+from dramatic_meaning import lint_dramatic_meaning
 from framing_lint import lint_composition_rules
 from util import read_json, utc_now, write_json
 
@@ -186,6 +187,12 @@ def audit(
             issues.append({**item, "severity": "error"})
     issues.extend(_coverage_issues(shots))
     issues.extend(_performance_issues(shots))
+    # Temple-AV meaning stack: shot world-change, motion purpose, dialogue purpose, arc stack.
+    # write-spec production path always fail-closes on meaning issues.
+    meaning = lint_dramatic_meaning(source, shots=shots, graph=graph)
+    for item in meaning.get("issues") or []:
+        if isinstance(item, dict):
+            issues.append({**item, "severity": "error"})
     if require_authored_contract:
         from creative_quality import validate_premium_vertical
 

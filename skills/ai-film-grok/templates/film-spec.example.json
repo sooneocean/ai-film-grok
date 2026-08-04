@@ -88,11 +88,24 @@
       }
     ],
     "audio_tracks": {
-      "dialogue": {"gain": 1.0, "duck_to_bgm": true},
-      "sfx": {"gain": 0.8, "duck_to_bgm": true},
-      "ambience": {"gain": 0.5},
-      "foley": {"gain": 0.6},
-      "music": {"gain": 0.7, "duck_to_vo": true}
+      "dialogue": {
+        "gain": 1.0,
+        "duck_to_bgm": true
+      },
+      "sfx": {
+        "gain": 0.8,
+        "duck_to_bgm": true
+      },
+      "ambience": {
+        "gain": 0.5
+      },
+      "foley": {
+        "gain": 0.6
+      },
+      "music": {
+        "gain": 0.7,
+        "duck_to_vo": true
+      }
     }
   },
   "grade": {
@@ -108,14 +121,13 @@
   "description": "说书人讲述：雨夜女司机与后座升温——色气靠距离与感官，不对口型",
   "aspect_ratio": "9:16",
   "heat_scale": "max",
-  "sex_vo_strict": false,
+  "sex_vo_strict": true,
   "cast_mode": "auto",
   "heat_phase_auto": true,
   "heat_arc_advise": false,
   "sex_floor_strict": true,
   "sex_wardrobe_strict": true,
-  "sex_vo_strict": true,
-  "sex_min_duration_ratio": 0.20,
+  "sex_min_duration_ratio": 0.2,
   "erotic_impact_strict": false,
   "sex_arc_strict": false,
   "sex_detail_cu_strict": false,
@@ -150,13 +162,13 @@
       {
         "label": "加速靠近",
         "start_ratio": 0.25,
-        "end_ratio": 0.60,
+        "end_ratio": 0.6,
         "intensity": 6,
         "cut_freq": "medium"
       },
       {
         "label": "感官高潮",
-        "start_ratio": 0.60,
+        "start_ratio": 0.6,
         "end_ratio": 0.85,
         "intensity": 9,
         "cut_freq": "fast"
@@ -179,7 +191,10 @@
       "真对口型当卖点",
       "说教收尾"
     ],
-    "cast": ["hero", "partner"]
+    "cast": [
+      "hero",
+      "partner"
+    ]
   },
   "scenes": [
     {
@@ -242,7 +257,7 @@
           "nar_en": "In the rearview, water still beads on her collarbones; she breathes soft.",
           "dsl": {
             "subject": "same driver in rearview mirror, wet collarbone, seductive eyes",
-            "action": "glances into rearview mirror",
+            "action": "leans closer toward the rearview, eyes draw near",
             "chain_mode": "continue",
             "cut_on": "mid_motion",
             "camera_axis": "ecu_hold",
@@ -265,7 +280,7 @@
             "cast": [
               "heroine"
             ],
-            "motion": "mirror glance, tight hold no push-in, soft breath, idle not speaking"
+            "motion": "leans close to mirror, gaze tightens near glass, soft breath, idle not speaking"
           }
         }
       ]

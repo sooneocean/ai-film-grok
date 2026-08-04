@@ -2160,6 +2160,37 @@ def validate_film_spec(
             + ",".join(mm["codes"] or ["MOTION"])
         )
 
+    # Dramatic meaning stack (shot / motion / dialogue purpose / emotional_arc).
+    # Report always written; fail-closed when meaning_gate_enabled (heat_scale=max /
+    # premium_vertical / dramatic_meaning_strict). write-spec also hard-fails via
+    # cinematic_audit regardless of this flag.
+    from dramatic_meaning import lint_dramatic_meaning, meaning_gate_enabled
+
+    meaning = lint_dramatic_meaning(spec, shots=shots)
+    spec["_dramatic_meaning"] = {
+        "ok": meaning.get("ok"),
+        "enabled": meaning_gate_enabled(spec),
+        "codes": meaning.get("codes"),
+        "error_count": meaning.get("error_count"),
+        "issues": meaning.get("issues"),
+        "parts": {
+            key: {
+                "ok": part.get("ok"),
+                "codes": part.get("codes"),
+                "error_count": part.get("error_count"),
+            }
+            for key, part in (meaning.get("parts") or {}).items()
+            if isinstance(part, dict)
+        },
+        "checked": meaning.get("checked"),
+        "note": meaning.get("note"),
+    }
+    if meaning_gate_enabled(spec) and not meaning.get("ok"):
+        raise FilmSpecError(
+            "dramatic meaning gate failed (dramatic_meaning_strict): "
+            + ",".join(meaning.get("codes") or ["SHOT_MEANING_EMPTY"])
+        )
+
     # Shot-local audio is additive for legacy projects, strict for new timed plans.
     try:
         from audio_cues import AudioCueError, validate_audio_cues

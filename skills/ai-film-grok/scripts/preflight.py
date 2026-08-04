@@ -754,6 +754,58 @@ def run_preflight(root: Path) -> dict[str, Any]:
             else:
                 soft.append(mm_issue)
 
+        # Dramatic meaning stack (shot / motion / dialogue purpose / emotional_arc)
+        try:
+            from dramatic_meaning import lint_dramatic_meaning, meaning_gate_enabled
+
+            shots_dm: list = []
+            if isinstance(spec.get("scenes"), list):
+                for sc in spec["scenes"]:
+                    if isinstance(sc, dict) and isinstance(sc.get("shots"), list):
+                        shots_dm.extend(sc["shots"])
+            graph_path = root / "drama-graph.json"
+            graph_dm = read_json(graph_path) if graph_path.is_file() else None
+            if not isinstance(graph_dm, dict):
+                graph_dm = None
+            dm = lint_dramatic_meaning(spec, shots=shots_dm, graph=graph_dm)
+            dm_codes = list(dm.get("codes") or [])
+            if dm_codes:
+                dm_strict = meaning_gate_enabled(spec)
+                if spec.get("dramatic_meaning_strict") is True:
+                    dm_strict = True
+                if spec.get("dramatic_meaning_strict") is False:
+                    dm_strict = False
+                dm_msg = (
+                    f"殿堂级意涵堆叠 {'hard' if dm_strict else 'soft'} lint: {dm_codes} "
+                    f"(errors={dm.get('error_count')})"
+                )
+                dm_fix = (
+                    "每镜 dramatic_function + visible_change/story_beat；"
+                    "运镜回答 beat 故事问题（禁 blink/push-in 空转）；"
+                    "对白须 speaker+text+subtext/emotion/purpose；"
+                    "ordered shots 须穿过 director_intent.emotional_arc（禁单情绪趴平）。"
+                    "见 lessons-2026-07-20-meaningful-motion.md · hard-defaults dramatic meaning"
+                )
+                dm_issue = _issue(
+                    "hard" if dm_strict else "soft",
+                    "dramatic_meaning",
+                    dm_msg,
+                    fix=dm_fix,
+                )
+                if dm_strict:
+                    hard.append(dm_issue)
+                else:
+                    soft.append(dm_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "dramatic_meaning_probe_error",
+                    f"dramatic meaning lint probe failed: {exc}"[:200],
+                    fix="check dramatic_meaning.lint_dramatic_meaning",
+                )
+            )
+
         # --- Production consistency P2-2~P2-6 (wardrobe/hair/makeup/light/rhythm/lipsync/voice drift) ---
         # Soft by default; hard when production_consistency_strict (premium).
         try:

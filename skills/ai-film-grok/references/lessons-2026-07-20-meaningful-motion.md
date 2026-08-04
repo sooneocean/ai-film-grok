@@ -54,7 +54,10 @@
 4. 一镜一意涵；第二动作拆下一镜  
 5. 与 `nar` 同事件（口白·动作锁）
 
-## Lint 码（soft；`meaningful_motion_strict` 可硬拦）
+## Lint 码（soft；`meaningful_motion_strict` / `dramatic_meaning_strict` 可硬拦）
+
+生产路径：`write-spec` → `cinematic_audit` 始终并入 `dramatic_meaning`（shot 意涵 + 对白 purpose + emotional_arc 堆叠）fail-closed；`heat_scale=max` 时 `validate_film_spec` / `preflight` 亦 hard。详见 `scripts/dramatic_meaning.py`。
+
 
 | 码 | 含义 |
 |---|---|

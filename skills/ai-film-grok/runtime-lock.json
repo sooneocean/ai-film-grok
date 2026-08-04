@@ -274,7 +274,7 @@
     },
     {
       "path": "scripts/cinematic_audit.py",
-      "sha256": "27cc0c461b90c865d2dcb39eaf288cec61148e58626a7d962812f1668256a12a"
+      "sha256": "59cdb417381cf86d0a4316d4687c7dbb3adcd35c7068468b5681862a537deb1e"
     },
     {
       "path": "scripts/cli/__init__.py",
@@ -565,6 +565,10 @@
       "sha256": "bf678228bcc4536f2b5a77dc00d666e8365dbbe597509fb11b2c5e6f5241d757"
     },
     {
+      "path": "scripts/dramatic_meaning.py",
+      "sha256": "06b4769b62b872fb608038dacee8004faa8b0c4c4f4eab3d454287a90bae9dd7"
+    },
+    {
       "path": "scripts/edit_edl_merge.py",
       "sha256": "4d65b59eca69122636a12e8c5011b0a5811344405cc0ea5cb5e8f2c7334ba5f7"
     },
@@ -614,7 +618,7 @@
     },
     {
       "path": "scripts/film_spec.py",
-      "sha256": "7db20e612c0877c43dc81f852da0bee6074011179b933795ac1a46acefcbe37c"
+      "sha256": "e9b3ddf9af788e1f5789628cd091b43027d1c0a23f4d0981b2a7ee3d1d61efc2"
     },
     {
       "path": "scripts/final_editorial_review.py",
@@ -918,7 +922,7 @@
     },
     {
       "path": "scripts/preflight.py",
-      "sha256": "493f0080ae48f2436713105914fc7d698a8247e5ee7e9c75ac786ad9c0037aa3"
+      "sha256": "aa9980bf2645ee171fc8b9d7a00aaae8d7b5a0a35f558f8d04e2b22dfb1e67a5"
     },
     {
       "path": "scripts/product_brief.py",
