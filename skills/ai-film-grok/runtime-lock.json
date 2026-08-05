@@ -466,7 +466,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "b6d9053d5a53218bea3ce93872144769ba8653d83d2efb265bb6d436c4d97526"
+      "sha256": "65f964c29dcabed71209869c669a809de8fd9466cbf800e9a6377dc7045557a2"
     },
     {
       "path": "scripts/cloud_media_download.py",
@@ -662,7 +662,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "bf9610dbc6efeda7b1b7f27e0fa0f3408a82f832128e3b7ccc54ace8e0dc1cbe"
+      "sha256": "bc9aefdfa3c77445202d893397322aae1a7525502de8c218811a3c37b3ed61bb"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -974,7 +974,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "f3ecf151a29c8aa1ab191d6bf38752bf7ee774e2dc0374e061601f929935dbc1"
+      "sha256": "a8b99d25a80852c28f0566805e129de02a7d4d4ab67a8c250d7cf1d4be29b2bf"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -1398,7 +1398,7 @@
     },
     {
       "path": "scripts/tts_backend.py",
-      "sha256": "bf22236b25e0a07409f629b5455f0aaf323d619babe39566627588d6ca530c2d"
+      "sha256": "5f7ec685b9bb1f9bdd855bcd647c1aa3044f1469bdc8c2cb95c03d69670a5ba7"
     },
     {
       "path": "scripts/tts_rehearsal.py",
@@ -1469,12 +1469,8 @@
       "sha256": "c4e44797eab8109f3a38505c2fc5c9fb28f56533bb64640db2feed004b3342c0"
     },
     {
-      "path": "scripts/weapon_inventory.py",
-      "sha256": "6e499e7baaf5127047c26e00a1dfec4d6ff14845b0298f0e15fa2b5ec90e04f2"
-    },
-    {
       "path": "scripts/weapon_router.py",
-      "sha256": "e4f0fb523fca5ab0112fe832ee1fbf7b41fe22bd4e80599a076bd6c62d162ba5"
+      "sha256": "6807b5e80d54f6399dce037fec39a90e23c7d27af80365b37d8ad4992af9a38f"
     },
     {
       "path": "scripts/workflow_pack.py",
@@ -1482,7 +1478,7 @@
     },
     {
       "path": "scripts/workflow_spine.py",
-      "sha256": "d93af25de38415812dc3b291dd63298559dca501149abb965de46a227de1f18d"
+      "sha256": "8fbd7f94f5b7641cd558dca6086adf4c58b7d6378157442b05d812e0265bd2e1"
     }
   ],
   "requirements_sha256": "f8c098495135ea53c62cfd94778efcf059f16c8e83852303f900c3eea5615001"
