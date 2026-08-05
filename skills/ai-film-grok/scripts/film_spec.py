@@ -90,16 +90,21 @@ TTS_BACKENDS = frozenset(
         "piper-local",
     }
 )
+
+from film_spec_profile import (  # noqa: E402, F401
+    DEFAULT_H3_CONFIG,
+    FRW_I2V_FRW_ONLY_LIFEBOAT,
+    H3_AUDIO_POLICIES,
+    I2V_PROFILES,
+    I2V_PROVIDERS,
+    default_frw_video_model,
+    default_i2v_provider,
+    frw_i2v_fallback_chain,
+    resolve_h3_config,
+    resolve_i2v_profile,
+)
 # Motion provider profile. FRW LTX 2.3 is the production action primary.
 # ``seedance_first`` and ``grok_primary`` remain readable compatibility inputs.
-I2V_PROVIDERS = frozenset({"frw", "frw-ltx23", "grok", "comfy-h3", "auto"})
-# h3_primary: local 5090 MiniMax H3 is the film-wide motion primary (unlimited compute).
-# hybrid_h3: dual-lane (Grok bulk soft + H3 restricted/meat).
-I2V_PROFILES = frozenset(
-    {"ltx23_primary", "seedance_first", "grok_primary", "hybrid_h3", "h3_primary"}
-)
-# Native resolution for 9:16 shorts. FRW LTX may return 704x1280 and must
-# preserve that native pair; conforming is a later delivery decision.
 DEFAULT_FRW_ASPECT = "9:16"
 DEFAULT_FRW_RESOLUTION = "720p"
 DEFAULT_FRW_DURATION = "5"
@@ -108,7 +113,6 @@ DEFAULT_FRW_FPS = "24"
 DEFAULT_LTX_WIDTH = "704"
 DEFAULT_LTX_HEIGHT = "1280"
 # Explicit legacy FRW lifeboat; it is not part of the automatic action chain.
-FRW_I2V_FRW_ONLY_LIFEBOAT = "legacy-img2video"
 ACTION_MOTION_PROVIDER_CHAIN = (
     "frw_ltx23_img2video_audio",
     "frw_api_img2video",
@@ -139,45 +143,6 @@ FRW_VIDEO_MODELS = frozenset(
 )
 
 
-def resolve_i2v_profile() -> str:
-    """Operating profile for hero motion bulk.
-
-    ``seedance_first`` is retained for backwards-compatible parsing but now
-    normalizes to the supported Grok-first action chain.
-    ``h3_primary`` = local 5090 MiniMax H3 is the film-wide primary (T2V/I2V/R2V/FLF).
-    """
-    from config_loader import get_config
-
-    cfg = get_config()
-    raw = cfg.i2v_profile.strip().lower()
-    if raw == "seedance_first":
-        return "grok_primary"
-    return raw if raw in I2V_PROFILES else "grok_primary"
-
-
-def default_i2v_provider() -> str:
-    profile = resolve_i2v_profile()
-    if profile == "h3_primary":
-        # Unlimited local compute primary; Grok only via opt-in cloud escape.
-        return "comfy-h3"
-    if profile in {"grok_primary", "hybrid_h3"}:
-        # hybrid_h3 keeps Grok as the bulk auto lock; restricted shots route to
-        # comfy-h3 via production_router / shot intent, not a film-wide lock.
-        return "grok"
-    return "frw-ltx23" if profile == "ltx23_primary" else "frw"
-
-
-# H3 ships stereo diegetic audio; prefer keeping it when usable.
-# strip_native_use_tts_bgm remains available when VO-only plates are wanted.
-H3_AUDIO_POLICIES = frozenset(
-    {
-        "prefer_native",  # default: keep if usable, else strip for TTS/BGM
-        "keep_native",  # always keep H3 native track
-        "strip_native_use_tts_bgm",
-        "mute_native",
-    }
-)
-
 DEFAULT_H3_CONFIG: dict[str, object] = {
     "enabled": False,
     "stage": "pilot",
@@ -189,69 +154,6 @@ DEFAULT_H3_CONFIG: dict[str, object] = {
 }
 
 
-def resolve_h3_config(spec: dict | None = None) -> dict[str, object]:
-    """Merge film-spec h3 block with profile defaults.
-
-    - ``h3_primary`` / ``hybrid_h3`` → H3 lane enabled
-    - Adult / heat max films auto-enable dual-lane H3 (Grok bulk + local meat)
-      unless ``h3.enabled`` is explicitly false or heat is soft
-    """
-    profile = resolve_i2v_profile()
-    raw = (spec or {}).get("h3") if isinstance(spec, dict) else None
-    merged = dict(DEFAULT_H3_CONFIG)
-    if profile in {"hybrid_h3", "h3_primary"}:
-        merged["enabled"] = True
-    # Adult-max default dual-lane without requiring env hybrid_h3.
-    if isinstance(spec, dict) and profile != "ltx23_primary":
-        genre = str(spec.get("genre") or "").strip().lower()
-        heat = str(spec.get("heat_scale") or "").strip().lower()
-        adult_max = spec.get("adult_max_iron")
-        soft = heat in {"soft", "medium"} or adult_max is False
-        adultish = genre == "adult" or heat in {"max", "hot", "extreme"}
-        explicit_enabled = raw.get("enabled") if isinstance(raw, dict) else None
-        if (
-            not soft
-            and adultish
-            and explicit_enabled is not False
-            and (explicit_enabled is True or not isinstance(raw, dict) or "enabled" not in raw)
-        ):
-            merged["enabled"] = True
-    if isinstance(raw, dict):
-        for key, value in raw.items():
-            if key in DEFAULT_H3_CONFIG or key in {"notes"}:
-                merged[key] = value
-        if raw.get("enabled") is False:
-            merged["enabled"] = False
-    # clamp duration hard top for GPU safety
-    try:
-        max_dur = float(merged.get("max_duration_sec") or 8)
-    except (TypeError, ValueError):
-        max_dur = 8.0
-    merged["max_duration_sec"] = max(3.0, min(max_dur, 15.0))
-    try:
-        mp = float(merged.get("megapixels_draft") or 0.2)
-    except (TypeError, ValueError):
-        mp = 0.2
-    merged["megapixels_draft"] = max(0.1, min(mp, 1.0))
-    audio = str(merged.get("audio_policy") or "prefer_native").strip()
-    if audio not in H3_AUDIO_POLICIES:
-        audio = "prefer_native"
-    merged["audio_policy"] = audio
-    return merged
-
-
-def default_frw_video_model() -> str:
-    return FRW_I2V_FRW_ONLY_LIFEBOAT
-
-
-def frw_i2v_fallback_chain() -> tuple[str, ...]:
-    return (
-        "frw:img2video-api",
-        "grok:video-1.5",
-    )
-
-
-# Back-compat names used across codebase
 DEFAULT_I2V_PROVIDER = "auto"  # resolved in validate via profile
 DEFAULT_FRW_VIDEO_MODEL = FRW_I2V_FRW_ONLY_LIFEBOAT
 FRW_I2V_FALLBACK_CHAIN = frw_i2v_fallback_chain()

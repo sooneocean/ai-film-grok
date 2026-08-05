@@ -55,3 +55,17 @@ def test_w7_cli_package_and_shim_identity() -> None:
     text = (SCRIPTS / "cli_post.py").read_text(encoding="utf-8")
     assert "sys.modules[__name__]" in text or "_sys.modules[__name__]" in text
     assert len(text.splitlines()) < 30
+
+
+def test_w7_post_package_and_shim_identity() -> None:
+    """W7 · post domain modules live under scripts/post/ with thin shims."""
+    import post.compose_render as pkg
+    import compose_render as shim
+    import post.export_composition as exp_pkg
+    import export_composition as exp_shim
+
+    assert shim is pkg
+    assert exp_shim is exp_pkg
+    text = (SCRIPTS / "compose_render.py").read_text(encoding="utf-8")
+    assert "sys.modules[__name__]" in text or "_sys.modules[__name__]" in text
+    assert len(text.splitlines()) < 30

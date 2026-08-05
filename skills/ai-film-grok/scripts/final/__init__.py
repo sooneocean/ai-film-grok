@@ -36,6 +36,7 @@ from final.native_audio import (
     resolve_native_audio_volume,
 )
 from final.cards import mkcard_video, resolve_font, sub_png
+from final.tts_tracks import build_native_track, build_vocal_color_track, tts_edge, tts_to_wav
 from final.voice import (
     tts_backend_for_shot,
     validate_voice_language_locks,
@@ -73,5 +74,10 @@ __all__ = [
     "mkcard_video",
     "resolve_font",
     "sub_png",
+    "tts_to_wav",
+    "tts_edge",
+    "build_native_track",
+    "build_vocal_color_track",
 ]
+
 

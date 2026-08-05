@@ -2,6 +2,13 @@
 
 
 
+## [2.39.62] - 2026-08-05
+
+### Changed (W7 · post package expand)
+- Move 22 post-domain modules into `scripts/post/` (compose/export/closeout/caption/subtitle/post_*) with thin top-level shims.
+- Path depth fixes for burn_srt_pil / final_stages / compose_preview / agent_review_final.
+- Tests: `test_w7_post_package_and_shim_identity`.
+
 ## [2.39.61] - 2026-08-05
 
 ### Changed (W7 · cli package boundary)
