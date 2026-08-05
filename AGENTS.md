@@ -26,6 +26,8 @@ ai-film-grok/                    ← plugin root / git root
 │   │   ├── assets/              ← continuity / style_lock / face
 │   │   ├── plan/                ← drama_graph / narrative_control
 │   │   ├── gates/               ← preflight / production_gates
+│   │   ├── audio/               ← TTS/BGM/lipsync/sound（W6）
+│   │   ├── media/               ← I2V/Comfy/H3/FRW/queue（W6）
 │   │   ├── post/                ← render_final（W4）
 │   │   ├── narrative/           ← edit_policy_heat（W4）
 │   │   ├── cli_*.py             ← CLI clusters（shim-compat names）

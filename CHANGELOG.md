@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.52] - 2026-08-05
+
+### Changed (module refactor · W6 audio/media packages)
+- **`scripts/audio/`**: TTS/BGM/SFX/lipsync/sound/voice clusters (45 modules) + top-level shims.
+- **`scripts/media/`**: I2V/Comfy/H3/FRW/queue/pilot/weapon clusters (32 modules) + top-level shims.
+- Path fixes for skill-root / adapters / sibling script resolution after nesting.
+- Public import names unchanged (`sys.modules` hard-compat).
+
 ## [2.39.51] - 2026-08-05
 
 ### Changed (module refactor · W4/W5 finish)
