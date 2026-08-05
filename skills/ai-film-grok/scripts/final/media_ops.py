@@ -12,8 +12,6 @@ import wave
 from pathlib import Path
 from typing import Any
 
-from final.errors import RenderError
-from runtime_policy import sha256
 from edit_policy import (
     DEFAULT_TRANSITION_SEC,
     PolicyError,
@@ -22,10 +20,18 @@ from edit_policy import (
     normalize_transition_sec,
     plan_stretch,
 )
+from final.errors import RenderError
 from media_duration import MediaDurationError, probe_duration_sec
-from security_policy import SecurityPolicyError, atomic_write_text, safe_existing_file, safe_output_path
+from runtime_policy import sha256
+from security_policy import (
+    SecurityPolicyError,
+    atomic_write_text,
+    safe_existing_file,
+    safe_output_path,
+)
 from util import run_ffmpeg
 from util.subprocess import run as util_run
+
 
 # local wrappers used by peeled helpers
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -181,6 +187,40 @@ def stretch_clip(
         ]
     )
     return plan
+
+def resolve_join_transition_secs(
+    raw_join_secs: object,
+    *,
+    n_parts: int,
+    n_shots: int,
+    transition_sec: float,
+) -> list[float] | None:
+    """Derive per-join xfade timestamps (``join_use_ts``) from film-spec.
+
+    Pure leaf peeled from render_final(): accepts ``join_transition_secs`` and
+    aligns it to the actual assembly parts. Returns ``None`` on any mismatch
+    (non-list, wrong length, unconvertible or out-of-range values) so the
+    caller falls back to default transition timing — never raises.
+    """
+    if not isinstance(raw_join_secs, list) or len(raw_join_secs) != n_shots - 1:
+        return None
+    try:
+        story_secs = [max(0.0, min(0.8, float(x))) for x in raw_join_secs]
+        edge = float(transition_sec) if transition_sec > 0 else 0.05
+        n_joins = max(0, n_parts - 1)
+        if n_joins == n_shots + 1:
+            use_ts: list[float] | None = [edge] + story_secs + [edge]
+        elif n_joins == n_shots:
+            use_ts = [edge] + story_secs
+        elif n_joins == n_shots - 1:
+            use_ts = story_secs
+        else:
+            use_ts = None
+        if use_ts is not None and len(use_ts) != n_joins:
+            return None
+        return use_ts
+    except (TypeError, ValueError):
+        return None
 
 def concat_videos(
     parts: list[Path],

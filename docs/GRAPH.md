@@ -201,6 +201,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_fill_idle_run_next_ledger.py`
 - `skills/ai-film-grok/tests/test_final_editorial_review.py`
 - `skills/ai-film-grok/tests/test_final_hotpath_contracts.py`
+- `skills/ai-film-grok/tests/test_final_join_transition_secs.py`
 - `skills/ai-film-grok/tests/test_final_preflight.py`
 - `skills/ai-film-grok/tests/test_final_review_input.py`
 - `skills/ai-film-grok/tests/test_final_stages.py`

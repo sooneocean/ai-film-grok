@@ -131,7 +131,6 @@ except ImportError:  # pragma: no cover
 
 
 # R1/R1b/R1c peel: leaf helpers live in final/*; re-export for hard-compat.
-from final.errors import RenderError  # noqa: E402
 from final.caption_text import (  # noqa: E402, F401
     _ensure_caption_density,
     _legacy_validate_linear_narration,
@@ -149,34 +148,29 @@ from final.caption_text import (  # noqa: E402, F401
     validate_linear_narration,
     write_srt,
 )
-from final.voice import (  # noqa: E402, F401
-    DEFAULT_VOICE,
-    HEROINE_ZH_VOICE,
-    PARTNER_ZH_VOICE,
-    STORYTELLER_VOICE,
-    _HEROINE_SPEAKERS,
-    _NARRATOR_SPEAKERS,
-    _PARTNER_SPEAKERS,
-    _locked_voice_role,
-    normalize_cast_tts_backends,
-    normalize_cast_voices,
-    tts_backend_for_shot,
-    validate_voice_language_locks,
-    voice_for_shot,
+from final.cards import (  # noqa: E402, F401
+    FONT_CANDIDATES,
+    _wrap_title_lines,
+    mkcard_video,
+    sub_png,
 )
+from final.cards import (
+    resolve_font as _resolve_font_from_cards,
+)
+from final.enhance import (  # noqa: E402, F401
+    build_post_enhancement_vf_chain,
+    resolve_subtitle_mode,
+)
+from final.errors import RenderError  # noqa: E402
 from final.media_ops import (  # noqa: E402, F401
     apply_dialogue_broll_visual,
     concat_audio_segments,
     concat_videos,
     pdur,
+    resolve_join_transition_secs,
     run,
     stable_path_for_ffmpeg_filter,
     stretch_clip,
-)
-
-from final.enhance import (  # noqa: E402, F401
-    build_post_enhancement_vf_chain,
-    resolve_subtitle_mode,
 )
 from final.native_audio import (  # noqa: E402, F401
     DEFAULT_NATIVE_AUDIO_VOLUME,
@@ -188,12 +182,20 @@ from final.native_audio import (  # noqa: E402, F401
     resolve_native_audio_gain,
     resolve_native_audio_volume,
 )
-from final.cards import (  # noqa: E402, F401
-    FONT_CANDIDATES,
-    _wrap_title_lines,
-    mkcard_video,
-    resolve_font as _resolve_font_from_cards,
-    sub_png,
+from final.voice import (  # noqa: E402, F401
+    _HEROINE_SPEAKERS,
+    _NARRATOR_SPEAKERS,
+    _PARTNER_SPEAKERS,
+    DEFAULT_VOICE,
+    HEROINE_ZH_VOICE,
+    PARTNER_ZH_VOICE,
+    STORYTELLER_VOICE,
+    _locked_voice_role,
+    normalize_cast_tts_backends,
+    normalize_cast_voices,
+    tts_backend_for_shot,
+    validate_voice_language_locks,
+    voice_for_shot,
 )
 
 
@@ -225,6 +227,23 @@ def read_json(path: Path) -> dict[str, Any]:
     return require_json_fnv(path)
 
 
+from final.tts_tracks import (  # noqa: E402, F401
+    DEFAULT_VOCAL_COLOR_GAIN as _TTS_DEFAULT_VOCAL_COLOR_GAIN,
+)
+from final.tts_tracks import (
+    SR as _TTS_SR,
+)
+from final.tts_tracks import (
+    build_native_track,
+    build_vocal_color_track,
+    tts_edge,
+)
+from final.tts_tracks import (
+    tts_synthesize as _tts_synthesize_default,
+)
+from final.tts_tracks import (
+    tts_to_wav as _tts_to_wav_impl,
+)
 from render_final_music import (  # noqa: E402, F401
     _try_external_music_gen,
     make_tone,
@@ -235,16 +254,6 @@ from render_final_music import (  # noqa: E402, F401
     silence_wav,
     write_wav_mono,
     write_wav_stereo,
-)
-
-from final.tts_tracks import (  # noqa: E402, F401
-    DEFAULT_VOCAL_COLOR_GAIN as _TTS_DEFAULT_VOCAL_COLOR_GAIN,
-    SR as _TTS_SR,
-    build_native_track,
-    build_vocal_color_track,
-    tts_edge,
-    tts_to_wav as _tts_to_wav_impl,
-    tts_synthesize as _tts_synthesize_default,
 )
 
 # Hard-compat: tests monkeypatch render_final.tts_synthesize
@@ -1110,28 +1119,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     except PolicyError as exc:
         raise RenderError(str(exc)) from exc
     # Per-join transition duration from edit_strategy (voice-coupled rhythm)
-    full_join_use_ts: list[float] | None = None
-    raw_join_secs = spec.get("join_transition_secs")
-    if isinstance(raw_join_secs, list) and len(raw_join_secs) == len(shot_audio) - 1:
-        try:
-            story_secs = [max(0.0, min(0.8, float(x))) for x in raw_join_secs]
-            edge = float(transition_sec) if transition_sec > 0 else 0.05
-            # title→s0, s0→s1…, sN→end  (len = n_shots + 1 when both pads present)
-            n_parts = len(parts)
-            n_joins = max(0, n_parts - 1)
-            if n_joins == len(shot_audio) + 1:
-                full_join_use_ts = [edge] + story_secs + [edge]
-            elif n_joins == len(shot_audio):
-                # missing one pad
-                full_join_use_ts = [edge] + story_secs
-            elif n_joins == len(shot_audio) - 1:
-                full_join_use_ts = story_secs
-            else:
-                full_join_use_ts = None
-            if full_join_use_ts is not None and len(full_join_use_ts) != n_joins:
-                full_join_use_ts = None
-        except (TypeError, ValueError):
-            full_join_use_ts = None
+    full_join_use_ts = resolve_join_transition_secs(
+        spec.get("join_transition_secs"),
+        n_parts=len(parts),
+        n_shots=len(shot_audio),
+        transition_sec=transition_sec,
+    )
     xfade_plan = concat_videos(
         parts,
         silent,
