@@ -33,6 +33,8 @@
 
 ## Canary log
 
+- **2026-08-05 AF7 final**: real execute s_cu i2v · takes 14→16 · drain PARTIAL · 
+
 - **2026-08-05 dry**: film `skills/.../h3-angles-runthrough` · pending=2 · ETA≈18m · `priority_ok` · until-empty stop=`dry_run_pass_execute`  
   - receipt: `artifacts/2026-08-05-h3-until-empty-canary.json`  
   - memory: `memory/2026-08-05-h3-until-empty-canary.md`  
