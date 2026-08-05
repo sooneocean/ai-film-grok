@@ -415,11 +415,54 @@ class Wave3AudioPipelineTimeoutTests(unittest.TestCase):
         self.assertIn("timed out", src)
 
     def test_burn_srt_pil_ffmpeg_has_timeout(self) -> None:
-        src = (SCRIPTS / "burn_srt_pil.py").read_text(encoding="utf-8")
+        src = _impl_source("burn_srt_pil.py").read_text(encoding="utf-8")
         self.assertIn("timeout=1800", src)
 
     def test_narrative_evidence_probe_has_timeout(self) -> None:
-        src = (SCRIPTS / "narrative_evidence.py").read_text(encoding="utf-8")
+        src = _impl_source("narrative_evidence.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=30", src)
+
+
+
+class Wave3AdapterNodeTimeoutTests(unittest.TestCase):
+    """R-af1 residual · adapters + lipsync node + canary/opt probe hangs."""
+
+    def test_elevenlabs_and_voicebox_ffmpeg_have_timeout(self) -> None:
+        el = (SCRIPTS / "adapters" / "elevenlabs_tts.py").read_text(encoding="utf-8")
+        vb = (SCRIPTS / "adapters" / "voicebox_tts.py").read_text(encoding="utf-8")
+        mu = (SCRIPTS / "adapters" / "music_external.py").read_text(encoding="utf-8")
+        hg = (SCRIPTS / "adapters" / "higgs_audio.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=120", el)
+        self.assertIn("timeout=120", vb)
+        self.assertIn("timeout=300", mu)
+        self.assertIn("timeout=1800", hg)
+
+    def test_node_lipsync_adapters_have_timeout(self) -> None:
+        ls = (SCRIPTS / "node" / "latentsync_adapter.py").read_text(encoding="utf-8")
+        mt = (SCRIPTS / "node" / "musetalk_adapter.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=", ls)
+        self.assertIn("timeout=600", mt)
+        self.assertIn("TimeoutExpired", ls)
+        self.assertIn("TimeoutExpired", mt)
+
+    def test_mmaudio_run_checked_defaults_timeout(self) -> None:
+        src = _impl_source("mmaudio_adapter.py").read_text(encoding="utf-8")
+        self.assertIn('setdefault("timeout", 1800)', src)
+        self.assertIn("TimeoutExpired", src)
+
+    def test_elevenlabs_canary_metrics_have_timeout(self) -> None:
+        src = (SCRIPTS / "elevenlabs_canary.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=30", src)
+        self.assertIn("timeout=60", src)
+        runs = src.split("subprocess.run(")[1:]
+        self.assertGreaterEqual(len(runs), 3)
+        for chunk in runs:
+            # only care about _audio_metrics paths roughly
+            if "ffprobe" in chunk[:400] or "ffmpeg" in chunk[:400] or "volumedetect" in chunk[:800]:
+                self.assertIn("timeout=", chunk[:1200])
+
+    def test_optimization_program_probe_has_timeout(self) -> None:
+        src = (SCRIPTS / "optimization_program.py").read_text(encoding="utf-8")
         self.assertIn("timeout=30", src)
 
 

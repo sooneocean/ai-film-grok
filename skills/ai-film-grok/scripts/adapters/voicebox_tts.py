@@ -196,7 +196,10 @@ def _ffmpeg_to_target(src: Path, dest: Path) -> None:
         "s16",
         str(dest),
     ]
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired as exc:
+        raise SystemExit(f"ffmpeg convert timed out after {exc.timeout}s") from exc
     if p.returncode != 0:
         raise SystemExit(f"ffmpeg convert failed: {(p.stderr or '')[-400:]}")
 

@@ -115,12 +115,12 @@ story.receive → script-value-debrief → plan run → fidelity
 | ID | Residual | Why still hurts / status |
 |----|----------|-------------------------|
 | **R-ops** | Full overnight drain to `queue_empty` | **PARTIAL** execute + `--free-first` proven; contention still blocks drain · s53 free-first canary |
-| **R-af1** | Hot-path subprocess timeouts | **PARTIAL→core SHIPPED**: identity · shortform_motion · h3_workflow · **audio TTS/stem/gate + shortform_director + burn_srt + narrative_evidence** (2.39.58); adapters/node/compose residual open |
+| **R-af1** | Hot-path subprocess timeouts | **PARTIAL→core SHIPPED**: film hot paths + **adapters/node/canary/mmaudio** (2.39.65); compose_preview Popen residual open |
 | **R-af2** | closeout ↔ post_doctor / caption-pixel | **SHIPPED** AF3/AF6 |
 | **R-doc** | hard-defaults FRW-first bulk prose | **SHIPPED** AF8 → h3_primary |
 | **R-mf-doc** | material-fidelity M5–M6 tracker | **SHIPPED** (M0–M6 landed) |
 | **R-cov** | final/compose failure-mode tests | Still useful; not line vanity |
-| **R-util** | Wave 3 util FilmError / run_ffmpeg | **PARTIAL** (final + H3 + audio/shortform/burn/evidence 2.39.58; full util.run_ffmpeg migration open) |
+| **R-util** | Wave 3 util FilmError / run_ffmpeg | **PARTIAL** (hang-proof bulk through 2.39.65; full util.run_ffmpeg migration open) |
 | **R-struct** | Module refactor leaf peels | **W0–W5 SHIPPED**; heat/film_spec intentional residual |
 | **R-hygiene** | Local dirty trees / doc drift | Ongoing |
 

@@ -87,7 +87,10 @@ def _mp3_to_wav(mp3: Path, wav: Path) -> None:
         "s16",
         str(wav),
     ]
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired as exc:
+        raise SystemExit(f"ffmpeg mp3→wav timed out after {exc.timeout}s") from exc
     if p.returncode != 0:
         raise SystemExit(f"ffmpeg mp3→wav failed: {p.stderr[-300:]}")
 

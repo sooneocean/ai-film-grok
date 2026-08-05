@@ -104,12 +104,25 @@ def list_voices() -> dict[str, Any]:
 
 
 def _audio_metrics(path: Path, *, chars: int) -> dict[str, Any]:
-    probe = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ElevenLabsCanaryError("AUDIO_PROBE_TIMEOUT") from exc
     try:
         duration = float(json.loads(probe.stdout)["format"]["duration"])
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
@@ -117,30 +130,49 @@ def _audio_metrics(path: Path, *, chars: int) -> dict[str, Any]:
     if probe.returncode or duration <= 0:
         raise ElevenLabsCanaryError("AUDIO_DURATION_INVALID")
 
-    volume = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        volume = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-af",
+                "volumedetect",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ElevenLabsCanaryError("AUDIO_VOLUME_TIMEOUT") from exc
     mean_match = re.search(r"mean_volume:\s*(-?[\d.]+) dB", volume.stderr)
-    silence = subprocess.run(
-        [
-            "ffmpeg",
-            "-v",
-            "info",
-            "-i",
-            str(path),
-            "-af",
-            "silencedetect=n=-45dB:d=0.1",
-            "-f",
-            "null",
-            "-",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        silence = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "info",
+                "-i",
+                str(path),
+                "-af",
+                "silencedetect=n=-45dB:d=0.1",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ElevenLabsCanaryError("AUDIO_SILENCE_TIMEOUT") from exc
     silence_seconds = sum(
         float(item) for item in re.findall(r"silence_duration:\s*([\d.]+)", silence.stderr)
     )

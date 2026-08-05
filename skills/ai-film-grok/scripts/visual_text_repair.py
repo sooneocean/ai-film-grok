@@ -122,7 +122,7 @@ def _replace_frames(source: Path, repaired: dict[int, Path], output: Path, fps: 
             check=True,
             timeout=1800,
         )
-    except (OSError, subprocess.CalledProcessError) as exc:
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
         raise VisualTextRepairError("could not rebuild repaired video") from exc
     finally:
         shutil.rmtree(staging, ignore_errors=True)

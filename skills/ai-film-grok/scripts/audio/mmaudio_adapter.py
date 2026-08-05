@@ -86,7 +86,12 @@ def _run_checked(
     command: list[str], *, stage: str, **kwargs: object
 ) -> subprocess.CompletedProcess:
     try:
-        return subprocess.run(command, check=True, **kwargs)
+        kwargs.setdefault("timeout", 1800)
+        return subprocess.run(command, check=True, **kwargs)  # type: ignore[arg-type]
+    except subprocess.TimeoutExpired as exc:
+        raise MMAudioAdapterError(
+            f"{stage} failed: subprocess_timeout_{int(exc.timeout or 0)}"
+        ) from None
     except subprocess.CalledProcessError as exc:
         code = _failure_code(exc.stderr, exc.returncode)
         raise MMAudioAdapterError(f"{stage} failed: {code}") from None

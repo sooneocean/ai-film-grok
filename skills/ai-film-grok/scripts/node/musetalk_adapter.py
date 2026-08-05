@@ -59,7 +59,10 @@ def main() -> int:
                 str(normalized),
             ],
             check=False,
+            timeout=600,
         )
+    except subprocess.TimeoutExpired:
+        return 76
     except OSError:
         return 75
     if normalized_run.returncode != 0:
@@ -80,6 +83,8 @@ def main() -> int:
     )
     results = work / "results"
     try:
+        timeout_sec = float(os.environ.get("AIFILM_MUSETALK_TIMEOUT", "3600") or 3600)
+        timeout_sec = max(120.0, timeout_sec)
         completed = subprocess.run(
             [
                 sys.executable,
@@ -105,7 +110,10 @@ def main() -> int:
             ],
             cwd=root,
             check=False,
+            timeout=timeout_sec,
         )
+    except subprocess.TimeoutExpired:
+        return 76
     except OSError:
         return 75
     if completed.returncode != 0:

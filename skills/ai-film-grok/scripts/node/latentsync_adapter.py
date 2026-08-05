@@ -58,7 +58,14 @@ def main() -> int:
     if args.deepcache == "1":
         command.append("--enable_deepcache")
     try:
-        completed = subprocess.run(command, cwd=root, check=False)
+        # GPU lipsync can be long; bound hang (default 1h, env override).
+        timeout_sec = float(os.environ.get("AIFILM_LATENTSYNC_TIMEOUT", "3600") or 3600)
+        timeout_sec = max(120.0, timeout_sec)
+        completed = subprocess.run(
+            command, cwd=root, check=False, timeout=timeout_sec
+        )
+    except subprocess.TimeoutExpired:
+        return 76  # hang/timeout distinct from technical 75
     except OSError:
         return 75
     if completed.returncode != 0:

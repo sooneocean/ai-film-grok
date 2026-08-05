@@ -47,7 +47,11 @@ def main() -> int:
         "{performance_json}": perf,
     }
     command = [next((replacements.get(x, x) for x in [item]), item) for item in argv]
-    p = subprocess.run(command, check=False)
+    try:
+        # Long local TTS can run minutes; still bound hang (default 30 min).
+        p = subprocess.run(command, check=False, timeout=1800)
+    except subprocess.TimeoutExpired as exc:
+        raise SystemExit(f"Higgs Audio command timed out after {exc.timeout}s") from exc
     if p.returncode:
         raise SystemExit(p.returncode)
     if not Path(args.out).is_file():

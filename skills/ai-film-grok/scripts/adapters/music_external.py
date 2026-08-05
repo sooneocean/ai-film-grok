@@ -143,7 +143,11 @@ def _http_generate(prompt: str, duration: float, mood: str, seed: int, out: Path
         "pcm_s16le",
         str(out),
     ]
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired as exc:
+        tmp.unlink(missing_ok=True)
+        raise SystemExit(f"ffmpeg music normalize timed out after {exc.timeout}s") from exc
     tmp.unlink(missing_ok=True)
     if p.returncode != 0 or not out.is_file() or out.stat().st_size < MIN_BYTES:
         raise SystemExit(f"ffmpeg music normalize failed: {(p.stderr or '')[-300:]}")

@@ -211,12 +211,16 @@ def record_audio_lane(
     review_path = Path(review_receipt).expanduser().resolve()
     if not artifact_path.is_file() or not review_path.is_file():
         raise ValueError("artifact and review_receipt must be existing files")
-    probe = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_format", str(artifact_path)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_format", str(artifact_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError("artifact ffprobe timed out") from exc
     if probe.returncode != 0:
         raise ValueError("artifact fails ffprobe read-back")
     review = read_json(review_path)
