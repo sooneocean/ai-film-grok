@@ -721,19 +721,7 @@ def build_dispatch(
                 "visual",
             )
 
-    # Wave H · after clips: select-shortlist once (multi-take preferred, never deletes)
-    if craft_stage in {"selects", "media", "rough"} and gates.get("clips_complete"):
-        sel_rec = read_json(root / "receipts" / "select-shortlist.json") or {}
-        takes_dir = root / "takes"
-        has_takes = takes_dir.is_dir() and any(takes_dir.rglob("*.mp4"))
-        if has_takes and not sel_rec.get("shots"):
-            pre(
-                "select-shortlist",
-                f'aifilm select-shortlist --root "{r}"',
-                "clips 齐且有 takes — 先 select-shortlist 标 preferred（不删 take）再粗剪/final",
-                "visual",
-            )
-    # Consolidated machine lane after clips (gate-auto or ship-prep if multi-take)
+    # W4 · one machine next after clips (ship-prep includes shortlist+pk; no duplicate select-shortlist)
     if craft_stage in {"selects", "media", "rough", "post"} and gates.get("clips_complete"):
         try:
             from gate_auto import next_machine_lane_action

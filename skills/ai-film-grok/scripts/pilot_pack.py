@@ -6,6 +6,7 @@ Wave A2 · workflow optimize: undress/union/rhythm coverage + media + scorecard
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -79,17 +80,131 @@ def _state_index_gaps(root: Path) -> dict[str, Any]:
         }
 
 
-def _go_template(root: Path, shots: list[str]) -> str:
+def _h3_mode_trio(
+    root: Path,
+    spec: dict[str, Any],
+    pilot_shots: list[str],
+) -> dict[str, Any]:
+    """Suggest pilot coverage for I2V / R2V / T2V (5090 mainline mode GO)."""
+    profile = str(spec.get("_i2v_profile") or "").strip().lower()
+    h3_block = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
+    h3_on = profile in {"h3_primary", "hybrid_h3"} or h3_block.get("enabled") is True
+    by_mode: dict[str, list[dict[str, Any]]] = {"i2v": [], "r2v": [], "t2v": [], "flf": []}
+    try:
+        from h3_mode import resolve_h3_mode
+        from production_router import build_shot_intent
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": f"import:{exc}"[:120],
+            "h3_enabled": h3_on,
+            "profile": profile or None,
+        }
+
+    pilot_set = {str(s) for s in pilot_shots}
+    film_modes: set[str] = set()
+    pilot_modes: set[str] = set()
+    for scene in spec.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        for sh in scene.get("shots") or []:
+            if not isinstance(sh, dict) or not sh.get("id"):
+                continue
+            sid = str(sh["id"])
+            try:
+                intent = build_shot_intent(spec, sh)
+            except Exception:
+                intent = {}
+            role = str(sh.get("shot_role") or intent.get("shot_role") or "hero")
+            has_still = (root / "stills" / f"{sid}.png").is_file() or (
+                root / "stills" / f"{sid}.jpg"
+            ).is_file()
+            has_last = (root / "stills" / f"{sid}_end.png").is_file()
+            resolved = resolve_h3_mode(
+                sh,
+                intent=intent if isinstance(intent, dict) else {},
+                has_still=has_still or role == "hero",
+                has_last=has_last,
+            )
+            mode = str(resolved.get("mode") or "i2v").lower()
+            if mode not in by_mode:
+                mode = "i2v"
+            film_modes.add(mode)
+            row = {
+                "shot_id": sid,
+                "mode": mode,
+                "alt_mode": resolved.get("alt_mode"),
+                "reasons": list(resolved.get("reasons") or [])[:4],
+                "in_pilot": sid in pilot_set,
+            }
+            by_mode[mode].append(row)
+            if sid in pilot_set:
+                pilot_modes.add(mode)
+
+    picks: dict[str, str | None] = {}
+    for mode in ("i2v", "r2v", "t2v", "flf"):
+        rows = by_mode.get(mode) or []
+        in_p = next((r for r in rows if r.get("in_pilot")), None)
+        picks[mode] = str((in_p or (rows[0] if rows else {})).get("shot_id") or "") or None
+
+    need = {"i2v", "t2v"}
+    if any(by_mode.get("r2v")):
+        need.add("r2v")
+    missing = sorted(m for m in need if not picks.get(m))
+    cmds: list[str] = []
+    for mode, sid in picks.items():
+        if not sid:
+            continue
+        cmds.append(
+            f'aifilm h3 run --root "{root}" --shot-id {sid} --mode {mode} --register --stage pilot'
+        )
+    return {
+        "ok": (not missing) if profile == "h3_primary" else True,
+        "h3_enabled": h3_on,
+        "profile": profile or None,
+        "film_modes": sorted(film_modes),
+        "pilot_modes": sorted(pilot_modes),
+        "picks": picks,
+        "missing_modes": missing,
+        "by_mode_counts": {k: len(v) for k, v in by_mode.items() if v},
+        "pilot_run_cmds": cmds,
+        "note": "Mode GO: one I2V + one T2V (env) + R2V if meat energy",
+    }
+
+
+def _go_template(
+    root: Path,
+    shots: list[str],
+    *,
+    h3_trio: dict[str, Any] | None = None,
+) -> str:
     csv = ",".join(shots)
-    return (
-        f"用户 GO 粘贴模板：\n"
-        f'1) aifilm pilot pack --root "{root}"\n'
+    lines = [
+        "用户 GO 粘贴模板：",
+        f'1) aifilm pilot pack --root "{root}"',
         f'2) aifilm pilot score --root "{root}" --shots {csv} '
         f"--score-identity pass --score-style pass --score-motion pass "
-        f'--reviewer <you> --notes "…"\n'
-        f'3) aifilm pilot approve --root "{root}" --shots {csv} --user-phrase "pilot 过"\n'
-        f"4) media-queue bulk…"
-    )
+        f'--reviewer <you> --notes "…"',
+        f'3) aifilm pilot approve --root "{root}" --shots {csv} --user-phrase "pilot 过"',
+    ]
+    trio = h3_trio if isinstance(h3_trio, dict) else {}
+    profile = str(trio.get("profile") or "")
+    if trio.get("h3_enabled") or profile in {"h3_primary", "hybrid_h3"}:
+        lines.append("4) H3 模式 smoke（I2V / T2V / 可选 R2V）:")
+        for cmd in list(trio.get("pilot_run_cmds") or [])[:4]:
+            lines.append(f"   {cmd}")
+        if profile == "h3_primary":
+            lines.append(
+                f'5) aifilm h3 cycle --root "{root}" --until-empty --execute  # bulk 挂机'
+            )
+        else:
+            lines.append(
+                f'5) aifilm h3 run-next --root "{root}" --execute --max 5  # meat；setup 可 Grok bulk'
+            )
+    else:
+        lines.append("4) media-queue bulk…")
+    return "\n".join(lines)
 
 
 def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str, Any]:
@@ -156,6 +271,9 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
     trio_ok = bool(coverage.get("three_beat_ok"))
     heat_blocks = bool(heat.get("active") and heat.get("hard_fail"))
 
+    h3_trio = _h3_mode_trio(base, spec if isinstance(spec, dict) else {}, picked)
+    profile = str(spec.get("_i2v_profile") or "").strip().lower()
+
     blockers: list[str] = []
     if not media_ok:
         blockers.append("PILOT_MEDIA_NOT_READY")
@@ -169,6 +287,13 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
         blockers.append("HEAT_HARD_FAIL")
     if state.get("ok") is False and not state.get("soft"):
         blockers.append("STATE_INDEX_GAPS")
+    if (
+        profile == "h3_primary"
+        and h3_trio.get("missing_modes")
+        and os.environ.get("AIFILM_STRICT_H3_PILOT_MODES", "").strip().lower()
+        in {"1", "true", "yes", "on"}
+    ):
+        blockers.append("PILOT_H3_MODE_TRIO_INCOMPLETE")
 
     ok = not blockers
     next_cmd: str | None = None
@@ -185,6 +310,9 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
             f'aifilm pilot pick --root "{base}"  # re-pick undress+union+rhythm; '
             "re-register those shots into pilot set"
         )
+    elif "PILOT_H3_MODE_TRIO_INCOMPLETE" in blockers:
+        cmds = list(h3_trio.get("pilot_run_cmds") or [])
+        next_cmd = cmds[0] if cmds else f'aifilm h3 list --root "{base}"'
     elif "PILOT_NOT_USER_APPROVED" in blockers:
         next_cmd = (
             f'aifilm pilot approve --root "{base}" --shots {",".join(picked)} '
@@ -195,9 +323,14 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
     elif "STATE_INDEX_GAPS" in blockers:
         next_cmd = f'aifilm state-index check --root "{base}"'
 
+    bulk_hint = (
+        f'aifilm h3 cycle --root "{base}" --until-empty --execute'
+        if profile == "h3_primary"
+        else f'media-queue add --root "{base}" …  # or h3 run-next'
+    )
     payload = {
         "kind": "pilot-go",
-        "schema_version": 1,
+        "schema_version": 2,
         "root": str(base),
         "at": utc_now(),
         "ok": ok,
@@ -211,6 +344,7 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
         "scorecard_all_pass": score_ok,
         "user_approved": approved,
         "adult_three_beat": coverage,
+        "h3_mode_trio": h3_trio,
         "state_index": state,
         "heat": {
             "scale": heat_scale,
@@ -219,14 +353,14 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
             "why": heat.get("why"),
             "impact_score": heat.get("impact_score") or heat.get("score"),
         },
-        "go_template": _go_template(base, picked),
+        "go_template": _go_template(base, picked, h3_trio=h3_trio),
         "next_cmd": next_cmd,
         "required_proof": blockers[0] if blockers else "pilot_go.ok",
         "next_action": {
             "id": "pilot-go"
             if ok
             else f"pilot-block-{(blockers[0] if blockers else 'unknown').lower()}",
-            "cmd": next_cmd or f'media-queue add --root "{base}" …  # pilot_go.ok',
+            "cmd": next_cmd or bulk_hint,
             "why": "pilot GO pack ready for bulk" if ok else f"blocked: {','.join(blockers)}",
         },
     }

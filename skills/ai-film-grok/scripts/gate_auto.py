@@ -132,11 +132,29 @@ def next_machine_lane_action(
         takes_dir = base / "takes"
         has_takes = takes_dir.is_dir() and any(takes_dir.rglob("*.mp4"))
         multi_pending = has_takes and not (isinstance(sel, dict) and sel.get("shots"))
-        if multi_pending and ship.get("ok") is not True:
+        human_pk = bool(isinstance(ship, dict) and ship.get("human_pk_required"))
+        if (multi_pending or human_pk) and ship.get("ok") is not True:
+            why = "多 take / 人审 PK — ship-prep（shortlist+pk-dailies 一页）再 gate-auto"
+            if isinstance(ship, dict) and ship.get("human_one_pager"):
+                why = f"{why} · 见 {ship.get('human_one_pager')}"
             return {
                 "id": "ship-prep",
                 "cmd": f'aifilm ship-prep --root "{r}"',
-                "why": "多 take 未 shortlist — ship-prep 再 gate-auto（一体）",
+                "why": why,
+            }
+        if human_pk and ship.get("ok") is True:
+            pager = (
+                ship.get("human_one_pager")
+                or ship.get("dailies_path")
+                or "receipts/pk-dailies.md"
+            )
+            return {
+                "id": "gate-auto",
+                "cmd": f'aifilm gate-auto --root "{r}"',
+                "why": (
+                    f"机读过闸；人审 PK 仍待 promote（{pager}）—"
+                    "gate 可先跑，export 前再 promote"
+                ),
             }
     return {
         "id": "gate-auto",

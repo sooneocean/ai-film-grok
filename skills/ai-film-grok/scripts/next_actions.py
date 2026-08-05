@@ -688,30 +688,32 @@ def build_next_actions(
             )
 
     if gates.get("clips_complete") and not gates.get("final_complete"):
-        # Consolidated machine lane: one next (gate-auto, or ship-prep if multi-take)
+        # W4 · single machine next (ship-prep owns shortlist+pk; no duplicate select-shortlist)
+        machine_pending = False
         try:
             from gate_auto import next_machine_lane_action
 
             lane = next_machine_lane_action(root, prefer_ship_prep=True)
             if lane:
                 add(lane["id"], lane["cmd"], lane["why"])
+                machine_pending = True
         except Exception:
             add(
                 "gate-auto",
                 f'aifilm gate-auto --root "{r}"',
                 "clips 齐 — gate-auto 机读过闸",
             )
-        # Wave H: multi-take shortlist before post when takes exist
-        sel_rec = read_json(root / "receipts" / "select-shortlist.json") or {}
-        takes_dir = root / "takes"
-        has_takes = takes_dir.is_dir() and any(takes_dir.rglob("*.mp4"))
-        if has_takes and not sel_rec.get("shots"):
-            add(
-                "select-shortlist",
-                f'aifilm select-shortlist --root "{r}"',
-                "有多 take — 先 select-shortlist 再 post/final（preferred 仅建议）",
-            )
+            machine_pending = True
         final_rec = _final_record(root)
+        # No plate yet + machine red → only machine (+ post-plan), skip final/tts stack
+        if machine_pending and not final_rec:
+            if not (root / "post-plan.json").is_file():
+                add(
+                    "post-plan-init",
+                    f'aifilm post-plan --root "{r}" init --owner hyperframes',
+                    "后期 owner 未锁 — 机读过闸后进 final 需要",
+                )
+            return actions
         preview_ok = _preview_ok(root)
         rehearse_ok = _tts_rehearse_ok(root)
         require_reh = bool(spec.get("tts_rehearsal_required") is True) if spec else False

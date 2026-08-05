@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.17] - 2026-08-05
+
+### Added (Gate slim · W4)
+- **Single machine next** after clips: ship-prep / gate-auto only; no duplicate `select-shortlist` in dispatch/next_actions (plate-less path returns early without stacking final/tts).
+- **pilot-pack** `h3_mode_trio` + GO template for I2V/R2V/T2V smoke (`schema_version` 2); optional strict via `AIFILM_STRICT_H3_PILOT_MODES=1`.
+- **ship-prep** writes `receipts/ship-prep-human.md` one-pager when multi-take / human PK.
+- **Tests**: `tests/test_w4_gate_slim.py`.
+
 ## [2.39.16] - 2026-08-05
 
 ### Added (H3 overnight throughput · W3)

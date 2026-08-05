@@ -1550,6 +1550,51 @@ def ship_prep(
         or promote_deferred,
         "promote_deferred_human_pk": promote_deferred,
     }
+    # W4 · one-page human decision sheet (multi-take / PK)
+    if write and (out.get("human_pk_required") or promote_deferred):
+        human_md_path = root / "receipts" / "ship-prep-human.md"
+        pk_step = next((s for s in steps if s.get("id") == "pk_compare"), {}) or {}
+        dailies = pk_step.get("dailies_path") or str(root / "receipts" / "pk-dailies.md")
+        multi_n = int(pk_step.get("multi_take_count") or 0)
+        lines = [
+            f"# Ship-prep human one-pager · {root.name}",
+            "",
+            f"- **ok**: {out.get('ok')}",
+            f"- **human_pk_required**: {out.get('human_pk_required')}",
+            f"- **promote_deferred**: {promote_deferred}",
+            f"- **multi_take_shots**: {multi_n}",
+            f"- **blocked_by**: {out.get('blocked_by') or '—'}",
+            f"- **pk-dailies**: `{dailies}`",
+            "",
+            "## Do now (human only)",
+            "",
+            f"1. Open `{dailies}` — pick winners (never auto).",
+            f'2. `aifilm h3 pk-compare --root "{root}"`',
+            f'3. `aifilm select-shortlist --root "{root}" --promote`  # after eye-OK only',
+            f'4. `aifilm gate-auto --root "{root}"`',
+            f'5. `aifilm final --root "{root}" --post-engine hyperframes`  # when gates green',
+            "",
+            "## Multi-take shortlist (advisory)",
+            "",
+        ]
+        for row in list(pk_step.get("shots") or [])[:30]:
+            if not isinstance(row, dict):
+                continue
+            lines.append(
+                f"- **{row.get('shot_id')}** takes={row.get('take_count')} "
+                f"rec={row.get('recommended_lane')} mean={row.get('recommended_mean')} "
+                f"pk={row.get('pk_score')}"
+            )
+        if multi_n == 0:
+            lines.append("- (no multi-take rows — promote may still need review)")
+        lines.append("")
+        try:
+            human_md_path.parent.mkdir(parents=True, exist_ok=True)
+            human_md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            out["human_one_pager"] = str(human_md_path)
+            out["dailies_path"] = dailies
+        except OSError:
+            pass
     if write:
         write_json(root / "receipts" / "ship-prep.json", out)
     return out
