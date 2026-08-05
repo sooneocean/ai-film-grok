@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.39.29] - 2026-08-05
+
+### Added (Post P3 · agent-review-final machine lane)
+- **`agent_review_final` L0** merges post machine lane into objective dims: caption-pixel, post-route double-burn, timeline dual-clock, post-doctor hard codes, mix PARTIAL notes, true-video / cinematic-gate.
+- **Never** auto-approves `review-final` / `final_complete`; `--apply` still requires verbatim user phrase.
+- Receipt exposes `machine_lane` + `p3_post_lane`.
+- **Tests**: `test_agent_review_final` P3 cases (double-burn, dual-clock, mix PARTIAL note).
+
+## [2.39.28] - 2026-08-05
+
+### Changed (CLI extract · W5d2 parsers)
+- Move `add_orchestrate_parsers` / `add_oauth_parsers` / `add_evidence_parsers` / `add_bootstrap_parsers` out of `build_parser`.
+- `aifilm_grok.py` ~5348 → ~5029 LOC; public subcommand strings unchanged.
+- Tests: extend `test_cli_w5d_extract.py`.
+
 ## [2.39.27] - 2026-08-05
 
 ### Changed (CLI extract · W5d)

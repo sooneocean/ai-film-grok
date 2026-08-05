@@ -18,6 +18,106 @@ from util.errors import FilmError
 def _emit(obj: dict[str, Any]) -> None:
     print(json.dumps(obj, ensure_ascii=False, indent=2))
 
+def add_evidence_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    pe = sub.add_parser("production-evidence", help="Read-only production evidence ledger")
+    pe.add_argument("--root", required=True)
+
+    promotion = sub.add_parser(
+        "promotion-report",
+        help="Read-only candidate-to-promotion quality report",
+    )
+    promotion.add_argument("--root", required=True)
+    promotion.add_argument(
+        "--out", default=None, help="Explicit JSON report path inside the film root"
+    )
+
+
+    speech_preview = sub.add_parser(
+        "speech-preview",
+        help="Private RTX 5090 speech preview sidecar; candidate-only, never a production TTS backend",
+    )
+    speech_preview_sub = speech_preview.add_subparsers(dest="speech_preview_action", required=True)
+    speech_preview_sub.add_parser(
+        "probe",
+        help="Validate loopback launcher and capacity-check configuration; never starts inference",
+    )
+    speech_start = speech_preview_sub.add_parser(
+        "start", help="Request the configured private launcher after a live capacity gate"
+    )
+    speech_start.add_argument(
+        "--confirm", action="store_true", help="Required to launch the sidecar"
+    )
+    speech_session = speech_preview_sub.add_parser(
+        "session", help="Record one decoded, measured dialogue turn as a candidate-only receipt"
+    )
+    speech_session.add_argument("--root", required=True, help="Film workspace root")
+    speech_session.add_argument(
+        "--audio", required=True, help="Decoded reply audio inside the workspace"
+    )
+    speech_session.add_argument(
+        "--session-json", required=True, help="In-workspace measured client result JSON"
+    )
+    speech_export = speech_preview_sub.add_parser(
+        "export-candidate", help="Export a hash-bound preview candidate for human listening"
+    )
+    speech_export.add_argument("--root", required=True, help="Film workspace root")
+    speech_export.add_argument(
+        "--session-receipt", required=True, help="In-workspace speech-preview session receipt"
+    )
+
+    si = sub.add_parser(
+        "state-index",
+        help="Checkpoint: state photos + keyframes + promote plan (fluid camera/joins)",
+    )
+    si_sub = si.add_subparsers(dest="state_index_action", required=True)
+    sic = si_sub.add_parser(
+        "check",
+        help="Run state-index gate; write receipts/state-index.json",
+    )
+    sic.add_argument("--root", required=True)
+    sic.add_argument(
+        "--strict",
+        action="store_true",
+        help="Also fail if generate_plan or soft gaps non-empty",
+    )
+    sip = si_sub.add_parser(
+        "plan",
+        help="Print regenerate plan (state photos / keyframes / promote) for this stage",
+    )
+    sip.add_argument("--root", required=True)
+    sip.add_argument("--strict", action="store_true")
+    sia = si_sub.add_parser(
+        "approve-state",
+        help="Register a human-approved local I2I wardrobe-state image; never calls a provider",
+    )
+    sia.add_argument("--root", required=True)
+    sia.add_argument("--character-id", required=True)
+    sia.add_argument("--wardrobe-state-id", required=True)
+    sia.add_argument("--image", required=True)
+    sia.add_argument("--reviewer", required=True)
+    sia.add_argument("--review-note", required=True)
+    sia.add_argument(
+        "--generation-receipt",
+        help="JSON receipt for this I2I generation; required for non-full states",
+    )
+    sipf = si_sub.add_parser(
+        "approve-performance-state",
+        help="Register a human-approved, hash-bound dialogue performance I2I still",
+    )
+    sipf.add_argument("--root", required=True)
+    sipf.add_argument("--speaker", required=True)
+    sipf.add_argument("--performance-state-id", required=True)
+    sipf.add_argument("--image", required=True)
+    sipf.add_argument("--generation-receipt", required=True)
+    sipf.add_argument("--reviewer", required=True)
+    sipf.add_argument("--review-note", required=True)
+    sis = si_sub.add_parser(
+        "contact-sheet",
+        help="Render an offline visual review sheet for one wardrobe ladder; never calls a provider",
+    )
+    sis.add_argument("--root", required=True)
+    sis.add_argument("--character-id", required=True)
+
 
 def cmd_state_index(args: argparse.Namespace) -> int:
     """Checkpoint: state photos + keyframes + promote plan for fluid transitions."""

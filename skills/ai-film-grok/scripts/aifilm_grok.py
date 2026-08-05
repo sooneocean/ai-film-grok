@@ -2399,6 +2399,17 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="aifilm_grok", description="ai-film-grok local control plane")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    from cli_bootstrap import add_bootstrap_parsers
+    from cli_evidence import add_evidence_parsers
+    from cli_oauth import add_oauth_parsers
+    from cli_orchestrate import add_orchestrate_parsers
+
+    add_bootstrap_parsers(sub)
+    add_oauth_parsers(sub)
+    add_orchestrate_parsers(sub)
+    add_evidence_parsers(sub)
+
+
     doctor = sub.add_parser(
         "doctor", help="Check tooling, locks, schema, backends, and security posture"
     )
@@ -2415,10 +2426,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=".",
         help="Film root for --art-check (default: current dir)",
     )
-    sub.add_parser(
-        "lock-runtime", help="Fingerprint the current verified Python/FFmpeg/script runtime"
-    )
-
     fls = sub.add_parser(
         "frw-lipsync",
         help="FRW cloud lipsync (ltx/wan/seedance 音画同步); probe first — often 403/502",
@@ -2503,135 +2510,6 @@ def build_parser() -> argparse.ArgumentParser:
     img.add_argument("--kb-fallback", action="store_true")
     img.add_argument("--style-fail", action="store_true")
 
-    goauth = sub.add_parser(
-        "grok-oauth",
-        help=(
-            "Grok OAuth pack (auth.json): doctor|refresh|chat|image|image-edit|"
-            "video|video-status|tts|voices"
-        ),
-    )
-    goauth.add_argument(
-        "oauth_action",
-        nargs="?",
-        default="doctor",
-        choices=[
-            "doctor",
-            "refresh",
-            "chat",
-            "image",
-            "image-edit",
-            "video",
-            "video-status",
-            "tts",
-            "voices",
-        ],
-    )
-    goauth.add_argument("--prompt", default=None)
-    goauth.add_argument(
-        "--root",
-        default=None,
-        help="Film root; enables exact-first generation usage accounting",
-    )
-    goauth.add_argument("--shot-id", default="", help="Optional shot id for usage accounting")
-    goauth.add_argument("--job-id", default="", help="Optional media queue job id")
-    goauth.add_argument("--out", default=None, help="output path (image/video/tts)")
-    goauth.add_argument("--model", default=None)
-    goauth.add_argument("--system", default=None)
-    goauth.add_argument("--aspect", default="9:16")
-    goauth.add_argument("--deep", action="store_true", help="doctor: also probe TTS voices")
-    goauth.add_argument("--json", action="store_true", dest="json_mode", help="chat: JSON mode")
-    goauth.add_argument("--image", default=None, help="input still for image-edit / video I2V")
-    goauth.add_argument("--ref", action="append", default=[], help="extra reference image(s)")
-    goauth.add_argument("--duration", type=int, default=6, help="video duration seconds")
-    goauth.add_argument(
-        "--resolution",
-        default=None,
-        help="video: 480p|720p|1080p; image: 1k|2k",
-    )
-    goauth.add_argument("--wait", action="store_true", help="video: poll until done")
-    goauth.add_argument("--timeout", type=float, default=600.0, help="video poll timeout sec")
-    goauth.add_argument("--request-id", default=None, dest="request_id")
-    goauth.add_argument(
-        "--generation-id",
-        default=None,
-        dest="generation_id",
-        help="Tracking id returned by video submit; required to finish async accounting",
-    )
-    goauth.add_argument("--text", default=None, help="tts text")
-    goauth.add_argument("--text-file", default=None, dest="text_file")
-    goauth.add_argument("--voice", default=None, help="tts voice_id (default eve)")
-    goauth.add_argument("--language", default=None, help="tts language (default zh)")
-    goauth.add_argument("--speed", type=float, default=None, help="tts speed 0.7–1.5")
-    goauth.add_argument("--timestamps", action="store_true", help="tts character timestamps")
-    disp = sub.add_parser(
-        "dispatch",
-        help="AUTO orchestrate: craft ring + capability + next_cmd (agent primary entry)",
-    )
-    disp.add_argument("--root", required=True)
-    disp.add_argument("--print-cmd-only", action="store_true", help="Only print next shell command")
-    disp.add_argument(
-        "--print-instruction",
-        action="store_true",
-        help="Only print agent_instruction checklist",
-    )
-    disp.add_argument("--no-capability", action="store_true", help="Skip capability probe (faster)")
-    disp.add_argument(
-        "--refresh-capability",
-        action="store_true",
-        help="Bypass the ten-minute guidance cache and run a live capability probe",
-    )
-    disp.add_argument(
-        "--format",
-        choices=("compact", "full"),
-        default=None,
-        dest="dispatch_format",
-        help="Output compact agent packet (default) or full audit packet",
-    )
-    disp.add_argument("--full", action="store_true", help="Alias for --format full")
-    disp.add_argument("--no-write", action="store_true", help="Do not write receipts/dispatch.json")
-    advance_p = sub.add_parser(
-        "advance",
-        help="Execute only allowlisted local actions; stop at paid, external or human gates",
-    )
-    advance_p.add_argument("--root", required=True)
-    advance_p.add_argument(
-        "--max-local",
-        type=int,
-        default=3,
-        help="Maximum local steps, hard-capped at 10",
-    )
-    autopilot_p = sub.add_parser(
-        "autopilot",
-        help="Execute bounded local and budget-authorized external steps; stop at every safety gate",
-    )
-    autopilot_p.add_argument("--root", required=True)
-    autopilot_p.add_argument("--max-actions", type=int, default=3)
-    autopilot_p.add_argument("--dry-run", action="store_true")
-
-    craft_p = sub.add_parser(
-        "craft",
-        help="Craft spine status (idea→story→beats→shots→media→selects→rough→verified)",
-    )
-    craft_p.add_argument("--root", required=True)
-    craft_p.add_argument(
-        "craft_action",
-        nargs="?",
-        default="status",
-        choices=["status"],
-        help="status (default)",
-    )
-
-    sel_p = sub.add_parser("selects", help="Selects ring: planned shots vs approved clips")
-    sel_p.add_argument("--root", required=True)
-    sel_p.add_argument(
-        "selects_action",
-        nargs="?",
-        default="report",
-        choices=["report"],
-        help="report (default)",
-    )
-    sel_p.add_argument("--no-write", action="store_true", help="Do not write selects-report.json")
-
     from cli_audio import add_audio_parsers
 
     add_audio_parsers(sub)
@@ -2642,11 +2520,6 @@ def build_parser() -> argparse.ArgumentParser:
     init_p.add_argument("--root", required=True)
     init_p.add_argument("--aspect", default="9:16")
     init_p.add_argument("--force", action="store_true")
-
-    resume_manifest = sub.add_parser(
-        "resume-manifest", help="Create only a missing manifest for a legacy film root"
-    )
-    resume_manifest.add_argument("--root", required=True)
 
     st = sub.add_parser("status", help="Gate status")
     st.add_argument("--root", required=True)
@@ -2676,8 +2549,6 @@ def build_parser() -> argparse.ArgumentParser:
         "audio-visual", help="Check audio, dialogue, subtitle and timeline alignment"
     ).add_argument("--root", required=True)
 
-    pe = sub.add_parser("production-evidence", help="Read-only production evidence ledger")
-    pe.add_argument("--root", required=True)
     ne = sub.add_parser(
         "narrative-evidence",
         help="Create or validate executed/human evidence for episode hooks and plot points",
@@ -3743,16 +3614,6 @@ def build_parser() -> argparse.ArgumentParser:
     closure_review.add_argument("--scores-json", required=True)
     closure_review.add_argument("--notes", default="")
 
-    promotion = sub.add_parser(
-        "promotion-report",
-        help="Read-only candidate-to-promotion quality report",
-    )
-    promotion.add_argument("--root", required=True)
-    promotion.add_argument(
-        "--out", default=None, help="Explicit JSON report path inside the film root"
-    )
-
-    # v1.23: reference video audit — reverse-engineer shot grammar
     refaudit = sub.add_parser(
         "analyze-reference",
         help="Analyze a reference video: probe, contact sheet, keyframes, shot grammar",
@@ -3932,39 +3793,6 @@ def build_parser() -> argparse.ArgumentParser:
     vibevoice_run.add_argument("--audio", required=True, help="Verified local audio in root")
     vibevoice_run.add_argument("--subtitles", default=None, help="Optional in-root SRT sidecar")
 
-    speech_preview = sub.add_parser(
-        "speech-preview",
-        help="Private RTX 5090 speech preview sidecar; candidate-only, never a production TTS backend",
-    )
-    speech_preview_sub = speech_preview.add_subparsers(dest="speech_preview_action", required=True)
-    speech_preview_sub.add_parser(
-        "probe",
-        help="Validate loopback launcher and capacity-check configuration; never starts inference",
-    )
-    speech_start = speech_preview_sub.add_parser(
-        "start", help="Request the configured private launcher after a live capacity gate"
-    )
-    speech_start.add_argument(
-        "--confirm", action="store_true", help="Required to launch the sidecar"
-    )
-    speech_session = speech_preview_sub.add_parser(
-        "session", help="Record one decoded, measured dialogue turn as a candidate-only receipt"
-    )
-    speech_session.add_argument("--root", required=True, help="Film workspace root")
-    speech_session.add_argument(
-        "--audio", required=True, help="Decoded reply audio inside the workspace"
-    )
-    speech_session.add_argument(
-        "--session-json", required=True, help="In-workspace measured client result JSON"
-    )
-    speech_export = speech_preview_sub.add_parser(
-        "export-candidate", help="Export a hash-bound preview candidate for human listening"
-    )
-    speech_export.add_argument("--root", required=True, help="Film workspace root")
-    speech_export.add_argument(
-        "--session-receipt", required=True, help="In-workspace speech-preview session receipt"
-    )
-
     semantic_index = sub.add_parser(
         "semantic-index",
         help="Opt-in private semantic retrieval; returns source-bound review candidates only",
@@ -4024,60 +3852,6 @@ def build_parser() -> argparse.ArgumentParser:
         "planning-history", help="Show planning readiness progression and current blockers"
     )
     history.add_argument("--root", required=True)
-    usage = sub.add_parser(
-        "usage",
-        help="Exact-first T2I/I2V/TTS request counts, tokens and provider costs",
-    )
-    usage_sub = usage.add_subparsers(dest="usage_action", required=True)
-    usage_status_p = usage_sub.add_parser("status", help="Summarize one film usage ledger")
-    usage_status_p.add_argument("--root", required=True)
-    usage_list_p = usage_sub.add_parser("list", help="List each generation request")
-    usage_list_p.add_argument("--root", required=True)
-    usage_list_p.add_argument(
-        "--operation",
-        choices=("t2i", "image_edit", "i2v", "t2v", "tts"),
-        default=None,
-    )
-    usage_list_p.add_argument(
-        "--format",
-        choices=("json", "table"),
-        default="json",
-        dest="output_format",
-    )
-    usage_summary_p = usage_sub.add_parser(
-        "summary", help="Aggregate ledgers below one explicit projects directory"
-    )
-    usage_summary_p.add_argument("--scan-root", required=True)
-    usage_record_p = usage_sub.add_parser(
-        "record", help="Record one native/manual generation without inventing missing usage"
-    )
-    usage_record_p.add_argument("--root", required=True)
-    usage_record_p.add_argument(
-        "--operation",
-        required=True,
-        choices=("t2i", "image_edit", "i2v", "t2v", "tts"),
-    )
-    usage_record_p.add_argument("--provider", required=True)
-    usage_record_p.add_argument("--model", default="")
-    usage_record_p.add_argument(
-        "--status",
-        required=True,
-        choices=("succeeded", "failed", "moderated"),
-    )
-    usage_record_p.add_argument(
-        "--measurement",
-        choices=("unknown", "manual_exact", "local_zero"),
-        default="unknown",
-    )
-    usage_record_p.add_argument("--provider-request-id", default="")
-    usage_record_p.add_argument("--output", default="")
-    usage_record_p.add_argument("--idempotency-key", default="")
-    usage_record_p.add_argument("--shot-id", default="")
-    usage_record_p.add_argument("--job-id", default="")
-    usage_record_p.add_argument("--input-tokens", type=int, default=None)
-    usage_record_p.add_argument("--output-tokens", type=int, default=None)
-    usage_record_p.add_argument("--total-tokens", type=int, default=None)
-    usage_record_p.add_argument("--cost-in-usd-ticks", type=int, default=None)
     prompt_budget = sub.add_parser(
         "prompt-budget", help="Audit prompt-token estimates and repeated provider-bound lines"
     )
@@ -4143,47 +3917,6 @@ def build_parser() -> argparse.ArgumentParser:
     dn_res.add_argument("--shot-id", default=None)
     dn_res.add_argument("--note", default="")
 
-    nxt = sub.add_parser("next", help="Print next recommended production command")
-    nxt.add_argument("--root", required=True)
-    nxt.add_argument("--all", action="store_true", help="List full next_actions")
-    nxt.add_argument(
-        "--print-cmd-only",
-        action="store_true",
-        help="Stdout only the command string (for shell eval)",
-    )
-    nxt.add_argument(
-        "--print-stage",
-        action="store_true",
-        help="Also print pipeline stage line on stderr (or with --print-cmd-only)",
-    )
-    nxt.add_argument(
-        "--print-stage-only",
-        action="store_true",
-        help="Stdout only compact stage line (片 2/7 语音·tts-rehearse); still persists sidecar",
-    )
-
-    stg = sub.add_parser(
-        "stage",
-        help="Show current pipeline layer (agent/visual/voice/design/post/…)",
-    )
-    stg.add_argument("--root", required=True)
-    stg.add_argument(
-        "--json",
-        dest="as_json",
-        action="store_true",
-        help="Emit full pipeline_stage JSON",
-    )
-    stg.add_argument(
-        "--full",
-        action="store_true",
-        help="Long label + next_cmd line",
-    )
-    stg.add_argument(
-        "--no-persist",
-        action="store_true",
-        help="Do not write receipts/pipeline_stage.json or HUD sidecar",
-    )
-
     pf = sub.add_parser(
         "preflight",
         help="Lesson-based health check before bulk/final (hard+soft)",
@@ -4240,59 +3973,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write VO spice + sex SFX + music_energy into film-spec (still no still gen)",
     )
-
-    si = sub.add_parser(
-        "state-index",
-        help="Checkpoint: state photos + keyframes + promote plan (fluid camera/joins)",
-    )
-    si_sub = si.add_subparsers(dest="state_index_action", required=True)
-    sic = si_sub.add_parser(
-        "check",
-        help="Run state-index gate; write receipts/state-index.json",
-    )
-    sic.add_argument("--root", required=True)
-    sic.add_argument(
-        "--strict",
-        action="store_true",
-        help="Also fail if generate_plan or soft gaps non-empty",
-    )
-    sip = si_sub.add_parser(
-        "plan",
-        help="Print regenerate plan (state photos / keyframes / promote) for this stage",
-    )
-    sip.add_argument("--root", required=True)
-    sip.add_argument("--strict", action="store_true")
-    sia = si_sub.add_parser(
-        "approve-state",
-        help="Register a human-approved local I2I wardrobe-state image; never calls a provider",
-    )
-    sia.add_argument("--root", required=True)
-    sia.add_argument("--character-id", required=True)
-    sia.add_argument("--wardrobe-state-id", required=True)
-    sia.add_argument("--image", required=True)
-    sia.add_argument("--reviewer", required=True)
-    sia.add_argument("--review-note", required=True)
-    sia.add_argument(
-        "--generation-receipt",
-        help="JSON receipt for this I2I generation; required for non-full states",
-    )
-    sipf = si_sub.add_parser(
-        "approve-performance-state",
-        help="Register a human-approved, hash-bound dialogue performance I2I still",
-    )
-    sipf.add_argument("--root", required=True)
-    sipf.add_argument("--speaker", required=True)
-    sipf.add_argument("--performance-state-id", required=True)
-    sipf.add_argument("--image", required=True)
-    sipf.add_argument("--generation-receipt", required=True)
-    sipf.add_argument("--reviewer", required=True)
-    sipf.add_argument("--review-note", required=True)
-    sis = si_sub.add_parser(
-        "contact-sheet",
-        help="Render an offline visual review sheet for one wardrobe ladder; never calls a provider",
-    )
-    sis.add_argument("--root", required=True)
-    sis.add_argument("--character-id", required=True)
 
     from cli_pilot import add_pilot_parsers
 

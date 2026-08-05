@@ -21,6 +21,16 @@ from runtime_policy import build_runtime_lock, verify_runtime_lock
 def _emit(obj: dict[str, Any]) -> None:
     print(json.dumps(obj, ensure_ascii=False, indent=2))
 
+def add_bootstrap_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    sub.add_parser(
+        "lock-runtime", help="Fingerprint the current verified Python/FFmpeg/script runtime"
+    )
+
+    resume_manifest = sub.add_parser(
+        "resume-manifest", help="Create only a missing manifest for a legacy film root"
+    )
+    resume_manifest.add_argument("--root", required=True)
+
 
 def cmd_lock_runtime(_: argparse.Namespace) -> int:
     skill_dir = Path(__file__).resolve().parents[1]

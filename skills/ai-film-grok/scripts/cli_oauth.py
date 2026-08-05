@@ -18,6 +18,123 @@ from util.errors import FilmError
 def _emit(obj: dict[str, Any]) -> None:
     print(json.dumps(obj, ensure_ascii=False, indent=2))
 
+def add_oauth_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    goauth = sub.add_parser(
+        "grok-oauth",
+        help=(
+            "Grok OAuth pack (auth.json): doctor|refresh|chat|image|image-edit|"
+            "video|video-status|tts|voices"
+        ),
+    )
+    goauth.add_argument(
+        "oauth_action",
+        nargs="?",
+        default="doctor",
+        choices=[
+            "doctor",
+            "refresh",
+            "chat",
+            "image",
+            "image-edit",
+            "video",
+            "video-status",
+            "tts",
+            "voices",
+        ],
+    )
+    goauth.add_argument("--prompt", default=None)
+    goauth.add_argument(
+        "--root",
+        default=None,
+        help="Film root; enables exact-first generation usage accounting",
+    )
+    goauth.add_argument("--shot-id", default="", help="Optional shot id for usage accounting")
+    goauth.add_argument("--job-id", default="", help="Optional media queue job id")
+    goauth.add_argument("--out", default=None, help="output path (image/video/tts)")
+    goauth.add_argument("--model", default=None)
+    goauth.add_argument("--system", default=None)
+    goauth.add_argument("--aspect", default="9:16")
+    goauth.add_argument("--deep", action="store_true", help="doctor: also probe TTS voices")
+    goauth.add_argument("--json", action="store_true", dest="json_mode", help="chat: JSON mode")
+    goauth.add_argument("--image", default=None, help="input still for image-edit / video I2V")
+    goauth.add_argument("--ref", action="append", default=[], help="extra reference image(s)")
+    goauth.add_argument("--duration", type=int, default=6, help="video duration seconds")
+    goauth.add_argument(
+        "--resolution",
+        default=None,
+        help="video: 480p|720p|1080p; image: 1k|2k",
+    )
+    goauth.add_argument("--wait", action="store_true", help="video: poll until done")
+    goauth.add_argument("--timeout", type=float, default=600.0, help="video poll timeout sec")
+    goauth.add_argument("--request-id", default=None, dest="request_id")
+    goauth.add_argument(
+        "--generation-id",
+        default=None,
+        dest="generation_id",
+        help="Tracking id returned by video submit; required to finish async accounting",
+    )
+    goauth.add_argument("--text", default=None, help="tts text")
+    goauth.add_argument("--text-file", default=None, dest="text_file")
+    goauth.add_argument("--voice", default=None, help="tts voice_id (default eve)")
+    goauth.add_argument("--language", default=None, help="tts language (default zh)")
+    goauth.add_argument("--speed", type=float, default=None, help="tts speed 0.7–1.5")
+    goauth.add_argument("--timestamps", action="store_true", help="tts character timestamps")
+
+    usage = sub.add_parser(
+        "usage",
+        help="Exact-first T2I/I2V/TTS request counts, tokens and provider costs",
+    )
+    usage_sub = usage.add_subparsers(dest="usage_action", required=True)
+    usage_status_p = usage_sub.add_parser("status", help="Summarize one film usage ledger")
+    usage_status_p.add_argument("--root", required=True)
+    usage_list_p = usage_sub.add_parser("list", help="List each generation request")
+    usage_list_p.add_argument("--root", required=True)
+    usage_list_p.add_argument(
+        "--operation",
+        choices=("t2i", "image_edit", "i2v", "t2v", "tts"),
+        default=None,
+    )
+    usage_list_p.add_argument(
+        "--format",
+        choices=("json", "table"),
+        default="json",
+        dest="output_format",
+    )
+    usage_summary_p = usage_sub.add_parser(
+        "summary", help="Aggregate ledgers below one explicit projects directory"
+    )
+    usage_summary_p.add_argument("--scan-root", required=True)
+    usage_record_p = usage_sub.add_parser(
+        "record", help="Record one native/manual generation without inventing missing usage"
+    )
+    usage_record_p.add_argument("--root", required=True)
+    usage_record_p.add_argument(
+        "--operation",
+        required=True,
+        choices=("t2i", "image_edit", "i2v", "t2v", "tts"),
+    )
+    usage_record_p.add_argument("--provider", required=True)
+    usage_record_p.add_argument("--model", default="")
+    usage_record_p.add_argument(
+        "--status",
+        required=True,
+        choices=("succeeded", "failed", "moderated"),
+    )
+    usage_record_p.add_argument(
+        "--measurement",
+        choices=("unknown", "manual_exact", "local_zero"),
+        default="unknown",
+    )
+    usage_record_p.add_argument("--provider-request-id", default="")
+    usage_record_p.add_argument("--output", default="")
+    usage_record_p.add_argument("--idempotency-key", default="")
+    usage_record_p.add_argument("--shot-id", default="")
+    usage_record_p.add_argument("--job-id", default="")
+    usage_record_p.add_argument("--input-tokens", type=int, default=None)
+    usage_record_p.add_argument("--output-tokens", type=int, default=None)
+    usage_record_p.add_argument("--total-tokens", type=int, default=None)
+    usage_record_p.add_argument("--cost-in-usd-ticks", type=int, default=None)
+
 
 def cmd_grok_oauth(args: argparse.Namespace) -> int:
     """Grok OAuth pack (chat/image/edit/video/tts) via ~/.grok/auth.json."""

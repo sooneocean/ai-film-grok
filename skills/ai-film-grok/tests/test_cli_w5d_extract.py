@@ -69,3 +69,23 @@ def test_extracted_modules_importable() -> None:
     assert callable(cli_oauth.cmd_grok_oauth)
     assert callable(cli_evidence.cmd_state_index)
     assert callable(cli_bootstrap.cmd_lock_runtime)
+
+
+def test_add_w5d_parsers_callable() -> None:
+    import argparse
+
+    from cli_bootstrap import add_bootstrap_parsers
+    from cli_evidence import add_evidence_parsers
+    from cli_oauth import add_oauth_parsers
+    from cli_orchestrate import add_orchestrate_parsers
+
+    p = argparse.ArgumentParser()
+    sub = p.add_subparsers(dest="cmd", required=True)
+    add_bootstrap_parsers(sub)
+    add_oauth_parsers(sub)
+    add_orchestrate_parsers(sub)
+    add_evidence_parsers(sub)
+    assert p.parse_args(["dispatch", "--root", "/x"]).cmd == "dispatch"
+    assert p.parse_args(["grok-oauth", "doctor"]).cmd == "grok-oauth"
+    assert p.parse_args(["state-index", "check", "--root", "/x"]).cmd == "state-index"
+    assert p.parse_args(["lock-runtime"]).cmd == "lock-runtime"
