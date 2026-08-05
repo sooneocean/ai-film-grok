@@ -1142,7 +1142,7 @@
     },
     {
       "path": "scripts/final/__init__.py",
-      "sha256": "82670660def4ba2e9e44090ef937e830345817599dcc2ccac225c65a8f681f60"
+      "sha256": "e0495bb24c5fe6e69c4fdfd382787ab5fb24c79e57f7a1b2788a271ff2eb28cf"
     },
     {
       "path": "scripts/final/caption_text.py",
@@ -1174,7 +1174,7 @@
     },
     {
       "path": "scripts/final/voice.py",
-      "sha256": "696daa140782bfb252ef0c1aac65ec4d9aed97b9771c09c5448dc33644cf1e1a"
+      "sha256": "c253b28b4915068fd0af32a34ef38274683b73b252211584551dab00b39d1a20"
     },
     {
       "path": "scripts/final_editorial_review.py",
@@ -1966,7 +1966,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "73601d92ccad5527820c16905487327f47dee6d38a34661b5241548e0b4c4fe8"
+      "sha256": "e0d0f17f981d4c993ca0b72c8eb1628679a46b5ecbfdcb7d6aaa7bc95cde8308"
     },
     {
       "path": "scripts/post/render_final_music.py",

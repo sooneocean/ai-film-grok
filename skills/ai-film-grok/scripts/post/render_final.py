@@ -158,6 +158,8 @@ from final.voice import (  # noqa: E402, F401
     _NARRATOR_SPEAKERS,
     _PARTNER_SPEAKERS,
     _locked_voice_role,
+    normalize_cast_tts_backends,
+    normalize_cast_voices,
     tts_backend_for_shot,
     validate_voice_language_locks,
     voice_for_shot,
@@ -324,26 +326,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         or (STORYTELLER_VOICE if vo_mode in ("storyteller", "hybrid") else DEFAULT_VOICE)
     )
     # 一角一声：film-spec.cast_voices = {"storyteller": "zh-CN-XiaoxiaoNeural", "heroine": "..."}
-    cast_voices_raw = spec.get("cast_voices") or {}
-    cast_voices: dict[str, str] = {}
-    if isinstance(cast_voices_raw, dict):
-        for k, v in cast_voices_raw.items():
-            if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
-                cast_voices[k.strip()] = v.strip()
-    # Chinese-only cast defaults (Japanese retired 2026-08-04)
-    cast_voices.setdefault("heroine", HEROINE_ZH_VOICE)
-    cast_voices.setdefault("partner", PARTNER_ZH_VOICE)
-    cast_voices.setdefault("male_hero", PARTNER_ZH_VOICE)
-    cast_voices.setdefault("storyteller", STORYTELLER_VOICE)
-    # Strip legacy ja-JP locks so Chinese TTS never inherits Japanese voice ids.
-    for _role, _vid in list(cast_voices.items()):
-        if isinstance(_vid, str) and (_vid.startswith("ja-JP-") or _vid.startswith("ja-")):
-            if _role in {"heroine"}:
-                cast_voices[_role] = HEROINE_ZH_VOICE
-            elif _role in {"partner", "male_hero", "hero"}:
-                cast_voices[_role] = PARTNER_ZH_VOICE
-            else:
-                cast_voices[_role] = STORYTELLER_VOICE
+    cast_voices = normalize_cast_voices(spec.get("cast_voices") or {})
     vo_rate = str(getattr(args, "vo_rate", None) or spec.get("vo_rate") or DEFAULT_VO_RATE)
     vo_pitch = str(getattr(args, "vo_pitch", None) or spec.get("vo_pitch") or DEFAULT_VO_PITCH)
     vo_tts_vol = str(getattr(args, "vo_tts_volume", None) or spec.get("vo_tts_volume") or "+0%")
@@ -354,18 +337,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         or "auto"
     )
     tts_allow_network_fallback = bool(spec.get("tts_allow_network_fallback", False))
-    cast_tts_backends_raw = spec.get("cast_tts_backends") or {}
-    cast_tts_backends: dict[str, str] = {}
-    if not isinstance(cast_tts_backends_raw, dict):
-        raise RenderError("cast_tts_backends must be an object when configured")
-    for role, provider in cast_tts_backends_raw.items():
-        if (
-            isinstance(role, str)
-            and isinstance(provider, str)
-            and role.strip()
-            and provider.strip()
-        ):
-            cast_tts_backends[role.strip()] = provider.strip().lower()
+    cast_tts_backends = normalize_cast_tts_backends(spec.get("cast_tts_backends") or {})
     raw_gain = getattr(args, "vo_gain", None)
     if raw_gain is None:
         raw_gain = spec.get("vo_gain")

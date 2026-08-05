@@ -8,8 +8,9 @@
 - On capacity recover → continue loop; timeout still stop_reason=`capacity_not_ready`.
 - **Tests**: CapacityWaitTests in `test_h3_until_empty.py`.
 
-### Added (final voice normalize leaves)
-- **`final.voice.normalize_cast_voices` / `normalize_cast_tts_backends`**: pure peel from render_final; Chinese locks; remap legacy `ja-JP-*` voice ids.
+### Changed (R1c residual · voice cast normalize)
+- **`final.voice`**: peel `normalize_cast_voices` / `normalize_cast_tts_backends` from `post/render_final`; hard-compat re-export.
+- **`render_final`** calls the normalize leaves (no policy change); Chinese locks; remap legacy `ja-JP-*`.
 - **Tests**: `test_final_voice_normalize.py`.
 
 ## [2.39.65] - 2026-08-05

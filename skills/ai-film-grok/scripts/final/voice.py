@@ -98,6 +98,57 @@ def validate_voice_language_locks(
                 "dialogue_spoken_lang=zh only (Japanese retired)"
             )
 
+def normalize_cast_voices(cast_voices_raw: Any) -> dict[str, str]:
+    """Normalize film-spec ``cast_voices`` into a Chinese-locked dict.
+
+    Pure leaf peeled from render_final(): drops non-string / empty entries,
+    fills the Chinese-only role defaults (Japanese retired 2026-08-04), and
+    remaps legacy ``ja-JP-*`` / ``ja-*`` voice ids back to Chinese locks so
+    Chinese TTS never inherits a Japanese voice.
+    """
+    cast_voices: dict[str, str] = {}
+    if isinstance(cast_voices_raw, dict):
+        for k, v in cast_voices_raw.items():
+            if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
+                cast_voices[k.strip()] = v.strip()
+    # Chinese-only cast defaults (Japanese retired 2026-08-04)
+    cast_voices.setdefault("heroine", HEROINE_ZH_VOICE)
+    cast_voices.setdefault("partner", PARTNER_ZH_VOICE)
+    cast_voices.setdefault("male_hero", PARTNER_ZH_VOICE)
+    cast_voices.setdefault("storyteller", STORYTELLER_VOICE)
+    # Strip legacy ja-JP locks so Chinese TTS never inherits Japanese voice ids.
+    for _role, _vid in list(cast_voices.items()):
+        if isinstance(_vid, str) and (_vid.startswith("ja-JP-") or _vid.startswith("ja-")):
+            if _role in {"heroine"}:
+                cast_voices[_role] = HEROINE_ZH_VOICE
+            elif _role in {"partner", "male_hero", "hero"}:
+                cast_voices[_role] = PARTNER_ZH_VOICE
+            else:
+                cast_voices[_role] = STORYTELLER_VOICE
+    return cast_voices
+
+
+def normalize_cast_tts_backends(cast_tts_backends_raw: Any) -> dict[str, str]:
+    """Normalize film-spec ``cast_tts_backends`` into role → lowercased provider.
+
+    Pure leaf peeled from render_final(): raises ``RenderError`` when the
+    configured value is not an object, strips whitespace and lowercases each
+    provider, and drops empty / non-string entries.
+    """
+    if not isinstance(cast_tts_backends_raw, dict):
+        raise RenderError("cast_tts_backends must be an object when configured")
+    cast_tts_backends: dict[str, str] = {}
+    for role, provider in cast_tts_backends_raw.items():
+        if (
+            isinstance(role, str)
+            and isinstance(provider, str)
+            and role.strip()
+            and provider.strip()
+        ):
+            cast_tts_backends[role.strip()] = provider.strip().lower()
+    return cast_tts_backends
+
+
 def tts_backend_for_shot(
     shot: dict[str, Any], *, default_backend: str, cast_tts_backends: dict[str, str] | None
 ) -> str:

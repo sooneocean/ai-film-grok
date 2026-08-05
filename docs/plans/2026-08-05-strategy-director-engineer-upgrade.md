@@ -366,6 +366,7 @@ From antifragility residual list:
 - [x] **S5.2** doctor advisory when tunnel ok but profile not h3_primary/hybrid_h3
 - [x] **S5.3** Execute until-empty canary **PARTIAL** — path proven; stop=`capacity_not_ready` (honest). Full `queue_empty` drain needs 5090 free · `artifacts/2026-08-05-s53-until-empty-canary.json`
 - [x] **S5.3-ops** `h3 cycle --free-first` — idle+memory-floor → free once; **never** cancel foreign · live canary `artifacts/2026-08-05-s53-free-first-canary.json` (dry=queue_busy skip; exec race still capacity_not_ready)
+- [x] **S5.3-ops deep** `--capacity-wait-sec` + `recover_capacity_contention` (2.39.66) — free-first again + poll; continue if ready; timeout still honest stop
 - [x] **S5.4** generation_ready / still-challenge in dispatch compact
 
 **Depends:** S1 for safe overnight · **Risk:** ops · **Verify:** canary JSON + dispatch screenshot/receipt
