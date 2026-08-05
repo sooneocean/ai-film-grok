@@ -7,7 +7,7 @@
 
 | | |
 |---|---|
-| **版本** | **`2.39.56`**（见 [`plugin.json`](./plugin.json) · 变更 [`CHANGELOG.md`](./CHANGELOG.md)） |
+| **版本** | **`2.39.69`**（见 [`plugin.json`](./plugin.json) · 变更 [`CHANGELOG.md`](./CHANGELOG.md)） |
 | **GitHub** | https://github.com/sooneocean/ai-film-grok |
 | **Gitea（个人）** | http://172.238.15.154:3000/Redredchen01/ai-film-grok |
 | **Gitea（aidev）** | http://172.238.15.154:3000/aidev/ai-film-grok |
@@ -30,6 +30,7 @@
 | **hybrid_h3 双轨** | 安全 bulk 走 Grok；肉戏/高难/对白 CU 软锁本机 MiniMax H3（5090） | `AIFILM_I2V_PROFILE=hybrid_h3` · `aifilm h3 plan\|run` |
 | **FLF first+last** | 有首尾静帧时 H3 主轨优先 first+last frame；R2V 作能量位 / pose land | 有 end still 时自动 FLF；见 weapon-lane |
 | **Fill-Idle 挑战** | GPU 空闲时 P0→P1→P2 挑战（不抢 P0）；多 take 只给 shortlist，**人 promote** | `aifilm h3 next\|run-next\|cycle\|pk-compare\|evidence` |
+| **Layer-4 时间轴提示词** | 5090 H3 主产线自动使用 `[0s-Ns]` 分段提示词；每段独立视觉单元 | `dsl.prompt_format=timeline` 强制单镜分段；`flat` 退回 spine |
 | **still-challenge** | 弱 take 可先 FRW i2i 刷更好静帧再 I2V/FLF/R2V（30s 限速；禁静默 promote） | `aifilm still-challenge plan\|run\|promote` |
 | **对白优先** | 场硬闸：每场 ≥1 句 on/off_camera；对白镜画面=说话者；中文 TTS 默认 edge | 见 hard-defaults · stages/voice |
 
@@ -215,10 +216,13 @@ flowchart TB
   subgraph VIS["1 · 视觉层 · 可插拔"]
     STILL["静帧<br/>image_gen / image_edit / OAuth image"]
     I2V["I2V bulk<br/>默认 grok_primary → Grok image_to_video"]
-    FRW["对白讲话镜锁 FRW LTX 2.3 原生有声<br/>分类技术失败 fallback → FRW API I2V → Grok"]
+    FRW["对白讲话镜锁 FRW LTX 2.3 原声<br/>分类技术失败 fallback → FRW API I2V → Grok"]
+    H3["5090 H3 主产线<br/>h3_primary / hybrid_h3"]
+    H3L4["Layer-4 时间轴提示词<br/>[0s-Ns] 分段 · continuity anchors<br/>单 primary action / 段 · 结尾姿态"]
     Q["media-queue · register-clip · continue"]
     STILL --> I2V --> Q
     FRW -.-> Q
+    H3 --> H3L4 --> Q
   end
 
   subgraph VOI["2 · 语音层 · 可插拔"]
@@ -249,6 +253,9 @@ flowchart TB
 
   note1["一键 final --post-engine hyperframes<br/>= FFmpeg plate → HF → 封装"]
   POST --- note1
+
+  note2["单镜覆盖: dsl.prompt_format = timeline|flat<br/>timeline → [0s-Ns] 分段 · flat → spine 单段<br/>5090 H3 默认 timeline; Grok 默认 flat"]
+  H3L4 -.-> note2
 ```
 
 ### 数据落盘（film root）
@@ -360,7 +367,35 @@ AIFILM_I2V_PROFILE=h3_primary
 # AIFILM_I2V_PROFILE=ltx23_primary
 ```
 
-火力矩阵全文：[`weapon-lane-matrix.md`](./skills/ai-film-grok/references/weapon-lane-matrix.md)。
+### H3 时间轴提示词（Layer-4 · 5090 专属）
+
+5090 H3 主产线（`h3_primary` / `hybrid_h3`）自动使用 **MiniMax H3 Layer-4 时间轴提示词**：将镜头按 `[0s-Ns]` 分段，每段是独立的视觉单元，包含动作、摄影、环境和音效描述。模型按段解码，时间连贯性显著优于整段叙述。
+
+```
+[0s-2s] 开场状态 + 主体动作 + 摄影 + 环境 + 情绪
+[2s-5s] 动作推进 + 摄影跟随 + 环境变化
+[5s-8s] 结尾姿态 + 环境收束 + 音效延续
+Audio: 自然音效与动作匹配
+```
+
+**分段密度**（参考）：
+
+| 时长 | 段数 |
+|------|------|
+| ~5s  | 2–3  |
+| ~8s  | 3–4  |
+| ~10s | 4–5  |
+| ~15s | 5–8  |
+
+**单镜覆盖**（`dsl.prompt_format` 或 `shot.prompt_format`）：
+
+| 值 | 效果 |
+|----|------|
+| `timeline` / `temporal` / `h3_timeline` | 强制时间轴分段（即使非 5090 profile） |
+| `flat` / `spine` / `paragraph` | 退回传统 spine 单段格式 |
+| 未设置 | 自动按 profile 决定（5090 → timeline） |
+
+默认情况下 `h3_primary` 和 `hybrid_h3` 自动启用时间轴；`grok_primary` / `ltx23_primary` 保持 spine 格式。
 
 ### 3 · TTS（旁白）
 
