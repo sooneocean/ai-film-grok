@@ -20,6 +20,7 @@ from __future__ import annotations
 import pytest
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -251,6 +252,28 @@ class CaptionPathHotpathTests(unittest.TestCase):
                 plate_subs="burn",
                 caption_owner="hyperframes",
             )
+
+    def test_env_force_ship_hardburn(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with mock.patch.dict(os.environ, {"AIFILM_CAPTION_PATH": "ship_hardburn"}, clear=False):
+                route = resolve_caption_path(root, post_engine="hyperframes")
+            self.assertEqual(route["caption_path"], "ship_hardburn")
+            self.assertIn("env", str(route.get("source") or "").lower())
+
+    def test_spec_caption_path_overrides_default_hf(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "film-spec.json", {"post": {"caption_path": "ship_hardburn"}})
+            route = resolve_caption_path(root, post_engine="hyperframes")
+            self.assertEqual(route["caption_path"], "ship_hardburn")
+
+    def test_master_hf_ok_with_subs_off_and_hf_owner(self) -> None:
+        assert_no_double_caption_layers(
+            caption_path="master_hf",
+            plate_subs="off",
+            caption_owner="hyperframes",
+        )
 
 
 class SrtNonOverlapHotpathTests(unittest.TestCase):

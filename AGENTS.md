@@ -34,15 +34,16 @@ ai-film-grok/                    ← plugin root / git root
 
 | AREA | 范围 | 优先测 |
 |------|------|--------|
-| Spine | dispatch / craft / next / SKILL 主脊 | `test_dispatch` `test_craft_spine` |
+| Spine | `scripts/spine/*` · dispatch / craft / next / SKILL 主脊 | `test_dispatch` `test_craft_spine` · `test_w3_package_shims` |
 | Graph+Registry | drama-graph derive / skill list | `test_drama_graph` `test_skill_registry` |
-| Plan | story.normalize → shot plan | `test_story_plan` |
-| Assets | character/location/prop/state | `test_asset_registry` |
+| Plan | `scripts/plan/*` · story.normalize → shot plan | `test_story_plan` |
+| Assets | `scripts/assets/*` · character/location/prop/state | `test_asset_registry` |
 | Media | I2V / queue / register / OAuth 出图 | media / continuity 相关 |
 | Audio | TTS / BGM / recipe / lipsync | `test_audio_recipe` `test_capability` |
-| Post | final / compose / review / export | `test_delivery_gates` compose 相关 |
+| Post | final / compose / review / export | `test_delivery_gates` · `test_final_hotpath_contracts` |
 | Narrative | 色气 / 性爱时长≥20% / 剪辑 / 景别 / lessons | `test_heat_arc_multi` + soft gate |
-| Gates | hard-defaults / security / runtime-lock | doctor + delivery gates |
+| Gates | `scripts/gates/*` · hard-defaults / security / runtime-lock | doctor + delivery gates · `test_w3_package_shims` |
+| Core | `scripts/core/*` · film_io / media_ops / emit | hub re-export hard-compat tests |
 
 细则见 skill 内 `references/pipeline-methodology.md` · `references/hard-defaults.md`。
 

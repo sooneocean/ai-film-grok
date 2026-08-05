@@ -322,6 +322,12 @@ class FidelityApplyAndPromptTests(unittest.TestCase):
             rep = design_go(root, write=True)
             self.assertTrue((root / "receipts" / "design-go.json").is_file())
             self.assertIn("checks", rep)
+            self.assertIn("craft_onepager", rep)
+            craft = rep.get("craft_onepager") or {}
+            self.assertIn("summary_lines", craft)
+            self.assertTrue((root / "receipts" / "design-go-onepager.md").is_file())
+            md = (root / "receipts" / "design-go-onepager.md").read_text(encoding="utf-8")
+            self.assertIn("Craft matrix", md)
 
     def test_advance_allowlists_fidelity(self) -> None:
         from advance import ADVANCE_ACTIONS

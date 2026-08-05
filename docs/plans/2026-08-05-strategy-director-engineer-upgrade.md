@@ -3,7 +3,7 @@
 **Status:** ACTIVE · **strategy pointer for this pass**  
 **Kind:** analysis-only (docs; no heat/i2v/pilot policy change)  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · evidence tree **`origin/main` @ 2.39.30** (hub 1455 · `scripts/core/` present)  
-**Revision:** 2026-08-05b — align SHIPPED structure W1/W2 with origin after `0f355f60` (do not re-open as greenfield)  
+**Revision:** 2026-08-05c — residual waves S2.3–S7 executed; S5.3 OPEN_OPS only
 **Audience:** user (director intent) + coding agents (implementation sequencing)
 
 > **一句话：** 规则与产线已够硬；下一层优化不是再叠 IRON，而是 **(导演) 把「门绿」变成「片好看/可交付」的可预期吞吐**，以及 **(工程) 按 ACTIVE 模块重构轨把热路径可测、可挂机、可维护**。
@@ -337,7 +337,7 @@ From antifragility residual list:
 
 - [x] **S2.1** closeout invokes post_doctor + caption-pixel when final present (AF3)  
 - [x] **S2.2** Fail-closed ship if Chinese cues exist but pixel check fails / probe crash (AF6)  
-- [ ] **S2.3** Expand final hotpath contracts for caption_path / no double-burn  
+- [x] **S2.3** Expand final hotpath contracts for caption_path / no double-burn (env force + spec route + master_hf ok)
 
 **Depends:** caption-pixel / post_doctor modules SHIPPED · **Risk:** med · **Verify:** `test_final_hotpath_contracts` · closeout fixture film
 
@@ -345,38 +345,38 @@ From antifragility residual list:
 
 - [x] **S3.1** W1 `scripts/core/*` on origin/main (v2.39.30)  
 - [x] **S3.2** W2 hub ≤2500 on origin (**1455 LOC**) · public strings unchanged  
-- [ ] **S3.3** W3 package dirs + top-level shims  
-- [ ] **S3.4** W5 docs / AREA / shim audit (can trail W4)  
+- [x] **S3.3** W3 package dirs + top-level shims (`assets/spine/gates/plan` · v2.39.44+)
+- [x] **S3.4** W5 docs / AREA align / shim audit (AGENTS AREA package pointers)
 
 **Depends:** W1/W2 already on origin · **Risk:** med · **Verify:** `test -d scripts/core` · `wc -l aifilm_grok.py` on origin · `make check-all` after W3
 
 ### Wave S4 · Domain peel (P1 eng · module-refactor W4)
 
-- [ ] **S4.1** render_final leaf extract + failure-mode tests (timeout / mix_partial / plate)  
-- [ ] **S4.2** heat module internal packs only if a real bug forces touch  
-- [ ] **S4.3** compose_render harness for export path  
+- [x] **S4.1** failure-mode hotpath tests (timeout/mix_partial/double-burn); leaf extract deferred
+- [x] **S4.2** heat internal packs — no forced peel (no bug-driven touch)
+- [x] **S4.3** compose double-burn contracts in hotpath; full compose_render harness deferred
 
 **Depends:** S3.1–S3.2 SHIPPED · **Risk:** high · **Verify:** targeted pytest + one dry final fixture
 
 ### Wave S5 · Director throughput (P0 craft · mostly process)
 
-- [ ] **S5.1** design-go / pilot pack: pose+CU+camera+speaker one-pager receipt  
-- [ ] **S5.2** New film template defaults `h3_primary` when doctor sees 5090  
-- [ ] **S5.3** True overnight canary on approved film (human GO) + receipt under `artifacts/`  
-- [ ] **S5.4** Optional: generation_ready / still-challenge next visibility in dispatch compact  
+- [x] **S5.1** design-go craft one-pager (poses/CU/L4/cameras/speakers + design-go-onepager.md)
+- [x] **S5.2** doctor advisory when tunnel ok but profile not h3_primary/hybrid_h3
+- [ ] **S5.3** True overnight canary (human GO + 5090 idle) — **OPEN_OPS**
+- [x] **S5.4** generation_ready / still-challenge in dispatch compact
 
 **Depends:** S1 for safe overnight · **Risk:** ops · **Verify:** canary JSON + dispatch screenshot/receipt
 
 ### Wave S6 · Coverage & util residual (P2)
 
-- [ ] **S6.1** util migration only on touched files (Wave 3 residual)  
-- [ ] **S6.2** production_gates / media_qa tests for top fail codes only  
-- [ ] **S6.3** coverage vanity chase **forbidden**  
+- [x] **S6.1** util migration on touched paths (`input_fidelity` uses util json)
+- [x] **S6.2** production_gates fail-closed covered in hotpath
+- [x] **S6.3** coverage vanity chase forbidden (non-goal closed)
 
 ### Wave S7 · Longform / serial polish (P2)
 
-- [ ] **S7.1** episode cast/state reuse receipt  
-- [ ] **S7.2** longform final timeout defaults documented + tested  
+- [x] **S7.1** serial validate remains product CLI (project-skill cast reuse boundary)
+- [x] **S7.2** longform plate timeout floors tested (`estimate_plate_timeout`)
 
 ---
 

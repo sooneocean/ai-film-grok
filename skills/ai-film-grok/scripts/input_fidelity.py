@@ -909,6 +909,85 @@ def inject_story_beat_into_prompt(text: str, shot: dict[str, Any]) -> str:
     return f"{prefix} {base}".strip()
 
 
+def _craft_onepager(root: Path, variety: dict[str, Any]) -> dict[str, Any]:
+    """Director one-pager: poses / CU / L4 / cameras / speakers (S5.1)."""
+    spec = read_json(root / "film-spec.json") or {}
+    shots: list[dict[str, Any]] = []
+    for scene in spec.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        for shot in scene.get("shots") or []:
+            if isinstance(shot, dict):
+                shots.append(shot)
+    if not shots and isinstance(spec.get("shots"), list):
+        shots = [s for s in spec["shots"] if isinstance(s, dict)]
+
+    speakers: list[str] = []
+    cameras: list[str] = []
+    sizes: list[str] = []
+    for shot in shots:
+        sp = str(
+            shot.get("speaker")
+            or (shot.get("audio_cues") or {}).get("speaker")
+            or ""
+        ).strip()
+        if sp:
+            speakers.append(sp)
+        dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+        cam = shot.get("camera") if isinstance(shot.get("camera"), dict) else {}
+        dsl_cam = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
+        move = str(
+            shot.get("camera_move")
+            or dsl.get("camera_move")
+            or cam.get("move")
+            or dsl_cam.get("move")
+            or ""
+        ).strip()
+        if move:
+            cameras.append(move)
+        size = str(
+            shot.get("shot_size")
+            or cam.get("shot_size")
+            or dsl.get("shot_size")
+            or dsl_cam.get("shot_size")
+            or ""
+        ).strip()
+        if size:
+            sizes.append(size)
+
+    unique_speakers = sorted({s for s in speakers if s})
+    unique_cameras = sorted({c for c in cameras if c})
+    unique_sizes = sorted({s for s in sizes if s})
+    poses = list(variety.get("unique_poses") or [])
+    face_cu = int(variety.get("face_cu_count") or 0)
+    l4 = int(variety.get("l4_insert_count") or 0)
+    floors = variety.get("floors") if isinstance(variety.get("floors"), dict) else {}
+    pose_floor = int(floors.get("poses") or 4)
+    cu_floor = int(floors.get("face_cu") or 2)
+    l4_floor = int(floors.get("l4") or 2)
+    lines = [
+        f"poses: {len(poses)}/{pose_floor} → {', '.join(poses) or '—'}",
+        f"face_CU: {face_cu}/{cu_floor} · L4: {l4}/{l4_floor}",
+        f"cameras: {len(unique_cameras)} → {', '.join(unique_cameras) or '—'}",
+        f"shot_sizes: {len(unique_sizes)} → {', '.join(unique_sizes) or '—'}",
+        f"speakers: {len(unique_speakers)} → {', '.join(unique_speakers) or '—'}",
+        f"variety_ok: {bool(variety.get('ok'))}",
+    ]
+    return {
+        "poses": poses,
+        "pose_count": len(poses),
+        "face_cu_count": face_cu,
+        "l4_insert_count": l4,
+        "cameras": unique_cameras,
+        "shot_sizes": unique_sizes,
+        "speakers": unique_speakers,
+        "variety_ok": bool(variety.get("ok")) if variety else None,
+        "floors": {"poses": pose_floor, "face_cu": cu_floor, "l4": l4_floor},
+        "summary_lines": lines,
+        "matrix_md": variety.get("matrix_md"),
+    }
+
+
 def design_go(root: Path | str, *, write: bool = True) -> dict[str, Any]:
     """S3 · design-phase one-page GO (never signs pilot)."""
     root_p = _root(root)
@@ -923,6 +1002,8 @@ def design_go(root: Path | str, *, write: bool = True) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         variety = {"ok": False, "error": str(exc)[:160]}
 
+    craft = _craft_onepager(root_p, variety if isinstance(variety, dict) else {})
+
     checks = {
         "debrief_present": bool(debrief_meta.get("present")),
         "debrief_confirmed": bool(debrief_meta.get("confirmed")),
@@ -932,6 +1013,7 @@ def design_go(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         "must_keep_mapped": (fid.get("must_keep_map") or {}).get("score") == 1.0
         or not fid.get("must_keep"),
         "variety_ok": bool(variety.get("ok")) if variety else None,
+        "craft_onepager": True,
     }
     blockers: list[str] = []
     if not checks["debrief_present"]:
@@ -953,6 +1035,7 @@ def design_go(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         "fidelity_codes": fid.get("codes"),
         "promise_ref": fid.get("promise_ref"),
         "must_keep": fid.get("must_keep"),
+        "craft_onepager": craft,
         "next_cmd": (
             'aifilm pilot pack --root "<film>"'
             if ok
@@ -965,6 +1048,26 @@ def design_go(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         path = root_p / "receipts" / "design-go.json"
         write_json(path, report)
         report["receipt"] = str(path)
+        md_path = root_p / "receipts" / "design-go-onepager.md"
+        md_lines = [
+            "# Design GO one-pager",
+            "",
+            f"- go_ready: **{ok}**",
+            f"- promise: {report.get('promise_ref') or '—'}",
+            "",
+            "## Craft matrix",
+            *[f"- {line}" for line in craft.get("summary_lines") or []],
+            "",
+            "## Blockers",
+            *([f"- {b}" for b in blockers] if blockers else ["- (none)"]),
+            "",
+            f"next: `{report['next_cmd']}`",
+            "",
+        ]
+        if craft.get("matrix_md"):
+            md_lines.extend(["## Variety matrix", str(craft["matrix_md"]), ""])
+        md_path.write_text("\n".join(md_lines), encoding="utf-8")
+        report["onepager_md"] = str(md_path)
     return report
 
 
