@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.51] - 2026-08-05
+
+### Changed (module refactor · W4/W5 finish)
+- **W4**: `render_final` → `scripts/post/`; `edit_policy_heat` → `scripts/narrative/`; top-level hard-compat shims.
+- **W5**: AGENTS package layout + AREA pointers; refactor tracker W3–W5 DONE; REFACTORING_PLAN superseded.
+- Public import/CLI names unchanged.
+
 ## [2.39.50] - 2026-08-05
 
 ### Fixed (Workflow wire · recompute_gates phase/primary alignment)
