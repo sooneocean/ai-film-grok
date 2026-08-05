@@ -115,6 +115,32 @@ class QueueError(RuntimeError):
     pass
 
 
+def _inventory_weapon_tags() -> str:
+    """Documented primary weapons for agent recovery (weapon-inventory SSoT)."""
+    try:
+        from weapon_inventory import primary_for
+
+        still = (primary_for("text-to-image") or {}).get("id") or "qwen-image-2512-quality"
+        edit = (primary_for("local-image-edit") or {}).get("id") or "qwen-image-edit-2511-local"
+        motion = (primary_for("image-to-video") or {}).get("id") or "minimax-h3-i2v-pilot"
+        tts = (primary_for("tts_zh_ship") or {}).get("id") or "edge_tts_zh"
+        return f"weapons: still={still} edit={edit} motion={motion} tts={tts}"
+    except Exception:
+        return (
+            "weapons: still=qwen-image-2512-quality "
+            "edit=qwen-image-edit-2511-local motion=minimax-h3-i2v-pilot tts=edge_tts_zh"
+        )
+
+
+def _queue_error(msg: str) -> QueueError:
+    """QueueError with inventory primary tags when not already present."""
+    text = str(msg or "").strip()
+    tags = _inventory_weapon_tags()
+    if "weapons:" in text or "motion=" in text:
+        return QueueError(text)
+    return QueueError(f"{text} — {tags}")
+
+
 def style_reference_output_evidence(
     root: Path | str,
     *,
@@ -548,12 +574,23 @@ class MediaQueue:
                                     if is_h3_primary
                                     else "restricted_local"
                                 )
-                                raise QueueError(
-                                    f"shot {shot_id!r} is {lane_why} → local MiniMax H3 "
-                                    f"(provider_lock={locked or rec}). "
+                                motion_p = "minimax-h3-i2v-pilot"
+                                try:
+                                    from weapon_inventory import primary_for
+
+                                    motion_p = (
+                                        (primary_for("image-to-video") or {}).get("id")
+                                        or motion_p
+                                    )
+                                except Exception:
+                                    pass
+                                raise _queue_error(
+                                    f"shot {shot_id!r} is {lane_why} → local motion primary "
+                                    f"{motion_p} (provider_lock={locked or rec}). "
                                     f'Use: aifilm h3 plan --root "{self.root}" --shot-id {shot_id} '
                                     f'&& aifilm h3 run --root "{self.root}" --shot-id {shot_id} '
-                                    f"--register. Escape: AIFILM_ALLOW_CLOUD_RESTRICTED=1 "
+                                    f"--register (inventory motion={motion_p}). "
+                                    f"Escape: AIFILM_ALLOW_CLOUD_RESTRICTED=1 "
                                     f"(not recommended for bare/meat / h3_primary)."
                                 )
                         # Motion Prompt Spine: enrich + fail-closed empty core (P0/A).
@@ -579,18 +616,18 @@ class MediaQueue:
                                     role=str(shot_row.get("shot_role") or "hero"),
                                 )
                             except MotionCoreError as exc:
-                                raise QueueError(str(exc)) from exc
+                                raise _queue_error(str(exc)) from exc
                             except QueueError:
                                 raise
                             except Exception as exc:
-                                raise QueueError(
+                                raise _queue_error(
                                     f"motion core enrich failed for {shot_id}: {exc}"
                                 ) from exc
                 except QueueError:
                     raise
                 except Exception as exc:
                     # Restricted / H3 routing must not silent-pass into cloud bulk
-                    raise QueueError(
+                    raise _queue_error(
                         f"restricted/local motion routing failed for {shot_id}: {exc}"
                     ) from exc
         try:
@@ -600,7 +637,7 @@ class MediaQueue:
                     ", ".join(str(code) for code in source_contract.get("errors") or [])
                 )
         except ProductionChainError as exc:
-            raise QueueError(f"queue source contract is not ready: {exc}") from exc
+            raise _queue_error(f"queue source contract is not ready: {exc}") from exc
         prompt_hash = sha256(prompt)
         input_records = [{"path": str(path), "sha256": sha256(path)} for path in resolved_inputs]
         legacy_identity = {
@@ -652,12 +689,12 @@ class MediaQueue:
                     force=allow_without_pilot,
                 )
             except ProductionGateError as exc:
-                raise QueueError(str(exc)) from exc
+                raise _queue_error(str(exc)) from exc
             # Wave 5: adult-max heat hard_fail blocks all queue adds (not pilot-skippable)
             try:
                 assert_heat_allows_media(self.root)
             except ProductionGateError as exc:
-                raise QueueError(str(exc)) from exc
+                raise _queue_error(str(exc)) from exc
             # Wave G: pilot-approved bulk defaults to bulk-preflight hard gate
             # (pilot window ≤3 shots without approval stays open; canary/skip env opt-out).
             skip_pf = os.environ.get("AIFILM_SKIP_BULK_PREFLIGHT", "").strip().lower() in {
@@ -691,14 +728,14 @@ class MediaQueue:
                         check_lease=False,
                     )
                 except WorkflowPackError as exc:
-                    raise QueueError(str(exc)) from exc
+                    raise _queue_error(str(exc)) from exc
                 except Exception as exc:  # noqa: BLE001
-                    raise QueueError(f"bulk preflight unavailable: {exc}") from exc
+                    raise _queue_error(f"bulk preflight unavailable: {exc}") from exc
             effective_budget = int(
                 (state.get("policy") or {}).get("budget_units") or self.budget_units
             )
             if len(state["jobs"]) >= effective_budget:
-                raise QueueError(
+                raise _queue_error(
                     f"generation-unit budget exhausted ({len(state['jobs'])}/{effective_budget}); "
                     "use the budget command to raise it explicitly before adding work"
                 )

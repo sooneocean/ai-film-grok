@@ -1318,7 +1318,7 @@
     },
     {
       "path": "scripts/media/media_queue.py",
-      "sha256": "d47d344304998a19211bcc9547b6b5cbfc553c11e51bd256034d67da6680bb0f"
+      "sha256": "028dddef15c31819f11aba3a5c2446a4c0e97ab7e647012de6af0c3069a75527"
     },
     {
       "path": "scripts/media/pilot_pack.py",

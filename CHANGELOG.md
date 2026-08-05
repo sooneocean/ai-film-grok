@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.55] - 2026-08-05
+
+### Added (media-queue inventory primary tags on fail)
+- **media_queue**: `_queue_error` / `_inventory_weapon_tags` append still/edit/motion/tts primaries on enqueue hard fails.
+- H3 cloud-block, bulk-preflight, pilot/heat, motion-core, budget errors name documented weapons.
+- **Tests**: `test_media_queue_inventory.py`.
+
 ## [2.39.54] - 2026-08-05
 
 ### Fixed (film-spec health · H3 templates validate)
