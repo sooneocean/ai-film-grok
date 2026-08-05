@@ -517,13 +517,38 @@ def build_dispatch(
             "Selects 环：对照 planned vs approved，未 register 的先补",
             "visual",
         )
+    # audio-plan is a pre-plate dry-run only. Once a plate exists or final is
+    # approved/exported, closeout/export/done own the primary — never thrash.
     if craft_stage in {"rough", "verified"}:
-        pre(
-            "audio-plan",
-            f'aifilm audio-plan --root "{r}"',
-            "音轨 dry-run：確認 TTS/BGM/lipsync 路徑再 final",
-            "voice",
+        has_plate_early = any(
+            (root / rel).is_file()
+            for rel in (
+                "out/film_final.mp4",
+                "out/film_hyperframes.mp4",
+                "out/final.mp4",
+                "final.mp4",
+            )
         )
+        if not has_plate_early:
+            man_early = read_json(root / "manifest.json") or {}
+            ff_early = (
+                ((man_early.get("outputs") or {}).get("final_film") or {})
+                if isinstance(man_early, dict)
+                else {}
+            )
+            raw_early = str(ff_early.get("path") or "").strip()
+            if raw_early:
+                p_early = Path(raw_early)
+                has_plate_early = (
+                    p_early.is_file() if p_early.is_absolute() else (root / p_early).is_file()
+                )
+        if not (has_plate_early or gates.get("final_complete") or gates.get("desktop_exported")):
+            pre(
+                "audio-plan",
+                f'aifilm audio-plan --root "{r}"',
+                "音轨 dry-run：確認 TTS/BGM/lipsync 路徑再 final",
+                "voice",
+            )
 
     if craft_stage == "post":
         pre(
@@ -721,8 +746,13 @@ def build_dispatch(
                 "visual",
             )
 
-    # W4 · one machine next after clips (ship-prep includes shortlist+pk; no duplicate select-shortlist)
-    if craft_stage in {"selects", "media", "rough", "post"} and gates.get("clips_complete"):
+    # W4 · one machine next after clips (pre-plate only; plate path uses closeout)
+    if (
+        craft_stage in {"selects", "media", "rough", "post"}
+        and gates.get("clips_complete")
+        and not gates.get("final_complete")
+        and not plate_exists
+    ):
         try:
             from gate_auto import next_machine_lane_action
 
@@ -1250,9 +1280,15 @@ def build_dispatch(
 
     try:
         from generation_ready import generation_ready_report
+
         generation_ready = generation_ready_report(root)
     except Exception as exc:  # noqa: BLE001
-        generation_ready = {"ok": True, "skipped": True, "error": str(exc)[:160], "line": "generation_ready skipped"}
+        generation_ready = {
+            "ok": True,
+            "skipped": True,
+            "error": str(exc)[:160],
+            "line": "generation_ready skipped",
+        }
 
     packet = {
         "ok": True,

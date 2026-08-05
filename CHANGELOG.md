@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.40] - 2026-08-05
+
+### Fixed (Workflow wire · primary next ↔ seven-step phase)
+- **Legacy public phase** no longer freezes at `define_story` when drama-graph is absent: production evidence (style/spec/pilot/clips/plate/final) advances the seven-step phase.
+- **Plate thrash**: after plate exists, primary is `closeout-run` — not `audio-plan` / `gate-auto` / `post-plan-init`.
+- **Visual stage label**: drop Seedance-as-default wording → `Grok still + H3/Grok I2V`.
+- **Tests**: `tests/test_workflow_wire_primary.py` state-matrix regression; compact dispatch phase expectations aligned.
+
 ## [2.39.33] - 2026-08-05
 
 ### Added (Weapon armory inventory · primaries + handoff)

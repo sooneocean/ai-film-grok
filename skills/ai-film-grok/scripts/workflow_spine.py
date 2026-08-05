@@ -272,6 +272,84 @@ def _post_audit_current(root: Path) -> bool:
         return False
 
 
+def _has_final_film(root: Path, manifest: dict[str, Any] | None = None) -> bool:
+    """True when a plate/final candidate exists on disk or is bound in manifest."""
+    for rel in (
+        "out/film_final.mp4",
+        "out/film_hyperframes.mp4",
+        "out/final.mp4",
+        "final.mp4",
+    ):
+        if _present(root / rel, min_bytes=1):
+            return True
+    man = manifest if isinstance(manifest, dict) else (read_json(root / "manifest.json") or {})
+    outputs = man.get("outputs") if isinstance(man.get("outputs"), dict) else {}
+    final_rec = outputs.get("final_film") if isinstance(outputs.get("final_film"), dict) else {}
+    raw = str(final_rec.get("path") or "").strip()
+    if not raw:
+        return False
+    path = Path(raw)
+    return path.is_file() if path.is_absolute() else _present(root / path, min_bytes=1)
+
+
+def _legacy_production_readiness(
+    root: Path,
+    *,
+    gates: dict[str, Any],
+    manifest: dict[str, Any],
+) -> dict[str, bool]:
+    """Gate/evidence readiness for legacy roots without drama-graph stage locks.
+
+    Professional narrative locks stay strict. Legacy public progress follows real
+    production evidence so the seven-step phase does not freeze at define_story
+    while pilot/bulk/plate/final have already advanced.
+    """
+    has_brief = bool(gates.get("brief") or _present(root / "brief.json"))
+    style_ok = bool(gates.get("style_locked"))
+    if not style_ok:
+        style = read_json(root / "style-bible.json") or {}
+        style_ok = bool(isinstance(style, dict) and style.get("locked"))
+    spec_ok = bool(gates.get("spec"))
+    if not spec_ok:
+        spec = read_json(root / "film-spec.json") or {}
+        shots = spec.get("shots") if isinstance(spec.get("shots"), list) else []
+        spec_ok = bool(shots)
+    pilot_user = _pilot_user_approved(root)
+    clips_ok = bool(gates.get("clips_complete"))
+    final_complete = bool(gates.get("final_complete"))
+    has_final = _has_final_film(root, manifest)
+    post_audit = _post_audit_current(root)
+
+    concept_ok = has_brief
+    # No narrative scope locks in pure legacy: brief is enough to leave define_story.
+    script_ok = has_brief
+    look_ok = style_ok
+    shot_ok = look_ok and spec_ok
+    # Clips already complete implies pilot window is past for public progress.
+    pilot_ok = shot_ok and (pilot_user or clips_ok)
+    bulk_ok = pilot_ok and clips_ok
+    # Soft-complete dailies after bulk. Selects/rough stay open until a plate
+    # exists so public phase lands on selects_rough rather than post_master.
+    dailies_ok = bulk_ok
+    rough_ok = bulk_ok and has_final
+    picture_ok = bulk_ok and has_final
+    post_ok = has_final and final_complete
+    master_ok = post_ok and post_audit
+    return {
+        "concept_lock": concept_ok,
+        "script_lock": script_ok,
+        "department_look_lock": look_ok,
+        "shot_animatic_lock": shot_ok,
+        "pilot_approval": pilot_ok,
+        "bulk": bulk_ok,
+        "dailies_review": dailies_ok,
+        "selects_rough_cut": rough_ok,
+        "picture_lock": picture_ok,
+        "post_locks": post_ok,
+        "master_lock": master_ok,
+    }
+
+
 def build_workflow_status(
     root: Path | str,
     *,
@@ -291,57 +369,64 @@ def build_workflow_status(
     narrative = narrative or {}
     mode, invalid_rigor = _mode(base)
     manifest = read_json(base / "manifest.json") or {}
+    if not isinstance(manifest, dict):
+        manifest = {}
     semantic = narrative.get("semantic") if isinstance(narrative.get("semantic"), dict) else {}
     projection = (
         narrative.get("projection") if isinstance(narrative.get("projection"), dict) else {}
     )
     locked_scopes = set(str(item) for item in narrative.get("locked_scopes") or [])
 
-    concept_ok = bool(gates.get("brief") and narrative.get("canonical"))
-    script_ok = bool(
-        concept_ok and not semantic.get("errors") and {"story", "beats"}.issubset(locked_scopes)
-    )
-    look_ok = bool(script_ok and gates.get("style_locked"))
-    shot_ok = bool(
-        look_ok
-        and gates.get("spec")
-        and narrative.get("ready_for_media")
-        and projection.get("stale") is not True
-    )
-    pilot_ok = bool(shot_ok and _pilot_user_approved(base))
-    bulk_ok = bool(pilot_ok and gates.get("clips_complete"))
-    from dailies import dailies_review_status
-
-    dailies_ok = bool(bulk_ok and dailies_review_status(base).get("ok"))
-    selects_ok = bool(dailies_ok and _selects_current(base))
-    rough_ok = bool(
-        selects_ok and _rough_current(base, manifest, professional=mode == "professional")
-    )
-    picture_ok = bool(rough_ok and _review_stage_approved(base, "preview"))
-    post_ok = bool(
-        picture_ok
-        and _post_plan_current(base)
-        and _review_stage_approved(base, "audio")
-        and (
-            _present(base / "receipts" / "tts-rehearsal.json")
-            or _present(base / "audio" / "mix_report.json")
+    # Legacy without drama-graph: public 7-step follows production evidence, not
+    # frozen concept_lock. Professional / narrative-canonical keep strict locks.
+    if mode != "professional" and not narrative.get("canonical"):
+        readiness = _legacy_production_readiness(base, gates=gates, manifest=manifest)
+    else:
+        concept_ok = bool(gates.get("brief") and narrative.get("canonical"))
+        script_ok = bool(
+            concept_ok and not semantic.get("errors") and {"story", "beats"}.issubset(locked_scopes)
         )
-    )
-    master_ok = bool(post_ok and gates.get("final_complete") and _post_audit_current(base))
+        look_ok = bool(script_ok and gates.get("style_locked"))
+        shot_ok = bool(
+            look_ok
+            and gates.get("spec")
+            and narrative.get("ready_for_media")
+            and projection.get("stale") is not True
+        )
+        pilot_ok = bool(shot_ok and _pilot_user_approved(base))
+        bulk_ok = bool(pilot_ok and gates.get("clips_complete"))
+        from dailies import dailies_review_status
 
-    readiness = {
-        "concept_lock": concept_ok,
-        "script_lock": script_ok,
-        "department_look_lock": look_ok,
-        "shot_animatic_lock": shot_ok,
-        "pilot_approval": pilot_ok,
-        "bulk": bulk_ok,
-        "dailies_review": dailies_ok,
-        "selects_rough_cut": rough_ok,
-        "picture_lock": picture_ok,
-        "post_locks": post_ok,
-        "master_lock": master_ok,
-    }
+        dailies_ok = bool(bulk_ok and dailies_review_status(base).get("ok"))
+        selects_ok = bool(dailies_ok and _selects_current(base))
+        rough_ok = bool(
+            selects_ok and _rough_current(base, manifest, professional=mode == "professional")
+        )
+        picture_ok = bool(rough_ok and _review_stage_approved(base, "preview"))
+        post_ok = bool(
+            picture_ok
+            and _post_plan_current(base)
+            and _review_stage_approved(base, "audio")
+            and (
+                _present(base / "receipts" / "tts-rehearsal.json")
+                or _present(base / "audio" / "mix_report.json")
+            )
+        )
+        master_ok = bool(post_ok and gates.get("final_complete") and _post_audit_current(base))
+
+        readiness = {
+            "concept_lock": concept_ok,
+            "script_lock": script_ok,
+            "department_look_lock": look_ok,
+            "shot_animatic_lock": shot_ok,
+            "pilot_approval": pilot_ok,
+            "bulk": bulk_ok,
+            "dailies_review": dailies_ok,
+            "selects_rough_cut": rough_ok,
+            "picture_lock": picture_ok,
+            "post_locks": post_ok,
+            "master_lock": master_ok,
+        }
     try:
         from director_stage_gates import stage_status
 

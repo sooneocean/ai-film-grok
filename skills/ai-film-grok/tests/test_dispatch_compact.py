@@ -68,8 +68,9 @@ def test_compact_packet_is_small_and_keeps_execution_contract(tmp_path: Path) ->
     assert "production_evidence" not in compact
     assert "agent_instruction" not in compact
     assert compact["responsibility"] == full["responsibility"]
-    assert compact["phase"]["id"] == "define_story"
-    assert compact["phase"]["index"] == 1
+    # brief + film-spec without style lock → design_performance (not frozen define_story)
+    assert compact["phase"]["id"] == "design_performance"
+    assert compact["phase"]["index"] == 2
     assert compact["phase"]["total"] == 7
     assert compact["required_proof"] == compact["phase"]["proof"]
     assert isinstance(compact["blocked_by"], list)
@@ -482,7 +483,8 @@ def test_dispatch_cli_defaults_compact_and_supports_full_rollback(tmp_path: Path
     compact = json.loads(compact_run.stdout)
     assert compact["mode"] == "compact"
     assert compact["schema_version"] == 4
-    assert compact["phase"]["id"] == "define_story"
+    # brief+spec fixture advances public phase past pure define_story
+    assert compact["phase"]["id"] == "design_performance"
     assert compact["phase"]["total"] == 7
 
     full_run = subprocess.run(

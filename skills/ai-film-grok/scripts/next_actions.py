@@ -74,7 +74,7 @@ _ACTION_STAGE: dict[str, str] = {
 
 _STAGE_LABELS_ZH: dict[str, str] = {
     "agent": "0·Agent 规划（Lens / 定妆 / film-spec / pilot）",
-    "visual": "1·视觉生成（Grok still + Seedance/Grok I2V）",
+    "visual": "1·视觉生成（Grok still + H3/Grok I2V）",
     "voice": "2·语音生成（Edge TTS + tts-rehearse / SRT）",
     "design": "3·设计合成（HyperFrames 优先 / Remotion）",
     "post": "4·后处理验收（FFmpeg plate · review-final）",
@@ -703,23 +703,26 @@ def build_next_actions(
             )
 
     if gates.get("clips_complete") and not gates.get("final_complete"):
-        # W4 · single machine next (ship-prep owns shortlist+pk; no duplicate select-shortlist)
-        machine_pending = False
-        try:
-            from gate_auto import next_machine_lane_action
-
-            lane = next_machine_lane_action(root, prefer_ship_prep=True)
-            if lane:
-                add(lane["id"], lane["cmd"], lane["why"])
-                machine_pending = True
-        except Exception:
-            add(
-                "gate-auto",
-                f'aifilm gate-auto --root "{r}"',
-                "clips 齐 — gate-auto 机读过闸",
-            )
-            machine_pending = True
         final_rec = _final_record(root)
+        # Plate already on disk → closeout owns the ladder (not gate-auto thrash).
+        # Machine lane is for pre-plate selects; re-opening it after plate is thrash.
+        machine_pending = False
+        if not final_rec:
+            # W4 · single machine next (ship-prep owns shortlist+pk; no duplicate select-shortlist)
+            try:
+                from gate_auto import next_machine_lane_action
+
+                lane = next_machine_lane_action(root, prefer_ship_prep=True)
+                if lane:
+                    add(lane["id"], lane["cmd"], lane["why"])
+                    machine_pending = True
+            except Exception:
+                add(
+                    "gate-auto",
+                    f'aifilm gate-auto --root "{r}"',
+                    "clips 齐 — gate-auto 机读过闸",
+                )
+                machine_pending = True
         # No plate yet + machine red → only machine (+ post-plan), skip final/tts stack
         if machine_pending and not final_rec:
             if not (root / "post-plan.json").is_file():
@@ -732,7 +735,9 @@ def build_next_actions(
         preview_ok = _preview_ok(root)
         rehearse_ok = _tts_rehearse_ok(root)
         require_reh = bool(spec.get("tts_rehearsal_required") is True) if spec else False
-        if not (root / "post-plan.json").is_file():
+        # post-plan is a pre-plate design gate. Once plate exists, closeout owns
+        # the ladder — reopening post-plan-init as primary is thrash.
+        if not final_rec and not (root / "post-plan.json").is_file():
             add(
                 "post-plan-init",
                 f'aifilm post-plan --root "{r}" init --owner hyperframes',
