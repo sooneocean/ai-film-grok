@@ -500,6 +500,7 @@ def build_h3_temporal_prompt(
     *,
     mode: str = "i2v",
     duration_sec: float | None = None,
+    ref_image_paths: list[str] | None = None,
 ) -> str:
     """Build MiniMax H3 Layer-4 timed action script for 5090 generation.
 
@@ -510,11 +511,18 @@ def build_h3_temporal_prompt(
       [5s-8s] ... ending pose
       Audio: ...
 
+    When 2V + reference images available, injects the Grok reference
+    composition stage before the timeline segments (see h3_timeline_prompt).
+
     Controls: temporal decomposition, one primary action/segment,
     subject+camera+env motion, continuity anchors, continuous vs multi-cut,
     implied diegetic sound + dialogue inject. See ``h3_timeline_prompt``.
     """
-    from h3_timeline_prompt import build_segment_lines, resolve_duration_sec
+    from h3_timeline_prompt import (
+        build_segment_lines,
+        inject_2v_reference_stage,
+        resolve_duration_sec,
+    )
 
     if duration_sec is None:
         h3 = (spec or {}).get("h3") if isinstance(spec, dict) else {}
@@ -529,23 +537,34 @@ def build_h3_temporal_prompt(
     shot_x = dict(shot) if isinstance(shot, dict) else {}
     shot_x["h3_mode"] = mode
 
+    has_dlg = bool(spoken_dialogue_text(shot))
+    # Dialogue performance: denser mouth language, never body HIGH MOTION thrash.
+    eff_tier = "medium" if has_dlg and tier == "high" else tier
+    if has_dlg:
+        n = _h3_segment_count(duration_sec, prompt_tier=eff_tier)
+
     segs = build_segment_lines(
         spec,
         shot_x,
         duration_sec=duration_sec,
-        prompt_tier=tier,
+        prompt_tier=eff_tier,
         n_segments=n,
         inject_continuity_in_first=True,
     )
     if segs:
         lead: list[str] = []
         df = dramatic_function_of(shot)
-        if df:
+        if df and df not in {"beat", "setup"}:
             lead.append(f"Dramatic function: {df}")
         want = want_beat_line(spec, shot)
-        if want:
+        if want and not has_dlg:
             lead.append(want.rstrip("."))
-        if tier == "high":
+        if has_dlg:
+            lead.append(
+                "MOUTH ENERGY priority: clear jaw open-close each Mandarin syllable; "
+                "visible lip sync; keep face identity fixed; never freeze the mouth"
+            )
+        elif tier == "high":
             lead.append(
                 "HIGH MOTION priority: large visible pose/body change across the timeline"
             )
@@ -562,6 +581,12 @@ def build_h3_temporal_prompt(
         segs = joined.split("\n")
     except Exception:
         pass
+
+    # Inject 2V reference stage when reference images are available.
+    if ref_image_paths:
+        body = "\n".join(segs)
+        body = inject_2v_reference_stage(body, shot, ref_image_paths=ref_image_paths)
+        segs = body.split("\n")
 
     audio = audio_clause(shot)
     body = "\n".join(segs)

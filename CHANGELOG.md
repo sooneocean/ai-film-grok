@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.71] - 2026-08-05
+
+### Fixed (H3 · dialogue timeline freeze from R3 A/B)
+- Live 5090 R3 A/B: high_motion timeline R2V wins (mean~26); dialogue v1 timeline froze (mean~1).
+- Dialogue path: compact continuity + **MOUTH ENERGY** (not HIGH MOTION); `dialogue_mouth_max` heat=build.
+- Combo eval film genre `drama` to avoid meat variety preflight on 5s pilots.
+- Evidence: `registry/evidence/h3-timeline-ab-summary-20260805.json`.
+
 ## [2.39.70] - 2026-08-05
 
 ### Changed (H3 · timeline combo families + R3 flat/timeline A/B)

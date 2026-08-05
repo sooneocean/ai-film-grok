@@ -284,8 +284,31 @@ def _primary_secondary(seeds: list[str], index: int, n: int) -> tuple[str, str]:
     return f"{seeds[-1]} holds and settles", ""
 
 
-def continuity_header(shot: dict[str, Any], *, mode: str = "i2v") -> str:
+def continuity_header(
+    shot: dict[str, Any],
+    *,
+    mode: str = "i2v",
+    compact: bool | None = None,
+) -> str:
     cut = camera_cut_mode(shot)
+    # Dialogue CU: short lock — long meta dumps freeze mouth performance on H3.
+    if compact is None:
+        try:
+            from motion_prompt_spine import spoken_dialogue_text
+
+            compact = bool(spoken_dialogue_text(shot))
+        except Exception:
+            compact = False
+    if compact:
+        lines = [
+            "Continuity: same face, hair, wardrobe, identity locked.",
+            "One primary mouth/body action per segment; describe motion not static frames.",
+            "Final segment holds a clear end expression after speech.",
+        ]
+        if cut != "multi":
+            lines.append("Single continuous take, locked camera preferred.")
+        return " ".join(lines)
+
     lines = [
         "Continuity anchor: maintain the same character appearance, clothing, hairstyle, "
         "props, face identity, and spatial orientation throughout all segments.",
@@ -313,6 +336,125 @@ def continuity_header(shot: dict[str, Any], *, mode: str = "i2v") -> str:
     if m in {"t2v", "text_to_video"}:
         lines.append("No new faces or characters unless the text explicitly requires them.")
     return " ".join(lines)
+
+
+# ── 2V Reference Stage ──────────────────────────────────────────
+
+
+def supports_image_input(mode: str) -> bool:
+    """Return True when the H3 mode accepts image reference input (2V)."""
+    return mode.strip().lower() in {"i2v", "flf", "r2v"}
+
+
+def build_reference_composition_prompt(
+    shot: dict[str, Any],
+    *,
+    mode: str = "i2v",
+) -> str:
+    """Generate a Grok image-model prompt for the ideal first-frame composition.
+
+    Used in the 2V reference stage: Grok generates a high-quality reference
+    image from this prompt, which then serves as the start frame for H3 video
+    generation.
+    """
+    from motion_prompt_spine import (
+        camera_clause,
+        dramatic_function_of,
+        motion_tier_for,
+        want_beat_line,
+    )
+
+    setting = _extract_setting(shot)
+    subject = _extract_subject(shot)
+    cam = camera_clause(shot) or "medium shot, steady framing"
+    mood = _mood_seed(shot)
+    lighting = _extract_lighting(shot)
+    tier = motion_tier_for(shot)
+
+    parts = [
+        "Composition reference frame for video generation.",
+        setting,
+        subject,
+        f"Camera: {cam}",
+        f"Lighting: {lighting}",
+        f"Mood: {mood}",
+        "9:16 aspect ratio. Cinematic quality. High detail. This image serves as the "
+        "start frame for motion generation.",
+    ]
+    return " ".join(p for p in parts if p)
+
+
+def inject_2v_reference_stage(
+    prompt: str,
+    shot: dict[str, Any],
+    *,
+    ref_image_paths: list[str] | None = None,
+) -> str:
+    """When 2V + reference images available, prepend the reference stage to the prompt.
+
+    Returns the enhanced prompt with:
+      1. Reference image generation instruction (Grok image model)
+      2. Timeline segments that anchor to the reference frame
+    """
+    if not ref_image_paths:
+        return prompt
+
+    comp_prompt = build_reference_composition_prompt(shot)
+
+    stage_header = (
+        "=== 2V REFERENCE STAGE ===\n"
+        "Step 1: Generate the reference composition image using Grok image model "
+        "from the composition prompt below.\n"
+        f"Composition prompt: {comp_prompt}\n"
+        "Step 2: Use the generated image as the start frame reference for video generation.\n"
+        "Maintain identity, wardrobe, props, and spatial orientation from the reference frame.\n"
+        "=== TIMELINE ===\n"
+    )
+
+    return f"{stage_header}{prompt}"
+
+
+def _extract_setting(shot: dict[str, Any]) -> str:
+    """Extract the scene/setting description from a shot dict."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    env = str(
+        dsl.get("environment") or dsl.get("env") or shot.get("environment") or ""
+    ).strip()
+    if env:
+        return env
+    df = str(shot.get("dramatic_function") or "").strip().lower()
+    setting_map = {
+        "action": "a dynamic urban environment",
+        "climax": "an intense dramatic setting",
+        "afterglow": "a quiet, atmospheric space",
+        "hook": "a compelling opening scene",
+        "approach": "a transitional space",
+        "reaction": "an intimate interior",
+    }
+    return setting_map.get(df, "a cinematic scene")
+
+
+def _extract_subject(shot: dict[str, Any]) -> str:
+    """Extract the subject description from a shot dict."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    subject = str(
+        dsl.get("subject")
+        or dsl.get("character")
+        or shot.get("subject")
+        or ""
+    ).strip()
+    if subject:
+        return subject
+    return "the main character"
+
+
+def _extract_lighting(shot: dict[str, Any]) -> str:
+    """Extract lighting description from a shot dict."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    lighting = str(dsl.get("lighting") or shot.get("lighting") or "").strip()
+    if lighting:
+        return lighting
+    return "natural cinematic lighting"
 
 
 def _mood_seed(shot: dict[str, Any]) -> str:

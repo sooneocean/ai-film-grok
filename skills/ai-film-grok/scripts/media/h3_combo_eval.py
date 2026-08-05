@@ -146,9 +146,10 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
     "dialogue_mouth_max": {
         "lane_tags": ["dialogue_mouth_energy", "hero_identity_lock"],
         "shot_role": "hero",
-        "heat_phase": "act",
+        "heat_phase": "build",
         "wardrobe_state": "clothed",
         "prompt_tier": "medium",
+        "dramatic_function": "dialogue",
         "screen_mode": "on_camera",
         "shot_size": "cu",
         "nar": "close-up Mandarin speech with strong visible mouth performance",
@@ -158,6 +159,11 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "visible_change": "lips and jaw articulate every Mandarin syllable; mouth energy high",
             "camera_prompt": "locked ECU mouth-priority close-up",
             "environment": "soft key light micro-shift on face",
+            "timeline_events": [
+                "jaw opens on first Mandarin syllables with clear lip shapes",
+                "keeps articulating mid-line with cheek and brow engagement",
+                "finishes line and holds expressive end mouth shape",
+            ],
         },
         "audio_cues": [
             {
@@ -439,9 +445,10 @@ def build_eval_film_spec(combos: list[ComboSpec] | None = None) -> dict[str, Any
     for c in combos:
         if c.shot_id not in shots_by_id:
             shots_by_id[c.shot_id] = shot_dict_for_family(c.family, c.shot_id)
+    # genre != adult: variety preflight meat floors would block 5s pilot A/B grids.
     return {
         "title": "h3-combo-eval",
-        "genre": "adult",
+        "genre": "drama",
         "aspect_ratio": "9:16",
         "vo_mode": "storyteller",
         "tts_backend": "edge",

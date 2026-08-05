@@ -23,3 +23,11 @@
 - `scripts/h3_timeline_prompt.py`
 - `scripts/motion_prompt_spine.py` → `build_h3_temporal_prompt`
 - `scripts/media/h3_workflow.py` → `_prompt_for_shot`
+
+## R3 A/B 实跑（2026-08-05 5090）
+- high I2V: flat 19.3 ≈ tl 18.7
+- high R2V: **tl high_motion_max mean 26.0** 胜
+- dialogue v1 tl: freeze mean 0.98 → v2 compact+MOUTH ENERGY mean 11.9 / mouth 30.5（flat 仍更高 19/45）
+- 政策：默认 timeline；对白走 compact+MOUTH ENERGY，禁 body HIGH MOTION
+- 证据：`registry/evidence/h3-timeline-ab-summary-20260805.json`
+
