@@ -9,6 +9,10 @@
 - **dispatch**: `h3_primary` next prefers `h3-until-empty` + capacity-plan.
 - **Tests**: `tests/test_h3_until_empty.py`.
 
+### Docs (Material Fidelity Loop · index)
+- **Plan + memory**: `docs/plans/2026-08-05-material-fidelity-loop.md` · `memory/2026-08-05-material-fidelity-loop.md`.
+- **Runtime already on main** (`still_source` · `generation_request` · h3 plan receipt · queue sha gate · stages/visual「谁喂谁」).
+
 ## [2.39.15] - 2026-08-05
 
 ### Added (Post P0 · caption_path + pixel ink · Wave 2)
