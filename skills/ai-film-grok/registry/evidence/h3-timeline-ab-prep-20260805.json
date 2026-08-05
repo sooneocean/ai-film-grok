@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "kind": "h3-timeline-ab-prep",
+  "status": "prepared_awaiting_gpu",
+  "eval_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-timeline-ab-20260805",
+  "round": 3,
+  "combos": [
+    {
+      "combo_id": "ab_high_flat_i2v",
+      "mode": "i2v",
+      "family": "high_motion_flat",
+      "shot_id": "s_ab_hi_flat",
+      "seed": 20260805,
+      "steps": 20,
+      "requires_last": false,
+      "lane_tags": [
+        "high_motion_energy",
+        "timeline_ab_flat"
+      ]
+    },
+    {
+      "combo_id": "ab_high_tl_i2v",
+      "mode": "i2v",
+      "family": "high_motion_max",
+      "shot_id": "s_ab_hi_tl",
+      "seed": 20260805,
+      "steps": 20,
+      "requires_last": false,
+      "lane_tags": [
+        "high_motion_energy",
+        "timeline_ab_timeline"
+      ]
+    },
+    {
+      "combo_id": "ab_high_flat_r2v",
+      "mode": "r2v",
+      "family": "high_motion_flat",
+      "shot_id": "s_ab_hi_flat",
+      "seed": 20260805,
+      "steps": 20,
+      "requires_last": false,
+      "lane_tags": [
+        "high_motion_energy",
+        "timeline_ab_flat"
+      ]
+    },
+    {
+      "combo_id": "ab_high_tl_r2v",
+      "mode": "r2v",
+      "family": "high_motion_max",
+      "shot_id": "s_ab_hi_tl",
+      "seed": 20260805,
+      "steps": 20,
+      "requires_last": false,
+      "lane_tags": [
+        "high_motion_energy",
+        "timeline_ab_timeline"
+      ]
+    },
+    {
+      "combo_id": "ab_dlg_flat_i2v",
+      "mode": "i2v",
+      "family": "dialogue_mouth_flat",
+      "shot_id": "s_ab_dlg_flat",
+      "seed": 20260805,
+      "steps": 20,
+      "requires_last": false,
+      "lane_tags": [
+        "dialogue_mouth_energy",
+        "timeline_ab_flat"
+      ]
+    },
+    {
+      "combo_id": "ab_dlg_tl_i2v",
+      "mode": "i2v",
+      "family": "dialogue_mouth_max",
+      "shot_id": "s_ab_dlg_tl",
+      "seed": 20260805,
+      "steps": 20,
+      "requires_last": false,
+      "lane_tags": [
+        "dialogue_mouth_energy",
+        "timeline_ab_timeline"
+      ]
+    }
+  ],
+  "pairs": [
+    {
+      "timeline_family": "high_motion_max",
+      "flat_family": "high_motion_flat",
+      "timeline_has_timecodes": true,
+      "flat_has_timecodes": false,
+      "timeline_validate": {
+        "ok": true,
+        "error": null,
+        "issues": [],
+        "segments": [
+          {
+            "start": 0.0,
+            "end": 2.0
+          },
+          {
+            "start": 2.0,
+            "end": 5.0
+          }
+        ],
+        "segment_count": 2,
+        "coverage_end": 5.0
+      },
+      "timeline_chars": 1665,
+      "flat_chars": 466
+    },
+    {
+      "timeline_family": "dialogue_mouth_max",
+      "flat_family": "dialogue_mouth_flat",
+      "timeline_has_timecodes": true,
+      "flat_has_timecodes": false,
+      "timeline_validate": {
+        "ok": true,
+        "error": null,
+        "issues": [],
+        "segments": [
+          {
+            "start": 0.0,
+            "end": 2.0
+          },
+          {
+            "start": 2.0,
+            "end": 5.0
+          }
+        ],
+        "segment_count": 2,
+        "coverage_end": 5.0
+      },
+      "timeline_chars": 1824,
+      "flat_chars": 367
+    }
+  ],
+  "execute_when_ready": "aifilm h3 combo-eval --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-timeline-ab-20260805\" --still \"<704x1280.png>\" --round 3 --execute --poll-sec 20 --max-wait-sec 3600",
+  "blockers": [
+    "need hero still ≥704×1280",
+    "comfy capacity (VRAM≥24GiB, queue idle, RAM floor)"
+  ],
+  "eval_root_rel": "skills/ai-film-grok/artifacts/5090-evaluation/h3-timeline-ab-20260805",
+  "note": "Prepared locally; artifacts/ may be gitignored. Re-run combo-eval --round 3 to regenerate."
+}

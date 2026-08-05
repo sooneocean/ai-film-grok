@@ -11,10 +11,12 @@
 3. **控乱序靠时间分解**：连续覆盖 + 1 primary/段 + continuity + ending pose + env motion。
 
 ## 检查清单
-- [ ] `aifilm h3 plan|run` 产出 prompt 含 `[0s-`
-- [ ] 首段有 Continuity / Primary action；末段 Resolves ending pose
-- [ ] 对白镜仍有 `line:「…」` + lip sync
-- [ ] 非 5090 profile 仍是 `Vertical 9:16` flat spine
+- [x] `aifilm h3 plan|run` 产出 prompt 含 `[0s-`
+- [x] 首段有 Continuity / Primary action；末段 Resolves ending pose
+- [x] 对白镜仍有 `line:「…」` + lip sync
+- [x] 非 5090 profile 仍是 `Vertical 9:16` flat spine
+- [x] combo families 默认 Layer-4 compile；`--round 3` flat vs timeline A/B
+- [ ] GPU 空闲时：`combo-eval --round 3 --execute`（prep：`artifacts/.../h3-timeline-ab-20260805`）
 - [ ] 可选：`dsl.camera_cut_mode=multi` / `timeline_events` / `environment`
 
 ## 代码

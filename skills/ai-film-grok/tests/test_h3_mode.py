@@ -192,7 +192,7 @@ class PlanListH3ModeTests(unittest.TestCase):
             self.assertEqual(plan["mode_resolve"].get("combo_preferred_mode"), "i2v")
             self.assertEqual(
                 plan.get("combo_prompt_family") or plan["mode_resolve"].get("combo_prompt_family"),
-                "dialogue_mandarin",
+                "dialogue_mouth_max",
             )
             self.assertTrue(plan.get("effect_tips"))
 

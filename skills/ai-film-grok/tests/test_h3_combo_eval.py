@@ -100,6 +100,34 @@ class Round2MatrixTests(unittest.TestCase):
             self.assertIn(f, fams)
             self.assertIn(f, PROMPT_FAMILIES)
 
+    def test_r3_timeline_ab_pairs(self) -> None:
+        from h3_combo_eval import (
+            build_combo_matrix,
+            compile_family_author_prompt,
+            prepare_eval_root,
+            PROMPT_FAMILIES,
+        )
+        combos = build_combo_matrix(round=3, include_flf=False)
+        fams = {c.family for c in combos}
+        self.assertIn("high_motion_flat", fams)
+        self.assertIn("high_motion_max", fams)
+        self.assertIn("dialogue_mouth_flat", fams)
+        self.assertIn("dialogue_mouth_max", fams)
+        tl = compile_family_author_prompt("high_motion_max", duration_sec=5)
+        flat = compile_family_author_prompt("high_motion_flat", duration_sec=5)
+        self.assertIn("[0s-", tl)
+        self.assertNotIn("[0s-", flat)
+        self.assertIn("Primary action", tl)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "ab"
+            prepare_eval_root(root, combos=combos)
+            p_tl = (root / "receipts" / "prompts" / "s_ab_hi_tl.i2v.txt").read_text()
+            p_flat = (root / "receipts" / "prompts" / "s_ab_hi_flat.i2v.txt").read_text()
+            self.assertIn("[0s-", p_tl)
+            self.assertNotIn("[0s-", p_flat)
+            for f in ("high_motion_flat", "dialogue_mouth_flat"):
+                self.assertIn(f, PROMPT_FAMILIES)
+
     def test_rank_lanes_best_of_merges_rounds(self) -> None:
         from h3_combo_eval import rank_lanes_best_of
         r1 = [{"ok": True, "combo_id": "soft_i2v", "mode": "i2v", "family": "soft_portrait",

@@ -275,6 +275,52 @@ R2_COMBO_ORDER: list[dict[str, Any]] = [
     {"combo_id": "r2_env_kinetic_t2v", "mode": "t2v", "family": "env_kinetic", "shot_id": "s_env2"},
 ]
 
+# Round-3: flat-paragraph vs Layer-4 timeline A/B (same still / seed / steps).
+R3_TIMELINE_AB_ORDER: list[dict[str, Any]] = [
+    {
+        "combo_id": "ab_high_flat_i2v",
+        "mode": "i2v",
+        "family": "high_motion_flat",
+        "shot_id": "s_ab_hi_flat",
+        "lane_tags": ["high_motion_energy", "timeline_ab_flat"],
+    },
+    {
+        "combo_id": "ab_high_tl_i2v",
+        "mode": "i2v",
+        "family": "high_motion_max",
+        "shot_id": "s_ab_hi_tl",
+        "lane_tags": ["high_motion_energy", "timeline_ab_timeline"],
+    },
+    {
+        "combo_id": "ab_high_flat_r2v",
+        "mode": "r2v",
+        "family": "high_motion_flat",
+        "shot_id": "s_ab_hi_flat",
+        "lane_tags": ["high_motion_energy", "timeline_ab_flat"],
+    },
+    {
+        "combo_id": "ab_high_tl_r2v",
+        "mode": "r2v",
+        "family": "high_motion_max",
+        "shot_id": "s_ab_hi_tl",
+        "lane_tags": ["high_motion_energy", "timeline_ab_timeline"],
+    },
+    {
+        "combo_id": "ab_dlg_flat_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mouth_flat",
+        "shot_id": "s_ab_dlg_flat",
+        "lane_tags": ["dialogue_mouth_energy", "timeline_ab_flat"],
+    },
+    {
+        "combo_id": "ab_dlg_tl_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mouth_max",
+        "shot_id": "s_ab_dlg_tl",
+        "lane_tags": ["dialogue_mouth_energy", "timeline_ab_timeline"],
+    },
+]
+
 
 
 @dataclass
@@ -301,6 +347,8 @@ def build_combo_matrix(
 ) -> list[ComboSpec]:
     if order is not None:
         rows = order
+    elif int(round) >= 3:
+        rows = list(R3_TIMELINE_AB_ORDER)
     elif int(round) >= 2:
         rows = list(R2_COMBO_ORDER)
     else:
@@ -330,11 +378,20 @@ def build_combo_matrix(
 
 def shot_dict_for_family(family: str, shot_id: str) -> dict[str, Any]:
     fam = PROMPT_FAMILIES[family]
+    heat = str(fam.get("heat_phase") or "setup")
+    # Infer DF from heat so timeline header is not generic "beat".
+    if heat in {"act", "climax"}:
+        df = "action"
+    elif heat in {"afterglow"}:
+        df = "afterglow"
+    else:
+        df = "setup" if fam.get("shot_role") == "env" else "approach"
     shot: dict[str, Any] = {
         "id": shot_id,
         "shot_role": fam.get("shot_role", "hero"),
-        "heat_phase": fam.get("heat_phase", "setup"),
+        "heat_phase": heat,
         "wardrobe_state": fam.get("wardrobe_state", "clothed"),
+        "dramatic_function": fam.get("dramatic_function") or df,
         "nar": fam.get("nar", ""),
         "dsl": dict(fam.get("dsl") or {}),
     }
@@ -347,7 +404,33 @@ def shot_dict_for_family(family: str, shot_id: str) -> dict[str, Any]:
         shot.setdefault("dsl", {})["prompt_tier"] = fam["prompt_tier"]
     if fam.get("audio_cues"):
         shot["audio_cues"] = list(fam["audio_cues"])
+    # prompt_format: timeline (default 5090) | flat (A/B baseline)
+    pfmt = str(fam.get("prompt_format") or shot["dsl"].get("prompt_format") or "timeline").strip()
+    shot["prompt_format"] = pfmt
+    shot.setdefault("dsl", {})["prompt_format"] = pfmt
     return shot
+
+
+def compile_family_author_prompt(
+    family: str,
+    *,
+    shot_id: str | None = None,
+    duration_sec: float = 5.0,
+    mode: str = "i2v",
+) -> str:
+    """Compile Layer-4 timeline (or flat override) author prompt for a combo family."""
+    fam = PROMPT_FAMILIES[family]
+    pfmt = str(fam.get("prompt_format") or "timeline").strip().lower()
+    if pfmt == "flat" and fam.get("author_prompt"):
+        return str(fam["author_prompt"]).strip()
+    if fam.get("author_prompt"):
+        return str(fam["author_prompt"]).strip()
+    from motion_prompt_spine import build_h3_temporal_prompt
+
+    shot = shot_dict_for_family(family, shot_id or f"s_{family}")
+    return build_h3_temporal_prompt(
+        {}, shot, mode=mode, duration_sec=float(duration_sec)
+    ).strip()
 
 
 def build_eval_film_spec(combos: list[ComboSpec] | None = None) -> dict[str, Any]:
@@ -765,10 +848,10 @@ def prepare_eval_root(
         if c.shot_id in seen:
             continue
         seen.add(c.shot_id)
-        fam = PROMPT_FAMILIES[c.family]
-        (prompts / f"{c.shot_id}.i2v.txt").write_text(
-            str(fam.get("author_prompt") or "") + "\n", encoding="utf-8"
+        text = compile_family_author_prompt(
+            c.family, shot_id=c.shot_id, duration_sec=5.0, mode=c.mode
         )
+        (prompts / f"{c.shot_id}.i2v.txt").write_text(text + "\n", encoding="utf-8")
         if c.mode != "t2v" and c.family != "env_no_face":
             dest = stills / f"{c.shot_id}.png"
             if src and src.is_file() and not dest.is_file():

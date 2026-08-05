@@ -280,7 +280,13 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     combo.add_argument("--max-wait-sec", type=float, default=3600.0, dest="max_wait_sec")
     combo.add_argument("--no-free-memory", action="store_true")
     combo.add_argument("--write-registry", action="store_true", dest="write_registry")
-    combo.add_argument("--round", type=int, default=1, dest="combo_round", help="1=baseline, 2=R2 optimized families")
+    combo.add_argument(
+        "--round",
+        type=int,
+        default=1,
+        dest="combo_round",
+        help="1=baseline, 2=R2 optimized families, 3=flat vs Layer-4 timeline A/B",
+    )
     combo.add_argument("--seed", type=int, default=20260805)
     combo.add_argument("--receipt", type=Path, default=None)
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.70] - 2026-08-05
+
+### Changed (H3 · timeline combo families + R3 flat/timeline A/B)
+- Combo `author_prompt` defaults to Layer-4 compile via `compile_family_author_prompt`.
+- Families carry `prompt_format` + camera/env seeds; flat baselines `high_motion_flat` / `dialogue_mouth_flat`.
+- `aifilm h3 combo-eval --round 3` = flat vs timeline A/B grid; prep root `artifacts/.../h3-timeline-ab-20260805`.
+- `dsl.prompt_format=flat|timeline` overrides 5090 auto-timeline for controlled A/B.
+- Fix plan test: dialogue lane winner family `dialogue_mouth_max`.
+
 ## [2.39.69] - 2026-08-05
 
 ### Changed (H3 · Layer-4 timeline prompt compiler for 5090)
