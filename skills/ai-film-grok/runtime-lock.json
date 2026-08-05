@@ -974,11 +974,19 @@
     },
     {
       "path": "scripts/final/__init__.py",
-      "sha256": "1a6e8be569773a663f387da8c0ad0a8a97aa740dacaa98d17ea5ca370745e723"
+      "sha256": "ea6a07408e73553cd905bdf0183818bc379b885a3fdfee33d5160f3d341c15bf"
     },
     {
       "path": "scripts/final/caption_text.py",
       "sha256": "bf85a2db0c28ef065d2b6916f538fb20a44a62a7ad37b7692513349794781d48"
+    },
+    {
+      "path": "scripts/final/cards.py",
+      "sha256": "221ea02113c163c95bd0006933bcd3a6943988e6707adab48f3cb26d5e6f99c5"
+    },
+    {
+      "path": "scripts/final/enhance.py",
+      "sha256": "954d85a12821f662c68f07ba72555b4708e180be7fa154ba7c69634793a92cd4"
     },
     {
       "path": "scripts/final/errors.py",
@@ -987,6 +995,10 @@
     {
       "path": "scripts/final/media_ops.py",
       "sha256": "2579d1d27584e0e25fda09fcbe6fa508ba86d228c22ce264f19b659637fd5f69"
+    },
+    {
+      "path": "scripts/final/native_audio.py",
+      "sha256": "88d3f8f4a5a5e6f87b5ea65d0956afba6b301bf25bbb4eb9a1a8a6534a44b10d"
     },
     {
       "path": "scripts/final/voice.py",
@@ -1558,7 +1570,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "d7baab0c4217075d72f8261119a66cbaf0015035c3adae695ffe14f032c0bc59"
+      "sha256": "815fb98130417d94106490cdfc0463678858fc1e74f8f57ff9d3d26b25e794ca"
     },
     {
       "path": "scripts/post_audit.py",
