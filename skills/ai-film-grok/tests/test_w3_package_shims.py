@@ -69,3 +69,17 @@ def test_w7_post_package_and_shim_identity() -> None:
     text = (SCRIPTS / "compose_render.py").read_text(encoding="utf-8")
     assert "sys.modules[__name__]" in text or "_sys.modules[__name__]" in text
     assert len(text.splitlines()) < 30
+
+
+def test_w7_plan_package_and_shim_identity() -> None:
+    """W7 · plan domain modules live under scripts/plan/ with thin shims."""
+    import plan.film_spec as pkg
+    import film_spec as shim
+    import plan.story_plan as sp_pkg
+    import story_plan as sp_shim
+
+    assert shim is pkg
+    assert sp_shim is sp_pkg
+    text = (SCRIPTS / "film_spec.py").read_text(encoding="utf-8")
+    assert "sys.modules[__name__]" in text or "_sys.modules[__name__]" in text
+    assert len(text.splitlines()) < 30

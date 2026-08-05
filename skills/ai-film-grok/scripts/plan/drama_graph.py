@@ -545,6 +545,7 @@ def derive_graph(root: Path, *, write: bool = True) -> dict[str, Any]:
             "targetResolution": target_res,
             "targetFps": fps,
             "root": str(root),
+            "production_mode": str(spec.get("production_mode") or "shortform"),
         },
         "story": {
             "premise": str(di.get("premise") or di.get("logline") or ""),
