@@ -104,7 +104,7 @@ cd "$ROOT/skills/ai-film-grok" && python -m pytest tests/test_w3_package_shims.p
 
 ### Wave R1 · `post/render_final` internal leaves (P0)
 
-**Progress 2026-08-05:** re-wired AST-identical leaves via `final/*` re-exports (LOC 4333→~3271). Remaining: orchestrator body + native/cards/tts local helpers.
+**Progress 2026-08-05:** re-wired AST-identical leaves via `final/*` (4333→~3271). **R1b (2.39.59–60):** peel native/cards/enhance → `final/*` (3271→~3006; missing files fixed in 2.39.60). Remaining: orchestrator body.
 
 **Target:** `scripts/post/render_final.py` (~4333) — keep package + top-level shim.
 

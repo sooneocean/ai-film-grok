@@ -2,10 +2,19 @@
 
 
 
+## [2.39.60] - 2026-08-05
+
+### Fixed
+- R1b complete: add missing `final/{enhance,native_audio,cards}.py` leaf modules (were imported but not committed in 2.39.59) + `final` re-exports; font fail-closed test patches source of truth.
+
 ## 2.39.59 — 2026-08-05
 
 ### Changed
 - R1b structure: peel native/cards/enhance leaves from post/render_final into final/* (re-export hard-compat). LOC ~3271→~3006.
+
+### Fixed
+- Ship missing `final/{cards,enhance,native_audio}.py` leaf modules (R1b import was incomplete on origin-bound tree).
+- `resolve_font` stays patchable via `render_final.FONT_CANDIDATES` (hard-compat with tests).
 
 ## [2.39.58] - 2026-08-05
 

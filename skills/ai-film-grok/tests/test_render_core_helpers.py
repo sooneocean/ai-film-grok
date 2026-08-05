@@ -197,6 +197,10 @@ def test_render_json_and_font_fail_closed(tmp_path: Path, monkeypatch) -> None:
     invalid.write_text("{broken", encoding="utf-8")
     with pytest.raises(ValueError, match="Invalid JSON"):
         render_mod.read_json(invalid)
+    # FONT_CANDIDATES lives on final.cards after R1b peel; patch source of truth.
+    import final.cards as cards_mod
+
+    monkeypatch.setattr(cards_mod, "FONT_CANDIDATES", [str(tmp_path / "missing.ttf")])
     monkeypatch.setattr(render_mod, "FONT_CANDIDATES", [str(tmp_path / "missing.ttf")])
     with pytest.raises(RenderError, match="Chinese-capable"):
         render_mod.resolve_font()
