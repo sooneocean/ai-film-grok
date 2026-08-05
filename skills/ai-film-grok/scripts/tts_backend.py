@@ -1683,7 +1683,7 @@ def synthesize(
         if not recovered:
             raise primary_error from None
 
-    return {
+    result: dict[str, Any] = {
         "backend": used,
         "path": str(out_mp3),
         "voice": voice_used,
@@ -1695,6 +1695,46 @@ def synthesize(
         "performance_hash": cue_hash(cue),
         "performance_compile": {"edge": edge_plan, "instruction": compile_instruction(cue)},
     }
+    # AF4 · PARTIAL-honest when opt-in fallback recovered primary failure
+    if "fallback" in str(used).lower():
+        from util import utc_now as _utc_now
+        from util import write_json as _write_json
+
+        result["partial"] = True
+        result["honest_limits"] = [
+            f"TTS recovered via fallback chain: {used}",
+            "voice quality may be more synthetic than primary backend",
+            "do not claim primary TTS succeeded without reading receipts/tts-partial.json",
+        ]
+        if usage_root:
+            try:
+                root = Path(usage_root).expanduser().resolve()
+                path = root / "receipts" / "tts-partial.json"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                _write_json(
+                    path,
+                    {
+                        "kind": "tts-partial",
+                        "schema_version": 1,
+                        "at": _utc_now(),
+                        "ok": True,
+                        "partial": True,
+                        "used": used,
+                        "voice": voice_used,
+                        "model": model_used,
+                        "shot_id": str(shot_id or "") or None,
+                        "job_id": str(job_id or "") or None,
+                        "primary_error": (
+                            str(primary_error)[:300] if primary_error is not None else None
+                        ),
+                        "honest_limits": result["honest_limits"],
+                        "path": str(out_mp3),
+                    },
+                )
+                result["partial_receipt"] = str(path)
+            except Exception:
+                pass  # never block audio write on receipt I/O
+    return result
 
 
 def main() -> int:

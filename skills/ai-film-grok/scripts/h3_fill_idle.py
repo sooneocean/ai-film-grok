@@ -954,34 +954,41 @@ def _soft_identity_penalty(
         still = _approved_still(root, shot_id)
         if still is None or not Path(take_path).is_file():
             return penalty, caution
-        # Extract one midframe via ffmpeg when available
+        # Extract one midframe via ffmpeg when available (bounded timeout — AF1)
         import shutil
-        import subprocess
         import tempfile
 
         if not shutil.which("ffmpeg"):
             return penalty, caution
         with tempfile.TemporaryDirectory() as tmp:
             frame = Path(tmp) / "mid.png"
-            subprocess.run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-ss",
-                    "0.5",
-                    "-i",
-                    take_path,
-                    "-frames:v",
-                    "1",
-                    str(frame),
-                ],
-                check=False,
-                capture_output=True,
-            )
+            try:
+                from util.subprocess import run as util_run
+
+                util_run(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-ss",
+                        "0.5",
+                        "-i",
+                        take_path,
+                        "-frames:v",
+                        "1",
+                        str(frame),
+                    ],
+                    check=False,
+                    timeout=30,
+                )
+            except Exception:
+                # Hang/timeout/start fail → skip identity pixel compare (soft)
+                caution.append("identity_midframe_timeout_or_fail")
+                return penalty, caution
             if not frame.is_file():
+                caution.append("identity_midframe_missing")
                 return penalty, caution
             try:
                 import numpy as np

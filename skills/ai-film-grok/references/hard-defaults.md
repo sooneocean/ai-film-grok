@@ -167,7 +167,7 @@
 
 1. `write-spec` 过 → 才 `media-queue add`
 2. pilot 用户批准 → 才 bulk（无批准最多 3 shot_id）
-3. hero bulk 按 Grok image_to_video → FRW API I2V → FRW LTX 2.3（对白讲话镜直接锁 FRW LTX 有声）；每一路仍须当前 canary/pilot
+3. hero bulk 默认 **`h3_primary`**（5090 本地 MiniMax H3 I2V/FLF/R2V/T2V）；**Grok** = pilot 快看 / soft 对照，非主 bulk。无 5090 才 `grok_primary`；旧项目可 `ltx23_primary` / FRW LTX 对白安全镜。每一路仍须当前 canary/pilot
 4. continue 串行 + 字节 promote；禁 cast 重起
 5. 失败只用 fail/requeue；禁手改 queue JSON
 6. moderation：换 soft still，荤点留给 VO

@@ -35,7 +35,7 @@ from security_policy import (
     safe_workspace_directory,
     validate_identifier,
 )
-from util import read_json, utc_now
+from util import read_json, utc_now, write_json
 
 OPERATIONS = frozenset({"image_gen", "image_edit", "image_to_video", "reference_to_video"})
 COMPLETION_ENDPOINTS = frozenset({*ALLOWED_VIDEO_ENDPOINTS, "image_gen", "image_edit"})
@@ -44,6 +44,61 @@ STATUS_RUNNING = "running"
 STATUS_SUCCEEDED = "succeeded"
 STATUS_FAILED = "failed"
 TERMINAL_STATUSES = frozenset({STATUS_SUCCEEDED, STATUS_FAILED})
+QUEUE_PARTIAL_REL = Path("receipts/media-queue-partial.json")
+
+
+def note_queue_partial(
+    root: Path | str,
+    *,
+    stage: str,
+    error: str,
+    shot_id: str = "",
+    job_id: str = "",
+    honest_limits: list[str] | None = None,
+) -> Path:
+    """AF2 · durable honesty when post-complete side effects fail (handoff/sidecar)."""
+    base = Path(root).expanduser().resolve()
+    path = base / QUEUE_PARTIAL_REL
+    path.parent.mkdir(parents=True, exist_ok=True)
+    prior = read_json(path) if path.is_file() else None
+    events: list[dict[str, Any]] = []
+    if isinstance(prior, dict) and isinstance(prior.get("events"), list):
+        events = list(prior["events"])  # type: ignore[arg-type]
+    events.append(
+        {
+            "at": utc_now(),
+            "stage": str(stage),
+            "shot_id": str(shot_id or "") or None,
+            "job_id": str(job_id or "") or None,
+            "error": str(error)[:300],
+        }
+    )
+    events = events[-40:]
+    limits = list(
+        honest_limits
+        or [
+            "take media may be ok — side effect (handoff/sidecar) failed",
+            "do not claim continue-chain is complete without re-check",
+        ]
+    )
+    write_json(
+        path,
+        {
+            "kind": "media-queue-partial",
+            "schema_version": 1,
+            "at": utc_now(),
+            "ok": True,
+            "partial": True,
+            "root": str(base),
+            "honest_limits": limits,
+            "events": events,
+            "last_stage": str(stage),
+            "last_error": str(error)[:300],
+        },
+    )
+    return path
+
+
 # Typed fail reasons — agents must use these instead of hand-editing queue JSON
 FAIL_REASONS = frozenset({"moderation", "motion", "rate_limit", "decode", "other"})
 # Default backoff seconds by reason when retryable
@@ -1042,9 +1097,7 @@ class MediaQueue:
                         # provider sidecar for lane detect
                         side = Path(str(dest) + ".json")
                         if not side.is_file():
-                            from util import write_json as _wj
-
-                            _wj(
+                            write_json(
                                 side,
                                 {
                                     "provider": "grok",
@@ -1053,8 +1106,18 @@ class MediaQueue:
                                     "from": "media_queue.complete",
                                 },
                             )
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 — AF2 honesty
+                note_queue_partial(
+                    self.root,
+                    stage="grok_take_sidecar",
+                    error=str(exc),
+                    shot_id=str(job.get("shot_id") or ""),
+                    job_id=str(job.get("id") or job_id),
+                )
+                warnings = list(job.get("warnings") or [])
+                warnings.append(f"grok_take_sidecar_partial: {str(exc)[:160]}")
+                job["warnings"] = warnings[-12:]
+                job["partial_side_effects"] = True
         # go4 · Grok bulk continue handoff write (parity H3)
         if endpoint in {"image_to_video", "reference_to_video"}:
             try:
@@ -1064,8 +1127,18 @@ class MediaQueue:
                 if sid and media.is_file():
                     mode = "r2v" if endpoint == "reference_to_video" else "i2v"
                     maybe_write_for_clip(self.root, sid, media, engine="grok", mode=mode)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 — AF2 honesty
+                note_queue_partial(
+                    self.root,
+                    stage="continue_handoff",
+                    error=str(exc),
+                    shot_id=str(job.get("shot_id") or ""),
+                    job_id=str(job.get("id") or job_id),
+                )
+                warnings = list(job.get("warnings") or [])
+                warnings.append(f"continue_handoff_partial: {str(exc)[:160]}")
+                job["warnings"] = warnings[-12:]
+                job["partial_side_effects"] = True
         return job
 
     def reconcile(self, *, stale_after_seconds: int = 1800, now: str | None = None) -> list[str]:

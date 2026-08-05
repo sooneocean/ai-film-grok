@@ -255,15 +255,75 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         if ev.get("mix_partial") and ev.get("ok"):
             evidence_step["detail"] = "ok; " + "; ".join(ev.get("honest_limits") or ["mix partial"])
             evidence_step["advisory"] = True
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 — AF6: probe crash must not fake green when final exists
+        has_final = final_rec is not None
         evidence_step = {
             "id": "evidence_fresh",
-            "ok": True,
-            "detail": f"advisory skip: {exc}"[:160],
-            "next_cmd": None,
-            "advisory": True,
+            "ok": not has_final,
+            "detail": (
+                f"evidence probe failed: {exc}"[:160]
+                if has_final
+                else f"advisory skip (no final): {exc}"[:160]
+            ),
+            "next_cmd": (f'aifilm caption-pixel-check --root "{base}"' if has_final else None),
+            "advisory": not has_final,
+            "probe_error": True,
         }
     steps.append(evidence_step)
+
+    # AF3 · post-doctor hard codes on the closeout ladder (MIX_PARTIAL stays soft inside doctor)
+    post_doctor_step: dict[str, Any] = {
+        "id": "post_doctor",
+        "ok": True,
+        "detail": "skipped — no final/plate yet",
+        "next_cmd": None,
+        "advisory": True,
+        "skipped": True,
+    }
+    if final_rec is not None:
+        try:
+            from post_doctor import run_post_doctor
+
+            doctor = run_post_doctor(base, write=True)
+            hard = list(doctor.get("hard") or [])
+            soft = list(doctor.get("soft") or [])
+            hard_codes = [str(i.get("code") or "") for i in hard if isinstance(i, dict)]
+            soft_codes = [str(i.get("code") or "") for i in soft if isinstance(i, dict)]
+            mix_only = not hard and any(c == "MIX_PARTIAL" for c in soft_codes)
+            post_doctor_step = {
+                "id": "post_doctor",
+                "ok": bool(doctor.get("ok") if doctor.get("ok") is not None else not hard),
+                "detail": (
+                    "ok"
+                    if not hard and not mix_only
+                    else (
+                        "ok; MIX_PARTIAL (honest amix fallback)"
+                        if mix_only
+                        else "; ".join(hard_codes) or "post-doctor hard"
+                    )
+                ),
+                "next_cmd": None
+                if not hard
+                else (
+                    doctor.get("next_cmd")
+                    or (hard[0].get("fix") if hard else None)
+                    or f'aifilm post-doctor --root "{base}"'
+                ),
+                "advisory": bool(mix_only and not hard),
+                "hard_codes": hard_codes,
+                "soft_codes": soft_codes,
+                "mix_partial": "MIX_PARTIAL" in soft_codes,
+            }
+        except Exception as exc:  # noqa: BLE001
+            post_doctor_step = {
+                "id": "post_doctor",
+                "ok": False,
+                "detail": f"post-doctor probe failed: {exc}"[:160],
+                "next_cmd": f'aifilm post-doctor --root "{base}"',
+                "advisory": False,
+                "probe_error": True,
+            }
+    steps.append(post_doctor_step)
 
     # Delivery Truth · i2v-final-gate must be green before delivery_ready
     motion_gate_step: dict[str, Any] = {
@@ -466,6 +526,9 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
     for s in steps:
         if s.get("id") == "evidence_fresh" and s.get("ok") and s.get("advisory"):
             soft_ids.add("evidence_fresh")
+        # AF3 · MIX_PARTIAL-only post_doctor is advisory honesty, not hard block
+        if s.get("id") == "post_doctor" and s.get("ok") and s.get("advisory"):
+            soft_ids.add("post_doctor")
     blocked = next(
         (s for s in steps if not s["ok"] and s["id"] not in soft_ids),
         None,

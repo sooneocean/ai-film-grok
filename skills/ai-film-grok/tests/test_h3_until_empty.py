@@ -143,5 +143,34 @@ class UntilEmptyTests(unittest.TestCase):
             self.assertTrue((root / "receipts" / "fill-idle-until-empty.json").is_file())
 
 
+    def test_until_empty_capacity_not_ready_stop(self) -> None:
+        """AF5 · capacity block must stop execute honestly (not run_failed)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+
+            def _fake_run_next(*_a, **_k):
+                return {
+                    "ok": True,
+                    "jobs_ran": 0,
+                    "skipped_reason": "capacity_not_ready",
+                    "pending_after": 3,
+                    "next_after": {"shot_id": "meat1"},
+                }
+
+            with mock.patch("h3_fill_idle.run_next_fill_idle", side_effect=_fake_run_next):
+                rep = fill_idle_until_empty(
+                    root,
+                    execute=True,
+                    max_jobs_per_cycle=2,
+                    max_cycles=5,
+                    include_challenge=True,
+                    stop_on_capacity=True,
+                )
+            self.assertEqual(rep["stop_reason"], "capacity_not_ready")
+            self.assertNotEqual(rep["stop_reason"], "run_failed")
+            self.assertTrue((root / "receipts" / "fill-idle-until-empty.json").is_file())
+
+
 if __name__ == "__main__":
     unittest.main()
