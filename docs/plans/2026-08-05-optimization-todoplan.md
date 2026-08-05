@@ -1,11 +1,12 @@
 # ai-film-grok 痛点分析 + 优化 TodoPlan（2026-08-05）
 
 **Status:** ACTIVE · Waves 0–2 / until-empty / gate-slim **SHIPPED** · canary dry **PARTIAL** (2026-08-05)  
-**Repo pointer** for optimization sequencing. Session plan has the full pain map.
+**Repo pointer** for **ops throughput waves** (this file).  
+**Strategy pointer (director + engineer residual):** [2026-08-05-strategy-director-engineer-upgrade.md](2026-08-05-strategy-director-engineer-upgrade.md)
 
 ## 一句话
 
-流程门禁 + **h3_primary** + **until-empty 挂机** + **caption_path/pixel** 已落地；**dry canary 已过**；真烧 GPU 过夜仍待人确认 5090 idle。
+流程门禁 + **h3_primary** + **until-empty 挂机** + **caption_path/pixel** 已落地；**dry canary 已过**；真烧 GPU 过夜仍待人确认 5090 idle。后续双镜头升级与 OPEN 队列见 strategy 档，勿把本档 SHIPPED 波次当绿野重开。
 
 ## 痛点（摘要）
 
