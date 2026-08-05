@@ -1,10 +1,11 @@
 # Session wrap · 2026-08-05 antifragility closeout
 
 ## Shipped (origin/main)
+- **v2.39.67** doctor core tts_backend accepts edge when preferred unready (release-light)
 - **v2.39.65** hang-proof: adapters / node lipsync / canary / opt probes
 - **v2.39.66** S5.3-ops: `--capacity-wait-sec` + `recover_capacity_contention` (never cancel foreign)
 - Hang-proof film hot paths earlier (h3_workflow, audio TTS/stem, shortform, burn_srt, narrative_evidence)
-- HEAD `752ad1ae` == `origin/main`
+- HEAD equals origin/main after push; includes 2.39.67 doctor core fix
 
 ## Residual OPEN
 - **R-ops live overnight drain** to `queue_empty` — capacity blocked (RAM/VRAM/queue busy); honest PARTIAL only
