@@ -104,12 +104,38 @@ def _spoken_dialogue_text(shot: dict[str, Any]) -> str:
     return spoken_dialogue_text(shot)
 
 
+def _collect_ref_images(plan: dict[str, Any]) -> list[str] | None:
+    """Collect available reference image paths for the 2V reference stage.
+
+    Returns a list of absolute path strings when the plan has image references
+    for I2V / FLF / R2V modes; returns None otherwise.
+    """
+    mode = str(plan.get("mode") or "").strip().lower()
+    if mode not in {"i2v", "flf", "r2v"}:
+        return None
+
+    refs: list[str] = []
+    for key in ("still_path", "last_path"):
+        val = plan.get(key)
+        if val:
+            p = Path(str(val)).expanduser().resolve()
+            if p.is_file() and str(p) not in refs:
+                refs.append(str(p))
+    for raw in plan.get("ref_paths") or []:
+        p = Path(str(raw)).expanduser().resolve()
+        if p.is_file() and str(p) not in refs:
+            refs.append(str(p))
+
+    return refs if refs else None
+
+
 def _prompt_for_shot(
     root: Path,
     shot: dict[str, Any],
     *,
     mode: str,
     spec: dict[str, Any] | None = None,
+    ref_image_paths: list[str] | None = None,
 ) -> str:
     """Build H3 motion prompt with shared film-core spine (DF/want/camera/dialogue).
 
@@ -117,6 +143,9 @@ def _prompt_for_shot(
     ``hybrid_h3``), the prompt is built with MiniMax H3 temporal-segment
     format (``[Xs-Ys]``) so the DiT decoder receives per-segment visual
     decomposition instead of a single monolithic paragraph.
+
+    When 2V + reference images are available, the prompt includes a
+    Grok reference-composition stage before the timeline segments.
     """
     from motion_prompt_spine import (
         MotionCoreError,
@@ -202,7 +231,8 @@ def _prompt_for_shot(
     elif use_timeline:
         # Layer-4 timed action script ([0s-2s] …) for 5090 H3 (or explicit timeline).
         prompt = build_h3_temporal_prompt(
-            film, shot, mode=mode, duration_sec=duration
+            film, shot, mode=mode, duration_sec=duration,
+            ref_image_paths=ref_image_paths,
         )
     else:
         prompt = build_motion_prompt(film, shot, mode=mode, include_provider_prefix=True)
@@ -769,7 +799,11 @@ def run_h3_shot(
 
     spec = _load_spec(base)
     shot = _find_shot(spec, shot_id)
-    prompt = _prompt_for_shot(base, shot, mode=str(plan["mode"]), spec=spec)
+    ref_image_paths = _collect_ref_images(plan)
+    prompt = _prompt_for_shot(
+        base, shot, mode=str(plan["mode"]), spec=spec,
+        ref_image_paths=ref_image_paths,
+    )
     if plan["mode"] == "flf":
         clause = flf_prompt_clause()
         if "first-last-frame" not in prompt.lower() and "last keyframe" not in prompt.lower():

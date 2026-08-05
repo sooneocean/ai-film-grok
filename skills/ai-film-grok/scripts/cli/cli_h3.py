@@ -285,7 +285,7 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
         type=int,
         default=1,
         dest="combo_round",
-        help="1=baseline, 2=R2 optimized families, 3=flat vs Layer-4 timeline A/B",
+        help="1=baseline, 2=R2 optimized, 3=flat vs timeline A/B, 4=post-fix MOUTH ENERGY + R2V retry",
     )
     combo.add_argument("--seed", type=int, default=20260805)
     combo.add_argument("--receipt", type=Path, default=None)

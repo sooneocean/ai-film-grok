@@ -50,7 +50,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 ![ai-film-grok 四层流水线](docs/architecture.png)
 
-> 有私有 5090 时推荐 **`h3_primary`**（全镜本地 H3）；双轨用 **`hybrid_h3`**；纯云 **`grok_primary`**。`ltx23_primary` 仅旧项目。完整插拔矩阵见仓库根 README。
+> 有私有 5090 时推荐 **`h3_primary`**（全镜本地 H3）；双轨用 **`hybrid_h3`**；纯云 **`grok_primary`**。成人云有声铺量用 **`ltx23_adult`**（safe 对白/soft→LTX 原音；meat→H3；i2i=still-challenge）。`ltx23_primary` 仅旧项目。完整插拔矩阵见仓库根 README。
 
 ---
 

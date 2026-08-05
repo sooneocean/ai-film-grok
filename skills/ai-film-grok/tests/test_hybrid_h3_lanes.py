@@ -142,3 +142,139 @@ def test_l4_contact_difficulty() -> None:
     )
     assert intent["content_class"] == "restricted_local"
     assert "l4_contact:l4" in (intent.get("difficulty_flags") or [])
+
+
+def test_ltx23_adult_profile_defaults() -> None:
+    with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "ltx23_adult"}):
+        assert resolve_i2v_profile() == "ltx23_adult"
+        assert default_i2v_provider() == "frw-ltx23"
+        h3 = resolve_h3_config({"genre": "adult", "heat_scale": "max"})
+        assert h3["enabled"] is True
+
+
+def test_ltx23_adult_safe_dialogue_routes_ltx_audio() -> None:
+    intent = build_shot_intent(
+        {
+            "_i2v_profile": "ltx23_adult",
+            "h3": {"enabled": True},
+            "motion_lanes": {
+                "dialogue": "frw_ltx23",
+                "dialogue_safe_cloud": "cloud_ltx23_audio",
+                "allow_ltx_dialogue": True,
+                "restricted_local": "comfy-h3",
+            },
+        },
+        {
+            "id": "s_dlg",
+            "shot_role": "hero",
+            "heat_phase": "setup",
+            "screen_mode": "on_camera",
+            "spoken_text": "先别急。",
+            "speaker": "heroine",
+        },
+    )
+    assert intent["content_class"] == "general"
+    assert intent["recommended_lane"] == "cloud_ltx23_audio"
+    assert intent["recommended_provider"] == "frw-ltx23"
+    assert intent["recommended_weapon"] == "ltx23-img2video-audio"
+    assert intent["audio_policy"] == "prefer_native"
+    assert intent["provider_lock"] == "frw-ltx23"
+
+
+def test_ltx23_adult_restricted_meat_never_routes_ltx() -> None:
+    intent = build_shot_intent(
+        {
+            "_i2v_profile": "ltx23_adult",
+            "h3": {"enabled": True},
+            "motion_lanes": {
+                "dialogue": "frw_ltx23",
+                "allow_ltx_dialogue": True,
+                "restricted_local": "comfy-h3",
+            },
+        },
+        {
+            "id": "s_meat_ltx",
+            "shot_role": "hero",
+            "heat_phase": "act",
+            "wardrobe_state": "bare",
+            "screen_mode": "on_camera",
+            "spoken_text": "再深一点。",
+        },
+    )
+    assert intent["content_class"] == "restricted_local"
+    assert intent["recommended_provider"] == "comfy-h3"
+    assert intent["provider_lock"] == "comfy-h3"
+    assert intent["recommended_weapon"] == "minimax-h3-i2v-pilot"
+
+
+def test_hybrid_lanes_dialogue_frw_ltx23_safe_audio() -> None:
+    intent = build_shot_intent(
+        {
+            "_i2v_profile": "hybrid_h3",
+            "h3": {"enabled": True},
+            "motion_lanes": {"dialogue": "frw_ltx23", "allow_ltx_dialogue": True},
+        },
+        {
+            "id": "s_safe_dlg",
+            "shot_role": "hero",
+            "heat_phase": "setup",
+            "screen_mode": "on_camera",
+            "spoken_text": "今晚有空吗？",
+        },
+    )
+    assert intent["recommended_provider"] == "frw-ltx23"
+    assert intent["recommended_lane"] == "cloud_ltx23_audio"
+    # hybrid does not hard-lock provider unless profile is ltx23_*
+    assert intent["provider_lock"] is None
+
+
+def test_next_actions_ltx23_adult_surfaces_audio_and_still_repair(tmp_path: Path) -> None:
+    from next_actions import build_next_actions
+
+    (tmp_path / "receipts").mkdir(parents=True)
+    (tmp_path / "film-spec.json").write_text(
+        __import__("json").dumps(
+            {
+                "title": "ltx fixture",
+                "_i2v_profile": "ltx23_adult",
+                "h3": {"enabled": True},
+                "motion_lanes": {
+                    "dialogue": "frw_ltx23",
+                    "allow_ltx_dialogue": True,
+                    "restricted_local": "comfy-h3",
+                },
+                "scenes": [{"id": "s1", "shots": [{"id": "shot01", "shot_role": "hero"}]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "receipts" / "pilot-approval.json").write_text(
+        __import__("json").dumps(
+            {
+                "approved": True,
+                "approved_by": "user",
+                "user_phrase": "pilot 过",
+                "shots": ["shot01", "shot02", "shot03"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "receipts" / "bulk-preflight.json").write_text(
+        __import__("json").dumps({"ok": True}),
+        encoding="utf-8",
+    )
+    actions = build_next_actions(
+        tmp_path,
+        gates={
+            "brief": True,
+            "style_locked": True,
+            "spec": True,
+            "clips_complete": False,
+            "final_complete": False,
+        },
+    )
+    ids = [a["id"] for a in actions]
+    assert "frw-ltx23-canary" in ids
+    assert "frw-ltx23-audio-unit" in ids
+    assert "still-challenge-repair" in ids
+    assert "h3-lane-meat" in ids

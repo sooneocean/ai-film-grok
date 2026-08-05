@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from h3_mode import resolve_h3_mode
+from h3_mode import resolve_h3_mode, supports_image_input
 from h3_workflow import list_h3_eligible_shots, plan_h3_shot
 from util import write_json
 
@@ -219,6 +219,22 @@ class PlanListH3ModeTests(unittest.TestCase):
             self.assertIn(meat["mode"], {"i2v", "r2v"})
             self.assertIn("--mode", meat["command"])
             self.assertIn("h3_max_effect_v1", str(report.get("policy") or ""))
+
+    def test_supports_image_input_i2v(self) -> None:
+        self.assertTrue(supports_image_input("i2v"))
+
+    def test_supports_image_input_flf(self) -> None:
+        self.assertTrue(supports_image_input("flf"))
+
+    def test_supports_image_input_r2v(self) -> None:
+        self.assertTrue(supports_image_input("r2v"))
+
+    def test_supports_image_input_t2v(self) -> None:
+        self.assertFalse(supports_image_input("t2v"))
+
+    def test_supports_image_input_case_insensitive(self) -> None:
+        self.assertTrue(supports_image_input("I2V"))
+        self.assertTrue(supports_image_input("  i2v  "))
 
 
 if __name__ == "__main__":

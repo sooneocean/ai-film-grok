@@ -12,6 +12,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from aifilm_grok import build_parser  # noqa: E402
 from h3_workflow import (  # noqa: E402
+    _collect_ref_images,
     ensure_h3_delivery_geometry,
     list_h3_eligible_shots,
     plan_h3_shot,
@@ -179,3 +180,45 @@ def test_ensure_geometry_upscales_small(tmp_path: Path) -> None:
     assert meta["upscaled"] is True
     assert meta["deliver_path"] == str(dest.resolve())
     assert dest.is_file()
+
+
+def test_collect_ref_images_i2v_still(tmp_path: Path) -> None:
+    still = tmp_path / "shot_a1.png"
+    still.write_bytes(b"\x89PNG")
+    plan = {"mode": "i2v", "still_path": str(still)}
+    refs = _collect_ref_images(plan)
+    assert refs is not None
+    assert len(refs) == 1
+    assert refs[0].endswith("shot_a1.png")
+
+
+def test_collect_ref_images_r2v_multiple(tmp_path: Path) -> None:
+    still = tmp_path / "shot_a1.png"
+    still.write_bytes(b"\x89PNG")
+    end = tmp_path / "shot_a1_end.png"
+    end.write_bytes(b"\x89PNG")
+    style = tmp_path / "style_ref.png"
+    style.write_bytes(b"\x89PNG")
+    plan = {
+        "mode": "r2v",
+        "still_path": str(still),
+        "last_path": str(end),
+        "ref_paths": [str(style)],
+    }
+    refs = _collect_ref_images(plan)
+    assert refs is not None
+    assert len(refs) == 3
+
+
+def test_collect_ref_images_t2v_returns_none(tmp_path: Path) -> None:
+    still = tmp_path / "shot_a1.png"
+    still.write_bytes(b"\x89PNG")
+    plan = {"mode": "t2v", "still_path": str(still)}
+    refs = _collect_ref_images(plan)
+    assert refs is None
+
+
+def test_collect_ref_images_no_images() -> None:
+    plan = {"mode": "i2v"}
+    refs = _collect_ref_images(plan)
+    assert refs is None

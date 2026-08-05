@@ -9,8 +9,9 @@
 
 - **对白镜画面必须可见「人在讲」**（on_camera>嘴动+近景；肉戏对白→H3 i2v/r2v 注入 Mandarin 台词）。
 - **禁全场纯 silence/action_cover 或纯 nar**：每场 ≥1 条 on/off_camera 对白；逃生 `narration_reason`（见 [hard-defaults](hard-defaults.md) 对白场景级规）。
-- **有声生成工具组** = `Grok Imagine Video`（安全对白 bulk） · `5090 H3 i2v/r2v`（restricted/肉戏/h3_primary 对白） · `Qwen`（状态照） · **`FRW img2image`（静帧挑战）**。
-- **冻结**：后期对嘴（LatentSync/MuseTalk/InfiniteTalk/FRW lipsync）；LTX 对白棚退出默认。混音 **`prefer_native`**。
+- **有声生成工具组** = `Grok Imagine Video`（安全对白 bulk） · **`FRW LTX 2.3 img2video-audio`**（opt-in 安全/半衣有声；`ltx23_adult`） · `5090 H3 i2v/r2v`（restricted/肉戏/h3_primary 对白） · `Qwen`（状态照） · **`FRW img2image`（still-challenge 修复）**。
+- **冻结**：后期对嘴（LatentSync/MuseTalk/InfiniteTalk/FRW lipsync）。混音 **`prefer_native`**。
+- **LTX 权限档 A（默认）**：safe 对白 + soft 半衣可 LTX；**bare/插入/高难永远 H3**；云 403 不降 heat，签名切 H3。
 
 ## 默认
 
@@ -18,9 +19,11 @@
 |------|----------------|
 | **本机 5090 主产线（推荐）** | **`AIFILM_I2V_PROFILE=h3_primary`** → auto=`comfy-h3`；setup/meat/对白/env 默认本地；云 bulk 硬拦 |
 | `genre=adult` 或 `heat_scale=max/hot/extreme` | 自动 `h3.enabled=true`，片级 `_i2v_profile→hybrid_h3`（Grok bulk + H3 meat）；**有 5090 请显式改 `h3_primary`** |
+| **云 LTX 有声铺量（成人 opt-in）** | **`AIFILM_I2V_PROFILE=ltx23_adult`**：safe 对白/soft→LTX 2.3 audio；**meat/bare→H3 hard**；still 坏→`still-challenge`；**不**因 adult 自动选用 |
 | 非成人 / `heat soft` / `adult_max_iron:false` / `h3.enabled=false` | 保持 `grok_primary`，不锁 H3 |
-| 显式 `AIFILM_I2V_PROFILE=hybrid_h3` | 双轨：Grok soft + H3 restricted |
+| 显式 `AIFILM_I2V_PROFILE=hybrid_h3` | 双轨：Grok soft + H3 restricted；lanes 可挂 LTX 安全对白 |
 | 显式 `AIFILM_I2V_PROFILE=h3_primary` | **全片 H3 主轨**（时间无限；Grok 仅 escape） |
+| `ltx23_primary` | **legacy** 全片 LTX 标签；新成人 max 片勿用 |
 
 > 定策档：[docs/plans/2026-08-05-h3-primary-capacity.md](../../../docs/plans/2026-08-05-h3-primary-capacity.md)
 
@@ -32,8 +35,9 @@
 | Foreplay soft clothed | Grok | Grok 优先；moderation → 签名切 H3 | 同上 |
 | Act / climax / bare / undressed | Qwen Edit / undress-anchor | **H3 I2V**（queue 硬拦云 bulk） | H3 `prefer_native` |
 | 高难（deep_thrust / creampie / L4+contact / force_local_h3） | 本地状态照 | **H3 I2V**；能量不够 → **R2V** | 同上 |
-| 对白近景（非敏感） | Grok face | **Grok Imagine Video** | **原声** prefer_native（禁后期对嘴） |
+| 对白近景（非敏感） | Grok face | **Grok** 默认；**`ltx23_adult` / lanes 允许 → LTX 2.3 有声** | **原声** prefer_native（禁后期对嘴） |
 | **对白近景（restricted / bare）** | Qwen 状态照 | **H3 I2V**（台词注入）；狠嘴 CU / 状态链 → **H3 R2V** | H3 **原声** spoken Mandarin |
+| soft 亲密（clothed · `ltx23_adult`） | 批 still / FRW i2i | **LTX 2.3 有声 I2V**；失败→H3 | prefer_native |
 | Env / bridge | 可选 | FRW env 或 **H3 T2V**（无脸） | 环境 |
 | 续镜 / continue | **批准末帧** | **H3 I2V** | 原声或沿用策略 |
 | 毒镜 | Qwen 解剖修 | **禁 I2V** | — |

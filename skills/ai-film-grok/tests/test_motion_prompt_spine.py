@@ -367,3 +367,26 @@ def test_h3_temporal_prompt_non_5090_uses_spine(tmp_path: Path) -> None:
     prompt = _prompt_for_shot(tmp_path, shot, mode="i2v", spec=spec)
     # Spine format: has provider prefix (the key differentiator from temporal path)
     assert "Vertical 9:16" in prompt
+
+
+def test_build_h3_temporal_prompt_with_ref_images(tmp_path: Path) -> None:
+    """When ref_image_paths are provided, the prompt includes the 2V reference stage."""
+    from h3_timeline_prompt import inject_2v_reference_stage
+
+    shot = {
+        "id": "s1",
+        "shot_role": "hero",
+        "dramatic_function": "hook",
+        "dsl": {"environment": "a dark alley"},
+    }
+    # Without ref images: no 2V stage marker
+    prompt_plain = build_h3_temporal_prompt({}, shot, duration_sec=5)
+    assert "=== 2V REFERENCE STAGE ===" not in prompt_plain
+
+    # With ref images: 2V stage marker present
+    prompt_with_ref = build_h3_temporal_prompt(
+        {}, shot, duration_sec=5, ref_image_paths=["/tmp/ref.png"]
+    )
+    assert "=== 2V REFERENCE STAGE ===" in prompt_with_ref
+    assert "Composition prompt:" in prompt_with_ref
+    assert "Grok image model" in prompt_with_ref

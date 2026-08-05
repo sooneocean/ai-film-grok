@@ -327,6 +327,60 @@ R3_TIMELINE_AB_ORDER: list[dict[str, Any]] = [
     },
 ]
 
+# Round-4: post-R3 policy — fixed MOUTH ENERGY timeline + retry failed flat R2V +
+# dialogue R2V stress + soft identity timeline smoke.
+R4_POST_FIX_ORDER: list[dict[str, Any]] = [
+    {
+        "combo_id": "r4_high_tl_i2v",
+        "mode": "i2v",
+        "family": "high_motion_max",
+        "shot_id": "s_r4_hi",
+        "lane_tags": ["high_motion_energy", "timeline_ab_timeline"],
+    },
+    {
+        "combo_id": "r4_high_tl_r2v",
+        "mode": "r2v",
+        "family": "high_motion_max",
+        "shot_id": "s_r4_hi",
+        "lane_tags": ["high_motion_energy", "timeline_ab_timeline"],
+    },
+    {
+        "combo_id": "r4_high_flat_r2v",
+        "mode": "r2v",
+        "family": "high_motion_flat",
+        "shot_id": "s_r4_hi_flat",
+        "lane_tags": ["high_motion_energy", "timeline_ab_flat"],
+    },
+    {
+        "combo_id": "r4_dlg_flat_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mouth_flat",
+        "shot_id": "s_r4_dlg_flat",
+        "lane_tags": ["dialogue_mouth_energy", "timeline_ab_flat"],
+    },
+    {
+        "combo_id": "r4_dlg_tl_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mouth_max",
+        "shot_id": "s_r4_dlg_tl",
+        "lane_tags": ["dialogue_mouth_energy", "timeline_ab_timeline"],
+    },
+    {
+        "combo_id": "r4_dlg_tl_r2v",
+        "mode": "r2v",
+        "family": "dialogue_mouth_max",
+        "shot_id": "s_r4_dlg_tl",
+        "lane_tags": ["dialogue_mouth_energy", "timeline_ab_timeline"],
+    },
+    {
+        "combo_id": "r4_soft_tl_i2v",
+        "mode": "i2v",
+        "family": "soft_portrait_alive",
+        "shot_id": "s_r4_soft",
+        "lane_tags": ["hero_identity_lock", "timeline_ab_timeline"],
+    },
+]
+
 
 
 @dataclass
@@ -353,6 +407,8 @@ def build_combo_matrix(
 ) -> list[ComboSpec]:
     if order is not None:
         rows = order
+    elif int(round) >= 4:
+        rows = list(R4_POST_FIX_ORDER)
     elif int(round) >= 3:
         rows = list(R3_TIMELINE_AB_ORDER)
     elif int(round) >= 2:

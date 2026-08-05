@@ -128,6 +128,19 @@ class Round2MatrixTests(unittest.TestCase):
             for f in ("high_motion_flat", "dialogue_mouth_flat"):
                 self.assertIn(f, PROMPT_FAMILIES)
 
+    def test_r4_post_fix_matrix(self) -> None:
+        from h3_combo_eval import build_combo_matrix, compile_family_author_prompt
+
+        combos = build_combo_matrix(round=4, include_flf=False)
+        ids = {c.combo_id for c in combos}
+        self.assertIn("r4_high_tl_r2v", ids)
+        self.assertIn("r4_dlg_tl_i2v", ids)
+        self.assertIn("r4_high_flat_r2v", ids)
+        dlg = compile_family_author_prompt("dialogue_mouth_max", duration_sec=5)
+        self.assertIn("[0s-", dlg)
+        self.assertIn("MOUTH ENERGY", dlg)
+        self.assertNotIn("HIGH MOTION", dlg)
+
     def test_rank_lanes_best_of_merges_rounds(self) -> None:
         from h3_combo_eval import rank_lanes_best_of
         r1 = [{"ok": True, "combo_id": "soft_i2v", "mode": "i2v", "family": "soft_portrait",

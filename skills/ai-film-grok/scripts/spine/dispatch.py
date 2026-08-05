@@ -462,6 +462,16 @@ def build_dispatch(
                     "动作镜按固定优先级逐级探测；未就绪可跳过，已启动路线只在明确技术失败后签名降级",
                     "visual",
                 )
+        elif i2v_profile == "ltx23_adult":
+            if craft_stage in {"shots", "media"}:
+                pre(
+                    "ltx23-adult-lanes",
+                    f"# ltx23_adult: safe dialogue/soft → frw img2video-audio ltx2.3 (prefer_native) · "
+                    f"restricted/meat → h3 plan|run · still repair → still-challenge i2i (≥30s)  "
+                    f"(profile={i2v_profile})",
+                    "云有声第三轨仅 general/soft；bare/肉戏 H3 hard；坏 still 先 i2i 再 motion；禁降 heat",
+                    "visual",
+                )
         elif i2v_profile == "grok_primary":
             if craft_stage in {"shots", "media"}:
                 pre(
@@ -474,7 +484,7 @@ def build_dispatch(
             if craft_stage in {"shots", "media"}:
                 pre(
                     "hybrid-h3-lanes",
-                    f"# Dual lane (profile={i2v_profile}): bulk Grok media-queue · restricted/meat → aifilm h3 plan|run --register (comfy-h3 film-lane ≤8s; prefer_native; pilot approval for bulk)",
+                    f"# Dual lane (profile={i2v_profile}): bulk Grok media-queue · restricted/meat → aifilm h3 plan|run --register (comfy-h3 film-lane ≤8s; prefer_native; pilot approval for bulk); safe dialogue may use LTX audio when lanes.dialogue=frw_ltx23",
                     "云 bulk 仍 Grok；敏感/肉戏 soft-lock 本地 MiniMax H3 film-lane；原声可用则保留",
                     "visual",
                 )
@@ -1048,13 +1058,31 @@ def build_dispatch(
     agent_do.append("用户说「可以/ok/一路做完」才 pilot approve / run_to_completion")
 
     # Fallback routing summary for media + Grok Build native tools
-    i2v_line = (
-        "ltx23_primary: still=image_edit(cast) · motion=FRW LTX 2.3 → "
-        "FRW API img2video → Grok Video 1.5"
-        if i2v_profile == "ltx23_primary"
-        else "grok_primary: still=image_edit(cast) · motion=image_to_video · "
-        "FRW Wan/local only after readiness or technical-failure gates"
-    )
+    if i2v_profile == "ltx23_primary":
+        i2v_line = (
+            "ltx23_primary (legacy): still=image_edit(cast) · motion=FRW LTX 2.3 → "
+            "FRW API img2video → Grok Video 1.5"
+        )
+    elif i2v_profile == "ltx23_adult":
+        i2v_line = (
+            "ltx23_adult: safe dialogue/soft=FRW LTX 2.3 img2video-audio prefer_native · "
+            "restricted/meat=H3 · still repair=FRW i2i still-challenge · never silent meat→LTX"
+        )
+    elif i2v_profile == "h3_primary":
+        i2v_line = (
+            "h3_primary: still=Qwen/Grok · motion=H3 I2V/FLF/R2V/T2V film-wide · "
+            "cloud escape only with AIFILM_ALLOW_CLOUD_RESTRICTED"
+        )
+    elif i2v_profile == "hybrid_h3":
+        i2v_line = (
+            "hybrid_h3: soft=Grok bulk · meat=H3 · optional safe dialogue LTX audio · "
+            "still-challenge for weak stills"
+        )
+    else:
+        i2v_line = (
+            "grok_primary: still=image_edit(cast) · motion=image_to_video · "
+            "FRW Wan/local only after readiness or technical-failure gates"
+        )
     routing = {
         "tts_default": "edge",
         "tts_quality": "voicebox if app up",

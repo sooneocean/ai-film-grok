@@ -45,9 +45,15 @@ _ACTION_STAGE: dict[str, str] = {
     "queue-or-register": "visual",
     "h3-fill-idle": "visual",
     "h3-lane": "visual",
+    "h3-lane-meat": "visual",
+    "h3-run-meat": "visual",
     "h3-run-next": "visual",
     "h3-until-empty": "visual",
     "h3-capacity-plan": "visual",
+    "frw-ltx23-canary": "visual",
+    "frw-ltx23-audio-unit": "visual",
+    "still-challenge-repair": "visual",
+    "still-challenge-weak-mean": "visual",
     "pilot-window": "visual",
     "tts-rehearse": "voice",
     "compose-preview": "design",
@@ -629,18 +635,60 @@ def build_next_actions(
                             )
                         ),
                     )
-            # H3 lanes: hybrid_h3 (meat) or h3_primary (film-wide local primary).
+            # H3 lanes: hybrid_h3 / h3_primary / ltx23_adult (meat hard on H3).
             h3_enabled = False
             film_profile = ""
             try:
                 h3_block = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
                 film_profile = str(spec.get("_i2v_profile") or "").strip().lower()
                 h3_enabled = bool(
-                    h3_block.get("enabled") is True or film_profile in {"hybrid_h3", "h3_primary"}
+                    h3_block.get("enabled") is True
+                    or film_profile in {"hybrid_h3", "h3_primary", "ltx23_adult"}
                 )
             except Exception:
                 h3_enabled = False
             is_h3_primary = film_profile == "h3_primary"
+            is_ltx23_adult = film_profile in {"ltx23_adult", "ltx23_primary"}
+            lanes = spec.get("motion_lanes") if isinstance(spec.get("motion_lanes"), dict) else {}
+            allow_ltx_dialogue = bool(
+                is_ltx23_adult
+                or lanes.get("allow_ltx_dialogue") is True
+                or str(lanes.get("dialogue") or lanes.get("dialogue_safe_cloud") or "")
+                .strip()
+                .lower()
+                in {"frw_ltx23", "frw-ltx23", "cloud_ltx23_audio", "ltx23"}
+            )
+            if allow_ltx_dialogue and film_profile != "h3_primary":
+                canary = root / "receipts" / "frw-key-capability.json"
+                if not canary.is_file():
+                    add(
+                        "frw-ltx23-canary",
+                        f'aifilm frw canary --root "{r}" --full',
+                        _with_primary(
+                            "ltx23 有声轨：bulk 前先 frw canary（img2video-audio 能力回执）"
+                        ),
+                    )
+                add(
+                    "frw-ltx23-audio-unit",
+                    f'aifilm frw img2video-audio --model ltx2.3 --img-url <approved-still-url> '
+                    f'--prompt "$(cat receipts/prompts/<safe-dialogue-shot>.ltx23.txt 2>/dev/null '
+                    f'|| cat receipts/prompts/<id>.i2v.txt)" --wait\n'
+                    f'# then: aifilm register-clip --root "{r}" --shot-id <id> '
+                    f"--source-endpoint frw_ltx23_img2video_audio --audio-policy prefer_native …",
+                    _with_primary(
+                        "safe 对白/soft：FRW LTX 2.3 有声 unit（≥5min 限流；prefer_native；"
+                        "restricted/meat 勿走此轨→H3）"
+                    ),
+                )
+                add(
+                    "still-challenge-repair",
+                    f'aifilm still-challenge next --root "{r}"\n'
+                    f'# run --execute --max-submits 1 → promote --identity-approved '
+                    f"--anatomy-safe → 再 LTX/H3",
+                    _with_primary(
+                        "FRW i2i 修底片（≥30s/unit）：弱 still/hijack/毒后重 still，人 promote 才 motion"
+                    ),
+                )
             if h3_enabled:
                 if is_h3_primary:
                     # Primary production path: 5090 unlimited overnight throughput.
@@ -683,6 +731,31 @@ def build_next_actions(
                         f'AIFILM_ALLOW_CLOUD_RESTRICTED=1 media-queue add --root "{r}" …',
                         _with_primary(
                             "镜头未齐：主轨 aifilm h3 run；Grok 云仅 escape 后可选"
+                        ),
+                    )
+                elif is_ltx23_adult:
+                    add(
+                        "h3-lane-meat",
+                        f'aifilm h3 list --root "{r}"; aifilm h3 next --root "{r}"',
+                        _with_primary(
+                            "ltx23_adult 肉戏/restricted：H3 list/next（P0 meat 永不 LTX）"
+                        ),
+                    )
+                    add(
+                        "h3-run-meat",
+                        f'aifilm h3 run --root "{r}" --shot-id <restricted-id> '
+                        f"--mode i2v --register --stage pilot",
+                        _with_primary(
+                            "restricted/bare：H3 I2V/R2V；云拒审 LTX 后也走此轨，禁降 heat"
+                        ),
+                    )
+                    add(
+                        "queue-or-register",
+                        f"# ltx23_adult dual: safe→frw img2video-audio · meat→h3 run\n"
+                        f'aifilm h3 run --root "{r}" --shot-id <meat> --mode i2v --register\n'
+                        f"# safe dialogue: frw-ltx23-audio-unit above",
+                        _with_primary(
+                            "镜头未齐：safe 对白 LTX 有声 unit；肉戏 H3；坏 still 先 still-challenge"
                         ),
                     )
                 else:

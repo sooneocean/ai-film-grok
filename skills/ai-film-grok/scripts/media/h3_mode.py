@@ -28,6 +28,12 @@ H3_MODE_ENDPOINT = {
 }
 _VALID_MODES = frozenset({"t2v", "i2v", "flf", "r2v"})
 
+
+def supports_image_input(mode: str) -> bool:
+    """Return True when the H3 mode accepts image reference input (2V)."""
+    return mode.strip().lower() in {"i2v", "flf", "r2v"}
+
+
 _CLOSE_SIZES = frozenset(
     {
         "cu",

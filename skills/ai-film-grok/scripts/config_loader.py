@@ -404,7 +404,7 @@ _ENV_HELP: dict[str, str] = {
     "AIFILM_MUSIC_LICENSE": "License note for externally generated music",
     "FRW_API_KEY": "FRW API key for env-plate / lipsync tasks",
     "FRWCLAW_ROOT": "FRW claw project root path",
-    "AIFILM_I2V_PROFILE": "I2V operating profile: h3_primary | hybrid_h3 | grok_primary | ltx23_primary | seedance_first",
+    "AIFILM_I2V_PROFILE": "I2V operating profile: h3_primary | hybrid_h3 | grok_primary | ltx23_adult | ltx23_primary | seedance_first",
     "AIFILM_SEEDANCE_AVAILABLE": "0|1 — whether Seedance I2V is available this season",
     "AIFILM_LIPSYNC_BACKEND": "Lipsync backend: off | auto | musetalk | wav2lip | external",
     "AIFILM_LIPSYNC_ARGV": "External lipsync command as JSON argv array",
@@ -458,7 +458,7 @@ _DEFAULT_EXAMPLES: dict[str, tuple[str, str]] = {
     "AIFILM_GROK_TTS_LANGUAGE": ("zh", "zh | en | …"),
     "AIFILM_I2V_PROFILE": (
         "h3_primary",
-        "h3_primary (5090 unlimited) | hybrid_h3 | grok_primary | ltx23_primary | seedance_first",
+        "h3_primary (5090 unlimited) | hybrid_h3 | grok_primary | ltx23_adult (safe LTX audio + H3 meat) | ltx23_primary | seedance_first",
     ),
     "AIFILM_SEEDANCE_AVAILABLE": ("0", ""),
     "VOICEBOX_BASE_URL": ("http://127.0.0.1:17493", "alias: AIFILM_VOICEBOX_URL"),

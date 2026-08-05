@@ -364,6 +364,8 @@ def build_shot_intent(
     h3_raw = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
     # Prefer resolved config (adult-max auto-enable) over raw film-spec only.
     is_h3_primary = film_profile == "h3_primary"
+    is_ltx23_adult = film_profile == "ltx23_adult"
+    is_ltx23_primary = film_profile == "ltx23_primary"
     h3_enabled = (
         bool(h3_cfg.get("enabled"))
         or h3_raw.get("enabled") is True
@@ -371,6 +373,7 @@ def build_shot_intent(
         in {
             "hybrid_h3",
             "h3_primary",
+            "ltx23_adult",
         }
     )
     lanes = spec.get("motion_lanes") if isinstance(spec.get("motion_lanes"), dict) else {}
@@ -379,14 +382,30 @@ def build_shot_intent(
         or shot.get("speaker_on_camera") is True
         or str(shot.get("screen_mode") or "") == "on_camera"
     )
+    # Safe (non-restricted) LTX 2.3 native-audio lane: opt-in via profile or motion_lanes.
+    dialogue_lane_cfg = str(
+        lanes.get("dialogue_safe_cloud") or lanes.get("dialogue") or ""
+    ).strip().lower()
+    use_ltx_safe_audio = (
+        is_ltx23_adult
+        or is_ltx23_primary
+        or dialogue_lane_cfg
+        in {
+            "frw_ltx23",
+            "frw-ltx23",
+            "cloud_ltx23_audio",
+            "ltx23",
+            "ltx2.3",
+        }
+        or lanes.get("allow_ltx_dialogue") is True
+    )
     recommended_lane = "cloud_grok"
     recommended_provider = "grok"
     recommended_weapon: str | None = None
     audio_policy = "carry_parent_dialogue" if parent_shot_id is not None else None
     if dialogue and identity_lock:
-        # Dialogue native-audio (2026-08-05): Grok Video + 5090 H3 only.
-        # Post lipsync (LatentSync/MuseTalk/InfiniteTalk/FRW lipsync) is frozen.
-        # LTX dialogue棚 retired from default production path.
+        # Native-audio IRON: post lipsync frozen. Generators = Grok Video / H3 / opt-in LTX2.3.
+        # Restricted + bare meat dialogue → H3 hard (never silent cloud meat).
         if restricted or is_h3_primary:
             recommended_lane = str(lanes.get("dialogue_restricted_local") or "local_dialogue_h3")
             recommended_provider = "comfy-h3"
@@ -394,6 +413,13 @@ def build_shot_intent(
             audio_policy = str(h3_cfg.get("audio_policy") or "prefer_native")
             if h3_enabled and not provider_lock:
                 provider_lock = "comfy-h3"
+        elif use_ltx_safe_audio:
+            recommended_lane = str(lanes.get("dialogue_safe_cloud") or "cloud_ltx23_audio")
+            recommended_provider = "frw-ltx23"
+            recommended_weapon = "ltx23-img2video-audio"
+            audio_policy = "prefer_native"
+            if not provider_lock and film_profile in {"ltx23_adult", "ltx23_primary"}:
+                provider_lock = "frw-ltx23"
         else:
             recommended_lane = str(lanes.get("dialogue_safe_cloud") or "cloud_dialogue_grok")
             recommended_provider = "grok"
@@ -404,8 +430,7 @@ def build_shot_intent(
         recommended_provider = "comfy-h3"
         recommended_weapon = "minimax-h3-i2v-pilot"
         audio_policy = str(h3_cfg.get("audio_policy") or "prefer_native")
-        # Soft-lock restricted meat to H3 only when hybrid/h3 is enabled and film
-        # did not already lock another provider.
+        # Soft-lock restricted meat to H3 when hybrid/h3/ltx23_adult enabled.
         if h3_enabled and not provider_lock:
             provider_lock = "comfy-h3"
     elif role in {"env", "bridge", "insert"} and not identity_lock:
@@ -432,6 +457,14 @@ def build_shot_intent(
             audio_policy = str(h3_cfg.get("audio_policy") or "prefer_native")
             if not provider_lock:
                 provider_lock = "comfy-h3"
+        elif is_ltx23_adult or (is_ltx23_primary and use_ltx_safe_audio):
+            # Soft / non-restricted hero under ltx23_adult → LTX native-audio I2V.
+            recommended_lane = str(lanes.get("setup_non_sensitive") or "cloud_ltx23_audio")
+            recommended_provider = "frw-ltx23"
+            recommended_weapon = "ltx23-img2video-audio"
+            audio_policy = "prefer_native"
+            if not provider_lock:
+                provider_lock = "frw-ltx23"
         else:
             recommended_lane = str(lanes.get("setup_non_sensitive") or "cloud_grok")
             recommended_provider = "grok"

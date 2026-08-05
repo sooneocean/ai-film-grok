@@ -94,7 +94,7 @@ def suggest_i2v_from_canary(
     except Exception:
         profile = "grok_primary"
     out["i2v_profile"] = profile
-    if profile == "ltx23_primary":
+    if profile in {"ltx23_primary", "ltx23_adult"}:
         patch = {
             "i2v_provider": "frw-ltx23",
             "frw_video_model": "ltx-i2v",
@@ -105,24 +105,44 @@ def suggest_i2v_from_canary(
             and str(receipt.get("recommended_l1") or "")
             in {"ltx23-img2video-audio", "frw_ltx23_img2video_audio"}
         )
-        out["ok"] = ltx_approved
+        out["ok"] = ltx_approved if profile == "ltx23_primary" else True
+        # ltx23_adult can proceed to H3 meat without LTX canary; warn only.
         out["patch"] = patch
         out["changes"] = {
             key: {"from": cur.get(key), "to": value}
             for key, value in patch.items()
             if cur.get(key) != value
         }
-        out["rationale"] = ["动作主链固定为 FRW LTX 2.3 → FRW API I2V → Grok Video 1.5"]
-        out["warnings"] = (
-            []
-            if ltx_approved
-            else ["LTX 2.3 primary lacks a current decoded, human-approved film canary"]
-        )
-        out["recommendations"] = [
-            "record a film-scoped FRW LTX 2.3 img2video-audio canary",
-            "do not rewrite film-spec to a fallback provider; runtime routing skips unready lanes",
-            "FRW API I2V needs its own decoded, human-approved film canary before fallback",
-        ]
+        if profile == "ltx23_adult":
+            out["rationale"] = [
+                "ltx23_adult: safe dialogue/soft → FRW LTX 2.3 img2video-audio; "
+                "restricted/meat → comfy-h3 hard; still repair → FRW i2i still-challenge"
+            ]
+            out["warnings"] = (
+                []
+                if ltx_approved
+                else [
+                    "LTX audio canary missing — safe-dialogue LTX units blocked until "
+                    "aifilm frw canary; meat may still run on H3"
+                ]
+            )
+            out["recommendations"] = [
+                "record film-scoped FRW LTX 2.3 img2video-audio canary before LTX bulk",
+                "never route bare/act/climax to LTX without explicit canary+user override",
+                "weak stills: aifilm still-challenge before re-I2V",
+            ]
+        else:
+            out["rationale"] = ["动作主链固定为 FRW LTX 2.3 → FRW API I2V → Grok Video 1.5"]
+            out["warnings"] = (
+                []
+                if ltx_approved
+                else ["LTX 2.3 primary lacks a current decoded, human-approved film canary"]
+            )
+            out["recommendations"] = [
+                "record a film-scoped FRW LTX 2.3 img2video-audio canary",
+                "do not rewrite film-spec to a fallback provider; runtime routing skips unready lanes",
+                "FRW API I2V needs its own decoded, human-approved film canary before fallback",
+            ]
         out["current"] = {
             "i2v_provider": cur.get("i2v_provider"),
             "frw_video_model": cur.get("frw_video_model"),

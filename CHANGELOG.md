@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.39.73] - 2026-08-05
+
+### Added (2V Reference Stage — H3 Layer-4)
+- When a model supports image input (I2V/FLF/R2V) and reference images are
+  available, the H3 prompt compiler injects a Grok reference-composition
+  stage before the timeline segments. The first frame is generated via
+  Grok image model from a composition prompt, then used as the start-frame
+  reference for H3 video generation.
+- `_collect_ref_images()` in `h3_workflow.py` gathers `still_path`/
+  `last_path`/`ref_paths` from the plan for the 2V stage.
+- `supports_image_input()` in `h3_mode.py` detects whether a mode accepts
+  image input.
+- `build_reference_composition_prompt()` and `inject_2v_reference_stage()`
+  in `h3_timeline_prompt.py` generate the Grok image prompt and wrap the
+  timeline.
+- `build_h3_temporal_prompt()` in `motion_prompt_spine.py` accepts
+  `ref_image_paths` and passes them through to the 2V injection.
+
+## [2.39.72] - 2026-08-05
+
+### Added (LTX 2.3 adult audio lane + FRW i2i repair plan)
+- Profile **`ltx23_adult`**: safe dialogue/soft → FRW LTX 2.3 `img2video-audio` (`prefer_native`); restricted/bare/meat → **H3 hard**.
+- `production_router`: lane `cloud_ltx23_audio` when profile or `motion_lanes.dialogue=frw_ltx23` / `allow_ltx_dialogue`.
+- Docs: `docs/plans/2026-08-05-ltx23-adult-audio-lane.md`, memory card, hard-defaults + weapon-lane patches.
+- Still repair remains `still-challenge` (FRW i2i ≥30s); not a silent still primary over Qwen.
+- **dispatch/next**: `frw-ltx23-canary` · `frw-ltx23-audio-unit` · `still-challenge-repair` · `h3-lane-meat` under `ltx23_adult`.
+
 ## [2.39.71] - 2026-08-05
 
 ### Fixed (H3 · dialogue timeline freeze from R3 A/B)

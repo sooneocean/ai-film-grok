@@ -8,13 +8,22 @@ from __future__ import annotations
 
 from typing import Any
 
-# Motion provider profile. FRW LTX 2.3 is the production action primary.
+# Motion provider profiles. Adult meat stays local H3; LTX is opt-in audio lane.
 # ``seedance_first`` and ``grok_primary`` remain readable compatibility inputs.
 I2V_PROVIDERS = frozenset({"frw", "frw-ltx23", "grok", "comfy-h3", "auto"})
 # h3_primary: local 5090 MiniMax H3 is the film-wide motion primary (unlimited compute).
 # hybrid_h3: dual-lane (Grok bulk soft + H3 restricted/meat).
+# ltx23_adult: safe dialogue + soft → FRW LTX 2.3 native audio; restricted/meat → H3 hard.
+# ltx23_primary: legacy full-film LTX (deprecated for new adult max films).
 I2V_PROFILES = frozenset(
-    {"ltx23_primary", "seedance_first", "grok_primary", "hybrid_h3", "h3_primary"}
+    {
+        "ltx23_primary",
+        "ltx23_adult",
+        "seedance_first",
+        "grok_primary",
+        "hybrid_h3",
+        "h3_primary",
+    }
 )
 # Explicit legacy FRW lifeboat; it is not part of the automatic action chain.
 FRW_I2V_FRW_ONLY_LIFEBOAT = "legacy-img2video"
@@ -66,7 +75,10 @@ def default_i2v_provider() -> str:
         # hybrid_h3 keeps Grok as the bulk auto lock; restricted shots route to
         # comfy-h3 via production_router / shot intent, not a film-wide lock.
         return "grok"
-    return "frw-ltx23" if profile == "ltx23_primary" else "frw"
+    if profile in {"ltx23_primary", "ltx23_adult"}:
+        # Film-wide auto label is FRW LTX; restricted meat still soft-locks to H3.
+        return "frw-ltx23"
+    return "frw"
 
 
 def resolve_h3_config(spec: dict | None = None) -> dict[str, object]:
@@ -79,9 +91,11 @@ def resolve_h3_config(spec: dict | None = None) -> dict[str, object]:
     profile = resolve_i2v_profile()
     raw = (spec or {}).get("h3") if isinstance(spec, dict) else None
     merged = dict(DEFAULT_H3_CONFIG)
-    if profile in {"hybrid_h3", "h3_primary"}:
+    if profile in {"hybrid_h3", "h3_primary", "ltx23_adult"}:
+        # ltx23_adult still needs H3 for restricted/bare meat (never silent cloud meat).
         merged["enabled"] = True
     # Adult-max default dual-lane without requiring env hybrid_h3.
+    # ltx23_primary is legacy pure-cloud; do not auto-force H3 unless film opts in.
     if isinstance(spec, dict) and profile != "ltx23_primary":
         genre = str(spec.get("genre") or "").strip().lower()
         heat = str(spec.get("heat_scale") or "").strip().lower()

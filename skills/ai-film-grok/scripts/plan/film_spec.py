@@ -955,8 +955,14 @@ def validate_film_spec(
         i2v_notes = list(spec.get("_i2v_notes") or [])
         if i2v_profile == "ltx23_primary":
             i2v_notes.append(
-                "auto→frw-ltx23 (LTX 2.3 native-audio primary; fresh approved canary and "
-                "per-shot media review required)"
+                "auto→frw-ltx23 (LEGACY full-film LTX 2.3; prefer ltx23_adult for adult max; "
+                "fresh approved canary + per-shot media review required)"
+            )
+        elif i2v_profile == "ltx23_adult":
+            i2v_notes.append(
+                "auto→frw-ltx23 label + ltx23_adult lanes: safe dialogue/soft → LTX 2.3 "
+                "img2video-audio (prefer_native); restricted/bare/meat → comfy-h3 hard; "
+                "still repair → FRW i2i still-challenge; canary required before bulk"
             )
         elif i2v_profile == "grok_primary":
             i2v_notes.append(
@@ -966,8 +972,8 @@ def validate_film_spec(
         elif i2v_profile == "hybrid_h3":
             i2v_notes.append(
                 "auto→grok bulk primary + hybrid_h3 lanes: restricted/meat → comfy-h3 pilot; "
-                "env → FRW ltx-t2v; dialogue → FRW LTX; setup non-sensitive → Grok; "
-                "H3 audio prefer_native (keep usable stereo; else strip→TTS/BGM)"
+                "env → FRW ltx-t2v; safe dialogue → FRW LTX 2.3 audio when lanes.dialogue=frw_ltx23; "
+                "setup non-sensitive → Grok; H3 audio prefer_native"
             )
         elif i2v_profile == "h3_primary":
             i2v_notes.append(
@@ -1011,7 +1017,8 @@ def validate_film_spec(
             )
             spec["_i2v_notes"] = notes
         if not isinstance(spec.get("motion_lanes"), dict):
-            if str(spec.get("_i2v_profile") or "") == "h3_primary":
+            profile_now = str(spec.get("_i2v_profile") or "")
+            if profile_now == "h3_primary":
                 spec["motion_lanes"] = {
                     "default": "comfy-h3",
                     "restricted_local": "comfy-h3",
@@ -1021,13 +1028,31 @@ def validate_film_spec(
                     "setup_non_sensitive": "comfy-h3",
                     "allow_cloud_soft": False,
                 }
+            elif profile_now == "ltx23_adult":
+                # Option A: safe dialogue/soft → LTX audio; meat → H3; i2i repair separate.
+                spec["motion_lanes"] = {
+                    "default": "frw-ltx23",
+                    "restricted_local": "comfy-h3",
+                    "env": "frw_ltx_t2v",
+                    "dialogue": "frw_ltx23",
+                    "dialogue_safe_cloud": "cloud_ltx23_audio",
+                    "dialogue_restricted_local": "local_dialogue_h3",
+                    "setup_non_sensitive": "cloud_ltx23_audio",
+                    "still_repair": "frw_img2image_still_challenge",
+                    "allow_ltx_dialogue": True,
+                    "allow_cloud_soft": True,
+                }
             else:
                 spec["motion_lanes"] = {
                     "default": "cloud",
                     "restricted_local": "comfy-h3",
                     "env": "frw_ltx_t2v",
                     "dialogue": "frw_ltx23",
+                    "dialogue_safe_cloud": "cloud_ltx23_audio",
+                    "dialogue_restricted_local": "local_dialogue_h3",
                     "setup_non_sensitive": "grok",
+                    "still_repair": "frw_img2image_still_challenge",
+                    "allow_ltx_dialogue": True,
                 }
     elif str(spec.get("_i2v_profile") or "") == "h3_primary" and not isinstance(
         spec.get("motion_lanes"), dict
@@ -1040,6 +1065,21 @@ def validate_film_spec(
             "dialogue": "comfy-h3",
             "setup_non_sensitive": "comfy-h3",
             "allow_cloud_soft": False,
+        }
+    elif str(spec.get("_i2v_profile") or "") == "ltx23_adult" and not isinstance(
+        spec.get("motion_lanes"), dict
+    ):
+        spec["motion_lanes"] = {
+            "default": "frw-ltx23",
+            "restricted_local": "comfy-h3",
+            "env": "frw_ltx_t2v",
+            "dialogue": "frw_ltx23",
+            "dialogue_safe_cloud": "cloud_ltx23_audio",
+            "dialogue_restricted_local": "local_dialogue_h3",
+            "setup_non_sensitive": "cloud_ltx23_audio",
+            "still_repair": "frw_img2image_still_challenge",
+            "allow_ltx_dialogue": True,
+            "allow_cloud_soft": True,
         }
     # FRW video model (Seedance/LTX path). auto → seedance id kept as aspirational label
     raw_fvm = spec.get("frw_video_model", default_frw_video_model())
