@@ -119,6 +119,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_cli_plan_run.py`
 - `skills/ai-film-grok/tests/test_cli_roundtrip.py`
 - `skills/ai-film-grok/tests/test_cli_smoke.py`
+- `skills/ai-film-grok/tests/test_cli_w5d_extract.py`
 - `skills/ai-film-grok/tests/test_cli_weapon.py`
 - `skills/ai-film-grok/tests/test_cli_write_spec_extract.py`
 - `skills/ai-film-grok/tests/test_clip_uniqueness.py`
