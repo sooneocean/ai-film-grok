@@ -1,7 +1,7 @@
 # Antifragility Todo Plan — ai-film-grok（2026-08-05）
 
-**Status:** ACTIVE · AF1–AF6+AF8 SHIPPED in 2.39.33 · AF7 ops open · was analysis-only（本档不写生产代码）  
-**Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · plugin **2.39.33**  
+**Status:** ACTIVE · AF1–AF6+AF8 SHIPPED in 2.39.34 · AF7 ops open · was analysis-only（本档不写生产代码）  
+**Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · plugin **2.39.34**  
 **Theme:** 反脆弱 = **压力下更诚实、更可恢复**（fail-closed 门 + PARTIAL 回执 + 超时/resume），不是「多重试几次假装成功」。
 
 ## 一句话

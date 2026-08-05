@@ -2,6 +2,11 @@
 
 ## [2.39.33] - 2026-08-05
 
+### Added (Weapon armory inventory · primaries + handoff)
+- Cross-modality weapon inventory SSoT (see prior commit e4dca61f).
+
+## [2.39.34] - 2026-08-05
+
 ### Fixed / Added (antifragility AF1–AF6 + AF8)
 - **AF1** `h3_fill_idle` identity midframe ffmpeg → `util.subprocess.run(..., timeout=30)`; hang soft-skips with caution.
 - **AF2** `media_queue.complete` handoff/sidecar failures write `receipts/media-queue-partial.json` (no silent `pass`).
