@@ -1466,7 +1466,7 @@
     },
     {
       "path": "scripts/media/h3_fill_idle.py",
-      "sha256": "29cccd0fc6d298a8b07dbd3e194fbe8b19436715e996daa430ccfbd4f30f1f68"
+      "sha256": "c83e514026ac4c93456b8bdab3048facacc73734eeed2ea9dc6d6a5bfc8fbff9"
     },
     {
       "path": "scripts/media/h3_media_pack.py",

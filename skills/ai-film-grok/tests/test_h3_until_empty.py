@@ -18,6 +18,8 @@ from h3_fill_idle import (  # noqa: E402
     fill_idle_until_empty,
     next_fill_idle_job,
     prepare_capacity_free_first,
+    recover_capacity_contention,
+    wait_for_comfy_capacity,
 )
 from util import write_json  # noqa: E402
 
@@ -282,6 +284,127 @@ class FreeFirstPrepTests(unittest.TestCase):
         self.assertTrue(rep["attempted"])
         self.assertTrue(rep["freed"])
         self.assertEqual(rep["outcome"], "ready_after_free")
+
+
+class CapacityWaitTests(unittest.TestCase):
+    def test_wait_zero_is_single_probe(self) -> None:
+        fake = {"ok": True, "ready": False, "status": "blocked", "blockers": []}
+        with mock.patch("h3_fill_idle.probe_comfy_capacity_soft", return_value=fake):
+            rep = wait_for_comfy_capacity(max_wait_sec=0.0, sleep_fn=lambda _s: None)
+        self.assertFalse(rep.get("ready"))
+        self.assertEqual(rep.get("outcome"), "not_ready_no_wait")
+        self.assertEqual(rep.get("probes"), 1)
+
+    def test_wait_ready_after_poll(self) -> None:
+        blocked = {
+            "ok": True,
+            "ready": False,
+            "status": "blocked",
+            "blockers": [{"code": "VRAM_BELOW_FLOOR", "message": "low"}],
+        }
+        ready = {"ok": True, "ready": True, "status": "ready", "blockers": []}
+        with mock.patch(
+            "h3_fill_idle.probe_comfy_capacity_soft",
+            side_effect=[blocked, ready],
+        ):
+            rep = wait_for_comfy_capacity(
+                max_wait_sec=30.0,
+                poll_sec=0.5,
+                sleep_fn=lambda _s: None,
+            )
+        self.assertTrue(rep.get("ready"))
+        self.assertEqual(rep.get("outcome"), "ready_after_wait")
+
+    def test_until_empty_capacity_wait_recovers_and_continues(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+            calls = {"n": 0}
+
+            def _fake_run_next(*_a, **_k):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    return {
+                        "ok": True,
+                        "jobs_ran": 0,
+                        "skipped_reason": "capacity_not_ready",
+                        "pending_after": 2,
+                        "next_after": {"shot_id": "s1"},
+                    }
+                return {
+                    "ok": True,
+                    "jobs_ran": 0,
+                    "skipped_reason": "queue_empty",
+                    "pending_after": 0,
+                    "next_after": None,
+                }
+
+            recover = {
+                "kind": "ai-film-capacity-recover",
+                "ready": True,
+                "outcome": "ready_after_wait",
+            }
+            with mock.patch("h3_fill_idle.run_next_fill_idle", side_effect=_fake_run_next):
+                with mock.patch(
+                    "h3_fill_idle.recover_capacity_contention",
+                    return_value=recover,
+                ) as rec:
+                    with mock.patch(
+                        "h3_fill_idle.prepare_capacity_free_first",
+                        return_value={"outcome": "already_ready", "free_first": True},
+                    ):
+                        rep = fill_idle_until_empty(
+                            root,
+                            execute=True,
+                            max_cycles=5,
+                            free_first=True,
+                            capacity_wait_sec=60.0,
+                            stop_on_capacity=True,
+                        )
+            rec.assert_called()
+            self.assertEqual(rep["stop_reason"], "queue_empty")
+            self.assertEqual(rep.get("capacity_wait_sec"), 60.0)
+            self.assertGreaterEqual(len(rep.get("capacity_waits") or []), 1)
+            self.assertEqual(calls["n"], 2)
+
+    def test_until_empty_capacity_wait_timeout_still_stops(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+
+            def _fake_run_next(*_a, **_k):
+                return {
+                    "ok": True,
+                    "jobs_ran": 0,
+                    "skipped_reason": "capacity_not_ready",
+                    "pending_after": 1,
+                    "next_after": {"shot_id": "s1"},
+                }
+
+            recover = {
+                "kind": "ai-film-capacity-recover",
+                "ready": False,
+                "outcome": "still_blocked",
+            }
+            with mock.patch("h3_fill_idle.run_next_fill_idle", side_effect=_fake_run_next):
+                with mock.patch(
+                    "h3_fill_idle.recover_capacity_contention",
+                    return_value=recover,
+                ):
+                    with mock.patch(
+                        "h3_fill_idle.prepare_capacity_free_first",
+                        return_value={"outcome": "skipped", "free_first": True},
+                    ):
+                        rep = fill_idle_until_empty(
+                            root,
+                            execute=True,
+                            max_cycles=3,
+                            free_first=True,
+                            capacity_wait_sec=30.0,
+                            stop_on_capacity=True,
+                        )
+            self.assertEqual(rep["stop_reason"], "capacity_not_ready")
+            self.assertFalse((rep.get("capacity_waits") or [{}])[0].get("ready"))
 
 
 if __name__ == "__main__":

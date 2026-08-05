@@ -3,7 +3,7 @@
 **Status:** ACTIVE · **strategy pointer for this pass**  
 **Kind:** analysis-only (docs; no heat/i2v/pilot policy change)  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · evidence tree **`origin/main` @ 2.39.30** (hub 1455 · `scripts/core/` present)  
-**Revision:** 2026-08-05e — S5.3-ops `--free-first` shipped; overnight drain still OPEN_OPS
+**Revision:** 2026-08-05f — S5.3 capacity-wait + hang-proof closeout ship
 **Audience:** user (director intent) + coding agents (implementation sequencing)
 
 > **一句话：** 规则与产线已够硬；下一层优化不是再叠 IRON，而是 **(导演) 把「门绿」变成「片好看/可交付」的可预期吞吐**，以及 **(工程) 按 ACTIVE 模块重构轨把热路径可测、可挂机、可维护**。
@@ -114,8 +114,8 @@ story.receive → script-value-debrief → plan run → fidelity
 
 | ID | Residual | Why still hurts / status |
 |----|----------|-------------------------|
-| **R-ops** | Full overnight drain to `queue_empty` | **PARTIAL** execute + `--free-first` proven; contention still blocks drain · s53 free-first canary |
-| **R-af1** | Hot-path subprocess timeouts | **PARTIAL→core SHIPPED**: film hot paths + **adapters/node/canary/mmaudio** (2.39.65); compose_preview Popen residual open |
+| **R-ops** | Full overnight drain to `queue_empty` | **PARTIAL** code: free-first + **capacity-wait** (2.39.66); live drain OPEN_OPS when 5090 contended |
+| **R-af1** | Hot-path subprocess timeouts | **PARTIAL→core SHIPPED** through 2.39.65 (adapters/node); compose_preview/speech_preview Popen residual open |
 | **R-af2** | closeout ↔ post_doctor / caption-pixel | **SHIPPED** AF3/AF6 |
 | **R-doc** | hard-defaults FRW-first bulk prose | **SHIPPED** AF8 → h3_primary |
 | **R-mf-doc** | material-fidelity M5–M6 tracker | **SHIPPED** (M0–M6 landed) |

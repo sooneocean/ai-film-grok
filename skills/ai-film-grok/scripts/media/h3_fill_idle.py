@@ -878,6 +878,122 @@ def prepare_capacity_free_first(
     return report
 
 
+_CAPACITY_WAIT_SEC_HARD_MAX = 600.0
+_CAPACITY_WAIT_POLL_DEFAULT = 5.0
+
+
+def wait_for_comfy_capacity(
+    *,
+    max_wait_sec: float = 0.0,
+    poll_sec: float = _CAPACITY_WAIT_POLL_DEFAULT,
+    sleep_fn=None,
+) -> dict:
+    """Poll soft capacity until ready or timeout. Never cancels foreign work.
+
+    ``max_wait_sec<=0`` returns a single probe (no sleep). ``sleep_fn`` is injectable for tests.
+    """
+    import time as _time
+
+    sleeper = sleep_fn if callable(sleep_fn) else _time.sleep
+    max_wait = max(0.0, min(float(max_wait_sec or 0.0), _CAPACITY_WAIT_SEC_HARD_MAX))
+    poll = max(0.5, float(poll_sec or _CAPACITY_WAIT_POLL_DEFAULT))
+    started = _time.monotonic()
+    probes = 0
+    last = probe_comfy_capacity_soft()
+    probes += 1
+    if last.get("ready") is True or max_wait <= 0:
+        return {
+            "schema_version": 1,
+            "kind": "ai-film-capacity-wait",
+            "ok": True,
+            "ready": last.get("ready") is True,
+            "waited_sec": 0.0,
+            "max_wait_sec": max_wait,
+            "poll_sec": poll,
+            "probes": probes,
+            "last": _capacity_snapshot(last),
+            "outcome": "ready" if last.get("ready") is True else "not_ready_no_wait",
+        }
+
+    while (_time.monotonic() - started) < max_wait:
+        remaining = max_wait - (_time.monotonic() - started)
+        sleeper(min(poll, max(0.1, remaining)))
+        last = probe_comfy_capacity_soft()
+        probes += 1
+        if last.get("ready") is True:
+            return {
+                "schema_version": 1,
+                "kind": "ai-film-capacity-wait",
+                "ok": True,
+                "ready": True,
+                "waited_sec": round(_time.monotonic() - started, 2),
+                "max_wait_sec": max_wait,
+                "poll_sec": poll,
+                "probes": probes,
+                "last": _capacity_snapshot(last),
+                "outcome": "ready_after_wait",
+            }
+
+    return {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-wait",
+        "ok": True,
+        "ready": False,
+        "waited_sec": round(_time.monotonic() - started, 2),
+        "max_wait_sec": max_wait,
+        "poll_sec": poll,
+        "probes": probes,
+        "last": _capacity_snapshot(last),
+        "outcome": "timeout_still_blocked",
+    }
+
+
+def recover_capacity_contention(
+    *,
+    free_first: bool = False,
+    capacity_wait_sec: float = 0.0,
+    poll_sec: float = _CAPACITY_WAIT_POLL_DEFAULT,
+    sleep_fn=None,
+) -> dict:
+    """S5.3 deep: free-first once more (if safe) then optional wait. Never cancel foreign."""
+    report = {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-recover",
+        "free_first": bool(free_first),
+        "capacity_wait_sec": float(capacity_wait_sec or 0.0),
+        "free_prep": None,
+        "wait": None,
+        "ready": False,
+        "outcome": None,
+    }
+    free_prep = prepare_capacity_free_first(free_first=bool(free_first), dry_run=False)
+    report["free_prep"] = free_prep
+    if free_prep.get("outcome") == "ready_after_free" or (free_prep.get("after") or {}).get(
+        "ready"
+    ) is True:
+        report["ready"] = True
+        report["outcome"] = "ready_after_free"
+        return report
+
+    wait_rep = wait_for_comfy_capacity(
+        max_wait_sec=float(capacity_wait_sec or 0.0),
+        poll_sec=poll_sec,
+        sleep_fn=sleep_fn,
+    )
+    report["wait"] = wait_rep
+    if wait_rep.get("ready") is True:
+        report["ready"] = True
+        report["outcome"] = wait_rep.get("outcome") or "ready"
+        return report
+
+    final = probe_comfy_capacity_soft()
+    report["final"] = _capacity_snapshot(final)
+    report["ready"] = final.get("ready") is True
+    report["outcome"] = "ready" if report["ready"] else "still_blocked"
+    return report
+
+
+
 def assert_priority_order(
     pending: list[dict[str, Any]],
     next_row: dict[str, Any] | None,
@@ -1324,13 +1440,11 @@ def fill_idle_cycle(
     max_cycles: int = 40,
     stop_on_capacity: bool = True,
     free_first: bool = False,
+    capacity_wait_sec: float = 0.0,
 ) -> dict[str, Any]:
-    """One agent-facing cycle: evidence → run-next (optional) → evidence again → pk peek.
+    """One agent-facing cycle: evidence → run-next → evidence → pk peek.
 
-    Never auto-promotes. With ``until_empty=True`` loops cycles until queue empty,
-    capacity blocks, run fails, or ``max_cycles`` (hard-capped) — not an OS daemon.
-    With ``free_first=True``: if queue idle and only RAM/VRAM floors block, free models once
-    before run-next (never cancels foreign prompts).
+    free_first / capacity_wait_sec enable contention recovery (never cancel foreign).
     """
     base = _root(root)
     if until_empty:
@@ -1343,6 +1457,7 @@ def fill_idle_cycle(
             notes=notes,
             stop_on_capacity=bool(stop_on_capacity),
             free_first=bool(free_first),
+            capacity_wait_sec=float(capacity_wait_sec or 0.0),
         )
     free_prep = prepare_capacity_free_first(
         free_first=bool(free_first),
@@ -1356,6 +1471,24 @@ def fill_idle_cycle(
         max_jobs=int(max_jobs or 5),
         free_memory_on_mode_switch=True,
     )
+    capacity_recovery = None
+    if (
+        bool(execute)
+        and str(run_rep.get("skipped_reason") or "") == "capacity_not_ready"
+        and (bool(free_first) or float(capacity_wait_sec or 0.0) > 0)
+    ):
+        capacity_recovery = recover_capacity_contention(
+            free_first=bool(free_first),
+            capacity_wait_sec=float(capacity_wait_sec or 0.0),
+        )
+        if capacity_recovery.get("ready") is True:
+            run_rep = run_next_fill_idle(
+                base,
+                include_challenge=include_challenge,
+                execute=True,
+                max_jobs=int(max_jobs or 5),
+                free_memory_on_mode_switch=True,
+            )
     after = write_fill_idle_evidence(base, notes=f"cycle-after {notes}".strip())
     pk = pk_compare(base, measure_missing=False, write_dailies=True)
     multi = sum(1 for s in (pk.get("shots") or []) if int(s.get("take_count") or 0) >= 2)
@@ -1367,7 +1500,9 @@ def fill_idle_cycle(
         "execute": bool(execute),
         "until_empty": False,
         "free_first": bool(free_first),
+        "capacity_wait_sec": float(capacity_wait_sec or 0.0),
         "free_prep": free_prep,
+        "capacity_recovery": capacity_recovery,
         "before": before.get("metrics"),
         "run": {
             "jobs_ran": run_rep.get("jobs_ran"),
@@ -1388,11 +1523,17 @@ def fill_idle_cycle(
             if multi
             else [
                 f'aifilm h3 run-next --root "{base}" --execute --max {max_jobs}',
-                f'aifilm h3 cycle --root "{base}" --until-empty --execute --free-first',
+                (
+                    f'aifilm h3 cycle --root "{base}" --until-empty --execute '
+                    f"--free-first --capacity-wait-sec 120"
+                ),
                 f'aifilm ship-prep --root "{base}"',
             ]
         ),
-        "note": "never auto-promote; cycle is scheduling + evidence only; free_first never cancels foreign",
+        "note": (
+            "never auto-promote; free_first never cancels foreign; "
+            "capacity_wait polls ready without cancel"
+        ),
     }
 
 
@@ -1406,21 +1547,17 @@ def fill_idle_until_empty(
     notes: str = "",
     stop_on_capacity: bool = True,
     free_first: bool = False,
+    capacity_wait_sec: float = 0.0,
 ) -> dict[str, Any]:
-    """Overnight loop: keep calling run-next until queue empty or safety stop.
+    """Overnight loop until queue empty or safety stop.
 
-    Safety:
-    - max_cycles hard-capped (default 40, hard max 80)
-    - max_jobs_per_cycle hard-capped at 20
-    - stops on capacity_not_ready (unless stop_on_capacity=False)
-    - stops on run_failed
-    - never auto-promotes
-    - not a background OS daemon (caller owns the process)
-    - free_first: if queue idle + memory floor block, free models once before the loop
+    free_first and/or capacity_wait_sec recover contention then continue if ready.
+    Never cancels foreign prompts; not an OS daemon.
     """
     base = _root(root)
     max_cycles = max(1, min(int(max_cycles or 40), _UNTIL_EMPTY_MAX_CYCLES_HARD))
     max_jobs_per_cycle = max(1, min(int(max_jobs_per_cycle or 5), _UNTIL_EMPTY_MAX_JOBS_PER_CYCLE))
+    capacity_wait_sec = max(0.0, min(float(capacity_wait_sec or 0.0), _CAPACITY_WAIT_SEC_HARD_MAX))
     free_prep = prepare_capacity_free_first(
         free_first=bool(free_first),
         dry_run=not bool(execute),
@@ -1428,6 +1565,7 @@ def fill_idle_until_empty(
     plan_before = capacity_plan(base, include_challenge=include_challenge)
     before = write_fill_idle_evidence(base, notes=f"until-empty-before {notes}".strip())
     cycles: list[dict[str, Any]] = []
+    capacity_waits: list[dict[str, Any]] = []
     total_ran = 0
     stop_reason = "max_cycles"
     ok = True
@@ -1443,16 +1581,15 @@ def fill_idle_until_empty(
         ran = int(run_rep.get("jobs_ran") or 0)
         total_ran += ran
         skipped = str(run_rep.get("skipped_reason") or "")
-        cycles.append(
-            {
-                "cycle": cycle_i + 1,
-                "jobs_ran": ran,
-                "skipped_reason": skipped or None,
-                "ok": bool(run_rep.get("ok") is not False),
-                "pending_after": run_rep.get("pending_after"),
-                "next_after": run_rep.get("next_after"),
-            }
-        )
+        cycle_row: dict[str, Any] = {
+            "cycle": cycle_i + 1,
+            "jobs_ran": ran,
+            "skipped_reason": skipped or None,
+            "ok": bool(run_rep.get("ok") is not False),
+            "pending_after": run_rep.get("pending_after"),
+            "next_after": run_rep.get("next_after"),
+        }
+        cycles.append(cycle_row)
         if not execute:
             stop_reason = "dry_run_pass_execute"
             break
@@ -1460,6 +1597,19 @@ def fill_idle_until_empty(
             stop_reason = "queue_empty"
             break
         if skipped == "capacity_not_ready" and stop_on_capacity:
+            if bool(free_first) or capacity_wait_sec > 0:
+                recover = recover_capacity_contention(
+                    free_first=bool(free_first),
+                    capacity_wait_sec=capacity_wait_sec,
+                )
+                capacity_waits.append(recover)
+                cycle_row["capacity_recover"] = {
+                    "outcome": recover.get("outcome"),
+                    "ready": recover.get("ready"),
+                    "waited_sec": (recover.get("wait") or {}).get("waited_sec"),
+                }
+                if recover.get("ready"):
+                    continue
             stop_reason = "capacity_not_ready"
             break
         if skipped == "run_failed" or run_rep.get("ok") is False:
@@ -1485,6 +1635,8 @@ def fill_idle_until_empty(
         "execute": bool(execute),
         "until_empty": True,
         "free_first": bool(free_first),
+        "capacity_wait_sec": capacity_wait_sec,
+        "capacity_waits": capacity_waits,
         "free_prep": free_prep,
         "stop_reason": stop_reason,
         "cycles_run": len(cycles),
@@ -1514,14 +1666,17 @@ def fill_idle_until_empty(
             ]
             if multi or stop_reason == "queue_empty"
             else [
-                f'aifilm h3 cycle --root "{base}" --until-empty --execute --free-first',
+                (
+                    f'aifilm h3 cycle --root "{base}" --until-empty --execute '
+                    f"--free-first --capacity-wait-sec 120"
+                ),
                 "aifilm comfy free-memory --confirm  # manual if free_first skipped queue_busy",
                 f'aifilm h3 capacity-plan --root "{base}"',
             ]
         ),
         "note": (
-            "until-empty loop owns the process until stop; never auto-promote; "
-            "not a systemd/launchd daemon; free_first never cancels foreign prompts"
+            "until-empty owns process until stop; never auto-promote; "
+            "free_first never cancels foreign; capacity_wait polls without cancel"
         ),
     }
     try:
@@ -1534,7 +1689,6 @@ def fill_idle_until_empty(
     except Exception as exc:  # noqa: BLE001
         report["write_error"] = str(exc)[:160]
     return report
-
 
 def write_fill_idle_evidence(
     root: Path | str,

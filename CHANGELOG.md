@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.39.66] - 2026-08-05
+
+### Added (S5.3-ops · capacity-wait on until-empty)
+- **`wait_for_comfy_capacity` / `recover_capacity_contention`**: free-first again (if safe) then poll ready; never cancel foreign; hard max 600s.
+- **CLI** `aifilm h3 cycle --capacity-wait-sec N` (with `--until-empty`); receipts include `capacity_waits`.
+- On capacity recover → continue loop; timeout still stop_reason=`capacity_not_ready`.
+- **Tests**: CapacityWaitTests in `test_h3_until_empty.py`.
+
+### Added (final voice normalize leaves)
+- **`final.voice.normalize_cast_voices` / `normalize_cast_tts_backends`**: pure peel from render_final; Chinese locks; remap legacy `ja-JP-*` voice ids.
+- **Tests**: `test_final_voice_normalize.py`.
+
 ## [2.39.65] - 2026-08-05
 
 ### Fixed (hang-proof · adapters + node lipsync + canary/opt)

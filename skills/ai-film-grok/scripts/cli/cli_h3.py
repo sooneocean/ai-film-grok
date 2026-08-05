@@ -245,6 +245,16 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
             "before cycle/until-empty (never cancels foreign prompts)"
         ),
     )
+    cycle.add_argument(
+        "--capacity-wait-sec",
+        type=float,
+        default=0.0,
+        dest="capacity_wait_sec",
+        help=(
+            "On capacity_not_ready: free-first again (if --free-first) then poll wait "
+            "up to N seconds for ready before stop (never cancels foreign; hard max 600)"
+        ),
+    )
     cycle.add_argument("--no-challenge", action="store_true")
     cycle.add_argument("--notes", default="")
     cycle.add_argument("--receipt", type=Path, default=None)
@@ -357,6 +367,7 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 max_cycles=int(getattr(args, "max_cycles", 40) or 40),
                 stop_on_capacity=not bool(getattr(args, "continue_on_capacity", False)),
                 free_first=bool(getattr(args, "free_first", False)),
+                capacity_wait_sec=float(getattr(args, "capacity_wait_sec", 0.0) or 0.0),
             )
         elif action == "capacity-plan":
             from h3_fill_idle import capacity_plan
