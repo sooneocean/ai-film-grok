@@ -35,6 +35,9 @@ _ACTION_SKILLS = {
     "closeout-run": "projection.verify",
     "production-evidence-gate": "projection.verify",
     "bulk-preflight": "image.animate",
+    "h3-run-next": "image.animate",
+    "h3-fill-idle": "image.animate",
+    "h3-lane": "image.animate",
     "pilot-pack": "quality.inspect",
     "variety-precheck": "story.validate",
     "i2v-motion-gate": "projection.verify",
@@ -79,6 +82,8 @@ _COMMAND_POLICIES = {
     "queue-progress": ("local", "none"),
     "tunnel-probe": ("local", "none"),
     "gpu-lease": ("local", "none"),
+    # Local 5090 MiniMax H3 — free compute; pilot/approve still human via separate gates
+    "h3": ("local", "none"),
     # P1: write assist draft only — never sets final_complete
     "agent-review-final": ("local", "none"),
     "queue-run-oauth": ("paid", "human_required"),
@@ -701,7 +706,8 @@ def build_dispatch(
                     isinstance(sp, dict)
                     and (
                         (isinstance(sp.get("h3"), dict) and sp["h3"].get("enabled"))
-                        or str(sp.get("_i2v_profile") or "") == "hybrid_h3"
+                        or str(sp.get("_i2v_profile") or "")
+                        in {"hybrid_h3", "h3_primary"}
                     )
                 )
             except Exception:

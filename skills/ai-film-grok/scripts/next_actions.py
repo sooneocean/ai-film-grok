@@ -43,6 +43,7 @@ _ACTION_STAGE: dict[str, str] = {
     "queue-or-register": "visual",
     "h3-fill-idle": "visual",
     "h3-lane": "visual",
+    "h3-run-next": "visual",
     "pilot-window": "visual",
     "tts-rehearse": "voice",
     "compose-preview": "design",
@@ -602,31 +603,67 @@ def build_next_actions(
                         f'aifilm bulk-preflight --root "{r}" --no-tunnel',
                         "bulk 单门未绿 — 先 bulk-preflight 再 media-queue",
                     )
-            # Hybrid H3: restricted/meat soft-lock → local MiniMax, not Grok bulk.
+            # H3 lanes: hybrid_h3 (meat) or h3_primary (film-wide local primary).
             h3_enabled = False
+            film_profile = ""
             try:
                 h3_block = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
                 film_profile = str(spec.get("_i2v_profile") or "").strip().lower()
-                h3_enabled = bool(h3_block.get("enabled") is True or film_profile == "hybrid_h3")
+                h3_enabled = bool(
+                    h3_block.get("enabled") is True
+                    or film_profile in {"hybrid_h3", "h3_primary"}
+                )
             except Exception:
                 h3_enabled = False
+            is_h3_primary = film_profile == "h3_primary"
             if h3_enabled:
+                if is_h3_primary:
+                    # Primary production path: 5090 unlimited throughput first.
+                    add(
+                        "h3-run-next",
+                        f'aifilm h3 run-next --root "{r}" --execute --max 5',
+                        "h3_primary 主产线：按场景 I2V/FLF/R2V/T2V 吃 P0→P1→P2（无限本地算力）",
+                    )
+                    add(
+                        "h3-fill-idle",
+                        f'aifilm h3 cycle --root "{r}" --execute --max 5',
+                        "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）",
+                    )
+                    add(
+                        "h3-lane",
+                        f'aifilm h3 list --root "{r}"; aifilm h3 next --root "{r}"',
+                        "h3_primary：list/next 看模式+队列；云 bulk 默认硬拦",
+                    )
+                    add(
+                        "queue-or-register",
+                        f'# cloud opt-in only under h3_primary\n'
+                        f'AIFILM_ALLOW_CLOUD_RESTRICTED=1 media-queue add --root "{r}" …',
+                        "镜头未齐：主轨 aifilm h3 run；Grok 云仅 escape 后可选",
+                    )
+                else:
+                    add(
+                        "h3-fill-idle",
+                        f'aifilm h3 cycle --root "{r}" --execute --max 5',
+                        "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）",
+                    )
+                    add(
+                        "h3-lane",
+                        f'aifilm h3 list --root "{r}" --challenge; aifilm h3 next --root "{r}"',
+                        "hybrid_h3：list/next 看 P0–P2；dual 粘连；P2=pilot",
+                    )
+                    add(
+                        "queue-or-register",
+                        f'media-queue add --root "{r}" --shot-id <id> --operation image_to_video … '
+                        f'&& aifilm register-clip --root "{r}" …',
+                        "镜头未齐：云 bulk 用 Grok 队列 + register-clip；H3 镜用 aifilm h3 run",
+                    )
+            else:
                 add(
-                    "h3-fill-idle",
-                    f'aifilm h3 cycle --root "{r}" --execute --max 5',
-                    "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）",
+                    "queue-or-register",
+                    f'media-queue add --root "{r}" --shot-id <id> --operation image_to_video … '
+                    f'&& aifilm register-clip --root "{r}" …',
+                    "镜头未齐：云 bulk 用 Grok 队列 + register-clip",
                 )
-                add(
-                    "h3-lane",
-                    f'aifilm h3 list --root "{r}" --challenge; aifilm h3 next --root "{r}"',
-                    "hybrid_h3：list/next 看 P0–P2；dual 粘连；P2=pilot",
-                )
-            add(
-                "queue-or-register",
-                f'media-queue add --root "{r}" --shot-id <id> --operation image_to_video … '
-                f'&& aifilm register-clip --root "{r}" …',
-                "镜头未齐：云 bulk 用 Grok 队列 + register-clip；H3 镜用 aifilm h3 run",
-            )
         else:
             add(
                 "pilot-pack",

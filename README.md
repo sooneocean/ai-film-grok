@@ -7,7 +7,7 @@
 
 | | |
 |---|---|
-| **版本** | **`2.39.13`**（见 [`plugin.json`](./plugin.json) · 变更 [`CHANGELOG.md`](./CHANGELOG.md)） |
+| **版本** | **`2.39.14`**（见 [`plugin.json`](./plugin.json) · 变更 [`CHANGELOG.md`](./CHANGELOG.md)） |
 | **GitHub** | https://github.com/sooneocean/ai-film-grok |
 | **Gitea（个人）** | http://172.238.15.154:3000/Redredchen01/ai-film-grok |
 | **Gitea（aidev）** | http://172.238.15.154:3000/aidev/ai-film-grok |
@@ -26,6 +26,7 @@
 | **Script-value debrief** | 锁故事前先写「用户/编剧/导演/观众/生产」L0–L4 价值卡；确认 promise + 不可砍 beat | `aifilm plan debrief --action seed\|confirm\|validate` |
 | **Input Fidelity** | 源句、must_keep、受保护对白是否还在成片链上；污染/实体覆盖/锚点打分 | `aifilm fidelity status\|check\|apply` · 回执 `receipts/input-fidelity.json` |
 | **design-go** | debrief + fidelity + 抗无聊一页纸；**永不代签 pilot** | `aifilm design-go --root <film>` |
+| **h3_primary 主产线** | 有 5090：全镜本地 H3（无限时间产能）；云 bulk 默认硬拦 | `AIFILM_I2V_PROFILE=h3_primary` · `aifilm h3 run-next` |
 | **hybrid_h3 双轨** | 安全 bulk 走 Grok；肉戏/高难/对白 CU 软锁本机 MiniMax H3（5090） | `AIFILM_I2V_PROFILE=hybrid_h3` · `aifilm h3 plan\|run` |
 | **FLF first+last** | 有首尾静帧时 H3 主轨优先 first+last frame；R2V 作能量位 / pose land | 有 end still 时自动 FLF；见 weapon-lane |
 | **Fill-Idle 挑战** | GPU 空闲时 P0→P1→P2 挑战（不抢 P0）；多 take 只给 shortlist，**人 promote** | `aifilm h3 next\|run-next\|cycle\|pk-compare\|evidence` |
@@ -334,7 +335,7 @@ final --post-engine hyperframes
 
 | 插槽 | 默认（当前季） | 可切换 | 怎么换 |
 |------|----------------|--------|--------|
-| **运营 profile** | `grok_primary`（纯云） | **`hybrid_h3`**（推荐有 5090 时）· `ltx23_primary`（仅旧项目） | `AIFILM_I2V_PROFILE=…` |
+| **运营 profile** | `grok_primary`（纯云） | **`h3_primary`**（推荐有 5090）· `hybrid_h3`（双轨）· `ltx23_primary`（旧） | `AIFILM_I2V_PROFILE=…` |
 | **L1 安全 bulk** | Grok `image_to_video` | FRW API I2V（分类技术失败 + canary） | 影片级 approved canary；禁静默换 provider |
 | **对白讲话镜（安全向）** | FRW **LTX 2.3** 原生有声 | Grok fallback | 锁 FRW 后同镜不回切 |
 | **肉戏 / 高难 / 受限对白** | `hybrid_h3` → **本机 MiniMax H3**（I2V / R2V / FLF） | Grok 仅 soft 铺量 | `aifilm h3 plan\|run` · pilot 批 |
@@ -346,11 +347,14 @@ final --post-engine hyperframes
 | 会话工具 | `image_to_video` | `reference_to_video`（少用） | 无原生 T2V |
 
 ```bash
-# 默认：纯云 Grok 主链
-AIFILM_I2V_PROFILE=grok_primary
+# 有私有 RTX 5090：全镜本地 H3 主产线（推荐 · 时间换无限产能）
+AIFILM_I2V_PROFILE=h3_primary
 
-# 有私有 RTX 5090 时：Grok 铺量 + H3 攻坚（推荐成人/高动片）
+# 双轨：Grok 铺量 + H3 攻坚
 # AIFILM_I2V_PROFILE=hybrid_h3
+
+# 纯云 Grok 主链
+# AIFILM_I2V_PROFILE=grok_primary
 
 # 仅旧项目显式锁定时使用 LTX-first 兼容路径
 # AIFILM_I2V_PROFILE=ltx23_primary
@@ -506,7 +510,7 @@ v1.6 新项目还需为 final 的七个维度各提供 `--screening-evidence "�
 | 变量 | 默认 | 含义 |
 |------|------|------|
 | `AIFILM_TTS_BACKEND` | `edge` | TTS 后端 |
-| `AIFILM_I2V_PROFILE` | `grok_primary` | `grok_primary` · **`hybrid_h3`** · `ltx23_primary`（旧） |
+| `AIFILM_I2V_PROFILE` | `h3_primary`（有 5090） | **`h3_primary`** · `hybrid_h3` · `grok_primary` · `ltx23_primary`（旧） |
 | `AIFILM_FIDELITY_STRICT` | off | `1` 时 fidelity check 失败退出 2 |
 | `AIFILM_DEBRIEF_STRICT` | off | `1` 时 story lock 要求已 confirm debrief |
 | `AIFILM_LIPSYNC_BACKEND` | `off` | 口型 |
@@ -549,7 +553,7 @@ cd ~/.grok/plugins/ai-film-grok
 
 | 路径 | 用途 |
 |------|------|
-| `plugin.json` | 插件元数据 / 版本 **`2.39.13`** |
+| `plugin.json` | 插件元数据 / 版本 **`2.39.14`** |
 | `CHANGELOG.md` | 版本明细（本季从 2.38→2.39 的 debrief / fidelity / H3 FLF / Fill-Idle） |
 | `commands/` | `/ai-film-grok` · `/aifilm` |
 | `skills/ai-film-grok/SKILL.md` | Agent 主脊（短） |
@@ -586,7 +590,7 @@ MIT © [dex](https://github.com/sooneocean)
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.39.13`
+- 插件版本：`2.39.14`
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
 - Python 脚本：`334` 个

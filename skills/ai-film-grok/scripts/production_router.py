@@ -345,7 +345,7 @@ def build_shot_intent(
     parent_shot_id = str(shot.get("_dialogue_broll_parent") or "").strip() or None
     broll_kind = str(shot.get("kind") or "").strip().lower() or None
     # Dual-lane recommendation (cloud Grok/FRW vs local MiniMax H3).
-    # Soft-lock only when the *film* opts in (h3.enabled or film _i2v_profile),
+    # Soft-lock when the *film* opts in (h3.enabled / hybrid_h3 / h3_primary),
     # not merely because the process env profile is hybrid_h3.
     try:
         from film_spec import resolve_h3_config
@@ -360,9 +360,11 @@ def build_shot_intent(
     film_profile = str(spec.get("_i2v_profile") or "").strip().lower()
     h3_raw = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
     # Prefer resolved config (adult-max auto-enable) over raw film-spec only.
-    h3_enabled = (
-        bool(h3_cfg.get("enabled")) or h3_raw.get("enabled") is True or film_profile == "hybrid_h3"
-    )
+    is_h3_primary = film_profile == "h3_primary"
+    h3_enabled = bool(h3_cfg.get("enabled")) or h3_raw.get("enabled") is True or film_profile in {
+        "hybrid_h3",
+        "h3_primary",
+    }
     lanes = spec.get("motion_lanes") if isinstance(spec.get("motion_lanes"), dict) else {}
     dialogue = bool(
         shot.get("lipsync") is True
@@ -374,10 +376,9 @@ def build_shot_intent(
     recommended_weapon: str | None = None
     audio_policy = "carry_parent_dialogue" if parent_shot_id is not None else None
     if dialogue and identity_lock:
-        # Dialogue-first lane: restricted (meat/bare) on-camera dialogue goes to
-        # local H3 (RTX 5090 i2v; r2v when reference states exist) with spoken
-        # Mandarin in-prompt; safe dialogue keeps the FRW LTX 2.3 native-audio棚.
-        if restricted:
+        # Dialogue-first: restricted (or full h3_primary) → local H3; safe dialogue
+        # under hybrid keeps FRW LTX 2.3 native-audio棚.
+        if restricted or is_h3_primary:
             recommended_lane = str(lanes.get("dialogue_restricted_local") or "local_dialogue_h3")
             recommended_provider = "comfy-h3"
             recommended_weapon = "minimax-h3-i2v-pilot"
@@ -397,14 +398,37 @@ def build_shot_intent(
         if h3_enabled and not provider_lock:
             provider_lock = "comfy-h3"
     elif role in {"env", "bridge", "insert"} and not identity_lock:
-        recommended_lane = str(lanes.get("env") or "cloud_env")
-        recommended_provider = "frw"
-        recommended_weapon = None
-        operation = "text_to_video"
+        # h3_primary: unlimited local T2V for no-face env/bridge (no FRW spend).
+        if is_h3_primary and h3_enabled:
+            recommended_lane = str(lanes.get("env") or "local_h3_t2v")
+            recommended_provider = "comfy-h3"
+            recommended_weapon = "minimax-h3-t2v-pilot"
+            audio_policy = str(h3_cfg.get("audio_policy") or "prefer_native")
+            operation = "text_to_video"
+            if not provider_lock:
+                provider_lock = "comfy-h3"
+        else:
+            recommended_lane = str(lanes.get("env") or "cloud_env")
+            recommended_provider = "frw"
+            recommended_weapon = None
+            operation = "text_to_video"
     elif identity_lock:
-        recommended_lane = str(lanes.get("setup_non_sensitive") or "cloud_grok")
-        recommended_provider = "grok"
-    recommended_still = "comfy_lan" if restricted and identity_lock else "grok"
+        if is_h3_primary and h3_enabled:
+            # Film-wide local primary: setup/soft also stays on 5090 H3.
+            recommended_lane = str(lanes.get("setup_non_sensitive") or "local_h3")
+            recommended_provider = "comfy-h3"
+            recommended_weapon = "minimax-h3-i2v-pilot"
+            audio_policy = str(h3_cfg.get("audio_policy") or "prefer_native")
+            if not provider_lock:
+                provider_lock = "comfy-h3"
+        else:
+            recommended_lane = str(lanes.get("setup_non_sensitive") or "cloud_grok")
+            recommended_provider = "grok"
+    recommended_still = (
+        "comfy_lan"
+        if (restricted and identity_lock) or (is_h3_primary and restricted)
+        else "grok"
+    )
     # Film-core payload for motion prompt spine (shared Grok/H3).
     try:
         from motion_prompt_spine import core_fields

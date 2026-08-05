@@ -14,9 +14,13 @@
 
 | 片型 | Profile / H3 |
 |------|----------------|
-| `genre=adult` 或 `heat_scale=max/hot/extreme` | 自动 `h3.enabled=true`，片级 `_i2v_profile→hybrid_h3`（Grok bulk + H3 meat） |
+| **本机 5090 主产线（推荐）** | **`AIFILM_I2V_PROFILE=h3_primary`** → auto=`comfy-h3`；setup/meat/对白/env 默认本地；云 bulk 硬拦 |
+| `genre=adult` 或 `heat_scale=max/hot/extreme` | 自动 `h3.enabled=true`，片级 `_i2v_profile→hybrid_h3`（Grok bulk + H3 meat）；**有 5090 请显式改 `h3_primary`** |
 | 非成人 / `heat soft` / `adult_max_iron:false` / `h3.enabled=false` | 保持 `grok_primary`，不锁 H3 |
-| 显式 `AIFILM_I2V_PROFILE=hybrid_h3` | 始终 dual-lane |
+| 显式 `AIFILM_I2V_PROFILE=hybrid_h3` | 双轨：Grok soft + H3 restricted |
+| 显式 `AIFILM_I2V_PROFILE=h3_primary` | **全片 H3 主轨**（时间无限；Grok 仅 escape） |
+
+> 定策档：[docs/plans/2026-08-05-h3-primary-capacity.md](../../../docs/plans/2026-08-05-h3-primary-capacity.md)
 
 ## 镜头路由
 
@@ -132,6 +136,19 @@ aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --
 3. **机读建议 + 人最终拍板**——shortlist/mean 可推荐；`preferred` / approved **必须人一眼**（防换人、毒、回穿）。
 
 ### 谁是主轨
+
+**`h3_primary`（推荐 · 无限本地）**
+
+| 镜类 | 主生成 | 模式 |
+|------|--------|------|
+| setup / soft hero | **H3** | I2V（有 last→FLF） |
+| restricted / bare / 高难 | **H3** | I2V；高难→R2V |
+| 对白近景 | **H3** | I2V+台词；狠嘴→R2V |
+| env / bridge 无脸 | **H3** | **T2V** |
+| 续镜 continue | **H3** | I2V 末帧 / FLF |
+| Grok | 可选 pilot / 云 escape | 不默认 bulk |
+
+**`hybrid_h3`（双轨兼容）**
 
 | 镜类 | 主生成 | H3 角色 |
 |------|--------|---------|

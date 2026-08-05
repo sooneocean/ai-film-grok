@@ -93,7 +93,11 @@ TTS_BACKENDS = frozenset(
 # Motion provider profile. FRW LTX 2.3 is the production action primary.
 # ``seedance_first`` and ``grok_primary`` remain readable compatibility inputs.
 I2V_PROVIDERS = frozenset({"frw", "frw-ltx23", "grok", "comfy-h3", "auto"})
-I2V_PROFILES = frozenset({"ltx23_primary", "seedance_first", "grok_primary", "hybrid_h3"})
+# h3_primary: local 5090 MiniMax H3 is the film-wide motion primary (unlimited compute).
+# hybrid_h3: dual-lane (Grok bulk soft + H3 restricted/meat).
+I2V_PROFILES = frozenset(
+    {"ltx23_primary", "seedance_first", "grok_primary", "hybrid_h3", "h3_primary"}
+)
 # Native resolution for 9:16 shorts. FRW LTX may return 704x1280 and must
 # preserve that native pair; conforming is a later delivery decision.
 DEFAULT_FRW_ASPECT = "9:16"
@@ -136,10 +140,11 @@ FRW_VIDEO_MODELS = frozenset(
 
 
 def resolve_i2v_profile() -> str:
-    """Operating profile for hero I2V bulk.
+    """Operating profile for hero motion bulk.
 
     ``seedance_first`` is retained for backwards-compatible parsing but now
     normalizes to the supported Grok-first action chain.
+    ``h3_primary`` = local 5090 MiniMax H3 is the film-wide primary (T2V/I2V/R2V/FLF).
     """
     from config_loader import get_config
 
@@ -152,6 +157,9 @@ def resolve_i2v_profile() -> str:
 
 def default_i2v_provider() -> str:
     profile = resolve_i2v_profile()
+    if profile == "h3_primary":
+        # Unlimited local compute primary; Grok only via opt-in cloud escape.
+        return "comfy-h3"
     if profile in {"grok_primary", "hybrid_h3"}:
         # hybrid_h3 keeps Grok as the bulk auto lock; restricted shots route to
         # comfy-h3 via production_router / shot intent, not a film-wide lock.
@@ -182,15 +190,16 @@ DEFAULT_H3_CONFIG: dict[str, object] = {
 
 
 def resolve_h3_config(spec: dict | None = None) -> dict[str, object]:
-    """Merge film-spec h3 block with profile defaults (hybrid_h3 opts in).
+    """Merge film-spec h3 block with profile defaults.
 
-    Adult / heat max films auto-enable dual-lane H3 (Grok bulk + local meat)
-    unless ``h3.enabled`` is explicitly false or heat is soft.
+    - ``h3_primary`` / ``hybrid_h3`` → H3 lane enabled
+    - Adult / heat max films auto-enable dual-lane H3 (Grok bulk + local meat)
+      unless ``h3.enabled`` is explicitly false or heat is soft
     """
     profile = resolve_i2v_profile()
     raw = (spec or {}).get("h3") if isinstance(spec, dict) else None
     merged = dict(DEFAULT_H3_CONFIG)
-    if profile == "hybrid_h3":
+    if profile in {"hybrid_h3", "h3_primary"}:
         merged["enabled"] = True
     # Adult-max default dual-lane without requiring env hybrid_h3.
     if isinstance(spec, dict) and profile != "ltx23_primary":
@@ -1058,6 +1067,13 @@ def validate_film_spec(
                 "env → FRW ltx-t2v; dialogue → FRW LTX; setup non-sensitive → Grok; "
                 "H3 audio prefer_native (keep usable stereo; else strip→TTS/BGM)"
             )
+        elif i2v_profile == "h3_primary":
+            i2v_notes.append(
+                "auto→comfy-h3 film-wide primary (AIFILM_I2V_PROFILE=h3_primary): "
+                "setup/meat/dialogue/continue → local MiniMax H3 (I2V/FLF/R2V by scene); "
+                "env/bridge no-face → H3 T2V; Grok cloud only via AIFILM_ALLOW_CLOUD_RESTRICTED=1; "
+                "H3 audio prefer_native"
+            )
         else:
             i2v_notes.append("auto→frw-ltx23 (compatibility profile normalized to LTX primary)")
         spec["_i2v_notes"] = i2v_notes
@@ -1069,27 +1085,60 @@ def validate_film_spec(
             "auto always resolves to Grok primary"
         )
         spec["_i2v_notes"] = i2v_notes
+    if i2v_profile == "h3_primary" and i2v_provider in {"grok", "frw", "frw-ltx23"}:
+        i2v_notes = list(spec.get("_i2v_notes") or [])
+        i2v_notes.append(
+            f"NOTE explicit i2v_provider={i2v_provider} under h3_primary — cloud/FRW is "
+            "opt-in only; per-shot soft-lock still prefers comfy-h3 unless provider is "
+            "shot-explicit"
+        )
+        spec["_i2v_notes"] = i2v_notes
     spec["i2v_provider"] = i2v_provider
-    # Dual-lane MiniMax H3: hybrid_h3 profile, explicit h3.enabled, or adult-max auto.
+    # Dual-lane MiniMax H3: hybrid_h3 / h3_primary, explicit h3.enabled, or adult-max auto.
     h3_cfg = resolve_h3_config(spec)
     spec["h3"] = h3_cfg
     if h3_cfg.get("enabled") is True:
+        # Do not demote an explicit h3_primary film to hybrid_h3.
         if str(spec.get("_i2v_profile") or "") == "grok_primary":
             spec["_i2v_profile"] = "hybrid_h3"
             notes = list(spec.get("_i2v_notes") or [])
             notes.append(
                 "adult/heat dual-lane: film promoted to hybrid_h3 (Grok setup bulk + "
-                "local MiniMax H3 restricted/meat); set h3.enabled=false to opt out"
+                "local MiniMax H3 restricted/meat); set h3.enabled=false to opt out, "
+                "or AIFILM_I2V_PROFILE=h3_primary for full local primary"
             )
             spec["_i2v_notes"] = notes
         if not isinstance(spec.get("motion_lanes"), dict):
-            spec["motion_lanes"] = {
-                "default": "cloud",
-                "restricted_local": "comfy-h3",
-                "env": "frw_ltx_t2v",
-                "dialogue": "frw_ltx23",
-                "setup_non_sensitive": "grok",
-            }
+            if str(spec.get("_i2v_profile") or "") == "h3_primary":
+                spec["motion_lanes"] = {
+                    "default": "comfy-h3",
+                    "restricted_local": "comfy-h3",
+                    "env": "comfy-h3",
+                    "dialogue": "comfy-h3",
+                    "dialogue_restricted_local": "comfy-h3",
+                    "setup_non_sensitive": "comfy-h3",
+                    "allow_cloud_soft": False,
+                }
+            else:
+                spec["motion_lanes"] = {
+                    "default": "cloud",
+                    "restricted_local": "comfy-h3",
+                    "env": "frw_ltx_t2v",
+                    "dialogue": "frw_ltx23",
+                    "setup_non_sensitive": "grok",
+                }
+    elif str(spec.get("_i2v_profile") or "") == "h3_primary" and not isinstance(
+        spec.get("motion_lanes"), dict
+    ):
+        # Profile alone still seeds local-primary lanes even if h3.enabled later false.
+        spec["motion_lanes"] = {
+            "default": "comfy-h3",
+            "restricted_local": "comfy-h3",
+            "env": "comfy-h3",
+            "dialogue": "comfy-h3",
+            "setup_non_sensitive": "comfy-h3",
+            "allow_cloud_soft": False,
+        }
     # FRW video model (Seedance/LTX path). auto → seedance id kept as aspirational label
     raw_fvm = spec.get("frw_video_model", default_frw_video_model())
     if not isinstance(raw_fvm, str) or raw_fvm.lower() not in FRW_VIDEO_MODELS:

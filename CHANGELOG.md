@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.39.14] - 2026-08-05
+
+### Added (h3_primary · 5090 unlimited mainline · P0)
+- **`AIFILM_I2V_PROFILE=h3_primary`**: film-wide local MiniMax H3 primary (`auto` → `comfy-h3`).
+- **Router**: setup / safe dialogue / env under `h3_primary` lock to H3 (I2V or T2V); Grok not default bulk.
+- **media-queue**: blocks cloud for all H3-locked shots on `h3_primary` (escape `AIFILM_ALLOW_CLOUD_RESTRICTED=1`).
+- **dispatch / next_actions**: prefer `h3-run-next` when clips incomplete + H3 primary.
+- **Docs**: `docs/plans/2026-08-05-h3-primary-capacity.md` · memory · weapon-lane · stages/visual · SKILL P0.
+- **Tests**: `tests/test_h3_primary.py` (+ profile unit).
+
 ## [2.39.13] - 2026-08-05
 
 ### Changed (Machine-lane consolidation · single entry)

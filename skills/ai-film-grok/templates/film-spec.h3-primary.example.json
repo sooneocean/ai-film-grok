@@ -1,0 +1,19 @@
+{
+  "title": "H3 Primary Example",
+  "aspect_ratio": "9:16",
+  "genre": "adult",
+  "heat_scale": "max",
+  "i2v_provider": "auto",
+  "tts_backend": "edge",
+  "vo_mode": "dialogue_drama",
+  "h3": {
+    "enabled": true,
+    "audio_policy": "prefer_native",
+    "max_duration_sec": 8
+  },
+  "_notes": [
+    "Set AIFILM_I2V_PROFILE=h3_primary so write-spec resolves auto→comfy-h3 and seeds motion_lanes default=comfy-h3.",
+    "Modes: env→T2V · still only→I2V · first+last→FLF · high energy→R2V (h3 plan/list).",
+    "Cloud bulk blocked unless AIFILM_ALLOW_CLOUD_RESTRICTED=1."
+  ]
+}

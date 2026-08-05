@@ -23,7 +23,7 @@
     "setup_non_sensitive": "grok"
   },
   "notes": [
-    "AIFILM_I2V_PROFILE=hybrid_h3 (or keep grok_primary and set h3.enabled true).",
+    "AIFILM_I2V_PROFILE=hybrid_h3 (dual-lane) or h3_primary (full local 5090 primary).",
     "Restricted/meat hero shots soft-lock to comfy-h3 pilot; bulk auto stays Grok.",
     "H3 native stereo is preferred when usable; set strip_native_use_tts_bgm only for VO-only plates.",
     "Do not allow_bulk until user-approved pilot and weapon promote."

@@ -240,7 +240,7 @@
         "comfy-h3",
         "auto"
       ],
-      "description": "Bulk motion provider. auto follows AIFILM_I2V_PROFILE (grok_primary/hybrid_h3 → grok; ltx23_primary → frw-ltx23). comfy-h3 is the local MiniMax H3 pilot lock; restricted shots may soft-lock to comfy-h3 under hybrid_h3 without changing film-wide auto bulk."
+      "description": "Bulk motion provider. auto follows AIFILM_I2V_PROFILE (h3_primary → comfy-h3 film-wide; hybrid_h3/grok_primary → grok bulk with H3 soft-lock on restricted; ltx23_primary → frw-ltx23). comfy-h3 is the local MiniMax H3 lock."
     },
     "motion_lanes": {
       "type": "object",

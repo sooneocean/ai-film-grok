@@ -50,6 +50,15 @@ class I2VProfileTests(unittest.TestCase):
             self.assertEqual(resolve_i2v_profile(), "hybrid_h3")
             self.assertEqual(default_i2v_provider(), "grok")
 
+    def test_h3_primary_profile_opt_in(self) -> None:
+        import config_loader as cl
+
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "h3_primary"}):
+            cl._CONFIG = None
+            cl._CONFIG_ENV_FINGERPRINT = None
+            self.assertEqual(resolve_i2v_profile(), "h3_primary")
+            self.assertEqual(default_i2v_provider(), "comfy-h3")
+
     def test_write_spec_auto_to_grok(self) -> None:
         with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}):
             spec = {

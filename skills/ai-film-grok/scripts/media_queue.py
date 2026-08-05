@@ -457,10 +457,16 @@ class MediaQueue:
                         locked = str(intent.get("provider_lock") or "").strip().lower()
                         rec = str(intent.get("recommended_provider") or "").strip().lower()
                         h3_on = bool(intent.get("h3_enabled"))
+                        film_profile = str(raw_spec.get("_i2v_profile") or "").strip().lower()
+                        is_h3_primary = film_profile == "h3_primary"
+                        # hybrid: block restricted meat; h3_primary: all H3-locked shots
                         wants_h3 = locked == "comfy-h3" or (
                             h3_on
                             and rec == "comfy-h3"
-                            and intent.get("content_class") == "restricted_local"
+                            and (
+                                intent.get("content_class") == "restricted_local"
+                                or is_h3_primary
+                            )
                         )
                         contract_provider = (
                             str((generation_contract or {}).get("provider") or "").strip().lower()
@@ -475,13 +481,18 @@ class MediaQueue:
                             "minimax-h3",
                         }:
                             if not allow_cloud:
+                                lane_why = (
+                                    "h3_primary film-wide local primary"
+                                    if is_h3_primary
+                                    else "restricted_local"
+                                )
                                 raise QueueError(
-                                    f"shot {shot_id!r} is restricted_local → local MiniMax H3 "
+                                    f"shot {shot_id!r} is {lane_why} → local MiniMax H3 "
                                     f"(provider_lock={locked or rec}). "
                                     f'Use: aifilm h3 plan --root "{self.root}" --shot-id {shot_id} '
                                     f'&& aifilm h3 run --root "{self.root}" --shot-id {shot_id} '
                                     f"--register. Escape: AIFILM_ALLOW_CLOUD_RESTRICTED=1 "
-                                    f"(not recommended for bare/meat)."
+                                    f"(not recommended for bare/meat / h3_primary)."
                                 )
                         # Motion Prompt Spine: enrich + fail-closed empty core (P0/A).
                         from motion_prompt_spine import (
