@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.47] - 2026-08-05
+
+### Changed (module refactor · W4 render_final peel)
+- New package `scripts/final/`: `caption_text` · `voice` · `media_ops` · `errors`.
+- Peel pure caption/voice/media helpers from `render_final.py` (~4333 → **~3305** LOC).
+- Hard-compat: `render_final` re-exports public symbols for existing tests/importers.
+
 ## [2.39.46] - 2026-08-05
 
 ### Added (Weapon inventory CLI + doctor/dispatch surface)

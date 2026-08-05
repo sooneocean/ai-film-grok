@@ -1,6 +1,6 @@
 # Project module refactor — ACTIVE tracker (2026-08-05)
 
-**Status:** ACTIVE · W0–W3 SHIPPED (v2.39.44) · W4 domain peel next
+**Status:** ACTIVE · W0–W4 partial SHIPPED (v2.39.47) · heat/export residual · W5 docs
 **Selection:** Full A+B+C · hard compatibility (shims; public CLI strings never rename)  
 **Evidence tree:** `origin/main` @ plugin **2.39.30** · hub **`aifilm_grok.py` = 1455 LOC** · `scripts/core/*` present  
 **Do not claim DONE from dirty worktree alone** — only origin (or green main after push).
@@ -37,7 +37,7 @@ Landing commits (structure): `0f355f60` refactor W1+W2 · follow-ups `071a3113` 
 | W1 | `scripts/core/*` · break cli↔hub IO cycle | **DONE** (on origin/main) |
 | W2 | CLI parser/cmd extract · hub ≤2500 | **DONE** (hub 1455) |
 | W3 | Package dirs + top-level shims | **DONE** (v2.39.44) |
-| W4 | Domain monoliths (render_final / heat / …) | pending |
+| W4 | Domain monoliths (render_final peel first) | **DONE** partial v2.39.47 (render_final ~3305) |
 | W5 | Docs / AREA align / shim audit | pending |
 
 ## Iron
