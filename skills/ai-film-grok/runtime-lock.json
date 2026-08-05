@@ -270,7 +270,7 @@
     },
     {
       "path": "scripts/caption_pixel_check.py",
-      "sha256": "1d87fff4646ccfebcf6b9d4cc001bc42c7a17e2545cf0d680eb30bad3c791900"
+      "sha256": "1be9561bca990b09b8bfeaccc5da11a6569a5d29c6afc10b809b8d237d4e75fc"
     },
     {
       "path": "scripts/checkpoint.py",
@@ -422,7 +422,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "9dbbe32c3ed52876c5cc3dddd41c9b42d1bc3b111fd03093bb985f05bf169399"
+      "sha256": "65f964c29dcabed71209869c669a809de8fd9466cbf800e9a6377dc7045557a2"
     },
     {
       "path": "scripts/cloud_media_download.py",
