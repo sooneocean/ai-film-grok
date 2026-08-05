@@ -1,0 +1,301 @@
+{
+  "schema": "aifilm-tts-manifest-v1",
+  "generated_at": "2026-08-05T09:34:25.576668+00:00",
+  "engines": {
+    "free": {
+      "date": "2026-07-29",
+      "status": "active",
+      "samples": [
+        {
+          "engine": "free",
+          "sample": "edge_ja_dialogue",
+          "audio_path": "2026-07-29-free/edge_ja_dialogue.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        },
+        {
+          "engine": "free",
+          "sample": "edge_zh_narration",
+          "audio_path": "2026-07-29-free/edge_zh_narration.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        },
+        {
+          "engine": "free",
+          "sample": "qwen5090_default_route",
+          "audio_path": "2026-07-29-free/qwen5090_default_route.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        },
+        {
+          "engine": "free",
+          "sample": "qwen5090_ja_female",
+          "audio_path": "2026-07-29-free/qwen5090_ja_female.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        },
+        {
+          "engine": "free",
+          "sample": "qwen5090_zh_storyteller",
+          "audio_path": "2026-07-29-free/qwen5090_zh_storyteller.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        }
+      ]
+    },
+    "chatterbox": {
+      "date": "2026-07-30",
+      "status": "active",
+      "samples": [
+        {
+          "engine": "chatterbox",
+          "sample": "chatterbox_adapter_zh",
+          "audio_path": "2026-07-30-chatterbox/chatterbox_adapter_zh.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        },
+        {
+          "engine": "chatterbox",
+          "sample": "chatterbox_backend_zh",
+          "audio_path": "2026-07-30-chatterbox/chatterbox_backend_zh.mp3",
+          "format": "mp3",
+          "text": "她靠近窗边，声音清晰而平静，这段本地口白已经接入到影片管线。",
+          "status": "ok"
+        },
+        {
+          "engine": "chatterbox",
+          "sample": "chatterbox_multilingual_zh",
+          "audio_path": "2026-07-30-chatterbox/chatterbox_multilingual_zh.wav",
+          "format": "wav",
+          "text": null,
+          "status": "ok"
+        }
+      ]
+    },
+    "cosyvoice": {
+      "date": "2026-07-30",
+      "status": "active",
+      "samples": [
+        {
+          "engine": "cosyvoice",
+          "sample": "cosyvoice_backend_zh_female",
+          "audio_path": "2026-07-30-cosyvoice/cosyvoice_backend_zh_female.mp3",
+          "format": "mp3",
+          "text": "她在清晨的窗前，轻声说：这一段旁白可以安心交给本地模型。",
+          "status": "ok"
+        },
+        {
+          "engine": "cosyvoice",
+          "sample": "cosyvoice_sft_zh_female",
+          "audio_path": "2026-07-30-cosyvoice/cosyvoice_sft_zh_female.wav",
+          "format": "wav",
+          "text": null,
+          "status": "ok"
+        }
+      ]
+    },
+    "free-expanded": {
+      "date": "2026-07-30",
+      "status": "active",
+      "samples": [
+        {
+          "engine": "free-expanded",
+          "sample": "qwen_ja_male_cool",
+          "audio_path": "2026-07-30-free-expanded/qwen_ja_male_cool.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        },
+        {
+          "engine": "free-expanded",
+          "sample": "qwen_ja_male_gentle",
+          "audio_path": "2026-07-30-free-expanded/qwen_ja_male_gentle.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        },
+        {
+          "engine": "free-expanded",
+          "sample": "qwen_zh_male_narrator",
+          "audio_path": "2026-07-30-free-expanded/qwen_zh_male_narrator.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        },
+        {
+          "engine": "free-expanded",
+          "sample": "qwen_zh_male_warm",
+          "audio_path": "2026-07-30-free-expanded/qwen_zh_male_warm.mp3",
+          "format": "mp3",
+          "text": null,
+          "status": "ok"
+        }
+      ]
+    },
+    "kokoro": {
+      "date": "2026-07-30",
+      "status": "active",
+      "samples": [
+        {
+          "engine": "kokoro",
+          "sample": "kokoro_backend_zh_zf001",
+          "audio_path": "2026-07-30-kokoro/kokoro_backend_zh_zf001.mp3",
+          "format": "mp3",
+          "text": "这是一段离线中文口白验证。",
+          "status": "ok"
+        },
+        {
+          "engine": "kokoro",
+          "sample": "kokoro_zh_zf001",
+          "audio_path": "2026-07-30-kokoro/kokoro_zh_zf001.wav",
+          "format": "wav",
+          "text": null,
+          "status": "ok"
+        }
+      ]
+    },
+    "fish": {
+      "date": "2026-07-29",
+      "status": "archived_failed",
+      "samples": [],
+      "errors": 8,
+      "note": "all requests failed (HTTP 402: API credit exhausted); archived out of active rotation"
+    }
+  },
+  "samples": [
+    {
+      "engine": "free",
+      "sample": "edge_ja_dialogue",
+      "audio_path": "2026-07-29-free/edge_ja_dialogue.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "free",
+      "sample": "edge_zh_narration",
+      "audio_path": "2026-07-29-free/edge_zh_narration.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "free",
+      "sample": "qwen5090_default_route",
+      "audio_path": "2026-07-29-free/qwen5090_default_route.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "free",
+      "sample": "qwen5090_ja_female",
+      "audio_path": "2026-07-29-free/qwen5090_ja_female.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "free",
+      "sample": "qwen5090_zh_storyteller",
+      "audio_path": "2026-07-29-free/qwen5090_zh_storyteller.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "chatterbox",
+      "sample": "chatterbox_adapter_zh",
+      "audio_path": "2026-07-30-chatterbox/chatterbox_adapter_zh.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "chatterbox",
+      "sample": "chatterbox_backend_zh",
+      "audio_path": "2026-07-30-chatterbox/chatterbox_backend_zh.mp3",
+      "format": "mp3",
+      "text": "她靠近窗边，声音清晰而平静，这段本地口白已经接入到影片管线。",
+      "status": "ok"
+    },
+    {
+      "engine": "chatterbox",
+      "sample": "chatterbox_multilingual_zh",
+      "audio_path": "2026-07-30-chatterbox/chatterbox_multilingual_zh.wav",
+      "format": "wav",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "cosyvoice",
+      "sample": "cosyvoice_backend_zh_female",
+      "audio_path": "2026-07-30-cosyvoice/cosyvoice_backend_zh_female.mp3",
+      "format": "mp3",
+      "text": "她在清晨的窗前，轻声说：这一段旁白可以安心交给本地模型。",
+      "status": "ok"
+    },
+    {
+      "engine": "cosyvoice",
+      "sample": "cosyvoice_sft_zh_female",
+      "audio_path": "2026-07-30-cosyvoice/cosyvoice_sft_zh_female.wav",
+      "format": "wav",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "free-expanded",
+      "sample": "qwen_ja_male_cool",
+      "audio_path": "2026-07-30-free-expanded/qwen_ja_male_cool.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "free-expanded",
+      "sample": "qwen_ja_male_gentle",
+      "audio_path": "2026-07-30-free-expanded/qwen_ja_male_gentle.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "free-expanded",
+      "sample": "qwen_zh_male_narrator",
+      "audio_path": "2026-07-30-free-expanded/qwen_zh_male_narrator.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "free-expanded",
+      "sample": "qwen_zh_male_warm",
+      "audio_path": "2026-07-30-free-expanded/qwen_zh_male_warm.mp3",
+      "format": "mp3",
+      "text": null,
+      "status": "ok"
+    },
+    {
+      "engine": "kokoro",
+      "sample": "kokoro_backend_zh_zf001",
+      "audio_path": "2026-07-30-kokoro/kokoro_backend_zh_zf001.mp3",
+      "format": "mp3",
+      "text": "这是一段离线中文口白验证。",
+      "status": "ok"
+    },
+    {
+      "engine": "kokoro",
+      "sample": "kokoro_zh_zf001",
+      "audio_path": "2026-07-30-kokoro/kokoro_zh_zf001.wav",
+      "format": "wav",
+      "text": null,
+      "status": "ok"
+    }
+  ]
+}

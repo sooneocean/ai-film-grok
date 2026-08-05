@@ -2,6 +2,9 @@
 *.lock
 .DS_Store
 
+# Safety backups produced by mutation scripts
+*.bak
+
 # Model / download caches (regenerable, not project data)
 melo-cache/
 

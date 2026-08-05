@@ -1,7 +1,7 @@
 {
   "schema": "aifilm-bgm-library-v1",
-  "revision": 89,
-  "updated_at": "2026-07-29T06:31:09.418062+00:00",
+  "revision": 90,
+  "updated_at": "2026-08-05T09:29:07.293669+00:00",
   "assets": {
     "rnb-5900-7255568d10": {
       "schema": "aifilm-bgm-asset-v1",
@@ -321,7 +321,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "rnb-5901-2b956d25b9",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -486,7 +486,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "rnb-5902-684c00d651",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -651,7 +651,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "rnb-5903-12db10a093",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -816,7 +816,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "sensual-6100-6e9aec27df",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -981,7 +981,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "sensual-6101-6a7972c8b2",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -1146,7 +1146,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "sensual-6102-16f19f20b6",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -1311,7 +1311,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "sensual-6103-39336cab46",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -1641,7 +1641,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "dark-6200-9df3e64099",
+      "similarity_cluster": "dark-6201-3e9a2d4889",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -1806,7 +1806,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "dark-6202-45ccd1cfa8",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -2136,7 +2136,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "warm-6300-5dee332847",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -2466,7 +2466,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "warm-6302-6d84fd57e0",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -2631,7 +2631,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "warm-6301-340870bdd7",
+      "similarity_cluster": "warm-6303-4db1444266",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -2961,7 +2961,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "playful-6401-aaed2b88b9",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -3126,7 +3126,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "playful-6402-62a915eb17",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -3291,7 +3291,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "playful-6402-62a915eb17",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -3621,7 +3621,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "rnb-6501-7334fe1fba",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -3786,7 +3786,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "rnb-6502-db735a083e",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -3951,7 +3951,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "rnb-6503-a478648f7a",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -4116,7 +4116,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "rnb-6504-8839161f67",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -4446,7 +4446,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "sensual-6101-6a7972c8b2",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -4611,7 +4611,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "sensual-6601-ae3bfa1ff6",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -4776,7 +4776,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "sensual-6101-6a7972c8b2",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -4941,7 +4941,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "sensual-6603-968320f8fd",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -5106,7 +5106,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "dark-6700-3d6d54add0",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -5271,7 +5271,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "dark-6701-02a1dd7b31",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -5436,7 +5436,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "dark-6700-3d6d54add0",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -5601,7 +5601,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "dark-6703-37303756ae",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -6096,7 +6096,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "warm-6802-58f36cf57e",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -6261,7 +6261,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "warm-6801-1dc1e60f1c",
+      "similarity_cluster": "warm-6803-6bebe1fce5",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -6591,7 +6591,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "playful-6901-80ec4029b5",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -6756,7 +6756,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "playful-6402-62a915eb17",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -6921,7 +6921,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "playful-6400-6ee5b68a56",
+      "similarity_cluster": "playful-6903-29a5f79346",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -7108,7 +7108,7 @@
         ]
       },
       "instrumental": true,
-      "similarity_cluster": "rnb-5900-7255568d10",
+      "similarity_cluster": "rnb-6504-8839161f67",
       "human_review": {
         "reviewer": "dex",
         "instrumental_confirmed": true,
@@ -7302,7 +7302,7 @@
         ]
       },
       "instrumental": false,
-      "similarity_cluster": null,
+      "similarity_cluster": "rnb-21001-dedb5bddc6",
       "human_review": null,
       "license_note": "",
       "use_count": 0,
@@ -7494,7 +7494,7 @@
         ]
       },
       "instrumental": false,
-      "similarity_cluster": null,
+      "similarity_cluster": "rnb-21003-66462ca8cd",
       "human_review": null,
       "license_note": "",
       "use_count": 0,
@@ -7677,7 +7677,7 @@
         ]
       },
       "instrumental": false,
-      "similarity_cluster": null,
+      "similarity_cluster": "rnb-21004-5e683c78b7",
       "human_review": null,
       "license_note": "",
       "use_count": 0,
