@@ -2,7 +2,8 @@
 
 **Status:** ACTIVE · Waves 0–2 / until-empty / gate-slim **SHIPPED** · canary dry **PARTIAL** (2026-08-05)  
 **Repo pointer** for **ops throughput waves** (this file).  
-**Strategy pointer (director + engineer residual):** [2026-08-05-strategy-director-engineer-upgrade.md](2026-08-05-strategy-director-engineer-upgrade.md)
+**Strategy pointer (director + engineer residual):** [2026-08-05-strategy-director-engineer-upgrade.md](2026-08-05-strategy-director-engineer-upgrade.md)  
+**Structure residual (大石 internal peels):** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md) · owner [project-module-refactor](2026-08-05-project-module-refactor.md) (W0–W5 package SHIPPED · internal peels optional)
 
 ## 一句话
 

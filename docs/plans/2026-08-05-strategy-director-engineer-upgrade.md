@@ -14,7 +14,7 @@
 |-----|----------------------|
 | **This file** | **Single strategy pointer** (dual-lens + ordered residual todos) |
 | [2026-08-05-optimization-todoplan.md](2026-08-05-optimization-todoplan.md) | Ops throughput waves — Waves 0–2/4/5/M **SHIPPED**; residual pointed here |
-| [2026-08-05-project-module-refactor.md](2026-08-05-project-module-refactor.md) | Structure owner — **W0–W2 SHIPPED on origin** · residual **W3–W5** |
+| [2026-08-05-project-module-refactor.md](2026-08-05-project-module-refactor.md) | Structure owner — **W0–W5 package/docs SHIPPED** · residual **internal peels** |
 | [2026-08-05-antifragility-todoplan.md](2026-08-05-antifragility-todoplan.md) | Fail-closed / hang / PARTIAL honesty residuals |
 | [2026-08-05-h3-primary-capacity.md](2026-08-05-h3-primary-capacity.md) | h3_primary + until-empty — **code SHIPPED**; true overnight canary OPEN |
 | [2026-08-05-material-fidelity-loop.md](2026-08-05-material-fidelity-loop.md) | M0–M4 SHIPPED; M5–M6 **code landed ~2.39.23** (doc backlog stale) |
@@ -52,9 +52,9 @@
 | Module | ~LOC | Why it matters |
 |--------|-----:|----------------|
 | `aifilm_grok.py` | **1455** | CLI hub after W1/W2 extract (≤2500 met) |
-| `render_final.py` | **4333** | final master path · coverage **~30%** · **W4 candidate** |
-| `edit_policy_heat.py` | **4015** | adult max / heat arc / wardrobe iron · **W4** |
-| `film_spec.py` | **3234** | write-spec / validate / projectors · **W4** |
+| `post/render_final.py` | **4333** | package-boundary SHIPPED; body still multi-k · **internal peel residual** — [residual plan](2026-08-05-residual-monolith-w4-todo.md) |
+| `narrative/edit_policy_heat.py` | **4015** | package-boundary SHIPPED · **internal packs residual** (bug-driven) |
+| `film_spec.py` | **3234** | write-spec / validate / projectors · **residual** |
 | `story_plan.py` | **2858** | plan run / spines |
 | `export_composition.py` | **2835** | compose / HF export surface |
 | `edit_policy.py` | **2667** | visual_fit / stretch / cut silk |
@@ -119,7 +119,6 @@ story.receive → script-value-debrief → plan run → fidelity
 | **R-af2** | closeout ↔ post_doctor / caption-pixel chain incomplete | Modules exist; not fully wired into single fail-closed closeout |
 | **R-doc** | hard-defaults §量产十条 L169 still “Grok→FRW bulk” | Contradicts `h3_primary` / weapon-lane canon |
 | **R-mf-doc** | material-fidelity plan still lists M5–M6 backlog | Code landed; tracker stale |
-| **R-struct** | Module refactor **W3–W5 only** (W0–W2 SHIPPED) | Package dirs / domain monoliths (render_final, heat…) / AREA shim audit |
 | **R-cov** | final/compose failure-mode tests | Low coverage on ship path; not line vanity |
 | **R-util** | Wave 3 util FilmError / run_ffmpeg migration | Partial since opt plan |
 | **R-hygiene** | Local dirty trees / doc drift | Keep tracker/status tied to origin evidence |
@@ -243,15 +242,15 @@ Implement as **receipt counters** on real film roots (not new IRON paragraphs).
 3. Never mix “big move + policy change” in one commit.  
 4. Per wave: `make check-all` + `make lock-runtime` when script fingerprints change + English commit + push.
 
-### E1 · Module refactor residual = W3–W5 (W1/W2 SHIPPED)
+### E1 · Module refactor residual = internal peels (W0–W5 package/docs SHIPPED)
 
-**State on origin/main (2.39.30):** `scripts/core/*` present (~795 LOC); hub **1455** ≤2500; public CLI strings unchanged.  
-**Do not re-do W1/W2.** Residual:
+**State:** hub **~1462** ≤2500; `scripts/core/*` (~795); packages include `post/` + `narrative/` (W4 boundary `ef9c4c70`); W5 docs DONE.  
+**Do not re-do W0–W5 package/docs.** Residual:
 
-1. **W3:** package dirs + top-level shims (keep import paths working).  
-2. **W4:** domain monolith peel (`render_final` first) — surgical, with failure-mode tests.  
-3. **W5:** docs / AGENTS AREA / shim audit.  
-4. Any follow-up hub touch must keep `make check-all` + lock-runtime green before claiming DONE.
+1. **Internal leaf peels** of still multi-k bodies — **single plan:** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md).  
+2. Package boundary ≠ full leaf peel DONE (`post/render_final` still ~4333; heat still ~4015).  
+3. Any peel: `make check-all` + lock-runtime green before DONE.
+
 
 ### E2 · Domain monoliths — surgical, not heroic (P1)
 
@@ -260,7 +259,7 @@ Order by **ship risk × touch frequency**, not raw LOC:
 | Priority | Module | Extract angle |
 |----------|--------|---------------|
 | 1 | `render_final.py` | stages already partial (`final_stages`, music, mix_partial) — peel leaf pure functions + failure-mode tests |
-| 2 | `edit_policy_heat.py` | keep public `heat check` API; internal packs by arc/wardrobe/impact |
+| 2 | `narrative/edit_policy_heat.py` | **4015** | package-boundary SHIPPED · **internal packs residual** (bug-driven) |
 | 3 | `film_spec.py` | projectors vs validate vs CLI glue |
 | 4 | `export_composition.py` / `compose_render.py` | coverage-starved; test harness first |
 | 5 | `story_plan.py` | only if dual-path residue reappears |
@@ -356,7 +355,9 @@ From antifragility residual list:
 - [x] **S4.2** heat internal packs — no forced peel (no bug-driven touch)
 - [x] **S4.3** compose double-burn contracts in hotpath; full compose_render harness deferred
 
-**Depends:** S3.1–S3.2 SHIPPED · **Risk:** high · **Verify:** targeted pytest + one dry final fixture
+
+**Note:** S4 checkboxes = **risk cover / deferral**, not full internal leaf peels. Package boundary landed (`post/` · `narrative/`); residual peels = [residual plan](2026-08-05-residual-monolith-w4-todo.md).
+**Depends:** S3 + W4 package boundary SHIPPED · **Risk:** high · **Verify:** targeted pytest + residual plan verify sets
 
 ### Wave S5 · Director throughput (P0 craft · mostly process)
 

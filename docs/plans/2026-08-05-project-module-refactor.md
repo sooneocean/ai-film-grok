@@ -1,41 +1,42 @@
 # Project module refactor — ACTIVE tracker (2026-08-05)
 
-**Status:** ACTIVE · **W0–W3 SHIPPED** · W4 leaf peel optional next  
-**Evidence:** `scripts/{core,assets,spine,gates,plan}/` · `tests/test_w3_package_shims.py` · hub ≤2500
+**Status:** ACTIVE · **W0–W5 package/docs SHIPPED** · **residual internal peels optional**  
+**Evidence:** `scripts/{core,assets,spine,gates,plan,post,narrative,final}/` · hub ≤2500 · shims · `tests/test_w3_package_shims.py`  
+**Residual internal-peel todo:** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md)
 
 ## Waves
 
 | Wave | Theme | Status |
 |------|--------|--------|
 | W0 | Tracker + baseline | **DONE** |
-| W1 | `scripts/core/*` · break cli↔hub IO cycle | **DONE** (on origin/main) |
-| W2 | CLI parser/cmd extract · hub ≤2500 | **DONE** (hub 1455) |
-| W3 | Package dirs + top-level shims | **DONE** (v2.39.44) |
-| W4 | Domain monoliths → packages | **DONE** (post/render_final · narrative/edit_policy_heat) |
-| W5 | Docs / AREA align / shim audit | **DONE** |
+| W1 | `scripts/core/*` | **DONE** (~795 LOC) |
+| W2 | CLI extract · hub ≤2500 | **DONE** (hub ~1462) |
+| W3 | Package dirs + shims | **DONE** |
+| W4 | Domain → packages (`post/render_final` · `narrative/edit_policy_heat`) | **DONE** package boundary (`ef9c4c70`) · **internal leaf peels residual** (bodies still ~4333 / ~4015) |
+| W5 | Docs / AREA / shim audit | **DONE** |
+
+## Residual peel order (risk × touch · not LOC vanity)
+
+See [residual W4/internal plan](2026-08-05-residual-monolith-w4-todo.md):
+
+1. `post/render_final` internal leaves (after `final/*` + music)  
+2. `narrative/edit_policy_heat` packs (**bug-driven only**)  
+3. `film_spec` projectors vs validate  
+4. export / compose (harness first)  
+5. `story_plan` only if dual-path residue  
+
+**Do not** claim full internal peel DONE from package-boundary move alone.
 
 ## Iron
-Public `aifilm` subcommand strings unchanged · shims hard-compat · no silent heat/i2v_provider/pilot policy change.
+Public `aifilm` subcommand strings unchanged · shims hard-compat · no silent heat / `i2v_provider` / pilot policy change · no “everything <1500 LOC” vanity sprint.
 
 ## Related
+- [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md) — **single residual structure todo plan**
+- [2026-08-05-strategy-director-engineer-upgrade.md](2026-08-05-strategy-director-engineer-upgrade.md) — R-struct pointer
+- [cli-extract-map.md](cli-extract-map.md) — hub CLI extract (W2)
 
-- [2026-08-05-strategy-director-engineer-upgrade.md](2026-08-05-strategy-director-engineer-upgrade.md) — dual-lens residual queue (S3 = W3+, not re-do W1/W2)
-- [cli-extract-map.md](cli-extract-map.md) — prior CLI domain extracts
-- [REFACTORING_PLAN.md](../../REFACTORING_PLAN.md) — older P0–P3 (superseded by this tracker for structure)
-- AGENTS.md AREA table — test map
+## W4–W5 closeout notes
 
-
-## W3 batch (v2.39.44–45)
-
-- packages: spine · assets · plan · gates (+ core)
-- hard-compat shims via sys.modules
-- path fixes: skill_scripts / advance / plan schemas
-- verified: 43+ domain tests; main smoke import ok
-
-
-## W4–W5 closeout
-
-- **W4**: `render_final` → `scripts/post/render_final.py` + top-level shim; `edit_policy_heat` → `scripts/narrative/edit_policy_heat.py` + shim.
-- Internal leaf-split of 4k-line monoliths deferred (import graph / cycle risk); package boundary is the ship gate.
-- **W5**: AGENTS layout + AREA pointers; this tracker marked DONE for W3–W5.
-- Iron: public imports and CLI strings unchanged (`sys.modules` shims).
+- **W4 package boundary**: `render_final` → `scripts/post/render_final.py` + shim; `edit_policy_heat` → `scripts/narrative/edit_policy_heat.py` + shim.
+- Internal leaf-split of multi-k bodies deferred (import graph / cycle risk); residual queue = residual plan R1–R5.
+- **W5**: AGENTS AREA + this tracker.

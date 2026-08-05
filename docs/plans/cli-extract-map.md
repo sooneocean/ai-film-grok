@@ -31,7 +31,7 @@
 ## Next candidates
 
 - remaining `build_parser` bulk still large inside aifilm_grok
-- further render_final leaf splits if needed
+- further render_final / domain monolith leaf splits → [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md) (internal peels residual)
 - do **not** rename public subcommands
 
 ## W5d2 parsers (v2.39.28)
