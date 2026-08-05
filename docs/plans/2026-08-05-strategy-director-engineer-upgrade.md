@@ -317,8 +317,8 @@ From antifragility residual list:
 
 ### Wave S0 · Hygiene & truth (cheap · do first)
 
-- [ ] **S0.1** Fix `hard-defaults.md` 量产十条 #3 for `h3_primary` (doc drift L169)  
-- [ ] **S0.2** Update material-fidelity plan: M5–M6 SHIPPED status + residual only if real  
+- [x] **S0.1** Fix `hard-defaults.md` 量产十条 #3 for `h3_primary` (AF8 · v2.39.34)  
+- [x] **S0.2** Update material-fidelity plan: M5–M6 SHIPPED status + residual only if real  
 - [x] **S0.3** Point optimization-todoplan “next” → this strategy residual table  
 - [x] **S0.4** Structure tracker aligned to origin: W0–W2 SHIPPED (hub 1455 + `core/`); no fabricated DONE  
 
@@ -326,17 +326,17 @@ From antifragility residual list:
 
 ### Wave S1 · Hang-proof overnight (P0 eng+ops)
 
-- [ ] **S1.1** `h3_fill_idle` identity ffmpeg: timeout via `util.run_ffmpeg` / `util.run`  
-- [ ] **S1.2** Inventory top hang sites (tts probe / scene_sound / delivery) — migrate if no timeout  
-- [ ] **S1.3** Tests: timeout → soft skip identity penalty + caution receipt (not process hang)  
-- [ ] **S1.4** until-empty unit: `capacity_not_ready` stop_reason path  
+- [x] **S1.1** `h3_fill_idle` identity ffmpeg: timeout via `util.run` (AF1 · v2.39.34)  
+- [x] **S1.2** scene_sound + local TTS adapter hang sites: explicit `timeout=` (v2.39.41)  
+- [x] **S1.3** Tests: timeout → soft skip identity penalty + caution (AF1 + behavioral)  
+- [x] **S1.4** until-empty unit: `capacity_not_ready` stop_reason path (AF5)  
 
 **Depends:** util/subprocess SHIPPED · **Risk:** med · **Verify:** `pytest -k 'h3_until_empty or h3_fill_idle'` + manual dry cycle
 
 ### Wave S2 · Ship truth wire-up (P0 deliver)
 
-- [ ] **S2.1** closeout invokes post_doctor + caption-pixel when final present  
-- [ ] **S2.2** Fail-closed ship if Chinese cues exist but pixel check fails  
+- [x] **S2.1** closeout invokes post_doctor + caption-pixel when final present (AF3)  
+- [x] **S2.2** Fail-closed ship if Chinese cues exist but pixel check fails / probe crash (AF6)  
 - [ ] **S2.3** Expand final hotpath contracts for caption_path / no double-burn  
 
 **Depends:** caption-pixel / post_doctor modules SHIPPED · **Risk:** med · **Verify:** `test_final_hotpath_contracts` · closeout fixture film

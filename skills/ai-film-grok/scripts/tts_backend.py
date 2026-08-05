@@ -735,24 +735,28 @@ def _local_adapter(
         )
         if cfg.higgs_audio_argv:
             env["HIGGS_AUDIO_ARGV"] = cfg.higgs_audio_argv
-        p = subprocess.run(
-            [
-                sys.executable,
-                str(script),
-                "--text-file",
-                str(text_file),
-                "--out",
-                str(out_mp3),
-                "--voice",
-                voice or "",
-                "--performance-file",
-                str(perf_file),
-            ],
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            p = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--text-file",
+                    str(text_file),
+                    "--out",
+                    str(out_mp3),
+                    "--voice",
+                    voice or "",
+                    "--performance-file",
+                    str(perf_file),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=600,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise TTSError(f"{name} adapter timed out after 600s") from exc
         if p.returncode != 0:
             detail = (p.stderr or p.stdout or "adapter failed").strip()[-800:]
             raise TTSError(f"{name} adapter failed: {detail}")

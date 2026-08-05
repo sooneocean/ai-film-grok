@@ -331,28 +331,32 @@ def _stage_verified_asset(
 
 def _write_stem(samples: np.ndarray, *, out: Path, sample_rate: int, label: str) -> dict[str, str]:
     out.parent.mkdir(parents=True, exist_ok=True)
-    proc = subprocess.run(
-        [
-            "ffmpeg",
-            "-y",
-            "-v",
-            "error",
-            "-f",
-            "f32le",
-            "-ar",
-            str(sample_rate),
-            "-ac",
-            "2",
-            "-i",
-            "pipe:0",
-            "-c:a",
-            "pcm_s16le",
-            str(out),
-        ],
-        input=np.clip(samples, -1.0, 1.0).tobytes(),
-        capture_output=True,
-        check=False,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-v",
+                "error",
+                "-f",
+                "f32le",
+                "-ar",
+                str(sample_rate),
+                "-ac",
+                "2",
+                "-i",
+                "pipe:0",
+                "-c:a",
+                "pcm_s16le",
+                str(out),
+            ],
+            input=np.clip(samples, -1.0, 1.0).tobytes(),
+            capture_output=True,
+            check=False,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise SceneSoundError(f"cannot write {label} stem: ffmpeg timeout") from exc
     if proc.returncode:
         raise SceneSoundError(f"cannot write {label} stem")
     return {"path": str(out), "sha256": hashlib.sha256(out.read_bytes()).hexdigest()}
@@ -398,29 +402,35 @@ def render_scene_sound_stem(
                 asset_fd = staged_assets[key]
                 os.lseek(asset_fd, 0, os.SEEK_SET)
                 duration = float(event["duration_sec"])
-                proc = subprocess.run(
-                    [
-                        "ffmpeg",
-                        "-v",
-                        "error",
-                        "-stream_loop",
-                        "-1",
-                        "-i",
-                        f"/dev/fd/{asset_fd}",
-                        "-t",
-                        f"{duration:.3f}",
-                        "-ar",
-                        str(sample_rate),
-                        "-ac",
-                        "2",
-                        "-f",
-                        "f32le",
-                        "pipe:1",
-                    ],
-                    capture_output=True,
-                    check=False,
-                    pass_fds=(asset_fd,),
-                )
+                try:
+                    proc = subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-v",
+                            "error",
+                            "-stream_loop",
+                            "-1",
+                            "-i",
+                            f"/dev/fd/{asset_fd}",
+                            "-t",
+                            f"{duration:.3f}",
+                            "-ar",
+                            str(sample_rate),
+                            "-ac",
+                            "2",
+                            "-f",
+                            "f32le",
+                            "pipe:1",
+                        ],
+                        capture_output=True,
+                        check=False,
+                        pass_fds=(asset_fd,),
+                        timeout=180,
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    raise SceneSoundError(
+                        f"{event.get('id')}: cannot decode asset: ffmpeg timeout"
+                    ) from exc
                 if proc.returncode:
                     raise SceneSoundError(f"{event.get('id')}: cannot decode asset")
                 decoded = np.frombuffer(proc.stdout, dtype=np.float32).reshape((-1, 2))

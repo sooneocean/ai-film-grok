@@ -33,6 +33,42 @@ class AF1SubprocessTimeoutTests(unittest.TestCase):
         self.assertIn("util_run", block)
         self.assertIn("timeout=30", block)
 
+    def test_soft_identity_timeout_soft_skips_penalty(self) -> None:
+        """AF1 · TimeoutExpired on midframe extract → caution, not process hang."""
+        from h3_fill_idle import _soft_identity_penalty
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            still = root / "stills"
+            still.mkdir()
+            (still / "s1.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
+            take = root / "takes" / "s1"
+            take.mkdir(parents=True)
+            clip = take / "h3_t1.mp4"
+            clip.write_bytes(b"\x00" * 1024)
+
+            def _boom(*_a, **_k):
+                raise subprocess.TimeoutExpired(cmd=["ffmpeg"], timeout=30)
+
+            with (
+                mock.patch("h3_workflow._approved_still", return_value=still / "s1.png"),
+                mock.patch("shutil.which", return_value="/usr/bin/ffmpeg"),
+                mock.patch("util.subprocess.run", side_effect=_boom),
+            ):
+                pen, caut = _soft_identity_penalty(root, "s1", str(clip), lane="h3")
+            self.assertIn("identity_midframe_timeout_or_fail", caut)
+            self.assertTrue(all(not c.startswith("identity_l1_") for c in caut))
+
+    def test_scene_sound_ffmpeg_paths_have_timeout(self) -> None:
+        src = (SCRIPTS / "scene_sound_stems.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=120", src)
+        self.assertIn("timeout=180", src)
+        runs = src.split("subprocess.run(")[1:]
+        ffmpeg_runs = [c for c in runs if '"ffmpeg"' in c[:800] or "'ffmpeg'" in c[:800]]
+        self.assertGreaterEqual(len(ffmpeg_runs), 2)
+        for chunk in ffmpeg_runs:
+            self.assertIn("timeout=", chunk[:1200])
+
 
 class AF5UntilEmptyCapacityTests(unittest.TestCase):
     def test_until_empty_capacity_not_ready_stop(self) -> None:
