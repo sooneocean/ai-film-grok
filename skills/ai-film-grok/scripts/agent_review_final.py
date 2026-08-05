@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""P1 · Agent assist for review-final (never auto-approves).
+"""P1 / P3 · Agent assist for review-final (never auto-approves).
 
 Builds a full director scorecard draft from L0 machine evidence already on disk,
 writes ``receipts/agent-review-final.json`` + an optional hash-bound
 ``final-review-input.assist.json``, and emits a paste-ready ``review-final``
 command for the human. Artistic sign-off remains ``review-final --approve``.
+
+P3 (2026-08-05): merge post machine lane into objective dims —
+caption-pixel · post-route · timeline-clock · post-doctor · mix PARTIAL ·
+true-video / cinematic-gate — still **never** sets ``final_complete``.
 """
 
 from __future__ import annotations
@@ -235,46 +239,205 @@ def _collect_l0(root: Path, *, final: dict[str, Any] | None, duration: float) ->
         "fail_code": None if esc_pass else "INVENTORY_INCOMPLETE",
     }
 
+    # --- P3 machine lane (post) · advisory into objective dims ---
+    machine_lane: dict[str, Any] = {
+        "caption_pixel": None,
+        "post_route": None,
+        "timeline_clock": None,
+        "post_doctor": None,
+        "mix_partial": None,
+        "true_video": None,
+        "cinematic_gate": None,
+    }
+
+    # caption pixel ink
+    try:
+        from caption_pixel_check import caption_pixel_status
+
+        cap = caption_pixel_status(root)
+        machine_lane["caption_pixel"] = {
+            "ok": cap.get("ok"),
+            "missing_ink": cap.get("missing_ink"),
+            "stale": cap.get("stale"),
+            "skipped": cap.get("skipped"),
+            "detail": cap.get("detail"),
+        }
+    except Exception as exc:  # noqa: BLE001
+        machine_lane["caption_pixel"] = {"ok": None, "error": str(exc)[:160]}
+
+    # post-route / double-burn risk
+    route = read_json(root / "receipts" / "post-route.json") or {}
+    if isinstance(route, dict) and route.get("caption_path"):
+        machine_lane["post_route"] = {
+            "caption_path": route.get("caption_path"),
+            "plate_subs": route.get("plate_subs"),
+        }
+        try:
+            from post_route import PostRouteError, assert_no_double_caption_layers
+
+            delivery = read_json(root / "out" / "final-delivery.json") or {}
+            subs_meta = (
+                delivery.get("subtitles") if isinstance(delivery.get("subtitles"), dict) else {}
+            )
+            assert_no_double_caption_layers(
+                caption_path=str(route.get("caption_path")),
+                plate_subs=str(route.get("plate_subs") or ""),
+                caption_owner=str(subs_meta.get("caption_owner") or ""),
+            )
+            machine_lane["post_route"]["double_burn_ok"] = True
+        except Exception as exc:  # noqa: BLE001 — PostRouteError or import
+            machine_lane["post_route"]["double_burn_ok"] = False
+            machine_lane["post_route"]["error"] = str(exc)[:200]
+
+    # timeline single clock
+    try:
+        from timeline_clock import audit_timeline_clock
+
+        clock = audit_timeline_clock(root, write=False)
+        machine_lane["timeline_clock"] = {
+            "ok": clock.get("ok"),
+            "dual_clock": clock.get("dual_clock"),
+            "skipped": clock.get("skipped"),
+            "error": clock.get("error"),
+        }
+    except Exception as exc:  # noqa: BLE001
+        machine_lane["timeline_clock"] = {"ok": None, "error": str(exc)[:160]}
+
+    # post-doctor hard codes
+    try:
+        from post_doctor import run_post_doctor
+
+        doctor = run_post_doctor(root, write=False)
+        hard_codes = [
+            str(i.get("code"))
+            for i in (doctor.get("hard") or [])
+            if isinstance(i, dict) and i.get("code")
+        ]
+        machine_lane["post_doctor"] = {
+            "ok": doctor.get("ok"),
+            "hard_codes": hard_codes,
+        }
+    except Exception as exc:  # noqa: BLE001
+        machine_lane["post_doctor"] = {"ok": None, "error": str(exc)[:160]}
+
+    # mix PARTIAL honesty
+    mix = read_json(root / "receipts" / "final-mix-partial.json") or {}
+    if isinstance(mix, dict) and mix.get("kind") == "final-mix-partial" and mix.get("partial"):
+        machine_lane["mix_partial"] = {
+            "partial": True,
+            "reason_code": mix.get("reason_code") or mix.get("reason"),
+            "affected_tracks": mix.get("affected_tracks"),
+        }
+
+    # true-video + cinematic-gate (motion-adjacent)
+    tv = read_json(root / "receipts" / "true-video-policy.json") or {}
+    if isinstance(tv, dict) and tv:
+        machine_lane["true_video"] = {"ok": tv.get("ok")}
+    cin = read_json(root / "receipts" / "cinematic-gate.json") or {}
+    if isinstance(cin, dict) and cin:
+        machine_lane["cinematic_gate"] = {"ok": cin.get("ok")}
+
+    # motion: fold true-video / cinematic hard fails
+    if machine_lane.get("true_video") and machine_lane["true_video"].get("ok") is False:
+        motion_pass = False
+        motion_notes.append("true_video_policy not ok")
+    if machine_lane.get("cinematic_gate") and machine_lane["cinematic_gate"].get("ok") is False:
+        motion_pass = False
+        motion_notes.append("cinematic-gate not ok")
+    dims["motion"] = {
+        "pass": motion_pass,
+        "source": "l0",
+        "note": "; ".join(motion_notes),
+        "fail_code": None if motion_pass else "MOTION_LOW",
+    }
+
     # audio
     audio_q = _quality_gate_ok(quality, "audio")
     audio_pass = audio_q is not False
+    audio_notes: list[str] = []
+    if audio_q is True:
+        audio_notes.append("quality audio pass")
+    elif audio_q is False:
+        audio_notes.append("quality audio fail")
+    else:
+        audio_notes.append("no audio quality gate — provisional")
+    if machine_lane.get("mix_partial"):
+        # PARTIAL is honesty, not auto-fail: note for human, keep pass unless quality red
+        audio_notes.append(
+            f"mix PARTIAL {machine_lane['mix_partial'].get('reason_code')} "
+            f"tracks={machine_lane['mix_partial'].get('affected_tracks')}"
+        )
     dims["audio"] = {
         "pass": audio_pass,
         "source": "l0",
-        "note": (
-            "quality audio pass"
-            if audio_q is True
-            else (
-                "quality audio fail" if audio_q is False else "no audio quality gate — provisional"
-            )
-        ),
+        "note": "; ".join(audio_notes),
         "fail_code": None if audio_pass else "AUDIO_MISSING",
     }
 
-    # subs
+    # subs · quality + caption pixel + double-burn + doctor hard caption codes
     subs_q = _quality_gate_ok(quality, "subtitles") or _quality_gate_ok(quality, "subs")
     srt_ok = srt.is_file() and srt.stat().st_size > 0
     subs_pass = True
+    subs_notes: list[str] = [f"srt={'yes' if srt_ok else 'no'}", f"quality_subs={subs_q}"]
     if subs_q is False:
         subs_pass = False
-    elif not srt_ok and subs_q is not True:
-        # missing SRT is a soft fail for assist (many plates use burned-only)
-        subs_pass = True
+        subs_notes.append("quality subtitles fail")
+    cap_lane = machine_lane.get("caption_pixel") or {}
+    # Only fail when a real pixel receipt is present and red (or explicit missing_ink).
+    # Missing receipt stays provisional so assist still drafts before caption-pixel-check.
+    if cap_lane.get("skipped"):
+        subs_notes.append("caption_pixel skipped")
+    elif cap_lane.get("missing_ink") is True:
+        subs_pass = False
+        subs_notes.append(f"caption_pixel missing_ink: {cap_lane.get('detail') or 'no ink'}")
+    elif cap_lane.get("ok") is False and not str(cap_lane.get("detail") or "").startswith(
+        "missing receipt"
+    ):
+        # stale / red with evidence — hard
+        if cap_lane.get("stale") or cap_lane.get("present") is True:
+            subs_pass = False
+            subs_notes.append(f"caption_pixel red: {cap_lane.get('detail') or 'pixel red'}")
+        else:
+            subs_notes.append(
+                f"caption_pixel not green yet (provisional): {cap_lane.get('detail')}"
+            )
+    elif cap_lane.get("ok") is True:
+        subs_notes.append("caption_pixel ok")
+    if (machine_lane.get("post_route") or {}).get("double_burn_ok") is False:
+        subs_pass = False
+        subs_notes.append("post-route double-burn risk")
+    doctor_hard = set((machine_lane.get("post_doctor") or {}).get("hard_codes") or [])
+    # Doctor hard caption codes only when not pure "missing receipt" provisional
+    for code in ("DOUBLE_BURN_RISK", "SRT_OVERLAP", "SRT_BAD_CUE"):
+        if code in doctor_hard:
+            subs_pass = False
+            subs_notes.append(f"post-doctor {code}")
+    if "CAPTION_PIXEL_RED" in doctor_hard and cap_lane.get("missing_ink") is True:
+        subs_pass = False
+        subs_notes.append("post-doctor CAPTION_PIXEL_RED")
     dims["subs"] = {
         "pass": subs_pass,
-        "source": "l0",
-        "note": (f"srt={'yes' if srt_ok else 'no'}; quality_subs={subs_q}"),
+        "source": "l0+post",
+        "note": "; ".join(subs_notes),
         "fail_code": None if subs_pass else "SUBTITLE_DOUBLE_BURN",
     }
 
-    # dead_air
+    # dead_air · freeze/black + dual timeline clock (subtitle cut risk)
     freeze = _quality_gate_ok(quality, "freeze") or _quality_gate_ok(quality, "freezes")
     black = _quality_gate_ok(quality, "black_frames") or _quality_gate_ok(quality, "black")
     dead_pass = freeze is not False and black is not False and quality.get("hard_fail") is not True
+    dead_notes = [f"freeze={freeze}", f"black={black}", f"hard_fail={quality.get('hard_fail')}"]
+    clock_lane = machine_lane.get("timeline_clock") or {}
+    if clock_lane.get("dual_clock") is True:
+        dead_pass = False
+        dead_notes.append("DUAL_TIMELINE_CLOCK — rewrite film_timeline authority")
+    if "DUAL_TIMELINE_CLOCK" in doctor_hard:
+        dead_pass = False
+        dead_notes.append("post-doctor DUAL_TIMELINE_CLOCK")
     dims["dead_air"] = {
         "pass": dead_pass,
-        "source": "l0",
-        "note": f"freeze={freeze} black={black} hard_fail={quality.get('hard_fail')}",
+        "source": "l0+post",
+        "note": "; ".join(dead_notes),
         "fail_code": None if dead_pass else "DECODE_FAILED",
     }
 
@@ -326,6 +489,7 @@ def _collect_l0(root: Path, *, final: dict[str, Any] | None, duration: float) ->
     return {
         "objective_all_pass": objective_all,
         "dimensions": dims,
+        "machine_lane": machine_lane,
         "heat": {
             "active": heat.get("active"),
             "hard_fail": heat.get("hard_fail"),
@@ -520,11 +684,13 @@ def build_agent_review_final(
         },
         "review_contract_version": contract,
         "l0": l0,
+        "machine_lane": (l0.get("machine_lane") if isinstance(l0, dict) else None),
         "scorecard": scorecard,
         "grades": grades,
         "screening_evidence": evidence,
         "fail_reasons": fail_reasons,
         "reviewer_bound": bool(rev),
+        "p3_post_lane": True,
         "next_cmd": cmd,
         "human_next": (
             f'aifilm agent-review-final --root "{base}" --apply '

@@ -140,6 +140,91 @@ class AgentReviewFinalCore(unittest.TestCase):
                 build_agent_review_final(root)
 
 
+class AgentReviewFinalP3PostLane(unittest.TestCase):
+    def test_machine_lane_present_and_never_auto_approve(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_minimal_film(root)
+            report = build_agent_review_final(root, write=True)
+            self.assertTrue(report.get("p3_post_lane"))
+            lane = report.get("machine_lane") or (report.get("l0") or {}).get("machine_lane")
+            self.assertIsInstance(lane, dict)
+            self.assertIn("caption_pixel", lane)
+            self.assertIn("timeline_clock", lane)
+            self.assertFalse(report["auto_approved"])
+            self.assertTrue(report["never_auto_approves_review_final"])
+            # gates untouched
+            man = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            self.assertFalse(man["gates"]["final_complete"])
+
+    def test_double_burn_route_fails_subs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_minimal_film(root)
+            (root / "receipts" / "post-route.json").write_text(
+                json.dumps(
+                    {
+                        "kind": "post-route",
+                        "caption_path": "master_hf",
+                        "plate_subs": "burn",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = build_agent_review_final(root, write=True)
+            self.assertEqual(report["scorecard"].get("subs"), "fail")
+            self.assertFalse(report.get("objective_all_pass"))
+
+    def test_dual_clock_fails_dead_air(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_minimal_film(root)
+            (root / "receipts" / "film_timeline.json").write_text(
+                json.dumps({"shot_starts": [0.0, 6.0, 12.0], "output_duration": 18.0}),
+                encoding="utf-8",
+            )
+            (root / "timeline.json").write_text(
+                json.dumps(
+                    {
+                        "shot_starts": [0.0, 7.6, 15.0],
+                        "shots": [
+                            {"id": "s01", "duration_sec": 7.6},
+                            {"id": "s02", "duration_sec": 7.4},
+                            {"id": "s03", "duration_sec": 6.0},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = build_agent_review_final(root, write=True)
+            self.assertEqual(report["scorecard"].get("dead_air"), "fail")
+            self.assertFalse(report.get("objective_all_pass"))
+            lane = report.get("machine_lane") or {}
+            self.assertTrue((lane.get("timeline_clock") or {}).get("dual_clock"))
+
+    def test_mix_partial_notes_audio_but_does_not_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_minimal_film(root)
+            (root / "receipts" / "final-mix-partial.json").write_text(
+                json.dumps(
+                    {
+                        "kind": "final-mix-partial",
+                        "partial": True,
+                        "reason_code": "sidechain_mix_failed_amix_fallback",
+                        "affected_tracks": ["mx", "dx"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = build_agent_review_final(root, write=True)
+            self.assertEqual(report["scorecard"].get("audio"), "pass")
+            note = ((report.get("l0") or {}).get("dimensions") or {}).get("audio", {}).get(
+                "note"
+            ) or ""
+            self.assertIn("mix PARTIAL", note)
+
+
 class AgentReviewFinalApply(unittest.TestCase):
     def test_apply_rejects_missing_phrase(self) -> None:
         from agent_review_final import AgentReviewFinalError, apply_agent_review_final

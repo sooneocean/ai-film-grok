@@ -154,6 +154,9 @@
 |---|---|
 | 交付 | `final --post-engine hyperframes` |
 | 字幕唯一所有权 | `plate-cards blank` + `subs off`；最终烧字只能由 HyperFrames 完成，HF 失败即修复并重渲，禁 PIL/FFmpeg 兜底 |
+| 字幕路径（P0） | `master_hf`（plate `subs=off` + HF 烧） vs `ship_hardburn`（PIL 硬烧，可烧底）；`aifilm caption-pixel-check` 底带 ink；禁双烧 |
+| 后期单钟（P1） | 只认 `film_timeline.shot_starts`；`timeline-clock` / `post-doctor`；mix PARTIAL 写 receipt 不装五轨齐 |
+| 审片 assist（P3） | `agent-review-final` 机读预填；**禁**代签 `review-final` / `final_complete`；须人短语 `--apply` |
 | final | 串行；FRW clip 先 re-encode 再 register |
 | loudnorm | auto ≈ -16 LUFS |
 | 路径 | HF 忌空格路径 → 可拷 `/tmp/...` |

@@ -12,3 +12,4 @@
 - **Cinematic-gate（P0 · 2026-08-04 ε）**：`aifilm cinematic-gate --root` → true-video + inventory + i2v-final + variety + five-track（默认 auto_i2v）。**export-desktop** 要求 `receipts/cinematic-gate.json` ok。clips 齐后 dispatch 推 **gate-auto** 再 final。
 
 深入资料：[quality-closure.md](../quality-closure.md) · [hard-defaults.md](../hard-defaults.md) · [high-motion-style-lock](../lessons-2026-07-27-high-motion-style-lock-final.md) · [closeout-gates](../lessons-2026-07-29-closeout-gates-chaebol.md)
+- **审片 assist（P3 · 2026-08-05）**：`aifilm agent-review-final` 机读预填字幕/单钟/门闸；**禁止** 代签 review-final；须人短语 `--apply`。

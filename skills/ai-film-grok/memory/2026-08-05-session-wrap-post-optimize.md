@@ -6,12 +6,13 @@
 ## 三句话
 1. **后期 P0–P2 已上 main**：字幕单路径 · 像素机检 · 单钟 · post-doctor · mix PARTIAL 诚实 · 热路径契约测。
 2. **CLI 拆分后补回**：`caption-pixel-check` / `post-doctor` / `timeline-clock` / `final --caption-path`。
-3. **收工指针**：plugin **2.39.26**；作战序仍 `gate-auto → final → review-final → closeout`。
+3. **收工指针**：plugin **2.39.29**；作战序仍 `gate-auto → final → review-final → closeout`。
 
 ## 检查清单
 - [x] P0 caption_path + pixel
 - [x] P1 timeline_clock + post_doctor + mix_partial
 - [x] P2 hotpath contracts
+- [x] P3 agent-review-final machine lane
 - [x] CLI restore + version hygiene
 - [x] tests green + push
 
