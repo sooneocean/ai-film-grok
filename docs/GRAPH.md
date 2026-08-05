@@ -66,6 +66,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_agent_review_final.py`
 - `skills/ai-film-grok/tests/test_ambience_candidates.py`
 - `skills/ai-film-grok/tests/test_anatomy_safety.py`
+- `skills/ai-film-grok/tests/test_antifragility_af.py`
 - `skills/ai-film-grok/tests/test_approval_ledger.py`
 - `skills/ai-film-grok/tests/test_asset_registry.py`
 - `skills/ai-film-grok/tests/test_audio_armory.py`
@@ -421,6 +422,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_voice_tracks.py`
 - `skills/ai-film-grok/tests/test_w4_gate_slim.py`
 - `skills/ai-film-grok/tests/test_wardrobe_ladder.py`
+- `skills/ai-film-grok/tests/test_weapon_inventory.py`
 - `skills/ai-film-grok/tests/test_weapon_router.py`
 - `skills/ai-film-grok/tests/test_workflow_p0_gates.py`
 - `skills/ai-film-grok/tests/test_workflow_pack.py`
