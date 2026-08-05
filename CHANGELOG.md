@@ -2,6 +2,14 @@
 
 ## [2.39.75] - 2026-08-05
 
+### Changed (routing rewire R2–R7 complete)
+- **R2** `spine/stage_model.py` — public craft / pipeline / craft-eight projection; `design`→post.
+- **R4** `spine/action_policy.py` — spend/skill maps; dispatch `resolve_*`; advance catalog cross-check tests.
+- **R5** `layer=capability|weapon` on route-plan / weapon_route; schema allows `layer`; **no** silent lane switch.
+- **R6** compact: `stage_public` + `route_catalog_id`; context-routing public aliases; routing-map contract.
+- **R7** `test_stage_model` · `test_action_policy`; production_router suite green.
+- Public CLI argv / pilot / `i2v_provider` unchanged.
+
 ### Changed (ltx23 next_action concrete shot)
 - `next_actions` LTX audio unit picks first missing-clip **general** `frw-ltx23` shot (never restricted/meat).
 - Refresh `runtime-lock.json` after script fingerprint drift.
