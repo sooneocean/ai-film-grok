@@ -315,6 +315,9 @@ def plan_h3_shot(
         "command": cmd,
         "command_alt": cmd_alt,
         "effect_tips": _h3_effect_tips(mode, mode_res),
+        "combo_lane": mode_res.get("combo_lane"),
+        "combo_preferred_mode": mode_res.get("combo_preferred_mode"),
+        "combo_prompt_family": mode_res.get("combo_prompt_family"),
         "still_challenge_candidates": _still_challenge_candidates(base, shot_id),
     }
     # Material fidelity: unified GenerationRequest receipt (StillSource + prompt + refs)

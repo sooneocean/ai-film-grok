@@ -170,7 +170,7 @@ def _pack(
     return out
 
 
-def resolve_h3_mode(
+def resolve_h3_mode_core(
     shot: dict[str, Any],
     *,
     intent: dict[str, Any] | None = None,
@@ -265,7 +265,9 @@ def resolve_h3_mode(
     energy_hits: list[str] = []
     on_cam = bool(spoken) and screen in {"on_camera", "on-camera", ""}
     close = size in _CLOSE_SIZES or size.endswith("_cu") or "close" in size
-    if restricted and on_cam and close:
+    # Combo winners: dialogue_mouth_energy prefers I2V; skip R2V force when registry says i2v.
+    dlg_combo_pref = preferred_mode_for_lane("dialogue_mouth_energy")
+    if restricted and on_cam and close and dlg_combo_pref != "i2v":
         energy_hits.append("dialogue_close_r2v")
     if restricted and motion_tier == "high":
         if any(tok in flag_blob for tok in _R2V_ENERGY_FLAGS):
@@ -351,6 +353,19 @@ def resolve_h3_mode(
         reasons.append("restricted_hero")
     if spoken:
         reasons.append("dialogue_inject")
+    if (
+        restricted
+        and on_cam
+        and close
+        and spoken
+        and has_still
+        and dlg_combo_pref == "i2v"
+        and not force_r2v
+    ):
+        reasons.append("combo_win_dialogue_i2v")
+        alt_mode = "r2v"
+        if "combo_alt_r2v_mouth_cu" not in (alt_reasons or []):
+            alt_reasons = list(alt_reasons or []) + ["combo_alt_r2v_mouth_cu"]
 
     return _pack(
         "i2v",
@@ -421,3 +436,98 @@ def preferred_mode_for_lane(lane: str) -> str | None:
         return None
     mode = entry.get("preferred_mode")
     return str(mode) if mode else None
+
+
+def infer_combo_lane(
+    shot: dict[str, Any],
+    *,
+    intent: dict[str, Any] | None = None,
+    has_still: bool = False,
+) -> str | None:
+    """Map a shot to a combo-eval lane (for registry preferred_mode)."""
+    sh = shot if isinstance(shot, dict) else {}
+    intent = intent if isinstance(intent, dict) else {}
+    role = str(intent.get("shot_role") or sh.get("shot_role") or "hero").strip().lower()
+    if role in {"env", "bridge"}:
+        return "faceless_env"
+    spoken = spoken_text_of(sh, intent)
+    screen = screen_mode_of(sh, intent)
+    size = shot_size_token(sh)
+    close = size in _CLOSE_SIZES or size.endswith("_cu") or "close" in size
+    on_cam = bool(spoken) and screen in {"on_camera", "on-camera", ""}
+    motion_tier = str(intent.get("motion_tier") or "").strip().lower()
+    if not motion_tier:
+        try:
+            from motion_prompt_spine import motion_tier_for
+
+            motion_tier = motion_tier_for(sh)
+        except Exception:
+            motion_tier = "medium"
+    heat = str(intent.get("heat_phase") or sh.get("heat_phase") or "").strip().lower()
+    flags = [str(f) for f in (intent.get("difficulty_flags") or [])]
+    flag_blob = " ".join(flags).lower()
+    if spoken and on_cam and close:
+        return "dialogue_mouth_energy"
+    if motion_tier == "high" or any(tok in flag_blob for tok in _R2V_ENERGY_FLAGS):
+        return "high_motion_energy"
+    if heat in {"act", "climax"} and any(
+        tok in flag_blob for tok in ("sex_pose", "deep_thrust", "penetration", "l4_contact")
+    ):
+        return "high_motion_energy"
+    if has_still or role in {"hero", "insert"}:
+        return "hero_identity_lock"
+    return None
+
+
+def annotate_combo_resolve(
+    pack: dict[str, Any],
+    *,
+    lane: str | None,
+) -> dict[str, Any]:
+    """Attach combo-eval preferred mode/family onto a resolve pack (live plan path)."""
+    if not isinstance(pack, dict):
+        return pack
+    if not lane:
+        return pack
+    preferred = preferred_mode_for_lane(lane)
+    family = None
+    try:
+        from h3_combo_eval import load_combo_winners
+
+        data = load_combo_winners() or {}
+        lanes = data.get("lanes") if isinstance(data.get("lanes"), dict) else {}
+        entry = lanes.get(lane) if isinstance(lanes.get(lane), dict) else {}
+        family = (entry or {}).get("prompt_family")
+    except Exception:
+        pass
+    pack = dict(pack)
+    pack["combo_lane"] = lane
+    if preferred:
+        pack["combo_preferred_mode"] = preferred
+    if family:
+        pack["combo_prompt_family"] = family
+    pack["combo_policy"] = "h3_max_effect_combo_v1"
+    return pack
+
+
+def resolve_h3_mode(
+    shot: dict[str, Any],
+    *,
+    intent: dict[str, Any] | None = None,
+    has_still: bool | None = None,
+    has_last: bool | None = None,
+    wants_continue: bool | None = None,
+) -> dict[str, Any]:
+    """Pick H3 mode for max effect; annotate with combo-eval lane winners for plan/run."""
+    pack = resolve_h3_mode_core(
+        shot,
+        intent=intent,
+        has_still=has_still,
+        has_last=has_last,
+        wants_continue=wants_continue,
+    )
+    sh = shot if isinstance(shot, dict) else {}
+    intent_d = intent if isinstance(intent, dict) else {}
+    still_flag = bool(has_still) if has_still is not None else False
+    lane = infer_combo_lane(sh, intent=intent_d, has_still=still_flag)
+    return annotate_combo_resolve(pack, lane=lane)

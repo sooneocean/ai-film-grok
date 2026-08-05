@@ -44,7 +44,8 @@ class ResolveH3ModeTests(unittest.TestCase):
         r = resolve_h3_mode(_shot(), has_still=True)
         self.assertEqual(r["mode"], "i2v")
 
-    def test_dialogue_close_restricted_is_r2v_without_last(self) -> None:
+    def test_dialogue_close_restricted_is_i2v_with_combo_winners(self) -> None:
+        """combo winners dialogue_mouth_energy → I2V primary (R2V alt for extreme mouth)."""
         r = resolve_h3_mode(
             _shot(
                 shot_size="cu",
@@ -61,7 +62,12 @@ class ResolveH3ModeTests(unittest.TestCase):
             has_still=True,
             has_last=False,
         )
-        self.assertEqual(r["mode"], "r2v")
+        self.assertEqual(r["mode"], "i2v")
+        self.assertEqual(r.get("combo_lane"), "dialogue_mouth_energy")
+        self.assertEqual(r.get("combo_preferred_mode"), "i2v")
+        self.assertIn("combo_win_dialogue_i2v", r.get("reasons") or [])
+        self.assertEqual(r.get("alt_mode"), "r2v")
+
 
     def test_dialogue_close_with_last_prefers_flf(self) -> None:
         r = resolve_h3_mode(
@@ -134,6 +140,16 @@ class ResolveH3ModeTests(unittest.TestCase):
         r = resolve_h3_mode(_shot(force_r2v=True), has_still=True)
         self.assertEqual(r["mode"], "r2v")
 
+    def test_combo_lane_annotation_on_env(self) -> None:
+        r = resolve_h3_mode(
+            _shot(shot_role="env", heat_phase="setup", wardrobe_state="clothed"),
+            intent={"shot_role": "env", "content_class": "general"},
+            has_still=False,
+        )
+        self.assertEqual(r["mode"], "t2v")
+        self.assertEqual(r.get("combo_lane"), "faceless_env")
+        self.assertEqual(r.get("combo_preferred_mode"), "t2v")
+
 
 class PlanListH3ModeTests(unittest.TestCase):
     def _film(self, root: Path, shots: list) -> None:
@@ -170,8 +186,14 @@ class PlanListH3ModeTests(unittest.TestCase):
                 ],
             )
             plan = plan_h3_shot(root, "m1")
-            self.assertEqual(plan["mode"], "r2v")
+            self.assertEqual(plan["mode"], "i2v")
             self.assertIn("mode_resolve", plan)
+            self.assertEqual(plan["mode_resolve"].get("combo_lane"), "dialogue_mouth_energy")
+            self.assertEqual(plan["mode_resolve"].get("combo_preferred_mode"), "i2v")
+            self.assertEqual(
+                plan.get("combo_prompt_family") or plan["mode_resolve"].get("combo_prompt_family"),
+                "dialogue_mandarin",
+            )
             self.assertTrue(plan.get("effect_tips"))
 
     def test_list_includes_mode_and_command(self) -> None:

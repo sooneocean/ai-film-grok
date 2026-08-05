@@ -318,7 +318,21 @@ def rank_lanes(
         r for r in enriched
         if r.get("mode") == "t2v" or r.get("family") == "env_no_face" or _has_tag(r, "faceless_env")
     ]
-    faceless = _pick(env_cands, lambda r: float(r["scores"]["motion_score"]))
+    env_true = [
+        r for r in env_cands
+        if not isinstance(r.get("identity"), dict)
+        or r["identity"].get("start_l1") is None
+        or r["identity"].get("note")
+    ]
+    if env_true and any((r.get("motion_mean_absdiff") or r.get("motion_mean")) is not None for r in env_true):
+        faceless = _pick(env_true, lambda r: float(r["scores"]["motion_score"]))
+    else:
+        faceless = {
+            "combo_id": "env_t2v_policy", "mode": "t2v", "family": "env_no_face",
+            "score": None, "score_basis": "policy_only",
+            "motion_mean_absdiff": None,
+            "identity": {"start_l1": None, "note": "N/A policy_only"},
+        }
 
     winners = {
         "hero_identity_lock": hero,

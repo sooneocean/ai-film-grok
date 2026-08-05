@@ -3,7 +3,7 @@
   "kind": "h3-combo-winners",
   "policy": "h3_max_effect_combo_v1",
   "source_verdict_kind": "h3-combo-verdict",
-  "ts": "2026-08-05T03:24:48.904721+00:00",
+  "ts": "2026-08-05T03:38:42.653671+00:00",
   "lanes": {
     "hero_identity_lock": {
       "preferred_mode": "i2v",
@@ -80,23 +80,19 @@
     "faceless_env": {
       "preferred_mode": "t2v",
       "prompt_family": "env_no_face",
-      "notes": "Never hang cast face on T2V; env/bridge only",
+      "notes": "Policy-only: never hang cast face on T2V. Score not from face-still T2V AB.",
+      "score_basis": "policy_only",
       "winner": {
-        "combo_id": "env_t2v",
+        "combo_id": "env_t2v_policy",
         "mode": "t2v",
         "family": "env_no_face",
-        "score": 19.35,
-        "scores": {
-          "identity_score": 0.0,
-          "motion_score": 19.35,
-          "mouth_score": 0.0,
-          "hero_balanced": 5.805
-        },
-        "motion_mean_absdiff": 19.35,
+        "score": null,
+        "score_basis": "policy_only",
+        "motion_mean_absdiff": null,
         "identity": {
-          "start_l1": null
-        },
-        "mouth_region_std_change": null
+          "start_l1": null,
+          "note": "N/A policy_only"
+        }
       }
     }
   },
