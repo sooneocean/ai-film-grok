@@ -230,7 +230,7 @@
     },
     {
       "path": "scripts/audio/audio_delivery_gate.py",
-      "sha256": "a891cb9a94266bd06ea81fb2ddd9b812135d839729d8967ef2219924d4df9f77"
+      "sha256": "98cecb53c67627d7843a6c92350a2f577b0dc38b30c7d9e0a7ca3aa24debee36"
     },
     {
       "path": "scripts/audio/audio_event_editor.py",
@@ -270,7 +270,7 @@
     },
     {
       "path": "scripts/audio/audio_tts_render.py",
-      "sha256": "5853172d133f42c858c8bb783da6ac80257d5bc34c458ac9d48ef7150d22e368"
+      "sha256": "f1a9df526e7ea87f889b9861ece961f1d165558269fa1db9e77efaf93faecea9"
     },
     {
       "path": "scripts/audio/audio_visual_alignment.py",
@@ -286,7 +286,7 @@
     },
     {
       "path": "scripts/audio/event_voice_stem.py",
-      "sha256": "9112244c178463f73cace7b98ef9903ae5990d42cfe10db0217157b516ebb778"
+      "sha256": "8dca652231e408d5eba8847dda6bba1a3b1ab2bfcd0f05f584f5126bd99bc2d6"
     },
     {
       "path": "scripts/audio/lipsync_backend.py",
@@ -494,7 +494,7 @@
     },
     {
       "path": "scripts/burn_srt_pil.py",
-      "sha256": "e0b39892d7b639b340e52c91ff122bcb6c80061d9f0ccda1a49e4f32b320defa"
+      "sha256": "60e0161edb92b3b0837b24ce7088a88878056a4f7c938d1fb11fb376736c9431"
     },
     {
       "path": "scripts/cache.py",
@@ -986,7 +986,7 @@
     },
     {
       "path": "scripts/final/media_ops.py",
-      "sha256": "2923a949553ca786ca4709edbfae6b8bb47707e9477692f334c51e2ec1c70bb6"
+      "sha256": "2579d1d27584e0e25fda09fcbe6fa508ba86d228c22ce264f19b659637fd5f69"
     },
     {
       "path": "scripts/final/voice.py",
@@ -1410,7 +1410,7 @@
     },
     {
       "path": "scripts/narrative_evidence.py",
-      "sha256": "17f043cd0819ff1455703e4516b77164d7a8580711a684fe89bf5bc56c36429c"
+      "sha256": "76e11c47b6c8497d2f90e77cd18705b61b0b9ece4b46053884e3e3785f26acd2"
     },
     {
       "path": "scripts/narrative_timeline.py",
@@ -1558,7 +1558,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "b4467f38bd2e8735bdf833bfb0c694b65a25f01a192fbeda7b279c810db47914"
+      "sha256": "fd013e011d9dbd98b02c29d97988e609ed0ca7c5e1dd6da2c99f0ddf24ccec20"
     },
     {
       "path": "scripts/post_audit.py",
@@ -1750,7 +1750,7 @@
     },
     {
       "path": "scripts/shortform_director.py",
-      "sha256": "554f68ff7256a378f17a932351820a9f57fc6673b1e14e04d057a712af4d10a6"
+      "sha256": "10e606a68a9c729398d44d1186000281af274972063afe030ff8316b76cd00f7"
     },
     {
       "path": "scripts/shortform_motion.py",
