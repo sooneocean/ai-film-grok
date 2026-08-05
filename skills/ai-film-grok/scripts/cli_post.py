@@ -15,6 +15,17 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from core.constants import EXPORT_METADATA_FILES, MANIFEST_NAME
+from core.emit import emit
+from core.film_io import (
+    film_dirs,
+    load_director_notes,
+    load_manifest,
+    save_director_notes,
+    save_manifest,
+)
+from core.gates import recompute_gates
+from core.paths import record_file_matches, which_npx_safe
 from director_review import (
     SCORECARD_DIMENSIONS,
     DirectorReviewError,
@@ -44,62 +55,6 @@ from util import sha256_file, utc_now, write_json
 from util.errors import FilmError
 from util.subprocess import run
 from util.validators import film_output_path
-
-MANIFEST_NAME = "manifest.json"
-SCHEMA_VERSION = 2
-EXPORT_METADATA_FILES = (
-    "brief.json",
-    "style-bible.json",
-    "film-spec.json",
-    "timeline.json",
-    "manifest.json",
-    "README.md",
-    "post-plan.json",
-)
-
-
-def _ag():
-    """Lazy aifilm_grok — helpers stay patchable on the monolith for tests."""
-    import aifilm_grok as ag
-
-    return ag
-
-
-def emit(obj: dict[str, Any]) -> None:
-    return _ag().emit(obj)
-
-
-def load_manifest(root: Path) -> dict[str, Any]:
-    return _ag().load_manifest(root)
-
-
-def save_manifest(root: Path, manifest: dict[str, Any]) -> None:
-    return _ag().save_manifest(root, manifest)
-
-
-def recompute_gates(root: Path, manifest: dict[str, Any]) -> None:
-    return _ag().recompute_gates(root, manifest)
-
-
-def film_dirs(root: Path) -> dict[str, Path]:
-    return _ag().film_dirs(root)
-
-
-def record_file_matches(*args: Any, **kwargs: Any) -> bool:
-    # aifilm_grok signature: (root, record, *, field=...)
-    return _ag().record_file_matches(*args, **kwargs)
-
-
-def which_npx_safe() -> str | None:
-    return _ag().which_npx_safe()
-
-
-def load_director_notes(root: Path) -> dict[str, Any]:
-    return _ag().load_director_notes(root)
-
-
-def save_director_notes(root: Path, notes: dict[str, Any]) -> None:
-    return _ag().save_director_notes(root, notes)
 
 
 def cmd_post_quality(args: argparse.Namespace) -> int:
@@ -1773,3 +1728,632 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
         }
     )
     return 0
+
+def add_post_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    pa = sub.add_parser("post-audit", help="Unified post-production audit")
+    pa.add_argument("--root", required=True)
+
+    caption_audit = sub.add_parser(
+        "caption-frame-audit",
+        help="Extract final-MP4 frames during subtitle cues for human readability review",
+    )
+    caption_audit.add_argument("--root", required=True)
+    caption_audit.add_argument("--max-frames", type=int, default=5)
+
+    caption_pixel = sub.add_parser(
+        "caption-pixel-check",
+        help="Machine ink check: final MP4 bottom-band looks like burned captions at cue mids",
+    )
+    caption_pixel.add_argument("--root", required=True)
+    caption_pixel.add_argument("--max-samples", type=int, default=5)
+    caption_pixel.add_argument(
+        "--final",
+        default=None,
+        help="Optional path to final MP4 (default out/film_final.mp4)",
+    )
+
+    post_doc = sub.add_parser(
+        "post-doctor",
+        help="One-page post health: caption_path, double-burn, SRT, five-track, timeline clock",
+    )
+    post_doc.add_argument("--root", required=True)
+
+    tl_clock = sub.add_parser(
+        "timeline-clock",
+        help="Audit/rewrite single on-picture timeline clock (film_timeline authority)",
+    )
+    tl_clock_sub = tl_clock.add_subparsers(dest="timeline_clock_action", required=True)
+    tl_aud = tl_clock_sub.add_parser("audit", help="Compare film_timeline vs timeline.json")
+    tl_aud.add_argument("--root", required=True)
+    tl_rw = tl_clock_sub.add_parser(
+        "rewrite",
+        help="Rewrite timeline.json shot_starts from film_timeline (on-picture slots)",
+    )
+    tl_rw.add_argument("--root", required=True)
+
+    transition_audit = sub.add_parser(
+        "transition-frame-audit",
+        help="Extract final-MP4 frames around every planned shot transition for human review",
+    )
+    transition_audit.add_argument("--root", required=True)
+
+    transition_template = sub.add_parser(
+        "transition-frame-review-template",
+        help="Create a per-seam human decision template for the current transition audit",
+    )
+    transition_template.add_argument("--root", required=True)
+
+    transition_attest = sub.add_parser(
+        "transition-frame-attest",
+        help="Record human approval for current per-transition review frames",
+    )
+    transition_attest.add_argument("--root", required=True)
+    transition_attest.add_argument("--user-phrase", required=True)
+    transition_attest.add_argument(
+        "--decisions",
+        help="Path to completed transition-review-decisions JSON; required when the film has joins",
+    )
+
+    caption_attest = sub.add_parser(
+        "caption-frame-attest",
+        help="Record human readability approval for current caption review frames",
+    )
+    caption_attest.add_argument("--root", required=True)
+    caption_attest.add_argument("--user-phrase", required=True)
+
+    fin = sub.add_parser(
+        "final", help="Render formal final: edge-tts VO + BGM + burned Chinese subs"
+    )
+    fin.add_argument("--root", required=True)
+    fin.add_argument("--out-name", default="film_final.mp4")
+    fin.add_argument(
+        "--caption-path",
+        default=None,
+        choices=["master_hf", "ship_hardburn"],
+        help=(
+            "One caption decision: master_hf=plate subs off + HF/Remotion owns captions; "
+            "ship_hardburn=plate PIL/ffmpeg burn (no double layer). Default from post-engine."
+        ),
+    )
+    fin.add_argument(
+        "--ship-hardburn",
+        action="store_true",
+        help="Alias for --caption-path ship_hardburn (fast ship / gate-red path)",
+    )
+    fin.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume valid per-shot stretch/lipsync checkpoints from receipts/checkpoints/",
+    )
+    fin.add_argument(
+        "--force",
+        action="store_true",
+        help="Clear per-shot final-render checkpoints before rendering",
+    )
+    fin.add_argument("--transition-sec", type=float, default=None, help="Inter-shot xfade seconds")
+    fin.add_argument(
+        "--allow-loop-risk",
+        action="store_true",
+        help="Allow final when VO would stream_loop short plates (discouraged); does NOT skip measured over-plate",
+    )
+    fin.add_argument(
+        "--strict-tts-rehearsal",
+        action="store_true",
+        help="Require receipts/tts-rehearsal.json before final; measured VO preferred for pacing",
+    )
+    fin.add_argument(
+        "--vo-fit",
+        default=None,
+        choices=["atempo", "legacy"],
+        help="slot mode: atempo=VO speed to plate (default three-axis); legacy=old pad/stretch",
+    )
+    fin.add_argument(
+        "--voice",
+        default=None,
+        help="edge voice or provider voice id; default comes from film-spec",
+    )
+    fin.add_argument(
+        "--tts-backend",
+        default=None,
+        choices=["audio_node", "auto", "minimax", "fish", "edge", "external"],
+        help="audio_node: private Qwen3-TTS on the 5090; auto: external > MiniMax > pinned Fish > edge",
+    )
+    fin.add_argument("--vo-rate", default=None)
+    fin.add_argument("--vo-pitch", default=None)
+    fin.add_argument("--vo-gain", type=float, default=None)
+    fin.add_argument(
+        "--vocal-color-gain",
+        type=float,
+        default=None,
+        help="Independent 娇喘/语助词 track gain (0..1.5; film-spec voice_tracks.vocal_color_gain)",
+    )
+    fin.add_argument("--title")
+    fin.add_argument("--end-title")
+    fin.add_argument("--music", help="External BGM file (overrides audio/bgm.wav templates)")
+    fin.add_argument(
+        "--music-license",
+        help="License note; or place audio/*.license.txt beside the file",
+    )
+    fin.add_argument(
+        "--music-template",
+        default=None,
+        choices=["off", "auto", "on", "timeline", "approved_library"],
+        help=(
+            "BGM: auto/on/off retain legacy behavior; timeline uses film-local cue templates; "
+            "approved_library requires shared human-approved cue matches"
+        ),
+    )
+    fin.add_argument(
+        "--music-volume",
+        type=float,
+        default=0.52,
+        help="BGM mix gain once; ~0.45-0.58 dual-track (VO clear + BGM audible)",
+    )
+    fin.add_argument(
+        "--native-audio-volume",
+        type=float,
+        default=None,
+        help="Mix gain for generated clip audio preserved as native stems (default from film-spec or 0.72; primary video sound)",
+    )
+    fin.add_argument(
+        "--music-mood",
+        default="rnb",
+        help="playful|dark|warm|rnb|sensual|soul — 色气默认 rnb (seductive R&B/Soul；勿对里番用 dark)",
+    )
+    fin.add_argument(
+        "--music-seed",
+        type=int,
+        default=None,
+        help="Procedural BGM seed (change for a new anti-fatigue take; default = hash of title)",
+    )
+    fin.add_argument(
+        "--sidechain-threshold",
+        type=float,
+        default=None,
+        help="VO→BGM sidechain threshold (rnb default 0.07)",
+    )
+    fin.add_argument(
+        "--sidechain-ratio",
+        type=float,
+        default=None,
+        help="VO→BGM sidechain ratio (rnb default 3.2)",
+    )
+    fin.add_argument(
+        "--sidechain-attack",
+        type=float,
+        default=None,
+        help="Sidechain attack ms (rnb default 15)",
+    )
+    fin.add_argument(
+        "--sidechain-release",
+        type=float,
+        default=None,
+        help="Sidechain release ms — higher = BGM returns slower in VO pauses (rnb default 720)",
+    )
+    fin.add_argument(
+        "--loudnorm",
+        default=None,
+        choices=["off", "auto", "on"],
+        help="Mix loudness: auto (default, only if too loud/quiet) | on | off",
+    )
+    fin.add_argument(
+        "--target-lufs",
+        type=float,
+        default=None,
+        help="loudnorm target LUFS (default -16 shortform)",
+    )
+    fin.add_argument(
+        "--lipsync",
+        default="off",
+        choices=["auto", "off", "require", "latentsync", "external", "wav2lip"],
+        help="Lip-sync OFF by default. RTX node uses LatentSync 1.6 for approved close-up repair.",
+    )
+    fin.add_argument("--sub-lead", type=float, default=0.08, help="Show subtitles early (seconds)")
+    fin.add_argument(
+        "--sub-max-unit", type=float, default=1.75, help="Max seconds per subtitle line"
+    )
+    fin.add_argument("--sub-max-chars", type=int, default=14, help="Max Chinese chars per line")
+    fin.add_argument(
+        "--title-dur",
+        type=float,
+        default=1.5,
+        help="Title pad seconds (designed-post keeps pad; glyphs only if --plate-cards text)",
+    )
+    fin.add_argument(
+        "--end-dur",
+        type=float,
+        default=None,
+        help="End card pad seconds (default: render_final 1.6; designed-post still draws 完)",
+    )
+    fin.add_argument(
+        "--plate-cards",
+        choices=["text", "blank", "auto"],
+        default="blank",
+        help="blank=pad only with no glyphs (default); text is an explicit FFmpeg-only compatibility override",
+    )
+    fin.add_argument(
+        "--post-engine",
+        default="hyperframes",
+        choices=["ffmpeg", "hyperframes", "remotion"],
+        help=(
+            "Staged final: ffmpeg=plate burns captions; "
+            "hyperframes=stage_plate (subs off) → stage_hf captions → "
+            "stage_caption verify (HF failure blocks and must re-render) → deliver. "
+            "Never assumes HF burned without gate."
+        ),
+    )
+    fin.add_argument(
+        "--subs",
+        default="off",
+        choices=["burn", "off"],
+        help=(
+            "Plate only: off is the default so HyperFrames is the sole text/caption layer; "
+            "burn is an explicit FFmpeg-only compatibility override."
+        ),
+    )
+    fin.add_argument(
+        "--plate-timeout",
+        type=int,
+        default=0,
+        help="Seconds for stage_plate; 0 auto-scales from duration, shots and lipsync (floor 1200)",
+    )
+    fin.add_argument(
+        "--no-caption-recovery",
+        action="store_true",
+        help=("Deprecated compatibility flag; HyperFrames delivery never uses caption recovery"),
+    )
+    fin.add_argument(
+        "--compose-quality",
+        default=None,
+        choices=["draft", "standard", "high"],
+        help="HyperFrames render quality when --post-engine hyperframes",
+    )
+    fin.add_argument(
+        "--compose-preset",
+        default="auto",
+        choices=["auto", "ecchi-rnb", "minimal"],
+        help="Designed-post title/caption look: auto (from mood/tone) | ecchi-rnb | minimal",
+    )
+    fin.add_argument(
+        "--title-sequence",
+        default=None,
+        choices=["auto", "none"],
+        help="Override film-spec title_sequence mode (auto=spec/default, none=suppress)",
+    )
+    fin.add_argument(
+        "--end-roll",
+        default=None,
+        choices=["auto", "none", "cast_only", "full"],
+        help="Override film-spec end_roll mode (auto=spec/default, none=suppress)",
+    )
+    fin.add_argument(
+        "--require-preview",
+        action="store_true",
+        help="With designed-post: require receipts/compose-preview.json first",
+    )
+    fin.add_argument(
+        "--npm-install",
+        action="store_true",
+        help="With --post-engine remotion: run npm install once before render (network)",
+    )
+    fin.add_argument(
+        "--npm-install-timeout",
+        type=int,
+        default=900,
+        help="Seconds for remotion --npm-install (default 900)",
+    )
+    fin.add_argument(
+        "--allow-burned-underlay",
+        action="store_true",
+        help="Allow underlay when plate already has burned-in captions (double-burn risk)",
+    )
+    fin.add_argument(
+        "--skip-compose-check",
+        action="store_true",
+        help="Skip hyperframes check before render (not recommended)",
+    )
+    fin.add_argument(
+        "--keep-compose-raw",
+        action="store_true",
+        help="Keep out/film_*_raw.mp4 when using designed-post engines",
+    )
+    fin.add_argument(
+        "--skip-preflight",
+        action="store_true",
+        help="Skip lesson preflight hard gates before final (not recommended)",
+    )
+    fin.add_argument(
+        "--skip-heat-gate",
+        action="store_true",
+        help="Skip adult-max heat final_ok (S-grade) gate before final (not recommended)",
+    )
+    fin.add_argument(
+        "--preflight-strict",
+        action="store_true",
+        help="Also block final on preflight soft warnings",
+    )
+
+    review = sub.add_parser(
+        "review-final",
+        help="Record explicit end-to-end final-film approval with director scorecard",
+    )
+    review.add_argument("--root", required=True)
+    review.add_argument(
+        "--review-file",
+        help="Hash-bound JSON emitted by review-ui; replaces reviewer/notes/score/grade/evidence flags",
+    )
+    review.add_argument("--approve", action="store_true")
+    review.add_argument("--reviewer")
+    review.add_argument("--notes")
+    review.add_argument(
+        "--watched-full", action="store_true", help="Required by review contract v3"
+    )
+    for dim in SCORECARD_DIMENSIONS:
+        flag = f"--score-{dim.replace('_', '-')}"
+        review.add_argument(
+            flag,
+            choices=["pass", "fail"],
+            default=None,
+            dest=f"score_{dim}",
+            help=f"Director scorecard dimension '{dim}' (required with --approve)",
+        )
+        review.add_argument(
+            f"--grade-{dim.replace('_', '-')}",
+            type=int,
+            choices=range(1, 6),
+            default=None,
+            dest=f"grade_{dim}",
+            help="v3 numeric grade 1-5",
+        )
+    review.add_argument(
+        "--reshoot-shots",
+        default="",
+        help="Comma-separated shot ids to attach to identity/style/motion/escalation fails (writes director_notes)",
+    )
+    review.add_argument(
+        "--screening-evidence",
+        action="append",
+        default=[],
+        help="v1.6: repeat dimension@seconds:note for each final scorecard dimension",
+    )
+    review.add_argument(
+        "--fail-reason",
+        action="append",
+        default=[],
+        help="v3 repeat dimension:CANONICAL_CODE[:shot]",
+    )
+
+    editorial_review = sub.add_parser(
+        "final-editorial-review",
+        help="Write a hash-bound no-spend editorial review before final approval",
+    )
+    editorial_review.add_argument("--root", required=True)
+
+    postq = sub.add_parser("post-quality", help="VFX, audio and premium Master QC contracts")
+    postq_sub = postq.add_subparsers(dest="post_action", required=True)
+    vr = postq_sub.add_parser("vfx-register")
+    vr.add_argument("--root", required=True)
+    vr.add_argument("--shot-id", required=True)
+    vr.add_argument("--plate", required=True)
+    vr.add_argument(
+        "--status", choices=("pending", "wip", "review", "approved", "rejected"), required=True
+    )
+    vr.add_argument("--reviewer", required=True)
+    vr.add_argument("--notes", default="")
+    for name in ("vfx-check", "audio-check"):
+        post_check = postq_sub.add_parser(name)
+        post_check.add_argument("--root", required=True)
+    mq = postq_sub.add_parser("master-qc")
+    mq.add_argument("--root", required=True)
+    mq.add_argument("--final", default=None)
+
+    closeout = sub.add_parser(
+        "closeout",
+        help="Delivery ladder: heat → review-final gate → post-audit → optional export",
+    )
+    closeout_sub = closeout.add_subparsers(dest="closeout_action", required=True)
+    cos = closeout_sub.add_parser("status", help="Read-only closeout ladder status")
+    cos.add_argument("--root", required=True)
+    cor = closeout_sub.add_parser(
+        "run",
+        help="Run automatable steps; stop at human review-final (never auto-approve)",
+    )
+    cor.add_argument("--root", required=True)
+    cor.add_argument(
+        "--export",
+        action="store_true",
+        help="After post-audit ok, emit export-desktop next_cmd (requires --name)",
+    )
+    cor.add_argument("--name", default=None, help="Desktop export folder name (with --export)")
+    cor.add_argument(
+        "--status-only",
+        action="store_true",
+        help="Do not run post-audit; status snapshot only",
+    )
+
+    cpv = sub.add_parser(
+        "compose-preview",
+        help="Start HyperFrames or Remotion Studio; write receipts/compose-preview.json",
+    )
+    cpv.add_argument("--root", required=True)
+    cpv.add_argument(
+        "--engine",
+        default="hyperframes",
+        choices=["hyperframes", "remotion"],
+        help="hyperframes (default) | remotion (needs npm install in compose/remotion)",
+    )
+    cpv.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="Studio port (default 3002 HF / 3003 Remotion)",
+    )
+    cpv.add_argument("--no-open", action="store_true", help="Print URL only; do not open browser")
+    cpv.add_argument(
+        "--no-export", action="store_true", help="Do not auto export-compose if missing"
+    )
+    cpv.add_argument("--foreground", action="store_true", help="Block instead of background server")
+    cpv.add_argument("--force-new", action="store_true")
+    cpv.add_argument("--stop", action="store_true", help="Stop background Studio (HF only)")
+    cpv.add_argument(
+        "--status",
+        action="store_true",
+        dest="status_only",
+        help="Show running Studio URL without starting",
+    )
+
+    ec = sub.add_parser(
+        "export-compose",
+        help="Export approved clips to HyperFrames/Remotion designed-post packages",
+    )
+    ec.add_argument("--root", required=True)
+    ec.add_argument(
+        "--engine",
+        default="both",
+        choices=["hyperframes", "remotion", "both"],
+        help="hyperframes (HTML Studio, default primary) | remotion | both",
+    )
+    ec.add_argument(
+        "--post-owner",
+        choices=["ffmpeg", "hyperframes", "remotion"],
+        default=None,
+        help="Create a missing post-plan with this owner (default follows --engine)",
+    )
+    ec.add_argument(
+        "--layout",
+        default="auto",
+        choices=["auto", "multiclip", "underlay"],
+        help="auto: underlay when film_final exists",
+    )
+    ec.add_argument(
+        "--compose-preset",
+        default="auto",
+        choices=["auto", "ecchi-rnb", "minimal"],
+        help="Title/caption preset: auto|ecchi-rnb|minimal",
+    )
+    ec.add_argument("--title-dur", type=float, default=1.5)
+    ec.add_argument("--end-dur", type=float, default=1.5)
+    ec.add_argument(
+        "--title-sequence",
+        default=None,
+        choices=["auto", "none"],
+        help="Override film-spec title_sequence mode (auto=spec/default, none=suppress)",
+    )
+    ec.add_argument(
+        "--end-roll",
+        default=None,
+        choices=["auto", "none", "cast_only", "full"],
+        help="Override film-spec end_roll mode (auto=spec/default, none=suppress)",
+    )
+    ec.add_argument("--force", action="store_true", help="Overwrite existing compose/")
+
+    cr = sub.add_parser(
+        "compose-render",
+        help="HyperFrames check+render+audio+register final (designed post)",
+    )
+    cr.add_argument("--root", required=True)
+    cr.add_argument(
+        "--engine",
+        default="hyperframes",
+        choices=["hyperframes", "remotion", "both"],
+    )
+    cr.add_argument("--layout", default="auto", choices=["auto", "multiclip", "underlay"])
+    cr.add_argument(
+        "--compose-preset",
+        default="auto",
+        choices=["auto", "ecchi-rnb", "minimal"],
+        help="Title/caption preset: auto|ecchi-rnb|minimal",
+    )
+    cr.add_argument(
+        "--require-preview",
+        action="store_true",
+        help="Require receipts/compose-preview.json before HyperFrames render",
+    )
+    cr.add_argument(
+        "--npm-install",
+        action="store_true",
+        help="Remotion: run npm install in compose/remotion before auto-render (network)",
+    )
+    cr.add_argument(
+        "--npm-install-timeout",
+        type=int,
+        default=900,
+        help="Timeout seconds for --npm-install (default 900)",
+    )
+    cr.add_argument("--quality", default="standard", choices=["draft", "standard", "high"])
+    cr.add_argument("--out-name", default="film_final.mp4")
+    cr.add_argument("--no-export", action="store_true")
+    cr.add_argument("--no-force-export", action="store_true")
+    cr.add_argument("--no-register", action="store_true")
+    cr.add_argument("--skip-check", action="store_true")
+    cr.add_argument(
+        "--keep-raw",
+        action="store_true",
+        help="Keep out/film_hyperframes_raw.mp4 after audio mux",
+    )
+    cr.add_argument("--title-dur", type=float, default=1.5)
+    cr.add_argument("--end-dur", type=float, default=1.5)
+    cr.add_argument(
+        "--title-sequence",
+        default=None,
+        choices=["auto", "none"],
+        help="Override film-spec title_sequence mode (auto=spec/default, none=suppress)",
+    )
+    cr.add_argument(
+        "--end-roll",
+        default=None,
+        choices=["auto", "none", "cast_only", "full"],
+        help="Override film-spec end_roll mode (auto=spec/default, none=suppress)",
+    )
+    cr.add_argument(
+        "--allow-burned-underlay",
+        action="store_true",
+        help="Allow underlay when plate already has burned-in captions (double-burn risk)",
+    )
+    cr.add_argument(
+        "--register-only",
+        default=None,
+        help="Only register existing MP4 as final_film",
+    )
+    cr.add_argument("--post-engine", default="external")
+
+    pp = sub.add_parser(
+        "post-plan",
+        help="Create or validate the editorial-to-HyperFrames/Remotion handoff",
+    )
+    pp.add_argument("--root", required=True)
+    pp_sub = pp.add_subparsers(dest="post_plan_action", required=True)
+    pp_init = pp_sub.add_parser("init", help="Write post-plan.json with one post owner")
+    pp_init.add_argument(
+        "--owner", choices=["ffmpeg", "hyperframes", "remotion"], default="hyperframes"
+    )
+    pp_init.add_argument("--edl", default=None, help="Workspace-relative video-use EDL path")
+    pp_init.add_argument("--master-subtitles", default="out/final.srt")
+    pp_init.add_argument("--audio-plan", default="sound-plan.json")
+    pp_init.add_argument("--force", action="store_true")
+    pp_validate = pp_sub.add_parser("validate", help="Validate post-plan.json")
+    pp_validate.add_argument("--check-artifacts", action="store_true")
+    pp_sub.add_parser("show", help="Print post-plan.json and its validation result")
+
+    rf = sub.add_parser(
+        "register-final",
+        help="Register external/composed MP4 as formal final_film candidate",
+    )
+    rf.add_argument("--root", required=True)
+    rf.add_argument("--source", required=True)
+    rf.add_argument("--out-name", default="film_final.mp4")
+    rf.add_argument(
+        "--post-engine",
+        default="external",
+        help="Label: external|hyperframes|remotion|ffmpeg",
+    )
+    rf.add_argument(
+        "--allow-static",
+        action="store_true",
+        help="Allow motion QA soft path (title-only tests; production leave off)",
+    )
+
+    ex = sub.add_parser("export-desktop", help="Copy deliverables to ~/Desktop/<name>")
+    ex.add_argument("--root", required=True)
+    ex.add_argument("--name", required=True)
+    ex.add_argument("--force", action="store_true")

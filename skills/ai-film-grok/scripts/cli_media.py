@@ -2,7 +2,7 @@
 """Media / still / style / continuity / register CLI handlers.
 
 Extracted from aifilm_grok. Public command strings unchanged.
-Helpers proxy through aifilm_grok so tests can monkeypatch the monolith.
+Shared IO/helpers come from core/ (no hub cycle).
 """
 
 from __future__ import annotations
@@ -22,6 +22,22 @@ from continuity_chain import (
     is_long_form,
     upsert_join,
 )
+from core.constants import (
+    DEFAULT_FPS,
+    DEFAULT_HEIGHT,
+    DEFAULT_WIDTH,
+    NATIVE_AUDIO_AUDIBLE_MIN_DB,
+)
+from core.emit import emit
+from core.film_io import ensure_tree, film_dirs, load_manifest, save_manifest
+from core.gates import recompute_gates
+from core.media_ops import (
+    _auto_promote_last_to_next,
+    _register_media,
+    media_duration,
+    normalize_clip,
+    probe_native_audio_mean_volume,
+)
 from film_spec import FilmSpecError, validate_film_spec
 from logger import log
 from media_qa import ALLOWED_VIDEO_ENDPOINTS, MediaQAError, analyze_media
@@ -38,71 +54,6 @@ from util.errors import FilmError
 from util.subprocess import run
 from util.validators import film_output_path, valid_shot_id
 from visual_bible import load_bible
-
-MANIFEST_NAME = "manifest.json"
-SCHEMA_VERSION = 2
-DEFAULT_FPS = 30
-DEFAULT_WIDTH = 720
-DEFAULT_HEIGHT = 1280
-NATIVE_AUDIO_AUDIBLE_MIN_DB = -42.0
-
-
-def _ag():
-    import aifilm_grok as ag
-
-    return ag
-
-
-def emit(obj: dict[str, Any]) -> None:
-    return _ag().emit(obj)
-
-
-def load_manifest(root: Path) -> dict[str, Any]:
-    return _ag().load_manifest(root)
-
-
-def save_manifest(root: Path, manifest: dict[str, Any]) -> None:
-    return _ag().save_manifest(root, manifest)
-
-
-def recompute_gates(root: Path, manifest: dict[str, Any]) -> None:
-    return _ag().recompute_gates(root, manifest)
-
-
-def film_dirs(root: Path) -> dict[str, Path]:
-    return _ag().film_dirs(root)
-
-
-def record_file_matches(record: dict[str, Any], path: Path) -> bool:
-    return _ag().record_file_matches(record, path)
-
-
-def which_npx_safe() -> str | None:
-    return _ag().which_npx_safe()
-
-
-def probe_native_audio_mean_volume(path: Path) -> float | None:
-    return _ag().probe_native_audio_mean_volume(path)
-
-
-def ensure_tree(root: Path) -> dict[str, Path]:
-    return _ag().ensure_tree(root)
-
-
-def normalize_clip(root: Path, *args: Any, **kwargs: Any) -> Any:
-    return _ag().normalize_clip(root, *args, **kwargs)
-
-
-def media_duration(path: Path) -> float:
-    return _ag().media_duration(path)
-
-
-def _register_media(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    return _ag()._register_media(*args, **kwargs)
-
-
-def _auto_promote_last_to_next(*args: Any, **kwargs: Any) -> Any:
-    return _ag()._auto_promote_last_to_next(*args, **kwargs)
 
 
 def cmd_lint_continuity(args: argparse.Namespace) -> int:
@@ -1743,3 +1694,355 @@ def cmd_reencode_clips(args: argparse.Namespace) -> int:
         }
     )
     return 0 if not failed else 2
+
+def add_media_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    lintc = sub.add_parser(
+        "lint-continuity",
+        help="Lint film-spec for cast/coverage/screen-direction continuity issues",
+    )
+    lintc.add_argument("--root", required=True)
+    lintc.add_argument("--spec", default=None, help="Optional path to film-spec JSON")
+    lintc.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit non-zero when blocking continuity codes are present",
+    )
+
+    ls = sub.add_parser("lock-style", help="Lock style bible")
+    ls.add_argument("--root", required=True)
+    ls.add_argument("--canonical", help="Path to approved style master image")
+    ls.add_argument("--cast-master", help="Path to approved cast master (face/wardrobe lock)")
+    ls.add_argument(
+        "--char-id",
+        default="hero",
+        help="Cast master character id (default hero; e.g. lushiran)",
+    )
+    ls.add_argument("--signature", help="Override signature block (≥40 chars)")
+    ls.add_argument(
+        "--medium",
+        choices=["anime", "manhua", "semi_real", "photoreal"],
+        help="Force medium fingerprint into style-bible before lock",
+    )
+    ls.add_argument(
+        "--from-plan",
+        action="store_true",
+        help="Merge receipts/style-lock-plan.json into bible before lock",
+    )
+    ls.add_argument(
+        "--strict-style-lock",
+        action="store_true",
+        help="Fail lock if style_fingerprint/cast_locks hard checks fail",
+    )
+
+    # Pixel face-identity fingerprints
+
+    fid = sub.add_parser(
+        "face-identity",
+        help="Pixel face lock: enroll|enroll-bible|verify|audit|status → receipts/face-identity.json",
+    )
+    fid_sub = fid.add_subparsers(dest="face_identity_cmd", required=True)
+    fe = fid_sub.add_parser("enroll", help="Enroll one cast master / face plate")
+    fe.add_argument("--root", required=True)
+    fe.add_argument("--char-id", default="hero")
+    fe.add_argument("--source", required=True, help="Cast master or face-lock image")
+    fe.add_argument("--label", default="")
+    feb = fid_sub.add_parser("enroll-bible", help="Enroll all style-bible cast_masters")
+    feb.add_argument("--root", required=True)
+    fv = fid_sub.add_parser("verify", help="Verify one still against enrolled cast")
+    fv.add_argument("--root", required=True)
+    fv.add_argument("--image", required=True)
+    fv.add_argument("--char-id", default="hero")
+    fv.add_argument(
+        "--ahash-max", type=int, default=None, help="default from face_identity.DEFAULT_*"
+    )
+    fv.add_argument("--dhash-max", type=int, default=None)
+    fv.add_argument("--hist-max", type=float, default=None)
+    fa = fid_sub.add_parser("audit", help="Verify keyframes/ vs enrolled; set verified flag")
+    fa.add_argument("--root", required=True)
+    fa.add_argument("--char-id", help="Default cast when shot map missing")
+    fa.add_argument("--strict", action="store_true", help="Exit 2 if any keyframe fails")
+    fa.add_argument("--ahash-max", type=int, default=None)
+    fa.add_argument("--dhash-max", type=int, default=None)
+    fa.add_argument("--hist-max", type=float, default=None)
+    fs = fid_sub.add_parser("status", help="Show face-identity receipt + post_audit view")
+    fs.add_argument("--root", required=True)
+
+    # Input-ref style lock (medium + cast_locks + agent prompt prefixes)
+
+    slock = sub.add_parser(
+        "style-lock",
+        help="Lock medium/identity from user ref image (plan|apply|check|prompt|recommend)",
+    )
+    slock_sub = slock.add_subparsers(dest="style_lock_cmd", required=True)
+    slp = slock_sub.add_parser("plan", help="Analyze ref → style-lock-plan.json + face crops")
+    slp.add_argument("--root", required=True)
+    slp.add_argument("--ref", required=True, help="User character sheet or face/ref image")
+    slp.add_argument("--char-id", default="hero")
+    slp.add_argument("--name", help="Display name")
+    slp.add_argument(
+        "--medium",
+        choices=["anime", "manhua", "semi_real", "photoreal", "auto"],
+        default="auto",
+        help="auto=infer from theme/hint; manhua recommended for 漫剧 stability",
+    )
+    slp.add_argument("--theme", default="")
+    slp.add_argument("--title", default="")
+    slp.add_argument("--hint", default="", help="Free text: 漫剧/写实/要稳定…")
+    slp.add_argument("--face-notes", default="")
+    slp.add_argument("--hair", default="")
+    slp.add_argument("--never", default="")
+    slp.add_argument("--wardrobe", default="")
+    slp.add_argument("--palette", default="")
+    slp.add_argument("--lighting", default="")
+    slp.add_argument("--no-crop", action="store_true", help="Skip heuristic face crops")
+    sla = slock_sub.add_parser("apply", help="Merge plan into style-bible.json")
+    sla.add_argument("--root", required=True)
+    sla.add_argument("--plan-file", help="Default receipts/style-lock-plan.json")
+    slc = slock_sub.add_parser("check", help="Validate style fingerprint + cast locks")
+    slc.add_argument("--root", required=True)
+    slpr = slock_sub.add_parser("prompt", help="Print still/I2V prompt prefixes")
+    slpr.add_argument("--root", required=True)
+    slpr.add_argument("--cast", help="Comma cast ids")
+    slpr.add_argument("--motion", default="")
+    slr = slock_sub.add_parser("recommend", help="Recommend medium for a stability goal")
+    slr.add_argument("--goal", required=True, help="e.g. 要稳定像漫剧")
+
+    bible = sub.add_parser("bible", help="Manage Visual Bible")
+    bible_sub = bible.add_subparsers(dest="bible_cmd", required=True)
+
+    b_init = bible_sub.add_parser("init", help="Initialize or migrate Visual Bible")
+    b_init.add_argument("--root", required=True)
+
+    b_lock = bible_sub.add_parser("lock", help="Lock Visual Bible (Candidate -> Approved)")
+    b_lock.add_argument("--root", required=True)
+
+    b_state = bible_sub.add_parser("state", help="Update Visual Bible state")
+    b_state.add_argument("--root", required=True)
+    b_state.add_argument("--set", choices=["Draft", "Candidate", "Approved"], required=True)
+
+    rs = sub.add_parser("register-still", help="Register approved still")
+    rs.add_argument("--root", required=True)
+    rs.add_argument("--shot-id", required=True)
+    rs.add_argument("--source", required=True)
+    rs.add_argument("--role", default="keyframe")
+    rs.add_argument("--status", default="approved")
+    rs.add_argument("--prompt-file")
+    rs.add_argument("--queue-job-id", help="Required for reference-first approved stills")
+    rs.add_argument(
+        "--identity-approved",
+        action="store_true",
+        help="Required when --status approved: still matches cast master",
+    )
+    rs.add_argument(
+        "--review-note",
+        help="Required when --status approved: brief visual review note",
+    )
+    rs.add_argument(
+        "--anatomy-safe",
+        action="store_true",
+        help="Required for adult-max approved stills after full-frame anatomy inspection",
+    )
+    rs.add_argument(
+        "--char-id",
+        help="Cast id for pixel face-identity verify (default: first dsl.cast)",
+    )
+    rs.add_argument(
+        "--require-face-identity",
+        action="store_true",
+        help="Fail approved register if face-identity pixel match fails",
+    )
+
+    rc = sub.add_parser("register-clip", help="Register approved I2V clip")
+    rc.add_argument("--root", required=True)
+    rc.add_argument("--shot-id", required=True)
+    rc.add_argument("--source", required=True)
+    rc.add_argument("--status", default="approved")
+    rc.add_argument("--prompt-file")
+    rc.add_argument("--queue-job-id", help="Required for reference-first approved clips")
+    rc.add_argument("--source-endpoint", choices=sorted(ALLOWED_VIDEO_ENDPOINTS))
+    rc.add_argument("--identity-approved", action="store_true")
+    rc.add_argument("--motion-approved", action="store_true")
+    rc.add_argument("--review-note")
+    rc.add_argument(
+        "--anatomy-safe",
+        action="store_true",
+        help="Required for adult-max approved clips after full-frame anatomy inspection",
+    )
+    rc.add_argument(
+        "--strict-video-contract",
+        action="store_true",
+        help="Approved clips: enforce native 9:16 704x1280 and film-spec FPS",
+    )
+    rc.add_argument(
+        "--review-receipt",
+        help="v1.6 approved review receipt (defaults to receipts/reviews/<shot>.json)",
+    )
+
+    asb = sub.add_parser("assemble", help="Assemble silent film from timeline + clips")
+    asb.add_argument("--root", required=True)
+    asb.add_argument("--out-name", default="film_silent.mp4")
+
+    # Real-footage ingestion + auto-cut (video-use bridge, 2026-07-23)
+
+    ingf = sub.add_parser(
+        "ingest-footage",
+        help="Ingest real footage → transcribe (local Whisper) → takes_packed.md",
+    )
+    ingf.add_argument("--root", required=True)
+    ingf.add_argument("--source", required=True, help="Path to source video file")
+    ingf.add_argument("--label", default=None, help="Human label for the source")
+    ingf.add_argument(
+        "--whisper-model",
+        default="base",
+        dest="whisper_model",
+        help="Whisper model: base (fast) | medium (accurate)",
+    )
+
+    acut = sub.add_parser(
+        "auto-cut",
+        help="Auto-cut real footage on word boundaries + silence gaps (video-use logic)",
+    )
+    acut.add_argument("--root", required=True)
+    acut.add_argument("--source-id", required=True, help="Footage source_id from ingest-footage")
+    acut.add_argument(
+        "--target-duration",
+        type=float,
+        default=None,
+        dest="target_duration",
+        help="Optional target total duration (sec) to aim segment count at",
+    )
+
+    shortform = sub.add_parser(
+        "shortform", help="Provider-neutral 15–60s topic/A-roll/C-roll planning and A-roll remux"
+    )
+    shortform_sub = shortform.add_subparsers(dest="shortform_action", required=True)
+    sf_plan = shortform_sub.add_parser("plan", help="Create a hash-bound shortform package")
+    sf_plan.add_argument("--root", required=True)
+    sf_plan.add_argument("--mode", required=True, choices=("topic", "aroll", "croll"))
+    sf_plan.add_argument("--approved-script", default="")
+    sf_plan.add_argument("--source-video", default="")
+    sf_plan.add_argument("--transcript", default="")
+    sf_plan.add_argument("--anchor", default="")
+    sf_validate = shortform_sub.add_parser(
+        "validate", help="Validate source hashes and editorial rules"
+    )
+    sf_validate.add_argument("--root", required=True)
+    sf_validate.add_argument("--require-approved", action="store_true")
+    sf_review = shortform_sub.add_parser("review", help="Record plan or sample review")
+    sf_review.add_argument("--root", required=True)
+    sf_review.add_argument("--stage", required=True, choices=("plan", "sample"))
+    sf_review.add_argument("--reviewer", required=True)
+    sf_review.add_argument("--note", required=True)
+    sf_review.add_argument("--approve", action="store_true")
+    sf_lipsync = shortform_sub.add_parser(
+        "enable-lipsync", help="Bind one B/C near shot to final audio"
+    )
+    sf_lipsync.add_argument("--root", required=True)
+    sf_lipsync.add_argument("--shot-id", required=True)
+    sf_lipsync.add_argument("--speaker", required=True)
+    sf_lipsync.add_argument("--face-target", required=True)
+    sf_lipsync.add_argument("--audio-sha256", required=True)
+    sf_render_lipsync = shortform_sub.add_parser(
+        "render-lipsync", help="Explicitly submit one hash-bound B/C sample to the locked backend"
+    )
+    sf_render_lipsync.add_argument("--root", required=True)
+    sf_render_lipsync.add_argument("--shot-id", required=True)
+    sf_render_lipsync.add_argument("--video", required=True)
+    sf_render_lipsync.add_argument("--audio", required=True)
+    sf_render_lipsync.add_argument("--backend", default="auto")
+    sf_render_lipsync.add_argument("--out", default="")
+    sf_broll = shortform_sub.add_parser(
+        "aroll-broll", help="Plan one bounded source-audio-preserving A-roll cover"
+    )
+    sf_broll.add_argument("--root", required=True)
+    sf_broll.add_argument("--beat-id", required=True)
+    sf_assemble = shortform_sub.add_parser(
+        "assemble-aroll", help="Remux source audio under reviewed A-roll visuals"
+    )
+    sf_assemble.add_argument("--root", required=True)
+    sf_assemble.add_argument("--visual-dir", required=True)
+    sf_assemble.add_argument("--out", default="")
+    sf_motion = shortform_sub.add_parser(
+        "motion-plan", help="Write deterministic local layer-motion plan"
+    )
+    sf_motion.add_argument("--root", required=True)
+    sf_motion.add_argument("--shot-id", required=True)
+    sf_motion.add_argument("--base", required=True)
+    sf_motion.add_argument("--layers", required=True)
+    sf_render_motion = shortform_sub.add_parser(
+        "render-motion", help="Render one deterministic local layer-motion sample"
+    )
+    sf_render_motion.add_argument("--root", required=True)
+    sf_render_motion.add_argument("--plan", required=True)
+    sf_render_motion.add_argument("--duration", required=True, type=float)
+    sf_render_motion.add_argument("--fps", type=int, default=30)
+    sf_render_motion.add_argument("--width", type=int, default=1080)
+    sf_render_motion.add_argument("--height", type=int, default=1920)
+    sf_render_motion.add_argument("--out", default="")
+
+    extf = sub.add_parser(
+        "extract-frame",
+        help="Extract first/last frame from a clip as next-shot still seed (frame-chain)",
+    )
+    extf.add_argument("--root", default=None, help="Film root (with --shot-id)")
+    extf.add_argument("--shot-id", default=None, help="Use clips/<shot-id> or manifest path")
+    extf.add_argument("--source", default=None, help="Explicit clip path")
+    extf.add_argument(
+        "--which",
+        default="last",
+        help="first | last | <seconds>",
+    )
+    extf.add_argument("--out", default=None, help="Output image path")
+    extf.add_argument(
+        "--next-shot-id",
+        default=None,
+        help="When using --root/--shot-id, name seed as keyframes/<next>-seed.png",
+    )
+    extf.add_argument(
+        "--promote-keyframe",
+        default=None,
+        metavar="NEXT_SHOT_ID",
+        help=(
+            "Copy extracted last frame byte-identically to keyframes/<id>.png "
+            "(continue-chain: next I2V frame-1; do not restart from cast)"
+        ),
+    )
+
+    cchain = sub.add_parser(
+        "continuity-chain",
+        help="Init/check film-root continuity_chain.md (long-form action chain)",
+    )
+    cchain_sub = cchain.add_subparsers(dest="chain_action", required=True)
+    cci = cchain_sub.add_parser("init", help="Create continuity_chain.md skeleton from film-spec")
+    cci.add_argument("--root", required=True)
+    cci.add_argument("--force", action="store_true", help="Overwrite existing file")
+    ccc = cchain_sub.add_parser("check", help="Validate doc + byte-identical joins + checklists")
+    ccc.add_argument("--root", required=True)
+    ccc.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat incomplete 9-point checklist as failure",
+    )
+
+    reenc = sub.add_parser(
+        "reencode-clips",
+        help="Re-encode film-spec clips to clean h264 (no upscale) and re-register",
+    )
+    reenc.add_argument("--root", required=True)
+    reenc.add_argument("--width", type=int, default=None, help="Max canvas width (default 720)")
+    reenc.add_argument("--height", type=int, default=None, help="Max canvas height (default 1280)")
+    reenc.add_argument("--fps", type=int, default=30)
+    reenc.add_argument("--crf", type=int, default=18)
+    reenc.add_argument("--duration-cap", type=float, default=6.0)
+    reenc.add_argument(
+        "--force-scale",
+        action="store_true",
+        help="Force scale/pad to --width/--height even if that upscales (discouraged)",
+    )
+    reenc.add_argument(
+        "--source-endpoint",
+        default=None,
+        choices=sorted(ALLOWED_VIDEO_ENDPOINTS),
+        help="Override per-clip endpoint; default keeps manifest or frw_seedance_i2v",
+    )
+    reenc.add_argument("--review-note", default=None)

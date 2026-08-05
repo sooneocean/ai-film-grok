@@ -7,15 +7,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import sys
 from pathlib import Path
 from typing import Any
 
+from runtime_policy import build_runtime_lock, verify_runtime_lock
 from util import require_json as read_json
 from util import sha256_file, write_json
 from util.errors import FilmError
-from runtime_policy import build_runtime_lock, verify_runtime_lock
 
 
 def _emit(obj: dict[str, Any]) -> None:
@@ -44,7 +42,9 @@ def cmd_lock_runtime(_: argparse.Namespace) -> int:
 
 def cmd_resume_manifest(args: argparse.Namespace) -> int:
     """Create only the missing state manifest for a legacy film root."""
-    import aifilm_grok as core
+    from core.constants import MANIFEST_NAME
+    from core.emit import emit
+    from core.film_io import empty_manifest, ensure_tree, save_manifest
 
     raw_root = Path(args.root).expanduser()
     if raw_root.is_symlink():
@@ -52,36 +52,36 @@ def cmd_resume_manifest(args: argparse.Namespace) -> int:
     root = raw_root.resolve()
     if not root.is_dir():
         raise FilmError(f"Legacy root must be a real directory: {root}")
-    manifest_path = root / core.MANIFEST_NAME
+    manifest_path = root / MANIFEST_NAME
     if manifest_path.exists() or manifest_path.is_symlink():
         raise FilmError(f"Manifest already exists at {manifest_path}; refusing to overwrite it")
     brief_path = root / "brief.json"
     if not brief_path.is_file():
         raise FilmError(f"Legacy root needs brief.json before manifest resume: {root}")
-    brief = core.read_json(brief_path)
+    brief = read_json(brief_path)
     title = str(brief.get("title") or "").strip()
     theme = str(brief.get("theme") or "").strip()
     aspect = str(brief.get("aspect_ratio") or "9:16").strip()
     if not title or not theme:
         raise FilmError("Legacy brief.json needs non-empty title and theme before manifest resume")
-    manifest = core.empty_manifest(title=title, theme=theme, aspect=aspect)
+    manifest = empty_manifest(title=title, theme=theme, aspect=aspect)
     contract_path = root / "director-contract.json"
     graph_path = root / "drama-graph.json"
     truth = manifest["truth_contract"]
-    truth["contract_sha256"] = core.sha256_file(contract_path) if contract_path.is_file() else ""
-    truth["graph_sha256"] = core.sha256_file(graph_path) if graph_path.is_file() else ""
+    truth["contract_sha256"] = sha256_file(contract_path) if contract_path.is_file() else ""
+    truth["graph_sha256"] = sha256_file(graph_path) if graph_path.is_file() else ""
     truth["spec_sha256"] = (
-        core.sha256_file(root / "film-spec.json") if (root / "film-spec.json").is_file() else ""
+        sha256_file(root / "film-spec.json") if (root / "film-spec.json").is_file() else ""
     )
     truth["timeline_sha256"] = (
-        core.sha256_file(root / "timeline.json") if (root / "timeline.json").is_file() else ""
+        sha256_file(root / "timeline.json") if (root / "timeline.json").is_file() else ""
     )
     manifest["notes"].append(
         "Legacy resume created this manifest only; existing style, contract, still, and clip evidence remains unapproved until revalidated."
     )
-    core.ensure_tree(root)
-    core.save_manifest(root, manifest)
-    core.emit(
+    ensure_tree(root)
+    save_manifest(root, manifest)
+    emit(
         {
             "ok": True,
             "created": True,

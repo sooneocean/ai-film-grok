@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.30] - 2026-08-05
+
+### Changed (module refactor · W1 core + W2 hub ≤2500)
+- **W1** `scripts/core/*`: emit / film_io / gates / media_ops / paths / constants; hub re-exports for hard-compat.
+- **W2** CLI extract: `cli_media/post/status` parsers + `cli_quality_ops` / `cli_director_ops` / `cli_motion_ops` / `cli_review_ops` / `cli_misc_ops`.
+- **`aifilm_grok.py`**: ~5028 → **~1513** LOC (target &lt;2500 **met**).
+- Public subcommand strings unchanged; `probe_native_audio_mean_volume` keeps hub-level `run` patchability.
+
 ## [2.39.29] - 2026-08-05
 
 ### Added (Post P3 · agent-review-final machine lane)

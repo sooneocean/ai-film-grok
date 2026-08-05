@@ -134,7 +134,23 @@ def add_orchestrate_parsers(sub: argparse._SubParsersAction[argparse.ArgumentPar
 
 def cmd_next(args: argparse.Namespace) -> int:
     """Print the single next recommended production command (lesson routing)."""
-    import aifilm_grok as core
+    from core.constants import MANIFEST_NAME as _MANIFEST_NAME
+    from core.emit import emit as _emit
+    from core.film_io import load_manifest as _load_manifest
+    from core.film_io import save_manifest as _save_manifest
+    from core.gates import recompute_gates as _recompute_gates
+    class _Core:
+        MANIFEST_NAME = _MANIFEST_NAME
+        emit = staticmethod(_emit)
+        load_manifest = staticmethod(_load_manifest)
+        save_manifest = staticmethod(_save_manifest)
+        recompute_gates = staticmethod(_recompute_gates)
+        @staticmethod
+        def _pipeline_bundle(*a, **k):
+            import aifilm_grok as hub
+            return hub._pipeline_bundle(*a, **k)
+    core = _Core
+
 
     root = Path(args.root).expanduser().resolve()
     manifest = core.load_manifest(root) if (root / core.MANIFEST_NAME).is_file() else {}
@@ -240,7 +256,23 @@ def cmd_next(args: argparse.Namespace) -> int:
 
 def cmd_stage(args: argparse.Namespace) -> int:
     """Print / refresh current pipeline stage (product spine layer)."""
-    import aifilm_grok as core
+    from core.constants import MANIFEST_NAME as _MANIFEST_NAME
+    from core.emit import emit as _emit
+    from core.film_io import load_manifest as _load_manifest
+    from core.film_io import save_manifest as _save_manifest
+    from core.gates import recompute_gates as _recompute_gates
+    class _Core:
+        MANIFEST_NAME = _MANIFEST_NAME
+        emit = staticmethod(_emit)
+        load_manifest = staticmethod(_load_manifest)
+        save_manifest = staticmethod(_save_manifest)
+        recompute_gates = staticmethod(_recompute_gates)
+        @staticmethod
+        def _pipeline_bundle(*a, **k):
+            import aifilm_grok as hub
+            return hub._pipeline_bundle(*a, **k)
+    core = _Core
+
 
     root = Path(args.root).expanduser().resolve()
     manifest = core.load_manifest(root) if (root / core.MANIFEST_NAME).is_file() else {}
@@ -297,7 +329,23 @@ def cmd_stage(args: argparse.Namespace) -> int:
 
 def cmd_dispatch(args: argparse.Namespace) -> int:
     """Auto-orchestrate: craft + capability + next → single agent packet."""
-    import aifilm_grok as core
+    from core.constants import MANIFEST_NAME as _MANIFEST_NAME
+    from core.emit import emit as _emit
+    from core.film_io import load_manifest as _load_manifest
+    from core.film_io import save_manifest as _save_manifest
+    from core.gates import recompute_gates as _recompute_gates
+    class _Core:
+        MANIFEST_NAME = _MANIFEST_NAME
+        emit = staticmethod(_emit)
+        load_manifest = staticmethod(_load_manifest)
+        save_manifest = staticmethod(_save_manifest)
+        recompute_gates = staticmethod(_recompute_gates)
+        @staticmethod
+        def _pipeline_bundle(*a, **k):
+            import aifilm_grok as hub
+            return hub._pipeline_bundle(*a, **k)
+    core = _Core
+
 
     root = Path(args.root).expanduser().resolve()
     from dispatch import build_dispatch
@@ -381,7 +429,23 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
 
 def cmd_advance(args: argparse.Namespace) -> int:
     """Execute a bounded sequence of allowlisted local dispatch actions."""
-    import aifilm_grok as core
+    from core.constants import MANIFEST_NAME as _MANIFEST_NAME
+    from core.emit import emit as _emit
+    from core.film_io import load_manifest as _load_manifest
+    from core.film_io import save_manifest as _save_manifest
+    from core.gates import recompute_gates as _recompute_gates
+    class _Core:
+        MANIFEST_NAME = _MANIFEST_NAME
+        emit = staticmethod(_emit)
+        load_manifest = staticmethod(_load_manifest)
+        save_manifest = staticmethod(_save_manifest)
+        recompute_gates = staticmethod(_recompute_gates)
+        @staticmethod
+        def _pipeline_bundle(*a, **k):
+            import aifilm_grok as hub
+            return hub._pipeline_bundle(*a, **k)
+    core = _Core
+
 
     root = Path(args.root).expanduser().resolve()
     from advance import AdvanceError, advance_local
@@ -410,7 +474,23 @@ def cmd_advance(args: argparse.Namespace) -> int:
 
 def cmd_autopilot(args: argparse.Namespace) -> int:
     """Run one bounded, budget-authorized automation pass for a film."""
-    import aifilm_grok as core
+    from core.constants import MANIFEST_NAME as _MANIFEST_NAME
+    from core.emit import emit as _emit
+    from core.film_io import load_manifest as _load_manifest
+    from core.film_io import save_manifest as _save_manifest
+    from core.gates import recompute_gates as _recompute_gates
+    class _Core:
+        MANIFEST_NAME = _MANIFEST_NAME
+        emit = staticmethod(_emit)
+        load_manifest = staticmethod(_load_manifest)
+        save_manifest = staticmethod(_save_manifest)
+        recompute_gates = staticmethod(_recompute_gates)
+        @staticmethod
+        def _pipeline_bundle(*a, **k):
+            import aifilm_grok as hub
+            return hub._pipeline_bundle(*a, **k)
+    core = _Core
+
 
     from autopilot import AutopilotError, autopilot_once
 
@@ -427,7 +507,23 @@ def cmd_autopilot(args: argparse.Namespace) -> int:
 
 def cmd_craft(args: argparse.Namespace) -> int:
     """Craft spine status (idea→verified)."""
-    import aifilm_grok as core
+    from core.constants import MANIFEST_NAME as _MANIFEST_NAME
+    from core.emit import emit as _emit
+    from core.film_io import load_manifest as _load_manifest
+    from core.film_io import save_manifest as _save_manifest
+    from core.gates import recompute_gates as _recompute_gates
+    class _Core:
+        MANIFEST_NAME = _MANIFEST_NAME
+        emit = staticmethod(_emit)
+        load_manifest = staticmethod(_load_manifest)
+        save_manifest = staticmethod(_save_manifest)
+        recompute_gates = staticmethod(_recompute_gates)
+        @staticmethod
+        def _pipeline_bundle(*a, **k):
+            import aifilm_grok as hub
+            return hub._pipeline_bundle(*a, **k)
+    core = _Core
+
 
     root_s = getattr(args, "root", None)
     if not root_s:
@@ -447,7 +543,23 @@ def cmd_craft(args: argparse.Namespace) -> int:
 
 
 def cmd_selects(args: argparse.Namespace) -> int:
-    import aifilm_grok as core
+    from core.constants import MANIFEST_NAME as _MANIFEST_NAME
+    from core.emit import emit as _emit
+    from core.film_io import load_manifest as _load_manifest
+    from core.film_io import save_manifest as _save_manifest
+    from core.gates import recompute_gates as _recompute_gates
+    class _Core:
+        MANIFEST_NAME = _MANIFEST_NAME
+        emit = staticmethod(_emit)
+        load_manifest = staticmethod(_load_manifest)
+        save_manifest = staticmethod(_save_manifest)
+        recompute_gates = staticmethod(_recompute_gates)
+        @staticmethod
+        def _pipeline_bundle(*a, **k):
+            import aifilm_grok as hub
+            return hub._pipeline_bundle(*a, **k)
+    core = _Core
+
 
     root_s = getattr(args, "root", None)
     if not root_s:

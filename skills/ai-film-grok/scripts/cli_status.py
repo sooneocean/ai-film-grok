@@ -23,15 +23,12 @@ from typing import Any
 
 
 def cmd_status(args: argparse.Namespace) -> int:
-    # Lazy import from aifilm_grok to avoid a circular import at module load.
-    from aifilm_grok import (
-        GATE_ORDER,
-        MANIFEST_NAME,
-        _pipeline_bundle,
-        emit,
-        load_manifest,
-        recompute_gates,
-    )
+    # Pipeline stage helper still lives on hub (orchestration, not pure IO).
+    from aifilm_grok import _pipeline_bundle
+    from core.constants import GATE_ORDER, MANIFEST_NAME
+    from core.emit import emit
+    from core.film_io import load_manifest
+    from core.gates import recompute_gates
     from util import require_json as read_json
 
     root = Path(args.root).expanduser().resolve()
@@ -303,10 +300,8 @@ def _classify_doctor_readiness(
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    from aifilm_grok import (
-        emit,
-        grok_permission_mode,
-    )
+    from aifilm_grok import grok_permission_mode
+    from core.emit import emit
     from runtime_policy import verify_requirements_lock, verify_runtime_lock
     from util import require_json as read_json
 
@@ -626,3 +621,25 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     emit(report)
     return 0 if (report["strict_ok"] if getattr(args, "strict", False) else report["ok"]) else 1
+
+def add_status_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    doctor = sub.add_parser(
+        "doctor", help="Check tooling, locks, schema, backends, and security posture"
+    )
+    doctor.add_argument(
+        "--strict", action="store_true", help="Also fail on global security warnings"
+    )
+    doctor.add_argument(
+        "--art-check",
+        action="store_true",
+        help="Also run director methodology verification (pace_chart/act_structure/music_spotting)",
+    )
+    doctor.add_argument(
+        "--art-root",
+        default=".",
+        help="Film root for --art-check (default: current dir)",
+    )
+
+    st = sub.add_parser("status", help="Gate status")
+    st.add_argument("--root", required=True)
+    st.set_defaults(no_write=True)

@@ -26,22 +26,19 @@ def add_longform_parsers(subparsers: Any) -> None:
 
 
 def cmd_longform(args: Namespace) -> int:
+    from core.emit import emit
+    from util.errors import FilmError
+
     root = Path(args.root).expanduser().resolve()
     try:
         if args.longform_action == "status":
-            from aifilm_grok import emit
-
             report = longform_status(root)
             emit(report)
             return 0 if report.get("ok") else 1
         if args.longform_action == "resume":
-            from aifilm_grok import emit
-
             report = prepare_longform_resume(root, unit_id=str(args.unit))
             emit(report)
             return 0
     except LongformError as exc:
-        from aifilm_grok import FilmError
-
         raise FilmError(str(exc)) from exc
     raise ValueError(f"unknown longform action: {args.longform_action}")

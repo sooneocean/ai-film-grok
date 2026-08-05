@@ -1,6 +1,6 @@
 # CLI extract map — aifilm_grok.py domain split
 
-**Status:** ACTIVE · 2026-08-05 · v2.39.28
+**Status:** ACTIVE · 2026-08-05 · v2.39.30
 **Goal:** shrink `aifilm_grok.py` toward <2500 lines by extracting cmd handlers only.  
 **Iron:** public subcommand strings never rename.
 
@@ -37,3 +37,7 @@
 ## W5d2 parsers (v2.39.28)
 
 - add_*_parsers for orchestrate/oauth/evidence/bootstrap moved out of build_parser.
+
+## W1/W2 core+hub (v2.39.30)
+
+- core package + bulk CLI extract; aifilm_grok ~1513 LOC.

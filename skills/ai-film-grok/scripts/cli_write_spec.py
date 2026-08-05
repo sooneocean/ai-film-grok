@@ -211,11 +211,12 @@ def _compatibility_dramatic_functions(spec: dict[str, Any]) -> dict[str, Any]:
 
 
 def cmd_write_spec(args: argparse.Namespace) -> int:
-    # Lazy import: avoid circular import at module load; allow aifilm_grok monkeypatches.
-    import aifilm_grok as core
+    from core.constants import DEFAULT_FPS, DEFAULT_HEIGHT, DEFAULT_WIDTH
+    from core.film_io import ensure_tree, load_manifest, save_manifest
+    from core.gates import recompute_gates
 
     root = Path(args.root).expanduser().resolve()
-    core.ensure_tree(root)
+    ensure_tree(root)
     try:
         from narrative_control import NarrativeControlError, assert_projection_ready
 
@@ -336,13 +337,13 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
     # graph before producing a strict audit so no production command can see a
     # stale or pre-contract beat map.
     derive_graph(root, write=True)
-    manifest = core.load_manifest(root)
+    manifest = load_manifest(root)
     # seed timeline placeholders
     timeline = {
         "schema_version": 1,
-        "fps": core.DEFAULT_FPS,
-        "width": manifest.get("width", core.DEFAULT_WIDTH),
-        "height": manifest.get("height", core.DEFAULT_HEIGHT),
+        "fps": DEFAULT_FPS,
+        "width": manifest.get("width", DEFAULT_WIDTH),
+        "height": manifest.get("height", DEFAULT_HEIGHT),
         "shots": [
             {
                 "id": shot["id"],
@@ -370,8 +371,8 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
             longform_plan = build_longform_plan(root, write=True)
         except LongformError as exc:
             raise FilmError(f"longform production plan failed: {exc}") from exc
-    core.recompute_gates(root, manifest)
-    core.save_manifest(root, manifest)
+    recompute_gates(root, manifest)
+    save_manifest(root, manifest)
     cont = spec.get("_continuity_lint") or lint_continuity(shots)
     write_json(root / "continuity_lint.json", cont)
     # Reconcile after writing the projection so the receipt binds the current
