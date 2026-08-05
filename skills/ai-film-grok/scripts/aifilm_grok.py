@@ -985,6 +985,7 @@ def main(argv: list[str] | None = None) -> int:
             "bulk-preflight": cmd_workflow,
             "variety-precheck": cmd_workflow,
             "select-shortlist": cmd_workflow,
+            "anti-hijack": cmd_workflow,
             "ship-prep": cmd_workflow,
             "gpu-lease": cmd_workflow,
             "tunnel-probe": cmd_workflow,

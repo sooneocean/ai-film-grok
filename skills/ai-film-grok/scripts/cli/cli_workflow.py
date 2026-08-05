@@ -71,7 +71,10 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
     # select shortlist
     ss = sub.add_parser(
         "select-shortlist",
-        help="Multi-take preferred shortlist by mean (optional --promote into manifest)",
+        help=(
+            "Multi-take preferred shortlist by mean + composition anti-hijack "
+            "(optional --promote into manifest)"
+        ),
     )
     ss.add_argument("--root", required=True)
     ss.add_argument(
@@ -84,6 +87,23 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
         action="store_true",
         help="Do not auto-measure missing mean sidecars",
     )
+
+    # composition anti-hijack (stand-alone score / promote)
+    ah = sub.add_parser(
+        "anti-hijack",
+        help=(
+            "Composition anti-hijack: reject sand top-down / male torso steal; "
+            "score multi-seed takes → receipts/anti-hijack-score.json"
+        ),
+    )
+    ah.add_argument("--root", required=True)
+    ah.add_argument("--shots", default="", help="Comma shot ids (default: all with takes)")
+    ah.add_argument(
+        "--promote",
+        action="store_true",
+        help="Promote composition-OK preferred into manifest.clips (never hijack)",
+    )
+    ah.add_argument("--no-write", action="store_true")
 
     # gate-auto: machine verification ladder (no human pilot/PK/review)
     ga = sub.add_parser(
@@ -367,6 +387,20 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
             )
             _emit(report)
             return 0
+
+        if cmd == "anti-hijack":
+            from composition_anti_hijack import run_for_root
+
+            shots_raw = str(getattr(args, "shots", "") or "")
+            shots = [s.strip() for s in shots_raw.split(",") if s.strip()] or None
+            report = run_for_root(
+                args.root,
+                shot_ids=shots,
+                write=not bool(getattr(args, "no_write", False)),
+                promote=bool(getattr(args, "promote", False)),
+            )
+            _emit(report)
+            return 0 if report.get("ok") is not False else 2
 
         if cmd == "gate-auto":
             from gate_auto import run_gate_auto

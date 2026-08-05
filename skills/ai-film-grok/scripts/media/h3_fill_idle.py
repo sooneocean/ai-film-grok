@@ -1260,12 +1260,35 @@ def score_take_for_pk(
         caution.append("below_motion_floor")
     if lane == "h3":
         caution.append("verify_same_face_before_promote")
+    # Composition anti-hijack (sand plate / male torso steal) — hard demote
+    ah_meta: dict[str, Any] | None = None
+    try:
+        import composition_anti_hijack as _ah
+
+        if not _ah._env_skip() and take.get("path"):
+            # cheap: use existing anti_hijack annotation if present
+            if isinstance(take.get("anti_hijack"), dict):
+                ah_meta = take["anti_hijack"]
+            else:
+                # skip full ffmpeg if caller already marked; light path only on pk
+                ah_meta = _ah.score_take(str(take["path"]), want="generic")
+            if ah_meta.get("hijack"):
+                score -= 40.0
+                caution.append("composition_hijack")
+            elif ah_meta.get("ok") is False and float(ah_meta.get("score") or 0) < 0.3:
+                score -= 12.0
+                caution.append("composition_weak")
+            else:
+                score += min(6.0, float(ah_meta.get("score") or 0) * 5.0)
+    except Exception:
+        ah_meta = None
     return {
         **take,
         "pk_score": round(score, 3),
         "pk_motion": round(motion_pts, 3),
         "pk_identity_penalty": round(id_pen, 3),
         "pk_caution": caution,
+        "pk_anti_hijack": ah_meta,
     }
 
 

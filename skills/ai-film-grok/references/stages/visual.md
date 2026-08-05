@@ -47,6 +47,7 @@ L5 endframe handoff  → 下镜 L3（continue；smash 勿盲 promote）
 - **要影片不要图（true-video）**：**运镜 = 模型生成视频内**；still 只作 I2V/R2V first 输入，**永不**进成片轨。禁 Ken Burns/zoompan/panel still-motion 当 hero。`register-clip`/`ship-prep`/`final` 走 `true_video_policy`。剧情片禁 `motion_plan` Ken Burns；仅 `production_mode=panel` 旁路。moderated → 末帧 continue + 真 I2V/H3。
 - **末帧链**：`extract-frame --promote-keyframe NEXT` 默认；下镜从 seed 开，禁 cast 重起。**smash/跨空间勿盲 promote**（防沙滩污染洞穴肉戏）。
 - **对白镜 speaker=画面（P0 · v3）**：`on_camera` 台词角色须占画面主读（脸/口型）；禁 A 台词 + B 肉身。
+- **构图防抢走（P0 · 2026-08-05）**：multi-seed 禁只比 white0/音量/mean；`aifilm anti-hijack` + shortlist 自动拒沙俯视/脚印、拒男胸抢女主镜。逃生 `AIFILM_SKIP_ANTI_HIJACK=1`。
 - **DP 焦段自动注入（v2.35 P0）**：根据 `shot_size` 拼入焦段词 — wide: `35mm deep focus` · medium: `50mm f/2.8` · close-up: `85mm f/1.4 creamy bokeh` · insert: `105mm macro`。三点式光影预设按 `director_intent.tone` 自动匹配（warm/tense/dramatic/afterglow）；Teal&Orange 调色词默认拼入末行。禁正面均光/平光无层次。见 [hollywood-optics](../hollywood-optics-prompts.md)。
 - **对白三相表演注入（v2.35 P0）**：Keyframe Prompt 必含三段 — Pre-Speech（0.15-0.25s `subtle intake of breath`）· Spoken Delivery（`mouth articulates、eye contact`）· Afterglow Breath（0.35-0.70s `gentle exhale, expression lingers`）。台词 >4.5s 自动拆镜，DX 轨不断。见 [hollywood-optics](../hollywood-optics-prompts.md)。
 - **肉戏邻镜差异 + afterglow**：邻镜禁同构图复读；余韵禁无对象单人站桩。见 [huangdao §H](../lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md)。

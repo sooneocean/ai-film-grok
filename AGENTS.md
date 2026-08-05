@@ -89,7 +89,7 @@ JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmErr
 4. **机读门禁**：`skills/ai-film-grok/references/hard-defaults.md`（成人 MAX、毒镜、卸装、抗无聊、声线等 **只改这里** + 对应测）。
 5. **阶段卡**：`references/stages/*`（dispatch 默认 context）；长课 `lessons-*` 按需，**不**默认整页进 context。
 6. **短记忆卡**：`memory/*` 仅原话+三句+清单+链 lesson；见 `memory/README.md`。
-7. **声线 / 成人 / 毒镜 / final**：见 SKILL P0 短列表 + hard-defaults；勿在本档复写长段 IRON。
+7. **声线 / 成人 / 毒镜 / final / 构图防抢走**：见 SKILL P0 短列表 + hard-defaults；multi-seed 须 `anti-hijack`（禁只比 mean/音量）；勿在本档复写长段 IRON。
 8. **字幕 ship 硬烧 + 肉戏 speaker/体位（2026-08-03 荒岛 v3）**：用户可见=像素有中文；`on_camera` speaker=画面主体；肉戏邻镜差异 + afterglow 禁单人站桩 → [huangdao lesson](skills/ai-film-grok/references/lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) · [memory](skills/ai-film-grok/memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md)。
 8b. **H3 效果最大化（2026-08-04）**：I2V 锁脸默认 · R2V 高动/大嘴 · T2V 无脸 env；续镜末帧→I2V；对白注入合并自定义 prompt → [h3-max lesson](skills/ai-film-grok/references/lessons-2026-08-04-h3-max-effect.md) · [memory](skills/ai-film-grok/memory/2026-08-04-h3-max-effect.md) · [weapon-lane-matrix](skills/ai-film-grok/references/weapon-lane-matrix.md)。
 8c. **Fill-Idle 挑战（2026-08-04）**：Grok 铺 soft；restricted 主轨 H3；5090 P0→P1→P2 空闲挑战（能烧就烧、禁抢 P0）；R2V=能量位；PK=shortlist 建议+人 promote；P2=mean 最低优先；final 不等 P2 / 高光不强制挑战；跨集胜率不自动 → [weapon-lane Fill-Idle](skills/ai-film-grok/references/weapon-lane-matrix.md) · [memory](skills/ai-film-grok/memory/2026-08-04-h3-fill-idle-challenge.md)。

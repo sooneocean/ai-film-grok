@@ -954,10 +954,12 @@ def select_shortlist(
     promote: bool = False,
     measure_missing: bool = True,
 ) -> dict[str, Any]:
-    """Multi-take preferred pick by mean; optional promote into manifest clips (v2.37).
+    """Multi-take preferred pick by mean + composition anti-hijack (v2.37+).
 
-    Never deletes takes. ``promote=True`` sets clips[sid].path to highest-mean take
-    that has a mean (still records below_floor when under DF floors).
+    Never deletes takes. ``promote=True`` sets clips[sid].path to best take that
+    passes composition anti-hijack (sand/torso steal reject) when available;
+    never promotes a hijack-flagged take if a clean alternate exists.
+    Escape composition: ``AIFILM_SKIP_ANTI_HIJACK=1``.
     """
     root = _root(root)
     if measure_missing:
@@ -997,6 +999,17 @@ def select_shortlist(
             sid = p.parent.name if p.parent != takes_root else p.stem.split("_")[0]
             shot_dirs.setdefault(sid, []).append(p)
 
+    anti_hijack_on = True
+    try:
+        import composition_anti_hijack as _ah
+
+        if _ah._env_skip():
+            anti_hijack_on = False
+    except Exception:  # noqa: BLE001
+        _ah = None  # type: ignore
+        anti_hijack_on = False
+    ah_cache = root / "work" / "anti-hijack" / "frames"
+
     for sid, files in sorted(shot_dirs.items()):
         scored: list[dict[str, Any]] = []
         for f in files:
@@ -1021,11 +1034,37 @@ def select_shortlist(
                 }
             )
         scored.sort(key=lambda x: (-float(x["score"]), -int(x["bytes"])))
+        sh = shot_meta.get(sid) or {}
+        composition_note: dict[str, Any] | None = None
+        if anti_hijack_on and _ah is not None and len(scored) >= 1:
+            try:
+                scored = _ah.apply_anti_hijack_to_candidates(
+                    scored,
+                    shot=sh,
+                    cache_dir=ah_cache / sid,
+                    enabled=True,
+                )
+                composition_note = {
+                    "enabled": True,
+                    "want": scored[0].get("composition_want") if scored else None,
+                    "preferred_hijack": bool(scored[0].get("composition_hijack")) if scored else None,
+                    "preferred_composition_ok": bool(scored[0].get("composition_ok")) if scored else None,
+                    "note": "composition gate demotes sand/torso hijack before mean",
+                }
+            except Exception as exc:  # noqa: BLE001
+                composition_note = {"enabled": True, "error": str(exc)}
         preferred = scored[0] if scored else None
+        # never promote hijack if a clean alternate exists
+        if preferred and preferred.get("composition_hijack"):
+            # prefer non-hijack alternate; composition_ok may be missing when skip
+            clean = [c for c in scored if not c.get("composition_hijack")]
+            if clean:
+                preferred = clean[0]
+                if composition_note is not None:
+                    composition_note["preferred_switched_from_hijack"] = True
         below_floor = False
         floor_val = None
         if preferred and preferred.get("mean") is not None:
-            sh = shot_meta.get(sid) or {}
             try:
                 from i2v_motion_gate import evaluate_shot_motion
 
@@ -1067,10 +1106,18 @@ def select_shortlist(
             "below_floor": below_floor,
             "floor": floor_val,
             "pk_advisory": pk_note,
+            "composition_anti_hijack": composition_note,
         }
         rows.append(row)
 
         if promote and preferred and preferred.get("path"):
+            # hard block: do not promote known hijack when alternatives scored
+            if preferred.get("composition_hijack") and any(
+                not c.get("composition_hijack") for c in scored
+            ):
+                continue
+            if preferred.get("composition_hijack") and preferred.get("composition_ok") is False:
+                continue
             prev = clips.get(sid) if isinstance(clips.get(sid), dict) else {}
             new_clip = {
                 **(prev or {}),
@@ -1078,6 +1125,8 @@ def select_shortlist(
                 "mean": preferred.get("mean"),
                 "mean_absdiff": preferred.get("mean"),
                 "preferred_from": "select-shortlist",
+                "composition_ok": preferred.get("composition_ok"),
+                "composition_score": preferred.get("composition_score"),
                 "promoted_at": utc_now(),
                 "status": prev.get("status") or "candidate",
             }
@@ -1088,6 +1137,7 @@ def select_shortlist(
                     "path": preferred["path"],
                     "mean": preferred.get("mean"),
                     "below_floor": below_floor,
+                    "composition_hijack": preferred.get("composition_hijack"),
                 }
             )
 

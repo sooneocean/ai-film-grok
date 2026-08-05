@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "f7c34a5e702d62a17c4cbee4a8f738e92229c08b01e37f16a633e1a5c0ef8e1b"
+      "sha256": "16c193f292174b9303c401b53510a8aa8b8d5abc799ae0e6eae289a177713ea3"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -570,7 +570,7 @@
     },
     {
       "path": "scripts/cli/cli_h3.py",
-      "sha256": "9093bc0c4f941a18e3731c5b436c2ef69136b9a555642b828da261ffcffd83e7"
+      "sha256": "98f7c00d12d926cf2e9433e545ad8922917daf42c80933e600c5b5fee98184b7"
     },
     {
       "path": "scripts/cli/cli_interactive.py",
@@ -686,7 +686,7 @@
     },
     {
       "path": "scripts/cli/cli_workflow.py",
-      "sha256": "72808f6da325bed7d86f9295d7bd04cf68c2615b088a5ab27b941d480dc5a72e"
+      "sha256": "08e6f4658a15f702a0a8064e06698c364399c79c4f3bd15b37843567971801c7"
     },
     {
       "path": "scripts/cli/cli_workshop.py",
@@ -903,6 +903,10 @@
     {
       "path": "scripts/compose_render.py",
       "sha256": "5714d14ba26471eb84e4309959b1025102e43435ea6d4604580030d7df194b7d"
+    },
+    {
+      "path": "scripts/composition_anti_hijack.py",
+      "sha256": "13b186000231c0b94e9de87665eb1296393d70bfc62633e5a7c3444a590a776d"
     },
     {
       "path": "scripts/config_loader.py",
@@ -1309,6 +1313,10 @@
       "sha256": "d978975002ec5edef534e1b26b8bf19ea216923a39e59cbfe17010c8d01db616"
     },
     {
+      "path": "scripts/h3_timeline_prompt.py",
+      "sha256": "51ca4085611d3997a8f9ab808a372dc3bb3e991d0ab242a3968977c21bd16ccd"
+    },
+    {
       "path": "scripts/h3_workflow.py",
       "sha256": "55c1d1cf8a9993923231c579b6b78f49bdb56653f8e49e64456c677f0688fce0"
     },
@@ -1462,11 +1470,11 @@
     },
     {
       "path": "scripts/media/h3_combo_eval.py",
-      "sha256": "dd65d506ae82de1254787a3cf4776ee04246dc5d6c5a083e50f4d225665a2adf"
+      "sha256": "3fa6991859cb6b23b52b176babee673401931b78400550df586088713d125f7b"
     },
     {
       "path": "scripts/media/h3_fill_idle.py",
-      "sha256": "21851bf14d719224bed5c61c8d14b5ba4f5cf132f01f5df8c827cc02991929a1"
+      "sha256": "2383d02d86dd37b00b8449b7c3439f6ba65098ee26d52c016429994c091f2dec"
     },
     {
       "path": "scripts/media/h3_media_pack.py",
@@ -1478,7 +1486,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "477271e0d5b8cd2e5aa5946490b66a978aba55c785bd394de76de0d7a445069a"
+      "sha256": "c72ca516d8b5260ab15aeddc9346fc2f0f2d9d98ae8ddb2735cba799ff7648a4"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -1570,7 +1578,7 @@
     },
     {
       "path": "scripts/motion_prompt_spine.py",
-      "sha256": "318798a0a1b4daee6fc02d9b41cdcddbb0cd4e48ce7b2026627872e7600730a1"
+      "sha256": "7cda5fb007563e2e6b8bfeb05b45889e39dc1c1fd8cd0f30a29339c07e4cfcae"
     },
     {
       "path": "scripts/music_cue.py",
@@ -2466,7 +2474,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "1f3f0eeeffd4ab96a76c84f92e53ffcc0932901cbff8a525f7dd4c6915dfe6cc"
+      "sha256": "e570ab05f044ed099b116aa9ed4ecbb0cb43f94b02c17ea090ffcd7116adaaec"
     },
     {
       "path": "scripts/workflow_spine.py",
