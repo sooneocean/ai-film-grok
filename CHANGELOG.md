@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.22] - 2026-08-05
+
+### Changed (CLI extract · W5c)
+- **`cli_audio.py`**: extract audio/TTS/BGM/SFX/lipsync cluster (~22 cmds) from monolith.
+- **`aifilm_grok.py`**: ~5980 LOC (was ~7161 after write-spec extract).
+- **Tests**: `tests/test_cli_audio_extract.py`.
+- **Docs**: `docs/plans/cli-extract-map.md`.
+
 ## [2.39.21] - 2026-08-05
 
 ### Changed (CLI extract · W5b)
