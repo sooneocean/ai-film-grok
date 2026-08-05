@@ -121,6 +121,7 @@ story.receive → script-value-debrief → plan run → fidelity
 | **R-mf-doc** | material-fidelity plan still lists M5–M6 backlog | Code landed; tracker stale |
 | **R-cov** | final/compose failure-mode tests | Low coverage on ship path; not line vanity |
 | **R-util** | Wave 3 util FilmError / run_ffmpeg migration | Partial since opt plan |
+| **R-struct** | Module refactor **internal peels residual** (W0–W5 package/docs SHIPPED) | Leaf peels of post/render_final · heat packs · film_spec · export/compose per [residual plan](2026-08-05-residual-monolith-w4-todo.md) |
 | **R-hygiene** | Local dirty trees / doc drift | Keep tracker/status tied to origin evidence |
 
 ### 2.3 Explicit non-goals / iron (this strategy)
@@ -258,7 +259,7 @@ Order by **ship risk × touch frequency**, not raw LOC:
 
 | Priority | Module | Extract angle |
 |----------|--------|---------------|
-| 1 | `render_final.py` | stages already partial (`final_stages`, music, mix_partial) — peel leaf pure functions + failure-mode tests |
+| 1 | `post/render_final.py` | stages already partial (`final_stages`, music, mix_partial) — peel leaf pure functions + failure-mode tests |
 | 2 | `narrative/edit_policy_heat.py` | **4015** | package-boundary SHIPPED · **internal packs residual** (bug-driven) |
 | 3 | `film_spec.py` | projectors vs validate vs CLI glue |
 | 4 | `export_composition.py` / `compose_render.py` | coverage-starved; test harness first |
