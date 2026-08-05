@@ -4,7 +4,7 @@
 
 | 层 | TTS | speaker | 字段 |
 |----|-----|---------|------|
-| **角色对白 / 口白** | **中文** Edge（女 Xiaoyi / 男 Yunxi） | 具名角色 | 中文 `spoken_text` + `caption_text`；近景 lipsync |
+| **角色对白 / 口白** | **模型原声优先**（Grok Video / H3）；Edge 仅字幕时钟 | 具名角色 | 中文 `spoken_text` + `caption_text`；**禁**后期 lipsync bulk |
 | **无对白** | 无 VO | — | silence/reaction/action_cover；禁第三人称 `nar` 填钟 |
 | **旁白 gap** | 中文 Edge | narrator | 目标 0、硬顶 **5%** |
 | **字幕像素** | 正式 HF / ship 硬烧 | — | 中文 `caption_text`；验收=抽帧可读（见 post v3） |

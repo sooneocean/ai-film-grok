@@ -32,7 +32,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 ## P0
 
 1. **真相**：graph 真、spec 投影；locks+hash 齐再媒体；先 Director’s Lens（[guide](references/directors-lens.md)）。
-2. **对白主链**：讲话镜=FRW LTX 2.3 I2V；[workflow](references/dialogue-first-workflow.md)
+2. **对白主链**：讲话镜=**Grok Video / 5090 H3 原音**（禁后期对嘴）；[workflow](references/dialogue-first-workflow.md)
 3. **身份介质**：锁 medium/cast/face；still 只改已批源；moderated 禁 `image_gen` 绕脸；漫剧 manhua。
 4. **先验后生**：still 过身份/结构/画风/几何（9:16≥704×1280）才 I2V。
 5. **连续性**：`state-index` 先于 bulk；衣着只前进；Continue 硬接批准末帧。
@@ -49,7 +49,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 14. **高动**：mean≥18、肉戏≥20；桌面 final 仅 motion-gate ok。
 15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
 16. **5090**：未锁视觉走 `weapon_route`；本机 1×`comfy_video`；禁 pgrep 自杀。
-17. **口型**：默认 off；近景对白人批后 LatentSync→MuseTalk。[lipsync](references/lipsync.md)
+17. **口型/原音**：生产 **冻结** 后期对嘴（LatentSync/MuseTalk/InfiniteTalk/FRW lipsync）；有声镜靠模型原音 `prefer_native`。[lipsync](references/lipsync.md)
 18. **零旁白 IRON**：`dialogue_drama` 默认 `zero_narration_strict`；`nar` 硬底 0%。
 19. **DP+5-Track**：焦段/三点光；DX/FX/BG/MX/SUB；-16 LUFS。[5track](references/5track-audio-master.md)
 20. **真片+gate-auto**：**运镜只在 Grok/H3 视频内**；still 不进 timeline。`aifilm gate-auto` 机写 mean→i2v-final→sex_sfx→five-track→true-video→variety→cinematic。仅 pilot / 多 take PK / review-final 须人。[memory](memory/2026-08-04-gate-auto.md)

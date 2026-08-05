@@ -643,6 +643,8 @@ def test_sensitive_shot_fields_fail_closed_even_when_genre_is_mislabeled(
             }
         ],
         genre="drama",
+        h3={"enabled": True, "audio_policy": "prefer_native"},
+        _i2v_profile="hybrid_h3",
     )
     _write_capabilities(
         tmp_path,
@@ -671,7 +673,7 @@ def test_sensitive_shot_fields_fail_closed_even_when_genre_is_mislabeled(
     report = explain_route(tmp_path, shot_id="shot01", now=NOW)
 
     assert report["intent"]["content_class"] == "restricted_local"
-    # hybrid_h3 / dual-lane soft-locks restricted meat to comfy-h3 (not retired wan22).
+    # hybrid_h3 dual-lane soft-locks restricted meat to comfy-h3 (not retired wan22).
     assert report["intent"]["provider_lock"] == "comfy-h3"
     assert report["selected"]["capability_id"] == "local-restricted"
     rejected = {item["capability_id"]: item["reasons"] for item in report["rejected"]}

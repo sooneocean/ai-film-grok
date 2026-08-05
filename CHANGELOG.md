@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.68] - 2026-08-05
+
+### Changed (dialogue · native audio IRON)
+- **Spoken shots** generate on **Grok Imagine Video** (safe) or **5090 H3** (restricted / `h3_primary`); mix keeps **`prefer_native` / `use_clip_audio`**.
+- **Frozen** post lipsync: LatentSync / MuseTalk / InfiniteTalk / FantasyTalking / FRW lipsync — out of production DAG; `final --lipsync off`.
+- LTX dialogue棚 exits default path (`cloud_dialogue_grok` replaces `cloud_dialogue_ltx`).
+- Code: `dialogue_competition` policy `native_audio_grok_h3_v1`; `production_router` lane/provider updates; schema run_conditions.
+- Docs: hard-defaults · dialogue-first · lipsync · weapon-lane · stages/voice · SKILL P0 · memory card.
+
 ## [2.39.67] - 2026-08-05
 
 ### Fixed (docs · S5.3 canary honesty)

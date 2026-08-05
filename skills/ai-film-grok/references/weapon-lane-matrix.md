@@ -5,11 +5,12 @@
 > 类比：**Grok = 量产流水线**；**H3 = 重工车间**；**LTX = 对白棚**；**Qwen = 本地修片台**。  
 > 实机课：[lessons-2026-08-04-h3-max-effect.md](lessons-2026-08-04-h3-max-effect.md) · 短卡 `memory/2026-08-04-h3-max-effect.md`
 
-## 对白优先（v2.34）
+## 对白优先（v2.34 · **原音 IRON 2026-08-05**）
 
 - **对白镜画面必须可见「人在讲」**（on_camera>嘴动+近景；肉戏对白→H3 i2v/r2v 注入 Mandarin 台词）。
 - **禁全场纯 silence/action_cover 或纯 nar**：每场 ≥1 条 on/off_camera 对白；逃生 `narration_reason`（见 [hard-defaults](hard-defaults.md) 对白场景级规）。
-- 工具组 = `grok i2v`（安全 setup/只做 bulk） · `5090 H3 i2v/r2v`（restricted/肉戏/对白restricted） · `FRW LTX`（安全对白棚） · `Qwen`（状态照） · **`FRW img2image`（静帧素材挑战 · ≥30s/次）**。
+- **有声生成工具组** = `Grok Imagine Video`（安全对白 bulk） · `5090 H3 i2v/r2v`（restricted/肉戏/h3_primary 对白） · `Qwen`（状态照） · **`FRW img2image`（静帧挑战）**。
+- **冻结**：后期对嘴（LatentSync/MuseTalk/InfiniteTalk/FRW lipsync）；LTX 对白棚退出默认。混音 **`prefer_native`**。
 
 ## 默认
 
@@ -31,8 +32,8 @@
 | Foreplay soft clothed | Grok | Grok 优先；moderation → 签名切 H3 | 同上 |
 | Act / climax / bare / undressed | Qwen Edit / undress-anchor | **H3 I2V**（queue 硬拦云 bulk） | H3 `prefer_native` |
 | 高难（deep_thrust / creampie / L4+contact / force_local_h3） | 本地状态照 | **H3 I2V**；能量不够 → **R2V** | 同上 |
-| 对白近景（非敏感） | Grok face | FRW LTX 2.3 | 原生有声（中文） |
-| **对白近景（restricted / bare）** | Qwen 状态照 | **H3 I2V**（台词注入）；狠嘴 CU / 状态链 → **H3 R2V** | H3 原声 spoken Mandarin |
+| 对白近景（非敏感） | Grok face | **Grok Imagine Video** | **原声** prefer_native（禁后期对嘴） |
+| **对白近景（restricted / bare）** | Qwen 状态照 | **H3 I2V**（台词注入）；狠嘴 CU / 状态链 → **H3 R2V** | H3 **原声** spoken Mandarin |
 | Env / bridge | 可选 | FRW env 或 **H3 T2V**（无脸） | 环境 |
 | 续镜 / continue | **批准末帧** | **H3 I2V** | 原声或沿用策略 |
 | 毒镜 | Qwen 解剖修 | **禁 I2V** | — |

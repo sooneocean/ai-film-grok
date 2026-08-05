@@ -33,6 +33,7 @@
 | **对白镜 speaker=画面主体（P0 · 同 v3）** | `on_camera` + 具名 `speaker` → 画面主读该角色脸/口型；**禁止** 角色 A 的台词配角色 B 全身肉戏特写（荒岛 climax「到了」配男主）。 |
 | **对白优先·场景级拒旁白（P0 · 2026-08-03 v2.34）** | `dialogue_drama`：每个 scene（嵌套 shots）**必须**有 ≥1 个 `on_camera`/`off_camera` 对白镜（`spoken_text` 非空）。**禁止**整场纯 `silence`/`action_cover`/`reaction` 或纯 `nar` 撑；无 `narration_reason` 即 raise。逃生=scene `{"silent_scene": true, "narration_reason": "…"}`（须交代原因）或 spec `allow_silent_scenes:true`；**默认当对白片做**。对白镜画面必须可见「人正在讲」：on_camera 镜 speaker 的脸/口型是主体；H3/Grok prompt 注入「角色开口说话，口型清晰」。 |
 | **对白肉戏 → H3（5090）本地对白路径（P0 · 同 v2.34）** | `restricted`（heat/bare/高难）+ 对白镜不再硬钉 `cloud_dialogue_ltx`；路由 `local_dialogue_h3`（`minimax-h3-i2v-pilot`；有状态照→`r2v`）。H3 prompt 首部注入 `Audio: the visible character speaks this line in natural Mandarin on camera` 与台词；`audio_policy=prefer_native`。无台词镜仍走 ambience/foley。 |
+| **对白原音 IRON（P0 · 2026-08-05）** | **有声镜只走 Grok Imagine Video + 5090 H3** 生成（软/安全→Grok；restricted/`h3_primary`→H3）。成片混音 **`prefer_native` / `use_clip_audio`**（模型原声）。**冻结** 后期对嘴：LatentSync / MuseTalk / InfiniteTalk / FantasyTalking / FRW lipsync / Wav2Lip — 默认不进 production DAG；`final --lipsync off`。Edge TTS 仅字幕时钟/可选 ADR，**不是**对白画面驱动。LTX 对白棚退出默认路径。代码：`dialogue_competition` policy `native_audio_grok_h3_v1` · `production_router` `cloud_dialogue_grok`。 |
 | **要影片不要图（P0 · 2026-08-03 · 强化 2026-08-04 true-video）** | 用户拒静图：**运镜只许模型内生成**（Grok I2V / H3 I2V·FLF·R2V / LTX 对白·env）。**Still 永不进 timeline**（只作 I2V 输入）。hero clip **禁止** Ken Burns / zoompan / panel-animation / shortform still-motion。`register-clip` + `preflight` + `final` + `ship-prep` 机读 `true_video_policy`（码 `TRUE_VIDEO_*` / `PANEL_MOTION_NOT_HERO`）。`production_mode=panel` 才允许 panel 包；剧情片默认禁。moderated → 末帧 continue + 真 I2V/H3；记 PARTIAL，禁静默 still 过交付。逃生 `AIFILM_SKIP_TRUE_VIDEO_POLICY=1`。代码：`scripts/true_video_policy.py`。 |
 | **运镜服务事件（P0 · 2026-08-04 β）** | **角色/事件先动，摄影机服务变化**。禁 drive 镜（hook/approach/action）仅 push-in/blink 无 `visible_change`。码：`CAMERA_WITHOUT_EVENT` · `MOTION_NO_MEANING` · `MOTION_CORE_CAMERA_ONLY`。`build_motion_prompt` **不再**静默塞 subtle push-in。邻镜肉戏：`ADJACENT_CAMERA` / `ADJACENT_FRAMING` / `ADJACENT_TRIPLE_COLLISION`（variety-precheck）。H3 默认跟 `h3 list` 的 `mode`/`command`；能量不够才 `alt_mode=r2v`。 |
 | **末帧 promote 默认（P0 · 强化 2026-08-03）** | register 后 `extract-frame --which last --promote-keyframe NEXT`；下镜 I2V 从 seed 开，禁 cast 重起。**smash / 跨空间 / 跨大 wardrobe** 勿盲 promote（防沙滩链污染洞穴肉戏）。丝滑先帧链后 xfade。 |
@@ -138,11 +139,11 @@
 | 动作降级 | 未就绪路线可跳过；已尝试路线仅 timeout/429/5xx/连接失败才签名降级；质量/人工拒绝不切换 |
 | FRW Wan | 公共 CLI 不可指定模型；只有回执明确证明 Wan 身份、全解码与人审通过才启用，否则跳到本地 |
 | env 无脸 | FRW LTX T2V 优先；再走 Grok no-face 与已验证本地路线 |
-| 口型 | 默认 off（说书）；对白近景 opt-in `frw-lipsync probe`→run；403/502 跳过勿硬上 |
+| 口型 | **生产冻结**（2026-08-05）：默认 off；对白用 Grok/H3 **原音**；旧 lipsync 工具仅归档/实验，勿 bulk |
 | 静帧 | 主角 Grok **`image_edit(cast)`**；禁反复纯 `image_gen`；加载 `/imagine` |
 | **静帧几何·禁压缩** | **P0**：I2V 前 keyframe **≥704×1280 且 9:16 竖比**；FRW 原生 704×1280 不强制升到 720；禁横图/缩略图/缩水 jpg。 |
 | **先验后生·算力刀口** | **P0**（2026-07-22）：**验证通过才烧下一级**（still 先验→I2V；ref 先验→image_edit bulk）。禁止未验批量 I2V/出图；坏了只修上游。见 [verify-before-generate](lessons-2026-07-22-verify-before-generate.md) |
-| Grok Build | 推理+Imagine；静帧仍以 Grok/Qwen 锁定；动作 I2V 为 Grok 主链，对白讲话镜锁 FRW LTX |
+| Grok Build | 推理+Imagine；静帧 Grok/Qwen；动作 I2V Grok/H3；**对白讲话镜 = Grok Video 或 H3 原音**（非 LTX/非后期对嘴） |
 | 构图 | 禁裁头（P0·2026-07-27 强化）：主戏镜 full head+headroom；**裁脚优先于裁头**；定器特写=「脸+结合同镜」或短 insert，禁无头主镜；打包慎用 increase+crop 切顶。见 [headroom-no-crop-heads](lessons-2026-07-27-headroom-no-crop-heads.md) |
 | 库存 | film-spec 镜数 = approved clips |
 | 同源 | 禁止半 Grok 半 FRW still/2V |

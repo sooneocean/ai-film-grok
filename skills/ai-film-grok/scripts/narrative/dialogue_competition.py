@@ -330,46 +330,32 @@ def build_dialogue_competition_plan(
         }
         for lane, capability in selected.items()
     }
-    grok_promotion = str(selected["grok_imagine_video"].get("promotion") or "").lower()
-    h3_promotion = str(selected["local_h3"].get("promotion") or "").lower()
+    def _lane_eligibility(cap: dict[str, Any]) -> tuple[bool, bool]:
+        """Return (production_eligible, pilot_only)."""
+        if not cap.get("_current"):
+            return False, True
+        promo = str(cap.get("promotion") or "").lower()
+        if promo == "pilot":
+            return False, True
+        # production / final / empty → ready for bulk native-audio path
+        return True, False
+
+    grok_ok, grok_pilot = _lane_eligibility(selected["grok_imagine_video"])
+    h3_ok, h3_pilot = _lane_eligibility(selected["local_h3"])
     plan["candidates"][0].update(
         {
             "models": [selected["grok_imagine_video"].get("model")],
-            "pilot_only": grok_promotion not in {"production", "final", ""},
-            "production_eligible": grok_promotion in {"production", "final", ""}
-            or bool(selected["grok_imagine_video"].get("_current")),
+            "pilot_only": grok_pilot,
+            "production_eligible": grok_ok,
         }
     )
-    # Empty promotion on current-ready cloud Grok is treated production-eligible
-    # (Grok Imagine is the bulk native-audio path).
-    if selected["grok_imagine_video"].get("_current") and not grok_promotion:
-        plan["candidates"][0]["production_eligible"] = True
-        plan["candidates"][0]["pilot_only"] = False
-    if selected["grok_imagine_video"].get("_current") and grok_promotion in {
-        "production",
-        "final",
-        "pilot",
-    }:
-        # production_router stamps pilot for experimental; ready non-experimental is production
-        if grok_promotion == "pilot":
-            plan["candidates"][0]["production_eligible"] = False
-            plan["candidates"][0]["pilot_only"] = True
-        else:
-            plan["candidates"][0]["production_eligible"] = True
-            plan["candidates"][0]["pilot_only"] = False
     plan["candidates"][1].update(
         {
             "models": [selected["local_h3"].get("model")],
-            "pilot_only": h3_promotion not in {"production", "final"},
-            "production_eligible": h3_promotion in {"production", "final"},
+            "pilot_only": h3_pilot,
+            "production_eligible": h3_ok,
         }
     )
-    if selected["local_h3"].get("_current") and h3_promotion in {"production", "final", ""}:
-        plan["candidates"][1]["production_eligible"] = True
-        plan["candidates"][1]["pilot_only"] = False
-    if selected["local_h3"].get("_current") and not h3_promotion:
-        plan["candidates"][1]["production_eligible"] = True
-        plan["candidates"][1]["pilot_only"] = False
 
     plan["secondary_available"] = bool(selected["local_h3"].get("_current"))
     # GPU is only hard for local H3 path (5090). Grok cloud does not need comfy queue.

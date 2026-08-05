@@ -40,6 +40,8 @@
             "enum": [
               "always",
               "when_route_auto_or_infinite_talk",
+              "when_route_auto_or_grok",
+              "when_route_h3_or_primary_technical_failure",
               "when_explicit_secondary_or_primary_technical_failure",
               "when_secondary_grok_imagine_succeeds",
               "after_active_route_succeeds",

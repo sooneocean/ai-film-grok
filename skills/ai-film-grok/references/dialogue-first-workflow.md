@@ -31,46 +31,40 @@ story.receive
 - 状态键是「角色 × 场景 × 衣着 × 情绪 × 姿态 × 视线 × 道具 × 光线 × 空间位置」。角色母版先经 Qwen I2I 生成状态照；状态照再生成每句关键帧；已批准的上镜末帧可 promote 为下一镜候选。批准 I2I receipt 必须绑定输入、输出、模型与 SHA-256。
 - `dialogue-scene-package.json` 用 `line_id` 把台词、TTS 哈希/时长、状态照、关键帧、口型、字幕和人工审核绑在一起。`on_camera` 只允许短句、近景/微侧脸、遮挡少，且必须有状态照、TTS 与逐镜人工口型审核。
 - TTS 排练完成后会锁回每一条对白镜的 `duration_sec`（实音频 + 明确前后停顿），禁止再用估算秒数硬塞进既有 I2V 片长。
-- `aifilm dialogue-production-plan --root <film>` 会把每个 `line_id` 编译为无消费责任链：TTS → Qwen 状态照 → Qwen 关键帧 → FRW 上传（keyframe SHA-256 + `img-url` receipt）→ FRW LTX 2.3 原生有声 I2V → 无烧字/口型/语义审查 →（被拒绝时才）原 FRW `img2video` →（仍需上镜口型时）LatentSync → Foley/MMAudio → post。每一步列出依赖与必须回执；生成计划本身不会提交 5090 队列。
+- `aifilm dialogue-production-plan --root <film>` 把每个 `line_id` 编成责任链：**状态照 → Grok Video 或 5090 H3 原音 I2V/R2V → 人审（语义/原声/无烧字）→ promote → post**。Edge TTS 只服务字幕时钟与可选 ADR，**不**驱动后期对嘴。计划本身不提交 5090 队列。
 
-## 讲话镜动态路由
+## 讲话镜动态路由（2026-08-05 · 原音 IRON）
 
-同一讲话镜的候选必须共享批准状态图与表演意图；只有 FRW `img2video` → LatentSync 的回退分支会绑定最终日文 TTS。LTX 原生有声 I2V 仅按提示词生成声音，不接收该 TTS：
-
-**v2.34 对白车道补充（用户新规：对话对白优先 + 工具组 grok i2v/5090 H3 i2v/r2v）**
+**用户新规**：有语音的部分用 **Grok Video + 5090 H3** 生成；原先对嘴工具效果差，**全部先冻结**；直接用模型 **原音** 优化混音。
 
 | 场景 | 路由 | 音频要点 |
 |---|---|---|
-| 非敏感对白近景 | `cloud_dialogue_ltx`（FRW LTX 2.3 原生有声 I2V） | LTX 原生有声（中文）；`audio_policy=prefer_native` |
-| **restricted 对白近景**（heat/bare/高难 + on_camera 台词） | `local_dialogue_h3`（5090 `minimax-h3-i2v-pilot`；有状态照链 → `minimax-h3-r2v-pilot`） | H3 prompt 首部硬注入：`Audio: the visible character speaks this line in natural Mandarin on camera; mouth visibly articulates the line, lip sync priority; line: 「<spoken_text>」.` `prefer_native` |
-| 无台词覆盖镜（action_cover/silence/reaction） | 沿用各车道（Grok / FRW env / H3 i2v） | 不能占满一整场（v2.34 场景级规） |
+| 非敏感对白近景 | `cloud_dialogue_grok`（Grok Imagine Video I2V） | 模型原声；`audio_policy=prefer_native` / `use_clip_audio` |
+| **restricted 对白近景**（heat/bare/高难 + on_camera） | `local_dialogue_h3`（5090 `minimax-h3-i2v`；状态链/能量 → `r2v`） | H3 prompt 注入中文台词 + 口型可见；`prefer_native` |
+| `h3_primary` 全片 | 对白也走 H3 | 同上 |
+| 无台词覆盖镜 | Grok / H3 / env 车道 | 不能占满一整场（v2.34 场景级规） |
 
-1. **首选**：Qwen I2I 状态图/关键帧 → FRW 上传取得 `img-url` → FRW `img2video-audio`（此子命令选择 LTX 2.3）。提示词强制含「无可见文字、无字幕、无水印」，但提示词不是门禁：必须解码抽帧，人审确认没有供应商烧字、听到的台词符合预期、口型与声音一致。
-2. **第一回退**：仅在 LTX 原生音画被明确拒绝（台词不符、口型不符、供应商烧字或解码失败）时，才使用原 FRW `img2video`；它复用同一批准关键帧。LTX 的 `img2video-audio` 会按提示词自行生成声音，当前 FRW CLI **不接收外部 TTS 音频**，因此不能把它误记成已锁定 TTS 的口型结果。
-3. **口型后处理**：若第一回退用于上镜对白，才将该 FRW `img2video` 片与已锁定 TTS 交给 RTX LatentSync 1.6；它不再占用默认 5090 容量。
+**冻结（勿 bulk）**：LatentSync · MuseTalk · InfiniteTalk · FantasyTalking · FRW lipsync · Wav2Lip · LTX 对白棚默认路径。
 
-条件 DAG 固定为：
+条件 DAG（`dialogue_competition` policy `native_audio_grok_h3_v1`）：
 
 ```text
-state_i2i → tts rehearsal → keyframe_i2i → FRW keyframe upload → FRW LTX 2.3 native-audio I2V
-  → native-text gate → post
-  └→ stable close-up: FRW img2video → LatentSync 1.6
-  └→ head/body acting or camera movement: InfiniteTalk / FantasyTalking pilot
-                                              → full human review → promote
+state_i2i
+  → primary_grok_native（auto / 安全对白）
+  → alt_h3_native（restricted / 显式 local_h3 / Grok 可分类技术失败）
+  → qa → provisional_select → human_approve → promote
 ```
 
-`dialogue_motion_route=auto` 只在 FRW 原生有声音画 canary 已通过且可审查时选择 LTX 2.3；它生成的声音必须逐镜确认台词语义、口型和无烧字。质量拒绝、身份漂移和未知错误都不构成静默换路理由。LTX 被记录为技术拒绝后：单人、正脸、稳定机位、短句近景才走 FRW `img2video` → LatentSync；需要头部、身体、表情或镜头运动整段重演时，才进 InfiniteTalk／FantasyTalking 的明确 pilot。两者重生成整张画面，未经 canary 与人工批准不得进入 production。
+1. **首选**：批准状态 still → Grok Imagine Video（prompt 含中文台词 + 嘴型清晰 + 无字幕烧字）→ 保留 clip 原声。
+2. **restricted / h3_primary / Grok 技术失败**：同一 still → `aifilm h3 plan|run --register`（I2V/R2V）→ `prefer_native`。
+3. **禁**：把 final TTS 灌进 LatentSync/MuseTalk 做后期对嘴；`final --lipsync off`。
 
-RTX 5090 单队列串行；队列、GPU 或能力证据未知/过期即阻断。尚未晋升的 InfiniteTalk
-只可进入 pilot；架构首选不等于伪造生产就绪。自动评分只产生 provisional winner；
-完整观看人工批准前不得 promote，败选素材不得进入 final。
+自动评分只产生 provisional winner；完整观看人工批准前不得 promote。
 
 ## 30–60 秒武器样片
 
-批量生产前，以同一组有真实 TTS 哈希的 `line_id` 做 30–60 秒样片。无消费的
-`aifilm dialogue-benchmark --root <film>` 会写出 Qwen 状态照、FRW LTX 2.3 原生有声 I2V、无烧字审查与按需 LatentSync 1.6
-三臂的共同输入与人工选择门；它不是生成或批准的替代品。每一臂有实际产物与完整看片后，
-才可记录稳定参数并进入 bulk。
+批量前用同一组 `line_id` 做 30–60 秒样片：Grok 原音臂 + H3 原音臂（可选）人审择优；**不再**默认跑 LatentSync 臂。`aifilm dialogue-benchmark` 若仍输出旧三臂文案，以本页生产路由为准，败选/旧臂不得 promote。
+
 
 若 5090 正忙，可执行 `aifilm dialogue-benchmark-queue enqueue --root <film>`，把三臂
 保存为项目内可审计的本地待办；它**绝不**提交 ComfyUI prompt。worker 使用 `claim` 时才
