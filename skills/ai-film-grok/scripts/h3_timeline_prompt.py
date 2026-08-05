@@ -335,6 +335,13 @@ def continuity_header(
     m = (mode or "i2v").strip().lower()
     if m in {"t2v", "text_to_video"}:
         lines.append("No new faces or characters unless the text explicitly requires them.")
+    # 2V reference anchor: lock to the reference image composition.
+    if m in {"i2v", "flf", "r2v"}:
+        lines.append(
+            "2V reference anchor: the start frame is derived from the reference "
+            "image; preserve its composition, subject identity, and spatial "
+            "orientation throughout the timeline."
+        )
     return " ".join(lines)
 
 
@@ -356,6 +363,10 @@ def build_reference_composition_prompt(
     Used in the 2V reference stage: Grok generates a high-quality reference
     image from this prompt, which then serves as the start frame for H3 video
     generation.
+
+    The prompt includes scene setting, subject identity, camera direction,
+    lighting, mood, shot size, lens, depth of field, color palette, motion
+    tier, and mode-specific composition guidance for maximum control.
     """
     from motion_prompt_spine import (
         camera_clause,
@@ -364,20 +375,46 @@ def build_reference_composition_prompt(
         want_beat_line,
     )
 
+    mode = (mode or "i2v").strip().lower()
     setting = _extract_setting(shot)
     subject = _extract_subject(shot)
     cam = camera_clause(shot) or "medium shot, steady framing"
     mood = _mood_seed(shot)
     lighting = _extract_lighting(shot)
     tier = motion_tier_for(shot)
+    shot_size = _extract_shot_size(shot)
+    palette = _extract_color_palette(shot)
+    dof = _extract_depth_of_field(shot)
+    lens = _extract_lens_hint(shot)
+
+    # Tier-based motion guidance
+    tier_guidance = {
+        "soft": "Soft motion: micro-performance only (eyes, breath, jaw); locked camera preferred.",
+        "medium": "Medium motion: visible body/pose change with steady camera.",
+        "high": "High motion: large visible pose/body change; dynamic camera track.",
+    }.get(tier, "Medium motion: visible body/pose change with steady camera.")
+
+    # Mode-specific composition focus
+    mode_focus = {
+        "i2v": "Lock the subject identity and wardrobe exactly; the first frame must be the starting pose for motion generation.",
+        "flf": "First-last frame composition: the first frame establishes the opening pose; the last frame (if provided) establishes the landing pose. Maintain identity across both.",
+        "r2v": "Energy-first composition: emphasize the subject's dynamic pose and facial expression; the reference frame should capture the peak energy moment.",
+    }.get(mode, "Lock the subject identity and wardrobe exactly.")
 
     parts = [
         "Composition reference frame for video generation.",
         setting,
         subject,
+        f"Shot: {shot_size}",
         f"Camera: {cam}",
+        f"Lens: {lens}",
+        f"Depth of field: {dof}",
         f"Lighting: {lighting}",
+        f"Color palette: {palette}",
         f"Mood: {mood}",
+        f"Motion tier: {tier}",
+        tier_guidance,
+        mode_focus,
         "9:16 aspect ratio. Cinematic quality. High detail. This image serves as the "
         "start frame for motion generation.",
     ]
@@ -389,29 +426,75 @@ def inject_2v_reference_stage(
     shot: dict[str, Any],
     *,
     ref_image_paths: list[str] | None = None,
+    mode: str = "i2v",
 ) -> str:
     """When 2V + reference images available, prepend the reference stage to the prompt.
 
     Returns the enhanced prompt with:
       1. Reference image generation instruction (Grok image model)
-      2. Timeline segments that anchor to the reference frame
+      2. Existing reference images reused as composition anchors
+      3. Timeline segments that anchor to the reference frame
     """
     if not ref_image_paths:
         return prompt
 
-    comp_prompt = build_reference_composition_prompt(shot)
+    mode = (mode or "i2v").strip().lower()
+    comp_prompt = build_reference_composition_prompt(shot, mode=mode)
+
+    # Build existing reference image section
+    ref_section = _build_ref_image_section(ref_image_paths, mode)
 
     stage_header = (
         "=== 2V REFERENCE STAGE ===\n"
-        "Step 1: Generate the reference composition image using Grok image model "
-        "from the composition prompt below.\n"
+        f"Mode: {mode}\n"
+        "Step 1: Generate or refine the reference composition image.\n"
         f"Composition prompt: {comp_prompt}\n"
-        "Step 2: Use the generated image as the start frame reference for video generation.\n"
-        "Maintain identity, wardrobe, props, and spatial orientation from the reference frame.\n"
+        f"{ref_section}"
+        "Step 2: Use the resulting image as the start frame reference "
+        "for video generation.\n"
+        "Maintain identity, wardrobe, props, and spatial orientation "
+        "from the reference frame throughout all segments.\n"
         "=== TIMELINE ===\n"
     )
 
     return f"{stage_header}{prompt}"
+
+
+def _build_ref_image_section(
+    ref_image_paths: list[str],
+    mode: str,
+) -> str:
+    """Build a section describing existing reference images to reuse."""
+    if not ref_image_paths:
+        return ""
+
+    lines = []
+    if len(ref_image_paths) == 1:
+        lines.append(
+            "Reference image available: use it as the primary composition "
+            "anchor for the start frame."
+        )
+    else:
+        lines.append(
+            f"{len(ref_image_paths)} reference images available: use the "
+            "first as the primary composition anchor; use subsequent images "
+            "for identity/style consistency."
+        )
+
+    # Mode-specific guidance for existing refs
+    mode_guidance = {
+        "i2v": "The reference image defines the subject's appearance, "
+               "wardrobe, and starting pose. Do not alter identity.",
+        "flf": "The first reference is the opening frame; the last "
+               "reference (if present) defines the landing pose.",
+        "r2v": "The reference image defines the energy pose and facial "
+               "expression. Prioritize motion over static identity.",
+    }
+    guidance = mode_guidance.get(mode, "")
+    if guidance:
+        lines.append(guidance)
+
+    return " ".join(lines)
 
 
 def _extract_setting(shot: dict[str, Any]) -> str:

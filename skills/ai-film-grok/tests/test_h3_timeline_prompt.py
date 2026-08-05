@@ -124,7 +124,7 @@ def test_inject_2v_reference_stage_with_refs() -> None:
     )
     assert "=== 2V REFERENCE STAGE ===" in result
     assert "Composition prompt:" in result
-    assert "Grok image model" in result
+    assert "Generate or refine" in result
     assert "[0s-2s] walk begins." in result
     assert result.index("=== 2V REFERENCE STAGE ===") < result.index(
         "=== TIMELINE ==="

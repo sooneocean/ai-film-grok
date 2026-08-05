@@ -585,7 +585,9 @@ def build_h3_temporal_prompt(
     # Inject 2V reference stage when reference images are available.
     if ref_image_paths:
         body = "\n".join(segs)
-        body = inject_2v_reference_stage(body, shot, ref_image_paths=ref_image_paths)
+        body = inject_2v_reference_stage(
+            body, shot, ref_image_paths=ref_image_paths, mode=mode
+        )
         segs = body.split("\n")
 
     audio = audio_clause(shot)

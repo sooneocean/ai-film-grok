@@ -104,11 +104,22 @@ def _spoken_dialogue_text(shot: dict[str, Any]) -> str:
     return spoken_dialogue_text(shot)
 
 
-def _collect_ref_images(plan: dict[str, Any]) -> list[str] | None:
-    """Collect available reference image paths for the 2V reference stage.
+_VALID_IMAGE_EXTENSIONS = frozenset(
+    {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
+)
 
-    Returns a list of absolute path strings when the plan has image references
-    for I2V / FLF / R2V modes; returns None otherwise.
+
+def _is_valid_image(path: Path) -> bool:
+    """Check if a path points to a valid image file by extension."""
+    return path.suffix.lower() in _VALID_IMAGE_EXTENSIONS
+
+
+def _collect_ref_images(plan: dict[str, Any]) -> list[str] | None:
+    """Collect available reference image paths/URLs for the 2V stage.
+
+    Returns a list of absolute path strings or URLs when the plan has
+    image references for I2V / FLF / R2V modes; returns None otherwise.
+    Only includes files with valid image extensions.
     """
     mode = str(plan.get("mode") or "").strip().lower()
     if mode not in {"i2v", "flf", "r2v"}:
@@ -117,13 +128,26 @@ def _collect_ref_images(plan: dict[str, Any]) -> list[str] | None:
     refs: list[str] = []
     for key in ("still_path", "last_path"):
         val = plan.get(key)
-        if val:
-            p = Path(str(val)).expanduser().resolve()
-            if p.is_file() and str(p) not in refs:
-                refs.append(str(p))
+        if not val:
+            continue
+        val_str = str(val)
+        if val_str.startswith(("http://", "https://")):
+            if val_str not in refs:
+                refs.append(val_str)
+            continue
+        p = Path(val_str).expanduser().resolve()
+        if p.is_file() and _is_valid_image(p) and str(p) not in refs:
+            refs.append(str(p))
     for raw in plan.get("ref_paths") or []:
-        p = Path(str(raw)).expanduser().resolve()
-        if p.is_file() and str(p) not in refs:
+        if not raw:
+            continue
+        raw_str = str(raw)
+        if raw_str.startswith(("http://", "https://")):
+            if raw_str not in refs:
+                refs.append(raw_str)
+            continue
+        p = Path(raw_str).expanduser().resolve()
+        if p.is_file() and _is_valid_image(p) and str(p) not in refs:
             refs.append(str(p))
 
     return refs if refs else None

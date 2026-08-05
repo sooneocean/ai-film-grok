@@ -389,4 +389,4 @@ def test_build_h3_temporal_prompt_with_ref_images(tmp_path: Path) -> None:
     )
     assert "=== 2V REFERENCE STAGE ===" in prompt_with_ref
     assert "Composition prompt:" in prompt_with_ref
-    assert "Grok image model" in prompt_with_ref
+    assert "Generate or refine" in prompt_with_ref
