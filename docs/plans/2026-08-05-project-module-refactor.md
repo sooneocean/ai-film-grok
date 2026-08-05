@@ -1,6 +1,6 @@
 # Project module refactor — ACTIVE tracker (2026-08-05)
 
-**Status:** ACTIVE · **W0–W6 package/docs SHIPPED** · **residual internal peels optional**  
+**Status:** ACTIVE · **W0–W7 packages SHIPPED** · pure-helper peels SHIPPED · residual = orchestrator/heat/export only
 **Evidence:** `scripts/{core,assets,spine,gates,plan,post,narrative,final,audio,media}/` · hub ≤2500 · shims · `tests/test_w3_package_shims.py`  
 **Residual internal-peel todo:** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md)
 

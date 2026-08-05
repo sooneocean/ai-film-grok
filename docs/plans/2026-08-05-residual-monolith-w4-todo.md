@@ -1,6 +1,6 @@
 # Residual 大石 / 大型模组拆分 Todo Plan — post-W4 (2026-08-05)
 
-**Status:** ACTIVE · **structure residual only** · W0–W5 package-boundary **SHIPPED** · residual = **internal leaf peels**  
+**Status:** ACTIVE · pure-helper peels **SHIPPED** (R1/R1b/R1c + R3a) · residual = orchestrator / heat packs / export harness only
 **Kind:** structure plan (docs + ordered implementer queue; not a vanity LOC sprint)  
 **Owner tracker:** [2026-08-05-project-module-refactor.md](2026-08-05-project-module-refactor.md)  
 **Strategy pointer:** [2026-08-05-strategy-director-engineer-upgrade.md](2026-08-05-strategy-director-engineer-upgrade.md) · R-struct  
@@ -65,7 +65,7 @@
 
 | Priority | Module | ~LOC | Why residual (risk × touch) | Status |
 |----------|--------|-----:|-------------------------------|--------|
-| **P0** | `post/render_final.py` | **2735** | Ship path; package-moved but body still ~4.3k; coverage ~30% | package SHIPPED · **internal leaf residual** |
+| **P0** | `post/render_final.py` | **2745** | Ship path; package-moved but body still ~4.3k; coverage ~30% | package SHIPPED · **internal leaf residual** |
 | **P1** | `narrative/edit_policy_heat.py` | **4015** | Adult/heat IRON; 53 helpers; high blast radius | package SHIPPED · **internal packs residual** |
 | **P1** | `film_spec.py` | **3136** | write-spec / validate / projectors | still root monolith |
 | **P2** | `export_composition.py` | **2835** | HF/Remotion export; coverage-starved | harness first |
@@ -213,8 +213,8 @@ python -m pytest tests/test_compose_hotpath_contracts.py tests/test_export_compo
 
 1. [ ] **R0** hygiene (core + shims + package boundary present)
 2. [ ] **R1** only if final hotpath is the touch target — one leaf pack per PR
-3. [ ] **R2** only if heat bug forces multi-pack edit
-4. [x] **R3a** profile leaves DONE; validate/projectors still residual when write-spec churns
+3. [ ] **R2** heat packs — still deferred (bug-driven only)
+4. [x] **R3a** profile leaves DONE; validate/projectors residual
 5. [ ] **R4** harness first for export/compose
 6. [ ] **R5** skip unless dual-path residue
 7. [ ] After any script peel: `make check-all` · lock-runtime if needed · English commit · bump version + CHANGELOG
@@ -281,3 +281,36 @@ make -C "$ROOT" check-all
 - Leaves: `scripts/final/*` · `render_final_music.py`
 - Tests: `test_w3_package_shims` · `test_final_hotpath_contracts` · `test_heat_*`
 - Tracker closeout notes: module-refactor “Internal leaf-split deferred”
+
+---
+
+## 10. Round closeout (2026-08-05 · pure-helper peels)
+
+**SHIPPED this residual campaign:**
+
+| Step | What | Evidence |
+|------|------|----------|
+| R1 | Re-export AST-identical caption/voice/media from `final/*` | 4333→3271 |
+| R1b | `final/{native_audio,cards,enhance}.py` | ~3271→~3014 |
+| R1c | `final/tts_tracks.py` (TTS + native/color tracks) | ~3014→~2745 |
+| R3a | `film_spec_profile.py` + re-export via `plan/film_spec` (W7) | profile pure leaves |
+| Package | W4/W7 package dirs + shims | `post/` · `plan/` · `narrative/` |
+
+**Explicitly still residual (optional / bug-driven — not vanity LOC):**
+
+1. `post/render_final.render_final()` orchestrator body (~2k lines) — peel stages only when final bugs force multi-section edit  
+2. `narrative/edit_policy_heat` internal packs — **bug-driven only** (S4.2)  
+3. `plan/film_spec` validate/projectors split — when write-spec churn demands  
+4. export/compose harness-first (R4) — not heroic rewrite  
+5. `story_plan` — only dual-path residue  
+
+**Iron still binding:** public subcommand strings · no silent heat/i2v/pilot · shim hard-compat · no 1500-LOC vanity sprint.
+
+**Verify (regression set for leaf peels):**
+```bash
+cd skills/ai-film-grok
+python -m pytest tests/test_i2v_profile.py tests/test_safe_sidecars.py \
+  tests/test_native_audio_mix.py tests/test_render_core_helpers.py \
+  tests/test_final_hotpath_contracts.py tests/test_w3_package_shims.py -q
+```
+
