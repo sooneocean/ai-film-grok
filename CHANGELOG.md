@@ -2,6 +2,13 @@
 
 
 
+## [2.39.61] - 2026-08-05
+
+### Changed (W7 · cli package boundary)
+- Move all `cli_*.py` implementations into `scripts/cli/` with thin top-level `sys.modules` shims (hard-compat).
+- Path depth: skill root `parents[2]`; scripts dir `parents[1]`.
+- Tests: `test_w7_cli_package_and_shim_identity`.
+
 ## [2.39.60] - 2026-08-05
 
 ### Fixed

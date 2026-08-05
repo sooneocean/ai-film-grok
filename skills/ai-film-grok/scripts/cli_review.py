@@ -1,24 +1,8 @@
-"""Read-only continuity review packet presentation helpers."""
+"""Shim — implementation in cli.cli_review (W7 package layout).
 
-from __future__ import annotations
+Keeps `import cli_review` / `from cli_review import …` working for hard-compat.
+"""
+from cli import cli_review as _impl
+import sys as _sys
 
-from pathlib import Path
-from typing import Any
-
-from util import read_json
-
-
-def review_packet_status(root: Path | str, shot_id: str) -> dict[str, Any]:
-    base = Path(root).expanduser().resolve()
-    packet = read_json(base / "receipts" / "reviews" / f"{shot_id}.json") or {}
-    continuity = (
-        packet.get("continuity_packet") if isinstance(packet.get("continuity_packet"), dict) else {}
-    )
-    return {
-        "kind": "review-packet-status",
-        "shot_id": shot_id,
-        "reviewed": packet.get("approved") is True,
-        "continuity_packet_current": continuity.get("ok") is True,
-        "neighbours": continuity.get("neighbours") or {},
-        "receipt": packet,
-    }
+_sys.modules[__name__] = _impl
