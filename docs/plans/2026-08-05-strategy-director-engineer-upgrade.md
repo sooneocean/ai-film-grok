@@ -3,7 +3,7 @@
 **Status:** ACTIVE · **strategy pointer for this pass**  
 **Kind:** analysis-only (docs; no heat/i2v/pilot policy change)  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · evidence tree **`origin/main` @ 2.39.30** (hub 1455 · `scripts/core/` present)  
-**Revision:** 2026-08-05c — residual waves S2.3–S7 executed; S5.3 OPEN_OPS only
+**Revision:** 2026-08-05d — S5.3 execute canary PARTIAL (capacity_not_ready honest stop)
 **Audience:** user (director intent) + coding agents (implementation sequencing)
 
 > **一句话：** 规则与产线已够硬；下一层优化不是再叠 IRON，而是 **(导演) 把「门绿」变成「片好看/可交付」的可预期吞吐**，以及 **(工程) 按 ACTIVE 模块重构轨把热路径可测、可挂机、可维护**。
@@ -114,7 +114,7 @@ story.receive → script-value-debrief → plan run → fidelity
 
 | ID | Residual | Why still hurts |
 |----|----------|-----------------|
-| **R-ops** | True overnight `until-empty --execute` on real film | Dry canary only (`artifacts/2026-08-05-h3-until-empty-canary.json`); 5090 idle + pilot GO needed |
+| **R-ops** | Full overnight drain to `queue_empty` | Execute canary **PARTIAL** (`artifacts/2026-08-05-s53-until-empty-canary.json` · stop=`capacity_not_ready`); re-run when 5090 free |
 | **R-af1** | Hot-path subprocess timeouts incomplete | ~150 bare `subprocess.*`; `util.run_ffmpeg` barely adopted; hang risk on fill-idle identity |
 | **R-af2** | closeout ↔ post_doctor / caption-pixel chain incomplete | Modules exist; not fully wired into single fail-closed closeout |
 | **R-doc** | hard-defaults §量产十条 L169 still “Grok→FRW bulk” | Contradicts `h3_primary` / weapon-lane canon |
@@ -362,7 +362,7 @@ From antifragility residual list:
 
 - [x] **S5.1** design-go craft one-pager (poses/CU/L4/cameras/speakers + design-go-onepager.md)
 - [x] **S5.2** doctor advisory when tunnel ok but profile not h3_primary/hybrid_h3
-- [ ] **S5.3** True overnight canary (human GO + 5090 idle) — **OPEN_OPS**
+- [x] **S5.3** Execute until-empty canary **PARTIAL** — path proven; stop=`capacity_not_ready` (honest). Full `queue_empty` drain needs 5090 free · `artifacts/2026-08-05-s53-until-empty-canary.json`
 - [x] **S5.4** generation_ready / still-challenge in dispatch compact
 
 **Depends:** S1 for safe overnight · **Risk:** ops · **Verify:** canary JSON + dispatch screenshot/receipt
