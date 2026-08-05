@@ -1603,6 +1603,28 @@ def run_preflight(root: Path) -> dict[str, Any]:
             )
         )
 
+    try:
+        from timeline_clock import audit_timeline_clock
+        clock = audit_timeline_clock(root, write=True)
+        if clock.get("dual_clock"):
+            hard.append(_issue("hard", "DUAL_TIMELINE_CLOCK", str(clock.get("error") or "dual clock"), fix=str(clock.get("next_cmd") or "")))
+    except Exception as exc:
+        soft.append(_issue("soft", "timeline_clock_probe_error", str(exc)[:200]))
+    try:
+        from post_doctor import run_post_doctor
+        doctor = run_post_doctor(root, write=True)
+        for iss in doctor.get("hard") or []:
+            if not isinstance(iss, dict):
+                continue
+            code = str(iss.get("code") or "")
+            sev = "hard" if code in {"DOUBLE_BURN_RISK", "SRT_OVERLAP", "SRT_BAD_CUE", "DUAL_TIMELINE_CLOCK", "CAPTION_PIXEL_RED"} else "soft"
+            (hard if sev=="hard" else soft).append(_issue(sev, code, str(iss.get("message") or code), fix=str(iss.get("fix") or "")))
+        for iss in doctor.get("soft") or []:
+            if isinstance(iss, dict):
+                soft.append(_issue("soft", str(iss.get("code") or "post_doctor"), str(iss.get("message") or "")))
+    except Exception as exc:
+        soft.append(_issue("soft", "post_doctor_probe_error", str(exc)[:200]))
+
     hard_ok = len(hard) == 0
     try:
         from next_actions import build_next_actions, detect_pipeline_stage

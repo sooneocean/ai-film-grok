@@ -324,6 +324,17 @@ def plan_five_track(root: Path | str, *, write: bool = True) -> dict[str, Any]:
                 "message": (f"meat shots missing sex_sfx: {sex.get('missing')}"),
             }
         )
+    fx_path = stems.get("fx", {}).get("path")
+    if sex.get("required") and sex.get("ok") and fx_path:
+        try:
+            sz = Path(str(fx_path)).stat().st_size
+            if sz < 8_000:
+                issues.append({"code": "FIVE_TRACK_FX_LIKELY_INAUDIBLE", "severity": "warning", "message": f"FX stem very small ({sz} bytes)"})
+        except OSError:
+            pass
+    mix_partial = read_json(base / "receipts" / "final-mix-partial.json") or {}
+    if mix_partial.get("kind") == "final-mix-partial" and mix_partial.get("partial"):
+        issues.append({"code": "FIVE_TRACK_MIX_PARTIAL", "severity": "warning", "message": f"mix PARTIAL: {mix_partial.get('reason_code') or mix_partial.get('reason')}"})
     if mixed and not arts:
         issues.append(
             {

@@ -1849,30 +1849,22 @@ def write_final_mix_partial_receipt(
     error: str,
     mixed: Path | str,
     reason: str = "sidechain_mix_failed_amix_fallback",
+    error_type: str | None = None,
+    affected_tracks: list[str] | None = None,
 ) -> Path:
-    """Persist sidechain→amix PARTIAL so closeout/agents never treat it as silent OK.
+    """Delegate to mix_partial (P1-B honesty fields)."""
+    from mix_partial import write_final_mix_partial_receipt as _write
 
-    Fail-mode contract (Wave D / H1): kind=final-mix-partial, partial=True, from/to set.
-    """
-    base = Path(root).expanduser().resolve()
-    path = base / "receipts" / "final-mix-partial.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_json(
-        path,
-        {
-            "kind": "final-mix-partial",
-            "schema_version": 1,
-            "at": utc_now(),
-            "ok": True,
-            "partial": True,
-            "reason": str(reason),
-            "from": str(prior_sc),
-            "to": "amix_simple",
-            "error": str(error)[:300],
-            "mixed": str(mixed),
-        },
+    return _write(
+        root,
+        prior_sc=prior_sc,
+        error=error,
+        mixed=mixed,
+        reason=reason,
+        error_type=error_type,
+        affected_tracks=affected_tracks,
     )
-    return path
+
 
 
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
@@ -4098,6 +4090,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         except LongformError as exc:
             raise RenderError(f"longform unit masters: {exc}") from exc
     write_json(report_path, report)
+
+    try:
+        from timeline_clock import persist_film_timeline
+
+        report["film_timeline_receipt"] = str(persist_film_timeline(root, film_tl))
+        write_json(report_path, report)
+    except Exception as tl_exc:  # noqa: BLE001
+        report["film_timeline_receipt_error"] = str(tl_exc)[:160]
 
     # Update manifest gates
     manifest.setdefault("outputs", {})["final_film"] = {

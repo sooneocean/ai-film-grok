@@ -17,11 +17,11 @@ sys.path.insert(0, str(SCRIPTS))
 pytestmark = pytest.mark.hotpath
 
 from longform import estimate_plate_timeout  # noqa: E402
+from mix_partial import write_final_mix_partial_receipt  # noqa: E402
 from render_final import (  # noqa: E402
     RenderError,
     resolve_subtitle_mode,
     stable_path_for_ffmpeg_filter,
-    write_final_mix_partial_receipt,
 )
 
 
@@ -120,7 +120,7 @@ class SidechainFallbackContractTests(unittest.TestCase):
             self.assertIn("ffmpeg died", data["error"])
             self.assertEqual(data["mixed"], str(mixed))
             self.assertIn("at", data)
-            self.assertEqual(data["schema_version"], 1)
+            self.assertGreaterEqual(int(data["schema_version"]), 1)
 
 
 class PlateSubsModeTests(unittest.TestCase):
