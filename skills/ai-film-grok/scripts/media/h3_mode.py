@@ -398,7 +398,8 @@ def effect_tips(mode: str, mode_res: dict[str, Any] | None = None) -> list[str]:
         tips.append("质量优先：补 stills/<id>_end.png 后自动升 FLF（first+last）")
         tips.append("高动写清 HIGH MOTION + 每秒可见变化；不够再 --mode r2v")
         tips.append("combo lane: 身份锁脸默认 I2V+soft_portrait；高动先 I2V+HIGH MOTION 再 R2V")
-        tips.append("R2: soft_portrait_alive 防静帧；high_motion_max 每0.5s大姿变；dialogue_mouth_max 下颌开合")
+        tips.append("R2 win: 高动=R2V+high_motion_max(mean≥20)；对白=I2V+dialogue_mouth_max(下颌开合)")
+        tips.append("R2 win: 身份仍 soft_i2v；env 用稳漂移 env_no_face（勿过猛 kinetic）")
         if mode_res.get("alt_mode") == "r2v":
             tips.append(f"能量备胎 R2V：{mode_res.get('alt_reasons')}")
     elif mode == "flf":
