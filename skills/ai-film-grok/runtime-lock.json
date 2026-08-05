@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "fe384d762798b29d5de043967a97e0ceaeae22ffdcf151bc42487a228ec3763e"
+      "sha256": "469bbad53e7cf8e1c84e36d136642009b174cfa0a40e5f3d80a43a14a80b5d5b"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -466,7 +466,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "fbbd01971892a8bd8ee6c45b78fc20e44c6586cf7391a1959c80aedb9bb31d19"
+      "sha256": "b6d9053d5a53218bea3ce93872144769ba8653d83d2efb265bb6d436c4d97526"
     },
     {
       "path": "scripts/cloud_media_download.py",
@@ -662,7 +662,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "bc9aefdfa3c77445202d893397322aae1a7525502de8c218811a3c37b3ed61bb"
+      "sha256": "bf9610dbc6efeda7b1b7f27e0fa0f3408a82f832128e3b7ccc54ace8e0dc1cbe"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -806,7 +806,7 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "fd4ac62d1b21c1a0dbd3ffdaeaa995982262df8dfd77b1741adfa6426976544d"
+      "sha256": "626cae71730e444b70a2f8e6b32cba36f205113bb85453f87c85ec3cbbe2ce36"
     },
     {
       "path": "scripts/h3_media_pack.py",
@@ -922,7 +922,7 @@
     },
     {
       "path": "scripts/media_queue.py",
-      "sha256": "20369a204d396f790703c7cce2dc5ade31e904359a788be6abe7f56a53643624"
+      "sha256": "709f8e6ddfa1614b5a0940ec62167bffb986f10165314659e787f637b61f7a0b"
     },
     {
       "path": "scripts/mix_partial.py",
@@ -974,7 +974,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "a8b99d25a80852c28f0566805e129de02a7d4d4ab67a8c250d7cf1d4be29b2bf"
+      "sha256": "f3ecf151a29c8aa1ab191d6bf38752bf7ee774e2dc0374e061601f929935dbc1"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -1398,7 +1398,7 @@
     },
     {
       "path": "scripts/tts_backend.py",
-      "sha256": "bc8859a499f7871b20971ab460968e5e97c16c57c15d14a9aac5935d66a54cc5"
+      "sha256": "bf22236b25e0a07409f629b5455f0aaf323d619babe39566627588d6ca530c2d"
     },
     {
       "path": "scripts/tts_rehearsal.py",
@@ -1469,8 +1469,12 @@
       "sha256": "c4e44797eab8109f3a38505c2fc5c9fb28f56533bb64640db2feed004b3342c0"
     },
     {
+      "path": "scripts/weapon_inventory.py",
+      "sha256": "6e499e7baaf5127047c26e00a1dfec4d6ff14845b0298f0e15fa2b5ec90e04f2"
+    },
+    {
       "path": "scripts/weapon_router.py",
-      "sha256": "6807b5e80d54f6399dce037fec39a90e23c7d27af80365b37d8ad4992af9a38f"
+      "sha256": "e4f0fb523fca5ab0112fe832ee1fbf7b41fe22bd4e80599a076bd6c62d162ba5"
     },
     {
       "path": "scripts/workflow_pack.py",
@@ -1478,7 +1482,7 @@
     },
     {
       "path": "scripts/workflow_spine.py",
-      "sha256": "8fbd7f94f5b7641cd558dca6086adf4c58b7d6378157442b05d812e0265bd2e1"
+      "sha256": "d93af25de38415812dc3b291dd63298559dca501149abb965de46a227de1f18d"
     }
   ],
   "requirements_sha256": "f8c098495135ea53c62cfd94778efcf059f16c8e83852303f900c3eea5615001"

@@ -56,6 +56,7 @@ from security_policy import (
     SecurityPolicyError,
     safe_existing_file,
 )
+from runtime_policy import sha256  # noqa: F401 — re-exported; tests use aifilm_grok.sha256
 from util import require_json as read_json
 from util import sha256_file, utc_now, write_json
 from util.errors import FilmError  # noqa: E402 — re-exported for backward compat
