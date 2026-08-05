@@ -137,11 +137,24 @@ def _prompt_for_shot(
             film = {}
 
     i2v_profile = str(
-        (spec or {}).get("_i2v_profile")
+        (film or {}).get("_i2v_profile")
+        or (film or {}).get("i2v_profile")
+        or (spec or {}).get("_i2v_profile")
         or (spec or {}).get("i2v_profile")
         or ""
     ).strip().lower()
     is_5090_h3 = i2v_profile in {"h3_primary", "hybrid_h3"}
+    # Per-shot override for A/B: dsl.prompt_format = flat | timeline
+    dsl0 = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    fmt = str(
+        dsl0.get("prompt_format") or shot.get("prompt_format") or ""
+    ).strip().lower()
+    if fmt in {"flat", "spine", "paragraph"}:
+        use_timeline = False
+    elif fmt in {"timeline", "temporal", "h3_timeline"}:
+        use_timeline = True
+    else:
+        use_timeline = is_5090_h3
 
     sid = str(shot.get("id") or "shot")
     prompt_paths = [
@@ -169,11 +182,15 @@ def _prompt_for_shot(
         duration = 8.0
 
     if author:
-        # Keep author geometry/style; merge DF/want/dialogue/camera.
-        body = ensure_motion_core_in_prompt(author, film, shot)
-        # If author file had no geometry prefix, leave as-is; spine already has content.
-        if is_5090_h3:
-            # 5090 H3 path: author prompts keep spine format but skip Vertical 9:16 prefix.
+        # Keep author geometry/style; merge DF/want/dialogue; timeline when enabled.
+        body = ensure_motion_core_in_prompt(
+            author,
+            film,
+            shot,
+            timeline=bool(use_timeline),
+            duration_sec=duration,
+        )
+        if use_timeline:
             prompt = body
         elif not any(
             k in body.lower()
@@ -182,8 +199,8 @@ def _prompt_for_shot(
             prompt = f"{provider_prefix(mode)} {body}".strip()
         else:
             prompt = body
-    elif is_5090_h3:
-        # 5090 H3 primary path: Layer-4 timed action script ([0s-2s] …).
+    elif use_timeline:
+        # Layer-4 timed action script ([0s-2s] …) for 5090 H3 (or explicit timeline).
         prompt = build_h3_temporal_prompt(
             film, shot, mode=mode, duration_sec=duration
         )

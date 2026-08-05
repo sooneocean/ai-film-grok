@@ -33,14 +33,12 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "action": "subject holds eye contact with slight smile",
             "motion": "slow push-in, hair micro-motion",
             "visible_change": "expression softens, shoulders rise with breath",
+            "camera_prompt": "medium slow push-in",
+            "environment": "soft indoor light drift; hair micro-movement",
         },
-        "author_prompt": (
-            "Vertical 9:16 cinematic portrait. Keep the exact same person identity, face, hair, "
-            "wardrobe, and lighting from the start frame. Soft indoor ambience. Subtle natural "
-            "motion only: gentle breathing, tiny head turn toward camera, soft eye blink, hair "
-            "micro-movement. Medium slow push-in. No morphing, no face swap, no extra people, "
-            "no text, no logo. Audio: quiet room tone and soft fabric foley; no speech."
-        ),
+        # author_prompt: optional override; prepare_eval_root prefers Layer-4 compile.
+        "author_prompt": None,
+        "prompt_format": "timeline",
     },
     "high_motion": {
         "lane_tags": ["high_motion_energy", "hero_identity_lock"],
@@ -53,15 +51,11 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "action": "body rocks with vigorous rhythm, hands grip fabric, weight shifts hard",
             "motion": "aggressive handheld push-in and lateral drift, hair and clothes whip",
             "visible_change": "pose changes clearly every second, large motion amplitude",
+            "camera_prompt": "aggressive handheld push-in and lateral drift",
+            "environment": "hair and clothes whip; room air and fabric snap with inertia",
         },
-        "author_prompt": (
-            "Vertical 9:16. Animate the start frame with medium cel-anime style lock. "
-            "Keep identity and wardrobe fixed. HIGH MOTION priority: large visible pose/body "
-            "change every second; avoid frozen portrait or micro-breath-only. Body rocks with "
-            "vigorous rhythm, hands grip fabric, weight shifts hard. Aggressive handheld "
-            "push-in and lateral drift; hair and clothes whip. Pose changes clearly every "
-            "second with large motion amplitude. No morphing, no face swap, no extra people."
-        ),
+        "author_prompt": None,
+        "prompt_format": "timeline",
     },
     "dialogue_mandarin": {
         "lane_tags": ["dialogue_mouth_energy", "hero_identity_lock"],
@@ -76,6 +70,8 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "action": "character faces camera and speaks clearly",
             "motion": "subtle head motion while talking, mouth articulates",
             "visible_change": "lips form Mandarin syllables, expression engages",
+            "camera_prompt": "locked 85mm close-up, micro push only",
+            "environment": "soft room light micro-shifts; quiet ambience",
         },
         "audio_cues": [
             {
@@ -86,12 +82,8 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
                 "screen_mode": "on_camera",
             }
         ],
-        "author_prompt": (
-            "Vertical 9:16 close-up. Animate the start frame; keep identity fixed. "
-            "Character faces camera and speaks clearly with visible lip sync priority; "
-            "mouth articulates Mandarin syllables. line: 「过来，靠近一点，别停。」 "
-            "Subtle head motion while talking; expression engages. No morphing, no face swap."
-        ),
+        "author_prompt": None,
+        "prompt_format": "timeline",
     },
     "env_no_face": {
         "lane_tags": ["faceless_env"],
@@ -104,12 +96,11 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "action": "wind moves curtains and foliage, light shifts on walls",
             "motion": "slow lateral drift across empty room",
             "visible_change": "shadows and fabric move; no faces appear",
+            "camera_prompt": "slow lateral drift",
+            "environment": "curtains and foliage micro-motion; window light shifts",
         },
-        "author_prompt": (
-            "Vertical 9:16 text-to-video plate. Empty interior environment, no people, "
-            "no faces, no character. Soft window light, curtains and foliage micro-motion, "
-            "slow camera drift. Cinematic atmosphere only. No text, no logo."
-        ),
+        "author_prompt": None,
+        "prompt_format": "timeline",
     },
     "soft_portrait_alive": {
         "lane_tags": ["hero_identity_lock"],
@@ -122,15 +113,11 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "action": "eyes track camera with soft blinks, breath lifts chest continuously",
             "motion": "tiny head sway and hair drift; locked identity, no morph",
             "visible_change": "every half-second a small natural micro-change; never a still photo",
+            "camera_prompt": "medium slow push-in, identity lock",
+            "environment": "hair micro-drift and fabric settle",
         },
-        "author_prompt": (
-            "Vertical 9:16 cinematic portrait. Keep the exact same person identity, face, hair, "
-            "wardrobe, and lighting from the start frame. ALIVE SOFT MOTION: never freeze into a still "
-            "photo — continuous life signs every half second: gentle breathing that lifts shoulders, "
-            "soft natural blinks, tiny head turn toward camera, hair micro-drift, fabric settle. "
-            "Medium slow push-in. Identity lock priority: no morphing, no face swap, no extra people. "
-            "Audio: quiet room tone; no speech."
-        ),
+        "author_prompt": None,
+        "prompt_format": "timeline",
     },
     "high_motion_max": {
         "lane_tags": ["high_motion_energy", "hero_identity_lock"],
@@ -150,15 +137,11 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "visible_change": (
                 "pose silhouette changes large every half second; high optical flow; not micro-breath"
             ),
+            "camera_prompt": "aggressive handheld push-in plus lateral whip",
+            "environment": "hair and clothes snap with inertia; dust and fabric thrash",
         },
-        "author_prompt": (
-            "Vertical 9:16. Animate the start frame with medium cel-anime style lock. "
-            "Keep identity and wardrobe fixed. HIGH MOTION MAX: large visible body/pose change "
-            "every 0.5 seconds — full weight shifts, torso torque, hands re-grip fabric, hips and "
-            "shoulders counter-rotate. Aggressive handheld push-in and lateral whip; hair and clothes "
-            "snap with inertia. Silhouette changes large each half-second; avoid frozen portrait or "
-            "micro-breath-only. No morphing, no face swap, no extra people."
-        ),
+        "author_prompt": None,
+        "prompt_format": "timeline",
     },
     "dialogue_mouth_max": {
         "lane_tags": ["dialogue_mouth_energy", "hero_identity_lock"],
@@ -173,7 +156,78 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "action": "face camera and speak with clear jaw open-close each syllable",
             "motion": "cheeks and jaw move; brows engage; tiny head nods with speech rhythm",
             "visible_change": "lips and jaw articulate every Mandarin syllable; mouth energy high",
+            "camera_prompt": "locked ECU mouth-priority close-up",
+            "environment": "soft key light micro-shift on face",
         },
+        "audio_cues": [
+            {
+                "kind": "voice",
+                "line_type": "dialogue",
+                "speaker": "hero",
+                "spoken_text": "过来，靠近一点，别停。",
+                "screen_mode": "on_camera",
+            }
+        ],
+        "author_prompt": None,
+        "prompt_format": "timeline",
+    },
+    "env_kinetic": {
+        "lane_tags": ["faceless_env"],
+        "shot_role": "env",
+        "heat_phase": "setup",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "high",
+        "nar": "kinetic empty environment: wind, light, parallax, no people",
+        "dsl": {
+            "action": "strong wind billows curtains; foliage thrash; light shafts sweep walls",
+            "motion": "forward dolly with parallax depth through empty room",
+            "visible_change": "shadows and fabric move large every second; no faces appear",
+            "camera_prompt": "forward dolly with clear parallax depth",
+            "environment": "curtains thrash; foliage thrash; dust motes; light shafts sweep",
+        },
+        "author_prompt": None,
+        "prompt_format": "timeline",
+    },
+    # Flat-paragraph baselines for timeline A/B (dsl.prompt_format=flat).
+    "high_motion_flat": {
+        "lane_tags": ["high_motion_energy", "hero_identity_lock", "timeline_ab_flat"],
+        "shot_role": "hero",
+        "heat_phase": "act",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "high",
+        "nar": "high energy body motion flat-paragraph baseline",
+        "dsl": {
+            "action": "body rocks with vigorous rhythm, hands grip fabric, weight shifts hard",
+            "motion": "aggressive handheld push-in and lateral drift, hair and clothes whip",
+            "visible_change": "pose changes clearly every second, large motion amplitude",
+            "prompt_format": "flat",
+        },
+        "prompt_format": "flat",
+        "author_prompt": (
+            "Vertical 9:16. Animate the start frame with medium cel-anime style lock. "
+            "Keep identity and wardrobe fixed. HIGH MOTION priority: large visible pose/body "
+            "change every second; avoid frozen portrait or micro-breath-only. Body rocks with "
+            "vigorous rhythm, hands grip fabric, weight shifts hard. Aggressive handheld "
+            "push-in and lateral drift; hair and clothes whip. Pose changes clearly every "
+            "second with large motion amplitude. No morphing, no face swap, no extra people."
+        ),
+    },
+    "dialogue_mouth_flat": {
+        "lane_tags": ["dialogue_mouth_energy", "hero_identity_lock", "timeline_ab_flat"],
+        "shot_role": "hero",
+        "heat_phase": "act",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "medium",
+        "screen_mode": "on_camera",
+        "shot_size": "cu",
+        "nar": "close-up Mandarin speech flat-paragraph baseline",
+        "dsl": {
+            "action": "face camera and speak with clear jaw open-close each syllable",
+            "motion": "cheeks and jaw move; brows engage; tiny head nods with speech rhythm",
+            "visible_change": "lips and jaw articulate every Mandarin syllable; mouth energy high",
+            "prompt_format": "flat",
+        },
+        "prompt_format": "flat",
         "audio_cues": [
             {
                 "kind": "voice",
@@ -190,25 +244,6 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "line: 「过来，靠近一点，别停。」 "
             "Mouth region must show high visible change while face identity stays locked. "
             "No morphing, no face swap, no frozen mouth."
-        ),
-    },
-    "env_kinetic": {
-        "lane_tags": ["faceless_env"],
-        "shot_role": "env",
-        "heat_phase": "setup",
-        "wardrobe_state": "clothed",
-        "prompt_tier": "high",
-        "nar": "kinetic empty environment: wind, light, parallax, no people",
-        "dsl": {
-            "action": "strong wind billows curtains; foliage thrash; light shafts sweep walls",
-            "motion": "forward dolly with parallax depth through empty room",
-            "visible_change": "shadows and fabric move large every second; no faces appear",
-        },
-        "author_prompt": (
-            "Vertical 9:16 text-to-video plate. Empty interior, no people, no faces, no character. "
-            "KINETIC ENV: strong wind billows curtains hard, foliage thrash, dramatic light shafts "
-            "sweep across walls, dust motes, forward dolly with clear parallax depth. "
-            "Large visible environment motion every second. Cinematic atmosphere only. No text, no logo."
         ),
     },
 }
