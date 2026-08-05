@@ -221,31 +221,58 @@ def _run_light_checks(snapshot: Path) -> int:
     if not aifilm.is_file():
         print("[release] light: skip doctor (aifilm missing in snapshot)")
         return 0
-    # Prefer JSON doctor and require core_readiness only (not strict advisory).
+    # Prefer JSON doctor and require structural core only (not strict advisory /
+    # paid cloud TTS keys). Clean-checkout light push must not need MIMO_API_KEY.
     result = subprocess.run(
         [str(aifilm), "doctor"],
         cwd=snapshot,
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, "PYTHONPATH": ""},
+        env={**os.environ, "PYTHONPATH": "", "AIFILM_TTS_BACKEND": "edge"},
     )
+    payload: dict | None = None
+    try:
+        payload = json.loads(result.stdout or "")
+    except json.JSONDecodeError:
+        payload = None
+    if payload is not None:
+        core = payload.get("core_readiness") or {}
+        if core.get("ok") is True:
+            print("[release] light: doctor core_readiness ok")
+            return 0
+        checks = core.get("checks") if isinstance(core.get("checks"), dict) else {}
+        # Structural spine required for push; cloud TTS preferred-backend is not.
+        structural = (
+            "skill_spine",
+            "ffmpeg",
+            "ffprobe",
+            "edge_tts",
+            "numpy",
+            "pillow",
+            "requirements_lock",
+            "runtime_lock",
+            "film_spec_schema",
+        )
+        missing = [k for k in structural if checks and checks.get(k) is not True]
+        if not missing and checks:
+            failed = list(core.get("failed_checks") or [])
+            only_tts = failed and set(failed) <= {"tts_backend"}
+            if only_tts or checks.get("edge_tts") is True:
+                print(
+                    "[release] light: structural core ok "
+                    f"(edge TTS ready; ignored optional failed={failed or ['tts_backend']})"
+                )
+                return 0
+        failed = core.get("failed_checks") or payload.get("runtime_lock", {}).get("errors")
+        print(f"[release] light: doctor core failed: {failed}", file=sys.stderr)
+        return 1
     if result.returncode != 0:
         sys.stderr.write(result.stderr or result.stdout or "doctor failed\n")
         return result.returncode or 1
-    try:
-        payload = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        # Older doctor may print prose; treat exit 0 as pass.
-        print("[release] light: doctor exit 0 (non-JSON)")
-        return 0
-    core = payload.get("core_readiness") or {}
-    if core.get("ok") is True:
-        print("[release] light: doctor core_readiness ok")
-        return 0
-    failed = core.get("failed_checks") or payload.get("runtime_lock", {}).get("errors")
-    print(f"[release] light: doctor core failed: {failed}", file=sys.stderr)
-    return 1
+    # Older doctor may print prose; treat exit 0 as pass.
+    print("[release] light: doctor exit 0 (non-JSON)")
+    return 0
 
 
 def _run_full_checks(snapshot: Path) -> int:
