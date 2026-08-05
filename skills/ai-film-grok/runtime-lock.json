@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "5986e435cdd94cf0db26ef37b781ce81f1d31af12ab323820ba4e934abc0ef75"
+      "sha256": "fcab4e16ffaa90323d4a87a3a615261ce2754eba41b37baa323ccec74178160b"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -309,8 +309,16 @@
       "sha256": "89cfb09ab1541a00b80150f7834e9678498c85453d7c82bee44ea083efa5b4e1"
     },
     {
+      "path": "scripts/cli_bootstrap.py",
+      "sha256": "abd063a19f0162ed40b43e4792670dcad65f798ff84e0f172f29b13b928b03b4"
+    },
+    {
       "path": "scripts/cli_comfy.py",
       "sha256": "7babbeff09738ce474f4e8eb1103d7b104f2170f6a5baa2511e859fe4ee12db2"
+    },
+    {
+      "path": "scripts/cli_evidence.py",
+      "sha256": "dfb3aca66c0aec863b660610b6574082ea5e35c21324e3e1cb6614dbd8e12fbb"
     },
     {
       "path": "scripts/cli_graph.py",
@@ -345,8 +353,16 @@
       "sha256": "f4aff97cdeaf433fddd96c4ab64e06862b3fe96c1d8578dab2c2f628205b9ec9"
     },
     {
+      "path": "scripts/cli_oauth.py",
+      "sha256": "44204f9838de63f63ce22d4805e43b7c56ac8c6089ab35cef58da942bf53e66e"
+    },
+    {
       "path": "scripts/cli_optimization.py",
       "sha256": "e4095dcd5be44cc5d71a13b7e656b3cbf15a6419a3671bd5910afe7c3ddb5259"
+    },
+    {
+      "path": "scripts/cli_orchestrate.py",
+      "sha256": "fc8f1f6dd8153b1b0908d6b5cecc1c873cb9af26b1ad2bff6d607923995b77f4"
     },
     {
       "path": "scripts/cli_pilot.py",
