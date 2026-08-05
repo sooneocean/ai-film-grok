@@ -14,6 +14,7 @@
 - [x] canary 汇总 artifacts/2026-08-05-h3-until-empty-canary.json
 - [x] 真片 --execute 跑过（AF7）：capacity_not_ready 诚实停
 - [x] S5.3-ops `--free-first`（queue busy 不卸；见 s53-free-first canary）
+- [x] S5.3-ops `--capacity-wait-sec`（2.39.66+；live 仍 capacity_not_ready PARTIAL）
 - [ ] idle 后再跑到 queue_empty 真 takes 增量
 
 ## 链
