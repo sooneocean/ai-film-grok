@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "9587741537ea53e39ea7ea67f92d978b056d95731d8d6b38c5d4f4acecb9aa25"
+      "sha256": "87f4adcf45104d7ec41bae201c1c3847ccbb7280c37e17d7a5bd78bba59e956d"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -343,6 +343,10 @@
     {
       "path": "scripts/cli_optimization.py",
       "sha256": "e4095dcd5be44cc5d71a13b7e656b3cbf15a6419a3671bd5910afe7c3ddb5259"
+    },
+    {
+      "path": "scripts/cli_pilot.py",
+      "sha256": "a5cd021fc92e5a102646044b2299fdb6781bbccd4ef00efcd67df89e006e66dc"
     },
     {
       "path": "scripts/cli_plan.py",
