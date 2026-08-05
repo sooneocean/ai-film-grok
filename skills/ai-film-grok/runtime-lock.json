@@ -698,7 +698,7 @@
     },
     {
       "path": "scripts/cli_write_spec.py",
-      "sha256": "53be030e5eed00701aada89cc2d45a2e1ead02469e78b5e65e932341aeedd14e"
+      "sha256": "bd54bd4b446d9a6154eee5ee33c8180eab85af91b2ff4d8197120afa29b73eb4"
     },
     {
       "path": "scripts/clip_uniqueness.py",
@@ -1022,7 +1022,7 @@
     },
     {
       "path": "scripts/framing_lint.py",
-      "sha256": "85e56ac52942372b7f55c3d6c2795c90420ff4126939b5f78c124a3ab3adb652"
+      "sha256": "cb1324269f2ff8527468054ddf9ea69c2939eecf7ad5ac202e2aa0607b063aa8"
     },
     {
       "path": "scripts/frw_ab.py",

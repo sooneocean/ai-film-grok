@@ -65,9 +65,9 @@
 
 | Priority | Module | ~LOC | Why residual (risk × touch) | Status |
 |----------|--------|-----:|-------------------------------|--------|
-| **P0** | `post/render_final.py` | **3271** | Ship path; package-moved but body still ~4.3k; coverage ~30% | package SHIPPED · **internal leaf residual** |
+| **P0** | `post/render_final.py` | **2735** | Ship path; package-moved but body still ~4.3k; coverage ~30% | package SHIPPED · **internal leaf residual** |
 | **P1** | `narrative/edit_policy_heat.py` | **4015** | Adult/heat IRON; 53 helpers; high blast radius | package SHIPPED · **internal packs residual** |
-| **P1** | `film_spec.py` | **3234** | write-spec / validate / projectors | still root monolith |
+| **P1** | `film_spec.py` | **3136** | write-spec / validate / projectors | still root monolith |
 | **P2** | `export_composition.py` | **2835** | HF/Remotion export; coverage-starved | harness first |
 | **P2** | `compose_render.py` | **1603** | Compose path; double-burn contracts exist | harness residual |
 | **P2** | `edit_policy.py` | **2667** | visual_fit / stretch / cut silk | peel if dual-owner pain |
@@ -103,6 +103,8 @@ cd "$ROOT/skills/ai-film-grok" && python -m pytest tests/test_w3_package_shims.p
 ---
 
 ### Wave R1 · `post/render_final` internal leaves (P0)
+
+**Progress 2026-08-05 R1c+R3a:** `final/tts_tracks.py` + `film_spec_profile.py` (render_final ~2735; film_spec ~3136). Pure helper peels complete; residual = `render_final()` orchestrator body + heat packs (bug-driven) + export harness.
 
 **Progress 2026-08-05:** re-wired AST-identical leaves via `final/*` (4333→~3271). **R1b (2.39.59–60):** peel native/cards/enhance → `final/*` (3271→~3006; missing files fixed in 2.39.60). Remaining: orchestrator body.
 
@@ -154,6 +156,8 @@ python -m pytest tests/test_heat_check.py tests/test_heat_arc_multi.py -q
 ---
 
 ### Wave R3 · `film_spec` projectors vs validate (P1)
+
+**Progress 2026-08-05 R3a:** provider/profile pure leaves → `film_spec_profile.py` (validate/projectors still residual).
 
 **Target:** `film_spec.py` (~3234) — still root.
 
@@ -210,7 +214,7 @@ python -m pytest tests/test_compose_hotpath_contracts.py tests/test_export_compo
 1. [ ] **R0** hygiene (core + shims + package boundary present)
 2. [ ] **R1** only if final hotpath is the touch target — one leaf pack per PR
 3. [ ] **R2** only if heat bug forces multi-pack edit
-4. [ ] **R3** when write-spec/validate churns
+4. [x] **R3a** profile leaves DONE; validate/projectors still residual when write-spec churns
 5. [ ] **R4** harness first for export/compose
 6. [ ] **R5** skip unless dual-path residue
 7. [ ] After any script peel: `make check-all` · lock-runtime if needed · English commit · bump version + CHANGELOG

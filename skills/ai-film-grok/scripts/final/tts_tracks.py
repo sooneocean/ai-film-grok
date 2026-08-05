@@ -38,14 +38,19 @@ def tts_to_wav(
     usage_root: Path | str | None = None,
     shot_id: str = "",
     performance: dict[str, Any] | None = None,
+    synthesize: Any | None = None,
 ) -> tuple[Path, float, dict[str, Any]]:
-    """Synthesize VO via pluggable backend (fish > edge). Returns wav path, duration, meta."""
+    """Synthesize VO via pluggable backend (fish > edge). Returns wav path, duration, meta.
+
+    ``synthesize`` optional override for hard-compat monkeypatch of ``render_final.tts_synthesize``.
+    """
     out_mp3.parent.mkdir(parents=True, exist_ok=True)
     meta: dict[str, Any] = {"backend": "edge"}
-    if tts_synthesize is None:
+    synth = tts_synthesize if synthesize is None else synthesize
+    if synth is None:
         raise RenderError("tts_backend.py missing")
     try:
-        meta = tts_synthesize(
+        meta = synth(
             text,
             out_mp3,
             backend=backend,

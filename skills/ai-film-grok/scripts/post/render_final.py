@@ -241,8 +241,18 @@ from final.tts_tracks import (  # noqa: E402, F401
     build_native_track,
     build_vocal_color_track,
     tts_edge,
-    tts_to_wav,
+    tts_to_wav as _tts_to_wav_impl,
+    tts_synthesize as _tts_synthesize_default,
 )
+
+# Hard-compat: tests monkeypatch render_final.tts_synthesize
+tts_synthesize = _tts_synthesize_default
+
+
+def tts_to_wav(*args, **kwargs):
+    """Delegate to final.tts_tracks; honor patched ``tts_synthesize`` on this module."""
+    kwargs.setdefault("synthesize", tts_synthesize)
+    return _tts_to_wav_impl(*args, **kwargs)
 
 
 def write_final_mix_partial_receipt(

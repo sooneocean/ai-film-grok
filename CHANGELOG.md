@@ -1,5 +1,13 @@
 # Changelog
 
+
+## 2.39.64 — 2026-08-05
+
+### Changed
+- R1c: peel TTS + native/vocal-color track builders → `final/tts_tracks.py` (re-export hard-compat).
+- R3a: peel I2V/H3 profile resolve → `film_spec_profile.py` (re-export from `film_spec`; no provider policy change).
+- LOC: `post/render_final` ~3014→~2735; `film_spec` ~3234→~3136.
+
 ## [2.39.63] - 2026-08-05
 
 ### Fixed (film-spec write-spec scaffolds + glue)
