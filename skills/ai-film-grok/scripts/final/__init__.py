@@ -38,6 +38,8 @@ from final.native_audio import (
 from final.cards import mkcard_video, resolve_font, sub_png
 from final.tts_tracks import build_native_track, build_vocal_color_track, tts_edge, tts_to_wav
 from final.voice import (
+    normalize_cast_tts_backends,
+    normalize_cast_voices,
     tts_backend_for_shot,
     validate_voice_language_locks,
     voice_for_shot,
@@ -63,6 +65,8 @@ __all__ = [
     "validate_linear_narration",
     "validate_voice_language_locks",
     "voice_for_shot",
+    "normalize_cast_voices",
+    "normalize_cast_tts_backends",
     "write_srt",
     "build_post_enhancement_vf_chain",
     "resolve_subtitle_mode",
