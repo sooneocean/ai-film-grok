@@ -594,7 +594,7 @@ MIT © [dex](https://github.com/sooneocean)
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
 - Python 脚本：`346` 个
-- pytest 文件：`385` 个
+- pytest 文件：`384` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

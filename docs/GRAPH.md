@@ -261,7 +261,6 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_manifest_truth.py`
 - `skills/ai-film-grok/tests/test_master_delivery.py`
 - `skills/ai-film-grok/tests/test_material_fidelity_m3m4.py`
-- `skills/ai-film-grok/tests/test_material_fidelity_m5m6.py`
 - `skills/ai-film-grok/tests/test_meaningful_motion.py`
 - `skills/ai-film-grok/tests/test_media_duration.py`
 - `skills/ai-film-grok/tests/test_media_duration_cache.py`
