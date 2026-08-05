@@ -1542,7 +1542,7 @@
     },
     {
       "path": "scripts/media/weapon_router.py",
-      "sha256": "772278b87f473c985f1f04ba6ad41fa7042526cd28a0d585a1b5109d6d7224f1"
+      "sha256": "333d2bf57baec3771f3dcb80119aa714cfa4df60a0f447dd8ca53fb8b9c5f8f4"
     },
     {
       "path": "scripts/media-queue",
@@ -1842,7 +1842,7 @@
     },
     {
       "path": "scripts/plan/production_router.py",
-      "sha256": "66d5e25102b8ea68934e0a3690ca399547eb922ebfdccfe6bce2fbd3c8b545c9"
+      "sha256": "310aa4f0b3a4198ed94e089ea466a0e1c6c036c223d18a552a2b0d80067fb5a8"
     },
     {
       "path": "scripts/plan/production_team.py",
@@ -2257,8 +2257,12 @@
       "sha256": "9d44c6f279c5ec973ae953907a9782c7808a8e3db21d91761bcbc186ab77b561"
     },
     {
+      "path": "scripts/spine/action_policy.py",
+      "sha256": "5991e37987f0081384860a6cb693e520e8d4946a372d8f0ce1a7fcc7fa8a0e7f"
+    },
+    {
       "path": "scripts/spine/advance.py",
-      "sha256": "9b6cc33b2a498e91caee71e12a1e6316477c4ac573a1236358171c982713da86"
+      "sha256": "643809eaa5ed57ff537ebd50f27f3fd582a7753ea21fa7dba1ce4c59d753be55"
     },
     {
       "path": "scripts/spine/autopilot.py",
@@ -2282,15 +2286,15 @@
     },
     {
       "path": "scripts/spine/dispatch.py",
-      "sha256": "1bf2ed4249883b9fe0eb1f4c77d3d70f671f1a777a70651e29358c793d376e68"
+      "sha256": "42071e886448082569b94da4d348a51f381fc2eef518197e3b95f4b5c63130ec"
     },
     {
       "path": "scripts/spine/dispatch_compact.py",
-      "sha256": "3acc5fb141cae8b9e35527a6e778375423181198fc38f9ce462dbdc91f75e3f0"
+      "sha256": "456a7dbe347c2d891880d8225a22b3c04ae511a7b2bb41e7adffc13db312a9d4"
     },
     {
       "path": "scripts/spine/next_actions.py",
-      "sha256": "10060b13dbc93dfd73d7b25e8b04f3b0a903ea2d4ef1cc2c14dc36fc15676815"
+      "sha256": "b7e1573fb1b9d82a56141839c3515a15b3c25de825205a5b59cb5818315c7829"
     },
     {
       "path": "scripts/spine/project_state.py",
@@ -2299,6 +2303,10 @@
     {
       "path": "scripts/spine/selects_report.py",
       "sha256": "cb83b44c39d6e518ca8894c9faa307201c941d55ecd7cab7b156f69cae3ac6bb"
+    },
+    {
+      "path": "scripts/spine/stage_model.py",
+      "sha256": "0641adda5f0165deeda9fde7893064133e6f883b735daed696706f8066210db9"
     },
     {
       "path": "scripts/spine/workflow_spine.py",
