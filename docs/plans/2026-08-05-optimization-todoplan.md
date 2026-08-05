@@ -1,11 +1,11 @@
 # ai-film-grok 痛点分析 + 优化 TodoPlan（2026-08-05）
 
-**Status:** ACTIVE · Waves 0–2 / until-empty / gate-slim **SHIPPED** (through **v2.39.20**)  
+**Status:** ACTIVE · Waves 0–2 / until-empty / gate-slim **SHIPPED** · canary dry **PARTIAL** (2026-08-05)  
 **Repo pointer** for optimization sequencing. Session plan has the full pain map.
 
 ## 一句话
 
-流程门禁 + **h3_primary** + **until-empty 挂机** + **caption_path/pixel** 已落地；下一刀是 **真片过夜 canary**、material fidelity 实跑、巨石仅 churn 时再拆。
+流程门禁 + **h3_primary** + **until-empty 挂机** + **caption_path/pixel** 已落地；**dry canary 已过**；真烧 GPU 过夜仍待人确认 5090 idle。
 
 ## 痛点（摘要）
 
@@ -28,18 +28,25 @@
 | 4 | gate slim / pilot h3 modes | **DONE** 2.39.17 |
 | 5 | cli_pilot extract | **DONE** 2.39.19 |
 | M | Material Fidelity M3–M4 | **DONE** 2.39.18 |
-| next | 真片 `until-empty` canary · worktree 卫生 | open |
+| next | 真片 `until-empty` canary · worktree 卫生 | **PARTIAL** dry OK · worktree prune done · 真烧 open |
+
+## Canary log
+
+- **2026-08-05 dry**: film `skills/.../h3-angles-runthrough` · pending=2 · ETA≈18m · `priority_ok` · until-empty stop=`dry_run_pass_execute`  
+  - receipt: `artifacts/2026-08-05-h3-until-empty-canary.json`  
+  - memory: `memory/2026-08-05-h3-until-empty-canary.md`  
+  - worktree: pruned 2 prunable entries
 
 ## 不做
 
 自动批 pilot · 静默降 heat · 冲刺 monolith 1500 行 · 全自动毒镜 CV
 
-## 默认 go（真片）
+## 默认 go（真片过夜）
 
 ```bash
 export AIFILM_I2V_PROFILE=h3_primary
 aifilm write-spec --root "<film>"
-# pilot GO 后：
+# pilot GO + 5090 idle 后：
 aifilm h3 capacity-plan --root "<film>"
 aifilm h3 cycle --root "<film>" --until-empty --execute
 ```

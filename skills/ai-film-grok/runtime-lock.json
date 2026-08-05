@@ -594,11 +594,11 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "6b793515dcb06e3c9961c0bb414e0a6d0eef05ae3b46b62d50673fb9d6a3f7fe"
+      "sha256": "494a4255d0ea4269fad50f52db2034d2a0d7da667bb7e82bb2dfc43f539562bd"
     },
     {
       "path": "scripts/dispatch_compact.py",
-      "sha256": "fb808f6ec037551885402daa8cea8f4bbbe5c9228d1bada9a52b49235b18bc03"
+      "sha256": "4731927198d6f8a0eb86e3f4f13b8a401528061ec4f25949f417ea0d0233dd37"
     },
     {
       "path": "scripts/drama_graph.py",
@@ -738,7 +738,7 @@
     },
     {
       "path": "scripts/h3_media_pack.py",
-      "sha256": "0f7f7b61575d10ee3ae2d31e28e89417fd7b2b77948207aa30cb3c03e462f9c3"
+      "sha256": "ed246f3b4b85c01dc281d75a399d02fb1c1fb11cc34d01ad972c35607b00dd25"
     },
     {
       "path": "scripts/h3_mode.py",
