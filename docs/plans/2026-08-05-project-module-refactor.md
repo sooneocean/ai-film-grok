@@ -1,7 +1,7 @@
 # Project module refactor — ACTIVE tracker (2026-08-05)
 
-**Status:** ACTIVE · **W0–W5 package/docs SHIPPED** · **residual internal peels optional**  
-**Evidence:** `scripts/{core,assets,spine,gates,plan,post,narrative,final}/` · hub ≤2500 · shims · `tests/test_w3_package_shims.py`  
+**Status:** ACTIVE · **W0–W6 package/docs SHIPPED** · **residual internal peels optional**  
+**Evidence:** `scripts/{core,assets,spine,gates,plan,post,narrative,final,audio,media}/` · hub ≤2500 · shims · `tests/test_w3_package_shims.py`  
 **Residual internal-peel todo:** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md)
 
 ## Waves
@@ -14,6 +14,7 @@
 | W3 | Package dirs + shims | **DONE** |
 | W4 | Domain → packages (`post/render_final` · `narrative/edit_policy_heat`) | **DONE** package boundary (`ef9c4c70`) · **internal leaf peels residual** (bodies still ~4333 / ~4015) |
 | W5 | Docs / AREA / shim audit | **DONE** |
+| W6 | `audio/*` + `media/*` packages + shims | **DONE** (v2.39.54 boundary · v2.39.56 path-depth fix) |
 
 ## Residual peel order (risk × touch · not LOC vanity)
 
@@ -42,8 +43,9 @@ Public `aifilm` subcommand strings unchanged · shims hard-compat · no silent h
 - **W5**: AGENTS AREA + this tracker.
 
 
-## W6 audio/media (v2.39.52)
+## W6 audio/media (**DONE** · v2.39.54 + path fix v2.39.56)
 
-- packages: `audio/` (45) · `media/` (32) + shims
-- path fixes: skill root parents[2], adapters/sibling scripts via parent.parent
-- tests: audio/media/h3/dispatch/delivery green
+- packages: `audio/` (45) · `media/` (32) + top-level `sys.modules` shims
+- path fixes: skill root `parents[2]`; adapters/sibling via `parent.parent` (= `scripts/`); plugin root for `.local-runtimes` = `parents[4]` from `scripts/audio/*`
+- public import/CLI names unchanged
+- residual: optional internal peels only (see residual plan); not re-opened by W6

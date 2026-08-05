@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.39.56] - 2026-08-05
+
+### Fixed (W6 path depth · local TTS argv trust)
+- **`audio/tts_backend`**: chatterbox/piper trusted interpreter uses `parents[4]` (plugin root) after nest into `scripts/audio/` (was `parents[3]` → wrong `skills/`).
+- Restores `chatterbox_local_argv_configured` / `piper_local_argv_configured` vs `SCRIPTS.parents[2]` contract.
+
+### Fixed (hang-proof · h3_workflow + continue handoff)
+- **h3_workflow**: all bare `subprocess.run` paths now use `timeout=` — strip audio (120/300s), volumedetect (60s soft), geometry upscale (600s), register-clip (300s). Timeouts raise `H3WorkflowError` (volumedetect soft-keeps native).
+- **continue_handoff**: end-frame ffmpeg extract `timeout=60` (was hang risk overnight).
+- **Tests**: Wave3H3WorkflowTimeoutTests in `test_antifragility_af.py`.
+- **Strategy residual**: R-af1/R-util hot H3 paths tightened; bulk bare migration still open.
+
 ## [2.39.55] - 2026-08-05
 
 ### Added (media-queue inventory primary tags on fail)

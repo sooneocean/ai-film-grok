@@ -271,8 +271,9 @@ def chatterbox_local_argv_configured() -> bool:
     if not interpreter.is_absolute():
         return False
     adapter = (Path(__file__).resolve().parent.parent / "adapters" / "chatterbox_local_tts.py").resolve()
+    # scripts/audio/* → parents[4] is plugin root (was parents[3] at scripts/*)
     trusted_python = (
-        Path(__file__).resolve().parents[3]
+        Path(__file__).resolve().parents[4]
         / ".local-runtimes"
         / "chatterbox-mac"
         / "bin"
@@ -309,7 +310,7 @@ def piper_local_argv_configured() -> bool:
     interpreter_path = Path(argv[0]).expanduser()
     if not interpreter_path.is_absolute():
         return False
-    root = Path(__file__).resolve().parents[3]
+    root = Path(__file__).resolve().parents[4]  # plugin root from scripts/audio/*
     adapter = (Path(__file__).resolve().parent.parent / "adapters" / "piper_local_tts.py").resolve()
     trusted_python = (root / ".local-runtimes" / "piper-mac" / "bin" / "python").resolve()
     try:

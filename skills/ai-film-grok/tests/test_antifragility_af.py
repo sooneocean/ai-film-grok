@@ -308,5 +308,53 @@ class Wave3ShortformTimeoutTests(unittest.TestCase):
         self.assertIn("local motion candidate decode timed out", src)
         self.assertIn("local motion candidate probe timed out", src)
 
+
+class Wave3H3WorkflowTimeoutTests(unittest.TestCase):
+    """R-util / R-af1 · h3_workflow ffmpeg + register-clip must not hang forever."""
+
+    def test_h3_workflow_subprocess_runs_have_timeout(self) -> None:
+        src = _impl_source("h3_workflow.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=120", src)  # strip stream-copy
+        self.assertIn("timeout=300", src)  # strip re-encode + register-clip
+        self.assertIn("timeout=600", src)  # geometry upscale
+        self.assertIn("timeout=60", src)  # volumedetect
+        runs = src.split("subprocess.run(")[1:]
+        self.assertGreaterEqual(len(runs), 6)
+        for chunk in runs:
+            self.assertIn("timeout=", chunk[:1600], msg=chunk[:200])
+        self.assertIn("timed out", src)
+        self.assertIn("volumedetect_timeout", src)
+
+    def test_continue_handoff_endframe_has_timeout(self) -> None:
+        src = _impl_source("continue_handoff.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=60", src)
+        runs = src.split("subprocess.run(")[1:]
+        self.assertGreaterEqual(len(runs), 1)
+        for chunk in runs:
+            self.assertIn("timeout=", chunk[:1200])
+
+    def test_native_audio_volumedetect_timeout_soft(self) -> None:
+        from h3_workflow import _native_audio_usable
+
+        with tempfile.TemporaryDirectory() as tmp:
+            clip = Path(tmp) / "t.mp4"
+            clip.write_bytes(b"\x00" * 64)
+
+            def _boom(*_a, **_k):
+                raise subprocess.TimeoutExpired(cmd=["ffmpeg"], timeout=60)
+
+            with (
+                mock.patch(
+                    "media_qa.analyze_media",
+                    return_value={"has_audio": True, "ok": True},
+                ),
+                mock.patch("h3_workflow.subprocess.run", side_effect=_boom),
+            ):
+                usable, meta = _native_audio_usable(clip)
+            self.assertTrue(usable)
+            self.assertTrue(meta.get("volume_probe_timeout"))
+            self.assertEqual(meta.get("usable_reason"), "volumedetect_timeout")
+
+
 if __name__ == "__main__":
     unittest.main()

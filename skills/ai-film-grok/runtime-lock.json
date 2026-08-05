@@ -358,7 +358,7 @@
     },
     {
       "path": "scripts/audio/tts_backend.py",
-      "sha256": "86484e9baa400058c388ef019a8b5ccc9f9e995838d2504e7b008354ce24d645"
+      "sha256": "e29be9d7713fe70e19bd793d72d4eddc062486b82238eea3092ba1247007e0bd"
     },
     {
       "path": "scripts/audio/tts_rehearsal.py",
@@ -574,7 +574,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "578db3e268561f3a5790ca2a3868d9937c620ce917be1c6ade9dc0b3c563a65e"
+      "sha256": "999924318abde95df00f604c6d144cabc3c014d31d9eec313207e4f8950965bd"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -1282,7 +1282,7 @@
     },
     {
       "path": "scripts/media/h3_fill_idle.py",
-      "sha256": "fd4ac62d1b21c1a0dbd3ffdaeaa995982262df8dfd77b1741adfa6426976544d"
+      "sha256": "caca63f8a4530354f4815e365e587ece5adfd815be9385a83a9b994fe4d60f49"
     },
     {
       "path": "scripts/media/h3_media_pack.py",
@@ -1294,7 +1294,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "0fef7feb791b075282644558be5efca0b19139444a067fb213854ce1023953e0"
+      "sha256": "99471737ee99677851b59e75c003dcce6edac32b2fbcc9b1350a0c80dcc66e10"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -1826,7 +1826,7 @@
     },
     {
       "path": "scripts/spine/continue_handoff.py",
-      "sha256": "8924a24128a54d04bb743439c20a5adf846d2d6ae8375f58b8f2fdc521649fba"
+      "sha256": "6fa1be2eaac8b527e7b47c4885c61707c4174a55f8b3832ac86cce74501bacd2"
     },
     {
       "path": "scripts/spine/craft_spine.py",

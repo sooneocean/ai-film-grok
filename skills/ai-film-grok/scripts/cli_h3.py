@@ -236,6 +236,15 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
         dest="continue_on_capacity",
         help="With --until-empty: do not stop when capacity not ready",
     )
+    cycle.add_argument(
+        "--free-first",
+        action="store_true",
+        dest="free_first",
+        help=(
+            "If Comfy queue is idle and only RAM/VRAM floors block, free models once "
+            "before cycle/until-empty (never cancels foreign prompts)"
+        ),
+    )
     cycle.add_argument("--no-challenge", action="store_true")
     cycle.add_argument("--notes", default="")
     cycle.add_argument("--receipt", type=Path, default=None)
@@ -346,6 +355,7 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 until_empty=bool(getattr(args, "until_empty", False)),
                 max_cycles=int(getattr(args, "max_cycles", 40) or 40),
                 stop_on_capacity=not bool(getattr(args, "continue_on_capacity", False)),
+                free_first=bool(getattr(args, "free_first", False)),
             )
         elif action == "capacity-plan":
             from h3_fill_idle import capacity_plan

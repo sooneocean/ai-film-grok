@@ -368,7 +368,14 @@ def _strip_audio(src: Path, dest: Path) -> Path:
         "copy",
         str(dest),
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, check=False, timeout=120
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise H3WorkflowError(
+            f"strip H3 native audio timed out after {exc.timeout}s (stream copy)"
+        ) from exc
     if proc.returncode != 0 or not dest.is_file():
         # re-encode fallback if stream copy fails
         cmd = [
@@ -383,7 +390,14 @@ def _strip_audio(src: Path, dest: Path) -> Path:
             "yuv420p",
             str(dest),
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        try:
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, check=False, timeout=300
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise H3WorkflowError(
+                f"strip H3 native audio timed out after {exc.timeout}s (re-encode)"
+            ) from exc
     if proc.returncode != 0 or not dest.is_file():
         raise H3WorkflowError(f"failed to strip H3 native audio: {proc.stderr[:300]}")
     return dest
@@ -404,24 +418,33 @@ def _native_audio_usable(path: Path, *, min_db: float = -42.0) -> tuple[bool, di
         meta["probe_error"] = str(exc)[:200]
         return False, meta
 
-    # volumedetect on the embedded audio stream (no full re-encode)
-    proc = subprocess.run(
-        [
-            "ffmpeg",
-            "-hide_banner",
-            "-i",
-            str(path),
-            "-vn",
-            "-af",
-            "volumedetect",
-            "-f",
-            "null",
-            "-",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    # volumedetect on the embedded audio stream (no full re-encode; bounded hang)
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-i",
+                str(path),
+                "-vn",
+                "-af",
+                "volumedetect",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        # Soft: volume unknown → keep native if stream exists (same as probe fail).
+        meta["volume_probe_timeout"] = True
+        meta["usable_reason"] = "volumedetect_timeout"
+        usable = bool(has_audio)
+        meta["usable"] = usable
+        return usable, meta
     mean_db: float | None = None
     for line in (proc.stderr or "").splitlines():
         if "mean_volume:" in line:
@@ -507,7 +530,14 @@ def ensure_h3_delivery_geometry(
         "copy",
         str(dest),
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, check=False, timeout=600
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise H3WorkflowError(
+            f"H3 geometry upscale timed out after {exc.timeout}s (a-copy)"
+        ) from exc
     if proc.returncode != 0 or not dest.is_file():
         cmd_a = [
             "ffmpeg",
@@ -526,7 +556,14 @@ def ensure_h3_delivery_geometry(
             "192k",
             str(dest),
         ]
-        proc = subprocess.run(cmd_a, capture_output=True, text=True, check=False)
+        try:
+            proc = subprocess.run(
+                cmd_a, capture_output=True, text=True, check=False, timeout=600
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise H3WorkflowError(
+                f"H3 geometry upscale timed out after {exc.timeout}s (a-aac)"
+            ) from exc
     if proc.returncode != 0 or not dest.is_file():
         raise H3WorkflowError(f"H3 geometry upscale failed: {(proc.stderr or '')[:300]}")
     meta["upscaled"] = True
@@ -995,7 +1032,15 @@ def register_h3_clip(
         cmd.extend(("--queue-job-id", queue_job_id))
     if status == "approved":
         cmd.extend(("--identity-approved", "--motion-approved"))
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    try:
+        # register-clip may run QA gates; bound hang (not infinite overnight stall)
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, check=False, timeout=300
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise H3WorkflowError(
+            f"register-clip timed out after {exc.timeout}s for shot {shot_id}"
+        ) from exc
     if proc.returncode != 0:
         raise H3WorkflowError(f"register-clip failed: {(proc.stderr or proc.stdout or '')[:400]}")
     # Annotate manifest clip with H3 audio policy for post.

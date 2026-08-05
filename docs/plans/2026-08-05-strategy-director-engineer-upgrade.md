@@ -115,12 +115,12 @@ story.receive → script-value-debrief → plan run → fidelity
 | ID | Residual | Why still hurts / status |
 |----|----------|-------------------------|
 | **R-ops** | Full overnight drain to `queue_empty` | **PARTIAL** execute proven (AF7/S5.3); drain open · af7-final canary |
-| **R-af1** | Hot-path subprocess timeouts | **PARTIAL→core SHIPPED**: h3 identity timeout · shortform decode/probe timeout (2.39.53); bulk migration open |
+| **R-af1** | Hot-path subprocess timeouts | **PARTIAL→core SHIPPED**: identity · shortform (2.39.53) · **h3_workflow ffmpeg/register-clip + continue_handoff** (2.39.56); bulk migration open |
 | **R-af2** | closeout ↔ post_doctor / caption-pixel | **SHIPPED** AF3/AF6 |
 | **R-doc** | hard-defaults FRW-first bulk prose | **SHIPPED** AF8 → h3_primary |
 | **R-mf-doc** | material-fidelity M5–M6 tracker | **SHIPPED** (M0–M6 landed) |
 | **R-cov** | final/compose failure-mode tests | Still useful; not line vanity |
-| **R-util** | Wave 3 util FilmError / run_ffmpeg | **PARTIAL** (final path yes; more open) |
+| **R-util** | Wave 3 util FilmError / run_ffmpeg | **PARTIAL** (final + H3 deliver/register hang-proof 2.39.56; full util migration open) |
 | **R-struct** | Module refactor leaf peels | **W0–W5 SHIPPED**; heat/film_spec intentional residual |
 | **R-hygiene** | Local dirty trees / doc drift | Ongoing |
 

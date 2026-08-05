@@ -721,6 +721,10 @@ def build_fill_idle_queue(
     }
 
 
+_MEMORY_FLOOR_CODES = frozenset({"RAM_BELOW_FLOOR", "VRAM_BELOW_FLOOR"})
+_QUEUE_BUSY_CODE = "COMFY_QUEUE_BUSY"
+
+
 def probe_comfy_capacity_soft() -> dict[str, Any]:
     """Best-effort 5090 readiness (never raises; offline → ready=None)."""
     import os
@@ -757,6 +761,121 @@ def probe_comfy_capacity_soft() -> dict[str, Any]:
             "error": str(exc)[:200],
             "source": "submission_capacity",
         }
+
+
+def _capacity_blocker_codes(capacity: dict[str, Any] | None) -> set[str]:
+    codes: set[str] = set()
+    for item in (capacity or {}).get("blockers") or []:
+        if isinstance(item, dict) and item.get("code"):
+            codes.add(str(item["code"]))
+    return codes
+
+
+def _capacity_snapshot(capacity: dict[str, Any] | None) -> dict[str, Any]:
+    cap = capacity or {}
+    return {
+        "ready": cap.get("ready"),
+        "status": cap.get("status"),
+        "blockers": list(cap.get("blockers") or []),
+        "vram_free_bytes": cap.get("vram_free_bytes"),
+        "error": cap.get("error"),
+    }
+
+
+def prepare_capacity_free_first(
+    *,
+    free_first: bool = False,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Optionally free Comfy models once when idle queue is blocked only by RAM/VRAM floors.
+
+    Safety:
+    - never cancels foreign prompts / never free when ``COMFY_QUEUE_BUSY``
+    - free at most once per call
+    - only when every observed blocker is a memory floor code
+    - dry_run probes and reports ``would_free`` without calling free-memory
+    """
+    report: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-free-first",
+        "free_first": bool(free_first),
+        "attempted": False,
+        "freed": False,
+        "would_free": False,
+        "skipped_reason": None,
+        "outcome": None,
+        "before": None,
+        "after": None,
+        "free_result": None,
+    }
+    if not free_first:
+        report["skipped_reason"] = "free_first_disabled"
+        report["outcome"] = "skipped"
+        return report
+
+    before = probe_comfy_capacity_soft()
+    report["before"] = _capacity_snapshot(before)
+    if before.get("ready") is True:
+        report["skipped_reason"] = "already_ready"
+        report["outcome"] = "already_ready"
+        return report
+
+    codes = _capacity_blocker_codes(before)
+    if not codes and before.get("ready") is None:
+        report["skipped_reason"] = "capacity_probe_unavailable"
+        report["outcome"] = "skipped"
+        return report
+    if _QUEUE_BUSY_CODE in codes:
+        report["skipped_reason"] = "queue_busy_never_cancel_foreign"
+        report["outcome"] = "skipped_queue_busy"
+        return report
+    if not (codes & _MEMORY_FLOOR_CODES):
+        report["skipped_reason"] = "no_memory_floor_block"
+        report["outcome"] = "skipped"
+        return report
+    other = codes - _MEMORY_FLOOR_CODES
+    if other:
+        report["skipped_reason"] = "blockers_not_only_memory"
+        report["other_blockers"] = sorted(other)
+        report["outcome"] = "skipped_other_blockers"
+        return report
+
+    report["would_free"] = True
+    if dry_run:
+        report["skipped_reason"] = "dry_run_would_free"
+        report["outcome"] = "dry_run_would_free"
+        return report
+
+    report["attempted"] = True
+    try:
+        import os
+
+        from comfy_video import free_memory, normalize_base_url
+
+        raw = (
+            os.environ.get("AIFILM_COMFYUI_BASE_URL")
+            or os.environ.get("AIFILM_COMFY_BASE_URL")
+            or "http://127.0.0.1:18188"
+        ).strip()
+        base_url = normalize_base_url(raw)
+        free_result = free_memory(base_url)
+        report["free_result"] = free_result if isinstance(free_result, dict) else {"ok": bool(free_result)}
+        report["freed"] = bool((report["free_result"] or {}).get("ok"))
+    except Exception as exc:  # noqa: BLE001
+        report["free_result"] = {"ok": False, "error": str(exc)[:200]}
+        report["freed"] = False
+        report["skipped_reason"] = "free_memory_error"
+        report["outcome"] = "free_error"
+        return report
+
+    after = probe_comfy_capacity_soft()
+    report["after"] = _capacity_snapshot(after)
+    if after.get("ready") is True:
+        report["outcome"] = "ready_after_free"
+    else:
+        report["outcome"] = "still_blocked_after_free"
+        report["skipped_reason"] = "still_blocked_after_free"
+    return report
 
 
 def assert_priority_order(
@@ -1204,11 +1323,14 @@ def fill_idle_cycle(
     until_empty: bool = False,
     max_cycles: int = 40,
     stop_on_capacity: bool = True,
+    free_first: bool = False,
 ) -> dict[str, Any]:
     """One agent-facing cycle: evidence → run-next (optional) → evidence again → pk peek.
 
     Never auto-promotes. With ``until_empty=True`` loops cycles until queue empty,
     capacity blocks, run fails, or ``max_cycles`` (hard-capped) — not an OS daemon.
+    With ``free_first=True``: if queue idle and only RAM/VRAM floors block, free models once
+    before run-next (never cancels foreign prompts).
     """
     base = _root(root)
     if until_empty:
@@ -1220,7 +1342,12 @@ def fill_idle_cycle(
             include_challenge=include_challenge,
             notes=notes,
             stop_on_capacity=bool(stop_on_capacity),
+            free_first=bool(free_first),
         )
+    free_prep = prepare_capacity_free_first(
+        free_first=bool(free_first),
+        dry_run=not bool(execute),
+    )
     before = write_fill_idle_evidence(base, notes=f"cycle-before {notes}".strip())
     run_rep = run_next_fill_idle(
         base,
@@ -1239,6 +1366,8 @@ def fill_idle_cycle(
         "root": str(base),
         "execute": bool(execute),
         "until_empty": False,
+        "free_first": bool(free_first),
+        "free_prep": free_prep,
         "before": before.get("metrics"),
         "run": {
             "jobs_ran": run_rep.get("jobs_ran"),
@@ -1259,11 +1388,11 @@ def fill_idle_cycle(
             if multi
             else [
                 f'aifilm h3 run-next --root "{base}" --execute --max {max_jobs}',
-                f'aifilm h3 cycle --root "{base}" --until-empty --execute',
+                f'aifilm h3 cycle --root "{base}" --until-empty --execute --free-first',
                 f'aifilm ship-prep --root "{base}"',
             ]
         ),
-        "note": "never auto-promote; cycle is scheduling + evidence only",
+        "note": "never auto-promote; cycle is scheduling + evidence only; free_first never cancels foreign",
     }
 
 
@@ -1276,6 +1405,7 @@ def fill_idle_until_empty(
     include_challenge: bool = True,
     notes: str = "",
     stop_on_capacity: bool = True,
+    free_first: bool = False,
 ) -> dict[str, Any]:
     """Overnight loop: keep calling run-next until queue empty or safety stop.
 
@@ -1286,10 +1416,15 @@ def fill_idle_until_empty(
     - stops on run_failed
     - never auto-promotes
     - not a background OS daemon (caller owns the process)
+    - free_first: if queue idle + memory floor block, free models once before the loop
     """
     base = _root(root)
     max_cycles = max(1, min(int(max_cycles or 40), _UNTIL_EMPTY_MAX_CYCLES_HARD))
     max_jobs_per_cycle = max(1, min(int(max_jobs_per_cycle or 5), _UNTIL_EMPTY_MAX_JOBS_PER_CYCLE))
+    free_prep = prepare_capacity_free_first(
+        free_first=bool(free_first),
+        dry_run=not bool(execute),
+    )
     plan_before = capacity_plan(base, include_challenge=include_challenge)
     before = write_fill_idle_evidence(base, notes=f"until-empty-before {notes}".strip())
     cycles: list[dict[str, Any]] = []
@@ -1349,6 +1484,8 @@ def fill_idle_until_empty(
         "root": str(base),
         "execute": bool(execute),
         "until_empty": True,
+        "free_first": bool(free_first),
+        "free_prep": free_prep,
         "stop_reason": stop_reason,
         "cycles_run": len(cycles),
         "max_cycles": max_cycles,
@@ -1377,14 +1514,14 @@ def fill_idle_until_empty(
             ]
             if multi or stop_reason == "queue_empty"
             else [
-                "aifilm comfy free-memory --confirm",
-                f'aifilm h3 cycle --root "{base}" --until-empty --execute',
+                f'aifilm h3 cycle --root "{base}" --until-empty --execute --free-first',
+                "aifilm comfy free-memory --confirm  # manual if free_first skipped queue_busy",
                 f'aifilm h3 capacity-plan --root "{base}"',
             ]
         ),
         "note": (
             "until-empty loop owns the process until stop; never auto-promote; "
-            "not a systemd/launchd daemon"
+            "not a systemd/launchd daemon; free_first never cancels foreign prompts"
         ),
     }
     try:

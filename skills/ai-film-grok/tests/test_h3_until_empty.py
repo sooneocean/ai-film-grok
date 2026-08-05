@@ -17,6 +17,7 @@ from h3_fill_idle import (  # noqa: E402
     capacity_plan,
     fill_idle_until_empty,
     next_fill_idle_job,
+    prepare_capacity_free_first,
 )
 from util import write_json  # noqa: E402
 
@@ -170,6 +171,117 @@ class UntilEmptyTests(unittest.TestCase):
             self.assertEqual(rep["stop_reason"], "capacity_not_ready")
             self.assertNotEqual(rep["stop_reason"], "run_failed")
             self.assertTrue((root / "receipts" / "fill-idle-until-empty.json").is_file())
+
+    def test_until_empty_free_first_in_report(self) -> None:
+        """S5.3-ops · free_prep lands on until-empty receipt; never cancels foreign."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+
+            def _fake_run_next(*_a, **_k):
+                return {
+                    "ok": True,
+                    "jobs_ran": 0,
+                    "skipped_reason": "queue_empty",
+                    "pending_after": 0,
+                    "next_after": None,
+                }
+
+            with mock.patch("h3_fill_idle.run_next_fill_idle", side_effect=_fake_run_next):
+                with mock.patch(
+                    "h3_fill_idle.prepare_capacity_free_first",
+                    return_value={
+                        "kind": "ai-film-capacity-free-first",
+                        "free_first": True,
+                        "outcome": "already_ready",
+                        "freed": False,
+                    },
+                ) as prep:
+                    rep = fill_idle_until_empty(
+                        root,
+                        execute=True,
+                        max_jobs_per_cycle=2,
+                        max_cycles=3,
+                        free_first=True,
+                    )
+            prep.assert_called_once()
+            self.assertTrue(rep.get("free_first"))
+            self.assertEqual((rep.get("free_prep") or {}).get("outcome"), "already_ready")
+            self.assertEqual(rep["stop_reason"], "queue_empty")
+
+
+class FreeFirstPrepTests(unittest.TestCase):
+    def test_disabled_skips(self) -> None:
+        rep = prepare_capacity_free_first(free_first=False)
+        self.assertEqual(rep["skipped_reason"], "free_first_disabled")
+        self.assertFalse(rep["attempted"])
+        self.assertFalse(rep["freed"])
+
+    def test_queue_busy_never_frees(self) -> None:
+        fake_cap = {
+            "ok": True,
+            "ready": False,
+            "status": "blocked",
+            "vram_free_bytes": 1,
+            "blockers": [
+                {"code": "VRAM_BELOW_FLOOR", "message": "low"},
+                {"code": "COMFY_QUEUE_BUSY", "message": "busy"},
+            ],
+        }
+        with mock.patch("h3_fill_idle.probe_comfy_capacity_soft", return_value=fake_cap):
+            with mock.patch("comfy_video.free_memory") as free_m:
+                rep = prepare_capacity_free_first(free_first=True, dry_run=False)
+        self.assertEqual(rep["skipped_reason"], "queue_busy_never_cancel_foreign")
+        self.assertFalse(rep["attempted"])
+        free_m.assert_not_called()
+
+    def test_memory_only_dry_would_free(self) -> None:
+        fake_cap = {
+            "ok": True,
+            "ready": False,
+            "status": "blocked",
+            "vram_free_bytes": 1,
+            "blockers": [{"code": "VRAM_BELOW_FLOOR", "message": "low"}],
+        }
+        with mock.patch("h3_fill_idle.probe_comfy_capacity_soft", return_value=fake_cap):
+            with mock.patch("comfy_video.free_memory") as free_m:
+                rep = prepare_capacity_free_first(free_first=True, dry_run=True)
+        self.assertTrue(rep["would_free"])
+        self.assertEqual(rep["outcome"], "dry_run_would_free")
+        free_m.assert_not_called()
+
+    def test_memory_only_execute_frees_once(self) -> None:
+        blocked = {
+            "ok": True,
+            "ready": False,
+            "status": "blocked",
+            "vram_free_bytes": 1,
+            "blockers": [
+                {"code": "RAM_BELOW_FLOOR", "message": "ram"},
+                {"code": "VRAM_BELOW_FLOOR", "message": "vram"},
+            ],
+        }
+        ready = {
+            "ok": True,
+            "ready": True,
+            "status": "ready",
+            "vram_free_bytes": 30_000_000_000,
+            "blockers": [],
+        }
+        with mock.patch(
+            "h3_fill_idle.probe_comfy_capacity_soft",
+            side_effect=[blocked, ready],
+        ):
+            with mock.patch(
+                "comfy_video.free_memory",
+                return_value={"ok": True, "action": "free_memory"},
+            ) as free_m:
+                with mock.patch("comfy_video.normalize_base_url", return_value="http://127.0.0.1:18188"):
+                    rep = prepare_capacity_free_first(free_first=True, dry_run=False)
+        free_m.assert_called_once()
+        self.assertTrue(rep["attempted"])
+        self.assertTrue(rep["freed"])
+        self.assertEqual(rep["outcome"], "ready_after_free")
 
 
 if __name__ == "__main__":
