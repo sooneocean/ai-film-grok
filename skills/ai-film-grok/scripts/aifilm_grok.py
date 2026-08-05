@@ -266,14 +266,6 @@ def save_manifest(root: Path, manifest: dict[str, Any]) -> None:
     write_json(root / MANIFEST_NAME, manifest)
 
 
-def cmd_lock_runtime(_: argparse.Namespace) -> int:
-    skill_dir = Path(__file__).resolve().parents[1]
-    lock_path = skill_dir / "runtime-lock.json"
-    write_json(lock_path, build_runtime_lock(skill_dir))
-    result = verify_runtime_lock(skill_dir, lock_path)
-    emit({"ok": result["ok"], "runtime_lock": str(lock_path), "verification": result})
-    return 0 if result["ok"] else 2
-
 
 def _infer_medium_from_theme(theme: str, title: str) -> tuple[str, str, str]:
     """Return (medium, rendering, signature_hint) from theme/title keywords."""
@@ -461,55 +453,6 @@ def cmd_init(args: argparse.Namespace) -> int:
     emit(payload)
     return result
 
-
-def cmd_resume_manifest(args: argparse.Namespace) -> int:
-    """Create only the missing state manifest for a legacy film root."""
-    raw_root = Path(args.root).expanduser()
-    if raw_root.is_symlink():
-        raise FilmError(f"Legacy root must not be a symlink: {raw_root}")
-    root = raw_root.resolve()
-    if not root.is_dir():
-        raise FilmError(f"Legacy root must be a real directory: {root}")
-    manifest_path = root / MANIFEST_NAME
-    if manifest_path.exists() or manifest_path.is_symlink():
-        raise FilmError(f"Manifest already exists at {manifest_path}; refusing to overwrite it")
-    brief_path = root / "brief.json"
-    if not brief_path.is_file():
-        raise FilmError(f"Legacy root needs brief.json before manifest resume: {root}")
-    brief = read_json(brief_path)
-    title = str(brief.get("title") or "").strip()
-    theme = str(brief.get("theme") or "").strip()
-    aspect = str(brief.get("aspect_ratio") or "9:16").strip()
-    if not title or not theme:
-        raise FilmError("Legacy brief.json needs non-empty title and theme before manifest resume")
-    manifest = empty_manifest(title=title, theme=theme, aspect=aspect)
-    contract_path = root / "director-contract.json"
-    graph_path = root / "drama-graph.json"
-    truth = manifest["truth_contract"]
-    truth["contract_sha256"] = sha256_file(contract_path) if contract_path.is_file() else ""
-    truth["graph_sha256"] = sha256_file(graph_path) if graph_path.is_file() else ""
-    truth["spec_sha256"] = (
-        sha256_file(root / "film-spec.json") if (root / "film-spec.json").is_file() else ""
-    )
-    truth["timeline_sha256"] = (
-        sha256_file(root / "timeline.json") if (root / "timeline.json").is_file() else ""
-    )
-    manifest["notes"].append(
-        "Legacy resume created this manifest only; existing style, contract, still, and clip evidence remains unapproved until revalidated."
-    )
-    ensure_tree(root)
-    save_manifest(root, manifest)
-    emit(
-        {
-            "ok": True,
-            "created": True,
-            "root": str(root),
-            "manifest": str(manifest_path),
-            "preserved_existing_evidence": True,
-            "next_step": "Revalidate and lock style plus native evidence before media generation.",
-        }
-    )
-    return 0
 
 
 def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
@@ -752,161 +695,6 @@ def _pipeline_bundle(
     return actions, pipeline, next_cmd, next_id
 
 
-def cmd_next(args: argparse.Namespace) -> int:
-    """Print the single next recommended production command (lesson routing)."""
-    root = Path(args.root).expanduser().resolve()
-    manifest = load_manifest(root) if (root / MANIFEST_NAME).is_file() else {}
-    summary = (
-        recompute_gates(root, manifest) if manifest else {"gates": {}, "open_reshoot_count": 0}
-    )
-    if manifest:
-        save_manifest(root, manifest)
-    gates = summary.get("gates") or {}
-    open_n = int(summary.get("open_reshoot_count") or 0)
-    try:
-        actions, pipeline, next_cmd, next_id = _pipeline_bundle(
-            root, gates=gates, open_n=open_n, persist=True
-        )
-    except Exception as exc:
-        raise FilmError(f"next_actions failed: {exc}") from exc
-    try:
-        from workflow_spine import public_flow_phase
-
-        workflow = pipeline.get("workflow") if isinstance(pipeline, dict) else None
-        phase = public_flow_phase(workflow) if isinstance(workflow, dict) else None
-    except (ImportError, OSError, ValueError):
-        phase = None
-
-    print_stage = bool(getattr(args, "print_stage", False))
-    print_stage_only = bool(getattr(args, "print_stage_only", False))
-    print_cmd_only = bool(getattr(args, "print_cmd_only", False))
-
-    if print_stage_only:
-        from next_actions import format_stage_line
-
-        print(format_stage_line(pipeline, compact=True))
-        return 0
-
-    if getattr(args, "all", False):
-        emit(
-            {
-                "ok": True,
-                "root": str(root),
-                "phase": phase,
-                "pipeline_stage": pipeline,
-                "stage": pipeline.get("stage"),
-                "stage_label": pipeline.get("label_zh"),
-                "next_actions": actions,
-                "next_action": pipeline.get("bound_next_action"),
-                "state_hash": pipeline.get("state_hash"),
-            }
-        )
-        return 0
-    if not actions:
-        if print_stage:
-            from next_actions import format_stage_line
-
-            print(format_stage_line(pipeline, compact=True), file=sys.stderr)
-        emit(
-            {
-                "ok": True,
-                "root": str(root),
-                "phase": phase,
-                "pipeline_stage": pipeline,
-                "stage": pipeline.get("stage"),
-                "stage_label": pipeline.get("label_zh"),
-                "next_cmd": None,
-                "message": "no next action",
-            }
-        )
-        return 0
-    cmd = next_cmd or actions[0]["cmd"]
-    if print_cmd_only and print_stage:
-        # shell-friendly: stage on stderr, cmd on stdout
-        from next_actions import format_stage_line
-
-        print(format_stage_line(pipeline, compact=True), file=sys.stderr)
-        print(cmd)
-        return 0
-    if print_cmd_only:
-        print(cmd)
-        return 0
-    if print_stage:
-        from next_actions import format_stage_line
-
-        # human mode: one-line stage then full JSON (stage also in payload)
-        print(format_stage_line(pipeline, compact=False), file=sys.stderr)
-    emit(
-        {
-            "ok": True,
-            "root": str(root),
-            "phase": phase,
-            "pipeline_stage": pipeline,
-            "stage": pipeline.get("stage"),
-            "stage_label": pipeline.get("label_zh"),
-            "next_cmd": cmd,
-            "why": actions[0].get("why"),
-            "id": next_id or actions[0].get("id"),
-            "next_actions": actions,
-            "next_action": pipeline.get("bound_next_action"),
-            "state_hash": pipeline.get("state_hash"),
-        }
-    )
-    return 0
-
-
-def cmd_stage(args: argparse.Namespace) -> int:
-    """Print / refresh current pipeline stage (product spine layer)."""
-    root = Path(args.root).expanduser().resolve()
-    manifest = load_manifest(root) if (root / MANIFEST_NAME).is_file() else {}
-    summary = (
-        recompute_gates(root, manifest) if manifest else {"gates": {}, "open_reshoot_count": 0}
-    )
-    if manifest:
-        save_manifest(root, manifest)
-    gates = summary.get("gates") or {}
-    open_n = int(summary.get("open_reshoot_count") or 0)
-    try:
-        actions, pipeline, next_cmd, next_id = _pipeline_bundle(
-            root, gates=gates, open_n=open_n, persist=not bool(getattr(args, "no_persist", False))
-        )
-    except Exception as exc:
-        raise FilmError(f"stage detect failed: {exc}") from exc
-    from next_actions import format_stage_line
-
-    line = format_stage_line(pipeline, compact=not bool(getattr(args, "full", False)))
-    if getattr(args, "json", False) or getattr(args, "as_json", False):
-        try:
-            from workflow_spine import public_flow_phase
-
-            workflow = pipeline.get("workflow") if isinstance(pipeline, dict) else None
-            phase = public_flow_phase(workflow) if isinstance(workflow, dict) else None
-        except (ImportError, OSError, ValueError):
-            phase = None
-        emit(
-            {
-                "ok": True,
-                "root": str(root),
-                "phase": phase,
-                "pipeline_stage": pipeline,
-                "stage": pipeline.get("stage"),
-                "stage_label": pipeline.get("label_zh"),
-                "line": line,
-                "next_cmd": next_cmd,
-                "next_id": next_id,
-                "next_actions": actions[:3] if actions else [],
-                "next_action": pipeline.get("bound_next_action"),
-                "state_hash": pipeline.get("state_hash"),
-            }
-        )
-        return 0
-    if getattr(args, "full", False):
-        print(line)
-        if next_cmd:
-            print(f"next: {next_cmd}")
-        return 0
-    print(line)
-    return 0
 
 
 def cmd_quality_status(args: argparse.Namespace) -> int:
@@ -1237,129 +1025,6 @@ def cmd_quality_closure(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") else 2
 
 
-def cmd_state_index(args: argparse.Namespace) -> int:
-    """Checkpoint: state photos + keyframes + promote plan for fluid transitions."""
-    skill_dir = Path(__file__).resolve().parents[1]
-    sys.path.insert(0, str(skill_dir / "scripts"))
-    try:
-        from state_index_gate import run_state_index_check, write_state_index_receipt
-    except ImportError as exc:
-        raise FilmError(f"Cannot import state_index_gate: {exc}") from exc
-    root = Path(args.root).expanduser().resolve()
-    action = getattr(args, "state_index_action", None) or "check"
-    if action == "approve-performance-state":
-        from performance_state import approve_performance_state
-
-        try:
-            receipt = approve_performance_state(
-                root,
-                speaker=str(args.speaker),
-                state_id=str(args.performance_state_id),
-                image=Path(args.image),
-                generation_receipt=Path(args.generation_receipt),
-                reviewer=str(args.reviewer),
-                review_note=str(args.review_note),
-            )
-        except ValueError as exc:
-            raise FilmError(str(exc)) from exc
-        emit({"ok": True, **receipt})
-        return 0
-    if action == "approve-state":
-        from visual_bible import load_bible, save_bible
-        from wardrobe_ladder import approve_state
-
-        bible = load_bible(root)
-        try:
-            state = approve_state(
-                bible,
-                str(args.character_id),
-                str(args.wardrobe_state_id),
-                Path(args.image),
-                root=root,
-                reviewer=str(args.reviewer),
-                review_note=str(args.review_note),
-                generation_receipt=(
-                    Path(args.generation_receipt) if args.generation_receipt else None
-                ),
-            )
-        except ValueError as exc:
-            raise FilmError(str(exc)) from exc
-        save_bible(root, bible)
-        emit(
-            {
-                "ok": True,
-                "kind": "wardrobe-state-approved",
-                "character_id": args.character_id,
-                "state": state,
-            }
-        )
-        return 0
-    if action == "contact-sheet":
-        from visual_bible import load_bible
-        from wardrobe_ladder import render_contact_sheet
-
-        try:
-            sheet = render_contact_sheet(load_bible(root), str(args.character_id), root=root)
-        except ValueError as exc:
-            raise FilmError(str(exc)) from exc
-        emit(
-            {
-                "ok": True,
-                "kind": "wardrobe-ladder-contact-sheet",
-                "character_id": args.character_id,
-                **sheet,
-            }
-        )
-        return 0
-    report = run_state_index_check(root)
-    path = write_state_index_receipt(root, report)
-    report["receipt_path"] = str(path)
-    if action == "plan":
-        # plan = full report + human-readable generate_plan first
-        plan_view = {
-            "ok": report.get("ok"),
-            "kind": "state-index-plan",
-            "purpose": report.get("purpose"),
-            "generate_plan": report.get("generate_plan") or [],
-            "agent_do": report.get("agent_do") or [],
-            "hard": report.get("hard") or [],
-            "soft": report.get("soft") or [],
-            "fluency_issues": report.get("fluency_issues") or [],
-            "undress_anchor": report.get("undress_anchor"),
-            "missing_state_photos": report.get("missing_state_photos"),
-            "exact_state_ids": report.get("exact_state_ids") or {},
-            "missing_keyframes": report.get("missing_keyframes"),
-            "receipt_path": str(path),
-            "ref": report.get("ref"),
-            "note": (
-                "Execute generate_plan in order, then re-run: "
-                f'aifilm state-index check --root "{root}"'
-            ),
-        }
-        emit(plan_view)
-    else:
-        emit(report)
-    if not report.get("ok"):
-        return 2
-    if getattr(args, "strict", False) and (report.get("generate_plan") or report.get("soft")):
-        return 3
-    return 0
-
-
-def cmd_promotion_report(args: argparse.Namespace) -> int:
-    from promotion_report import build_promotion_report, write_promotion_report
-
-    root = Path(args.root).expanduser().resolve()
-    try:
-        report = (
-            write_promotion_report(root, args.out)
-            if getattr(args, "out", None)
-            else build_promotion_report(root)
-        )
-    except (OSError, ValueError) as exc:
-        raise FilmError(str(exc)) from exc
-    emit(report)
-    return 0
 
 
 from cli_longform import cmd_longform  # noqa: E402
@@ -1402,14 +1067,6 @@ from cli_status import (  # noqa: E402, F401
     cmd_status,
 )
 
-
-def cmd_production_evidence(args: argparse.Namespace) -> int:
-    """Read-only evidence ledger for production gates."""
-    from production_evidence import build_evidence
-
-    report = build_evidence(Path(args.root).expanduser().resolve())
-    emit(report)
-    return 0
 
 
 from cli_write_spec import cmd_write_spec  # noqa: E402 — write-spec cluster extracted (W5b)
@@ -1810,6 +1467,32 @@ def cmd_director_notes(args: argparse.Namespace) -> int:
 from cli_pilot import cmd_pilot  # noqa: E402 — pilot cluster extracted (W5)
 
 
+from cli_orchestrate import (  # noqa: E402 — orchestration cluster extracted (W5d)
+    cmd_advance,
+    cmd_autopilot,
+    cmd_craft,
+    cmd_dispatch,
+    cmd_next,
+    cmd_selects,
+    cmd_stage,
+)
+from cli_oauth import (  # noqa: E402 — oauth/usage extracted (W5d)
+    cmd_generation_usage,
+    cmd_grok_oauth,
+)
+from cli_evidence import (  # noqa: E402 — evidence cluster extracted (W5d)
+    cmd_production_evidence,
+    cmd_promotion_report,
+    cmd_speech_preview,
+    cmd_state_index,
+)
+from cli_bootstrap import (  # noqa: E402 — lock-runtime/resume-manifest (W5d)
+    cmd_lock_runtime,
+    cmd_resume_manifest,
+)
+
+
+
 def cmd_frw(args: argparse.Namespace) -> int:
     """Proxy to local frwclaw-pro dispatch (bulk 2V preferred path).
 
@@ -1956,240 +1639,6 @@ def cmd_i2v_motion_gate(args: argparse.Namespace) -> int:
     return 0 if rep.get("ok") else 1
 
 
-def cmd_grok_oauth(args: argparse.Namespace) -> int:
-    """Grok OAuth pack (chat/image/edit/video/tts) via ~/.grok/auth.json."""
-    from grok_oauth import (
-        GrokOAuthError,
-        chat_completion,
-        get_access_token,
-        images_edit,
-        images_generate,
-        probe,
-        tts_list_voices,
-        tts_speak,
-        video_generate,
-        video_status,
-        video_submit,
-        video_wait,
-    )
-
-    action = str(getattr(args, "oauth_action", None) or "doctor")
-    usage_root = getattr(args, "root", None)
-    shot_id = str(getattr(args, "shot_id", "") or "")
-    job_id = str(getattr(args, "job_id", "") or "")
-    try:
-        if action == "doctor":
-            rep = probe(deep=bool(getattr(args, "deep", False)))
-            emit(rep)
-            return 0 if rep.get("ok") else 1
-        if action == "refresh":
-            tok = get_access_token(force_refresh=True, persist=True)
-            emit(
-                {
-                    "ok": True,
-                    "refreshed": tok.get("refreshed"),
-                    "ttl_sec": tok.get("ttl_sec"),
-                    "expires_at": tok.get("expires_at"),
-                    "source": tok.get("source"),
-                    "email": tok.get("email"),
-                }
-            )
-            return 0
-        if action == "chat":
-            prompt = getattr(args, "prompt", None)
-            if not prompt:
-                raise FilmError("grok-oauth chat requires --prompt")
-            emit(
-                chat_completion(
-                    str(prompt),
-                    model=getattr(args, "model", None),
-                    system=getattr(args, "system", None),
-                    json_mode=bool(getattr(args, "json_mode", False)),
-                )
-            )
-            return 0
-        if action == "image":
-            prompt = getattr(args, "prompt", None)
-            out = getattr(args, "out", None)
-            if not prompt or not out:
-                raise FilmError("grok-oauth image requires --prompt and --out")
-            emit(
-                images_generate(
-                    str(prompt),
-                    out=Path(out),
-                    model=getattr(args, "model", None),
-                    aspect_ratio=getattr(args, "aspect", None) or "9:16",
-                    resolution=getattr(args, "resolution", None),
-                    usage_root=usage_root,
-                    shot_id=shot_id,
-                    job_id=job_id,
-                )
-            )
-            return 0
-        if action == "image-edit":
-            prompt = getattr(args, "prompt", None)
-            image = getattr(args, "image", None)
-            out = getattr(args, "out", None)
-            if not prompt or not image or not out:
-                raise FilmError("grok-oauth image-edit requires --image --prompt --out")
-            refs = list(getattr(args, "ref", None) or []) or None
-            emit(
-                images_edit(
-                    str(prompt),
-                    image=str(image),
-                    out=Path(out),
-                    model=getattr(args, "model", None),
-                    aspect_ratio=getattr(args, "aspect", None),
-                    extra_images=refs,
-                    usage_root=usage_root,
-                    shot_id=shot_id,
-                    job_id=job_id,
-                )
-            )
-            return 0
-        if action == "video":
-            prompt = getattr(args, "prompt", None)
-            image = getattr(args, "image", None)
-            out = getattr(args, "out", None)
-            refs = list(getattr(args, "ref", None) or []) or None
-            if getattr(args, "wait", False):
-                if not out:
-                    raise FilmError("grok-oauth video --wait requires --out")
-                emit(
-                    video_generate(
-                        str(prompt) if prompt else None,
-                        image=str(image) if image else None,
-                        out=Path(out),
-                        model=getattr(args, "model", None),
-                        duration=int(getattr(args, "duration", 6) or 6),
-                        aspect_ratio=getattr(args, "aspect", None) or "9:16",
-                        resolution=getattr(args, "resolution", None) or "720p",
-                        reference_images=refs,
-                        timeout_sec=float(getattr(args, "timeout", 600) or 600),
-                        usage_root=usage_root,
-                        shot_id=shot_id,
-                        job_id=job_id,
-                    )
-                )
-            else:
-                emit(
-                    video_submit(
-                        str(prompt) if prompt else None,
-                        image=str(image) if image else None,
-                        model=getattr(args, "model", None),
-                        duration=int(getattr(args, "duration", 6) or 6),
-                        aspect_ratio=getattr(args, "aspect", None) or "9:16",
-                        resolution=getattr(args, "resolution", None) or "720p",
-                        reference_images=refs,
-                        usage_root=usage_root,
-                        shot_id=shot_id,
-                        job_id=job_id,
-                    )
-                )
-            return 0
-        if action == "video-status":
-            rid = getattr(args, "request_id", None)
-            if not rid:
-                raise FilmError("grok-oauth video-status requires --request-id")
-            out = getattr(args, "out", None)
-            if getattr(args, "wait", False) or out:
-                emit(
-                    video_wait(
-                        str(rid),
-                        out=Path(out) if out else None,
-                        timeout_sec=float(getattr(args, "timeout", 600) or 600),
-                        usage_root=usage_root,
-                        generation_id=getattr(args, "generation_id", None),
-                    )
-                )
-            else:
-                emit(
-                    video_status(
-                        str(rid),
-                        usage_root=usage_root,
-                        generation_id=getattr(args, "generation_id", None),
-                    )
-                )
-            return 0
-        if action == "tts":
-            text = getattr(args, "text", None)
-            text_file = getattr(args, "text_file", None)
-            out = getattr(args, "out", None)
-            if text_file:
-                text = Path(str(text_file)).expanduser().read_text(encoding="utf-8")
-            if not text or not out:
-                raise FilmError("grok-oauth tts requires --text/--text-file and --out")
-            emit(
-                tts_speak(
-                    str(text),
-                    out=Path(out),
-                    voice_id=getattr(args, "voice", None),
-                    language=getattr(args, "language", None),
-                    speed=getattr(args, "speed", None),
-                    with_timestamps=bool(getattr(args, "timestamps", False)),
-                    usage_root=usage_root,
-                    shot_id=shot_id,
-                    job_id=job_id,
-                )
-            )
-            return 0
-        if action == "voices":
-            emit(tts_list_voices())
-            return 0
-    except GrokOAuthError as exc:
-        raise FilmError(str(exc)) from exc
-    raise FilmError(f"unknown grok-oauth action {action!r}")
-
-
-def cmd_generation_usage(args: argparse.Namespace) -> int:
-    from generation_usage import (
-        GenerationUsageError,
-        format_usage_table,
-        manual_record,
-        scan_usage,
-        usage_list,
-        usage_status,
-    )
-
-    action = str(getattr(args, "usage_action", "") or "status")
-    try:
-        if action == "status":
-            report = usage_status(Path(args.root))
-        elif action == "list":
-            report = usage_list(Path(args.root), operation=getattr(args, "operation", None))
-            if getattr(args, "output_format", "json") == "table":
-                print(format_usage_table(report))
-                return 0 if report.get("ok") else 2
-        elif action == "summary":
-            report = scan_usage(Path(args.scan_root))
-        elif action == "record":
-            report = {
-                "ok": True,
-                "kind": "generation-usage-record",
-                "record": manual_record(
-                    Path(args.root),
-                    operation=args.operation,
-                    provider=args.provider,
-                    model=args.model,
-                    status=args.status,
-                    measurement=args.measurement,
-                    provider_request_id=args.provider_request_id,
-                    output=Path(args.output) if args.output else None,
-                    idempotency_key=args.idempotency_key,
-                    shot_id=args.shot_id,
-                    job_id=args.job_id,
-                    input_tokens=args.input_tokens,
-                    output_tokens=args.output_tokens,
-                    total_tokens=args.total_tokens,
-                    cost_in_usd_ticks=args.cost_in_usd_ticks,
-                ),
-            }
-        else:
-            raise FilmError(f"unknown usage action {action!r}")
-    except GenerationUsageError as exc:
-        raise FilmError(str(exc)) from exc
-    emit(report)
-    return 0 if report.get("ok") else 2
 
 
 def _run_optimization_cli(args: argparse.Namespace, action: str) -> int:
@@ -2287,24 +1736,6 @@ def cmd_vibevoice_asr(args: argparse.Namespace) -> int:
     emit(report)
     return 0
 
-
-def cmd_speech_preview(args: argparse.Namespace) -> int:
-    """Operate the private, candidate-only Speech-to-Speech preview sidecar."""
-    from speech_preview import SpeechPreviewError, export_candidate, probe, record_session, start
-
-    try:
-        if args.speech_preview_action == "probe":
-            report = probe()
-        elif args.speech_preview_action == "start":
-            report = start(confirm=bool(args.confirm))
-        elif args.speech_preview_action == "session":
-            report = record_session(args.root, audio=args.audio, session_json=args.session_json)
-        else:
-            report = export_candidate(args.root, session_receipt=args.session_receipt)
-    except SpeechPreviewError as exc:
-        raise FilmError(str(exc)) from exc
-    emit(report)
-    return 0 if report.get("ok", True) else 2
 
 
 def _cmd_graph_legacy(args: argparse.Namespace) -> int:
@@ -2836,155 +2267,9 @@ def cmd_interactive(args: argparse.Namespace) -> int:
     return code
 
 
-def cmd_dispatch(args: argparse.Namespace) -> int:
-    """Auto-orchestrate: craft + capability + next → single agent packet."""
-    root = Path(args.root).expanduser().resolve()
-    from dispatch import build_dispatch
-    from dispatch_compact import compact_dispatch, record_orchestration_metrics
-
-    gates: dict[str, Any] = {}
-    open_n = 0
-    if (root / MANIFEST_NAME).is_file():
-        man = load_manifest(root)
-        summary = recompute_gates(root, man)
-        gates = summary.get("gates") or {}
-        open_n = int(summary.get("open_reshoot_count") or 0)
-
-    packet = build_dispatch(
-        root,
-        gates=gates,
-        open_reshoot_count=open_n,
-        include_capability=not bool(getattr(args, "no_capability", False)),
-        write_receipt=not bool(getattr(args, "no_write", False)),
-        refresh_capability=bool(getattr(args, "refresh_capability", False)),
-    )
-    from project_state import build_project_state, persist_project_state
-
-    project_state = build_project_state(
-        root,
-        gates=gates,
-        open_reshoot_count=open_n,
-        next_actions=list(packet.get("next_actions") or []),
-        next_cmd=packet.get("next_cmd"),
-        next_id=packet.get("next_id"),
-    )
-    packet["project_state"] = project_state
-    if not bool(getattr(args, "no_write", False)):
-        packet["project_state_receipt"] = str(persist_project_state(root, project_state))
-
-    # A no-write dispatch is a pure projection; regular dispatch updates the
-    # film receipt and HUD from the same canonical snapshot.
-    if not bool(getattr(args, "no_write", False)):
-        try:
-            from next_actions import detect_pipeline_stage, persist_pipeline_stage
-
-            pipeline = detect_pipeline_stage(root, gates=gates, open_reshoot_count=open_n)
-            persisted = persist_pipeline_stage(
-                root,
-                pipeline,
-                next_cmd=packet.get("next_cmd"),
-                next_id=packet.get("next_id"),
-            )
-            if persisted.get("errors"):
-                packet["hud_sync_error"] = persisted["errors"]
-        except Exception as exc:
-            packet["hud_sync_error"] = [str(exc)[:300]]
-
-    if bool(getattr(args, "print_cmd_only", False)):
-        print(packet.get("next_cmd") or "")
-        return 0 if packet.get("next_cmd") else 1
-    if bool(getattr(args, "print_instruction", False)):
-        print(packet.get("agent_instruction") or "")
-        return 0
-
-    configured_format = (
-        str(
-            getattr(args, "dispatch_format", None)
-            or os.environ.get("AIFILM_DISPATCH_FORMAT")
-            or "compact"
-        )
-        .strip()
-        .lower()
-    )
-    if bool(getattr(args, "full", False)):
-        configured_format = "full"
-    if configured_format not in {"compact", "full"}:
-        raise FilmError("dispatch format must be compact or full")
-    output = packet if configured_format == "full" else compact_dispatch(packet)
-    if configured_format == "compact" and not bool(getattr(args, "no_write", False)):
-        record_orchestration_metrics(root, output)
-    emit(output)
-    return 0 if packet.get("ok") else 1
 
 
-def cmd_advance(args: argparse.Namespace) -> int:
-    """Execute a bounded sequence of allowlisted local dispatch actions."""
-    root = Path(args.root).expanduser().resolve()
-    from advance import AdvanceError, advance_local
 
-    gates: dict[str, Any] = {}
-    open_n = 0
-    if (root / MANIFEST_NAME).is_file():
-        man = load_manifest(root)
-        summary = recompute_gates(root, man)
-        gates = summary.get("gates") or {}
-        open_n = int(summary.get("open_reshoot_count") or 0)
-        save_manifest(root, man)
-    try:
-        report = advance_local(
-            root,
-            gates=gates,
-            open_reshoot_count=open_n,
-            max_local=int(args.max_local),
-        )
-    except AdvanceError as exc:
-        raise FilmError(str(exc)) from exc
-    emit(report)
-    return 0 if report.get("ok") else 2
-
-
-def cmd_autopilot(args: argparse.Namespace) -> int:
-    """Run one bounded, budget-authorized automation pass for a film."""
-    from autopilot import AutopilotError, autopilot_once
-
-    try:
-        report = autopilot_once(
-            Path(args.root), max_actions=int(args.max_actions), dry_run=bool(args.dry_run)
-        )
-    except AutopilotError as exc:
-        raise FilmError(str(exc)) from exc
-    emit(report)
-    return 0 if report.get("ok") else 2
-
-
-def cmd_craft(args: argparse.Namespace) -> int:
-    """Craft spine status (idea→verified)."""
-    root_s = getattr(args, "root", None)
-    if not root_s:
-        raise FilmError("craft requires --root")
-    root = Path(root_s).expanduser().resolve()
-    from craft_spine import craft_status_report
-
-    gates: dict[str, Any] = {}
-    if (root / MANIFEST_NAME).is_file():
-        man = load_manifest(root)
-        summary = recompute_gates(root, man)
-        gates = summary.get("gates") or {}
-    report = craft_status_report(root, gates=gates)
-    emit(report)
-    return 0
-
-
-def cmd_selects(args: argparse.Namespace) -> int:
-    root_s = getattr(args, "root", None)
-    if not root_s:
-        raise FilmError("selects requires --root")
-    root = Path(root_s).expanduser().resolve()
-    from selects_report import build_selects_report
-
-    report = build_selects_report(root, write_receipt=not bool(getattr(args, "no_write", False)))
-    emit(report)
-    return 0 if report.get("ok") or report.get("planned") == 0 else 1
 
 
 from cli_audio import (  # noqa: E402 — audio cluster extracted (W5c)

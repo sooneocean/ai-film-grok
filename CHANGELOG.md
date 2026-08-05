@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.39.27] - 2026-08-05
+
+### Changed (CLI extract · W5d)
+- **`cli_orchestrate.py`**: next / stage / dispatch / advance / autopilot / craft / selects.
+- **`cli_oauth.py`**: grok-oauth / usage.
+- **`cli_evidence.py`**: state-index / promotion-report / production-evidence / speech-preview.
+- **`cli_bootstrap.py`**: lock-runtime / resume-manifest.
+- **`aifilm_grok.py`**: ~5348 LOC (was ~6063); public subcommand strings unchanged.
+- **Tests**: `tests/test_cli_w5d_extract.py`.
+- **Docs**: `docs/plans/cli-extract-map.md`.
+
 ## [2.39.26] - 2026-08-05
 
 ### Fixed (version pointer · session closeout)

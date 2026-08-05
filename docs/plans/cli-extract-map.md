@@ -1,6 +1,6 @@
 # CLI extract map — aifilm_grok.py domain split
 
-**Status:** ACTIVE · 2026-08-05 · v2.39.22  
+**Status:** ACTIVE · 2026-08-05 · v2.39.27  
 **Goal:** shrink `aifilm_grok.py` toward <2500 lines by extracting cmd handlers only.  
 **Iron:** public subcommand strings never rename.
 
@@ -8,7 +8,7 @@
 
 | Metric | After W5b write-spec | After W5c audio |
 |--------|----------------------|-----------------|
-| aifilm_grok.py LOC | ~7161 | **~5980** |
+| aifilm_grok.py LOC | ~5980 (W5c) | **~5348 (W5d)** |
 | Extracted | cli_write_spec | +**cli_audio** (~1235 LOC, 22 cmds) |
 
 ## Domain map
@@ -23,6 +23,10 @@
 | pilot | cli_pilot.py DONE | pilot pick/report/pack/score/approve |
 | write-spec | cli_write_spec.py DONE | write-spec + compatibility projectors |
 | **audio** | **cli_audio.py DONE (W5c)** | audio-* · tts-* · bgm/sfx/lipsync · capability · verify |
+| **orchestrate** | **cli_orchestrate.py DONE (W5d)** | next · stage · dispatch · advance · autopilot · craft · selects |
+| **oauth** | **cli_oauth.py DONE (W5d)** | grok-oauth · usage |
+| **evidence** | **cli_evidence.py DONE (W5d)** | state-index · promotion-report · production-evidence · speech-preview |
+| **bootstrap** | **cli_bootstrap.py DONE (W5d)** | lock-runtime · resume-manifest |
 
 ## Next candidates
 
