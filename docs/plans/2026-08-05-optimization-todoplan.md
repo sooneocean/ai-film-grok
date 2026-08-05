@@ -29,7 +29,7 @@
 | 4 | gate slim / pilot h3 modes | **DONE** 2.39.17 |
 | 5 | cli_pilot extract | **DONE** 2.39.19 |
 | M | Material Fidelity M3–M4 | **DONE** 2.39.18 |
-| next | 真片 `until-empty` canary · worktree 卫生 | **PARTIAL** dry OK · worktree prune done · 真烧 open |
+| next | 真片 `until-empty` canary · worktree 卫生 | **PARTIAL** execute path ran · stop=`capacity_not_ready` · full drain open until 5090 free · `artifacts/2026-08-05-s53-until-empty-canary.json` |
 
 ## Canary log
 

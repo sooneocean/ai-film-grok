@@ -1,0 +1,79 @@
+{
+  "kind": "h3-until-empty-canary",
+  "schema_version": 7,
+  "wave": "S5.3-go",
+  "at": "2026-08-05T03:43:13.817556+00:00",
+  "film_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough",
+  "profile_env": "h3_primary",
+  "execute": true,
+  "capacity_plan": {
+    "ok": true,
+    "pending_jobs": 2,
+    "eta_minutes_total": 18.0,
+    "priority_ok": true,
+    "by_mode": {
+      "i2v": 1,
+      "t2v": 1
+    },
+    "next": {
+      "shot_id": "s_cu",
+      "priority": "P0b",
+      "lane": "primary_h3",
+      "mode": "i2v",
+      "command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode i2v --register",
+      "best_mean": null,
+      "reasons": [
+        "dialogue_close_restricted",
+        "dual_need_i2v",
+        "dual_second_leg_i2v"
+      ]
+    }
+  },
+  "until_empty_execute": {
+    "ok": true,
+    "stop_reason": "capacity_not_ready",
+    "jobs_ran_total": 0,
+    "cycles_run": 1,
+    "plan_before": {
+      "pending_jobs": 2,
+      "eta_minutes_total": 18.0,
+      "p0_jobs": 1
+    },
+    "plan_after": {
+      "pending_jobs": 2,
+      "eta_minutes_total": 18.0,
+      "p0_jobs": 1
+    },
+    "cycles": [
+      {
+        "cycle": 1,
+        "jobs_ran": 0,
+        "skipped_reason": "capacity_not_ready",
+        "ok": true,
+        "pending_after": 2,
+        "next_after": {
+          "shot_id": "s_cu",
+          "priority": "P0b",
+          "lane": "primary_h3",
+          "mode": "i2v",
+          "command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode i2v --register",
+          "best_mean": null,
+          "reasons": [
+            "dialogue_close_restricted",
+            "dual_need_i2v",
+            "dual_second_leg_i2v"
+          ]
+        }
+      }
+    ]
+  },
+  "takes_mp4_count": 16,
+  "receipts": {
+    "capacity_plan": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/h3-capacity-plan.json",
+    "until_empty": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/fill-idle-until-empty.json"
+  },
+  "comfy_probe": "http://127.0.0.1:18188/system_stats reachable (ram_free low)",
+  "verdict": "PARTIAL",
+  "note": "S5.3 execute path ran with AIFILM_I2V_PROFILE=h3_primary. stop_reason=capacity_not_ready (fail-closed honesty PASS). No fake queue_empty. Full overnight drain still needs 5090 free VRAM/RAM + idle queue.",
+  "human_next": "When 5090 idle: aifilm h3 cycle --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --until-empty --execute"
+}

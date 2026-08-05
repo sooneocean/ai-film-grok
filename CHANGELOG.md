@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.50] - 2026-08-05
+
+### Docs / Ops (S5.3 execute canary PARTIAL)
+- Real `h3 cycle --until-empty --execute` on angles film; **stop_reason=capacity_not_ready** (fail-closed honesty).
+- Receipt: `artifacts/2026-08-05-s53-until-empty-canary.json` · strategy rev 2026-08-05d.
+- Full `queue_empty` overnight drain still needs free 5090 VRAM/RAM + idle Comfy queue.
+
 ## [2.39.49] - 2026-08-05
 
 ### Added (Weapon inventory → generation_ready / next_actions)
