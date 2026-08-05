@@ -190,9 +190,17 @@ from final.cards import (  # noqa: E402, F401
     FONT_CANDIDATES,
     _wrap_title_lines,
     mkcard_video,
-    resolve_font,
+    resolve_font as _resolve_font_from_cards,
     sub_png,
 )
+
+
+def resolve_font() -> str:
+    """Resolve Chinese-capable font using this module's FONT_CANDIDATES (hard-compat patchable)."""
+    for path in FONT_CANDIDATES:
+        if Path(path).is_file():
+            return path
+    raise RenderError("No Chinese-capable system font found")
 
 
 # 中文女声优先：旁白是主叙事，必须压过 BGM

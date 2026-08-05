@@ -27,6 +27,15 @@ from final.media_ops import (
     stable_path_for_ffmpeg_filter,
     stretch_clip,
 )
+from final.enhance import build_post_enhancement_vf_chain, resolve_subtitle_mode
+from final.native_audio import (
+    DEFAULT_NATIVE_AUDIO_VOLUME,
+    native_dialogue_replaced_by_post_tts,
+    primary_native_shot_ids,
+    resolve_native_audio_gain,
+    resolve_native_audio_volume,
+)
+from final.cards import mkcard_video, resolve_font, sub_png
 from final.voice import (
     tts_backend_for_shot,
     validate_voice_language_locks,
@@ -54,4 +63,15 @@ __all__ = [
     "validate_voice_language_locks",
     "voice_for_shot",
     "write_srt",
+    "build_post_enhancement_vf_chain",
+    "resolve_subtitle_mode",
+    "DEFAULT_NATIVE_AUDIO_VOLUME",
+    "native_dialogue_replaced_by_post_tts",
+    "primary_native_shot_ids",
+    "resolve_native_audio_gain",
+    "resolve_native_audio_volume",
+    "mkcard_video",
+    "resolve_font",
+    "sub_png",
 ]
+

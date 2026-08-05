@@ -5,7 +5,7 @@
 ## 2.39.59 — 2026-08-05
 
 ### Changed
-- R1b structure: peel native/cards/enhance leaves from  into  (re-export hard-compat). LOC ~3271→~3006.
+- R1b structure: peel native/cards/enhance leaves from post/render_final into final/* (re-export hard-compat). LOC ~3271→~3006.
 
 ## [2.39.58] - 2026-08-05
 
