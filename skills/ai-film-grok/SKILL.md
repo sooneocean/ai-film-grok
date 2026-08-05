@@ -18,7 +18,8 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 "$AIFILM" advance --root "<film>"
 ```
 
-每步后 dispatch，只跑 `next_action`；先 `blocked_by` 再 `required_proof`。读 `context_refs`/`weapon_route`。失败即停。`receipts/dispatch.json`。
+每步后 dispatch，只跑 `next_action`；先 `blocked_by` 再 `required_proof`。读 `context_refs`/`weapon_route`。失败即停。`receipts/dispatch.json`。  
+路由族谱（CLI/dispatch/skill/镜头/武器）：[routing-map](references/routing-map.md) · 机读表 `registry/route-catalog.json`。
 
 `autopilot`：allowlist 预算 + 本地吞吐；人审/质量/容量关即停写 receipt。
 

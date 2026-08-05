@@ -1,6 +1,6 @@
 # Routing rewire — semantic single source (2026-08-05)
 
-**Status:** ACTIVE · R0 inventory + R1 catalog in flight  
+**Status:** ACTIVE · R0+R1+R3 **SHIPPED** (behavior-neutral) · R2/R4–R7 open  
 **Scope:** CLI hub · spine dispatch · skill registry · production/weapon routers · context routing  
 **Not:** HTTP · residual render_final/heat leaf peels (see residual monolith plan)
 

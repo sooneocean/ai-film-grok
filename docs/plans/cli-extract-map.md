@@ -28,6 +28,13 @@
 | **evidence** | **cli_evidence.py DONE (W5d)** | state-index · promotion-report · production-evidence · speech-preview |
 | **bootstrap** | **cli_bootstrap.py DONE (W5d)** | lock-runtime · resume-manifest |
 
+## R3 hub residual (2026-08-05 routing rewire)
+
+- **DONE:** main if-ladder (~35 cmds) → `cli/cli_hub_residual.py` + `RESIDUAL_CMDS` table entry
+- hub `main` path: `_SIMPLE_DISPATCH` → residual → unknown
+- public subcommand strings unchanged
+- related: [2026-08-05-routing-rewire.md](2026-08-05-routing-rewire.md)
+
 ## Next candidates
 
 - remaining `build_parser` bulk still large inside aifilm_grok

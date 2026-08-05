@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.74] - 2026-08-05
+
+### Changed (routing rewire R0–R1–R3 · behavior-neutral)
+- **Route inventory** `scripts/tools/route_inventory.py` — coverage matrix of CLI / next_actions / advance / skills.
+- **Route catalog** `registry/route-catalog.json` + `route_catalog.py` + `tests/test_route_catalog.py`.
+- **Hub residual** ~35 if-ladder cmds → `cli/cli_hub_residual.py`; hub main is table-driven (`_SIMPLE_DISPATCH` → residual).
+- Docs: `docs/plans/2026-08-05-routing-rewire.md`, `references/routing-map.md`; `cli-extract-map` R3 note.
+- Public subcommand strings unchanged; no pilot / provider policy change.
+
 ## [2.39.73] - 2026-08-05
 
 ### Added (2V Reference Stage — H3 Layer-4)
