@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.63] - 2026-08-05
+
+### Fixed (film-spec write-spec scaffolds + glue)
+- **templates** example/adult-max/h3-primary/hybrid-h3: pose chain, size variety, arc_node, performance/craft, director_board → real `write-spec` green.
+- **cli/cli_write_spec**: wardrobe hard-fail only when bible authored `wardrobe_variants` (empty init no longer blocks scaffolds).
+- **framing_lint `_size_rank`**: normalize close-up / medium full / insert; medium-close before bare close.
+- **tests**: shipped templates write-spec path; size-rank normalize; health report follow-up.
+
 
 
 ## [2.39.62] - 2026-08-05

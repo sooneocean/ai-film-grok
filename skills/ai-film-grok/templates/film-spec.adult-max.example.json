@@ -94,12 +94,31 @@
             "motion": "hand on latch door close weight step-in",
             "camera": {
               "shot_size": "medium full",
-              "angle": "eye level"
+              "angle": "eye level",
+              "lens_mm": "35"
             },
             "visible_change": "door locks space narrows",
             "wardrobe_state": "full",
-            "coitus_beat": "entry"
-          }
+            "coitus_beat": "entry",
+            "lighting": "warm practicals low key",
+            "camera_axis": "front",
+            "look_axis": "left",
+            "start_pose": "standing at door latch full costume",
+            "end_pose": "door locked body pressed to partner entry hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "front",
+          "performance_delta": "door locks space narrows",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "pin partner to door latch close entry",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "落锁",
+          "emotion": "落锁",
+          "narrative_purpose": "推进到落锁",
+          "beat_id": "beat01"
         },
         {
           "id": "shot02",
@@ -115,13 +134,31 @@
             "motion": "straps slide dress peels bare skin expands",
             "camera": {
               "shot_size": "medium",
-              "angle": "eye level"
+              "angle": "eye level",
+              "lens_mm": "35"
             },
             "visible_change": "armor discarded bare skin",
             "wardrobe_state": "partial",
-            "start_pose": "shoulder straps already slipping",
-            "coitus_beat": "undress"
-          }
+            "start_pose": "door locked body pressed to partner entry",
+            "coitus_beat": "undress",
+            "lighting": "warm practicals low key",
+            "camera_axis": "three-quarter",
+            "look_axis": "left",
+            "end_pose": "armor discarded bare shoulders partial undress hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "three-quarter",
+          "performance_delta": "armor discarded bare skin",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "removes armor dress slides off shoulders undress",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "落锁",
+          "emotion": "落锁",
+          "narrative_purpose": "推进到落锁",
+          "beat_id": "beat02"
         },
         {
           "id": "shot03",
@@ -140,14 +177,32 @@
             "motion": "union_settle straddle-seat hips settle pelvis-lock weight down",
             "camera": {
               "shot_size": "medium full",
-              "angle": "slight low"
+              "angle": "slight low",
+              "lens_mm": "35"
             },
             "visible_change": "hips lock contact readable both undressed",
             "wardrobe_state": "bare",
             "partner_wardrobe_state": "undressed",
-            "start_pose": "already bare clothes discarded partner undressed",
-            "coitus_beat": "union"
-          }
+            "start_pose": "armor discarded bare shoulders partial undress",
+            "coitus_beat": "union",
+            "lighting": "warm practicals low key",
+            "camera_axis": "low-front",
+            "look_axis": "left",
+            "end_pose": "straddle-seat hips settle pelvis-lock weight down hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "low-front",
+          "performance_delta": "hips lock contact readable both undressed",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "straddle-seat hips settle pelvis-lock skin-to-sk",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "卸甲",
+          "emotion": "卸甲",
+          "narrative_purpose": "推进到卸甲",
+          "beat_id": "beat03"
         },
         {
           "id": "shot04",
@@ -165,15 +220,33 @@
             "action": "hips-sink grind-forward thrust-rhythm twice",
             "motion": "rhythm_hips hips-sink twice grind-forward thrust-rhythm locked camera",
             "camera": {
-              "shot_size": "medium",
-              "angle": "slight low"
+              "shot_size": "mcu",
+              "angle": "slight low",
+              "lens_mm": "50"
             },
             "visible_change": "two visible hip sinks thrust",
             "wardrobe_state": "bare",
             "partner_wardrobe_state": "undressed",
-            "start_pose": "already bare straddle locked",
-            "coitus_beat": "rhythm"
-          }
+            "start_pose": "straddle-seat hips settle pelvis-lock weight down",
+            "coitus_beat": "rhythm",
+            "lighting": "warm practicals low key",
+            "camera_axis": "side",
+            "look_axis": "left",
+            "end_pose": "two visible hip sinks thrust rhythm hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "side",
+          "performance_delta": "two visible hip sinks thrust",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "hips-sink grind-forward thrust-rhythm twice",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "卸甲",
+          "emotion": "卸甲",
+          "narrative_purpose": "推进到卸甲",
+          "beat_id": "beat04"
         },
         {
           "id": "shot05",
@@ -193,17 +266,35 @@
             "action": "hips-sink grind deeper thrust-rhythm pelvis-lock 定器",
             "motion": "rhythm_hips hips-sink grind-forward clutch",
             "camera": {
-              "shot_size": "close-up insert",
-              "angle": "slight low"
+              "shot_size": "medium",
+              "angle": "high angle",
+              "lens_mm": "35"
             },
             "framing": "union_closeup; full head and both shoulders inside frame, ample headroom, safe framing no cropping",
             "visible_change": "waist-pelvis union thrust readable",
             "wardrobe_state": "bare",
             "partner_wardrobe_state": "undressed",
-            "start_pose": "already bare union locked",
+            "start_pose": "two visible hip sinks thrust rhythm",
             "coitus_beat": "rhythm",
-            "coverage_role": "detail"
-          }
+            "coverage_role": "detail",
+            "lighting": "warm practicals low key",
+            "camera_axis": "overhead",
+            "look_axis": "left",
+            "end_pose": "hips locked contact readable both undressed hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "overhead",
+          "performance_delta": "waist-pelvis union thrust readable",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "hips-sink grind deeper thrust-rhythm pelvis-lock",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "结合节奏",
+          "emotion": "结合节奏",
+          "narrative_purpose": "推进到结合节奏",
+          "beat_id": "beat05"
         },
         {
           "id": "shot06",
@@ -221,14 +312,34 @@
             "action": "leg-wrap-waist clutch sheets, micro-tremble, breath rises, sweat bead",
             "motion": "lock_clutch leg-wrap-waist clutch sheets micro-tremble breath rise sweat bead",
             "camera": {
-              "shot_size": "close-up insert hands fabric",
-              "angle": "eye level"
+              "shot_size": "close-up insert",
+              "angle": "slight low",
+              "lens_mm": "85"
             },
             "visible_change": "fingers white on fabric",
             "wardrobe_state": "bare",
             "partner_wardrobe_state": "undressed",
-            "coitus_beat": "lock"
-          }
+            "coitus_beat": "lock",
+            "lighting": "warm practicals low key",
+            "camera_axis": "top-down",
+            "look_axis": "left",
+            "start_pose": "hips locked contact readable both undressed",
+            "end_pose": "waist-pelvis union thrust insert detail hold",
+            "chain_mode": "continue",
+            "framing": "full head and both shoulders inside frame, ample headroom, safe framing no cropping"
+          },
+          "camera_axis": "top-down",
+          "performance_delta": "fingers white on fabric",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "leg-wrap-waist clutch sheets, micro-tremble, bre",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "结合节奏",
+          "emotion": "结合节奏",
+          "narrative_purpose": "推进到结合节奏",
+          "beat_id": "beat06"
         },
         {
           "id": "shot07",
@@ -245,15 +356,34 @@
             "action": "arches and presses finish residual-tremor wet eyes 高潮 射出",
             "motion": "finish_arch presses up residual-tremor breath static hold",
             "camera": {
-              "shot_size": "close-up full head",
-              "angle": "eye level"
+              "shot_size": "cu",
+              "angle": "eye level",
+              "lens_mm": "85"
             },
             "framing": "full head and both shoulders inside frame, ample headroom, safe framing no cropping",
             "visible_change": "spine arch climax release then softens",
             "wardrobe_state": "bare",
             "partner_wardrobe_state": "undressed",
-            "coitus_beat": "finish"
-          }
+            "coitus_beat": "finish",
+            "lighting": "warm practicals low key",
+            "camera_axis": "front",
+            "look_axis": "left",
+            "start_pose": "waist-pelvis union thrust insert detail",
+            "end_pose": "spine arch climax release then softens hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "front",
+          "performance_delta": "spine arch climax release then softens",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "arches and presses finish residual-tremor wet ey",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "办完钩子",
+          "emotion": "办完钩子",
+          "narrative_purpose": "推进到办完钩子",
+          "beat_id": "beat07"
         },
         {
           "id": "shot08",
@@ -269,15 +399,42 @@
             "motion": "lean to ear residual pull-back hold",
             "camera": {
               "shot_size": "medium",
-              "angle": "eye level"
+              "angle": "eye level",
+              "lens_mm": "35"
             },
             "visible_change": "unfinished invitation",
             "wardrobe_state": "bare",
-            "start_pose": "already bare after climax",
-            "coitus_beat": "hook"
-          }
+            "start_pose": "spine arch climax release then softens",
+            "coitus_beat": "hook",
+            "lighting": "warm practicals low key",
+            "camera_axis": "profile",
+            "look_axis": "left",
+            "end_pose": "lean to ear residual unfinished invitation hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "profile",
+          "performance_delta": "unfinished invitation",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "ear whisper residual hold next round",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "办完钩子",
+          "emotion": "办完钩子",
+          "narrative_purpose": "推进到办完钩子",
+          "beat_id": "beat08"
         }
-      ]
+      ],
+      "director_board": {
+        "emotional_turn": "落锁好奇变成办穿失控",
+        "visual_strategy": "从全身门闩压到跨坐特写再回中景余韵",
+        "performance_strategy": "先锁门立规矩，再卸甲用身体接管节奏",
+        "audience_question": "谁先把规矩办穿？",
+        "coverage_strategy": "全景落锁→中景卸甲→特写结合→中景钩子",
+        "cut_intent": "soft glue through act, smash on climax face",
+        "approval_state": "approved"
+      }
     }
   ]
 }

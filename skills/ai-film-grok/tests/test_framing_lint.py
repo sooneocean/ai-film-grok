@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from film_spec import FilmSpecError, validate_film_spec  # noqa: E402
 from framing_lint import (  # noqa: E402
+    _size_rank,
     framing_crop_risk_in_text,
     lint_framing_iron,
 )
@@ -49,6 +50,23 @@ def _minimal(*, framing: str | None = None, motion: str | None = None) -> dict:
 
 
 class FramingLintTests(unittest.TestCase):
+    def test_size_rank_normalizes_hyphen_and_insert_tokens(self) -> None:
+        """close-up / medium full / insert must not fall out of 30° size map."""
+        cases = {
+            "close-up": 5,
+            "close up": 5,
+            "cu": 5,
+            "medium": 3,
+            "medium full": 2,
+            "medium close": 4,
+            "close-up insert": 6,
+            "ecu": 6,
+        }
+        for size, rank in cases.items():
+            with self.subTest(size=size):
+                shot = {"dsl": {"camera": {"shot_size": size}}}
+                self.assertEqual(_size_rank(shot), rank)
+
     def test_crop_prone_text_detected(self) -> None:
         hits = framing_crop_risk_in_text("extreme close-up, face fills the frame, push-in on face")
         self.assertTrue(hits)

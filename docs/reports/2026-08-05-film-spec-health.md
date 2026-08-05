@@ -92,3 +92,10 @@ cd "$SKILL" && env -u PYTHONPATH "$PY" -m pytest tests/test_director_intent.py t
 ```
 
 Commit: film-spec H3 templates + tests + this report (`Fix film-spec H3 templates so validate_film_spec accepts them`).
+
+## Follow-up (same day · write-spec scaffolds)
+
+1. Shipped templates write-spec green (pose chain, size variety, arc_node, performance/craft, director_board).
+2. write-spec wardrobe hard-fail only when bible authored wardrobe_variants.
+3. framing_lint _size_rank normalizes close-up / medium full / insert; medium-close before bare close.
+4. Tests: all film-spec*.json through real write-spec; size-rank unit tests.

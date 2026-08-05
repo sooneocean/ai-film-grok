@@ -207,7 +207,9 @@
         "cut_intent": "hook 后 soft_glue 升温，sensory 转 smash 压感官",
         "image_priority": "水珠与门闩的物件特写锚定每次距离变化",
         "sound_priority": "心跳 BGM duck，旁白第三人称保距离感",
-        "approval_state": "approved"
+        "approval_state": "approved",
+        "visual_strategy": "中景开门后切近景后视镜",
+        "performance_strategy": "先克制开门，再以锁骨与呼吸暴露紧张"
       },
       "shots": [
         {
@@ -238,12 +240,25 @@
             "environment": "rainy night street neon puddles",
             "camera": {
               "shot_size": "medium full",
-              "angle": "eye level"
+              "angle": "eye level",
+              "lens_mm": "35"
             },
             "cast": [
               "heroine"
             ],
-            "motion": "door opens, rain splash, step half-in, continuous slow dolly-in, hold end_pose, soft look — idle not speaking"
+            "motion": "door opens, rain splash, step half-in, continuous slow dolly-in, hold end_pose, soft look — idle not speaking",
+            "lighting": "cold streetlamp"
+          },
+          "camera_axis": "dolly_in",
+          "arc_node": "好奇登场",
+          "emotion": "好奇登场",
+          "narrative_purpose": "拉进私密空间",
+          "beat_id": "beat01",
+          "performance_delta": "车门从关到开；身体半入座舱",
+          "performance": {
+            "subtext": "她在决定要不要把乘客也淋进这摊热里——手比脑子快",
+            "playable_action": "grips door handle, hesitates, pulls open wider t",
+            "reaction_trigger": "雨声与门锁"
           }
         },
         {
@@ -275,12 +290,27 @@
             },
             "camera": {
               "shot_size": "close-up",
-              "angle": "eye level"
+              "angle": "eye level",
+              "lens_mm": "50"
             },
             "cast": [
               "heroine"
             ],
-            "motion": "leans close to mirror, gaze tightens near glass, soft breath, idle not speaking"
+            "motion": "leans close to mirror, gaze tightens near glass, soft breath, idle not speaking",
+            "lighting": "dashboard glow",
+            "start_pose": "body half-in looking toward back seat",
+            "end_pose": "lean near rearview, eyes tight on glass"
+          },
+          "camera_axis": "ecu_hold",
+          "arc_node": "前戏贴近",
+          "emotion": "前戏贴近",
+          "narrative_purpose": "后视镜加压感官",
+          "beat_id": "beat02",
+          "performance_delta": "视线落入后视镜；水珠仍停在锁骨",
+          "performance": {
+            "subtext": "边界试探",
+            "playable_action": "leans closer toward the rearview, eyes draw near",
+            "reaction_trigger": "后视镜对视"
           }
         }
       ]

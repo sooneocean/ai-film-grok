@@ -223,7 +223,25 @@ def _size_rank(shot: dict[str, Any]) -> int | None:
         .strip()
         .lower()
     )
-    return _SHOT_SIZE_ORDER.get(size)
+    if not size:
+        return None
+    key = size.replace("-", "_").replace(" ", "_")
+    if key in _SHOT_SIZE_ORDER:
+        return _SHOT_SIZE_ORDER[key]
+    # longest/most-specific first (avoid "medium close" → cu via bare "close")
+    if "insert" in key or "detail" in key or "ecu" in key or "extreme_close" in key:
+        return _SHOT_SIZE_ORDER.get("ecu")
+    if "medium_close" in key:
+        return _SHOT_SIZE_ORDER.get("mcu")
+    if "medium_full" in key or "mediumfull" in key:
+        return _SHOT_SIZE_ORDER.get("mws")
+    if key.startswith("medium") or "中景" in size:
+        return _SHOT_SIZE_ORDER.get("ms")
+    if "close" in key or "特写" in size or "近景" in size:
+        return _SHOT_SIZE_ORDER.get("cu")
+    if "wide" in key or "long" in key or "全景" in size:
+        return _SHOT_SIZE_ORDER.get("ws")
+    return None
 
 
 def lint_composition_rules(shots: list[dict[str, Any]]) -> dict[str, Any]:
