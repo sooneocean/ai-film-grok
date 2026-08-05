@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.39.48] - 2026-08-05
+
+### Added / Fixed (strategy residual closeout · S2.3–S7)
+- **S2.3** final hotpath: env force ship, film-spec caption_path, master_hf single-layer ok.
+- **S5.1** `design_go` craft one-pager + `receipts/design-go-onepager.md`.
+- **S5.2** doctor advisory when Comfy tunnel ok but profile not h3_primary/hybrid_h3.
+- **S3.3–S3.4** W3 packages SHIPPED; AGENTS AREA package pointers; refactor tracker W0–W3/W5 DONE.
+- **S4** hotpath failure contracts closed; further leaf peel optional (W4 peels may coexist).
+- **S5.3** remains **OPEN_OPS** (true overnight canary needs human GO + 5090).
+- **S5.4 / S6 / S7** closed to evidence (generation_ready compact · util · timeout floors).
+- Strategy rev **2026-08-05c**: `docs/plans/2026-08-05-strategy-director-engineer-upgrade.md`.
+
 ## [2.39.47] - 2026-08-05
 
 ### Changed (module refactor · W4 render_final peel)
