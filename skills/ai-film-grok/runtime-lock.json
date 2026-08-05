@@ -942,7 +942,7 @@
     },
     {
       "path": "scripts/input_fidelity.py",
-      "sha256": "bbd336868be5fd8ba48f2fb8e3f512d94c12f38af15b7be4216a4d72bc614bbd"
+      "sha256": "5731be1c89637445c07e912e0f8f48bc7d934d5d66dab17df11a4fccac810a0f"
     },
     {
       "path": "scripts/intake.py",
