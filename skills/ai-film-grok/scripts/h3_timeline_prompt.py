@@ -457,6 +457,81 @@ def _extract_lighting(shot: dict[str, Any]) -> str:
     return "natural cinematic lighting"
 
 
+def _extract_shot_size(shot: dict[str, Any]) -> str:
+    """Extract shot size from a shot dict for composition guidance."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    raw = str(
+        dsl.get("shot_size")
+        or dsl.get("framing")
+        or shot.get("shot_size")
+        or shot.get("framing")
+        or ""
+    ).strip().lower()
+    if raw:
+        return raw
+    df = str(shot.get("dramatic_function") or "").strip().lower()
+    size_map = {
+        "action": "wide",
+        "climax": "medium-wide",
+        "afterglow": "close-up",
+        "hook": "wide",
+        "approach": "medium",
+        "reaction": "close-up",
+    }
+    return size_map.get(df, "medium shot")
+
+
+def _extract_color_palette(shot: dict[str, Any]) -> str:
+    """Extract color palette hints from a shot dict."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    palette = str(
+        dsl.get("color_palette") or dsl.get("palette") or shot.get("color_palette") or ""
+    ).strip()
+    if palette:
+        return palette
+    heat = str(shot.get("heat_phase") or "").strip().lower()
+    df = str(shot.get("dramatic_function") or "").strip().lower()
+    if heat in {"act", "climax"} or df in {"action", "climax", "impact", "peak"}:
+        return "high contrast, saturated warm tones"
+    if heat == "afterglow" or df in {"afterglow", "reaction"}:
+        return "soft cool tones, desaturated"
+    if df in {"hook", "approach"}:
+        return "muted tones with a single warm accent"
+    return "natural cinematic palette"
+
+
+def _extract_depth_of_field(shot: dict[str, Any]) -> str:
+    """Extract depth of field hint from a shot dict."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    dof = str(
+        dsl.get("depth_of_field") or dsl.get("dof") or shot.get("depth_of_field") or ""
+    ).strip().lower()
+    if dof:
+        return dof
+    shot_size = _extract_shot_size(shot).lower()
+    if any(k in shot_size for k in ("close", "cu", "ecu", "extreme")):
+        return "shallow (subject sharp, background soft)"
+    if any(k in shot_size for k in ("wide", "ws", "ew", "extreme wide")):
+        return "deep (everything in focus)"
+    return "medium (subject sharp, gentle background falloff)"
+
+
+def _extract_lens_hint(shot: dict[str, Any]) -> str:
+    """Extract lens hint from a shot dict for composition guidance."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    lens = str(dsl.get("lens") or dsl.get("focal_length") or shot.get("lens") or "").strip()
+    if lens:
+        return lens
+    shot_size = _extract_shot_size(shot).lower()
+    if any(k in shot_size for k in ("close", "cu", "ecu")):
+        return "85mm f/1.4"
+    if any(k in shot_size for k in ("medium", "ms")):
+        return "50mm f/1.8"
+    if any(k in shot_size for k in ("wide", "ws")):
+        return "35mm f/2.0"
+    return "50mm f/1.8"
+
+
 def _mood_seed(shot: dict[str, Any]) -> str:
     df = str(shot.get("dramatic_function") or "").strip().lower()
     heat = str(shot.get("heat_phase") or "").strip().lower()
