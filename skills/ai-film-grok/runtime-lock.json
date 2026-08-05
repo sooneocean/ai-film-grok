@@ -1462,7 +1462,7 @@
     },
     {
       "path": "scripts/media/h3_combo_eval.py",
-      "sha256": "ada43c94bf73eeffa2340f304e10f146d9e2796d26666ebc8d63d925ee981b24"
+      "sha256": "dd65d506ae82de1254787a3cf4776ee04246dc5d6c5a083e50f4d225665a2adf"
     },
     {
       "path": "scripts/media/h3_fill_idle.py",
