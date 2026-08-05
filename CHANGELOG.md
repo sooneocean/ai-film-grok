@@ -1,5 +1,13 @@
 # Changelog
 
+
+## [2.39.20] - 2026-08-05
+
+### Fixed (h3_primary + caption soft gates)
+- **closeout caption_pixel**: soft-skip when no `final.srt` (no dialogue cues); hard only with SRT.
+- **evidence_stale**: CAPTION_PIXEL_STALE only when SRT present.
+- **tests**: isolate `AIFILM_I2V_PROFILE=grok_primary` for film-spec default + media-queue membership under machine h3_primary config.
+
 ## [2.39.19] - 2026-08-05
 
 ### Added (CLI extract + docs · W5)

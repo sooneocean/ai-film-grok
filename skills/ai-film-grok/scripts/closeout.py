@@ -174,11 +174,21 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         "next_cmd": f'aifilm caption-pixel-check --root "{base}"',
         "advisory": False,
     }
+    srt_present = any((base / rel).is_file() for rel in ("out/final.srt", "final.srt"))
     if final_rec is None:
         caption_step = {
             "id": "caption_pixel",
             "ok": True,
             "detail": "skipped — no final/plate yet",
+            "next_cmd": None,
+            "advisory": True,
+            "skipped": True,
+        }
+    elif not srt_present:
+        caption_step = {
+            "id": "caption_pixel",
+            "ok": True,
+            "detail": "skipped — no final.srt (no dialogue cues to probe)",
             "next_cmd": None,
             "advisory": True,
             "skipped": True,

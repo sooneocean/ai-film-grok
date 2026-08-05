@@ -116,11 +116,16 @@ class QueueShotMembershipTests(unittest.TestCase):
                 )
 
     def test_known_shot_accepted(self) -> None:
+        import os
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "receipts").mkdir()
+            spec = _spec_one("shot01")
+            spec["_i2v_profile"] = "grok_primary"
+            spec["i2v_provider"] = "grok"
             (root / "film-spec.json").write_text(
-                json.dumps(_spec_one("shot01"), ensure_ascii=False),
+                json.dumps(spec, ensure_ascii=False),
                 encoding="utf-8",
             )
             prompt = root / "p.txt"
@@ -129,9 +134,17 @@ class QueueShotMembershipTests(unittest.TestCase):
             still.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 32)
             q = MediaQueue(root, budget_units=10)
             with (
+                mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}),
                 mock.patch.object(media_queue, "assert_pilot_allows_add"),
                 mock.patch.object(media_queue, "assert_heat_allows_media"),
             ):
+                try:
+                    import config_loader as cl
+
+                    cl._CONFIG = None
+                    cl._CONFIG_ENV_FINGERPRINT = None
+                except Exception:
+                    pass
                 job = q.add_job(
                     shot_id="shot01",
                     operation="image_to_video",

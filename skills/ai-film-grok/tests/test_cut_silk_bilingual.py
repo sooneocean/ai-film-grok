@@ -147,7 +147,9 @@ class CaptionFormatTests(unittest.TestCase):
         self.assertEqual(d["text"], "只有中文")
 
     def test_film_spec_defaults_caption_and_fluency(self) -> None:
+        import os
         import sys
+        from unittest import mock
 
         sys.path.insert(0, str(ROOT / "scripts"))
         from film_spec import validate_film_spec
@@ -191,10 +193,18 @@ class CaptionFormatTests(unittest.TestCase):
                 }
             ],
         }
-        validate_film_spec(spec, assign_missing_ids=False)
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}):
+            try:
+                import config_loader as cl
+
+                cl._CONFIG = None
+                cl._CONFIG_ENV_FINGERPRINT = None
+            except Exception:
+                pass
+            validate_film_spec(spec, assign_missing_ids=False)
         self.assertEqual(spec.get("caption_mode"), "zh")
         self.assertEqual(spec.get("transition_fluency"), "silk")
-        # grok_primary season: auto resolves to Grok image_to_video.
+        # grok_primary: auto resolves to Grok image_to_video.
         self.assertEqual(spec.get("i2v_provider"), "grok")
         intents = spec.get("transition_intents") or []
         self.assertEqual(len(intents), 1)

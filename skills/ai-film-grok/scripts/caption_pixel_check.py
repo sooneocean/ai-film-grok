@@ -286,11 +286,13 @@ def evidence_stale_after_final(root: Path | str) -> dict[str, Any]:
             issues.append({"code": "QUALITY_REPORT_STALE", "detail": "quality-report sha ≠ final"})
             actions.append(f'rm -f "{qr}"')
 
-    # caption pixel
-    cap = caption_pixel_status(base)
-    if final and (cap.get("stale") or (not cap.get("present") and final.is_file())):
-        issues.append({"code": "CAPTION_PIXEL_STALE", "detail": cap.get("detail") or "stale"})
-        actions.append(f'aifilm caption-pixel-check --root "{base}"')
+    # caption pixel — only when dialogue SRT exists
+    srt = _first_file(base, "out/final.srt", "final.srt")
+    if final and srt is not None:
+        cap = caption_pixel_status(base)
+        if cap.get("stale") or (not cap.get("present") and final.is_file()):
+            issues.append({"code": "CAPTION_PIXEL_STALE", "detail": cap.get("detail") or "stale"})
+            actions.append(f'aifilm caption-pixel-check --root "{base}"')
 
     # mix partial honesty
     mix = read_json(base / "receipts" / "final-mix-partial.json") or {}
