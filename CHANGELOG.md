@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.44] - 2026-08-05
+
+### Changed (module refactor · W3 package dirs + shims)
+- Domains: `scripts/assets/` · `scripts/spine/` · `scripts/gates/` · `scripts/plan/` (42 modules).
+- Top-level hard-compat shims via `sys.modules` replacement.
+- Skill-root schema path parents fix in plan loaders.
+- Tests: `tests/test_w3_package_shims.py`.
+
 ## [2.39.43] - 2026-08-05
 
 ### Changed (module refactor · W3 package dirs + shims)
