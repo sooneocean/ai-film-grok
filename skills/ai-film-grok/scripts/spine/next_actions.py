@@ -16,20 +16,14 @@ from pathlib import Path
 from typing import Any
 
 from security_policy import atomic_write_text
+from spine.stage_model import (
+    INTERNAL_PIPELINE as PIPELINE_STAGES,
+    PIPELINE_LABELS_ZH as _STAGE_LABELS_ZH,
+    STAGE_OWNERS as _STAGE_OWNERS,
+    responsibility_for_stage,
+)
 from util import read_json, write_json
 from util.spine_helpers import post_audit_current, pilot_user_ok
-from spine.dispatch import _STAGE_OWNERS
-
-# Backward-compatible internal projection (Grok Agent + layers 1–4 + delivery).
-PIPELINE_STAGES: tuple[str, ...] = (
-    "agent",
-    "visual",
-    "voice",
-    "design",
-    "post",
-    "deliver",
-    "done",
-)
 
 # action id → primary stage (for status.next_actions[].stage)
 _ACTION_STAGE: dict[str, str] = {
@@ -79,22 +73,6 @@ _ACTION_STAGE: dict[str, str] = {
     "export-desktop": "deliver",
     "done": "done",
 }
-
-_STAGE_LABELS_ZH: dict[str, str] = {
-    "agent": "0·Agent 规划（Lens / 定妆 / film-spec / pilot）",
-    "visual": "1·视觉生成（Grok still + H3/Grok I2V）",
-    "voice": "2·语音生成（Edge TTS + tts-rehearse / SRT）",
-    "design": "3·设计合成（HyperFrames 优先 / Remotion）",
-    "post": "4·后处理验收（FFmpeg plate · review-final）",
-    "deliver": "交付导出（export-desktop）",
-    "done": "完成",
-}
-
-
-def responsibility_for_stage(stage: str) -> dict[str, str | None]:
-    """Map each pipeline stage to its one accountable owner."""
-    owner, department = _STAGE_OWNERS.get(stage, ("director", None))
-    return {"owner": owner, "department": department, "stage": stage}
 
 
 def with_responsibility(action: dict[str, Any]) -> dict[str, Any]:

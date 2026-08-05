@@ -218,6 +218,11 @@ ADVANCE_ACTIONS: dict[str, AdvancePolicy] = {
 }
 
 
+def advance_eligible_ids() -> frozenset[str]:
+    """Local advance allowlist. Catalog advance_eligible should cover this (R4 test)."""
+    return frozenset(ADVANCE_ACTIONS)
+
+
 class AdvanceError(ValueError):
     """A dispatch action is unsafe, stale or not authorized for local advance."""
 

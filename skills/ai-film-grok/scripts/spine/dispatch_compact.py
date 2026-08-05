@@ -356,9 +356,11 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
         "root": packet.get("root"),
         "craft_stage": packet.get("craft_stage"),
         "pipeline_stage": packet.get("pipeline_stage"),
+        "stage_public": packet.get("stage_public"),
         # The sole user-facing progress model.  `workflow` remains below as a
         # diagnostic compatibility projection for existing callers.
         "phase": phase,
+        "route_catalog_id": packet.get("route_catalog_id") or packet.get("next_id"),
         "next_id": packet.get("next_id"),
         "next_cmd": _bounded_text(packet.get("next_cmd"), max_bytes=1536),
         "next_why": _bounded_text(packet.get("next_why"), max_bytes=768),
@@ -369,7 +371,14 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
         "department_handoff": packet.get("department_handoff"),
         # Weapon selection is also a bound orchestration contract. Keeping the
         # same object prevents compact/full mode from choosing different tools.
-        "weapon_route": packet.get("weapon_route"),
+        "weapon_route": (
+            {
+                **(packet.get("weapon_route") or {}),
+                "layer": (packet.get("weapon_route") or {}).get("layer") or "weapon",
+            }
+            if isinstance(packet.get("weapon_route"), dict)
+            else packet.get("weapon_route")
+        ),
         "weapon_inventory_line": _bounded_text(
             (
                 (

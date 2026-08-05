@@ -877,6 +877,8 @@ def explain_route(
     report = {
         "schema_version": 1,
         "kind": "ai-film-route-plan",
+        # R5: capability layer (snapshot rank) vs weapon layer (armory lock)
+        "layer": "capability",
         "ok": route_ok,
         "read_only": True,
         "auto_execute": False,

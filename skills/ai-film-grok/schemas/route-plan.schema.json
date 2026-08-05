@@ -22,6 +22,11 @@
   "properties": {
     "schema_version": { "const": 1 },
     "kind": { "const": "ai-film-route-plan" },
+    "layer": {
+      "type": "string",
+      "enum": ["capability", "weapon", "intent"],
+      "description": "Routing layer: capability=snapshot rank; weapon=armory lock; intent=content demand"
+    },
     "ok": { "type": "boolean" },
     "read_only": { "const": true },
     "auto_execute": { "const": false },

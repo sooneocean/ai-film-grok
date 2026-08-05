@@ -93,6 +93,8 @@ def build_weapon_route(
     common = {
         "schema_version": 1,
         "kind": "ai-film-weapon-route",
+        # R5: weapon layer (local armory + provider lock); not capability rank
+        "layer": "weapon",
         "workflow_stage": stage or None,
         "demand_detected": demand_detected,
         "auto_select": False,

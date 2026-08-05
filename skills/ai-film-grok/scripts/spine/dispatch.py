@@ -20,88 +20,16 @@ from pathlib import Path
 from typing import Any
 
 from quality_gates import summarize_quality
+from spine.action_policy import (
+    ACTION_SKILLS as _ACTION_SKILLS,
+    COMMAND_POLICIES as _COMMAND_POLICIES,
+    SKILL_POLICIES as _SKILL_POLICIES,
+    resolve_policy,
+    resolve_skill_id,
+)
+from spine.stage_model import STAGE_OWNERS as _STAGE_OWNERS
+from spine.stage_model import project_stages, responsibility_for_stage, stage_owners
 from util import read_json, write_json
-
-_ACTION_SKILLS = {
-    "narrative-validate": "story.validate",
-    "narrative-project": "graph.project",
-    "narrative-lock": "story.validate",
-    "grok-i2v-bulk": "image.animate",
-    "state-index-plan": "character.state.update",
-    "dialogue-candidate-review": "quality.inspect",
-    "audio-plan": "sound.design",
-    "selects-report": "projection.verify",
-    "post-audit-gate": "projection.verify",
-    "closeout-run": "projection.verify",
-    "production-evidence-gate": "projection.verify",
-    "bulk-preflight": "image.animate",
-    "h3-run-next": "image.animate",
-    "h3-until-empty": "image.animate",
-    "h3-capacity-plan": "projection.verify",
-    "h3-fill-idle": "image.animate",
-    "h3-lane": "image.animate",
-    "pilot-pack": "quality.inspect",
-    "variety-precheck": "story.validate",
-    "i2v-motion-gate": "projection.verify",
-    "film-core-closeout": "projection.verify",
-    "select-shortlist": "projection.verify",
-    "ship-prep": "projection.verify",
-    "gate-auto": "projection.verify",
-    "cinematic-gate": "projection.verify",
-    "export-desktop": "export.package",
-    "dailies_review-evidence": "dispatch.orchestrate",
-    "agent-review-final": "quality.inspect",
-}
-_SKILL_POLICIES = {
-    "keyframe.generate": ("external", "human_required"),
-    "image.animate": ("paid", "human_required"),
-    "voice.synthesize": ("external", "human_required"),
-    "video.render": ("external", "human_required"),
-    # quality.inspect stays human: skill_runner maps it to review-final scorecard.
-    "quality.inspect": ("local", "human_required"),
-    # P0: local package copy after final_complete + post-audit (command still fail-closed).
-    "export.package": ("local", "none"),
-}
-_COMMAND_POLICIES = {
-    # P0: local read-only / post-gate delivery helpers (no spend, no artistic approve).
-    "dailies": ("local", "none"),
-    "export-desktop": ("local", "none"),
-    "final": ("external", "human_required"),
-    # closeout run = local post-audit ladder (does NOT auto-approve review-final)
-    "closeout": ("local", "none"),
-    "grok-oauth": ("external", "human_required"),
-    "media-queue": ("external", "human_required"),
-    "pilot": ("local", "human_required"),
-    "pilot-pack": ("local", "none"),  # GO evidence write; approve remains human
-    "bulk-preflight": ("local", "none"),
-    "variety-precheck": ("local", "none"),
-    "i2v-motion-gate": ("local", "none"),
-    "film-core-closeout": ("local", "none"),
-    "select-shortlist": ("local", "none"),
-    "ship-prep": ("local", "none"),
-    "gate-auto": ("local", "none"),
-    "cinematic-gate": ("local", "none"),
-    "queue-progress": ("local", "none"),
-    "tunnel-probe": ("local", "none"),
-    "gpu-lease": ("local", "none"),
-    # Local 5090 MiniMax H3 — free compute; pilot/approve still human via separate gates
-    "h3": ("local", "none"),
-    # P1: write assist draft only — never sets final_complete
-    "agent-review-final": ("local", "none"),
-    "queue-run-oauth": ("paid", "human_required"),
-    "review-ui": ("local", "human_required"),
-    "review-final": ("local", "human_required"),
-    "tts-rehearse": ("external", "human_required"),
-}
-_STAGE_OWNERS = {
-    "agent": ("director", None),
-    "visual": ("visual", "visual"),
-    "voice": ("audio", "audio"),
-    "design": ("post", "post"),
-    "post": ("post", "post"),
-    "deliver": ("delivery", None),
-    "done": ("delivery", None),
-}
 
 
 def responsibility_for_action(action: dict[str, Any] | None) -> dict[str, str | None]:
@@ -118,8 +46,7 @@ def responsibility_for_action(action: dict[str, Any] | None) -> dict[str, str | 
             else str((action or {}).get("stage") or "agent"),
         }
     stage = str((action or {}).get("stage") or "agent")
-    owner, department = _STAGE_OWNERS.get(stage, ("director", None))
-    return {"owner": owner, "department": department, "stage": stage}
+    return responsibility_for_stage(stage)
 
 
 def _quality_summary(root: Path) -> dict[str, Any]:
@@ -159,11 +86,10 @@ def structured_next_action(
         operation = "pilot-pack"
         if not action_id or action_id == "pilot":
             action_id = "pilot-pack"
-    skill_id = _ACTION_SKILLS.get(action_id, "dispatch.orchestrate")
-    spend_class, approval_class = _SKILL_POLICIES.get(skill_id, ("local", "none"))
-    command_policy = _COMMAND_POLICIES.get(operation)
-    if command_policy is not None:
-        spend_class, approval_class = command_policy
+    skill_id = resolve_skill_id(action_id)
+    spend_class, approval_class = resolve_policy(
+        action_id=action_id, operation=operation, skill_id=skill_id
+    )
     if operation == "plan" and "lock" in argv:
         approval_class = "human_required"
     # pilot approve/score/report stay human; only pack is local-none (above remap).
@@ -1323,6 +1249,21 @@ def build_dispatch(
             "line": "generation_ready skipped",
         }
 
+    stage_proj = project_stages(
+        craft_stage=craft_stage,
+        pipeline_stage=str(pipeline.get("stage") or "agent"),
+    )
+    route_catalog_id = str(next_id or "") or None
+    try:
+        from route_catalog import get_route
+
+        if route_catalog_id and get_route(route_catalog_id) is None:
+            # Prefer action id; fall back to cli: prefix rows
+            if get_route(f"cli:{route_catalog_id}") is not None:
+                route_catalog_id = f"cli:{route_catalog_id}"
+    except Exception:
+        pass
+
     packet = {
         "ok": True,
         "kind": "ai-film-dispatch",
@@ -1331,6 +1272,7 @@ def build_dispatch(
         "root": str(root),
         "auto": True,
         "craft_stage": craft_stage,
+        "stage_public": stage_proj.get("stage_public"),
         "craft": craft,
         "craft_line": craft_report.get("line") or craft.get("label_zh"),
         "pipeline_stage": pipeline.get("stage"),
@@ -1339,6 +1281,7 @@ def build_dispatch(
             "label_zh": pipeline.get("label_zh"),
             "craft_line": pipeline.get("craft_line"),
         },
+        "route_catalog_id": route_catalog_id,
         "next_id": next_id,
         "next_cmd": next_cmd,
         "next_action": next_action,

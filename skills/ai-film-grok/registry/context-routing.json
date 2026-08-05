@@ -78,6 +78,44 @@
         "reason": "Final review and export evidence",
         "required": true
       }
+    ],
+    "agent": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "Story and Director's Lens",
+        "required": true
+      },
+      {
+        "path": "references/script-value-debrief.md",
+        "reason": "Presentation-value L0–L4 before story lock",
+        "required": false
+      }
+    ],
+    "visual": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "Verified still and motion generation",
+        "required": true
+      },
+      {
+        "path": "references/comfy-weapon-armory.md",
+        "reason": "Live route verified 5090 still and edit weapons",
+        "required": false
+      }
+    ],
+    "post": [
+      {
+        "path": "references/stages/post.md",
+        "reason": "public craft post",
+        "required": true
+      }
+    ],
+    "deliver": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "public craft deliver",
+        "required": true
+      }
     ]
   },
   "pipeline_stages": {
@@ -183,6 +221,20 @@
         "reason": "Human review evidence",
         "required": true
       }
+    ],
+    "export.package": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "desktop export package",
+        "required": true
+      }
+    ],
+    "dispatch.orchestrate": [
+      {
+        "path": "references/routing-map.md",
+        "reason": "routing map for next_action",
+        "required": false
+      }
     ]
   },
   "issues": {
@@ -211,6 +263,20 @@
       {
         "path": "references/stages/approval.md",
         "reason": "Pilot, paid generation or final-review pause",
+        "required": true
+      }
+    ],
+    "HEAT_AGENT_HARD_FAIL": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "adult max heat before bulk",
+        "required": true
+      }
+    ],
+    "QUALITY_GATE_FAILED": [
+      {
+        "path": "references/stages/post.md",
+        "reason": "quality gate repair path",
         "required": true
       }
     ]

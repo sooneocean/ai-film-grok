@@ -20,18 +20,29 @@ aifilm dispatch --root <film>
 | **编排 dispatch** | 当前该干什么 | `aifilm dispatch` · `spine/dispatch.py` |
 | **next_actions** | 从片根状态列候选步 | `spine/next_actions.py` |
 | **skill 注册** | 能力清单 + argv 桥 | `registry/skills.json` · `skill_runner.py` |
-| **镜头 capability** | 单镜选 Grok/H3/FRW 等 | `aifilm route` · `plan/production_router.py` |
-| **武器 armory** | 本机 Comfy 武器 + provider 锁 | dispatch.`weapon_route` · `media/weapon_router.py` |
+| **镜头 capability** | 单镜选 Grok/H3/FRW 等 | `aifilm route` · `plan/production_router.py` · 回执 `layer=capability` |
+| **武器 armory** | 本机 Comfy 武器 + provider 锁 | dispatch.`weapon_route` · `media/weapon_router.py` · `layer=weapon` |
+
+### R5 选路三层契约（禁止互抢）
+
+1. **intent**：`build_shot_intent` / `classify_shot_content` — 内容 → lane 需求  
+2. **capability**：`explain_route` — 在 capability-snapshot 内排名（不写、不花）  
+3. **weapon**：`build_weapon_route` — 本机 armory + film-spec provider 锁  
+
+人读矩阵：`weapon-lane-matrix.md`。改默认 lane 须显式确认，禁止静默切 `i2v_provider`。
 
 支路（不是总控）：`post_route`（字幕路径）、`dialogue_i2i_route`、`frw_dispatch`。
 
-## 三套名字（暂时并存 · R2 投影）
+## 三套名字（R2：`spine/stage_model.py` 投影）
 
 | 用途 | 名字 |
 |------|------|
-| 对外 / SKILL 阶段 | agent → visual → voice → post → deliver |
+| 对外 / SKILL 阶段 | agent → visual → voice → post → deliver（`stage_public`） |
 | 内部 pipeline | 同上 + design（≈post）+ done |
+| craft 八环 | idea → … → verified（`craft_stage`） |
 | workflow 状态机 | 11-stage（`workflow_spine`） |
+
+`design` → 对外算 `post`。新代码只从 `stage_model` 取常量，勿再复制 STAGE 元组。
 
 ## 三套 ID（R1 catalog 对齐）
 
