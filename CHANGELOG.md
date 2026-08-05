@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.39.26] - 2026-08-05
+
+### Fixed (version pointer · session closeout)
+- Restore **plugin.json / docs** to the post P2 line after concurrent M5/M6 commits regressed the pointer to `2.39.23` while `2.39.24–25` already shipped post CLI + hotpath contracts.
+- Confirm post modules remain: `post_route` · `caption_pixel_check` · `timeline_clock` · `post_doctor` · `mix_partial`.
+
 ## [2.39.25] - 2026-08-05
 
 ### Added (Post P2 · hotpath contracts)
