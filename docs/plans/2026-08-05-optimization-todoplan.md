@@ -34,6 +34,11 @@
 
 ## Canary log
 
+- **2026-08-05 S5.3-ops queue_empty execute**: film h3-angles-runthrough · pending=0 · stop=`queue_empty` · free-first+capacity-wait · jobs_ran=0  
+  - receipt: `artifacts/2026-08-05-s53-until-empty-queue-empty.json`  
+  - memory: `memory/2026-08-05-s53-until-empty-queue-empty.md`
+
+
 - **2026-08-05 AF7 final**: real execute s_cu i2v · takes 14→16 · drain PARTIAL · 
 
 - **2026-08-05 dry**: film `skills/.../h3-angles-runthrough` · pending=2 · ETA≈18m · `priority_ok` · until-empty stop=`dry_run_pass_execute`  

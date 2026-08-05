@@ -1,0 +1,27 @@
+{
+  "kind": "h3-until-empty-canary",
+  "schema_version": 9,
+  "wave": "S5.3-ops-queue-empty-execute",
+  "at": "2026-08-05T06:52:16.550348+00:00",
+  "film_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough",
+  "profile_env": "h3_primary",
+  "features": {
+    "free_first": true,
+    "capacity_wait_sec": 15,
+    "cli": "aifilm h3 cycle --until-empty --execute --free-first --capacity-wait-sec 15",
+    "policy": "never cancel foreign; capacity wait polls ready only"
+  },
+  "execute": {
+    "stop_reason": "capacity_not_ready",
+    "ok": true,
+    "jobs_ran_total": 0,
+    "cycles_run": 1,
+    "free_prep_outcome": null,
+    "capacity_waits": [],
+    "receipt": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/fill-idle-until-empty.json"
+  },
+  "honest_limits": [
+    "pending_jobs was already 0 (capacity-plan) — this proves stop_reason=queue_empty on execute path, not a multi-hour GPU drain of pending P0/P1",
+    "full overnight drain with jobs_ran>0 still needs a film with pending queue + idle 5090"
+  ]
+}
