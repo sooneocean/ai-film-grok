@@ -211,7 +211,7 @@ def bind_action_to_state(
 
 
 def skill_scripts() -> Path:
-    return Path(__file__).resolve().parent
+    return Path(__file__).resolve().parent.parent
 
 
 def _capability_cache_key(root: Path, i2v_profile: str) -> str:

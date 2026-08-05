@@ -289,7 +289,7 @@ def _validate_argv(
 
 
 def _run_fixed(argv: list[str], *, timeout_sec: int = 600) -> dict[str, Any]:
-    script = Path(__file__).with_name("aifilm_grok.py").resolve()
+    script = Path(__file__).resolve().parent.parent / "aifilm_grok.py"
     python = Path(sys.executable).resolve()
     process = subprocess.run(
         [str(python), str(script), *argv],

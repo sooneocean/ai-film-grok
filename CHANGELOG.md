@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.45] - 2026-08-05
+
+### Changed (module refactor · W3 package layout)
+- Packages: `scripts/spine` · `assets` · `plan` · `gates` (plus existing `core`).
+- Top-level shims rebind via `sys.modules` (public import names unchanged).
+- Nested `Path(__file__)` roots fixed for dispatch/advance/plan schemas.
+- Hub re-exports write-spec `_compatibility_*` for hard-compat tests.
+
 ## [2.39.44] - 2026-08-05
 
 ### Changed (module refactor · W3 package dirs + shims)

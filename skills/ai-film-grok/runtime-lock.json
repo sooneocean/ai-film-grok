@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "469bbad53e7cf8e1c84e36d136642009b174cfa0a40e5f3d80a43a14a80b5d5b"
+      "sha256": "f7c34a5e702d62a17c4cbee4a8f738e92229c08b01e37f16a633e1a5c0ef8e1b"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -274,7 +274,7 @@
     },
     {
       "path": "scripts/autopilot_notify.py",
-      "sha256": "3ce800fc8cc84b27c122a41ad6c918c396cddfcd0d756b7d229406f3207eef03"
+      "sha256": "c03dd02422f43925c2e8701e9730dbf7af536253738eb3a5be57698371370085"
     },
     {
       "path": "scripts/backend-lock",
@@ -330,7 +330,7 @@
     },
     {
       "path": "scripts/checkpoint.py",
-      "sha256": "fce9aec3ac64a0daf8847616030acd33e892e05a0d22083c7a41dafcf1a633e5"
+      "sha256": "bd86de10359008312fcc11ee12bbfde90d021de88b889bbe5f71031c69235aa9"
     },
     {
       "path": "scripts/cinema_prompt.py",
@@ -570,7 +570,7 @@
     },
     {
       "path": "scripts/continue_handoff.py",
-      "sha256": "8924a24128a54d04bb743439c20a5adf846d2d6ae8375f58b8f2fdc521649fba"
+      "sha256": "7d0f99105d5ede4ca5e4b3788bce9bd7b3de965c41a0f9d54909b7640f8852fe"
     },
     {
       "path": "scripts/continuity.py",
@@ -1458,11 +1458,23 @@
     },
     {
       "path": "scripts/spine/advance.py",
-      "sha256": "f6a711c421e168aa802b90b4b2442d4bd652c71d91e4f5a27594f4d3d0c71329"
+      "sha256": "9b6cc33b2a498e91caee71e12a1e6316477c4ac573a1236358171c982713da86"
     },
     {
       "path": "scripts/spine/autopilot.py",
       "sha256": "158d16a3c942b39277f0087cc770d0624ad4374902c77056d230eb61e4a1680f"
+    },
+    {
+      "path": "scripts/spine/autopilot_notify.py",
+      "sha256": "3ce800fc8cc84b27c122a41ad6c918c396cddfcd0d756b7d229406f3207eef03"
+    },
+    {
+      "path": "scripts/spine/checkpoint.py",
+      "sha256": "fce9aec3ac64a0daf8847616030acd33e892e05a0d22083c7a41dafcf1a633e5"
+    },
+    {
+      "path": "scripts/spine/continue_handoff.py",
+      "sha256": "8924a24128a54d04bb743439c20a5adf846d2d6ae8375f58b8f2fdc521649fba"
     },
     {
       "path": "scripts/spine/craft_spine.py",
@@ -1470,7 +1482,7 @@
     },
     {
       "path": "scripts/spine/dispatch.py",
-      "sha256": "d26c076c8fbe4b45550361da4bf7a8829090fe3a80684119f18af6b0e57654d0"
+      "sha256": "b5b7de86f5f6bd67fa0afe2b4c0b8c806e3ef5cfd4f38819f968b4bdc305c37c"
     },
     {
       "path": "scripts/spine/dispatch_compact.py",

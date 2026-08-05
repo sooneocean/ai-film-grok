@@ -449,7 +449,14 @@ from cli_status import (  # noqa: E402, F401
     cmd_doctor,
     cmd_status,
 )
-from cli_write_spec import cmd_write_spec  # noqa: E402 — write-spec cluster extracted (W5b)
+from cli_write_spec import (  # noqa: E402
+    _compatibility_audio_cues,
+    _compatibility_director_intent,
+    _compatibility_dramatic_functions,
+    _compatibility_screen_modes,
+    _compatibility_vo_mode,
+    cmd_write_spec,
+)
 
 
 def _run_optimization_cli(args: argparse.Namespace, action: str) -> int:
