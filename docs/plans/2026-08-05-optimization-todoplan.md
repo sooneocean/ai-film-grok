@@ -37,6 +37,9 @@
   - receipt: `artifacts/2026-08-05-h3-until-empty-canary.json`  
   - memory: `memory/2026-08-05-h3-until-empty-canary.md`  
   - worktree: pruned 2 prunable entries
+- **2026-08-05 AF7 execute**: same film · capacity blocked · stop=`capacity_not_ready` · jobs_ran=0 · takes 14→14  
+  - receipt: `docs/reports/2026-08-05-h3-until-empty-canary-af7.json`  
+  - memory: `memory/2026-08-05-af7-until-empty-execute-canary.md`  
 
 ## 不做
 

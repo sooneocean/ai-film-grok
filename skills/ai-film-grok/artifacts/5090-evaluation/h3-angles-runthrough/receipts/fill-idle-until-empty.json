@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-fill-idle-until-empty",
+  "ok": true,
+  "root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough",
+  "execute": true,
+  "until_empty": true,
+  "stop_reason": "capacity_not_ready",
+  "cycles_run": 1,
+  "max_cycles": 5,
+  "max_jobs_per_cycle": 2,
+  "jobs_ran_total": 0,
+  "plan_before": {
+    "pending_jobs": 2,
+    "eta_minutes_total": 18.0,
+    "p0_jobs": 1
+  },
+  "plan_after": {
+    "pending_jobs": 2,
+    "eta_minutes_total": 18.0,
+    "p0_jobs": 1
+  },
+  "before": {
+    "p0_pending": 5,
+    "p1_pending": 0,
+    "p2_pending": 0,
+    "pending_jobs": 2,
+    "multi_take_shots": 7,
+    "by_priority": {
+      "P0a": 3,
+      "P0b": 1,
+      "P0c": 1,
+      "done": 2
+    },
+    "by_mode": {
+      "i2v": 1,
+      "t2v": 1
+    },
+    "priority_ok": true,
+    "eta_minutes_total": 18.0
+  },
+  "after": {
+    "p0_pending": 5,
+    "p1_pending": 0,
+    "p2_pending": 0,
+    "pending_jobs": 2,
+    "multi_take_shots": 7,
+    "by_priority": {
+      "P0a": 3,
+      "P0b": 1,
+      "P0c": 1,
+      "done": 2
+    },
+    "by_mode": {
+      "i2v": 1,
+      "t2v": 1
+    },
+    "priority_ok": true,
+    "eta_minutes_total": 18.0
+  },
+  "cycles": [
+    {
+      "cycle": 1,
+      "jobs_ran": 0,
+      "skipped_reason": "capacity_not_ready",
+      "ok": true,
+      "pending_after": 2,
+      "next_after": {
+        "shot_id": "s_cu",
+        "priority": "P0b",
+        "lane": "primary_h3",
+        "mode": "i2v",
+        "command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode i2v --register",
+        "best_mean": null,
+        "reasons": [
+          "dialogue_close_restricted",
+          "dual_need_i2v",
+          "dual_second_leg_i2v"
+        ]
+      }
+    }
+  ],
+  "pk_multi_take": 7,
+  "dailies_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/pk-dailies.md",
+  "human_next": [
+    "aifilm h3 pk-compare --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\"",
+    "aifilm select-shortlist --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --promote  # only after human OK",
+    "aifilm ship-prep --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\""
+  ],
+  "note": "until-empty loop owns the process until stop; never auto-promote; not a systemd/launchd daemon"
+}

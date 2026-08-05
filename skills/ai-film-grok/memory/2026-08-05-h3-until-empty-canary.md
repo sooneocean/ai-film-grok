@@ -12,7 +12,8 @@
 - [x] capacity-plan 回执
 - [x] fill-idle-until-empty dry 回执
 - [x] canary 汇总 artifacts/2026-08-05-h3-until-empty-canary.json
-- [ ] 真片 --execute 过夜（人确认 5090 idle）
+- [x] 真片 --execute 跑过（AF7）：capacity_not_ready 诚实停
+- [ ] idle 后再跑到 queue_empty 真 takes 增量
 
 ## 链
 - docs/plans/2026-08-05-optimization-todoplan.md

@@ -1,6 +1,6 @@
 # Antifragility Todo Plan — ai-film-grok（2026-08-05）
 
-**Status:** ACTIVE · AF1–AF6+AF8 SHIPPED in 2.39.34 · AF7 ops open · was analysis-only（本档不写生产代码）  
+**Status:** ACTIVE · AF1–AF6+AF8 SHIPPED in 2.39.34 · AF7 PARTIAL (execute capacity_not_ready) · was analysis-only（本档不写生产代码）  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · plugin **2.39.34**  
 **Theme:** 反脆弱 = **压力下更诚实、更可恢复**（fail-closed 门 + PARTIAL 回执 + 超时/resume），不是「多重试几次假装成功」。
 
@@ -139,7 +139,7 @@
   - 扩 wave_a / closeout 测
 - **Policy:** **fail-closed**（有 final 时）；无 final 可 skip
 
-### AF7 · 真片 until-empty canary（P2 · 运维 / 非本分析目标实现）
+### AF7 · 真片 until-empty canary（P2 · 运维） · **PARTIAL 2026-08-05**
 
 - **Problem signal:** dry canary 已过（`artifacts/2026-08-05-h3-until-empty-canary.json`）；**真烧 GPU 过夜**仍 open（optimization next）。
 - **Failure mode:** 代码路径未在 5090 idle 真压下验证 stop_reason / lease / 误杀。

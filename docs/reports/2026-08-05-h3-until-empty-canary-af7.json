@@ -1,0 +1,106 @@
+{
+  "kind": "h3-until-empty-canary",
+  "schema_version": 2,
+  "at": "2026-08-05T03:18:32+00:00",
+  "wave": "AF7",
+  "film_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough",
+  "profile_env": "h3_primary",
+  "execute": true,
+  "capacity_before": {
+    "ok": true,
+    "ready": false,
+    "status": "blocked",
+    "blockers": [
+      {
+        "code": "RAM_BELOW_FLOOR",
+        "message": "free system memory is below the 12 GiB submission floor"
+      },
+      {
+        "code": "VRAM_BELOW_FLOOR",
+        "message": "free GPU memory is below the 24 GiB submission floor"
+      },
+      {
+        "code": "COMFY_QUEUE_BUSY",
+        "message": "another ComfyUI prompt is running or pending"
+      }
+    ],
+    "vram_free_bytes": 6446423903,
+    "base_url": "http://127.0.0.1:18188"
+  },
+  "capacity_after": {
+    "ok": true,
+    "ready": false,
+    "status": "blocked",
+    "blockers": [
+      {
+        "code": "RAM_BELOW_FLOOR",
+        "message": "free system memory is below the 12 GiB submission floor"
+      },
+      {
+        "code": "VRAM_BELOW_FLOOR",
+        "message": "free GPU memory is below the 24 GiB submission floor"
+      },
+      {
+        "code": "COMFY_QUEUE_BUSY",
+        "message": "another ComfyUI prompt is running or pending"
+      }
+    ]
+  },
+  "capacity_plan": {
+    "ok": true,
+    "pending_jobs": 2,
+    "eta_minutes_total": 18.0,
+    "priority_ok": true,
+    "by_mode": {
+      "i2v": 1,
+      "t2v": 1
+    },
+    "p0_jobs": 1
+  },
+  "until_empty_execute": {
+    "ok": true,
+    "stop_reason": "capacity_not_ready",
+    "jobs_ran_total": 0,
+    "cycles_run": 1,
+    "plan_before": {
+      "pending_jobs": 2,
+      "eta_minutes_total": 18.0,
+      "p0_jobs": 1
+    },
+    "plan_after": {
+      "pending_jobs": 2,
+      "eta_minutes_total": 18.0,
+      "p0_jobs": 1
+    },
+    "cycles": [
+      {
+        "cycle": 1,
+        "jobs_ran": 0,
+        "skipped_reason": "capacity_not_ready",
+        "ok": true,
+        "pending_after": 2,
+        "next_after": {
+          "shot_id": "s_cu",
+          "priority": "P0b",
+          "lane": "primary_h3",
+          "mode": "i2v",
+          "command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode i2v --register",
+          "best_mean": null,
+          "reasons": [
+            "dialogue_close_restricted",
+            "dual_need_i2v",
+            "dual_second_leg_i2v"
+          ]
+        }
+      }
+    ]
+  },
+  "takes_mp4_count": 14,
+  "receipts": {
+    "capacity_plan": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/h3-capacity-plan.json",
+    "until_empty": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/fill-idle-until-empty.json"
+  },
+  "verdict": "PARTIAL",
+  "note": "Execute path ran; fail-closed stop on capacity_not_ready (VRAM/RAM floor and/or Comfy queue busy). No fake GPU burn. AF7 honesty PASS — re-run when 5090 idle for queue_empty burn.",
+  "human_next": "When idle: aifilm h3 cycle --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --until-empty --execute"
+}
