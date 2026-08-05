@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "87f4adcf45104d7ec41bae201c1c3847ccbb7280c37e17d7a5bd78bba59e956d"
+      "sha256": "f18f7fcacba8ca8a5bd0e81299be461baf9d438ff60b5e0a0aa964af6d9f6716"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -417,6 +417,10 @@
       "sha256": "1709c864f0520f67ae6a7d5b327b49b8e537a293d8074adb9af274db4a0ec192"
     },
     {
+      "path": "scripts/cli_write_spec.py",
+      "sha256": "305e22694f246324983a109359aea9e2ce5e14f71c0222e507e85dee859f8135"
+    },
+    {
       "path": "scripts/clip_uniqueness.py",
       "sha256": "6172ddc41749385b9b513cb933063a072ee5ba0a9efd8ec69a4734fb462b4375"
     },
@@ -590,11 +594,11 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "494a4255d0ea4269fad50f52db2034d2a0d7da667bb7e82bb2dfc43f539562bd"
+      "sha256": "6b793515dcb06e3c9961c0bb414e0a6d0eef05ae3b46b62d50673fb9d6a3f7fe"
     },
     {
       "path": "scripts/dispatch_compact.py",
-      "sha256": "4731927198d6f8a0eb86e3f4f13b8a401528061ec4f25949f417ea0d0233dd37"
+      "sha256": "fb808f6ec037551885402daa8cea8f4bbbe5c9228d1bada9a52b49235b18bc03"
     },
     {
       "path": "scripts/drama_graph.py",
@@ -674,7 +678,7 @@
     },
     {
       "path": "scripts/five_track.py",
-      "sha256": "17d7377dadbd21cefd0b461b4ed518961cecaafcd8d8134da3b539ea5f39c28e"
+      "sha256": "6b87f6cdebf619c811d6d53d96b63ed8e67c5c5d3a8728e6afb6b41bd6933197"
     },
     {
       "path": "scripts/framing_lint.py",
@@ -845,6 +849,10 @@
       "sha256": "709f8e6ddfa1614b5a0940ec62167bffb986f10165314659e787f637b61f7a0b"
     },
     {
+      "path": "scripts/mix_partial.py",
+      "sha256": "d2d07d6342a3fb4cafb7e708dedc9bb43d1d918a9584f9f4d2de723fc7f9b1a4"
+    },
+    {
       "path": "scripts/mmaudio_adapter.py",
       "sha256": "f61b469796be72e6c75aea136f8635afa7e128caa9e53062b2cf91eb2fbbaa29"
     },
@@ -1002,7 +1010,7 @@
     },
     {
       "path": "scripts/preflight.py",
-      "sha256": "a05edd11ffe1bed2293f3d66b3f882d2da1040c47a2be9db063fb5819c5c05bf"
+      "sha256": "64fe6429c2fa164ebf7961f8cf4dfcbee4f6497a3e34bdd3ee5428a4238088b3"
     },
     {
       "path": "scripts/product_brief.py",
@@ -1094,7 +1102,7 @@
     },
     {
       "path": "scripts/render_final.py",
-      "sha256": "71ee0ada6cd38bbca9096d7e1dfdd9444a2a628e2be89d0439fa7860d4197542"
+      "sha256": "07fcb79ebf1162db42a897c43c3c223e50aa3c2896f454c1d1566fe271d4ae59"
     },
     {
       "path": "scripts/render_final_music.py",
