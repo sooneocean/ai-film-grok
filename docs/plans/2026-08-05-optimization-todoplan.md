@@ -34,9 +34,10 @@
 
 ## Canary log
 
-- **2026-08-05 S5.3-ops queue_empty execute**: film h3-angles-runthrough · pending=0 · stop=`queue_empty` · free-first+capacity-wait · jobs_ran=0  
-  - receipt: `artifacts/2026-08-05-s53-until-empty-queue-empty.json`  
-  - memory: `memory/2026-08-05-s53-until-empty-queue-empty.md`
+- **2026-08-05 S5.3-ops until-empty execute PARTIAL**: film h3-angles-runthrough · pending_after=2 · stop=`capacity_not_ready` · free-first+capacity-wait · jobs_ran=0  
+  - live: `…/receipts/fill-idle-until-empty.json` · canary: `artifacts/2026-08-05-s53-until-empty-queue-empty.json` (content corrected; not queue_empty)  
+  - memory: `memory/2026-08-05-s53-until-empty-queue-empty.md`  
+  - full `queue_empty` drain still OPEN_OPS
 
 
 - **2026-08-05 AF7 final**: real execute s_cu i2v · takes 14→16 · drain PARTIAL · 

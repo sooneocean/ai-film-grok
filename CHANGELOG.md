@@ -2,6 +2,11 @@
 
 ## [2.39.67] - 2026-08-05
 
+### Fixed (docs · S5.3 canary honesty)
+- Corrected false `queue_empty` narrative: live receipt is **stop_reason=capacity_not_ready** (pending_after=2, jobs_ran=0).
+- Aligned canary JSON, memory, optimization-todoplan, strategy R-ops (PARTIAL; overnight drain OPEN).
+
+
 ### Fixed (doctor core · release-light clean checkout)
 - **cli_status doctor**: `core_readiness.tts_backend` passes when edge-tts is installed even if preferred (mimo) is unconfigured — unblocks pre-push light gate without keys.
 - Preferred-unready still reported in `tts.ok` for honest production synthesis path.

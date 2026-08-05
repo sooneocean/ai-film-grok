@@ -114,7 +114,7 @@ story.receive → script-value-debrief → plan run → fidelity
 
 | ID | Residual | Why still hurts / status |
 |----|----------|-------------------------|
-| **R-ops** | Full overnight drain to `queue_empty` | **PARTIAL** execute `queue_empty` proven on empty pending (2.39.67 canary); multi-job drain OPEN when film has pending + idle 5090 |
+| **R-ops** | Full overnight drain to `queue_empty` | **PARTIAL** execute path proven; live stop=`capacity_not_ready` (pending_after=2, jobs_ran=0) on h3-angles canary — **not** queue_empty; multi-job drain OPEN until idle 5090 |
 | **R-af1** | Hot-path subprocess timeouts | **PARTIAL→core SHIPPED** through 2.39.65 (adapters/node); compose_preview/speech_preview Popen residual open |
 | **R-af2** | closeout ↔ post_doctor / caption-pixel | **SHIPPED** AF3/AF6 |
 | **R-doc** | hard-defaults FRW-first bulk prose | **SHIPPED** AF8 → h3_primary |
