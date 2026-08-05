@@ -1,3 +1,5 @@
+> **Superseded** by `docs/plans/2026-08-05-project-module-refactor.md` (W0–W5 package layout).
+
 # ai-film-grok 系统级重構優化計畫
 
 > 目標：降低維護成本、消除重複代碼、改善安全性與 Git 倉庫健康度、提升可測試性。

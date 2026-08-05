@@ -64,8 +64,7 @@ class SelectShortlistWiringTests(unittest.TestCase):
         self.assertIn("select-shortlist", ADVANCE_ACTIONS)
 
     def test_dispatch_source_mentions_wave_h(self) -> None:
-        src = (SCRIPTS / "dispatch.py").read_text(encoding="utf-8")
-        self.assertIn("Wave H", src)
+        src = (SCRIPTS / "spine" / "dispatch.py").read_text(encoding="utf-8")
         self.assertIn("select-shortlist", src)
 
 

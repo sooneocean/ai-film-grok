@@ -2,6 +2,14 @@
 
 ## [2.39.50] - 2026-08-05
 
+### Fixed (Workflow wire · recompute_gates phase/primary alignment)
+- Legacy readiness **only** trusts `recompute_gates` for style/spec/clips (no shots-list-as-spec).
+- Plate on disk advances public phase to `post_master` (same family as closeout primary).
+- Bulk/H3 next require `gates.spec` green.
+- Tests drive disk → `recompute_gates` → `build_dispatch`.
+
+## [2.39.50] - 2026-08-05
+
 ### Docs / Ops (S5.3 execute canary PARTIAL)
 - Real `h3 cycle --until-empty --execute` on angles film; **stop_reason=capacity_not_ready** (fail-closed honesty).
 - Receipt: `artifacts/2026-08-05-s53-until-empty-canary.json` · strategy rev 2026-08-05d.
@@ -42,6 +50,12 @@
 - **S5.3** remains **OPEN_OPS** (true overnight canary needs human GO + 5090).
 - **S5.4 / S6 / S7** closed to evidence (generation_ready compact · util · timeout floors).
 - Strategy rev **2026-08-05c**: `docs/plans/2026-08-05-strategy-director-engineer-upgrade.md`.
+## [2.39.47] - 2026-08-05
+
+### Changed (module refactor · W4/W5 finish)
+- **W4 packages**: `scripts/post/render_final.py` · `scripts/narrative/edit_policy_heat.py` with top-level hard-compat shims.
+- **W5 docs**: AGENTS layout/AREA pointers · refactor tracker closeout · REFACTORING_PLAN superseded pointer.
+- Public import names and CLI strings unchanged.
 
 ## [2.39.46] - 2026-08-05
 

@@ -67,7 +67,7 @@ class AdvanceAllowlistTests(unittest.TestCase):
 class DispatchInjectSmoke(unittest.TestCase):
     def test_bulk_preflight_insert_source_exists(self) -> None:
         # static contract: dispatch source mentions Wave F bulk-preflight inject
-        src = (SCRIPTS / "dispatch.py").read_text(encoding="utf-8")
+        src = (SCRIPTS / "spine" / "dispatch.py").read_text(encoding="utf-8")
         self.assertIn("Wave F", src)
         self.assertIn("bulk-preflight", src)
         self.assertIn("variety-precheck", src)

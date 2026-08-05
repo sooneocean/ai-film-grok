@@ -20,15 +20,25 @@ ai-film-grok/                    ← plugin root / git root
 ├── commands/                    ← /ai-film-grok · /aifilm
 ├── skills/ai-film-grok/         ← skill 本体
 │   ├── SKILL.md                 ← 主脊（短）
-│   ├── scripts/                 ← aifilm CLI + 模块
+│   ├── scripts/                 ← aifilm CLI + domain packages
+│   │   ├── core/                ← emit / film_io / gates / media_ops
+│   │   ├── spine/               ← dispatch / advance / workflow
+│   │   ├── assets/              ← continuity / style_lock / face
+│   │   ├── plan/                ← drama_graph / narrative_control
+│   │   ├── gates/               ← preflight / production_gates
+│   │   ├── post/                ← render_final（W4）
+│   │   ├── narrative/           ← edit_policy_heat（W4）
+│   │   ├── cli_*.py             ← CLI clusters（shim-compat names）
+│   │   └── <name>.py            ← hard-compat shims → packages
 │   ├── references/              ← 稳定规则
-│   ├── references/lessons-*     ← 踩坑（可晋升到稳定）
 │   ├── memory/                  ← 会话索引
 │   ├── tests/                   ← pytest
 │   ├── templates/ schemas/ assets/
-│   └── config.env.example       ← 复制为 config.env（gitignored）
-└── .github/workflows/           ← GitHub CI
+│   └── config.env.example
+└── .github/workflows/
 ```
+
+Package layout tracker: `docs/plans/2026-08-05-project-module-refactor.md`
 
 ## 维护区块（改哪测哪）
 
@@ -40,10 +50,9 @@ ai-film-grok/                    ← plugin root / git root
 | Assets | `scripts/assets/*` · character/location/prop/state | `test_asset_registry` |
 | Media | I2V / queue / register / OAuth 出图 | media / continuity 相关 |
 | Audio | TTS / BGM / recipe / lipsync | `test_audio_recipe` `test_capability` |
-| Post | final / compose / review / export | `test_delivery_gates` · `test_final_hotpath_contracts` |
-| Narrative | 色气 / 性爱时长≥20% / 剪辑 / 景别 / lessons | `test_heat_arc_multi` + soft gate |
-| Gates | `scripts/gates/*` · hard-defaults / security / runtime-lock | doctor + delivery gates · `test_w3_package_shims` |
-| Core | `scripts/core/*` · film_io / media_ops / emit | hub re-export hard-compat tests |
+| Post | final / compose / review / export · `scripts/post/` | `test_delivery_gates` compose 相关 |
+| Narrative | 色气 / 性爱时长≥20% / 剪辑 / 景别 · `scripts/narrative/` | `test_heat_arc_multi` + soft gate |
+| Gates | hard-defaults / security / runtime-lock | doctor + delivery gates |
 
 细则见 skill 内 `references/pipeline-methodology.md` · `references/hard-defaults.md`。
 

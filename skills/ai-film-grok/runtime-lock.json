@@ -742,7 +742,7 @@
     },
     {
       "path": "scripts/edit_policy_heat.py",
-      "sha256": "f736fc69c5f396fa74f1d68dc01de022536c599f64a19de6ea49962c18a82b57"
+      "sha256": "4bb8336b5ea12f949f86eaf86ae08f6b9bee623bf548ea995dc68a52ad7fcf22"
     },
     {
       "path": "scripts/edit_strategy.py",
@@ -1081,6 +1081,14 @@
       "sha256": "be0ebedb05de6076de9247e072f585b63431177a7ea8e88ec98ac8292014f2b5"
     },
     {
+      "path": "scripts/narrative/__init__.py",
+      "sha256": "f84050cc53166190c306c0692d7a76ea40a13e60f43c1d3222fa052ab2238c45"
+    },
+    {
+      "path": "scripts/narrative/edit_policy_heat.py",
+      "sha256": "f736fc69c5f396fa74f1d68dc01de022536c599f64a19de6ea49962c18a82b57"
+    },
+    {
       "path": "scripts/narrative_control.py",
       "sha256": "f9b2c7ca485ab3000bbb264dade5de42dd839670c18b942543c21279260c8f67"
     },
@@ -1229,6 +1237,14 @@
       "sha256": "d57d2267cba1c387c9e95f7d3a29d4a5b6273ef5a1a79c22765b48965a7d7397"
     },
     {
+      "path": "scripts/post/__init__.py",
+      "sha256": "fe46e475576cef34e64e2c97eb09901de4e46659dcaa54ed705f4e7ebecca074"
+    },
+    {
+      "path": "scripts/post/render_final.py",
+      "sha256": "b4467f38bd2e8735bdf833bfb0c694b65a25f01a192fbeda7b279c810db47914"
+    },
+    {
       "path": "scripts/post_audit.py",
       "sha256": "2a0863c72d939a213713117455ea8b5bde8eb313e1a65030fdcc85f4aaae11bf"
     },
@@ -1346,7 +1362,7 @@
     },
     {
       "path": "scripts/render_final.py",
-      "sha256": "723274bd4a5c5a207f44caa8776ef5c074d04d1b35989a6652e1f48ca885f26d"
+      "sha256": "c1ef0efe1ad7f6bea8438cda0d9389d3c14cd2941ef2ea1fc186731d721866f7"
     },
     {
       "path": "scripts/render_final_music.py",
@@ -1522,7 +1538,7 @@
     },
     {
       "path": "scripts/spine/workflow_spine.py",
-      "sha256": "7359c37327a3c8f5e949ff7aa66864781012ae9d76e6854af75801e0f5afe241"
+      "sha256": "3c37004781f7d69b7351f3650c01bb38b96122c722fd32e4a5dfd1f651a8a586"
     },
     {
       "path": "scripts/stable_audio_adapter.py",

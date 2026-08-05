@@ -298,25 +298,39 @@ def _legacy_production_readiness(
     gates: dict[str, Any],
     manifest: dict[str, Any],
 ) -> dict[str, bool]:
-    """Gate/evidence readiness for legacy roots without drama-graph stage locks.
+    """Gate-aligned readiness for legacy roots without drama-graph stage locks.
 
-    Professional narrative locks stay strict. Legacy public progress follows real
-    production evidence so the seven-step phase does not freeze at define_story
-    while pilot/bulk/plate/final have already advanced.
+    Public seven-step phase MUST track the same gates that drive
+    ``build_next_actions`` / dispatch primary (from ``recompute_gates``).
+
+    Do **not** treat a raw film-spec shots list as ``spec`` green — that races
+    ahead of ``gates["spec"]`` (validate_film_spec) and yields phase=production
+    while primary is still write-spec. Soft-read style/brief only when the
+    corresponding gate key is absent (callers that never recomputed).
     """
-    has_brief = bool(gates.get("brief") or _present(root / "brief.json"))
-    style_ok = bool(gates.get("style_locked"))
-    if not style_ok:
+    if "brief" in gates:
+        has_brief = bool(gates.get("brief"))
+    else:
+        has_brief = _present(root / "brief.json")
+
+    if "style_locked" in gates:
+        style_ok = bool(gates.get("style_locked"))
+    else:
         style = read_json(root / "style-bible.json") or {}
         style_ok = bool(isinstance(style, dict) and style.get("locked"))
-    spec_ok = bool(gates.get("spec"))
-    if not spec_ok:
-        spec = read_json(root / "film-spec.json") or {}
-        shots = spec.get("shots") if isinstance(spec.get("shots"), list) else []
-        spec_ok = bool(shots)
+
+    # Strict: only recompute_gates-validated film-spec advances past design.
+    if "spec" in gates:
+        spec_ok = bool(gates.get("spec"))
+    else:
+        # No gates payload — still refuse shots-list-only promotion.
+        spec_ok = False
+
     pilot_user = _pilot_user_approved(root)
-    clips_ok = bool(gates.get("clips_complete"))
-    final_complete = bool(gates.get("final_complete"))
+    clips_ok = bool(gates.get("clips_complete")) if "clips_complete" in gates else False
+    final_complete = (
+        bool(gates.get("final_complete")) if "final_complete" in gates else False
+    )
     has_final = _has_final_film(root, manifest)
     post_audit = _post_audit_current(root)
 
@@ -325,11 +339,11 @@ def _legacy_production_readiness(
     script_ok = has_brief
     look_ok = style_ok
     shot_ok = look_ok and spec_ok
-    # Clips already complete implies pilot window is past for public progress.
-    pilot_ok = shot_ok and (pilot_user or clips_ok)
-    bulk_ok = pilot_ok and clips_ok
-    # Soft-complete dailies after bulk. Selects/rough stay open until a plate
-    # exists so public phase lands on selects_rough rather than post_master.
+    # Pilot done when user approved, or media already past (clips / plate).
+    pilot_ok = shot_ok and (pilot_user or clips_ok or has_final)
+    # Plate on disk means bulk public-progress is past even if clip inventory
+    # fingerprints lag — closeout is primary, phase must be post_master family.
+    bulk_ok = pilot_ok and (clips_ok or has_final)
     dailies_ok = bulk_ok
     rough_ok = bulk_ok and has_final
     picture_ok = bulk_ok and has_final
@@ -348,6 +362,7 @@ def _legacy_production_readiness(
         "post_locks": post_ok,
         "master_lock": master_ok,
     }
+
 
 
 def build_workflow_status(
