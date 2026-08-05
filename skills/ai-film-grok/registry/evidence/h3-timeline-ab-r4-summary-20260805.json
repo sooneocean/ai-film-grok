@@ -1,0 +1,90 @@
+{
+  "kind": "h3-timeline-ab-r4-summary",
+  "eval_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-timeline-ab-r4-20260805",
+  "seed": 20260805,
+  "rows": [
+    {
+      "combo": "r4_dlg_flat_i2v",
+      "mode": "i2v",
+      "family": "dialogue_mouth_flat",
+      "ok": true,
+      "motion": 19.0763,
+      "id_start": 19.5491,
+      "id_mid": 76.7604,
+      "mouth": 44.7261,
+      "error": null
+    },
+    {
+      "combo": "r4_dlg_tl_i2v",
+      "mode": "i2v",
+      "family": "dialogue_mouth_max",
+      "ok": true,
+      "motion": 11.9222,
+      "id_start": 19.503,
+      "id_mid": 73.4605,
+      "mouth": 30.4837,
+      "error": null
+    },
+    {
+      "combo": "r4_dlg_tl_r2v",
+      "mode": "r2v",
+      "family": "dialogue_mouth_max",
+      "ok": true,
+      "motion": 12.4296,
+      "id_start": 66.0319,
+      "id_mid": 66.7734,
+      "mouth": 24.8233,
+      "error": null
+    },
+    {
+      "combo": "r4_high_flat_r2v",
+      "mode": "r2v",
+      "family": "high_motion_flat",
+      "ok": true,
+      "motion": 18.3937,
+      "id_start": 19.9416,
+      "id_mid": 38.5865,
+      "mouth": 51.8653,
+      "error": null
+    },
+    {
+      "combo": "r4_high_tl_i2v",
+      "mode": "i2v",
+      "family": "high_motion_max",
+      "ok": true,
+      "motion": 18.6721,
+      "id_start": 19.3696,
+      "id_mid": 41.2551,
+      "mouth": 27.4711,
+      "error": null
+    },
+    {
+      "combo": "r4_high_tl_r2v",
+      "mode": "r2v",
+      "family": "high_motion_max",
+      "ok": true,
+      "motion": 26.0017,
+      "id_start": 20.405,
+      "id_mid": 48.2332,
+      "mouth": 50.7239,
+      "error": null
+    },
+    {
+      "combo": "r4_soft_tl_i2v",
+      "mode": "i2v",
+      "family": "soft_portrait_alive",
+      "ok": true,
+      "motion": 4.7533,
+      "id_start": 19.1773,
+      "id_mid": 26.8479,
+      "mouth": 17.5622,
+      "error": null
+    }
+  ],
+  "policy": {
+    "high_motion": "R2V + high_motion_max (Layer-4 timeline) — mean 26.0 beats flat R2V 18.4",
+    "dialogue": "I2V flat still wins mouth (19.1/44.7) vs tl I2V (11.9) vs tl R2V (12.4, id_start 66 bad)",
+    "identity": "I2V soft_portrait_alive timeline ok soft motion 4.75 id_start 19.2",
+    "default_5090": "timeline ON; high energy R2V; dialogue prefer flat author or compact MOUTH ENERGY timeline not body thrash"
+  }
+}

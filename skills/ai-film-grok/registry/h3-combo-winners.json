@@ -3,103 +3,95 @@
   "kind": "h3-combo-winners",
   "policy": "h3_max_effect_combo_v1",
   "source_verdict_kind": "h3-combo-verdict",
-  "ts": "2026-08-05T04:27:18.268670+00:00",
+  "ts": "2026-08-05T09:38:13.458195+00:00",
   "lanes": {
     "hero_identity_lock": {
       "preferred_mode": "i2v",
-      "prompt_family": "soft_portrait",
-      "notes": "R1 soft_i2v still best identity (score~87). soft_portrait_alive only slight motion lift.",
+      "prompt_family": "soft_portrait_alive",
+      "notes": "Lock face from approved still; soft portrait control wins identity L1",
       "winner": {
-        "combo_id": "soft_i2v",
+        "combo_id": "r4_soft_tl_i2v",
         "mode": "i2v",
-        "family": "soft_portrait",
-        "score": 87.0255,
+        "family": "soft_portrait_alive",
+        "score": 74.0181,
         "scores": {
-          "identity_score": 87.0255,
-          "motion_score": 2.0331,
-          "mouth_score": 8.6004,
-          "hero_balanced": 61.5278
+          "identity_score": 74.0181,
+          "motion_score": 4.7533,
+          "mouth_score": 17.5622,
+          "hero_balanced": 53.2386
         },
-        "motion_mean_absdiff": 2.0331,
+        "motion_mean_absdiff": 4.7533,
         "identity": {
-          "start_l1": 8.1782,
-          "mid_l1": 15.6031,
-          "end_l1": 21.0221
+          "start_l1": 19.1773,
+          "mid_l1": 26.8479,
+          "end_l1": 41.6946
         },
-        "mouth_region_std_change": 8.6004
+        "mouth_region_std_change": 17.5622
       }
     },
     "high_motion_energy": {
       "preferred_mode": "r2v",
       "prompt_family": "high_motion_max",
-      "notes": "R2 winner: high_motion_max + R2V (mean~21.6). Write HIGH MOTION MAX / every 0.5s pose change.",
+      "notes": "HIGH MOTION clause required; R2V when energy > identity; I2V first if identity lock still required",
       "winner": {
-        "combo_id": "r2_high_max_r2v",
+        "combo_id": "r4_high_tl_r2v",
         "mode": "r2v",
         "family": "high_motion_max",
-        "score": 21.644,
+        "score": 26.0017,
         "scores": {
-          "identity_score": 77.5719,
-          "motion_score": 21.644,
-          "mouth_score": 4.2337,
-          "hero_balanced": 60.7935
+          "identity_score": 71.455,
+          "motion_score": 26.0017,
+          "mouth_score": 50.7239,
+          "hero_balanced": 57.819
         },
-        "motion_mean_absdiff": 21.644,
+        "motion_mean_absdiff": 26.0017,
         "identity": {
-          "start_l1": 11.0495,
-          "mid_l1": 40.6204,
-          "end_l1": 23.5862
+          "start_l1": 20.405,
+          "mid_l1": 48.2332,
+          "end_l1": 19.3629
         },
-        "mouth_region_std_change": 4.2337
+        "mouth_region_std_change": 50.7239
       }
     },
     "dialogue_mouth_energy": {
       "preferred_mode": "i2v",
-      "prompt_family": "dialogue_mouth_max",
-      "notes": "R2 winner: dialogue_mouth_max + I2V (mouth↑ motion~12, identity start_l1~8). Jaw open/close each Mandarin syllable; R2V only if identity can float.",
+      "prompt_family": "dialogue_mouth_flat",
+      "notes": "Default I2V + Mandarin line inject; R2V only for extreme mouth CU when identity can float",
       "winner": {
-        "combo_id": "r2_dlg_mouth_i2v",
+        "combo_id": "r4_dlg_flat_i2v",
         "mode": "i2v",
-        "family": "dialogue_mouth_max",
-        "score": 72.95901,
+        "family": "dialogue_mouth_flat",
+        "score": 92.02932,
         "scores": {
-          "identity_score": 69.1002,
-          "motion_score": 12.0696,
-          "mouth_score": 34.752,
-          "hero_balanced": 51.991
+          "identity_score": 51.5424,
+          "motion_score": 19.0763,
+          "mouth_score": 44.7261,
+          "hero_balanced": 41.8026
         },
-        "motion_mean_absdiff": 12.0696,
+        "motion_mean_absdiff": 19.0763,
         "identity": {
-          "start_l1": 8.3271,
-          "mid_l1": 53.2759,
-          "end_l1": 53.7673
+          "start_l1": 19.5491,
+          "mid_l1": 76.7604,
+          "end_l1": 78.2746
         },
-        "mouth_region_std_change": 34.752
+        "mouth_region_std_change": 44.7261
       }
     },
     "faceless_env": {
       "preferred_mode": "t2v",
       "prompt_family": "env_no_face",
-      "notes": "R1 env_t2v motion~10.7 beat R2 env_kinetic~7.8; keep steady env drift, not over-amped kinetic.",
+      "notes": "Never hang cast face on T2V; env/bridge only",
       "winner": {
-        "combo_id": "env_t2v",
+        "combo_id": "env_t2v_policy",
         "mode": "t2v",
         "family": "env_no_face",
-        "score": 10.7459,
-        "scores": {
-          "identity_score": 0.0,
-          "motion_score": 10.7459,
-          "mouth_score": 0.0,
-          "hero_balanced": 3.2238
-        },
-        "motion_mean_absdiff": 10.7459,
+        "score": null,
+        "score_basis": "policy_only",
+        "motion_mean_absdiff": null,
         "identity": {
           "start_l1": null,
-          "mid_l1": null,
-          "end_l1": null,
-          "note": "N/A faceless or no still"
-        },
-        "mouth_region_std_change": null
+          "note": "N/A policy_only"
+        }
       }
     }
   },
@@ -108,16 +100,5 @@
     "duration_sec": 5.0,
     "fps": 24,
     "note": "registry tuning.steps.allowed is [20] only"
-  },
-  "source": "r1_r2_best_of_live_20260805",
-  "eval_roots": [
-    "artifacts/5090-evaluation/h3-combo-eval-20260805",
-    "artifacts/5090-evaluation/h3-combo-eval-r2-20260805"
-  ],
-  "r2_delta": {
-    "high_motion": "high_r2v 19.75 → r2_high_max_r2v 21.64",
-    "dialogue": "dlg_i2v motion 1.64 → r2_dlg_mouth_i2v 12.07",
-    "soft": "soft_i2v kept (alive 2.22 motion not enough identity win)",
-    "env": "env_t2v kept over env_kinetic"
   }
 }

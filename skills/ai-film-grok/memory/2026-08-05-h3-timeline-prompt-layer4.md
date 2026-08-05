@@ -31,3 +31,11 @@
 - 政策：默认 timeline；对白走 compact+MOUTH ENERGY，禁 body HIGH MOTION
 - 证据：`registry/evidence/h3-timeline-ab-summary-20260805.json`
 
+## R4 实跑（2026-08-05 5090 · post-fix）
+| lane | winner | 关键数 |
+|------|--------|------|
+| high_motion | **R2V + high_motion_max timeline** | mean **26.0** > flat R2V 18.4 |
+| dialogue | **I2V + dialogue_mouth_flat** | mouth 44.7；tl I2V 11.9 / tl R2V 12.4 id漂 |
+| identity | I2V soft_portrait_alive timeline | mean 4.75 · id_start 19.2 |
+证据：`registry/evidence/h3-timeline-ab-r4-summary-20260805.json` · `--round 4`
+
