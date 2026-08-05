@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.39.43] - 2026-08-05
+
+### Changed (module refactor · W3 package dirs + shims)
+- Package domains under `scripts/`: **assets/** · **spine/** · **gates/** · **plan/** (42 modules).
+- Top-level `import X` kept via thin `sys.modules` shims (hard-compat).
+- Path fixes for skill-root schemas (`parents[2]`) in plan loaders.
+- Tests: `tests/test_w3_package_shims.py`.
+
+## [2.39.42] - 2026-08-05
+
+### Fixed (S1 hang residual · strategy tick)
+- **scene_sound_stems** ffmpeg encode/decode: `timeout=120/180` → `SceneSoundError` on hang (no overnight pipe freeze).
+- **tts_backend** local adapter: `timeout=600` → `TTSError` on hang.
+- **AF1 test**: behavioral `_soft_identity_penalty` TimeoutExpired soft-skip + scene_sound timeout structural assert.
+- **Strategy plan**: S0/S1/S2.1–2 checkboxes aligned to SHIPPED evidence (S2.3 still open).
+
 ## [2.39.41] - 2026-08-05
 
 ### Added (H3 idle-gated combo eval)

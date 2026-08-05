@@ -334,7 +334,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "a19fd892967fc1ecb1107b462b2ff0d1900194224d54eccccd82a85715096a7d"
+      "sha256": "578db3e268561f3a5790ca2a3868d9937c620ce917be1c6ade9dc0b3c563a65e"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -818,7 +818,7 @@
     },
     {
       "path": "scripts/h3_mode.py",
-      "sha256": "2d37aba994972b461b8e605d2064394bfbb867b2e11dd72ad9c62bfa023276db"
+      "sha256": "60bf7b8ad8388000e2991c94851bb43603c2d92c2e14af1d0ef2e16504478164"
     },
     {
       "path": "scripts/h3_workflow.py",
@@ -1218,7 +1218,7 @@
     },
     {
       "path": "scripts/scene_sound_stems.py",
-      "sha256": "1d73755caab28f1165fb9c0e8b7d2bf4b394d215c5b73a27b810d82c5adc45f6"
+      "sha256": "5fc67e2bf3aeea35b53546c7eb9a7d99c22feffb4e50c3bd0c9dc29421643a65"
     },
     {
       "path": "scripts/script_value_debrief.py",
@@ -1402,7 +1402,7 @@
     },
     {
       "path": "scripts/tts_backend.py",
-      "sha256": "bf22236b25e0a07409f629b5455f0aaf323d619babe39566627588d6ca530c2d"
+      "sha256": "00a830ca1c0e42047b23f1066c72a3370c7f2404c107d7728dd4a08572809adc"
     },
     {
       "path": "scripts/tts_rehearsal.py",
