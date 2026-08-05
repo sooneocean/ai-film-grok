@@ -130,7 +130,7 @@ except ImportError:  # pragma: no cover
     sound_cues_to_sfx_kinds = None  # type: ignore
 
 
-# R1 peel: leaf helpers live in final/*; re-export for hard-compat.
+# R1/R1b peel: leaf helpers live in final/*; re-export for hard-compat.
 from final.errors import RenderError  # noqa: E402
 from final.caption_text import (  # noqa: E402, F401
     _ensure_caption_density,
@@ -172,107 +172,37 @@ from final.media_ops import (  # noqa: E402, F401
     stretch_clip,
 )
 
+from final.enhance import (  # noqa: E402, F401
+    build_post_enhancement_vf_chain,
+    resolve_subtitle_mode,
+)
+from final.native_audio import (  # noqa: E402, F401
+    DEFAULT_NATIVE_AUDIO_VOLUME,
+    NATIVE_AUDIO_GAIN_MAX,
+    NATIVE_AUDIO_GAIN_MIN,
+    NATIVE_AUDIO_TARGET_DB,
+    native_dialogue_replaced_by_post_tts,
+    primary_native_shot_ids,
+    resolve_native_audio_gain,
+    resolve_native_audio_volume,
+)
+from final.cards import (  # noqa: E402, F401
+    FONT_CANDIDATES,
+    _wrap_title_lines,
+    mkcard_video,
+    resolve_font,
+    sub_png,
+)
+
 
 # 中文女声优先：旁白是主叙事，必须压过 BGM
 # TTS 质量与稳定声线分开选择；跨服务商降级必须显式开启。
-def build_post_enhancement_vf_chain(
-    enable_denoise: bool = True,
-    enable_sharpen: bool = True,
-    denoise_strength: str = "2.0:1.5:3.0:2.5",
-    sharpen_strength: float = 0.35,
-) -> str:
-    """Build FFmpeg video filter chain for 3D temporal denoising and CAS sharpening."""
-    filters = []
-    if enable_denoise:
-        filters.append(f"hqdn3d={denoise_strength}")
-    if enable_sharpen:
-        filters.append(f"cas=strength={sharpen_strength:.2f}")
-    return ",".join(filters)
-
-
-def resolve_native_audio_volume(
-    args: argparse.Namespace,
-    spec: dict[str, Any],
-    voice_policy: dict[str, Any] | None = None,
-) -> float:
-    """Resolve native I2V audio gain without letting a policy override the CLI."""
-    cli_value = getattr(args, "native_audio_volume", None)
-    if cli_value is not None:
-        raw_value = cli_value
-    elif (voice_policy or {}).get("native_audio_volume") is not None:
-        raw_value = (voice_policy or {})["native_audio_volume"]
-    else:
-        raw_value = spec.get("native_audio_volume", DEFAULT_NATIVE_AUDIO_VOLUME)
-    try:
-        value = float(raw_value)
-    except (TypeError, ValueError) as exc:
-        raise RenderError("native_audio_volume must be between 0 and 1") from exc
-    if value < 0 or value > 1:
-        raise RenderError("native_audio_volume must be between 0 and 1")
-    return value
-
-
-def primary_native_shot_ids(shot_audio: list[dict[str, Any]]) -> list[str]:
-    """Keep usable native ambience, never a stem replaced by rendered TTS."""
-    return [
-        str(item["id"])
-        for item in shot_audio
-        if item.get("native_audio")
-        and item.get("native_audio_audible") is not False
-        and not item.get("native_audio_suppressed_for_tts")
-    ]
-
-
-def native_dialogue_replaced_by_post_tts(shot: dict[str, Any]) -> bool:
-    """True only when an approved dialogue contract explicitly selects post TTS."""
-    contracts = shot.get("dialogue_contracts")
-    if not isinstance(contracts, list):
-        return False
-    for contract in contracts:
-        if not isinstance(contract, dict):
-            continue
-        for line in contract.get("lines") or []:
-            if isinstance(line, dict) and str(line.get("audio_origin") or "") == "post_vo":
-                return True
-    return False
-
-
-def resolve_native_audio_gain(native_record: dict[str, Any] | None) -> float:
-    """Normalize audible I2V stems conservatively; never amplify known silence."""
-    if not isinstance(native_record, dict):
-        return 1.0  # Legacy records have no level receipt.
-    if native_record.get("audible") is False:
-        return 0.0
-    mean_volume_db = native_record.get("mean_volume_db")
-    if not isinstance(mean_volume_db, (int, float)) or isinstance(mean_volume_db, bool):
-        return 1.0
-    gain = 10 ** ((NATIVE_AUDIO_TARGET_DB - float(mean_volume_db)) / 20)
-    return max(NATIVE_AUDIO_GAIN_MIN, min(NATIVE_AUDIO_GAIN_MAX, gain))
-
-
-# 混音：TTS 是对白的唯一来源。含已渲染 TTS 的镜头不得再混入 I2V 原生声，
-# 否则音频驱动 I2V 会把同一句话叠播成两个人声。
-# Multi-track mix (旁白 / 娇喘语助 / 原生 clip 音 / BGM 独立增益):
-# - BGM 生成用固定健康 amp（不吃 music_volume，避免「生成压一次 + 混音再压一次」→ 音乐消失）
-# - music_volume 只在 amix 时用；sidechain 说话时让路，停顿时音乐回来
-# - vocal_color = 色气语助词/娇喘，独立 TTS 轨，不写进 nar（见 voice-tracks.md）
 DEFAULT_MUSIC_VOLUME = 0.48  # 略降 BGM，旁白更贴耳、节奏更干净
-DEFAULT_NATIVE_AUDIO_VOLUME = 0.72  # I2V 自带音乐/环境声是默认主视频声
-NATIVE_AUDIO_TARGET_DB = -22.0  # 留出 global gain、BGM 与 narration ducking 的余量
-NATIVE_AUDIO_GAIN_MIN = 0.50
-NATIVE_AUDIO_GAIN_MAX = 1.60
 DEFAULT_BGM_GEN_AMP = 0.22  # 程序化 BGM 生成响度（固定，勿再乘 music_volume）
 DEFAULT_VO_GAIN = 1.32  # 旁白增益：清晰压过环境音与 BGM（星声 lesson 略抬）
 DEFAULT_VOCAL_COLOR_GAIN = 0.0  # 2026-07-21: 语助轨默认关闭；成片以 nar+BGM 主导
 DEFAULT_VO_RATE = "+0%"  # 默认不拖腔；快节奏色气短片可用 +5%~+8%（禁 -3%+slot 叠拖）
 DEFAULT_VO_PITCH = "+0Hz"
-FONT_CANDIDATES = [
-    "/System/Library/Fonts/STHeiti Medium.ttc",
-    "/System/Library/Fonts/PingFang.ttc",
-    "/Library/Fonts/Arial Unicode.ttf",
-]
-# Re-export policy constants for tests/back-compat
-# Transitions: DEFAULT_TRANSITION_SEC from edit_policy (silk soft dissolve)
 SR = 44100
 # 9:16 竖屏：一句一卡；过长句按逗号拆开，阅读更轻松
 DEFAULT_SUB_MAX_CHARS = 12  # phrase-sized cue; long nar always splits at ，/。
@@ -283,13 +213,6 @@ def read_json(path: Path) -> dict[str, Any]:
     from util import require_json_fnv
 
     return require_json_fnv(path)
-
-
-def resolve_font() -> str:
-    for path in FONT_CANDIDATES:
-        if Path(path).is_file():
-            return path
-    raise RenderError("No Chinese-capable system font found")
 
 
 def tts_to_wav(
@@ -591,194 +514,6 @@ def build_vocal_color_track(
         ]
     )
     return output
-
-
-def _wrap_title_lines(text: str, max_chars: int) -> list[str]:
-    lines: list[str] = []
-    current = ""
-    for char in text:
-        current += char
-        if char in "，。！？… " or len(current) >= max_chars:
-            lines.append(current.strip())
-            current = ""
-    if current.strip():
-        lines.append(current.strip())
-    return lines
-
-
-def sub_png(
-    text: str,
-    path: Path,
-    *,
-    width: int,
-    height: int,
-    font_path: str,
-    title: bool = False,
-    dodge: bool = False,
-    italic: bool = False,
-) -> None:
-    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    if title:
-        font = ImageFont.truetype(font_path, max(42, width // 18))
-        lines = _wrap_title_lines(text, 10)
-        lh = font.size + 18
-        total_h = len(lines) * lh
-        y0 = (height - total_h) // 2
-        for i, line in enumerate(lines):
-            bbox = draw.textbbox((0, 0), line, font=font)
-            tw = bbox[2] - bbox[0]
-            x = (width - tw) // 2
-            draw.text(
-                (x, y0 + i * lh),
-                line,
-                font=font,
-                fill=(255, 236, 242, 255),
-                stroke_width=2,
-                stroke_fill=(40, 10, 24, 255),
-            )
-    else:
-        try:
-            from subtitle_typesetter import break_text_semantically
-
-            lines = break_text_semantically(text, max_chars=18)
-        except Exception:
-            lines = [text]
-
-        font = ImageFont.truetype(font_path, max(30, width // 21))
-        lh = font.size + 10
-        total_th = len(lines) * lh
-        bar_h = total_th + max(40, height // 20)
-
-        text_img = Image.new("RGBA", (width, bar_h + 20), (0, 0, 0, 0))
-        text_draw = ImageDraw.Draw(text_img)
-
-        y0 = (bar_h - total_th) // 2
-
-        for i, line in enumerate(lines):
-            bbox = text_draw.textbbox((0, 0), line, font=font)
-            tw = bbox[2] - bbox[0]
-            x = (width - tw) // 2
-            y = y0 + i * lh
-
-            # soft drop shadow
-            shadow_offset = 3
-            text_draw.text(
-                (x + shadow_offset, y + shadow_offset),
-                line,
-                font=font,
-                fill=(0, 0, 0, 180),
-                stroke_width=3,
-                stroke_fill=(0, 0, 0, 180),
-            )
-            # main text with stroke
-            text_draw.text(
-                (x, y),
-                line,
-                font=font,
-                fill=(255, 250, 252, 255),
-                stroke_width=2,
-                stroke_fill=(0, 0, 0, 255),
-            )
-
-        if italic:
-            text_img = text_img.transform(
-                (width, bar_h + 20),
-                Image.AFFINE,
-                (1, -0.25, 0.25 * (bar_h / 2), 0, 1, 0),
-                resample=Image.BICUBIC,
-            )
-
-        if dodge:
-            for dy in range(bar_h):
-                a = int(120 + 70 * ((bar_h - dy) / max(1, bar_h - 1)))
-                draw.line([(0, dy), (width, dy)], fill=(0, 0, 0, a))
-            img.alpha_composite(text_img, (0, 0))
-        else:
-            for dy in range(bar_h):
-                a = int(120 + 70 * (dy / max(1, bar_h - 1)))
-                draw.line(
-                    [(0, height - bar_h + dy), (width, height - bar_h + dy)], fill=(0, 0, 0, a)
-                )
-            img.alpha_composite(text_img, (0, height - bar_h))
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    img.save(path)
-
-
-def mkcard_video(
-    text: str, out: Path, *, width: int, height: int, duration: float, fps: int, font_path: str
-) -> None:
-    """Title/end card: dark wine gradient + soft highlight (色气 short-film feel).
-
-    Empty ``text`` → **blank pad** (same gradient, no glyphs). Used when designed
-    post (HyperFrames/Remotion) owns title/end lettering so FFmpeg does not
-    double-burn under the designed card.
-    """
-    work = out.parent
-    png = work / f"{out.stem}_card.png"
-    img = Image.new("RGB", (width, height), (12, 6, 14))
-    draw = ImageDraw.Draw(img)
-    # vertical gradient (deep plum → near black)
-    for y in range(height):
-        t = y / max(1, height - 1)
-        r = int(18 + 22 * (1 - t))
-        g = int(6 + 4 * (1 - t))
-        b = int(22 + 18 * (1 - t))
-        draw.line([(0, y), (width, y)], fill=(r, g, b))
-    # soft vignette bars
-    draw.rectangle([0, 0, width, height // 8], fill=(0, 0, 0))
-    draw.rectangle([0, height - height // 8, width, height], fill=(0, 0, 0))
-    label = (text or "").strip()
-    if label:
-        font = ImageFont.truetype(font_path, max(40, width // 16))
-        # CJK short titles: keep one line (max_chars high enough to avoid 戏服玩心|夜)
-        lines = _wrap_title_lines(label, max(16, len(label)))
-        lh = font.size + 18
-        y0 = (height - len(lines) * lh) // 2
-        for i, line in enumerate(lines):
-            bbox = draw.textbbox((0, 0), line, font=font)
-            tw = bbox[2] - bbox[0]
-            x = (width - tw) // 2
-            # soft pink-white for 色气 title
-            draw.text(
-                (x, y0 + i * lh),
-                line,
-                font=font,
-                fill=(255, 236, 242),
-                stroke_width=2,
-                stroke_fill=(40, 10, 24),
-            )
-    img.save(png)
-    run(
-        [
-            "ffmpeg",
-            "-y",
-            "-loop",
-            "1",
-            "-r",
-            str(fps),
-            "-i",
-            str(png),
-            "-t",
-            f"{duration:.3f}",
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-r",
-            str(fps),
-            str(out),
-        ]
-    )
-
-
-def resolve_subtitle_mode(args: argparse.Namespace) -> str:
-    """Return the explicit plate-caption mode; visible captions belong to HyperFrames by default."""
-    subs_mode = str(getattr(args, "subs", "off") or "off").strip().lower()
-    if subs_mode not in {"burn", "off"}:
-        raise RenderError("--subs must be burn|off")
-    return subs_mode
 
 
 def write_final_mix_partial_receipt(

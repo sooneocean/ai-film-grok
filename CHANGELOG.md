@@ -1,6 +1,12 @@
 # Changelog
 
 
+
+## 2.39.59 — 2026-08-05
+
+### Changed
+- R1b structure: peel native/cards/enhance leaves from  into  (re-export hard-compat). LOC ~3271→~3006.
+
 ## [2.39.58] - 2026-08-05
 
 ### Fixed (hang-proof · audio TTS + shortform + media probe paths)

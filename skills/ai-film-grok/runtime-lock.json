@@ -1558,7 +1558,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "fd013e011d9dbd98b02c29d97988e609ed0ca7c5e1dd6da2c99f0ddf24ccec20"
+      "sha256": "d7baab0c4217075d72f8261119a66cbaf0015035c3adae695ffe14f032c0bc59"
     },
     {
       "path": "scripts/post_audit.py",

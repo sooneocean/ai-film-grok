@@ -12,7 +12,7 @@
 | W1 | `scripts/core/*` | **DONE** (~795 LOC) |
 | W2 | CLI extract · hub ≤2500 | **DONE** (hub ~1462) |
 | W3 | Package dirs + shims | **DONE** |
-| W4 | Domain → packages (`post/render_final` · `narrative/edit_policy_heat`) | **DONE** package boundary (`ef9c4c70`) · **internal leaf peels residual** (bodies still ~3271 / ~4015 (R1 leaf rewire)) |
+| W4 | Domain → packages (`post/render_final` · `narrative/edit_policy_heat`) | **DONE** package boundary (`ef9c4c70`) · **internal leaf peels residual** (bodies still ~3006 / ~4015 (R1+R1b leaf rewire)) |
 | W5 | Docs / AREA / shim audit | **DONE** |
 | W6 | `audio/*` + `media/*` packages + shims | **DONE** (v2.39.54 boundary · v2.39.56 path-depth fix) |
 
