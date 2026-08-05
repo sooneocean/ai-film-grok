@@ -650,7 +650,14 @@ def build_next_actions(
                     add(
                         "bulk-preflight",
                         f'aifilm bulk-preflight --root "{r}" --no-tunnel',
-                        "bulk 单门未绿 — 先 bulk-preflight 再 media-queue",
+                        _with_primary(
+                            "bulk 单门未绿 — 先 bulk-preflight 再 media-queue"
+                            + (
+                                f"；失败时点名 still={inv_still} motion={inv_motion}"
+                                if inv_still or inv_motion
+                                else ""
+                            )
+                        ),
                     )
             # H3 lanes: hybrid_h3 (meat) or h3_primary (film-wide local primary).
             h3_enabled = False

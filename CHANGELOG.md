@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.52] - 2026-08-05
+
+### Added (bulk-preflight weapon inventory hints)
+- **bulk_preflight** attaches `weapon_inventory` primaries; failed checks get `weapon_hint`.
+- **next_cmd / next_why** name still/edit/motion primaries (Qwen / H3) on hard fails.
+- **assert_bulk_preflight** error strings include still= / motion= weapons.
+- **next_actions** bulk-preflight why tags inventory primaries.
+- **Tests**: `test_bulk_preflight_inventory.py`.
+
 ## [2.39.51] - 2026-08-05
 
 ### Changed (module refactor · W4/W5 finish)

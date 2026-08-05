@@ -797,12 +797,24 @@
       "sha256": "bf85a2db0c28ef065d2b6916f538fb20a44a62a7ad37b7692513349794781d48"
     },
     {
+      "path": "scripts/final/cards.py",
+      "sha256": "a999870219abc13567a64ba0e6f7c044022ba0845f1807200cc3933b21c35010"
+    },
+    {
+      "path": "scripts/final/enhance.py",
+      "sha256": "6c83e6bb137d1ebfd1bcc94a20466139d499150139d250bf97508a4ebc2c9b3a"
+    },
+    {
       "path": "scripts/final/errors.py",
       "sha256": "7b147d900e2ff63328232f3eb88a709e77e50ec056f8e801fb04daba95c55612"
     },
     {
       "path": "scripts/final/media_ops.py",
       "sha256": "2923a949553ca786ca4709edbfae6b8bb47707e9477692f334c51e2ec1c70bb6"
+    },
+    {
+      "path": "scripts/final/native_audio.py",
+      "sha256": "593f3f2ef77468e1e7eda86cf1b449ccbec62936efc5b101b1adb9312ff18e07"
     },
     {
       "path": "scripts/final/voice.py",
@@ -1526,7 +1538,7 @@
     },
     {
       "path": "scripts/spine/next_actions.py",
-      "sha256": "a336393efd3800ce099e8163709899ad43ecd317511d669a5a1dbf870f92d31e"
+      "sha256": "69be3b254589b1a2161a0a9b7828e31884b39ab57657ae576667f8adca838b14"
     },
     {
       "path": "scripts/spine/project_state.py",
@@ -1714,7 +1726,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "5247da4b3f777eb424e8274edbf067fd604237896f7cd9ee43898d944d928f9e"
+      "sha256": "1f3f0eeeffd4ab96a76c84f92e53ffcc0932901cbff8a525f7dd4c6915dfe6cc"
     },
     {
       "path": "scripts/workflow_spine.py",

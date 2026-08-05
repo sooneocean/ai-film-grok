@@ -206,6 +206,75 @@ def pilot_go_allows_bulk(root: Path | str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _weapon_inventory_for_bulk() -> dict[str, Any]:
+    """Soft attach of documented generation primaries (weapon-inventory SSoT)."""
+    try:
+        from weapon_inventory import inventory_report, primary_for
+
+        rep = inventory_report(validate=True)
+        still = primary_for("text-to-image")
+        edit = primary_for("local-image-edit")
+        motion = primary_for("image-to-video")
+        tts = primary_for("tts_zh_ship")
+        bgm = primary_for("bgm")
+        return {
+            "ok": bool(rep.get("ok")),
+            "line": rep.get("line"),
+            "still_primary": (still or {}).get("id"),
+            "edit_primary": (edit or {}).get("id"),
+            "motion_primary": (motion or {}).get("id"),
+            "tts_primary": (tts or {}).get("id"),
+            "bgm_primary": (bgm or {}).get("id"),
+            "profile_default": rep.get("profile_default"),
+            "cli": "aifilm weapon inventory --tier primary",
+        }
+    except Exception as exc:  # noqa: BLE001 — soft
+        return {"ok": False, "error": str(exc)[:160]}
+
+
+def _bulk_next_cmd_for_failure(
+    root: Path,
+    failed_id: str,
+    *,
+    tunnel_port: int,
+    inv: dict[str, Any],
+) -> str:
+    """Map preflight fail → recovery cmd that names inventory primaries."""
+    still = str(inv.get("still_primary") or "qwen-image-2512-quality")
+    edit = str(inv.get("edit_primary") or "qwen-image-edit-2511-local")
+    motion = str(inv.get("motion_primary") or "minimax-h3-i2v-pilot")
+    r = str(root)
+    cmd_map = {
+        "pilot": f'aifilm pilot pack --root "{r}"',
+        "heat": f'aifilm heat boost --root "{r}" --apply',
+        "state_index": (
+            f'aifilm state-index plan --root "{r}"  # state photos → still primary {still}'
+        ),
+        "still_source": (
+            f'aifilm still-challenge plan --root "{r}"  '
+            f"# peak still: edit={edit} / t2i={still}; ban cast master for undress"
+        ),
+        "still_uniqueness": f'aifilm status --root "{r}"  # still reuse; re-gen with {still}',
+        "anatomy_stills": (
+            f'aifilm register-still --root "{r}"  '
+            f"# anatomy_safe via {edit}; poison still bans I2V ({motion})"
+        ),
+        "geometry": f"fix keyframes to ≥704×1280 9:16 (still primary {still})",
+        "tunnel": (
+            f"aifilm tunnel-probe --port {tunnel_port}  "
+            f"# 18188→8188 required for motion primary {motion}"
+        ),
+        "local_comfy_client": "stop extra comfy_video.py clients (one only)",
+        "gpu_lease": (
+            f'aifilm gpu-lease status --root "{r}"  # lease 5090 before {motion}'
+        ),
+        "variety": (
+            f'aifilm variety-precheck --root "{r}"  # fix ADJACENT_MOTION / poses before {motion}'
+        ),
+    }
+    return cmd_map.get(failed_id, f'aifilm bulk-preflight --root "{r}"')
+
+
 def bulk_preflight(
     root: Path | str,
     *,
@@ -217,6 +286,7 @@ def bulk_preflight(
     """Single-door bulk readiness: pilot · heat · state · stills · anatomy · tunnel · lease."""
     root = _root(root)
     checks: list[dict[str, Any]] = []
+    inv = _weapon_inventory_for_bulk()
 
     def add(cid: str, ok: bool, **extra: Any) -> None:
         checks.append({"id": cid, "ok": ok, **extra})
@@ -391,21 +461,36 @@ def bulk_preflight(
     failed = [c for c in checks if not c.get("ok")]
     ok = not failed
     next_cmd = None
+    next_why = None
+    weapon_hints: dict[str, str] = {}
     if not ok:
-        first = failed[0]["id"]
-        cmd_map = {
-            "pilot": f'aifilm pilot pack --root "{root}"',
-            "heat": f'aifilm heat boost --root "{root}" --apply',
-            "state_index": f'aifilm state-index plan --root "{root}"',
-            "still_uniqueness": f'aifilm status --root "{root}"  # still reuse',
-            "anatomy_stills": f'aifilm register-still --root "{root}"  # anatomy_safe',
-            "geometry": "fix keyframes to ≥704×1280 9:16",
-            "tunnel": f"aifilm tunnel-probe --port {tunnel_port}",
-            "local_comfy_client": "stop extra comfy_video.py clients (one only)",
-            "gpu_lease": f'aifilm gpu-lease status --root "{root}"',
-            "variety": f'aifilm variety-precheck --root "{root}"  # fix ADJACENT_MOTION / poses',
+        first = str(failed[0]["id"])
+        next_cmd = _bulk_next_cmd_for_failure(
+            root, first, tunnel_port=tunnel_port, inv=inv
+        )
+        still = inv.get("still_primary") or "qwen-image-2512-quality"
+        edit = inv.get("edit_primary") or "qwen-image-edit-2511-local"
+        motion = inv.get("motion_primary") or "minimax-h3-i2v-pilot"
+        weapon_hints = {
+            "still_primary": str(still),
+            "edit_primary": str(edit),
+            "motion_primary": str(motion),
         }
-        next_cmd = cmd_map.get(first, f'aifilm bulk-preflight --root "{root}"')
+        # Per-fail weapon-named recovery (agent glance)
+        for c in failed:
+            cid = str(c.get("id") or "")
+            if cid in {"still_source", "still_uniqueness", "state_index", "geometry"}:
+                c["weapon_hint"] = f"still={still}"
+            elif cid == "anatomy_stills":
+                c["weapon_hint"] = f"edit={edit}; ban I2V on poison ({motion})"
+            elif cid in {"tunnel", "gpu_lease", "local_comfy_client", "variety"}:
+                c["weapon_hint"] = f"motion={motion}"
+            elif cid == "pilot":
+                c["weapon_hint"] = f"no bulk until pilot GO · motion primary {motion}"
+        next_why = (
+            f"bulk blocked on {first} · fix via next_cmd · "
+            f"primaries still={still} edit={edit} motion={motion}"
+        )
 
     out = {
         "schema_version": 1,
@@ -416,6 +501,9 @@ def bulk_preflight(
         "checks": checks,
         "failed": [c["id"] for c in failed],
         "next_cmd": next_cmd,
+        "next_why": next_why,
+        "weapon_inventory": inv,
+        "weapon_hints": weapon_hints or None,
         "required_proof": "all checks ok before media-queue bulk add",
     }
     if write:
@@ -457,10 +545,15 @@ def assert_bulk_preflight(
         check_lease=check_lease,
     )
     if require and not report.get("ok"):
+        inv = report.get("weapon_inventory") if isinstance(report.get("weapon_inventory"), dict) else {}
+        motion = inv.get("motion_primary") or "minimax-h3-i2v-pilot"
+        still = inv.get("still_primary") or "qwen-image-2512-quality"
         raise WorkflowPackError(
             "bulk preflight failed: "
             + ",".join(report.get("failed") or [])
             + f" — next: {report.get('next_cmd')}"
+            + f" — weapons: still={still} motion={motion}"
+            + (f" — why: {report.get('next_why')}" if report.get("next_why") else "")
         )
     return report
 

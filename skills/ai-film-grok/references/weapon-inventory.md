@@ -49,3 +49,12 @@ pytest skills/ai-film-grok/tests/test_weapon_inventory.py skills/ai-film-grok/te
 - `generation_ready` → `weapon_inventory` / `inventory_line` / hints
 - `next_actions` H3 why → `wp=minimax-h3-i2v-pilot` 等 primary 标签
 - `aifilm dispatch` compact → `weapon_inventory_line` + motion/still_primary
+
+## bulk-preflight（round 4）
+
+失败时 `receipts/bulk-preflight.json` 带 `weapon_inventory` + `next_why`，点名 still/edit/motion primary：
+
+```bash
+aifilm bulk-preflight --root "<film>" --no-tunnel
+# failed → next_cmd names Qwen edit / H3 motion
+```
