@@ -85,3 +85,29 @@ class PreferredModeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Round2MatrixTests(unittest.TestCase):
+    def test_r2_matrix_covers_optimized_families(self) -> None:
+        from h3_combo_eval import build_combo_matrix, PROMPT_FAMILIES
+        combos = build_combo_matrix(round=2, include_flf=False)
+        modes = {c.mode for c in combos}
+        self.assertIn("i2v", modes)
+        self.assertIn("r2v", modes)
+        self.assertIn("t2v", modes)
+        fams = {c.family for c in combos}
+        for f in ("soft_portrait_alive", "high_motion_max", "dialogue_mouth_max", "env_kinetic"):
+            self.assertIn(f, fams)
+            self.assertIn(f, PROMPT_FAMILIES)
+
+    def test_rank_lanes_best_of_merges_rounds(self) -> None:
+        from h3_combo_eval import rank_lanes_best_of
+        r1 = [{"ok": True, "combo_id": "soft_i2v", "mode": "i2v", "family": "soft_portrait",
+               "lane_tags": ["hero_identity_lock"], "motion_mean_absdiff": 2.0,
+               "identity": {"start_l1": 8.0, "mid_l1": 12.0, "end_l1": 15.0}}]
+        r2 = [{"ok": True, "combo_id": "r2_soft_alive_i2v", "mode": "i2v", "family": "soft_portrait_alive",
+               "lane_tags": ["hero_identity_lock"], "motion_mean_absdiff": 5.0,
+               "identity": {"start_l1": 8.5, "mid_l1": 11.0, "end_l1": 14.0}}]
+        v = rank_lanes_best_of(r1, r2)
+        self.assertIn("hero_identity_lock", v["lanes_complete"])
+        self.assertEqual(v["rounds_merged"], 2)

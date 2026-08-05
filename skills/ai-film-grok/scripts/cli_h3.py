@@ -270,6 +270,7 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     combo.add_argument("--max-wait-sec", type=float, default=3600.0, dest="max_wait_sec")
     combo.add_argument("--no-free-memory", action="store_true")
     combo.add_argument("--write-registry", action="store_true", dest="write_registry")
+    combo.add_argument("--round", type=int, default=1, dest="combo_round", help="1=baseline, 2=R2 optimized families")
     combo.add_argument("--seed", type=int, default=20260805)
     combo.add_argument("--receipt", type=Path, default=None)
 
@@ -375,7 +376,7 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 legacy = skill_root / "artifacts" / "5090-evaluation" / "h3-quality-ab-20260804" / "stills" / "s_ab.png"
                 if legacy.is_file():
                     still = legacy
-            combos = build_combo_matrix(seed=int(getattr(args, "seed", 20260805) or 20260805))
+            combos = build_combo_matrix(seed=int(getattr(args, "seed", 20260805) or 20260805), round=int(getattr(args, "combo_round", 1) or 1))
             prepare_eval_root(eval_root, source_still=still, end_still=getattr(args, "end_still", None), combos=combos)
             report = run_combo_grid(
                 eval_root, combos=combos,

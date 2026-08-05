@@ -111,6 +111,106 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "slow camera drift. Cinematic atmosphere only. No text, no logo."
         ),
     },
+    "soft_portrait_alive": {
+        "lane_tags": ["hero_identity_lock"],
+        "shot_role": "hero",
+        "heat_phase": "setup",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "soft",
+        "nar": "alive portrait: continuous micro-life, never freeze, keep identity",
+        "dsl": {
+            "action": "eyes track camera with soft blinks, breath lifts chest continuously",
+            "motion": "tiny head sway and hair drift; locked identity, no morph",
+            "visible_change": "every half-second a small natural micro-change; never a still photo",
+        },
+        "author_prompt": (
+            "Vertical 9:16 cinematic portrait. Keep the exact same person identity, face, hair, "
+            "wardrobe, and lighting from the start frame. ALIVE SOFT MOTION: never freeze into a still "
+            "photo — continuous life signs every half second: gentle breathing that lifts shoulders, "
+            "soft natural blinks, tiny head turn toward camera, hair micro-drift, fabric settle. "
+            "Medium slow push-in. Identity lock priority: no morphing, no face swap, no extra people. "
+            "Audio: quiet room tone; no speech."
+        ),
+    },
+    "high_motion_max": {
+        "lane_tags": ["high_motion_energy", "hero_identity_lock"],
+        "shot_role": "hero",
+        "heat_phase": "act",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "high",
+        "nar": "maximum body kinetic energy with identity lock",
+        "dsl": {
+            "action": (
+                "full-body weight shifts and torso torque every 0.5s; hands re-grip; "
+                "hips and shoulders counter-rotate hard"
+            ),
+            "motion": (
+                "aggressive handheld push-in plus lateral whip; hair and clothes snap with inertia"
+            ),
+            "visible_change": (
+                "pose silhouette changes large every half second; high optical flow; not micro-breath"
+            ),
+        },
+        "author_prompt": (
+            "Vertical 9:16. Animate the start frame with medium cel-anime style lock. "
+            "Keep identity and wardrobe fixed. HIGH MOTION MAX: large visible body/pose change "
+            "every 0.5 seconds — full weight shifts, torso torque, hands re-grip fabric, hips and "
+            "shoulders counter-rotate. Aggressive handheld push-in and lateral whip; hair and clothes "
+            "snap with inertia. Silhouette changes large each half-second; avoid frozen portrait or "
+            "micro-breath-only. No morphing, no face swap, no extra people."
+        ),
+    },
+    "dialogue_mouth_max": {
+        "lane_tags": ["dialogue_mouth_energy", "hero_identity_lock"],
+        "shot_role": "hero",
+        "heat_phase": "act",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "medium",
+        "screen_mode": "on_camera",
+        "shot_size": "cu",
+        "nar": "close-up Mandarin speech with strong visible mouth performance",
+        "dsl": {
+            "action": "face camera and speak with clear jaw open-close each syllable",
+            "motion": "cheeks and jaw move; brows engage; tiny head nods with speech rhythm",
+            "visible_change": "lips and jaw articulate every Mandarin syllable; mouth energy high",
+        },
+        "audio_cues": [
+            {
+                "kind": "voice",
+                "line_type": "dialogue",
+                "speaker": "hero",
+                "spoken_text": "过来，靠近一点，别停。",
+                "screen_mode": "on_camera",
+            }
+        ],
+        "author_prompt": (
+            "Vertical 9:16 close-up. Animate the start frame; keep exact identity fixed. "
+            "STRONG LIP SYNC: jaw opens and closes clearly on each Mandarin syllable; cheeks and "
+            "mouth corners move; brows engage; tiny head nods on speech rhythm. "
+            "line: 「过来，靠近一点，别停。」 "
+            "Mouth region must show high visible change while face identity stays locked. "
+            "No morphing, no face swap, no frozen mouth."
+        ),
+    },
+    "env_kinetic": {
+        "lane_tags": ["faceless_env"],
+        "shot_role": "env",
+        "heat_phase": "setup",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "high",
+        "nar": "kinetic empty environment: wind, light, parallax, no people",
+        "dsl": {
+            "action": "strong wind billows curtains; foliage thrash; light shafts sweep walls",
+            "motion": "forward dolly with parallax depth through empty room",
+            "visible_change": "shadows and fabric move large every second; no faces appear",
+        },
+        "author_prompt": (
+            "Vertical 9:16 text-to-video plate. Empty interior, no people, no faces, no character. "
+            "KINETIC ENV: strong wind billows curtains hard, foliage thrash, dramatic light shafts "
+            "sweep across walls, dust motes, forward dolly with clear parallax depth. "
+            "Large visible environment motion every second. Cinematic atmosphere only. No text, no logo."
+        ),
+    },
 }
 
 DEFAULT_COMBO_ORDER: list[dict[str, Any]] = [
@@ -129,6 +229,17 @@ DEFAULT_COMBO_ORDER: list[dict[str, Any]] = [
         "requires_last": True,
     },
 ]
+
+# Round-2: optimized prompt families (beat R1 soft freeze / high gap / mouth soft / env soft)
+R2_COMBO_ORDER: list[dict[str, Any]] = [
+    {"combo_id": "r2_soft_alive_i2v", "mode": "i2v", "family": "soft_portrait_alive", "shot_id": "s_soft2"},
+    {"combo_id": "r2_high_max_i2v", "mode": "i2v", "family": "high_motion_max", "shot_id": "s_hi2"},
+    {"combo_id": "r2_high_max_r2v", "mode": "r2v", "family": "high_motion_max", "shot_id": "s_hi2"},
+    {"combo_id": "r2_dlg_mouth_i2v", "mode": "i2v", "family": "dialogue_mouth_max", "shot_id": "s_dlg2"},
+    {"combo_id": "r2_dlg_mouth_r2v", "mode": "r2v", "family": "dialogue_mouth_max", "shot_id": "s_dlg2"},
+    {"combo_id": "r2_env_kinetic_t2v", "mode": "t2v", "family": "env_kinetic", "shot_id": "s_env2"},
+]
+
 
 
 @dataclass
@@ -151,8 +262,14 @@ def build_combo_matrix(
     seed: int = DEFAULT_SEED,
     include_flf: bool = True,
     order: list[dict[str, Any]] | None = None,
+    round: int = 1,
 ) -> list[ComboSpec]:
-    rows = order if order is not None else list(DEFAULT_COMBO_ORDER)
+    if order is not None:
+        rows = order
+    elif int(round) >= 2:
+        rows = list(R2_COMBO_ORDER)
+    else:
+        rows = list(DEFAULT_COMBO_ORDER)
     out: list[ComboSpec] = []
     for raw in rows:
         mode = str(raw["mode"]).lower()
@@ -363,7 +480,39 @@ def rank_lanes(
     }
 
 
+def load_metrics_rows(path: Path | str) -> list[dict[str, Any]]:
+    """Load ab-metrics.json rows (or a list JSON) for multi-round ranking."""
+    p = Path(path).expanduser().resolve()
+    if not p.is_file():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if isinstance(data, list):
+        return [r for r in data if isinstance(r, dict)]
+    if isinstance(data, dict):
+        rows = data.get("rows")
+        if isinstance(rows, list):
+            return [r for r in rows if isinstance(r, dict)]
+    return []
+
+
+def rank_lanes_best_of(*row_groups: list[dict[str, Any]], **kwargs: Any) -> dict[str, Any]:
+    """Rank across multiple rounds (R1+R2 rows)."""
+    merged: list[dict[str, Any]] = []
+    for group in row_groups:
+        for r in group or []:
+            if isinstance(r, dict):
+                merged.append(dict(r))
+    verdict = rank_lanes(merged, **kwargs)
+    verdict["rounds_merged"] = len(row_groups)
+    verdict["rows_input"] = len(merged)
+    return verdict
+
+
 def merge_winners_into_effect_defaults(verdict: dict[str, Any]) -> dict[str, Any]:
+
     recipes = verdict.get("recipes") if isinstance(verdict.get("recipes"), dict) else {}
     winners = verdict.get("winners") if isinstance(verdict.get("winners"), dict) else {}
     return {
