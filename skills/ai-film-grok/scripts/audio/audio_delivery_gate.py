@@ -17,12 +17,16 @@ def _sha256(path: Path) -> str:
 
 
 def _probe(path: Path) -> dict[str, Any]:
-    proc = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(path)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(path)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "ffprobe timed out"}
     if proc.returncode:
         return {"ok": False, "error": "ffprobe failed"}
     streams = json.loads(proc.stdout).get("streams") or []

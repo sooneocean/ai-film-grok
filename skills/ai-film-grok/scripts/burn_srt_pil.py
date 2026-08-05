@@ -119,7 +119,17 @@ def main() -> int:
             "copy",
             str(out_path),
         ]
-        r = subprocess.run(cmd, capture_output=True, text=True, env=minimal_subprocess_env())
+        try:
+            r = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                env=minimal_subprocess_env(),
+                timeout=1800,
+            )
+        except subprocess.TimeoutExpired:
+            sys.stderr.write("burn_srt_pil: ffmpeg timed out after 1800s\n")
+            return 124
         if r.returncode != 0:
             sys.stderr.write(r.stderr[-3000:])
             return r.returncode

@@ -18,28 +18,34 @@ class EventVoiceStemError(ValueError):
 
 def _decode(path: Path, *, duration: float, inner_voice: bool, sample_rate: int) -> np.ndarray:
     filters = "highpass=f=250,lowpass=f=3200" if inner_voice else "anull"
-    proc = subprocess.run(
-        [
-            "ffmpeg",
-            "-v",
-            "error",
-            "-i",
-            str(path),
-            "-t",
-            f"{duration:.3f}",
-            "-af",
-            filters,
-            "-ar",
-            str(sample_rate),
-            "-ac",
-            "2",
-            "-f",
-            "f32le",
-            "pipe:1",
-        ],
-        capture_output=True,
-        check=False,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-t",
+                f"{duration:.3f}",
+                "-af",
+                filters,
+                "-ar",
+                str(sample_rate),
+                "-ac",
+                "2",
+                "-f",
+                "f32le",
+                "pipe:1",
+            ],
+            capture_output=True,
+            check=False,
+            timeout=180,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise EventVoiceStemError(
+            f"cannot decode TTS asset (ffmpeg timed out): {path.name}"
+        ) from exc
     if proc.returncode:
         raise EventVoiceStemError(f"cannot decode TTS asset: {path.name}")
     raw = np.frombuffer(proc.stdout, dtype=np.float32)
@@ -103,28 +109,32 @@ def render_event_voice_stem(
             samples[start:end] += _controls(decoded[: end - start], event, sample_rate)
         executed.append(event_id)
     out.parent.mkdir(parents=True, exist_ok=True)
-    proc = subprocess.run(
-        [
-            "ffmpeg",
-            "-y",
-            "-v",
-            "error",
-            "-f",
-            "f32le",
-            "-ar",
-            str(sample_rate),
-            "-ac",
-            "2",
-            "-i",
-            "pipe:0",
-            "-c:a",
-            "pcm_s16le",
-            str(out),
-        ],
-        input=np.clip(samples, -1.0, 1.0).tobytes(),
-        capture_output=True,
-        check=False,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-v",
+                "error",
+                "-f",
+                "f32le",
+                "-ar",
+                str(sample_rate),
+                "-ac",
+                "2",
+                "-i",
+                "pipe:0",
+                "-c:a",
+                "pcm_s16le",
+                str(out),
+            ],
+            input=np.clip(samples, -1.0, 1.0).tobytes(),
+            capture_output=True,
+            check=False,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise EventVoiceStemError("cannot write event voice stem: ffmpeg timed out") from exc
     if proc.returncode:
         raise EventVoiceStemError("cannot write event voice stem")
     return {

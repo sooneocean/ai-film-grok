@@ -20,12 +20,27 @@ class AudioTTSRenderError(RuntimeError):
 
 
 def _duration(path: Path) -> float:
-    proc = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(path),
+            ],
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise AudioTTSRenderError(
+            f"cannot probe TTS asset (ffprobe timed out): {path.name}"
+        ) from exc
     if proc.returncode:
         raise AudioTTSRenderError(f"cannot probe TTS asset: {path.name}")
     try:
@@ -107,24 +122,30 @@ def render_tts_events(root: Path) -> dict[str, Any]:
             raise AudioTTSRenderError(
                 f"{event_id}: TTS failed without provider fallback: {exc}"
             ) from exc
-        proc = subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(mp3),
-                "-ar",
-                "48000",
-                "-ac",
-                "2",
-                "-c:a",
-                "pcm_s16le",
-                str(wav),
-            ],
-            capture_output=True,
-            check=False,
-            text=True,
-        )
+        try:
+            proc = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(mp3),
+                    "-ar",
+                    "48000",
+                    "-ac",
+                    "2",
+                    "-c:a",
+                    "pcm_s16le",
+                    str(wav),
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise AudioTTSRenderError(
+                f"{event_id}: cannot convert synthesized audio to WAV (ffmpeg timed out)"
+            ) from exc
         if proc.returncode or not wav.is_file():
             raise AudioTTSRenderError(f"{event_id}: cannot convert synthesized audio to WAV")
         duration = _duration(wav)

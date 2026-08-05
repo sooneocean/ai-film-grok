@@ -1,16 +1,21 @@
 # Changelog
 
 
+## [2.39.58] - 2026-08-05
+
+### Fixed (hang-proof · audio TTS + shortform + media probe paths)
+- **`audio_tts_render`**: ffprobe duration `timeout=30`; mp3→wav ffmpeg `timeout=120`.
+- **`event_voice_stem`**: decode `timeout=180`; write stem `timeout=120`.
+- **`audio_delivery_gate`**: ffprobe streams `timeout=30` (soft fail map).
+- **`shortform_director`**: pcm hash / probe / remux / concat paths bound with timeouts (30–300s).
+- **`burn_srt_pil`**: burn ffmpeg `timeout=1800` (exit 124 on hang).
+- **`narrative_evidence`**: media duration ffprobe `timeout=30`.
+- **Tests**: Wave3AudioPipelineTimeoutTests (+ shortform source checks) in `test_antifragility_af.py`.
+
 ## [2.39.57] - 2026-08-05
 
 ### Changed
 - R1 structure: `post/render_final` re-exports caption/voice/media leaves from `final/*` (AST-identical de-dupe; public import surface unchanged). LOC 4333→3271.
-
-### Fixed (hang-proof · audio TTS pipeline)
-- **`audio_tts_render`**: ffprobe duration `timeout=30`; mp3→wav ffmpeg `timeout=120`.
-- **`event_voice_stem`**: decode `timeout=180`; write stem `timeout=120`.
-- **`audio_delivery_gate`**: ffprobe streams `timeout=30` (soft fail map).
-- **Tests**: Wave3AudioPipelineTimeoutTests in `test_antifragility_af.py`.
 
 ## [2.39.56] - 2026-08-05
 

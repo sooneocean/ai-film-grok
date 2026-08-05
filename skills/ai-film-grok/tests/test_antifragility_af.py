@@ -356,5 +356,72 @@ class Wave3H3WorkflowTimeoutTests(unittest.TestCase):
             self.assertEqual(meta.get("usable_reason"), "volumedetect_timeout")
 
 
+class Wave3AudioPipelineTimeoutTests(unittest.TestCase):
+    """R-af1 residual · TTS render / event voice stem / delivery gate must bound hangs."""
+
+    def test_audio_tts_render_subprocess_runs_have_timeout(self) -> None:
+        src = _impl_source("audio_tts_render.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=30", src)  # ffprobe duration
+        self.assertIn("timeout=120", src)  # mp3→wav
+        runs = src.split("subprocess.run(")[1:]
+        self.assertGreaterEqual(len(runs), 2)
+        for chunk in runs:
+            self.assertIn("timeout=", chunk[:1200], msg=chunk[:200])
+        self.assertIn("timed out", src)
+
+    def test_event_voice_stem_subprocess_runs_have_timeout(self) -> None:
+        src = _impl_source("event_voice_stem.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=180", src)  # decode
+        self.assertIn("timeout=120", src)  # write stem
+        runs = src.split("subprocess.run(")[1:]
+        self.assertGreaterEqual(len(runs), 2)
+        for chunk in runs:
+            self.assertIn("timeout=", chunk[:1200], msg=chunk[:200])
+        self.assertIn("timed out", src)
+
+    def test_audio_delivery_gate_probe_has_timeout(self) -> None:
+        src = _impl_source("audio_delivery_gate.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=30", src)
+        runs = src.split("subprocess.run(")[1:]
+        self.assertGreaterEqual(len(runs), 1)
+        for chunk in runs:
+            self.assertIn("timeout=", chunk[:800], msg=chunk[:200])
+        self.assertIn("ffprobe timed out", src)
+
+    def test_audio_tts_duration_timeout_raises(self) -> None:
+        from audio_tts_render import AudioTTSRenderError, _duration
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wav = Path(tmp) / "x.wav"
+            wav.write_bytes(b"\x00" * 32)
+
+            def _boom(*_a, **_k):
+                raise subprocess.TimeoutExpired(cmd=["ffprobe"], timeout=30)
+
+            with mock.patch("audio_tts_render.subprocess.run", side_effect=_boom):
+                with self.assertRaises(AudioTTSRenderError) as ctx:
+                    _duration(wav)
+            self.assertIn("timed out", str(ctx.exception))
+
+    def test_shortform_director_ffmpeg_paths_have_timeout(self) -> None:
+        src = (SCRIPTS / "shortform_director.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=180", src)
+        self.assertIn("timeout=300", src)
+        self.assertIn("timeout=30", src)
+        runs = src.split("subprocess.run(")[1:]
+        self.assertGreaterEqual(len(runs), 4)
+        for chunk in runs:
+            self.assertIn("timeout=", chunk[:1600], msg=chunk[:200])
+        self.assertIn("timed out", src)
+
+    def test_burn_srt_pil_ffmpeg_has_timeout(self) -> None:
+        src = (SCRIPTS / "burn_srt_pil.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=1800", src)
+
+    def test_narrative_evidence_probe_has_timeout(self) -> None:
+        src = (SCRIPTS / "narrative_evidence.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=30", src)
+
+
 if __name__ == "__main__":
     unittest.main()

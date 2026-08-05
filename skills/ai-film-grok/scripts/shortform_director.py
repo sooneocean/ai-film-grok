@@ -38,26 +38,32 @@ def _sha256(path: Path) -> str:
 
 def _pcm_sha256(path: Path) -> str:
     """Hash decoded samples so A-roll receipts prove source-audio preservation."""
-    result = subprocess.run(
-        [
-            "ffmpeg",
-            "-v",
-            "error",
-            "-i",
-            str(path),
-            "-map",
-            "0:a:0",
-            "-ac",
-            "2",
-            "-ar",
-            "48000",
-            "-f",
-            "s16le",
-            "pipe:1",
-        ],
-        capture_output=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                "0:a:0",
+                "-ac",
+                "2",
+                "-ar",
+                "48000",
+                "-f",
+                "s16le",
+                "pipe:1",
+            ],
+            capture_output=True,
+            check=False,
+            timeout=180,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ShortformError(
+            f"cannot decode source audio for {path.name} (ffmpeg timed out)"
+        ) from exc
     if result.returncode != 0 or not result.stdout:
         raise ShortformError(f"cannot decode source audio for {path.name}")
     return hashlib.sha256(result.stdout).hexdigest()
@@ -178,12 +184,27 @@ def segment_aroll_words(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _duration(path: Path) -> float:
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "csv=p=0",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ShortformError(
+            f"cannot probe duration for {path.name} (ffprobe timed out)"
+        ) from exc
     try:
         duration = float(result.stdout.strip())
     except ValueError as exc:
@@ -599,14 +620,22 @@ def assemble_aroll(
             "yuv420p",
             str(part),
         ]
-        if subprocess.run(command, capture_output=True, text=True).returncode != 0:
+        try:
+            remux = subprocess.run(
+                command, capture_output=True, text=True, timeout=300
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ShortformError(
+                f"ffmpeg timed out remuxing {beat['id']}"
+            ) from exc
+        if remux.returncode != 0:
             raise ShortformError(f"ffmpeg failed to remux {beat['id']}")
         parts.append(part)
     listing = work / "concat.txt"
     listing.write_text("".join(f"file '{part}'\n" for part in parts), encoding="utf-8")
     visual_master = work / "visual-master.mp4"
-    if (
-        subprocess.run(
+    try:
+        concat_vis = subprocess.run(
             [
                 "ffmpeg",
                 "-y",
@@ -625,17 +654,21 @@ def assemble_aroll(
             ],
             capture_output=True,
             text=True,
-        ).returncode
-        != 0
-    ):
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ShortformError(
+            "ffmpeg timed out concatenating A-roll visuals"
+        ) from exc
+    if concat_vis.returncode != 0:
         raise ShortformError("ffmpeg failed to concatenate A-roll visuals")
     source_duration = _duration(source)
     if abs(_duration(visual_master) - source_duration) > 0.05:
         raise ShortformError("assembled visual clock differs from source audio clock")
     target = out or root / "out" / "shortform-aroll-candidate.mp4"
     target.parent.mkdir(parents=True, exist_ok=True)
-    if (
-        subprocess.run(
+    try:
+        mux = subprocess.run(
             [
                 "ffmpeg",
                 "-y",
@@ -658,9 +691,11 @@ def assemble_aroll(
             ],
             capture_output=True,
             text=True,
-        ).returncode
-        != 0
-    ):
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ShortformError("ffmpeg timed out concatenating A-roll") from exc
+    if mux.returncode != 0:
         raise ShortformError("ffmpeg failed to concatenate A-roll")
     source_audio_pcm_sha256 = _pcm_sha256(source)
     output_audio_pcm_sha256 = _pcm_sha256(target)

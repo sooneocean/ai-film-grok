@@ -101,11 +101,19 @@ def _media_probe(path: Path) -> dict[str, Any]:
                 str(path),
             ],
             text=True,
+            timeout=30,
         )
         duration = float(json.loads(raw)["format"]["duration"])
         if not math.isfinite(duration) or duration <= 0:
             raise ValueError("media duration must be finite and positive")
-    except (OSError, subprocess.CalledProcessError, KeyError, TypeError, ValueError) as exc:
+    except (
+        OSError,
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
         raise NarrativeEvidenceError(
             f"cannot probe media duration: {path}", code="MEDIA_UNREADABLE"
         ) from exc
