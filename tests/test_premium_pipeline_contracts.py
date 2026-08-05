@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
-
-sys.path.insert(
-    0, str(Path(__file__).resolve().parents[1] / "skills" / "ai-film-grok" / "scripts")
-)
 
 from dailies import dailies_status, update_dailies
 from delivery_package import build_delivery_package

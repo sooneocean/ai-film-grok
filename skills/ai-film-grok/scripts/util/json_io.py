@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 from security_policy import atomic_write_text
-
 from util import require_json, write_json
 from util.errors import FilmError  # noqa: F401 — re-export
 

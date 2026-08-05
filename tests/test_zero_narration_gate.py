@@ -7,14 +7,9 @@ defaults zero_narration_strict=true → NAR_BUDGET_VIOLATION when nar ratio > 0.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
-
-sys.path.insert(
-    0, str(Path(__file__).resolve().parents[1] / "skills" / "ai-film-grok" / "scripts")
-)
 
 from film_spec import zero_narration_gate  # noqa: E402
 

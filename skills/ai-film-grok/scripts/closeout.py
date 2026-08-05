@@ -166,6 +166,95 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         steps[0]["next_cmd"] = heat.get("next_cmd") or f'aifilm heat boost --root "{base}" --apply'
         steps[0]["required_proof"] = "heat_agent_status.hard_fail cleared"
 
+    # P0-B · caption pixel ink (SRT cues → bottom-band has soup). Soft until plate/final exists.
+    caption_step: dict[str, Any] = {
+        "id": "caption_pixel",
+        "ok": False,
+        "detail": "missing caption-pixel-check",
+        "next_cmd": f'aifilm caption-pixel-check --root "{base}"',
+        "advisory": False,
+    }
+    if final_rec is None:
+        caption_step = {
+            "id": "caption_pixel",
+            "ok": True,
+            "detail": "skipped — no final/plate yet",
+            "next_cmd": None,
+            "advisory": True,
+            "skipped": True,
+        }
+    else:
+        try:
+            from caption_pixel_check import caption_pixel_status
+
+            cap = caption_pixel_status(base)
+            caption_step = {
+                "id": "caption_pixel",
+                "ok": bool(cap.get("ok")),
+                "detail": cap.get("detail") or ("ok" if cap.get("ok") else "pixel red"),
+                "next_cmd": None
+                if cap.get("ok")
+                else (cap.get("next_cmd") or caption_step["next_cmd"]),
+                "advisory": False,
+                "stale": bool(cap.get("stale")),
+                "missing_ink": bool(cap.get("missing_ink")),
+                "skipped": bool(cap.get("skipped")),
+            }
+        except Exception as exc:  # noqa: BLE001
+            caption_step = {
+                "id": "caption_pixel",
+                "ok": False,
+                "detail": str(exc)[:200],
+                "next_cmd": f'aifilm caption-pixel-check --root "{base}"',
+                "advisory": False,
+            }
+    steps.append(caption_step)
+
+    # P0-C · evidence stale after final rewrite (quality-report / caption)
+    evidence_step: dict[str, Any] = {
+        "id": "evidence_fresh",
+        "ok": True,
+        "detail": "ok",
+        "next_cmd": None,
+        "advisory": True,
+    }
+    try:
+        from caption_pixel_check import evidence_stale_after_final
+
+        ev = evidence_stale_after_final(base)
+        evidence_step = {
+            "id": "evidence_fresh",
+            "ok": bool(ev.get("ok")),
+            "detail": (
+                "ok"
+                if ev.get("ok")
+                else "; ".join(
+                    str(i.get("code") or i.get("detail")) for i in (ev.get("issues") or [])
+                )
+                or "stale evidence"
+            ),
+            "next_cmd": None
+            if ev.get("ok")
+            else (ev.get("next_cmd") or f'aifilm caption-pixel-check --root "{base}"'),
+            "advisory": False,
+            "actions": ev.get("actions") or [],
+            "honest_limits": ev.get("honest_limits") or [],
+            "mix_partial": bool(ev.get("mix_partial")),
+        }
+        # mix partial is honesty flag, not hard block by itself
+        if ev.get("mix_partial") and ev.get("ok"):
+            evidence_step["detail"] = "ok; " + "; ".join(ev.get("honest_limits") or ["mix partial"])
+            evidence_step["advisory"] = True
+    except Exception as exc:  # noqa: BLE001
+        evidence_step = {
+            "id": "evidence_fresh",
+            "ok": True,
+            "detail": f"advisory skip: {exc}"[:160],
+            "next_cmd": None,
+            "advisory": True,
+        }
+    steps.append(evidence_step)
+
     # Delivery Truth · i2v-final-gate must be green before delivery_ready
     motion_gate_step: dict[str, Any] = {
         "id": "i2v_motion",
@@ -363,6 +452,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
     # hard fidelity when marked hard and not ok
     if fid_step.get("hard") and not fid_step.get("ok"):
         soft_ids.discard("input_fidelity")
+    # evidence honesty-only (mix partial) stays soft when ok+advisory
+    for s in steps:
+        if s.get("id") == "evidence_fresh" and s.get("ok") and s.get("advisory"):
+            soft_ids.add("evidence_fresh")
     blocked = next(
         (s for s in steps if not s["ok"] and s["id"] not in soft_ids),
         None,
@@ -477,6 +570,53 @@ def closeout_run(
         if write_receipt:
             write_json(base / RECEIPT_REL, payload)
         return payload
+
+    # P0-B · after human review: auto-run caption pixel when missing/stale
+    try:
+        cap_step = next(s for s in status["steps"] if s["id"] == "caption_pixel")
+    except StopIteration:
+        cap_step = {"ok": True}
+    if not cap_step.get("ok") and not cap_step.get("skipped"):
+        try:
+            from caption_pixel_check import run_caption_pixel_check
+
+            pixel = run_caption_pixel_check(base, write=True)
+            ran.append(
+                {
+                    "id": "caption_pixel",
+                    "ok": bool(pixel.get("ok")),
+                    "missing_ink": bool(pixel.get("missing_ink")),
+                    "path": pixel.get("path"),
+                }
+            )
+            if not pixel.get("ok"):
+                payload = {
+                    **status,
+                    "ok": False,
+                    "stopped_at": "caption_pixel",
+                    "ran": ran,
+                    "caption_pixel": pixel,
+                    "next_cmd": pixel.get("next_cmd")
+                    or f'aifilm caption-pixel-check --root "{base}"',
+                    "required_proof": "receipts/caption-pixel-check.json ok (burned Chinese ink)",
+                }
+                if write_receipt:
+                    write_json(base / RECEIPT_REL, payload)
+                return payload
+            status = closeout_status(base)
+            status["mode"] = "run"
+        except Exception as exc:  # noqa: BLE001
+            payload = {
+                **status,
+                "ok": False,
+                "stopped_at": "caption_pixel",
+                "ran": ran,
+                "error": str(exc)[:300],
+                "next_cmd": f'aifilm caption-pixel-check --root "{base}"',
+            }
+            if write_receipt:
+                write_json(base / RECEIPT_REL, payload)
+            return payload
 
     # Single machine-lane ensure when cinematic red
     try:

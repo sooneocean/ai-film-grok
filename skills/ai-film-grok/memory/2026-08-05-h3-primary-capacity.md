@@ -15,12 +15,14 @@
 ## 检查清单
 - [ ] `export AIFILM_I2V_PROFILE=h3_primary`（或 config.env）
 - [ ] `aifilm write-spec` 后 `_i2v_profile=h3_primary` · `i2v_provider=comfy-h3`
-- [ ] `aifilm h3 list` 看 mode；`h3 run-next --execute`
+- [ ] `aifilm h3 capacity-plan` 看 ETA
+- [ ] `aifilm h3 cycle --until-empty --execute` 挂机吃光队列
 - [ ] media-queue 推 Grok 应 QueueError（escape: `AIFILM_ALLOW_CLOUD_RESTRICTED=1`）
-- [ ] hybrid 片：setup 仍 Grok（回归）
+- [ ] hybrid 片：setup 仍 Grok（回归）；P0 永不被 P2 挤
 
 ## 作战序
 ```text
-write-spec (h3_primary) → pilot 人批 → h3 run-next 挂机
+write-spec (h3_primary) → pilot 人批
+→ capacity-plan → cycle --until-empty --execute
 → ship-prep / pk 人 promote → gate-auto → final
 ```

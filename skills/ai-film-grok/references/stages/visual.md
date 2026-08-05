@@ -2,6 +2,30 @@
 
 先验后生：静帧、身份、状态、几何未过闸，不得进入 I2V。
 
+## 谁喂谁（素材 → 模型 · 一眼图）
+
+```text
+L0 style-v1          → 画风锁（MEDIUM LOCK）
+L1 cast master       → image_edit 定妆 / R2V identity ref（禁 peak 直接当 I2V 首帧）
+L2 state photo       → 卸装阶梯 undressed/bare / undress-anchor
+L3 still|keyframe    → 一镜一静帧（I2V/H3 first 主粮）
+L4 clip take         → Grok I2V / H3 I2V·FLF·R2V / LTX 对白
+L5 endframe handoff  → 下镜 L3（continue；smash 勿盲 promote）
+
+武器吃什么：
+  Grok I2V     ← L3 still + motion spine prompt
+  H3 I2V       ← L3（或 L5 continue）+ 狠 motion
+  H3 FLF       ← L3 first + L3_end last
+  H3 R2V       ← L3 + L1 identity refs（+ 可选 last 作 pose）
+  H3 T2V       ← 无脸 env only
+  FRW LTX      ← 对白脸 still + 有声中文
+  Qwen / FRW i2i ← 修 L2/L3（still-challenge；人 promote）
+
+机读单出口：`still_source.resolve` · `generation_request.build` →
+  receipts/prompts/<id>.request.json
+命名：[material-fidelity-loop](../material-fidelity-loop.md)
+```
+
 - 有角色的 still 使用已批准 cast/face/state 来源；禁止从零抽脸绕过 moderated 结果。
 - 9:16 keyframe 默认至少 704×1280，接受 provider 原生 704×1280 且不强制放大；禁止横图、缩略图和压糊来源。
 - `state-index check|plan` 先于 bulk；衣着状态只前进，已脱不得回穿。

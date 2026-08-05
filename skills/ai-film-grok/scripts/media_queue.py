@@ -337,6 +337,16 @@ class MediaQueue:
         resolved_inputs = [path.expanduser().resolve() for path in inputs]
         if any(not path.is_file() for path in resolved_inputs):
             raise QueueError("every media input must be an existing file")
+        # Material fidelity: if a GenerationRequest receipt exists, pixel sha must match
+        if operation in {"image_to_video", "reference_to_video"} and resolved_inputs:
+            try:
+                from generation_request import GenerationRequestError, assert_pixel_pack_current
+
+                assert_pixel_pack_current(self.root, shot_id, inputs=resolved_inputs)
+            except GenerationRequestError as exc:
+                raise QueueError(str(exc)) from exc
+            except Exception:
+                pass  # no receipt / optional path — do not block legacy jobs
         if operation in {"image_to_video", "reference_to_video"}:
             from anatomy_safety import requires_anatomy_safety
 
@@ -463,10 +473,7 @@ class MediaQueue:
                         wants_h3 = locked == "comfy-h3" or (
                             h3_on
                             and rec == "comfy-h3"
-                            and (
-                                intent.get("content_class") == "restricted_local"
-                                or is_h3_primary
-                            )
+                            and (intent.get("content_class") == "restricted_local" or is_h3_primary)
                         )
                         contract_provider = (
                             str((generation_contract or {}).get("provider") or "").strip().lower()

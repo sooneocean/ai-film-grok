@@ -361,10 +361,15 @@ def build_shot_intent(
     h3_raw = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
     # Prefer resolved config (adult-max auto-enable) over raw film-spec only.
     is_h3_primary = film_profile == "h3_primary"
-    h3_enabled = bool(h3_cfg.get("enabled")) or h3_raw.get("enabled") is True or film_profile in {
-        "hybrid_h3",
-        "h3_primary",
-    }
+    h3_enabled = (
+        bool(h3_cfg.get("enabled"))
+        or h3_raw.get("enabled") is True
+        or film_profile
+        in {
+            "hybrid_h3",
+            "h3_primary",
+        }
+    )
     lanes = spec.get("motion_lanes") if isinstance(spec.get("motion_lanes"), dict) else {}
     dialogue = bool(
         shot.get("lipsync") is True
@@ -425,9 +430,7 @@ def build_shot_intent(
             recommended_lane = str(lanes.get("setup_non_sensitive") or "cloud_grok")
             recommended_provider = "grok"
     recommended_still = (
-        "comfy_lan"
-        if (restricted and identity_lock) or (is_h3_primary and restricted)
-        else "grok"
+        "comfy_lan" if (restricted and identity_lock) or (is_h3_primary and restricted) else "grok"
     )
     # Film-core payload for motion prompt spine (shared Grok/H3).
     try:

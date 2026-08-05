@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from util.errors import FilmError
-from util.subprocess import run, run_compose_env  # noqa: F401
+from util.subprocess import run, run_compose_env, run_ffmpeg  # noqa: F401
 from util.time import utc_now  # noqa: F401
 from util.validators import (  # noqa: F401
     aspect_dims,

@@ -18,7 +18,7 @@ import numpy as np
 from logger import log
 from runtime_policy import sha256
 from sound_plan import resolve_music_template_timeline
-from util import write_json
+from util import run_ffmpeg, write_json
 
 # Local defs — avoid circular import with render_final (which re-exports this module).
 SR = 44100
@@ -29,25 +29,14 @@ class RenderError(RuntimeError):
 
 
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    """Subprocess runner: ffmpeg gets -nostdin + AIFILM_FFMPEG_TIMEOUT; others use the canonical 60s timeout."""
     argv = list(cmd)
     executable = Path(argv[0]).name if argv else ""
-    if executable == "ffmpeg" and "-nostdin" not in argv:
-        argv.insert(1, "-nostdin")
     if executable == "ffmpeg":
-        try:
-            ff_timeout = float(os.environ.get("AIFILM_FFMPEG_TIMEOUT") or 1800)
-        except (TypeError, ValueError):
-            ff_timeout = 1800.0
-        ff_timeout = max(120.0, ff_timeout)
-    else:
-        ff_timeout = 60.0
-    return subprocess.run(
-        argv,
-        check=check,
-        text=True,
-        capture_output=True,
-        timeout=ff_timeout,
-    )
+        return run_ffmpeg(argv, check=check)
+    from util.subprocess import run as util_run
+
+    return util_run(cmd, check=check, timeout=60)
 
 
 try:

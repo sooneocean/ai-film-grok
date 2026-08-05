@@ -3,11 +3,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
-# All dimensions must be explicitly scored on --approve.
-# P3-5: expanded from 7 to 11 dimensions — added rhythm/emotion/theme/performance.
+from util.time import utc_now
+
 SCORECARD_DIMENSIONS: tuple[str, ...] = (
     "identity",
     "style",  # medium/palette/line language coherence across whole film
@@ -57,10 +56,6 @@ _DEFAULT_ACTION_FOR_DIM: dict[str, str] = {
 
 class DirectorReviewError(ValueError):
     pass
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def empty_scorecard() -> dict[str, bool | None]:

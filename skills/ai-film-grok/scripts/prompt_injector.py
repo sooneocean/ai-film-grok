@@ -1,14 +1,9 @@
 import hashlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-# Path used by motion spine film-spec load (root may be Path | str).
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).isoformat()
+from util.time import utc_now
 
 
 def _sha256(content: str) -> str:

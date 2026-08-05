@@ -62,7 +62,6 @@ from scene_sound_stems import SceneSoundError, render_scene_sound_stem
 from security_policy import (
     SecurityPolicyError,
     atomic_write_text,
-    minimal_subprocess_env,
     safe_existing_file,
     safe_output_path,
 )
@@ -81,7 +80,8 @@ from sound_plan import (
     validate_audio_tracks_contract,
 )
 from transition_ops import TransitionOperationError, bind_transition_operations_to_timeline
-from util import utc_now, write_json
+from util import run_ffmpeg, utc_now, write_json
+from util.subprocess import run as util_run
 
 # local sibling import
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -360,29 +360,12 @@ def read_json(path: Path) -> dict[str, Any]:
 
 
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    """Subprocess runner: ffmpeg gets -nostdin + AIFILM_FFMPEG_TIMEOUT; others use the canonical 60s timeout."""
     argv = list(cmd)
     executable = Path(argv[0]).name if argv else ""
-    if executable == "ffmpeg" and "-nostdin" not in argv:
-        argv.insert(1, "-nostdin")
-    # P0 · 2026-07-23: complex sidechain mix on ~60–90s films can exceed 600s wall
-    # (TimeoutExpired mid-plate). Override with AIFILM_FFMPEG_TIMEOUT seconds.
     if executable == "ffmpeg":
-        try:
-            ff_timeout = float(os.environ.get("AIFILM_FFMPEG_TIMEOUT") or 1800)
-        except (TypeError, ValueError):
-            ff_timeout = 1800.0
-        ff_timeout = max(120.0, ff_timeout)
-    else:
-        ff_timeout = 60.0
-    return subprocess.run(
-        argv,
-        timeout=ff_timeout,
-        check=check,
-        capture_output=True,
-        text=True,
-        stdin=subprocess.DEVNULL,
-        env=minimal_subprocess_env(),
-    )
+        return run_ffmpeg(argv, check=check)
+    return util_run(cmd, check=check, timeout=60)
 
 
 def pdur(path: Path | str) -> float:

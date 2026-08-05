@@ -328,29 +328,59 @@ def cmd_final(args: argparse.Namespace) -> int:
     if args.out_name:
         film_output_path(root, args.out_name)
 
-    # ── Staged final (P0 · 2026-07-23): no assumed captions ──
-    # stage_plate  → FFmpeg VO/BGM/clips; HF/Remotion path forces plate subs=off
-    # stage_hf     → HyperFrames owns designed captions (export+render)
-    # stage_caption→ verify pixels; HyperFrames is the sole caption owner
+    # ── Staged final (P0 · 2026-07-23 / 2026-08-05 caption_path): no assumed captions ──
+    # stage_plate  → FFmpeg VO/BGM/clips; caption_path decides burn vs off
+    # master_hf    → plate subs=off; HF/Remotion owns designed captions
+    # ship_hardburn→ plate burn; designed post may grade only (no second caption layer)
     # Never: hand-mux silent plate and claim "HF will have burned subs".
     stages_receipt: dict[str, Any] = {}
-    subs_mode = str(getattr(args, "subs", None) or "").strip().lower()
-    if not subs_mode:
-        # HF/Remotion: plate must NOT burn (HF owns captions). FFmpeg: plate burns.
-        subs_mode = "off" if post_engine in {"hyperframes", "remotion"} else "burn"
-    plate_cards = str(getattr(args, "plate_cards", None) or "auto").strip().lower()
-    if plate_cards in {"", "auto"}:
-        plate_cards = "blank" if post_engine in {"hyperframes", "remotion"} else "text"
-    if plate_cards not in {"text", "blank"}:
-        raise FilmError("--plate-cards must be auto|text|blank")
-    if post_engine in {"hyperframes", "remotion"} and subs_mode == "burn":
-        log(
-            "stage_plate: forcing --subs off for designed-post "
-            "(HF/Remotion owns captions; plate burn would double-burn underlay)"
+    try:
+        from post_route import (
+            PostRouteError,
+            apply_route_to_plate,
+            resolve_caption_path,
+            write_post_route,
         )
-        subs_mode = "off"
-        if plate_cards == "text":
-            plate_cards = "blank"
+
+        route = resolve_caption_path(
+            root,
+            post_engine=post_engine,
+            explicit=getattr(args, "caption_path", None),
+            prefer_ship=bool(getattr(args, "ship_hardburn", False)),
+        )
+        plate = apply_route_to_plate(
+            route,
+            subs_mode=str(getattr(args, "subs", None) or "").strip().lower() or None,
+            plate_cards=str(getattr(args, "plate_cards", None) or "auto"),
+        )
+        route_receipt = write_post_route(
+            root,
+            {
+                **route,
+                "plate_subs": plate["subs"],
+                "plate_cards": plate["plate_cards"],
+            },
+        )
+        stages_receipt["post_route"] = {
+            "caption_path": plate["caption_path"],
+            "source": route.get("source"),
+            "path": route_receipt.get("path"),
+        }
+        subs_mode = plate["subs"]
+        plate_cards = plate["plate_cards"]
+        allow_burned_underlay_route = bool(plate.get("allow_burned_underlay"))
+        designed_caption_owner = bool(plate.get("designed_caption_owner"))
+        log(
+            f"post_route: caption_path={plate['caption_path']} "
+            f"source={route.get('source')} plate_subs={subs_mode} "
+            f"plate_cards={plate_cards}"
+        )
+        for note in route.get("notes") or []:
+            log(f"post_route note: {note}")
+    except PostRouteError as exc:
+        raise FilmError(str(exc)) from exc
+    except ImportError as exc:
+        raise FilmError(f"Cannot import post_route: {exc}") from exc
 
     cmd = [sys.executable, str(script), "--root", str(root)]
     if args.out_name:
@@ -509,9 +539,22 @@ def cmd_final(args: argparse.Namespace) -> int:
 
     if post_engine == "ffmpeg":
         if ffmpeg_result is not None:
+            # Ship/plate path: durable pixel ink receipt (P0-B)
+            try:
+                from caption_pixel_check import run_caption_pixel_check
+
+                final_guess = Path(
+                    str(ffmpeg_result.get("output") or root / "out" / "film_final.mp4")
+                )
+                stages_receipt["caption_pixel"] = run_caption_pixel_check(
+                    root, final_mp4=final_guess if final_guess.is_file() else None, write=True
+                )
+            except Exception as exc:  # noqa: BLE001
+                stages_receipt["caption_pixel"] = {"ok": False, "error": str(exc)[:200]}
             out_obj = {
                 **ffmpeg_result,
                 "post_engine": "ffmpeg",
+                "caption_path": (stages_receipt.get("post_route") or {}).get("caption_path"),
                 "stages": stages_receipt,
                 "caption_owner": "ffmpeg_plate",
             }
@@ -562,10 +605,20 @@ def cmd_final(args: argparse.Namespace) -> int:
                 f"tooling={tooling}。可改用 --post-engine ffmpeg，"
                 "或安装 Node 22+ 后重试。"
             )
-        log(
-            "stage_hf: HyperFrames export+render owns designed captions "
-            "(plate was subs=off; no double-burn assume)"
+        allow_burned = (
+            bool(getattr(args, "allow_burned_underlay", False)) or allow_burned_underlay_route
         )
+        if designed_caption_owner:
+            log(
+                "stage_hf: HyperFrames export+render owns designed captions "
+                "(caption_path=master_hf; plate was subs=off; no double-burn assume)"
+            )
+        else:
+            log(
+                "stage_hf: HyperFrames grade/title only "
+                "(caption_path=ship_hardburn; plate already burned; allow_burned_underlay)"
+            )
+            allow_burned = True
         try:
             result = compose_render(
                 root,
@@ -582,7 +635,7 @@ def cmd_final(args: argparse.Namespace) -> int:
                 require_preview=bool(getattr(args, "require_preview", False)),
                 title_dur=float(getattr(args, "title_dur", 1.5) or 1.5),
                 end_dur=1.5,
-                allow_burned_underlay=bool(getattr(args, "allow_burned_underlay", False)),
+                allow_burned_underlay=allow_burned,
                 title_sequence=getattr(args, "title_sequence", None),
                 end_roll=getattr(args, "end_roll", None),
             )
@@ -608,45 +661,86 @@ def cmd_final(args: argparse.Namespace) -> int:
             "output_sha256": result.get("output_sha256"),
         }
 
-        # stage_caption: verify HF put captions in delivery.  A formal HF
-        # deliverable never falls back to another caption renderer: that would
-        # violate the single-owner contract and hide a broken HF export.
         final_path = Path(str(result.get("output") or root / "out" / "film_final.mp4"))
-        log("stage_caption: verify HF caption ownership (no assume) ...")
-        caption_gate = ensure_captions_after_hf(
-            root,
-            final_mp4=final_path,
-        )
-        stages_receipt["caption"] = caption_gate
-        if not caption_gate.get("ok"):
-            stages_path = write_stages_receipt(root, stages_receipt)
-            emit(
-                {
-                    "ok": False,
-                    "post_engine": "hyperframes",
-                    "stage": "caption",
-                    "stages": stages_receipt,
-                    "stages_receipt": str(stages_path),
-                    "error": caption_gate.get("error")
-                    or "HF caption gate failed; a HyperFrames re-render is required",
-                    "next": [
-                        "inspect compose/hyperframes caption layout and SRT binding",
-                        "re-run: aifilm final --post-engine hyperframes",
-                    ],
-                }
+        # stage_caption: master_hf → HF ownership gate; ship_hardburn → pixel ink only
+        if designed_caption_owner:
+            log("stage_caption: verify HF caption ownership (no assume) ...")
+            caption_gate = ensure_captions_after_hf(
+                root,
+                final_mp4=final_path,
             )
-            return 2
-        owner = str(caption_gate.get("caption_owner") or "hyperframes")
-        burned = owner in {
-            "hyperframes",
-            "hyperframes_export_only",
-        }
+            stages_receipt["caption"] = caption_gate
+            if not caption_gate.get("ok"):
+                stages_path = write_stages_receipt(root, stages_receipt)
+                emit(
+                    {
+                        "ok": False,
+                        "post_engine": "hyperframes",
+                        "stage": "caption",
+                        "stages": stages_receipt,
+                        "stages_receipt": str(stages_path),
+                        "error": caption_gate.get("error")
+                        or "HF caption gate failed; a HyperFrames re-render is required",
+                        "next": [
+                            "inspect compose/hyperframes caption layout and SRT binding",
+                            "re-run: aifilm final --post-engine hyperframes --caption-path master_hf",
+                            "or ship path: aifilm final --caption-path ship_hardburn --post-engine ffmpeg",
+                        ],
+                    }
+                )
+                return 2
+            owner = str(caption_gate.get("caption_owner") or "hyperframes")
+            burned = owner in {
+                "hyperframes",
+                "hyperframes_export_only",
+            }
+        else:
+            log("stage_caption: ship_hardburn — pixel ink check on plate-burned delivery ...")
+            from caption_pixel_check import run_caption_pixel_check
+
+            pixel = run_caption_pixel_check(root, final_mp4=final_path, write=True)
+            stages_receipt["caption"] = {
+                "ok": bool(pixel.get("ok")),
+                "caption_owner": "ffmpeg_plate",
+                "caption_path": "ship_hardburn",
+                "pixel": pixel,
+            }
+            if not pixel.get("ok"):
+                stages_path = write_stages_receipt(root, stages_receipt)
+                emit(
+                    {
+                        "ok": False,
+                        "post_engine": "hyperframes",
+                        "stage": "caption",
+                        "stages": stages_receipt,
+                        "stages_receipt": str(stages_path),
+                        "error": pixel.get("error")
+                        or "caption pixel ink missing after ship hardburn",
+                        "next": [
+                            pixel.get("next_cmd")
+                            or f'aifilm final --root "{root}" --caption-path ship_hardburn --post-engine ffmpeg',
+                        ],
+                    }
+                )
+                return 2
+            owner = "ffmpeg_plate"
+            burned = True
+        # Always refresh durable pixel receipt when delivery succeeds
+        try:
+            from caption_pixel_check import run_caption_pixel_check
+
+            stages_receipt["caption_pixel"] = run_caption_pixel_check(
+                root, final_mp4=final_path, write=True
+            )
+        except Exception as exc:  # noqa: BLE001
+            stages_receipt["caption_pixel"] = {"ok": False, "error": str(exc)[:200]}
         stages_receipt["deliver"] = patch_delivery_burned_in(root, burned_in=burned, owner=owner)
         stages_path = write_stages_receipt(root, stages_receipt)
         log(f"stage_deliver: caption_owner={owner} burned_in={burned} receipt={stages_path}")
         out_obj: dict[str, Any] = {
             "ok": True,
             "post_engine": "hyperframes",
+            "caption_path": stages_receipt.get("post_route", {}).get("caption_path"),
             "ffmpeg": ffmpeg_result,
             "compose": result,
             "output": str(final_path),

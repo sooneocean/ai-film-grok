@@ -1,6 +1,6 @@
 # h3_primary · 5090 无限主产线（2026-08-05）
 
-**Status:** Wave 0–1 **IN PROGRESS → landing in 2.39.14**  
+**Status:** Wave 0–1 **DONE in 2.39.14** · W3 until-empty still open  
 **Strategy:** Local MiniMax H3 on 5090 is the **film-wide primary** generation path. Time is free; cloud quota is not.
 
 ## 定策三句
@@ -25,10 +25,18 @@
 - [x] W0 本档 + SKILL/矩阵指针
 - [x] W1 profile / router / media-queue / next_actions
 - [x] W1 tests `test_h3_primary.py`
-- [ ] W2 mode table 更多黄金用例（可选 harden）
-- [ ] W3 daemon until-empty
+- [x] W2 mode table 沿用 `h3_mode` + 矩阵文案 + 路由测
+- [x] W3 until-empty + capacity-plan + P0 硬断言（v2.39.15）
 - [ ] W4 gate 减负
 - [ ] W5 CLI 拆分
+
+### W3 用法
+
+```bash
+aifilm h3 capacity-plan --root "<film>"          # ETA 一页纸
+aifilm h3 cycle --root "<film>" --until-empty --execute --max 5
+# 可选：--max-cycles 40（硬顶 80）；--continue-on-capacity 不因 VRAM 停
+```
 
 ## 启用
 

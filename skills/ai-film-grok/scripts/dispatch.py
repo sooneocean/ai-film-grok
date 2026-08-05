@@ -36,6 +36,8 @@ _ACTION_SKILLS = {
     "production-evidence-gate": "projection.verify",
     "bulk-preflight": "image.animate",
     "h3-run-next": "image.animate",
+    "h3-until-empty": "image.animate",
+    "h3-capacity-plan": "projection.verify",
     "h3-fill-idle": "image.animate",
     "h3-lane": "image.animate",
     "pilot-pack": "quality.inspect",
@@ -706,8 +708,7 @@ def build_dispatch(
                     isinstance(sp, dict)
                     and (
                         (isinstance(sp.get("h3"), dict) and sp["h3"].get("enabled"))
-                        or str(sp.get("_i2v_profile") or "")
-                        in {"hybrid_h3", "h3_primary"}
+                        or str(sp.get("_i2v_profile") or "") in {"hybrid_h3", "h3_primary"}
                     )
                 )
             except Exception:

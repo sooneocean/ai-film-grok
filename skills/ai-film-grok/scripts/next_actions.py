@@ -44,6 +44,8 @@ _ACTION_STAGE: dict[str, str] = {
     "h3-fill-idle": "visual",
     "h3-lane": "visual",
     "h3-run-next": "visual",
+    "h3-until-empty": "visual",
+    "h3-capacity-plan": "visual",
     "pilot-window": "visual",
     "tts-rehearse": "voice",
     "compose-preview": "design",
@@ -610,19 +612,28 @@ def build_next_actions(
                 h3_block = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
                 film_profile = str(spec.get("_i2v_profile") or "").strip().lower()
                 h3_enabled = bool(
-                    h3_block.get("enabled") is True
-                    or film_profile in {"hybrid_h3", "h3_primary"}
+                    h3_block.get("enabled") is True or film_profile in {"hybrid_h3", "h3_primary"}
                 )
             except Exception:
                 h3_enabled = False
             is_h3_primary = film_profile == "h3_primary"
             if h3_enabled:
                 if is_h3_primary:
-                    # Primary production path: 5090 unlimited throughput first.
+                    # Primary production path: 5090 unlimited overnight throughput.
+                    add(
+                        "h3-until-empty",
+                        f'aifilm h3 cycle --root "{r}" --until-empty --execute --max 5',
+                        "h3_primary 挂机：until-empty 吃光 P0→P1→P2（无限本地算力；永不 auto-promote）",
+                    )
+                    add(
+                        "h3-capacity-plan",
+                        f'aifilm h3 capacity-plan --root "{r}"',
+                        "全片 H3 backlog ETA（按 I2V/FLF/R2V/T2V）",
+                    )
                     add(
                         "h3-run-next",
                         f'aifilm h3 run-next --root "{r}" --execute --max 5',
-                        "h3_primary 主产线：按场景 I2V/FLF/R2V/T2V 吃 P0→P1→P2（无限本地算力）",
+                        "h3_primary 主产线：单批 5 镜；或改用 until-empty 挂机",
                     )
                     add(
                         "h3-fill-idle",
@@ -636,7 +647,7 @@ def build_next_actions(
                     )
                     add(
                         "queue-or-register",
-                        f'# cloud opt-in only under h3_primary\n'
+                        f"# cloud opt-in only under h3_primary\n"
                         f'AIFILM_ALLOW_CLOUD_RESTRICTED=1 media-queue add --root "{r}" …',
                         "镜头未齐：主轨 aifilm h3 run；Grok 云仅 escape 后可选",
                     )

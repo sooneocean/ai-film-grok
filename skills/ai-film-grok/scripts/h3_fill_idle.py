@@ -27,6 +27,18 @@ PRIORITY_RANK = {
     "done": 100,
 }
 
+# Empirical wall-clock minutes per H3 job on a busy 5090 (planning ETA only).
+_ETA_MINUTES_BY_MODE: dict[str, float] = {
+    "i2v": 8.0,
+    "flf": 10.0,
+    "r2v": 12.0,
+    "t2v": 10.0,
+}
+_DEFAULT_ETA_MINUTES = 9.0
+# Overnight loop safety (not an OS daemon): cycles × max_jobs_per_cycle.
+_UNTIL_EMPTY_MAX_CYCLES_HARD = 80
+_UNTIL_EMPTY_MAX_JOBS_PER_CYCLE = 20
+
 # Dual second leg sorts ahead of other same-rank pending (γ2 stickiness)
 _DUAL_STICKY_REASONS = frozenset(
     {
@@ -662,6 +674,11 @@ def build_fill_idle_queue(
 
     pending = [r for r in rows if r.get("command")]
     next_row = pending[0] if pending else None
+    priority_violations = assert_priority_order(pending, next_row)
+    # Fail-closed repair: if sort ever mis-picks, force next to true best pending.
+    if priority_violations and pending:
+        next_row = pending[0]
+        priority_violations = assert_priority_order(pending, next_row)
     by_pri: dict[str, int] = {}
     for r in rows:
         p = str(r.get("priority") or "?")
@@ -678,6 +695,8 @@ def build_fill_idle_queue(
         "count": len(rows),
         "pending_count": len(pending),
         "by_priority": by_pri,
+        "priority_ok": not priority_violations,
+        "priority_violations": priority_violations,
         "next": (
             {
                 "shot_id": next_row["shot_id"],
@@ -697,6 +716,7 @@ def build_fill_idle_queue(
             "P2 sorted lowest mean first; pilot stage for fill challenges",
             "PK: select-shortlist advisory → human --promote",
             "aifilm comfy free-memory --confirm before mode switch",
+            "Overnight: aifilm h3 cycle --until-empty --execute",
         ],
     }
 
@@ -737,6 +757,130 @@ def probe_comfy_capacity_soft() -> dict[str, Any]:
             "error": str(exc)[:200],
             "source": "submission_capacity",
         }
+
+
+def assert_priority_order(
+    pending: list[dict[str, Any]],
+    next_row: dict[str, Any] | None,
+) -> list[str]:
+    """Hard invariant: next must be the best pending rank; P2 never ahead of P0/P1.
+
+    Returns human-readable violation codes (empty = ok).
+    """
+    violations: list[str] = []
+    if not pending:
+        return violations
+    if not isinstance(next_row, dict):
+        violations.append("next_missing_while_pending")
+        return violations
+    best = pending[0]
+    if str(next_row.get("shot_id") or "") != str(best.get("shot_id") or ""):
+        violations.append(
+            f"next_not_first_pending:{next_row.get('shot_id')}!={best.get('shot_id')}"
+        )
+    next_pri = str(next_row.get("priority") or "")
+    next_rank = int(PRIORITY_RANK.get(next_pri, 99))
+    p0_pending = [
+        r for r in pending if str(r.get("priority") or "").startswith("P0")
+    ]
+    p1_pending = [r for r in pending if str(r.get("priority") or "") == "P1"]
+    if p0_pending and next_pri.startswith("P2"):
+        violations.append("P2_selected_while_P0_pending")
+    if p0_pending and next_pri == "P1":
+        violations.append("P1_selected_while_P0_pending")
+    if p1_pending and next_pri.startswith("P2") and not p0_pending:
+        violations.append("P2_selected_while_P1_pending")
+    for r in pending:
+        r_rank = int(PRIORITY_RANK.get(str(r.get("priority") or ""), 99))
+        if r_rank < next_rank:
+            violations.append(
+                f"higher_priority_starved:{r.get('priority')}:{r.get('shot_id')}"
+            )
+            break
+    return violations
+
+
+def eta_minutes_for_mode(mode: str | None) -> float:
+    key = str(mode or "i2v").strip().lower()
+    return float(_ETA_MINUTES_BY_MODE.get(key, _DEFAULT_ETA_MINUTES))
+
+
+def capacity_plan(
+    root: Path | str,
+    *,
+    include_challenge: bool = True,
+) -> dict[str, Any]:
+    """Read-only backlog ETA for overnight H3 scheduling (no GPU)."""
+    base = _root(root)
+    queue = build_fill_idle_queue(
+        base, include_challenge=include_challenge, include_done=False
+    )
+    pending = [r for r in (queue.get("shots") or []) if r.get("command")]
+    by_mode: dict[str, int] = {}
+    by_pri: dict[str, int] = {}
+    eta_by_mode: dict[str, float] = {}
+    eta_by_pri: dict[str, float] = {}
+    total_eta = 0.0
+    for r in pending:
+        mode = str(r.get("mode") or "i2v").lower()
+        pri = str(r.get("priority") or "?")
+        minutes = eta_minutes_for_mode(mode)
+        by_mode[mode] = by_mode.get(mode, 0) + 1
+        by_pri[pri] = by_pri.get(pri, 0) + 1
+        eta_by_mode[mode] = round(eta_by_mode.get(mode, 0.0) + minutes, 1)
+        eta_by_pri[pri] = round(eta_by_pri.get(pri, 0.0) + minutes, 1)
+        total_eta += minutes
+    p0_jobs = sum(by_pri.get(k, 0) for k in ("P0a", "P0b", "P0c"))
+    p0_eta = sum(eta_by_pri.get(k, 0.0) for k in ("P0a", "P0b", "P0c"))
+    groups = [
+        {
+            "priority": pri,
+            "jobs": by_pri.get(pri, 0),
+            "eta_minutes": eta_by_pri.get(pri, 0.0),
+        }
+        for pri in sorted(by_pri.keys(), key=lambda p: PRIORITY_RANK.get(p, 99))
+    ]
+    plan = {
+        "schema_version": 1,
+        "kind": "ai-film-h3-capacity-plan",
+        "ok": bool(queue.get("ok")),
+        "at": utc_now(),
+        "root": str(base),
+        "pending_jobs": len(pending),
+        "eta_minutes_total": round(total_eta, 1),
+        "eta_hours_total": round(total_eta / 60.0, 2),
+        "p0_jobs": p0_jobs,
+        "p0_eta_minutes": round(p0_eta, 1),
+        "by_mode": by_mode,
+        "eta_by_mode": eta_by_mode,
+        "by_priority": by_pri,
+        "eta_by_priority": eta_by_pri,
+        "groups": groups,
+        "next": queue.get("next"),
+        "priority_ok": queue.get("priority_ok", True),
+        "priority_violations": queue.get("priority_violations") or [],
+        "assumptions": {
+            "minutes_per_mode": dict(_ETA_MINUTES_BY_MODE),
+            "default_minutes": _DEFAULT_ETA_MINUTES,
+            "serial_one_5090": True,
+            "note": "ETA is planning only; real wall time varies with VRAM/queue",
+        },
+        "ops": [
+            f'aifilm h3 cycle --root "{base}" --until-empty --execute',
+            f'aifilm h3 run-next --root "{base}" --execute --max 5',
+            f'aifilm h3 capacity-plan --root "{base}"',
+        ],
+    }
+    try:
+        from util import write_json
+
+        path = base / "receipts" / "h3-capacity-plan.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, plan)
+        plan["path"] = str(path)
+    except Exception as exc:  # noqa: BLE001
+        plan["write_error"] = str(exc)[:160]
+    return plan
 
 
 def next_fill_idle_job(
@@ -785,6 +929,8 @@ def next_fill_idle_job(
         "root": queue.get("root"),
         "pending_count": queue.get("pending_count"),
         "by_priority": queue.get("by_priority"),
+        "priority_ok": queue.get("priority_ok", True),
+        "priority_violations": queue.get("priority_violations") or [],
         "next": nxt,
         "command": cmd,
         "capacity": capacity,
@@ -1050,12 +1196,26 @@ def fill_idle_cycle(
     max_jobs: int = 5,
     include_challenge: bool = True,
     notes: str = "",
+    until_empty: bool = False,
+    max_cycles: int = 40,
+    stop_on_capacity: bool = True,
 ) -> dict[str, Any]:
     """One agent-facing cycle: evidence → run-next (optional) → evidence again → pk peek.
 
-    Never auto-promotes. Not a daemon (``max_jobs`` capped by run_next).
+    Never auto-promotes. With ``until_empty=True`` loops cycles until queue empty,
+    capacity blocks, run fails, or ``max_cycles`` (hard-capped) — not an OS daemon.
     """
     base = _root(root)
+    if until_empty:
+        return fill_idle_until_empty(
+            base,
+            execute=bool(execute),
+            max_jobs_per_cycle=int(max_jobs or 5),
+            max_cycles=int(max_cycles or 40),
+            include_challenge=include_challenge,
+            notes=notes,
+            stop_on_capacity=bool(stop_on_capacity),
+        )
     before = write_fill_idle_evidence(base, notes=f"cycle-before {notes}".strip())
     run_rep = run_next_fill_idle(
         base,
@@ -1073,6 +1233,7 @@ def fill_idle_cycle(
         "ok": bool(run_rep.get("ok") is not False),
         "root": str(base),
         "execute": bool(execute),
+        "until_empty": False,
         "before": before.get("metrics"),
         "run": {
             "jobs_ran": run_rep.get("jobs_ran"),
@@ -1093,11 +1254,146 @@ def fill_idle_cycle(
             if multi
             else [
                 f'aifilm h3 run-next --root "{base}" --execute --max {max_jobs}',
+                f'aifilm h3 cycle --root "{base}" --until-empty --execute',
                 f'aifilm ship-prep --root "{base}"',
             ]
         ),
         "note": "never auto-promote; cycle is scheduling + evidence only",
     }
+
+
+def fill_idle_until_empty(
+    root: Path | str,
+    *,
+    execute: bool = False,
+    max_jobs_per_cycle: int = 5,
+    max_cycles: int = 40,
+    include_challenge: bool = True,
+    notes: str = "",
+    stop_on_capacity: bool = True,
+) -> dict[str, Any]:
+    """Overnight loop: keep calling run-next until queue empty or safety stop.
+
+    Safety:
+    - max_cycles hard-capped (default 40, hard max 80)
+    - max_jobs_per_cycle hard-capped at 20
+    - stops on capacity_not_ready (unless stop_on_capacity=False)
+    - stops on run_failed
+    - never auto-promotes
+    - not a background OS daemon (caller owns the process)
+    """
+    base = _root(root)
+    max_cycles = max(1, min(int(max_cycles or 40), _UNTIL_EMPTY_MAX_CYCLES_HARD))
+    max_jobs_per_cycle = max(
+        1, min(int(max_jobs_per_cycle or 5), _UNTIL_EMPTY_MAX_JOBS_PER_CYCLE)
+    )
+    plan_before = capacity_plan(base, include_challenge=include_challenge)
+    before = write_fill_idle_evidence(base, notes=f"until-empty-before {notes}".strip())
+    cycles: list[dict[str, Any]] = []
+    total_ran = 0
+    stop_reason = "max_cycles"
+    ok = True
+
+    for cycle_i in range(max_cycles):
+        run_rep = run_next_fill_idle(
+            base,
+            include_challenge=include_challenge,
+            execute=bool(execute),
+            max_jobs=max_jobs_per_cycle,
+            free_memory_on_mode_switch=True,
+        )
+        ran = int(run_rep.get("jobs_ran") or 0)
+        total_ran += ran
+        skipped = str(run_rep.get("skipped_reason") or "")
+        cycles.append(
+            {
+                "cycle": cycle_i + 1,
+                "jobs_ran": ran,
+                "skipped_reason": skipped or None,
+                "ok": bool(run_rep.get("ok") is not False),
+                "pending_after": run_rep.get("pending_after"),
+                "next_after": run_rep.get("next_after"),
+            }
+        )
+        if not execute:
+            stop_reason = "dry_run_pass_execute"
+            break
+        if skipped in {"queue_empty", "queue_empty_after_runs"}:
+            stop_reason = "queue_empty"
+            break
+        if skipped == "capacity_not_ready" and stop_on_capacity:
+            stop_reason = "capacity_not_ready"
+            break
+        if skipped == "run_failed" or run_rep.get("ok") is False:
+            stop_reason = "run_failed"
+            ok = False
+            break
+        if ran == 0 and skipped not in {"", "None"}:
+            stop_reason = skipped or "no_progress"
+            break
+        if ran == 0:
+            stop_reason = "no_progress"
+            break
+
+    after = write_fill_idle_evidence(base, notes=f"until-empty-after {notes}".strip())
+    plan_after = capacity_plan(base, include_challenge=include_challenge)
+    pk = pk_compare(base, measure_missing=False, write_dailies=True)
+    multi = sum(1 for s in (pk.get("shots") or []) if int(s.get("take_count") or 0) >= 2)
+    report = {
+        "schema_version": 1,
+        "kind": "ai-film-fill-idle-until-empty",
+        "ok": ok,
+        "root": str(base),
+        "execute": bool(execute),
+        "until_empty": True,
+        "stop_reason": stop_reason,
+        "cycles_run": len(cycles),
+        "max_cycles": max_cycles,
+        "max_jobs_per_cycle": max_jobs_per_cycle,
+        "jobs_ran_total": total_ran,
+        "plan_before": {
+            "pending_jobs": plan_before.get("pending_jobs"),
+            "eta_minutes_total": plan_before.get("eta_minutes_total"),
+            "p0_jobs": plan_before.get("p0_jobs"),
+        },
+        "plan_after": {
+            "pending_jobs": plan_after.get("pending_jobs"),
+            "eta_minutes_total": plan_after.get("eta_minutes_total"),
+            "p0_jobs": plan_after.get("p0_jobs"),
+        },
+        "before": before.get("metrics"),
+        "after": after.get("metrics"),
+        "cycles": cycles,
+        "pk_multi_take": multi,
+        "dailies_path": pk.get("dailies_path"),
+        "human_next": (
+            [
+                f'aifilm h3 pk-compare --root "{base}"',
+                f'aifilm select-shortlist --root "{base}" --promote  # only after human OK',
+                f'aifilm ship-prep --root "{base}"',
+            ]
+            if multi or stop_reason == "queue_empty"
+            else [
+                'aifilm comfy free-memory --confirm',
+                f'aifilm h3 cycle --root "{base}" --until-empty --execute',
+                f'aifilm h3 capacity-plan --root "{base}"',
+            ]
+        ),
+        "note": (
+            "until-empty loop owns the process until stop; never auto-promote; "
+            "not a systemd/launchd daemon"
+        ),
+    }
+    try:
+        from util import write_json
+
+        path = base / "receipts" / "fill-idle-until-empty.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, report)
+        report["path"] = str(path)
+    except Exception as exc:  # noqa: BLE001
+        report["write_error"] = str(exc)[:160]
+    return report
 
 
 def write_fill_idle_evidence(
@@ -1112,6 +1408,12 @@ def write_fill_idle_evidence(
     multi = [s for s in (pk.get("shots") or []) if int(s.get("take_count") or 0) >= 2]
     pending = [r for r in (queue.get("shots") or []) if r.get("command")]
     by_pri = queue.get("by_priority") or {}
+    eta_total = 0.0
+    by_mode: dict[str, int] = {}
+    for r in pending:
+        mode = str(r.get("mode") or "i2v").lower()
+        by_mode[mode] = by_mode.get(mode, 0) + 1
+        eta_total += eta_minutes_for_mode(mode)
     evidence = {
         "schema_version": 1,
         "kind": "ai-film-fill-idle-evidence",
@@ -1126,6 +1428,9 @@ def write_fill_idle_evidence(
             "pending_jobs": len(pending),
             "multi_take_shots": len(multi),
             "by_priority": by_pri,
+            "by_mode": by_mode,
+            "priority_ok": queue.get("priority_ok", True),
+            "eta_minutes_total": round(eta_total, 1),
         },
         "checklist": {
             "fill_p0_first": True,
@@ -1134,6 +1439,8 @@ def write_fill_idle_evidence(
             "film_case_path": str(base),
         },
         "next_ops": [
+            f'aifilm h3 capacity-plan --root "{base}"',
+            f'aifilm h3 cycle --root "{base}" --until-empty --execute',
             f'aifilm h3 run-next --root "{base}" --execute --max 5',
             f'aifilm ship-prep --root "{base}"',
             f'aifilm h3 pk-compare --root "{base}"',

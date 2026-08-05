@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
+from typing import Any
 
 
 def run(
@@ -25,12 +26,40 @@ def run(
     )
 
 
+def run_ffmpeg(
+    cmd: list[str],
+    *,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    """FFmpeg wrapper: injects ``-nostdin`` and applies ``AIFILM_FFMPEG_TIMEOUT``."""
+    from security_policy import minimal_subprocess_env
+
+    argv = list(cmd)
+    if "-nostdin" not in argv:
+        argv.insert(1, "-nostdin")
+    try:
+        ff_timeout = float(os.environ.get("AIFILM_FFMPEG_TIMEOUT") or 1800)
+    except (TypeError, ValueError):
+        ff_timeout = 1800.0
+    ff_timeout = max(120.0, ff_timeout)
+    return subprocess.run(
+        argv,
+        timeout=ff_timeout,
+        check=check,
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        env=minimal_subprocess_env(),
+    )
+
+
 def run_compose_env(
     cmd: list[str],
     *,
     cwd: Path | str | None = None,
     check: bool = True,
     timeout: int | float | None = 60,
+    stdin: Any | None = None,
 ) -> subprocess.CompletedProcess[str]:
     from security_policy import minimal_subprocess_env
 
@@ -48,4 +77,5 @@ def run_compose_env(
         text=True,
         env=env,
         timeout=timeout,
+        stdin=stdin,
     )

@@ -104,7 +104,9 @@ aifilm comfy capacity                # ready · VRAM≥24GiB · queue idle
 aifilm h3 list --root "<film>"                    # P0 primary（restricted）
 aifilm h3 list --root "<film>" --challenge        # + P1/P2 Fill-Idle 挑战队列
 aifilm h3 next --root "<film>"                    # 下一条 + capacity_ready（P0→P1→P2 mean 最低）
+aifilm h3 capacity-plan --root "<film>"                # backlog ETA（I2V/FLF/R2V/T2V）
 aifilm h3 cycle --root "<film>" --execute --max 5      # 一循环 evidence→run-next→pk（禁 promote）
+aifilm h3 cycle --root "<film>" --until-empty --execute # 挂机吃光队列（非 OS daemon；硬顶 cycles）
 aifilm h3 run-next --root "<film>" --execute [--max 5] # P2=pilot；换模 free-memory；非 daemon
 aifilm h3 pk-compare --root "<film>"                   # pk_score + receipts/pk-dailies.md
 aifilm h3 evidence --root "<film>"                     # fill-idle-evidence.json

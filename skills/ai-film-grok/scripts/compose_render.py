@@ -34,7 +34,7 @@ from security_policy import (
     safe_output_path,
     safe_workspace_directory,
 )
-from util import utc_now, write_json
+from util import run_compose_env, utc_now, write_json
 
 SCHEMA_VERSION = 1
 
@@ -57,26 +57,15 @@ def run(
     check: bool = True,
     timeout: int | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    env = minimal_subprocess_env()
-    # hyperframes/npx need PATH + HOME; keep minimal but usable
-    for key in ("PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "NODE_PATH", "npm_config_cache"):
-        if key in os.environ:
-            env[key] = os.environ[key]
-    # Allow npx network cache under user home
-    if "HOME" in env:
-        env.setdefault("npm_config_cache", str(Path(env["HOME"]) / ".npm"))
     argv = list(cmd)
     if argv and Path(argv[0]).name == "ffmpeg" and "-nostdin" not in argv:
         argv.insert(1, "-nostdin")
-    return subprocess.run(
+    return run_compose_env(
         argv,
-        cwd=str(cwd) if cwd else None,
+        cwd=cwd,
         check=check,
-        capture_output=True,
-        text=True,
-        env=env,
-        stdin=subprocess.DEVNULL,
         timeout=timeout,
+        stdin=subprocess.DEVNULL,
     )
 
 

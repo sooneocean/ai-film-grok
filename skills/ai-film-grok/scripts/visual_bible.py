@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from util import read_json, write_json
+from util.time import utc_now
 
 try:
     from .department_contracts import migrate_style_bible
 except ImportError:  # direct script imports used by the CLI
     from department_contracts import migrate_style_bible
-
-
-def utc_now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def migrate_to_v2(bible: dict[str, Any]) -> dict[str, Any]:

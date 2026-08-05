@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.39.15] - 2026-08-05
+
+### Added (Post P0 · caption_path + pixel ink · Wave 2)
+- **`caption_path`**: `master_hf` | `ship_hardburn` — one episode, one caption decision (`receipts/post-route.json`).
+- **CLI**: `final --caption-path` / `--ship-hardburn`; `aifilm caption-pixel-check --root`.
+- **closeout**: ladder steps `caption_pixel` + `evidence_fresh`; auto-run pixel check when final exists (soft-skip before plate).
+- **Modules**: `post_route.py` · `caption_pixel_check.py` (bottom-band ink heuristic; escape `AIFILM_SKIP_CAPTION_PIXEL=1`).
+- **Docs**: `docs/plans/2026-08-05-optimization-todoplan.md` · stages/post pointers.
+
+### Changed (util · Wave 3 partial)
+- **`util.run_ffmpeg` / `run_compose_env`**: canonical ffmpeg/compose runners; `render_final` / music / `compose_render` delegate.
+- **`FilmError`**: optional `code` + `details`; `utc_now` unified in director_review / prompt_injector / visual_bible.
+
+### Tests
+- `tests/test_post_route.py` · `tests/test_caption_pixel_check.py`
+
 ## [2.39.14] - 2026-08-05
 
 ### Added (h3_primary · 5090 unlimited mainline · P0)

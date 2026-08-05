@@ -208,7 +208,7 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
 
     cycle = actions.add_parser(
         "cycle",
-        help="Fill-Idle one cycle: evidence → run-next → evidence → pk peek (never promote)",
+        help="Fill-Idle cycle / overnight until-empty (never promote)",
     )
     cycle.add_argument("--root", type=Path, required=True)
     cycle.add_argument(
@@ -217,9 +217,40 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
         help="Actually run H3 jobs (default dry: only plan + evidence)",
     )
     cycle.add_argument("--max", type=int, default=5, dest="max_jobs")
+    cycle.add_argument(
+        "--until-empty",
+        action="store_true",
+        dest="until_empty",
+        help="Loop cycles until queue empty / capacity block / fail (not an OS daemon)",
+    )
+    cycle.add_argument(
+        "--max-cycles",
+        type=int,
+        default=40,
+        dest="max_cycles",
+        help="With --until-empty: max cycles (default 40, hard max 80)",
+    )
+    cycle.add_argument(
+        "--continue-on-capacity",
+        action="store_true",
+        dest="continue_on_capacity",
+        help="With --until-empty: do not stop when capacity not ready",
+    )
     cycle.add_argument("--no-challenge", action="store_true")
     cycle.add_argument("--notes", default="")
     cycle.add_argument("--receipt", type=Path, default=None)
+
+    cap = actions.add_parser(
+        "capacity-plan",
+        help="Backlog ETA by mode/priority (no GPU; writes receipts/h3-capacity-plan.json)",
+    )
+    cap.add_argument("--root", type=Path, required=True)
+    cap.add_argument(
+        "--no-challenge",
+        action="store_true",
+        help="Only primary H3 backlog (skip P2 soft challenges)",
+    )
+    cap.add_argument("--receipt", type=Path, default=None)
 
 
 def run_h3(args: argparse.Namespace) -> dict[str, Any]:
@@ -300,6 +331,16 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 max_jobs=int(getattr(args, "max_jobs", 5) or 5),
                 include_challenge=not bool(getattr(args, "no_challenge", False)),
                 notes=str(getattr(args, "notes", "") or ""),
+                until_empty=bool(getattr(args, "until_empty", False)),
+                max_cycles=int(getattr(args, "max_cycles", 40) or 40),
+                stop_on_capacity=not bool(getattr(args, "continue_on_capacity", False)),
+            )
+        elif action == "capacity-plan":
+            from h3_fill_idle import capacity_plan
+
+            report = capacity_plan(
+                args.root,
+                include_challenge=not bool(getattr(args, "no_challenge", False)),
             )
         elif action == "run":
             report = run_h3_shot(

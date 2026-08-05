@@ -35,6 +35,7 @@
 | [longform-workflow.md](longform-workflow.md) | 8–15 分钟竖屏长片合约、单元与恢复 |
 | [principles.md](principles.md) | 底层泛化能力 P0–P5 |
 | [hard-defaults.md](hard-defaults.md) | 默认与跨层决策（硬门禁完整表） |
+| [material-fidelity-loop.md](material-fidelity-loop.md) | 素材→模型统一领料（StillSource + GenerationRequest 命名表） |
 | [production-discipline.md](production-discipline.md) | 量产纪律 season-scale |
 | [short-drama-sop-bridge.md](short-drama-sop-bridge.md) | 短剧量产 SOP 的运营层桥接：G0–G11、运行卡、返工分流与三遍终检 |
 | [director-self-scorecard.md](director-self-scorecard.md) | 导演自评卡 |

@@ -272,7 +272,7 @@ def plan_h3_shot(
         if alt
         else None
     )
-    return {
+    plan: dict[str, Any] = {
         "schema_version": 1,
         "kind": "ai-film-h3-shot-plan",
         "ok": True,
@@ -317,6 +317,31 @@ def plan_h3_shot(
         "effect_tips": _h3_effect_tips(mode, mode_res),
         "still_challenge_candidates": _still_challenge_candidates(base, shot_id),
     }
+    # Material fidelity: unified GenerationRequest receipt (StillSource + prompt + refs)
+    try:
+        from generation_request import build_generation_request
+
+        gen_kind = str(mode) if str(mode) in {"i2v", "flf", "r2v", "t2v"} else "i2v"
+        gen_req = build_generation_request(
+            base,
+            shot_id,
+            kind=gen_kind,
+            still_override=still_override,
+            last_override=last_override,
+            refs_override=refs_override,
+            write=True,
+        )
+        plan["generation_request"] = {
+            "ok": gen_req.get("ok"),
+            "text_sha256": gen_req.get("text_sha256"),
+            "image_ref_count": len(gen_req.get("image_refs") or []),
+            "still_source": (gen_req.get("still_source") or {}).get("source"),
+            "receipt": f"receipts/prompts/{shot_id}.request.json",
+            "constraints": gen_req.get("constraints") or [],
+        }
+    except Exception as exc:  # noqa: BLE001 — plan must not die on optional receipt
+        plan["generation_request"] = {"ok": False, "error": str(exc)[:200]}
+    return plan
 
 
 def _still_challenge_candidates(root: Path, shot_id: str) -> list[dict[str, Any]]:
