@@ -272,6 +272,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_media_probe.py`
 - `skills/ai-film-grok/tests/test_media_qa.py`
 - `skills/ai-film-grok/tests/test_media_queue.py`
+- `skills/ai-film-grok/tests/test_media_queue_inventory.py`
 - `skills/ai-film-grok/tests/test_merge_edls.py`
 - `skills/ai-film-grok/tests/test_micro_motion.py`
 - `skills/ai-film-grok/tests/test_mmaudio_adapter.py`
