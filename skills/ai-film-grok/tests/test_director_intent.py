@@ -100,5 +100,36 @@ class DirectorIntentValidationTests(unittest.TestCase):
         self.assertGreaterEqual(len(intent["emotional_arc"]), 3)
 
 
+
+    def test_all_shipped_film_spec_templates_validate(self) -> None:
+        """Every templates/film-spec*.json must pass the real validate_film_spec path."""
+        templates = sorted((ROOT / "templates").glob("film-spec*.json"))
+        self.assertGreaterEqual(len(templates), 4, templates)
+        for path in templates:
+            with self.subTest(template=path.name):
+                data = json.loads(path.read_text(encoding="utf-8"))
+                shots = validate_film_spec(copy.deepcopy(data), assign_missing_ids=False)
+                self.assertGreaterEqual(len(shots), 1, path.name)
+                self.assertIsInstance(data.get("director_intent"), dict, path.name)
+                intent = data["director_intent"]
+                self.assertGreaterEqual(len(intent.get("emotional_arc") or []), 3, path.name)
+                self.assertTrue(str(intent.get("logline") or "").strip(), path.name)
+
+    def test_h3_primary_and_hybrid_templates_keep_weapon_lane_fields(self) -> None:
+        """H3 scaffolds must stay production-valid while retaining lane metadata."""
+        for name, required_keys in (
+            ("film-spec.h3-primary.example.json", ("h3", "_notes")),
+            ("film-spec.hybrid-h3.example.json", ("h3", "motion_lanes")),
+        ):
+            path = ROOT / "templates" / name
+            with self.subTest(template=name):
+                data = json.loads(path.read_text(encoding="utf-8"))
+                for key in required_keys:
+                    self.assertIn(key, data)
+                shots = validate_film_spec(copy.deepcopy(data), assign_missing_ids=False)
+                self.assertGreaterEqual(len(shots), 6)
+                self.assertTrue((data.get("h3") or {}).get("enabled"))
+
+
 if __name__ == "__main__":
     unittest.main()

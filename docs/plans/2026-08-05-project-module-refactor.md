@@ -40,3 +40,10 @@ Public `aifilm` subcommand strings unchanged · shims hard-compat · no silent h
 - **W4 package boundary**: `render_final` → `scripts/post/render_final.py` + shim; `edit_policy_heat` → `scripts/narrative/edit_policy_heat.py` + shim.
 - Internal leaf-split of multi-k bodies deferred (import graph / cycle risk); residual queue = residual plan R1–R5.
 - **W5**: AGENTS AREA + this tracker.
+
+
+## W6 audio/media (v2.39.52)
+
+- packages: `audio/` (45) · `media/` (32) + shims
+- path fixes: skill root parents[2], adapters/sibling scripts via parent.parent
+- tests: audio/media/h3/dispatch/delivery green

@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.39.54] - 2026-08-05
+
+### Fixed (film-spec health · H3 templates validate)
+- **templates/film-spec.h3-primary.example.json** + **hybrid-h3**: expand from profile skeletons to adult-max IRON arc so real `validate_film_spec` accepts them (keep h3 / motion_lanes notes).
+- **tests/test_director_intent.py**: all shipped `templates/film-spec*.json` must pass validate; H3 templates retain weapon-lane fields.
+- **docs/reports/2026-08-05-film-spec-health.md**: probe of templates, H3 canaries, Desktop historical roots (seedance / dramatic_meaning deferred).
+
+## [2.39.54] - 2026-08-05
+
+### Changed (module refactor · W6 audio/media packages)
+- **`scripts/audio/`**: TTS/BGM/SFX/lipsync/sound/voice clusters (45 modules) + top-level shims.
+- **`scripts/media/`**: I2V/Comfy/H3/FRW/queue/pilot/weapon clusters (32 modules) + top-level shims.
+- Path fixes for skill-root / adapters / sibling script resolution after nesting.
+- Public import names unchanged (`sys.modules` hard-compat).
+
 ## [2.39.53] - 2026-08-05
 
 ### Fixed (hang-proof · shortform motion + residual table truth)
