@@ -3421,6 +3421,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     caption_audit.add_argument("--root", required=True)
     caption_audit.add_argument("--max-frames", type=int, default=5)
+    caption_pixel = sub.add_parser(
+        "caption-pixel-check",
+        help="Machine ink check: final MP4 bottom-band looks like burned captions at cue mids",
+    )
+    caption_pixel.add_argument("--root", required=True)
+    caption_pixel.add_argument("--max-samples", type=int, default=5)
+    caption_pixel.add_argument(
+        "--final",
+        default=None,
+        help="Optional path to final MP4 (default out/film_final.mp4)",
+    )
+    post_doc = sub.add_parser(
+        "post-doctor",
+        help="One-page post health: caption_path, double-burn, SRT, five-track, timeline clock",
+    )
+    post_doc.add_argument("--root", required=True)
+    tl_clock = sub.add_parser(
+        "timeline-clock",
+        help="Audit/rewrite single on-picture timeline clock (film_timeline authority)",
+    )
+    tl_clock_sub = tl_clock.add_subparsers(dest="timeline_clock_action", required=True)
+    tl_aud = tl_clock_sub.add_parser("audit", help="Compare film_timeline vs timeline.json")
+    tl_aud.add_argument("--root", required=True)
+    tl_rw = tl_clock_sub.add_parser(
+        "rewrite",
+        help="Rewrite timeline.json shot_starts from film_timeline (on-picture slots)",
+    )
+    tl_rw.add_argument("--root", required=True)
     transition_audit = sub.add_parser(
         "transition-frame-audit",
         help="Extract final-MP4 frames around every planned shot transition for human review",
@@ -3891,6 +3919,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     fin.add_argument("--root", required=True)
     fin.add_argument("--out-name", default="film_final.mp4")
+    fin.add_argument(
+        "--caption-path",
+        default=None,
+        choices=["master_hf", "ship_hardburn"],
+        help=(
+            "One caption decision: master_hf=plate subs off + HF/Remotion owns captions; "
+            "ship_hardburn=plate PIL/ffmpeg burn (no double layer). Default from post-engine."
+        ),
+    )
+    fin.add_argument(
+        "--ship-hardburn",
+        action="store_true",
+        help="Alias for --caption-path ship_hardburn (fast ship / gate-red path)",
+    )
     fin.add_argument(
         "--resume",
         action="store_true",
@@ -5681,6 +5723,47 @@ def main(argv: list[str] | None = None) -> int:
 
             emit(build_caption_frame_audit(Path(args.root), max_frames=args.max_frames))
             return 0
+        if args.cmd == "caption-pixel-check":
+            from caption_pixel_check import run_caption_pixel_check
+
+            final = (
+                Path(args.final).expanduser().resolve()
+                if getattr(args, "final", None)
+                else None
+            )
+            report = run_caption_pixel_check(
+                Path(args.root),
+                max_samples=int(getattr(args, "max_samples", 5) or 5),
+                write=True,
+                final_mp4=final,
+            )
+            emit(report)
+            return 0 if report.get("ok") else 2
+        if args.cmd == "post-doctor":
+            from post_doctor import run_post_doctor
+
+            report = run_post_doctor(Path(args.root), write=True)
+            emit(report)
+            return 0 if report.get("ok") else 2
+        if args.cmd == "timeline-clock":
+            from timeline_clock import (
+                TimelineClockError,
+                audit_timeline_clock,
+                rewrite_timeline_from_film,
+            )
+
+            action = str(getattr(args, "timeline_clock_action", None) or "audit")
+            root = Path(args.root).expanduser().resolve()
+            try:
+                if action == "rewrite":
+                    report = rewrite_timeline_from_film(root)
+                else:
+                    report = audit_timeline_clock(root, write=True)
+            except TimelineClockError as exc:
+                emit({"ok": False, "error": str(exc)})
+                return 2
+            emit(report)
+            return 0 if report.get("ok") else 2
         if args.cmd == "transition-frame-audit":
             from transition_frame_audit import build_transition_frame_audit
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.39.24] - 2026-08-05
+
+### Fixed (Post CLI restore + version hygiene)
+- **CLI restore** on slim monolith: `caption-pixel-check`, `post-doctor`, `timeline-clock audit|rewrite`, `final --caption-path|--ship-hardburn` (dropped during CLI extract waves).
+- **Pointers**: plugin / README / skill README / GRAPH → **2.39.24**.
+- **Verify**: post P1 modules + hotpath tests green.
+
+## [2.39.23] - 2026-08-05
+
+### Added (Material Fidelity · M5 identity/FLF + M6 generation_ready)
+- **M5** `identity_refs.py`: canonical/cast + face-lock first; legacy cast/refs soft-warn; media_pack `flf_ready`/`mode_hint`/`identity_warnings`.
+- **M6** `generation_ready.py`: dispatch full+compact expose style/still/FLF readiness line.
+- **Tests**: `tests/test_material_fidelity_m5m6.py`.
+
 ## [2.39.22] - 2026-08-05
 
 ### Changed (CLI extract · W5c)
