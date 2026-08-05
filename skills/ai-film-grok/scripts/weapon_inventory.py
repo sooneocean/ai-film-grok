@@ -223,3 +223,77 @@ def primary_weapon_id_for_router_operation(operation: str) -> str | None:
     return resolve_registry_weapon_id(entry) or (
         str(entry["id"]) if entry.get("id") in _load_comfy_weapon_ids() else None
     )
+
+
+def inventory_report(
+    *,
+    tier: str | None = None,
+    modality: str | None = None,
+    primary_for_demand: str | None = None,
+    validate: bool = True,
+) -> dict[str, Any]:
+    """CLI/doctor-facing snapshot of the cross-modality inventory."""
+    data = load_inventory()
+    rows: list[dict[str, Any]] = []
+    want_tier = str(tier or "").strip().lower() or None
+    want_mod = str(modality or "").strip().lower() or None
+    for entry in iter_entries(data):
+        if want_tier and str(entry.get("tier") or "").lower() != want_tier:
+            continue
+        if want_mod and str(entry.get("modality") or "").lower() != want_mod:
+            continue
+        rows.append(
+            {
+                "id": entry.get("id"),
+                "modality": entry.get("modality"),
+                "tier": entry.get("tier"),
+                "provider": entry.get("provider"),
+                "registry_weapon": resolve_registry_weapon_id(entry),
+                "cli": entry.get("cli"),
+                "demand_classes": list(entry.get("demand_classes") or [])[:8],
+                "why": entry.get("why"),
+            }
+        )
+    # Primaries first, then secondary/experimental/retired
+    tier_rank = {"primary": 0, "secondary": 1, "experimental": 2, "retired": 3}
+    rows.sort(
+        key=lambda r: (
+            tier_rank.get(str(r.get("tier") or ""), 9),
+            str(r.get("modality") or ""),
+            str(r.get("id") or ""),
+        )
+    )
+    validation = validate_inventory(inventory=data) if validate else None
+    demand_hit = None
+    if primary_for_demand:
+        hit = primary_for(primary_for_demand, data)
+        demand_hit = (
+            {
+                "demand": primary_for_demand,
+                "id": hit.get("id"),
+                "tier": hit.get("tier"),
+                "modality": hit.get("modality"),
+                "registry_weapon": resolve_registry_weapon_id(hit) if hit else None,
+                "provider": hit.get("provider"),
+            }
+            if hit
+            else {"demand": primary_for_demand, "id": None}
+        )
+    primaries_by_mod: dict[str, list[str]] = {}
+    for entry in primaries(data):
+        mid = str(entry.get("modality") or "")
+        primaries_by_mod.setdefault(mid, []).append(str(entry.get("id")))
+    return {
+        "schema_version": 1,
+        "kind": "ai-film-weapon-inventory-report",
+        "ok": True if validation is None else bool(validation.get("ok")),
+        "updated_at": data.get("updated_at"),
+        "profile_default": data.get("profile_default"),
+        "line": inventory_summary_line(data),
+        "primaries": primaries_by_mod,
+        "entries": rows,
+        "entry_count": len(rows),
+        "primary_for": demand_hit,
+        "validation": validation,
+        "handoff_chain": data.get("handoff_chain"),
+    }

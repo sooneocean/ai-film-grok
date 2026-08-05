@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.46] - 2026-08-05
+
+### Added (Weapon inventory CLI + doctor/dispatch surface)
+- **`aifilm weapon inventory`**: list/filter tiers; `--primary-for`; `--validate` cross-check.
+- **`inventory_report()`** on `weapon_inventory.py`.
+- **doctor** soft field `weapon_inventory` (line + primaries + validation).
+- **weapon_router** `inventory_line`; compact dispatch `weapon_inventory_line`.
+- **Tests**: `test_cli_weapon` inventory cases · compact line · report helpers.
+
 ## [2.39.45] - 2026-08-05
 
 ### Changed (module refactor · W3 package layout)

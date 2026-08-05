@@ -370,6 +370,21 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
         # Weapon selection is also a bound orchestration contract. Keeping the
         # same object prevents compact/full mode from choosing different tools.
         "weapon_route": packet.get("weapon_route"),
+        "weapon_inventory_line": _bounded_text(
+            (
+                (
+                    (packet.get("weapon_route") or {}).get("inventory_line")
+                    if isinstance(packet.get("weapon_route"), dict)
+                    else None
+                )
+                or (
+                    (packet.get("weapon_inventory") or {}).get("line")
+                    if isinstance(packet.get("weapon_inventory"), dict)
+                    else None
+                )
+            ),
+            max_bytes=240,
+        ),
         "generation_ready": (
             {
                 "ok": (packet.get("generation_ready") or {}).get("ok"),

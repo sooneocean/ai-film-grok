@@ -480,6 +480,22 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         tunnel = {"ok": None, "skipped": True, "error": str(exc)[:160], "advisory": True}
     report["comfy_tunnel"] = tunnel
 
+    # S5.2 · advisory: 5090 tunnel up but profile not h3_primary (do not hard-fail core)
+    i2v_profile = str(os.environ.get("AIFILM_I2V_PROFILE") or "").strip().lower()
+    report["i2v_profile"] = {
+        "value": i2v_profile or None,
+        "recommended": "h3_primary",
+        "advisory": True,
+    }
+    if tunnel.get("ok") is True and i2v_profile not in {"h3_primary", "hybrid_h3"}:
+        msg = (
+            "Comfy tunnel looks ready but AIFILM_I2V_PROFILE is not h3_primary "
+            f"(current={i2v_profile or 'unset'}); set AIFILM_I2V_PROFILE=h3_primary "
+            "for local 5090 film-wide primary (hybrid_h3 also ok)"
+        )
+        environment_warnings.append(msg)
+        report["i2v_profile"]["warning"] = msg
+
     # video-use skill readiness (real-footage editing ring, 2026-07-23) — soft probe
     video_use: dict[str, Any] = {"ok": False, "required_for": "ingest-footage / auto-cut"}
     try:
@@ -519,6 +535,29 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     except Exception as exc:  # noqa: BLE001 — soft probe
         i2v_providers = {"ok": False, "error": str(exc)[:200]}
     report["i2v_providers"] = i2v_providers
+
+    # Cross-modality weapon inventory (soft; never blocks core_readiness alone)
+    weapon_inventory: dict[str, Any] = {"ok": False}
+    try:
+        from weapon_inventory import inventory_report
+
+        weapon_inventory = inventory_report(validate=True)
+        # slim for doctor payload
+        weapon_inventory = {
+            "ok": bool(weapon_inventory.get("ok")),
+            "line": weapon_inventory.get("line"),
+            "primaries": weapon_inventory.get("primaries"),
+            "profile_default": weapon_inventory.get("profile_default"),
+            "updated_at": weapon_inventory.get("updated_at"),
+            "validation": {
+                "ok": (weapon_inventory.get("validation") or {}).get("ok"),
+                "errors": list((weapon_inventory.get("validation") or {}).get("errors") or [])[:6],
+                "primary_count": (weapon_inventory.get("validation") or {}).get("primary_count"),
+            },
+        }
+    except Exception as exc:  # noqa: BLE001 — soft probe
+        weapon_inventory = {"ok": False, "error": str(exc)[:200]}
+    report["weapon_inventory"] = weapon_inventory
 
     # Grok OAuth (session token from grok login) — soft probe, does not fail doctor by default
     grok_oauth: dict[str, Any] = {"ok": False}

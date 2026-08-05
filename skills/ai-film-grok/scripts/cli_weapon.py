@@ -51,6 +51,32 @@ def add_weapon_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser])
     promote.add_argument("--canary-receipt", type=Path, required=True)
     promote.add_argument("--review-receipt", type=Path, required=True)
     promote.add_argument("--receipt", type=Path, default=None)
+    inventory = actions.add_parser(
+        "inventory",
+        help="Cross-modality weapon inventory (text/still/motion/audio tiers; no GPU)",
+    )
+    inventory.add_argument(
+        "--validate",
+        action="store_true",
+        help="Cross-check primaries against comfy-weapons + known externals",
+    )
+    inventory.add_argument(
+        "--primary-for",
+        dest="primary_for",
+        default=None,
+        help="Resolve documented primary for a demand class (e.g. image-to-video)",
+    )
+    inventory.add_argument(
+        "--tier",
+        default=None,
+        help="Filter: primary|secondary|experimental|retired",
+    )
+    inventory.add_argument(
+        "--modality",
+        default=None,
+        help="Filter: text|still|motion|audio",
+    )
+    inventory.add_argument("--receipt", type=Path, default=None)
 
 
 def _weapon(weapon_id: str) -> dict[str, Any]:
@@ -174,7 +200,24 @@ def _complete_canary(args: argparse.Namespace) -> dict[str, Any]:
 
 def run_weapon(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], None]) -> int:
     try:
-        if args.weapon_action == "probe":
+        if args.weapon_action == "inventory":
+            from weapon_inventory import WeaponInventoryError, inventory_report
+
+            try:
+                report = inventory_report(
+                    tier=getattr(args, "tier", None),
+                    modality=getattr(args, "modality", None),
+                    primary_for_demand=getattr(args, "primary_for", None),
+                    validate=True,
+                )
+                # Listing always emits; --validate fails closed when cross-check errs.
+                if getattr(args, "validate", False):
+                    report["ok"] = bool((report.get("validation") or {}).get("ok"))
+                else:
+                    report["ok"] = True
+            except WeaponInventoryError as exc:
+                raise WeaponControlError(str(exc)) from exc
+        elif args.weapon_action == "probe":
             report = probe_armory(args.base_url)
             armory = load_armory()
             report["research"] = [

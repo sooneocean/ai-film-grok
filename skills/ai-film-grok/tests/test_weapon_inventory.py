@@ -189,3 +189,44 @@ def test_comfy_blocked_no_stale_meat_denial() -> None:
     assert "adult-meat-motion-production" not in blocked
     selected = select_weapon("adult-meat-motion-i2v", stage="production")
     assert selected["weapon"]["id"] == "minimax-h3-i2v-pilot"
+
+
+def test_inventory_report_and_router_line(tmp_path: Path) -> None:
+    from weapon_inventory import inventory_report
+
+    rep = inventory_report(validate=True, primary_for_demand="text-to-image")
+    assert rep["ok"] is True
+    assert rep["primary_for"]["id"] == "qwen-image-2512-quality"
+    assert "still=" in rep["line"]
+    route = build_weapon_route(
+        tmp_path,
+        workflow={"mode": "professional", "current_stage": "shot_animatic_lock"},
+    )
+    assert route["inventory_line"]
+    assert "motion=" in route["inventory_line"]
+
+
+def test_compact_exposes_weapon_inventory_line() -> None:
+    from dispatch_compact import compact_dispatch
+
+    packet = {
+        "ok": True,
+        "kind": "ai-film-dispatch",
+        "schema_version": 2,
+        "craft_stage": "media",
+        "pipeline_stage": "visual",
+        "next_id": "x",
+        "next_cmd": "echo",
+        "next_why": "test",
+        "next_action": {"id": "x", "cmd": "echo", "skill_id": ""},
+        "weapon_route": {
+            "status": "ready",
+            "weapon_id": "qwen-image-2512-quality",
+            "inventory_line": "still=qwen · motion=h3 · audio=edge",
+        },
+        "metrics": {},
+        "workflow": {},
+        "state_hash": "abc",
+    }
+    c = compact_dispatch(packet)
+    assert c.get("weapon_inventory_line") == "still=qwen · motion=h3 · audio=edge"

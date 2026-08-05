@@ -7,7 +7,7 @@
 
 | | |
 |---|---|
-| **版本** | **`2.39.44`**（见 [`plugin.json`](./plugin.json) · 变更 [`CHANGELOG.md`](./CHANGELOG.md)） |
+| **版本** | **`2.39.46`**（见 [`plugin.json`](./plugin.json) · 变更 [`CHANGELOG.md`](./CHANGELOG.md)） |
 | **GitHub** | https://github.com/sooneocean/ai-film-grok |
 | **Gitea（个人）** | http://172.238.15.154:3000/Redredchen01/ai-film-grok |
 | **Gitea（aidev）** | http://172.238.15.154:3000/aidev/ai-film-grok |
@@ -39,7 +39,7 @@
 2. 硬表：[`references/hard-defaults.md`](./skills/ai-film-grok/references/hard-defaults.md)  
 3. 火力矩阵：[`references/weapon-lane-matrix.md`](./skills/ai-film-grok/references/weapon-lane-matrix.md)  
 4. 剧本价值：[`references/script-value-debrief.md`](./skills/ai-film-grok/references/script-value-debrief.md)  
-5. 版本明细：[`CHANGELOG.md`](./CHANGELOG.md) → `[2.39.0]` … `[2.38.0]`
+5. 版本明细：[`CHANGELOG.md`](./CHANGELOG.md) → `[2.39.46]` … `[2.38.0]`
 
 ---
 
@@ -553,7 +553,7 @@ cd ~/.grok/plugins/ai-film-grok
 
 | 路径 | 用途 |
 |------|------|
-| `plugin.json` | 插件元数据 / 版本 **`2.39.44`** |
+| `plugin.json` | 插件元数据 / 版本 **`2.39.46`** |
 | `CHANGELOG.md` | 版本明细（本季从 2.38→2.39 的 debrief / fidelity / H3 FLF / Fill-Idle） |
 | `commands/` | `/ai-film-grok` · `/aifilm` |
 | `skills/ai-film-grok/SKILL.md` | Agent 主脊（短） |
@@ -590,10 +590,10 @@ MIT © [dex](https://github.com/sooneocean)
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.39.44`
+- 插件版本：`2.39.46`
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
-- Python 脚本：`412` 个
+- Python 脚本：`415` 个
 - pytest 文件：`391` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)

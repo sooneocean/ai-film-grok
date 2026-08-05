@@ -113,3 +113,38 @@ def test_research_weapon_canary_is_plannable(capsys) -> None:
     )
     assert run_weapon(args, emit=lambda payload: print(json.dumps(payload))) == 0
     assert json.loads(capsys.readouterr().out)["allowed_stage"] == "pilot"
+
+
+def test_weapon_inventory_lists_primaries(capsys) -> None:
+    args = Namespace(
+        weapon_action="inventory",
+        validate=False,
+        primary_for=None,
+        tier="primary",
+        modality=None,
+        receipt=None,
+    )
+    assert run_weapon(args, emit=lambda payload: print(json.dumps(payload))) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["kind"] == "ai-film-weapon-inventory-report"
+    assert out["ok"] is True
+    assert out["line"]
+    assert "still" in out["primaries"]
+    assert "motion" in out["primaries"]
+    assert any(e["id"] == "minimax-h3-i2v-pilot" for e in out["entries"])
+
+
+def test_weapon_inventory_primary_for_i2v(capsys) -> None:
+    args = Namespace(
+        weapon_action="inventory",
+        validate=True,
+        primary_for="image-to-video",
+        tier=None,
+        modality=None,
+        receipt=None,
+    )
+    assert run_weapon(args, emit=lambda payload: print(json.dumps(payload))) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["ok"] is True
+    assert out["primary_for"]["id"] == "minimax-h3-i2v-pilot"
+    assert out["validation"]["ok"] is True

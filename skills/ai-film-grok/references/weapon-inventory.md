@@ -34,8 +34,12 @@ StillSource → GenerationRequest (text_sha + image_refs.sha) → H3 / media-que
 
 详：[material-fidelity-loop.md](material-fidelity-loop.md)
 
-## 校验
+## 校验 / CLI
 
 ```bash
-pytest skills/ai-film-grok/tests/test_weapon_inventory.py -q
+aifilm weapon inventory                 # 全表 + line
+aifilm weapon inventory --tier primary  # 仅 primary
+aifilm weapon inventory --primary-for image-to-video --validate
+aifilm doctor                           # soft 字段 weapon_inventory.line
+pytest skills/ai-film-grok/tests/test_weapon_inventory.py skills/ai-film-grok/tests/test_cli_weapon.py -q
 ```
