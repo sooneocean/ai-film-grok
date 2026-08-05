@@ -3,7 +3,7 @@
 **Status:** ACTIVE · **strategy pointer for this pass**  
 **Kind:** analysis-only (docs; no heat/i2v/pilot policy change)  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · evidence tree **`origin/main` @ 2.39.30** (hub 1455 · `scripts/core/` present)  
-**Revision:** 2026-08-05d — S5.3 execute canary PARTIAL (capacity_not_ready honest stop)
+**Revision:** 2026-08-05e — S5.3-ops `--free-first` shipped; overnight drain still OPEN_OPS
 **Audience:** user (director intent) + coding agents (implementation sequencing)
 
 > **一句话：** 规则与产线已够硬；下一层优化不是再叠 IRON，而是 **(导演) 把「门绿」变成「片好看/可交付」的可预期吞吐**，以及 **(工程) 按 ACTIVE 模块重构轨把热路径可测、可挂机、可维护**。
@@ -114,7 +114,7 @@ story.receive → script-value-debrief → plan run → fidelity
 
 | ID | Residual | Why still hurts / status |
 |----|----------|-------------------------|
-| **R-ops** | Full overnight drain to `queue_empty` | **PARTIAL** execute proven (AF7/S5.3); drain open · af7-final canary |
+| **R-ops** | Full overnight drain to `queue_empty` | **PARTIAL** execute + `--free-first` proven; contention still blocks drain · s53 free-first canary |
 | **R-af1** | Hot-path subprocess timeouts | **PARTIAL→core SHIPPED**: identity · shortform (2.39.53) · **h3_workflow ffmpeg/register-clip + continue_handoff** (2.39.56); bulk migration open |
 | **R-af2** | closeout ↔ post_doctor / caption-pixel | **SHIPPED** AF3/AF6 |
 | **R-doc** | hard-defaults FRW-first bulk prose | **SHIPPED** AF8 → h3_primary |
@@ -365,6 +365,7 @@ From antifragility residual list:
 - [x] **S5.1** design-go craft one-pager (poses/CU/L4/cameras/speakers + design-go-onepager.md)
 - [x] **S5.2** doctor advisory when tunnel ok but profile not h3_primary/hybrid_h3
 - [x] **S5.3** Execute until-empty canary **PARTIAL** — path proven; stop=`capacity_not_ready` (honest). Full `queue_empty` drain needs 5090 free · `artifacts/2026-08-05-s53-until-empty-canary.json`
+- [x] **S5.3-ops** `h3 cycle --free-first` — idle+memory-floor → free once; **never** cancel foreign · live canary `artifacts/2026-08-05-s53-free-first-canary.json` (dry=queue_busy skip; exec race still capacity_not_ready)
 - [x] **S5.4** generation_ready / still-challenge in dispatch compact
 
 **Depends:** S1 for safe overnight · **Risk:** ops · **Verify:** canary JSON + dispatch screenshot/receipt

@@ -1,6 +1,26 @@
 # Changelog
 
+
+## [2.39.57] - 2026-08-05
+
+### Changed
+- R1 structure: `post/render_final` re-exports caption/voice/media leaves from `final/*` (AST-identical de-dupe; public import surface unchanged). LOC 4333→3271.
+
+### Fixed (hang-proof · audio TTS pipeline)
+- **`audio_tts_render`**: ffprobe duration `timeout=30`; mp3→wav ffmpeg `timeout=120`.
+- **`event_voice_stem`**: decode `timeout=180`; write stem `timeout=120`.
+- **`audio_delivery_gate`**: ffprobe streams `timeout=30` (soft fail map).
+- **Tests**: Wave3AudioPipelineTimeoutTests in `test_antifragility_af.py`.
+
 ## [2.39.56] - 2026-08-05
+
+### Added (S5.3-ops · h3 cycle --free-first)
+- **`prepare_capacity_free_first`**: queue idle + only RAM/VRAM floors → free models once before cycle/until-empty.
+- **Never** free on `COMFY_QUEUE_BUSY` (no cancel foreign prompts).
+- CLI: `aifilm h3 cycle --free-first` (with `--until-empty`); receipts include `free_prep`.
+- **Tests**: disabled / queue_busy / dry would_free / free once / until-empty free_prep.
+- **Canary PARTIAL**: `artifacts/2026-08-05-s53-free-first-canary.json` · strategy rev 2026-08-05e.
+- Full overnight `queue_empty` drain still OPEN_OPS (5090 contention).
 
 ### Fixed (W6 path depth · local TTS argv trust)
 - **`audio/tts_backend`**: chatterbox/piper trusted interpreter uses `parents[4]` (plugin root) after nest into `scripts/audio/` (was `parents[3]` → wrong `skills/`).

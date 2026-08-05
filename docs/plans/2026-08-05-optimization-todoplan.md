@@ -30,7 +30,7 @@
 | 4 | gate slim / pilot h3 modes | **DONE** 2.39.17 |
 | 5 | cli_pilot extract | **DONE** 2.39.19 |
 | M | Material Fidelity M3–M4 | **DONE** 2.39.18 |
-| next | 真片 `until-empty` canary · worktree 卫生 | **PARTIAL** execute path ran · stop=`capacity_not_ready` · full drain open until 5090 free · `artifacts/2026-08-05-s53-until-empty-canary.json` |
+| next | 真片 `until-empty` canary · worktree 卫生 | **PARTIAL** execute + `--free-first` · full drain open until 5090 free · `artifacts/2026-08-05-s53-free-first-canary.json` |
 
 ## Canary log
 
@@ -43,6 +43,9 @@
 - **2026-08-05 AF7 execute**: same film · capacity blocked · stop=`capacity_not_ready` · jobs_ran=0 · takes 14→14  
   - receipt: `docs/reports/2026-08-05-h3-until-empty-canary-af7.json`  
   - memory: `memory/2026-08-05-af7-until-empty-execute-canary.md`  
+- **2026-08-05 S5.3-ops free-first**: `--free-first` code+tests · dry skip on `COMFY_QUEUE_BUSY` · execute race still `capacity_not_ready`  
+  - receipt: `artifacts/2026-08-05-s53-free-first-canary.json`  
+  - memory: `memory/2026-08-05-s53-free-first-ops.md`  
 
 ## 不做
 
@@ -55,7 +58,7 @@ export AIFILM_I2V_PROFILE=h3_primary
 aifilm write-spec --root "<film>"
 # pilot GO + 5090 idle 后：
 aifilm h3 capacity-plan --root "<film>"
-aifilm h3 cycle --root "<film>" --until-empty --execute
+aifilm h3 cycle --root "<film>" --until-empty --execute --free-first
 ```
 
 See: `2026-08-05-h3-primary-capacity.md` · `2026-08-05-material-fidelity-loop.md` · closed ROI/workflow plans.
