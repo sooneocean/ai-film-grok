@@ -252,6 +252,18 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     )
     cap.add_argument("--receipt", type=Path, default=None)
 
+    combo = actions.add_parser("combo-eval", help="Idle-gated T2V/I2V/R2V(/FLF) combo grid")
+    combo.add_argument("--root", type=Path, default=None)
+    combo.add_argument("--still", type=Path, default=None)
+    combo.add_argument("--end-still", type=Path, default=None, dest="end_still")
+    combo.add_argument("--execute", action="store_true")
+    combo.add_argument("--poll-sec", type=float, default=20.0, dest="poll_sec")
+    combo.add_argument("--max-wait-sec", type=float, default=3600.0, dest="max_wait_sec")
+    combo.add_argument("--no-free-memory", action="store_true")
+    combo.add_argument("--write-registry", action="store_true", dest="write_registry")
+    combo.add_argument("--seed", type=int, default=20260805)
+    combo.add_argument("--receipt", type=Path, default=None)
+
 
 def run_h3(args: argparse.Namespace) -> dict[str, Any]:
     action = str(args.h3_action)
@@ -342,6 +354,28 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 args.root,
                 include_challenge=not bool(getattr(args, "no_challenge", False)),
             )
+        elif action == "combo-eval":
+            from datetime import datetime, timezone
+            from h3_combo_eval import build_combo_matrix, prepare_eval_root, run_combo_grid, write_winners_registry
+            skill_root = Path(__file__).resolve().parent.parent
+            default_root = skill_root / "artifacts" / "5090-evaluation" / f"h3-combo-eval-{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+            eval_root = Path(args.root).expanduser().resolve() if args.root else default_root
+            still = getattr(args, "still", None)
+            if still is None:
+                legacy = skill_root / "artifacts" / "5090-evaluation" / "h3-quality-ab-20260804" / "stills" / "s_ab.png"
+                if legacy.is_file():
+                    still = legacy
+            combos = build_combo_matrix(seed=int(getattr(args, "seed", 20260805) or 20260805))
+            prepare_eval_root(eval_root, source_still=still, end_still=getattr(args, "end_still", None), combos=combos)
+            report = run_combo_grid(
+                eval_root, combos=combos,
+                poll_sec=float(getattr(args, "poll_sec", 20.0) or 20.0),
+                max_wait_per_job_sec=float(getattr(args, "max_wait_sec", 3600.0) or 3600.0),
+                free_memory_on_mode_switch=not bool(getattr(args, "no_free_memory", False)),
+                execute=bool(getattr(args, "execute", False)),
+            )
+            if bool(getattr(args, "write_registry", False)) and report.get("winners"):
+                report["registry_path"] = str(write_winners_registry(report["winners"]))
         elif action == "run":
             report = run_h3_shot(
                 args.root,

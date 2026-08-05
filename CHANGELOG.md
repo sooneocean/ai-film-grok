@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.41] - 2026-08-05
+
+### Added (H3 idle-gated combo eval)
+- `h3_combo_eval.py` + `aifilm h3 combo-eval` + `registry/h3-combo-winners.json`
+- Wired into `effect_tips` / `preferred_mode_for_lane`
+- Tests: `test_h3_combo_eval.py`
+
+
 ## [2.39.40] - 2026-08-05
 
 ### Fixed (Workflow wire · primary next ↔ seven-step phase)

@@ -66,6 +66,8 @@ aifilm h3 plan --root "<film>" --shot-id s01 --still takes/s01/still_frw_*.png
 | **R2V** | 参考演；有 last 时 last=pose land ref | ref0 主 still | 优先 pose ref | `force_r2v` / 无 last 的能量 CU | 必须像素贴落点（改 FLF） |
 | **T2V** | 纯文生 | — | — | 无脸 env/bridge | **任何锁脸 hero** |
 
+**Combo winners（`registry/h3-combo-winners.json`）**：身份锁脸→I2V · 高动→R2V · 对白→I2V · env→T2V。`aifilm h3 combo-eval --execute --write-registry`。
+
 **自动选型（`scripts/h3_mode.py` · policy `h3_max_effect_v2_first_last`）**：写进 `h3 plan` / `h3 list` / Fill-Idle。
 
 | 优先级 | 条件 | mode |

@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "kind": "h3-combo-winners",
+  "policy": "h3_max_effect_combo_v1",
+  "source_verdict_kind": "h3-combo-verdict",
+  "ts": "2026-08-05T03:24:48.904721+00:00",
+  "lanes": {
+    "hero_identity_lock": {
+      "preferred_mode": "i2v",
+      "prompt_family": "soft_portrait",
+      "notes": "Lock face from approved still; soft portrait control wins identity L1",
+      "winner": {
+        "combo_id": "soft_i2v",
+        "mode": "i2v",
+        "family": "soft_portrait",
+        "score": 87.1269,
+        "scores": {
+          "identity_score": 87.1269,
+          "motion_score": 4.321,
+          "mouth_score": 0.5,
+          "hero_balanced": 62.2851
+        },
+        "motion_mean_absdiff": 4.321,
+        "identity": {
+          "start_l1": 9.12,
+          "mid_l1": 13.269,
+          "end_l1": 21.662
+        },
+        "mouth_region_std_change": 0.5
+      }
+    },
+    "high_motion_energy": {
+      "preferred_mode": "r2v",
+      "prompt_family": "high_motion",
+      "notes": "HIGH MOTION clause required; R2V when energy > identity; I2V first if identity lock still required",
+      "winner": {
+        "combo_id": "high_r2v",
+        "mode": "r2v",
+        "family": "high_motion",
+        "score": 33.921,
+        "scores": {
+          "identity_score": 71.4129,
+          "motion_score": 33.921,
+          "mouth_score": 24.084,
+          "hero_balanced": 60.1653
+        },
+        "motion_mean_absdiff": 33.921,
+        "identity": {
+          "start_l1": 11.922,
+          "mid_l1": 58.681,
+          "end_l1": 25.109
+        },
+        "mouth_region_std_change": 24.084
+      }
+    },
+    "dialogue_mouth_energy": {
+      "preferred_mode": "i2v",
+      "prompt_family": "dialogue_mandarin",
+      "notes": "Default I2V + Mandarin line inject; R2V only for extreme mouth CU when identity can float",
+      "winner": {
+        "combo_id": "dlg_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mandarin",
+        "score": 6.02651,
+        "scores": {
+          "identity_score": 88.5702,
+          "motion_score": 2.664,
+          "mouth_score": 0.799,
+          "hero_balanced": 62.7983
+        },
+        "motion_mean_absdiff": 2.664,
+        "identity": {
+          "start_l1": 9.191,
+          "mid_l1": 13.577,
+          "end_l1": 13.806
+        },
+        "mouth_region_std_change": 0.799
+      }
+    },
+    "faceless_env": {
+      "preferred_mode": "t2v",
+      "prompt_family": "env_no_face",
+      "notes": "Never hang cast face on T2V; env/bridge only",
+      "winner": {
+        "combo_id": "env_t2v",
+        "mode": "t2v",
+        "family": "env_no_face",
+        "score": 19.35,
+        "scores": {
+          "identity_score": 0.0,
+          "motion_score": 19.35,
+          "mouth_score": 0.0,
+          "hero_balanced": 5.805
+        },
+        "motion_mean_absdiff": 19.35,
+        "identity": {
+          "start_l1": null
+        },
+        "mouth_region_std_change": null
+      }
+    }
+  },
+  "weapon_defaults": {
+    "steps": 20,
+    "duration_sec": 5.0,
+    "fps": 24,
+    "note": "registry tuning.steps.allowed is [20] only"
+  },
+  "baseline_verdict": {
+    "schema_version": 1,
+    "kind": "h3-combo-verdict",
+    "ts": "2026-08-05T03:24:48.904721+00:00",
+    "winners": {
+      "hero_identity_lock": {
+        "combo_id": "soft_i2v",
+        "mode": "i2v",
+        "family": "soft_portrait",
+        "score": 87.1269,
+        "scores": {
+          "identity_score": 87.1269,
+          "motion_score": 4.321,
+          "mouth_score": 0.5,
+          "hero_balanced": 62.2851
+        },
+        "motion_mean_absdiff": 4.321,
+        "identity": {
+          "start_l1": 9.12,
+          "mid_l1": 13.269,
+          "end_l1": 21.662
+        },
+        "mouth_region_std_change": 0.5
+      },
+      "high_motion_energy": {
+        "combo_id": "high_r2v",
+        "mode": "r2v",
+        "family": "high_motion",
+        "score": 33.921,
+        "scores": {
+          "identity_score": 71.4129,
+          "motion_score": 33.921,
+          "mouth_score": 24.084,
+          "hero_balanced": 60.1653
+        },
+        "motion_mean_absdiff": 33.921,
+        "identity": {
+          "start_l1": 11.922,
+          "mid_l1": 58.681,
+          "end_l1": 25.109
+        },
+        "mouth_region_std_change": 24.084
+      },
+      "dialogue_mouth_energy": {
+        "combo_id": "dlg_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mandarin",
+        "score": 6.02651,
+        "scores": {
+          "identity_score": 88.5702,
+          "motion_score": 2.664,
+          "mouth_score": 0.799,
+          "hero_balanced": 62.7983
+        },
+        "motion_mean_absdiff": 2.664,
+        "identity": {
+          "start_l1": 9.191,
+          "mid_l1": 13.577,
+          "end_l1": 13.806
+        },
+        "mouth_region_std_change": 0.799
+      },
+      "faceless_env": {
+        "combo_id": "env_t2v",
+        "mode": "t2v",
+        "family": "env_no_face",
+        "score": 19.35,
+        "scores": {
+          "identity_score": 0.0,
+          "motion_score": 19.35,
+          "mouth_score": 0.0,
+          "hero_balanced": 5.805
+        },
+        "motion_mean_absdiff": 19.35,
+        "identity": {
+          "start_l1": null
+        },
+        "mouth_region_std_change": null
+      }
+    },
+    "recipes": {
+      "hero_identity_lock": {
+        "mode": "i2v",
+        "prompt_family": "soft_portrait",
+        "combo_id": "soft_i2v",
+        "steps": 20,
+        "seed_policy": "fixed_for_ab_or_shot_seed",
+        "score": 87.1269
+      },
+      "high_motion_energy": {
+        "mode": "r2v",
+        "prompt_family": "high_motion",
+        "combo_id": "high_r2v",
+        "steps": 20,
+        "seed_policy": "fixed_for_ab_or_shot_seed",
+        "score": 33.921
+      },
+      "dialogue_mouth_energy": {
+        "mode": "i2v",
+        "prompt_family": "dialogue_mandarin",
+        "combo_id": "dlg_i2v",
+        "steps": 20,
+        "seed_policy": "fixed_for_ab_or_shot_seed",
+        "score": 6.02651
+      },
+      "faceless_env": {
+        "mode": "t2v",
+        "prompt_family": "env_no_face",
+        "combo_id": "env_t2v",
+        "steps": 20,
+        "seed_policy": "fixed_for_ab_or_shot_seed",
+        "score": 19.35
+      }
+    },
+    "rows_scored": 7,
+    "lanes_complete": [
+      "hero_identity_lock",
+      "high_motion_energy",
+      "dialogue_mouth_energy",
+      "faceless_env"
+    ]
+  }
+}

@@ -372,10 +372,17 @@ def effect_tips(mode: str, mode_res: dict[str, Any] | None = None) -> list[str]:
         "换模式前: aifilm comfy free-memory --confirm",
         "产能: aifilm comfy capacity（free VRAM≥24GiB · queue idle）",
     ]
+    try:
+        from h3_combo_eval import winner_tips_from_registry
+
+        tips.extend(winner_tips_from_registry())
+    except Exception:
+        pass
     if mode == "i2v":
         tips.append("I2V 单首帧：源 still 须已是目标体位/状态；软肖像 prompt 会静")
         tips.append("质量优先：补 stills/<id>_end.png 后自动升 FLF（first+last）")
         tips.append("高动写清 HIGH MOTION + 每秒可见变化；不够再 --mode r2v")
+        tips.append("combo lane: 身份锁脸默认 I2V+soft_portrait；高动先 I2V+HIGH MOTION 再 R2V")
         if mode_res.get("alt_mode") == "r2v":
             tips.append(f"能量备胎 R2V：{mode_res.get('alt_reasons')}")
     elif mode == "flf":
@@ -388,8 +395,27 @@ def effect_tips(mode: str, mode_res: dict[str, Any] | None = None) -> list[str]:
         tips.append("R2V：first=主 ref0；有 end still 时 last 优先作 pose land ref")
         tips.append("身份弱于 I2V/FLF；要像素贴落点 → --mode flf + --last-frame")
         tips.append("适合大嘴 CU / 邻镜换构图 / force_r2v 体位高动")
+        tips.append("combo lane: 高动能量位优先 R2V+high_motion family")
     elif mode == "t2v":
         tips.append("T2V 禁挂角色脸；只做无脸 env/bridge/气氛")
+        tips.append("combo lane: faceless_env → T2V+env_no_face only")
     tips.append("对白：audio_cues.spoken_text + on_camera → 自动注入 line:「…」")
+    tips.append("combo lane: 对白默认 I2V+dialogue_mandarin；极端大嘴 CU 才 R2V")
     tips.append("续镜：dsl.chain_mode=continue → 自动末帧作 first；有 last 则 FLF")
     return tips
+
+
+def preferred_mode_for_lane(lane: str) -> str | None:
+    try:
+        from h3_combo_eval import load_combo_winners
+        data = load_combo_winners()
+    except Exception:
+        return None
+    if not data:
+        return None
+    lanes = data.get("lanes") if isinstance(data.get("lanes"), dict) else {}
+    entry = lanes.get(lane) if isinstance(lanes.get(lane), dict) else None
+    if not entry:
+        return None
+    mode = entry.get("preferred_mode")
+    return str(mode) if mode else None
