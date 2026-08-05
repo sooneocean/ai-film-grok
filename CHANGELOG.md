@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.53] - 2026-08-05
+
+### Fixed (hang-proof · shortform motion + residual table truth)
+- **shortform_motion**: full-decode ffmpeg + ffprobe use `timeout=` (was bare hang risk).
+- **Strategy residual table**: R-af2/R-doc SHIPPED; R-af1 core hang paths reduced; R-ops/R-util PARTIAL.
+- **Tests**: shortform timeout asserts in `test_antifragility_af`.
+
 ## [2.39.52] - 2026-08-05
 
 ### Added (bulk-preflight weapon inventory hints)

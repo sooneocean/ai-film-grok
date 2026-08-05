@@ -300,30 +300,40 @@ def render_plan(
     if result.returncode != 0 or not temporary.is_file() or temporary.stat().st_size <= 0:
         temporary.unlink(missing_ok=True)
         raise ShortformMotionError(f"ffmpeg local motion render failed: {result.stderr[-400:]}")
-    decoded = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", str(temporary), "-f", "null", "-"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        decoded = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(temporary), "-f", "null", "-"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        temporary.unlink(missing_ok=True)
+        raise ShortformMotionError("local motion candidate decode timed out") from exc
     if decoded.returncode != 0:
         temporary.unlink(missing_ok=True)
         raise ShortformMotionError("local motion candidate failed full decode")
-    probe = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "stream=width,height,avg_frame_rate:format=duration",
-            "-of",
-            "json",
-            str(temporary),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=width,height,avg_frame_rate:format=duration",
+                "-of",
+                "json",
+                str(temporary),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired as exc:
+        temporary.unlink(missing_ok=True)
+        raise ShortformMotionError("local motion candidate probe timed out") from exc
     if probe.returncode != 0:
         temporary.unlink(missing_ok=True)
         raise ShortformMotionError("cannot ffprobe local motion candidate")

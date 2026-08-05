@@ -287,5 +287,14 @@ class AF8DocDriftTests(unittest.TestCase):
         self.assertNotIn("hero bulk 按 Grok image_to_video → FRW API I2V", text)
 
 
+
+class Wave3ShortformTimeoutTests(unittest.TestCase):
+    def test_shortform_decode_probe_have_timeout(self) -> None:
+        src = (SCRIPTS / "shortform_motion.py").read_text(encoding="utf-8")
+        self.assertIn("timeout=60", src)
+        self.assertIn("timeout=30", src)
+        self.assertIn("local motion candidate decode timed out", src)
+        self.assertIn("local motion candidate probe timed out", src)
+
 if __name__ == "__main__":
     unittest.main()

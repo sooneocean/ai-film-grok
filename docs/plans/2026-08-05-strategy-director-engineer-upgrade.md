@@ -112,17 +112,17 @@ story.receive → script-value-debrief → plan run → fidelity
 
 ### 2.2 OPEN / PARTIAL residuals (this strategy’s work queue)
 
-| ID | Residual | Why still hurts |
-|----|----------|-----------------|
-| **R-ops** | Full overnight drain to `queue_empty` | Execute canary **PARTIAL** (`artifacts/2026-08-05-s53-until-empty-canary.json` · stop=`capacity_not_ready`); re-run when 5090 free |
-| **R-af1** | Hot-path subprocess timeouts incomplete | ~150 bare `subprocess.*`; `util.run_ffmpeg` barely adopted; hang risk on fill-idle identity |
-| **R-af2** | closeout ↔ post_doctor / caption-pixel chain incomplete | Modules exist; not fully wired into single fail-closed closeout |
-| **R-doc** | hard-defaults §量产十条 L169 still “Grok→FRW bulk” | Contradicts `h3_primary` / weapon-lane canon |
-| **R-mf-doc** | material-fidelity plan still lists M5–M6 backlog | Code landed; tracker stale |
-| **R-cov** | final/compose failure-mode tests | Low coverage on ship path; not line vanity |
-| **R-util** | Wave 3 util FilmError / run_ffmpeg migration | Partial since opt plan |
-| **R-struct** | Module refactor **internal peels residual** (W0–W5 package/docs SHIPPED) | Leaf peels of post/render_final · heat packs · film_spec · export/compose per [residual plan](2026-08-05-residual-monolith-w4-todo.md) |
-| **R-hygiene** | Local dirty trees / doc drift | Keep tracker/status tied to origin evidence |
+| ID | Residual | Why still hurts / status |
+|----|----------|-------------------------|
+| **R-ops** | Full overnight drain to `queue_empty` | **PARTIAL** execute proven (AF7/S5.3); drain open · af7-final canary |
+| **R-af1** | Hot-path subprocess timeouts | **PARTIAL→core SHIPPED**: h3 identity timeout · shortform decode/probe timeout (2.39.53); bulk migration open |
+| **R-af2** | closeout ↔ post_doctor / caption-pixel | **SHIPPED** AF3/AF6 |
+| **R-doc** | hard-defaults FRW-first bulk prose | **SHIPPED** AF8 → h3_primary |
+| **R-mf-doc** | material-fidelity M5–M6 tracker | **SHIPPED** (M0–M6 landed) |
+| **R-cov** | final/compose failure-mode tests | Still useful; not line vanity |
+| **R-util** | Wave 3 util FilmError / run_ffmpeg | **PARTIAL** (final path yes; more open) |
+| **R-struct** | Module refactor leaf peels | **W0–W5 SHIPPED**; heat/film_spec intentional residual |
+| **R-hygiene** | Local dirty trees / doc drift | Ongoing |
 
 ### 2.3 Explicit non-goals / iron (this strategy)
 

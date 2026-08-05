@@ -3,7 +3,7 @@
   "kind": "h3-combo-winners",
   "policy": "h3_max_effect_combo_v1",
   "source_verdict_kind": "h3-combo-verdict",
-  "ts": "2026-08-05T03:38:42.653671+00:00",
+  "ts": "2026-08-05T03:53:50.413970+00:00",
   "lanes": {
     "hero_identity_lock": {
       "preferred_mode": "i2v",
@@ -13,20 +13,20 @@
         "combo_id": "soft_i2v",
         "mode": "i2v",
         "family": "soft_portrait",
-        "score": 87.1269,
+        "score": 87.0255,
         "scores": {
-          "identity_score": 87.1269,
-          "motion_score": 4.321,
-          "mouth_score": 0.5,
-          "hero_balanced": 62.2851
+          "identity_score": 87.0255,
+          "motion_score": 2.0331,
+          "mouth_score": 8.6004,
+          "hero_balanced": 61.5278
         },
-        "motion_mean_absdiff": 4.321,
+        "motion_mean_absdiff": 2.0331,
         "identity": {
-          "start_l1": 9.12,
-          "mid_l1": 13.269,
-          "end_l1": 21.662
+          "start_l1": 8.1782,
+          "mid_l1": 15.6031,
+          "end_l1": 21.0221
         },
-        "mouth_region_std_change": 0.5
+        "mouth_region_std_change": 8.6004
       }
     },
     "high_motion_energy": {
@@ -37,20 +37,20 @@
         "combo_id": "high_r2v",
         "mode": "r2v",
         "family": "high_motion",
-        "score": 33.921,
+        "score": 19.7522,
         "scores": {
-          "identity_score": 71.4129,
-          "motion_score": 33.921,
-          "mouth_score": 24.084,
-          "hero_balanced": 60.1653
+          "identity_score": 79.8752,
+          "motion_score": 19.7522,
+          "mouth_score": 20.7701,
+          "hero_balanced": 61.8383
         },
-        "motion_mean_absdiff": 33.921,
+        "motion_mean_absdiff": 19.7522,
         "identity": {
-          "start_l1": 11.922,
-          "mid_l1": 58.681,
-          "end_l1": 25.109
+          "start_l1": 10.7996,
+          "mid_l1": 24.8337,
+          "end_l1": 36.3744
         },
-        "mouth_region_std_change": 24.084
+        "mouth_region_std_change": 20.7701
       }
     },
     "dialogue_mouth_energy": {
@@ -61,39 +61,47 @@
         "combo_id": "dlg_i2v",
         "mode": "i2v",
         "family": "dialogue_mandarin",
-        "score": 6.02651,
+        "score": 30.6094,
         "scores": {
-          "identity_score": 88.5702,
-          "motion_score": 2.664,
-          "mouth_score": 0.799,
-          "hero_balanced": 62.7983
+          "identity_score": 88.184,
+          "motion_score": 1.6416,
+          "mouth_score": 13.1001,
+          "hero_balanced": 62.2213
         },
-        "motion_mean_absdiff": 2.664,
+        "motion_mean_absdiff": 1.6416,
         "identity": {
-          "start_l1": 9.191,
-          "mid_l1": 13.577,
-          "end_l1": 13.806
+          "start_l1": 8.2669,
+          "mid_l1": 15.476,
+          "end_l1": 15.1986
         },
-        "mouth_region_std_change": 0.799
+        "mouth_region_std_change": 13.1001
       }
     },
     "faceless_env": {
       "preferred_mode": "t2v",
       "prompt_family": "env_no_face",
-      "notes": "Policy-only: never hang cast face on T2V. Score not from face-still T2V AB.",
-      "score_basis": "policy_only",
+      "notes": "Live env_no_face T2V plate (no face still); motion scored; never hang cast face",
       "winner": {
-        "combo_id": "env_t2v_policy",
+        "combo_id": "env_t2v",
         "mode": "t2v",
         "family": "env_no_face",
-        "score": null,
-        "score_basis": "policy_only",
-        "motion_mean_absdiff": null,
+        "score": 10.7459,
+        "scores": {
+          "identity_score": 0.0,
+          "motion_score": 10.7459,
+          "mouth_score": 0.0,
+          "hero_balanced": 3.2238
+        },
+        "motion_mean_absdiff": 10.7459,
         "identity": {
           "start_l1": null,
-          "note": "N/A policy_only"
-        }
-      }
+          "mid_l1": null,
+          "end_l1": null,
+          "note": "N/A faceless or no still"
+        },
+        "mouth_region_std_change": null
+      },
+      "score_basis": "live_env_t2v"
     }
   },
   "weapon_defaults": {
@@ -102,126 +110,6 @@
     "fps": 24,
     "note": "registry tuning.steps.allowed is [20] only"
   },
-  "baseline_verdict": {
-    "schema_version": 1,
-    "kind": "h3-combo-verdict",
-    "ts": "2026-08-05T03:24:48.904721+00:00",
-    "winners": {
-      "hero_identity_lock": {
-        "combo_id": "soft_i2v",
-        "mode": "i2v",
-        "family": "soft_portrait",
-        "score": 87.1269,
-        "scores": {
-          "identity_score": 87.1269,
-          "motion_score": 4.321,
-          "mouth_score": 0.5,
-          "hero_balanced": 62.2851
-        },
-        "motion_mean_absdiff": 4.321,
-        "identity": {
-          "start_l1": 9.12,
-          "mid_l1": 13.269,
-          "end_l1": 21.662
-        },
-        "mouth_region_std_change": 0.5
-      },
-      "high_motion_energy": {
-        "combo_id": "high_r2v",
-        "mode": "r2v",
-        "family": "high_motion",
-        "score": 33.921,
-        "scores": {
-          "identity_score": 71.4129,
-          "motion_score": 33.921,
-          "mouth_score": 24.084,
-          "hero_balanced": 60.1653
-        },
-        "motion_mean_absdiff": 33.921,
-        "identity": {
-          "start_l1": 11.922,
-          "mid_l1": 58.681,
-          "end_l1": 25.109
-        },
-        "mouth_region_std_change": 24.084
-      },
-      "dialogue_mouth_energy": {
-        "combo_id": "dlg_i2v",
-        "mode": "i2v",
-        "family": "dialogue_mandarin",
-        "score": 6.02651,
-        "scores": {
-          "identity_score": 88.5702,
-          "motion_score": 2.664,
-          "mouth_score": 0.799,
-          "hero_balanced": 62.7983
-        },
-        "motion_mean_absdiff": 2.664,
-        "identity": {
-          "start_l1": 9.191,
-          "mid_l1": 13.577,
-          "end_l1": 13.806
-        },
-        "mouth_region_std_change": 0.799
-      },
-      "faceless_env": {
-        "combo_id": "env_t2v",
-        "mode": "t2v",
-        "family": "env_no_face",
-        "score": 19.35,
-        "scores": {
-          "identity_score": 0.0,
-          "motion_score": 19.35,
-          "mouth_score": 0.0,
-          "hero_balanced": 5.805
-        },
-        "motion_mean_absdiff": 19.35,
-        "identity": {
-          "start_l1": null
-        },
-        "mouth_region_std_change": null
-      }
-    },
-    "recipes": {
-      "hero_identity_lock": {
-        "mode": "i2v",
-        "prompt_family": "soft_portrait",
-        "combo_id": "soft_i2v",
-        "steps": 20,
-        "seed_policy": "fixed_for_ab_or_shot_seed",
-        "score": 87.1269
-      },
-      "high_motion_energy": {
-        "mode": "r2v",
-        "prompt_family": "high_motion",
-        "combo_id": "high_r2v",
-        "steps": 20,
-        "seed_policy": "fixed_for_ab_or_shot_seed",
-        "score": 33.921
-      },
-      "dialogue_mouth_energy": {
-        "mode": "i2v",
-        "prompt_family": "dialogue_mandarin",
-        "combo_id": "dlg_i2v",
-        "steps": 20,
-        "seed_policy": "fixed_for_ab_or_shot_seed",
-        "score": 6.02651
-      },
-      "faceless_env": {
-        "mode": "t2v",
-        "prompt_family": "env_no_face",
-        "combo_id": "env_t2v",
-        "steps": 20,
-        "seed_policy": "fixed_for_ab_or_shot_seed",
-        "score": 19.35
-      }
-    },
-    "rows_scored": 7,
-    "lanes_complete": [
-      "hero_identity_lock",
-      "high_motion_energy",
-      "dialogue_mouth_energy",
-      "faceless_env"
-    ]
-  }
+  "source": "live_combo_grid_20260805",
+  "eval_root": "artifacts/5090-evaluation/h3-combo-eval-20260805"
 }
