@@ -31,3 +31,7 @@
 
 ## Final tip after wrap docs
 - SHA: `23b85400e74a43877f47c66a59042fad1e1b5891`
+
+## Remote tip after successful push
+- **SHA**: `f08a1d37ff8aa4c280a97172ecee50a6f5ce41a8`
+- **push_exit**: 0 (light gate; AIFILM_TTS_BACKEND=edge for doctor preferred TTS)
