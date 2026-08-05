@@ -1,8 +1,9 @@
 # Strategy · Director + Engineer Upgrade Plan (2026-08-05)
 
 **Status:** ACTIVE · **strategy pointer for this pass**  
-**Kind:** analysis-only (no production behavior change in this commit)  
-**Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · plugin **2.39.29** (HEAD at write: `63c44887`)  
+**Kind:** analysis-only (docs; no heat/i2v/pilot policy change)  
+**Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · evidence tree **`origin/main` @ 2.39.30** (hub 1455 · `scripts/core/` present)  
+**Revision:** 2026-08-05b — align SHIPPED structure W1/W2 with origin after `0f355f60` (do not re-open as greenfield)  
 **Audience:** user (director intent) + coding agents (implementation sequencing)
 
 > **一句话：** 规则与产线已够硬；下一层优化不是再叠 IRON，而是 **(导演) 把「门绿」变成「片好看/可交付」的可预期吞吐**，以及 **(工程) 按 ACTIVE 模块重构轨把热路径可测、可挂机、可维护**。
@@ -13,7 +14,7 @@
 |-----|----------------------|
 | **This file** | **Single strategy pointer** (dual-lens + ordered residual todos) |
 | [2026-08-05-optimization-todoplan.md](2026-08-05-optimization-todoplan.md) | Ops throughput waves — Waves 0–2/4/5/M **SHIPPED**; residual pointed here |
-| [2026-08-05-project-module-refactor.md](2026-08-05-project-module-refactor.md) | Structure waves W0–W5 — **ACTIVE** owner for monolith extract |
+| [2026-08-05-project-module-refactor.md](2026-08-05-project-module-refactor.md) | Structure owner — **W0–W2 SHIPPED on origin** · residual **W3–W5** |
 | [2026-08-05-antifragility-todoplan.md](2026-08-05-antifragility-todoplan.md) | Fail-closed / hang / PARTIAL honesty residuals |
 | [2026-08-05-h3-primary-capacity.md](2026-08-05-h3-primary-capacity.md) | h3_primary + until-empty — **code SHIPPED**; true overnight canary OPEN |
 | [2026-08-05-material-fidelity-loop.md](2026-08-05-material-fidelity-loop.md) | M0–M4 SHIPPED; M5–M6 **code landed ~2.39.23** (doc backlog stale) |
@@ -26,15 +27,17 @@
 
 ## 1. Current-state map (concrete repo evidence)
 
-### 1.1 Inventory snapshot (2026-08-05 · this checkout)
+### 1.1 Inventory snapshot (evidence = `origin/main` @ 2.39.30 unless noted)
 
 | Metric | Value | Source |
 |--------|------:|--------|
-| Plugin version | **2.39.29** | `plugin.json` |
-| Python scripts | **~364** files · **~154k** LOC | `project_audit` / `wc` |
-| Tests | **~383–387** `test_*.py` | tree |
+| Plugin version | **2.39.30** | `plugin.json` on origin/main |
+| Hub `aifilm_grok.py` | **1455 LOC** (was 5028 pre-W1) | `wc` on `git show origin/main:…` |
+| `scripts/core/*` | **7 py · ~795 LOC** | present on origin (W1) |
+| `cli_*.py` modules | **~41** | origin tree |
+| Python scripts | **~360+** · **~150k+** LOC | project_audit / tree |
+| Tests | **~380+** `test_*.py` | tree |
 | Coverage (cached) | **~62%** overall | `skills/ai-film-grok/coverage.json` |
-| `cli_*.py` modules | **36–41** | tree (extract waves ongoing) |
 | References | **~165** md · **~78** lessons | tree |
 | Memory cards | **~67** | tree |
 | Stages | agent / visual / voice / post / deliver (+ approval) | `references/stages/` |
@@ -44,24 +47,24 @@
 | Gate-auto | `scripts/gate_auto.py` + `cinematic_gate.py` | hard-defaults P0 |
 | H3 overnight | `cli_h3.py` · `h3_fill_idle.py` · `test_h3_until_empty` | plans |
 
-### 1.2 Monolith / hot-path LOC (HEAD tree; WIP may differ)
+### 1.2 Monolith / hot-path LOC (origin/main @ 2.39.30)
 
 | Module | ~LOC | Why it matters |
 |--------|-----:|----------------|
-| `aifilm_grok.py` | **~4400–5000** on last clean extract baseline; **WIP worktree ~1500** after further extract | CLI hub + remaining cmd handlers |
-| `render_final.py` | **4333** | final master path · coverage **~30%** |
-| `edit_policy_heat.py` | **4015** | adult max / heat arc / wardrobe iron |
-| `film_spec.py` | **3234** | write-spec / validate / projectors |
+| `aifilm_grok.py` | **1455** | CLI hub after W1/W2 extract (≤2500 met) |
+| `render_final.py` | **4333** | final master path · coverage **~30%** · **W4 candidate** |
+| `edit_policy_heat.py` | **4015** | adult max / heat arc / wardrobe iron · **W4** |
+| `film_spec.py` | **3234** | write-spec / validate / projectors · **W4** |
 | `story_plan.py` | **2858** | plan run / spines |
 | `export_composition.py` | **2835** | compose / HF export surface |
 | `edit_policy.py` | **2667** | visual_fit / stretch / cut silk |
 | `h3_fill_idle.py` | **1700** | Fill-Idle + until-empty energy |
-| `dispatch.py` | **1454** | next_action brain · coverage **~81%** |
+| `dispatch.py` | **~1450** | next_action brain · coverage **~81%** |
 | `media_queue.py` | **1288** | bulk queue honesty |
-| `core/*` (WIP) | **~795** | W1 film_io / gates / media_ops extract |
+| `core/*` | **~795** | **SHIPPED W1** — film_io / gates / media_ops / paths / emit |
 
 **Coverage pain (audit cache, not vanity target):**  
-`compose_render` **~19%** · `render_final` **~30%** · `aifilm_grok` **~36%** · `production_gates` **~50%** · vs `dispatch` **~81%** · `story_plan` **~92%**.
+`compose_render` **~19%** · `render_final` **~30%** · `production_gates` **~50%** · vs `dispatch` **~81%** · `story_plan` **~92%**.
 
 ### 1.3 Pipeline spine (product truth)
 
@@ -80,16 +83,11 @@ story.receive → script-value-debrief → plan run → fidelity
 | Post | `stages/post.md` | `render_final` · `compose_*` · `caption_*` · `mix_partial` | caption_path · no double-burn · post-doctor |
 | Deliver | `stages/deliver.md` | `gate_auto` · `cinematic_gate` · `closeout` · export | machine-lane green before ship |
 
-### 1.4 project_audit readiness (this write)
+### 1.4 Evidence discipline
 
-```text
-plugin_validate PASS · cli_help PASS
-ruff / docs_current / baseline_current / doctor.core FAIL
-working tree: dirty (module-refactor WIP + untracked plans)
-tests_fast: NOT RUN by audit when other gates fail
-```
-
-Interpretation: **not** “product is broken”; tree is mid-refactor + hygiene drift. Strategy must **not** freeze dirty WIP as “done.”
+- **SHIPPED structure claims** must match `origin/main` (`aifilm_grok.py` LOC + `scripts/core/` present), not a dirty worktree snapshot.
+- Historical trap (e6844f01 era): tracker once said W1/W2 DONE while hub was still 5028 and `core/` absent — **fixed** when `0f355f60` landed code + this revision re-aligned docs.
+- Local dirty trees may still fail doctor/ruff; that is hygiene, not permission to invent DONE waves.
 
 ---
 
@@ -106,6 +104,7 @@ Interpretation: **not** “product is broken”; tree is mid-refactor + hygiene 
 | Opt Wave 2 post_route / caption-pixel / soft SRT | v2.39.15–20 | **DONE** |
 | Opt Wave 4 gate slim / pilot h3 modes | v2.39.17 · `test_w4_gate_slim` | **DONE** |
 | Opt Wave 5 CLI pilot + domain extracts | cli_pilot · cli_post/media/audio/orchestrate… · cli-extract-map | **DONE** (ongoing residual) |
+| **Module refactor W0–W2** (`core/*` + hub ≤2500) | v2.39.30 · hub **1455** · `scripts/core/` · `0f355f60` | **DONE on origin** |
 | Material Fidelity M0–M4 (+ M5/M6 code ~2.39.23) | `still_source` · `generation_request` · CHANGELOG | **DONE** (tracker doc lag) |
 | Gate-auto machine lane | `gate_auto.py` · hard-defaults · memory `2026-08-04-gate-auto` | **DONE** |
 | Adult max / poison / variety / speaker / zero_narration IRON | hard-defaults + many tests | **DONE** as product law |
@@ -120,10 +119,10 @@ Interpretation: **not** “product is broken”; tree is mid-refactor + hygiene 
 | **R-af2** | closeout ↔ post_doctor / caption-pixel chain incomplete | Modules exist; not fully wired into single fail-closed closeout |
 | **R-doc** | hard-defaults §量产十条 L169 still “Grok→FRW bulk” | Contradicts `h3_primary` / weapon-lane canon |
 | **R-mf-doc** | material-fidelity plan still lists M5–M6 backlog | Code landed; tracker stale |
-| **R-struct** | Module refactor W1–W5 | Hub shrink / domain packages / domain monoliths; public CLI strings iron |
+| **R-struct** | Module refactor **W3–W5 only** (W0–W2 SHIPPED) | Package dirs / domain monoliths (render_final, heat…) / AREA shim audit |
 | **R-cov** | final/compose failure-mode tests | Low coverage on ship path; not line vanity |
 | **R-util** | Wave 3 util FilmError / run_ffmpeg migration | Partial since opt plan |
-| **R-dirty** | Working tree mid-extract | Audit red; risk of half-push |
+| **R-hygiene** | Local dirty trees / doc drift | Keep tracker/status tied to origin evidence |
 
 ### 2.3 Explicit non-goals / iron (this strategy)
 
@@ -244,15 +243,15 @@ Implement as **receipt counters** on real film roots (not new IRON paragraphs).
 3. Never mix “big move + policy change” in one commit.  
 4. Per wave: `make check-all` + `make lock-runtime` when script fingerprints change + English commit + push.
 
-### E1 · Finish / stabilize module refactor W1 (P0 eng)
+### E1 · Module refactor residual = W3–W5 (W1/W2 SHIPPED)
 
-**State:** `scripts/core/` exists (paths, film_io, gates, media_ops, emit, constants); hub WIP shrink; tree dirty.  
-**Do:**
+**State on origin/main (2.39.30):** `scripts/core/*` present (~795 LOC); hub **1455** ≤2500; public CLI strings unchanged.  
+**Do not re-do W1/W2.** Residual:
 
-1. Land W1 only when green: no import cycle cli↔hub; shims preserve old imports.  
-2. Hub target ≤2500 (W2) without renaming subcommands.  
-3. Do **not** force-push half-extract; if blocked, stash or finish tests first.  
-4. Align `AGENTS.md` AREA table after package dirs (W5).
+1. **W3:** package dirs + top-level shims (keep import paths working).  
+2. **W4:** domain monolith peel (`render_final` first) — surgical, with failure-mode tests.  
+3. **W5:** docs / AGENTS AREA / shim audit.  
+4. Any follow-up hub touch must keep `make check-all` + lock-runtime green before claiming DONE.
 
 ### E2 · Domain monoliths — surgical, not heroic (P1)
 
@@ -298,7 +297,7 @@ From antifragility residual list:
 
 ### E7 · Ops / doctor / lock (P1)
 
-1. Dirty tree must not become “doctor always red forever” — either finish W1 or isolate WIP.  
+1. Status claims (Waves DONE) require origin evidence (LOC + paths), not worktree-only.  
 2. `make doctor` core green on clean main after each wave.  
 3. pre-push light remains default; full gate on release.  
 4. Worktree prune discipline (already partially done).
@@ -320,10 +319,10 @@ From antifragility residual list:
 
 - [ ] **S0.1** Fix `hard-defaults.md` 量产十条 #3 for `h3_primary` (doc drift L169)  
 - [ ] **S0.2** Update material-fidelity plan: M5–M6 SHIPPED status + residual only if real  
-- [ ] **S0.3** Point optimization-todoplan “next” → this strategy residual table  
-- [ ] **S0.4** Land or quarantine dirty module-refactor WIP so `project_audit` / doctor can go green on main  
+- [x] **S0.3** Point optimization-todoplan “next” → this strategy residual table  
+- [x] **S0.4** Structure tracker aligned to origin: W0–W2 SHIPPED (hub 1455 + `core/`); no fabricated DONE  
 
-**Depends:** none · **Risk:** low · **Verify:** `rg` L169 · plan headers · clean `git status` on main after land
+**Depends:** none · **Risk:** low · **Verify:** `rg` L169 · plan headers · origin LOC/`core/`
 
 ### Wave S1 · Hang-proof overnight (P0 eng+ops)
 
@@ -342,21 +341,22 @@ From antifragility residual list:
 
 **Depends:** caption-pixel / post_doctor modules SHIPPED · **Risk:** med · **Verify:** `test_final_hotpath_contracts` · closeout fixture film
 
-### Wave S3 · Structure W1→W2 (P0 eng)
+### Wave S3 · Structure W3+ (W1/W2 SHIPPED — do not re-open)
 
-- [ ] **S3.1** Complete `scripts/core` W1: break cli↔hub IO cycle; green check-all  
-- [ ] **S3.2** W2: remaining parser/cmd extract; hub ≤2500; public strings unchanged  
-- [ ] **S3.3** lock-runtime + version bump + CHANGELOG per AGENTS loop  
+- [x] **S3.1** W1 `scripts/core/*` on origin/main (v2.39.30)  
+- [x] **S3.2** W2 hub ≤2500 on origin (**1455 LOC**) · public strings unchanged  
+- [ ] **S3.3** W3 package dirs + top-level shims  
+- [ ] **S3.4** W5 docs / AREA / shim audit (can trail W4)  
 
-**Depends:** S0.4 · **Risk:** high if rushed · **Verify:** `make check-all` · import shims · CLI help smoke
+**Depends:** W1/W2 already on origin · **Risk:** med · **Verify:** `test -d scripts/core` · `wc -l aifilm_grok.py` on origin · `make check-all` after W3
 
-### Wave S4 · Domain peel (P1 eng)
+### Wave S4 · Domain peel (P1 eng · module-refactor W4)
 
 - [ ] **S4.1** render_final leaf extract + failure-mode tests (timeout / mix_partial / plate)  
 - [ ] **S4.2** heat module internal packs only if a real bug forces touch  
 - [ ] **S4.3** compose_render harness for export path  
 
-**Depends:** S3 · **Risk:** high · **Verify:** targeted pytest + one dry final fixture
+**Depends:** S3.1–S3.2 SHIPPED · **Risk:** high · **Verify:** targeted pytest + one dry final fixture
 
 ### Wave S5 · Director throughput (P0 craft · mostly process)
 
@@ -384,15 +384,16 @@ From antifragility residual list:
 
 ```text
 S0 hygiene ──────────────────────────────┐
-                                         ├─→ S3 structure ─→ S4 domain peel
 S1 hang-proof ─→ S5.3 overnight canary ──┤
-S2 ship truth ───────────────────────────┘
+S2 ship truth ───────────────────────────┤
+S3 W3+ (W1/W2 already SHIPPED) ─→ S4 W4 domain peel
 S5 design GO (can parallel after S0)
 S6 / S7 last
 ```
 
 **Impact order if capacity is scarce:**  
-`S0` → `S1` → `S2` → `S5.3` → `S3` → `S5.1` → `S4` → `S6/S7`.
+`S0` → `S1` → `S2` → `S5.3` → `S5.1` → `S3.3` → `S4` → `S6/S7`.  
+(Do **not** schedule “finish W1/W2” — already on origin/main.)
 
 ---
 
@@ -433,10 +434,10 @@ aifilm closeout run --root "<film>"
 ## 9. Appendix · probe commands used
 
 ```bash
-# inventory
-find skills/ai-film-grok/scripts -name '*.py' | wc -l
-wc -l skills/ai-film-grok/scripts/{aifilm_grok,render_final,edit_policy_heat,film_spec,story_plan,export_composition,dispatch}.py
-python3 scripts/project_audit.py
+# inventory vs origin evidence
+git show origin/main:plugin.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["version"])'
+git show origin/main:skills/ai-film-grok/scripts/aifilm_grok.py | wc -l   # expect ~1455
+git ls-tree -r --name-only origin/main skills/ai-film-grok/scripts/core/  # expect 7 py
 # anchors that must exist
 test -f skills/ai-film-grok/scripts/aifilm_grok.py
 test -f skills/ai-film-grok/scripts/render_final.py
@@ -445,6 +446,7 @@ test -f skills/ai-film-grok/references/hard-defaults.md
 test -f skills/ai-film-grok/references/weapon-lane-matrix.md
 test -f docs/plans/2026-08-05-optimization-todoplan.md
 test -f docs/plans/2026-08-05-project-module-refactor.md
+# tracker must NOT claim W1/W2 DONE without core/ + hub≤2500 on origin
 ```
 
 ---
