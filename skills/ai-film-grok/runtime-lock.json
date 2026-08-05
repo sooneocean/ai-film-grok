@@ -1438,7 +1438,7 @@
     },
     {
       "path": "scripts/shortform_motion.py",
-      "sha256": "0f1270567cf15d52e907227d8a3cf98d53d3fd2e85d3886f91fc36da0e202fe7"
+      "sha256": "f44463d1e5d25f63db2c17f3f1297a03f524d6641c62f2b0d83014a8aea0d5e7"
     },
     {
       "path": "scripts/shot_evidence.py",
