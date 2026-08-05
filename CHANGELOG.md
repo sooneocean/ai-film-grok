@@ -17,11 +17,16 @@
 ## 2.39.64 — 2026-08-05
 
 ### Changed
+- W7 narrative: 21 modules → `scripts/narrative/` + thin shims; shim-safe edit_policy↔heat cycle.
 - R1c: peel TTS + native/vocal-color track builders → `final/tts_tracks.py` (re-export hard-compat).
 - R3a: peel I2V/H3 profile resolve → `film_spec_profile.py` (re-export from `film_spec`; no provider policy change).
 - LOC: `post/render_final` ~3014→~2735; `film_spec` ~3234→~3136.
 
 ## [2.39.63] - 2026-08-05
+
+### Changed (W7 · plan package expand)
+- Move 18 plan-domain modules into `scripts/plan/` (film_spec, story_*, production_*, shot_*) with thin top-level shims.
+- Tests: `test_w7_plan_package_and_shim_identity`.
 
 ### Fixed (film-spec write-spec scaffolds + glue)
 - **templates** example/adult-max/h3-primary/hybrid-h3: pose chain, size variety, arc_node, performance/craft, director_board → real `write-spec` green.
