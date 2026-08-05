@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.39.21] - 2026-08-05
+
+### Changed (CLI extract · W5b)
+- **`cli_write_spec.py`**: extract `write-spec` + film-spec compatibility projectors from monolith.
+- **`aifilm_grok.py`**: ~7161 LOC (was ~7539 after pilot extract).
+- **Tests**: `tests/test_cli_write_spec_extract.py`.
+- **Docs**: `docs/plans/cli-extract-map.md`.
+
+## [2.39.20] - 2026-08-05
+
+### Added (Post P1 · timeline clock + doctor + mix honesty)
+- **`timeline_clock`**: single on-picture clock; `aifilm timeline-clock audit|rewrite`; final persists `receipts/film_timeline.json`.
+- **`post-doctor`**: one-page post health (caption_path / double-burn / SRT / five-track / mix PARTIAL / pixel).
+- **`mix_partial`**: PARTIAL receipt v2 with `reason_code` · `affected_tracks` · `honest_limits` · `error_type`.
+- **preflight** hard: dual-clock · double-burn · SRT overlap · caption pixel red.
+- **five-track** soft: FX likely inaudible · mix PARTIAL honesty.
+- **Tests**: `tests/test_post_p1_timeline_doctor.py`.
 
 ## [2.39.20] - 2026-08-05
 

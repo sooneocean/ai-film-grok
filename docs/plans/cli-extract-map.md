@@ -1,15 +1,15 @@
 # CLI extract map — aifilm_grok.py domain split
 
-**Status:** ACTIVE · 2026-08-05 · v2.39.18  
+**Status:** ACTIVE · 2026-08-05 · v2.39.20  
 **Goal:** shrink `aifilm_grok.py` toward <2500 lines by extracting cmd handlers only.  
 **Iron:** public subcommand strings never rename.
 
 ## Baseline
 
-| Metric | Before C2 | After C2 | After C3 | After C4 | After W5 (pilot) |
-|--------|-----------|----------|----------|----------|------------------|
-| aifilm_grok.py LOC | ~11200 | ~9650 | ~8070 | ~7720 | ~7650 (pilot out) |
-| Extracted | — | cli_post | +cli_media | +doctor→cli_status | +**cli_pilot** |
+| Metric | After W5 pilot | After W5b write-spec |
+|--------|----------------|----------------------|
+| aifilm_grok.py LOC | ~7539 | **~7161** |
+| Extracted | cli_pilot | +**cli_write_spec** (~417 LOC) |
 
 ## Domain map
 
@@ -20,12 +20,12 @@
 | status/doctor | cli_status.py DONE | status, doctor |
 | workflow | cli_workflow DONE | bulk-preflight, ship-prep, pilot-pack alias |
 | h3/comfy | cli_h3 / cli_comfy DONE | h3, comfy |
-| **pilot** | **cli_pilot.py DONE (W5)** | pilot pick/report/pack/score/approve |
+| pilot | cli_pilot.py DONE | pilot pick/report/pack/score/approve |
+| **write-spec** | **cli_write_spec.py DONE (W5b)** | write-spec + compatibility projectors |
 
 ## Next candidates
 
-- audio / bgm / lipsync cmd cluster still in monolith (~handlers + build_parser)
-- `cmd_write_spec` (~470 LOC)
+- audio / bgm / lipsync cmd cluster still in monolith
 - further render_final leaf splits if needed
 - do **not** rename public subcommands
 
