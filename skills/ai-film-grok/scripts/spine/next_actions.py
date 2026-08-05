@@ -235,6 +235,48 @@ def _export_desktop_name(root: Path) -> str:
     return "GrokFilm"
 
 
+def _first_ltx23_audio_candidate(root: Path, spec: dict[str, Any]) -> dict[str, str] | None:
+    """First missing-clip general dialogue/soft hero for LTX 2.3 audio unit.
+
+    Restricted/bare never returned (meat stays H3). Best-effort; empty on errors.
+    """
+    if not isinstance(spec, dict):
+        return None
+    try:
+        from production_router import build_shot_intent
+    except Exception:
+        return None
+    man = read_json(root / "manifest.json") or {}
+    clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
+    scenes = spec.get("scenes") if isinstance(spec.get("scenes"), list) else []
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        shots = scene.get("shots") if isinstance(scene.get("shots"), list) else []
+        for shot in shots:
+            if not isinstance(shot, dict):
+                continue
+            sid = str(shot.get("id") or "").strip()
+            if not sid or sid in clips:
+                continue
+            try:
+                intent = build_shot_intent(spec, shot)
+            except Exception:
+                continue
+            if intent.get("content_class") == "restricted_local":
+                continue
+            if intent.get("recommended_provider") != "frw-ltx23":
+                continue
+            still = root / "stills" / f"{sid}.png"
+            still_hint = str(still) if still.is_file() else f"stills/{sid}.png"
+            return {
+                "shot_id": sid,
+                "lane": str(intent.get("recommended_lane") or "cloud_ltx23_audio"),
+                "still_hint": still_hint,
+            }
+    return None
+
+
 def detect_pipeline_stage(
     root: Path,
     *,
@@ -668,18 +710,37 @@ def build_next_actions(
                             "ltx23 有声轨：bulk 前先 frw canary（img2video-audio 能力回执）"
                         ),
                     )
-                add(
-                    "frw-ltx23-audio-unit",
-                    f'aifilm frw img2video-audio --model ltx2.3 --img-url <approved-still-url> '
-                    f'--prompt "$(cat receipts/prompts/<safe-dialogue-shot>.ltx23.txt 2>/dev/null '
-                    f'|| cat receipts/prompts/<id>.i2v.txt)" --wait\n'
-                    f'# then: aifilm register-clip --root "{r}" --shot-id <id> '
-                    f"--source-endpoint frw_ltx23_img2video_audio --audio-policy prefer_native …",
-                    _with_primary(
-                        "safe 对白/soft：FRW LTX 2.3 有声 unit（≥5min 限流；prefer_native；"
-                        "restricted/meat 勿走此轨→H3）"
-                    ),
-                )
+                ltx_hint = _first_ltx23_audio_candidate(root, spec if isinstance(spec, dict) else {})
+                if ltx_hint:
+                    sid = ltx_hint["shot_id"]
+                    add(
+                        "frw-ltx23-audio-unit",
+                        f'# next safe LTX audio shot={sid} lane={ltx_hint["lane"]}\n'
+                        f'# still={ltx_hint["still_hint"]} → upload public URL then:\n'
+                        f'aifilm frw img2video-audio --model ltx2.3 --img-url <url-for-{sid}> '
+                        f'--prompt "$(cat receipts/prompts/{sid}.ltx23.txt 2>/dev/null '
+                        f'|| cat receipts/prompts/{sid}.i2v.txt)" --wait\n'
+                        f'aifilm register-clip --root "{r}" --shot-id {sid} '
+                        f"--source <clip.mp4> --source-endpoint frw_ltx23_img2video_audio "
+                        f"--audio-policy prefer_native --identity-approved --motion-approved "
+                        f'--review-note "lane=ltx23_audio shot={sid}"',
+                        _with_primary(
+                            f"safe 对白/soft 下一镜 {sid}：LTX 2.3 有声 unit（≥5min；prefer_native）"
+                        ),
+                    )
+                else:
+                    add(
+                        "frw-ltx23-audio-unit",
+                        f'aifilm frw img2video-audio --model ltx2.3 --img-url <approved-still-url> '
+                        f'--prompt "$(cat receipts/prompts/<safe-dialogue-shot>.ltx23.txt 2>/dev/null '
+                        f'|| cat receipts/prompts/<id>.i2v.txt)" --wait\n'
+                        f'# then: aifilm register-clip --root "{r}" --shot-id <id> '
+                        f"--source-endpoint frw_ltx23_img2video_audio --audio-policy prefer_native …",
+                        _with_primary(
+                            "safe 对白/soft：FRW LTX 2.3 有声 unit（≥5min 限流；prefer_native；"
+                            "restricted/meat 勿走此轨→H3）"
+                        ),
+                    )
                 add(
                     "still-challenge-repair",
                     f'aifilm still-challenge next --root "{r}"\n'

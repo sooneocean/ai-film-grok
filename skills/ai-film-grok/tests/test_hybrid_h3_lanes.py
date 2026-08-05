@@ -232,6 +232,8 @@ def test_next_actions_ltx23_adult_surfaces_audio_and_still_repair(tmp_path: Path
     from next_actions import build_next_actions
 
     (tmp_path / "receipts").mkdir(parents=True)
+    (tmp_path / "stills").mkdir(parents=True)
+    (tmp_path / "stills" / "dlg01.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     (tmp_path / "film-spec.json").write_text(
         __import__("json").dumps(
             {
@@ -242,8 +244,28 @@ def test_next_actions_ltx23_adult_surfaces_audio_and_still_repair(tmp_path: Path
                     "dialogue": "frw_ltx23",
                     "allow_ltx_dialogue": True,
                     "restricted_local": "comfy-h3",
+                    "dialogue_safe_cloud": "cloud_ltx23_audio",
                 },
-                "scenes": [{"id": "s1", "shots": [{"id": "shot01", "shot_role": "hero"}]}],
+                "scenes": [
+                    {
+                        "id": "s1",
+                        "shots": [
+                            {
+                                "id": "dlg01",
+                                "shot_role": "hero",
+                                "heat_phase": "setup",
+                                "screen_mode": "on_camera",
+                                "spoken_text": "今晚有空吗？",
+                            },
+                            {
+                                "id": "meat01",
+                                "shot_role": "hero",
+                                "heat_phase": "act",
+                                "wardrobe_state": "bare",
+                            },
+                        ],
+                    }
+                ],
             }
         ),
         encoding="utf-8",
@@ -278,3 +300,6 @@ def test_next_actions_ltx23_adult_surfaces_audio_and_still_repair(tmp_path: Path
     assert "frw-ltx23-audio-unit" in ids
     assert "still-challenge-repair" in ids
     assert "h3-lane-meat" in ids
+    audio = next(a for a in actions if a["id"] == "frw-ltx23-audio-unit")
+    assert "dlg01" in audio["cmd"]
+    assert "meat01" not in audio["cmd"]

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.39.75] - 2026-08-05
+
+### Changed (ltx23 next_action concrete shot)
+- `next_actions` LTX audio unit picks first missing-clip **general** `frw-ltx23` shot (never restricted/meat).
+- Refresh `runtime-lock.json` after script fingerprint drift.
+
 ## [2.39.74] - 2026-08-05
 
 ### Changed (routing rewire R0–R1–R3 · behavior-neutral)
