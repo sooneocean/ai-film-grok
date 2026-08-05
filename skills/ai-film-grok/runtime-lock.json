@@ -318,7 +318,7 @@
     },
     {
       "path": "scripts/cli_h3.py",
-      "sha256": "04cb01ca21149a5d8d30b10381f428ef023d0c1b223e169994751a84ca3597df"
+      "sha256": "a19fd892967fc1ecb1107b462b2ff0d1900194224d54eccccd82a85715096a7d"
     },
     {
       "path": "scripts/cli_interactive.py",
@@ -586,7 +586,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "07ad66bd4aeeb6c52f18f45a139a0afa764aed8c26bbd750778578237ca1e478"
+      "sha256": "32a141cb5939f78dcf915e5d48c1700719ca6d36a2cec27b56e86af3aceedc81"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -726,7 +726,7 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "a53e0f5af2f2e67eeded05646aff630f75027a6468be982651d98d28be47521c"
+      "sha256": "643d01709f927b29d336a08073dfcdf543d1b2a0bf537ef9cc952219443e776b"
     },
     {
       "path": "scripts/h3_media_pack.py",
@@ -738,7 +738,7 @@
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "0099e616d3cb9b63065d68360a78513efb224ff8533e4d60f65646c6ecef4f57"
+      "sha256": "4e5904f56fd2ff7a1ec54b4c611f08e6f8792d433842cd328e5337af0ba55a5b"
     },
     {
       "path": "scripts/heat_check.py",
@@ -886,7 +886,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "8e22b9c2b86691e061026a1b83c27fcd72ba13cd6c43beec6ee3368aef04726d"
+      "sha256": "1926c0d77cf17cd476495c9b1c94c7ebbddf8744fcc436f066059cadb1781283"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -1374,7 +1374,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "0f74beab3bc8ab503e453735f64c5cd67ecc71ac6174761ba0d5309d152ec276"
+      "sha256": "251ad474dccc854eaf61ddeb0b93ce87425c6001b2109f5d17e6d4a492105308"
     },
     {
       "path": "scripts/workflow_spine.py",

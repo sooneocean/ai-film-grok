@@ -780,9 +780,7 @@ def assert_priority_order(
         )
     next_pri = str(next_row.get("priority") or "")
     next_rank = int(PRIORITY_RANK.get(next_pri, 99))
-    p0_pending = [
-        r for r in pending if str(r.get("priority") or "").startswith("P0")
-    ]
+    p0_pending = [r for r in pending if str(r.get("priority") or "").startswith("P0")]
     p1_pending = [r for r in pending if str(r.get("priority") or "") == "P1"]
     if p0_pending and next_pri.startswith("P2"):
         violations.append("P2_selected_while_P0_pending")
@@ -793,9 +791,7 @@ def assert_priority_order(
     for r in pending:
         r_rank = int(PRIORITY_RANK.get(str(r.get("priority") or ""), 99))
         if r_rank < next_rank:
-            violations.append(
-                f"higher_priority_starved:{r.get('priority')}:{r.get('shot_id')}"
-            )
+            violations.append(f"higher_priority_starved:{r.get('priority')}:{r.get('shot_id')}")
             break
     return violations
 
@@ -812,9 +808,7 @@ def capacity_plan(
 ) -> dict[str, Any]:
     """Read-only backlog ETA for overnight H3 scheduling (no GPU)."""
     base = _root(root)
-    queue = build_fill_idle_queue(
-        base, include_challenge=include_challenge, include_done=False
-    )
+    queue = build_fill_idle_queue(base, include_challenge=include_challenge, include_done=False)
     pending = [r for r in (queue.get("shots") or []) if r.get("command")]
     by_mode: dict[str, int] = {}
     by_pri: dict[str, int] = {}
@@ -1284,9 +1278,7 @@ def fill_idle_until_empty(
     """
     base = _root(root)
     max_cycles = max(1, min(int(max_cycles or 40), _UNTIL_EMPTY_MAX_CYCLES_HARD))
-    max_jobs_per_cycle = max(
-        1, min(int(max_jobs_per_cycle or 5), _UNTIL_EMPTY_MAX_JOBS_PER_CYCLE)
-    )
+    max_jobs_per_cycle = max(1, min(int(max_jobs_per_cycle or 5), _UNTIL_EMPTY_MAX_JOBS_PER_CYCLE))
     plan_before = capacity_plan(base, include_challenge=include_challenge)
     before = write_fill_idle_evidence(base, notes=f"until-empty-before {notes}".strip())
     cycles: list[dict[str, Any]] = []
@@ -1374,7 +1366,7 @@ def fill_idle_until_empty(
             ]
             if multi or stop_reason == "queue_empty"
             else [
-                'aifilm comfy free-memory --confirm',
+                "aifilm comfy free-memory --confirm",
                 f'aifilm h3 cycle --root "{base}" --until-empty --execute',
                 f'aifilm h3 capacity-plan --root "{base}"',
             ]

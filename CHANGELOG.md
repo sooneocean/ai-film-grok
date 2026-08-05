@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.16] - 2026-08-05
+
+### Added (H3 overnight throughput · W3)
+- **`aifilm h3 cycle --until-empty --execute`**: loop run-next until queue empty / capacity / fail (hard max cycles; never promote; not an OS daemon).
+- **`aifilm h3 capacity-plan`**: backlog ETA by mode/priority → `receipts/h3-capacity-plan.json`.
+- **Priority invariant**: `assert_priority_order` — P0 never starved by P2; queue exposes `priority_ok`.
+- **dispatch**: `h3_primary` next prefers `h3-until-empty` + capacity-plan.
+- **Tests**: `tests/test_h3_until_empty.py`.
+
 ## [2.39.15] - 2026-08-05
 
 ### Added (Post P0 · caption_path + pixel ink · Wave 2)

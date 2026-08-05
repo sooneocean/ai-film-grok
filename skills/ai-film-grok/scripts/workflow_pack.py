@@ -253,6 +253,25 @@ def bulk_preflight(
     man = read_json(root / "manifest.json") or {}
     spec = read_json(root / "film-spec.json") or {}
     shot_ids = [str(s.get("id")) for s in _shots_from_spec(spec) if s.get("id")]
+
+    # still-source audit (peak wardrobe must not rely on full cast master)
+    try:
+        from still_source import audit_film_still_sources
+
+        ssa = audit_film_still_sources(root)
+        # Hard only when film already has some approved stills (skip empty design roots).
+        has_any_still = bool((man.get("stills") or {}) if isinstance(man, dict) else False)
+        peak_hard = bool(ssa.get("hard")) and has_any_still
+        add(
+            "still_source",
+            (not peak_hard),
+            peak_missing=ssa.get("peak_missing"),
+            hard=ssa.get("hard") if peak_hard else [],
+            advisory=ssa.get("hard") if not peak_hard else [],
+        )
+    except Exception as exc:  # noqa: BLE001
+        add("still_source", True, skipped=True, error=str(exc)[:120])
+
     try:
         from still_uniqueness import active_still_reuse_report
 

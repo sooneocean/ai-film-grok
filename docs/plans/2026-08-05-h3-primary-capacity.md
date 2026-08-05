@@ -26,7 +26,7 @@
 - [x] W1 profile / router / media-queue / next_actions
 - [x] W1 tests `test_h3_primary.py`
 - [x] W2 mode table 沿用 `h3_mode` + 矩阵文案 + 路由测
-- [x] W3 until-empty + capacity-plan + P0 硬断言（v2.39.15）
+- [x] W3 until-empty + capacity-plan + P0 硬断言（v2.39.16）
 - [ ] W4 gate 减负
 - [ ] W5 CLI 拆分
 
