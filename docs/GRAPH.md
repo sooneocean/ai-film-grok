@@ -94,6 +94,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_bgm_final_integration.py`
 - `skills/ai-film-grok/tests/test_bgm_library.py`
 - `skills/ai-film-grok/tests/test_bulk_preflight_hard_gate.py`
+- `skills/ai-film-grok/tests/test_bulk_preflight_inventory.py`
 - `skills/ai-film-grok/tests/test_burn_srt_pil.py`
 - `skills/ai-film-grok/tests/test_cache.py`
 - `skills/ai-film-grok/tests/test_camera_serves_event.py`
