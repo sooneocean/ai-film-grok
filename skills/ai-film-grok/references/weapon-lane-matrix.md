@@ -1,6 +1,7 @@
 # 武器库双车道矩阵（Grok Video 1.5 + 5090 H3）
 
-> 2026-08-03 · 运营真相 · **2026-08-04 H3 效果最大化补丁**。  
+> 2026-08-03 · 运营真相 · **2026-08-04 H3 效果最大化补丁** · **2026-08-05 全模态盘点**。  
+> **primary 表**：[weapon-inventory.md](weapon-inventory.md) · `registry/weapon-inventory.json`。  
 > 类比：**Grok = 量产流水线**；**H3 = 重工车间**；**LTX = 对白棚**；**Qwen = 本地修片台**。  
 > 实机课：[lessons-2026-08-04-h3-max-effect.md](lessons-2026-08-04-h3-max-effect.md) · 短卡 `memory/2026-08-04-h3-max-effect.md`
 

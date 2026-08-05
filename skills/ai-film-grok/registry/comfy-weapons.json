@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "ai-film-comfy-weapon-armory",
-  "updated_at": "2026-08-03",
+  "updated_at": "2026-08-05",
   "default_node": "rtx5090-main",
   "nodes": {
     "rtx5090-main": {
@@ -75,7 +75,9 @@
         "independent_verifier": "ACCEPT",
         "model_sha256": "5dc80554d5d83390046a2f4a94ece06afb7700bf7b0aaf8bde9769793875876b",
         "workflow_sha256": "6f9855d986e336f9317066dc0cf925062073ad151b95579b0409079fa47d9188",
-        "output_sha256": "1ba1b25b8ef46251caec371cb2bddd60b2c442f7809cc7cc649e95499e89ff30"
+        "output_sha256": "1ba1b25b8ef46251caec371cb2bddd60b2c442f7809cc7cc649e95499e89ff30",
+        "production_promoted": true,
+        "production_promoted_at": "2026-08-05"
       }
     },
     {
@@ -141,7 +143,9 @@
         "independent_verifier": "ACCEPT",
         "local_edit_identity_gate": true,
         "large_viewpoint_identity_gate": false,
-        "output_sha256": "c3c865c1bad43e4a7dc7d5d764a61c73ed2d2cfdba0fd33e4dfa191209af860b"
+        "output_sha256": "c3c865c1bad43e4a7dc7d5d764a61c73ed2d2cfdba0fd33e4dfa191209af860b",
+        "production_promoted": true,
+        "production_promoted_at": "2026-08-05"
       }
     },
     {
@@ -1487,10 +1491,6 @@
     {
       "intent": "large-viewpoint-identity-lock",
       "reason": "The 2511 angle-change pilot did not pass the pixel identity gate"
-    },
-    {
-      "intent": "adult-meat-motion-production",
-      "reason": "No promoted local weapon meets the mean motion >=20 production gate"
     }
   ]
 }

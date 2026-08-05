@@ -5,6 +5,8 @@ Its machine-readable truth is `registry/comfy-weapons.json`; workflow templates
 live under `templates/comfy/`. No SSH private key, password, token or prompt is
 stored in the registry.
 
+**Cross-modality tiers**: `registry/weapon-inventory.json` · [weapon-inventory.md](weapon-inventory.md).
+
 ## Agent routing rule
 
 For a new still or edit request with no already-locked provider:

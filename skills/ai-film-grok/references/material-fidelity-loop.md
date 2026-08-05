@@ -56,7 +56,7 @@ mean 红 + 脸绿 → 推 still-challenge（人 promote）再 I2V。
 ## 指针
 
 - 阶段卡：[stages/visual.md](stages/visual.md)  
-- 武器：[weapon-lane-matrix.md](weapon-lane-matrix.md)  
+- 武器盘点：[weapon-inventory.md](weapon-inventory.md) · 双车道：[weapon-lane-matrix.md](weapon-lane-matrix.md)  
 - 先验后生：[lessons-2026-07-22-verify-before-generate.md](lessons-2026-07-22-verify-before-generate.md)  
 - 状态照：[keyframe-first-state-index.md](keyframe-first-state-index.md)  
 - hard-defaults：仅指针行「Material Fidelity」  

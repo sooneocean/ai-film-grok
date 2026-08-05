@@ -17,5 +17,5 @@
 - **字幕验收 = 像素可见（P0 · v3）**：每条对白 cue 抽帧人眼可读；ship 硬烧优先。用户报「没字幕」先抽帧再改，勿只改 HF CSS。
 - final 前自检：`speaker | voice | spoken_lang=zh | screen_mode | caption_pixels=ok`。
 
-色气 BGM 默认 **rnb**。机读：[hard-defaults](../hard-defaults.md)。  
+色气 BGM 默认 **rnb**。中文 VO primary=Edge。机读：[hard-defaults](../hard-defaults.md) · [weapon-inventory](../weapon-inventory.md)。  
 深入：[dialogue-first-workflow](../dialogue-first-workflow.md) · [vo-modes](../vo-modes.md) · [voices](../voices.md) · [caption-hardburn](../memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md)

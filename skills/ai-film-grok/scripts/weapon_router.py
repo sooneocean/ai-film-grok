@@ -176,6 +176,15 @@ def build_weapon_route(
         command = f"aifilm comfy route --intent {operation}" + (
             " --allow-experimental" if pilot_only else ""
         )
+    inventory_tier = "primary" if promoted or not pilot_only else "experimental"
+    try:
+        from weapon_inventory import primary_for
+
+        inv = primary_for(operation)
+        if inv and inv.get("tier"):
+            inventory_tier = str(inv["tier"])
+    except Exception:
+        inv = None
     return {
         **common,
         "status": "ready",
@@ -191,6 +200,8 @@ def build_weapon_route(
         "pilot_only": pilot_only,
         "production_promoted": promoted,
         "pilot_verified": bool((weapon.get("verified") or {}).get("real_pilot")),
+        "inventory_tier": inventory_tier,
+        "inventory_id": (inv or {}).get("id") if isinstance(inv, dict) else None,
         "reason": (
             "unlocked visual demand maps to MiniMax H3 film-lane (hybrid restricted/meat); "
             "explicit aifilm h3 / media-queue — bulk still needs user pilot approval"

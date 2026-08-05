@@ -23,7 +23,7 @@ L5 endframe handoff  → 下镜 L3（continue；smash 勿盲 promote）
 
 机读单出口：`still_source.resolve` · `generation_request.build` →
   receipts/prompts/<id>.request.json
-命名：[material-fidelity-loop](../material-fidelity-loop.md)
+命名：[material-fidelity-loop](../material-fidelity-loop.md) · primary：[weapon-inventory](../weapon-inventory.md)
 ```
 
 - 有角色的 still 使用已批准 cast/face/state 来源；禁止从零抽脸绕过 moderated 结果。

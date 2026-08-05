@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-weapon-inventory",
+  "updated_at": "2026-08-05",
+  "tiers": ["primary", "secondary", "experimental", "retired"],
+  "profile_default": "h3_primary",
+  "notes": [
+    "Tiers grounded in comfy-weapons status+production_promoted, hard-defaults, shipped routing.",
+    "Ship Chinese VO primary is Edge. config AIFILM_TTS_BACKEND default mimo is secondary free tier."
+  ],
+  "handoff_chain": {
+    "visual": [
+      "still_source.resolve_still_source",
+      "generation_request.build_generation_request",
+      "h3_media_pack / media-queue consume",
+      "receipts/prompts/<shot>.request.json (text_sha256 + image_refs[].sha256)"
+    ],
+    "code": [
+      "scripts/still_source.py",
+      "scripts/generation_request.py",
+      "scripts/h3_media_pack.py",
+      "scripts/weapon_router.py",
+      "scripts/weapon_inventory.py"
+    ],
+    "docs": [
+      "references/material-fidelity-loop.md",
+      "references/weapon-lane-matrix.md",
+      "references/weapon-inventory.md"
+    ]
+  },
+  "modalities": {
+    "text": {
+      "label": "文 · prompt / craft assembly",
+      "entries": [
+        {"id": "motion_prompt_spine", "tier": "primary", "demand_classes": ["motion_prompt", "i2v_prompt", "h3_prompt"], "provider": "local_module", "code": "scripts/motion_prompt_spine.py", "why": "Single motion core for Grok I2V + H3"},
+        {"id": "prompt_injector", "tier": "primary", "demand_classes": ["still_prompt", "keyframe_prompt"], "provider": "local_module", "code": "scripts/prompt_injector.py", "why": "Still/keyframe text from style-bible"},
+        {"id": "asset_prompt_hints", "tier": "secondary", "demand_classes": ["location_prop_hints"], "provider": "local_module", "code": "scripts/asset_registry.py::build_asset_prompt_hints", "why": "M3 location/prop fixed lines"},
+        {"id": "grok_chat_agent", "tier": "secondary", "demand_classes": ["agent_ops"], "provider": "grok_oauth", "why": "Agent ops only"}
+      ]
+    },
+    "still": {
+      "label": "图 · still / keyframe / edit",
+      "entries": [
+        {"id": "qwen-image-2512-quality", "tier": "primary", "demand_classes": ["text-to-image", "keyframe", "character-still", "poster", "chinese-text"], "provider": "comfy_lan", "registry_weapon": "qwen-image-2512-quality", "cli": "aifilm comfy route --intent text-to-image", "why": "Local T2I primary"},
+        {"id": "qwen-image-edit-2511-local", "tier": "primary", "demand_classes": ["image-edit", "local-image-edit", "wardrobe-edit", "identity-preserving-edit"], "provider": "comfy_lan", "registry_weapon": "qwen-image-edit-2511-local", "cli": "aifilm comfy route --intent local-image-edit --identity-lock", "why": "Identity-preserving edit primary"},
+        {"id": "grok_cast_image_edit", "tier": "secondary", "demand_classes": ["cast_lock", "hero_setup_still", "soft_hero"], "provider": "grok", "why": "Cast lock / hybrid setup"},
+        {"id": "frw_img2image_still_challenge", "tier": "secondary", "demand_classes": ["still-challenge", "weak_take_relight"], "provider": "frw", "cli": "aifilm still-challenge plan|next|run|promote", "why": "Cloud still challenger"},
+        {"id": "qwen-layered-control", "tier": "retired", "demand_classes": ["layered-image", "qwen-control"], "provider": "comfy_lan", "why": "Blocked in registry"}
+      ]
+    },
+    "motion": {
+      "label": "影 · I2V / FLF / R2V / T2V",
+      "entries": [
+        {"id": "minimax-h3-i2v-pilot", "tier": "primary", "demand_classes": ["image-to-video", "i2v", "adult-meat-motion-i2v", "general-i2v"], "provider": "comfy-h3", "registry_weapon": "minimax-h3-i2v-pilot", "cli": "aifilm h3 plan|run --mode i2v --register", "profile": "h3_primary", "why": "5090 film-lane I2V primary"},
+        {"id": "minimax-h3-flf", "tier": "primary", "demand_classes": ["flf", "first-last-frame"], "provider": "comfy-h3", "registry_weapon": "minimax-h3-i2v-pilot", "cli": "aifilm h3 plan|run --mode flf --last-frame PATH --register", "why": "FLF mode on H3 I2V weapon"},
+        {"id": "minimax-h3-r2v-pilot", "tier": "primary", "demand_classes": ["reference-to-video", "r2v", "energy_cu"], "provider": "comfy-h3", "registry_weapon": "minimax-h3-r2v-pilot", "cli": "aifilm h3 plan|run --mode r2v --register", "why": "Energy CU / high-motion"},
+        {"id": "minimax-h3-t2v-pilot", "tier": "primary", "demand_classes": ["text-to-video", "t2v", "env-plate", "bridge-insert"], "provider": "comfy-h3", "registry_weapon": "minimax-h3-t2v-pilot", "cli": "aifilm h3 plan|run --mode t2v --register", "why": "Faceless env only"},
+        {"id": "grok_video_1_5", "tier": "secondary", "demand_classes": ["cloud_i2v", "soft_bulk", "hybrid_setup"], "provider": "grok_primary", "why": "hybrid soft + cloud escape"},
+        {"id": "frw_ltx_dialogue", "tier": "secondary", "demand_classes": ["safe_dialogue_near", "broll_audiovideo"], "provider": "frw", "why": "Safe dialogue near"},
+        {"id": "infinite-talk-stable-pilot", "tier": "experimental", "demand_classes": ["talking-avatar-stable-pilot"], "provider": "comfy_lan", "registry_weapon": "infinite-talk-stable-pilot", "why": "Pilot only"},
+        {"id": "fantasy-talking-6step-pilot", "tier": "experimental", "demand_classes": ["talking-avatar-expressive-pilot"], "provider": "comfy_lan", "registry_weapon": "fantasy-talking-6step-pilot", "why": "Expressive canary"},
+        {"id": "hunyuan15-720p-i2v-sr-pilot", "tier": "experimental", "demand_classes": ["short-shot-i2v-sr-pilot"], "provider": "comfy_lan", "registry_weapon": "hunyuan15-720p-i2v-sr-pilot", "why": "Research SR"},
+        {"id": "ltx23-native-i2v-pilot", "tier": "experimental", "demand_classes": ["broll-audiovideo-pilot"], "provider": "comfy_lan", "registry_weapon": "ltx23-native-i2v-pilot", "why": "Local LTX pilot"},
+        {"id": "lipdub22b-official-fp8-pilot", "tier": "experimental", "demand_classes": ["text-redub-visual-preservation-research"], "provider": "comfy_lan", "registry_weapon": "lipdub22b-official-fp8-pilot", "why": "Research redub"},
+        {"id": "wan22_local_i2v", "tier": "retired", "demand_classes": ["wan22-i2v"], "provider": "comfy-wan22", "why": "Retired; H3 owns motion"},
+        {"id": "seedance_primary", "tier": "retired", "demand_classes": ["seedance-i2v"], "provider": "frw", "why": "Not primary"}
+      ]
+    },
+    "audio": {
+      "label": "声音 · TTS / BGM / SFX",
+      "entries": [
+        {"id": "edge_tts_zh", "tier": "primary", "demand_classes": ["tts_zh_ship", "chinese_vo", "storyteller_zh"], "provider": "edge", "cli": "aifilm final --tts-backend edge", "voices": ["zh-CN-XiaoyiNeural", "zh-CN-YunxiNeural", "zh-CN-XiaoxiaoNeural"], "why": "Ship Chinese VO primary"},
+        {"id": "mimo_tts", "tier": "secondary", "demand_classes": ["tts_auto_free", "mimo_vo"], "provider": "mimo", "cli": "AIFILM_TTS_BACKEND=mimo|auto", "why": "Free-tier secondary when key set"},
+        {"id": "qwen3_tts_audio_node", "tier": "secondary", "demand_classes": ["local_qwen_tts", "voice_armory"], "provider": "audio_node", "code": "scripts/voice_armory.py", "why": "5090 Qwen3-TTS profiles"},
+        {"id": "bgm_recipe_rnb", "tier": "primary", "demand_classes": ["bgm", "score", "music_mood"], "provider": "recipe", "cli": "aifilm final --music-mood rnb", "why": "Ecchi BGM default rnb"},
+        {"id": "ace_step15_bgm_library", "tier": "secondary", "demand_classes": ["instrumental-rnb-bgm-pilot", "ace_score_master"], "provider": "audio_node", "registry_weapon": "ace-step15-xl-rnb-pilot", "why": "ACE library human-approve"},
+        {"id": "stable_audio_ambient", "tier": "experimental", "demand_classes": ["room_tone", "ambient"], "provider": "audio_node", "why": "Candidate ambient"},
+        {"id": "mmaudio_sfx", "tier": "experimental", "demand_classes": ["video-bound-foley", "text-to-sfx"], "provider": "audio_node", "why": "Research SFX"},
+        {"id": "voicebox_tts", "tier": "experimental", "demand_classes": ["voicebox_optin"], "provider": "voicebox", "why": "Opt-in fallback only"},
+        {"id": "elevenlabs_ja_path", "tier": "retired", "demand_classes": ["ja_dialogue"], "provider": "elevenlabs", "why": "ja path retired"}
+      ]
+    }
+  },
+  "demand_primary_index": {
+    "text-to-image": "qwen-image-2512-quality",
+    "keyframe": "qwen-image-2512-quality",
+    "local-image-edit": "qwen-image-edit-2511-local",
+    "image-edit": "qwen-image-edit-2511-local",
+    "image-to-video": "minimax-h3-i2v-pilot",
+    "i2v": "minimax-h3-i2v-pilot",
+    "adult-meat-motion-i2v": "minimax-h3-i2v-pilot",
+    "flf": "minimax-h3-flf",
+    "reference-to-video": "minimax-h3-r2v-pilot",
+    "r2v": "minimax-h3-r2v-pilot",
+    "text-to-video": "minimax-h3-t2v-pilot",
+    "t2v": "minimax-h3-t2v-pilot",
+    "env-plate": "minimax-h3-t2v-pilot",
+    "tts_zh_ship": "edge_tts_zh",
+    "chinese_vo": "edge_tts_zh",
+    "bgm": "bgm_recipe_rnb",
+    "motion_prompt": "motion_prompt_spine",
+    "still_prompt": "prompt_injector"
+  }
+}

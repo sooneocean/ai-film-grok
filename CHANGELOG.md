@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.39.33] - 2026-08-05
+
+### Fixed / Added (antifragility AF1–AF6 + AF8)
+- **AF1** `h3_fill_idle` identity midframe ffmpeg → `util.subprocess.run(..., timeout=30)`; hang soft-skips with caution.
+- **AF2** `media_queue.complete` handoff/sidecar failures write `receipts/media-queue-partial.json` (no silent `pass`).
+- **AF3** `closeout` ladder runs `post_doctor`; hard codes block; `MIX_PARTIAL` advisory.
+- **AF4** TTS opt-in fallback writes `receipts/tts-partial.json` + `partial`/`honest_limits` on result.
+- **AF5** until-empty `capacity_not_ready` stop covered in tests.
+- **AF6** closeout evidence probe crash with final present is fail-closed (not advisory green).
+- **AF8** hard-defaults hero bulk prose → **h3_primary** (FRW-first stale line removed).
+- **Plan**: `docs/plans/2026-08-05-antifragility-todoplan.md` · tests `test_antifragility_af.py`.
+
 ## [2.39.30] - 2026-08-05
 
 ### Changed (module refactor · W1 core + W2 hub ≤2500)
