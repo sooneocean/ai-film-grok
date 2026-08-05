@@ -429,7 +429,6 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_workflow_wave_a.py`
 - `skills/ai-film-grok/tests/test_workflow_wave_f.py`
 - `skills/ai-film-grok/tests/test_workflow_wave_h.py`
-- `skills/ai-film-grok/tests/test_workflow_wire_primary.py`
 - `skills/ai-film-project/tests/test_validate_project_blueprint.py`
 - `tests/test_premium_pipeline_contracts.py`
 - `tests/test_release_gate.py`

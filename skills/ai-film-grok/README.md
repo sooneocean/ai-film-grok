@@ -436,7 +436,7 @@ Private skill for team use unless otherwise stated.
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
 - Python 脚本：`364` 个
-- pytest 文件：`387` 个
+- pytest 文件：`386` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->
