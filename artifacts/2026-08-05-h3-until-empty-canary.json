@@ -1,0 +1,26 @@
+{
+  "kind": "h3-until-empty-canary",
+  "at": "2026-08-05T02:29:04Z",
+  "film_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough",
+  "profile_env": "h3_primary",
+  "film_profile": "hybrid_h3",
+  "capacity_plan": {
+    "ok": true,
+    "pending_jobs": 2,
+    "eta_minutes_total": 18.0,
+    "priority_ok": true,
+    "by_mode": {
+      "i2v": 1,
+      "t2v": 1
+    }
+  },
+  "until_empty_dry": {
+    "ok": true,
+    "stop_reason": "dry_run_pass_execute",
+    "jobs_ran_total": 0,
+    "cycles_run": 1
+  },
+  "verdict": "PARTIAL",
+  "note": "Dry-run only. No GPU execute.",
+  "human_next": "aifilm h3 cycle --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --until-empty --execute"
+}
