@@ -592,7 +592,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "Formal final requires edge-tts + numpy + pillow (pip install --user edge-tts numpy pillow)"
         )
     elif (
-        not tts_info.get("ok")
+        not (bool(tts_info.get("ok")) or edge_ok)
         or not requirements["ok"]
         or not runtime["ok"]
         or not schema_ok
@@ -602,6 +602,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         report["error"] = (
             "Runtime/schema/backend verification failed; inspect nested doctor reports"
         )
+    # Core TTS: preferred ready OR edge installed (release-light clean checkout).
+    tts_core_ok = bool(tts_info.get("ok")) or edge_ok
     core_checks = {
         "skill_spine": bool(report["skill_md"]),
         "ffmpeg": bool(report["ffmpeg"]),
@@ -609,7 +611,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "edge_tts": edge_ok,
         "numpy": numpy_ok,
         "pillow": pil_ok,
-        "tts_backend": bool(tts_info.get("ok")),
+        "tts_backend": tts_core_ok,
         "requirements_lock": bool(requirements.get("ok")),
         "runtime_lock": bool(runtime.get("ok")),
         "film_spec_schema": schema_ok,

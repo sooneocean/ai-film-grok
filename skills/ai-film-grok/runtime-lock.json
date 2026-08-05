@@ -670,7 +670,7 @@
     },
     {
       "path": "scripts/cli/cli_status.py",
-      "sha256": "3d75cfd64296bd7cb1b96be281cc62f5e40a5a12709b9018894176b6ec648244"
+      "sha256": "284af40660486a7cbb4cd8cbaad9238214296c083ee92c7410bdc8cef8dab24d"
     },
     {
       "path": "scripts/cli/cli_still_challenge.py",
