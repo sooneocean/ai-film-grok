@@ -54,3 +54,11 @@ Landing commits (structure): `0f355f60` refactor W1+W2 · follow-ups `071a3113` 
 - [cli-extract-map.md](cli-extract-map.md) — prior CLI domain extracts
 - [REFACTORING_PLAN.md](../../REFACTORING_PLAN.md) — older P0–P3 (superseded by this tracker for structure)
 - AGENTS.md AREA table — test map
+
+
+## W3 batch (v2.39.44–45)
+
+- packages: spine · assets · plan · gates (+ core)
+- hard-compat shims via sys.modules
+- path fixes: skill_scripts / advance / plan schemas
+- verified: 43+ domain tests; main smoke import ok

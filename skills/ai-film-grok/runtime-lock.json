@@ -490,7 +490,7 @@
     },
     {
       "path": "scripts/cli_status.py",
-      "sha256": "fecb2af455a40ab026b628486c12478c1d9ed26610a1f11bc56df6a364bf1f34"
+      "sha256": "ba022a47385fe50b4a5e131d5964bb0849b122c99718a73f66e3efa5eecf6b7e"
     },
     {
       "path": "scripts/cli_still_challenge.py",
@@ -502,7 +502,7 @@
     },
     {
       "path": "scripts/cli_weapon.py",
-      "sha256": "d13eae45380ec1f8386b954ed859236a9f80bca8ff32fa893d3fe82796474866"
+      "sha256": "e1648e9e253757cf37a4033e0efb49bd52e74a57228bc76479af3dfbd699ed0d"
     },
     {
       "path": "scripts/cli_workflow.py",
@@ -942,7 +942,7 @@
     },
     {
       "path": "scripts/input_fidelity.py",
-      "sha256": "5731be1c89637445c07e912e0f8f48bc7d934d5d66dab17df11a4fccac810a0f"
+      "sha256": "bbd336868be5fd8ba48f2fb8e3f512d94c12f38af15b7be4216a4d72bc614bbd"
     },
     {
       "path": "scripts/intake.py",
@@ -1486,7 +1486,7 @@
     },
     {
       "path": "scripts/spine/dispatch_compact.py",
-      "sha256": "215c1b3bb7405e95ef8bf90e14b1b10bf9095a48b02565c1c59e8c08496da30e"
+      "sha256": "a2760838733f559e046de64bfbe15b723b19f794e3cc63b64d0d5bcea7afa1d4"
     },
     {
       "path": "scripts/spine/next_actions.py",
@@ -1670,11 +1670,11 @@
     },
     {
       "path": "scripts/weapon_inventory.py",
-      "sha256": "6d4a2c120bba72b1abc475e89f564b65eba78fa0281e4db2ddda26e21f16f4be"
+      "sha256": "536597348540021f497db39f7e262b9ce719771ced1d7c83a6e9e55df6043d41"
     },
     {
       "path": "scripts/weapon_router.py",
-      "sha256": "e4f0fb523fca5ab0112fe832ee1fbf7b41fe22bd4e80599a076bd6c62d162ba5"
+      "sha256": "772278b87f473c985f1f04ba6ad41fa7042526cd28a0d585a1b5109d6d7224f1"
     },
     {
       "path": "scripts/workflow_pack.py",
