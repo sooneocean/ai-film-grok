@@ -11,12 +11,7 @@ import subprocess
 from pathlib import Path
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from util import sha256_file
 
 
 def _git(root: Path, *args: str) -> str:
@@ -47,8 +42,8 @@ def main() -> int:
     payload = {
         "repo_commit": _git(root, "rev-parse", "HEAD"),
         "repo_dirty": bool(_git(root, "status", "--porcelain")),
-        "checkpoint_sha256": _sha256(checkpoint),
-        "adapter_sha256": _sha256(adapter),
+        "checkpoint_sha256": sha256_file(checkpoint),
+        "adapter_sha256": sha256_file(adapter),
         "python": platform.python_version(),
         "pytorch": torch.__version__,
         "cuda": torch.version.cuda,

@@ -8,7 +8,7 @@ new media is bought or a cut is approved.
 
 from __future__ import annotations
 
-import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,7 @@ from continuity import (
 )
 from dramatic_meaning import lint_dramatic_meaning
 from framing_lint import lint_composition_rules
-from util import read_json, utc_now, write_json
+from util import read_json, sha256_file, utc_now, write_json
 
 AUDIT_VERSION = 1
 RECEIPT_RELATIVE_PATH = Path("receipts/cinematic-audit.json")
@@ -45,16 +45,6 @@ def _issue(code: str, message: str, shot_ids: list[str] | None = None) -> dict[s
         "message": message,
         "shot_ids": shot_ids or [],
     }
-
-
-def _digest(path: Path) -> str | None:
-    if not path.is_file():
-        return None
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _coverage_issues(shots: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -205,9 +195,9 @@ def audit(
                     str(item.get("message") or "creative contract is incomplete"),
                 )
             )
-    manifest_hash = _digest(base / "manifest.json")
+    manifest_hash = sha256_file(base / "manifest.json") if (base / "manifest.json").is_file() else None
     final_path = base / "out" / "film_final.mp4"
-    final_hash = _digest(final_path)
+    final_hash = sha256_file(final_path) if final_path.is_file() else None
     if require_clip_evidence or require_media_evidence:
         manifest = read_json(base / "manifest.json") or {}
         clips = manifest.get("clips") if isinstance(manifest, dict) else None
@@ -225,7 +215,7 @@ def audit(
                 if (
                     not approved_clip_record(record)
                     or not path.is_file()
-                    or _digest(path) != (record.get("sha256") if isinstance(record, dict) else None)
+                    or sha256_file(path) != (record.get("sha256") if isinstance(record, dict) else None)
                     or not current.get("ok")
                 ):
                     invalid.append(str(shot_id))
@@ -263,7 +253,7 @@ def audit(
         "version": AUDIT_VERSION,
         "created_at": utc_now(),
         "inputs": {
-            "film_spec_sha256": _digest(base / "film-spec.json") if spec is None else None,
+            "film_spec_sha256": sha256_file(base / "film-spec.json") if spec is None else None,
             "manifest_sha256": manifest_hash,
             "final_mp4_sha256": final_hash,
         },
@@ -299,13 +289,13 @@ def current_audit(root: Path | str) -> dict[str, Any]:
     report = read_json(base / RECEIPT_RELATIVE_PATH)
     if not isinstance(report, dict):
         return {"ok": False, "blocking_codes": ["CINEMATIC_AUDIT_MISSING"]}
-    expected = _digest(base / "film-spec.json")
+    expected = sha256_file(base / "film-spec.json")
     if (
         report.get("version") != AUDIT_VERSION
         or report.get("inputs", {}).get("film_spec_sha256") != expected
-        or report.get("inputs", {}).get("manifest_sha256") != _digest(base / "manifest.json")
+        or report.get("inputs", {}).get("manifest_sha256") != sha256_file(base / "manifest.json")
         or report.get("inputs", {}).get("final_mp4_sha256")
-        != _digest(base / "out" / "film_final.mp4")
+        != sha256_file(base / "out" / "film_final.mp4")
     ):
         return {"ok": False, "blocking_codes": ["CINEMATIC_AUDIT_STALE"]}
     return report

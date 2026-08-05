@@ -12,8 +12,7 @@ from typing import Any
 from audio_timeline import caption_bindings, timeline_hash, validate_timeline
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+from util import sha256_file
 
 
 def _probe(path: Path) -> dict[str, Any]:
@@ -46,7 +45,7 @@ def _verify_rendered_tts_asset(root: Path, job: dict[str, Any]) -> str | None:
         return "rendered TTS asset escapes film root"
     if not asset.is_file():
         return "rendered TTS asset is missing"
-    if str(job.get("asset_sha256") or "") != _sha256(asset):
+    if str(job.get("asset_sha256") or "") != sha256_file(asset):
         return "rendered TTS asset checksum changed"
     return None
 
@@ -177,7 +176,7 @@ def build_delivery_report(
         "subtitle_binding_count": len(subtitle_bindings),
         "final_mp4": {
             "path": str(final_mp4) if final_mp4 else None,
-            "sha256": _sha256(final_mp4) if final_mp4 and final_mp4.is_file() else None,
+            "sha256": sha256_file(final_mp4) if final_mp4 and final_mp4.is_file() else None,
             "ffprobe": probe,
         },
         "stale": delivery_stale,

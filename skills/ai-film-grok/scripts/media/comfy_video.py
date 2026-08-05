@@ -1463,57 +1463,6 @@ def generate(
     timeout_sec: int = 1800,
 ) -> dict[str, Any]:
     raise ComfyVideoError(WAN22_I2V_RETIRED)
-    if str(profile.get("name") or "").startswith("adult-"):
-        validate_adult_request(prompt=prompt, subject_basis=subject_basis)
-    capability = probe(base_url)
-    profile_key = {
-        "adult-motion": "adult_motion",
-        "adult-action-experimental": "adult_action_experimental",
-        "adult-general-experimental": "adult_general_experimental",
-    }.get(str(profile.get("name") or ""), "official")
-    if not capability["profiles"].get(profile_key):
-        raise ComfyVideoError(f"required Wan profile is not installed: {profile_key}")
-    uploaded = upload_image(base_url, image)
-    graph = build_wan22_i2v_prompt(
-        image_name=uploaded["name"],
-        prompt=prompt,
-        width=width,
-        height=height,
-        duration_sec=duration_sec,
-        seed=seed,
-        turbo=turbo,
-        profile=profile,
-    )
-    client_id = f"aifilm-{secrets.token_hex(8)}"
-    prompt_id = submit(base_url, graph, client_id=client_id)
-    result = wait_for_result(
-        base_url,
-        prompt_id,
-        client_id=client_id,
-        timeout_sec=timeout_sec,
-    )
-    downloaded = download_result(base_url, result, out)
-    return {
-        "schema_version": 1,
-        "kind": "local-wan22-generation",
-        "ok": True,
-        "provider": "comfy-wan22",
-        "profile": profile["name"],
-        "prompt_id": prompt_id,
-        "input_sha256": uploaded["sha256"],
-        "output": downloaded,
-        "models": [profile["high"], profile["low"]],
-        "loras": [name for name in (profile.get("high_lora"), profile.get("low_lora")) if name],
-        "lora_sha256": dict((capability.get("profile_lora_sha256") or {}).get(profile_key) or {}),
-        "experimental_assets_promoted": False,
-        "lora_strength": profile.get("lora_strength"),
-        "turbo": turbo,
-        "width": width,
-        "height": height,
-        "duration_sec": duration_sec,
-        "subject_basis": subject_basis or None,
-        "adult_attestation": str(profile.get("name") or "").startswith("adult-"),
-    }
 
 
 def _parser() -> argparse.ArgumentParser:

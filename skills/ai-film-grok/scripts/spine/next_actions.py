@@ -17,6 +17,8 @@ from typing import Any
 
 from security_policy import atomic_write_text
 from util import read_json, write_json
+from util.spine_helpers import post_audit_current, pilot_user_ok
+from spine.dispatch import _STAGE_OWNERS
 
 # Backward-compatible internal projection (Grok Agent + layers 1–4 + delivery).
 PIPELINE_STAGES: tuple[str, ...] = (
@@ -82,20 +84,10 @@ _STAGE_LABELS_ZH: dict[str, str] = {
     "done": "完成",
 }
 
-_STAGE_RESPONSIBILITY: dict[str, tuple[str, str | None]] = {
-    "agent": ("director", None),
-    "visual": ("visual", "visual"),
-    "voice": ("audio", "audio"),
-    "design": ("post", "post"),
-    "post": ("post", "post"),
-    "deliver": ("delivery", None),
-    "done": ("delivery", None),
-}
-
 
 def responsibility_for_stage(stage: str) -> dict[str, str | None]:
     """Map each pipeline stage to its one accountable owner."""
-    owner, department = _STAGE_RESPONSIBILITY.get(stage, ("director", None))
+    owner, department = _STAGE_OWNERS.get(stage, ("director", None))
     return {"owner": owner, "department": department, "stage": stage}
 
 
@@ -219,28 +211,6 @@ def _external_review_current(final_record: dict[str, Any] | None, root: Path) ->
     )
 
 
-def _pilot_user_ok(root: Path) -> bool:
-    pilot_approval = read_json(root / "receipts" / "pilot-approval.json") or {}
-    try:
-        from production_gates import pilot_is_user_approved
-
-        return pilot_is_user_approved(pilot_approval)
-    except Exception:
-        return False
-
-
-def _post_audit_current(root: Path) -> bool:
-    receipt = read_json(root / "receipts" / "post-audit.json") or {}
-    if not isinstance(receipt, dict) or receipt.get("delivery_ready") is not True:
-        return False
-    try:
-        from post_audit import audit_freshness
-
-        return audit_freshness(root, receipt).get("stale") is False
-    except (ImportError, OSError, ValueError):
-        return False
-
-
 def _export_desktop_name(root: Path) -> str:
     """Stable Desktop folder name without placeholders (advance-safe argv)."""
     import re
@@ -279,11 +249,11 @@ def detect_pipeline_stage(
     clips_ok = bool(gates.get("clips_complete"))
     final_ok = bool(gates.get("final_complete"))
     export_ok = bool(gates.get("desktop_exported"))
-    pilot_ok = _pilot_user_ok(root)
+    pilot_ok = pilot_user_ok(root)
     final_rec = _final_record(root)
     rehearse_ok = _tts_rehearse_ok(root)
     preview_ok = _preview_ok(root)
-    post_audit_current = _post_audit_current(root)
+    post_audit_fresh = post_audit_current(root)
 
     blockers: list[str] = []
     stage = "agent"
@@ -314,7 +284,7 @@ def detect_pipeline_stage(
         blockers.append("clips_incomplete")
     elif final_ok and export_ok:
         stage, detail = "done", "complete"
-    elif final_ok and not post_audit_current:
+    elif final_ok and not post_audit_current(root):
         stage, detail = "post", "post-audit"
         blockers.append("post_audit_missing_or_stale")
     elif final_ok and not export_ok:
@@ -396,7 +366,7 @@ def detect_pipeline_stage(
             "compose_preview": preview_ok,
             "final_film": bool(final_rec),
             "final_complete": final_ok,
-            "post_audit_current": post_audit_current,
+            "post_audit_current": post_audit_current(root),
             "desktop_exported": export_ok,
             "open_reshoot_count": int(open_reshoot_count or 0),
             "post_engine": (final_rec or {}).get("post_engine"),
@@ -541,7 +511,7 @@ def build_next_actions(
                     f'aifilm fidelity check --root "{r}"',
                     "重算 input-fidelity 回执",
                 )
-            elif fid.get("has_source") and not _pilot_user_ok(root):
+            elif fid.get("has_source") and not pilot_user_ok(root):
                 add(
                     "design-go",
                     f'aifilm design-go --root "{r}"',
@@ -945,7 +915,7 @@ def build_next_actions(
             pass
 
     if gates.get("final_complete") and not gates.get("desktop_exported"):
-        if _post_audit_current(root):
+        if post_audit_current(root):
             export_name = _export_desktop_name(root)
             add(
                 "export-desktop",

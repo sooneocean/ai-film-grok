@@ -15,6 +15,7 @@ from h3_mode import effect_tips as _h3_effect_tips
 from h3_mode import resolve_h3_mode
 from production_router import build_shot_intent
 from util import read_json, sha256_file, write_json
+from util.film_spec import _iter_shots, _load_spec, _root
 
 
 class H3WorkflowError(RuntimeError):
@@ -28,28 +29,6 @@ _H3_ENDPOINTS = frozenset(
         "local_minimax_h3_r2v",
     }
 )
-
-
-def _root(path: Path | str) -> Path:
-    return Path(path).expanduser().resolve()
-
-
-def _load_spec(root: Path) -> dict[str, Any]:
-    data = read_json(root / "film-spec.json")
-    if not isinstance(data, dict):
-        raise H3WorkflowError("film-spec.json is missing or invalid")
-    return data
-
-
-def _iter_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
-    shots: list[dict[str, Any]] = []
-    for scene in spec.get("scenes") or []:
-        if not isinstance(scene, dict):
-            continue
-        for shot in scene.get("shots") or []:
-            if isinstance(shot, dict) and shot.get("id"):
-                shots.append(shot)
-    return shots
 
 
 def _find_shot(spec: dict[str, Any], shot_id: str) -> dict[str, Any]:

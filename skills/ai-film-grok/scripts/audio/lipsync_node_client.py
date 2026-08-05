@@ -36,12 +36,7 @@ _ALLOWED_NODE_NETWORKS = (
 )
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from util import sha256_file
 
 
 class _MultipartBody:
@@ -313,8 +308,8 @@ def render(
         raise LipsyncNodeError("invalid lip-sync inference parameters")
     source_video = _validate_input(video, limit=_MAX_VIDEO_BYTES, label="video")
     source_audio = _validate_input(audio, limit=_MAX_AUDIO_BYTES, label="audio")
-    input_video_sha256 = _sha256_file(source_video)
-    input_audio_sha256 = _sha256_file(source_audio)
+    input_video_sha256 = sha256_file(source_video)
+    input_audio_sha256 = sha256_file(source_audio)
     output = out.expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -389,7 +384,7 @@ def render(
     try:
         _download_artifact(base_url, token, job_id, partial)
         local_probe = _validate_mp4(partial)
-        actual_hash = _sha256_file(partial)
+        actual_hash = sha256_file(partial)
         if actual_hash != status.get("output_sha256"):
             raise LipsyncNodeError("lip-sync node MP4 hash does not match receipt")
         remote_probe = status.get("ffprobe") or {}

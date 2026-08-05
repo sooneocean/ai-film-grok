@@ -16,6 +16,7 @@ from typing import Any
 from h3_mode import resolve_h3_mode, screen_mode_of, shot_size_token, spoken_text_of
 from production_router import build_shot_intent
 from util import read_json, utc_now
+from util.film_spec import _iter_shots, _load_spec, _root
 
 PRIORITY_RANK = {
     "P0a": 10,
@@ -52,26 +53,6 @@ _DUAL_STICKY_REASONS = frozenset(
 
 _H3_NAME_MARKERS = ("h3", "minimax", "r2v", "local_minimax", "comfy-h3", "ref2va", "fl2va")
 _GROK_NAME_MARKERS = ("grok", "imagine", "media-queue", "xai")
-
-
-def _root(path: Path | str) -> Path:
-    return Path(path).expanduser().resolve()
-
-
-def _iter_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
-    shots: list[dict[str, Any]] = []
-    for scene in spec.get("scenes") or []:
-        if not isinstance(scene, dict):
-            continue
-        for shot in scene.get("shots") or []:
-            if isinstance(shot, dict) and shot.get("id"):
-                shots.append(shot)
-    return shots
-
-
-def _load_spec(root: Path) -> dict[str, Any]:
-    data = read_json(root / "film-spec.json")
-    return data if isinstance(data, dict) else {}
 
 
 def guess_take_lane(path: Path) -> str:

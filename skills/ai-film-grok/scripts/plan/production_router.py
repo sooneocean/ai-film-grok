@@ -173,12 +173,15 @@ def _dialogue_competition(
             value["lane"] = "state_i2i"
         elif "text_to_speech" in operations or "edge" in identity:
             value["lane"] = "tts"
-        elif "face_animation_to_audio" in operations or "infinitetalk" in identity:
-            value["lane"] = "infinite_talk"
-        elif "video_lip_sync" in operations or "latent" in identity:
-            value["lane"] = "grok_lipsync"
+        elif "image_to_video" in operations and (
+            "h3" in identity or "comfy-h3" in identity or "minimax" in identity
+        ):
+            # 5090 MiniMax H3 native-audio dialogue (preferred for restricted).
+            value["lane"] = "local_h3"
         elif "image_to_video" in operations and "grok" in identity:
             value["lane"] = "grok_imagine_video"
+        # Frozen post-lipsync tools (LatentSync / InfiniteTalk / MuseTalk) are
+        # intentionally not mapped into competition lanes.
         competition_capabilities.append(value)
 
     capacity = read_json(base / "receipts" / "comfy-capacity.json")
@@ -381,8 +384,9 @@ def build_shot_intent(
     recommended_weapon: str | None = None
     audio_policy = "carry_parent_dialogue" if parent_shot_id is not None else None
     if dialogue and identity_lock:
-        # Dialogue-first: restricted (or full h3_primary) → local H3; safe dialogue
-        # under hybrid keeps FRW LTX 2.3 native-audio棚.
+        # Dialogue native-audio (2026-08-05): Grok Video + 5090 H3 only.
+        # Post lipsync (LatentSync/MuseTalk/InfiniteTalk/FRW lipsync) is frozen.
+        # LTX dialogue棚 retired from default production path.
         if restricted or is_h3_primary:
             recommended_lane = str(lanes.get("dialogue_restricted_local") or "local_dialogue_h3")
             recommended_provider = "comfy-h3"
@@ -391,8 +395,10 @@ def build_shot_intent(
             if h3_enabled and not provider_lock:
                 provider_lock = "comfy-h3"
         else:
-            recommended_lane = "cloud_dialogue_ltx"
-            recommended_provider = "frw-ltx23"
+            recommended_lane = str(lanes.get("dialogue_safe_cloud") or "cloud_dialogue_grok")
+            recommended_provider = "grok"
+            recommended_weapon = "grok-imagine-video"
+            audio_policy = "prefer_native"
     elif restricted and identity_lock:
         recommended_lane = str(lanes.get("restricted_local") or "local_h3")
         recommended_provider = "comfy-h3"
@@ -802,9 +808,9 @@ def explain_route(
     if isinstance(competition, dict):
         bindings = competition.get("capability_bindings") or {}
         active_lanes = (
-            ["grok_imagine_video", "grok_lipsync"]
-            if competition.get("selected_route") == "grok_imagine_video"
-            else ["infinite_talk"]
+            ["local_h3"]
+            if competition.get("selected_route") == "local_h3"
+            else ["grok_imagine_video"]
         )
         chain_ids = [
             str((bindings.get(lane) or {}).get("id") or "")
@@ -890,10 +896,8 @@ def _execution_plan(route_plan: dict[str, Any], *, route_plan_sha256: str) -> di
         )
         step_bindings = {
             "state_i2i": "state_i2i",
-            "tts": "tts",
-            "primary_infinite_talk": "infinite_talk",
-            "secondary_grok_imagine": "grok_imagine_video",
-            "secondary_lipsync": "grok_lipsync",
+            "primary_grok_native": "grok_imagine_video",
+            "alt_h3_native": "local_h3",
             "qa": "dialogue-qa",
             "provisional_select": "dialogue-ranker",
             "human_approve": "human-review",

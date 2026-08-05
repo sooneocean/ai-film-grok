@@ -99,12 +99,7 @@ def _run_checked(
         raise MMAudioAdapterError(f"{stage} failed: executable_unavailable") from None
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+from util import sha256_file
 
 
 def _resolve_checkout(path: Path) -> Path:
@@ -167,7 +162,7 @@ def _require_checkout(repo: Path) -> tuple[str, str]:
     )
     if not all(path.is_file() and not path.is_symlink() for path, _digest in required):
         raise MMAudioAdapterError("MMAudio offline weights are incomplete")
-    if any(_sha256(path) != digest for path, digest in required):
+    if any(sha256_file(path) != digest for path, digest in required):
         raise MMAudioAdapterError("MMAudio weight SHA-256 mismatch")
     return commit, expected_checkpoint
 

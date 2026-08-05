@@ -4,21 +4,7 @@
 from __future__ import annotations
 
 import subprocess
-from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
-
-from media_qa import analyze_media
-from performance_evidence import (
-    PerformanceEvidenceError,
-    find_shot,
-    parse_performance_evidence,
-    performance_contract,
-    validate_performance_evidence,
-)
-from security_policy import minimal_subprocess_env, validate_identifier
-from util import read_json, write_json
-from util import sha256_file as _sha256
+from util import read_json, utc_now, write_json
 
 # Core five always required; coitus optional (act/climax mute-frame when scored)
 CORE_REVIEW_DIMENSIONS = (
@@ -34,10 +20,6 @@ REVIEW_DIMENSIONS = CORE_REVIEW_DIMENSIONS + OPTIONAL_REVIEW_DIMENSIONS
 
 class ShotReviewError(ValueError):
     pass
-
-
-def _utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def review_dir(root: Path) -> Path:
@@ -310,7 +292,7 @@ def create_shot_review(
     packet = {
         "schema_version": 5,
         "kind": "shot-review",
-        "at": _utc_now(),
+        "at": utc_now(),
         "shot_id": sid,
         "approved": approved,
         "reviewer": reviewer.strip(),

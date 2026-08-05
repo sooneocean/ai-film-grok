@@ -22,12 +22,7 @@ class BGMCandidateError(RuntimeError):
     pass
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+from util import sha256_file
 
 
 def _pending_dir(root: Path) -> Path:
@@ -94,7 +89,7 @@ def generate(
     except AudioNodeError as exc:
         raise BGMCandidateError(f"private ACE-Step node failed: {exc}") from exc
     _validate_wav(wav)
-    file_hash = _sha256(wav)
+    file_hash = sha256_file(wav)
     if file_hash != node.get("sha256"):
         wav.unlink(missing_ok=True)
         raise BGMCandidateError("private ACE-Step node receipt hash mismatch")
@@ -138,7 +133,7 @@ def approve(root: Path, asset_id: str) -> dict[str, Any]:
     if (
         not _confined_without_symlinks(root, source)
         or not source.is_file()
-        or _sha256(source) != record.get("sha256")
+        or sha256_file(source) != record.get("sha256")
     ):
         raise BGMCandidateError("BGM candidate is missing or its hash changed")
     _validate_wav(source)
@@ -151,12 +146,12 @@ def approve(root: Path, asset_id: str) -> dict[str, Any]:
         raise BGMCandidateError("BGM template directory is invalid")
     temporary = destination.with_suffix(".partial.wav")
     shutil.copyfile(source, temporary)
-    if _sha256(temporary) != record["sha256"]:
+    if sha256_file(temporary) != record["sha256"]:
         temporary.unlink(missing_ok=True)
         raise BGMCandidateError("BGM candidate changed while being approved")
     _validate_wav(temporary)
     temporary.replace(destination)
-    if _sha256(destination) != record["sha256"]:
+    if sha256_file(destination) != record["sha256"]:
         destination.unlink(missing_ok=True)
         raise BGMCandidateError("approved BGM hash mismatch")
     record.update(

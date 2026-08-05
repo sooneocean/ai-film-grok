@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from util import utc_now
 
 CHECKLIST_KEYS = (
     "pose",
@@ -200,7 +201,7 @@ def load_frame_chain_receipt(root: Path) -> dict[str, Any]:
 def save_frame_chain_receipt(root: Path, data: dict[str, Any]) -> Path:
     p = frame_chain_receipt_path(root)
     p.parent.mkdir(parents=True, exist_ok=True)
-    data["updated_at"] = datetime.now(UTC).isoformat()
+    data["updated_at"] = utc_now()
     data["schema_version"] = 1
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return p
@@ -248,7 +249,7 @@ def render_chain_skeleton(
     shots: list[dict[str, Any]],
     spine: str = "（填写一句话动作脊柱）",
 ) -> str:
-    date = datetime.now(UTC).strftime("%Y-%m-%d")
+    date = utc_now()[:10]
     n = len(shots)
     ids = [str(s.get("id") or f"shot{i + 1}") for i, s in enumerate(shots)]
     lines = [

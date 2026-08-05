@@ -389,7 +389,7 @@ def test_local_capacity_accepts_both_idle_queue_shapes(
     )
 
 
-def test_speaking_shot_route_exposes_serial_competition_dag_and_fails_closed(
+def test_speaking_shot_route_exposes_native_audio_dag_and_fails_closed_without_grok(
     tmp_path: Path,
 ) -> None:
     _write_spec(
@@ -409,7 +409,7 @@ def test_speaking_shot_route_exposes_serial_competition_dag_and_fails_closed(
                 },
                 "tts": {
                     "status": "final",
-                    "language": "ja",
+                    "language": "zh",
                     "audio_sha256": "b" * 64,
                 },
             }
@@ -435,34 +435,24 @@ def test_speaking_shot_route_exposes_serial_competition_dag_and_fails_closed(
     assert report["blocked_reason"] == "DIALOGUE_COMPETITION_BLOCKED"
     assert [step["id"] for step in competition["dag"]["steps"]] == [
         "state_i2i",
-        "tts",
-        "primary_infinite_talk",
-        "secondary_grok_imagine",
-        "secondary_lipsync",
+        "primary_grok_native",
+        "alt_h3_native",
         "qa",
         "provisional_select",
         "human_approve",
         "promote",
     ]
-    assert len(report["execution_plan"]["tasks"]) == 9
-    assert report["execution_plan"]["tasks"][3]["run_condition"] == (
-        "when_explicit_secondary_or_primary_technical_failure"
+    assert len(report["execution_plan"]["tasks"]) == 7
+    assert report["execution_plan"]["tasks"][2]["run_condition"] == (
+        "when_route_h3_or_primary_technical_failure"
     )
     assert all(task["status"] == "blocked" for task in report["execution_plan"]["tasks"])
     assert report["execution_plan"]["authorized"] is False
-
-    production_report = plan_route(
-        tmp_path,
-        shot_id="line01",
-        quality_tier="select",
-        now=NOW,
-    )
-    assert "DIALOGUE_ROUTE_NOT_PROMOTED" in {
-        issue["code"] for issue in production_report["route_plan"]["dialogue_competition"]["issues"]
-    }
+    assert competition["route_policy"]["lipsync_post"] == "frozen"
+    assert "CAPABILITY_STALE" in {issue["code"] for issue in competition["issues"]}
 
 
-def test_speaking_shot_selects_infinite_talk_and_exposes_grok_audio_linked_secondary(
+def test_speaking_shot_selects_grok_native_audio_with_h3_alt(
     tmp_path: Path,
 ) -> None:
     _write_spec(
@@ -507,13 +497,6 @@ def test_speaking_shot_selects_infinite_talk_and_exposes_grok_audio_linked_secon
                 shot_roles=["hero"],
             ),
             _capability(
-                "infinitetalk",
-                provider="comfy-infinitetalk",
-                model="infinitetalk",
-                operations=["face_animation_to_audio"],
-                shot_roles=["hero"],
-            ),
-            _capability(
                 "grok-imagine-video",
                 provider="grok",
                 model="imagine-video",
@@ -521,10 +504,10 @@ def test_speaking_shot_selects_infinite_talk_and_exposes_grok_audio_linked_secon
                 shot_roles=["hero"],
             ),
             _capability(
-                "latentsync-1.6",
-                provider="comfy-latentsync",
-                model="latentsync-1.6",
-                operations=["video_lip_sync"],
+                "comfy-h3",
+                provider="comfy-h3",
+                model="minimax-h3",
+                operations=["image_to_video"],
                 shot_roles=["hero"],
             ),
         ],
@@ -537,15 +520,14 @@ def test_speaking_shot_selects_infinite_talk_and_exposes_grok_audio_linked_secon
     report = explain_route(tmp_path, shot_id="line01", now=NOW)
 
     assert report["ok"] is True, report
-    assert report["selected"]["capability_id"] == "infinitetalk"
-    assert report["selected"]["dialogue_motion_route"] == "infinite_talk"
-    assert report["selected"]["route_chain"] == ["infinitetalk"]
+    assert report["selected"]["capability_id"] == "grok-imagine-video"
+    assert report["selected"]["dialogue_motion_route"] == "grok_imagine_video"
+    assert report["selected"]["route_chain"] == ["grok-imagine-video"]
     competition = report["dialogue_competition"]
     assert competition["secondary_available"] is True
-    assert competition["candidates"][1]["models"] == [
-        "imagine-video",
-        "latentsync-1.6",
-    ]
+    assert competition["candidates"][0]["audio_link"] == "prefer_native_clip_audio"
+    assert competition["candidates"][1]["lane"] == "local_h3"
+    assert competition["route_policy"]["lipsync_post"] == "frozen"
     assert competition["route_policy"]["forbidden_secondary_triggers"] == [
         "human_quality_rejection",
         "unknown_error",

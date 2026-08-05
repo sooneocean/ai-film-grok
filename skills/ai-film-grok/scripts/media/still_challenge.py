@@ -10,7 +10,6 @@ Policy (2026-08-04):
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
@@ -28,6 +27,7 @@ from frw_rate_limit import (
     peek_frw_rate_wait,
 )
 from util import read_json, utc_now, write_json
+from util.film_spec import _iter_shots, _load_spec, _root
 
 PRIORITY_RANK = {
     "S0": 10,
@@ -45,26 +45,6 @@ DEFAULT_MODEL = "flux"
 
 class StillChallengeError(RuntimeError):
     pass
-
-
-def _root(path: Path | str) -> Path:
-    return Path(path).expanduser().resolve()
-
-
-def _iter_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
-    shots: list[dict[str, Any]] = []
-    for scene in spec.get("scenes") or []:
-        if not isinstance(scene, dict):
-            continue
-        for shot in scene.get("shots") or []:
-            if isinstance(shot, dict) and shot.get("id"):
-                shots.append(shot)
-    return shots
-
-
-def _load_spec(root: Path) -> dict[str, Any]:
-    data = read_json(root / "film-spec.json")
-    return data if isinstance(data, dict) else {}
 
 
 def _approved_still(root: Path, shot_id: str) -> Path | None:
@@ -151,19 +131,14 @@ def list_candidates(root: Path | str, shot_id: str) -> list[dict[str, Any]]:
             {
                 "path": str(p),
                 "name": p.name,
-                "sha256": _sha256(p) if p.is_file() else None,
+                "sha256": sha256_file(p) if p.is_file() else None,
                 "mtime": p.stat().st_mtime if p.is_file() else None,
             }
         )
     return out
 
 
-def _sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
+from util import sha256_file
 
 
 def _soft_still_heuristic(shot: dict[str, Any], intent: dict[str, Any] | None) -> bool:
@@ -388,7 +363,7 @@ def _promoted_after(root: Path, shot_id: str, candidates: list[dict[str, Any]]) 
     still = _approved_still(root, shot_id)
     if still is None or not still.is_file():
         return False
-    still_sha = _sha256(still)
+    still_sha = sha256_file(still)
     return any(c.get("sha256") == still_sha for c in candidates)
 
 
@@ -580,7 +555,7 @@ def run_still_challenge(
         "shot_id": shot_id,
         "execute": bool(execute),
         "source_path": str(src_path),
-        "source_sha256": _sha256(src_path),
+        "source_sha256": sha256_file(src_path),
         "prompt": i2i_prompt,
         "model": model,
         "steps": IMG2IMAGE_STEPS,
@@ -680,7 +655,7 @@ def run_still_challenge(
 
     plan["status"] = "candidate"
     plan["candidate_path"] = str(out_path)
-    plan["candidate_sha256"] = _sha256(out_path) if out_path.is_file() else None
+    plan["candidate_sha256"] = sha256_file(out_path) if out_path.is_file() else None
     plan["promote_command"] = (
         f'aifilm still-challenge promote --root "{base}" --shot-id {shot_id} '
         f'--source "{out_path}" --identity-approved --anatomy-safe '
@@ -844,7 +819,7 @@ def promote_still_challenge(
         "role": role,
         "provider": "frw_i2i",
         "source_endpoint": "frw_img2image",
-        "sha256": _sha256(dest),
+        "sha256": sha256_file(dest),
         "promoted_from": str(cand),
         "review_note": review_note,
         "identity_approved": bool(identity_approved),

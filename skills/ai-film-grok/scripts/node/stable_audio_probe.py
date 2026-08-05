@@ -12,12 +12,7 @@ MODEL = "stabilityai/stable-audio-open-1.0"
 LICENSE = "Stability AI Community License"
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from util import sha256_file
 
 
 def main() -> int:
@@ -50,8 +45,8 @@ def main() -> int:
                 "ok": True,
                 "model": MODEL,
                 "license": LICENSE,
-                "checkpoint_sha256": _sha256(checkpoint),
-                "adapter_sha256": _sha256(adapter),
+                "checkpoint_sha256": sha256_file(checkpoint),
+                "adapter_sha256": sha256_file(adapter),
             },
             sort_keys=True,
         )

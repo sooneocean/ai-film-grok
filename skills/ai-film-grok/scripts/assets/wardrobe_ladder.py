@@ -8,7 +8,6 @@ before it can become the input for the following step.
 from __future__ import annotations
 
 import json
-from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -20,12 +19,7 @@ def _slug(value: object) -> str:
     return "-".join(part for part in text.split("-") if part) or "garment"
 
 
-def _sha256(path: Path) -> str:
-    digest = sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from util import sha256_file
 
 
 def _stored_path(path: Path, root: Path) -> str:
@@ -239,7 +233,7 @@ def ladder_plan(
         if not path.is_absolute():
             path = root / path
         approved = state.get("status") == "approved" and path.is_file()
-        if approved and state.get("sha256") != _sha256(path):
+        if approved and state.get("sha256") != sha256_file(path):
             hard.append(
                 {"code": "WARDROBE_STATE_HASH_DRIFT", "character_id": character_id, "state_id": sid}
             )
@@ -260,7 +254,7 @@ def ladder_plan(
             parent_ready = (
                 parent.get("status") == "approved"
                 and parent_path.is_file()
-                and parent.get("sha256") == _sha256(parent_path)
+                and parent.get("sha256") == sha256_file(parent_path)
             )
             if not parent_ready:
                 hard.append(
@@ -310,7 +304,7 @@ def approve_state(
     if not image.is_file():
         raise ValueError(f"state image does not exist: {image}")
     image_meta = _image_metadata(image)
-    image_sha = _sha256(image)
+    image_sha = sha256_file(image)
     parent_id = state.get("parent_state_id")
     parent: dict[str, Any] | None = None
     if parent_id:
@@ -322,7 +316,7 @@ def approve_state(
         parent_path = Path(str(parent.get("path") or ""))
         if not parent_path.is_absolute():
             parent_path = root / parent_path
-        if not parent_path.is_file() or _sha256(parent_path) != parent["sha256"]:
+        if not parent_path.is_file() or sha256_file(parent_path) != parent["sha256"]:
             raise ValueError(f"parent state {parent_id} image is missing or hash-drifted")
         if generation_receipt is None:
             raise ValueError("generation_receipt is required for a non-full I2I wardrobe state")
@@ -356,7 +350,7 @@ def approve_state(
                 )
         receipt_record = {
             "path": _stored_path(generation_receipt, root),
-            "sha256": _sha256(generation_receipt),
+            "sha256": sha256_file(generation_receipt),
         }
     approved_at = utc_now()
     parent_record = (
@@ -448,4 +442,4 @@ def render_contact_sheet(bible: dict[str, Any], character_id: str, *, root: Path
     temp = out.with_suffix(".tmp.png")
     sheet.save(temp, format="PNG")
     temp.replace(out)
-    return {"path": _stored_path(out, root), "sha256": _sha256(out), "states": state_rows}
+    return {"path": _stored_path(out, root), "sha256": sha256_file(out), "states": state_rows}

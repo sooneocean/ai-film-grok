@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from util import read_json
+from util.spine_helpers import present, pilot_user_ok
 
 CRAFT_STAGES: tuple[str, ...] = (
     "idea",
@@ -43,23 +44,6 @@ CRAFT_QUESTIONS: dict[str, str] = {
     "rough": "顺序与节奏是否成立？",
     "verified": "能否声称可发布？",
 }
-
-
-def _present(path: Path) -> bool:
-    return path.is_file() and path.stat().st_size > 2
-
-
-def _pilot_user_ok(root: Path) -> bool:
-    try:
-        from production_gates import load_pilot_approval, pilot_is_user_approved
-
-        return pilot_is_user_approved(load_pilot_approval(root))
-    except Exception:
-        pilot = read_json(root / "receipts" / "pilot-approval.json") or {}
-        return bool(
-            str(pilot.get("approved_by") or "").lower() == "user"
-            and str(pilot.get("user_phrase") or "").strip()
-        )
 
 
 def _director_intent_ok(spec: dict[str, Any]) -> bool:
@@ -154,7 +138,7 @@ def detect_craft_stage(
     final_rec = outputs.get("final_film") if isinstance(outputs.get("final_film"), dict) else {}
     silent_rec = outputs.get("silent_film") if isinstance(outputs.get("silent_film"), dict) else {}
 
-    has_brief = _present(root / "brief.json") or _present(receipts / "creative-brief.md")
+    has_brief = present(root / "brief.json") or present(receipts / "creative-brief.md")
     has_init = (
         has_brief
         or bool(gates.get("brief"))
@@ -162,17 +146,17 @@ def detect_craft_stage(
         and ((root / "film-spec.json").is_file() or (root / "README.md").is_file())
     )
     story_ok = _director_intent_ok(spec) if spec else False
-    if not story_ok and _present(receipts / "directors-lens.md"):
+    if not story_ok and present(receipts / "directors-lens.md"):
         story_ok = True
     beats_ok = _beats_ok(spec) if spec else False
-    if _present(receipts / "beat-sheet.md"):
+    if present(receipts / "beat-sheet.md"):
         beats_ok = True
     style_ok = bool(gates.get("style_locked"))
     if not style_ok:
         style = read_json(root / "style-bible.json") or {}
         style_ok = bool(style.get("locked"))
     spec_ok = _spec_valid_flag(root, gates)
-    pilot_ok = _pilot_user_ok(root)
+    pilot_ok = pilot_user_ok(root)
     clips_ok = bool(gates.get("clips_complete"))
     if not clips_ok and isinstance(man.get("clips"), dict):
         approved = sum(
@@ -189,8 +173,8 @@ def detect_craft_stage(
             for c in man["clips"].values()
             if isinstance(c, dict) and c.get("status") == "approved"
         )
-    has_media_work = approved_n > 0 or _present(receipts / "media-queue.json")
-    rough_ok = _present(receipts / "rough-cut.json") or bool(
+    has_media_work = approved_n > 0 or present(receipts / "media-queue.json")
+    rough_ok = present(receipts / "rough-cut.json") or bool(
         silent_rec and (silent_rec.get("path") or silent_rec.get("sha256"))
     )
     # plate without review still rough

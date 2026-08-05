@@ -41,12 +41,7 @@ def default_library_root() -> Path:
     )
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+from util import sha256_file
 
 
 def _safe(root: Path, relative: str) -> Path:
@@ -128,7 +123,7 @@ def _candidate_record(project_root: Path, asset_id: str) -> tuple[Path, Path, di
         or record.get("path") != str(wav.relative_to(project_root))
         or not wav.is_file()
         or wav.is_symlink()
-        or _sha256(wav) != record.get("sha256")
+        or sha256_file(wav) != record.get("sha256")
     ):
         raise SFXLibraryError("project SFX candidate does not bind pending bytes")
     _validate_wav(wav)
@@ -155,7 +150,7 @@ def stage_project_candidate(
     canonical["staged_at"] = datetime.now(UTC).isoformat()
     canonical["project_origin"] = {
         "project_root_sha256": hashlib.sha256(str(project_root).encode()).hexdigest(),
-        "candidate_receipt_sha256": _sha256(source_receipt),
+        "candidate_receipt_sha256": sha256_file(source_receipt),
     }
     screen = canonical.get("asr_speech_screen")
     if isinstance(screen, dict):
@@ -192,14 +187,14 @@ def stage_project_candidate(
 
 def _copy_once(source: Path, destination: Path) -> None:
     if destination.exists():
-        if destination.is_symlink() or _sha256(destination) != _sha256(source):
+        if destination.is_symlink() or sha256_file(destination) != sha256_file(source):
             raise SFXLibraryError("library asset id already belongs to different bytes")
         return
     temporary = destination.with_name(f".{destination.name}.partial")
     if temporary.exists() or temporary.is_symlink():
         raise SFXLibraryError("library temporary output already exists")
     shutil.copyfile(source, temporary)
-    if _sha256(temporary) != _sha256(source):
+    if sha256_file(temporary) != sha256_file(source):
         temporary.unlink(missing_ok=True)
         raise SFXLibraryError("library copy hash mismatch")
     os.replace(temporary, destination)
@@ -244,7 +239,7 @@ def _canonical_screen(
         "status": "completed_candidate_signal",
         "receipt": f"library:{_review_relative(asset_id)}",
         "audio_sha256": audio_sha256,
-        "report_sha256": _sha256(report_path),
+        "report_sha256": sha256_file(report_path),
         "transcript_sha256": provider["transcript_sha256"],
         "segment_count": len(segments),
         "speech_like_segment_count": speech_like,
@@ -276,7 +271,7 @@ def import_project_asset(
         or record.get("license") != "CC-BY-NC-4.0"
         or not source_wav.is_file()
         or source_wav.is_symlink()
-        or _sha256(source_wav) != record.get("sha256")
+        or sha256_file(source_wav) != record.get("sha256")
     ):
         raise SFXLibraryError("legacy approved SFX does not bind its bytes and NC scope")
     _validate_wav(source_wav)
@@ -300,7 +295,7 @@ def import_project_asset(
     canonical["imported_at"] = datetime.now(UTC).isoformat()
     canonical["legacy_origin"] = {
         "project_root_sha256": hashlib.sha256(str(project_root).encode()).hexdigest(),
-        "approval_receipt_sha256": _sha256(source_receipt),
+        "approval_receipt_sha256": sha256_file(source_receipt),
     }
     canonical["asr_speech_screen"] = _canonical_screen(
         screen,
@@ -345,7 +340,7 @@ def approved_asset(
         record.get("asset_id") != asset_id
         or record.get("status") != _APPROVED
         or record.get("approved_path") != _approved_relative(asset_id)
-        or record.get("sha256") != _sha256(wav)
+        or record.get("sha256") != sha256_file(wav)
         or record.get("license") != "CC-BY-NC-4.0"
         or record.get("production_eligible") is not False
         or record.get("delivery_eligible_scopes") != [_SCOPE]
@@ -371,7 +366,7 @@ def candidate_asset(
         or record.get("usage_scope") != "noncommercial_internal_research"
         or record.get("license") != "CC-BY-NC-4.0"
         or record.get("pending_path") != _pending_relative(asset_id)
-        or record.get("sha256") != _sha256(wav)
+        or record.get("sha256") != sha256_file(wav)
     ):
         raise SFXLibraryError("global SFX candidate receipt does not bind pending bytes")
     return wav, receipt, record
@@ -464,7 +459,7 @@ def _asr_review_valid(record: dict[str, Any], *, library_root: Path | None = Non
             and report.get("human_review_required") is True
             and audio.get("sha256") == record.get("sha256") == screen.get("audio_sha256")
             and provider.get("transcript_sha256") == screen.get("transcript_sha256")
-            and _sha256(report_path) == screen.get("report_sha256")
+            and sha256_file(report_path) == screen.get("report_sha256")
             and len(segments) == screen.get("segment_count")
             and speech_like == screen.get("speech_like_segment_count")
         )
@@ -487,7 +482,7 @@ def approved_event_receipt_valid(
             source == f"library:{record['approved_path']}"
             and receipt == f"library:{_approved_relative(asset_id, receipt=True)}"
             and receipt_path.is_file()
-            and _sha256(wav) == event.get("source_sha256")
+            and sha256_file(wav) == event.get("source_sha256")
             and record.get("model") == event.get("model") == "hkchengrex/MMAudio-large-44k-v2"
             and record.get("checkpoint_fingerprint") == event.get("checkpoint_fingerprint")
             and record.get("node_job_id") == event.get("node_job_id")

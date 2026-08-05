@@ -5,13 +5,10 @@ from __future__ import annotations
 import json
 import math
 import subprocess
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from narrative_control import validate_narrative_graph
-from story_plan import normalize_story_graph
-from util import canonical_json_sha256, read_json, sha256_file, write_json
+from util import canonical_json_sha256, read_json, sha256_file, utc_now, write_json
 
 EVIDENCE_NAME = "narrative-evidence.json"
 VALID_STATUSES = frozenset({"verified", "missing", "uncertain"})
@@ -21,10 +18,6 @@ class NarrativeEvidenceError(ValueError):
     def __init__(self, message: str, *, code: str = "NARRATIVE_EVIDENCE_INVALID") -> None:
         super().__init__(message)
         self.code = code
-
-
-def _now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _graph_fingerprint(root: Path, graph: dict[str, Any]) -> str:
@@ -159,7 +152,7 @@ def build_narrative_evidence(root: Path, *, write: bool = True) -> dict[str, Any
     report = {
         "schema_version": 2,
         "kind": "narrative-evidence",
-        "at": _now(),
+        "at": utc_now(),
         "graph_fingerprint": fingerprint,
         "planned": planned,
         "items": items,
@@ -242,13 +235,13 @@ def record_narrative_evidence(
             "media_path": str(media.relative_to(root)),
             "media_sha256": probe["sha256"],
             "duration_sec": probe["duration_sec"],
-            "recorded_at": _now(),
+            "recorded_at": utc_now(),
         }
         item["human_review"] = {
             "approved": True,
             "reviewer": reviewer.strip(),
             "user_phrase": user_phrase.strip(),
-            "reviewed_at": _now(),
+            "reviewed_at": utc_now(),
             "note": note or "",
         }
     else:
@@ -257,12 +250,12 @@ def record_narrative_evidence(
             "approved": False,
             "reviewer": reviewer or "",
             "user_phrase": user_phrase or "",
-            "reviewed_at": _now(),
+            "reviewed_at": utc_now(),
             "note": note or "",
         }
     item["evidence_status"] = status
     report["graph_fingerprint"] = _graph_fingerprint(root, graph)
-    report["at"] = _now()
+    report["at"] = utc_now()
     write_json(root / EVIDENCE_NAME, report)
     return {
         "ok": True,

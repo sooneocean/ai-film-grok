@@ -22,6 +22,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from util import utc_now
+
 
 def _ahash(image_path: Path, hash_size: int = 8) -> str | None:
     """Compute average hash (aHash) of an image using PIL.
@@ -157,10 +159,7 @@ def write_identity_receipt(
         "max_distance": max_distance,
         "cast_master": str(cast_master_path),
         "comparisons": results,
-        "at": __import__("datetime")
-        .datetime.now(__import__("datetime").timezone.utc)
-        .replace(microsecond=0)
-        .isoformat(),
+        "at": utc_now(),
     }
 
     receipt_dir = root / "receipts"

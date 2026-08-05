@@ -54,12 +54,7 @@ class BackendExecutionError(RuntimeError):
         self.safe_message = message[:300]
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from util import sha256_file
 
 
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
@@ -215,7 +210,7 @@ def _runtime() -> dict[str, Any]:
         "platform": platform.platform(),
         "ffmpeg": _tool_version("ffmpeg", "-version"),
         "ffprobe": _tool_version("ffprobe", "-version"),
-        "service_sha256": _sha256(Path(__file__).resolve()),
+        "service_sha256": sha256_file(Path(__file__).resolve()),
     }
 
 
@@ -470,8 +465,8 @@ async def _execute(job_id: str) -> None:
         metrics: dict[str, Any]
         try:
             if (
-                _sha256(video) != state["input_video_sha256"]
-                or _sha256(audio) != state["input_audio_sha256"]
+                sha256_file(video) != state["input_video_sha256"]
+                or sha256_file(audio) != state["input_audio_sha256"]
             ):
                 raise BackendExecutionError("integrity", "input integrity check failed")
             try:
@@ -518,7 +513,7 @@ async def _execute(job_id: str) -> None:
                     "status": "completed",
                     "chosen_backend": chosen,
                     "fallback_reason": fallback_reason,
-                    "output_sha256": _sha256(artifact),
+                    "output_sha256": sha256_file(artifact),
                     "ffprobe": probe,
                     "metrics": metrics,
                     "provenance": {
@@ -676,7 +671,7 @@ def get_artifact(
         artifact.is_symlink()
         or not artifact.is_file()
         or artifact.resolve().parent != (JOBS_ROOT / job_id).resolve()
-        or _sha256(artifact) != expected
+        or sha256_file(artifact) != expected
     ):
         raise HTTPException(status_code=409, detail="artifact integrity failure")
     return FileResponse(artifact, media_type="video/mp4", filename=f"{job_id}.mp4")

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from util import read_json, sha256_file, utc_now, write_json
+from util.film_spec import _root
 
 KIND_STILL = "still"
 KIND_I2V = "i2v"
@@ -26,10 +27,6 @@ VALID_KINDS = frozenset({KIND_STILL, KIND_I2V, KIND_FLF, KIND_R2V, KIND_T2V})
 
 class GenerationRequestError(ValueError):
     """Generation request could not be built or validated."""
-
-
-def _root(path: Path | str) -> Path:
-    return Path(path).expanduser().resolve()
 
 
 def generation_request_skip_strict() -> bool:

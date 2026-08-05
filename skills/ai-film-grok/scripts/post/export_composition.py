@@ -957,37 +957,6 @@ def build_title_sequence_html(
     return f"""    <section id="title-sequence" class="clip overlay title-sequence" data-start="0" data-duration="{float(title_dur):.3f}" data-track-index="3">
       <div class="ts-backdrop"><div class="ts-content">{content}</div></div>
     </section>"""
-    title = str(package.get("title") or "")
-    safe_title = html.escape(title)
-    subtitle = html.escape(str(title_sequence.get("subtitle") or ""))
-    tagline = html.escape(str(title_sequence.get("tagline") or ""))
-    show_motifs = bool(title_sequence.get("show_motifs", True))
-    di = package.get("director_intent") if isinstance(package.get("director_intent"), dict) else {}
-    motifs_raw = di.get("visual_motifs") or []
-    motifs: list[str] = []
-    if isinstance(motifs_raw, list) and show_motifs:
-        for m in motifs_raw:
-            s = str(m).strip()
-            if s:
-                motifs.append(s)
-
-    motif_tags = ""
-    if motifs:
-        tags = "".join(f'<span class="motif-tag">{html.escape(t)}</span>' for t in motifs[:8])
-        motif_tags = f'<div class="motif-cloud">{tags}</div>'
-
-    subtitle_block = ""
-    if subtitle:
-        subtitle_block = f'<p class="ts-subtitle">{subtitle}</p>'
-    if tagline:
-        subtitle_block += f'<p class="ts-tagline">{tagline}</p>'
-
-    inner = f"""<h1 class="ts-title">{safe_title}</h1>{subtitle_block}{motif_tags}"""
-    return f"""    <section id="title-sequence" class="clip overlay title-sequence" data-start="0" data-duration="{float(title_dur):.3f}" data-track-index="2" data-preset="{html.escape(preset)}">
-      <div class="ts-backdrop">
-        <div class="ts-content">{inner}</div>
-      </div>
-    </section>"""
 
 
 def build_end_roll_html(

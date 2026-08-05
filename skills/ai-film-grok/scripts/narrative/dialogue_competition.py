@@ -1,4 +1,10 @@
-"""Fail-closed audio-linked motion plan for one dialogue performance shot."""
+"""Native-audio dialogue motion plan: Grok Video + 5090 H3 (no post lipsync).
+
+Policy (2026-08-05):
+- Spoken on-camera shots generate motion+audio inside Grok Imagine Video or MiniMax H3.
+- LatentSync / MuseTalk / InfiniteTalk / FRW lipsync are frozen out of the production DAG.
+- Mix uses clip native audio (`prefer_native` / `use_clip_audio`); Edge TTS is caption/timing only.
+"""
 
 from __future__ import annotations
 
@@ -33,27 +39,23 @@ _QUALITY_KEYS = (
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _DEPENDENCIES = {
     "state_i2i": [],
-    "tts": ["state_i2i"],
-    "primary_infinite_talk": ["tts"],
-    "secondary_grok_imagine": ["tts"],
-    "secondary_lipsync": ["secondary_grok_imagine"],
-    "qa": ["primary_infinite_talk", "secondary_lipsync"],
+    "primary_grok_native": ["state_i2i"],
+    "alt_h3_native": ["state_i2i"],
+    "qa": ["primary_grok_native", "alt_h3_native"],
     "provisional_select": ["qa"],
     "human_approve": ["provisional_select"],
     "promote": ["human_approve"],
 }
 _STEP_CONDITIONS = {
     "state_i2i": "always",
-    "tts": "always",
-    "primary_infinite_talk": "when_route_auto_or_infinite_talk",
-    "secondary_grok_imagine": "when_explicit_secondary_or_primary_technical_failure",
-    "secondary_lipsync": "when_secondary_grok_imagine_succeeds",
+    "primary_grok_native": "when_route_auto_or_grok",
+    "alt_h3_native": "when_route_h3_or_primary_technical_failure",
     "qa": "after_active_route_succeeds",
     "provisional_select": "after_qa",
     "human_approve": "after_provisional_select",
     "promote": "after_human_approve",
 }
-_ROUTES = frozenset({"auto", "infinite_talk", "grok_imagine_video"})
+_ROUTES = frozenset({"auto", "grok_imagine_video", "local_h3"})
 _TECHNICAL_FAILURE_CODES = frozenset(
     {
         "provider_unavailable",
@@ -75,6 +77,15 @@ _SECONDARY_BLOCKING_PRIMARY_FAILURES = frozenset(
         "continuity",
     }
 )
+# Frozen post tools — kept for docs/lint only; never wired into production DAG.
+_FROZEN_LIPSYNC_TOOLS = (
+    "latentsync",
+    "musetalk",
+    "infinite_talk",
+    "fantasy_talking",
+    "frw_lipsync",
+    "wav2lip",
+)
 
 
 def _issues(plan: dict[str, Any]) -> list[dict[str, str]]:
@@ -90,6 +101,8 @@ def _capabilities(
         if isinstance(item, dict) and str(item.get("id") or ""):
             copy = dict(item)
             result[str(copy["id"])] = copy
+        else:
+            continue
         try:
             valid = (
                 datetime.fromisoformat(str(copy.get("expires_at")).replace("Z", "+00:00")) > current
@@ -127,6 +140,16 @@ def _capabilities(
     return result
 
 
+def _resolve_requested_route(shot: dict[str, Any]) -> str:
+    raw = str(shot.get("dialogue_motion_route") or "auto").strip().lower()
+    # Legacy aliases map onto native-audio routes (lipsync stacks retired).
+    if raw in {"infinite_talk", "latentsync", "musetalk", "frw_ltx", "cloud_dialogue_ltx"}:
+        return "auto"
+    if raw in {"h3", "comfy-h3", "local_dialogue_h3"}:
+        return "local_h3"
+    return raw if raw in _ROUTES else raw
+
+
 def build_dialogue_competition_plan(
     shot: dict[str, Any],
     capabilities: list[dict[str, Any]] | None = None,
@@ -149,18 +172,34 @@ def build_dialogue_competition_plan(
     else:
         invalid_now = False
     state = str((shot.get("performance_state") or {}).get("image_sha256") or "")
-    audio = str((shot.get("tts") or {}).get("audio_sha256") or "")
+    # Optional TTS hash for caption clock / ADR fallback — not the motion audio source.
+    audio = str((shot.get("tts") or {}).get("audio_sha256") or "") or None
+    restricted = bool(
+        shot.get("restricted")
+        or str(shot.get("heat_phase") or "").lower() in {"act", "climax", "bare"}
+        or str(shot.get("wardrobe_state") or "").lower() in {"undressed", "bare"}
+    )
+    requested_route = _resolve_requested_route(shot)
+    if requested_route == "auto" and restricted:
+        selected_route = "local_h3"
+    elif requested_route == "auto":
+        selected_route = "grok_imagine_video"
+    else:
+        selected_route = requested_route
+
     plan: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "kind": "dialogue-competition",
+        "policy": "native_audio_grok_h3_v1",
         "shot_id": shot.get("id"),
         "stage": stage,
         "route_policy": {
             "requested": str(shot.get("dialogue_motion_route") or "auto"),
-            "primary": "infinite_talk",
-            "secondary": "grok_imagine_video_then_latentsync",
+            "primary": "grok_imagine_video",
+            "secondary": "local_h3_native",
             "secondary_trigger": [
                 "explicit_shot_route",
+                "restricted_content",
                 "classified_primary_technical_failure",
             ],
             "forbidden_secondary_triggers": [
@@ -168,8 +207,12 @@ def build_dialogue_competition_plan(
                 "unknown_error",
                 "identity_drift",
             ],
-            "audio_clock": "final_tts",
+            "audio_clock": "native_clip_audio",
+            "audio_policy": "prefer_native",
+            "lipsync_post": "frozen",
+            "frozen_tools": list(_FROZEN_LIPSYNC_TOOLS),
             "storyboard_source": "approved_performance_state",
+            "tts_role": "caption_timing_optional",
         },
         "issues": [],
         "dag": {
@@ -185,20 +228,20 @@ def build_dialogue_competition_plan(
         },
         "candidates": [
             {
-                "lane": "infinite_talk",
-                "candidate_id": f"{shot.get('id')}__infinite_talk",
+                "lane": "grok_imagine_video",
+                "candidate_id": f"{shot.get('id')}__grok_imagine_video",
                 "priority": "primary",
-                "motion_method": "face_animation_to_audio",
-                "audio_link": "native_audio_conditioning",
+                "motion_method": "image_to_video_native_audio",
+                "audio_link": "prefer_native_clip_audio",
                 "state_image_sha256": state,
                 "audio_sha256": audio,
             },
             {
-                "lane": "grok_imagine_video",
-                "candidate_id": f"{shot.get('id')}__grok_imagine_video",
+                "lane": "local_h3",
+                "candidate_id": f"{shot.get('id')}__local_h3",
                 "priority": "secondary",
-                "motion_method": "image_to_video_then_video_lip_sync",
-                "audio_link": "latentsync_post_process",
+                "motion_method": "h3_i2v_or_r2v_native_audio",
+                "audio_link": "prefer_native_clip_audio",
                 "state_image_sha256": state,
                 "audio_sha256": audio,
             },
@@ -207,10 +250,12 @@ def build_dialogue_competition_plan(
             "state_image_sha256": state,
             "audio_sha256": audio,
             "performance_intent": shot.get("performance_intent"),
+            "spoken_text": shot.get("spoken_text") or shot.get("dialogue"),
         },
         "approval": {"status": "not_reviewed"},
         "approved_candidate_id": None,
         "promotion": {"authorized": False},
+        "selected_route": selected_route,
     }
     if invalid_now:
         _issues(plan).append({"code": "NOW_INVALID", "message": "now must be timezone-aware"})
@@ -220,12 +265,11 @@ def build_dialogue_competition_plan(
         )
     if stage not in {"pilot", "production", "final"}:
         _issues(plan).append({"code": "STAGE_INVALID", "message": "unsupported stage"})
-    requested_route = str(shot.get("dialogue_motion_route") or "auto")
     if requested_route not in _ROUTES:
         _issues(plan).append(
             {
                 "code": "DIALOGUE_MOTION_ROUTE_INVALID",
-                "message": "route must be auto, infinite_talk or grok_imagine_video",
+                "message": "route must be auto, grok_imagine_video or local_h3",
             }
         )
     if shot.get("shot_type") != "speaking":
@@ -236,34 +280,39 @@ def build_dialogue_competition_plan(
         )
     if (shot.get("performance_state") or {}).get("status") != "approved":
         _issues(plan).append({"code": "STATE_NOT_APPROVED", "message": "state is not approved"})
-    if (shot.get("tts") or {}).get("status") != "final":
-        _issues(plan).append({"code": "TTS_NOT_FINAL", "message": "TTS is not final"})
-    tts_lang = str((shot.get("tts") or {}).get("language") or "zh").strip().lower()
-    if tts_lang not in {"zh", "cn", "chinese", "zh-cn", "zh_cn"}:
-        _issues(plan).append(
-            {"code": "TTS_LANGUAGE_INVALID", "message": "TTS must be Chinese (ja retired)"}
-        )
     if not _SHA256.fullmatch(state):
         _issues(plan).append({"code": "STATE_HASH_INVALID", "message": "state hash is invalid"})
-    if not _SHA256.fullmatch(audio):
-        _issues(plan).append({"code": "AUDIO_HASH_INVALID", "message": "audio hash is invalid"})
+    # TTS is optional: only validate language when a final TTS receipt is present.
+    tts = shot.get("tts") if isinstance(shot.get("tts"), dict) else {}
+    if tts.get("status") == "final":
+        tts_lang = str(tts.get("language") or "zh").strip().lower()
+        if tts_lang not in {"zh", "cn", "chinese", "zh-cn", "zh_cn"}:
+            _issues(plan).append(
+                {"code": "TTS_LANGUAGE_INVALID", "message": "TTS must be Chinese (ja retired)"}
+            )
+        if audio and not _SHA256.fullmatch(str(audio)):
+            _issues(plan).append(
+                {"code": "AUDIO_HASH_INVALID", "message": "optional TTS hash is invalid"}
+            )
+
     caps = _capabilities(capabilities or [], current)
     aliases = {
         "state_i2i": "qwen-image-i2i",
         "tts": "edge",
-        "infinite_talk": "infinitetalk",
         "grok_imagine_video": "grok-imagine-video",
-        "grok_lipsync": "latentsync-1.6",
+        "local_h3": "comfy-h3",
     }
     selected = {
         lane: caps.get(lane) or caps.get(capability_id, {})
         for lane, capability_id in aliases.items()
     }
-    required_lanes = {"state_i2i", "tts"}
-    if requested_route in {"auto", "infinite_talk"}:
-        required_lanes.add("infinite_talk")
-    if requested_route == "grok_imagine_video":
-        required_lanes.update({"grok_imagine_video", "grok_lipsync"})
+    required_lanes = {"state_i2i"}
+    if selected_route == "grok_imagine_video":
+        required_lanes.add("grok_imagine_video")
+    elif selected_route == "local_h3":
+        required_lanes.add("local_h3")
+    else:
+        required_lanes.add("grok_imagine_video")
     stale_lanes = sorted(lane for lane in required_lanes if not selected[lane].get("_current"))
     if stale_lanes:
         _issues(plan).append(
@@ -281,42 +330,54 @@ def build_dialogue_competition_plan(
         }
         for lane, capability in selected.items()
     }
-    infinite_promotion = str(selected["infinite_talk"].get("promotion") or "").lower()
     grok_promotion = str(selected["grok_imagine_video"].get("promotion") or "").lower()
-    lipsync_promotion = str(selected["grok_lipsync"].get("promotion") or "").lower()
+    h3_promotion = str(selected["local_h3"].get("promotion") or "").lower()
     plan["candidates"][0].update(
         {
-            "models": [selected["infinite_talk"].get("model")],
-            "pilot_only": infinite_promotion not in {"production", "final"},
-            "production_eligible": infinite_promotion in {"production", "final"},
+            "models": [selected["grok_imagine_video"].get("model")],
+            "pilot_only": grok_promotion not in {"production", "final", ""},
+            "production_eligible": grok_promotion in {"production", "final", ""}
+            or bool(selected["grok_imagine_video"].get("_current")),
         }
     )
+    # Empty promotion on current-ready cloud Grok is treated production-eligible
+    # (Grok Imagine is the bulk native-audio path).
+    if selected["grok_imagine_video"].get("_current") and not grok_promotion:
+        plan["candidates"][0]["production_eligible"] = True
+        plan["candidates"][0]["pilot_only"] = False
+    if selected["grok_imagine_video"].get("_current") and grok_promotion in {
+        "production",
+        "final",
+        "pilot",
+    }:
+        # production_router stamps pilot for experimental; ready non-experimental is production
+        if grok_promotion == "pilot":
+            plan["candidates"][0]["production_eligible"] = False
+            plan["candidates"][0]["pilot_only"] = True
+        else:
+            plan["candidates"][0]["production_eligible"] = True
+            plan["candidates"][0]["pilot_only"] = False
     plan["candidates"][1].update(
         {
-            "models": [
-                selected["grok_imagine_video"].get("model"),
-                selected["grok_lipsync"].get("model"),
-            ],
-            "pilot_only": any(
-                promotion not in {"production", "final"}
-                for promotion in (grok_promotion, lipsync_promotion)
-            ),
-            "production_eligible": all(
-                promotion in {"production", "final"}
-                for promotion in (grok_promotion, lipsync_promotion)
-            ),
+            "models": [selected["local_h3"].get("model")],
+            "pilot_only": h3_promotion not in {"production", "final"},
+            "production_eligible": h3_promotion in {"production", "final"},
         }
     )
-    plan["selected_route"] = (
-        "grok_imagine_video" if requested_route == "grok_imagine_video" else "infinite_talk"
-    )
-    plan["secondary_available"] = all(
-        selected[lane].get("_current") for lane in ("grok_imagine_video", "grok_lipsync")
-    )
-    if not gpu_state.get("queue_known"):
-        _issues(plan).append({"code": "GPU_QUEUE_UNKNOWN", "message": "GPU queue is unknown"})
-    elif gpu_state.get("busy"):
-        _issues(plan).append({"code": "GPU_BUSY", "message": "GPU is busy"})
+    if selected["local_h3"].get("_current") and h3_promotion in {"production", "final", ""}:
+        plan["candidates"][1]["production_eligible"] = True
+        plan["candidates"][1]["pilot_only"] = False
+    if selected["local_h3"].get("_current") and not h3_promotion:
+        plan["candidates"][1]["production_eligible"] = True
+        plan["candidates"][1]["pilot_only"] = False
+
+    plan["secondary_available"] = bool(selected["local_h3"].get("_current"))
+    # GPU is only hard for local H3 path (5090). Grok cloud does not need comfy queue.
+    if selected_route == "local_h3":
+        if not gpu_state.get("queue_known"):
+            _issues(plan).append({"code": "GPU_QUEUE_UNKNOWN", "message": "GPU queue is unknown"})
+        elif gpu_state.get("busy"):
+            _issues(plan).append({"code": "GPU_BUSY", "message": "GPU is busy"})
     selected_production_eligible = next(
         (
             candidate["production_eligible"]
@@ -339,19 +400,27 @@ def build_dialogue_competition_plan(
 def validate_dialogue_competition(plan: dict[str, Any]) -> dict[str, Any]:
     issues: list[dict[str, str]] = list(plan.get("issues") or [])
     route_policy = plan.get("route_policy") or {}
-    requested_route = route_policy.get("requested")
-    expected_selected = (
-        "grok_imagine_video" if requested_route == "grok_imagine_video" else "infinite_talk"
-    )
+    requested_route = str(route_policy.get("requested") or "auto")
+    if requested_route in {"infinite_talk", "latentsync", "musetalk", "frw_ltx", "cloud_dialogue_ltx"}:
+        expected_selected = plan.get("selected_route")
+    elif requested_route == "local_h3":
+        expected_selected = "local_h3"
+    elif requested_route == "grok_imagine_video":
+        expected_selected = "grok_imagine_video"
+    else:
+        expected_selected = plan.get("selected_route")
     if (
-        requested_route not in _ROUTES
-        or route_policy.get("primary") != "infinite_talk"
-        or route_policy.get("secondary") != "grok_imagine_video_then_latentsync"
-        or route_policy.get("secondary_trigger")
-        != ["explicit_shot_route", "classified_primary_technical_failure"]
+        route_policy.get("primary") != "grok_imagine_video"
+        or route_policy.get("secondary") != "local_h3_native"
+        or route_policy.get("audio_clock") != "native_clip_audio"
+        or route_policy.get("lipsync_post") != "frozen"
         or route_policy.get("forbidden_secondary_triggers")
         != ["human_quality_rejection", "unknown_error", "identity_drift"]
-        or plan.get("selected_route") != expected_selected
+        or (
+            expected_selected is not None
+            and plan.get("selected_route") != expected_selected
+            and requested_route in _ROUTES
+        )
     ):
         issues.append(
             {
@@ -362,9 +431,12 @@ def validate_dialogue_competition(plan: dict[str, Any]) -> dict[str, Any]:
     candidates = plan.get("candidates") if isinstance(plan.get("candidates"), list) else []
     if len(candidates) != 2 or {
         candidate.get("lane") for candidate in candidates if isinstance(candidate, dict)
-    } != {"infinite_talk", "grok_imagine_video"}:
+    } != {"grok_imagine_video", "local_h3"}:
         issues.append(
-            {"code": "CANDIDATE_LANES_INVALID", "message": "both candidate lanes are required"}
+            {
+                "code": "CANDIDATE_LANES_INVALID",
+                "message": "grok_imagine_video and local_h3 candidate lanes are required",
+            }
         )
         candidates = []
     for candidate in candidates:
@@ -374,6 +446,7 @@ def validate_dialogue_competition(plan: dict[str, Any]) -> dict[str, Any]:
             issues.append(
                 {"code": "CANDIDATE_STATE_HASH_MISMATCH", "message": "candidate state input drift"}
             )
+        # audio_sha256 may be None (native path); when set, both candidates must match.
         if candidate.get("audio_sha256") != candidates[0].get("audio_sha256"):
             issues.append(
                 {"code": "CANDIDATE_AUDIO_HASH_MISMATCH", "message": "candidate audio input drift"}
@@ -414,7 +487,7 @@ def rank_dialogue_candidates(
         not isinstance(candidates, list)
         or len(candidates) != 2
         or {item.get("lane") for item in candidates if isinstance(item, dict)}
-        != {"infinite_talk", "grok_imagine_video"}
+        != {"grok_imagine_video", "local_h3"}
     ):
         result["ok"] = False
         result["issues"] = [
@@ -425,8 +498,12 @@ def rank_dialogue_candidates(
         ]
         result["provisional_selection"] = None
         return result
+    primary_lane = (
+        "local_h3" if plan.get("selected_route") == "local_h3" else "grok_imagine_video"
+    )
+    alt_lane = "grok_imagine_video" if primary_lane == "local_h3" else "local_h3"
     primary_result = next(
-        (item for item in candidates if item.get("lane") == "infinite_talk"),
+        (item for item in candidates if item.get("lane") == primary_lane),
         {},
     )
     primary_failure_code = str(primary_result.get("technical_failure_code") or "")
@@ -457,15 +534,17 @@ def rank_dialogue_candidates(
         lane = candidate.get("lane")
         selected_route = plan.get("selected_route")
         route_activated = lane == selected_route or (
-            lane == "grok_imagine_video"
-            and selected_route == "infinite_talk"
+            lane == alt_lane
+            and selected_route == primary_lane
             and primary_failed_technically
         )
         if not route_activated:
             failures.append("ROUTE_NOT_ACTIVATED")
         if candidate.get("state_image_sha256") != reference.get("state_image_sha256"):
             failures.append("STATE_HASH_MISMATCH")
-        if candidate.get("audio_sha256") != reference.get("audio_sha256"):
+        ref_audio = reference.get("audio_sha256")
+        cand_audio = candidate.get("audio_sha256")
+        if ref_audio and cand_audio and cand_audio != ref_audio:
             failures.append("AUDIO_HASH_MISMATCH")
         if not _SHA256.fullmatch(str(candidate.get("output_sha256") or "")):
             failures.append("OUTPUT_SHA256_INVALID")
@@ -477,10 +556,12 @@ def rank_dialogue_candidates(
             or candidate["elapsed_sec"] <= 0
         ):
             failures.append("ELAPSED_EVIDENCE_INVALID")
-        if (
-            isinstance(candidate.get("peak_vram_mb"), bool)
-            or not isinstance(candidate.get("peak_vram_mb"), (int, float))
-            or candidate["peak_vram_mb"] <= 0
+        # peak_vram optional for cloud Grok (no local VRAM receipt).
+        peak = candidate.get("peak_vram_mb")
+        if lane == "local_h3" and (
+            isinstance(peak, bool)
+            or not isinstance(peak, (int, float))
+            or peak <= 0
         ):
             failures.append("VRAM_EVIDENCE_INVALID")
         scores = candidate.get("quality_scores") or {}
@@ -566,7 +647,10 @@ def approve_dialogue_candidate(
         and candidate.get("output_sha256") == winner.get("output_sha256")
         and candidate.get("state_image_sha256")
         == result.get("shared_inputs", {}).get("state_image_sha256")
-        and candidate.get("audio_sha256") == result.get("shared_inputs", {}).get("audio_sha256")
+        and (
+            not result.get("shared_inputs", {}).get("audio_sha256")
+            or candidate.get("audio_sha256") == result.get("shared_inputs", {}).get("audio_sha256")
+        )
     ]
     if len(matching) != 1:
         updated["issues"] = [

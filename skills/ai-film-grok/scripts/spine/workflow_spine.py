@@ -14,6 +14,7 @@ from typing import Any
 from director_stage_gates import STAGE_ORDER
 from production_book import RIGOR_LEVELS
 from util import read_json
+from util.spine_helpers import post_audit_current, present, pilot_user_ok
 
 STAGE_LABELS_ZH: dict[str, str] = {
     "concept_lock": "概念锁",
@@ -186,25 +187,12 @@ _ACTION_PRIORITY: dict[str, tuple[str, ...]] = {
 }
 
 
-def _present(path: Path, *, min_bytes: int = 2) -> bool:
-    return path.is_file() and path.stat().st_size > min_bytes
-
-
 def _mode(root: Path) -> tuple[str, str | None]:
     book = read_json(root / "production-book.json")
     if not isinstance(book, dict):
         return "legacy", None
     rigor = str(book.get("rigor") or "legacy")
     return rigor if rigor in RIGOR_LEVELS else "legacy", rigor
-
-
-def _pilot_user_approved(root: Path) -> bool:
-    try:
-        from production_gates import load_pilot_approval, pilot_is_user_approved
-
-        return pilot_is_user_approved(load_pilot_approval(root))
-    except (OSError, ValueError):
-        return False
 
 
 def _selects_current(root: Path) -> bool:
@@ -228,7 +216,7 @@ def _rough_current(root: Path, manifest: dict[str, Any], *, professional: bool) 
                 and rough.get("selected_set_sha256") == selects.get("selected_set_sha256")
             )
         return bool(build_editor_cut_report(root, write=False).get("ok"))
-    if _present(root / "receipts" / "rough-cut.json"):
+    if present(root / "receipts" / "rough-cut.json"):
         return True
     editor_cut = read_json(root / "receipts" / "editor-cut.json") or {}
     if editor_cut.get("ok") is True and int(editor_cut.get("shot_count") or 0) > 0:
@@ -260,18 +248,6 @@ def _post_plan_current(root: Path) -> bool:
         return False
 
 
-def _post_audit_current(root: Path) -> bool:
-    receipt = read_json(root / "receipts" / "post-audit.json") or {}
-    if receipt.get("delivery_ready") is not True:
-        return False
-    try:
-        from post_audit import audit_freshness
-
-        return audit_freshness(root, receipt).get("stale") is False
-    except (OSError, ValueError):
-        return False
-
-
 def _has_final_film(root: Path, manifest: dict[str, Any] | None = None) -> bool:
     """True when a plate/final candidate exists on disk or is bound in manifest."""
     for rel in (
@@ -280,7 +256,7 @@ def _has_final_film(root: Path, manifest: dict[str, Any] | None = None) -> bool:
         "out/final.mp4",
         "final.mp4",
     ):
-        if _present(root / rel, min_bytes=1):
+        if present(root / rel, min_bytes=1):
             return True
     man = manifest if isinstance(manifest, dict) else (read_json(root / "manifest.json") or {})
     outputs = man.get("outputs") if isinstance(man.get("outputs"), dict) else {}
@@ -289,7 +265,7 @@ def _has_final_film(root: Path, manifest: dict[str, Any] | None = None) -> bool:
     if not raw:
         return False
     path = Path(raw)
-    return path.is_file() if path.is_absolute() else _present(root / path, min_bytes=1)
+    return path.is_file() if path.is_absolute() else present(root / path, min_bytes=1)
 
 
 def _legacy_production_readiness(
@@ -311,7 +287,7 @@ def _legacy_production_readiness(
     if "brief" in gates:
         has_brief = bool(gates.get("brief"))
     else:
-        has_brief = _present(root / "brief.json")
+        has_brief = present(root / "brief.json")
 
     if "style_locked" in gates:
         style_ok = bool(gates.get("style_locked"))
@@ -326,13 +302,13 @@ def _legacy_production_readiness(
         # No gates payload — still refuse shots-list-only promotion.
         spec_ok = False
 
-    pilot_user = _pilot_user_approved(root)
+    pilot_user = pilot_user_ok(root)
     clips_ok = bool(gates.get("clips_complete")) if "clips_complete" in gates else False
     final_complete = (
         bool(gates.get("final_complete")) if "final_complete" in gates else False
     )
     has_final = _has_final_film(root, manifest)
-    post_audit = _post_audit_current(root)
+    post_audit = post_audit_current(root)
 
     concept_ok = has_brief
     # No narrative scope locks in pure legacy: brief is enough to leave define_story.
@@ -408,7 +384,7 @@ def build_workflow_status(
             and narrative.get("ready_for_media")
             and projection.get("stale") is not True
         )
-        pilot_ok = bool(shot_ok and _pilot_user_approved(base))
+        pilot_ok = bool(shot_ok and pilot_user_ok(base))
         bulk_ok = bool(pilot_ok and gates.get("clips_complete"))
         from dailies import dailies_review_status
 
@@ -423,11 +399,11 @@ def build_workflow_status(
             and _post_plan_current(base)
             and _review_stage_approved(base, "audio")
             and (
-                _present(base / "receipts" / "tts-rehearsal.json")
-                or _present(base / "audio" / "mix_report.json")
+                present(base / "receipts" / "tts-rehearsal.json")
+                or present(base / "audio" / "mix_report.json")
             )
         )
-        master_ok = bool(post_ok and gates.get("final_complete") and _post_audit_current(base))
+        master_ok = bool(post_ok and gates.get("final_complete") and post_audit_current(base))
 
         readiness = {
             "concept_lock": concept_ok,
