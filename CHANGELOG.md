@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.19] - 2026-08-05
+
+### Added (CLI extract + docs · W5)
+- **`cli_pilot.py`**: extract `pilot pick|report|pack|score|approve` from monolith (`aifilm_grok` ~7.5k LOC).
+- **Docs**: hard-defaults / skill README push **`h3_primary`** as 5090 default; `cli-extract-map` updated.
+- **Tests**: `tests/test_cli_pilot_extract.py`.
+
 ## [2.39.18] - 2026-08-05
 
 ### Added (Material Fidelity · M3 registry + M4 evidence)

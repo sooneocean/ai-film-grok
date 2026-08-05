@@ -114,7 +114,7 @@
 
 | 规则 | 默认 |
 |---|---|
-| bulk 动作 I2V | **双车道默认（成人 max）**：setup/非敏感 = **Grok Video 1.5** 云 bulk；**肉戏/bare/高难** = **5090 MiniMax H3**；对白讲话镜锁 FRW LTX 2.3。矩阵见 [weapon-lane-matrix.md](weapon-lane-matrix.md)。非成人可纯 `grok_primary`。 |
+| bulk 动作 I2V | **有 5090 推荐 `h3_primary`**（全镜本地 H3，时间换无限产能）。**`hybrid_h3`** 双轨：setup=Grok 云；肉戏/bare=H3。对白安全镜可 FRW LTX。矩阵见 [weapon-lane-matrix.md](weapon-lane-matrix.md)。无 GPU 才纯 `grok_primary`。 |
 | 本地 MiniMax H3 | **film-lane 已打通（verified + production_promoted）**：`comfy-h3` T2V/I2V/R2V；`aifilm h3 plan|run` 无需 `--allow-experimental`；成人 max **自动** `h3.enabled` + soft-lock；`media-queue` **硬拦** restricted 进云 bulk（逃生 `AIFILM_ALLOW_CLOUD_RESTRICTED=1`）；出片 **≥704×1280** upscale；**bulk 仍要用户 pilot 批准**；原声 `prefer_native`；证据 `registry/evidence/h3-canaries/`；Wan 2.2 本地 I2V 仍退役 |
 | **H3 效果最大化（P0 · 2026-08-04 · 2.37.3 自动 mode）** | **模式**：**I2V**=有 still 的主角/肉戏/反应/续镜默认；**R2V**=高能量、换构图、对白大嘴 CU；**T2V**=仅无脸 env/bridge（**禁锁脸**）。**机读**：`scripts/h3_mode.py` `resolve_h3_mode` → `h3 list|plan` 输出 `mode`/`command`/`alt_mode`。**高动**=狠 prompt+状态 still。**续镜**=批准末帧→I2V。**对白注入**=`audio_cues` 必进 prompt。**运维**=换模式前 `comfy free-memory --confirm`；VRAM≥24GiB；5090 独占。见 [weapon-lane-matrix](weapon-lane-matrix.md)·[h3-max-effect](lessons-2026-08-04-h3-max-effect.md) |
 | **Fill-Idle 挑战（P0 · 2026-08-04 · 2.37.5 机读）** | **Grok 铺 soft baseline**；**restricted 主轨 H3**。CLI：`aifilm h3 next` / `h3 list --challenge` / `h3 pk-compare`（P0→P1→P2 mean 最低；禁静默 promote）。PK：人 `select-shortlist --promote`。final **不**阻塞于 P2。见 [weapon-lane-matrix](weapon-lane-matrix.md) · [memory](../memory/2026-08-04-h3-fill-idle-challenge.md) |
@@ -131,7 +131,7 @@
 | **高动态常态（P0 · 2026-07-27）** | **产品硬底**：平常 mean≥**18**；肉戏 act/climax mean≥**20**（目标≥24）；成片 1:00→片尾包络≥**18**。**DF 分档（P1）**见上「Motion Core P1/P2」。禁止 Ken Burns/仅微呼吸/弱 raw 装片；多 take 取 mean 最高且时长≥镜长；肉戏 10s 优先 **6s×2 hybrid**。交付前写 `i2v-high-motion-audit` + `i2v-final-gate`；**仅 gate ok 才拷桌面 film_final**。**代码入口**：`scripts/i2v_motion_gate.py`（`MEAN_NORMAL_FLOOR=18` / `MEAN_MEAT_FLOOR=20` / soft=10 / medium=16）· CLI `aifilm i2v-motion-gate --rows …`。见 [high-motion-style-lock](lessons-2026-07-27-high-motion-style-lock-final.md) |
 | **I2V 画风锁 MEDIUM（P0 · 同案）** | 源图= style-locked still/keyframe；prompt 首段 **MEDIUM LOCK cel anime**（match style-v1；禁 photoreal/3D/半写实油光）；高动重跑与 last-frame 连戏 **不得** 用 mean 换 medium fail；交付前 style audit 抽帧。见同上 lesson |
 | **vocal_color 默认** | **never**（2026-07-27 用户永久禁娇喘轨除非显式恢复）；`forbid_vocal_color` / gain=0 |
-| I2V profile | 环境默认 `grok_primary`；**成人 max 片级自动 hybrid 行为**（Grok bulk + H3 meat）；显式 `AIFILM_I2V_PROFILE=hybrid_h3` 或 `h3.enabled`；退出：`h3.enabled=false` / soft heat；旧项目 `ltx23_primary` |
+| I2V profile | **推荐 `h3_primary`**（5090）；`hybrid_h3` 双轨；成人 max 无 profile 时仍可 auto-enable H3→hybrid；纯云 `grok_primary`；旧项目 `ltx23_primary`。退出 H3：`h3.enabled=false` / soft heat |
 | FRW LTX canary | 影片级完整解码＋人工批准后才可执行；缺证据时跳到 Grok，但不永久改写 film-spec |
 | 403 / 502 | **403**=未开通；**502**=平台挂；勿混淆 |
 | 动作降级 | 未就绪路线可跳过；已尝试路线仅 timeout/429/5xx/连接失败才签名降级；质量/人工拒绝不切换 |

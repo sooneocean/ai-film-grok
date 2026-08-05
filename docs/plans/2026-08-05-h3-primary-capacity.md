@@ -28,7 +28,7 @@
 - [x] W2 mode table 沿用 `h3_mode` + 矩阵文案 + 路由测
 - [x] W3 until-empty + capacity-plan + P0 硬断言（v2.39.16）
 - [x] W4 gate 减负（v2.39.17）：单机读 next · pilot 三模式 GO · ship-prep 人审一页
-- [ ] W5 CLI 拆分
+- [x] W5 CLI 拆分起步（v2.39.18）：`cli_pilot` + 文案 h3_primary 主推
 
 ### W3 用法
 

@@ -26,7 +26,7 @@
 Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
   · plan debrief → fidelity apply → design-go（锁前）
         ↓
-1. 视觉生成     静帧 Grok；I2V 默认 grok_primary
+1. 视觉生成     静帧 Grok；I2V 有 5090 默认 **h3_primary**（否则 grok_primary）
                 · 对白讲话镜 → FRW LTX 2.3 有声
                 · hybrid_h3：肉戏/高难/受限对白 → 5090 MiniMax H3（FLF/R2V）
                 · 空闲 → Fill-Idle 挑战（不自动 promote）
@@ -50,7 +50,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 ![ai-film-grok 四层流水线](docs/architecture.png)
 
-> 当前季默认 **I2V = `grok_primary`**；有私有 5090 时成人/高动片建议 **`hybrid_h3`**。`ltx23_primary` 仅旧项目。完整插拔矩阵见仓库根 README。
+> 有私有 5090 时推荐 **`h3_primary`**（全镜本地 H3）；双轨用 **`hybrid_h3`**；纯云 **`grok_primary`**。`ltx23_primary` 仅旧项目。完整插拔矩阵见仓库根 README。
 
 ---
 
@@ -96,7 +96,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 | 能力 | 在本 skill 中的角色 | 入口 |
 |------|---------------------|------|
 | **Grok Imagine（图像）** | 文生图 / 图生图：风格样张、定妆、每镜关键帧 | `image_gen`、`image_edit` |
-| **Grok Imagine Video** | `grok_primary` / hybrid 安全 bulk 主链；需影片级 approved canary | `image_to_video` · OAuth video |
+| **Grok Imagine Video** | 纯云 / hybrid 安全 bulk；`h3_primary` 下仅 opt-in | `image_to_video` · OAuth video |
 | **FRW LTX 2.3** | **安全向**对白讲话镜原生有声；分类技术失败 fallback | `"$AIFILM" frw img2video-audio --model ltx2.3` |
 | **FRW API I2V / i2i** | Grok 不可用后的 I2V 备选；**still-challenge** 刷更好静帧 | `frw img2video` · `still-challenge` |
 | **本机 MiniMax H3（5090）** | `hybrid_h3`：肉戏/高难/受限对白；**FLF** 首尾帧；R2V 能量位 | `aifilm h3 plan\|run\|next\|cycle` |
