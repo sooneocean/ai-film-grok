@@ -8,6 +8,13 @@
 - On capacity recover → continue loop; timeout still stop_reason=`capacity_not_ready`.
 - **Tests**: CapacityWaitTests in `test_h3_until_empty.py`.
 
+### Changed (H3 combo R2 best-of live → workflow)
+- **Registry** `h3-combo-winners.json`: best-of R1+R2 idle grid on 5090.
+  - high_motion_energy → **R2V + high_motion_max** (mean~21.6)
+  - dialogue_mouth_energy → **I2V + dialogue_mouth_max** (motion~12)
+  - hero_identity keeps soft_i2v; faceless_env keeps env_no_face
+- `resolve_h3_mode` picks preferred_mode + prompt_family from registry.
+
 ### Changed (R1c residual · voice cast normalize)
 - **`final.voice`**: peel `normalize_cast_voices` / `normalize_cast_tts_backends` from `post/render_final`; hard-compat re-export.
 - **`render_final`** calls the normalize leaves (no policy change); Chinese locks; remap legacy `ja-JP-*`.
