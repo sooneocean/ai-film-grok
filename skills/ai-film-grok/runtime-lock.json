@@ -738,7 +738,7 @@
     },
     {
       "path": "scripts/h3_media_pack.py",
-      "sha256": "ed246f3b4b85c01dc281d75a399d02fb1c1fb11cc34d01ad972c35607b00dd25"
+      "sha256": "0f7f7b61575d10ee3ae2d31e28e89417fd7b2b77948207aa30cb3c03e462f9c3"
     },
     {
       "path": "scripts/h3_mode.py",
