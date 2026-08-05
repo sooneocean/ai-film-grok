@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.47] - 2026-08-05
+
+### Changed (module refactor · W4/W5 finish)
+- **W4 packages**: `scripts/post/render_final.py` · `scripts/narrative/edit_policy_heat.py` with top-level hard-compat shims.
+- **W5 docs**: AGENTS layout/AREA pointers · refactor tracker closeout · REFACTORING_PLAN superseded pointer.
+- Public import names and CLI strings unchanged.
+
 ## [2.39.46] - 2026-08-05
 
 ### Added (Weapon inventory CLI + doctor/dispatch surface)

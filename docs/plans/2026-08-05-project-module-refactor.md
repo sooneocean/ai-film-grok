@@ -37,8 +37,8 @@ Landing commits (structure): `0f355f60` refactor W1+W2 · follow-ups `071a3113` 
 | W1 | `scripts/core/*` · break cli↔hub IO cycle | **DONE** (on origin/main) |
 | W2 | CLI parser/cmd extract · hub ≤2500 | **DONE** (hub 1455) |
 | W3 | Package dirs + top-level shims | **DONE** (v2.39.44) |
-| W4 | Domain monoliths (render_final / heat / …) | pending |
-| W5 | Docs / AREA align / shim audit | pending |
+| W4 | Domain monoliths → packages | **DONE** (post/render_final · narrative/edit_policy_heat) |
+| W5 | Docs / AREA align / shim audit | **DONE** |
 
 ## Iron
 
@@ -62,3 +62,11 @@ Landing commits (structure): `0f355f60` refactor W1+W2 · follow-ups `071a3113` 
 - hard-compat shims via sys.modules
 - path fixes: skill_scripts / advance / plan schemas
 - verified: 43+ domain tests; main smoke import ok
+
+
+## W4–W5 closeout
+
+- **W4**: `render_final` → `scripts/post/render_final.py` + top-level shim; `edit_policy_heat` → `scripts/narrative/edit_policy_heat.py` + shim.
+- Internal leaf-split of 4k-line monoliths deferred (import graph / cycle risk); package boundary is the ship gate.
+- **W5**: AGENTS layout + AREA pointers; this tracker marked DONE for W3–W5.
+- Iron: public imports and CLI strings unchanged (`sys.modules` shims).

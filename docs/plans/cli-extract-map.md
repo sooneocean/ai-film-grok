@@ -1,6 +1,6 @@
 # CLI extract map — aifilm_grok.py domain split
 
-**Status:** ACTIVE · 2026-08-05 · v2.39.30
+**Status:** continued by project-module-refactor W3–W5 ·  ACTIVE · 2026-08-05 · v2.39.30
 **Goal:** shrink `aifilm_grok.py` toward <2500 lines by extracting cmd handlers only.  
 **Iron:** public subcommand strings never rename.
 
