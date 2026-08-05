@@ -6,6 +6,10 @@ Order (author-facing prompt body):
   → camera_prompt → dialogue/foley audio → (provider prefix separate)
 
 Fail-closed rules live in ``assert_motion_prompt_core``.
+
+MiniMax H3 temporal prompt builder (5090 H3 primary path):
+``build_h3_temporal_prompt()`` produces ``[Xs-Ys]`` segmented prompts
+that match the H3 DiT temporal decomposition format.
 """
 
 from __future__ import annotations
@@ -454,14 +458,140 @@ def build_motion_prompt(
     return body
 
 
+# ── MiniMax H3 temporal prompt builder (5090 H3 primary path) ──────────────
+
+_H3_SEGMENT_DURATIONS = {
+    # duration_sec → segment count (~2–3s per clear action)
+    5: 2,
+    6: 2,
+    7: 3,
+    8: 3,
+    9: 3,
+    10: 4,
+    11: 4,
+    12: 4,
+    13: 5,
+    14: 5,
+    15: 5,
+}
+
+
+def _h3_segment_count(duration_sec: float, *, prompt_tier: str = "medium") -> int:
+    """Return temporal segment count for duration (+ soft/high density nudge)."""
+    dur = int(round(duration_sec))
+    if dur <= 5:
+        base = 2
+    elif dur >= 15:
+        base = 5
+    else:
+        base = _H3_SEGMENT_DURATIONS.get(dur, 3)
+    tier = (prompt_tier or "medium").strip().lower()
+    if tier == "soft":
+        return max(2, base - (1 if base > 2 else 0))
+    if tier == "high" and dur >= 8:
+        cap = 3 if dur <= 5 else (4 if dur <= 8 else (5 if dur <= 10 else 8))
+        return min(cap, base + 1)
+    return base
+
+
+def build_h3_temporal_prompt(
+    spec: dict[str, Any] | None,
+    shot: dict[str, Any],
+    *,
+    mode: str = "i2v",
+    duration_sec: float | None = None,
+) -> str:
+    """Build MiniMax H3 Layer-4 timed action script for 5090 generation.
+
+    Output (no Vertical 9:16 prefix — H3 is natively 9:16)::
+
+      [0s-2s] continuity + open + primary action + camera + env + mood ...
+      [2s-5s] ...
+      [5s-8s] ... ending pose
+      Audio: ...
+
+    Controls: temporal decomposition, one primary action/segment,
+    subject+camera+env motion, continuity anchors, continuous vs multi-cut,
+    implied diegetic sound + dialogue inject. See ``h3_timeline_prompt``.
+    """
+    from h3_timeline_prompt import build_segment_lines, resolve_duration_sec
+
+    if duration_sec is None:
+        h3 = (spec or {}).get("h3") if isinstance(spec, dict) else {}
+        h3 = h3 if isinstance(h3, dict) else {}
+        duration_sec = resolve_duration_sec(
+            shot, default=float(h3.get("max_duration_sec") or 8)
+        )
+    duration_sec = max(3.0, min(float(duration_sec), 15.0))
+
+    tier = motion_tier_for(shot)
+    n = _h3_segment_count(duration_sec, prompt_tier=tier)
+    shot_x = dict(shot) if isinstance(shot, dict) else {}
+    shot_x["h3_mode"] = mode
+
+    segs = build_segment_lines(
+        spec,
+        shot_x,
+        duration_sec=duration_sec,
+        prompt_tier=tier,
+        n_segments=n,
+        inject_continuity_in_first=True,
+    )
+    if segs:
+        lead: list[str] = []
+        df = dramatic_function_of(shot)
+        if df:
+            lead.append(f"Dramatic function: {df}")
+        want = want_beat_line(spec, shot)
+        if want:
+            lead.append(want.rstrip("."))
+        if tier == "high":
+            lead.append(
+                "HIGH MOTION priority: large visible pose/body change across the timeline"
+            )
+        elif tier == "soft":
+            lead.append("SOFT MOTION: micro-performance only; locked camera preferred")
+        if lead:
+            tc, _, rest = segs[0].partition("] ")
+            segs[0] = f"{tc}] {'; '.join(lead)}. {rest}".strip()
+
+    try:
+        from input_fidelity import inject_story_beat_into_prompt
+
+        joined = inject_story_beat_into_prompt("\n".join(segs), shot)
+        segs = joined.split("\n")
+    except Exception:
+        pass
+
+    audio = audio_clause(shot)
+    body = "\n".join(segs)
+    if audio:
+        body = f"{body}\n{audio}"
+    return body.strip()
+
+
+# ── end H3 temporal builder ────────────────────────────────────────────────
+
+
 def ensure_motion_core_in_prompt(
     text: str,
     spec: dict[str, Any] | None,
     shot: dict[str, Any],
+    *,
+    timeline: bool | None = None,
+    duration_sec: float | None = None,
 ) -> str:
-    """Merge missing core clauses into an author prompt (idempotent)."""
+    """Merge missing core clauses into an author prompt (idempotent).
+
+    When ``timeline=True`` and author text has no ``[0s-…]`` markers, append
+    Layer-4 continuity + timed segments (5090 H3 path).
+    """
     base = (text or "").strip()
     if not base:
+        if timeline:
+            return build_h3_temporal_prompt(
+                spec, shot, mode="i2v", duration_sec=duration_sec
+            )
         return build_motion_prompt(spec, shot, mode="i2v", include_provider_prefix=False)
 
     out = base
@@ -481,7 +611,6 @@ def ensure_motion_core_in_prompt(
 
     want = want_beat_line(spec, shot)
     if want and want not in out and "advances want" not in out.lower():
-        # Insert after DF if present, else prepend after first sentence-ish
         out = f"{out.rstrip()} {want}"
 
     tier = motion_tier_for(shot)
@@ -501,6 +630,17 @@ def ensure_motion_core_in_prompt(
             out = f"{out.rstrip()} {audio}"
     elif "Audio:" not in out:
         out = f"{out.rstrip()} {audio}"
+
+    if timeline:
+        try:
+            from h3_timeline_prompt import has_timeline_markers, merge_timeline_into_author
+
+            if not has_timeline_markers(out):
+                out = merge_timeline_into_author(
+                    out, spec, shot, duration_sec=duration_sec
+                )
+        except Exception:
+            pass
 
     return out.strip()
 
@@ -569,6 +709,8 @@ def assert_motion_prompt_core(
                 "advances want",
                 "visible change",
                 "story beat",
+                "primary action",
+                "opening state",
             )
         )
         # Camera-only filler (push-in / blink / breath) is NOT enough for hero I2V

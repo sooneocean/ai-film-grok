@@ -111,10 +111,17 @@ def _prompt_for_shot(
     mode: str,
     spec: dict[str, Any] | None = None,
 ) -> str:
-    """Build H3 motion prompt with shared film-core spine (DF/want/camera/dialogue)."""
+    """Build H3 motion prompt with shared film-core spine (DF/want/camera/dialogue).
+
+    When the film spec uses the 5090 H3 primary profile (``h3_primary`` or
+    ``hybrid_h3``), the prompt is built with MiniMax H3 temporal-segment
+    format (``[Xs-Ys]``) so the DiT decoder receives per-segment visual
+    decomposition instead of a single monolithic paragraph.
+    """
     from motion_prompt_spine import (
         MotionCoreError,
         assert_motion_prompt_core,
+        build_h3_temporal_prompt,
         build_motion_prompt,
         ensure_motion_core_in_prompt,
         provider_prefix,
@@ -125,9 +132,17 @@ def _prompt_for_shot(
     else:
         try:
             film = _load_spec(root)
-        except H3WorkflowError:
+        except Exception:
             # Unit tests / prompt-only calls may lack film-spec; spine still works.
             film = {}
+
+    i2v_profile = str(
+        (spec or {}).get("_i2v_profile")
+        or (spec or {}).get("i2v_profile")
+        or ""
+    ).strip().lower()
+    is_5090_h3 = i2v_profile in {"h3_primary", "hybrid_h3"}
+
     sid = str(shot.get("id") or "shot")
     prompt_paths = [
         root / "receipts" / "prompts" / f"{sid}.i2v.txt",
@@ -141,17 +156,37 @@ def _prompt_for_shot(
             if text:
                 author = text
                 break
+    h3_cfg = (film or {}).get("h3") if isinstance((film or {}).get("h3"), dict) else {}
+    duration = None
+    try:
+        duration = float(
+            shot.get("duration_sec")
+            or shot.get("max_duration_sec")
+            or h3_cfg.get("max_duration_sec")
+            or 8
+        )
+    except (TypeError, ValueError):
+        duration = 8.0
+
     if author:
-        # Keep author geometry/style; merge missing DF/want/dialogue/camera.
+        # Keep author geometry/style; merge DF/want/dialogue/camera.
         body = ensure_motion_core_in_prompt(author, film, shot)
         # If author file had no geometry prefix, leave as-is; spine already has content.
-        if not any(
+        if is_5090_h3:
+            # 5090 H3 path: author prompts keep spine format but skip Vertical 9:16 prefix.
+            prompt = body
+        elif not any(
             k in body.lower()
             for k in ("vertical 9:16", "picture 1", "text-to-video", "animate the start")
         ):
             prompt = f"{provider_prefix(mode)} {body}".strip()
         else:
             prompt = body
+    elif is_5090_h3:
+        # 5090 H3 primary path: Layer-4 timed action script ([0s-2s] …).
+        prompt = build_h3_temporal_prompt(
+            film, shot, mode=mode, duration_sec=duration
+        )
     else:
         prompt = build_motion_prompt(film, shot, mode=mode, include_provider_prefix=True)
     try:

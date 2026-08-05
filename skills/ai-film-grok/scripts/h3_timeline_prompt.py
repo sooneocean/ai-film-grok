@@ -1,0 +1,555 @@
+#!/usr/bin/env python3
+"""H3 Timeline Prompt Compiler (Layer 4) — shot → timed motion script for MiniMax H3.
+
+Not a screenplay or storyboard system. Covers only:
+
+  shot / beat → continuous timecode segments → model-ready prompt
+
+Core chain:
+  duration → segment count → events → subject action → camera → env motion
+  → implied sound → continuous timeline
+
+Format:
+  [0s-2s] ...
+  [2s-5s] ...
+  [5s-8s] ...
+
+Gaps and overlaps are forbidden. Each segment is one dynamic unit
+(setting + subject + action + camera + mood + implied sound), with
+at most one primary action (+ optional secondary reaction).
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from typing import Any
+
+# Duration → recommended segment count (min, max). ~2–3s per clear action.
+_DURATION_SEGMENTS: list[tuple[float, int, int]] = [
+    (5.0, 2, 3),
+    (8.0, 3, 4),
+    (10.0, 4, 5),
+    (15.0, 5, 8),
+    (30.0, 8, 12),
+]
+
+_TIMECODE_RE = re.compile(
+    r"\[(\d+(?:\.\d+)?)\s*s\s*-\s*(\d+(?:\.\d+)?)\s*s\]",
+    re.IGNORECASE,
+)
+
+# Soft env motion templates by tier (raise dynamic density without new plot events).
+_ENV_BY_TIER: dict[str, list[str]] = {
+    "soft": [
+        "soft ambient light shifts across surfaces",
+        "fabric and hair micro-drift with quiet air",
+        "subtle dust motes drift in the light",
+    ],
+    "medium": [
+        "rain or air moves through the space",
+        "reflections flicker on wet surfaces",
+        "background elements sway with light parallax",
+    ],
+    "high": [
+        "steam, dust, or rain surges with the action",
+        "lights flicker and hard reflections whip across surfaces",
+        "environment particles and fabric snap with inertia",
+    ],
+}
+
+
+def timeline_prompt_enabled() -> bool:
+    """Default ON for H3. Escape: AIFILM_H3_TIMELINE=0."""
+    raw = os.environ.get("AIFILM_H3_TIMELINE", "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def has_timeline_markers(text: str) -> bool:
+    return bool(_TIMECODE_RE.search(text or ""))
+
+
+def resolve_duration_sec(
+    shot: dict[str, Any] | None,
+    *,
+    default: float = 5.0,
+    max_cap: float = 15.0,
+) -> float:
+    """Pick generation length from shot / dsl / h3 intent fields."""
+    sh = shot if isinstance(shot, dict) else {}
+    dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+    candidates = [
+        sh.get("duration_sec"),
+        sh.get("max_duration_sec"),
+        sh.get("duration"),
+        dsl.get("duration_sec"),
+        dsl.get("max_duration_sec"),
+        dsl.get("duration"),
+    ]
+    for raw in candidates:
+        if raw is None or raw == "":
+            continue
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if val > 0:
+            return max(2.0, min(float(max_cap), val))
+    return max(2.0, min(float(max_cap), float(default)))
+
+
+def segment_count_for(
+    duration_sec: float,
+    *,
+    prompt_tier: str = "medium",
+    n_events: int | None = None,
+) -> int:
+    """Map duration → segment count; denser for high motion, sparser for soft."""
+    dur = max(2.0, float(duration_sec))
+    lo, hi = 2, 3
+    for limit, a, b in _DURATION_SEGMENTS:
+        if dur <= limit + 1e-6:
+            lo, hi = a, b
+            break
+    else:
+        lo, hi = 8, 12
+
+    tier = (prompt_tier or "medium").strip().lower()
+    if tier == "soft":
+        n = lo
+    elif tier == "high":
+        n = hi
+    else:
+        n = (lo + hi) // 2
+
+    if n_events is not None and n_events > 0:
+        # Cap event density: ~one primary action per segment.
+        n = max(lo, min(hi, max(n, min(n_events, hi))))
+    # Keep ~1.5–3.5s per segment when possible.
+    max_by_time = max(2, int(round(dur / 1.6)))
+    min_by_time = max(2, int(round(dur / 3.2)))
+    n = max(min_by_time, min(max_by_time, n))
+    return max(2, min(12, n))
+
+
+def plan_segment_bounds(duration_sec: float, n_segments: int) -> list[tuple[float, float]]:
+    """Continuous coverage [0, duration] with no gaps or overlaps."""
+    dur = max(2.0, float(duration_sec))
+    n = max(1, int(n_segments))
+    # Prefer integer-ish boundaries for short clips (H3 friendly).
+    if dur <= 15 and abs(dur - round(dur)) < 1e-6:
+        total = int(round(dur))
+        base = total // n
+        rem = total - base * n
+        bounds: list[tuple[float, float]] = []
+        t = 0
+        for i in range(n):
+            # Put leftover seconds on middle/late segments (action peak).
+            extra = 1 if i >= (n - rem) else 0
+            end = t + base + extra
+            if i == n - 1:
+                end = total
+            bounds.append((float(t), float(end)))
+            t = end
+        return bounds
+
+    step = dur / n
+    bounds = []
+    for i in range(n):
+        a = round(i * step, 2)
+        b = round(dur if i == n - 1 else (i + 1) * step, 2)
+        bounds.append((a, b))
+    return bounds
+
+
+def format_timecode(start: float, end: float) -> str:
+    def clean(x: float) -> str:
+        if abs(x - round(x)) < 1e-6:
+            return f"{int(round(x))}s"
+        return f"{x:.1f}s"
+
+    return f"[{clean(start)}-{clean(end)}]"
+
+
+def camera_cut_mode(shot: dict[str, Any]) -> str:
+    """continuous | multi — whether segments are phases of one shot or cuts."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    raw = (
+        str(dsl.get("camera_cut_mode") or dsl.get("cut_mode") or shot.get("camera_cut_mode") or "")
+        .strip()
+        .lower()
+    )
+    if raw in {"multi", "multicut", "cut", "cuts", "edit", "montage"}:
+        return "multi"
+    if raw in {"continuous", "single", "one_shot", "oners"}:
+        return "continuous"
+    # Continue chains and default I2V are one continuous take.
+    if str(dsl.get("chain_mode") or "").lower() == "continue" or shot.get("parent_shot_id"):
+        return "continuous"
+    return "continuous"
+
+
+def _split_event_seeds(shot: dict[str, Any]) -> list[str]:
+    """Pull discrete event seeds from dsl + content channels (max density control)."""
+    from motion_prompt_spine import dsl_action_parts
+
+    parts = dsl_action_parts(shot)
+    seeds: list[str] = []
+    for p in parts:
+        # Split on "; " or " then " lightly; keep short clauses whole.
+        chunks = re.split(r"\s*;\s*|\s+then\s+|\s+,\s+(?=[A-Z])", p)
+        for c in chunks:
+            c = " ".join(c.split()).strip(" .")
+            if c and c.lower() not in {"needs_authoring", "tbd", "todo", "n/a"}:
+                seeds.append(c)
+    # Author explicit timeline events
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    explicit = dsl.get("timeline_events") or dsl.get("events") or shot.get("timeline_events")
+    if isinstance(explicit, list):
+        out = []
+        for e in explicit:
+            if isinstance(e, str) and e.strip():
+                out.append(e.strip())
+            elif isinstance(e, dict):
+                t = str(e.get("action") or e.get("text") or e.get("event") or "").strip()
+                if t:
+                    out.append(t)
+        if out:
+            return out
+    return seeds
+
+
+def _camera_seed(shot: dict[str, Any]) -> str:
+    from motion_prompt_spine import camera_clause
+
+    cam = camera_clause(shot)
+    if cam:
+        return cam
+    tier_hint = {
+        "soft": "locked camera, micro push only if needed",
+        "medium": "slow continuous camera move matching the action",
+        "high": "energetic handheld or dynamic track following the body",
+    }
+    try:
+        from motion_prompt_spine import motion_tier_for
+
+        return tier_hint.get(motion_tier_for(shot), tier_hint["medium"])
+    except Exception:
+        return tier_hint["medium"]
+
+
+def _env_seed(shot: dict[str, Any], index: int, tier: str) -> str:
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    env = str(dsl.get("environment") or dsl.get("env_motion") or shot.get("environment") or "").strip()
+    if env:
+        return env
+    bank = _ENV_BY_TIER.get(tier, _ENV_BY_TIER["medium"])
+    return bank[index % len(bank)]
+
+
+def _primary_secondary(seeds: list[str], index: int, n: int) -> tuple[str, str]:
+    """One primary action; optional secondary reaction. No 7-verb dumps."""
+    if not seeds:
+        # Progressive generic arc when author left only framing.
+        arc = [
+            "subject holds readable presence and begins a clear physical beat",
+            "primary action develops with visible body/pose change",
+            "action peaks with decisive movement",
+            "motion settles into a stable readable pose",
+        ]
+        primary = arc[min(index, len(arc) - 1)]
+        return primary, ""
+    if len(seeds) == 1:
+        # Stretch single seed across arc: start → develop → resolve.
+        base = seeds[0]
+        if n <= 2:
+            if index == 0:
+                return f"{base} begins", "body prepares"
+            return f"{base} completes and holds", ""
+        if index == 0:
+            return f"{base} begins from a clear start pose", ""
+        if index == n - 1:
+            return f"{base} resolves into a stable end pose", ""
+        return f"{base} continues with progressive intensity", ""
+    # Map seeds across segments; avoid packing all into one segment.
+    if index < len(seeds):
+        primary = seeds[index]
+        secondary = seeds[index + 1] if (index + 1 < len(seeds) and index == n - 1) else ""
+        # Only last segment may absorb leftover as secondary (one max).
+        if index == n - 1 and len(seeds) > n:
+            # Prefer last remaining seed as secondary, not a laundry list.
+            secondary = seeds[-1] if seeds[-1] != primary else ""
+        return primary, secondary
+    # More segments than seeds: resolve / hold.
+    return f"{seeds[-1]} holds and settles", ""
+
+
+def continuity_header(shot: dict[str, Any], *, mode: str = "i2v") -> str:
+    cut = camera_cut_mode(shot)
+    lines = [
+        "Continuity anchor: maintain the same character appearance, clothing, hairstyle, "
+        "props, face identity, and spatial orientation throughout all segments.",
+        "Scene continuity: location, weather, time of day, and lighting direction stay "
+        "consistent; each segment continues from the previous ending state.",
+        "Each segment contains one primary action and at most one secondary reaction. "
+        "Describe motion, not static frames.",
+    ]
+    if cut == "multi":
+        lines.append(
+            "Camera mode: multi-cut — clean cut at the start of a segment only when framing "
+            "intentionally changes; otherwise hold continuity."
+        )
+    else:
+        lines.append(
+            "Camera mode: single continuous take — one continuous camera move across all "
+            "segments (phases of the same shot, not hard cuts)."
+        )
+    lines.append(
+        "Final segment must resolve into a clear ending pose, composition, or environmental "
+        "beat rather than cutting off mid-action."
+    )
+    # Mode-specific identity (I2V/R2V already have prefix; reinforce for T2V env).
+    m = (mode or "i2v").strip().lower()
+    if m in {"t2v", "text_to_video"}:
+        lines.append("No new faces or characters unless the text explicitly requires them.")
+    return " ".join(lines)
+
+
+def _mood_seed(shot: dict[str, Any]) -> str:
+    df = str(shot.get("dramatic_function") or "").strip().lower()
+    heat = str(shot.get("heat_phase") or "").strip().lower()
+    if heat in {"act", "climax"} or df in {"action", "climax", "impact", "peak"}:
+        return "high-energy charged atmosphere"
+    if heat == "afterglow" or df in {"afterglow", "reaction"}:
+        return "soft lingering afterglow mood"
+    if df in {"hook", "approach"}:
+        return "tension-building atmosphere"
+    return "cinematic natural mood"
+
+
+def _dialogue_in_segment(
+    shot: dict[str, Any],
+    index: int,
+    n: int,
+    *,
+    dialogue: str,
+    screen: str,
+) -> str:
+    """Place spoken line in a middle-ish segment for lip-sync priority."""
+    if not dialogue:
+        return ""
+    # Prefer segment near 40–60% of clip for on-camera speech.
+    target = max(0, min(n - 1, n // 2 if n > 2 else 0))
+    if index != target:
+        return ""
+    if screen == "off_camera":
+        return (
+            f'off-camera Mandarin line continues: 「{dialogue}」 '
+            f"(voice present, mouth may be out of frame)"
+        )
+    return (
+        f'character speaks on camera in natural Mandarin with visible lip sync; '
+        f'line: 「{dialogue}」'
+    )
+
+
+def build_segment_lines(
+    spec: dict[str, Any] | None,
+    shot: dict[str, Any],
+    *,
+    duration_sec: float | None = None,
+    prompt_tier: str | None = None,
+    n_segments: int | None = None,
+    inject_continuity_in_first: bool = True,
+) -> list[str]:
+    """Return list of '[0s-2s] ...' lines (no provider prefix)."""
+    from motion_prompt_spine import motion_tier_for, shot_screen_mode, spoken_dialogue_text
+
+    dur = (
+        resolve_duration_sec(shot, default=duration_sec or 5.0)
+        if duration_sec is None
+        else float(duration_sec)
+    )
+    tier = (prompt_tier or motion_tier_for(shot)).strip().lower()
+    seeds = _split_event_seeds(shot)
+    n = (
+        int(n_segments)
+        if n_segments is not None
+        else segment_count_for(dur, prompt_tier=tier, n_events=len(seeds) or None)
+    )
+    n = max(2, min(12, n))
+    bounds = plan_segment_bounds(dur, n)
+    cam = _camera_seed(shot)
+    mood = _mood_seed(shot)
+    dialogue = spoken_dialogue_text(shot)
+    screen = shot_screen_mode(shot)
+    cut = camera_cut_mode(shot)
+    cont = continuity_header(shot, mode=str(shot.get("h3_mode") or "i2v"))
+
+    lines: list[str] = []
+    for i, (a, b) in enumerate(bounds):
+        primary, secondary = _primary_secondary(seeds, i, n)
+        env = _env_seed(shot, i, tier)
+        dlg = _dialogue_in_segment(shot, i, n, dialogue=dialogue, screen=screen)
+
+        # Segment formula: Setting/Subject + Action + Camera + Mood + Env (+ speech)
+        bits: list[str] = []
+        if i == 0:
+            if inject_continuity_in_first:
+                bits.append(cont)
+            bits.append("Opening state readable from the start frame")
+        bits.append(f"Primary action: {primary}")
+        if secondary:
+            bits.append(f"Secondary reaction: {secondary}")
+        if cut == "multi" and i > 0:
+            bits.append(f"Clean cut into: {cam}")
+        else:
+            bits.append(f"Camera: {cam}")
+        bits.append(f"Environment in motion: {env}")
+        bits.append(f"Mood: {mood}")
+        if dlg:
+            bits.append(dlg)
+        # Implied sound via visible event (no separate audio prompt block here)
+        bits.append("Implied diegetic sound follows visible physical events")
+        if i == n - 1:
+            bits.append("Resolves into a clear ending pose and composition")
+
+        body = "; ".join(bits) + "."
+        lines.append(f"{format_timecode(a, b)} {body}")
+    return lines
+
+
+def compile_timeline_body(
+    spec: dict[str, Any] | None,
+    shot: dict[str, Any],
+    *,
+    duration_sec: float | None = None,
+    include_film_core: bool = True,
+    include_audio_clause: bool = True,
+) -> str:
+    """Semantic body: optional DF/want + continuity + timeline (+ audio clause)."""
+    from motion_prompt_spine import (
+        audio_clause,
+        dramatic_function_of,
+        motion_tier_for,
+        want_beat_line,
+    )
+
+    chunks: list[str] = []
+    if include_film_core:
+        df = dramatic_function_of(shot)
+        if df:
+            chunks.append(f"Dramatic function: {df}.")
+        want = want_beat_line(spec, shot)
+        if want:
+            chunks.append(want if want.endswith(".") else f"{want}.")
+        tier = motion_tier_for(shot)
+        if tier == "high":
+            chunks.append(
+                "HIGH MOTION priority: large visible pose/body change across the timeline; "
+                "avoid frozen portrait or micro-breath-only."
+            )
+        elif tier == "soft":
+            chunks.append(
+                "SOFT MOTION: micro-performance only (eyes, breath, jaw); locked camera preferred."
+            )
+
+    chunks.append(continuity_header(shot, mode=str(shot.get("h3_mode") or "i2v")))
+    chunks.extend(build_segment_lines(spec, shot, duration_sec=duration_sec))
+
+    if include_audio_clause:
+        # Keep film-core audio inject (dialogue line / ambience) for fail-closed asserts.
+        chunks.append(audio_clause(shot))
+
+    return " ".join(c for c in chunks if c and str(c).strip()).strip()
+
+
+def compile_h3_timeline_prompt(
+    spec: dict[str, Any] | None,
+    shot: dict[str, Any],
+    *,
+    mode: str = "i2v",
+    duration_sec: float | None = None,
+    include_provider_prefix: bool = True,
+) -> str:
+    """Full H3-ready prompt: geometry prefix + timed motion script."""
+    from motion_prompt_spine import provider_prefix
+
+    shot_x = dict(shot) if isinstance(shot, dict) else {}
+    shot_x["h3_mode"] = mode
+    body = compile_timeline_body(
+        spec,
+        shot_x,
+        duration_sec=duration_sec,
+        include_film_core=True,
+        include_audio_clause=True,
+    )
+    try:
+        from input_fidelity import inject_story_beat_into_prompt
+
+        body = inject_story_beat_into_prompt(body, shot_x)
+    except Exception:
+        pass
+    if include_provider_prefix:
+        return f"{provider_prefix(mode)} {body}".strip()
+    return body
+
+
+def merge_timeline_into_author(
+    author: str,
+    spec: dict[str, Any] | None,
+    shot: dict[str, Any],
+    *,
+    duration_sec: float | None = None,
+) -> str:
+    """If author prompt has no timecodes, append continuity + timeline segments."""
+    base = (author or "").strip()
+    if not base:
+        return compile_timeline_body(spec, shot, duration_sec=duration_sec)
+    if has_timeline_markers(base):
+        return base
+    cont = continuity_header(shot)
+    segs = " ".join(build_segment_lines(spec, shot, duration_sec=duration_sec))
+    return f"{base.rstrip()} {cont} {segs}".strip()
+
+
+def validate_timeline_coverage(
+    text: str,
+    *,
+    duration_sec: float | None = None,
+    tol: float = 0.05,
+) -> dict[str, Any]:
+    """Machine check: starts at 0, continuous, optional end match, no overlap."""
+    matches = list(_TIMECODE_RE.finditer(text or ""))
+    if not matches:
+        return {
+            "ok": False,
+            "error": "NO_TIMECODES",
+            "segments": [],
+        }
+    segs: list[dict[str, float]] = []
+    for m in matches:
+        a, b = float(m.group(1)), float(m.group(2))
+        segs.append({"start": a, "end": b})
+    issues: list[str] = []
+    if segs[0]["start"] > tol:
+        issues.append(f"FIRST_NOT_ZERO:{segs[0]['start']}")
+    for i in range(len(segs) - 1):
+        if segs[i]["end"] > segs[i + 1]["start"] + tol:
+            issues.append(f"OVERLAP@{i}")
+        elif segs[i + 1]["start"] - segs[i]["end"] > tol:
+            issues.append(f"GAP@{i}:{segs[i]['end']}→{segs[i + 1]['start']}")
+        if segs[i]["end"] <= segs[i]["start"]:
+            issues.append(f"NON_POSITIVE@{i}")
+    if segs[-1]["end"] <= segs[-1]["start"]:
+        issues.append("NON_POSITIVE@last")
+    if duration_sec is not None and abs(segs[-1]["end"] - float(duration_sec)) > max(tol, 0.51):
+        issues.append(f"END_MISMATCH:{segs[-1]['end']}!={duration_sec}")
+    return {
+        "ok": not issues,
+        "error": issues[0] if issues else None,
+        "issues": issues,
+        "segments": segs,
+        "segment_count": len(segs),
+        "coverage_end": segs[-1]["end"] if segs else 0.0,
+    }

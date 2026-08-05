@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.69] - 2026-08-05
+
+### Changed (H3 · Layer-4 timeline prompt compiler for 5090)
+- **New** `scripts/h3_timeline_prompt.py`: temporal decomposition (`[0s-2s]…`), continuous coverage, continuity anchors, one primary action/segment, subject+camera+env motion, ending pose, continuous vs multi-cut, implied diegetic sound + dialogue inject; `validate_timeline_coverage`.
+- **`build_h3_temporal_prompt`**: no longer round-robin clause split — full Layer-4 timed action script.
+- **`h3_workflow._prompt_for_shot`**: `h3_primary`/`hybrid_h3` always compile timeline (author files get markers if missing); non-5090 stays flat spine with `Vertical 9:16`.
+- Docs: lesson H3-max §Layer-4 · memory `2026-08-05-h3-timeline-prompt-layer4` · tests `test_h3_timeline_prompt` + temporal spine cases.
+
 ## [2.39.68] - 2026-08-05
 
 ### Changed (dialogue · native audio IRON)

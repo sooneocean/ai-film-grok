@@ -1,6 +1,7 @@
 # Memory · 2026-08-04 · H3 效果最大化
 
-**完整课**：[lessons-2026-08-04-h3-max-effect.md](../references/lessons-2026-08-04-h3-max-effect.md)
+**完整课**：[lessons-2026-08-04-h3-max-effect.md](../references/lessons-2026-08-04-h3-max-effect.md)  
+**时间轴 Layer-4**：[2026-08-05-h3-timeline-prompt-layer4.md](2026-08-05-h3-timeline-prompt-layer4.md)
 
 ## 用户原话
 > 继续跑通 思考哪些角度可以使用这个模型  

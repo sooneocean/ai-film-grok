@@ -217,7 +217,8 @@ dramatic_function → want_beat → action/motion/visible_change
 | 机制 | 行为 |
 |------|------|
 | `motion_tier_resolve` | **单一真相**：`prompt_tier` + `optical_tier` + floor 映射 |
-| `motion_prompt_spine.py` | 共用拼装 + `assert_motion_prompt_core` |
+| `motion_prompt_spine.py` | 共用拼装 + `assert_motion_prompt_core`；5090 → `build_h3_temporal_prompt` |
+| `h3_timeline_prompt.py` | Layer-4 时间轴编译（时间码/连续性/事件密度） |
 | `build_shot_intent` | 带出 `want_beat` / `motion_tier` / `optical_tier` / `spoken_text` |
 | `h3 run` | 空核拒跑；写 `receipts/prompts/<id>.h3.spine.txt`；register 时 variety 硬门 |
 | `media-queue` | 入队前 enrich + fail closed（**不 silent pass**） |

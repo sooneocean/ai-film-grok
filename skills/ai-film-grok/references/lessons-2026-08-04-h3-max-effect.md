@@ -104,6 +104,25 @@ Grok 与 H3 **同一拼装顺序**（`scripts/motion_prompt_spine.py`）：
 `build_shot_intent` 输出 `motion_tier` / `want_beat` / `has_action_core`。  
 空核 → `MOTION_CORE_*` fail closed（h3 run + media-queue）。
 
+## H3 Layer-4 时间轴编译（2026-08-05 · 5090 主产）
+
+> **定位**：只覆盖 Shot/Beat → 可执行时间轴 prompt，不是剧本转分镜。  
+> 实现：`scripts/h3_timeline_prompt.py` + `build_h3_temporal_prompt`；`h3_primary`/`hybrid_h3` 经 `_prompt_for_shot` 自动启用。
+
+| 控制项 | 规则 |
+|--------|------|
+| 时间码 | `[0s-2s]` 连续覆盖，禁空档/重叠 |
+| 分段密度 | 5s→2 / 8s→3 / 10s→4 / 15s→5（soft 少 1、high 可 +1） |
+| 段内公式 | Setting + Subject + **1 primary action** + ≤1 secondary + Camera + Env motion + Mood |
+| 三种运动 | 主体 / 镜头 / 环境（禁「会动的静图」） |
+| 连续镜头 | 默认 single continuous take；`dsl.camera_cut_mode=multi` 才按段切 |
+| Continuity | 首段注入人物/服装/场景/光线锚；末段必须 ending pose |
+| 音讯 | 可见事件暗示 + 台词 `audio_cues` 注入（禁独立 audio prompt 块） |
+| 输出 | 纯 prompt（无 Vertical 9:16 前缀）；可 `validate_timeline_coverage` |
+
+可选字段：`duration_sec`、`dsl.timeline_events`、`dsl.environment`、`dsl.camera_cut_mode`。  
+测：`tests/test_h3_timeline_prompt.py` · `test_motion_prompt_spine` temporal 组。
+
 ## Fill-Idle 运营（2026-08-04 定策 · 与模式选型互补）
 
 > 用户要：Grok 主轴 + 本地免费 PK；能烧就烧；R2V 能量位；人拍板替换。  
