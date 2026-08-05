@@ -650,6 +650,26 @@ def write_mean_sidecar(video: Path, mean: float, **extra: Any) -> Path:
     }
     payload.update(extra)
     side.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # M4 · shot-evidence feedback (best-effort; never fail mean write)
+    try:
+        from shot_evidence import write_shot_evidence_from_video
+
+        film_root = None
+        for parent in Path(video).resolve().parents:
+            if (parent / "film-spec.json").is_file() or (parent / "manifest.json").is_file():
+                film_root = parent
+                break
+        if film_root is not None:
+            floor = float(MEAN_NORMAL_FLOOR)
+            write_shot_evidence_from_video(
+                film_root,
+                video,
+                mean=float(mean),
+                source="mean_sidecar",
+                motion_ok=float(mean) >= floor,
+            )
+    except Exception:
+        pass
     return side
 
 

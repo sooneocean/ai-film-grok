@@ -39,6 +39,20 @@ receipts/prompts/<shot_id>.request.json
 视频坏 → 先改 L2/L3（state photo / still-challenge），**不要**同 still 盲重烧。  
 mean 红 + 脸绿 → 推 still-challenge（人 promote）再 I2V。
 
+## M3 · Registry 进 prompt
+
+`build_asset_prompt_hints`（`asset_registry.py`）→ location structure/lighting/palette/immutableRules/recurringObjects + prop condition/storyFunction。  
+缺 `assets-registry.json` 时 soft（提示 `aifilm assets sync`）。
+
+## M4 · 反馈环
+
+| 写入 | 时机 |
+|------|------|
+| `receipts/shot-evidence/<id>.json` | `write_mean_sidecar` · `register-clip` |
+| `PRIOR_EVIDENCE` 行 | 下次 `build_generation_request` 首部（≤3 行） |
+| next_actions `still-challenge-weak-mean` | `suggest_still_challenge` |
+| pk_score | identity L1 罚分加重（永不 auto-promote） |
+
 ## 指针
 
 - 阶段卡：[stages/visual.md](stages/visual.md)  

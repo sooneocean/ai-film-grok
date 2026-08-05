@@ -991,12 +991,16 @@ def _soft_identity_penalty(
                 b = np.asarray(Image.open(frame).convert("L").resize((64, 64)), dtype=float)
                 l1 = float(np.mean(np.abs(a - b)))
                 # empirical: similar still~clip mid often <25; drift higher
+                # M4.4 · heavier identity weight so high-mean drift loses shortlist
                 if l1 > 45:
-                    penalty += 12.0
+                    penalty += 18.0
                     caution.append("identity_l1_high")
                 elif l1 > 30:
-                    penalty += 5.0
+                    penalty += 8.0
                     caution.append("identity_l1_soft")
+                elif l1 > 25:
+                    penalty += 3.0
+                    caution.append("identity_l1_watch")
             except Exception:
                 pass
     except Exception:

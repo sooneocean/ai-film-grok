@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.18] - 2026-08-05
+
+### Added (Material Fidelity · M3 registry + M4 evidence)
+- **M3** `build_asset_prompt_hints`: location/prop locks into GenerationRequest (structure, lighting, palette, immutableRules, recurringObjects, prop condition/storyFunction).
+- **M4** `shot_evidence.py`: evidence from mean sidecar + register-clip; `PRIOR_EVIDENCE` in next gen; next_actions still-challenge on weak mean; heavier pk identity L1 penalty.
+- **Tests**: `tests/test_material_fidelity_m3m4.py`.
+- **Docs**: material-fidelity-loop + plan tracker (M0–M4 shipped).
+
 ## [2.39.17] - 2026-08-05
 
 ### Added (Gate slim · W4)

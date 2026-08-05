@@ -1132,6 +1132,30 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         )
     except Exception:
         pass
+    # M4 · shot-evidence for next GenerationRequest feedback
+    try:
+        from shot_evidence import write_shot_evidence
+
+        mean_val = None
+        try:
+            from i2v_motion_gate import measure_mean_absdiff
+
+            mean_val = measure_mean_absdiff(Path(record.get("path") or source))
+        except Exception:
+            mean_val = None
+        write_shot_evidence(
+            root,
+            str(args.shot_id),
+            mean=mean_val,
+            video_path=Path(record.get("path") or source),
+            identity_ok=bool(identity_approved),
+            motion_ok=bool(motion_approved),
+            poison=False if anatomy_safe else None,
+            source="register-clip",
+            extra={"status": str(args.status or ""), "endpoint": str(endpoint or "")},
+        )
+    except Exception:
+        pass
     try:
         record["duration_sec"] = media_duration(Path(record["path"]))
     except Exception:

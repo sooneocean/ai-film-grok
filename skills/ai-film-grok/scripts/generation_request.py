@@ -60,54 +60,15 @@ def _find_shot(root: Path, shot_id: str) -> tuple[dict[str, Any], dict[str, Any]
     return spec, shot
 
 
-def _asset_hints(root: Path, shot: dict[str, Any]) -> list[str]:
-    """Location/prop fixed lines from assets-registry (soft if registry missing)."""
-    lines: list[str] = []
-    reg = read_json(root / "assets-registry.json") or {}
-    if not isinstance(reg, dict):
-        return lines
-    loc_id = str(
-        shot.get("locationId")
-        or shot.get("location_id")
-        or (shot.get("dsl") or {}).get("location")
-        or ""
-    ).strip()
-    locations = reg.get("locations") if isinstance(reg.get("locations"), dict) else {}
-    # also list form
-    if not locations and isinstance(reg.get("locations"), list):
-        locations = {
-            str(x.get("id")): x for x in reg["locations"] if isinstance(x, dict) and x.get("id")
-        }
-    loc = locations.get(loc_id) if loc_id else None
-    if isinstance(loc, dict):
-        bits = [
-            str(loc.get("description") or "").strip(),
-            str(loc.get("structure") or "").strip(),
-            str(loc.get("lighting") or "").strip(),
-            str(loc.get("palette") or "").strip(),
-        ]
-        bits = [b for b in bits if b]
-        if bits:
-            lines.append("Location lock: " + "; ".join(bits[:4]))
-        rules = loc.get("immutableRules") or loc.get("immutable_rules") or []
-        if isinstance(rules, list) and rules:
-            lines.append("Location immutable: " + ", ".join(str(r) for r in rules[:4]))
-    prop_ids: list[str] = []
-    for key in ("propIds", "prop_ids", "props"):
-        raw = shot.get(key)
-        if isinstance(raw, list):
-            prop_ids.extend(str(x) for x in raw if x)
-    props = reg.get("props") if isinstance(reg.get("props"), dict) else {}
-    if not props and isinstance(reg.get("props"), list):
-        props = {str(x.get("id")): x for x in reg["props"] if isinstance(x, dict) and x.get("id")}
-    for pid in prop_ids[:4]:
-        pr = props.get(pid)
-        if isinstance(pr, dict):
-            lines.append(
-                f"Prop {pid}: {pr.get('description') or pid}"
-                + (f" ({pr.get('condition')})" if pr.get("condition") else "")
-            )
-    return lines
+def _asset_hints(root: Path, shot: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
+    """Location/prop fixed lines from assets-registry (M3 · single helper)."""
+    try:
+        from asset_registry import build_asset_prompt_hints
+
+        rep = build_asset_prompt_hints(root, shot)
+        return list(rep.get("lines") or []), rep
+    except Exception as exc:
+        return [], {"ok": False, "error": str(exc)[:120]}
 
 
 def _assemble_text(
@@ -154,10 +115,15 @@ def _assemble_text(
                 shot.get("dsl", {}).get("motion") if isinstance(shot.get("dsl"), dict) else ""
             ) or str(shot.get("nar") or "")
             meta["assembler"] = f"fallback:{type(exc).__name__}"
-    hints = _asset_hints(root, shot)
+    hints, hint_meta = _asset_hints(root, shot)
     if hints:
         prompt = (prompt + "\n" + "\n".join(hints)).strip()
         meta["asset_hints"] = hints
+    meta["asset_hint_meta"] = {
+        k: hint_meta.get(k)
+        for k in ("registry_present", "codes", "missing", "location_id", "hint")
+        if k in hint_meta
+    }
     return prompt, negative, meta
 
 
@@ -227,6 +193,18 @@ def build_generation_request(
 
     prompt, negative, text_meta = _assemble_text(base, spec, shot, kind=k)
 
+    # M4 · prior take evidence (budget 3 lines)
+    prior_lines: list[str] = []
+    try:
+        from shot_evidence import prior_evidence_lines
+
+        prior_lines = prior_evidence_lines(base, shot_id, max_lines=3)
+        if prior_lines:
+            prompt = ("\n".join(prior_lines) + "\n" + prompt).strip()
+            text_meta["prior_evidence"] = prior_lines
+    except Exception:
+        prior_lines = []
+
     image_refs: list[dict[str, Any]] = []
     if still_entry.get("path") and still_entry.get("ok"):
         image_refs.append(
@@ -284,6 +262,7 @@ def build_generation_request(
         },
         "continue_handoff": cont,
         "text_meta": text_meta,
+        "prior_evidence": prior_lines,
         "constraints": constraints,
         "ok": not constraints and bool(prompt.strip() or k == KIND_T2V),
     }

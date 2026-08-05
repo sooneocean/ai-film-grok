@@ -12,8 +12,10 @@
 - [x] M0 文档（谁喂谁 + 命名表）
 - [x] still_source + 测
 - [x] generation_request + h3 plan + queue
-- [ ] M3–M6 backlog
+- [x] M3 asset_prompt_hints
+- [x] M4 shot_evidence + PRIOR_EVIDENCE + still-challenge next
+- [ ] M5–M6 backlog
 
 ## 链
-- `scripts/still_source.py` · `generation_request.py`
+- `scripts/still_source.py` · `generation_request.py` · `shot_evidence.py` · `asset_registry.build_asset_prompt_hints`
 - `references/material-fidelity-loop.md` · `docs/plans/2026-08-05-material-fidelity-loop.md`

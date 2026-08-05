@@ -939,3 +939,126 @@ def derive_character_state_timeline(
         )
 
     return timeline
+
+
+def _index_by_id(bag: Any) -> dict[str, dict[str, Any]]:
+    if isinstance(bag, dict):
+        out: dict[str, dict[str, Any]] = {}
+        for k, v in bag.items():
+            if isinstance(v, dict):
+                out[str(v.get("id") or k)] = v
+        return out
+    if isinstance(bag, list):
+        return {str(x.get("id")): x for x in bag if isinstance(x, dict) and x.get("id")}
+    return {}
+
+
+def build_asset_prompt_hints(
+    root: Path | str,
+    shot: dict[str, Any] | None = None,
+    *,
+    max_lines: int = 8,
+) -> dict[str, Any]:
+    """Machine lines for location/prop locks into still/I2V prompts (M3).
+
+    Soft when registry missing; reports missing_location / missing_prop codes.
+    """
+    base = Path(root).expanduser().resolve()
+    sh = shot if isinstance(shot, dict) else {}
+    reg = read_json(base / REGISTRY_NAME) or {}
+    lines: list[str] = []
+    missing: list[str] = []
+    codes: list[str] = []
+
+    if not isinstance(reg, dict) or not reg:
+        return {
+            "ok": True,
+            "registry_present": False,
+            "lines": [],
+            "missing": ["ASSET_REGISTRY_MISSING"],
+            "codes": ["ASSET_REGISTRY_MISSING"],
+            "hint": "run: aifilm assets sync --root …",
+        }
+
+    locations = _index_by_id(reg.get("locations"))
+    props = _index_by_id(reg.get("props"))
+
+    dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+    loc_id = str(
+        sh.get("locationId")
+        or sh.get("location_id")
+        or dsl.get("locationId")
+        or dsl.get("location")
+        or ""
+    ).strip()
+    # location field may be free-text name — only treat short ids as registry keys
+    if loc_id and loc_id in locations:
+        loc = locations[loc_id]
+        bits = [
+            str(loc.get("description") or loc.get("name") or "").strip(),
+            str(loc.get("structure") or "").strip(),
+            str(loc.get("timeOfDay") or loc.get("time_of_day") or "").strip(),
+            str(loc.get("lighting") or "").strip(),
+            str(loc.get("palette") or "").strip(),
+        ]
+        bits = [b for b in bits if b]
+        if bits:
+            lines.append(f"Location lock [{loc_id}]: " + "; ".join(bits[:5]))
+        rules = loc.get("immutableRules") or loc.get("immutable_rules") or []
+        if isinstance(rules, list) and rules:
+            lines.append("Location immutable: " + ", ".join(str(r) for r in rules[:5]))
+        objs = loc.get("recurringObjects") or loc.get("recurring_objects") or []
+        if isinstance(objs, list) and objs:
+            lines.append("Recurring objects: " + ", ".join(str(o) for o in objs[:5]))
+        angles = loc.get("primaryAngles") or loc.get("primary_angles") or []
+        if isinstance(angles, list) and angles:
+            lines.append("Primary angles: " + ", ".join(str(a) for a in angles[:3]))
+    elif loc_id and locations:
+        # free-text location with registry present → soft miss only if looks like id
+        if re.match(r"^[A-Za-z0-9_-]{1,40}$", loc_id) and " " not in loc_id:
+            missing.append(f"location:{loc_id}")
+            codes.append("LOCATION_UNREGISTERED")
+
+    prop_ids: list[str] = []
+    for key in ("propIds", "prop_ids", "props"):
+        raw = sh.get(key) if key != "props" else sh.get(key)
+        if isinstance(raw, list):
+            prop_ids.extend(str(x) for x in raw if x)
+    must_show = sh.get("must_show") or dsl.get("must_show") or []
+    if isinstance(must_show, list):
+        for item in must_show:
+            s = str(item).strip()
+            if s.startswith("prop:") or s.startswith("prop_"):
+                prop_ids.append(s.split(":", 1)[-1].split("_", 1)[-1] if ":" in s else s)
+
+    seen_p: set[str] = set()
+    for pid in prop_ids:
+        if not pid or pid in seen_p:
+            continue
+        seen_p.add(pid)
+        pr = props.get(pid)
+        if not isinstance(pr, dict):
+            if re.match(r"^[A-Za-z0-9_-]{1,40}$", pid):
+                missing.append(f"prop:{pid}")
+                codes.append("PROP_UNREGISTERED")
+            continue
+        desc = str(pr.get("description") or pr.get("name") or pid).strip()
+        cond = str(pr.get("condition") or "").strip()
+        fn = str(pr.get("storyFunction") or pr.get("story_function") or "").strip()
+        bit = f"Prop {pid}: {desc}"
+        if cond:
+            bit += f" (condition={cond})"
+        if fn:
+            bit += f" — {fn}"
+        lines.append(bit)
+
+    lines = lines[: max(1, int(max_lines))]
+    return {
+        "ok": not codes or "ASSET_REGISTRY_MISSING" not in codes,
+        "registry_present": True,
+        "location_id": loc_id or None,
+        "lines": lines,
+        "missing": missing,
+        "codes": list(dict.fromkeys(codes)),
+        "line_count": len(lines),
+    }

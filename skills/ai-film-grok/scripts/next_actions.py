@@ -595,6 +595,21 @@ def build_next_actions(
             pass
 
     if not gates.get("clips_complete"):
+        # M4 · weak mean + identity ok → still-challenge before re-burn
+        try:
+            from shot_evidence import list_still_challenge_suggestions
+
+            sc_sug = list_still_challenge_suggestions(root)
+            if sc_sug.get("count") and sc_sug.get("next_cmd"):
+                first = (sc_sug.get("suggestions") or [{}])[0]
+                add(
+                    "still-challenge-weak-mean",
+                    str(sc_sug["next_cmd"]),
+                    f"mean 弱但身份未红（{first.get('shot_id')} mean={first.get('mean')}）"
+                    " — 先 still-challenge 换 still 再 I2V（人 promote）",
+                )
+        except Exception:
+            pass
         if pilot_ok or not gates.get("spec"):
             # Wave F: bulk door before queue when pilot already GO
             if pilot_ok:

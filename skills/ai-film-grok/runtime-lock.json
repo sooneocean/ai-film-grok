@@ -138,7 +138,7 @@
     },
     {
       "path": "scripts/asset_registry.py",
-      "sha256": "9d7b4791334b67e443c6c1e78f016f62231730ee282ac5c173302d4b2ffac87d"
+      "sha256": "3cb7b29887c3efc6f70f9bbac13a82b1ba2f9afa8bb629403864aec9bde22a7e"
     },
     {
       "path": "scripts/audio_armory.py",
@@ -330,7 +330,7 @@
     },
     {
       "path": "scripts/cli_media.py",
-      "sha256": "57165b37921176f7176b0a6fa305cc55b45751b0cf6e635561001734d4bbd3ba"
+      "sha256": "b2c04bd0283f96248db0a9869c27cda244b77febf851ccec0fc53b733358a78b"
     },
     {
       "path": "scripts/cli_motion.py",
@@ -586,7 +586,7 @@
     },
     {
       "path": "scripts/dispatch.py",
-      "sha256": "32a141cb5939f78dcf915e5d48c1700719ca6d36a2cec27b56e86af3aceedc81"
+      "sha256": "494a4255d0ea4269fad50f52db2034d2a0d7da667bb7e82bb2dfc43f539562bd"
     },
     {
       "path": "scripts/dispatch_compact.py",
@@ -702,11 +702,11 @@
     },
     {
       "path": "scripts/gate_auto.py",
-      "sha256": "b97b20efaeab0ba72841e30b2039a8c2b8af523efe68a965df53f739c4677e54"
+      "sha256": "cf821883193a5711645f6a79af7791ad25975f8d6235dfe815633efd7e6400d0"
     },
     {
       "path": "scripts/generation_request.py",
-      "sha256": "c5516d032f6a1e5ce8366f06247349380fb1b8a9b3f7e027e7c2cc1ff1289424"
+      "sha256": "7f8d231ec1743727b7c0323a05f3cc8cfc9b20726f3dc8531f1ecf1f123c9aa5"
     },
     {
       "path": "scripts/generation_usage.py",
@@ -726,7 +726,7 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "643d01709f927b29d336a08073dfcdf543d1b2a0bf537ef9cc952219443e776b"
+      "sha256": "626cae71730e444b70a2f8e6b32cba36f205113bb85453f87c85ec3cbbe2ce36"
     },
     {
       "path": "scripts/h3_media_pack.py",
@@ -746,7 +746,7 @@
     },
     {
       "path": "scripts/i2v_motion_gate.py",
-      "sha256": "4754ab7337760e49f6b14993a72e1ec59794982211ff0468034723d2f7871860"
+      "sha256": "ffdebc7f71a59290f4b58d4f4bf07216fdffe404f290efa6cd5c19230c3268cc"
     },
     {
       "path": "scripts/i2v_provider.py",
@@ -886,7 +886,7 @@
     },
     {
       "path": "scripts/next_actions.py",
-      "sha256": "1926c0d77cf17cd476495c9b1c94c7ebbddf8744fcc436f066059cadb1781283"
+      "sha256": "a8b99d25a80852c28f0566805e129de02a7d4d4ab67a8c250d7cf1d4be29b2bf"
     },
     {
       "path": "scripts/node/backend_probe.py",
@@ -950,7 +950,7 @@
     },
     {
       "path": "scripts/pilot_pack.py",
-      "sha256": "818dd21911370a00dcfcdfd7ee3f441196d922064c32c28fa7f4a509eb159ef1"
+      "sha256": "c1fddc4e60e6c4b30da623f26ebcdc3e08bff6527ab8b3b5a007e6884655c957"
     },
     {
       "path": "scripts/pilot_review.py",
@@ -979,6 +979,10 @@
     {
       "path": "scripts/post_bible.py",
       "sha256": "1da4449eb556eff5bdfc1e8938b04e15d9f0b3a04830244478bd06c4dd19cbdb"
+    },
+    {
+      "path": "scripts/post_doctor.py",
+      "sha256": "0153f42aaeaab3466ea2120eab6b9edadca6440ab73884f98d2907fd72842a6a"
     },
     {
       "path": "scripts/post_plan.py",
@@ -1165,6 +1169,10 @@
       "sha256": "0f1270567cf15d52e907227d8a3cf98d53d3fd2e85d3886f91fc36da0e202fe7"
     },
     {
+      "path": "scripts/shot_evidence.py",
+      "sha256": "b3564de9edb85783e22ad4951b68516daee0ed932c0dabff5468e80a0afdd705"
+    },
+    {
       "path": "scripts/shot_inventory.py",
       "sha256": "c55e77d64a9112282972f168fe65afb27433b8dc83f13277a08fa3efef32d5f1"
     },
@@ -1277,6 +1285,10 @@
       "sha256": "4b36a731a4f344763af04552f56d37acf023b5b39bb62eb9cc715c4c17d412c6"
     },
     {
+      "path": "scripts/timeline_clock.py",
+      "sha256": "10a3a5b55c7ee9b05f799df176b5044e48f36d425844d7f4e373a5a85a833142"
+    },
+    {
       "path": "scripts/transaction_receipt.py",
       "sha256": "075bc4cf315d4e28d471a5a889f0f30eeaeb55580567944d8664bea72b8014a1"
     },
@@ -1374,7 +1386,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "251ad474dccc854eaf61ddeb0b93ce87425c6001b2109f5d17e6d4a492105308"
+      "sha256": "5247da4b3f777eb424e8274edbf067fd604237896f7cd9ee43898d944d928f9e"
     },
     {
       "path": "scripts/workflow_spine.py",
