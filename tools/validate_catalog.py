@@ -57,8 +57,8 @@ def check_asset(aid, a, root):
     if st not in VALID_STATUSES:
         err(f"[{aid}] status {st!r} not in {sorted(VALID_STATUSES)}")
     p = a.get("path")
-    if not isinstance(p, str) or not p.endswith(".wav"):
-        err(f"[{aid}] path {p!r} must be a .wav path")
+    if not isinstance(p, str) or not (p.endswith(".wav") or p.endswith(".flac")):
+        err(f"[{aid}] path {p!r} must be a .wav or .flac path")
     else:
         fp = os.path.join(root, p)
         if not os.path.exists(fp):

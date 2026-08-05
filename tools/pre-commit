@@ -1,0 +1,19 @@
+#!/bin/sh
+# pre-commit gate: validate bgm-library/catalog.json against the contract.
+# Runs fast (--no-sha skips hashing ~400MB of audio). Aborts the commit on
+# any contract violation so catalog drift can never be committed silently.
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+PY=$(command -v python3 || true)
+if [ -z "$PY" ]; then
+  echo "pre-commit: python3 not found; skipping catalog validation" >&2
+  exit 0
+fi
+if [ -f "$ROOT/bgm-library/catalog.json" ]; then
+  if ! "$PY" "$ROOT/tools/validate_catalog.py" --no-sha; then
+    echo "pre-commit: catalog validation FAILED — commit aborted." >&2
+    echo "           Fix the issue, or bypass with: git commit --no-verify" >&2
+    exit 1
+  fi
+fi
+exit 0
