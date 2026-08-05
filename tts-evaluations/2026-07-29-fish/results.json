@@ -1,0 +1,50 @@
+[
+  {
+    "name": "zh_female_energetic",
+    "voice_id": "54a5170264694bfc8e9ad98df7bd89c3",
+    "status": "error",
+    "error": "Fish TTS HTTP 402: {\"message\":\"Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.\",\"status\":402}"
+  },
+  {
+    "name": "zh_female_warm",
+    "voice_id": "bf6c479f5a384b8d857310030035824b",
+    "status": "error",
+    "error": "Fish TTS HTTP 402: {\"message\":\"Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.\",\"status\":402}"
+  },
+  {
+    "name": "zh_female_soft",
+    "voice_id": "faccba1a8ac54016bcfc02761285e67f",
+    "status": "error",
+    "error": "Fish TTS HTTP 402: {\"message\":\"Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.\",\"status\":402}"
+  },
+  {
+    "name": "zh_male_documentary",
+    "voice_id": "59cb5986671546eaa6ca8ae6f29f6d22",
+    "status": "error",
+    "error": "Fish TTS HTTP 402: {\"message\":\"Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.\",\"status\":402}"
+  },
+  {
+    "name": "zh_male_cinematic",
+    "voice_id": "dd43b30d04d9446a94ebe41f301229b5",
+    "status": "error",
+    "error": "Fish TTS HTTP 402: {\"message\":\"Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.\",\"status\":402}"
+  },
+  {
+    "name": "ja_female_energetic",
+    "voice_id": "5161d41404314212af1254556477c17d",
+    "status": "error",
+    "error": "Fish TTS HTTP 402: {\"message\":\"Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.\",\"status\":402}"
+  },
+  {
+    "name": "ja_female_calm",
+    "voice_id": "0089dce5fefb4c6ba9b9f2f0debe1ddc",
+    "status": "error",
+    "error": "Fish TTS HTTP 402: {\"message\":\"Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.\",\"status\":402}"
+  },
+  {
+    "name": "ja_male_calm",
+    "voice_id": "45c5d3723c9c42f598e4776dcfd5f02d",
+    "status": "error",
+    "error": "Fish TTS HTTP 402: {\"message\":\"Insufficient API credit. API credit is managed independently from platform credit. Please visit https://fish.audio/app/developers to view your API credit balance or add funds.\",\"status\":402}"
+  }
+]
