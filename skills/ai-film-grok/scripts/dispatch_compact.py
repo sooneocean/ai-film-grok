@@ -370,6 +370,20 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
         # Weapon selection is also a bound orchestration contract. Keeping the
         # same object prevents compact/full mode from choosing different tools.
         "weapon_route": packet.get("weapon_route"),
+        "generation_ready": (
+            {
+                "ok": (packet.get("generation_ready") or {}).get("ok"),
+                "line": _bounded_text((packet.get("generation_ready") or {}).get("line"), max_bytes=200),
+                "style_locked": (packet.get("generation_ready") or {}).get("style_locked"),
+                "still_source_ok": (packet.get("generation_ready") or {}).get("still_source_ok"),
+                "flf_eligible": (packet.get("generation_ready") or {}).get("flf_eligible"),
+                "flf_missing_last": (packet.get("generation_ready") or {}).get("flf_missing_last"),
+                "peak_missing": list((packet.get("generation_ready") or {}).get("peak_missing") or [])[:6],
+                "blockers": list((packet.get("generation_ready") or {}).get("blockers") or [])[:4],
+            }
+            if isinstance(packet.get("generation_ready"), dict)
+            else None
+        ),
         "workflow": {
             "public_entry": (packet.get("workflow") or {}).get("public_entry"),
             "mode": (packet.get("workflow") or {}).get("mode"),

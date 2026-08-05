@@ -1248,6 +1248,12 @@ def build_dispatch(
             "unknown_cost_requests": 0,
         }
 
+    try:
+        from generation_ready import generation_ready_report
+        generation_ready = generation_ready_report(root)
+    except Exception as exc:  # noqa: BLE001
+        generation_ready = {"ok": True, "skipped": True, "error": str(exc)[:160], "line": "generation_ready skipped"}
+
     packet = {
         "ok": True,
         "kind": "ai-film-dispatch",
@@ -1275,6 +1281,7 @@ def build_dispatch(
         "agent_instruction": "\n".join(f"- {x}" for x in agent_do),
         "routing": routing,
         "weapon_route": weapon_route,
+        "generation_ready": generation_ready,
         "capability_summary": {
             "ok": (cap or {}).get("ok"),
             "tts_edge": ((cap or {}).get("tts") or {}).get("edge"),

@@ -245,58 +245,21 @@ def resolve_identity_refs(
     shot: dict[str, Any] | None = None,
     *,
     max_refs: int = MAX_AUTO_REFS,
+    include_legacy: bool = True,
 ) -> list[dict[str, Any]]:
-    """Collect cast identity / style reference images for R2V multi-ref."""
-    base = _root(root)
-    sh = shot if isinstance(shot, dict) else {}
-    refs: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    """Delegate to identity_refs (M5 canonical-first)."""
+    from identity_refs import resolve_identity_refs as _resolve
+    return _resolve(root, shot, max_refs=max_refs, include_legacy=include_legacy)
 
-    def _add(path: Path | None, *, source: str, role: str) -> None:
-        if path is None or not path.is_file():
-            return
-        key = str(path.resolve())
-        if key in seen:
-            return
-        entry = _file_entry(path, source=source, role=role)
-        if entry:
-            seen.add(key)
-            refs.append(entry)
 
-    # Explicit shot media refs
-    media = sh.get("media") if isinstance(sh.get("media"), dict) else {}
-    for key in ("identity_ref", "cast_ref", "style_ref", "reference_image"):
-        p = _rel_file(base, media.get(key) or sh.get(key))
-        _add(p, source=f"shot_field:{key}", role="identity" if "style" not in key else "style")
-
-    # style-bible cast masters / face enroll
-    bible = read_json(base / "style-bible.json") or {}
-    if isinstance(bible, dict):
-        chars = bible.get("characters") if isinstance(bible.get("characters"), dict) else {}
-        masters = bible.get("cast_masters") if isinstance(bible.get("cast_masters"), dict) else {}
-        for cid in _char_ids(sh) or list(chars.keys())[:2] or list(masters.keys())[:2]:
-            body = chars.get(cid) if isinstance(chars.get(cid), dict) else {}
-            for key in ("reference_image", "face_ref", "cast_master", "path"):
-                raw = body.get(key) if body else None
-                if isinstance(raw, dict):
-                    raw = raw.get("path") or raw.get("file")
-                _add(_rel_file(base, raw), source=f"bible.characters.{cid}", role="identity")
-            mraw = masters.get(cid)
-            if isinstance(mraw, dict):
-                mraw = mraw.get("path") or mraw.get("file")
-            _add(_rel_file(base, mraw), source=f"bible.cast_masters.{cid}", role="identity")
-
-    # Common cast/ ref directories
-    for cid in _char_ids(sh):
-        for candidate in (
-            base / "cast" / f"{cid}.png",
-            base / "cast" / f"{cid}_ref.png",
-            base / "refs" / f"{cid}.png",
-            base / "assets" / "cast" / f"{cid}.png",
-        ):
-            _add(candidate, source="cast_dir", role="identity")
-
-    return refs[: max(0, int(max_refs))]
+def resolve_identity_refs_report(
+    root: Path | str,
+    shot: dict[str, Any] | None = None,
+    *,
+    max_refs: int = MAX_AUTO_REFS,
+) -> dict[str, Any]:
+    from identity_refs import resolve_identity_refs_report as _report
+    return _report(root, shot, max_refs=max_refs)
 
 
 def resolve_media_pack(
@@ -343,13 +306,16 @@ def resolve_media_pack(
     last = _file_entry(last_path, source=last_source, role="last")
 
     refs: list[dict[str, Any]] = []
+    identity_warnings: list[str] = []
     if refs_override:
         for idx, raw in enumerate(refs_override):
             entry = _file_entry(Path(raw), source=f"explicit_ref_{idx}", role="reference")
             if entry:
                 refs.append(entry)
     else:
-        refs = resolve_identity_refs(base, sh, max_refs=max_refs)
+        id_rep = resolve_identity_refs_report(base, sh, max_refs=max_refs)
+        refs = list(id_rep.get("refs") or [])
+        identity_warnings = list(id_rep.get("warnings") or [])
 
     # Drop refs that duplicate first/last bytes path
     drop = {
@@ -373,7 +339,12 @@ def resolve_media_pack(
     missing_last_hint = None
     if first and not last:
         missing_last_hint = {
-            "message": "no end still — FLF unavailable; produce stills/<id>_end.png or promote --as end",
+            "message": (
+                "no end still — FLF unavailable (default quality path needs last); "
+                "produce stills/<id>_end.png or promote --as end"
+            ),
+            "mode_without_last": "i2v",
+            "mode_with_last": "flf",
             "suggested_paths": [
                 str(base / "stills" / f"{shot_id}_end.png"),
                 str(base / "keyframes" / f"{shot_id}_end.png"),
@@ -384,9 +355,10 @@ def resolve_media_pack(
                 f"# or copy an end pose board to stills/{shot_id}_end.png",
             ],
         }
-
+    flf_ready = first is not None and last is not None
+    mode_hint = "flf" if flf_ready else ("i2v" if first is not None else "t2v")
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "kind": "ai-film-h3-media-pack",
         "shot_id": shot_id,
         "first": first,
@@ -395,6 +367,9 @@ def resolve_media_pack(
         "has_first": first is not None,
         "has_last": last is not None,
         "has_refs": bool(refs),
+        "flf_ready": flf_ready,
+        "mode_hint": mode_hint,
+        "identity_warnings": list(identity_warnings),
         "reasons": reasons,
         "missing_last_hint": missing_last_hint,
     }
