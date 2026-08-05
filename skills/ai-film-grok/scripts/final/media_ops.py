@@ -29,7 +29,12 @@ from util.subprocess import run as util_run
 
 # local wrappers used by peeled helpers
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return util_run(cmd, check=check)
+    """Subprocess runner: ffmpeg gets -nostdin + AIFILM_FFMPEG_TIMEOUT; others use the canonical 60s timeout."""
+    argv = list(cmd)
+    executable = Path(argv[0]).name if argv else ""
+    if executable == "ffmpeg":
+        return run_ffmpeg(argv, check=check)
+    return util_run(cmd, check=check, timeout=60)
 
 
 def pdur(path: Path | str) -> float:

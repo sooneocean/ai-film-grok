@@ -65,7 +65,7 @@
 
 | Priority | Module | ~LOC | Why residual (risk × touch) | Status |
 |----------|--------|-----:|-------------------------------|--------|
-| **P0** | `post/render_final.py` | **4333** | Ship path; package-moved but body still ~4.3k; coverage ~30% | package SHIPPED · **internal leaf residual** |
+| **P0** | `post/render_final.py` | **3271** | Ship path; package-moved but body still ~4.3k; coverage ~30% | package SHIPPED · **internal leaf residual** |
 | **P1** | `narrative/edit_policy_heat.py` | **4015** | Adult/heat IRON; 53 helpers; high blast radius | package SHIPPED · **internal packs residual** |
 | **P1** | `film_spec.py` | **3234** | write-spec / validate / projectors | still root monolith |
 | **P2** | `export_composition.py` | **2835** | HF/Remotion export; coverage-starved | harness first |
@@ -103,6 +103,8 @@ cd "$ROOT/skills/ai-film-grok" && python -m pytest tests/test_w3_package_shims.p
 ---
 
 ### Wave R1 · `post/render_final` internal leaves (P0)
+
+**Progress 2026-08-05:** re-wired AST-identical leaves via `final/*` re-exports (LOC 4333→~3271). Remaining: orchestrator body + native/cards/tts local helpers.
 
 **Target:** `scripts/post/render_final.py` (~4333) — keep package + top-level shim.
 
