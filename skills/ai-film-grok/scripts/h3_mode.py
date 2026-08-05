@@ -406,8 +406,10 @@ def effect_tips(mode: str, mode_res: dict[str, Any] | None = None) -> list[str]:
 
 
 def preferred_mode_for_lane(lane: str) -> str | None:
+    """Return combo-eval preferred mode for a production lane (if registry present)."""
     try:
         from h3_combo_eval import load_combo_winners
+
         data = load_combo_winners()
     except Exception:
         return None
