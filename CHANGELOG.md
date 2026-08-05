@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.39.25] - 2026-08-05
+
+### Added (Post P2 · hotpath contracts)
+- Expand `test_final_hotpath_contracts`: caption_path plate rules, SRT non-overlap clamp, mix PARTIAL v2, dual-clock rewrite, post-doctor double-burn, plate timeout floors, allow_burned_underlay ship path.
+- Locks lesson-backed post P0/P1 invariants against CLI-extract churn.
+
 ## [2.39.24] - 2026-08-05
 
 ### Fixed (Post CLI restore + version hygiene)

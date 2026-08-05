@@ -1,4 +1,4 @@
-"""Hot-path delivery contracts (Batch D · ROI 2026-08-03).
+"""Hot-path delivery contracts (Batch D · ROI 2026-08-03 · P2 2026-08-05).
 
 Locks lesson-backed invariants that must not regress:
 
@@ -6,6 +6,10 @@ Locks lesson-backed invariants that must not regress:
 - HF caption gate fails closed when pixel probe is explicitly negative
 - heat final/media gates fail closed if ``heat_check`` cannot be imported
 - plate double-burn guard still rejects burned-in underlay plates
+- caption_path master_hf / ship_hardburn plate rules (no double layer)
+- SRT non-overlap clamp on write_srt
+- mix PARTIAL v2 honesty fields
+- ship path may allow_burned_underlay; default underlay still hard-blocks burn
 
 These complement test_final_stages / test_compose_render / test_adult_max_wave6
 without re-testing happy-path bulk.
@@ -29,11 +33,23 @@ pytestmark = pytest.mark.hotpath
 
 import final_stages  # noqa: E402
 from compose_render import ComposeRenderError, assert_underlay_not_double_burn  # noqa: E402
+from longform import estimate_plate_timeout  # noqa: E402
+from mix_partial import write_final_mix_partial_receipt  # noqa: E402
+from post_doctor import run_post_doctor  # noqa: E402
+from post_route import (  # noqa: E402
+    PostRouteError,
+    apply_route_to_plate,
+    assert_no_double_caption_layers,
+    resolve_caption_path,
+)
 from production_gates import (  # noqa: E402
     ProductionGateError,
     assert_heat_allows_final,
     assert_heat_allows_media,
 )
+from render_final import write_srt  # noqa: E402
+from timeline_clock import audit_timeline_clock, rewrite_timeline_from_film  # noqa: E402
+from util import write_json  # noqa: E402
 
 
 def _write(path: Path, text: str) -> None:
@@ -183,6 +199,160 @@ class DoubleBurnPlateTests(unittest.TestCase):
             )
             info = assert_underlay_not_double_burn(root, layout="underlay")
             self.assertTrue(info.get("ok", True) or info is not None)
+
+    def test_allow_burned_underlay_skips_double_burn_gate(self) -> None:
+        """ship_hardburn path may grade/title on burned plate with explicit allow."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plate = root / "out" / "plate.mp4"
+            _write(plate, "fake-plate")
+            _write(
+                root / "out" / "final-delivery.json",
+                json.dumps(
+                    {
+                        "plate": str(plate),
+                        "subtitles": {"burned_in": True, "caption_owner": "ffmpeg_plate"},
+                    }
+                ),
+            )
+            info = assert_underlay_not_double_burn(
+                root, layout="underlay", allow_burned_underlay=True
+            )
+            self.assertTrue(info.get("ok"))
+            self.assertTrue(info.get("skipped"))
+
+
+class CaptionPathHotpathTests(unittest.TestCase):
+    def test_master_hf_forbids_plate_burn(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            route = resolve_caption_path(root, post_engine="hyperframes")
+            self.assertEqual(route["caption_path"], "master_hf")
+            plate = apply_route_to_plate(route, subs_mode=None, plate_cards="auto")
+            self.assertEqual(plate["subs"], "off")
+            with self.assertRaises(PostRouteError):
+                apply_route_to_plate(route, subs_mode="burn", plate_cards="blank")
+
+    def test_ship_hardburn_forces_burn_and_allow_underlay_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            route = resolve_caption_path(
+                root, post_engine="hyperframes", explicit="ship_hardburn"
+            )
+            self.assertEqual(route["caption_path"], "ship_hardburn")
+            self.assertTrue(route["allow_burned_underlay"])
+            plate = apply_route_to_plate(route, subs_mode="off", plate_cards="auto")
+            self.assertEqual(plate["subs"], "burn")
+
+    def test_assert_no_double_caption_layers_ship_plus_hf_owner(self) -> None:
+        with self.assertRaises(PostRouteError):
+            assert_no_double_caption_layers(
+                caption_path="ship_hardburn",
+                plate_subs="burn",
+                caption_owner="hyperframes",
+            )
+
+
+class SrtNonOverlapHotpathTests(unittest.TestCase):
+    def test_write_srt_clamps_overlapping_cues(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "final.srt"
+            write_srt(
+                path,
+                [
+                    {"start": 0.0, "end": 2.0, "text": "甲"},
+                    {"start": 1.0, "end": 3.0, "text": "乙"},  # overlaps previous
+                ],
+            )
+            text = path.read_text(encoding="utf-8")
+            # second cue must start at/after previous end → no SRT_OVERLAP for post_doctor
+            self.assertIn("甲", text)
+            self.assertIn("乙", text)
+            # 00:00:02,000 appears as clamped start for cue 2
+            self.assertIn("00:00:02,000", text)
+
+
+class MixPartialHotpathTests(unittest.TestCase):
+    def test_partial_receipt_v2_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mixed = root / "audio" / "mixed.wav"
+            mixed.parent.mkdir(parents=True)
+            mixed.write_bytes(b"RIFF")
+            path = write_final_mix_partial_receipt(
+                root,
+                prior_sc="dynamic_eq",
+                error="sidechain graph hang",
+                mixed=mixed,
+                error_type="TimeoutExpired",
+                affected_tracks=["mx", "dx", "bg"],
+            )
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(data["kind"], "final-mix-partial")
+            self.assertTrue(data["partial"])
+            self.assertEqual(data["reason_code"], "sidechain_mix_failed_amix_fallback")
+            self.assertEqual(data["affected_tracks"], ["mx", "dx", "bg"])
+            self.assertTrue(data.get("honest_limits"))
+            self.assertEqual(data["error_type"], "TimeoutExpired")
+            self.assertGreaterEqual(int(data["schema_version"]), 2)
+
+
+class TimelineAndPostDoctorHotpathTests(unittest.TestCase):
+    def test_dual_clock_detected_and_rewrite_aligns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(
+                root / "receipts" / "film_timeline.json",
+                {"shot_starts": [0.0, 6.0, 12.0], "output_duration": 18.0},
+            )
+            write_json(
+                root / "timeline.json",
+                {
+                    "shot_starts": [0.0, 7.6, 15.0],
+                    "shots": [
+                        {"id": "s01", "duration_sec": 7.6},
+                        {"id": "s02", "duration_sec": 7.4},
+                        {"id": "s03", "duration_sec": 6.0},
+                    ],
+                },
+            )
+            audit = audit_timeline_clock(root, write=True)
+            self.assertTrue(audit.get("dual_clock"))
+            self.assertFalse(audit.get("ok"))
+            out = rewrite_timeline_from_film(root)
+            self.assertTrue(out.get("ok"))
+            tl = json.loads((root / "timeline.json").read_text(encoding="utf-8"))
+            self.assertEqual(tl["shot_starts"], [0.0, 6.0, 12.0])
+
+    def test_post_doctor_hard_on_double_burn_route(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(
+                root / "receipts" / "post-route.json",
+                {
+                    "kind": "post-route",
+                    "caption_path": "master_hf",
+                    "plate_subs": "burn",
+                },
+            )
+            report = run_post_doctor(root, write=True)
+            codes = {i["code"] for i in report.get("hard") or []}
+            self.assertIn("DOUBLE_BURN_RISK", codes)
+            self.assertFalse(report.get("ok"))
+
+
+class PlateTimeoutFloorHotpathTests(unittest.TestCase):
+    def test_short_floor_and_long_floor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.assertEqual(
+                estimate_plate_timeout(root, duration_sec=60, shot_count=8),
+                1200,
+            )
+            self.assertGreaterEqual(
+                estimate_plate_timeout(root, duration_sec=500, shot_count=20),
+                1800,
+            )
 
 
 if __name__ == "__main__":
