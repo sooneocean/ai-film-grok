@@ -570,7 +570,7 @@
     },
     {
       "path": "scripts/cli/cli_h3.py",
-      "sha256": "36ffbda9d9cee6e55d639c72b0ca2091c0156ce8f9838ad75d05cffcfe5fdd33"
+      "sha256": "9093bc0c4f941a18e3731c5b436c2ef69136b9a555642b828da261ffcffd83e7"
     },
     {
       "path": "scripts/cli/cli_interactive.py",
@@ -1466,7 +1466,7 @@
     },
     {
       "path": "scripts/media/h3_fill_idle.py",
-      "sha256": "caca63f8a4530354f4815e365e587ece5adfd815be9385a83a9b994fe4d60f49"
+      "sha256": "29cccd0fc6d298a8b07dbd3e194fbe8b19436715e996daa430ccfbd4f30f1f68"
     },
     {
       "path": "scripts/media/h3_media_pack.py",
@@ -1474,7 +1474,7 @@
     },
     {
       "path": "scripts/media/h3_mode.py",
-      "sha256": "34f51c3f8880868ec6c98e56180446077699d55b70aa207394f220bea10700df"
+      "sha256": "c113fafddd8ff18d6dd5a4da3112935680c114c1eba1f2d2c50fd2bde233970c"
     },
     {
       "path": "scripts/media/h3_workflow.py",
