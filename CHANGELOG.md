@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.39.65] - 2026-08-05
+
+### Fixed (hang-proof · adapters + node lipsync + canary/opt)
+- **adapters**: elevenlabs/voicebox ffmpeg `timeout=120`; music normalize `300`; higgs command `1800`.
+- **node**: latentsync / musetalk inference timeouts (env `AIFILM_*_TIMEOUT`, default 3600); musetalk normalize `600`; hang exit `76`.
+- **mmaudio_adapter**: `_run_checked` default `timeout=1800` + TimeoutExpired map.
+- **elevenlabs_canary** metrics: ffprobe `30` / volume+silence `60`.
+- **optimization_program** audio lane probe: `timeout=30`.
+- **visual_text_repair**: catch TimeoutExpired on rebuild path.
+- **Tests**: Wave3AdapterNodeTimeoutTests.
+- R-ops overnight drain still OPEN (capacity floors / queue busy).
+
+
 
 ## 2.39.64 — 2026-08-05
 

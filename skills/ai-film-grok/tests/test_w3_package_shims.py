@@ -83,3 +83,17 @@ def test_w7_plan_package_and_shim_identity() -> None:
     text = (SCRIPTS / "film_spec.py").read_text(encoding="utf-8")
     assert "sys.modules[__name__]" in text or "_sys.modules[__name__]" in text
     assert len(text.splitlines()) < 30
+
+
+def test_w7_narrative_package_and_shim_identity() -> None:
+    """W7 · narrative domain modules live under scripts/narrative/ with thin shims."""
+    import narrative.edit_policy as pkg
+    import edit_policy as shim
+    import narrative.heat_check as hc_pkg
+    import heat_check as hc_shim
+
+    assert shim is pkg
+    assert hc_shim is hc_pkg
+    text = (SCRIPTS / "edit_policy.py").read_text(encoding="utf-8")
+    assert "sys.modules[__name__]" in text or "_sys.modules[__name__]" in text
+    assert len(text.splitlines()) < 30

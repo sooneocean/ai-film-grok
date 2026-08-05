@@ -15,7 +15,7 @@
 | W4 | Domain → packages (`post/render_final` · `narrative/edit_policy_heat`) | **DONE** package boundary (`ef9c4c70`) · **internal leaf peels residual** (bodies still ~2735 / ~4015 (R1c+R3a leaf rewire)) |
 | W5 | Docs / AREA / shim audit | **DONE** |
 | W6 | `audio/*` + `media/*` packages + shims | **DONE** (v2.39.54 boundary · v2.39.56 path-depth fix) |
-| W7 | `cli/*` package boundary + expand post/plan/narrative | **IN PROGRESS** · B1 cli **DONE** (v2.39.61) · B2 post **DONE** (v2.39.62) · B3 plan **DONE** (v2.39.63) · B4 pending |
+| W7 | `cli/*` package boundary + expand post/plan/narrative | **IN PROGRESS** · B1 cli **DONE** (v2.39.61) · B2 post **DONE** (v2.39.62) · B3 plan **DONE** (v2.39.63) · B4 narrative **DONE** (v2.39.64) · package boundary complete |
 
 ## Residual peel order (risk × touch · not LOC vanity)
 
