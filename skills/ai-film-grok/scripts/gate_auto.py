@@ -55,16 +55,93 @@ def machine_receipts_green(root: Path | str) -> dict[str, Any]:
     auto = read_json(base / "receipts" / RECEIPT) or {}
     i2v = read_json(base / "receipts" / I2V_RECEIPT) or {}
     cin = read_json(base / "receipts" / CIN_RECEIPT) or {}
+    ready = read_json(base / "receipts" / "machine-ready.json") or {}
     auto_ok = isinstance(auto, dict) and auto.get("ok") is True and not auto.get("skipped")
     i2v_ok = isinstance(i2v, dict) and i2v.get("ok") is True
     cin_ok = isinstance(cin, dict) and cin.get("ok") is True
-    green = bool(auto_ok and i2v_ok and cin_ok)
+    ready_ok = isinstance(ready, dict) and ready.get("ok") is True
+    green = bool(ready_ok or (auto_ok and i2v_ok and cin_ok))
     return {
         "ok": green,
         "gate_auto": auto_ok,
         "i2v_final": i2v_ok,
         "cinematic": cin_ok,
+        "machine_ready": ready_ok,
         "human_pending": list(auto.get("human_pending") or []) if isinstance(auto, dict) else [],
+    }
+
+
+def ensure_machine_lane(
+    root: Path | str,
+    *,
+    force: bool = False,
+    write: bool = True,
+    fix_sex_sfx: bool = True,
+    measure_i2v: bool = True,
+    promote_single: bool = True,
+    run_variety: bool = True,
+    run_cinematic: bool = True,
+) -> dict[str, Any]:
+    """Single machine-lane entry for ship-prep / closeout / export / advance.
+
+    Returns green fast when receipts already ok; otherwise runs full gate-auto once.
+    """
+    base = Path(root).expanduser().resolve()
+    if not force:
+        st = machine_receipts_green(base)
+        if st.get("ok"):
+            return {
+                "ok": True,
+                "fast_path": True,
+                "ensured": True,
+                "root": str(base),
+                "blocked_by": None,
+                "human_pending": st.get("human_pending") or [],
+                "steps": [{"id": "cinematic_gate", "ok": True, "detail": "pre-green"}],
+                "note": "ensure_machine_lane: already green",
+            }
+    return run_gate_auto(
+        base,
+        write=write,
+        force=force,
+        fix_sex_sfx=fix_sex_sfx,
+        measure_i2v=measure_i2v,
+        promote_single=promote_single,
+        run_variety=run_variety,
+        run_cinematic=run_cinematic,
+    )
+
+
+def next_machine_lane_action(
+    root: Path | str,
+    *,
+    prefer_ship_prep: bool = False,
+) -> dict[str, str] | None:
+    """One next action for post-clips machine path, or None if already green.
+
+    Prefer gate-auto (single ladder). ship-prep only when prefer_ship_prep and
+    multi-take shortlist not done (shortlist/pk package).
+    """
+    base = Path(root).expanduser().resolve()
+    r = str(base)
+    if machine_receipts_green(base).get("ok"):
+        return None
+    if prefer_ship_prep:
+        ship = read_json(base / "receipts" / "ship-prep.json") or {}
+        sel = read_json(base / "receipts" / "select-shortlist.json") or {}
+        takes_dir = base / "takes"
+        has_takes = takes_dir.is_dir() and any(takes_dir.rglob("*.mp4"))
+        multi_pending = has_takes and not (isinstance(sel, dict) and sel.get("shots"))
+        if multi_pending and ship.get("ok") is not True:
+            return {
+                "id": "ship-prep",
+                "cmd": f'aifilm ship-prep --root "{r}"',
+                "why": "多 take 未 shortlist — ship-prep 再 gate-auto（一体）",
+            }
+    return {
+        "id": "gate-auto",
+        "cmd": f'aifilm gate-auto --root "{r}"',
+        "why": "机读过闸：mean/i2v/sex_sfx/cinematic（无需手点）",
     }
 
 

@@ -478,22 +478,23 @@ def closeout_run(
             write_json(base / RECEIPT_REL, payload)
         return payload
 
-    # gate-auto (measure+write) then cinematic when red — no hand-click loop
+    # Single machine-lane ensure when cinematic red
     try:
         cin = next(s for s in status["steps"] if s["id"] == "cinematic_gate")
     except StopIteration:
         cin = {"ok": True}
     if not cin.get("ok") and not cin.get("skipped"):
         try:
-            from gate_auto import run_gate_auto
+            from gate_auto import ensure_machine_lane
 
-            auto = run_gate_auto(base, write=True)
+            auto = ensure_machine_lane(base, force=False, write=True)
             ran.append(
                 {
                     "id": "gate_auto",
                     "ok": bool(auto.get("ok")),
                     "blocked_by": auto.get("blocked_by"),
                     "human_pending": auto.get("human_pending"),
+                    "fast_path": auto.get("fast_path"),
                 }
             )
             if not auto.get("ok"):
@@ -510,42 +511,17 @@ def closeout_run(
                     write_json(base / RECEIPT_REL, payload)
                 return payload
         except Exception as exc:  # noqa: BLE001
-            try:
-                from cinematic_gate import run_cinematic_gate
-
-                report = run_cinematic_gate(base, write=True, auto_i2v=True)
-                ran.append(
-                    {
-                        "id": "cinematic_gate",
-                        "ok": bool(report.get("ok")),
-                        "blocked_by": report.get("blocked_by"),
-                    }
-                )
-                if not report.get("ok"):
-                    payload = {
-                        **status,
-                        "ok": False,
-                        "stopped_at": "cinematic_gate",
-                        "ran": ran,
-                        "cinematic_gate": report,
-                        "next_cmd": report.get("next_cmd") or f'aifilm gate-auto --root "{base}"',
-                        "required_proof": "receipts/cinematic-gate.json ok=true",
-                    }
-                    if write_receipt:
-                        write_json(base / RECEIPT_REL, payload)
-                    return payload
-            except Exception as exc2:  # noqa: BLE001
-                payload = {
-                    **status,
-                    "ok": False,
-                    "stopped_at": "cinematic_gate",
-                    "ran": ran,
-                    "error": f"{exc}; {exc2}"[:300],
-                    "next_cmd": f'aifilm gate-auto --root "{base}"',
-                }
-                if write_receipt:
-                    write_json(base / RECEIPT_REL, payload)
-                return payload
+            payload = {
+                **status,
+                "ok": False,
+                "stopped_at": "gate_auto",
+                "ran": ran,
+                "error": str(exc)[:300],
+                "next_cmd": f'aifilm gate-auto --root "{base}"',
+            }
+            if write_receipt:
+                write_json(base / RECEIPT_REL, payload)
+            return payload
 
     # post-audit
     post_step = next(s for s in status["steps"] if s["id"] == "post_audit")

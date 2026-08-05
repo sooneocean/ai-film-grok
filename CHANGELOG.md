@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.13] - 2026-08-05
+
+### Changed (Machine-lane consolidation · single entry)
+- **`ensure_machine_lane`**: one entry for ship-prep / closeout / export (fast if green).
+- **`next_machine_lane_action`**: dispatch + next_actions share one post-clips next (gate-auto; ship-prep only for multi-take shortlist).
+- **ship-prep**: skip re-run i2v when receipt already ok; end via ensure_machine_lane with `measure_i2v=False` if already graded.
+- **export assert / closeout**: no dual gate-auto then cinematic auto_i2v thrash.
+- Removed scattered ship-prep / i2v-motion / gate-auto triple next paths.
+
 ## [2.39.12] - 2026-08-05
 
 ### Changed (Orchestration timing + token efficiency)

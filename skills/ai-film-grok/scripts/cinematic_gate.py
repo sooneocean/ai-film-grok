@@ -427,18 +427,17 @@ def assert_cinematic_gate_for_export(root: Path | str) -> dict[str, Any]:
     if isinstance(report, dict) and report.get("ok") is True:
         return {"ok": True, "gate": report, "path": str(path)}
 
-    # Deep auto: full machine ladder (fast_path if already green) then re-read cinematic
+    # One machine-lane ensure (writes cinematic when needed) — no double auto_i2v pass
     try:
-        from gate_auto import run_gate_auto
+        from gate_auto import ensure_machine_lane
 
-        auto = run_gate_auto(base, write=True, force=False)
-        if auto.get("ok") and auto.get("fast_path"):
-            report = read_json(path) if path.is_file() else None
-            if isinstance(report, dict) and report.get("ok") is True:
-                return {"ok": True, "gate": report, "path": str(path), "via": "gate-auto-fast"}
+        ensure_machine_lane(base, force=False, write=True)
     except Exception:
         pass
-    report = run_cinematic_gate(base, write=True, auto_i2v=True)
+    report = read_json(path) if path.is_file() else None
+    if not isinstance(report, dict) or report.get("ok") is not True:
+        # last resort: direct cinematic with auto_i2v (legacy films)
+        report = run_cinematic_gate(base, write=True, auto_i2v=True)
     if not isinstance(report, dict) or report.get("ok") is not True:
         raise CinematicGateError(
             "Desktop export blocked by cinematic-gate (ok!=true); "
@@ -446,4 +445,4 @@ def assert_cinematic_gate_for_export(root: Path | str) -> dict[str, Any]:
             f"blocked_by={report.get('blocked_by') if isinstance(report, dict) else None}. "
             "Escape: AIFILM_SKIP_CINEMATIC_GATE=1"
         )
-    return {"ok": True, "gate": report, "path": str(path)}
+    return {"ok": True, "gate": report, "path": str(path), "via": "ensure_machine_lane"}

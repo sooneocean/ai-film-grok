@@ -640,33 +640,18 @@ def build_next_actions(
             )
 
     if gates.get("clips_complete") and not gates.get("final_complete"):
-        # 2.37 · prefer ship-prep one-shot; fall back to motion-gate alone
-        ship_rec = read_json(root / "receipts" / "ship-prep.json") or {}
-        gate_rec = read_json(root / "receipts" / "i2v-final-gate.json") or {}
-        cin_rec = read_json(root / "receipts" / "cinematic-gate.json") or {}
-        if ship_rec.get("ok") is not True and gate_rec.get("ok") is not True:
-            add(
-                "ship-prep",
-                f'aifilm ship-prep --root "{r}"',
-                "clips 齐 — ship-prep：多 take 会 defer promote，等人 PK 后再 --promote",
-            )
-        elif gate_rec.get("ok") is not True:
-            add(
-                "i2v-motion-gate",
-                f'aifilm i2v-motion-gate --root "{r}" --write',
-                "clips 齐 — 先 i2v-motion-gate（--root 自动 DF）再 final/closeout",
-            )
-        # Wave ε · gate-auto absorbs cinematic (one slot; no dual add — actions capped at 8)
-        ready = read_json(root / "receipts" / "machine-ready.json") or {}
-        auto_rec = read_json(root / "receipts" / "gate-auto.json") or {}
-        machine_green = ready.get("ok") is True or (
-            auto_rec.get("ok") is True and cin_rec.get("ok") is True and gate_rec.get("ok") is True
-        )
-        if not machine_green and (cin_rec.get("ok") is not True or gate_rec.get("ok") is not True):
+        # Consolidated machine lane: one next (gate-auto, or ship-prep if multi-take)
+        try:
+            from gate_auto import next_machine_lane_action
+
+            lane = next_machine_lane_action(root, prefer_ship_prep=True)
+            if lane:
+                add(lane["id"], lane["cmd"], lane["why"])
+        except Exception:
             add(
                 "gate-auto",
                 f'aifilm gate-auto --root "{r}"',
-                "clips 齐 — gate-auto 自动测 mean/写 i2v-final/sex_sfx/cinematic（无需人工点闸）",
+                "clips 齐 — gate-auto 机读过闸",
             )
         # Wave H: multi-take shortlist before post when takes exist
         sel_rec = read_json(root / "receipts" / "select-shortlist.json") or {}

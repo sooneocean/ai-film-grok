@@ -726,28 +726,19 @@ def build_dispatch(
                 "clips 齐且有 takes — 先 select-shortlist 标 preferred（不删 take）再粗剪/final",
                 "visual",
             )
-    # Phase B/2.37 + gate-auto · machine ladder after clips (no human click-loop)
+    # Consolidated machine lane after clips (gate-auto or ship-prep if multi-take)
     if craft_stage in {"selects", "media", "rough", "post"} and gates.get("clips_complete"):
-        ship_rec = read_json(root / "receipts" / "ship-prep.json") or {}
-        gate_rec = read_json(root / "receipts" / "i2v-final-gate.json") or {}
-        cin_rec = read_json(root / "receipts" / "cinematic-gate.json") or {}
-        auto_rec = read_json(root / "receipts" / "gate-auto.json") or {}
-        ready = read_json(root / "receipts" / "machine-ready.json") or {}
-        machine_green = ready.get("ok") is True or (
-            auto_rec.get("ok") is True and cin_rec.get("ok") is True and gate_rec.get("ok") is True
-        )
-        if ship_rec.get("ok") is not True and gate_rec.get("ok") is not True:
-            pre(
-                "ship-prep",
-                f'aifilm ship-prep --root "{r}"',
-                "clips 齐 — 一键 means+variety+shortlist+motion-gate+gate-auto（优于散敲）",
-                "visual",
-            )
-        elif not machine_green:
+        try:
+            from gate_auto import next_machine_lane_action
+
+            lane = next_machine_lane_action(root, prefer_ship_prep=True)
+            if lane:
+                pre(lane["id"], lane["cmd"], lane["why"], "visual")
+        except Exception:
             pre(
                 "gate-auto",
                 f'aifilm gate-auto --root "{r}"',
-                "clips 齐 — gate-auto 机写 mean/i2v-final/sex_sfx/cinematic（无需人工点闸）",
+                "clips 齐 — gate-auto 机读过闸",
                 "visual",
             )
     if craft_stage in {"post", "deliver", "rough"} and (

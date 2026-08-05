@@ -143,6 +143,37 @@ def test_machine_receipts_green_and_fast_path(tmp_path: Path) -> None:
     assert rep2.get("fast_path") is not True
 
 
+def test_ensure_machine_lane_and_next_action(tmp_path: Path) -> None:
+    from gate_auto import ensure_machine_lane, next_machine_lane_action
+
+    rec = tmp_path / "receipts"
+    rec.mkdir(parents=True)
+    (rec / "gate-auto.json").write_text(
+        json.dumps({"ok": True, "kind": "gate-auto"}), encoding="utf-8"
+    )
+    (rec / "i2v-final-gate.json").write_text(
+        json.dumps({"ok": True, "kind": "i2v-final-gate"}), encoding="utf-8"
+    )
+    (rec / "cinematic-gate.json").write_text(
+        json.dumps({"ok": True, "kind": "cinematic-gate"}), encoding="utf-8"
+    )
+    ens = ensure_machine_lane(tmp_path, force=False)
+    assert ens.get("ok") is True
+    assert ens.get("fast_path") is True or ens.get("ensured") is True
+    assert next_machine_lane_action(tmp_path) is None
+    # red → gate-auto next
+    (rec / "cinematic-gate.json").write_text(
+        json.dumps({"ok": False, "kind": "cinematic-gate"}), encoding="utf-8"
+    )
+    (rec / "machine-ready.json").unlink(missing_ok=True)
+    (rec / "gate-auto.json").write_text(
+        json.dumps({"ok": False, "kind": "gate-auto"}), encoding="utf-8"
+    )
+    nxt = next_machine_lane_action(tmp_path, prefer_ship_prep=False)
+    assert nxt is not None
+    assert nxt["id"] == "gate-auto"
+
+
 def test_fast_path_reuse_skips_rewrite(tmp_path: Path) -> None:
     rec = tmp_path / "receipts"
     rec.mkdir(parents=True)
