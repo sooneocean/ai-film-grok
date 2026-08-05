@@ -11,6 +11,7 @@ melo-cache/
 # Large media binaries: version the METADATA, not the media.
 # For true binary versioning later, adopt Git LFS and remove these lines.
 *.wav
+*.flac
 *.mp3
 *.onnx
 
