@@ -19,13 +19,25 @@ from util import read_json, write_json  # noqa: E402
 from util.subprocess import run as util_run  # noqa: E402
 
 
+def _impl_source(module_filename: str) -> Path:
+    """Resolve real implementation for W6 hard-compat shims (media./audio./post.)."""
+    path = SCRIPTS / module_filename
+    text = path.read_text(encoding="utf-8")
+    if "sys.modules[__name__]" in text or "Shim —" in text or 'as _impl' in text:
+        for pkg in ("media", "audio", "post", "narrative", "spine", "gates", "plan"):
+            candidate = SCRIPTS / pkg / module_filename
+            if candidate.is_file() and candidate.stat().st_size > 200:
+                return candidate
+    return path
+
+
 class AF1SubprocessTimeoutTests(unittest.TestCase):
     def test_util_run_timeout_raises(self) -> None:
         with self.assertRaises(subprocess.TimeoutExpired):
             util_run([sys.executable, "-c", "import time; time.sleep(5)"], timeout=0.2)
 
     def test_h3_soft_identity_midframe_has_timeout(self) -> None:
-        src = (SCRIPTS / "h3_fill_idle.py").read_text(encoding="utf-8")
+        src = _impl_source("h3_fill_idle.py").read_text(encoding="utf-8")
         self.assertIn("timeout=30", src)
         self.assertIn("identity_midframe_timeout_or_fail", src)
         # midframe path must not use bare subprocess without timeout
@@ -60,7 +72,7 @@ class AF1SubprocessTimeoutTests(unittest.TestCase):
             self.assertTrue(all(not c.startswith("identity_l1_") for c in caut))
 
     def test_scene_sound_ffmpeg_paths_have_timeout(self) -> None:
-        src = (SCRIPTS / "scene_sound_stems.py").read_text(encoding="utf-8")
+        src = _impl_source("scene_sound_stems.py").read_text(encoding="utf-8")
         self.assertIn("timeout=120", src)
         self.assertIn("timeout=180", src)
         runs = src.split("subprocess.run(")[1:]
@@ -290,7 +302,7 @@ class AF8DocDriftTests(unittest.TestCase):
 
 class Wave3ShortformTimeoutTests(unittest.TestCase):
     def test_shortform_decode_probe_have_timeout(self) -> None:
-        src = (SCRIPTS / "shortform_motion.py").read_text(encoding="utf-8")
+        src = _impl_source("shortform_motion.py").read_text(encoding="utf-8")
         self.assertIn("timeout=60", src)
         self.assertIn("timeout=30", src)
         self.assertIn("local motion candidate decode timed out", src)
