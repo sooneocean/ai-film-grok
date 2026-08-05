@@ -466,7 +466,7 @@
     },
     {
       "path": "scripts/closeout.py",
-      "sha256": "65f964c29dcabed71209869c669a809de8fd9466cbf800e9a6377dc7045557a2"
+      "sha256": "9ac232d0f1b95e05003c2794f843554d7bdeb46718b73a6aff96d4a9a1a3b0f2"
     },
     {
       "path": "scripts/cloud_media_download.py",
@@ -806,7 +806,7 @@
     },
     {
       "path": "scripts/h3_fill_idle.py",
-      "sha256": "626cae71730e444b70a2f8e6b32cba36f205113bb85453f87c85ec3cbbe2ce36"
+      "sha256": "fd4ac62d1b21c1a0dbd3ffdaeaa995982262df8dfd77b1741adfa6426976544d"
     },
     {
       "path": "scripts/h3_media_pack.py",
@@ -922,7 +922,7 @@
     },
     {
       "path": "scripts/media_queue.py",
-      "sha256": "709f8e6ddfa1614b5a0940ec62167bffb986f10165314659e787f637b61f7a0b"
+      "sha256": "d47d344304998a19211bcc9547b6b5cbfc553c11e51bd256034d67da6680bb0f"
     },
     {
       "path": "scripts/mix_partial.py",
@@ -1398,7 +1398,7 @@
     },
     {
       "path": "scripts/tts_backend.py",
-      "sha256": "5f7ec685b9bb1f9bdd855bcd647c1aa3044f1469bdc8c2cb95c03d69670a5ba7"
+      "sha256": "bf22236b25e0a07409f629b5455f0aaf323d619babe39566627588d6ca530c2d"
     },
     {
       "path": "scripts/tts_rehearsal.py",
@@ -1469,8 +1469,12 @@
       "sha256": "c4e44797eab8109f3a38505c2fc5c9fb28f56533bb64640db2feed004b3342c0"
     },
     {
+      "path": "scripts/weapon_inventory.py",
+      "sha256": "6d4a2c120bba72b1abc475e89f564b65eba78fa0281e4db2ddda26e21f16f4be"
+    },
+    {
       "path": "scripts/weapon_router.py",
-      "sha256": "6807b5e80d54f6399dce037fec39a90e23c7d27af80365b37d8ad4992af9a38f"
+      "sha256": "e4f0fb523fca5ab0112fe832ee1fbf7b41fe22bd4e80599a076bd6c62d162ba5"
     },
     {
       "path": "scripts/workflow_pack.py",
