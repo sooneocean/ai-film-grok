@@ -718,8 +718,13 @@ def build_dispatch(
                     "pilot 已批但 bulk-preflight 未绿 — 单门过闸后再 media-queue bulk",
                     "visual",
                 )
-    # Fill-Idle: while clips incomplete (or hybrid active), surface next H3 job
-    if craft_stage in {"media", "visual", "rough", "selects"}:
+    # Fill-Idle: while clips incomplete (or hybrid active), surface next H3 job.
+    # Require gates.spec so invalid film-spec cannot steal primary from write-spec.
+    if (
+        craft_stage in {"media", "visual", "rough", "selects"}
+        and gates.get("spec")
+        and not gates.get("clips_complete")
+    ):
         try:
             from film_spec import resolve_h3_config
 
@@ -1318,6 +1323,11 @@ def build_dispatch(
         "routing": routing,
         "weapon_route": weapon_route,
         "generation_ready": generation_ready,
+        "weapon_inventory": (
+            (generation_ready or {}).get("weapon_inventory")
+            if isinstance(generation_ready, dict)
+            else None
+        ),
         "capability_summary": {
             "ok": (cap or {}).get("ok"),
             "tts_edge": ((cap or {}).get("tts") or {}).get("edge"),

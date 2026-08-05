@@ -44,8 +44,15 @@ def test_generation_ready_report(tmp_path):
     (root / "style-bible.json").write_text(json.dumps({"locked": True, "state": "Approved", "style_fingerprint": {"medium_key": "anime"}}), encoding="utf-8")
     rep = generation_ready_report(root)
     assert rep["kind"] == "generation-ready" and rep["style_locked"] is True
+    assert rep.get("weapon_inventory", {}).get("motion_primary") == "minimax-h3-i2v-pilot"
+    assert rep.get("weapon_inventory", {}).get("still_primary") == "qwen-image-2512-quality"
+    assert "motion_wp=" in rep["line"]
+    assert any("motion primary=" in h for h in (rep.get("hints") or []))
 
 def test_compact_dispatch_exposes_generation_ready():
-    packet = {"ok": True, "kind": "ai-film-dispatch", "schema_version": 2, "craft_stage": "media", "pipeline_stage": "visual", "next_id": "x", "next_cmd": "echo", "next_why": "test", "next_action": {"id": "x", "cmd": "echo", "skill_id": ""}, "weapon_route": {"status": "ready"}, "generation_ready": {"ok": True, "line": "style=lock · flf=1/2", "style_locked": True, "still_source_ok": True, "flf_eligible": 1, "flf_missing_last": 1, "peak_missing": [], "blockers": []}, "metrics": {}, "workflow": {}, "state_hash": "abc"}
+    packet = {"ok": True, "kind": "ai-film-dispatch", "schema_version": 2, "craft_stage": "media", "pipeline_stage": "visual", "next_id": "x", "next_cmd": "echo", "next_why": "test", "next_action": {"id": "x", "cmd": "echo", "skill_id": ""}, "weapon_route": {"status": "ready"}, "generation_ready": {"ok": True, "line": "style=lock · flf=1/2", "style_locked": True, "still_source_ok": True, "flf_eligible": 1, "flf_missing_last": 1, "peak_missing": [], "blockers": [], "inventory_line": "still=qwen · motion=h3", "weapon_inventory": {"still_primary": "qwen-image-2512-quality", "motion_primary": "minimax-h3-i2v-pilot"}, "hints": ["motion primary=minimax-h3-i2v-pilot"]}, "metrics": {}, "workflow": {}, "state_hash": "abc"}
     c = compact_dispatch(packet)
     assert c.get("generation_ready") and c["generation_ready"]["style_locked"] is True
+    assert c["generation_ready"].get("motion_primary") == "minimax-h3-i2v-pilot"
+    assert c.get("weapon_inventory_line") == "still=qwen · motion=h3"
+

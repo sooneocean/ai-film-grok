@@ -446,6 +446,33 @@ def build_next_actions(
 
     r = str(root)
 
+    # Cross-modality primaries (soft) — annotate visual why strings only.
+    inv_still = inv_motion = inv_edit = None
+    try:
+        from weapon_inventory import primary_for
+
+        inv_still = (primary_for("text-to-image") or {}).get("id")
+        inv_edit = (primary_for("local-image-edit") or {}).get("id")
+        inv_motion = (primary_for("image-to-video") or {}).get("id")
+    except Exception:
+        pass
+
+    def _with_primary(why: str, *, kind: str = "motion") -> str:
+        """Append inventory primary tag without blowing why budgets."""
+        tag = None
+        if kind == "motion" and inv_motion:
+            tag = f"wp={inv_motion}"
+        elif kind == "still" and inv_still:
+            tag = f"wp={inv_still}"
+        elif kind == "edit" and inv_edit:
+            tag = f"wp={inv_edit}"
+        if not tag or tag in why:
+            return why
+        base = why.rstrip()
+        if len(base) + len(tag) + 3 > 160:
+            return base
+        return f"{base} · {tag}"
+
     # A completed independent review with a failed dimension is more useful
     # than generic advisory.  Return its one evidence-backed repair instead of
     # asking an agent to choose among unrelated next steps.
@@ -605,12 +632,17 @@ def build_next_actions(
                 add(
                     "still-challenge-weak-mean",
                     str(sc_sug["next_cmd"]),
-                    f"mean 弱但身份未红（{first.get('shot_id')} mean={first.get('mean')}）"
-                    " — 先 still-challenge 换 still 再 I2V（人 promote）",
+                    _with_primary(
+                        f"mean 弱但身份未红（{first.get('shot_id')} mean={first.get('mean')}）"
+                        " — 先 still-challenge 换 still 再 I2V（人 promote）",
+                        kind="still",
+                    ),
                 )
         except Exception:
             pass
-        if pilot_ok or not gates.get("spec"):
+        # Bulk / H3 only after gates.spec is green (recompute_gates / validate_film_spec).
+        # Pilot-approved + invalid film-spec must not race to h3/media-queue primary.
+        if pilot_ok and gates.get("spec"):
             # Wave F: bulk door before queue when pilot already GO
             if pilot_ok:
                 bulk_rec = read_json(root / "receipts" / "bulk-preflight.json") or {}
@@ -638,57 +670,76 @@ def build_next_actions(
                     add(
                         "h3-until-empty",
                         f'aifilm h3 cycle --root "{r}" --until-empty --execute --max 5',
-                        "h3_primary 挂机：until-empty 吃光 P0→P1→P2（无限本地算力；永不 auto-promote）",
+                        _with_primary(
+                            "h3_primary 挂机：until-empty 吃光 P0→P1→P2（无限本地算力；永不 auto-promote）"
+                        ),
                     )
                     add(
                         "h3-capacity-plan",
                         f'aifilm h3 capacity-plan --root "{r}"',
-                        "全片 H3 backlog ETA（按 I2V/FLF/R2V/T2V）",
+                        _with_primary("全片 H3 backlog ETA（按 I2V/FLF/R2V/T2V）"),
                     )
                     add(
                         "h3-run-next",
                         f'aifilm h3 run-next --root "{r}" --execute --max 5',
-                        "h3_primary 主产线：单批 5 镜；或改用 until-empty 挂机",
+                        _with_primary(
+                            "h3_primary 主产线：单批 5 镜；或改用 until-empty 挂机"
+                        ),
                     )
                     add(
                         "h3-fill-idle",
                         f'aifilm h3 cycle --root "{r}" --execute --max 5',
-                        "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）",
+                        _with_primary(
+                            "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）"
+                        ),
                     )
                     add(
                         "h3-lane",
                         f'aifilm h3 list --root "{r}"; aifilm h3 next --root "{r}"',
-                        "h3_primary：list/next 看模式+队列；云 bulk 默认硬拦",
+                        _with_primary(
+                            "h3_primary：list/next 看模式+队列；云 bulk 默认硬拦"
+                        ),
                     )
                     add(
                         "queue-or-register",
                         f"# cloud opt-in only under h3_primary\n"
                         f'AIFILM_ALLOW_CLOUD_RESTRICTED=1 media-queue add --root "{r}" …',
-                        "镜头未齐：主轨 aifilm h3 run；Grok 云仅 escape 后可选",
+                        _with_primary(
+                            "镜头未齐：主轨 aifilm h3 run；Grok 云仅 escape 后可选"
+                        ),
                     )
                 else:
                     add(
                         "h3-fill-idle",
                         f'aifilm h3 cycle --root "{r}" --execute --max 5',
-                        "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）",
+                        _with_primary(
+                            "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）"
+                        ),
                     )
                     add(
                         "h3-lane",
                         f'aifilm h3 list --root "{r}" --challenge; aifilm h3 next --root "{r}"',
-                        "hybrid_h3：list/next 看 P0–P2；dual 粘连；P2=pilot",
+                        _with_primary(
+                            "hybrid_h3：list/next 看 P0–P2；dual 粘连；P2=pilot"
+                        ),
                     )
                     add(
                         "queue-or-register",
                         f'media-queue add --root "{r}" --shot-id <id> --operation image_to_video … '
                         f'&& aifilm register-clip --root "{r}" …',
-                        "镜头未齐：云 bulk 用 Grok 队列 + register-clip；H3 镜用 aifilm h3 run",
+                        _with_primary(
+                            "镜头未齐：云 bulk 用 Grok 队列 + register-clip；H3 镜用 aifilm h3 run"
+                        ),
                     )
             else:
                 add(
                     "queue-or-register",
                     f'media-queue add --root "{r}" --shot-id <id> --operation image_to_video … '
                     f'&& aifilm register-clip --root "{r}" …',
-                    "镜头未齐：云 bulk 用 Grok 队列 + register-clip",
+                    _with_primary(
+                        "镜头未齐：云 bulk 用 Grok 队列 + register-clip"
+                        + (f"；本地 motion 首选 {inv_motion}" if inv_motion else "")
+                    ),
                 )
         else:
             add(

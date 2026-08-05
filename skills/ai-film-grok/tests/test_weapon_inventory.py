@@ -230,3 +230,47 @@ def test_compact_exposes_weapon_inventory_line() -> None:
     }
     c = compact_dispatch(packet)
     assert c.get("weapon_inventory_line") == "still=qwen · motion=h3 · audio=edge"
+
+
+def test_next_actions_h3_why_tags_motion_primary(tmp_path: Path) -> None:
+    from next_actions import build_next_actions
+
+    root = tmp_path / "film"
+    root.mkdir()
+    (root / "brief.json").write_text('{"title":"t","theme":"x"}\n', encoding="utf-8")
+    (root / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "title": "t",
+                "_i2v_profile": "h3_primary",
+                "h3": {"enabled": True},
+                "scenes": [{"id": "sc1", "shots": [{"id": "s01"}]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "style-bible.json").write_text(
+        json.dumps({"locked": True, "style_fingerprint": {"medium_key": "anime"}}),
+        encoding="utf-8",
+    )
+    (root / "receipts").mkdir()
+    (root / "receipts" / "bulk-preflight.json").write_text(
+        json.dumps({"ok": True}), encoding="utf-8"
+    )
+    (root / "receipts" / "pilot-approval.json").write_text(
+        json.dumps({"approved": True, "approved_by": "user"}),
+        encoding="utf-8",
+    )
+    actions = build_next_actions(
+        root,
+        gates={
+            "brief": True,
+            "style_locked": True,
+            "spec": True,
+            "pilot_approved": True,
+            "clips_complete": False,
+        },
+    )
+    h3 = [a for a in actions if str(a.get("id") or "").startswith("h3-")]
+    assert h3, actions
+    assert any("wp=minimax-h3-i2v-pilot" in str(a.get("why") or "") for a in h3)

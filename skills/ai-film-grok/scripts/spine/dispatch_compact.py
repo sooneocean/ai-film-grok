@@ -378,6 +378,11 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
                     else None
                 )
                 or (
+                    (packet.get("generation_ready") or {}).get("inventory_line")
+                    if isinstance(packet.get("generation_ready"), dict)
+                    else None
+                )
+                or (
                     (packet.get("weapon_inventory") or {}).get("line")
                     if isinstance(packet.get("weapon_inventory"), dict)
                     else None
@@ -395,6 +400,17 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
                 "flf_missing_last": (packet.get("generation_ready") or {}).get("flf_missing_last"),
                 "peak_missing": list((packet.get("generation_ready") or {}).get("peak_missing") or [])[:6],
                 "blockers": list((packet.get("generation_ready") or {}).get("blockers") or [])[:4],
+                "still_primary": (
+                    ((packet.get("generation_ready") or {}).get("weapon_inventory") or {}).get(
+                        "still_primary"
+                    )
+                ),
+                "motion_primary": (
+                    ((packet.get("generation_ready") or {}).get("weapon_inventory") or {}).get(
+                        "motion_primary"
+                    )
+                ),
+                "hints": list((packet.get("generation_ready") or {}).get("hints") or [])[:4],
             }
             if isinstance(packet.get("generation_ready"), dict)
             else None

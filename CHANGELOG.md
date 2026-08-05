@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.49] - 2026-08-05
+
+### Added (Weapon inventory → generation_ready / next_actions)
+- **generation_ready**: `weapon_inventory` primaries + `still_wp`/`motion_wp` line tags + material hints.
+- **next_actions**: visual H3/queue why strings tag `wp=<motion primary>`.
+- **dispatch** packet exposes `weapon_inventory`; compact surfaces primaries + inventory_line.
+- **Tests**: generation_ready inventory, next_actions wp tag, compact line.
+
 ## [2.39.48] - 2026-08-05
 
 ### Added / Fixed (strategy residual closeout · S2.3–S7)

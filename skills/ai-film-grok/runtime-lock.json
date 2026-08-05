@@ -926,7 +926,7 @@
     },
     {
       "path": "scripts/h3_combo_eval.py",
-      "sha256": "542748b0670f72f111bbbb36becfe3ba3a604f5bf69fdbb31155162357323c12"
+      "sha256": "a28a0d7db4238ab1913c032110bb5394cd7235cfea56f539cd4c31fb65b04081"
     },
     {
       "path": "scripts/h3_fill_idle.py",
@@ -938,11 +938,11 @@
     },
     {
       "path": "scripts/h3_mode.py",
-      "sha256": "eadb4503467f9794b104933026ab69b8da86384cfff063695b37d5c733b31db2"
+      "sha256": "b6dfb713f5fa2090870f841b014949328a8efc6d76831950325f511da776e92e"
     },
     {
       "path": "scripts/h3_workflow.py",
-      "sha256": "4e5904f56fd2ff7a1ec54b4c611f08e6f8792d433842cd328e5337af0ba55a5b"
+      "sha256": "eb34f8faf184f106aa971590247f52e1cf7144384f46dc4988e3035eb7ef79a9"
     },
     {
       "path": "scripts/heat_check.py",
@@ -1502,15 +1502,15 @@
     },
     {
       "path": "scripts/spine/dispatch.py",
-      "sha256": "b5b7de86f5f6bd67fa0afe2b4c0b8c806e3ef5cfd4f38819f968b4bdc305c37c"
+      "sha256": "01bb8a98db5a3580500c11dcbbad86bbe79cd46a36eb9387887f800232d20a1c"
     },
     {
       "path": "scripts/spine/dispatch_compact.py",
-      "sha256": "39441fd79a35cb165e56481fcff0a69f943c2ddb73279dd20bda3eb90cb49688"
+      "sha256": "3acc5fb141cae8b9e35527a6e778375423181198fc38f9ce462dbdc91f75e3f0"
     },
     {
       "path": "scripts/spine/next_actions.py",
-      "sha256": "f3ecf151a29c8aa1ab191d6bf38752bf7ee774e2dc0374e061601f929935dbc1"
+      "sha256": "a336393efd3800ce099e8163709899ad43ecd317511d669a5a1dbf870f92d31e"
     },
     {
       "path": "scripts/spine/project_state.py",
