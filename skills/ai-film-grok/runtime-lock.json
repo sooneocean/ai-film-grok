@@ -1109,6 +1109,10 @@
       "sha256": "4bb8336b5ea12f949f86eaf86ae08f6b9bee623bf548ea995dc68a52ad7fcf22"
     },
     {
+      "path": "scripts/edit_policy_shared.py",
+      "sha256": "0f05eb572d4163595e89e85b779c7acfc7fc6dd7968636e87408f5fedf0140fb"
+    },
+    {
       "path": "scripts/edit_strategy.py",
       "sha256": "80f8df9de61b479eb1a09d6cf2f8d3cc8b868be6c0fa28709b4d0845da07bc2e"
     },
@@ -1446,7 +1450,7 @@
     },
     {
       "path": "scripts/media/comfy_recovery.py",
-      "sha256": "1b19f58f58f9964cd1a8ff8c1a6ce928fe58a6660a37c99f2e0b73eb7ee7e8fc"
+      "sha256": "b1338016a5634a6b6b6b284662c8bfaa3f5d14dea4601e852c80153db7f8bf1e"
     },
     {
       "path": "scripts/media/comfy_video.py",
@@ -1690,11 +1694,15 @@
     },
     {
       "path": "scripts/narrative/edit_policy.py",
-      "sha256": "ce112a4b92a5adcd300feb531289c7ede71aa944b23e5ae69daa5db808af4779"
+      "sha256": "a28b1a1f852f57da67592935ff940e2294f999440707f159682c23f93778c9b4"
     },
     {
       "path": "scripts/narrative/edit_policy_heat.py",
-      "sha256": "9d86c1ff1bd84e143b2f22bfc051d112b89716d7c099191a4ace3cdd1a156840"
+      "sha256": "acdafc1cedf0ff6520a2027f99b8920c976628ecb1b7ecddd3699fb3e9d748dd"
+    },
+    {
+      "path": "scripts/narrative/edit_policy_shared.py",
+      "sha256": "8df228687364d0f945c752b4dee85a6ff353ef04c443efdf7b3f861ae322f682"
     },
     {
       "path": "scripts/narrative/edit_strategy.py",

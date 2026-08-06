@@ -10,24 +10,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
-# Prefer in-package sibling when edit_policy is mid-import (shim-safe cycle).
-import sys as _sys
-
-_ep = _sys.modules.get("narrative.edit_policy")
-if _ep is not None and getattr(_ep, "PolicyError", None) is not None:
-    _COITUS_PSEUDO_ONLY = _ep._COITUS_PSEUDO_ONLY
-    _COITUS_READABLE_MARKERS = _ep._COITUS_READABLE_MARKERS
-    COITUS_BEATS = _ep.COITUS_BEATS
-    COITUS_REQUIRED_BEATS = _ep.COITUS_REQUIRED_BEATS
-    PolicyError = _ep.PolicyError
-else:
-    from edit_policy import (  # type: ignore
-        _COITUS_PSEUDO_ONLY,
-        _COITUS_READABLE_MARKERS,
-        COITUS_BEATS,
-        COITUS_REQUIRED_BEATS,
-        PolicyError,
-    )
+# Cycle-free leaf — do not import edit_policy at module load (edit_policy re-exports us).
+from edit_policy_shared import (
+    COITUS_BEATS,
+    COITUS_REQUIRED_BEATS,
+    PolicyError,
+    _COITUS_PSEUDO_ONLY,
+    _COITUS_READABLE_MARKERS,
+)
 
 # --- Heat arc / multi-heroine (adult max iron · 2026-07-24) ---
 # Adult max IRON: meat-ratio high, heat max, undress/expose when possible.

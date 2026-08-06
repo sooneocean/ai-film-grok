@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.39.93] - 2026-08-06
+
+### Fixed / Refactored (quality round 3)
+- **Cycle-free heat/policy**: `narrative/edit_policy_shared.py` holds `PolicyError` + coitus markers; `edit_policy_heat` no longer uses `sys.modules` probe; top-level shim `edit_policy_shared`.
+- **comfy_recovery** remote probe loop → `util.retry.retry_call` (injectable sleeper preserved).
+
 ## [2.39.92] - 2026-08-06
 
 ### Fixed / Refactored (quality round 2 · residual)
