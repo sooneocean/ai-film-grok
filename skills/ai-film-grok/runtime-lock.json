@@ -1362,7 +1362,7 @@
     },
     {
       "path": "scripts/gates/production_gates.py",
-      "sha256": "7090a97b36c40811d7e9875f322cfaf05ea61fc7e552350d29ba5201dcc18e21"
+      "sha256": "aadc8afefa265d9df13b0d11d931d1ef3a2e0296da0c9417fd06ea4bc2008015"
     },
     {
       "path": "scripts/gates/quality_gates.py",
@@ -2106,7 +2106,7 @@
     },
     {
       "path": "scripts/post/burn_srt_pil.py",
-      "sha256": "64dc5738751d96b376a2c9e14bf27155102f7a53d257040170680bb23dd724fb"
+      "sha256": "5b80251b87a8ff0e2e4569e3b7117b3e1446006adac9a7715d72f0d10e139b76"
     },
     {
       "path": "scripts/post/caption_frame_audit.py",
@@ -2178,7 +2178,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "bcf101e9da1157456f19f4722013181f811d0b8342dc471359c4bd36e953269e"
+      "sha256": "a9b58e5666560e873cd40b26982ce95a9c86824a1d5687410d16e50360220367"
     },
     {
       "path": "scripts/post/render_final_music.py",
@@ -2631,6 +2631,10 @@
     {
       "path": "scripts/util/json_io.py",
       "sha256": "734da0b94655863374657b8e77c5d8107990b02e969a46a09289db5a87b46099"
+    },
+    {
+      "path": "scripts/util/logger.py",
+      "sha256": "abe66db6f4d2b2c94df23f9761d699d6d080754a0aff7e6b9ef571d9ae58a5ee"
     },
     {
       "path": "scripts/util/retry.py",
