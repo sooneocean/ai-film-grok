@@ -15,3 +15,8 @@
 
 ## 片根
 `AI FILM SPACE/0805/suse-evolution-ep01` · `savani-ep0*-5m` · `0721/velvet-stage-dual`
+
+## GO
+- state-index hard=0
+- watch velvet→suse
+- pilot+heat still block bulk
