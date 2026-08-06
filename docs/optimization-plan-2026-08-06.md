@@ -34,7 +34,8 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 | **visual_bible 自动生成（第一增量）** | ✅ **本会话** | v2.40.13 `derive_style_bible_from_spec` + `assert_style_bible_consistency` + preflight 接入（`test_style_bible_consistency.py` 12 用例）；spec 驱动派生 lighting_timeline（heat_phase）+ cast_masters，consistency 门校验缺失/hero 缺失/光照数不一致 —— 视觉语法自洽第一增量，像素 palette 抽取待补 | 
 | **5090 no-hog 程序化校验（第一增量）** | ✅ **本会话** | v2.40.14 `gpu_no_hog_decision` + `gpu_no_hog_report` + `run_next_fill_idle` 显式守卫（`test_gpu_no_hog.py` 13 用例）；把"busy→零 submit 除非本会话独占 GPU"固化成纯函数+单测，补 submission_capacity 报 ready 却带 `COMFY_QUEUE_BUSY` 的漏判 —— 5090 统一调度器 / H3 Fill-Idle 第一增量 | 
 | **H3 Fill-Idle 自动派单（dispatch-order 显式化）** | ✅ **本会话** | v2.40.15 `fill_idle_sort_key` 抽离为纯函数+单测（`test_fill_idle_dispatch_order.py` 8 用例）；P0→P1→P2 / dual-sticky 优先 / P1 最少 H3 takes / P2 最低 mean 派单序从 `build_fill_idle_queue` 内嵌闭包提升为可测不变量 | 
-| 介质路由 / H3 Fill-Idle 完整派单 / sung | ⬜ P2 | 未做（sung 受 HeartMuLa 外部依赖阻塞；介质路由按 cast_state 稳定性选写实/漫剧、H3 Fill-Idle R2V=能量位自动选取 + P2 空闲挑战自动派待更多调研） |
+| **H3 Fill-Idle 模式/Lane 选取（R2V=能量位自动选取）** | ✅ **本会话** | v2.40.16 `select_fill_idle_mode` 抽离为纯函数+单测（`test_fill_idle_mode_select.py` 10 用例）；把 `classify_fill_idle_shot` 末尾的 R2V=能量位自动选取内联分支提升为可测不变量：primary dual second leg（r2v / flf-i2v）+ P2 soft challenge 优先 face-lock（flf/i2v）除非真实 on-cam-close 能量 | 
+| 介质路由 / H3 Fill-Idle 完整派单 / sung | ⬜ P2 | 未做（sung 受 HeartMuLa 外部依赖阻塞；介质路由按 cast_state 稳定性选写实/漫剧、H3 Fill-Idle P2 空闲挑战自动派待更多调研；R2V=能量位自动选取已在 v2.40.16 落地） |
 
 > 剩余真正开放的高 ROI P1/P2：首帧毒化·静帧压缩晋升 style_lock 默认硬锁、介质自动路由、H3 Fill-Idle 完整派单（R2V 能量位 + P2 空闲挑战自动派）、sung 自动生成（HeartMuLa⛔）、长片 SOP 固化。
 

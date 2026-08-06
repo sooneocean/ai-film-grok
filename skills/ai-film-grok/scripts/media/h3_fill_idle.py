@@ -297,6 +297,50 @@ def _is_primary_h3(intent: dict[str, Any]) -> bool:
     )
 
 
+def select_fill_idle_mode(
+    *,
+    mode_res: dict[str, Any],
+    reasons: list[str],
+    lane: str,
+    status: str,
+    primary: bool,
+    has_last: bool,
+    on_cam_close: bool,
+) -> tuple[str, list[str]]:
+    """Finalize H3 mode for a Fill-Idle job (R2V = energy-lane auto-selection).
+
+    Pure function: given the mode resolver result produced by ``resolve_h3_mode``
+    and the dispatch ``reasons`` already collected by ``classify_fill_idle_shot``,
+    return ``(mode, added_reasons)``. Extracted so the R2V=energy-lane policy is
+    a single testable invariant rather than inline branches (P2, v2.40.16).
+
+    Policy encoded:
+      - primary dual second leg: ``dual_need_r2v`` -> r2v; ``dual_need_i2v`` ->
+        flf when end-still exists else i2v.
+      - P2 soft challenge: prefer face-lock (flf/i2v) over r2v unless genuine
+        dialogue-close energy (on_cam_close) — r2v stays only for true energy.
+    """
+    mode = str(mode_res.get("mode") or "i2v")
+    added: list[str] = []
+    if primary and "dual_need_r2v" in reasons:
+        mode = "r2v"
+        added.append("dual_second_leg_r2v")
+    elif primary and "dual_need_i2v" in reasons:
+        # Prefer FLF identity leg when end still exists.
+        mode = "flf" if has_last else "i2v"
+        added.append("dual_second_leg_flf" if has_last else "dual_second_leg_i2v")
+    elif lane == "challenge_grok" and status.startswith("pending") and mode == "r2v":
+        # Still allow r2v if energy flags, but soft fill prefers face lock when alt exists.
+        if not primary and mode_res.get("alt_mode") not in {"i2v", "flf"}:
+            pass  # keep r2v for true energy
+        elif not primary:
+            # prefer flf/i2v for fair face PK unless dialogue-close energy.
+            if not on_cam_close:
+                mode = "flf" if has_last else "i2v"
+                added.append("p2_prefer_flf_face_pk" if has_last else "p2_prefer_i2v_face_pk")
+    return mode, added
+
+
 def _poison_blocked(root: Path, shot_id: str) -> bool:
     """Soft check: poison receipts or rejected stills skip the queue."""
     man = read_json(root / "manifest.json") or {}
@@ -510,25 +554,17 @@ def classify_fill_idle_shot(
         has_last=has_last,
         wants_continue=wants_continue,
     )
-    mode = str(mode_res.get("mode") or "i2v")
-    # Dual second leg: pick the missing mode explicitly
-    if primary and "dual_need_r2v" in reasons:
-        mode = "r2v"
-        reasons.append("dual_second_leg_r2v")
-    elif primary and "dual_need_i2v" in reasons:
-        # Prefer FLF identity leg when end still exists
-        mode = "flf" if has_last else "i2v"
-        reasons.append("dual_second_leg_flf" if has_last else "dual_second_leg_i2v")
-    # P2 soft challenges: default I2V/FLF first (policy); keep alt_mode from resolver
-    elif lane == "challenge_grok" and status.startswith("pending") and mode == "r2v":
-        # still allow r2v if energy flags, but soft fill prefers face lock when alt exists
-        if not primary and mode_res.get("alt_mode") not in {"i2v", "flf"}:
-            pass  # keep r2v for true energy
-        elif not primary:
-            # prefer flf/i2v for fair face PK unless dialogue-close energy
-            if not (on_cam and close):
-                mode = "flf" if has_last else "i2v"
-                reasons.append("p2_prefer_flf_face_pk" if has_last else "p2_prefer_i2v_face_pk")
+    # Finalize mode via extracted invariant (R2V = energy-lane auto-selection).
+    mode, mode_added = select_fill_idle_mode(
+        mode_res=mode_res,
+        reasons=reasons,
+        lane=lane,
+        status=status,
+        primary=primary,
+        has_last=has_last,
+        on_cam_close=bool(on_cam and close),
+    )
+    reasons.extend(mode_added)
 
     last_cli = f' --last-frame "{last_path}"' if last_path and mode in {"flf", "r2v"} else ""
     cmd = (

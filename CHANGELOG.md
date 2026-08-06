@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.40.16] - 2026-08-06
+
+### Changed (quality P2 · H3 Fill-Idle 完整派单 · 模式/Lane 选取纯函数化)
+- **Fill-Idle mode/lane selection extracted to a pure, unit-tested function** (`media/h3_fill_idle.py::select_fill_idle_mode`): the R2V=energy-lane auto-selection that used to live as inline branches at the end of `classify_fill_idle_shot` is now an explicit, behavior-preserving module-level function. It encodes: (1) primary dual second leg — `dual_need_r2v` → `r2v`; `dual_need_i2v` → `flf` when end-still exists else `i2v`; (2) P2 soft challenge prefers face-lock (`flf`/`i2v`) over blind `r2v` unless genuine on-camera-close dialogue energy. `classify_fill_idle_shot` calls it and extends its reasons — identical output.
+- Tests: `tests/test_fill_idle_mode_select.py` (10 cases — primary dual r2v / primary dual i2v flf+i2v / P2 challenge prefer flf / P2 challenge prefer i2v / P2 keep r2v dialogue-close / P2 keep r2v true-energy / passthrough primary / passthrough non-pending / default-mode fallback).
+
 ## [2.40.15] - 2026-08-06
 
 ### Changed (quality P2 · H3 Fill-Idle 自动派单 · dispatch-order 显式化)
