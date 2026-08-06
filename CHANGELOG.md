@@ -17,6 +17,72 @@
 - **Docs:** hard-defaults + stages/voice + memory card.
 - **Tests:** `test_native_audio_mix` lane XOR · `test_final_editorial_review` duplicate gate.
 
+## [2.40.17+] - 2026-08-06 (merged from main · quality P2 fill-idle + gates)
+
+> Version numbers on `main` for these pure-function extractions overlapped with
+> this branch's monolith/AD numbering; content is preserved under this banner
+> and coexists with the structure entries below.
+
+## [2.40.17] - 2026-08-06
+
+### Changed (quality P2 · H3 Fill-Idle 完整派单 · P2 空闲挑战自动派纯函数化)
+- **P2 idle-challenge auto-dispatch policy extracted to a pure, unit-tested function** (`media/h3_fill_idle.py::decide_p2_challenge`): the `has_still and has_any` branch of `classify_fill_idle_shot` — including the γ3 low-ROI-skip (`best >= floor + 6.0`) — was previously inline and untested as a unit. It is now an explicit, behavior-preserving function returning `(priority, lane, status, reasons)`, so the P2 soft-challenge decision is a CI-verifiable invariant. `classify_fill_idle_shot` calls it and extends its reasons — identical output.
+- Tests: `tests/test_fill_idle_p2_challenge.py` (9 cases — H3 ok no-rechallenge / H3 below-floor P1 retry / baseline strong skip / boundary exact / just-below enqueue / weak+grok mark / weak no-marker / missing best guard / missing floor guard).
+
+## [2.40.16] - 2026-08-06
+
+### Changed (quality P2 · H3 Fill-Idle 完整派单 · 模式/Lane 选取纯函数化)
+- **Fill-Idle mode/lane selection extracted to a pure, unit-tested function** (`media/h3_fill_idle.py::select_fill_idle_mode`): the R2V=energy-lane auto-selection that used to live as inline branches at the end of `classify_fill_idle_shot` is now an explicit, behavior-preserving module-level function. It encodes: (1) primary dual second leg — `dual_need_r2v` → `r2v`; `dual_need_i2v` → `flf` when end-still exists else `i2v`; (2) P2 soft challenge prefers face-lock (`flf`/`i2v`) over blind `r2v` unless genuine on-camera-close dialogue energy. `classify_fill_idle_shot` calls it and extends its reasons — identical output.
+- Tests: `tests/test_fill_idle_mode_select.py` (10 cases — primary dual r2v / primary dual i2v flf+i2v / P2 challenge prefer flf / P2 challenge prefer i2v / P2 keep r2v dialogue-close / P2 keep r2v true-energy / passthrough primary / passthrough non-pending / default-mode fallback).
+
+## [2.40.15] - 2026-08-06
+
+### Changed (quality P2 · H3 Fill-Idle 自动派单 · dispatch-order 显式化)
+- **Fill-Idle dispatch-order policy extracted to a pure, unit-tested function** (`media/h3_fill_idle.py::fill_idle_sort_key`): the P0→P1→P2 / dual-sticky-first / P1-fewest-H3-takes / P2-lowest-mean ordering was previously a nested closure inside `build_fill_idle_queue`, invisible to tests. It is now an explicit, behavior-preserving module-level function so the dispatch order is a CI-verifiable invariant. `build_fill_idle_queue` calls it directly (identical sort tuple).
+- Tests: `tests/test_fill_idle_dispatch_order.py` (8 cases — priority rank / dual-sticky / P2 lowest-mean / P2 missing-mean-last / P1 fewest-h3-takes / P1 mean tiebreak / shot_id tiebreak / full stability).
+
+## [2.40.14] - 2026-08-06
+
+### Added (quality P2 · H3 Fill-Idle / 5090 统一调度器 · no-hog 程序化校验)
+- **Multi-agent 5090 no-hog policy as a tested invariant** (`media/h3_fill_idle.py::gpu_no_hog_decision` + `gpu_no_hog_report`): the "busy queue ⇒ zero submit unless this session owns the GPU" rule (2026-08-06 IRON, user: '不准再犯') is now a **pure, GPU-free decision function** instead of an implicit side-effect of capacity probing. Encodes: `until_empty` execute requires explicit ownership; busy+not-owned ⇒ hold; dry-run always allowed; ownership (`AIFILM_I_OWN_THE_GPU`) overrides the hold.
+- **Explicit guard wired into `run_next_fill_idle`**: before any job submission it reads the Comfy capacity probe's `COMFY_QUEUE_BUSY` blocker directly. This closes a real gap — `submission_capacity` can report `status=="ready"` while still carrying the busy blocker, which the existing `capacity_ready` check could miss. Busy+not-owned ⇒ early return `skipped_reason="no_hog_busy_hold"` (behavior-preserving hold, clearer audit reason).
+- Tests: `tests/test_gpu_no_hog.py` (13 cases — dry-run / idle / busy-hold / owned-override / until_empty-ownership / report-wrap / env-override + wired-guard integration with mocked probe+planner).
+
+## [2.40.13] - 2026-08-06
+
+### Added (quality P2 · visual_bible 自动生成 / style-bible consistency)
+- **Style-bible auto-derivation** (`assets/visual_bible.py::derive_style_bible_from_spec`): auto-generates/refreshes `style-bible.json` from the film spec — derives the lighting timeline from each shot's `heat_phase` (reusing `derive_lighting_timeline`), carries over declared `cast_masters` (including a `hero` entry inferred from `shot_role == hero` shots), persists via `save_bible`. Spec-driven (no pixel extraction) — the first increment of the "visual_bible 自动生成" P2 item.
+- **Style-bible consistency gate** (`gates/production_gates.py::assert_style_bible_consistency` + `style_bible_consistency_report`): the style-bible is the canonical visual source of truth; when the spec declares visual content, reads back the on-disk `style-bible.json` and verifies it is consistent — `STYLE_BIBLE_MISSING` (no bible → run derive), `STYLE_BIBLE_HERO_CAST_MISSING` (spec has hero shots but bible lacks `cast_masters.hero`), `STYLE_BIBLE_LIGHTING_MISMATCH` (lighting_timeline count != shot count). Soft advisory by default; hard under `style_bible_strict` or adult `heat_scale` max/hot/extreme.
+- Emergency escape: `AIFILM_SKIP_STYLE_BIBLE_GATE=1`.
+- Wired into `preflight` as soft advisory.
+- Tests: `tests/test_style_bible_consistency.py` (12 cases — no-content / root-none / missing / hero-missing / lighting-mismatch / consistent / auto-derive-then-consistent / soft-by-default / strict-raise / adult-max-raise / env-escape / force-skip).
+
+## [2.40.12] - 2026-08-06
+
+### Added (quality P2 · transition export read-back 全量)
+- **Transition export read-back gate** (`gates/production_gates.py::assert_transition_export_readback` + `transition_export_readback_report`): closes the loop on the v2.40.11 controlled transition-policy gate. The policy gate validates the *plan* (`transition_intents`/`transition_styles`); this read-back validates the *built operations* (`spec["transition_ops"]`) actually materialise every declared seam and obey the policy — catching seams dropped or styles silently drifted during export/build.
+- Coverage + consistency checks: `EXPORT_READBACK_NO_OPS` (declared seams but no built ops), `EXPORT_READBACK_OP_COUNT_MISMATCH` (a seam dropped/duplicated), `EXPORT_READBACK_CONTINUE_NOT_HARD` (continue seam not hard_cut/0.0s/no-overlay), `EXPORT_READBACK_PARAGRAPH_BAD` (chapter seam not soft xfade+fade/dissolve), `EXPORT_READBACK_SOFT_NOT_XFADE` / `EXPORT_READBACK_HARD_NOT_CUT`, `EXPORT_READBACK_STYLE_DRIFT` (built style != declared), `EXPORT_READBACK_FLASHY_STYLE` (whip/grid on scene cut), `EXPORT_READBACK_OP_INVALID` / `EXPORT_READBACK_OP_BASE_INVALID`.
+- intro/outro / pure-MG roles relax (HF catalog open), mirroring the policy gate.
+- Wired into `preflight` as soft advisory; hard under `transition_policy_strict` or adult `heat_scale` max/hot/extreme (same strictness as the policy gate, incremental rollout).
+- Emergency escape: `AIFILM_SKIP_TRANSITION_READBACK_GATE=1`.
+- Tests: `tests/test_transition_export_readback.py` (19 cases — no-ops / op-missing / count-mismatch / continue-softened / chapter-bad / style-drift / flashy / relax / strict-raise / env-escape / root-spec).
+
+## [2.40.11] - 2026-08-06
+
+### Added (quality P2 · controlled transition-policy gate / HF 转场受控策略全量)
+- **Transition-policy gate** (`gates/production_gates.py::assert_transition_policy` + `transition_policy_report`): programmatic enforcement of the controlled transition grammar from `references/hf-transition-policy.md` — continue 接戏缝 must be hard match-cut (no xfade/dissolve); scene hard cuts must not use flashy styles (whip/grid); chapter/段落转场 restricted to soft fade/dissolve. Fills the gap left by `enforce_continue_hard_joins` (which silently auto-fixes continue seams) by *reporting* intent drift early; also covers scene-cut flashy-style and paragraph-transition rules nobody previously validated.
+- intro/outro / pure-MG roles relax to allow-all (HF catalog open).
+- Wired into `preflight` as soft advisory; hard under `transition_policy_strict` or adult `heat_scale` max/hot/extreme (incremental rollout like P0/P1 gates).
+- Emergency escape: `AIFILM_SKIP_TRANSITION_POLICY_GATE=1`.
+- Tests: `tests/test_transition_policy.py` (16 cases — continue-not-hard / paragraph-bad / scene-flashy / intro-relax / strict-raise / env-escape / root-spec).
+
+## [2.40.10] - 2026-08-06
+
+### Added (quality P1 · headroom / anti-crop timeline gate)
+- **Headroom gate** (`gates/production_gates.py::assert_headroom_protected` + `headroom_report`): timeline half of "防裁头" — every shot must keep `duration_sec >= 2.0s` and each scene-opening shot needs `>= 3.5s` lead-in so the subject's entrance isn't cropped/abrupt. Complements `framing_lint.lint_framing_iron` (which covers the *frame* half). Wired into `preflight` as soft advisory; hard under `headroom_strict` or adult `heat_scale` max/hot/extreme.
+- Emergency escape: `AIFILM_SKIP_HEADROOM_GATE=1`.
+- Tests: `tests/test_headroom.py` (12 cases — floor / scene-opener / top-level / strict-raise / env-escape / root-spec).
+
 ## [2.40.17] - 2026-08-06
 
 ### Structure (monolith closeout — heat facade + export/final/film_spec leaves)

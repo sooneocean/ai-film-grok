@@ -17,9 +17,13 @@ from production_gates import (
     ProductionGateError,
     anti_boring_variety_report,
     assert_face_identity_passed,
+    headroom_report,
     load_pilot_approval,
     loop_risk_shots_from_spec,
     pilot_is_user_approved,
+    style_bible_consistency_report,
+    transition_export_readback_report,
+    transition_policy_report,
 )
 from util import read_json, utc_now
 
@@ -877,6 +881,149 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "face_identity_probe_error",
                     f"face-identity probe failed: {exc}"[:200],
                     fix="check production_gates.assert_face_identity_passed",
+                )
+            )
+
+        # --- Headroom / anti-crop (shortform headroom P1) ---
+        # Timeline half of "防裁头": every shot >= 2.0s, scene-openers >= 3.5s lead-in.
+        # Soft advisory by default; hard on headroom_strict or adult max heat.
+        try:
+            hr = headroom_report(spec)
+            hr_codes = list(hr.get("codes") or [])
+            if hr_codes:
+                hr_strict = spec.get("headroom_strict") is True or str(
+                    spec.get("heat_scale") or ""
+                ).lower() in {"max", "hot", "extreme"}
+                hr_issue = _issue(
+                    "hard" if hr_strict else "soft",
+                    "headroom_protect",
+                    f"headroom {'hard' if hr_strict else 'soft'}: {hr_codes} — "
+                    f"{(hr.get('issues') or [{}])[0].get('message', '')[:120]}",
+                    fix=(
+                        "每镜 duration_sec ≥2.0s；场景开头镜 ≥3.5s 留白，避免裁头/ abrupt cut。"
+                        "lessons-2026-08-06-headroom"
+                    ),
+                )
+                if hr_strict:
+                    hard.append(hr_issue)
+                else:
+                    soft.append(hr_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "headroom_probe_error",
+                    f"headroom probe failed: {exc}"[:200],
+                    fix="check production_gates.headroom_report",
+                )
+            )
+
+        # --- Controlled transition policy (P2 · HF 转场受控策略全量) ---
+        # continue 接戏缝必须 hard match-cut；场景硬切禁 whip/grid；段落转场限
+        # fade/dissolve。Soft advisory by default; hard on transition_policy_strict
+        # or adult max heat. 把"编辑语法"固化成默认门，提前暴露转场意图漂移。
+        try:
+            tp = transition_policy_report(spec)
+            tp_codes = list(tp.get("codes") or [])
+            if tp_codes:
+                tp_strict = spec.get("transition_policy_strict") is True or str(
+                    spec.get("heat_scale") or ""
+                ).lower() in {"max", "hot", "extreme"}
+                tp_issue = _issue(
+                    "hard" if tp_strict else "soft",
+                    "transition_policy",
+                    f"transition-policy {'hard' if tp_strict else 'soft'}: {tp_codes} — "
+                    f"{(tp.get('issues') or [{}])[0].get('message', '')[:120]}",
+                    fix=(
+                        "continue 接戏缝→hard match-cut；场景硬切→禁 whip/grid；"
+                        "段落转场→soft fade/dissolve。lessons/hf-transition-policy"
+                    ),
+                )
+                if tp_strict:
+                    hard.append(tp_issue)
+                else:
+                    soft.append(tp_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "transition_policy_probe_error",
+                    f"transition-policy probe failed: {exc}"[:200],
+                    fix="check production_gates.transition_policy_report",
+                )
+            )
+
+        # --- Controlled transition export read-back (P2 · HF 转场 export read-back 全量) ---
+        # Read back built transition_ops and verify full seam coverage + policy
+        # consistency (continue→hard_cut/0.0s/no overlay; soft→xfade w/ declared
+        # style; chapter→soft fade/dissolve; scene cut→no whip/grid). Soft advisory
+        # by default; hard on transition_policy_strict or adult max heat.
+        try:
+            rb = transition_export_readback_report(spec)
+            rb_codes = list(rb.get("codes") or [])
+            if rb_codes:
+                rb_strict = spec.get("transition_policy_strict") is True or str(
+                    spec.get("heat_scale") or ""
+                ).lower() in {"max", "hot", "extreme"}
+                rb_issue = _issue(
+                    "hard" if rb_strict else "soft",
+                    "transition_readback",
+                    f"transition export read-back {'hard' if rb_strict else 'soft'}: "
+                    f"{rb_codes} — {((rb.get('issues') or [{}])[0].get('message', '') or '')[:120]}",
+                    fix=(
+                        "build one operation per declared seam (continue→hard_cut/0.0s/no "
+                        "overlay; soft→xfade with declared style; chapter→soft fade/dissolve; "
+                        "scene cut→no whip/grid).lessons/hf-transition-policy"
+                    ),
+                )
+                if rb_strict:
+                    hard.append(rb_issue)
+                else:
+                    soft.append(rb_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "transition_readback_probe_error",
+                    f"transition export read-back probe failed: {exc}"[:200],
+                    fix="check production_gates.transition_export_readback_report",
+                )
+            )
+
+        # --- Visual style-bible consistency (P2 · visual_bible 自动生成) ---
+        # The style-bible is the canonical visual source of truth. When the spec
+        # declares visual content, verify the on-disk style-bible.json is consistent
+        # (hero cast master present; lighting timeline matches shot count). Missing /
+        # inconsistent → recommend derive_style_bible_from_spec. Soft by default;
+        # hard on style_bible_strict or adult max heat.
+        try:
+            sb = style_bible_consistency_report(spec, root=root)
+            sb_codes = list(sb.get("codes") or [])
+            if sb_codes:
+                sb_strict = spec.get("style_bible_strict") is True or str(
+                    spec.get("heat_scale") or ""
+                ).lower() in {"max", "hot", "extreme"}
+                sb_issue = _issue(
+                    "hard" if sb_strict else "soft",
+                    "style_bible_consistency",
+                    f"style-bible consistency {'hard' if sb_strict else 'soft'}: {sb_codes} — "
+                    f"{((sb.get('issues') or [{}])[0].get('message', '') or '')[:120]}",
+                    fix=(
+                        "run derive_style_bible_from_spec to auto-generate/refresh "
+                        "style-bible.json (hero cast master + lighting timeline)."
+                    ),
+                )
+                if sb_strict:
+                    hard.append(sb_issue)
+                else:
+                    soft.append(sb_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "style_bible_consistency_probe_error",
+                    f"style-bible consistency probe failed: {exc}"[:200],
+                    fix="check production_gates.style_bible_consistency_report",
                 )
             )
 

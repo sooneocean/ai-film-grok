@@ -7,17 +7,38 @@
 
 ## 执行状态（2026-08-06 已落地）
 
-P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全绿（新增 56 用例，全量非 slow 套件 3153 passed）。详见 CHANGELOG `2.39.96`。
+P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全绿（新增 56 用例，全量非 slow 套件 3153 passed）。详见 CHANGELOG。
 
+> ⚠️ 双 checkout 并发：本会话（git 根 `/Users/dex/.grok/ai-film-grok`）与插件/其他 checkout 同推一个 `main`，远端多次 force-push。下列 P1 项由**另一条开发线**已先行落地（非本会话）：narrative 收尾重绑 + 发色锁 + 成人弧线（v2.40.6）、运动量化门 + 字幕 CJK + BGM 抗疲劳 + style NEG（v2.40.7）。本会话聚焦补齐**尚未覆盖**的 P1 项。
+
+### P0（本会话落地）
 | P0 | 门 | 落地文件 | 测试 |
 |----|----|---------|------|
 | 1 | 抗无聊硬门 | `gates/production_gates.py` `assert_anti_boring_variety` + `preflight` 接入 | `test_production_gates.py::AntiBoringGateTests` |
 | 2 | 每镜脸身份 post_audit 门 | `gates/production_gates.py` `assert_face_identity_passed` + `preflight` + `cli_media.register_clip` 注入 | `test_production_gates.py::FaceIdentityGateTests` |
-| 3 | 九项接戏程序化校验 | `assets/continuity_chain.py` 九项清单 + 字节复用 + **新增禁止掩盖检测**（byte-identical continue 缝叠长 dissolve / 定格倒放插镜）+ `gates/production_gates.py` `assert_continuity_chain_passed` | `test_continuity_chain.py`（含 coverup 用例） |
+| 3 | 九项接戏程序化校验 | `assets/continuity_chain.py` 九项清单 + 字节复用 + **新增禁止掩盖检测** + `gates/production_gates.py` `assert_continuity_chain_passed` | `test_continuity_chain.py`（含 coverup 用例） |
 | 4 | render_final 超时/假死防护 | `post/render_final.py` `_run_with_watchdog` + `--render-timeout`（默认 1800s，0 关闭）+ `final/errors.py` `RenderTimeoutError` | `test_render_watchdog.py` |
-| 5 | TTS 语言乒乓校验 | `audio/voice_cast_profiles.py` `detect_language_pingpong` + `audio/audio_plan.py` 接入（dry-run 输出 `tts_language_issues`） | `test_tts_language_pingpong.py` |
+| 5 | TTS 语言乒乓校验 | `audio/voice_cast_profiles.py` `detect_language_pingpong` + `audio/audio_plan.py` 接入 | `test_tts_language_pingpong.py` |
 
-> P1/P2（lesson→默认硬门晋升、运动量化门、5090 调度器、字幕/headroom 自动、BGM 抗疲劳、lipsync 自动晋级、visual_bible 自动、H3 Fill-Idle 自动、sung 生成、HF 转场全量、长片 SOP 固化）为后续深化与规模化阶段，未在本轮执行。
+### P1 进度（截至 v2.40.9）
+| P1 项 | 状态 | 落地 |
+|------|------|------|
+| 发色锁 / 成人弧线 / narrative 收尾重绑 | ✅ 另一条线 | v2.40.6 |
+| 运动量化门 / 字幕 CJK / BGM 抗疲劳 / style NEG | ✅ 另一条线 | v2.40.7 |
+| **headroom 自动构图保护（时间线防裁头）** | ✅ **本会话** | v2.40.9 `headroom_report` + `assert_headroom_protected` + preflight 接入（`test_headroom.py` 12 用例） |
+| 首帧毒化/静帧压缩 → style_lock 默认 | 🟡 部分（NEG token 在，未强制门） | 待补 |
+| 5090 统一调度器 | 🟡 部分（h3_fill_idle free_first） | 待补/进行中 |
+| lipsync 自动晋级 | ⛔ v2.40.0 已冻结，跳过 | — |
+| HF 转场受控策略（spec 级校验） | ✅ **本会话** | v2.40.11 `transition_policy_report` + `assert_transition_policy` + preflight 接入（`test_transition_policy.py` 16 用例） |
+| **HF 转场 export read-back 全量** | ✅ **本会话** | v2.40.12 `transition_export_readback_report` + `assert_transition_export_readback` + preflight 接入（`test_transition_export_readback.py` 19 用例）；校验 built transition_ops 全量覆盖 + 意图/风格/策略一致（continue→hard_cut/0.0s/no-overlay；soft→xfade+声明风格；chapter→soft fade/dissolve；scene cut→禁 whip/grid） |
+| **visual_bible 自动生成（第一增量）** | ✅ **本会话** | v2.40.13 `derive_style_bible_from_spec` + `assert_style_bible_consistency` + preflight 接入（`test_style_bible_consistency.py` 12 用例）；spec 驱动派生 lighting_timeline（heat_phase）+ cast_masters，consistency 门校验缺失/hero 缺失/光照数不一致 —— 视觉语法自洽第一增量，像素 palette 抽取待补 | 
+| **5090 no-hog 程序化校验（第一增量）** | ✅ **本会话** | v2.40.14 `gpu_no_hog_decision` + `gpu_no_hog_report` + `run_next_fill_idle` 显式守卫（`test_gpu_no_hog.py` 13 用例）；把"busy→零 submit 除非本会话独占 GPU"固化成纯函数+单测，补 submission_capacity 报 ready 却带 `COMFY_QUEUE_BUSY` 的漏判 —— 5090 统一调度器 / H3 Fill-Idle 第一增量 | 
+| **H3 Fill-Idle 自动派单（dispatch-order 显式化）** | ✅ **本会话** | v2.40.15 `fill_idle_sort_key` 抽离为纯函数+单测（`test_fill_idle_dispatch_order.py` 8 用例）；P0→P1→P2 / dual-sticky 优先 / P1 最少 H3 takes / P2 最低 mean 派单序从 `build_fill_idle_queue` 内嵌闭包提升为可测不变量 | 
+| **H3 Fill-Idle 模式/Lane 选取（R2V=能量位自动选取）** | ✅ **本会话** | v2.40.16 `select_fill_idle_mode` 抽离为纯函数+单测（`test_fill_idle_mode_select.py` 10 用例）；把 `classify_fill_idle_shot` 末尾的 R2V=能量位自动选取内联分支提升为可测不变量：primary dual second leg（r2v / flf-i2v）+ P2 soft challenge 优先 face-lock（flf/i2v）除非真实 on-cam-close 能量 | 
+| **H3 Fill-Idle P2 空闲挑战自动派（γ3 低 ROI 跳过）** | ✅ **本会话** | v2.40.17 `decide_p2_challenge` 抽离为纯函数+单测（`test_fill_idle_p2_challenge.py` 9 用例）；把 `classify_fill_idle_shot` 的 `has_still and has_any` 分支（含 γ3 `best>=floor+6.0` 低 ROI 跳过）提升为可测不变量：H3 已 ok→done / H3 低于 floor→P1 retry / 无 H3 且基线强→skip_p2_baseline_strong / 否则 P2 fill_idle_challenge（有 grok 基线标 has_baseline_take） | 
+| 介质路由 / sung | ⬜ P2 | 未做（sung 受 HeartMuLa 外部依赖阻塞；介质路由按 cast_state 稳定性选写实/漫剧待更多调研——`weapon_router.build_weapon_route` 仅做 workflow-demand→weapon/provider 路由，写实/漫剧稳定性路由在 i2v_provider/cast_state 暂未定位清晰边界） |
+
+> 剩余真正开放的高 ROI P1/P2：首帧毒化·静帧压缩晋升 style_lock 默认硬锁、介质自动路由、H3 Fill-Idle 完整派单（R2V 能量位 + P2 空闲挑战自动派）、sung 自动生成（HeartMuLa⛔）、长片 SOP 固化。
 
 ---
 
@@ -76,7 +97,7 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 | **P0** | 每镜脸身份自动门          | `register-clip` 强制 face post_audit 不通过即 reject | `scripts/assets/face_identity.py` + post audit      | 一致性最大痛点根治 |
 | P1     | lesson→默认硬锁       | 发色/静帧压缩/首帧毒化晋升 `style_lock` 默认硬 NEG/校验         | `scripts/assets/style_lock.py` + `hard-defaults.md` | 减少人工守门    |
 | P1     | 介质自动路由            | 按 cast_state 稳定性评分选 I2V 路线（写实/漫剧）              | `scripts/media/*` 路由层                               | 降低出图漂移    |
-| P2     | visual_bible 自动生成 | 从状态照抽取 palette/光照签名生成 style-bible              | `scripts/assets/visual_bible.py`                    | 全片视觉语法自洽  |
+| P2     | visual_bible 自动生成（第一增量） | spec 驱动派生 lighting_timeline（heat_phase）+ cast_masters，style-bible consistency 门（缺失/hero 缺失/光照数不一致） | `scripts/assets/visual_bible.py` + `gates/production_gates.py` | 全片视觉语法自洽（像素 palette 抽取待补） |
 
 > **Top-1 ROI**：每镜脸身份自动门。
 

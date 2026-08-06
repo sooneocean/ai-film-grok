@@ -1180,6 +1180,796 @@ def assert_anti_boring_variety(
     )
 
 
+# --- Headroom / anti-crop gate (P1 · shortform headroom auto-protect) ---
+# "防裁头": a too-short shot gets cropped/abrupt at the head; a scene-opening shot
+# needs extra lead-in so the subject's entrance isn't cut. This is the *timeline*
+# half of headroom — framing_lint.lint_framing_iron covers the *frame* half
+# (composition: full head + headroom in the picture). Soft advisory by default;
+# hard under headroom_strict or adult max heat (incremental rollout like P0 gates).
+_HEADROOM_MIN_SHOT_SEC = 2.0
+_HEADROOM_FIRST_SHOT_MIN_SEC = 3.5
+
+
+def headroom_report(spec: dict[str, Any]) -> dict[str, Any]:
+    """Detect timeline headroom / anti-crop failures.
+
+    Returns {"ok", "checked", "codes", "issues"}. Does not raise; callers decide
+    whether to block (assert_headroom_protected flips to hard under headroom_strict
+    / adult max heat).
+    """
+    issues: list[dict[str, Any]] = []
+    if not isinstance(spec, dict):
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    def _dur(sh: dict[str, Any]) -> float | None:
+        raw = sh.get("duration_sec")
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    # Every shot floor: micro-shots get cropped/abrupt ("裁头" risk).
+    for sh in _flatten_shots(spec):
+        sid = str(sh.get("id") or "?")
+        dur = _dur(sh)
+        if dur is None:
+            continue
+        if dur + 1e-9 < _HEADROOM_MIN_SHOT_SEC:
+            issues.append(
+                {
+                    "code": "HEADROOM_SHOT_TOO_SHORT",
+                    "shot_id": sid,
+                    "duration_sec": dur,
+                    "min_sec": _HEADROOM_MIN_SHOT_SEC,
+                    "message": (
+                        f"{sid}: shot {dur}s < floor {_HEADROOM_MIN_SHOT_SEC}s "
+                        f"— too short, prone to head-crop / abrupt cut"
+                    ),
+                }
+            )
+
+    # Scene-opening shot needs extra lead-in so the subject's entrance isn't cut.
+    scenes = spec.get("scenes") or []
+    if isinstance(scenes, list):
+        for sci, scene in enumerate(scenes):
+            if not isinstance(scene, dict):
+                continue
+            shots = scene.get("shots") or []
+            if not isinstance(shots, list) or not shots:
+                continue
+            first = next((s for s in shots if isinstance(s, dict)), None)
+            if first is None:
+                continue
+            sid = str(first.get("id") or f"scene{sci}:0")
+            dur = _dur(first)
+            if dur is None:
+                continue
+            if dur + 1e-9 < _HEADROOM_FIRST_SHOT_MIN_SEC:
+                issues.append(
+                    {
+                        "code": "HEADROOM_FIRST_SHOT_TOO_SHORT",
+                        "shot_id": sid,
+                        "duration_sec": dur,
+                        "min_sec": _HEADROOM_FIRST_SHOT_MIN_SEC,
+                        "message": (
+                            f"{sid}: scene-opening shot {dur}s < lead-in floor "
+                            f"{_HEADROOM_FIRST_SHOT_MIN_SEC}s — subject entrance may be cropped"
+                        ),
+                    }
+                )
+
+    return {
+        "ok": len(issues) == 0,
+        "checked": True,
+        "codes": sorted({i["code"] for i in issues}),
+        "issues": issues,
+    }
+
+
+def assert_headroom_protected(
+    root: Path | None = None,
+    *,
+    spec: dict[str, Any] | None = None,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """P1 headroom / anti-crop hard gate.
+
+    HARD when film-spec ``headroom_strict`` is True, or adult ``heat_scale`` is
+    max/hot/extreme. Otherwise surfaces as a soft advisory (incremental rollout).
+
+    Emergency escapes: ``force=True`` or ``AIFILM_SKIP_HEADROOM_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_HEADROOM_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    data = spec
+    if data is None and root is not None:
+        path = Path(root).expanduser().resolve() / "film-spec.json"
+        data = read_json(path) or {}
+    if not isinstance(data, dict) or not data:
+        return {"ok": True, "checked": False, "reason": "no_spec"}
+
+    strict = bool(data.get("headroom_strict") is True) or str(
+        data.get("heat_scale") or ""
+    ).lower() in {"max", "hot", "extreme"}
+    report = headroom_report(data)
+    if not report["codes"]:
+        return {"ok": True, "checked": report.get("checked", False), "codes": []}
+    if not strict:
+        return {
+            "ok": True,
+            "checked": True,
+            "soft": True,
+            "codes": report["codes"],
+            "issues": report["issues"],
+        }
+    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
+    raise ProductionGateError(
+        f"headroom gate (strict): {message} "
+        "Fix: give every shot >= 2.0s and scene-opening shots >= 3.5s lead-in so the "
+        "subject's head/entrance isn't cropped. "
+        "Emergency: --skip-headroom or AIFILM_SKIP_HEADROOM_GATE=1"
+    )
+
+
+# --- Controlled transition-policy gate (P2 · HF 转场受控策略全量) ---
+# references/hf-transition-policy.md: continue 接戏缝永远 hard match-cut；场景硬切
+# 禁 whip/grid 等花哨转场；段落转场限 fade/dissolve。把"编辑语法"固化成可程序化
+# 校验的默认门：spec 作者写错转场意图/风格时提前报错，而非渲染时才被
+# enforce_continue_hard_joins 静默改掉（掩盖意图漂移）。
+# Soft advisory by default; hard under transition_policy_strict or adult max heat.
+_TRANSITION_POLICY_CONTINUE = frozenset(
+    {"continue", "match", "match_cut", "match-cut", "byte"}
+)
+# Scene hard-cut 太花哨的转场（references/hf-transition-policy.md：whip 太快 / grid 太花）
+_FLASHY_SCENE_STYLES = frozenset({"whip", "grid"})
+# 段落/章间转场允许的 xfade 风格（fade 家族 + dissolve）
+_PARAGRAPH_STYLES = frozenset({"fade", "fadeblack", "fadewhite", "dissolve", None})
+# intro/outro / 纯 MG 段：放开 HF 转场全目录
+_RELAX_ROLES = frozenset({"intro", "outro", "title", "credit", "mg"})
+
+
+def _shot_chain_mode(shot: dict[str, Any]) -> str:
+    if not isinstance(shot, dict):
+        return ""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    return str(
+        shot.get("chain_mode") or dsl.get("chain_mode") or shot.get("join") or ""
+    ).strip().lower()
+
+
+def transition_policy_report(spec: dict[str, Any]) -> dict[str, Any]:
+    """Validate the controlled transition policy on transition_intents/transition_styles.
+
+    Returns {"ok", "checked", "codes", "issues"}. Does not raise; callers decide
+    whether to block (assert_transition_policy flips to hard under
+    transition_policy_strict / adult max heat).
+
+    Seam type per join i (between shot i and shot i+1), using the *incoming* shot:
+      - chain_mode in continue-set        -> "continue"  (hard match-cut only)
+      - dramatic_function == chapter_transition -> "paragraph" (soft fade/dissolve)
+      - scene_id change                   -> "scene_cut" (no whip/grid)
+      - else                              -> "default"   (treated like scene_cut)
+    intro/outro and pure-MG roles relax to allow-all (HF catalog open).
+    """
+    if not isinstance(spec, dict):
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+    intents = spec.get("transition_intents")
+    if not isinstance(intents, list) or not intents:
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    shots = _flatten_shots(spec)
+    n = len(shots)
+    n_joins = n - 1
+    if n_joins <= 0:
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    # shot -> scene id mapping (scene change ⇒ cross_scene)
+    shot_to_scene: dict[str, str] = {}
+    scenes = spec.get("scenes") or []
+    if isinstance(scenes, list):
+        for sci, sc in enumerate(scenes):
+            if not isinstance(sc, dict):
+                continue
+            sid = str(sc.get("id") or f"scene{sci}")
+            for sh in sc.get("shots") or []:
+                if isinstance(sh, dict) and sh.get("id"):
+                    shot_to_scene[str(sh.get("id"))] = sid
+    styles = spec.get("transition_styles")
+    if not isinstance(styles, list):
+        styles = [None] * n_joins
+
+    issues: list[dict[str, Any]] = []
+    for i in range(n_joins):
+        intent = str(intents[i] if i < len(intents) else "").strip().lower()
+        style = styles[i] if i < len(styles) else None
+        style = str(style).strip().lower() if style else None
+        incoming = shots[i + 1] if i + 1 < n else {}
+        chain = _shot_chain_mode(incoming)
+        df = str((incoming or {}).get("dramatic_function") or "").strip().lower()
+        role = str(
+            (incoming or {}).get("role") or (incoming or {}).get("kind") or ""
+        ).strip().lower()
+
+        # intro/outro / pure-MG → allow all (HF catalog open)
+        if role in _RELAX_ROLES:
+            continue
+
+        if chain in _TRANSITION_POLICY_CONTINUE:
+            if intent != "hard":
+                issues.append(
+                    {
+                        "code": "HF_TRANSITION_CONTINUE_NOT_HARD",
+                        "join_index": i,
+                        "intent": intent or None,
+                        "message": (
+                            f"join {i}: chain_mode={chain!r} (continue seam) but "
+                            f"transition_intent={intent!r} — must be hard match-cut "
+                            f"(forbid xfade/dissolve on continue 接戏缝)"
+                        ),
+                    }
+                )
+            continue
+        if df == "chapter_transition":
+            if intent != "soft" or (style is not None and style not in _PARAGRAPH_STYLES):
+                issues.append(
+                    {
+                        "code": "HF_TRANSITION_PARAGRAPH_BAD",
+                        "join_index": i,
+                        "intent": intent or None,
+                        "style": style,
+                        "message": (
+                            f"join {i}: chapter/段落转场 but intent={intent!r} "
+                            f"style={style!r} — must be soft with fade/dissolve"
+                        ),
+                    }
+                )
+            continue
+        # scene_cut / default
+        if intent in {"hard", "soft", "hold"}:
+            if style in _FLASHY_SCENE_STYLES:
+                issues.append(
+                    {
+                        "code": "HF_TRANSITION_SCENE_FLASHY_STYLE",
+                        "join_index": i,
+                        "intent": intent,
+                        "style": style,
+                        "message": (
+                            f"join {i}: scene cut transition intent={intent!r} "
+                            f"style={style!r} — whip/grid too busy for narrative scene cut"
+                        ),
+                    }
+                )
+        elif style in _FLASHY_SCENE_STYLES:
+            issues.append(
+                {
+                    "code": "HF_TRANSITION_SCENE_FLASHY_STYLE",
+                    "join_index": i,
+                    "intent": intent or None,
+                    "style": style,
+                    "message": (
+                        f"join {i}: scene cut uses flashy transition style={style!r} "
+                        f"(whip/grid too busy for narrative scene cut)"
+                    ),
+                }
+            )
+
+    return {
+        "ok": len(issues) == 0,
+        "checked": True,
+        "codes": sorted({i["code"] for i in issues}),
+        "issues": issues,
+    }
+
+
+def assert_transition_policy(
+    root: Path | None = None,
+    *,
+    spec: dict[str, Any] | None = None,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """P2 controlled transition-policy hard gate (HF 转场受控策略全量).
+
+    HARD when film-spec ``transition_policy_strict`` is True, or adult ``heat_scale``
+    is max/hot/extreme. Otherwise surfaces as a soft advisory (incremental rollout).
+
+    Emergency escapes: ``force=True`` or ``AIFILM_SKIP_TRANSITION_POLICY_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_TRANSITION_POLICY_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    data = spec
+    if data is None and root is not None:
+        path = Path(root).expanduser().resolve() / "film-spec.json"
+        data = read_json(path) or {}
+    if not isinstance(data, dict) or not data:
+        return {"ok": True, "checked": False, "reason": "no_spec"}
+
+    strict = bool(data.get("transition_policy_strict") is True) or str(
+        data.get("heat_scale") or ""
+    ).lower() in {"max", "hot", "extreme"}
+    report = transition_policy_report(data)
+    if not report["codes"]:
+        return {"ok": True, "checked": report.get("checked", False), "codes": []}
+    if not strict:
+        return {
+            "ok": True,
+            "checked": True,
+            "soft": True,
+            "codes": report["codes"],
+            "issues": report["issues"],
+        }
+    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
+    raise ProductionGateError(
+        f"transition-policy gate (strict): {message} "
+        "Fix: continue seams → hard match-cut; scene cuts → no whip/grid; "
+        "chapter transitions → soft fade/dissolve. "
+        "Emergency: --skip-transition-policy or AIFILM_SKIP_TRANSITION_POLICY_GATE=1"
+    )
+
+
+def transition_export_readback_report(spec: dict[str, Any]) -> dict[str, Any]:
+    """Read back built transition_ops and verify full coverage + policy consistency.
+
+    The controlled transition-policy gate (transition_policy_report) validates the
+    *plan* (transition_intents/transition_styles). This read-back validates the
+    *exported operations* (spec["transition_ops"]) actually materialise every
+    declared seam and match the policy — catching seams dropped or styles silently
+    drifted during export/build.
+
+    Returns {"ok", "checked", "codes", "issues", "seam_count", "ops_count"}.
+    Does not raise.
+    """
+    if not isinstance(spec, dict):
+        return {
+            "ok": True,
+            "checked": False,
+            "codes": [],
+            "issues": [],
+            "seam_count": 0,
+            "ops_count": 0,
+        }
+    # Only meaningful if the spec declares transition seams.
+    intents = spec.get("transition_intents")
+    styles = spec.get("transition_styles")
+    if not isinstance(intents, list) and not isinstance(styles, list):
+        return {
+            "ok": True,
+            "checked": False,
+            "codes": [],
+            "issues": [],
+            "seam_count": 0,
+            "ops_count": 0,
+        }
+    n_seams = max(
+        len(intents) if isinstance(intents, list) else 0,
+        len(styles) if isinstance(styles, list) else 0,
+    )
+    if n_seams <= 0:
+        return {
+            "ok": True,
+            "checked": False,
+            "codes": [],
+            "issues": [],
+            "seam_count": 0,
+            "ops_count": 0,
+        }
+
+    shots = _flatten_shots(spec)
+    ops = spec.get("transition_ops")
+    if not isinstance(ops, list):
+        # Declared seams but no built/read-back operations → coverage gap.
+        return {
+            "ok": False,
+            "checked": True,
+            "codes": ["EXPORT_READBACK_NO_OPS"],
+            "issues": [
+                {
+                    "code": "EXPORT_READBACK_NO_OPS",
+                    "seam_count": n_seams,
+                    "ops_count": 0,
+                    "message": (
+                        f"spec declares {n_seams} transition seam(s) but has no "
+                        f"transition_ops — export/build must materialise every seam"
+                    ),
+                }
+            ],
+            "seam_count": n_seams,
+            "ops_count": 0,
+        }
+    ops_count = len(ops)
+    issues: list[dict[str, Any]] = []
+    if ops_count != n_seams:
+        issues.append(
+            {
+                "code": "EXPORT_READBACK_OP_COUNT_MISMATCH",
+                "seam_count": n_seams,
+                "ops_count": ops_count,
+                "message": (
+                    f"transition_ops count={ops_count} != declared seam count={n_seams} "
+                    f"— a transition seam was dropped or duplicated during export"
+                ),
+            }
+        )
+
+    for i, op in enumerate(ops):
+        if not isinstance(op, dict):
+            issues.append(
+                {
+                    "code": "EXPORT_READBACK_OP_INVALID",
+                    "join_index": i,
+                    "message": f"transition_ops[{i}] is not an object",
+                }
+            )
+            continue
+        intent = (
+            str(intents[i]).strip().lower()
+            if isinstance(intents, list) and i < len(intents)
+            else None
+        )
+        style = styles[i] if isinstance(styles, list) and i < len(styles) else None
+        style = str(style).strip().lower() if style else None
+        picture = op.get("picture") if isinstance(op.get("picture"), dict) else {}
+        base = str(picture.get("base") or "").strip().lower()
+        op_style = str(picture.get("style") or "").strip().lower() or None
+        try:
+            dur = float(picture.get("duration_sec") or 0.0)
+        except (TypeError, ValueError):
+            dur = 0.0
+        overlay = str(picture.get("hyperframes_overlay") or "").strip().lower()
+
+        incoming = shots[i + 1] if i + 1 < len(shots) else {}
+        chain = _shot_chain_mode(incoming)
+        role = str(
+            (incoming or {}).get("role") or (incoming or {}).get("kind") or ""
+        ).strip().lower()
+        df = str((incoming or {}).get("dramatic_function") or "").strip().lower()
+
+        # intro/outro / pure-MG → relax (HF catalog open), but op base must still be valid
+        if role in _RELAX_ROLES:
+            if base not in {"hard_cut", "xfade"}:
+                issues.append(
+                    {
+                        "code": "EXPORT_READBACK_OP_BASE_INVALID",
+                        "join_index": i,
+                        "base": base,
+                        "message": (
+                            f"join {i} (relaxed role): op base={base!r} must be "
+                            f"hard_cut|xfade"
+                        ),
+                    }
+                )
+            continue
+
+        if chain in _TRANSITION_POLICY_CONTINUE:
+            # continue seam must stay hard_cut, zero-duration, no HyperFrames overlay
+            if base != "hard_cut" or abs(dur) > 1e-6 or overlay != "none":
+                issues.append(
+                    {
+                        "code": "EXPORT_READBACK_CONTINUE_NOT_HARD",
+                        "join_index": i,
+                        "base": base,
+                        "duration_sec": dur,
+                        "overlay": overlay,
+                        "message": (
+                            f"join {i}: chain_mode={chain!r} (continue seam) but built "
+                            f"op base={base!r} duration_sec={dur} overlay={overlay!r} — "
+                            f"must be hard_cut, 0.0s, no HyperFrames overlay"
+                        ),
+                    }
+                )
+            continue
+        if df == "chapter_transition":
+            if base != "xfade" or (
+                op_style is not None and op_style not in _PARAGRAPH_STYLES
+            ):
+                issues.append(
+                    {
+                        "code": "EXPORT_READBACK_PARAGRAPH_BAD",
+                        "join_index": i,
+                        "base": base,
+                        "style": op_style,
+                        "message": (
+                            f"join {i}: chapter/段落转场 but built op base={base!r} "
+                            f"style={op_style!r} — must be soft xfade with fade/dissolve"
+                        ),
+                    }
+                )
+            continue
+        # scene_cut / default
+        if intent == "soft":
+            if base != "xfade":
+                issues.append(
+                    {
+                        "code": "EXPORT_READBACK_SOFT_NOT_XFADE",
+                        "join_index": i,
+                        "base": base,
+                        "message": (
+                            f"join {i}: intent=soft but built op base={base!r} "
+                            f"(must be xfade)"
+                        ),
+                    }
+                )
+            elif style is not None and op_style != style:
+                issues.append(
+                    {
+                        "code": "EXPORT_READBACK_STYLE_DRIFT",
+                        "join_index": i,
+                        "declared_style": style,
+                        "op_style": op_style,
+                        "message": (
+                            f"join {i}: declared style={style!r} but built op "
+                            f"style={op_style!r} — export drifted the transition style"
+                        ),
+                    }
+                )
+            if op_style in _FLASHY_SCENE_STYLES:
+                issues.append(
+                    {
+                        "code": "EXPORT_READBACK_FLASHY_STYLE",
+                        "join_index": i,
+                        "style": op_style,
+                        "message": (
+                            f"join {i}: built op uses flashy style={op_style!r} "
+                            f"(whip/grid too busy for narrative scene cut)"
+                        ),
+                    }
+                )
+        elif intent == "hard":
+            if base != "hard_cut":
+                issues.append(
+                    {
+                        "code": "EXPORT_READBACK_HARD_NOT_CUT",
+                        "join_index": i,
+                        "base": base,
+                        "message": (
+                            f"join {i}: intent=hard but built op base={base!r} "
+                            f"(must be hard_cut)"
+                        ),
+                    }
+                )
+        else:
+            # intent None/unknown → still block flashy styles on non-continue seams
+            if op_style in _FLASHY_SCENE_STYLES:
+                issues.append(
+                    {
+                        "code": "EXPORT_READBACK_FLASHY_STYLE",
+                        "join_index": i,
+                        "style": op_style,
+                        "message": (
+                            f"join {i}: built op uses flashy style={op_style!r} "
+                            f"(whip/grid too busy for narrative scene cut)"
+                        ),
+                    }
+                )
+
+    return {
+        "ok": len(issues) == 0,
+        "checked": True,
+        "codes": sorted({i["code"] for i in issues}),
+        "issues": issues,
+        "seam_count": n_seams,
+        "ops_count": ops_count,
+    }
+
+
+def assert_transition_export_readback(
+    root: Path | None = None,
+    *,
+    spec: dict[str, Any] | None = None,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """P2 export read-back hard gate (HF 转场 export read-back 全量).
+
+    Verifies the built transition_ops fully cover and match the declared
+    transition_intents/transition_styles. HARD under transition_policy_strict or
+    adult max heat; otherwise a soft advisory (incremental rollout).
+
+    Emergency escapes: ``force=True`` or ``AIFILM_SKIP_TRANSITION_READBACK_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_TRANSITION_READBACK_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    data = spec
+    if data is None and root is not None:
+        path = Path(root).expanduser().resolve() / "film-spec.json"
+        data = read_json(path) or {}
+    if not isinstance(data, dict) or not data:
+        return {"ok": True, "checked": False, "reason": "no_spec"}
+
+    strict = bool(data.get("transition_policy_strict") is True) or str(
+        data.get("heat_scale") or ""
+    ).lower() in {"max", "hot", "extreme"}
+    report = transition_export_readback_report(data)
+    if not report["codes"]:
+        return {
+            "ok": True,
+            "checked": report.get("checked", False),
+            "codes": [],
+            "seam_count": report.get("seam_count", 0),
+            "ops_count": report.get("ops_count", 0),
+        }
+    if not strict:
+        return {
+            "ok": True,
+            "checked": True,
+            "soft": True,
+            "codes": report["codes"],
+            "issues": report["issues"],
+            "seam_count": report.get("seam_count", 0),
+            "ops_count": report.get("ops_count", 0),
+        }
+    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
+    raise ProductionGateError(
+        f"transition export read-back gate (strict): {message} "
+        "Fix: build one operation per declared seam (continue→hard_cut/0.0s/no overlay; "
+        "soft→xfade with declared style; chapter→soft fade/dissolve). "
+        "Emergency: --skip-transition-readback or AIFILM_SKIP_TRANSITION_READBACK_GATE=1"
+    )
+
+
+def style_bible_consistency_report(
+    spec: dict[str, Any], root: Path | None = None
+) -> dict[str, Any]:
+    """Validate visual style-bible consistency with the spec (P2 visual_bible 自动生成).
+
+    The style-bible is the canonical visual source of truth (palette / lighting /
+    cast masters). When the spec declares visual content (shots / cast), this reads
+    back the on-disk ``style-bible.json`` and verifies it is consistent:
+
+      - ``STYLE_BIBLE_MISSING``      spec has visual content but no style-bible.json
+                                     (run ``derive_style_bible_from_spec`` to auto-gen)
+      - ``STYLE_BIBLE_HERO_CAST_MISSING``  spec has hero shots but bible lacks
+                                     ``cast_masters.hero``
+      - ``STYLE_BIBLE_LIGHTING_MISMATCH``  bible lighting_timeline count != shot count
+
+    Returns {"ok", "checked", "codes", "issues"}. Does not raise.
+    """
+    if not isinstance(spec, dict):
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+    from assets.visual_bible import derive_lighting_timeline, load_bible  # lazy
+
+    shots = _flatten_shots(spec)
+    has_visual = bool(shots) or bool(spec.get("cast_masters"))
+    if not has_visual:
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    if root is None:
+        # Can't read the on-disk bible without a root; spec-only readiness only.
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    issues: list[dict[str, Any]] = []
+    bible_path = Path(root) / "style-bible.json"
+    if not bible_path.is_file():
+        issues.append(
+            {
+                "code": "STYLE_BIBLE_MISSING",
+                "message": (
+                    "spec declares visual content but no style-bible.json — "
+                    "run derive_style_bible_from_spec to auto-generate it"
+                ),
+            }
+        )
+        return {
+            "ok": False,
+            "checked": True,
+            "codes": ["STYLE_BIBLE_MISSING"],
+            "issues": issues,
+        }
+
+    bible = load_bible(Path(root))
+    hero_shots = [
+        s for s in shots if str(s.get("shot_role") or "").strip().lower() == "hero"
+    ]
+    cm = bible.get("cast_masters") if isinstance(bible.get("cast_masters"), dict) else {}
+    if hero_shots and "hero" not in cm:
+        issues.append(
+            {
+                "code": "STYLE_BIBLE_HERO_CAST_MISSING",
+                "message": (
+                    "spec has hero shots but style-bible.cast_masters.hero is missing — "
+                    "auto-derive or register the hero cast master"
+                ),
+            }
+        )
+    if shots:
+        tl = bible.get("lighting_timeline")
+        derived = derive_lighting_timeline(shots)
+        if not isinstance(tl, list) or len(tl) != len(shots):
+            issues.append(
+                {
+                    "code": "STYLE_BIBLE_LIGHTING_MISMATCH",
+                    "message": (
+                        f"style-bible lighting_timeline count "
+                        f"({len(tl) if isinstance(tl, list) else 0}) != shot count "
+                        f"({len(shots)}) — auto-derive to refresh"
+                    ),
+                }
+            )
+            _ = derived  # keep lazy import referenced for clarity
+
+    return {
+        "ok": len(issues) == 0,
+        "checked": True,
+        "codes": sorted({i["code"] for i in issues}),
+        "issues": issues,
+    }
+
+
+def assert_style_bible_consistency(
+    root: Path | None = None,
+    *,
+    spec: dict[str, Any] | None = None,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """P2 visual_bible consistency hard gate (visual_bible 自动生成).
+
+    HARD under ``style_bible_strict`` or adult ``heat_scale`` max/hot/extreme; otherwise
+    a soft advisory (incremental rollout). Emergency escapes: ``force=True`` or
+    ``AIFILM_SKIP_STYLE_BIBLE_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_STYLE_BIBLE_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    data = spec
+    if data is None and root is not None:
+        path = Path(root).expanduser().resolve() / "film-spec.json"
+        data = read_json(path) or {}
+    if not isinstance(data, dict) or not data:
+        return {"ok": True, "checked": False, "reason": "no_spec"}
+
+    report = style_bible_consistency_report(data, root=root)
+    if not report["codes"]:
+        return {
+            "ok": True,
+            "checked": report.get("checked", False),
+            "codes": [],
+        }
+    strict = bool(data.get("style_bible_strict") is True) or str(
+        data.get("heat_scale") or ""
+    ).lower() in {"max", "hot", "extreme"}
+    if not strict:
+        return {
+            "ok": True,
+            "checked": True,
+            "soft": True,
+            "codes": report["codes"],
+            "issues": report["issues"],
+        }
+    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
+    raise ProductionGateError(
+        f"style-bible consistency gate (strict): {message} "
+        "Fix: run derive_style_bible_from_spec to auto-generate / refresh style-bible.json. "
+        "Emergency: --skip-style-bible or AIFILM_SKIP_STYLE_BIBLE_GATE=1"
+    )
+
+
 # --- Face-identity post_audit gate (P0 · face-identity-pixel) ---
 # A post_audit that ran and found keyframe pixel drift means an approved clip would
 # carry a face-identity break; register-clip / final must reject until re-audited.

@@ -384,6 +384,86 @@ def _is_primary_h3(intent: dict[str, Any]) -> bool:
     )
 
 
+def select_fill_idle_mode(
+    *,
+    mode_res: dict[str, Any],
+    reasons: list[str],
+    lane: str,
+    status: str,
+    primary: bool,
+    has_last: bool,
+    on_cam_close: bool,
+) -> tuple[str, list[str]]:
+    """Finalize H3 mode for a Fill-Idle job (R2V = energy-lane auto-selection).
+
+    Pure function: given the mode resolver result produced by ``resolve_h3_mode``
+    and the dispatch ``reasons`` already collected by ``classify_fill_idle_shot``,
+    return ``(mode, added_reasons)``. Extracted so the R2V=energy-lane policy is
+    a single testable invariant rather than inline branches (P2, v2.40.16).
+
+    Policy encoded:
+      - primary dual second leg: ``dual_need_r2v`` -> r2v; ``dual_need_i2v`` ->
+        flf when end-still exists else i2v.
+      - P2 soft challenge: prefer face-lock (flf/i2v) over r2v unless genuine
+        dialogue-close energy (on_cam_close) — r2v stays only for true energy.
+    """
+    mode = str(mode_res.get("mode") or "i2v")
+    added: list[str] = []
+    if primary and "dual_need_r2v" in reasons:
+        mode = "r2v"
+        added.append("dual_second_leg_r2v")
+    elif primary and "dual_need_i2v" in reasons:
+        # Prefer FLF identity leg when end still exists.
+        mode = "flf" if has_last else "i2v"
+        added.append("dual_second_leg_flf" if has_last else "dual_second_leg_i2v")
+    elif lane == "challenge_grok" and status.startswith("pending") and mode == "r2v":
+        # Still allow r2v if energy flags, but soft fill prefers face lock when alt exists.
+        if not primary and mode_res.get("alt_mode") not in {"i2v", "flf"}:
+            pass  # keep r2v for true energy
+        elif not primary:
+            # prefer flf/i2v for fair face PK unless dialogue-close energy.
+            if not on_cam_close:
+                mode = "flf" if has_last else "i2v"
+                added.append("p2_prefer_flf_face_pk" if has_last else "p2_prefer_i2v_face_pk")
+    return mode, added
+
+
+def decide_p2_challenge(
+    *,
+    has_h3: bool,
+    below: bool,
+    has_grok: bool,
+    best: float | None,
+    floor: float | None,
+) -> tuple[str, str, str, list[str]]:
+    """Decide priority/lane/status for a P2 soft challenge after a baseline take exists.
+
+    Pure function extracted from ``classify_fill_idle_shot`` (the
+    ``has_still and has_any`` branch) so the P2 idle-challenge auto-dispatch
+    policy — including the γ3 low-ROI-skip — is a single testable invariant
+    rather than inline branches (P2, v2.40.17).
+
+    Policy encoded:
+      - H3 take already ok (has_h3 and not below) -> done, no re-challenge.
+      - H3 take below floor (has_h3 and below) -> P1 retry of the weak take.
+      - No H3 take yet: γ3 skip when baseline is already strong
+        (``best >= floor + 6.0``) to avoid low-ROI P2 burn; otherwise enqueue a
+        P2 fill_idle_challenge (marking has_baseline_take when a Grok/unknown
+        baseline exists).
+    """
+    if has_h3 and not below:
+        return "done", "challenge_grok", "done", ["already_challenged_ok"]
+    if has_h3 and below:
+        return "P1", "challenge_weak", "retry", ["challenge_below_floor"]
+    # γ3: baseline already strong -> skip low-ROI P2 burn.
+    if floor is not None and best is not None and float(best) >= float(floor) + 6.0:
+        return "done", "challenge_grok", "done", ["skip_p2_baseline_strong"]
+    reasons = ["fill_idle_challenge"]
+    if has_grok:
+        reasons.append("has_baseline_take")
+    return "P2", "challenge_grok", "pending", reasons
+
+
 def _poison_blocked(root: Path, shot_id: str) -> bool:
     """Soft check: poison receipts or rejected stills skip the queue."""
     man = read_json(root / "manifest.json") or {}
@@ -567,22 +647,14 @@ def classify_fill_idle_shot(
             reasons.append(f"h3_takes={h3_n}>={cap}")
     elif has_still and has_any:
         # soft challenge only after Grok/baseline take exists (main axis first)
-        if has_h3 and not below:
-            priority, lane, status = "done", "challenge_grok", "done"
-            reasons.append("already_challenged_ok")
-        elif has_h3 and below:
-            priority, lane, status = "P1", "challenge_weak", "retry"
-            reasons.append("challenge_below_floor")
-        else:
-            # γ3: baseline already strong → skip low-ROI P2 burn
-            if floor is not None and best is not None and float(best) >= float(floor) + 6.0:
-                priority, lane, status = "done", "challenge_grok", "done"
-                reasons.append("skip_p2_baseline_strong")
-            else:
-                priority, lane, status = "P2", "challenge_grok", "pending"
-                reasons.append("fill_idle_challenge")
-                if has_grok or any(t.get("lane") == "unknown" for t in takes):
-                    reasons.append("has_baseline_take")
+        priority, lane, status, p2_added = decide_p2_challenge(
+            has_h3=has_h3,
+            below=below,
+            has_grok=has_grok,
+            best=best,
+            floor=floor,
+        )
+        reasons.extend(p2_added)
     elif has_still and not has_any and not primary:
         priority, lane, status = "P3", "skip", "wait_grok_baseline"
         reasons.append("wait_for_grok_baseline")
@@ -597,25 +669,17 @@ def classify_fill_idle_shot(
         has_last=has_last,
         wants_continue=wants_continue,
     )
-    mode = str(mode_res.get("mode") or "i2v")
-    # Dual second leg: pick the missing mode explicitly
-    if primary and "dual_need_r2v" in reasons:
-        mode = "r2v"
-        reasons.append("dual_second_leg_r2v")
-    elif primary and "dual_need_i2v" in reasons:
-        # Prefer FLF identity leg when end still exists
-        mode = "flf" if has_last else "i2v"
-        reasons.append("dual_second_leg_flf" if has_last else "dual_second_leg_i2v")
-    # P2 soft challenges: default I2V/FLF first (policy); keep alt_mode from resolver
-    elif lane == "challenge_grok" and status.startswith("pending") and mode == "r2v":
-        # still allow r2v if energy flags, but soft fill prefers face lock when alt exists
-        if not primary and mode_res.get("alt_mode") not in {"i2v", "flf"}:
-            pass  # keep r2v for true energy
-        elif not primary:
-            # prefer flf/i2v for fair face PK unless dialogue-close energy
-            if not (on_cam and close):
-                mode = "flf" if has_last else "i2v"
-                reasons.append("p2_prefer_flf_face_pk" if has_last else "p2_prefer_i2v_face_pk")
+    # Finalize mode via extracted invariant (R2V = energy-lane auto-selection).
+    mode, mode_added = select_fill_idle_mode(
+        mode_res=mode_res,
+        reasons=reasons,
+        lane=lane,
+        status=status,
+        primary=primary,
+        has_last=has_last,
+        on_cam_close=bool(on_cam and close),
+    )
+    reasons.extend(mode_added)
 
     last_cli = f' --last-frame "{last_path}"' if last_path and mode in {"flf", "r2v"} else ""
     cmd = (
@@ -707,6 +771,37 @@ def _i2v_mean_strong_enough(
     return False
 
 
+def fill_idle_sort_key(row: dict[str, Any]) -> tuple:
+    """Pure dispatch-order key for the Fill-Idle queue (H3 Fill-Idle 自动派单).
+
+    Order: priority rank (P0<P1<P2) → dual-sticky first → fewest H3 takes first
+    (P1) → lowest best_mean first (P2/P1) → shot_id tiebreak.
+
+    Mirrors the policy previously inlined in ``build_fill_idle_queue`` so the
+    dispatch ordering is an explicit, unit-tested invariant rather than a nested
+    closure. Pure — operates only on the already-classified row dict.
+    """
+    r = row if isinstance(row, dict) else {}
+    rank = int(r.get("priority_rank") or 99)
+    sticky = 0 if r.get("dual_sticky") else 1
+    mean = r.get("best_mean")
+    h3_n = 0
+    for t in r.get("takes") or []:
+        if isinstance(t, dict) and t.get("lane") == "h3":
+            h3_n += 1
+    if r.get("priority") == "P2":
+        mean_key = float(mean) if mean is not None else 1e9
+        take_key = 0
+    elif r.get("priority") == "P1":
+        # fewest H3 takes first, then lowest mean
+        take_key = h3_n
+        mean_key = float(mean) if mean is not None else 1e9
+    else:
+        mean_key = 0.0
+        take_key = 0
+    return (rank, sticky, take_key, mean_key, str(r.get("shot_id") or ""))
+
+
 def build_fill_idle_queue(
     root: Path | str,
     *,
@@ -762,27 +857,8 @@ def build_fill_idle_queue(
 
     # P0 dual sticky first within rank; P1 rotate fewest H3 takes first (avoid
     # shot09 monopolizing the 5090 when mean never clears floor); P2 lowest mean.
-    def sort_key(r: dict[str, Any]) -> tuple:
-        rank = int(r.get("priority_rank") or 99)
-        sticky = 0 if r.get("dual_sticky") else 1
-        mean = r.get("best_mean")
-        h3_n = 0
-        for t in r.get("takes") or []:
-            if isinstance(t, dict) and t.get("lane") == "h3":
-                h3_n += 1
-        if r.get("priority") == "P2":
-            mean_key = float(mean) if mean is not None else 1e9
-            take_key = 0
-        elif r.get("priority") == "P1":
-            # fewest H3 takes first, then lowest mean (hardest still gets more later)
-            take_key = h3_n
-            mean_key = float(mean) if mean is not None else 1e9
-        else:
-            mean_key = 0.0
-            take_key = 0
-        return (rank, sticky, take_key, mean_key, str(r.get("shot_id") or ""))
-
-    rows.sort(key=sort_key)
+    # Ordering is the explicit, unit-tested fill_idle_sort_key policy.
+    rows.sort(key=fill_idle_sort_key)
 
     pending = [r for r in rows if r.get("command")]
     next_row = pending[0] if pending else None
@@ -1683,6 +1759,96 @@ def _env_i_own_the_gpu() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+# Multi-agent 5090 no-hog policy (2026-08-06 IRON, user: '不准再犯').
+# Pure decision — no GPU/network — so the rule is machine-checkable and
+# unit-testable independently of the Comfy `submission_capacity` API. This is
+# the explicit-first increment of the "H3 Fill-Idle 自动派单" / "5090 统一调度器"
+# P2 items: make the busy→zero-submit rule a tested invariant rather than an
+# implicit side-effect of capacity probing.
+def gpu_no_hog_decision(
+    *,
+    queue_busy: bool,
+    i_own_gpu: bool = False,
+    mode: str = "run_next",
+    execute: bool = True,
+) -> dict[str, Any]:
+    """Pure multi-agent 5090 no-hog dispatch decision.
+
+    Rules (2026-08-06 IRON):
+    - ``until_empty`` execute requires explicit ownership (``i_own_gpu``).
+    - busy queue (foreign/other agents' jobs running) => zero submit unless owned.
+    - free-first never cancels foreign (enforced at the capacity layer; this only
+      gates submission).
+    - dry-run (``execute=False``) never holds — probing is always allowed.
+
+    Returns ``{"decision": "proceed" | "hold" | "refused", "reason_code": str, ...}``.
+    """
+    owned = bool(i_own_gpu)
+    mode = str(mode or "run_next")
+    if not execute:
+        return {
+            "decision": "proceed",
+            "reason_code": "dry_run_allowed",
+            "owned": owned,
+            "queue_busy": bool(queue_busy),
+            "mode": mode,
+        }
+    if mode == "until_empty" and not owned:
+        return {
+            "decision": "refused",
+            "reason_code": "until_empty_requires_ownership",
+            "owned": owned,
+            "queue_busy": bool(queue_busy),
+            "mode": mode,
+        }
+    if bool(queue_busy) and not owned:
+        return {
+            "decision": "hold",
+            "reason_code": "no_hog_busy_hold",
+            "owned": owned,
+            "queue_busy": bool(queue_busy),
+            "mode": mode,
+        }
+    return {
+        "decision": "proceed",
+        "reason_code": "no_hog_ok",
+        "owned": owned,
+        "queue_busy": bool(queue_busy),
+        "mode": mode,
+    }
+
+
+def gpu_no_hog_report(
+    *,
+    queue_busy: bool,
+    i_own_gpu: bool = False,
+    mode: str = "run_next",
+    execute: bool = True,
+) -> dict[str, Any]:
+    """Wrap :func:`gpu_no_hog_decision` into a gate-style report dict.
+
+    ``holds`` is advisory — the live scheduler still decides whether to submit —
+    but the policy is now machine-checkable and unit-tested.
+    """
+    dec = gpu_no_hog_decision(
+        queue_busy=bool(queue_busy),
+        i_own_gpu=bool(i_own_gpu),
+        mode=mode,
+        execute=bool(execute),
+    )
+    return {
+        "schema_version": 1,
+        "kind": "ai-film-gpu-no-hog",
+        "decision": dec["decision"],
+        "holds": dec["decision"] in {"hold", "refused"},
+        "reason_code": dec["reason_code"],
+        "owned": dec["owned"],
+        "queue_busy": dec["queue_busy"],
+        "mode": dec["mode"],
+        "execute": bool(execute),
+    }
+
+
 def fill_idle_cycle(
     root: Path | str,
     *,
@@ -2259,6 +2425,22 @@ def run_next_fill_idle(
         "open_ops": [],
     }
     prev_mode: str | None = None
+
+    # Multi-agent 5090 no-hog guard (2026-08-06 IRON, user: '不准再犯'):
+    # a busy queue holding foreign/other agents' jobs must not be submitted to.
+    # The capacity probe can report status=="ready" while still carrying the
+    # COMFY_QUEUE_BUSY blocker — this explicit check closes that gap. Dry-run is
+    # always allowed; GPU ownership (AIFILM_I_OWN_THE_GPU) overrides the hold.
+    if execute:
+        _cap = probe_comfy_capacity_soft()
+        _busy = _QUEUE_BUSY_CODE in _capacity_blocker_codes(_cap)
+        if _busy and not _env_i_own_the_gpu():
+            last_out["skipped_reason"] = "no_hog_busy_hold"
+            last_out["ok"] = True
+            last_out["no_hog"] = gpu_no_hog_report(
+                queue_busy=True, i_own_gpu=False, mode="run_next", execute=True
+            )
+            return last_out
 
     def _mark_halt(reason: str, *, decision_tree: dict[str, Any], command: str | None = None) -> None:
         code, group = _halt_reason_code_and_group(reason)
