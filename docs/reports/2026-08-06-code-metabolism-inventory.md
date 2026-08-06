@@ -1,47 +1,42 @@
 # Code metabolism inventory — 2026-08-06
 
-**Generated:** 2026-08-06T11:34:48Z
-**Latest batch:** 2.40.39
+**Generated:** 2026-08-06T11:41:14Z
+**Latest batch:** 2.40.41
 
 ## Summary
 
 | Metric | Value |
 |--------|------:|
 | Top-level modules | 348 |
-| Classified shims | 255 |
-| Non-shim top-level | 93 |
-| Functions ≥200 LOC | 74 |
-| Max function LOC | 2450 |
+| Classified shims | 265 |
+| Non-shim top-level | 83 |
 
 ## Four lanes
 
 | Lane | Rule |
 |------|------|
-| A DELETE | 0 import ∧ 0 CLI ∧ 0 test (empty) |
-| B TOMBSTONE | frozen lipsync keep thin |
-| C MIGRATE | package + thin hard-compat shim |
-| D PEEL | pure leaves from giant orchestrators |
+| A DELETE | empty for whole files |
+| B TOMBSTONE | lipsync keep thin |
+| C MIGRATE | package + hard-compat shim |
+| D PEEL | pure leaves from orchestrators |
 
-## Batch 2.40.39 (this round)
+## Batch 2.40.41
 
 | Module | Package |
 |--------|---------|
-| `render_workspace` | `post/` |
-| `vo_atempo` | `audio/` |
-| `context_routing` | `spine/` (+ SKILL_ROOT parents[2]) |
-| `benchmark` | `plan/` |
-| `provider_canary` | `media/` |
-| `product_brief` | `plan/` |
-| `planning_autopilot` | `plan/` |
-| `elevenlabs_canary` | `audio/` |
+| `review_pack` / `picture_lock` / `auto_cut` / `local_omni_review` | `post/` |
+| `speech_preview` | `audio/` |
+| `reference_audit` | `media/` |
+| `shortform_motion` / `prompt_compression_pilot` / `optimization_experiments` / `motion_plan` | `plan/` |
 
-**Peel:** more `resolve_plate_slot_sec` call sites (cue triangle + visual slot).  
-**P4:** `tests/test_core_emit.py` for `core.emit`.
+**Peel:** `coerce_optional_float` for optional `in_point_sec`.  
+**P4:** `tests/test_core_constants.py`.
 
-## Prior batch 2.40.38
+## Prior
 
-vo_lint, native_text_gate, seedance_bridge, show_package, gold_calibration + golden_suite/color_grade shims + first plate-slot peel.
+- 2.40.39: 8 modules + plate-slot sites + core.emit  
+- 2.40.38: 5 modules + plate-slot intro + golden/color shims  
 
 ## Iron
 
-Public import names via shims · no heat/i2v/pilot retune in structure commits.
+Public import names via shims · no heat/i2v/pilot retune.

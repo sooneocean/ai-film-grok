@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.41] - 2026-08-06
+
+### Changed (code metabolism round 3 · P3-1×10 + coerce_optional_float + core.constants tests)
+- **P3-1 migrate + hard-compat shims (10):** `review_pack`/`picture_lock`/`auto_cut`/`local_omni_review`→`post/`; `speech_preview`→`audio/`; `reference_audit`→`media/`; `shortform_motion`/`prompt_compression_pilot`/`optimization_experiments`/`motion_plan`→`plan/`.
+- **Peel:** `post/render_final.coerce_optional_float` for optional `in_point_sec`.
+- **P4-1:** `tests/test_core_constants.py` (5 cases) for zero-coverage `core.constants`.
+- **Inventory** refreshed.
+- Iron: public `import name` preserved; no heat/i2v/pilot retune. Concurrent dirty `cli_pilot`/`cli_write_spec` left untouched.
+
 ## [2.40.40] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-3)

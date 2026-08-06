@@ -319,6 +319,17 @@ def resolve_plate_slot_sec(
     return float(plate_slot)
 
 
+
+def coerce_optional_float(value: object) -> float | None:
+    """Coerce a present value to float; None stays None (conversion errors raise).
+
+    Pure helper for optional timeline fields such as ``in_point_sec``.
+    """
+    if value is None:
+        return None
+    return float(value)  # type: ignore[arg-type]
+
+
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
     bgm_source_receipt: dict[str, Any] | None = None
@@ -962,7 +973,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         except (TypeError, ValueError):
             out_point = None
         try:
-            in_point = float(shot["in_point_sec"]) if shot.get("in_point_sec") is not None else None
+            in_point = coerce_optional_float(shot.get("in_point_sec"))
         except (TypeError, ValueError):
             in_point = None
         shot_audio.append(

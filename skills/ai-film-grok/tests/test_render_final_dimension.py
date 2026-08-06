@@ -81,3 +81,13 @@ def test_resolve_plate_slot_sec_zero_default_keeps_zero(render_final_mod) -> Non
         == 3.25
     )
 
+
+def test_coerce_optional_float(render_final_mod) -> None:
+    assert render_final_mod.coerce_optional_float(None) is None
+    assert render_final_mod.coerce_optional_float(1.5) == 1.5
+    assert render_final_mod.coerce_optional_float("2.25") == 2.25
+    import pytest
+
+    with pytest.raises((TypeError, ValueError)):
+        render_final_mod.coerce_optional_float("nope")
+
