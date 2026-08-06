@@ -1598,7 +1598,7 @@
     },
     {
       "path": "scripts/media/h3_fill_idle.py",
-      "sha256": "73900035e851ee08cb11164f211a0087431afc0223177aa5d677ad11d167a42a"
+      "sha256": "ceb5899556813c025b6ca03b37c862ece33eabb2e2322365e34f439b3db39a21"
     },
     {
       "path": "scripts/media/h3_media_pack.py",
@@ -1639,6 +1639,10 @@
     {
       "path": "scripts/media/media_queue.py",
       "sha256": "789322d7dda9a8c55726214b2418d7e4a976343b1355ab4181315fca813cda44"
+    },
+    {
+      "path": "scripts/media/media_routing.py",
+      "sha256": "3a56599000d06db41bb3cde4689afd6416b2f854f063b96349d9404a6b47a9a5"
     },
     {
       "path": "scripts/media/pilot_pack.py",
