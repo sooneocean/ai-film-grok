@@ -17,10 +17,6 @@
       "sha256": "210fcd8a477a3df2ad9fd1451b627a1da4e4e939fb34efead3ac3f12f6cdb6ae"
     },
     {
-      "path": "scripts/aifilm_grok.py",
-      "sha256": "2b0068fc6e0589e42a43194c8585eb54745035936b090a46985bc22e4a49b654"
-    },
-    {
       "path": "scripts/acoustic_policy.py",
       "sha256": "e46f29de4042a8fa8110193233ef1b7a31ff82a8eaa292ed277ab08c0f7323ed"
     },
