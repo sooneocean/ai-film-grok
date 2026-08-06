@@ -399,6 +399,10 @@ def cmd_final(args: argparse.Namespace) -> int:
         cmd += ["--end-dur", str(args.end_dur)]
     if getattr(args, "allow_loop_risk", False):
         cmd += ["--allow-loop-risk"]
+    if bool(getattr(args, "skip_preflight", False)):
+        cmd += ["--skip-preflight"]
+    if bool(getattr(args, "skip_heat_gate", False)):
+        cmd += ["--skip-heat-gate"]
     if getattr(args, "vo_fit", None):
         cmd += ["--vo-fit", str(args.vo_fit)]
     if bool(getattr(args, "resume", False)):

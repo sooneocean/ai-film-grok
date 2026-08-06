@@ -235,7 +235,7 @@ class MusicTemplateTests(unittest.TestCase):
     def test_skill_library_receipt_path_is_not_absolute(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            library = root / "shared" / "assets" / "bgm" / "rnb"
+            library = root / "assets" / "bgm" / "rnb"
             library.mkdir(parents=True)
             (library / "bed.wav").write_bytes(b"shared" * 100)
             (library / "bed.license.txt").write_text("test", encoding="utf-8")

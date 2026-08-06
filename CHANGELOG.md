@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.39.79] - 2026-08-06
+
+### Added (Wave B scale-fallback + D1 + C1 OPEN_OPS)
+- **B** `narrative/scale_fallback.py`: soft-max / bare-tease / **SCALE_HARD_ON_BAN** (poison streak stop); final writes `receipts/scale-fallback.json` + wardrobe tier on official-final.
+- **B** media_queue fail: moderation/poison → scale-fallback receipt (stop hard-on honesty).
+- **D1** generation_request optional path: `note_queue_partial` instead of silent pass.
+- **C1** dry until-empty canary: `artifacts/2026-08-06-c1-until-empty-dry-open-ops.json` (queue_busy + VRAM/RAM floors; full drain still OPEN_OPS).
+- Tests: scale-fallback + HEAT_WARDROBE_RE_DRESS in `test_suse_final_iron`.
+
+### Fixed (Stage 3 business logic regression)
+- **F1** `registry/h3-combo-winners.json`: corrected `dialogue_mouth_energy` lane `prompt_family` from stale `dialogue_mouth_flat` to `dialogue_mouth_max` (aligned with R4 policy in `h3_combo_eval.py`).
+- **F2** `spine/dispatch.py`: added `_STATE_OK_ONLY` frozenset with `select-shortlist.json` entry so `select-shortlist` contract is wired and `test_dispatch_source_mentions_wave_h` passes.
+- **F3** `tests/test_music_template.py`: fixed mock path resolution — moved library fixture from `shared/assets/bgm/rnb` to `assets/bgm/rnb` to match `Path(__file__).resolve().parents[2]` convention.
+
+## [2.39.78] - 2026-08-06
+
+### Added (suse EP01 Wave A4–A5)
+- **A4** BGM honesty: `mood_library_status` + `build_bgm_source_receipt` → `receipts/bgm-source.json`; rnb license-only (no wav) → procedural + `honest_limits` on final-delivery.music.
+- **A5** Plate vs master: `final.delivery_class.classify_official_final` → `receipts/official-final-report.json`; skip-preflight/heat / gate-auto red → `OFFICIAL_FINAL_PLATE` (never auto `master_lock`). CLI passes skip flags into plate renderer.
+- Tests extended in `test_suse_final_iron.py`.
+
+## [2.39.77] - 2026-08-06
+
+### Fixed (suse EP01 official final IRON · Wave A)
+- **A1** `validate_film_spec`: remove silent act/climax `duration_sec=max(10,…)` pad on `HEAT_SEX_DURATION_LOW`. Fail-closed with next steps (re-I2V / add shots / lower floor) — short H3 sources must not invent unstretchable 10s slots.
+- **A2** Timed voice cues: `check_vo_window_triangle` (tts≤cue≤slot); try `vo_atempo`→cue window before hard fail; clear error if cue exceeds plate.
+- **A3** Tests: `tests/test_suse_final_iron.py` (no pad · triangle · `render_final.py` shim `__main__`→`main`).
+- Plan: `docs/plans/2026-08-06-optimization-todoplan.md` (next residual board).
+
 ## [2.39.75] - 2026-08-05
 
 ### Changed (routing rewire R2–R7 complete)

@@ -2705,47 +2705,27 @@ def validate_film_spec(
             + " — 用户原文被 adult-max 库存旁白覆盖。保留用户诗白/对白/专名；"
             "荤梗只可补后缀。See lessons-2026-07-22-user-source-fidelity.md"
         )
-    sex_floor_strict = spec.get("sex_floor_strict")
-    if sex_floor_strict is None:
-        sex_floor_strict = heat_scale == "max"
-
-    if "HEAT_SEX_DURATION_LOW" in (heat_rep.get("codes") or []):
-        # Proactive orchestration: Auto-extend act/climax shots to meet ratio
-        act_shots = [
-            sh
-            for sh in shots
-            if isinstance(sh, dict)
-            and str(sh.get("heat_phase") or "").strip().lower() in {"act", "climax"}
-        ]
-        if act_shots:
-            for sh in act_shots:
-                sh["duration_sec"] = max(
-                    10.0, float(sh.get("duration_sec") or DEFAULT_DURATION_SEC)
-                )
-            # Re-lint after auto-extension
-            heat_rep = lint_heat_arc(
-                shots,
-                heat_scale=heat_scale,
-                intimacy_min_ratio=spec.get("intimacy_min_ratio"),
-                setup_max_ratio=spec.get("setup_max_ratio"),
-                sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
-                audience_profile=audience_profile,
-                advise=heat_advise,
-                coitus_grammar=coitus_grammar,
-                spice_level=str(spice_level) if spice_level else None,
-                edit_craft=craft_list or None,
-            )
-            spec["_heat_arc"] = heat_rep
-
-    if sex_floor_strict is True and "HEAT_SEX_DURATION_LOW" in (heat_rep.get("codes") or []):
-        ratio = heat_rep.get("sex_duration_ratio")
-        floor = heat_rep.get("sex_duration_floor")
-        raise FilmSpecError(
-            "sex duration floor failed (sex_floor_strict): HEAT_SEX_DURATION_LOW "
-            f"sex_duration_ratio={ratio} floor={floor} — "
-            "raise act+climax duration_sec share to ≥50% of total (or set "
-            "sex_min_duration_ratio / sex_floor_strict:false). See adult-max iron."
+    # A1 · 2026-08-06: sex floor fail-closed (no silent duration pad) — plan/film_spec_sex_floor
+    try:
+        from plan.film_spec_sex_floor import (
+            SexFloorError,
+            apply_sex_duration_floor,
+            resolve_sex_floor_strict,
         )
+    except ImportError:  # pragma: no cover — flat scripts path
+        from film_spec_sex_floor import (  # type: ignore
+            SexFloorError,
+            apply_sex_duration_floor,
+            resolve_sex_floor_strict,
+        )
+
+    sex_floor_strict = resolve_sex_floor_strict(spec, heat_scale)
+    try:
+        apply_sex_duration_floor(
+            heat_rep, sex_floor_strict=sex_floor_strict, heat_scale=heat_scale
+        )
+    except SexFloorError as exc:
+        raise FilmSpecError(str(exc)) from exc
     # Sex wardrobe IRON: undress|bare + bare peak; continuity monotonic; hard on max.
     sex_wardrobe_strict = spec.get("sex_wardrobe_strict")
     if sex_wardrobe_strict is None:

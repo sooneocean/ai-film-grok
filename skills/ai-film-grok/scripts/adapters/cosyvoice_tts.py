@@ -171,7 +171,11 @@ def _to_wav(raw: bytes, out: Path) -> None:
         "s16",
         str(out),
     ]
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired as exc:
+        tmp.unlink(missing_ok=True)
+        raise SystemExit(f"ffmpeg → wav timed out after {exc.timeout}s") from exc
     tmp.unlink(missing_ok=True)
     if p.returncode != 0 or not out.is_file() or out.stat().st_size < MIN_AUDIO_BYTES:
         raise SystemExit(f"ffmpeg → wav failed: {(p.stderr or '')[-400:]}")

@@ -292,6 +292,7 @@ def write_final_mix_partial_receipt(
 
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
+    bgm_source_receipt: dict[str, Any] | None = None
     try:
         paths = resolve_render_paths(root, args.out_name)
     except RenderWorkspaceError as exc:
@@ -691,13 +692,66 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 color_dur = 0.0
         # Timed voice cues reserve a part of the plate. Pad their stem before
         # mixing so a deliberate opening silence remains silence, not TTS.
+        # A2 · 2026-08-06: 口白窗三角 — offset+cue≤slot; TTS≤cue; try atempo→cue before fail.
         cue_offset = float(voice_cue.get("start_offset_sec") or 0.0) if voice_cue else 0.0
         cue_window = float(voice_cue.get("duration_sec") or 0.0) if voice_cue else 0.0
-        if voice_cue and dur > cue_window + 0.03:
-            raise RenderError(
-                f"{sid} voice cue exceeds its reserved window "
-                f"({dur:.2f}s > {cue_window:.2f}s); shorten text or enlarge audio_cues duration"
+        try:
+            _slot_for_cue = float(shot.get("duration_sec") or 0)
+        except (TypeError, ValueError):
+            _slot_for_cue = 0.0
+        if voice_cue and _slot_for_cue > 0:
+            from final.voice import check_vo_window_triangle
+
+            tri_ok, tri_code = check_vo_window_triangle(
+                float(dur), cue_offset, cue_window, _slot_for_cue
             )
+            if tri_code == "cue_exceeds_slot":
+                raise RenderError(
+                    f"{sid} voice cue exceeds plate "
+                    f"(offset {cue_offset:.2f}+cue {cue_window:.2f} > slot {_slot_for_cue:.2f}); "
+                    "shrink cue duration or raise duration_sec — do not invent cues past slot"
+                )
+            if tri_code == "tts_exceeds_cue":
+                vo_fit_early = str(
+                    spec.get("vo_fit") or getattr(args, "vo_fit", None) or "atempo"
+                ).strip().lower()
+                if vo_fit_early == "atempo" and cue_window > 0:
+                    try:
+                        from vo_atempo import VoAtempoError, fit_voice_to_plate, plan_vo_atempo
+
+                        plan = plan_vo_atempo(float(dur), float(cue_window))
+                        if not plan.get("ok"):
+                            raise RenderError(
+                                f"{sid} voice cue exceeds reserved window even after atempo "
+                                f"({dur:.2f}s > {cue_window:.2f}s; {plan.get('note')}); "
+                                "shorten spoken / raise vo_rate / enlarge cue within slot"
+                            )
+                        fitted_cue = work / f"vo_cue_fit_{i:02d}_{sid}.wav"
+                        fit_voice_to_plate(
+                            wav,
+                            fitted_cue,
+                            float(cue_window),
+                            vo_sec=float(dur),
+                            plan=plan,
+                            sample_rate=SR,
+                        )
+                        wav = fitted_cue
+                        dur = float(cue_window)
+                        log(
+                            f"  vo_atempo→cue_window factor={plan.get('atempo')} "
+                            f"raw→{cue_window:.2f}s"
+                        )
+                    except VoAtempoError as exc:
+                        raise RenderError(
+                            f"{sid} voice cue exceeds reserved window "
+                            f"({dur:.2f}s > {cue_window:.2f}s); atempo failed: {exc}"
+                        ) from exc
+                else:
+                    raise RenderError(
+                        f"{sid} voice cue exceeds its reserved window "
+                        f"({dur:.2f}s > {cue_window:.2f}s); shorten text, "
+                        "use --vo-fit atempo, or enlarge audio_cues duration within slot"
+                    )
         # shorter tail — snappier cut to next shot
         # non-vo coverage: silence already matches plate; no VO pad stretch
         if non_vo_coverage:
@@ -1735,6 +1789,35 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
         music_path = stereo
 
+    # A4 · 2026-08-06: honest BGM provenance (rnb license-only → procedural)
+    bgm_source_receipt: dict[str, Any] | None = None
+    try:
+        from sound_plan import build_bgm_source_receipt, mood_library_status
+
+        bed_src = str(mix_spotting.get("bed_source") or "unknown")
+        mood_st = mood_library_status(mood, film_root=root)
+        bgm_source_receipt = build_bgm_source_receipt(
+            bed_source=bed_src,
+            mood=mood,
+            license_note=str(license_note or ""),
+            music_resolved=music_resolved if isinstance(music_resolved, dict) else None,
+            mood_status=mood_st,
+        )
+        write_json(root / "receipts" / "bgm-source.json", bgm_source_receipt)
+        mix_spotting["bgm_source_receipt"] = {
+            "bed_source": bgm_source_receipt.get("bed_source"),
+            "partial": bgm_source_receipt.get("partial"),
+            "honest_limits": bgm_source_receipt.get("honest_limits"),
+            "mood_library": bgm_source_receipt.get("mood_library"),
+        }
+        if bgm_source_receipt.get("partial"):
+            log(
+                "BGM honesty: "
+                + "; ".join(str(x) for x in (bgm_source_receipt.get("honest_limits") or [])[:3])
+            )
+    except Exception as bgm_exc:  # noqa: BLE001 — never block final on receipt
+        log(f"bgm-source receipt skip: {bgm_exc}")
+
     # 7) Dual-track mix: VO primary + BGM always audible (两条音轨)
     # Sidechain: rnb default longer release so groove returns in VO pauses (Phase E)
     try:
@@ -2380,6 +2463,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "volume": music_vol,
             "ducked_under_narration": "sidechaincompress" in filters_help,
             "mood": mood,
+            "bed_source": mix_spotting.get("bed_source"),
+            "bgm_source": bgm_source_receipt,
+            "honest_limits": (bgm_source_receipt or {}).get("honest_limits") or [],
         },
         "native_audio": {
             "path": str(native_track),
@@ -2490,6 +2576,67 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     manifest["updated_at"] = utc_now()
     write_json(root / "manifest.json", manifest)
 
+    # A5 · 2026-08-06: plate vs master — never auto master_lock
+    # B · scale-fallback wardrobe honesty (soft-max / hard-on ban)
+    official_final: dict[str, Any] | None = None
+    scale_fallback_receipt: dict[str, Any] | None = None
+    try:
+        from final.delivery_class import (
+            classify_official_final,
+            read_gate_auto_ok,
+            write_official_final_report,
+        )
+
+        gate_ok = read_gate_auto_ok(root)
+        official_final = classify_official_final(
+            skip_preflight=bool(getattr(args, "skip_preflight", False)),
+            skip_heat_gate=bool(getattr(args, "skip_heat_gate", False)),
+            allow_loop_risk=bool(getattr(args, "allow_loop_risk", False)),
+            force=bool(getattr(args, "force", False)),
+            gate_auto_ok=gate_ok,
+            cinematic_ok=None,
+            final_complete=False,
+            bgm_partial=bool((bgm_source_receipt or {}).get("partial")),
+        )
+        try:
+            from narrative.scale_fallback import (
+                flatten_spec_shots,
+                report_scale_fallback_for_shots,
+                write_scale_fallback_receipt,
+            )
+
+            sf = report_scale_fallback_for_shots(
+                flatten_spec_shots(spec if isinstance(spec, dict) else {}),
+                heat_scale=str((spec or {}).get("heat_scale") or "max"),
+            )
+            scale_fallback_receipt = sf
+            write_scale_fallback_receipt(root, sf)
+            official_final["achieved_wardrobe_tier"] = sf.get("achieved_wardrobe_tier")
+            official_final["scale_fallback"] = {
+                "codes": sf.get("codes"),
+                "partial": sf.get("partial"),
+                "recommended_tier": sf.get("recommended_tier"),
+                "promote_ban": sf.get("promote_ban"),
+                "honest_limits": sf.get("honest_limits"),
+            }
+            if sf.get("partial"):
+                official_final["partial"] = True
+                limits = list(official_final.get("honest_limits") or [])
+                for h in sf.get("honest_limits") or []:
+                    if h not in limits:
+                        limits.append(h)
+                official_final["honest_limits"] = limits
+                if official_final.get("status") == "TECHNICAL_FINAL":
+                    official_final["status"] = "OFFICIAL_FINAL_PLATE"
+        except Exception as sf_exc:  # noqa: BLE001
+            log(f"scale-fallback receipt skip: {sf_exc}")
+        write_official_final_report(root, official_final)
+        report["official_final"] = official_final
+        report["scale_fallback"] = scale_fallback_receipt
+        write_json(report_path, report)
+    except Exception as of_exc:  # noqa: BLE001
+        log(f"official-final-report skip: {of_exc}")
+
     return {
         "ok": True,
         "output": str(final_path),
@@ -2499,6 +2646,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "cue_count": len(cues),
         "music_license": license_note,
         "lipsync_shots": lipsync_report,
+        "official_final": official_final,
+        "bgm_source": bgm_source_receipt,
     }
 
 
@@ -2641,6 +2790,16 @@ def main(argv: list[str] | None = None) -> int:
         "--allow-loop-risk",
         action="store_true",
         help="Allow final even when VO would stream_loop short plates (discouraged)",
+    )
+    p.add_argument(
+        "--skip-preflight",
+        action="store_true",
+        help="Record plate honesty only (CLI also skips preflight); marks OFFICIAL_FINAL_PLATE",
+    )
+    p.add_argument(
+        "--skip-heat-gate",
+        action="store_true",
+        help="Record plate honesty when heat final gate was skipped upstream",
     )
     p.add_argument(
         "--subs",

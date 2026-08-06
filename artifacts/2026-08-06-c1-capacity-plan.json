@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-h3-capacity-plan",
+  "ok": true,
+  "at": "2026-08-06T02:28:33+00:00",
+  "root": "/Users/dex/AI FILM SPACE/0721/velvet-stage-dual",
+  "pending_jobs": 10,
+  "eta_minutes_total": 80.0,
+  "eta_hours_total": 1.33,
+  "p0_jobs": 9,
+  "p0_eta_minutes": 72.0,
+  "by_mode": {
+    "i2v": 10
+  },
+  "eta_by_mode": {
+    "i2v": 80.0
+  },
+  "by_priority": {
+    "P0c": 9,
+    "P2": 1
+  },
+  "eta_by_priority": {
+    "P0c": 72.0,
+    "P2": 8.0
+  },
+  "groups": [
+    {
+      "priority": "P0c",
+      "jobs": 9,
+      "eta_minutes": 72.0
+    },
+    {
+      "priority": "P2",
+      "jobs": 1,
+      "eta_minutes": 8.0
+    }
+  ],
+  "next": {
+    "shot_id": "shot09",
+    "priority": "P0c",
+    "lane": "primary_h3",
+    "mode": "i2v",
+    "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\" --shot-id shot09 --mode i2v --register",
+    "best_mean": null,
+    "reasons": [
+      "continue_endframe",
+      "needs_h3_primary"
+    ]
+  },
+  "priority_ok": true,
+  "priority_violations": [],
+  "assumptions": {
+    "minutes_per_mode": {
+      "i2v": 8.0,
+      "flf": 10.0,
+      "r2v": 12.0,
+      "t2v": 10.0
+    },
+    "default_minutes": 9.0,
+    "serial_one_5090": true,
+    "note": "ETA is planning only; real wall time varies with VRAM/queue"
+  },
+  "ops": [
+    "aifilm h3 cycle --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\" --until-empty --execute",
+    "aifilm h3 run-next --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\" --execute --max 5",
+    "aifilm h3 capacity-plan --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\""
+  ]
+}

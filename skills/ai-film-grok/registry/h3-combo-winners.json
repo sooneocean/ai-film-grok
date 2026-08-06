@@ -55,7 +55,7 @@
     },
     "dialogue_mouth_energy": {
       "preferred_mode": "i2v",
-      "prompt_family": "dialogue_mouth_flat",
+      "prompt_family": "dialogue_mouth_max",
       "notes": "Default I2V + Mandarin line inject; R2V only for extreme mouth CU when identity can float",
       "winner": {
         "combo_id": "r4_dlg_flat_i2v",

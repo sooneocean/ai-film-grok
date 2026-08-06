@@ -6,7 +6,8 @@
 ## 三句话
 1. **Imagine 拦 bare I2V** → undress 末帧续接 + HIGH MOTION 软词；**禁**内衣冒充插入；写 `bare-i2v-partial.json`。  
 2. **重拍后 evidence 假红** → 全轨 review+register **两轮**（邻接 sha）；orphan pilot 镜清出 manifest。  
-3. **final 1200s 超时 + sidechain 假死** → 直调 `render_final` / 简化 amix；字幕路径空格炸 → **/tmp 或 PIL 烧字**。
+3. **final 1200s 超时 + sidechain 假死** → 直调 `render_final` / 简化 amix；字幕路径空格炸 → **/tmp 或 PIL 烧字**。  
+4. **叠乘 2026-08-06**：shim 须调 main；H3 槽认源；口白窗三角 → [suse-ep01-official-final-iron](2026-08-06-suse-ep01-official-final-iron.md)
 
 ## 检查单（下次 bulk 前）
 - [ ] I2V 提示首段 `MEDIUM LOCK cel`（禁 photoreal assembly）  

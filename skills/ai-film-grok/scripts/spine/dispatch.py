@@ -31,6 +31,22 @@ from spine.stage_model import STAGE_OWNERS as _STAGE_OWNERS
 from spine.stage_model import project_stages, responsibility_for_stage, stage_owners
 from util import read_json, write_json
 
+_STATE_OK_ONLY = frozenset(
+    {
+        "gate-auto.json",
+        "machine-ready.json",
+        "cinematic-gate.json",
+        "i2v-final-gate.json",
+        "i2v-high-motion-audit.json",
+        "ship-prep.json",
+        "five-track-plan.json",
+        "variety-precheck.json",
+        "select-shortlist.json",
+        "pk-compare-ship-prep.json",
+        "film-core-closeout.json",
+    }
+)
+
 
 def responsibility_for_action(action: dict[str, Any] | None) -> dict[str, str | None]:
     """Return the single accountable owner for a routed action."""

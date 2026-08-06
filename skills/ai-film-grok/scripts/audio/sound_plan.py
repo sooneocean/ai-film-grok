@@ -546,6 +546,95 @@ def resolve_music_template(
     }
 
 
+def skill_bgm_root() -> Path:
+    """Skill-level assets/bgm (shared licensed beds)."""
+    return Path(__file__).resolve().parents[2] / "assets" / "bgm"
+
+
+def mood_library_status(
+    mood: str = "rnb",
+    *,
+    skill_root: Path | None = None,
+    film_root: Path | None = None,
+) -> dict[str, Any]:
+    """Inspect skill/film BGM dirs: wav present vs license-only (suse EP01 A4).
+
+    When mood folder has *.license.txt but zero audio files, final must use
+    procedural and record honest_limits — never claim licensed library bed.
+    """
+    mood_l = normalize_sound_mood(mood or "rnb")
+    roots: list[tuple[str, Path]] = []
+    if film_root is not None:
+        fr = Path(film_root).expanduser().resolve()
+        roots.append(("film_templates", fr / "audio" / "templates" / mood_l))
+        roots.append(("film_audio", fr / "audio"))
+    sk = Path(skill_root) if skill_root is not None else skill_bgm_root()
+    roots.append(("skill_library", sk / mood_l))
+
+    wavs: list[str] = []
+    licenses: list[str] = []
+    for _tag, d in roots:
+        if not d.is_dir():
+            continue
+        for ext in MUSIC_TEMPLATE_EXTS:
+            for p in sorted(d.glob(f"*{ext}")):
+                if p.is_file() and p.stat().st_size > 0:
+                    wavs.append(str(p.name))
+        for p in sorted(d.glob("*.license.txt")):
+            if p.is_file():
+                licenses.append(str(p.name))
+        # also bed.* at skill_bgm/{mood}.wav level handled by resolve; status is advisory
+
+    license_only = bool(licenses) and not wavs
+    return {
+        "mood": mood_l,
+        "wav_count": len(wavs),
+        "license_count": len(licenses),
+        "license_only": license_only,
+        "wav_files": wavs[:20],
+        "license_files": licenses[:20],
+    }
+
+
+def build_bgm_source_receipt(
+    *,
+    bed_source: str,
+    mood: str,
+    license_note: str = "",
+    music_resolved: dict[str, Any] | None = None,
+    mood_status: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Honest BGM provenance for final-delivery + receipts/bgm-source.json."""
+    mood_l = normalize_sound_mood(mood or "rnb")
+    bed = str(bed_source or "unknown").strip().lower() or "unknown"
+    honest: list[str] = []
+    status = mood_status or {}
+    if bed == "procedural":
+        honest.append("BGM is procedural numpy score (not a licensed library wav)")
+        if status.get("license_only"):
+            honest.append(
+                f"assets/bgm/{mood_l} (or film templates) has license text only — "
+                "no wav; procedural fallback is intentional"
+            )
+        elif int(status.get("wav_count") or 0) == 0:
+            honest.append(f"no local/skill wav for mood={mood_l}; procedural used")
+    payload: dict[str, Any] = {
+        "kind": "bgm-source",
+        "bed_source": bed,
+        "mood": mood_l,
+        "license_or_source": license_note,
+        "music_resolved_source": (music_resolved or {}).get("source"),
+        "music_resolved_path": (music_resolved or {}).get("relative")
+        or (music_resolved or {}).get("path"),
+        "mood_library": status or None,
+        "honest_limits": honest,
+        "partial": bed == "procedural",
+        "licensed_library_used": bed
+        in {"skill_library", "local_template", "approved_library", "timeline_templates", "cli_music"},
+    }
+    return payload
+
+
 def resolve_music_template_timeline(
     root: Any,
     *,

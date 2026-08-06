@@ -4,7 +4,19 @@
 from __future__ import annotations
 
 import subprocess
-from util import read_json, utc_now, write_json
+from pathlib import Path
+from typing import Any
+
+from util import read_json, sha256_file as _sha256, utc_now, write_json
+from security_policy import minimal_subprocess_env, validate_identifier
+from media.media_qa import analyze_media
+from performance_evidence import (
+    PerformanceEvidenceError,
+    find_shot,
+    performance_contract,
+    parse_performance_evidence,
+    validate_performance_evidence,
+)
 
 # Core five always required; coitus optional (act/climax mute-frame when scored)
 CORE_REVIEW_DIMENSIONS = (

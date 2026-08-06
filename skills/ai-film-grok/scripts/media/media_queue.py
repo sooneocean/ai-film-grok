@@ -426,8 +426,17 @@ class MediaQueue:
                 assert_pixel_pack_current(self.root, shot_id, inputs=resolved_inputs)
             except GenerationRequestError as exc:
                 raise QueueError(str(exc)) from exc
-            except Exception:
-                pass  # no receipt / optional path — do not block legacy jobs
+            except Exception as exc:  # noqa: BLE001 — optional fidelity; never silent
+                note_queue_partial(
+                    self.root,
+                    stage="generation_request_optional",
+                    error=str(exc),
+                    shot_id=str(shot_id),
+                    honest_limits=[
+                        "generation_request check skipped (module/legacy)",
+                        "material fidelity not guaranteed for this enqueue",
+                    ],
+                )
         if operation in {"image_to_video", "reference_to_video"}:
             from anatomy_safety import requires_anatomy_safety
 
@@ -965,7 +974,75 @@ class MediaQueue:
             )
         except OSError:
             pass
+        # B · 2026-08-06: moderation/poison streaks → scale-fallback stop-hard-on honesty
+        err_l = str(error).lower()
+        if reason_norm == "moderation" or any(
+            k in err_l for k in ("poison", "anatomy", "futa", "畸形", "崩坏")
+        ):
+            try:
+                self._maybe_write_scale_fallback_on_fail(
+                    reason_norm=reason_norm,
+                    error=str(error),
+                    shot_id=str(job.get("shot_id") or ""),
+                )
+            except Exception:  # noqa: BLE001
+                pass
         return job
+
+    def _maybe_write_scale_fallback_on_fail(
+        self,
+        *,
+        reason_norm: str,
+        error: str,
+        shot_id: str,
+    ) -> None:
+        """Count recent moderation/poison fails; emit SCALE_HARD_ON_BAN when streak high."""
+        state = self._read()
+        poison_n = 0
+        mod_n = 0
+        for j in state.get("jobs") or []:
+            if not isinstance(j, dict):
+                continue
+            fr = str(j.get("fail_reason") or "")
+            err = str(j.get("last_error") or "").lower()
+            if fr == "moderation":
+                mod_n += 1
+            if "poison" in err or "anatomy" in err or "futa" in err or "畸形" in err or "崩坏" in err:
+                poison_n += 1
+        if mod_n < 2 and poison_n < 2 and reason_norm != "moderation":
+            return
+        from narrative.scale_fallback import (
+            decide_scale_fallback,
+            write_scale_fallback_receipt,
+        )
+
+        decision = decide_scale_fallback(
+            target_tier="bare",
+            consecutive_poison=max(poison_n, 2 if "poison" in error.lower() else 0),
+            consecutive_moderation=max(mod_n, 1 if reason_norm == "moderation" else 0),
+            consecutive_anatomy_fail=poison_n,
+        )
+        if not decision.get("codes"):
+            return
+        write_scale_fallback_receipt(
+            self.root,
+            {
+                "kind": "scale-fallback",
+                "schema_version": 1,
+                "source": "media_queue.fail",
+                "shot_id": shot_id or None,
+                "fail_reason": reason_norm,
+                "error": str(error)[:300],
+                "moderation_fail_jobs": mod_n,
+                "poison_like_jobs": poison_n,
+                "decision": decision,
+                "codes": decision.get("codes"),
+                "partial": True,
+                "honest_limits": decision.get("honest_limits"),
+                "promote_ban": decision.get("promote_ban"),
+                "note": decision.get("note"),
+            },
+        )
 
     def requeue(
         self,

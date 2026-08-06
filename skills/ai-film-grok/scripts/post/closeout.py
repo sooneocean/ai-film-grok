@@ -526,8 +526,12 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
     for s in steps:
         if s.get("id") == "evidence_fresh" and s.get("ok") and s.get("advisory"):
             soft_ids.add("evidence_fresh")
-        # AF3 · MIX_PARTIAL-only post_doctor is advisory honesty, not hard block
-        if s.get("id") == "post_doctor" and s.get("ok") and s.get("advisory"):
+        # AF3 · MIX_PARTIAL-only post_doctor is advisory honesty, not hard block.
+        # When film_core is hard, post_doctor is also soft — film_core is the
+        # primary hard gate and takes priority as blocked_by.
+        if s.get("id") == "post_doctor" and (
+            (s.get("ok") and s.get("advisory")) or film_core_hard
+        ):
             soft_ids.add("post_doctor")
     blocked = next(
         (s for s in steps if not s["ok"] and s["id"] not in soft_ids),

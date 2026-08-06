@@ -1,0 +1,1 @@
+{"kind":"c1-drain-launch","at":"2026-08-06T02:32:56Z","root":"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual","cmd":"h3 cycle --until-empty --execute --free-first --capacity-wait-sec 7200","note":"started while queue may be busy; free_first never kills foreign; waits for capacity"}

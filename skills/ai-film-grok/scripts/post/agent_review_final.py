@@ -779,7 +779,7 @@ def apply_agent_review_final(
 
     argv = [
         str(Path(sys.executable).resolve()),
-        str(Path(__file__).resolve().parents[1] / "aifilm_grok.py".resolve()),
+            str((Path(__file__).resolve().parents[1] / "aifilm_grok.py").resolve()),
         "review-final",
         "--root",
         str(base),

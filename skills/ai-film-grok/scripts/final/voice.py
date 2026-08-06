@@ -13,6 +13,36 @@ from final.caption_text import (
 )
 from final.errors import RenderError
 
+
+def check_vo_window_triangle(
+    tts_dur: float,
+    cue_offset: float,
+    cue_window: float,
+    slot: float,
+    *,
+    slack_sec: float = 0.03,
+) -> tuple[bool, str]:
+    """口白窗三角 (suse EP01 IRON): tts ≤ cue ≤ remaining slot after offset.
+
+    Returns (ok, code). Codes: ok | cue_exceeds_slot | tts_exceeds_cue | bad_slot
+    """
+    try:
+        tts = float(tts_dur)
+        off = float(cue_offset)
+        win = float(cue_window)
+        plate = float(slot)
+    except (TypeError, ValueError):
+        return False, "bad_slot"
+    if plate <= 0:
+        return False, "bad_slot"
+    if off < 0 or win < 0 or tts < 0:
+        return False, "bad_slot"
+    if off + win > plate + 1e-6:
+        return False, "cue_exceeds_slot"
+    if win > 0 and tts > win + float(slack_sec):
+        return False, "tts_exceeds_cue"
+    return True, "ok"
+
 # Voice / caption defaults (peeled from render_final W4)
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"  # edge 显式后端默认女声
 STORYTELLER_VOICE = "zh-CN-XiaoxiaoNeural"

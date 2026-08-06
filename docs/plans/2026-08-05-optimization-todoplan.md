@@ -1,7 +1,8 @@
 # ai-film-grok 痛点分析 + 优化 TodoPlan（2026-08-05）
 
-**Status:** ACTIVE · Waves 0–2 / until-empty / gate-slim **SHIPPED** · canary dry **PARTIAL** (2026-08-05)  
-**Repo pointer** for **ops throughput waves** (this file).  
+**Status:** SUPERSEDED for next residuals · Waves 0–2 / until-empty / gate-slim **SHIPPED** · canary dry **PARTIAL** (2026-08-05)  
+**Next execution board:** [2026-08-06-optimization-todoplan.md](2026-08-06-optimization-todoplan.md) (final IRON · wardrobe · ops drain)  
+**Repo pointer** for **ops throughput waves** (this file; W0–5 closed).  
 **Strategy pointer (director + engineer residual):** [2026-08-05-strategy-director-engineer-upgrade.md](2026-08-05-strategy-director-engineer-upgrade.md)  
 **Structure residual (大石 internal peels):** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md) · owner [project-module-refactor](2026-08-05-project-module-refactor.md) (W0–W5 package SHIPPED · internal peels optional)
 

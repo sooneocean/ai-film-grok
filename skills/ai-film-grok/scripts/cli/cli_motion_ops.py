@@ -134,7 +134,10 @@ def cmd_frw(args: argparse.Namespace) -> int:
     )
     from core.gates import recompute_gates  # noqa: F401
 
-    launcher = Path(__file__).resolve().parents[2] / "frw_dispatch.py"
+    # New structure: scripts/frw_dispatch.py; fallback to media/ for compat.
+    launcher = Path(__file__).resolve().parents[1] / "frw_dispatch.py"
+    if not launcher.is_file():
+        launcher = Path(__file__).resolve().parents[1] / "media" / "frw_dispatch.py"
     if not launcher.is_file():
         raise FilmError(f"missing FRW launcher: {launcher}")
     argv = list(getattr(args, "frw_argv", None) or [])

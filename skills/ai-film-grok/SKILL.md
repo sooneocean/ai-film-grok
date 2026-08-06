@@ -40,7 +40,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 6. **审批/用量**：pilot 用户批；付费绑 hash/预算；human/paid/external 暂停。
 7. **动作（5090 主产线）**：**`h3_primary`**（推荐有 5090）= 全镜本地 H3；挂机 `h3 cycle --until-empty --execute`；ETA `h3 capacity-plan`。场景：有 end→FLF；无 last→I2V；高动→R2V；无脸 env→T2V。`hybrid_h3`= 双轨。Grok 仅 pilot/云 escape。禁 Seedance/Wan。[矩阵](references/weapon-lane-matrix.md) · [plan](../../docs/plans/2026-08-05-h3-primary-capacity.md)
 8. **声线（中文唯一）**：口白=中文；每场≥1 台词；Edge；BGM=rnb。[对白](references/dialogue-first-workflow.md)
-9. **成人 MAX**：肉戏≥50%·亲密≥60%·setup≤20%；extreme；四拍+bare。[playbook](references/adult-max-playbook.md)
+9. **成人 MAX**：肉戏≥50%·亲密≥60%·setup≤20%；extreme；四拍+bare；**不回穿**；大尺度做不到→全裸诱惑→**模型极限勿硬上**（防崩）。[playbook](references/adult-max-playbook.md) · [2026-08-06](memory/2026-08-06-wardrobe-no-redress-fullnude-fallback.md)
 9b. **毒镜**：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V。
 10. **字幕**：`caption_mode`+`caption_text` 中文硬烧；`transition_fluency` 见 [cut-silk](references/lessons-2026-07-20-cut-silk-bilingual.md)
 11. **后期单责**：title/sub/end 单引擎；plate 可 `subs=off`。
