@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "kind": "comfy-lan-upload",
+  "remote": {
+    "name": "armory-qwen-retest_00001_.png",
+    "subfolder": "",
+    "type": "input",
+    "sha256": "a5cf8046be059fa1acaaa35d5dc66201b10532e31e7c91388535468bcd2cc351"
+  }
+}

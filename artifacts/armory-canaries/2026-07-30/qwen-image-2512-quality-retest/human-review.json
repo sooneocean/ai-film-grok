@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "kind": "local-weapon-human-visual-review",
+  "reviewed_at": "2026-07-30T04:51:28Z",
+  "reviewer": "Dex",
+  "reviewer_identity_cryptographically_verified": false,
+  "weapon_id": "qwen-image-2512-quality",
+  "artifact": {
+    "path": "armory-qwen-retest_00001_.png",
+    "sha256": "a5cf8046be059fa1acaaa35d5dc66201b10532e31e7c91388535468bcd2cc351",
+    "width": 928,
+    "height": 1664
+  },
+  "status": "approved",
+  "human_reviewed": true,
+  "verbatim_confirmation": "Qwen canary 視覺通過",
+  "scope": "This approval binds only the listed artifact hash. It does not approve a film shot, later Qwen output, video motion, or a default-provider change."
+}

@@ -1,0 +1,41 @@
+# Secrets & local machine paths — never commit
+config.env
+*.env
+!config.env.example
+!*.env.example
+
+# Python / tooling
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.benchmarks/
+.mypy_cache/
+.venv/
+venv/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Runtime fingerprints / ephemeral
+# keep runtime-lock.json committed so doctor can verify on clean install
+# (re-run: aifilm lock-runtime after local edits)
+
+# Local film roots or accidental media drops
+*.mp4
+*.mov
+*.wav
+*.mp3
+!templates/**
+artifacts/
+out/
+_final_work/

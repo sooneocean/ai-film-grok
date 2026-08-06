@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-agent-visual-review",
+  "experiment_id": "env-t2i-final-20260730",
+  "reviewed_at": "2026-07-30T03:19:11Z",
+  "candidate_only": true,
+  "approved": false,
+  "approved_by": null,
+  "prompt_sha256": "b52963397b649a738a476db51537693ebdd3a99832da23c298a04550c760b96e",
+  "rank_sha256": "d61f936fbe07006c74a1c07d20c7ec672008f598442fac893b15ffd94a9e032c",
+  "review_outcome": "rejected",
+  "agent_preference": {
+    "champion": null,
+    "challenger": null
+  },
+  "reviews": [
+    {
+      "model_id": "qwen",
+      "media_sha256": "985e22eab3ebf87e8bb544eed560928ba5bdcc9f78ce00320e26101fa22284f4",
+      "prompt_adherence": "strong",
+      "no_people": true,
+      "no_text": true,
+      "no_signs": false,
+      "independent_sample": false,
+      "promotion_eligible": false,
+      "notes": [
+        "Empty rain-soaked railway platform, blue-hour atmosphere, warm lamps, and wet reflections match the brief.",
+        "No people, readable text, letters, numbers, logos, or symbols are visible.",
+        "A hanging rectangular station sign violates the explicit no-sign requirement.",
+        "The output is not pixel-identical to the prior remediation image, but 93.99% of pixels are exactly equal and it is not an independent visual sample."
+      ]
+    },
+    {
+      "model_id": "flux",
+      "media_sha256": "c60af07d479164885ba3c3a4cd112d932bf6d1a3cdde566a94e0ee63bceab493",
+      "prompt_adherence": "moderate",
+      "no_people": true,
+      "no_text": false,
+      "no_signs": false,
+      "independent_sample": true,
+      "promotion_eligible": false,
+      "notes": [
+        "Empty railway platform, blue-hour atmosphere, warm lamps, and wet reflections match the scene.",
+        "A small wall-mounted sign on the right contains a number-like glyph despite the no-text, no-number, no-sign, and no-symbol constraints.",
+        "Candidate remains ineligible despite passing technical media QA."
+      ]
+    }
+  ],
+  "human_approval_required": true,
+  "promotion_written": false
+}

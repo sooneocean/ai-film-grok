@@ -1,0 +1,62 @@
+#!/bin/sh
+# Resolve the one supported Python runtime for every local entry point.
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SKILL_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+MIN_MAJOR=3
+MIN_MINOR=11
+
+fail() {
+  echo "aifilm runtime error: $*" >&2
+  exit 1
+}
+
+version_is_supported() {
+  "$1" -c "import sys; raise SystemExit(0 if sys.version_info >= ($MIN_MAJOR, $MIN_MINOR) else 1)" >/dev/null 2>&1
+}
+
+select_candidate() {
+  candidate=$1
+  [ -n "$candidate" ] || return 1
+  [ -x "$candidate" ] || return 1
+  if version_is_supported "$candidate"; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+  return 2
+}
+
+if [ -n "${AIFILM_PYTHON:-}" ]; then
+  resolved=$(select_candidate "$AIFILM_PYTHON") || status=$?
+  case ${status:-0} in
+    0) printf '%s\n' "$resolved" ;;
+    2) fail "AIFILM_PYTHON=$AIFILM_PYTHON is older than Python 3.11" ;;
+    *) fail "AIFILM_PYTHON=$AIFILM_PYTHON is not an executable Python" ;;
+  esac
+  exit 0
+fi
+
+PYENV_CANDIDATE=""
+if command -v pyenv >/dev/null 2>&1; then
+  PYENV_CANDIDATE=$(pyenv which python3 2>/dev/null || true)
+fi
+
+PINNED_CANDIDATE=""
+if [ -f "$SKILL_DIR/.python-version" ]; then
+  PINNED_VERSION=$(sed -n '1{s/[[:space:]]*$//;p;}' "$SKILL_DIR/.python-version")
+  case "$PINNED_VERSION" in
+    *[!0-9.]*|'') ;;
+    *) PINNED_CANDIDATE="$HOME/.pyenv/versions/$PINNED_VERSION/bin/python3" ;;
+  esac
+fi
+
+for candidate in "$PYENV_CANDIDATE" "$PINNED_CANDIDATE" "$(command -v python3 2>/dev/null || true)"; do
+  resolved=$(select_candidate "$candidate") || status=$?
+  if [ "${status:-0}" = 0 ]; then
+    printf '%s\n' "$resolved"
+    exit 0
+  fi
+done
+
+fail "Python 3.11+ is required. Set AIFILM_PYTHON to a compatible interpreter or install the version pinned in $SKILL_DIR/.python-version."

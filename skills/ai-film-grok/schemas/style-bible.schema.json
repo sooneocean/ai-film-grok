@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/style-bible.schema.json",
+  "title": "ai-film-grok visual style bible v3",
+  "type": "object",
+  "required": ["schema_version", "kind", "revision", "state", "hash", "approval_ref", "stale_reasons", "nodes"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 3 },
+    "kind": { "type": "string", "const": "visual-bible" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "state": { "enum": ["draft", "review", "locked", "stale"] },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "approval_ref": { "type": ["string", "null"] },
+    "stale_reasons": { "type": "array", "items": { "type": "object" } },
+    "nodes": {
+      "type": "object",
+      "required": ["face", "geometry", "body", "hair", "makeup", "wardrobe", "art", "location", "prop", "cinematography"],
+      "properties": {
+        "face": { "$ref": "#/$defs/parameterNode" },
+        "geometry": { "$ref": "#/$defs/parameterNode" },
+        "body": { "$ref": "#/$defs/parameterNode" },
+        "hair": { "$ref": "#/$defs/parameterNode" },
+        "makeup": { "$ref": "#/$defs/parameterNode" },
+        "wardrobe": { "$ref": "#/$defs/parameterNode" },
+        "art": { "$ref": "#/$defs/parameterNode" },
+        "location": { "$ref": "#/$defs/parameterNode" },
+        "prop": { "$ref": "#/$defs/parameterNode" },
+        "cinematography": { "$ref": "#/$defs/parameterNode" }
+      },
+      "additionalProperties": true
+    },
+    "locked": { "type": "boolean" },
+    "title": { "type": "string" },
+    "medium": { "type": "string" },
+    "palette": { "type": "string" },
+    "lighting": { "type": "string" },
+    "lens": { "type": "string" },
+    "rendering": { "type": "string" },
+    "signature_block": { "type": "string" },
+    "negative_hints": { "type": "string" },
+    "identity_lock": { "type": "string" },
+    "cast_locks": {
+      "type": "object",
+      "description": "Per-character structured identity lock. Keyed by character id. Replaces free-text identity_lock for multi-character. P1-1 face-lock.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "face_ref_path": { "type": "string", "description": "Path to canonical face reference image (cast master)" },
+          "identity_lock_tokens": { "type": "string", "description": "Face/hair/eyes description tokens for prompt injection" },
+          "never_tokens": { "type": "string", "description": "NEVER list — colors/features that must not drift (e.g. 'NEVER pure black hair')" },
+          "hair_lock": { "type": "string", "description": "Hair-specific lock line (color name + style) injected as 'Hair lock' in prompt" },
+          "makeup_lock": { "type": "string", "description": "Makeup-specific lock line for prompt injection" }
+        }
+      }
+    },
+    "hair_swatches": {
+      "type": "object",
+      "description": "Hair color swatches per character. Keyed by character id → {color_name, hex, description}. P1-2 hairstyle.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "color_name": { "type": "string", "description": "Human-readable color name (e.g. 'dark teal cyan-green')" },
+          "hex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "description": "Hex color code for swatch reference" },
+          "description": { "type": "string", "description": "Full hair description including style and length" }
+        }
+      }
+    },
+    "makeup": {
+      "type": "object",
+      "description": "Per-character makeup design. Keyed by character id → {name, ref_path, lock_tokens, cross_scene_consistency}. P1-3 makeup.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Makeup look name (e.g. 'natural dewy', 'smoky evening')" },
+          "ref_path": { "type": "string", "description": "Path to makeup reference image" },
+          "lock_tokens": { "type": "string", "description": "Makeup description tokens for prompt injection" },
+          "cross_scene_consistency": { "type": "boolean", "description": "If true, this makeup must be consistent across all scenes" }
+        }
+      }
+    },
+    "characters": { "type": "object" },
+    "wardrobe_variants": {
+      "type": "object",
+      "description": "Per-character wardrobe design sheet. Keyed by character id → {state_key: {garment, accessories, material, color, state}}. P1-4: upgraded from bare text to structured wardrobe sheet. Legacy string values still accepted (backward compat).",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": ["object", "string"],
+          "description": "Wardrobe entry per state (full/partial/undressed/bare/scene-specific). Object: {garment, accessories, material, color, state}. String: legacy text description.",
+          "properties": {
+            "garment": { "type": "string", "description": "Main garment description" },
+            "accessories": { "type": "array", "items": { "type": "string" }, "description": "Accessories list (jewelry, bags, etc.)" },
+            "material": { "type": "string", "description": "Fabric/material (silk, leather, cotton)" },
+            "color": { "type": "string", "description": "Primary color(s)" },
+            "state": { "type": "string", "description": "Wardrobe state label (full/partial/undressed/bare)" }
+          }
+        }
+      }
+    },
+    "wardrobe_ladders": {
+      "type": "object",
+      "description": "Canonical per-character I2I wardrobe chain. States remove registered garments outer-to-inner and retain approval provenance.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["garments", "states"],
+        "properties": {
+          "status": { "type": "string" },
+          "garments": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string", "minLength": 1 },
+                { "type": "object", "required": ["id"], "properties": { "id": { "type": "string", "minLength": 1 }, "label": { "type": "string" } }, "additionalProperties": true }
+              ]
+            }
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "parent_state_id", "removed_garment_ids", "wardrobe_state", "path", "status"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "parent_state_id": { "type": ["string", "null"] },
+                "removed_garment_ids": { "type": "array", "items": { "type": "string" } },
+                "wardrobe_state": { "type": "string" },
+                "path": { "type": "string", "minLength": 1 },
+                "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "status": { "type": "string", "enum": ["pending", "approved"] },
+                "approval": { "type": "object" }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "cast_state_masters": { "type": "object" },
+    "art_direction": {
+      "type": "object",
+      "description": "P1-6 art direction layer — structured beyond single-string palette/lighting. Holds color script, visual motifs, texture continuity.",
+      "properties": {
+        "color_script": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scene_id": { "type": "string" },
+              "color_temperature": { "type": "string", "description": "Warm/cool/neutral + motivation" },
+              "palette_override": { "type": "string", "description": "Scene-specific palette override" },
+              "emotional_motivation": { "type": "string", "description": "Why this color — narrative/emotional reason" }
+            }
+          },
+          "description": "Per-scene color temperature script — the 'color arc' of the film"
+        },
+        "visual_motifs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "motif": { "type": "string", "description": "e.g. 'rain=coldness', 'red door=danger'" },
+              "first_appearance": { "type": "string", "description": "scene/shot id where motif first appears" },
+              "recurrence_rule": { "type": "string", "description": "When/how this motif repeats" }
+            }
+          },
+          "description": "Recurring visual symbols with narrative meaning"
+        },
+        "texture_continuity": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "element": { "type": "string", "description": "e.g. 'wall texture', 'skin pores', 'fabric weave'" },
+              "lock_description": { "type": "string", "description": "How this texture must look consistently" }
+            }
+          },
+          "description": "Texture elements that must be consistent across shots"
+        }
+      }
+    },
+    "locations": { "type": "object" },
+    "props": { "type": "object" },
+    "continuity_states": { "type": "object" },
+    "approved_keyframes": { "type": "object" },
+    "updated_at": { "type": ["string", "null"] },
+    "canonical_style_path": { "type": ["string", "null"] },
+    "style_reference": {
+      "type": "object",
+      "description": "Immutable provenance for the uploaded image whose visual language anchors the whole film.",
+      "properties": {
+        "kind": { "const": "uploaded-style-reference" },
+        "original_path": { "type": "string" },
+        "staged_path": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "canonical_path": { "type": "string" },
+        "canonical_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "previous_versions": { "type": "array", "items": { "type": "object" } }
+  },
+  "$defs": {
+    "parameterNode": {
+      "type": "object",
+      "required": ["id", "revision", "hash", "source_refs", "dependency_refs", "state", "approval_ref", "stale_reasons", "data"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^visual\\.[a-z0-9_-]+\\.primary$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "source_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
+        "dependency_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "state": { "enum": ["draft", "review", "locked", "stale"] },
+        "approval_ref": { "type": ["string", "null"] },
+        "stale_reasons": { "type": "array", "items": { "type": "object" } },
+        "data": {}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

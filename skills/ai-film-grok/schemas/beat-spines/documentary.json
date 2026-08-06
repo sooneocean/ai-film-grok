@@ -1,0 +1,50 @@
+[
+  {
+    "key": "premise",
+    "dramatic_function": "hook",
+    "importance": "important",
+    "objective": "主题/问题引入",
+    "weight": 0.14,
+    "shots_n": 1
+  },
+  {
+    "key": "context",
+    "dramatic_function": "approach",
+    "importance": "supporting",
+    "objective": "背景/语境建立",
+    "weight": 0.18,
+    "shots_n": 1
+  },
+  {
+    "key": "evidence",
+    "dramatic_function": "sensory",
+    "importance": "climax",
+    "objective": "事实/数据/物证呈现",
+    "weight": 0.22,
+    "shots_n": 2
+  },
+  {
+    "key": "perspective",
+    "dramatic_function": "reaction",
+    "importance": "important",
+    "objective": "观点/访谈/立场",
+    "weight": 0.2,
+    "shots_n": 1
+  },
+  {
+    "key": "conclusion",
+    "dramatic_function": "action",
+    "importance": "important",
+    "objective": "结论/推论推进",
+    "weight": 0.16,
+    "shots_n": 1
+  },
+  {
+    "key": "coda",
+    "dramatic_function": "afterglow",
+    "importance": "supporting",
+    "objective": "余思/开放问题",
+    "weight": 0.1,
+    "shots_n": 1
+  }
+]

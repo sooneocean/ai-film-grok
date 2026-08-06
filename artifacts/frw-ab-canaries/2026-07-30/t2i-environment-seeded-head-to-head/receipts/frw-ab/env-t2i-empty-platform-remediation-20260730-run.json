@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-run",
+  "created_at": "2026-07-30T04:59:51.004741+00:00",
+  "experiment_id": "env-t2i-empty-platform-remediation-20260730",
+  "stage": "pilot",
+  "operation": "text_to_image",
+  "plan_sha256": "7c35793a4776f916676fa87755693fe0b42ae1fb55c3c1968da2ebfafffa48c6",
+  "catalog_sha256": "46ea14995336d17e498c0e92923ceaa061a7fce6407ebac040ebc4cc69a1ccdb",
+  "fanout_count": 2,
+  "submissions": [
+    {
+      "model_id": "flux",
+      "status": "submitted",
+      "task_id": "42662c88-0004-4417-8c98-83b492c4c6a7",
+      "query_command": "text2image-query"
+    },
+    {
+      "model_id": "qwen",
+      "status": "submitted",
+      "task_id": "64c8df87-52ad-4463-9862-8082c128bb90",
+      "query_command": "text2image-query"
+    }
+  ],
+  "ok": true,
+  "automatic_resubmit": false,
+  "run_sha256": "2fe2fc9d5adb6a84c2fa06c72b0b394e77fffff24092fbe4b49dd248b88f2d46"
+}

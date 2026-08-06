@@ -1,0 +1,65 @@
+{
+  "schema_version": 2,
+  "next": {
+    "id": "write-spec",
+    "skill_id": "dispatch.orchestrate",
+    "operation": "write-spec",
+    "spend_class": "local",
+    "approval_class": "none"
+  },
+  "graph": {
+    "exists": false
+  },
+  "quality": {
+    "ok": true,
+    "failed_count": 0
+  },
+  "production_evidence": {
+    "ready_for_bulk": false
+  },
+  "required_full_sections": [
+    "graph",
+    "jobs_summary",
+    "narrative_control",
+    "production_evidence",
+    "quality",
+    "post_audit",
+    "hard_gates"
+  ],
+  "required_action_fields": [
+    "skill_id",
+    "operation",
+    "argv",
+    "input_hashes",
+    "spend_class",
+    "approval_class",
+    "transaction_id",
+    "state_hash"
+  ],
+  "hard_gates": [
+    "write-spec before media-queue",
+    "pilot user approve before bulk (>3 shots)",
+    "no silent provider switch",
+    "final ≠ final_complete without review-final",
+    "state-index check before bulk when undress/continue (fluency)",
+    "canonical narrative graph validated + all scopes locked + projection hash current",
+    "production evidence ready before bulk motion",
+    "hero quality receipt pass before clip promote",
+    "provider fallback writes routing receipt and requires hero re-pilot",
+    "adult max heat_agent hard_fail blocks media-queue add (Wave 5)",
+    "adult max heat final_ok (S-grade) required before final/export (Wave 6)"
+  ],
+  "hard_gate_codes": [
+    "WRITE_SPEC_REQUIRED",
+    "PILOT_USER_APPROVAL_REQUIRED",
+    "SILENT_PROVIDER_SWITCH_FORBIDDEN",
+    "FINAL_HUMAN_REVIEW_REQUIRED",
+    "STATE_INDEX_REQUIRED",
+    "NARRATIVE_PROJECTION_CURRENT_REQUIRED",
+    "PRODUCTION_EVIDENCE_REQUIRED",
+    "HERO_QUALITY_RECEIPT_REQUIRED",
+    "PROVIDER_FALLBACK_REPILOT_REQUIRED",
+    "HEAT_AGENT_HARD_FAIL",
+    "HEAT_FINAL_NOT_OK"
+  ]
+}

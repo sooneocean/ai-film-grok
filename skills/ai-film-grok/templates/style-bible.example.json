@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "locked": false,
+  "title": "示例片",
+  "medium": "high-quality anime illustration (vertical doujin short)",
+  "palette": "silver-white hair, purple-red eyes, cold fluorescent shame whites, rain neon blues, violet harem rim",
+  "lighting": "night practicals, harsh disciplinary fluorescents, intimate low-key purple",
+  "lens": "vertical 9:16 anime cinematic, tight CU faces, low-angle dominance, continuous push-in",
+  "rendering": "clean anime linework, soft cel shading, wet fabric sheen, subtle data particles, adult proportions",
+  "signature_block": "Vertical 9:16 high-quality dark anime doujin short, clean linework, soft cel shading, coherent night academy palette, stable heroine identity and wardrobe, consistent grade across all shots.",
+  "identity_lock": "Adult anime woman Kei: long silver-white wavy hair, black headband, pink geometric halo antenna, large purple-red eyes, fair android-like skin, white oversized jacket with black panels and pink accents, black vest, cyan blue tie, short black skirt, long black thigh-high socks, black boots.",
+  "negative_hints": "do not change face identity; do not switch medium mid-film; no underage; no photoreal switch; no random outfit recolor",
+  "canonical_style_path": null,
+  "cast_masters": {
+    "kei": "canonical/cast/kei-v1.png"
+  },
+  "updated_at": null
+}

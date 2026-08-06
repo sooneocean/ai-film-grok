@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-h3-fill-idle-run-next",
+  "ok": true,
+  "root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough",
+  "execute": true,
+  "max_jobs": 1,
+  "jobs_attempted": 1,
+  "jobs_ran": 1,
+  "runs": [
+    {
+      "shot_id": "s_cu",
+      "mode": "r2v",
+      "priority": "P1",
+      "lane": "primary_h3",
+      "stage": "production",
+      "ok": true,
+      "deliver_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/takes/s_cu/s_cu_h3_r2v_20260804_704x1280.mp4",
+      "free_memory": null
+    }
+  ],
+  "ran": true,
+  "skipped_reason": null,
+  "run_result": {
+    "ok": true,
+    "shot_id": "s_cu",
+    "mode": "r2v",
+    "deliver_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/takes/s_cu/s_cu_h3_r2v_20260804_704x1280.mp4",
+    "receipt": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/h3-run-s_cu.json",
+    "weapon_id": "minimax-h3-r2v-pilot"
+  },
+  "next_report": {
+    "schema_version": 1,
+    "kind": "ai-film-h3-fill-idle-next",
+    "ok": true,
+    "root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough",
+    "pending_count": 2,
+    "by_priority": {
+      "P1": 1,
+      "done": 1
+    },
+    "priority_ok": true,
+    "priority_violations": [],
+    "next": {
+      "shot_id": "s_cu",
+      "priority": "P1",
+      "lane": "primary_h3",
+      "mode": "r2v",
+      "command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode r2v --register",
+      "best_mean": 10.7035,
+      "reasons": [
+        "dialogue_close_restricted",
+        "h3_below_floor"
+      ]
+    },
+    "command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode r2v --register",
+    "capacity": {
+      "ok": true,
+      "ready": true,
+      "status": "ready",
+      "vram_free_bytes": 32256032768,
+      "blockers": [],
+      "base_url": "http://127.0.0.1:18188",
+      "source": "submission_capacity"
+    },
+    "capacity_ready": true,
+    "still_challenge_hint": null,
+    "note": "Capacity ready — run command now"
+  },
+  "free_memory_on_mode_switch": true,
+  "next_after": {
+    "shot_id": "s_cu",
+    "priority": "P1",
+    "lane": "primary_h3",
+    "mode": "r2v",
+    "command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode r2v --register",
+    "best_mean": 10.7035,
+    "reasons": [
+      "dialogue_close_restricted",
+      "h3_below_floor"
+    ]
+  },
+  "command_after": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode r2v --register",
+  "pending_after": 2
+}

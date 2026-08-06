@@ -1,0 +1,18 @@
+# 收工后 / 下 session 接续
+
+## 已完成
+- 吞吐 Wave A–H 代码在 main
+- e2e 冒烟：`/tmp/aifilm-e2e-c2Q0QU`（见 memory/2026-08-03-throughput-e2e-run.md）
+- 结果条：`artifacts/session-wrap-2026-08-03-result.txt`
+
+## 下次推进（选一）
+1. **真片**：给 film root → `aifilm dispatch --root …` 按 next 走 pilot→bulk→closeout  
+2. **W8**：autopilot allowlist 扩 throughput（需你说 go）  
+3. **不要**再拆第四套阶段名 / 自批 pilot / 静默降 heat
+
+## 命令
+```bash
+AIFILM=~/.grok/plugins/ai-film-grok/skills/ai-film-grok/scripts/aifilm
+$AIFILM doctor
+$AIFILM dispatch --root "$ROOT"
+```

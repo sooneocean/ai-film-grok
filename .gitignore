@@ -1,15 +1,64 @@
-# Lock & OS junk (never version these)
-*.lock
+# ============================================================
+# Merged .gitignore
+#   - local pipeline lane (bgm / tts / video asset library)
+#   - Gitea ai-film-grok (ComfyUI film-generation pipeline)
+# ============================================================
+
+# ---- secrets & local runtime (never commit) ----
+**/config.env
+**/.env
+**/.env.*
+!**/.env.example
+!**/config.env.example
+
+# ---- OS / editor ----
 .DS_Store
+**/.DS_Store
+**/.idea/
+**/.vscode/
+**/*.swp
+**/*~
 
-# Safety backups produced by mutation scripts
+# ---- Python ----
+__pycache__/
+*.pyc
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.benchmarks/
+**/.coverage
+**/htmlcov/
+**/*.egg-info/
+**/.venv/
+**/venv/
+/.local-runtimes/
+**/g2pW/
+
+# ---- Node (if any post tooling lands) ----
+**/node_modules/
+**/dist/
+
+# ---- local skill / run noise ----
+**/backups/
+**/receipts/
+**/*.log
+**/last_suite.log
+
+# ---- lock & OS junk (never version these) ----
+*.lock
+
+# ---- Safety backups produced by mutation scripts ----
 *.bak
+**/*.bak-*
+**/*~pre-*
 
-# Model / download caches (regenerable, not project data)
+# ---- Model / download caches (regenerable, not project data) ----
 melo-cache/
 
-# Large media binaries: version the METADATA, not the media.
-# For true binary versioning later, adopt Git LFS and remove these lines.
+# ---- Large media binaries: version METADATA, not media.
+#      For true binary versioning later, adopt Git LFS and remove these lines. ----
 *.wav
 *.flac
 *.mp3
@@ -18,11 +67,40 @@ melo-cache/
 *.mov
 *.webm
 
-# Python
-__pycache__/
-*.pyc
-
-# Generator runtime scratch (job tickets); the ledger is generation-jobs.jsonl
+# ---- Generator runtime scratch (job tickets); the ledger is generation-jobs.jsonl ----
 bgm-library/.gen-tickets/
 video-library/.gen-tickets/
 video-library/.gen-tmp/
+
+# ---- film project outputs accidentally copied in ----
+**/out/
+**/clips/
+**/keyframes/
+**/film-spec.json
+**/manifest.json
+**/timeline.json
+
+# ---- transient locks & temporary test queues emitted during run ----
+artifacts/**/*.lock
+artifacts/lipdub-queue-*
+
+# ---- canary binary media — keep JSON/receipts tracked; media stays local only ----
+artifacts/**/*.mp4
+artifacts/**/*.mov
+artifacts/**/*.webm
+artifacts/**/*.png
+artifacts/**/*.jpg
+artifacts/**/*.jpeg
+artifacts/**/*.webp
+artifacts/**/*.wav
+artifacts/**/*.mp3
+artifacts/**/*.flac
+
+# ---- session / run-continuation tooling artifacts (never commit) ----
+.omo/
+.zcode/
+coverage.json
+
+# ---- local dev artifacts ----
+.kilo/
+backups-skills/

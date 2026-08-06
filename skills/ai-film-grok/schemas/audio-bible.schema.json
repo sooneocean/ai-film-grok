@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/audio-bible.schema.json",
+  "title": "ai-film-grok audio bible",
+  "type": "object",
+  "required": ["schema_version", "kind", "revision", "state", "hash", "approval_ref", "stale_reasons", "nodes"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "kind": { "type": "string", "const": "audio-bible" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "state": { "enum": ["draft", "review", "locked", "stale"] },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "approval_ref": { "type": ["string", "null"] },
+    "stale_reasons": { "type": "array", "items": { "type": "object" } },
+    "nodes": {
+      "type": "object",
+      "required": ["voice", "dialogue_delivery", "adr_lipsync", "ambience", "foley", "sfx", "bgm_motif_cue", "licensing"],
+      "properties": {
+        "voice": { "$ref": "#/$defs/voiceNode" },
+        "dialogue_delivery": { "$ref": "#/$defs/parameterNode" },
+        "adr_lipsync": { "$ref": "#/$defs/parameterNode" },
+        "ambience": { "$ref": "#/$defs/parameterNode" },
+        "foley": { "$ref": "#/$defs/parameterNode" },
+        "sfx": { "$ref": "#/$defs/parameterNode" },
+        "bgm_motif_cue": { "$ref": "#/$defs/parameterNode" },
+        "licensing": { "$ref": "#/$defs/parameterNode" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "parameterNode": {
+      "type": "object",
+      "required": ["id", "revision", "hash", "source_refs", "dependency_refs", "state", "approval_ref", "stale_reasons", "data"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^audio\\.[a-z0-9_-]+\\.primary$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "source_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
+        "dependency_refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "state": { "enum": ["draft", "review", "locked", "stale"] },
+        "approval_ref": { "type": ["string", "null"] },
+        "stale_reasons": { "type": "array", "items": { "type": "object" } },
+        "data": {}
+      },
+      "additionalProperties": true
+    }
+    ,"voiceNode": {
+      "allOf": [{ "$ref": "#/$defs/parameterNode" }],
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "performance": { "$ref": "#/$defs/performanceLock" },
+            "characters": { "type": "object" }
+          }
+        }
+      }
+    },
+    "performanceLock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "emotions": { "type": "array", "items": { "type": "string" } },
+        "delivery_tags": { "type": "array", "items": { "type": "string" } },
+        "default_rate": { "type": "string" },
+        "default_pitch": { "type": "string" },
+        "default_volume": { "type": "string" },
+        "reference_audio_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "provider": { "type": "string" },
+        "model": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": true
+}

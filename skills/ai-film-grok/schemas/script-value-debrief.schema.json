@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sooneocean/ai-film-grok/schemas/script-value-debrief.schema.json",
+  "title": "script-value-debrief",
+  "description": "Presentation-value L0–L4 debrief receipt before story lock.",
+  "type": "object",
+  "required": ["kind", "viewer_promise", "must_keep_beat_ids", "beat_cards"],
+  "additionalProperties": true,
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "script-value-debrief"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "film_title": { "type": "string" },
+    "viewer_promise": { "type": "string", "minLength": 1 },
+    "open_hook": { "type": "string" },
+    "confirmed_by_user": { "type": "boolean" },
+    "must_keep_beat_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "beat_cards": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["beat_id"],
+        "additionalProperties": true,
+        "properties": {
+          "beat_id": { "type": "string", "minLength": 1 },
+          "visual_event": { "type": "string" },
+          "value_rank": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "dramatic_function": { "type": "string" },
+          "state_in": { "type": "string" },
+          "state_out": { "type": "string" },
+          "visible_change": { "type": "string" },
+          "needs_agent_fill": { "type": "boolean" }
+        }
+      }
+    },
+    "pilot_shortlist_beat_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "user_brief": { "type": "object", "additionalProperties": true },
+    "writer": { "type": "object", "additionalProperties": true },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dead_air_risks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "seeded_from": { "type": "string" },
+    "needs_agent_fill": { "type": "boolean" },
+    "written_at": { "type": "string" },
+    "confirmed_at": { "type": "string" },
+    "confirm_user_phrase": { "type": "string" }
+  }
+}

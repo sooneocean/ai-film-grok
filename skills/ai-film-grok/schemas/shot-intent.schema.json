@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/shot-intent.schema.json",
+  "title": "ai-film-grok shot intent",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "shot_id",
+    "shot_role",
+    "operation",
+    "content_class",
+    "identity_lock",
+    "continuity_required",
+    "quality_tier",
+    "provider_lock"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "ai-film-shot-intent" },
+    "shot_id": { "type": "string", "minLength": 1 },
+    "shot_role": { "enum": ["hero", "env", "bridge", "insert"] },
+    "operation": { "enum": ["image_to_video", "text_to_video"] },
+    "content_class": { "enum": ["general", "restricted_local"] },
+    "identity_lock": { "type": "boolean" },
+    "continuity_required": { "type": "boolean" },
+    "quality_tier": { "enum": ["draft", "select", "hero"] },
+    "provider_lock": { "type": ["string", "null"] },
+    "recommended_lane": { "type": ["string", "null"] },
+    "recommended_provider": { "type": ["string", "null"] },
+    "recommended_weapon": { "type": ["string", "null"] },
+    "recommended_still_provider": { "type": ["string", "null"] },
+    "h3_enabled": { "type": "boolean" },
+    "difficulty_flags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "route_reasons": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "heat_phase": { "type": ["string", "null"] },
+    "wardrobe_state": { "type": ["string", "null"] },
+    "max_duration_sec": { "type": ["number", "null"] },
+    "parent_shot_id": { "type": ["string", "null"] },
+    "broll_kind": { "type": ["string", "null"], "enum": ["env", "insert", "reaction", null] },
+    "editorial_only": { "type": "boolean" },
+    "audio_policy": {
+      "type": ["string", "null"],
+      "enum": [
+        "carry_parent_dialogue",
+        "prefer_native",
+        "keep_native",
+        "strip_native_use_tts_bgm",
+        "mute_native",
+        null
+      ]
+    },
+    "dramatic_function": { "type": ["string", "null"] },
+    "want_beat": { "type": ["string", "null"] },
+    "motion_tier": { "type": ["string", "null"] },
+    "spoken_text": { "type": ["string", "null"] },
+    "screen_mode": { "type": ["string", "null"] },
+    "speaker": { "type": ["string", "null"] },
+    "has_action_core": { "type": ["boolean", "null"] },
+    "action_summary": { "type": ["string", "null"] },
+    "camera_prompt": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

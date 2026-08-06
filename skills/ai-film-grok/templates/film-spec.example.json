@@ -1,0 +1,319 @@
+{
+  "vo_mode": "hybrid",
+  "vo_voice": "zh-CN-XiaoxiaoNeural",
+  "tts_backend": "edge",
+  "cast_tts_backends": {
+    "storyteller": "edge",
+    "heroine": "edge",
+    "partner": "edge"
+  },
+  "dialogue_spoken_lang": "zh",
+  "narration_spoken_lang": "zh",
+  "caption_lang": "zh",
+  "cast_voices": {
+    "storyteller": "zh-CN-XiaoxiaoNeural",
+    "heroine": "zh-CN-XiaoyiNeural",
+    "partner": "zh-CN-YunxiNeural"
+  },
+  "i2v_provider": "grok",
+  "frw_video_model": "legacy-img2video",
+  "frw_env_model": "ltx-t2v",
+  "frw_aspect_ratio": "9:16",
+  "frw_resolution": "720p",
+  "frw_duration": "5",
+  "frw_width": "720",
+  "frw_height": "1280",
+  "frw_fps": "24",
+  "caption_mode": "zh_en",
+  "transition_fluency": "cinematic",
+  "tts_allow_network_fallback": false,
+  "native_audio_volume": 0.72,
+  "vo_rate": "+0%",
+  "vo_pitch": "+0Hz",
+  "vo_gain": 1.32,
+  "transition_sec": 0.3,
+  "transition_style": "dissolve",
+  "transition_default": "soft",
+  "edit_craft": [
+    "cut_on_action"
+  ],
+  "transition_intents": [
+    "hard"
+  ],
+  "transition_styles": [
+    "fade"
+  ],
+  "audio_policy": {
+    "mode": "auto",
+    "allow_sung": false,
+    "allow_lipsync": false,
+    "bed_source": "auto",
+    "max_sung_shots": 1
+  },
+  "sound_plan": {
+    "mood": "rnb",
+    "bed": true,
+    "events": [
+      {
+        "type": "sfx_accent",
+        "shot_id": "shot01",
+        "kind": "whoosh"
+      },
+      {
+        "type": "duck",
+        "shot_id": "shot02",
+        "depth": 0.4
+      },
+      {
+        "type": "music_in",
+        "shot_id": "shot01",
+        "label": "main_theme"
+      },
+      {
+        "type": "music_out",
+        "shot_id": "shot02",
+        "label": "main_theme"
+      }
+    ],
+    "music_spotting": [
+      {
+        "label": "main_theme",
+        "start_sec": 0.0,
+        "end_sec": 12.0,
+        "fade_in_sec": 0.5,
+        "fade_out_sec": 1.0,
+        "emotion": "tension",
+        "beat_ref": "approach",
+        "intensity": 7
+      }
+    ],
+    "audio_tracks": {
+      "dialogue": {
+        "gain": 1.0,
+        "duck_to_bgm": true
+      },
+      "sfx": {
+        "gain": 0.8,
+        "duck_to_bgm": true
+      },
+      "ambience": {
+        "gain": 0.5
+      },
+      "foley": {
+        "gain": 0.6
+      },
+      "music": {
+        "gain": 0.7,
+        "duck_to_vo": true
+      }
+    }
+  },
+  "grade": {
+    "color_temperature": "warm 3200K",
+    "saturation": 1.15,
+    "contrast": 1.1,
+    "brightness": 0.0,
+    "skin_tone_protection": true,
+    "gamma": 0.95
+  },
+  "color_grade_strict": true,
+  "title": "雨夜后座",
+  "description": "说书人讲述：雨夜女司机与后座升温——色气靠距离与感官，不对口型",
+  "aspect_ratio": "9:16",
+  "heat_scale": "max",
+  "sex_vo_strict": true,
+  "cast_mode": "auto",
+  "heat_phase_auto": true,
+  "heat_arc_advise": false,
+  "sex_floor_strict": true,
+  "sex_wardrobe_strict": true,
+  "sex_min_duration_ratio": 0.2,
+  "erotic_impact_strict": false,
+  "sex_arc_strict": false,
+  "sex_detail_cu_strict": false,
+  "both_undress_strict": false,
+  "coitus_strict": false,
+  "size_ladder_strict": false,
+  "pose_strict": false,
+  "montage_strict": false,
+  "director_intent": {
+    "logline": "雨夜出租车后座，说书人陪你靠近一位湿透的女司机。",
+    "tone": "成人色气·雨夜·办事完成可说满",
+    "emotional_arc": [
+      "好奇登场",
+      "前戏贴近",
+      "进行沉腰",
+      "高潮完成与钩子"
+    ],
+    "theme": "边界感：门锁与呼吸谁先越线",
+    "act_structure": {
+      "setup": "雨夜上车，热气与湿衣建立压迫",
+      "confrontation": "后视镜与感官贴进，距离阶梯收紧",
+      "resolution": "未完成邀请，钩子悬着"
+    },
+    "pace_chart": [
+      {
+        "label": "慢燃登场",
+        "start_ratio": 0.0,
+        "end_ratio": 0.25,
+        "intensity": 3,
+        "cut_freq": "slow"
+      },
+      {
+        "label": "加速靠近",
+        "start_ratio": 0.25,
+        "end_ratio": 0.6,
+        "intensity": 6,
+        "cut_freq": "medium"
+      },
+      {
+        "label": "感官高潮",
+        "start_ratio": 0.6,
+        "end_ratio": 0.85,
+        "intensity": 9,
+        "cut_freq": "fast"
+      },
+      {
+        "label": "余韵释放",
+        "start_ratio": 0.85,
+        "end_ratio": 1.0,
+        "intensity": 4,
+        "cut_freq": "slow"
+      }
+    ],
+    "visual_motifs": [
+      "雨=冷静外壳",
+      "后视镜=偷窥与对视",
+      "门闩=私密边界"
+    ],
+    "audience": "完播优先的短视频观众",
+    "taboos": [
+      "真对口型当卖点",
+      "说教收尾"
+    ],
+    "cast": [
+      "hero",
+      "partner"
+    ]
+  },
+  "scenes": [
+    {
+      "title": "Ride",
+      "summary": "上车 → 靠近 → 感官 → 余韵",
+      "director_board": {
+        "emotional_turn": "好奇 → 感官偷窥 → 身体失控",
+        "audience_question": "谁先越过这条看不见的线？",
+        "coverage_strategy": "后视镜 OTS + 锁骨特写 insert，近景加压",
+        "cut_intent": "hook 后 soft_glue 升温，sensory 转 smash 压感官",
+        "image_priority": "水珠与门闩的物件特写锚定每次距离变化",
+        "sound_priority": "心跳 BGM duck，旁白第三人称保距离感",
+        "approval_state": "approved",
+        "visual_strategy": "中景开门后切近景后视镜",
+        "performance_strategy": "先克制开门，再以锁骨与呼吸暴露紧张"
+      },
+      "shots": [
+        {
+          "id": "shot01",
+          "title": "上车",
+          "shot_role": "hero",
+          "dramatic_function": "hook",
+          "lipsync": false,
+          "duration_sec": 6,
+          "nar": "雨很急。她湿透的雨衣半敞，拉开车门，热气先扑出来。",
+          "nar_en": "The rain is fierce. Her wet raincoat half open, she pulls the door; heat spills out first.",
+          "dsl": {
+            "subject": "adult anime woman taxi driver, wet raincoat half open, heavy blush",
+            "action": "opens rear door under rain",
+            "start_pose": "hand on rear door handle, body outside cab in rain",
+            "end_pose": "door open, body half-in, look toward back seat — feeds shot02",
+            "chain_mode": "continue",
+            "cut_on": "mid_motion",
+            "camera_axis": "dolly_in",
+            "focal_character": "hero",
+            "viewpoint": "objective",
+            "look_axis": "left",
+            "story_beat": "她拉开车门，把乘客关进同一私密空间",
+            "visible_change": "车门从关到开；身体半入座舱",
+            "subtext": "她在决定要不要把乘客也淋进这摊热里——手比脑子快",
+            "playable_action": "grips door handle, hesitates, pulls open wider than needed",
+            "body_state": "wet skin flushed, breath held then released, fingers tremble on handle",
+            "environment": "rainy night street neon puddles",
+            "camera": {
+              "shot_size": "medium full",
+              "angle": "eye level",
+              "lens_mm": "35"
+            },
+            "cast": [
+              "heroine"
+            ],
+            "motion": "door opens, rain splash, step half-in, continuous slow dolly-in, hold end_pose, soft look — idle not speaking",
+            "lighting": "cold streetlamp"
+          },
+          "camera_axis": "dolly_in",
+          "arc_node": "好奇登场",
+          "emotion": "好奇登场",
+          "narrative_purpose": "拉进私密空间",
+          "beat_id": "beat01",
+          "performance_delta": "车门从关到开；身体半入座舱",
+          "performance": {
+            "subtext": "她在决定要不要把乘客也淋进这摊热里——手比脑子快",
+            "playable_action": "grips door handle, hesitates, pulls open wider t",
+            "reaction_trigger": "雨声与门锁"
+          }
+        },
+        {
+          "id": "shot02",
+          "title": "后视镜",
+          "shot_role": "hero",
+          "dramatic_function": "approach",
+          "lipsync": false,
+          "duration_sec": 6,
+          "nar": "后视镜里，锁骨上的水珠还没干，她轻轻喘了一下。",
+          "nar_en": "In the rearview, water still beads on her collarbones; she breathes soft.",
+          "dsl": {
+            "subject": "same driver in rearview mirror, wet collarbone, seductive eyes",
+            "action": "leans closer toward the rearview, eyes draw near",
+            "chain_mode": "continue",
+            "cut_on": "mid_motion",
+            "camera_axis": "ecu_hold",
+            "focal_character": "hero",
+            "viewpoint": "ots",
+            "look_axis": "left",
+            "story_beat": "距离被后视镜拉近，感官压迫开始",
+            "visible_change": "视线落入后视镜；水珠仍停在锁骨",
+            "environment": "taxi cabin dashboard glow",
+            "emotion": {
+              "primary": "tension",
+              "intensity": 0.9,
+              "valence": 0.8,
+              "arousal": 0.9
+            },
+            "camera": {
+              "shot_size": "close-up",
+              "angle": "eye level",
+              "lens_mm": "50"
+            },
+            "cast": [
+              "heroine"
+            ],
+            "motion": "leans close to mirror, gaze tightens near glass, soft breath, idle not speaking",
+            "lighting": "dashboard glow",
+            "start_pose": "body half-in looking toward back seat",
+            "end_pose": "lean near rearview, eyes tight on glass"
+          },
+          "camera_axis": "ecu_hold",
+          "arc_node": "前戏贴近",
+          "emotion": "前戏贴近",
+          "narrative_purpose": "后视镜加压感官",
+          "beat_id": "beat02",
+          "performance_delta": "视线落入后视镜；水珠仍停在锁骨",
+          "performance": {
+            "subtext": "边界试探",
+            "playable_action": "leans closer toward the rearview, eyes draw near",
+            "reaction_trigger": "后视镜对视"
+          }
+        }
+      ]
+    }
+  ]
+}

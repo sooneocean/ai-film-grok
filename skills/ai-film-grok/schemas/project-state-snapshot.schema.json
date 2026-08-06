@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/project-state-snapshot.schema.json",
+  "title": "ai-film-grok canonical project state snapshot",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "root",
+    "production_mode",
+    "canonical_stage",
+    "gates",
+    "next_actions",
+    "source_hashes",
+    "state_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "project-state-snapshot" },
+    "root": { "type": "string", "minLength": 1 },
+    "production_mode": { "enum": ["shortform", "longform"] },
+    "canonical_stage": { "type": ["string", "null"] },
+    "canonical_stage_index": { "type": ["integer", "null"] },
+    "canonical_stage_total": { "type": ["integer", "null"] },
+    "internal_stage": { "type": ["string", "null"] },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "truth_conflicts": { "type": "array", "items": { "type": "object" } },
+    "gates": { "type": "object" },
+    "open_reshoot_count": { "type": "integer", "minimum": 0 },
+    "next_id": { "type": ["string", "null"] },
+    "next_cmd": { "type": ["string", "null"] },
+    "next_action": { "type": ["object", "null"] },
+    "next_actions": { "type": "array", "items": { "type": "object" } },
+    "source_hashes": { "type": "object" },
+    "longform": { "type": ["object", "null"] },
+    "state_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "persisted_at": { "type": "string" }
+  },
+  "additionalProperties": false
+}

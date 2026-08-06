@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-capability-snapshot",
+  "generated_at": "2026-07-28T10:00:00+00:00",
+  "capabilities": [
+    {
+      "id": "local-wan-draft",
+      "provider": "comfy-wan22",
+      "model": "wan22-i2v",
+      "operations": ["image_to_video"],
+      "shot_roles": ["hero"],
+      "content_classes": ["general", "restricted_local"],
+      "status": "ready",
+      "verified_at": "2026-07-28T10:00:00+00:00",
+      "expires_at": "2026-07-29T10:00:00+00:00",
+      "authorization": "ready",
+      "pilot_verified": true,
+      "experimental": false,
+      "identity_lock_supported": true,
+      "quality_tiers": ["draft", "select"],
+      "quality_floor": 4,
+      "quality_score": 4,
+      "priority": 100,
+      "resource": "gpu:rtx5090-wan",
+      "concurrency": 1,
+      "cost_state": "free_local",
+      "cost_usd": 0
+    },
+    {
+      "id": "frw-env-draft",
+      "provider": "frw",
+      "model": "ltx-t2v",
+      "operations": ["text_to_video"],
+      "shot_roles": ["env", "bridge", "insert"],
+      "content_classes": ["general"],
+      "status": "ready",
+      "verified_at": "2026-07-28T10:00:00+00:00",
+      "expires_at": "2026-07-28T12:00:00+00:00",
+      "authorization": "ready",
+      "pilot_verified": true,
+      "experimental": false,
+      "identity_lock_supported": false,
+      "quality_tiers": ["draft"],
+      "quality_floor": 4,
+      "quality_score": 4,
+      "priority": 80,
+      "resource": "api:frw",
+      "concurrency": 2,
+      "cost_state": "unknown",
+      "cost_usd": null
+    }
+  ]
+}

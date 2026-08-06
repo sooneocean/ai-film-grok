@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "max_refs": 2,
+  "max_bytes": 4096,
+  "stages": {
+    "idea": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "Idea and brief authoring",
+        "required": true
+      }
+    ],
+    "story": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "Story and Director's Lens",
+        "required": true
+      },
+      {
+        "path": "references/script-value-debrief.md",
+        "reason": "Presentation-value L0–L4 before story lock",
+        "required": false
+      }
+    ],
+    "beats": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "Beat and narrative structure",
+        "required": true
+      },
+      {
+        "path": "references/script-value-debrief.md",
+        "reason": "Beat Value Cards and must_keep ranks",
+        "required": false
+      }
+    ],
+    "shots": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "Shot design, identity and state locks",
+        "required": true
+      }
+    ],
+    "media": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "Verified still and motion generation",
+        "required": true
+      },
+      {
+        "path": "references/comfy-weapon-armory.md",
+        "reason": "Live route verified 5090 still and edit weapons",
+        "required": false
+      }
+    ],
+    "selects": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "Dailies, selects and continuity review",
+        "required": true
+      }
+    ],
+    "rough": [
+      {
+        "path": "references/stages/post.md",
+        "reason": "Audio, edit and designed post",
+        "required": true
+      },
+      {
+        "path": "references/lessons-2026-07-24-ep2-voice-heat-final.md",
+        "reason": "final SRT/sub_lead/register-clip 工程坑",
+        "required": false
+      }
+    ],
+    "verified": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "Final review and export evidence",
+        "required": true
+      }
+    ],
+    "agent": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "Story and Director's Lens",
+        "required": true
+      },
+      {
+        "path": "references/script-value-debrief.md",
+        "reason": "Presentation-value L0–L4 before story lock",
+        "required": false
+      }
+    ],
+    "visual": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "Verified still and motion generation",
+        "required": true
+      },
+      {
+        "path": "references/comfy-weapon-armory.md",
+        "reason": "Live route verified 5090 still and edit weapons",
+        "required": false
+      }
+    ],
+    "post": [
+      {
+        "path": "references/stages/post.md",
+        "reason": "public craft post",
+        "required": true
+      }
+    ],
+    "deliver": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "public craft deliver",
+        "required": true
+      }
+    ]
+  },
+  "pipeline_stages": {
+    "voice": [
+      {
+        "path": "references/stages/voice.md",
+        "reason": "Voice, dialogue and mix routing (P0 声线表在阶段卡；长课按需)",
+        "required": true
+      },
+      {
+        "path": "references/lessons-2026-07-24-ep2-voice-heat-final.md",
+        "reason": "ep2 全量坑复盘（仅深挖时加载）",
+        "required": false
+      }
+    ],
+    "design": [
+      {
+        "path": "references/stages/post.md",
+        "reason": "Designed post and caption ownership",
+        "required": true
+      }
+    ],
+    "post": [
+      {
+        "path": "references/stages/post.md",
+        "reason": "Post audit and final screening",
+        "required": true
+      }
+    ],
+    "deliver": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "Master delivery evidence",
+        "required": true
+      }
+    ],
+    "done": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "Completed delivery read-back",
+        "required": true
+      }
+    ]
+  },
+  "skills": {
+    "projection.verify": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "gate-auto / ship-prep / closeout machine path",
+        "required": true
+      }
+    ],
+    "story.validate": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "Canonical graph validation and locks",
+        "required": true
+      }
+    ],
+    "graph.project": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "Projection freshness",
+        "required": true
+      }
+    ],
+    "character.state.update": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "Wardrobe and state progression",
+        "required": true
+      }
+    ],
+    "image.animate": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "Paid motion generation boundary",
+        "required": true
+      }
+    ],
+    "keyframe.generate": [
+      {
+        "path": "references/comfy-weapon-armory.md",
+        "reason": "Route unlocked still generation to a live verified local weapon",
+        "required": true
+      }
+    ],
+    "sound.design": [
+      {
+        "path": "references/stages/voice.md",
+        "reason": "Audio contract and mix evidence",
+        "required": true
+      },
+      {
+        "path": "references/lessons-2026-07-24-ep2-voice-heat-final.md",
+        "reason": "Hybrid ZH/JA voice contract and anti-switch",
+        "required": false
+      }
+    ],
+    "quality.inspect": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "Human review evidence",
+        "required": true
+      }
+    ],
+    "export.package": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "desktop export package",
+        "required": true
+      }
+    ],
+    "dispatch.orchestrate": [
+      {
+        "path": "references/routing-map.md",
+        "reason": "routing map for next_action",
+        "required": false
+      }
+    ]
+  },
+  "issues": {
+    "GRAPH_PROJECTION_STALE": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "Re-project stale narrative descendants",
+        "required": true
+      }
+    ],
+    "LOCKED_NODE_MUTATION": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "Locked narrative mutation",
+        "required": true
+      }
+    ],
+    "BURNED_SUBTITLE_HUMAN_REVIEW_MISSING": [
+      {
+        "path": "references/stages/post.md",
+        "reason": "Burned-caption visual attestation",
+        "required": true
+      }
+    ],
+    "HUMAN_APPROVAL_REQUIRED": [
+      {
+        "path": "references/stages/approval.md",
+        "reason": "Pilot, paid generation or final-review pause",
+        "required": true
+      }
+    ],
+    "HEAT_AGENT_HARD_FAIL": [
+      {
+        "path": "references/stages/agent.md",
+        "reason": "adult max heat before bulk",
+        "required": true
+      }
+    ],
+    "QUALITY_GATE_FAILED": [
+      {
+        "path": "references/stages/post.md",
+        "reason": "quality gate repair path",
+        "required": true
+      }
+    ]
+  }
+}

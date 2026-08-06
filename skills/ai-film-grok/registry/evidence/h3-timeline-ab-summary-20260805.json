@@ -1,0 +1,77 @@
+{
+  "kind": "h3-timeline-ab-summary",
+  "eval_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-timeline-ab-20260805",
+  "still": "/Users/dex/AI FILM SPACE/0721/fufu-afterclass-gangbang/keyframes/shot01.png",
+  "seed": 20260805,
+  "rows": [
+    {
+      "combo": "ab_high_flat_i2v",
+      "mode": "i2v",
+      "family": "high_motion_flat",
+      "motion": 19.3244,
+      "id_start": 19.4802,
+      "mouth": 53.76,
+      "ok": true
+    },
+    {
+      "combo": "ab_high_tl_i2v",
+      "mode": "i2v",
+      "family": "high_motion_max",
+      "motion": 18.6721,
+      "id_start": 19.3696,
+      "mouth": 27.47,
+      "ok": true
+    },
+    {
+      "combo": "ab_high_flat_r2v",
+      "mode": "r2v",
+      "family": "high_motion_flat",
+      "ok": false,
+      "error": "VRAM/QUEUE during submit"
+    },
+    {
+      "combo": "ab_high_tl_r2v",
+      "mode": "r2v",
+      "family": "high_motion_max",
+      "motion": 26.0017,
+      "id_start": 20.405,
+      "mouth": 50.72,
+      "ok": true,
+      "lane_winner": true
+    },
+    {
+      "combo": "ab_dlg_flat_i2v",
+      "mode": "i2v",
+      "family": "dialogue_mouth_flat",
+      "motion": 19.0763,
+      "id_start": 19.5491,
+      "mouth": 44.726,
+      "ok": true
+    },
+    {
+      "combo": "ab_dlg_tl_i2v",
+      "mode": "i2v",
+      "family": "dialogue_mouth_max",
+      "motion": 0.9755,
+      "mouth": 0.82,
+      "ok": true,
+      "note": "v1 freeze"
+    },
+    {
+      "combo": "ab_dlg_tl_i2v_v2",
+      "mode": "i2v",
+      "family": "dialogue_mouth_max",
+      "motion": 11.9222,
+      "mouth": 30.4837,
+      "id_start": 19.503,
+      "ok": true,
+      "note": "v2 MOUTH ENERGY compact"
+    }
+  ],
+  "takeaway": {
+    "high_i2v": "flat ≈ timeline (19.3 vs 18.7); both pass mean≥18",
+    "high_r2v": "timeline high_motion_max wins (26.0); flat R2V capacity fail",
+    "dialogue": "v1 timeline froze; v2 MOUTH ENERGY recovers",
+    "policy": "5090 default timeline ON; dialogue uses compact continuity + MOUTH ENERGY not HIGH MOTION"
+  }
+}

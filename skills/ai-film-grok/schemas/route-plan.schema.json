@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/route-plan.schema.json",
+  "title": "ai-film-grok route plan",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "ok",
+    "read_only",
+    "auto_execute",
+    "explained_at",
+    "film_spec",
+    "capability_snapshot",
+    "intent",
+    "selection_policy",
+    "selected",
+    "alternatives",
+    "rejected",
+    "blocked_reason"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "ai-film-route-plan" },
+    "layer": {
+      "type": "string",
+      "enum": ["capability", "weapon", "intent"],
+      "description": "Routing layer: capability=snapshot rank; weapon=armory lock; intent=content demand"
+    },
+    "ok": { "type": "boolean" },
+    "read_only": { "const": true },
+    "auto_execute": { "const": false },
+    "explained_at": { "type": "string", "format": "date-time" },
+    "film_spec": { "$ref": "#/$defs/source" },
+    "capability_snapshot": {
+      "allOf": [
+        { "$ref": "#/$defs/source" },
+        {
+          "type": "object",
+          "required": ["generated_at"],
+          "properties": {
+            "generated_at": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+    "intent": { "type": "object" },
+    "selection_policy": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "selected": {
+      "type": ["object", "null"]
+    },
+    "alternatives": { "type": "array", "items": { "type": "object" } },
+    "rejected": { "type": "array", "items": { "type": "object" } },
+    "dialogue_competition": { "type": ["object", "null"] },
+    "blocked_reason": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

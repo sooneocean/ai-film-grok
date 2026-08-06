@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "kind": "short-drama-platform-package",
+  "package_id": "ai-film-space-vertical-v1",
+  "intro": {"mode": "short", "duration_sec": 1.2, "subtitle": "EP.01", "tagline": "每一集，离真相更近一点"},
+  "outro": {"mode": "hook", "duration_sec": 1.8, "next_episode": "门后的声音，终于叫出了她的名字。", "cta": "下一集，敬请期待"},
+  "captions": {"theme": "platform-drama", "max_chars": 12, "languages": ["zh"]},
+  "safe_area": {"top_pct": 10, "bottom_pct": 16}
+}

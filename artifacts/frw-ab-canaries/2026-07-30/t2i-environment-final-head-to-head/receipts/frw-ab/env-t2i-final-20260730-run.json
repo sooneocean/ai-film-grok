@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-run",
+  "created_at": "2026-07-30T03:17:03.866507+00:00",
+  "experiment_id": "env-t2i-final-20260730",
+  "stage": "pilot",
+  "operation": "text_to_image",
+  "plan_sha256": "23fbd677f46cb1ca3dbdd227308c8ce3c45a26d8911737901cb79929abdc17b6",
+  "catalog_sha256": "46ea14995336d17e498c0e92923ceaa061a7fce6407ebac040ebc4cc69a1ccdb",
+  "fanout_count": 2,
+  "submissions": [
+    {
+      "model_id": "flux",
+      "status": "submitted",
+      "task_id": "a10e39dd-64a7-4ae5-93f3-89e6c28bcdde",
+      "query_command": "text2image-query"
+    },
+    {
+      "model_id": "qwen",
+      "status": "submitted",
+      "task_id": "be9c49e7-955b-4968-bc00-273ddf5cf28d",
+      "query_command": "text2image-query"
+    }
+  ],
+  "ok": true,
+  "automatic_resubmit": false,
+  "run_sha256": "fd24ca86af3a4caaf18d892f5789179836cdf409a3156117e1a479642533e979"
+}

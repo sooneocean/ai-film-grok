@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "kind": "armory-qwen-no-text-technical-receipt",
+  "status": "approved_for_production_use_non_default",
+  "weapon_id": "qwen-image-2512-quality",
+  "prompt_id": "a24e1f2f-fd1d-41f2-b0c7-e3946e95ad3b",
+  "workflow_sha256": "ab1597cb65409a3cdca7265963f65882724f179a104aaa61f3fa0a169d90b562",
+  "prompt_sha256": "444ee6e602fa610b23d939d8bbe4c772db877c29fc1ee16eb496fbb0c666d61f",
+  "artifact": {
+    "filename": "armory-qwen-no-text-0703_00001_.png",
+    "sha256": "3bafad2e79c842c2f833ce610c138e30c0e41d7f7a806a121d10b1a4900ab4eb",
+    "bytes": 1695077,
+    "format": "png",
+    "width": 928,
+    "height": 1664,
+    "decode_ok": true
+  },
+  "verification": {
+    "external_api_nodes_allowed": false,
+    "live_model_readback": true,
+    "visual_text_or_watermark_detected": false,
+    "automatic_promotion": false,
+    "default_route_changed": false
+  },
+  "human_visual_review": {
+    "approved": true,
+    "approved_by": "user",
+    "approval_phrase": "審完ok下一步"
+  },
+  "production_use_authorization": {
+    "approved": true,
+    "approved_by": "user",
+    "authorization_phrase": "授權下一步",
+    "scope": "production_use_non_default"
+  },
+  "next_gate": "project_bound_use_or_default_route_change_requires_separate_authorization"
+}

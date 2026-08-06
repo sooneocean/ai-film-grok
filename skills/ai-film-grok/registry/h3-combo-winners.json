@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "kind": "h3-combo-winners",
+  "policy": "h3_max_effect_combo_v1",
+  "source_verdict_kind": "h3-combo-verdict",
+  "ts": "2026-08-05T09:38:13.458195+00:00",
+  "lanes": {
+    "hero_identity_lock": {
+      "preferred_mode": "i2v",
+      "prompt_family": "soft_portrait_alive",
+      "notes": "Lock face from approved still; soft portrait control wins identity L1",
+      "winner": {
+        "combo_id": "r4_soft_tl_i2v",
+        "mode": "i2v",
+        "family": "soft_portrait_alive",
+        "score": 74.0181,
+        "scores": {
+          "identity_score": 74.0181,
+          "motion_score": 4.7533,
+          "mouth_score": 17.5622,
+          "hero_balanced": 53.2386
+        },
+        "motion_mean_absdiff": 4.7533,
+        "identity": {
+          "start_l1": 19.1773,
+          "mid_l1": 26.8479,
+          "end_l1": 41.6946
+        },
+        "mouth_region_std_change": 17.5622
+      }
+    },
+    "high_motion_energy": {
+      "preferred_mode": "r2v",
+      "prompt_family": "high_motion_max",
+      "notes": "HIGH MOTION clause required; R2V when energy > identity; I2V first if identity lock still required",
+      "winner": {
+        "combo_id": "r4_high_tl_r2v",
+        "mode": "r2v",
+        "family": "high_motion_max",
+        "score": 26.0017,
+        "scores": {
+          "identity_score": 71.455,
+          "motion_score": 26.0017,
+          "mouth_score": 50.7239,
+          "hero_balanced": 57.819
+        },
+        "motion_mean_absdiff": 26.0017,
+        "identity": {
+          "start_l1": 20.405,
+          "mid_l1": 48.2332,
+          "end_l1": 19.3629
+        },
+        "mouth_region_std_change": 50.7239
+      }
+    },
+    "dialogue_mouth_energy": {
+      "preferred_mode": "i2v",
+      "prompt_family": "dialogue_mouth_max",
+      "notes": "Default I2V + Mandarin line inject; R2V only for extreme mouth CU when identity can float",
+      "winner": {
+        "combo_id": "r4_dlg_flat_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mouth_flat",
+        "score": 92.02932,
+        "scores": {
+          "identity_score": 51.5424,
+          "motion_score": 19.0763,
+          "mouth_score": 44.7261,
+          "hero_balanced": 41.8026
+        },
+        "motion_mean_absdiff": 19.0763,
+        "identity": {
+          "start_l1": 19.5491,
+          "mid_l1": 76.7604,
+          "end_l1": 78.2746
+        },
+        "mouth_region_std_change": 44.7261
+      }
+    },
+    "faceless_env": {
+      "preferred_mode": "t2v",
+      "prompt_family": "env_no_face",
+      "notes": "Never hang cast face on T2V; env/bridge only",
+      "winner": {
+        "combo_id": "env_t2v_policy",
+        "mode": "t2v",
+        "family": "env_no_face",
+        "score": null,
+        "score_basis": "policy_only",
+        "motion_mean_absdiff": null,
+        "identity": {
+          "start_l1": null,
+          "note": "N/A policy_only"
+        }
+      }
+    }
+  },
+  "weapon_defaults": {
+    "steps": 20,
+    "duration_sec": 5.0,
+    "fps": 24,
+    "note": "registry tuning.steps.allowed is [20] only"
+  }
+}

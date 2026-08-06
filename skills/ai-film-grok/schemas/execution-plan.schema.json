@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/execution-plan.schema.json",
+  "title": "ai-film-grok execution plan",
+  "type": "object",
+  "required": ["schema_version", "kind", "route_plan_sha256", "authorized", "tasks"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "ai-film-execution-plan" },
+    "route_plan_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "authorized": { "type": "boolean" },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "shot_id",
+          "capability_id",
+          "resource",
+          "depends_on",
+          "idempotency_key",
+          "status"
+        ],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "shot_id": { "type": "string", "minLength": 1 },
+          "capability_id": { "type": "string", "minLength": 1 },
+          "resource": { "type": "string", "minLength": 1 },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          },
+          "run_condition": {
+            "description": "Required on newly emitted conditional dialogue tasks; optional only for schema-v1 legacy task receipts.",
+            "enum": [
+              "always",
+              "when_route_auto_or_infinite_talk",
+              "when_route_auto_or_grok",
+              "when_route_h3_or_primary_technical_failure",
+              "when_explicit_secondary_or_primary_technical_failure",
+              "when_secondary_grok_imagine_succeeds",
+              "after_active_route_succeeds",
+              "after_qa",
+              "after_provisional_select",
+              "after_human_approve"
+            ]
+          },
+          "idempotency_key": { "type": "string", "minLength": 1 },
+          "status": {
+            "enum": ["planned", "authorized", "submitted", "running", "succeeded", "failed", "blocked"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

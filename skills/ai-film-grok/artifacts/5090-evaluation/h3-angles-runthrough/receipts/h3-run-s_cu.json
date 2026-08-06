@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-h3-run",
+  "ok": true,
+  "shot_id": "s_cu",
+  "plan": {
+    "schema_version": 1,
+    "kind": "ai-film-h3-shot-plan",
+    "ok": true,
+    "shot_id": "s_cu",
+    "mode": "r2v",
+    "mode_resolve": {
+      "schema_version": 1,
+      "kind": "ai-film-h3-mode-resolve",
+      "mode": "r2v",
+      "weapon_id": "minimax-h3-r2v-pilot",
+      "source_endpoint": "local_minimax_h3_r2v",
+      "requires_still": true,
+      "requires_last": false,
+      "reasons": [
+        "explicit:r2v"
+      ],
+      "alt_mode": null,
+      "alt_reasons": [],
+      "policy": "h3_max_effect_v2_first_last",
+      "confidence": "hard"
+    },
+    "mode_policy": {
+      "truth": "h3 list/plan mode is the default truth",
+      "follow_command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode r2v --register",
+      "alt_when_energy_low": null,
+      "note": "Do not default whole film to R2V. Use resolve_h3_mode; CLI --mode only when overriding after pilot/energy fail."
+    },
+    "weapon_id": "minimax-h3-r2v-pilot",
+    "source_endpoint": "local_minimax_h3_r2v",
+    "provider": "comfy-h3",
+    "intent": {
+      "schema_version": 1,
+      "kind": "ai-film-shot-intent",
+      "shot_id": "s_cu",
+      "shot_role": "hero",
+      "operation": "image_to_video",
+      "content_class": "restricted_local",
+      "identity_lock": true,
+      "continuity_required": false,
+      "quality_tier": "draft",
+      "provider_lock": "comfy-h3",
+      "recommended_lane": "local_dialogue_h3",
+      "recommended_provider": "comfy-h3",
+      "recommended_weapon": "minimax-h3-i2v-pilot",
+      "recommended_still_provider": "comfy_lan",
+      "h3_enabled": true,
+      "difficulty_flags": [],
+      "route_reasons": [
+        "heat_phase:act"
+      ],
+      "max_duration_sec": 5.0,
+      "parent_shot_id": null,
+      "broll_kind": null,
+      "editorial_only": false,
+      "audio_policy": "prefer_native",
+      "heat_phase": "act",
+      "wardrobe_state": "clothed",
+      "dramatic_function": null,
+      "want_beat": "Dramatic function: beat",
+      "motion_tier": "high",
+      "spoken_text": "看着我。",
+      "screen_mode": "on_camera",
+      "speaker": null,
+      "has_action_core": true,
+      "action_summary": "tight face CU, character speaks. micro head motion, lips articulate. mouth forms Mandarin syllables",
+      "camera_prompt": "Framing: CU Lens: 85mm (85mm close-up face/reaction)."
+    },
+    "motion_core": {
+      "dramatic_function": null,
+      "want_beat": "Dramatic function: beat",
+      "motion_tier": "high",
+      "spoken_text": "看着我。",
+      "has_action_core": true
+    },
+    "h3_enabled": true,
+    "still_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/stills/s_cu.png",
+    "still_source": "approved",
+    "last_path": null,
+    "last_source": null,
+    "media_pack": {
+      "schema_version": 2,
+      "kind": "ai-film-h3-media-pack",
+      "shot_id": "s_cu",
+      "first": {
+        "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/stills/s_cu.png",
+        "source": "approved",
+        "sha256": "8fe7eac1849cf374a9c662e1fdf8249f769413a46828fefeb132949850c2d17c",
+        "role": "first"
+      },
+      "last": null,
+      "refs": [],
+      "has_first": true,
+      "has_last": false,
+      "has_refs": false,
+      "flf_ready": false,
+      "mode_hint": "i2v",
+      "identity_warnings": [],
+      "reasons": [
+        "first:approved",
+        "last:absent"
+      ],
+      "missing_last_hint": {
+        "message": "no end still — FLF unavailable (default quality path needs last); produce stills/<id>_end.png or promote --as end",
+        "mode_without_last": "i2v",
+        "mode_with_last": "flf",
+        "suggested_paths": [
+          "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/stills/s_cu_end.png",
+          "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/keyframes/s_cu_end.png"
+        ],
+        "commands": [
+          "aifilm still-challenge promote --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --as end --identity-approved --anatomy-safe --review-note end-still",
+          "# or copy an end pose board to stills/s_cu_end.png"
+        ]
+      }
+    },
+    "ref_paths": [],
+    "missing_last_hint": {
+      "message": "no end still — FLF unavailable (default quality path needs last); produce stills/<id>_end.png or promote --as end",
+      "mode_without_last": "i2v",
+      "mode_with_last": "flf",
+      "suggested_paths": [
+        "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/stills/s_cu_end.png",
+        "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/keyframes/s_cu_end.png"
+      ],
+      "commands": [
+        "aifilm still-challenge promote --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --as end --identity-approved --anatomy-safe --review-note end-still",
+        "# or copy an end pose board to stills/s_cu_end.png"
+      ]
+    },
+    "continue_handoff": {
+      "schema_version": 1,
+      "kind": "continue-handoff-resolve",
+      "shot_id": "s_cu",
+      "prev_shot_id": "s_ms",
+      "wants_continue": false,
+      "ok": false,
+      "end_frame": null,
+      "handoff_meta": null,
+      "copied_to_stills": false,
+      "still_dest": null,
+      "prompt_clause": null,
+      "note": "missing continue end frame for prev=s_ms"
+    },
+    "requires_still": true,
+    "requires_last": false,
+    "audio_policy": "prefer_native",
+    "max_duration_sec": 5.0,
+    "megapixels_draft": 0.2,
+    "allow_bulk": false,
+    "command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode r2v --register",
+    "command_alt": null,
+    "effect_tips": [
+      "换模式前: aifilm comfy free-memory --confirm",
+      "产能: aifilm comfy capacity（free VRAM≥24GiB · queue idle）",
+      "combo-win 身份锁脸: mode=i2v family=soft_portrait score=87.1269",
+      "combo-win 高动能量: mode=r2v family=high_motion score=33.921",
+      "combo-win 对白嘴型: mode=i2v family=dialogue_mandarin score=6.02651",
+      "combo-win 无脸环境: mode=t2v family=env_no_face score=19.35",
+      "combo weapon defaults: steps=20 duration=5.0s (registry-locked)",
+      "R2V：first=主 ref0；有 end still 时 last 优先作 pose land ref",
+      "身份弱于 I2V/FLF；要像素贴落点 → --mode flf + --last-frame",
+      "适合大嘴 CU / 邻镜换构图 / force_r2v 体位高动",
+      "combo lane: 高动能量位优先 R2V+high_motion family",
+      "对白：audio_cues.spoken_text + on_camera → 自动注入 line:「…」",
+      "combo lane: 对白默认 I2V+dialogue_mandarin；极端大嘴 CU 才 R2V",
+      "续镜：dsl.chain_mode=continue → 自动末帧作 first；有 last 则 FLF"
+    ],
+    "still_challenge_candidates": [],
+    "generation_request": {
+      "ok": true,
+      "text_sha256": "c2014a993062c6a171e238cc4d586e182e7a7c97909f775f392ba9bda7ae7150",
+      "image_ref_count": 1,
+      "still_source": "approved",
+      "receipt": "receipts/prompts/s_cu.request.json",
+      "constraints": []
+    }
+  },
+  "provider_result": {
+    "ok": true,
+    "prompt_id": "97e29c8c-2a37-4cc2-aea2-3b8076a934b9",
+    "weapon_id": "minimax-h3-r2v-pilot",
+    "source_endpoint": "local_minimax_h3_r2v",
+    "receipt": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/takes/s_cu/s_cu_h3_r2v_20260804.mp4.receipt.json"
+  },
+  "raw_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/takes/s_cu/s_cu_h3_r2v_20260804.mp4",
+  "raw_sha256": "57772a0c23012b9de6904e876be89259ec41b12af60fefb763bd5d556cdc4942",
+  "geometry": {
+    "ok": true,
+    "source": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/takes/s_cu/s_cu_h3_r2v_20260804.mp4",
+    "upscaled": true,
+    "min_width": 704,
+    "min_height": 1280,
+    "width": 704,
+    "height": 1280,
+    "deliver_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/takes/s_cu/s_cu_h3_r2v_20260804_704x1280.mp4",
+    "upscaled_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/takes/s_cu/s_cu_h3_r2v_20260804_704x1280.mp4",
+    "reason": "upscaled_from_352x608"
+  },
+  "deliver_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/takes/s_cu/s_cu_h3_r2v_20260804_704x1280.mp4",
+  "deliver_sha256": "ab5b6625cb478e157efef7affc1990478bbab8066328ea8f029f35ef2fd10d23",
+  "audio_stripped": false,
+  "audio_policy": "prefer_native",
+  "audio_policy_effective": "keep_native",
+  "use_clip_audio": true,
+  "native_audio_meta": {
+    "has_audio": true,
+    "mean_volume_db": -14.4,
+    "usable": true
+  },
+  "prompt_sha256": "21ea272cd19835f3cd5fea79514ef704644229578a7f71df220c416ab7e4585f",
+  "continue_handoff": {
+    "schema_version": 1,
+    "kind": "continue-handoff",
+    "shot_id": "s_cu",
+    "mode": "r2v",
+    "engine": "h3",
+    "seed": 20260804,
+    "source_clip": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/takes/s_cu/s_cu_h3_r2v_20260804_704x1280.mp4",
+    "end_frame": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/continue-handoff/s_cu_end.png",
+    "dramatic_function": null,
+    "heat_phase": "act",
+    "core": {
+      "dramatic_function": null,
+      "heat_phase": "act",
+      "want_beat": "Dramatic function: beat",
+      "motion_tier": "high",
+      "optical_tier": "meat",
+      "spoken_text": "看着我。",
+      "screen_mode": "on_camera",
+      "speaker": null,
+      "has_action_core": true,
+      "action_summary": "tight face CU, character speaks. micro head motion, lips articulate. mouth forms Mandarin syllables",
+      "camera_prompt": "Framing: CU Lens: 85mm (85mm close-up face/reaction).",
+      "focal_clause": "Lens: 85mm (85mm close-up face/reaction).",
+      "shot_size": "cu",
+      "continuity_required": false
+    },
+    "ok": true,
+    "note": "Next shot chain_mode=continue → plan uses /Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/continue-handoff/s_cu_end.png; AIFILM_CONTINUE_COPY_STILL=1 copies only if stills/<next>.png missing"
+  },
+  "media_pack": {
+    "schema_version": 2,
+    "kind": "ai-film-h3-media-pack",
+    "shot_id": "s_cu",
+    "first": {
+      "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/stills/s_cu.png",
+      "source": "approved",
+      "sha256": "8fe7eac1849cf374a9c662e1fdf8249f769413a46828fefeb132949850c2d17c",
+      "role": "first"
+    },
+    "last": null,
+    "refs": [],
+    "has_first": true,
+    "has_last": false,
+    "has_refs": false,
+    "flf_ready": false,
+    "mode_hint": "i2v",
+    "identity_warnings": [],
+    "reasons": [
+      "first:approved",
+      "last:absent"
+    ],
+    "missing_last_hint": {
+      "message": "no end still — FLF unavailable (default quality path needs last); produce stills/<id>_end.png or promote --as end",
+      "mode_without_last": "i2v",
+      "mode_with_last": "flf",
+      "suggested_paths": [
+        "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/stills/s_cu_end.png",
+        "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/keyframes/s_cu_end.png"
+      ],
+      "commands": [
+        "aifilm still-challenge promote --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --as end --identity-approved --anatomy-safe --review-note end-still",
+        "# or copy an end pose board to stills/s_cu_end.png"
+      ]
+    }
+  },
+  "first_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/stills/s_cu.png",
+  "last_path": null,
+  "input_provenance": {
+    "first_image": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/stills/s_cu.png",
+    "last_image": null,
+    "has_last_frame": false,
+    "ref_count": 0
+  },
+  "mean_absdiff": 10.7035,
+  "register": {
+    "ok": true,
+    "shot_id": "s_cu",
+    "source_endpoint": "local_minimax_h3_r2v",
+    "status": "candidate",
+    "stdout": "{\"ok\":true,\"record\":{\"shot_id\":\"s_cu\",\"role\":\"i2v\",\"status\":\"candidate\",\"path\":\"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/clips/s_cu.mp4\",\"sha256\":\"ab5b6625cb478e157efef7affc1990478bbab8066328ea8f029f35ef2fd10d23\",\"bytes\":824564,\"registered_at\":\"2026-08-05T03:34:39+00:00\",\"provider\":\"comfy-h3\",\"duration_sec\":5.167,\"source_endpoint\":\"local_minimax_h3_r2v\",\"identity_approved\":false,\"motion_approved\":false,\"review_note\":\"H3 r2v pilot; a",
+    "audio_policy": "keep_native",
+    "use_clip_audio": true
+  }
+}

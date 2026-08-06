@@ -1,0 +1,3550 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-route-catalog",
+  "description": "Single machine index: action/skill/cli routing. Generated R1 bootstrap; hand-edit carefully or regenerate.",
+  "iron": [
+    "public aifilm subcommand strings never rename",
+    "do not silent-change pilot/i2v_provider/adult/native-audio policy"
+  ],
+  "routes": [
+    {
+      "id": "agent-review-final",
+      "kind": "action",
+      "cli_cmd": "agent-review-final",
+      "skill_id": "quality.inspect",
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "agent-review-final-apply",
+      "kind": "action",
+      "cli_cmd": "agent-review-final",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "audio-plan",
+      "kind": "action",
+      "cli_cmd": "audio-plan",
+      "skill_id": "sound.design",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "bulk-preflight",
+      "kind": "action",
+      "cli_cmd": "bulk-preflight",
+      "skill_id": "image.animate",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "cinematic-gate",
+      "kind": "action",
+      "cli_cmd": "cinematic-gate",
+      "skill_id": "projection.verify",
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "closeout-run",
+      "kind": "action",
+      "cli_cmd": "closeout",
+      "skill_id": "projection.verify",
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "compose-preview",
+      "kind": "action",
+      "cli_cmd": "compose-preview",
+      "skill_id": null,
+      "craft_stage": "post",
+      "pipeline_stage": "design",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "compose-render-remotion",
+      "kind": "action",
+      "cli_cmd": "compose-render",
+      "skill_id": null,
+      "craft_stage": "post",
+      "pipeline_stage": "design",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "dailies_review-evidence",
+      "kind": "action",
+      "cli_cmd": "dailies",
+      "skill_id": "dispatch.orchestrate",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "design-go",
+      "kind": "action",
+      "cli_cmd": "design-go",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "dialogue-candidate-review",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "quality.inspect",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "director-notes",
+      "kind": "action",
+      "cli_cmd": "director-notes",
+      "skill_id": null,
+      "craft_stage": "visual",
+      "pipeline_stage": "visual",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "done",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": null,
+      "craft_stage": "done",
+      "pipeline_stage": "done",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "export-desktop",
+      "kind": "action",
+      "cli_cmd": "export-desktop",
+      "skill_id": "export.package",
+      "craft_stage": "deliver",
+      "pipeline_stage": "deliver",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "external-review",
+      "kind": "action",
+      "cli_cmd": "external-review",
+      "skill_id": null,
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "fidelity-apply",
+      "kind": "action",
+      "cli_cmd": "fidelity",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "fidelity-check",
+      "kind": "action",
+      "cli_cmd": "fidelity",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "film-core-closeout",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "projection.verify",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "final",
+      "kind": "action",
+      "cli_cmd": "final",
+      "skill_id": null,
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "external",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "final-audio",
+      "kind": "action",
+      "cli_cmd": "final",
+      "skill_id": null,
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "external",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "final-designed",
+      "kind": "action",
+      "cli_cmd": "final",
+      "skill_id": null,
+      "craft_stage": "post",
+      "pipeline_stage": "design",
+      "spend_class": "external",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "fix-framing",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "gate-auto",
+      "kind": "action",
+      "cli_cmd": "gate-auto",
+      "skill_id": "projection.verify",
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "grok-i2v-bulk",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "image.animate",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "paid",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "h3-capacity-plan",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "projection.verify",
+      "craft_stage": "visual",
+      "pipeline_stage": "visual",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "h3-fill-idle",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "image.animate",
+      "craft_stage": "visual",
+      "pipeline_stage": "visual",
+      "spend_class": "paid",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "h3-lane",
+      "kind": "action",
+      "cli_cmd": "h3",
+      "skill_id": "image.animate",
+      "craft_stage": "visual",
+      "pipeline_stage": "visual",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "h3-run-next",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "image.animate",
+      "craft_stage": "visual",
+      "pipeline_stage": "visual",
+      "spend_class": "paid",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "h3-until-empty",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "image.animate",
+      "craft_stage": "visual",
+      "pipeline_stage": "visual",
+      "spend_class": "paid",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "heat-boost",
+      "kind": "action",
+      "cli_cmd": "heat",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "i2v-motion-gate",
+      "kind": "action",
+      "cli_cmd": "i2v-motion-gate",
+      "skill_id": "projection.verify",
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "init",
+      "kind": "action",
+      "cli_cmd": "init",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "lock-style",
+      "kind": "action",
+      "cli_cmd": "lock-style",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "narrative-lock",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "story.validate",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "narrative-project",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "graph.project",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "narrative-validate",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": "story.validate",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "pilot-approve",
+      "kind": "action",
+      "cli_cmd": "pilot",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "pilot-pack",
+      "kind": "action",
+      "cli_cmd": "pilot-pack",
+      "skill_id": "quality.inspect",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "pilot-report",
+      "kind": "action",
+      "cli_cmd": "pilot",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "pilot-reshoot",
+      "kind": "action",
+      "cli_cmd": "pilot",
+      "skill_id": null,
+      "craft_stage": "visual",
+      "pipeline_stage": "visual",
+      "spend_class": "local",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "pilot-score",
+      "kind": "action",
+      "cli_cmd": "pilot",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "pilot-window",
+      "kind": "action",
+      "cli_cmd": "pilot",
+      "skill_id": null,
+      "craft_stage": "visual",
+      "pipeline_stage": "visual",
+      "spend_class": "local",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "plan-debrief",
+      "kind": "action",
+      "cli_cmd": "plan",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "plan-debrief-confirm",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "post-audit",
+      "kind": "action",
+      "cli_cmd": "post-audit",
+      "skill_id": null,
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills",
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "post-audit-gate",
+      "kind": "action",
+      "cli_cmd": "post-audit",
+      "skill_id": "projection.verify",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills",
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "post-plan-init",
+      "kind": "action",
+      "cli_cmd": "post-plan",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "production-evidence-gate",
+      "kind": "action",
+      "cli_cmd": "production-evidence",
+      "skill_id": "projection.verify",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "queue-or-register",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": null,
+      "craft_stage": "visual",
+      "pipeline_stage": "visual",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "review-final",
+      "kind": "action",
+      "cli_cmd": "review-final",
+      "skill_id": null,
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "local",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "select-shortlist",
+      "kind": "action",
+      "cli_cmd": "select-shortlist",
+      "skill_id": "projection.verify",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "selects-report",
+      "kind": "action",
+      "cli_cmd": "selects",
+      "skill_id": "projection.verify",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "ship-prep",
+      "kind": "action",
+      "cli_cmd": "ship-prep",
+      "skill_id": "projection.verify",
+      "craft_stage": "post",
+      "pipeline_stage": "post",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "state-index-plan",
+      "kind": "action",
+      "cli_cmd": "state-index",
+      "skill_id": "character.state.update",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "still-challenge-weak-mean",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "tts-rehearse",
+      "kind": "action",
+      "cli_cmd": "tts-rehearse",
+      "skill_id": null,
+      "craft_stage": "voice",
+      "pipeline_stage": "voice",
+      "spend_class": "external",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "variety-precheck",
+      "kind": "action",
+      "cli_cmd": "variety-precheck",
+      "skill_id": "story.validate",
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "write-spec",
+      "kind": "action",
+      "cli_cmd": "write-spec",
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "canonical",
+      "tags": [
+        "from_next_actions_or_action_skills"
+      ]
+    },
+    {
+      "id": "audio.asr-review",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "audio.asr-review",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "beat.extract",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "beat.extract",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "beat.validate",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "beat.validate",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "camera.motion.plan",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "camera.motion.plan",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "character.bible.build",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "character.bible.build",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "continuity.check",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "continuity.check",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "department.manage",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "department.manage",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "director.control",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "director.control",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "episode.structure",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "episode.structure",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "heat.lint",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "heat.lint",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "heat.vo-suggest",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "heat.vo-suggest",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "keyframe.generate",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "keyframe.generate",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "external",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "location.bible.build",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "location.bible.build",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "music.plan",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "music.plan",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "panel.layout",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "panel.layout",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "prop.track",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "prop.track",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "rhythm.evaluate",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "rhythm.evaluate",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "scene.segment",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "scene.segment",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "shot.plan",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "shot.plan",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "story.normalize",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "story.normalize",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "story.receive",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "story.receive",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "subtitle.generate",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "subtitle.generate",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "timeline.compose",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "timeline.compose",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "video.render",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "video.render",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "external",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "voice.synthesize",
+      "kind": "skill",
+      "cli_cmd": null,
+      "skill_id": "voice.synthesize",
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "external",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "partial",
+      "tags": [
+        "registry_skill"
+      ],
+      "runner": false
+    },
+    {
+      "id": "cli:adult-female-voice-pack",
+      "kind": "cli",
+      "cli_cmd": "adult-female-voice-pack",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:advance",
+      "kind": "cli",
+      "cli_cmd": "advance",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:ambience-candidate",
+      "kind": "cli",
+      "cli_cmd": "ambience-candidate",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:analyze-reference",
+      "kind": "cli",
+      "cli_cmd": "analyze-reference",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:anti-hijack",
+      "kind": "cli",
+      "cli_cmd": "anti-hijack",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:assemble",
+      "kind": "cli",
+      "cli_cmd": "assemble",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:assets",
+      "kind": "cli",
+      "cli_cmd": "assets",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:audio-event",
+      "kind": "cli",
+      "cli_cmd": "audio-event",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:audio-produce",
+      "kind": "cli",
+      "cli_cmd": "audio-produce",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:audio-provenance",
+      "kind": "cli",
+      "cli_cmd": "audio-provenance",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:audio-tts-render",
+      "kind": "cli",
+      "cli_cmd": "audio-tts-render",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:audio-verify",
+      "kind": "cli",
+      "cli_cmd": "audio-verify",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:audio-visual",
+      "kind": "cli",
+      "cli_cmd": "audio-visual",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:auto-cut",
+      "kind": "cli",
+      "cli_cmd": "auto-cut",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:autopilot",
+      "kind": "cli",
+      "cli_cmd": "autopilot",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:beat-evidence",
+      "kind": "cli",
+      "cli_cmd": "beat-evidence",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:benchmark",
+      "kind": "cli",
+      "cli_cmd": "benchmark",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:bgm-candidate",
+      "kind": "cli",
+      "cli_cmd": "bgm-candidate",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:bgm-library",
+      "kind": "cli",
+      "cli_cmd": "bgm-library",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:bible",
+      "kind": "cli",
+      "cli_cmd": "bible",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:brief",
+      "kind": "cli",
+      "cli_cmd": "brief",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:capability",
+      "kind": "cli",
+      "cli_cmd": "capability",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:caption-frame-attest",
+      "kind": "cli",
+      "cli_cmd": "caption-frame-attest",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:caption-frame-audit",
+      "kind": "cli",
+      "cli_cmd": "caption-frame-audit",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:caption-pixel-check",
+      "kind": "cli",
+      "cli_cmd": "caption-pixel-check",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:cinematic-audit",
+      "kind": "cli",
+      "cli_cmd": "cinematic-audit",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:comfy",
+      "kind": "cli",
+      "cli_cmd": "comfy",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:continuity-chain",
+      "kind": "cli",
+      "cli_cmd": "continuity-chain",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:craft",
+      "kind": "cli",
+      "cli_cmd": "craft",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:creative-pipeline",
+      "kind": "cli",
+      "cli_cmd": "creative-pipeline",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:dashboard",
+      "kind": "cli",
+      "cli_cmd": "dashboard",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:delivery-package",
+      "kind": "cli",
+      "cli_cmd": "delivery-package",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:department",
+      "kind": "cli",
+      "cli_cmd": "department",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:dialogue-benchmark",
+      "kind": "cli",
+      "cli_cmd": "dialogue-benchmark",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:dialogue-benchmark-approve",
+      "kind": "cli",
+      "cli_cmd": "dialogue-benchmark-approve",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:dialogue-benchmark-queue",
+      "kind": "cli",
+      "cli_cmd": "dialogue-benchmark-queue",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:dialogue-benchmark-review",
+      "kind": "cli",
+      "cli_cmd": "dialogue-benchmark-review",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:dialogue-production-plan",
+      "kind": "cli",
+      "cli_cmd": "dialogue-production-plan",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:director",
+      "kind": "cli",
+      "cli_cmd": "director",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:director-ledger",
+      "kind": "cli",
+      "cli_cmd": "director-ledger",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:dispatch",
+      "kind": "cli",
+      "cli_cmd": "dispatch",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:doctor",
+      "kind": "cli",
+      "cli_cmd": "doctor",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:editor-cut",
+      "kind": "cli",
+      "cli_cmd": "editor-cut",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:elevenlabs-canary",
+      "kind": "cli",
+      "cli_cmd": "elevenlabs-canary",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:env-plate",
+      "kind": "cli",
+      "cli_cmd": "env-plate",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:experiment",
+      "kind": "cli",
+      "cli_cmd": "experiment",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:export-compose",
+      "kind": "cli",
+      "cli_cmd": "export-compose",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:extract-frame",
+      "kind": "cli",
+      "cli_cmd": "extract-frame",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:face-identity",
+      "kind": "cli",
+      "cli_cmd": "face-identity",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:final-editorial-review",
+      "kind": "cli",
+      "cli_cmd": "final-editorial-review",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:five-track",
+      "kind": "cli",
+      "cli_cmd": "five-track",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:frw",
+      "kind": "cli",
+      "cli_cmd": "frw",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:frw-lipsync",
+      "kind": "cli",
+      "cli_cmd": "frw-lipsync",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:gold",
+      "kind": "cli",
+      "cli_cmd": "gold",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:gpu-lease",
+      "kind": "cli",
+      "cli_cmd": "gpu-lease",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:graph",
+      "kind": "cli",
+      "cli_cmd": "graph",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:grok-oauth",
+      "kind": "cli",
+      "cli_cmd": "grok-oauth",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "external",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:ingest-footage",
+      "kind": "cli",
+      "cli_cmd": "ingest-footage",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:interactive",
+      "kind": "cli",
+      "cli_cmd": "interactive",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:lint-continuity",
+      "kind": "cli",
+      "cli_cmd": "lint-continuity",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:lipsync-canary",
+      "kind": "cli",
+      "cli_cmd": "lipsync-canary",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:lipsync-challenge",
+      "kind": "cli",
+      "cli_cmd": "lipsync-challenge",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:lipsync-node",
+      "kind": "cli",
+      "cli_cmd": "lipsync-node",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:lipsync-pilot",
+      "kind": "cli",
+      "cli_cmd": "lipsync-pilot",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:local-llm",
+      "kind": "cli",
+      "cli_cmd": "local-llm",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:local-omni-review",
+      "kind": "cli",
+      "cli_cmd": "local-omni-review",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:lock-runtime",
+      "kind": "cli",
+      "cli_cmd": "lock-runtime",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:longform",
+      "kind": "cli",
+      "cli_cmd": "longform",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:manifest",
+      "kind": "cli",
+      "cli_cmd": "manifest",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:metrics",
+      "kind": "cli",
+      "cli_cmd": "metrics",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:motion-plan",
+      "kind": "cli",
+      "cli_cmd": "motion-plan",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:narrative-evidence",
+      "kind": "cli",
+      "cli_cmd": "narrative-evidence",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:next",
+      "kind": "cli",
+      "cli_cmd": "next",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:node",
+      "kind": "cli",
+      "cli_cmd": "node",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:optimization-program",
+      "kind": "cli",
+      "cli_cmd": "optimization-program",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:performance-candidate",
+      "kind": "cli",
+      "cli_cmd": "performance-candidate",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:performance-timeline",
+      "kind": "cli",
+      "cli_cmd": "performance-timeline",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:planning-answer",
+      "kind": "cli",
+      "cli_cmd": "planning-answer",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:planning-autopilot",
+      "kind": "cli",
+      "cli_cmd": "planning-autopilot",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:planning-history",
+      "kind": "cli",
+      "cli_cmd": "planning-history",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:post-doctor",
+      "kind": "cli",
+      "cli_cmd": "post-doctor",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:post-quality",
+      "kind": "cli",
+      "cli_cmd": "post-quality",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:preflight",
+      "kind": "cli",
+      "cli_cmd": "preflight",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:production-report",
+      "kind": "cli",
+      "cli_cmd": "production-report",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:promotion-report",
+      "kind": "cli",
+      "cli_cmd": "promotion-report",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:prompt-budget",
+      "kind": "cli",
+      "cli_cmd": "prompt-budget",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:prompt-compression-attest",
+      "kind": "cli",
+      "cli_cmd": "prompt-compression-attest",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:prompt-compression-pilot",
+      "kind": "cli",
+      "cli_cmd": "prompt-compression-pilot",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:provider-canary",
+      "kind": "cli",
+      "cli_cmd": "provider-canary",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:quality",
+      "kind": "cli",
+      "cli_cmd": "quality",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:quality-check",
+      "kind": "cli",
+      "cli_cmd": "quality-check",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:quality-closure",
+      "kind": "cli",
+      "cli_cmd": "quality-closure",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:quality-ledger",
+      "kind": "cli",
+      "cli_cmd": "quality-ledger",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:quality-status",
+      "kind": "cli",
+      "cli_cmd": "quality-status",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:queue-progress",
+      "kind": "cli",
+      "cli_cmd": "queue-progress",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:reencode-clips",
+      "kind": "cli",
+      "cli_cmd": "reencode-clips",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:register-clip",
+      "kind": "cli",
+      "cli_cmd": "register-clip",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:register-final",
+      "kind": "cli",
+      "cli_cmd": "register-final",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:register-still",
+      "kind": "cli",
+      "cli_cmd": "register-still",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:resume-manifest",
+      "kind": "cli",
+      "cli_cmd": "resume-manifest",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:review-contract",
+      "kind": "cli",
+      "cli_cmd": "review-contract",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:review-pack",
+      "kind": "cli",
+      "cli_cmd": "review-pack",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:review-shot",
+      "kind": "cli",
+      "cli_cmd": "review-shot",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:review-ui",
+      "kind": "cli",
+      "cli_cmd": "review-ui",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "human_required",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:route",
+      "kind": "cli",
+      "cli_cmd": "route",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:semantic-index",
+      "kind": "cli",
+      "cli_cmd": "semantic-index",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:serial",
+      "kind": "cli",
+      "cli_cmd": "serial",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:sfx-canary",
+      "kind": "cli",
+      "cli_cmd": "sfx-canary",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:sfx-candidate",
+      "kind": "cli",
+      "cli_cmd": "sfx-candidate",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:sfx-library",
+      "kind": "cli",
+      "cli_cmd": "sfx-library",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:shortform",
+      "kind": "cli",
+      "cli_cmd": "shortform",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:skill",
+      "kind": "cli",
+      "cli_cmd": "skill",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:speech-performance-timing",
+      "kind": "cli",
+      "cli_cmd": "speech-performance-timing",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:speech-preview",
+      "kind": "cli",
+      "cli_cmd": "speech-preview",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:stage",
+      "kind": "cli",
+      "cli_cmd": "stage",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:status",
+      "kind": "cli",
+      "cli_cmd": "status",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:still-challenge",
+      "kind": "cli",
+      "cli_cmd": "still-challenge",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:style-lock",
+      "kind": "cli",
+      "cli_cmd": "style-lock",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:subtitle-cut-boundaries",
+      "kind": "cli",
+      "cli_cmd": "subtitle-cut-boundaries",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:subtitle-dialogue-alignment",
+      "kind": "cli",
+      "cli_cmd": "subtitle-dialogue-alignment",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:team",
+      "kind": "cli",
+      "cli_cmd": "team",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:timeline-clock",
+      "kind": "cli",
+      "cli_cmd": "timeline-clock",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:transition-frame-attest",
+      "kind": "cli",
+      "cli_cmd": "transition-frame-attest",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:transition-frame-audit",
+      "kind": "cli",
+      "cli_cmd": "transition-frame-audit",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:transition-frame-review-template",
+      "kind": "cli",
+      "cli_cmd": "transition-frame-review-template",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "hub_if_ladder"
+      ],
+      "hub_if_ladder": true
+    },
+    {
+      "id": "cli:truth",
+      "kind": "cli",
+      "cli_cmd": "truth",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:tts-ab",
+      "kind": "cli",
+      "cli_cmd": "tts-ab",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:tunnel-probe",
+      "kind": "cli",
+      "cli_cmd": "tunnel-probe",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "legacy",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:usage",
+      "kind": "cli",
+      "cli_cmd": "usage",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:verify",
+      "kind": "cli",
+      "cli_cmd": "verify",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:vibevoice-asr",
+      "kind": "cli",
+      "cli_cmd": "vibevoice-asr",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:visual-text-audit",
+      "kind": "cli",
+      "cli_cmd": "visual-text-audit",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:visual-text-repair",
+      "kind": "cli",
+      "cli_cmd": "visual-text-repair",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:weapon",
+      "kind": "cli",
+      "cli_cmd": "weapon",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "cli:workshop",
+      "kind": "cli",
+      "cli_cmd": "workshop",
+      "skill_id": null,
+      "craft_stage": null,
+      "pipeline_stage": null,
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": false,
+      "status": "orphan",
+      "tags": [
+        "cli_surface"
+      ],
+      "hub_if_ladder": false
+    },
+    {
+      "id": "department_look_lock-evidence",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "legacy",
+      "tags": [
+        "advance_only"
+      ]
+    },
+    {
+      "id": "concept_lock-evidence",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "legacy",
+      "tags": [
+        "advance_only"
+      ]
+    },
+    {
+      "id": "quality-gate-repair",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "legacy",
+      "tags": [
+        "advance_only"
+      ]
+    },
+    {
+      "id": "rough-cut-review",
+      "kind": "action",
+      "cli_cmd": null,
+      "skill_id": null,
+      "craft_stage": "agent",
+      "pipeline_stage": "agent",
+      "spend_class": "local",
+      "approval_class": "none",
+      "advance_eligible": true,
+      "status": "legacy",
+      "tags": [
+        "advance_only"
+      ]
+    }
+  ],
+  "meta": {
+    "cli_count": 169,
+    "action_count": 58,
+    "advance_count": 29,
+    "registry_skill_count": 34,
+    "runner_count": 0,
+    "route_rows": 222,
+    "if_ladder": [
+      "analyze-reference",
+      "audio-provenance",
+      "audio-visual",
+      "beat-evidence",
+      "bible",
+      "brief",
+      "caption-frame-attest",
+      "caption-frame-audit",
+      "caption-pixel-check",
+      "director-ledger",
+      "editor-cut",
+      "graph",
+      "local-llm",
+      "local-omni-review",
+      "narrative-evidence",
+      "performance-timeline",
+      "planning-answer",
+      "planning-autopilot",
+      "planning-history",
+      "post-audit",
+      "post-doctor",
+      "prompt-budget",
+      "prompt-compression-attest",
+      "prompt-compression-pilot",
+      "quality-check",
+      "review-pack",
+      "semantic-index",
+      "skill",
+      "speech-performance-timing",
+      "subtitle-cut-boundaries",
+      "subtitle-dialogue-alignment",
+      "timeline-clock",
+      "transition-frame-attest",
+      "transition-frame-audit",
+      "transition-frame-review-template"
+    ]
+  }
+}

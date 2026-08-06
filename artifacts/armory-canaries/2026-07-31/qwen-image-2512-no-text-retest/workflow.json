@@ -1,0 +1,111 @@
+{
+  "unet": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "qwen_image_2512_fp8_e4m3fn.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "clip": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    }
+  },
+  "vae": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    }
+  },
+  "positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "Portrait photograph of one fictional adult man in a plain navy business suit, centered on a softly blurred modern city street at dusk. Natural skin texture, realistic hands, clean jacket fabric, cinematic soft light, vertical composition. No words, no letters, no logos, no badge, no watermark, no signage, no symbols, no UI, no typography.",
+      "clip": [
+        "clip",
+        0
+      ]
+    }
+  },
+  "negative": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "low resolution, malformed anatomy, extra fingers, duplicate subject, watermark, unreadable text",
+      "clip": [
+        "clip",
+        0
+      ]
+    }
+  },
+  "latent": {
+    "class_type": "EmptySD3LatentImage",
+    "inputs": {
+      "width": 928,
+      "height": 1664,
+      "batch_size": 1
+    }
+  },
+  "sampling": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": [
+        "unet",
+        0
+      ],
+      "shift": 3.1
+    }
+  },
+  "sampler": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "sampling",
+        0
+      ],
+      "seed": 2026073101,
+      "steps": 50,
+      "cfg": 4.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "positive",
+        0
+      ],
+      "negative": [
+        "negative",
+        0
+      ],
+      "latent_image": [
+        "latent",
+        0
+      ],
+      "denoise": 1.0
+    }
+  },
+  "decode": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "sampler",
+        0
+      ],
+      "vae": [
+        "vae",
+        0
+      ]
+    }
+  },
+  "save": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "decode",
+        0
+      ],
+      "filename_prefix": "aifilm/armory-qwen-no-text-20260731"
+    }
+  }
+}

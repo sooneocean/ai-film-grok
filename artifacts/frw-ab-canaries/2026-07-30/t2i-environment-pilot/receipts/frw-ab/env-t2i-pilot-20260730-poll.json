@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-poll",
+  "created_at": "2026-07-30T02:57:20.032445+00:00",
+  "experiment_id": "env-t2i-pilot-20260730",
+  "operation": "text_to_image",
+  "run_sha256": "89e2c24cf16099c85bcd75e4614bf7c900082267f476ce42e86ceec55c4dfc19",
+  "results": [
+    {
+      "model_id": "flux",
+      "task_id": "2f9b2556-b21b-4305-b839-33a2d6bc2b07",
+      "status": "completed",
+      "url_sha256": "94e456f577d3077cf95b655d9fe83c781839b227378e1df4dbc8304943d4df83",
+      "error_code": null
+    },
+    {
+      "model_id": "ponyxl3d",
+      "task_id": "9fb11c25-7005-4489-93f6-afceb7e81d7e",
+      "status": "completed",
+      "url_sha256": "6dc43dfe31c619a35a205eec7d9bb71af98d6300c20e4423b606797d69144943",
+      "error_code": null
+    },
+    {
+      "model_id": "qwen",
+      "task_id": "1fa9669a-a4c3-4340-b69f-39116374d526",
+      "status": "completed",
+      "url_sha256": "2a668b740066cef943ccc4128c41813d762aaab08c7d55dd3b43b425b3ed6fbf",
+      "error_code": null
+    }
+  ],
+  "terminal": true,
+  "automatic_resubmit": false,
+  "poll_sha256": "dbe277b8aed52b9176f4aecd8167b95d5d59d232ded11556a092ef4b401e8eea"
+}

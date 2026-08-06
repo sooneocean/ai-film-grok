@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-lipsync-challenge-registry",
+  "production_default": "latentsync-1.6",
+  "backends": [
+    {
+      "id": "latentsync-1.6",
+      "display_name": "LatentSync 1.6",
+      "lane": "original_video_preservation",
+      "task_type": "video_lip_sync",
+      "status": "production_default",
+      "original_video_pixel_preservation": false,
+      "preservation_evaluation_eligible": true,
+      "final_auto_route_eligible": true,
+      "default_route_change_allowed": false,
+      "license": {
+        "review_required": false,
+        "status": "existing_production_backend"
+      }
+    },
+    {
+      "id": "musetalk-1.5",
+      "display_name": "MuseTalk 1.5",
+      "lane": "original_video_preservation",
+      "task_type": "video_lip_sync",
+      "status": "lightweight_challenger",
+      "original_video_pixel_preservation": false,
+      "preservation_evaluation_eligible": true,
+      "final_auto_route_eligible": false,
+      "default_route_change_allowed": false,
+      "license": {
+        "review_required": true,
+        "status": "verify_before_promotion"
+      }
+    },
+    {
+      "id": "ltx-2.3-lipdub",
+      "display_name": "LTX-2.3 LipDub",
+      "lane": "text_redub_visual_preservation",
+      "task_type": "text_conditioned_lipdub",
+      "status": "research_only",
+      "original_video_pixel_preservation": false,
+      "preservation_evaluation_eligible": false,
+      "final_auto_route_eligible": false,
+      "default_route_change_allowed": false,
+      "shared_audio_benchmark_eligible": false,
+      "license": {
+        "review_required": true,
+        "status": "unreviewed"
+      }
+    },
+    {
+      "id": "echomimic-v3-flash",
+      "display_name": "EchoMimicV3 Flash",
+      "lane": "whole_frame_performance_generation",
+      "task_type": "face_animation_to_audio",
+      "status": "experimental_priority",
+      "original_video_pixel_preservation": false,
+      "preservation_evaluation_eligible": false,
+      "final_auto_route_eligible": false,
+      "default_route_change_allowed": false,
+      "license": {
+        "review_required": true,
+        "status": "verify_before_pilot"
+      }
+    },
+    {
+      "id": "longcat-video-avatar-1.5",
+      "display_name": "LongCat-Video-Avatar 1.5",
+      "lane": "whole_frame_performance_generation",
+      "task_type": "face_animation_to_audio",
+      "status": "blocked_single_gpu_feasibility",
+      "original_video_pixel_preservation": false,
+      "preservation_evaluation_eligible": false,
+      "final_auto_route_eligible": false,
+      "default_route_change_allowed": false,
+      "license": {
+        "review_required": true,
+        "status": "verify_before_pilot"
+      }
+    }
+  ]
+}

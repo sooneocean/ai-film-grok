@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "kind": "local-weapon-technical-receipt",
+  "weapon_id": "qwen-image-2512-quality",
+  "status": "technical_verified_human_visual_review_approved",
+  "source_submission_sha256": "9c417dc4378e05cef9fae4ffb6d9108aef5f6f8f218950d50183f48ee315a665",
+  "workflow_sha256": "7be70372574993e5e95248190439d31ff639ac8ee044fc6f8c13ee1031aaacaa",
+  "prompt_id": "63127da2-6ac1-40b8-b492-9be6bf372d2f",
+  "external_api_nodes_allowed": false,
+  "artifact": {
+    "path": "armory-qwen-retest_00001_.png",
+    "bytes": 1686417,
+    "sha256": "a5cf8046be059fa1acaaa35d5dc66201b10532e31e7c91388535468bcd2cc351",
+    "format": "PNG",
+    "width": 928,
+    "height": 1664,
+    "mode": "RGB",
+    "decode_ok": true
+  },
+  "agent_visual_observation": {
+    "status": "pass",
+    "checks": ["no visible text", "no visible badge", "no visible watermark", "no visible logo"],
+    "scope": "Automated/agent observation is technical evidence only and is not a human visual approval."
+  },
+  "human_review": {
+    "required": true,
+    "status": "approved",
+    "review_receipt": "human-review.json",
+    "artifact_sha256": "a5cf8046be059fa1acaaa35d5dc66201b10532e31e7c91388535468bcd2cc351"
+  },
+  "promotion": {
+    "eligible": true,
+    "reason": "Technical verification and a hash-bound human visual review are recorded; this does not change provider defaults or approve any film shot."
+  }
+}

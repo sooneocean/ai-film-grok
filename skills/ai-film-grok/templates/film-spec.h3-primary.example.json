@@ -1,0 +1,453 @@
+{
+  "title": "H3 Primary Example",
+  "description": "h3_primary scaffold: adult-max IRON + write-spec cinematic fields. Set AIFILM_I2V_PROFILE=h3_primary.",
+  "aspect_ratio": "9:16",
+  "vo_mode": "storyteller",
+  "tts_backend": "edge",
+  "i2v_provider": "auto",
+  "heat_scale": "max",
+  "adult_max_director": {
+    "schema_version": 1,
+    "strict": true,
+    "require_media_evidence": true,
+    "require_human_final_review": true,
+    "minimum_av_alignment_score": 90
+  },
+  "heat_phase_auto": true,
+  "sex_floor_strict": true,
+  "sex_wardrobe_strict": true,
+  "sex_vo_strict": true,
+  "heat_arc_strict": true,
+  "sex_arc_strict": true,
+  "sex_detail_cu_strict": true,
+  "both_undress_strict": true,
+  "spice_level": "extreme",
+  "sex_min_duration_ratio": 0.5,
+  "coitus_strict": true,
+  "size_ladder_strict": true,
+  "pose_strict": true,
+  "coitus_grammar": {
+    "enabled": true,
+    "mute_frame_test": true,
+    "beats": {
+      "entry": [
+        "shot01"
+      ],
+      "undress": [
+        "shot02"
+      ],
+      "union": [
+        "shot03"
+      ],
+      "rhythm": [
+        "shot04",
+        "shot05"
+      ],
+      "lock": [
+        "shot06"
+      ],
+      "finish": [
+        "shot07"
+      ],
+      "hook": [
+        "shot08"
+      ]
+    }
+  },
+  "director_intent": {
+    "logline": "本机 H3 主轨示范：展厅落锁后她卸甲办穿，云端 bulk 默认关闭只走 5090。",
+    "tone": "成人色气·H3 本地主轨·办事完成",
+    "audience": "成人短片观众",
+    "emotional_arc": [
+      "落锁",
+      "卸甲",
+      "结合节奏",
+      "办完钩子"
+    ],
+    "theme": "本地主轨下的完整办事弧",
+    "cast": [
+      "heroine",
+      "partner"
+    ],
+    "taboos": [
+      "未批 bulk 上云",
+      "全装跨坐当办事",
+      "脱完回穿"
+    ]
+  },
+  "scenes": [
+    {
+      "title": "加演",
+      "summary": "从落锁到办穿的一条压迫链",
+      "shots": [
+        {
+          "id": "shot01",
+          "dramatic_function": "hook",
+          "heat_phase": "setup",
+          "coitus_beat": "entry",
+          "wardrobe_state": "full",
+          "duration_sec": 5,
+          "nar": "展厅落锁。今晚只加演你一场。",
+          "dsl": {
+            "subject": "adult heroine full stage costume",
+            "action": "pin partner to door latch close entry",
+            "motion": "hand on latch door close weight step-in",
+            "camera": {
+              "shot_size": "medium full",
+              "angle": "eye level",
+              "lens_mm": "35"
+            },
+            "visible_change": "door locks space narrows",
+            "wardrobe_state": "full",
+            "coitus_beat": "entry",
+            "lighting": "warm practicals low key",
+            "camera_axis": "front",
+            "look_axis": "left",
+            "start_pose": "standing at door latch full costume",
+            "end_pose": "door locked body pressed to partner entry hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "front",
+          "performance_delta": "door locks space narrows",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "pin partner to door latch close entry",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "落锁",
+          "emotion": "落锁",
+          "narrative_purpose": "推进到落锁",
+          "beat_id": "beat01"
+        },
+        {
+          "id": "shot02",
+          "dramatic_function": "sensory",
+          "heat_phase": "foreplay",
+          "coitus_beat": "undress",
+          "wardrobe_state": "partial",
+          "duration_sec": 6,
+          "nar": "肩带一滑。卸甲半裸，规矩失效。",
+          "dsl": {
+            "subject": "adult heroine partial undress bare shoulders",
+            "action": "removes armor dress slides off shoulders undress",
+            "motion": "straps slide dress peels bare skin expands",
+            "camera": {
+              "shot_size": "medium",
+              "angle": "eye level",
+              "lens_mm": "35"
+            },
+            "visible_change": "armor discarded bare skin",
+            "wardrobe_state": "partial",
+            "start_pose": "door locked body pressed to partner entry",
+            "coitus_beat": "undress",
+            "lighting": "warm practicals low key",
+            "camera_axis": "three-quarter",
+            "look_axis": "left",
+            "end_pose": "armor discarded bare shoulders partial undress hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "three-quarter",
+          "performance_delta": "armor discarded bare skin",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "removes armor dress slides off shoulders undress",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "落锁",
+          "emotion": "落锁",
+          "narrative_purpose": "推进到落锁",
+          "beat_id": "beat02"
+        },
+        {
+          "id": "shot03",
+          "dramatic_function": "action",
+          "heat_phase": "act",
+          "sex_arc_beat": "penetration",
+          "coitus_beat": "union",
+          "wardrobe_state": "bare",
+          "partner_wardrobe_state": "undressed",
+          "sex_pose": "straddle",
+          "duration_sec": 8,
+          "nar": "跨坐落稳。整根吃进，锁住。",
+          "dsl": {
+            "subject": "adult heroine bare skin partner pants discarded",
+            "action": "straddle-seat hips settle pelvis-lock skin-to-skin",
+            "motion": "union_settle straddle-seat hips settle pelvis-lock weight down",
+            "camera": {
+              "shot_size": "medium full",
+              "angle": "slight low",
+              "lens_mm": "35"
+            },
+            "visible_change": "hips lock contact readable both undressed",
+            "wardrobe_state": "bare",
+            "partner_wardrobe_state": "undressed",
+            "start_pose": "armor discarded bare shoulders partial undress",
+            "coitus_beat": "union",
+            "lighting": "warm practicals low key",
+            "camera_axis": "low-front",
+            "look_axis": "left",
+            "end_pose": "straddle-seat hips settle pelvis-lock weight down hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "low-front",
+          "performance_delta": "hips lock contact readable both undressed",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "straddle-seat hips settle pelvis-lock skin-to-sk",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "卸甲",
+          "emotion": "卸甲",
+          "narrative_purpose": "推进到卸甲",
+          "beat_id": "beat03"
+        },
+        {
+          "id": "shot04",
+          "dramatic_function": "action",
+          "heat_phase": "act",
+          "sex_arc_beat": "penetration",
+          "coitus_beat": "rhythm",
+          "wardrobe_state": "bare",
+          "partner_wardrobe_state": "undressed",
+          "sex_pose": "cowgirl",
+          "duration_sec": 8,
+          "nar": "沉腰吃进。再顶，磨到发软。",
+          "dsl": {
+            "subject": "adult heroine bare skin cowgirl",
+            "action": "hips-sink grind-forward thrust-rhythm twice",
+            "motion": "rhythm_hips hips-sink twice grind-forward thrust-rhythm locked camera",
+            "camera": {
+              "shot_size": "mcu",
+              "angle": "slight low",
+              "lens_mm": "50"
+            },
+            "visible_change": "two visible hip sinks thrust",
+            "wardrobe_state": "bare",
+            "partner_wardrobe_state": "undressed",
+            "start_pose": "straddle-seat hips settle pelvis-lock weight down",
+            "coitus_beat": "rhythm",
+            "lighting": "warm practicals low key",
+            "camera_axis": "side",
+            "look_axis": "left",
+            "end_pose": "two visible hip sinks thrust rhythm hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "side",
+          "performance_delta": "two visible hip sinks thrust",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "hips-sink grind-forward thrust-rhythm twice",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "卸甲",
+          "emotion": "卸甲",
+          "narrative_purpose": "推进到卸甲",
+          "beat_id": "beat04"
+        },
+        {
+          "id": "shot05",
+          "dramatic_function": "action",
+          "heat_phase": "act",
+          "sex_arc_beat": "penetration",
+          "coitus_beat": "rhythm",
+          "coverage_role": "detail",
+          "framing": "union_closeup",
+          "wardrobe_state": "bare",
+          "partner_wardrobe_state": "undressed",
+          "sex_pose": "cowgirl",
+          "duration_sec": 8,
+          "nar": "定器锁死。再沉腰，节奏是她给的。",
+          "dsl": {
+            "subject": "adult pair bare waist pelvis union close",
+            "action": "hips-sink grind deeper thrust-rhythm pelvis-lock 定器",
+            "motion": "rhythm_hips hips-sink grind-forward clutch",
+            "camera": {
+              "shot_size": "medium",
+              "angle": "high angle",
+              "lens_mm": "35"
+            },
+            "framing": "union_closeup; full head and both shoulders inside frame, ample headroom, safe framing no cropping",
+            "visible_change": "waist-pelvis union thrust readable",
+            "wardrobe_state": "bare",
+            "partner_wardrobe_state": "undressed",
+            "start_pose": "two visible hip sinks thrust rhythm",
+            "coitus_beat": "rhythm",
+            "coverage_role": "detail",
+            "lighting": "warm practicals low key",
+            "camera_axis": "overhead",
+            "look_axis": "left",
+            "end_pose": "hips locked contact readable both undressed hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "overhead",
+          "performance_delta": "waist-pelvis union thrust readable",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "hips-sink grind deeper thrust-rhythm pelvis-lock",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "结合节奏",
+          "emotion": "结合节奏",
+          "narrative_purpose": "推进到结合节奏",
+          "beat_id": "beat05"
+        },
+        {
+          "id": "shot06",
+          "dramatic_function": "sensory",
+          "heat_phase": "act",
+          "sex_arc_beat": "penetration",
+          "coitus_beat": "lock",
+          "wardrobe_state": "bare",
+          "partner_wardrobe_state": "undressed",
+          "sex_pose": "lotus",
+          "duration_sec": 6,
+          "nar": "腿锁腰。攥床单，再夹紧。",
+          "dsl": {
+            "subject": "adult limbs bare",
+            "action": "leg-wrap-waist clutch sheets, micro-tremble, breath rises, sweat bead",
+            "motion": "lock_clutch leg-wrap-waist clutch sheets micro-tremble breath rise sweat bead",
+            "camera": {
+              "shot_size": "close-up insert",
+              "angle": "slight low",
+              "lens_mm": "85"
+            },
+            "visible_change": "fingers white on fabric",
+            "wardrobe_state": "bare",
+            "partner_wardrobe_state": "undressed",
+            "coitus_beat": "lock",
+            "lighting": "warm practicals low key",
+            "camera_axis": "top-down",
+            "look_axis": "left",
+            "start_pose": "hips locked contact readable both undressed",
+            "end_pose": "waist-pelvis union thrust insert detail hold",
+            "chain_mode": "continue",
+            "framing": "full head and both shoulders inside frame, ample headroom, safe framing no cropping"
+          },
+          "camera_axis": "top-down",
+          "performance_delta": "fingers white on fabric",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "leg-wrap-waist clutch sheets, micro-tremble, bre",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "结合节奏",
+          "emotion": "结合节奏",
+          "narrative_purpose": "推进到结合节奏",
+          "beat_id": "beat06"
+        },
+        {
+          "id": "shot07",
+          "dramatic_function": "action",
+          "heat_phase": "climax",
+          "sex_arc_beat": "climax_release",
+          "coitus_beat": "finish",
+          "wardrobe_state": "bare",
+          "partner_wardrobe_state": "undressed",
+          "duration_sec": 8,
+          "nar": "失声办穿。背一弓，腿软，射出余颤。",
+          "dsl": {
+            "subject": "adult heroine bare finish face",
+            "action": "arches and presses finish residual-tremor wet eyes 高潮 射出",
+            "motion": "finish_arch presses up residual-tremor breath static hold",
+            "camera": {
+              "shot_size": "cu",
+              "angle": "eye level",
+              "lens_mm": "85"
+            },
+            "framing": "full head and both shoulders inside frame, ample headroom, safe framing no cropping",
+            "visible_change": "spine arch climax release then softens",
+            "wardrobe_state": "bare",
+            "partner_wardrobe_state": "undressed",
+            "coitus_beat": "finish",
+            "lighting": "warm practicals low key",
+            "camera_axis": "front",
+            "look_axis": "left",
+            "start_pose": "waist-pelvis union thrust insert detail",
+            "end_pose": "spine arch climax release then softens hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "front",
+          "performance_delta": "spine arch climax release then softens",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "arches and presses finish residual-tremor wet ey",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "办完钩子",
+          "emotion": "办完钩子",
+          "narrative_purpose": "推进到办完钩子",
+          "beat_id": "beat07"
+        },
+        {
+          "id": "shot08",
+          "dramatic_function": "afterglow",
+          "heat_phase": "afterglow",
+          "coitus_beat": "hook",
+          "wardrobe_state": "bare",
+          "duration_sec": 5,
+          "nar": "贴耳：下一场——换你顶。",
+          "dsl": {
+            "subject": "adult pair bare residual",
+            "action": "ear whisper residual hold next round",
+            "motion": "lean to ear residual pull-back hold",
+            "camera": {
+              "shot_size": "medium",
+              "angle": "eye level",
+              "lens_mm": "35"
+            },
+            "visible_change": "unfinished invitation",
+            "wardrobe_state": "bare",
+            "start_pose": "spine arch climax release then softens",
+            "coitus_beat": "hook",
+            "lighting": "warm practicals low key",
+            "camera_axis": "profile",
+            "look_axis": "left",
+            "end_pose": "lean to ear residual unfinished invitation hold",
+            "chain_mode": "continue"
+          },
+          "camera_axis": "profile",
+          "performance_delta": "unfinished invitation",
+          "performance": {
+            "subtext": "欲望压过规矩",
+            "playable_action": "ear whisper residual hold next round",
+            "reaction_trigger": "门锁、触碰或节奏变化"
+          },
+          "subtext": "边界失效",
+          "arc_node": "办完钩子",
+          "emotion": "办完钩子",
+          "narrative_purpose": "推进到办完钩子",
+          "beat_id": "beat08"
+        }
+      ],
+      "director_board": {
+        "emotional_turn": "落锁好奇变成办穿失控",
+        "visual_strategy": "从全身门闩压到跨坐特写再回中景余韵",
+        "performance_strategy": "先锁门立规矩，再卸甲用身体接管节奏",
+        "audience_question": "谁先把规矩办穿？",
+        "coverage_strategy": "全景落锁→中景卸甲→特写结合→中景钩子",
+        "cut_intent": "soft glue through act, smash on climax face",
+        "approval_state": "approved"
+      }
+    }
+  ],
+  "genre": "adult",
+  "h3": {
+    "enabled": true,
+    "audio_policy": "prefer_native",
+    "max_duration_sec": 8,
+    "stage": "pilot",
+    "allow_bulk": false
+  },
+  "_notes": [
+    "Set AIFILM_I2V_PROFILE=h3_primary so write-spec resolves auto→comfy-h3 and seeds motion_lanes default=comfy-h3.",
+    "Modes: env→T2V · still only→I2V · first+last→FLF · high energy→R2V (h3 plan/list).",
+    "Cloud bulk blocked unless AIFILM_ALLOW_CLOUD_RESTRICTED=1."
+  ]
+}

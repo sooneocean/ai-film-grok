@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-promotion",
+  "approved": true,
+  "approved_by": "user",
+  "approved_at": "2026-07-30T04:00:34.214290+00:00",
+  "user_phrase": "批准 Qwen 为 champion，Flux 为 challenger",
+  "experiment_id": "env-t2i-seeded-20260730",
+  "operation": "text_to_image",
+  "catalog_sha256": "46ea14995336d17e498c0e92923ceaa061a7fce6407ebac040ebc4cc69a1ccdb",
+  "rank_sha256": "1072d0f8484305588daef019a59bb4b3065f1a2dab4e169c963414b56f4c740d",
+  "champion": "qwen",
+  "challenger": "flux",
+  "selection_binding_sha256": "1b88a5f55e6410aba13cf05c844ce906e56cf8bf9d10f207b8c4a82126a09c76",
+  "changes_primary_provider": false,
+  "requires_provider_switch_receipt": false,
+  "promotion_sha256": "37f8ea6c4e65f17dfaf5c5fe16cbf2fd823bcae3752136b651b4d05de49c9d04"
+}

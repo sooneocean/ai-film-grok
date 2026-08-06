@@ -1,0 +1,631 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/drama-graph.schema.json",
+  "title": "ai-film-grok Canonical Vertical Drama Graph v2",
+  "description": "Canonical, revisioned narrative graph projected into executable film-spec.",
+  "type": "object",
+  "required": ["schema_version", "project", "episodes"],
+  "allOf": [
+    {
+      "if": {
+        "required": ["narrative_policy"],
+        "properties": {
+          "narrative_policy": {
+            "required": ["require_reversal"],
+            "properties": { "require_reversal": { "const": true } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "episodes": {
+            "items": { "required": ["narrative_arc"] }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["narrative_policy"],
+        "properties": {
+          "narrative_policy": {
+            "required": ["require_complete_resolution"],
+            "properties": { "require_complete_resolution": { "const": true } }
+          }
+        }
+      },
+      "then": { "required": ["story_resolution"] }
+    }
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "enum": [1, 2] },
+    "revision": { "type": "integer", "minimum": 1 },
+    "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "state": { "enum": ["draft", "review", "locked", "stale"] },
+    "lock_scopes": {
+      "type": "array",
+      "items": { "enum": ["story", "beats", "shots", "panels"] }
+    },
+    "kind": { "type": "string", "const": "vertical-drama-graph" },
+    "dialogue_mode": {
+      "enum": ["dialogue_drama", "storyteller", "monologue"]
+    },
+    "derived_from": {
+      "type": "object",
+      "properties": {
+        "film_spec": { "type": "string" },
+        "style_bible": { "type": ["string", "null"] },
+        "at": { "type": "string" },
+        "mode": { "enum": ["derive", "manual", "planned", "legacy-import"] }
+      }
+    },
+    "project": {
+      "type": "object",
+      "required": ["id", "title", "aspectRatio"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "aspectRatio": { "enum": ["9:16", "16:9", "1:1", "3:4", "4:3"] },
+        "targetResolution": {
+          "type": "string",
+          "description": "Export target e.g. 1080x1920"
+        },
+        "targetFps": { "type": "integer" },
+        "root": { "type": "string" }
+      }
+    },
+    "story": {
+      "type": "object",
+      "properties": {
+        "genre": {
+          "type": "string",
+          "enum": ["adult", "drama", "mystery", "arthouse", "documentary"],
+          "description": "Beat spine selector. Determines which beat template drives dramatic_function assignment. See references/beat-spines.md. Default: adult (backward compat)."
+        },
+        "premise": { "type": "string" },
+        "logline": { "type": "string" },
+        "theme": { "type": "string" },
+        "protagonist_ids": { "type": "array", "items": { "type": "string" } },
+        "protagonist_goal": { "type": "string", "description": "What protagonist wants (external goal)" },
+        "protagonist_want": { "type": "string", "description": "Conscious external desire" },
+        "protagonist_need": { "type": "string", "description": "Unconscious internal need (growth)" },
+        "protagonist_arc": { "type": "string", "description": "Arc: A→B state change" },
+        "opposition": { "type": "string" },
+        "stakes": { "type": "string" },
+        "climax_choice": { "type": "string" },
+        "ending_hook": { "type": "string" },
+        "authoring_questions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "emotional_arc": { "type": "array", "items": { "type": "string" } },
+        "act_structure": {
+          "type": "object",
+          "description": "Three-act structure with ratio and beat anchors. See references/directors-lens.md.",
+          "properties": {
+            "setup": { "type": "string" },
+            "confrontation": { "type": "string" },
+            "resolution": { "type": "string" },
+            "setup_ratio": { "type": "number", "minimum": 0.05, "maximum": 0.50 },
+            "confrontation_ratio": { "type": "number", "minimum": 0.20, "maximum": 0.70 },
+            "resolution_ratio": { "type": "number", "minimum": 0.05, "maximum": 0.50 }
+          }
+        },
+        "pace_chart": {
+          "type": "array",
+          "description": "Structured rhythm curve segments. Each entry: label/start_ratio/end_ratio/cut_freq/intensity.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "start_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+              "end_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+              "cut_freq": { "type": "string" },
+              "intensity": { "type": "number", "minimum": 0, "maximum": 10 }
+            }
+          }
+        },
+        "constraints": { "type": "array", "items": { "type": "string" } },
+        "status": { "enum": ["needs_authoring", "review", "locked"] }
+      }
+    },
+    "episodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Episode" }
+    },
+    "plot_points": {
+      "type": "array",
+      "description": "Cross-episode promise and payoff ledger.",
+      "items": { "$ref": "#/$defs/PlotPoint" }
+    },
+    "plot_point_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/PlotPointCandidate" }
+    },
+    "story_resolution": { "$ref": "#/$defs/StoryResolution" },
+    "narrative_policy": {
+      "type": "object",
+      "properties": {
+        "midpoint_min": { "type": "integer", "minimum": 1 },
+        "payoff_window_episodes": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "require_plan_evidence": { "type": "boolean" },
+        "require_executed_evidence": { "type": "boolean" },
+        "require_reversal": { "type": "boolean" },
+        "require_complete_resolution": { "type": "boolean" },
+        "season_end_mode": { "enum": ["closed", "season_hook"] }
+      }
+    },
+    "characters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Character" }
+    },
+    "dialogue_ledger": {
+      "type": "array",
+      "description": "P1-8: Independent dialogue ledger — decoupled from shot.dialogue. Each entry is a line with speaker/emotion/subtext/beat_ref.",
+      "items": { "$ref": "#/$defs/DialogueLine" }
+    },
+    "dialogue_screenplay": {
+      "type": "object",
+      "description": "Canonical reviewed dialogue-scene contract projected from story reception."
+    },
+    "locations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Location" }
+    },
+    "props": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Prop" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "Episode": {
+      "type": "object",
+      "required": ["id", "episodeNumber", "title", "scenes"],
+      "properties": {
+        "id": { "type": "string" },
+        "episodeNumber": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "targetDuration": { "type": "number" },
+        "openingHook": { "type": "string" },
+        "centralConflict": { "type": "string" },
+        "climax": { "type": "string" },
+        "endingHook": { "type": "string" },
+        "opening_hook": { "$ref": "#/$defs/Hook" },
+        "mid_episode_points": { "type": "array", "items": { "type": "string" } },
+        "plot_point_candidates": { "type": "array", "items": { "$ref": "#/$defs/PlotPointCandidate" } },
+        "ending_hook": { "$ref": "#/$defs/Hook" },
+        "carry_in_points": { "type": "array", "items": { "type": "string" } },
+        "payoff_points": { "type": "array", "items": { "type": "string" } },
+        "new_audience_question": { "type": "string" },
+        "narrative_arc": { "$ref": "#/$defs/NarrativeArc" },
+        "aspectRatio": { "enum": ["9:16"] },
+        "status": {
+          "enum": [
+            "planning",
+            "asset-production",
+            "editing",
+            "review",
+            "approved",
+            "rendered"
+          ]
+        },
+        "scenes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Scene" }
+        }
+      }
+    },
+    "Hook": {
+      "type": "object",
+      "required": ["hook_id", "point_id", "beat_id", "shot_ids", "question", "source_refs", "visible_evidence"],
+      "properties": {
+        "hook_id": { "type": "string" },
+        "point_id": { "type": "string" },
+        "beat_id": { "type": "string" },
+        "shot_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "question": { "type": "string", "minLength": 1 },
+        "source_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "visible_evidence": { "type": "string", "minLength": 1 }
+      }
+    },
+    "NarrativeArc": {
+      "type": "object",
+      "properties": {
+        "opening_hook_id": { "type": "string" },
+        "escalation_beat_id": { "type": "string" },
+        "reversal": { "$ref": "#/$defs/Reversal" },
+        "payoff": { "$ref": "#/$defs/ArcPayoff" },
+        "ending_mode": { "enum": ["next_episode", "closed"] }
+      }
+    },
+    "StoryResolution": {
+      "type": "object",
+      "properties": {
+        "episode_id": { "type": "string" },
+        "beat_id": { "type": "string" },
+        "shot_ids": { "type": "array", "items": { "type": "string" } },
+        "climax_choice": { "type": "string" },
+        "outcome": { "type": "string" },
+        "final_state": { "type": "string" }
+      }
+    },
+    "Reversal": {
+      "type": "object",
+      "properties": {
+        "beat_id": { "type": "string" },
+        "shot_ids": { "type": "array", "items": { "type": "string" } },
+        "setup_expectation": { "type": "string" },
+        "revealed_truth": { "type": "string" },
+        "visible_consequence": { "type": "string" },
+        "source_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ArcPayoff": {
+      "type": "object",
+      "properties": {
+        "beat_id": { "type": "string" },
+        "shot_ids": { "type": "array", "items": { "type": "string" } },
+        "resolves_point_ids": { "type": "array", "items": { "type": "string" } },
+        "visible_change": { "type": "string" }
+      }
+    },
+    "PlotPointCandidate": {
+      "type": "object",
+      "required": ["candidate_id", "point_type", "source_refs", "source_excerpt", "confidence", "authoring_status"],
+      "properties": {
+        "candidate_id": { "type": "string" },
+        "point_type": { "enum": ["character_secret", "prop_clue", "relationship_promise", "danger_omen", "world_info", "custom"] },
+        "source_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "source_excerpt": { "type": "string", "minLength": 1 },
+        "audience_question": { "type": "string", "minLength": 1 },
+        "visible_evidence": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "authoring_status": { "enum": ["candidate", "confirmed", "stale"] },
+        "episode_hint": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "PlotPoint": {
+      "type": "object",
+      "required": [
+        "point_id", "point_type", "introduced_episode", "introduced_beat_id",
+        "introduced_shot_ids", "visible_evidence", "audience_question",
+        "planned_payoff_episode", "payoff_condition", "status", "source_refs", "source_excerpt", "confidence", "authoring_status"
+      ],
+      "properties": {
+        "point_id": { "type": "string" },
+        "point_type": { "enum": ["character_secret", "prop_clue", "relationship_promise", "danger_omen", "world_info", "custom"] },
+        "introduced_episode": { "type": "string" },
+        "introduced_beat_id": { "type": "string" },
+        "introduced_shot_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "visible_evidence": { "type": "string" },
+        "audience_question": { "type": "string" },
+        "planned_payoff_episode": { "type": "integer", "minimum": 1 },
+        "payoff_condition": { "type": "string" },
+        "status": { "enum": ["planted", "carried", "paid_off", "season_hook"] },
+        "source_refs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "source_excerpt": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "authoring_status": { "enum": ["candidate", "confirmed", "stale"] },
+        "payoff_evidence": {
+          "type": "object",
+          "properties": {
+            "episode": { "type": "string" }, "beat_id": { "type": "string" },
+            "shot_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            "visible_change": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "Scene": {
+      "type": "object",
+      "required": ["id", "order", "beats"],
+      "properties": {
+        "id": { "type": "string" },
+        "order": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "synopsis": { "type": "string" },
+        "purpose": { "type": "string" },
+        "conflict": { "type": "string" },
+        "entry_state": { "type": "string" },
+        "exit_state": { "type": "string" },
+        "locationId": { "type": ["string", "null"] },
+        "characterIds": { "type": "array", "items": { "type": "string" } },
+        "targetDuration": { "type": "number" },
+        "productionMode": {
+          "enum": [
+            "static-motion-comic",
+            "image-to-video",
+            "video-generation",
+            "hybrid",
+            "unknown"
+          ]
+        },
+        "status": {
+          "enum": ["parsed", "planned", "generated", "assembled", "approved"]
+        },
+        "beats": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Beat" }
+        }
+      }
+    },
+    "Beat": {
+      "type": "object",
+      "required": ["id", "order", "objective", "shots"],
+      "properties": {
+        "id": { "type": "string" },
+        "order": { "type": "integer", "minimum": 1 },
+        "objective": { "type": "string" },
+        "action": { "type": "string" },
+        "outcome": { "type": "string" },
+        "obstacle": { "type": "string" },
+        "tactic": { "type": "string" },
+        "turn": { "type": "string" },
+        "state_delta": { "type": "string" },
+        "audience_question": { "type": "string" },
+        "emotional_turn": { "type": "string" },
+        "authoring_questions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "director_board": {
+          "type": "object",
+          "properties": {
+            "emotional_turn": { "type": "string" },
+            "audience_question": { "type": "string" },
+            "image_priority": { "type": "string" },
+            "sound_priority": { "type": "string" },
+            "coverage_strategy": { "type": "string" },
+            "cut_intent": { "type": "string" },
+            "approval_state": { "enum": ["draft", "review", "approved"] }
+          }
+        },
+        "emotionalShift": {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string" },
+            "to": { "type": "string" }
+          }
+        },
+        "importance": {
+          "enum": ["supporting", "important", "climax"]
+        },
+        "targetDuration": { "type": "number" },
+        "shots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Shot" }
+        }
+      }
+    },
+    "Shot": {
+      "type": "object",
+      "required": ["id", "order"],
+      "properties": {
+        "id": { "type": "string" },
+        "order": { "type": "integer", "minimum": 1 },
+        "filmSpecShotId": { "type": "string" },
+        "narrativePurpose": { "type": "string" },
+        "dramaticFunction": { "type": "string" },
+        "shotSize": { "type": "string" },
+        "verticalComposition": {
+          "enum": [
+            "top-subject",
+            "center-subject",
+            "bottom-subject",
+            "foreground-background",
+            "two-character-stack",
+            "three-layer-depth",
+            "unknown"
+          ]
+        },
+        "cameraMovement": { "type": "string" },
+        "productionMode": {
+          "enum": [
+            "panel-animation",
+            "single-keyframe-i2v",
+            "first-last-frame-i2v",
+            "text-to-video",
+            "composite",
+            "unknown"
+          ]
+        },
+        "targetDuration": { "type": "number" },
+        "characterIds": { "type": "array", "items": { "type": "string" } },
+        "locationId": { "type": ["string", "null"] },
+        "wardrobeState": { "type": "string" },
+        "heatPhase": { "type": "string" },
+        "chainMode": { "type": "string" },
+        "beat_id": { "type": "string" },
+        "coverage_role": { "type": "string" },
+        "must_show": { "type": "string" },
+        "visible_change": { "type": "string" },
+        "start_state": { "type": "string" },
+        "end_state": { "type": "string" },
+        "playable_action": { "type": "string" },
+        "expectation": { "type": "string" },
+        "subtext": { "type": "string" },
+        "gaze_target": { "type": "string" },
+        "reaction_trigger": { "type": "string" },
+        "body_state": { "type": "string" },
+        "source_refs": { "type": "array", "items": { "type": "string" } },
+        "nar": { "type": "string" },
+        "panelIds": { "type": "array", "items": { "type": "string" } },
+        "keyframeIds": { "type": "array", "items": { "type": "string" } },
+        "motionClipIds": { "type": "array", "items": { "type": "string" } },
+        "dialogueLineIds": { "type": "array", "items": { "type": "string" } },
+        "panels": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Panel" }
+        },
+        "assetHints": {
+          "type": "object",
+          "properties": {
+            "keyframePath": { "type": ["string", "null"] },
+            "clipPath": { "type": ["string", "null"] },
+            "promptPath": { "type": ["string", "null"] },
+            "hasKeyframe": { "type": "boolean" },
+            "hasClip": { "type": "boolean" },
+            "hasPrompt": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "Panel": {
+      "type": "object",
+      "required": ["id", "order"],
+      "properties": {
+        "id": { "type": "string" },
+        "order": { "type": "integer" },
+        "subject": { "type": "string" },
+        "action": { "type": "string" },
+        "expression": { "type": "string" },
+        "location": { "type": "string" },
+        "verticalComposition": { "type": "string" },
+        "cameraAngle": { "type": "string" },
+        "lighting": { "type": "string" },
+        "style": { "type": "string" },
+        "continuityConstraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "negativeConstraints": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "referenceAssetIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sourcePromptPath": { "type": ["string", "null"] },
+        "must_include": { "type": "array", "items": { "type": "string" } },
+        "playable_action": { "type": "string" },
+        "gaze_target": { "type": "string" },
+        "control": { "$ref": "#/$defs/Control" },
+        "shot_number": { "type": "string", "description": "P1-7: Storyboard shot number (e.g. 'S01_A')" },
+        "duration_sec": { "type": "number", "description": "P1-7: Planned shot duration" },
+        "shot_size_progression": { "type": "string", "enum": ["wide_to_close", "close_to_wide", "intercut", "static", "unspecified"], "description": "P1-7: Shot size progression within scene context" },
+        "composition_rule": {
+          "type": "string",
+          "enum": ["rule_of_thirds", "leading_lines", "symmetry", "golden_ratio", "center_frame", "negative_space", "unspecified"],
+          "description": "P1-7: Composition rule: 三分法/引导线/对称/黄金分割/居中/负空间"
+        },
+        "camera_height": { "type": "string", "description": "P1-7: Camera height (eye_level/low_angle/high_angle/birds_eye/worms_eye)" },
+        "lens_mm": { "type": "number", "description": "P1-7: Focal length in mm (35mm equivalent)" },
+        "eyeline_target": { "type": "string", "description": "P1-7: Where subject looks — for eyeline match continuity" },
+        "axis_side": { "type": "string", "enum": ["left", "right", "center"], "description": "P1-7: Which side of 180° axis camera is on" },
+        "transition_to_next": { "type": "string", "description": "P1-7: Planned transition to next panel" }
+      }
+    },
+    "Control": {
+      "type": "object",
+      "properties": {
+        "state": { "enum": ["draft", "review", "locked", "stale"] },
+        "revision": { "type": "integer", "minimum": 1 },
+        "locked_fields": { "type": "array", "items": { "type": "string" } },
+        "locked_at": { "type": ["string", "null"] },
+        "lock_reason": { "type": ["string", "null"] }
+      }
+    },
+    "Character": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "identity": { "type": "string", "description": "Physical description: face/hair/eyes/wardrobe (visual identity)" },
+        "name": { "type": "string", "description": "Character name (dramatic identity, not just id)" },
+        "age": { "type": ["string", "integer"], "description": "Age or age band (e.g. 'mid-20s')" },
+        "personality": { "type": "string", "description": "Core personality traits (3-5 words)" },
+        "want": { "type": "string", "description": "What the character consciously wants (external goal)" },
+        "need": { "type": "string", "description": "What the character actually needs (internal growth)" },
+        "flaw": { "type": "string", "description": "Core flaw that prevents growth until arc resolves" },
+        "ghost_wound": { "type": "string", "description": "Backstory wound/ghost that drives behavior" },
+        "arc_turning_points": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Key moments where character changes (mapped to beat ids)"
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "to_character": { "type": "string", "description": "id of related character" },
+              "type": { "type": "string", "description": "e.g. mentor/rival/lover/family" },
+              "dynamic": { "type": "string", "description": "Power dynamic or emotional dynamic" }
+            }
+          },
+          "description": "Character relationship graph edges"
+        },
+        "psych_markers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Psychological externalization markers (body language, habits, tells)"
+        },
+        "dramatic_role": {
+          "type": "string",
+          "enum": ["protagonist", "antagonist", "mentor", "ally", "trickster", "guardian", "supporting"],
+          "description": "Dramatic function in the story (not just lead/supporting)"
+        },
+        "defaultWardrobe": { "type": "string" },
+        "castMaster": { "type": ["string", "null"] }
+      }
+    },
+    "Location": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "structure": { "type": "string", "description": "Spatial layout / geography" },
+        "timeOfDay": { "type": "string", "description": "Time of day (dawn/day/dusk/night)" },
+        "lighting": { "type": "string", "description": "Lighting setup (key/fill/practical)" },
+        "palette": { "type": "string", "description": "Scene color palette / color temperature motivation" },
+        "immutableRules": { "type": "array", "items": { "type": "string" }, "description": "Rules that must not change across shots in this location" },
+        "recurringObjects": { "type": "array", "items": { "type": "string" }, "description": "Set dressing / props that anchor this location" },
+        "primaryAngles": { "type": "array", "items": { "type": "string" }, "description": "Primary camera angles for this location" },
+        "atmosphere": { "type": "string", "description": "Mood/atmosphere descriptor" },
+        "color_temperature": { "type": "string", "description": "Color temperature motivation (warm/cool/neutral + Kelvin hint)" },
+        "set_dressing": { "type": "array", "items": { "type": "string" }, "description": "Detailed set dressing inventory" },
+        "lighting_plot": { "type": "string", "description": "Lighting plot: key light direction, fill ratio, practicals" }
+      }
+    },
+    "Prop": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "DialogueLine": {
+      "type": "object",
+      "required": ["line_id", "speaker", "text"],
+      "properties": {
+        "line_id": { "type": "string", "description": "Unique line id (e.g. 'dlg_001')" },
+        "speaker": { "type": "string", "description": "Character id who speaks this line" },
+        "addressee": { "type": "string" },
+        "text": { "type": "string", "minLength": 1, "description": "The actual dialogue text" },
+        "caption_text": { "type": "string" },
+        "spoken_ja": { "type": "string" },
+        "translation_status": { "type": "string" },
+        "emotion": { "type": "string", "description": "Speaker's emotional state when delivering this line" },
+        "subtext": { "type": "string", "description": "What the speaker really means (under the surface)" },
+        "actions": { "type": "object" },
+        "gaze": { "type": ["object", "string"] },
+        "props": { "type": "array", "items": { "type": "string" } },
+        "state_delta": { "type": "object" },
+        "source_evidence": { "type": "object" },
+        "beat_ref": { "type": "string", "description": "Beat id this line belongs to" },
+        "shot_ref": { "type": "string", "description": "Shot id where this line appears (for lipsync anchoring)" },
+        "delivery_note": { "type": "string", "description": "Director's delivery instruction (pace/tone/emphasis)" },
+        "lipsync_anchor": { "type": "boolean", "description": "If true, this line is a key lipsync anchor shot" },
+        "is_key_line": { "type": "boolean", "description": "If true, this is a memorable/key line that must be delivered well" }
+      }
+    }
+  }
+}

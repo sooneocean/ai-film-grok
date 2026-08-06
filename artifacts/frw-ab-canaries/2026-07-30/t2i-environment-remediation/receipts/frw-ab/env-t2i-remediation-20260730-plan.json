@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "kind": "frw-ab-plan",
+  "created_at": "2026-07-30T03:07:48.783503+00:00",
+  "experiment_id": "env-t2i-remediation-20260730",
+  "stage": "pilot",
+  "operation": "text_to_image",
+  "content_class": "general",
+  "catalog_sha256": "46ea14995336d17e498c0e92923ceaa061a7fce6407ebac040ebc4cc69a1ccdb",
+  "input_bindings": {
+    "height": {
+      "sha256": "6636dad0df1afa3e1546a4ad4615b2d3a51f0540a1587c77c53fbf60790d4bda",
+      "present": true
+    },
+    "prompt": {
+      "sha256": "b52963397b649a738a476db51537693ebdd3a99832da23c298a04550c760b96e",
+      "present": true
+    },
+    "width": {
+      "sha256": "0e34a483393bd4c4a0b71a9a9f31fdba31508ddd102a4f6f7fa5fb4e2afe768a",
+      "present": true
+    }
+  },
+  "candidates": [
+    {
+      "capability_id": "text_to_image:ponyxl3d",
+      "model_id": "ponyxl3d",
+      "operation": "text_to_image",
+      "catalog_status": "advertised",
+      "health_state": "pending_pilot_probe",
+      "parameters": [
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "width",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "height",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "invocation": {
+        "command": "text2image",
+        "query_command": "text2image-query",
+        "fixed_args": {
+          "model": "ponyxl3d"
+        }
+      }
+    },
+    {
+      "capability_id": "text_to_image:qwen",
+      "model_id": "qwen",
+      "operation": "text_to_image",
+      "catalog_status": "advertised",
+      "health_state": "pending_pilot_probe",
+      "parameters": [
+        {
+          "name": "prompt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "width",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "height",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "invocation": {
+        "command": "text2image",
+        "query_command": "text2image-query",
+        "fixed_args": {
+          "model": "qwen"
+        }
+      }
+    }
+  ],
+  "promotion_sha256": null,
+  "fanout": {
+    "mode": "selected_eligible",
+    "parallel": true,
+    "unmetered": true,
+    "candidate_count": 2,
+    "declared_concurrency_limit": null
+  },
+  "provider_policy": {
+    "primary_provider": "grok",
+    "changes_primary_provider": false,
+    "requires_provider_switch_receipt": false,
+    "shot_id": null,
+    "automatic_quality_fallback": false
+  },
+  "execution": {
+    "authorized": false,
+    "explicit_run_required": true,
+    "automatic_resubmit": false
+  },
+  "plan_sha256": "a67f05a9d77f333be499b79d3d5a1e6bb4cee8f7a1f2f1759f27b0c8fece0fec"
+}

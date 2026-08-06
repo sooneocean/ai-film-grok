@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -n "${AIFILM_PYTHON:-}" ] && [ -x "${AIFILM_PYTHON}" ]; then
+  PYTHON=${AIFILM_PYTHON}
+elif command -v pyenv >/dev/null 2>&1; then
+  PYTHON=$(pyenv which python3)
+else
+  PYTHON=$(command -v python3)
+fi
+exec "$PYTHON" "$SCRIPT_DIR/media_queue.py" "$@"

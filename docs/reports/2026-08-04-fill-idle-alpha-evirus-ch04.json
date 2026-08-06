@@ -1,0 +1,45 @@
+{
+  "kind": "fill-idle-alpha-run",
+  "at": "2026-08-04T06:06:41.461897+00:00",
+  "film_root": "/Users/dex/Desktop/e-virus-ch04-shelter/简报",
+  "title": "第4章：避难所的建立",
+  "mode": "dry_cycle_no_gpu_execute",
+  "capacity_ready": false,
+  "metrics": {
+    "p0_pending": 13,
+    "p1_pending": 0,
+    "p2_pending": 1,
+    "pending_jobs": 14,
+    "multi_take_shots": 0,
+    "by_priority": {
+      "P0a": 1,
+      "P0c": 12,
+      "P2": 1
+    }
+  },
+  "next_job": {
+    "shot_id": "ep01_s02_sh01",
+    "priority": "P0a",
+    "mode": "i2v",
+    "command": "aifilm h3 run --root \"/Users/dex/Desktop/e-virus-ch04-shelter/简报\" --shot-id ep01_s02_sh01 --mode i2v --register"
+  },
+  "findings": [
+    "heat=max → 14 pending H3 jobs (13 P0 meat/continue + 1 P2)",
+    "no multi-take yet (clips only single grok paths) → pk_multi_take=0",
+    "capacity_ready=false → did not --execute GPU burn (correct fail-closed)",
+    "many P0c continue legs need endframe chain after first I2V succeeds",
+    "identity_l1_high on several grok clips vs still — re-challenge candidates when capacity returns"
+  ],
+  "five_numbers": {
+    "p0_count": 13,
+    "p2_challenge_count": 1,
+    "human_swap_h3_ratio": null,
+    "mean_lift": null,
+    "redo_count": 0
+  },
+  "when_capacity_ready": [
+    "aifilm comfy free-memory --confirm",
+    "aifilm h3 cycle --root \"/Users/dex/Desktop/e-virus-ch04-shelter/简报\" --execute --max 5",
+    "aifilm h3 evidence --root \"/Users/dex/Desktop/e-virus-ch04-shelter/简报\" --notes \"post-execute\""
+  ]
+}

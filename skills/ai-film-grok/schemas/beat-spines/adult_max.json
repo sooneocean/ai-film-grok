@@ -1,0 +1,93 @@
+[
+  {
+    "key": "hook",
+    "dramatic_function": "hook",
+    "importance": "important",
+    "objective": "落锁/边界关闭：今晚只办你",
+    "weight": 0.08,
+    "shots_n": 1,
+    "heat_phase": "setup",
+    "coitus_beat": "entry",
+    "wardrobe_state": "full"
+  },
+  {
+    "key": "foreplay",
+    "dramatic_function": "sensory",
+    "importance": "important",
+    "objective": "前戏失序：卸甲/脱衣到半裸",
+    "weight": 0.12,
+    "shots_n": 1,
+    "heat_phase": "foreplay",
+    "coitus_beat": "undress",
+    "wardrobe_state": "partial"
+  },
+  {
+    "key": "foreplay2",
+    "dramatic_function": "approach",
+    "importance": "supporting",
+    "objective": "贴身权力：拽入跨坐起势",
+    "weight": 0.1,
+    "shots_n": 1,
+    "heat_phase": "foreplay",
+    "coitus_beat": "entry",
+    "wardrobe_state": "partial"
+  },
+  {
+    "key": "union",
+    "dramatic_function": "action",
+    "importance": "climax",
+    "objective": "结合：跨坐落稳骨盆咬合",
+    "weight": 0.12,
+    "shots_n": 1,
+    "heat_phase": "act",
+    "coitus_beat": "union",
+    "wardrobe_state": "undressed",
+    "duration_boost": 8.0
+  },
+  {
+    "key": "rhythm",
+    "dramatic_function": "action",
+    "importance": "climax",
+    "objective": "节奏：沉腰顶磨至少两次起伏",
+    "weight": 0.18,
+    "shots_n": 2,
+    "heat_phase": "act",
+    "coitus_beat": "rhythm",
+    "wardrobe_state": "undressed",
+    "duration_boost": 8.0
+  },
+  {
+    "key": "lock",
+    "dramatic_function": "sensory",
+    "importance": "important",
+    "objective": "锁紧：腿锁腰/攥布特写",
+    "weight": 0.1,
+    "shots_n": 1,
+    "heat_phase": "act",
+    "coitus_beat": "lock",
+    "wardrobe_state": "bare"
+  },
+  {
+    "key": "climax",
+    "dramatic_function": "action",
+    "importance": "climax",
+    "objective": "办完：失声拱背腿软",
+    "weight": 0.14,
+    "shots_n": 1,
+    "heat_phase": "climax",
+    "coitus_beat": "finish",
+    "wardrobe_state": "bare",
+    "duration_boost": 8.0
+  },
+  {
+    "key": "button",
+    "dramatic_function": "afterglow",
+    "importance": "supporting",
+    "objective": "余韵钩子：下一场换你顶",
+    "weight": 0.06,
+    "shots_n": 1,
+    "heat_phase": "afterglow",
+    "coitus_beat": "hook",
+    "wardrobe_state": "bare"
+  }
+]

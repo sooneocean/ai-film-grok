@@ -1,0 +1,50 @@
+[
+  {
+    "key": "mood_open",
+    "dramatic_function": "hook",
+    "importance": "important",
+    "objective": "建立氛围与情绪基调",
+    "weight": 0.16,
+    "shots_n": 1
+  },
+  {
+    "key": "observe",
+    "dramatic_function": "sensory",
+    "importance": "climax",
+    "objective": "静观：人物/环境的感官凝视",
+    "weight": 0.22,
+    "shots_n": 2
+  },
+  {
+    "key": "gesture",
+    "dramatic_function": "approach",
+    "importance": "important",
+    "objective": "微妙接近/关系微变",
+    "weight": 0.18,
+    "shots_n": 1
+  },
+  {
+    "key": "silence",
+    "dramatic_function": "reaction",
+    "importance": "important",
+    "objective": "留白/沉默中的情绪涌动",
+    "weight": 0.18,
+    "shots_n": 1
+  },
+  {
+    "key": "shift",
+    "dramatic_function": "action",
+    "importance": "supporting",
+    "objective": "情绪转折（非情节转折）",
+    "weight": 0.14,
+    "shots_n": 1
+  },
+  {
+    "key": "echo",
+    "dramatic_function": "afterglow",
+    "importance": "supporting",
+    "objective": "回响/未决的余韵",
+    "weight": 0.12,
+    "shots_n": 1
+  }
+]

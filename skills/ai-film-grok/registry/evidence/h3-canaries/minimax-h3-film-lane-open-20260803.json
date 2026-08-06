@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "kind": "comfy-weapon-film-lane-open",
+  "id": "minimax-h3-film-lane-open-20260803",
+  "provider": "comfy-h3",
+  "status": "production_film_lane",
+  "production_promoted": true,
+  "opened_at": "2026-08-03T09:14:22+00:00",
+  "weapons": [
+    "minimax-h3-t2v-pilot",
+    "minimax-h3-i2v-pilot",
+    "minimax-h3-r2v-pilot"
+  ],
+  "cli": "aifilm h3 run --register  # no --allow-experimental",
+  "e2e": {
+    "seed": 20260804,
+    "clip_sha256": "9543108537ff06db6820a7698e11aee32fcf7e5cdecb0c878e7811ca1642aad2",
+    "audio_policy_effective": "keep_native",
+    "audio_stripped": false
+  },
+  "bulk_policy": "user_pilot_approval_required_no_silent_bulk"
+}

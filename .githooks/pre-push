@@ -1,0 +1,27 @@
+#!/bin/sh
+# pre-push: secret scan (gitea-publish) + light release gate.
+# Full suite: AIFILM_RELEASE_GATE=full git push
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$ROOT"
+
+# gitea-publish hard-fails if core.fsmonitor is not false — pin local repo.
+git config --local core.fsmonitor false >/dev/null 2>&1 || true
+
+PUBLISH_SCRIPT="${GITEA_PUBLISH_SCRIPT:-${HOME}/.agents/skills/gitea-publish/scripts/gitea_publish.py}"
+PUBLISH_HOOKS="${GITEA_PUBLISH_HOOKS:-${HOME}/.agents/skills/gitea-publish/hooks}"
+
+if [ -f "$PUBLISH_SCRIPT" ]; then
+  GIT_CONFIG_COUNT=1 \
+  GIT_CONFIG_KEY_0=core.hooksPath \
+  GIT_CONFIG_VALUE_0="$PUBLISH_HOOKS" \
+  python3 "$PUBLISH_SCRIPT" hook pre-push --repo "$ROOT" \
+    --remote-name "${1:-}" --remote-url "${2:-}" --json
+else
+  echo "[pre-push] gitea-publish not installed; skipping secret scan" >&2
+fi
+
+# Default light gate (docs + doctor core). Override: AIFILM_RELEASE_GATE=full
+export AIFILM_RELEASE_GATE="${AIFILM_RELEASE_GATE:-light}"
+exec python3 "$ROOT/scripts/release_gate.py" --mode "$AIFILM_RELEASE_GATE"

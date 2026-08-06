@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AI Film exact wardrobe state binding",
+  "type": "object",
+  "required": ["wardrobe_state_id"],
+  "properties": {
+    "wardrobe_state_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Character-owned wardrobe_ladders state ID used as the pixel reference."
+    },
+    "wardrobe_state": {
+      "type": "string",
+      "enum": ["full", "armored", "partial", "undressed", "bare", "default"]
+    }
+  },
+  "additionalProperties": true
+}

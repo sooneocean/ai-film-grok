@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/assets-registry.schema.json",
+  "title": "ai-film-grok Asset Registry",
+  "type": "object",
+  "required": ["schema_version", "kind", "characters", "locations", "props", "characterStatesTimeline"],
+  "properties": {
+    "schema_version": { "type": "integer", "enum": [1, 2] },
+    "kind": { "type": "string", "const": "asset-registry" },
+    "at": { "type": "string" },
+    "root": { "type": "string" },
+    "characters": { "type": "array", "items": { "$ref": "#/$defs/character" } },
+    "locations": { "type": "array", "items": { "$ref": "#/$defs/location" } },
+    "props": { "type": "array", "items": { "$ref": "#/$defs/prop" } },
+    "characterStatesTimeline": { "type": "array", "items": { "$ref": "#/$defs/stateEvent" } },
+    "counts": { "type": "object" },
+    "consistency": { "type": "object" }
+  },
+  "$defs": {
+    "assetBase": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "ref": { "type": "string", "pattern": "^asset\\.(character|location|prop)\\." },
+        "sourceRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "dependencyRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "character": {
+      "allOf": [
+        { "$ref": "#/$defs/assetBase" },
+        {
+          "type": "object",
+          "properties": {
+            "identity": { "type": "string" },
+            "defaultWardrobe": { "type": "string" },
+            "castMaster": { "type": ["string", "null"] },
+            "states": { "type": "object" },
+            "wardrobeVariants": { "type": "object" },
+            "forbidDrift": { "type": "array", "items": { "type": "string" } },
+            "statesUsed": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+          }
+        }
+      ]
+    },
+    "location": {
+      "allOf": [
+        { "$ref": "#/$defs/assetBase" },
+        {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "structure": { "type": "string" },
+            "timeOfDay": { "type": "string" },
+            "lighting": { "type": "string" },
+            "palette": { "type": "string" },
+            "immutableRules": { "type": "array", "items": { "type": "string" } },
+            "recurringObjects": { "type": "array", "items": { "type": "string" } },
+            "primaryAngles": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "prop": {
+      "allOf": [
+        { "$ref": "#/$defs/assetBase" },
+        {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "ownerId": { "type": ["string", "null"] },
+            "locationId": { "type": ["string", "null"] },
+            "condition": { "type": "string" },
+            "storyFunction": { "type": "string" },
+            "firstShotId": { "type": ["string", "null"] },
+            "lastShotId": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+    "stateEvent": {
+      "type": "object",
+      "required": ["shotId", "characterId", "wardrobeState"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "shotId": { "type": "string", "minLength": 1 },
+        "shotRef": { "type": "string", "minLength": 1 },
+        "characterId": { "type": "string", "minLength": 1 },
+        "characterRef": { "type": "string", "pattern": "^asset\\.character\\." },
+        "wardrobeState": { "type": "string", "minLength": 1 },
+        "rank": { "type": "integer" },
+        "reDressRisk": { "type": "boolean" },
+        "heatPhase": { "type": "string" },
+        "emotion": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

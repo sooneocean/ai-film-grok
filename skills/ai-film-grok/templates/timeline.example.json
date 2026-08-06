@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "fps": 30,
+  "width": 720,
+  "height": 1280,
+  "shots": [
+    { "id": "shot01", "title": "Juice hook", "duration_sec": 2.5 },
+    { "id": "shot02", "title": "Mission lock", "duration_sec": 3.5 },
+    { "id": "shot03", "title": "Stall1 receive", "duration_sec": 4.0 },
+    { "id": "shot04", "title": "Stall1 bite", "duration_sec": 4.0 },
+    { "id": "shot05", "title": "Stall2 heat", "duration_sec": 8.0 },
+    { "id": "shot06", "title": "Stall3 climax", "duration_sec": 8.0 },
+    { "id": "shot07", "title": "Ending", "duration_sec": 4.0 }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "kind": "comfy-lan-workflow",
+  "ok": true,
+  "prompt_id": "2465d309-39ae-4d82-be43-62ef2080eb7a",
+  "workflow_sha256": "dd5e8568c4dd10cfa58ae8c25c0a005cd69126bb04c15b6e2f55313faf83a7d4",
+  "artifacts": [
+    {
+      "filename": "armory-qwen-no-text-20260731-0340_00001_.png",
+      "subfolder": "aifilm",
+      "type": "output"
+    }
+  ],
+  "external_api_nodes_allowed": false,
+  "weapon_id": "qwen-image-2512-quality",
+  "source_endpoint": null,
+  "pilot_only": false
+}

@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "kind": "comfy-weapon-armory-intake",
+  "id": "minimax-h3-armory-intake-20260803",
+  "provider": "comfy-h3",
+  "node": "rtx5090-main",
+  "status": "armory_admitted_pilot",
+  "production_promoted": false,
+  "admitted_at": "2026-08-03T09:07:28+00:00",
+  "audio_policy_default": "prefer_native",
+  "film_workflow": {
+    "cli": "aifilm h3 plan|run|list",
+    "notes": [
+      "Restricted/meat soft-lock under hybrid_h3",
+      "No silent bulk; pilot-gated allow-experimental",
+      "Native stereo preferred when usable; strip only when unusable or explicit",
+      "Wan 2.2 local I2V stays retired"
+    ]
+  },
+  "weapons": {
+    "minimax-h3-t2v-pilot": {
+      "weapon_id": "minimax-h3-t2v-pilot",
+      "mode": "t2v",
+      "workflow_template": "templates/comfy/minimax-h3-t2v-api.json",
+      "workflow_template_sha256": "e689527dcf5be5ac8e17c80b17e0ecaf80186c6f60d13e27e135d01613547725",
+      "source_endpoint": "local_minimax_h3_t2v",
+      "canary_receipt_rel": "artifacts/5090-evaluation/minimax-h3-canary/t2v-receipt.json",
+      "canary_media_rel": "artifacts/5090-evaluation/minimax-h3-canary/t2v-minimax_h3_t2v_canary_00001_.mp4",
+      "canary_output_sha256": "2ed7bbace35cc9953777d92946234f7282f8844d5fa18c4f1cfe9f1834776851",
+      "decode_ok": true,
+      "geometry": "352x608",
+      "duration_s": 5.167,
+      "native_audio": "aac_stereo"
+    },
+    "minimax-h3-i2v-pilot": {
+      "weapon_id": "minimax-h3-i2v-pilot",
+      "mode": "i2v",
+      "workflow_template": "templates/comfy/minimax-h3-i2v-api.json",
+      "workflow_template_sha256": "ae7de7060925cdd6bd2db73775e89fc30b745ecd3680c1236ad929ee9a670974",
+      "source_endpoint": "local_minimax_h3_i2v",
+      "canary_receipt_rel": "artifacts/5090-evaluation/minimax-h3-canary/i2v-receipt.json",
+      "canary_media_rel": "artifacts/5090-evaluation/minimax-h3-canary/i2v-minimax_h3_i2v_canary_00001_.mp4",
+      "canary_output_sha256": "c93621704ea871d978789bca3f94532a673b259e1bb89c6dbb9545550c6df812",
+      "decode_ok": true,
+      "geometry": "352x608",
+      "duration_s": 5.167,
+      "native_audio": "aac_stereo",
+      "film_workflow_e2e": {
+        "command": "aifilm h3 run --mode i2v --register --allow-experimental",
+        "verified_at": "2026-08-03T09:01:12Z",
+        "clip_sha256": "9d975b491ba8b62a568e321f09de493f8629b6c17d2e9c70958ee8ab9c350ed6",
+        "audio_policy": "prefer_native",
+        "audio_policy_effective": "keep_native",
+        "native_mean_volume_db": -19.1,
+        "use_clip_audio": true,
+        "prompt_id": "b92c5bd9-766e-4467-84da-3cc1f71c812b",
+        "register_status": "candidate"
+      }
+    },
+    "minimax-h3-r2v-pilot": {
+      "weapon_id": "minimax-h3-r2v-pilot",
+      "mode": "r2v",
+      "workflow_template": "templates/comfy/minimax-h3-r2v-api.json",
+      "workflow_template_sha256": "97e2163ea1753f86035650929719a65347ae4c5d56d42b37a99ff3edac6dfc3e",
+      "source_endpoint": "local_minimax_h3_r2v",
+      "canary_receipt_rel": "artifacts/5090-evaluation/minimax-h3-canary/r2v-receipt.json",
+      "canary_media_rel": "artifacts/5090-evaluation/minimax-h3-canary/r2v-minimax_h3_r2v_canary_00001_.mp4",
+      "canary_output_sha256": "f6432dcfa6d929e8ba996c9787cbdb9bf3b05771c3d8b9fd8c27d7a6327f1d03",
+      "decode_ok": true,
+      "geometry": "352x608",
+      "duration_s": 5.167,
+      "native_audio": "aac_stereo"
+    }
+  },
+  "live_probe_ready_ids": [
+    "minimax-h3-t2v-pilot",
+    "minimax-h3-i2v-pilot",
+    "minimax-h3-r2v-pilot"
+  ]
+}

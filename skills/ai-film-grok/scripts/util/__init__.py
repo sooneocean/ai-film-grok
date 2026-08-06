@@ -1,0 +1,121 @@
+"""Shared I/O and general-purpose utilities for the ai-film-grok pipeline.
+
+JSON contract (single entry for new code):
+
+- ``read_json(path)`` → soft: missing/invalid → ``None`` (use ``or {}``)
+- ``require_json(path)`` → strict: missing/invalid → ``FilmError``
+- ``write_json(path, data)`` → atomic UTF-8 pretty write
+"""
+
+from __future__ import annotations
+
+import fcntl
+import hashlib
+import json
+import os
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
+
+from util.errors import FilmError
+from util.subprocess import run, run_compose_env, run_ffmpeg  # noqa: F401
+from util.time import utc_now  # noqa: F401
+from util.validators import (  # noqa: F401
+    aspect_dims,
+    film_output_path,
+    slugify,
+    valid_shot_id,
+)
+
+
+def canonical_json_sha256(value: Any) -> str:
+    """Hash JSON data with the repository's canonical serialization contract."""
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(payload).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    """Hash large media without loading the complete file into memory."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def read_json(path: Path) -> dict[str, Any] | None:
+    """Soft read: missing/invalid/non-object → ``None`` (use ``or {}``)."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        return raw if isinstance(raw, dict) else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def require_json(path: Path) -> dict[str, Any]:
+    """Strict read: missing or invalid JSON raises ``FilmError``."""
+    data = read_json(path)
+    if data is None:
+        if not path.is_file():
+            raise FilmError(f"Missing JSON: {path}")
+        raise FilmError(f"Invalid JSON: {path}")
+    return data
+
+
+def soft_json(path: Path) -> dict[str, Any]:
+    """Soft read always returning a dict (missing / invalid / non-object → ``{}``)."""
+    return read_json(path) or {}
+
+
+def require_json_as(path: Path, error_cls: type[BaseException]) -> dict[str, Any]:
+    """Strict ``require_json`` remapping ``FilmError`` → ``error_cls(str)``."""
+    try:
+        return require_json(path)
+    except FilmError as exc:
+        raise error_cls(str(exc)) from exc
+
+
+def require_json_fnv(path: Path) -> dict[str, Any]:
+    """Strict read raising ``FileNotFoundError`` / ``ValueError`` (legacy final path)."""
+    try:
+        return require_json(path)
+    except FilmError as exc:
+        if not path.is_file():
+            raise FileNotFoundError(f"Missing JSON: {path}") from exc
+        raise ValueError(f"Invalid JSON: {path}") from exc
+
+
+def write_json(path: Path, data: Any) -> None:
+    """Atomic pretty-print JSON write (``ensure_ascii=False``)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", delete=False
+    ) as handle:
+        handle.write(payload)
+        temporary = Path(handle.name)
+    os.replace(temporary, path)
+
+
+@contextmanager
+def exclusive_file_lock(path: Path) -> Iterator[None]:
+    """Serialize optimistic read-check-replace writers for one canonical file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_name(f".{path.name}.lock")
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        os.chmod(lock_path, 0o600)
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def ensure_dir(path: Path) -> Path:
+    """Like ``mkdir -p`` — create *path* if missing, no-op if exists."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path

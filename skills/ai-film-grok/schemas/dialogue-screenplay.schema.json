@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/dialogue-screenplay.schema.json",
+  "title": "ai-film-grok Dialogue Screenplay v1",
+  "description": "Evidence-bearing, dialogue-first screenplay reviewed before projection into drama-graph.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "mode",
+    "status",
+    "review_status",
+    "source_refs",
+    "scenes",
+    "narration_gaps"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "dialogue-screenplay" },
+    "title": { "type": "string" },
+    "mode": { "enum": ["dialogue_drama", "storyteller", "monologue"] },
+    "mode_exception": {
+      "type": ["string", "null"],
+      "enum": ["documentary", "explicit_monologue", null]
+    },
+    "status": {
+      "enum": ["candidate_only", "reviewed", "approved", "locked", "stale"]
+    },
+    "review_status": {
+      "enum": ["pending", "reviewed", "approved", "rejected", "locked"]
+    },
+    "source_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Scene" }
+    },
+    "narration_gaps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/NarrationGap" }
+    },
+    "authoring_questions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "SourceEvidence": {
+      "type": "object",
+      "required": ["source_refs", "source_excerpt", "provenance"],
+      "properties": {
+        "source_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "source_excerpt": { "type": "string" },
+        "provenance": {
+          "enum": ["source_supported", "creative_suggestion"]
+        }
+      }
+    },
+    "Scene": {
+      "type": "object",
+      "required": [
+        "scene_id",
+        "scene_goal",
+        "conflict",
+        "emotional_turn",
+        "time_space",
+        "field_provenance",
+        "dialogue_turns",
+        "coverage_intent",
+        "narration_gaps",
+        "source_evidence",
+        "review_status"
+      ],
+      "properties": {
+        "scene_id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "scene_goal": { "type": "string", "minLength": 1 },
+        "conflict": { "type": "string", "minLength": 1 },
+        "emotional_turn": { "type": "string", "minLength": 1 },
+        "time_space": {
+          "type": "object",
+          "required": ["time", "location"],
+          "properties": {
+            "time": { "type": "string", "minLength": 1 },
+            "location": { "type": "string", "minLength": 1 }
+          }
+        },
+        "field_provenance": {
+          "type": "object",
+          "required": [
+            "scene_goal",
+            "conflict",
+            "emotional_turn",
+            "time_space"
+          ],
+          "properties": {
+            "scene_goal": {
+              "enum": ["source_supported", "creative_suggestion"]
+            },
+            "conflict": {
+              "enum": ["source_supported", "creative_suggestion"]
+            },
+            "emotional_turn": {
+              "enum": ["source_supported", "creative_suggestion"]
+            },
+            "time_space": {
+              "enum": ["source_supported", "creative_suggestion"]
+            }
+          }
+        },
+        "dialogue_turns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DialogueTurn" }
+        },
+        "coverage_intent": {
+          "type": "object",
+          "required": [
+            "shot_reverse_shot",
+            "over_shoulder",
+            "reaction",
+            "action_cover",
+            "environment_insert"
+          ],
+          "properties": {
+            "shot_reverse_shot": { "type": "boolean" },
+            "over_shoulder": { "type": "boolean" },
+            "reaction": { "type": "boolean" },
+            "action_cover": { "type": "boolean" },
+            "environment_insert": { "type": "boolean" }
+          }
+        },
+        "narration_gaps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NarrationGap" }
+        },
+        "source_evidence": { "$ref": "#/$defs/SourceEvidence" },
+        "review_status": {
+          "enum": ["pending", "reviewed", "approved", "rejected", "locked"]
+        }
+      }
+    },
+    "DialogueTurn": {
+      "type": "object",
+      "required": [
+        "line_id",
+        "speaker",
+        "addressee",
+        "dialogue_zh",
+        "subtitle_zh",
+        "dialogue_ja",
+        "translation_status",
+        "emotion",
+        "subtext",
+        "actions",
+        "screen_mode",
+        "lipsync_required",
+        "scene_state_id",
+        "gaze",
+        "props",
+        "state_delta",
+        "duration_sec",
+        "provenance",
+        "source_evidence",
+        "review_status"
+      ],
+      "properties": {
+        "line_id": { "type": "string", "minLength": 1 },
+        "speaker": { "type": "string", "minLength": 1 },
+        "addressee": { "type": "string", "minLength": 1 },
+        "dialogue_zh": { "type": "string" },
+        "subtitle_zh": { "type": "string" },
+        "dialogue_ja": { "type": "string" },
+        "translation_status": {
+          "enum": ["pending", "ready", "reviewed", "stale"]
+        },
+        "emotion": { "type": "string" },
+        "subtext": { "type": "string" },
+        "actions": {
+          "type": "object",
+          "required": ["before", "during", "after"],
+          "properties": {
+            "before": { "type": "string" },
+            "during": { "type": "string" },
+            "after": { "type": "string" }
+          }
+        },
+        "screen_mode": {"enum": ["on_camera", "off_camera", "reaction", "action_cover", "silence"]},
+        "lipsync_required": {"type": "boolean"},
+        "scene_state_id": {"type": "string"},
+        "gaze": { "type": "string" },
+        "props": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "state_delta": { "type": "string" },
+        "duration_sec": { "type": "number", "minimum": 0 },
+        "provenance": {
+          "enum": ["source_supported", "creative_suggestion"]
+        },
+        "source_evidence": { "$ref": "#/$defs/SourceEvidence" },
+        "review_status": {
+          "enum": ["pending", "reviewed", "approved", "rejected", "locked"]
+        }
+      }
+    },
+    "NarrationGap": {
+      "type": "object",
+      "required": [
+        "gap_id",
+        "text_zh",
+        "narration_reason",
+        "uncovered_information",
+        "duration_sec",
+        "source_evidence",
+        "duplicates_dialogue_or_visual",
+        "visual_information",
+        "review_status"
+      ],
+      "properties": {
+        "gap_id": { "type": "string", "minLength": 1 },
+        "text_zh": { "type": "string", "minLength": 1 },
+        "narration_reason": {
+          "enum": [
+            "time_jump",
+            "location_context",
+            "scene_establish",
+            "chapter_transition",
+            "offscreen_fact",
+            "inner_context",
+            "narrative_gap",
+            "ending_afterglow"
+          ]
+        },
+        "uncovered_information": { "type": "string", "minLength": 1 },
+        "duration_sec": { "type": "number", "exclusiveMinimum": 0 },
+        "source_evidence": { "$ref": "#/$defs/SourceEvidence" },
+        "duplicates_dialogue_or_visual": { "type": "boolean" },
+        "visual_information": { "type": "string" },
+        "review_status": {
+          "enum": ["pending", "reviewed", "approved", "rejected", "locked"]
+        }
+      }
+    }
+  }
+}

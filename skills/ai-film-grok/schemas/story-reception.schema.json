@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/story-reception.schema.json",
+  "title": "ai-film-grok StoryReception v1",
+  "type": "object",
+  "required": ["schema_version", "kind", "source", "fidelity", "treatment"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "story-reception"},
+    "dialogue_screenplay": {
+      "type": "object",
+      "description": "Reviewed dialogue screenplay required before a narrative story lock."
+    },
+    "source": {
+      "type": "object",
+      "required": ["raw_text", "sha256", "language", "source_ref"],
+      "properties": {
+        "raw_text": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "language": {"type": "string", "minLength": 1},
+        "source_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "fidelity": {"type": "object"},
+    "treatment": {
+      "type": "object",
+      "required": ["planning_text", "provenance"],
+      "properties": {
+        "planning_text": {"type": "string", "minLength": 1},
+        "provenance": {"type": "object"},
+        "mature_intimacy": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "adult_only": {"type": "boolean"},
+            "participants_confirmed_adult": {"type": "boolean"},
+            "consent": {"enum": ["explicit"]},
+            "visual_focus": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "kind": "h3-until-empty-canary",
+  "schema_version": 8,
+  "wave": "S5.3-ops-free-first",
+  "at": "2026-08-05T04:06:18.774002+00:00",
+  "film_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough",
+  "profile_env": "h3_primary",
+  "skip_variety_preflight": true,
+  "features": {
+    "free_first": true,
+    "cli_flag": "--free-first",
+    "policy": "queue idle + memory floors only → free once; never cancel foreign"
+  },
+  "dry_free_first": {
+    "stop_reason": "dry_run_pass_execute",
+    "free_prep": {
+      "schema_version": 1,
+      "kind": "ai-film-capacity-free-first",
+      "free_first": true,
+      "attempted": false,
+      "freed": false,
+      "would_free": false,
+      "skipped_reason": "queue_busy_never_cancel_foreign",
+      "outcome": "skipped_queue_busy",
+      "before": {
+        "ready": false,
+        "status": "blocked",
+        "blockers": [
+          {
+            "code": "RAM_BELOW_FLOOR",
+            "message": "free system memory is below the 12 GiB submission floor"
+          },
+          {
+            "code": "VRAM_BELOW_FLOOR",
+            "message": "free GPU memory is below the 24 GiB submission floor"
+          },
+          {
+            "code": "COMFY_QUEUE_BUSY",
+            "message": "another ComfyUI prompt is running or pending"
+          }
+        ],
+        "vram_free_bytes": 6506264031,
+        "error": null
+      },
+      "after": null,
+      "free_result": null
+    },
+    "jobs_ran_total": 0
+  },
+  "execute_free_first": {
+    "stop_reason": "capacity_not_ready",
+    "free_prep": {
+      "schema_version": 1,
+      "kind": "ai-film-capacity-free-first",
+      "free_first": true,
+      "attempted": false,
+      "freed": false,
+      "would_free": false,
+      "skipped_reason": "already_ready",
+      "outcome": "already_ready",
+      "before": {
+        "ready": true,
+        "status": "ready",
+        "blockers": [],
+        "vram_free_bytes": 32256032768,
+        "error": null
+      },
+      "after": null,
+      "free_result": null
+    },
+    "jobs_ran_total": 0,
+    "cycles": [
+      {
+        "cycle": 1,
+        "jobs_ran": 0,
+        "skipped_reason": "capacity_not_ready",
+        "ok": true,
+        "pending_after": 2,
+        "next_after": {
+          "shot_id": "s_cu",
+          "priority": "P1",
+          "lane": "primary_h3",
+          "mode": "r2v",
+          "command": "aifilm h3 run --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --shot-id s_cu --mode r2v --register",
+          "best_mean": 10.7035,
+          "reasons": [
+            "dialogue_close_restricted",
+            "h3_below_floor"
+          ]
+        }
+      }
+    ],
+    "plan_before": {
+      "pending_jobs": 2,
+      "eta_minutes_total": 22.0,
+      "p0_jobs": 0
+    },
+    "plan_after": {
+      "pending_jobs": 2,
+      "eta_minutes_total": 22.0,
+      "p0_jobs": 0
+    }
+  },
+  "takes_mp4_count": 16,
+  "verdict": "PARTIAL",
+  "note": "free_first wired + unit-tested. Live: dry saw COMFY_QUEUE_BUSY → skipped free (never cancel foreign). Execute race: free_prep already_ready then run-next capacity_not_ready (contention). No queue_empty drain; no fake overnight success.",
+  "human_next": "When 5090 idle: aifilm h3 cycle --root \"/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough\" --until-empty --execute --free-first"
+}

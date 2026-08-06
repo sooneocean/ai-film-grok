@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "kind": "local-weapon-technical-receipt",
+  "weapon_id": "hunyuan15-720p-i2v-sr-pilot",
+  "status": "technical_rejected_geometry",
+  "source_submission_sha256": "da5ac43c07385c48f4d3e43ff2eb732ebf877e55728184bb1a43e43bfaf65cef",
+  "prompt_id": "41e41240-4c22-4ef0-b701-135cc62946ad",
+  "external_api_nodes_allowed": false,
+  "input": {
+    "path": "../qwen-image-2512-quality-retest/armory-qwen-retest_00001_.png",
+    "sha256": "a5cf8046be059fa1acaaa35d5dc66201b10532e31e7c91388535468bcd2cc351",
+    "width": 928,
+    "height": 1664
+  },
+  "artifact": {
+    "path": "armory-hunyuan15_00001_.mp4",
+    "sha256": "cf36f42b1c25656abb77176f650f688003c3915f1bcd892ca7ef5a3211391d01",
+    "width": 1920,
+    "height": 1072,
+    "fps": 24.0,
+    "duration_sec": 5.0417,
+    "decoded_frames": 121,
+    "decode_ok": true,
+    "motion_ok": true,
+    "motion_score": 10.8801,
+    "motion_continuity": 1.0
+  },
+  "geometry_review": {
+    "status": "rejected",
+    "reason": "Portrait input was emitted as landscape video and the face was materially cropped out.",
+    "evidence_frame": "frame-mid.png"
+  },
+  "promotion": {
+    "eligible": false,
+    "reason": "The pilot cannot preserve portrait source geometry."
+  }
+}

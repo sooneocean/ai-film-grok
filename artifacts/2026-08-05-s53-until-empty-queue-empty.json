@@ -1,0 +1,35 @@
+{
+  "kind": "h3-until-empty-canary",
+  "schema_version": 10,
+  "wave": "S5.3-ops-capacity-wait-execute-PARTIAL",
+  "at": "2026-08-05T06:52:16.550348+00:00",
+  "corrected_at": "2026-08-05T07:00:00+00:00",
+  "correction": "Honest rewrite: live receipt is capacity_not_ready, not queue_empty (skeptic 2026-08-05).",
+  "film_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough",
+  "profile_env": "h3_primary",
+  "features": {
+    "free_first": true,
+    "capacity_wait_sec": 15,
+    "cli": "aifilm h3 cycle --until-empty --execute --free-first --capacity-wait-sec 15",
+    "policy": "never cancel foreign; capacity wait polls ready only"
+  },
+  "live_receipt": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/fill-idle-until-empty.json",
+  "execute": {
+    "stop_reason": "capacity_not_ready",
+    "ok": true,
+    "jobs_ran_total": 0,
+    "cycles_run": 1,
+    "pending_before": 2,
+    "pending_after": 2,
+    "free_prep_outcome": null,
+    "capacity_waits": [],
+    "receipt": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-angles-runthrough/receipts/fill-idle-until-empty.json"
+  },
+  "verdict": "PARTIAL",
+  "honest_limits": [
+    "Live fill-idle-until-empty.json: stop_reason=capacity_not_ready, jobs_ran=0, pending_after=2 (not queue_empty).",
+    "pending_jobs was still 2 — capacity blocked (VRAM/RAM/queue); no fake overnight drain success.",
+    "full overnight drain to queue_empty still needs idle 5090 + pending work + free Comfy queue",
+    "Filename retains historical queue-empty slug for path stability; content is capacity_not_ready PARTIAL only"
+  ]
+}
