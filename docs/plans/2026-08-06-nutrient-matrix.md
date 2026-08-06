@@ -48,10 +48,10 @@
 
 | ID | 缺口 | 下一步（Wave N1） |
 |----|------|-------------------|
-| H1 | plate≠master 人仍口头 DONE | closeout 字段强制；无 report 禁 final_complete 话术 |
-| H2 | multi-seed 纪律 | shortlist/pk 无 anti-hijack → demote/next_cmd |
+| H1 | plate≠master 人仍口头 DONE | ✅ 2.40.14 closeout + export-desktop 机读拦 |
+| H2 | multi-seed 纪律 | ✅ 2.40.14 shortlist promote fail-closed（SKIP 逃生） |
 | H3 | material fidelity request | restricted 缺 receipt soft→hard |
-| H4 | promote 硬冲 bare | SCALE_* 进 register fail-closed |
+| H4 | promote 硬冲 bare | ✅ 2.40.14 register promote_ban nested |
 | H5 | aac≠可懂中文 | deliver 抽听；ASR deferred |
 | H6 | 双片 drain 误杀 | 纪律 + 禁 pgrep 源码 |
 

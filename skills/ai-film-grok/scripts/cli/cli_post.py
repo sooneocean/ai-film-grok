@@ -1640,6 +1640,28 @@ def cmd_export_desktop(args: argparse.Namespace) -> int:
         raise FilmError(
             "Desktop export requires completed technical QA and explicit full-film final review"
         )
+    # N1.1 · OFFICIAL_FINAL_PLATE / plate honesty never ships as desktop master
+    try:
+        from closeout import plate_delivery_honesty
+        from final.delivery_class import plate_blocks_final_complete
+
+        plate_h = plate_delivery_honesty(root)
+        plate_adv = plate_blocks_final_complete(root, gates=manifest.get("gates") or {})
+        if plate_h.get("is_official_plate") or plate_adv.get("blocks_ship_complete"):
+            markers = ", ".join((plate_h.get("markers") or [])[:3]) or "plate receipt"
+            codes = ",".join(plate_adv.get("codes") or []) or "OFFICIAL_FINAL_PLATE"
+            raise FilmError(
+                f"Desktop export blocked: delivery is plate-only ({markers}; {codes}) — "
+                "OFFICIAL_FINAL_PLATE ≠ master. Run gate-auto green + human review-final; "
+                "do not treat plate as final_complete ship."
+            )
+    except FilmError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — fail closed if honesty probe crashes with final_complete
+        raise FilmError(
+            f"Desktop export blocked: plate/master honesty probe failed ({exc}); "
+            "refuse ship while delivery class is ambiguous"
+        ) from exc
     # Wave 6: re-check adult-max heat before shipping desktop (no silent cool export)
     try:
         from production_gates import ProductionGateError, assert_heat_allows_final

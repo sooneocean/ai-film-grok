@@ -20,7 +20,7 @@
 
 | # | 查什么 | 路径 / 命令 | 红线 |
 |---|--------|-------------|------|
-| 1 | 交付语义 | `receipts/official-final-report.json`（或 closeout 字段） | `OFFICIAL_FINAL_PLATE` / PARTIAL **≠** master-lock / `final_complete` |
+| 1 | 交付语义 | `receipts/official-final-report.json`（或 closeout 字段） | `OFFICIAL_FINAL_PLATE` / PARTIAL **≠** master-lock / `final_complete`；**export-desktop 机读拦 plate**（2.40.14） |
 | 2 | final 入口诚实 | 成片时长 + 有 aac/口白；禁 ~1s 假绿 | shim 必须调 `main()`（`test_suse_final_iron`） |
 | 3 | 超时/假死 | `receipts/final-timeout.json` 若存在 | 有则按 `next_cmd` 重跑；勿当成功 |
 | 4 | 口白窗 | TTS ≤ cue ≤ slot（stretch 前） | 溢出 → 砍 spoken / vo_rate，**禁**只拉长 cue 超槽 |
@@ -30,5 +30,16 @@
 | 8 | gate-auto | `aifilm gate-auto --root` / closeout | 红则 plate PARTIAL；**禁**刷假 master |
 | 9 | 混音 partial | `receipts/final-mix-partial.json` | sidechain 降级须标 PARTIAL |
 | 10 | 人审 | review-final / pilot / PK | 机读不代签 |
+| 11 | 时长诚实 | `receipts/duration-honesty-closeout.json` · closeout `duration_honesty` | planned/media/shot_n vs target；硬门仍 bulk-preflight |
+| 12 | 抽听中文 | 每场 ≥1 句人耳可懂 | aac 存在 ≠ 可懂；升 hard 仅用户要 `AIFILM_NATIVE_AUDIO_MANDARIN_HARD` |
+| 13 | 门红话术 | gate-auto 红 → **PARTIAL plate ship** | 禁称 master-lock / final_complete |
+| 14 | 改 final 清缓存 | 删陈旧 `quality-report.json` + 叙事重绑 | 见 closeout / post 纪律 |
 
-链：`stages/post.md` · memory `suse-ep01-official-final-iron` · plan `2026-08-06-next-optimization-todoplan` W1。
+### Agent 回报用户前（B1 肌肉 · 禁口头「final 好了」）
+
+1. 读 `receipts/official-final-report.json` → `status` / `master_lock` / path  
+2. 读 closeout `plate_honesty` + `duration_honesty`  
+3. 有 `final-timeout.json` → 按 `next_cmd`，勿当成功  
+4. 三字段写进对话再给用户看片路径  
+
+链：`stages/post.md` · memory `suse-ep01-official-final-iron` · plan `2026-08-06-ad-process-optimization-todoplan` · next-optimization W1。

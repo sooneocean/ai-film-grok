@@ -137,10 +137,19 @@ class UntilEmptyTests(unittest.TestCase):
                 )
             self.assertFalse(rep.get("ok"))
             self.assertEqual(rep.get("stop_reason"), "exclusive_gpu_required")
+            self.assertEqual(rep.get("halt_reason_code"), "RUN_EXCLUSIVE_GPU_REQUIRED")
+            self.assertEqual(rep.get("halt_reason_group"), "ownership")
+            self.assertEqual(rep.get("skipped_reason"), "exclusive_gpu_required")
+            self.assertIn("decision_tree", rep)
             self.assertEqual(int(rep.get("jobs_ran_total") or 0), 0)
             self.assertTrue((root / "receipts" / "fill-idle-until-empty.json").is_file())
             self.assertIn("takes_count_delta", rep)
             self.assertIn("pending_reason_breakdown", rep)
+            self.assertIn("open_ops", rep)
+            self.assertTrue(rep["open_ops"])
+            self.assertEqual(rep["open_ops"][0].get("reason"), "exclusive_gpu_required")
+            self.assertEqual(rep["open_ops"][0].get("halt_reason_code"), "RUN_EXCLUSIVE_GPU_REQUIRED")
+            self.assertEqual(rep["open_ops"][0].get("halt_reason_group"), "ownership")
 
     def test_until_empty_execute_queue_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -197,6 +206,45 @@ class UntilEmptyTests(unittest.TestCase):
             self.assertEqual(rep["stop_reason"], "capacity_not_ready")
             self.assertNotEqual(rep["stop_reason"], "run_failed")
             self.assertTrue((root / "receipts" / "fill-idle-until-empty.json").is_file())
+
+    def test_until_empty_records_cycle_open_ops(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+
+            def _fake_run_next(*_a, **_k):
+                return {
+                    "ok": True,
+                    "jobs_ran": 0,
+                    "skipped_reason": "capacity_not_ready",
+                    "pending_after": 2,
+                    "next_after": {"shot_id": "meat1"},
+                    "open_ops": [
+                        {
+                            "schema_version": 1,
+                            "kind": "ai-film-h3-run-next-open-op",
+                            "halt_reason_code": "RUN_NOT_EXECUTED_CAPACITY",
+                            "halt_reason_group": "capacity",
+                            "reason": "capacity_not_ready",
+                        }
+                    ],
+                }
+
+            with mock.patch("h3_fill_idle.run_next_fill_idle", side_effect=_fake_run_next):
+                rep = fill_idle_until_empty(
+                    root,
+                    execute=True,
+                    i_own_the_gpu=True,
+                    max_jobs_per_cycle=2,
+                    max_cycles=5,
+                    include_challenge=True,
+                    stop_on_capacity=True,
+                )
+            self.assertEqual(rep["stop_reason"], "capacity_not_ready")
+            self.assertTrue(rep.get("cycles"))
+            self.assertEqual(rep["cycles"][0].get("halt_reason_code"), "RUN_NOT_EXECUTED_CAPACITY")
+            self.assertIn("open_ops", rep["cycles"][0])
+            self.assertEqual(rep["cycles"][0]["open_ops"][0]["reason"], "capacity_not_ready")
 
     def test_queue_busy_submit_is_capacity_not_run_failed(self) -> None:
         """C1 race: probe ready then COMFY_QUEUE_BUSY → capacity_not_ready (retryable)."""

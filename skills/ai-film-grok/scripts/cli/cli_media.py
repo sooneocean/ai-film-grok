@@ -988,6 +988,53 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             )
         if not review_note:
             raise FilmError("Approved clips require --review-note with the visual review result")
+        # AD C3 · scale_fallback promote ban: no blind approve of hard-on collapse
+        if os.environ.get("AIFILM_SKIP_SCALE_PROMOTE_GATE", "").strip().lower() not in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            try:
+                from util import read_json as soft_read_json
+
+                sf_path = root / "receipts" / "scale-fallback.json"
+                sf = soft_read_json(sf_path) if sf_path.is_file() else None
+                # N1.2 · promote_ban on receipt root or nested decision
+                ban = False
+                ban_codes: list[Any] = []
+                if isinstance(sf, dict):
+                    ban = bool(sf.get("promote_ban"))
+                    ban_codes = list(sf.get("codes") or [])
+                    dec = sf.get("decision") if isinstance(sf.get("decision"), dict) else {}
+                    if dec.get("promote_ban"):
+                        ban = True
+                        ban_codes = list(dec.get("codes") or ban_codes)
+                if ban:
+                    note_l = review_note.lower()
+                    allow = any(
+                        tok in note_l
+                        for tok in (
+                            "soft-max",
+                            "soft_max",
+                            "model-limit",
+                            "scale_fallback",
+                            "scale-fallback",
+                            "fallback accepted",
+                        )
+                    )
+                    if not allow:
+                        raise FilmError(
+                            "scale_fallback promote_ban active "
+                            f"(codes={ban_codes}) — do not blind-approve collapsed bare; "
+                            "re-gen at recommended_tier / soft-max, or pass review-note containing "
+                            "'soft-max' / 'scale_fallback' after human accept. "
+                            "Escape: AIFILM_SKIP_SCALE_PROMOTE_GATE=1"
+                        )
+            except FilmError:
+                raise
+            except Exception:  # noqa: BLE001
+                pass
     manifest = load_manifest(root)
     style_job = None
     style = read_json(root / "style-bible.json") if (root / "style-bible.json").is_file() else {}

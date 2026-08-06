@@ -671,6 +671,57 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 art_report["checks"][str(film_root)] = {"ok": False, "error": str(exc)[:200]}
         report["art_check"] = art_report
 
+    # N1.4 · optional film-root plate≠master soft advisory (never hard-fails core doctor)
+    film_root_arg = getattr(args, "root", None) or getattr(args, "art_root", None)
+    if film_root_arg and str(film_root_arg).strip() not in {"", "."}:
+        try:
+            fr = Path(str(film_root_arg)).expanduser().resolve()
+        except Exception:  # noqa: BLE001
+            fr = None
+        if fr is not None and (
+            (fr / "receipts" / "official-final-report.json").is_file()
+            or (fr / "manifest.json").is_file()
+        ):
+            plate_adv: dict[str, Any] = {"advisory": True, "ok": True}
+            try:
+                from closeout import plate_delivery_honesty
+                from final.delivery_class import plate_blocks_final_complete
+                from util import read_json as _rj
+
+                man = _rj(fr / "manifest.json") if (fr / "manifest.json").is_file() else {}
+                gates = (man or {}).get("gates") if isinstance(man, dict) else {}
+                honesty = plate_delivery_honesty(fr)
+                blocks = plate_blocks_final_complete(fr, gates=gates if isinstance(gates, dict) else {})
+                plate_adv = {
+                    "advisory": True,
+                    "ok": not bool(blocks.get("blocks_ship_complete")),
+                    "is_official_plate": bool(honesty.get("is_official_plate")),
+                    "markers": list(honesty.get("markers") or [])[:5],
+                    "codes": list(blocks.get("codes") or []),
+                    "blocks_ship_complete": bool(blocks.get("blocks_ship_complete")),
+                    "note": blocks.get("note") or honesty.get("note"),
+                    "next": list(blocks.get("next") or []),
+                    "root": str(fr),
+                }
+                if honesty.get("is_official_plate") or blocks.get("blocks_ship_complete"):
+                    msg = (
+                        f"film root plate honesty: {plate_adv.get('note')} "
+                        f"(markers={plate_adv.get('markers')})"
+                    )
+                    environment_warnings.append(msg)
+                    plate_adv["warning"] = msg
+            except Exception as exc:  # noqa: BLE001 — soft only
+                plate_adv = {
+                    "advisory": True,
+                    "ok": True,
+                    "skipped": True,
+                    "error": str(exc)[:160],
+                }
+            report["plate_vs_master"] = plate_adv
+            # refresh security warnings list after append
+            if "security_posture" in report and isinstance(report["security_posture"], dict):
+                report["security_posture"]["warnings"] = environment_warnings
+
     emit(report)
     return 0 if (report["strict_ok"] if getattr(args, "strict", False) else report["ok"]) else 1
 
@@ -690,6 +741,11 @@ def add_status_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser])
         "--art-root",
         default=".",
         help="Film root for --art-check (default: current dir)",
+    )
+    doctor.add_argument(
+        "--root",
+        default=None,
+        help="Optional film root: soft plate≠master advisory (OFFICIAL_FINAL_PLATE vs final_complete)",
     )
 
     st = sub.add_parser("status", help="Gate status")

@@ -211,10 +211,10 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 | **N0.3** | nutrient-matrix 落库 | ✅ |
 | **N0.4** | 单一执行板互指 + Wave 表刷新 | ✅ |
 | **N0.5** | Agents 影音 Combo 再砍 | skip（已 ~103 行指针体） |
-| **N1.1** | closeout：plate 语义禁假 final_complete | pending |
-| **N1.2** | promote/register：SCALE_* fail-closed | pending |
-| **N1.3** | multi-seed 无 anti-hijack → demote/next_cmd | pending |
-| **N1.4** | doctor plate≠master soft advisory | pending |
+| **N1.1** | closeout + **export-desktop** 禁 plate 当 master | ✅ 2.40.14 |
+| **N1.2** | promote/register：SCALE_* fail-closed（含 nested decision） | ✅ 2.40.14 |
+| **N1.3** | multi-seed 无 anti-hijack → promote fail-closed + next_cmd | ✅ 2.40.14 |
+| **N1.4** | doctor `--root` plate≠master soft advisory | ✅ 2.40.14 |
 | **N2** | C1 until-empty OPEN_OPS 真烧 | 等人+GPU |
 | **N3** | 挡路 peel only（=W3 residual） | 触达 |
 

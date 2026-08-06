@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.40.14] - 2026-08-06
+
+### Product (Wave N1 · nutrient L4 defaults)
+- **N1.1 export plate block:** `export-desktop` refuses `OFFICIAL_FINAL_PLATE` / plate honesty conflict even when `gates.final_complete` is wrongly true.
+- **N1.2 scale promote:** `register-clip` honors nested `decision.promote_ban` on `scale-fallback` receipt.
+- **N1.3 shortlist promote fail-closed:** multi-seed `--promote` blocked when anti-hijack unavailable (unless intentional `AIFILM_SKIP_ANTI_HIJACK=1`); codes `SHORTLIST_PROMOTE_BLOCKED_*` + `next_cmd`.
+- **N1.4 doctor:** optional `--root` soft `plate_vs_master` advisory (never hard-fails core doctor).
+- Tests: `tests/test_nutrient_n1.py`.
+
+### Structure (monolith relief round 3 · coitus + final/io)
+- **M4 coitus pack:** `narrative/heat_coitus.py` — SEX_POSES, coitus grammar, sex-arc resolve/lint, pose variety; re-exported by `edit_policy_heat`. Wardrobe lazy import points at coitus leaf (no cycle at load).
+- **M2.2c:** `read_json` → `final/io.py` (re-export hard-compat on `render_final`).
+- IRON defaults not retuned. Verify: peel suite heat/final/write-spec/director/compose hotpath.
+
+## [2.40.13] - 2026-08-06
+
+### Structure (monolith relief round 2 · M2.2 + M4 wardrobe)
+- **M2.2:** `build_final_film_manifest_entry` → `final/manifest.py` (``resolve_font`` stays on `render_final` for FONT_CANDIDATES monkeypatch hard-compat).
+- **M4 wardrobe pack:** `narrative/heat_wardrobe.py` — wardrobe states, undress markers, continuity, `lint_sex_wardrobe` / `lint_both_undress`; re-exported by `edit_policy_heat`.
+- Root shim `heat_wardrobe.py`. IRON defaults not retuned.
+- Verify: peel suite heat/final/write-spec/director/compose hotpath (adult spine sex-floor float boundary still pre-existing).
+
 ## [2.40.12] - 2026-08-06
 
 ### Structure (monolith relief M1–M4 parallel)

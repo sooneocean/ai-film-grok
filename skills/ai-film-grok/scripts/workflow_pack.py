@@ -608,7 +608,7 @@ def bulk_preflight(
             elif cid == "duration_target":
                 c["weapon_hint"] = (
                     "add shots / FLF longer / lower target_duration "
-                    f"(H3 ~5.2s · see receipts/duration-target.json)"
+                    "(H3 ~5.2s · see receipts/duration-target.json)"
                 )
             elif cid == "pilot":
                 c["weapon_hint"] = f"no bulk until pilot GO · motion primary {motion}"
@@ -1266,25 +1266,94 @@ def select_shortlist(
                 }
             )
 
-    if promote and promoted:
+    # AD C2 / N1.3 · multi-seed: anti-hijack before mean; fail-closed promote when gate missing
+    multi_take_rows = [r for r in rows if int(r.get("take_count") or 0) >= 2]
+    ah_skip_intentional = False
+    try:
+        import composition_anti_hijack as _ah_env
+
+        ah_skip_intentional = bool(_ah_env._env_skip())
+    except Exception:  # noqa: BLE001
+        ah_skip_intentional = False
+    mean_only_risk = bool(multi_take_rows) and not anti_hijack_on
+    hijack_preferred = [
+        r
+        for r in rows
+        if (r.get("preferred") or {}).get("composition_hijack")
+        and not any(
+            not c.get("composition_hijack")
+            for c in (r.get("candidates") or [])
+            if isinstance(c, dict)
+        )
+    ]
+    codes: list[str] = []
+    if mean_only_risk:
+        codes.append("SHORTLIST_MEAN_ONLY_NO_ANTI_HIJACK")
+    if hijack_preferred:
+        codes.append("SHORTLIST_HIJACK_PREFERRED_NO_CLEAN_ALT")
+    # N1.3 · --promote must not write mean-only multi-seed (escape = intentional SKIP env)
+    promote_blocked = False
+    if promote and hijack_preferred:
+        promote_blocked = True
+        codes.append("SHORTLIST_PROMOTE_BLOCKED_HIJACK")
+    if promote and mean_only_risk and not ah_skip_intentional:
+        promote_blocked = True
+        codes.append("SHORTLIST_PROMOTE_BLOCKED_MEAN_ONLY")
+
+    did_promote = False
+    if promote and promoted and not promote_blocked:
         man["clips"] = clips
         write_json(root / "manifest.json", man)
+        did_promote = True
+    elif promote and promote_blocked:
+        promoted = []
 
+    shortlist_ok = not promote_blocked
+    next_cmd: str | None
+    if promote_blocked:
+        next_cmd = (
+            f'unset AIFILM_SKIP_ANTI_HIJACK; aifilm anti-hijack --root "{root}"; '
+            f'aifilm select-shortlist --root "{root}" --promote'
+        )
+    elif rows:
+        next_cmd = f'aifilm i2v-motion-gate --root "{root}" --write'
+    else:
+        next_cmd = None
     out = {
-        "schema_version": 1,
+        "schema_version": 2,
         "kind": "select-shortlist",
         "at": utc_now(),
         "root": str(root),
-        "ok": True,
+        "ok": shortlist_ok,
         "shots": rows,
         "promoted": promoted,
         "promote": promote,
+        "promote_blocked": promote_blocked,
+        "did_promote": did_promote,
+        "anti_hijack_enabled": anti_hijack_on,
+        "anti_hijack_skip_intentional": ah_skip_intentional,
+        "multi_take_count": len(multi_take_rows),
+        "mean_only_forbidden": True,
+        "codes": codes,
+        "composition_discipline": {
+            "rule": "multi-seed shortlist ranks composition anti-hijack before mean/volume",
+            "escape": "AIFILM_SKIP_ANTI_HIJACK=1 (explicit; still logs SHORTLIST_MEAN_ONLY_*)",
+            "mean_only_ok": False,
+            "promote_requires_anti_hijack": True,
+        },
         "note": (
-            "preferred promoted into manifest.clips (takes retained)"
-            if promote
-            else "preferred is advisory; pass --promote to write manifest.clips"
+            "PROMOTE BLOCKED: multi-seed without anti-hijack or hijack-only takes — "
+            "fix composition gate then re-run --promote"
+            if promote_blocked
+            else (
+                "preferred promoted into manifest.clips (takes retained); "
+                "composition demotes sand/torso hijack before mean"
+                if did_promote
+                else "preferred is advisory; pass --promote to write manifest.clips; "
+                "do not pick by mean alone when take_count≥2"
+            )
         ),
-        "next_cmd": (f'aifilm i2v-motion-gate --root "{root}" --write' if rows else None),
+        "next_cmd": next_cmd,
     }
     if write:
         write_json(root / "receipts" / SELECT_SHORTLIST_NAME, out)
