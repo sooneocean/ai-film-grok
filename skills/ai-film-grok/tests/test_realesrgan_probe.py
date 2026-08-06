@@ -12,7 +12,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from realesrgan_probe import probe_realesrgan  # noqa: E402
+from media.realesrgan_probe import probe_realesrgan  # noqa: E402
 
 
 class RealEsrganProbeTests(unittest.TestCase):
@@ -49,7 +49,7 @@ class RealEsrganProbeTests(unittest.TestCase):
 
     def test_comfy_hint_when_loader_present(self) -> None:
         with mock.patch(
-            "realesrgan_probe._probe_comfy",
+            "media.realesrgan_probe._probe_comfy",
             return_value={
                 "skipped": False,
                 "ok": True,

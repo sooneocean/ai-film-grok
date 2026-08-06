@@ -1575,7 +1575,7 @@
         "motion_gate_red_still_blocks_promote",
         "no_upscale_after_hardburn_captions"
       ],
-      "probe_command": "./scripts/runtime-python scripts/realesrgan_probe.py",
+      "probe_command": "./scripts/runtime-python scripts/media/realesrgan_probe.py",
       "promotion_requirements": [
         "weight_fingerprints",
         "ab_vs_ffmpeg_geometry_canary",

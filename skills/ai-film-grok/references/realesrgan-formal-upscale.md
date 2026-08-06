@@ -65,9 +65,9 @@ aifilm upscale canary --source <lowres.mp4> --out-dir artifacts/realesrgan-canar
 
 ```bash
 cd skills/ai-film-grok
-./scripts/runtime-python scripts/realesrgan_probe.py
+./scripts/runtime-python scripts/media/realesrgan_probe.py
 # 可选 Comfy 节点面：
-./scripts/runtime-python scripts/realesrgan_probe.py --base-url http://127.0.0.1:18188
+./scripts/runtime-python scripts/media/realesrgan_probe.py --base-url http://127.0.0.1:18188
 ```
 
 - 永不自动下载权重、永不 submit prompt、永不 promote。
