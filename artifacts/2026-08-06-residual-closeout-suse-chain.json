@@ -1,0 +1,38 @@
+{
+  "kind": "residual-closeout-film-chain",
+  "at": "2026-08-06T08:08:55.967478+00:00",
+  "film_root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+  "pk_compare": {
+    "ok": true,
+    "multi_take_approx": 26,
+    "dailies": "receipts/pk-dailies.md"
+  },
+  "shortlist": {
+    "ok": true,
+    "anti_hijack_enabled": true,
+    "did_promote": false,
+    "promoted_n": 0,
+    "multi_take_count": 26,
+    "codes": []
+  },
+  "ship_prep": {
+    "ok": false,
+    "blocked_by": "i2v_motion_gate",
+    "next_cmd": "aifilm i2v-motion-gate --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --write",
+    "human_pk_required": true,
+    "fail_steps": [
+      "i2v_motion_gate",
+      "film_core",
+      "five_track",
+      "input_fidelity",
+      "gate_auto",
+      "cinematic_gate"
+    ]
+  },
+  "human_next": [
+    "read receipts/ship-prep-human.md + pk-dailies.md",
+    "fix i2v_motion_gate / five_track / fidelity",
+    "gate-auto + ship-prep until green",
+    "human review-final (no auto final_complete)"
+  ]
+}
