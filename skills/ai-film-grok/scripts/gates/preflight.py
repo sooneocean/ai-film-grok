@@ -21,8 +21,9 @@ from production_gates import (
     load_pilot_approval,
     loop_risk_shots_from_spec,
     pilot_is_user_approved,
-    transition_policy_report,
+    style_bible_consistency_report,
     transition_export_readback_report,
+    transition_policy_report,
 )
 from util import read_json, utc_now
 
@@ -986,6 +987,43 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "transition_readback_probe_error",
                     f"transition export read-back probe failed: {exc}"[:200],
                     fix="check production_gates.transition_export_readback_report",
+                )
+            )
+
+        # --- Visual style-bible consistency (P2 · visual_bible 自动生成) ---
+        # The style-bible is the canonical visual source of truth. When the spec
+        # declares visual content, verify the on-disk style-bible.json is consistent
+        # (hero cast master present; lighting timeline matches shot count). Missing /
+        # inconsistent → recommend derive_style_bible_from_spec. Soft by default;
+        # hard on style_bible_strict or adult max heat.
+        try:
+            sb = style_bible_consistency_report(spec, root=root)
+            sb_codes = list(sb.get("codes") or [])
+            if sb_codes:
+                sb_strict = spec.get("style_bible_strict") is True or str(
+                    spec.get("heat_scale") or ""
+                ).lower() in {"max", "hot", "extreme"}
+                sb_issue = _issue(
+                    "hard" if sb_strict else "soft",
+                    "style_bible_consistency",
+                    f"style-bible consistency {'hard' if sb_strict else 'soft'}: {sb_codes} — "
+                    f"{((sb.get('issues') or [{}])[0].get('message', '') or '')[:120]}",
+                    fix=(
+                        "run derive_style_bible_from_spec to auto-generate/refresh "
+                        "style-bible.json (hero cast master + lighting timeline)."
+                    ),
+                )
+                if sb_strict:
+                    hard.append(sb_issue)
+                else:
+                    soft.append(sb_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "style_bible_consistency_probe_error",
+                    f"style-bible consistency probe failed: {exc}"[:200],
+                    fix="check production_gates.style_bible_consistency_report",
                 )
             )
 

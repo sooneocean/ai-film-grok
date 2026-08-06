@@ -31,7 +31,8 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 | lipsync 自动晋级 | ⛔ v2.40.0 已冻结，跳过 | — |
 | HF 转场受控策略（spec 级校验） | ✅ **本会话** | v2.40.11 `transition_policy_report` + `assert_transition_policy` + preflight 接入（`test_transition_policy.py` 16 用例） |
 | **HF 转场 export read-back 全量** | ✅ **本会话** | v2.40.12 `transition_export_readback_report` + `assert_transition_export_readback` + preflight 接入（`test_transition_export_readback.py` 19 用例）；校验 built transition_ops 全量覆盖 + 意图/风格/策略一致（continue→hard_cut/0.0s/no-overlay；soft→xfade+声明风格；chapter→soft fade/dissolve；scene cut→禁 whip/grid） |
-| visual_bible / 介质路由 / H3 Fill-Idle / sung | ⬜ P2 | 未做（sung 受 HeartMuLa 外部依赖阻塞） |
+| **visual_bible 自动生成（第一增量）** | ✅ **本会话** | v2.40.13 `derive_style_bible_from_spec` + `assert_style_bible_consistency` + preflight 接入（`test_style_bible_consistency.py` 12 用例）；spec 驱动派生 lighting_timeline（heat_phase）+ cast_masters，consistency 门校验缺失/hero 缺失/光照数不一致 —— 视觉语法自洽第一增量，像素 palette 抽取待补 | 
+| 介质路由 / H3 Fill-Idle / sung | ⬜ P2 | 未做（sung 受 HeartMuLa 外部依赖阻塞；介质路由/H3 Fill-Idle 待更多调研） |
 
 > 剩余真正开放的高 ROI P1/P2：首帧毒化·静帧压缩晋升 style_lock 默认硬锁、5090 统一调度器、HF 转场全量、visual_bible 自动、介质自动路由、H3 Fill-Idle 自动派单、sung 自动生成、长片 SOP 固化。
 
@@ -92,7 +93,7 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 | **P0** | 每镜脸身份自动门          | `register-clip` 强制 face post_audit 不通过即 reject | `scripts/assets/face_identity.py` + post audit      | 一致性最大痛点根治 |
 | P1     | lesson→默认硬锁       | 发色/静帧压缩/首帧毒化晋升 `style_lock` 默认硬 NEG/校验         | `scripts/assets/style_lock.py` + `hard-defaults.md` | 减少人工守门    |
 | P1     | 介质自动路由            | 按 cast_state 稳定性评分选 I2V 路线（写实/漫剧）              | `scripts/media/*` 路由层                               | 降低出图漂移    |
-| P2     | visual_bible 自动生成 | 从状态照抽取 palette/光照签名生成 style-bible              | `scripts/assets/visual_bible.py`                    | 全片视觉语法自洽  |
+| P2     | visual_bible 自动生成（第一增量） | spec 驱动派生 lighting_timeline（heat_phase）+ cast_masters，style-bible consistency 门（缺失/hero 缺失/光照数不一致） | `scripts/assets/visual_bible.py` + `gates/production_gates.py` | 全片视觉语法自洽（像素 palette 抽取待补） |
 
 > **Top-1 ROI**：每镜脸身份自动门。
 

@@ -199,3 +199,40 @@ def derive_lighting_timeline(shots: list[dict[str, Any]]) -> list[dict[str, Any]
             }
         )
     return timeline
+
+
+def derive_style_bible_from_spec(
+    spec: dict[str, Any], root: Path | str
+) -> dict[str, Any]:
+    """Auto-generate / refresh ``style-bible.json`` from the film spec (P2 visual_bible 自动生成).
+
+    Spec-driven (no pixel extraction): derives the lighting timeline from each shot's
+    ``heat_phase``, carries over declared ``cast_masters`` (including a hero entry
+    inferred from ``shot_role == hero`` shots), and persists via ``save_bible``.
+    Palette / theme come from declared style data and the heat_phase lighting presets.
+    """
+    root = Path(root)
+    bible = load_bible(root)
+    shots: list[dict[str, Any]] = []
+    if isinstance(spec.get("shots"), list):
+        shots.extend(spec["shots"])
+    for sc in spec.get("scenes") or []:
+        if isinstance(sc, dict):
+            shots.extend(sc.get("shots") or [])
+    shots = [s for s in shots if isinstance(s, dict)]
+    if shots:
+        bible["lighting_timeline"] = derive_lighting_timeline(shots)
+    cast_masters = (
+        spec.get("cast_masters") if isinstance(spec.get("cast_masters"), dict) else {}
+    )
+    if cast_masters:
+        bible.setdefault("cast_masters", {})
+        for key, value in cast_masters.items():
+            bible["cast_masters"][key] = value
+    hero_shots = [
+        s for s in shots if str(s.get("shot_role") or "").strip().lower() == "hero"
+    ]
+    if hero_shots and "hero" not in (bible.get("cast_masters") or {}):
+        bible.setdefault("cast_masters", {})["hero"] = ""
+    save_bible(root, bible)
+    return bible

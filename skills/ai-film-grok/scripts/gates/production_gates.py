@@ -1828,6 +1828,148 @@ def assert_transition_export_readback(
     )
 
 
+def style_bible_consistency_report(
+    spec: dict[str, Any], root: Path | None = None
+) -> dict[str, Any]:
+    """Validate visual style-bible consistency with the spec (P2 visual_bible 自动生成).
+
+    The style-bible is the canonical visual source of truth (palette / lighting /
+    cast masters). When the spec declares visual content (shots / cast), this reads
+    back the on-disk ``style-bible.json`` and verifies it is consistent:
+
+      - ``STYLE_BIBLE_MISSING``      spec has visual content but no style-bible.json
+                                     (run ``derive_style_bible_from_spec`` to auto-gen)
+      - ``STYLE_BIBLE_HERO_CAST_MISSING``  spec has hero shots but bible lacks
+                                     ``cast_masters.hero``
+      - ``STYLE_BIBLE_LIGHTING_MISMATCH``  bible lighting_timeline count != shot count
+
+    Returns {"ok", "checked", "codes", "issues"}. Does not raise.
+    """
+    if not isinstance(spec, dict):
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+    from assets.visual_bible import derive_lighting_timeline, load_bible  # lazy
+
+    shots = _flatten_shots(spec)
+    has_visual = bool(shots) or bool(spec.get("cast_masters"))
+    if not has_visual:
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    if root is None:
+        # Can't read the on-disk bible without a root; spec-only readiness only.
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    issues: list[dict[str, Any]] = []
+    bible_path = Path(root) / "style-bible.json"
+    if not bible_path.is_file():
+        issues.append(
+            {
+                "code": "STYLE_BIBLE_MISSING",
+                "message": (
+                    "spec declares visual content but no style-bible.json — "
+                    "run derive_style_bible_from_spec to auto-generate it"
+                ),
+            }
+        )
+        return {
+            "ok": False,
+            "checked": True,
+            "codes": ["STYLE_BIBLE_MISSING"],
+            "issues": issues,
+        }
+
+    bible = load_bible(Path(root))
+    hero_shots = [
+        s for s in shots if str(s.get("shot_role") or "").strip().lower() == "hero"
+    ]
+    cm = bible.get("cast_masters") if isinstance(bible.get("cast_masters"), dict) else {}
+    if hero_shots and "hero" not in cm:
+        issues.append(
+            {
+                "code": "STYLE_BIBLE_HERO_CAST_MISSING",
+                "message": (
+                    "spec has hero shots but style-bible.cast_masters.hero is missing — "
+                    "auto-derive or register the hero cast master"
+                ),
+            }
+        )
+    if shots:
+        tl = bible.get("lighting_timeline")
+        derived = derive_lighting_timeline(shots)
+        if not isinstance(tl, list) or len(tl) != len(shots):
+            issues.append(
+                {
+                    "code": "STYLE_BIBLE_LIGHTING_MISMATCH",
+                    "message": (
+                        f"style-bible lighting_timeline count "
+                        f"({len(tl) if isinstance(tl, list) else 0}) != shot count "
+                        f"({len(shots)}) — auto-derive to refresh"
+                    ),
+                }
+            )
+            _ = derived  # keep lazy import referenced for clarity
+
+    return {
+        "ok": len(issues) == 0,
+        "checked": True,
+        "codes": sorted({i["code"] for i in issues}),
+        "issues": issues,
+    }
+
+
+def assert_style_bible_consistency(
+    root: Path | None = None,
+    *,
+    spec: dict[str, Any] | None = None,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """P2 visual_bible consistency hard gate (visual_bible 自动生成).
+
+    HARD under ``style_bible_strict`` or adult ``heat_scale`` max/hot/extreme; otherwise
+    a soft advisory (incremental rollout). Emergency escapes: ``force=True`` or
+    ``AIFILM_SKIP_STYLE_BIBLE_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_STYLE_BIBLE_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    data = spec
+    if data is None and root is not None:
+        path = Path(root).expanduser().resolve() / "film-spec.json"
+        data = read_json(path) or {}
+    if not isinstance(data, dict) or not data:
+        return {"ok": True, "checked": False, "reason": "no_spec"}
+
+    report = style_bible_consistency_report(data, root=root)
+    if not report["codes"]:
+        return {
+            "ok": True,
+            "checked": report.get("checked", False),
+            "codes": [],
+        }
+    strict = bool(data.get("style_bible_strict") is True) or str(
+        data.get("heat_scale") or ""
+    ).lower() in {"max", "hot", "extreme"}
+    if not strict:
+        return {
+            "ok": True,
+            "checked": True,
+            "soft": True,
+            "codes": report["codes"],
+            "issues": report["issues"],
+        }
+    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
+    raise ProductionGateError(
+        f"style-bible consistency gate (strict): {message} "
+        "Fix: run derive_style_bible_from_spec to auto-generate / refresh style-bible.json. "
+        "Emergency: --skip-style-bible or AIFILM_SKIP_STYLE_BIBLE_GATE=1"
+    )
+
+
 # --- Face-identity post_audit gate (P0 · face-identity-pixel) ---
 # A post_audit that ran and found keyframe pixel drift means an approved clip would
 # carry a face-identity break; register-clip / final must reject until re-audited.

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.13] - 2026-08-06
+
+### Added (quality P2 · visual_bible 自动生成 / style-bible consistency)
+- **Style-bible auto-derivation** (`assets/visual_bible.py::derive_style_bible_from_spec`): auto-generates/refreshes `style-bible.json` from the film spec — derives the lighting timeline from each shot's `heat_phase` (reusing `derive_lighting_timeline`), carries over declared `cast_masters` (including a `hero` entry inferred from `shot_role == hero` shots), persists via `save_bible`. Spec-driven (no pixel extraction) — the first increment of the "visual_bible 自动生成" P2 item.
+- **Style-bible consistency gate** (`gates/production_gates.py::assert_style_bible_consistency` + `style_bible_consistency_report`): the style-bible is the canonical visual source of truth; when the spec declares visual content, reads back the on-disk `style-bible.json` and verifies it is consistent — `STYLE_BIBLE_MISSING` (no bible → run derive), `STYLE_BIBLE_HERO_CAST_MISSING` (spec has hero shots but bible lacks `cast_masters.hero`), `STYLE_BIBLE_LIGHTING_MISMATCH` (lighting_timeline count != shot count). Soft advisory by default; hard under `style_bible_strict` or adult `heat_scale` max/hot/extreme.
+- Emergency escape: `AIFILM_SKIP_STYLE_BIBLE_GATE=1`.
+- Wired into `preflight` as soft advisory.
+- Tests: `tests/test_style_bible_consistency.py` (12 cases — no-content / root-none / missing / hero-missing / lighting-mismatch / consistent / auto-derive-then-consistent / soft-by-default / strict-raise / adult-max-raise / env-escape / force-skip).
+
 ## [2.40.12] - 2026-08-06
 
 ### Added (quality P2 · transition export read-back 全量)
