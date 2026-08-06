@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "effect-board-film-canary",
-  "at": "2026-08-06T03:21:20.353996+00:00",
+  "at": "2026-08-06T03:27:37.618670+00:00",
   "push_blocked": "github account suspended 403",
   "gpu_drain": {
     "alive": true,
@@ -108,5 +108,15 @@
       },
       "clips_measured": 21
     }
+  ],
+  "suse": {
+    "variety_ok": true,
+    "target": 140,
+    "h3_slot_cap": 5.9,
+    "note": "heat-boost 9.9 clamped; media ~134s"
+  },
+  "blocked": [
+    "github_push_403",
+    "gpu_velvet_drain"
   ]
 }
