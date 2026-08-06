@@ -245,6 +245,7 @@ A1 槽位认源（最高杠杆）
 | `2026-08-05-optimization-todoplan` | W0–5 SHIPPED；next=本档 A/C |
 | `2026-08-05-antifragility-…` | AF 核心 SHIPPED；D 波为尾巴 |
 | `2026-08-05-residual-monolith-w4` | E 波结构 owner |
+| `2026-08-06-codebase-quality-todoplan.md` | **工程质量 / 团队能力**单一执行板（互补于本档产品面；规则机读化 / 去重 / 巨石 peel / 测试纪律 / 团队 uplift） |
 | memory 08-06 ×2 | A/B 需求圣旨源 |
 
 ---
