@@ -17,9 +17,11 @@ aifilm h3 capacity-plan --root "<film>"
 aifilm h3 cycle --root "<film>" --until-empty --execute --free-first --capacity-wait-sec 120
 ```
 
-## 2026-08-06 续 · drain 已挂起（2.39.80）
+## 2026-08-06 续 · execute PARTIAL（2.39.80）
 
-- 已启动：`--until-empty --execute --free-first --capacity-wait-sec 7200`
-- PID 见 `artifacts/2026-08-06-c1-drain.pid`；log `artifacts/2026-08-06-c1-drain.stdout.log`
-- live：`fill-idle-run-next.json` 报 `execute=true` + `skipped_reason=capacity_not_ready`（VRAM/RAM/queue）
-- **queue_empty 需等 foreign 队列跑完 + 内存地板**；进程在 capacity-wait 轮询，不杀 foreign
+- 已跑：`--until-empty --execute --free-first --capacity-wait-sec 7200`
+- **capacity 最终 ready=true**（路径打通）
+- 第 1 job `shot09` **run_failed**：`variety preflight L4_INSERT_LOW`（产品门禁，非 hang）
+- `jobs_ran=0` · pending 仍 10 · **非 queue_empty**
+- 回执：`artifacts/2026-08-06-c1-drain-closeout.json` · `artifacts/2026-08-06-c1-execute-run-next.json`
+- 进程已停（避免同错误空转）；换绿 variety 片根或 `write-spec` 修 L4 后再 drain
