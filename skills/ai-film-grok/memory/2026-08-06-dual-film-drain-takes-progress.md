@@ -22,6 +22,7 @@
 - 证据：`plugins/ai-film-grok/artifacts/2026-08-06-session-result.json` · `…-suse-bulk-now.json`
 
 ## 链
+- **P0 升级 · 多 agent 禁抢闲占满**：[2026-08-06-multi-agent-gpu-no-hog](2026-08-06-multi-agent-gpu-no-hog.md)（不准再犯）
 - capacity-wait IRON：[2026-08-06-c1-capacity-wait-iron](2026-08-06-c1-capacity-wait-iron.md)
 - free-first 先例：[2026-08-05-s53-free-first-ops](2026-08-05-s53-free-first-ops.md)
 - 代码：`media/h3_fill_idle.py`（free_first / capacity_wait / never cancel foreign）
