@@ -9,7 +9,7 @@
 ## bgm-library
 - `catalog.json`：46 资产（revision 152，round6 闭环 60 fill 缺口前为 92）。`technical.fingerprint` 为 101 维声纹。
 - `similarity_cluster`：全部 46 资产已填（曾 3 个 pending 为 null，已修）。聚类规则 = 同 mood 内对 fingerprint 做余弦相似度、阈值 0.95 贪心归组。新增资产后需重跑聚类。
-- `gap-queue.jsonl`：缺口生命周期 `status` ∈ {open, routed_generate, filled, rejected}；`action` ∈ {fill, generate}；`routed_backend` / `generation_job_id` 在 routed_generate 时填。当前 60 filled(fill) + 10 routed_generate(acep-step)。**关键发现（round6 审计）：原 60 个 open fill 缺口全部 `suggested_asset_id` 指向 approved 资产——此前无任何自动化闭环（只能人手 `fill_gap.py`），已于 round6 经 `fill_open_gaps.py --apply` 一次闭环（rev 92→152，仅 2 个资产被 60 次复用）；10 个 generate 缺口原缺 `duration`，已 `reconcile --fix` 按 to-generate.jsonl 回填 30s。**
+- `gap-queue.jsonl`：缺口生命周期 `status` ∈ {open, routed_generate, filled, rejected}；`action` ∈ {fill, generate}；`routed_backend` / `generation_job_id` 在 routed_generate 时填。当前 **100 缺口 = 60 filled(fill) + 10 routed_generate(acep-step) + 30 open(generate·coverage_gap，其中 6 个 no-capable-backend 死路)**（round7 `coverage --emit-generate --apply` 前瞻排产 30 入队）。**关键发现（round6 审计）：原 60 个 open fill 缺口全部 `suggested_asset_id` 指向 approved 资产——此前无任何自动化闭环（只能人手 `fill_gap.py`），已于 round6 经 `fill_open_gaps.py --apply` 一次闭环（rev 92→152，仅 2 个资产被 60 次复用）；全部 generate 缺口原缺 `duration`，已 `reconcile --fix` 按 to-generate.jsonl 回填 30s。**
 - `generators.json`（schema aifilm-generators-v1）：声音生成后端能力注册表（acestep local active / ltx23 api active / grok15 api active 角色待定 / h3 pending）。新增声音源 = 加一条目，router/generate_loop 不变。
 - `generation-jobs.jsonl`：generate 回路台账（job_id/source_gap_id/backend/ext_id/status/spec）。
 - 修改前备份：`catalog.json.bak`、`gap-queue.jsonl.bak`（已被 .gitignore 忽略）。
@@ -26,6 +26,7 @@
 - `cluster_assets.py`：同 mood 声纹余弦聚类（阈值 0.95），回填 similarity_cluster；可复现。
 - `fill_gap.py`：填充缺口闭环，维护 use_count / last_used_*；generate 类缺口无候选会拒绝。
 - `fill_open_gaps.py`（round6 新增）：批量闭环 open `fill` 缺口。默认 `--dry-run`，`--apply` 才写盘；扫描 action==fill&status==open 且 suggested_asset_id 指向 approved 资产的缺口，逐条委托 `fill_gap.py` 闭环。`eligible(gaps,cat)` 纯函数可单测；`--limit N` 限量。可重入（filled 跳过）。
+- `coverage.py`（round7 新增）：供需覆盖分析器。按 (mood,stem,energy桶) 交叉比对 approved 供应 + routed_generate 在制 vs 全缺口需求，标记 STARVED/THIN/OK，输出优先级生成队列（deficit 降序）；`--emit-generate [--apply]` 把 Top-N 落成 open generate 缺口 + to-generate.jsonl 台账（默认 dry-run）；`--json` 机读。含纯函数 `analyze()/priority_queue()`。
 - `pipeline_lib.py`：共享库（路径/load-save+备份/bump/sha256/stdlib 声纹指纹/状态机转移校验）。
 - `route.py`：资产+缺口状态机契约（单一事实源）+ `check` 校验。round6 新增软 WARN（不破坏 gate）：`generate` 缺口缺 `duration` 字段时告警（reconcile --fix 回填）。
 - `approve_asset.py` / `reject_asset.py`：真实 approve/reject（替代旧 review 页只打印的 `aifilm` CLI）；原子改 status+移文件+校验门禁。
@@ -48,8 +49,9 @@
   - `_build_spec` 现优先用 `gap.get("duration")`（reconcile 回填），再 to-generate.jsonl，再 30s 默认。
 - `breaker.py`（round5 新增）：后端熔断（连续失败 3 次冷却 600s，half-open 试探，成功复位），状态持久化于 `bgm-library/.breaker.json`。`capable_backends(..., breaker=)` 自动跳过 tripped 后端；generate_loop submit 记录失败/成功。
 - `reconcile.py`（round5 新增，round6 扩）：管线体检（跨 catalog/gaps/jobs/磁盘）。只读审计 + `--fix` 安全修复（重算空/非规范指纹、补 similarity_cluster、复位 failed/missing 工单的 stuck 缺口、回填 generate 缺口缺失的 duration（来自 to-generate.jsonl））；`--strict` 可当 CI gate。审计新增：open fill 缺口可闭合/死路计数、generate 缺口缺 duration 计数。
-- `run_tests.py` + `tools/tests/`（round5 新增，round6 加 test_fill_open_gaps）：纯 stdlib `unittest` 套件（pipeline_lib / router / qa_audio / breaker / api / validate / tts / fill_open_gaps），**54 测试全过**。回归防护。
-- `report.py`：可观测汇总 + 孤儿审计（round5 加 tts 缺口计数行；round6 加 open fill 缺口可闭合/死路 + generate 缺口缺 duration 计数）。
+- `run_tests.py` + `tools/tests/`（round5 新增，round6 加 test_fill_open_gaps，round7 加 test_coverage）：纯 stdlib `unittest` 套件（pipeline_lib / router / qa_audio / breaker / api / validate / tts / fill_open_gaps / coverage），**58 测试全过**。回归防护。
+- `report.py`：可观测汇总 + 孤儿审计（round5 加 tts 缺口计数行；round6 加 open fill 缺口可闭合/死路 + generate 缺口缺 duration 计数；round7 加 library coverage STARVED/THIN 摘要）。
+- `pipeline.py`（round7 新增）：统一编排入口，把 ~20 脚本收口为 dispatcher（check/doctor/submit/poll/run-acestep/fill-open/reconcile/coverage/one-shot/status）。`one-shot` 串 fill-open→reconcile --fix→submit→run-acestep→poll --auto-approve→doctor（`--demo` 走 MockBackend 端到端）；`status --json` 汇 coverage/reconcile/jobs 为健康 blob。各子命令委托现有已测工具（subprocess），行为不变。
 - `gen_review.py`：由 catalog 动态生成 review/index.html（round5 加 TTS 车道状态块）。
 - `self_test.py`：临时副本用 Mock 跑通全闭环。**round5 加固：注入 1 个 tts 缺口，断言它“被路由但不生成/不回填”，证明 BGM↔TTS 双管线分离。round6 扩：先 `reconcile --fix` 验证 10 generate 缺口 duration 回填；注入 3 个 open fill 缺口（approved 候选）+1 死路，断言 `fill_open_gaps --apply` 闭环 3/留 1/rev+3/use_count+3，且 `--dry-run` 不写。**
 - Mock 后端（round3 修两 bug）：振幅 2000→24000 让峰值过 QA 门槛；**修复 for-s 循环缩进错误**。
@@ -62,7 +64,7 @@
 - 已批准母带已转 FLAC（无损，省 ~213MB 磁盘），catalog 路径/sha256/codec 已同步；可 flac→wav 还原。下游若只认 wav 需告知（当时未确认）。
 
 ## 未决
-- `use_count` 已由 round6 闭环 60 fill 缺口起跳（仅 2 个资产被 60 次复用）；`reconcile --fix` 已回填 10 generate 缺口 duration。实时仓库现状：rev 152、60 filled + 10 routed_generate(acep-step 待落盘)。
+- `use_count` 已由 round6 闭环 60 fill 缺口起跳（仅 2 个资产被 60 次复用）；`reconcile --fix` 已回填全部 generate 缺口 duration（10 ambient + 30 coverage_gap）。实时仓库现状：rev 152、gaps 100 = 60 filled + 10 routed_generate(acep-step) + 30 open(coverage_gap，6 死路)。
 - 外部依赖（closure 路径已就绪，差真实凭据/命令）：
   - acestep `invocation.cmd` 仍是 `REPLACE_ME` 占位；`run_acestep.py --pending` 会检测并跳过，操作员配好真实 5090 ACE-Step CLI 后即可落 wav。配好后 `generate_loop.py --poll --auto-approve` 闭合 10 缺口（见 RUNBOOK.md）。
   - ltx23 / grok15 的 `endpoint`/`auth_env` 仍是 `REPLACE_ME`；`ApiBackend` 已实现（重试/退避/鉴权），填好即用，填前建议把 `status` 置 `pending` 避免 failover+熔断。`grok15` 角色仍待定（垫乐 vs 配音）；若是配音应走 TTS 车道（`asset_kind:"tts"`）而非 BGM 生成。

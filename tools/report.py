@@ -58,6 +58,20 @@ def main():
     gen_missing_dur = [g for g in gaps if g.get("action") == "generate" and "duration" not in g]
     print(f"  generate gaps missing duration: {len(gen_missing_dur)}")
 
+    # library coverage: supply (approved + in-flight) vs demand by (mood,stem,bucket)
+    try:
+        from coverage import analyze as _cov_analyze
+        ca = _cov_analyze(cat, gaps)
+        starved = [r for r in ca["rows"] if r["status"] == "STARVED"]
+        thin = [r for r in ca["rows"] if r["status"] == "THIN"]
+        print(f"  library coverage: STARVED={len(starved)} THIN={len(thin)} "
+              f"(target-min {ca['target_min']})")
+        for r in (starved + thin)[:8]:
+            print(f"    {r['status']:8} {r['mood']}/{r['stem']}/{r['energy_bucket']} "
+                  f"eff={r['effective']} demand={r['demand']}")
+    except Exception as e:
+        print(f"  (coverage analysis skipped: {e})")
+
     print("─ generation jobs by backend/status ─")
     jb = collections.Counter(j["backend"] for j in jobs)
     js = collections.Counter(j["status"] for j in jobs)

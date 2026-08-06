@@ -107,16 +107,22 @@ def main():
         expect = sum(1 for g in gaps
                      if g.get("action") == "generate" and g.get("asset_kind") != "tts")
         tts_ids = [g["gap_id"] for g in gaps if g.get("asset_kind") == "tts"]
+        # capture the generate-gap ids before the demo run (fill_gap.py rewrites
+        # action->"fill" on close, so we must track by id, not by action)
+        gen_ids = [g["gap_id"] for g in gaps if g.get("action") == "generate"]
         print(f"expected generate gaps to close: {expect}")
 
-        r = _run(["tools/generate_loop.py", "--demo", "--auto-approve"], cwd=T)
+        r = _run(["tools/pipeline.py", "one-shot", "--demo"], cwd=T)
 
         # assertions
         cat = json.load(open(os.path.join(T, "bgm-library", "catalog.json"), encoding="utf-8"))
         gaps = _load_gaps(T)
         jobs = [json.loads(l) for l in open(os.path.join(T, "bgm-library", "generation-jobs.jsonl"), encoding="utf-8") if l.strip()]
 
-        filled = sum(1 for g in gaps if g.get("status") == "filled")
+        gen_ids_set = set(gen_ids)
+        gen_filled = sum(1 for g in gaps
+                         if g.get("gap_id") in gen_ids_set and g.get("status") == "filled")
+        total_filled = sum(1 for g in gaps if g.get("status") == "filled")
         jobs_done = sum(1 for j in jobs if j.get("status") == "done")
         approved = sum(1 for a in cat["assets"].values() if a["status"] == "approved")
         new_assets = len(cat["assets"])
@@ -124,9 +130,10 @@ def main():
         print(f"  assets created : {new_assets}")
         print(f"  approved       : {approved}")
         print(f"  jobs done      : {jobs_done}")
-        print(f"  gaps filled    : {filled}")
+        print(f"  generate gaps filled: {gen_filled} (of {expect} tracked by id)")
+        print(f"  total filled incl. pre-existing: {total_filled}")
 
-        ok = (new_assets == expect and approved == expect and jobs_done == expect and filled == expect)
+        ok = (new_assets == expect and approved == expect and jobs_done == expect and gen_filled == expect)
         # TTS gap must have been routed (logged) but NOT generated/filled
         tts_routed = "tts gap" in r.stdout
         tts_still_open = all(g.get("status") == "open" for g in gaps if g.get("gap_id") in tts_ids)
@@ -178,6 +185,9 @@ def main():
         # also confirm the routing contract still holds (soft WARN allowed)
         rc = _run(["tools/route.py", "check"], cwd=T)
         ok = ok and rc.returncode == 0
+        # Round 7-C: the unified dispatcher must delegate `check` correctly
+        rc2 = _run(["tools/pipeline.py", "check"], cwd=T)
+        ok = ok and rc2.returncode == 0
 
         if ok:
             print("\nSELF-TEST PASS ✓ — closed loop + TTS dual-pipeline + Round6 fill-open/duration verified")
