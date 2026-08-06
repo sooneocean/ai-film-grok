@@ -290,6 +290,12 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
     bgm_source_receipt: dict[str, Any] | None = None
     try:
+        from final.heartbeat import write_final_heartbeat
+
+        write_final_heartbeat(root, stage="start", detail="render_final enter")
+    except Exception:
+        pass
+    try:
         paths = resolve_render_paths(root, args.out_name)
     except RenderWorkspaceError as exc:
         raise RenderError(str(exc)) from exc

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.0] - 2026-08-06
+
+### Added / Fixed (lipsync freeze cleanup + continuity MVP)
+- Delete obsolete lipsync node/canary/challenge/pilot tests; single `test_lipsync_frozen`.
+- Preflight wires `continuity_programmatic` + Chinese-only voice hard codes (no ja cast_voices).
+- Final heartbeat receipt helpers; programmatic continue-join checks.
+
 ## [2.39.99] - 2026-08-06
 
 ### Added / Fixed (shortform S0.3–S0.4 + S1.1 + lipsync freeze)

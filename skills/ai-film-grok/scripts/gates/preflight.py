@@ -1171,6 +1171,62 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             fix="补 continuity_chain.md 九项核对 / receipts/frame-chain.json",
                         )
                     )
+                # Programmatic MVP (v2.40): forbidden joins + frame hash when files exist
+                try:
+                    from continuity_programmatic import check_continuity_programmatic
+
+                    cpr = check_continuity_programmatic(root, write=True)
+                    for iss in cpr.get("issues") or []:
+                        code = str(iss.get("code") or "continuity_prog")
+                        sev = (
+                            "hard"
+                            if code
+                            in {
+                                "CHAIN_DOC_MISSING",
+                                "CONTINUE_FORBIDDEN_TRANSITION",
+                                "CONTINUE_FRAME_HASH_MISMATCH",
+                            }
+                            else "soft"
+                        )
+                        bucket = hard if sev == "hard" else soft
+                        bucket.append(
+                            _issue(
+                                sev,
+                                code,
+                                str(iss.get("message") or "continuity programmatic"),
+                                fix="continue 缝 byte match + 禁 dissolve 盖缝；见 continuity_programmatic",
+                            )
+                        )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # TTS language ping-pong hard (v2.40): no ja cast_voices / ja dialogue_spoken_lang
+        try:
+            cast_voices = spec.get("cast_voices") if isinstance(spec.get("cast_voices"), dict) else {}
+            for role, vid in cast_voices.items():
+                if isinstance(vid, str) and (
+                    vid.lower().startswith("ja-") or "ja-jp" in vid.lower()
+                ):
+                    hard.append(
+                        _issue(
+                            "hard",
+                            "voice_lang_ja_cast",
+                            f"cast_voices[{role}]={vid!r} is Japanese; Chinese-only (v2.40)",
+                            fix="normalize cast_voices to zh-CN-* Edge ids",
+                        )
+                    )
+            dlang = str(spec.get("dialogue_spoken_lang") or "zh").strip().lower()
+            if dlang in {"ja", "jp", "japanese"}:
+                hard.append(
+                    _issue(
+                        "hard",
+                        "voice_lang_ja_dialogue",
+                        "dialogue_spoken_lang=ja is retired; use zh",
+                        fix="set dialogue_spoken_lang=zh",
+                    )
+                )
         except Exception:
             pass
 
