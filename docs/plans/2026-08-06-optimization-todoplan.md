@@ -2,8 +2,8 @@
 
 **结论先行：** 产线「规则硬 + 包边界拆完」阶段已过；下一轮不该再开绿地 IRON / 虚荣 LOC 冲刺，而应 **(1) 锁死 08-06 正牌 final 实坑 (2) 运维把 5090 until-empty 烧穿 (3) 按出片风险做叶拆与热路径诚实**。
 
-**Status:** ACTIVE · Wave **A1–A5 + B + D1 SHIPPED** (2.39.77–79) · **C1 OPEN_OPS** (capacity busy)  
-**Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · plugin **2.39.79**  
+**Status:** ACTIVE · **A–E code SHIPPED** (2.39.80) · **C1 drain RUNNING** (capacity-wait; not yet queue_empty)  
+**Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · plugin **2.39.80**  
 **依据：** memory 08-06 · strategy/AF/opt residual · residual-monolith · 本机探针（LOC / closeout / film_spec auto-extend）
 
 ---

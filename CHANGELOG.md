@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.80] - 2026-08-06
+
+### Added / Fixed (C1 drain launch · D2 · E peel)
+- **C1** background drain launch: `h3 cycle --until-empty --execute --free-first --capacity-wait-sec 7200` on velvet-stage-dual; artifacts `2026-08-06-c1-drain*`; honest capacity_not_ready while VRAM/queue busy.
+- **D2** cosyvoice ffmpeg `timeout=180`; hotpath timeout contract tests; AST audit residual only Popen long-runners + media_qa setdefault.
+- **E** peel `plan/film_spec_sex_floor.py` (+ shim) for A1 sex-floor fail-closed (no duration invent).
+
 ## [2.39.79] - 2026-08-06
 
 ### Added (Wave B scale-fallback + D1 + C1 OPEN_OPS)

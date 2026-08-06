@@ -16,3 +16,10 @@ aifilm h3 capacity-plan --root "<film>"
 # ready 后：
 aifilm h3 cycle --root "<film>" --until-empty --execute --free-first --capacity-wait-sec 120
 ```
+
+## 2026-08-06 续 · drain 已挂起（2.39.80）
+
+- 已启动：`--until-empty --execute --free-first --capacity-wait-sec 7200`
+- PID 见 `artifacts/2026-08-06-c1-drain.pid`；log `artifacts/2026-08-06-c1-drain.stdout.log`
+- live：`fill-idle-run-next.json` 报 `execute=true` + `skipped_reason=capacity_not_ready`（VRAM/RAM/queue）
+- **queue_empty 需等 foreign 队列跑完 + 内存地板**；进程在 capacity-wait 轮询，不杀 foreign
