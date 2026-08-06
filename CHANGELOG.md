@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.20] - 2026-08-06
+
+### Added (quality P2 · 介质自动路由 · 按角色稳定性选写实/漫剧)
+- **Media auto-routing by cast-state stability** (`media/media_routing.py`): unblocks the long-stalled P2 "介质自动路由（按 cast_state 稳定性选写实/漫剧）". The film has a global `medium_key` (photoreal / anime / manhua …) locked for the whole movie; an unstable cast member drifts in photoreal, so routing them to anime/漫剧 at *planning time* keeps identity coherent.
+  - `route_character_medium(film_medium, char_stability)` — pure policy: unstable + photoreal → `anime` (`unstable_cast_downgrade_to_anime`); otherwise film medium. Decision is planned, never switches mid-film, so the existing medium lock stays intact.
+  - `load_cast_stability(root)` — data source: optional spec `cast_stability` map overriding per-character stability, seeding every known char (`cast_ids` / `characters`) to "stable" by default.
+  - `resolve_shot_medium(root, shot, intent)` / `media_routing_report(root)` — orchestration + observable per-character decisions.
+- Tests: `tests/test_media_routing.py` (15 cases — pure policy matrix / signal loader defaults+overrides+case-normalization / resolve+report downgrade counting). Zero external deps.
+
 ## [2.40.19] - 2026-08-06
 
 ### Fixed (ops hygiene · media_queue shim + XOR docs)
