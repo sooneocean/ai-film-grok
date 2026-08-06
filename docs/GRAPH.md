@@ -381,6 +381,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_script_value_debrief.py`
 - `skills/ai-film-grok/tests/test_security_policy.py`
 - `skills/ai-film-grok/tests/test_seedance_bridge.py`
+- `skills/ai-film-grok/tests/test_seedvr2_probe.py`
 - `skills/ai-film-grok/tests/test_semantic_index.py`
 - `skills/ai-film-grok/tests/test_serial_quality.py`
 - `skills/ai-film-grok/tests/test_sfx_accent.py`
@@ -454,6 +455,9 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_voice_tracks.py`
 - `skills/ai-film-grok/tests/test_w3_package_shims.py`
 - `skills/ai-film-grok/tests/test_w4_gate_slim.py`
+- `skills/ai-film-grok/tests/test_wan_dancer_probe.py`
+- `skills/ai-film-grok/tests/test_wan_fun_control_probe.py`
+- `skills/ai-film-grok/tests/test_wan_s2v_probe.py`
 - `skills/ai-film-grok/tests/test_wardrobe_ladder.py`
 - `skills/ai-film-grok/tests/test_weapon_inventory.py`
 - `skills/ai-film-grok/tests/test_weapon_router.py`
