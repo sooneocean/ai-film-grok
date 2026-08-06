@@ -582,7 +582,7 @@
     },
     {
       "path": "scripts/cli/cli_h3.py",
-      "sha256": "4f40b17ed720e66d479f93bad630969df54b26b62b20996fe96b6412be64f9b3"
+      "sha256": "14bcb9e0809b1ef54baaee55e62dabe711488a7a00094e2d1d916adb49bcc627"
     },
     {
       "path": "scripts/cli/cli_hub_residual.py",
@@ -1606,7 +1606,7 @@
     },
     {
       "path": "scripts/media/h3_media_pack.py",
-      "sha256": "3b86eee4824f8675e45875e2eefee07adae52d3be734fc8bfbbe73c36c5c41d0"
+      "sha256": "926c0e3752f3fbae1739991c34035b26d2461e9268a801fe8623ff037fd8cbbc"
     },
     {
       "path": "scripts/media/h3_mode.py",

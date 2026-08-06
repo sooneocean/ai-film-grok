@@ -300,6 +300,13 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     combo.add_argument("--seed", type=int, default=20260805)
     combo.add_argument("--receipt", type=Path, default=None)
 
+    enrich = actions.add_parser(
+        "enrich-last",
+        help="Scan continue handoffs and auto-derive candidate end-stills for FLF chains",
+    )
+    enrich.add_argument("--root", type=Path, required=True)
+    enrich.add_argument("--receipt", type=Path, default=None)
+
     ship = actions.add_parser(
         "ship-native",
         help=(
@@ -470,6 +477,10 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
             )
             if bool(getattr(args, "write_registry", False)) and report.get("winners"):
                 report["registry_path"] = str(write_winners_registry(report["winners"]))
+        elif action == "enrich-last":
+            from h3_media_pack import enrich_h3_last_frames
+
+            report = enrich_h3_last_frames(args.root)
         elif action == "run":
             report = run_h3_shot(
                 args.root,
