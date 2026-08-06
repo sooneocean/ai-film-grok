@@ -284,10 +284,7 @@ def _legacy_production_readiness(
     while primary is still write-spec. Soft-read style/brief only when the
     corresponding gate key is absent (callers that never recomputed).
     """
-    if "brief" in gates:
-        has_brief = bool(gates.get("brief"))
-    else:
-        has_brief = present(root / "brief.json")
+    has_brief = bool(gates.get("brief")) if "brief" in gates else present(root / "brief.json")
 
     if "style_locked" in gates:
         style_ok = bool(gates.get("style_locked"))
@@ -296,11 +293,8 @@ def _legacy_production_readiness(
         style_ok = bool(isinstance(style, dict) and style.get("locked"))
 
     # Strict: only recompute_gates-validated film-spec advances past design.
-    if "spec" in gates:
-        spec_ok = bool(gates.get("spec"))
-    else:
-        # No gates payload — still refuse shots-list-only promotion.
-        spec_ok = False
+    # No gates payload — still refuse shots-list-only promotion.
+    spec_ok = bool(gates.get("spec")) if "spec" in gates else False
 
     pilot_user = pilot_user_ok(root)
     clips_ok = bool(gates.get("clips_complete")) if "clips_complete" in gates else False

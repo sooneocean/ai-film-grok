@@ -412,10 +412,7 @@ def run_for_root(
         want = infer_want(sh)
         ranked = rank_takes(files, want=want, cache_dir=cache / sid)
         preferred = pick_preferred(files, want=want, cache_dir=cache / sid)
-        if preferred and preferred.get("hijack"):
-            hijack_only = True
-        else:
-            hijack_only = False
+        hijack_only = bool(preferred and preferred.get("hijack"))
         for r in ranked:
             if r.get("hijack"):
                 hijack_count += 1
