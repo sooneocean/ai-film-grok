@@ -1,0 +1,18 @@
+{
+  "kind": "c1-drain-closeout",
+  "at": "2026-08-06T02:38:33.696897+00:00",
+  "film": "/Users/dex/AI FILM SPACE/0721/velvet-stage-dual",
+  "status": "PARTIAL",
+  "capacity_became_ready": true,
+  "jobs_attempted": 1,
+  "jobs_ran": 0,
+  "stop": "run_failed",
+  "error": "variety preflight failed: L4_INSERT_LOW — next: aifilm write-spec --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\"  # fix variety issues then re-check",
+  "pending_still": 10,
+  "queue_empty": false,
+  "honest_limits": [
+    "GPU capacity path proven (ready=true after wait)",
+    "first execute blocked by variety preflight L4_INSERT_LOW (product gate, not hang)",
+    "full queue_empty needs film variety fix or different film root with green preflight"
+  ]
+}

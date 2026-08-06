@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-h3-fill-idle-run-next",
+  "ok": false,
+  "root": "/Users/dex/AI FILM SPACE/0721/velvet-stage-dual",
+  "execute": true,
+  "max_jobs": 5,
+  "jobs_attempted": 1,
+  "jobs_ran": 0,
+  "runs": [
+    {
+      "shot_id": "shot09",
+      "mode": "i2v",
+      "stage": "production",
+      "ok": false,
+      "error": "variety preflight failed: L4_INSERT_LOW — next: aifilm write-spec --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\"  # fix variety issues then re-check"
+    }
+  ],
+  "ran": false,
+  "skipped_reason": "run_failed",
+  "run_result": null,
+  "next_report": {
+    "schema_version": 1,
+    "kind": "ai-film-h3-fill-idle-next",
+    "ok": true,
+    "root": "/Users/dex/AI FILM SPACE/0721/velvet-stage-dual",
+    "pending_count": 10,
+    "by_priority": {
+      "P0c": 9,
+      "P2": 1
+    },
+    "priority_ok": true,
+    "priority_violations": [],
+    "next": {
+      "shot_id": "shot09",
+      "priority": "P0c",
+      "lane": "primary_h3",
+      "mode": "i2v",
+      "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\" --shot-id shot09 --mode i2v --register",
+      "best_mean": null,
+      "reasons": [
+        "continue_endframe",
+        "needs_h3_primary"
+      ]
+    },
+    "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\" --shot-id shot09 --mode i2v --register",
+    "capacity": {
+      "ok": true,
+      "ready": true,
+      "status": "ready",
+      "vram_free_bytes": 32262324224,
+      "blockers": [],
+      "base_url": "http://127.0.0.1:18188",
+      "source": "submission_capacity"
+    },
+    "capacity_ready": true,
+    "still_challenge_hint": null,
+    "note": "Capacity ready — run command now"
+  },
+  "free_memory_on_mode_switch": true,
+  "error": "variety preflight failed: L4_INSERT_LOW — next: aifilm write-spec --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\"  # fix variety issues then re-check",
+  "next_after": {
+    "shot_id": "shot09",
+    "priority": "P0c",
+    "lane": "primary_h3",
+    "mode": "i2v",
+    "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\" --shot-id shot09 --mode i2v --register",
+    "best_mean": null,
+    "reasons": [
+      "continue_endframe",
+      "needs_h3_primary"
+    ]
+  },
+  "command_after": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0721/velvet-stage-dual\" --shot-id shot09 --mode i2v --register",
+  "pending_after": 10
+}
