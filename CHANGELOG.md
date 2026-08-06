@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.26] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-2 路径外部化)
+- **新增 `util/paths.py`（P3-2 基础设施）**：集中收口原本散落在 5 个模块里的 macOS-only 硬编码路径，提供三个纯函数——`plugin_root()`（从 `__file__` 推导插件根，绝不写死用户目录）、`homebrew_bin()`（按平台探测 `/opt/homebrew/bin` 或 `/home/linuxbrew/.linuxbrew/bin`，不存在则返回 `''`）、`build_subprocess_path()`（仅当 homebrew 存在才前置、永远带齐系统 bindir）、`first_existing_file()`（候选文件逐项 resolve 取首个存在者）。
+- **消除"仅本机可跑"陷阱**：`adapters/piper_local_tts.py` 的 `DEFAULT_ROOT` 由 `/Users/dex/.grok/ai-film-grok/piper-voices` 改为 `plugin_root() / "piper-voices"`（本机解析结果完全一致，行为零回归）；3 处 subprocess `PATH` 硬编码（`piper_local_tts` / `audio/tts_backend` ×2 / `spine/advance`）改为 `build_subprocess_path()`；`narrative/dialogue_scene_package.py` 与 `piper_local_tts.py` 的 ffprobe/ffmpeg 候选列表补 `/home/linuxbrew/.linuxbrew/bin` 项。Linux/CI 现可复现，Mac 行为字节级不变。
+- **测试**：`tests/test_util_paths.py`（4 用例，跨平台不假设 homebrew 存在：`build_subprocess_path` 永远含系统 bindir / homebrew 仅存在时注入 / `plugin_root` 指向本 checkout / `first_existing_file` 命中与 miss）。
+- **未动项**：`adapters/cosyvoice_local_tts.py` 的 `/Users/dex/Developer/CosyVoice` 仅出现在 docstring 示例（运行期走 `COSYVOICE_*` env，已外部化），不视为可执行硬编码路径。
+
 ## [2.40.25] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 2 统一错误体系 · P2-1)

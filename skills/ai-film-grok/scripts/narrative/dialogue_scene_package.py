@@ -32,6 +32,7 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_EVIDENCE_BYTES = 512 * 1024 * 1024
 _FFPROBE_CANDIDATES = (
     Path("/opt/homebrew/bin/ffprobe"),
+    Path("/home/linuxbrew/.linuxbrew/bin/ffprobe"),
     Path("/usr/local/bin/ffprobe"),
     Path("/usr/bin/ffprobe"),
 )

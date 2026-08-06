@@ -11,18 +11,21 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from util.paths import build_subprocess_path, plugin_root
+
 
 class PiperError(RuntimeError):
     pass
 
 
-DEFAULT_ROOT = Path("/Users/dex/.grok/ai-film-grok/piper-voices")
+DEFAULT_ROOT = plugin_root() / "piper-voices"
 DEFAULT_VOICE = "zh_CN-chaowen-medium"
 DEFAULT_BINARY = (
     Path(__file__).resolve().parents[4] / ".local-runtimes" / "piper-mac" / "bin" / "piper"
 )
 _FFMPEG_CANDIDATES = (
     Path("/opt/homebrew/bin/ffmpeg"),
+    Path("/home/linuxbrew/.linuxbrew/bin/ffmpeg"),
     Path("/usr/local/bin/ffmpeg"),
     Path("/usr/bin/ffmpeg"),
 )
@@ -76,7 +79,7 @@ def _subprocess_env() -> dict[str, str]:
         for name in ("HOME", "LANG", "LC_ALL", "TMPDIR")
         if (value := os.environ.get(name))
     }
-    env["PATH"] = f"/opt/homebrew/bin:/usr/local/bin:{os.defpath}"
+    env["PATH"] = build_subprocess_path()
     env["HF_HUB_OFFLINE"] = "1"
     env["TRANSFORMERS_OFFLINE"] = "1"
     env["HF_DATASETS_OFFLINE"] = "1"

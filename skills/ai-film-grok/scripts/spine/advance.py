@@ -22,6 +22,7 @@ from transaction_receipt import (
     load_receipt,
     stable_hash,
 )
+from util.paths import build_subprocess_path
 
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _SECRET = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/-]+|((?:api[_-]?key|token|secret)=)\S+")
@@ -233,7 +234,7 @@ def _redact(text: str) -> str:
 
 def _safe_env() -> dict[str, str]:
     env = {
-        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        "PATH": build_subprocess_path(),
         "LANG": os.environ.get("LANG", "en_US.UTF-8"),
         "LC_ALL": os.environ.get("LC_ALL", ""),
         "PYTHONNOUSERSITE": "1",

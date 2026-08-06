@@ -54,6 +54,7 @@ from typing import Any
 
 from config_loader import get_config
 from performance_cue import compile_edge, compile_instruction, cue_hash, normalize_performance_cue
+from util.paths import build_subprocess_path
 from security_policy import (
     SecurityPolicyError,
     atomic_write_bytes,
@@ -356,7 +357,7 @@ def external_tts_subprocess_env() -> dict[str, str]:
     if chatterbox_local_argv_configured():
         for name in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH"):
             env.pop(name, None)
-        env["PATH"] = f"/opt/homebrew/bin:/usr/local/bin:{os.defpath}"
+        env["PATH"] = build_subprocess_path()
         env["HF_HUB_OFFLINE"] = "1"
         env["TRANSFORMERS_OFFLINE"] = "1"
         for name in ("CHATTERBOX_DEVICE", "CHATTERBOX_LANGUAGE", "HF_HOME"):
@@ -366,7 +367,7 @@ def external_tts_subprocess_env() -> dict[str, str]:
     if piper_local_argv_configured():
         for name in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH", "PYTHONHOME", "PYTHONPATH"):
             env.pop(name, None)
-        env["PATH"] = f"/opt/homebrew/bin:/usr/local/bin:{os.defpath}"
+        env["PATH"] = build_subprocess_path()
         env["HF_HUB_OFFLINE"] = "1"
         env["TRANSFORMERS_OFFLINE"] = "1"
         env["HF_DATASETS_OFFLINE"] = "1"
