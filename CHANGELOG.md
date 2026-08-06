@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.8] - 2026-08-06
+
+### Added (quality P1 · motion mean / caption CJK / BGM fatigue / style NEG)
+- **register-clip**: approved clips hard-fail `evaluate_shot_motion` mean floors (escape `AIFILM_SKIP_MOTION_MEAN=1`).
+- **caption**: `lint_chinese_caption_spacing` (CJK internal spaces) wired into caption-pixel-check.
+- **BGM anti-fatigue**: `bgm_anti_fatigue` receipt on final; long single-loop soft→hard at ≥180s.
+- **style_lock**: `GLOBAL_DEFAULT_NEGATIVE` merged into still/I2V prompt prefixes.
+- Tests: motion mean · CJK spacing · bgm fatigue · style neg merge.
+
 ## [2.40.7] - 2026-08-06
 
 ### Added (content-quality P0 hard gates — close the "gate-green-but-fails" gap)

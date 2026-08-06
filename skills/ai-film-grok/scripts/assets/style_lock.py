@@ -18,6 +18,7 @@ image_edit(cast|face-lock) for pixels; this locks the *language* and gates.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,31 @@ from util import utc_now
 # ---------------------------------------------------------------------------
 # Medium presets — the biggest lever for identity stability
 # ---------------------------------------------------------------------------
+
+# Always-on NEG (lessons: keyframe poison / compress / watermark)
+GLOBAL_DEFAULT_NEGATIVE = (
+    "watermark, text, logo, subtitle, caption burn-in, UI overlay, "
+    "blurry first frame, jpeg artifacts, over-compressed, neon genitals, "
+    "futa, lactation spray, random hair recolor, face morph"
+)
+
+
+def merge_default_negative(existing: str | None = None) -> str:
+    """Merge GLOBAL_DEFAULT_NEGATIVE into medium/fingerprint negatives (dedupe tokens)."""
+    parts: list[str] = []
+    seen: set[str] = set()
+    for chunk in (existing or "", GLOBAL_DEFAULT_NEGATIVE):
+        for tok in re.split(r"[,;]", chunk):
+            t = tok.strip()
+            if not t:
+                continue
+            key = t.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            parts.append(t)
+    return ", ".join(parts)
+
 
 MEDIUM_PRESETS: dict[str, dict[str, Any]] = {
     "anime": {
@@ -299,8 +325,9 @@ def build_agent_still_prompt_prefix(
         "Refs: image_edit(cast master and/or face-lock crops and/or approved still) ONLY for faces. "
         "No text, no watermark, no labels."
     )
-    if fingerprint.get("negative"):
-        lines.append(f"--no {fingerprint['negative']}")
+    neg = merge_default_negative(str(fingerprint.get("negative") or ""))
+    if neg:
+        lines.append(f"--no {neg}")
     return "\n".join(lines)
 
 
@@ -316,6 +343,9 @@ def build_agent_i2v_prompt_prefix(
     ]
     if motion:
         lines.append(f"Motion: {motion}")
+    neg = merge_default_negative(str(fingerprint.get("negative") or ""))
+    if neg:
+        lines.append(f"--no {neg}")
     return " ".join(lines)
 
 
@@ -381,18 +411,19 @@ def validate_style_lock_bible(bible: dict[str, Any]) -> dict[str, Any]:
                 f"HAIR_LOCK_WEAK:{cid} — prefer 'hair match cast master; NEVER random recolor'"
             )
     # Default hard NEG tokens for first-frame poison / compress lessons
-    neg = str(
+    neg_raw = str(
         (fp.get("negative") if isinstance(fp, dict) else None)
         or bible.get("negative")
         or ""
-    ).lower()
+    )
+    neg = neg_raw.lower()
     required_neg = ("watermark", "text", "logo")
     missing_neg = [t for t in required_neg if t not in neg]
     if missing_neg and medium_key:
+        # Auto-heal path: callers should merge_default_negative into fingerprint
         soft.append(
-            "STYLE_NEG_DEFAULT_GAP: add --no tokens "
-            + ",".join(missing_neg)
-            + " (watermark/text/logo; see keyframe-first-frame-poison)"
+            "STYLE_NEG_DEFAULT_GAP: will merge GLOBAL_DEFAULT_NEGATIVE at prompt build "
+            + f"(missing in bible: {','.join(missing_neg)})"
         )
     if medium_key == "photoreal":
         soft.append(

@@ -1098,17 +1098,17 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         )
     except Exception:
         pass
-    # M4 · shot-evidence for next GenerationRequest feedback
+    # M4 · shot-evidence + motion mean hard gate on approved clips (v2.40.7)
+    mean_val = None
+    try:
+        from i2v_motion_gate import evaluate_shot_motion, measure_mean_absdiff
+
+        mean_val = measure_mean_absdiff(Path(record.get("path") or source))
+    except Exception:
+        mean_val = None
     try:
         from shot_evidence import write_shot_evidence
 
-        mean_val = None
-        try:
-            from i2v_motion_gate import measure_mean_absdiff
-
-            mean_val = measure_mean_absdiff(Path(record.get("path") or source))
-        except Exception:
-            mean_val = None
         write_shot_evidence(
             root,
             str(args.shot_id),
@@ -1122,6 +1122,60 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         )
     except Exception:
         pass
+    if str(args.status or "") == "approved":
+        skip_mean = os.environ.get("AIFILM_SKIP_MOTION_MEAN", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if not skip_mean:
+            heat_phase = None
+            dramatic_function = None
+            wardrobe_state = None
+            try:
+                spec_m = read_json(root / "film-spec.json") or {}
+                for sc in spec_m.get("scenes") or []:
+                    if not isinstance(sc, dict):
+                        continue
+                    for sh in sc.get("shots") or []:
+                        if not isinstance(sh, dict):
+                            continue
+                        if str(sh.get("id")) != str(args.shot_id):
+                            continue
+                        dsl = sh.get("dsl") if isinstance(sh.get("dsl"), dict) else {}
+                        heat_phase = sh.get("heat_phase") or dsl.get("heat_phase")
+                        dramatic_function = sh.get("dramatic_function") or dsl.get(
+                            "dramatic_function"
+                        )
+                        wardrobe_state = sh.get("wardrobe_state") or dsl.get("wardrobe_state")
+                        break
+            except Exception:
+                pass
+            tags = getattr(args, "tags", None)
+            tag_list = [str(t) for t in tags] if isinstance(tags, (list, tuple)) else []
+            try:
+                from i2v_motion_gate import evaluate_shot_motion
+            except Exception:
+                evaluate_shot_motion = None  # type: ignore
+            if evaluate_shot_motion is not None:
+                grade = evaluate_shot_motion(
+                    mean_val,
+                    heat_phase=str(heat_phase) if heat_phase else None,
+                    dramatic_function=str(dramatic_function) if dramatic_function else None,
+                    wardrobe_state=str(wardrobe_state) if wardrobe_state else None,
+                    source=str(endpoint or ""),
+                    source_tags=tag_list,
+                    shot_id=str(args.shot_id),
+                )
+                record["motion_mean_gate"] = grade
+                if not grade.get("ok"):
+                    raise FilmError(
+                        f"register-clip motion mean gate failed for {args.shot_id}: "
+                        f"mean={grade.get('mean')} tier={grade.get('tier')} "
+                        f"floor={grade.get('floor')} codes={grade.get('codes')}. "
+                        "Reshoot high-motion take or AIFILM_SKIP_MOTION_MEAN=1 (discouraged)."
+                    )
     try:
         record["duration_sec"] = media_duration(Path(record["path"]))
     except Exception:

@@ -11,6 +11,7 @@ Receipt: ``receipts/caption-pixel-check.json``
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,53 @@ def _skip_enabled() -> bool:
         "true",
         "yes",
         "on",
+    }
+
+
+_CJK_SPACE = re.compile(r"[\u4e00-\u9fff]\s+[\u4e00-\u9fff]")
+
+
+def lint_chinese_caption_spacing(srt: Path | str) -> dict[str, Any]:
+    """Detect CJK-with-internal-spaces (PIL/burn often glitches) — soft/hard signal."""
+    path = Path(srt)
+    issues: list[dict[str, Any]] = []
+    if not path.is_file():
+        return {"ok": True, "issues": [], "checked": 0}
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return {"ok": False, "issues": [{"code": "SRT_READ_FAIL", "message": str(exc)}], "checked": 0}
+    checked = 0
+    for i, line in enumerate(text.splitlines(), 1):
+        line = line.strip()
+        if not line or "-->" in line or line.isdigit():
+            continue
+        if not re.search(r"[\u4e00-\u9fff]", line):
+            continue
+        checked += 1
+        if _CJK_SPACE.search(line):
+            issues.append(
+                {
+                    "code": "CAPTION_CJK_INTERNAL_SPACE",
+                    "line": i,
+                    "message": f"line {i}: Chinese caption has spaces between CJK chars",
+                    "sample": line[:80],
+                }
+            )
+        # Empty or whitespace-only cue body after index/timing already skipped
+        if line.replace(" ", "").replace("\u3000", "") == "":
+            issues.append(
+                {
+                    "code": "CAPTION_EMPTY_CUE",
+                    "line": i,
+                    "message": f"line {i}: empty caption cue",
+                }
+            )
+    return {
+        "ok": not issues,
+        "checked": checked,
+        "issues": issues,
+        "next_cmd": "fix SRT / re-render Edge captions without CJK spacing",
     }
 
 
@@ -133,11 +181,12 @@ def run_caption_pixel_check(
     route = read_json(base / "receipts" / "post-route.json") or {}
     caption_path = route.get("caption_path")
 
+    spacing = lint_chinese_caption_spacing(srt)
     report = {
         "schema_version": 1,
         "kind": "caption-pixel-check",
         "at": utc_now(),
-        "ok": bool(ok_probe),
+        "ok": bool(ok_probe) and bool(spacing.get("ok")),
         "missing_ink": bool(missing_ink),
         "inconclusive": bool(inconclusive),
         "caption_path": caption_path,
@@ -146,6 +195,7 @@ def run_caption_pixel_check(
             "path": str(srt),
             "sha256": sha256_file(srt),
         },
+        "cjk_spacing": spacing,
         "cues_checked": sample_n,
         "likely_count": likely,
         "timestamps": timestamps,
@@ -181,6 +231,15 @@ def run_caption_pixel_check(
         report["next_cmd"] = (
             f'aifilm final --root "{base}" --caption-path ship_hardburn --post-engine ffmpeg '
             f"--tts-backend edge --music-mood rnb"
+        )
+    elif not spacing.get("ok"):
+        report["ok"] = False
+        report["error"] = (
+            "Chinese caption spacing issues: "
+            + ",".join(str(i.get("code")) for i in (spacing.get("issues") or [])[:4])
+        )
+        report["next_cmd"] = (
+            f'aifilm final --root "{base}" --tts-backend edge  # fix CJK spaces in SRT'
         )
     elif inconclusive:
         report["ok"] = False

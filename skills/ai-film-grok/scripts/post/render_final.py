@@ -1476,6 +1476,44 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         raw_seed = f"{title_s}|{mood}|{total_dur:.2f}|v3-multi-style|{count_key}"
         music_seed = int(hashlib.sha256(raw_seed.encode("utf-8")).hexdigest()[:8], 16)
 
+    # P1 · long-plate BGM anti-fatigue receipt (soft/hard advice before bed render)
+    try:
+        from bgm_anti_fatigue import check_bgm_anti_fatigue
+
+        bed_src = str(ap.get("bed_source") or "auto")
+        tmpl_preview = str(
+            getattr(args, "music_template", None)
+            or (sound_plan or {}).get("music_template")
+            or "auto"
+        )
+        fatigue = check_bgm_anti_fatigue(
+            root,
+            total_dur_sec=float(total_dur),
+            music_seed=music_seed,
+            bed_source=bed_src,
+            template_mode=tmpl_preview,
+            mood=mood,
+            write=True,
+        )
+        mix_spotting["bgm_anti_fatigue"] = {
+            "ok": fatigue.get("ok"),
+            "issues": fatigue.get("issues"),
+            "recommend": fatigue.get("recommend"),
+        }
+        # Auto-promote template timeline on very long single-loop risk
+        hard_fat = [
+            i for i in (fatigue.get("issues") or []) if i.get("severity") == "hard"
+        ]
+        if hard_fat and str(ap.get("bed_source") or "auto").lower() in {"auto", ""}:
+            if not getattr(args, "music_template", None):
+                # Prefer multi-style procedural via seed already diversifying; force template auto→timeline if library later
+                log(
+                    "bgm anti-fatigue: long plate single-loop risk — "
+                    "prefer music_template=timeline or approved multi-chapter bed"
+                )
+    except Exception as exc:  # noqa: BLE001
+        mix_spotting["bgm_anti_fatigue"] = {"ok": True, "error": str(exc)[:120]}
+
     # Phase 4: Plot-Adaptive Mood Timeline
     if isinstance(sound_plan, dict):
         sound_plan["mood_timeline"] = build_mood_timeline(
