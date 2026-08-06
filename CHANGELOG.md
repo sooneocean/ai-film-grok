@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.45] - 2026-08-06
+
+### Fixed (metabolism follow-up · antifragility source-path tests)
+- **AF tests read real impl after P3-1 shims:** `test_antifragility_af` `shortform_director` / `optimization_program` / `elevenlabs_canary` now use `_impl_source(...)` instead of top-level shim files (shim has no `timeout=` bodies).
+- **elevenlabs_canary metrics assertion** aligned with shipped path: 2×`subprocess.run` + `probe_native_audio_mean_volume(..., timeout=60.0)`.
+- **Verify:** `tests/test_antifragility_af.py` 27 passed.
+
 ## [2.40.44] - 2026-08-06
 
 ### Changed (code metabolism residual closeout · P3-1×29 + inventory)

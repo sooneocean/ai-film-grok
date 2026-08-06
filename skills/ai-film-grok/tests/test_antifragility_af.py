@@ -406,7 +406,7 @@ class Wave3AudioPipelineTimeoutTests(unittest.TestCase):
             self.assertIn("timed out", str(ctx.exception))
 
     def test_shortform_director_ffmpeg_paths_have_timeout(self) -> None:
-        src = (SCRIPTS / "shortform_director.py").read_text(encoding="utf-8")
+        src = _impl_source("shortform_director.py").read_text(encoding="utf-8")
         self.assertIn("timeout=180", src)
         self.assertIn("timeout=300", src)
         self.assertIn("timeout=30", src)
@@ -454,18 +454,21 @@ class Wave3AdapterNodeTimeoutTests(unittest.TestCase):
         self.assertIn("TimeoutExpired", src)
 
     def test_elevenlabs_canary_metrics_have_timeout(self) -> None:
-        src = (SCRIPTS / "elevenlabs_canary.py").read_text(encoding="utf-8")
+        src = _impl_source("elevenlabs_canary.py").read_text(encoding="utf-8")
         self.assertIn("timeout=30", src)
         self.assertIn("timeout=60", src)
+        # Shipped path: two subprocess.run (ffprobe + silencedetect) plus
+        # probe_native_audio_mean_volume(..., timeout=60.0) for mean volume.
         runs = src.split("subprocess.run(")[1:]
-        self.assertGreaterEqual(len(runs), 3)
+        self.assertGreaterEqual(len(runs), 2)
         for chunk in runs:
-            # only care about _audio_metrics paths roughly
-            if "ffprobe" in chunk[:400] or "ffmpeg" in chunk[:400] or "volumedetect" in chunk[:800]:
+            if "ffprobe" in chunk[:400] or "ffmpeg" in chunk[:400] or "volumedetect" in chunk[:800] or "silencedetect" in chunk[:800]:
                 self.assertIn("timeout=", chunk[:1200])
+        self.assertIn("probe_native_audio_mean_volume", src)
+        self.assertIn("timeout=60.0", src)
 
     def test_optimization_program_probe_has_timeout(self) -> None:
-        src = (SCRIPTS / "optimization_program.py").read_text(encoding="utf-8")
+        src = _impl_source("optimization_program.py").read_text(encoding="utf-8")
         self.assertIn("timeout=30", src)
 
 
