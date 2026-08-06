@@ -161,8 +161,9 @@ def cmd_final(args: argparse.Namespace) -> int:
     if not script.is_file():
         raise FilmError(f"Missing {script}")
     root = Path(args.root).expanduser().resolve()
-    from production_truth import ProductionTruthError, require_current_canonical_truth
     import os as _os
+
+    from production_truth import ProductionTruthError, require_current_canonical_truth
 
     # H3 native / incomplete drama-graph ship: --skip-canonical-truth or AIFILM_SKIP_CANONICAL_TRUTH=1
     try:
@@ -269,7 +270,7 @@ def cmd_final(args: argparse.Namespace) -> int:
                 + "] (--skip-cinematic / AIFILM_SKIP_CINEMATIC) → OFFICIAL_FINAL_PLATE honesty"
             )
             try:
-                from util import write_json, utc_now
+                from util import utc_now, write_json
 
                 write_json(
                     root / "receipts" / "skip-cinematic.json",

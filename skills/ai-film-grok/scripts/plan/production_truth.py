@@ -82,7 +82,7 @@ def write_skip_canonical_truth_receipt(
     path = root_p / "receipts" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        from util import write_json, utc_now
+        from util import utc_now, write_json
 
         payload = dict(contract)
         payload["at"] = utc_now()

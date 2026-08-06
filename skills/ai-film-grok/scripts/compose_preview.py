@@ -2,7 +2,8 @@
 
 Keeps `import compose_preview` / `from compose_preview import …` working for hard-compat.
 """
-from post import compose_preview as _impl
 import sys as _sys
+
+from post import compose_preview as _impl
 
 _sys.modules[__name__] = _impl

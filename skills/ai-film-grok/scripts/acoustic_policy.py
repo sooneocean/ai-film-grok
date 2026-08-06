@@ -2,7 +2,8 @@
 
 Keeps `import acoustic_policy` / `from acoustic_policy import …` working for hard-compat.
 """
-from audio import acoustic_policy as _impl
 import sys as _sys
+
+from audio import acoustic_policy as _impl
 
 _sys.modules[__name__] = _impl

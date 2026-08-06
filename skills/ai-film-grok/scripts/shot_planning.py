@@ -5,7 +5,8 @@ Keeps `import shot_planning` / `from shot_planning import …` working for hard-
 
 from __future__ import annotations
 
-from plan import shot_planning as _impl
 import sys as _sys
+
+from plan import shot_planning as _impl
 
 _sys.modules[__name__] = _impl

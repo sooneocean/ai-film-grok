@@ -2,7 +2,8 @@
 
 Keeps `import compose_render` / `from compose_render import …` working for hard-compat.
 """
-from post import compose_render as _impl
 import sys as _sys
+
+from post import compose_render as _impl
 
 _sys.modules[__name__] = _impl

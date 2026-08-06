@@ -9,7 +9,6 @@ import platform
 import subprocess
 from pathlib import Path
 
-
 from util import sha256_file
 
 

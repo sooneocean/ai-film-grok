@@ -2,7 +2,8 @@
 
 Keeps `import event_voice_stem` / `from event_voice_stem import …` working for hard-compat.
 """
-from audio import event_voice_stem as _impl
 import sys as _sys
+
+from audio import event_voice_stem as _impl
 
 _sys.modules[__name__] = _impl

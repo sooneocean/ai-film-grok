@@ -2,7 +2,8 @@
 
 Keeps `import checkpoint` / `from checkpoint import …` working for hard-compat.
 """
-from spine import checkpoint as _impl
 import sys as _sys
+
+from spine import checkpoint as _impl
 
 _sys.modules[__name__] = _impl

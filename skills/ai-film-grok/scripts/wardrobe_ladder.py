@@ -5,7 +5,8 @@ Keeps `import wardrobe_ladder` / `from wardrobe_ladder import …` working for h
 
 from __future__ import annotations
 
-from assets import wardrobe_ladder as _impl
 import sys as _sys
+
+from assets import wardrobe_ladder as _impl
 
 _sys.modules[__name__] = _impl

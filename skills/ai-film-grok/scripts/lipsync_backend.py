@@ -2,7 +2,8 @@
 
 Keeps `import lipsync_backend` / `from lipsync_backend import …` working for hard-compat.
 """
-from audio import lipsync_backend as _impl
 import sys as _sys
+
+from audio import lipsync_backend as _impl
 
 _sys.modules[__name__] = _impl

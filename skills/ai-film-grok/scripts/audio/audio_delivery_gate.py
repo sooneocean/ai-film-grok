@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from audio_timeline import caption_bindings, timeline_hash, validate_timeline
-
-
 from util import sha256_file
 
 

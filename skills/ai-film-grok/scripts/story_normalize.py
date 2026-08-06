@@ -2,7 +2,8 @@
 
 Keeps `import story_normalize` / `from story_normalize import …` working for hard-compat.
 """
-from plan import story_normalize as _impl
 import sys as _sys
+
+from plan import story_normalize as _impl
 
 _sys.modules[__name__] = _impl

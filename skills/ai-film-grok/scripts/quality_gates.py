@@ -5,7 +5,8 @@ Keeps `import quality_gates` / `from quality_gates import …` working for hard-
 
 from __future__ import annotations
 
-from gates import quality_gates as _impl
 import sys as _sys
+
+from gates import quality_gates as _impl
 
 _sys.modules[__name__] = _impl

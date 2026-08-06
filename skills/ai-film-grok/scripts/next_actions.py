@@ -5,7 +5,8 @@ Keeps `import next_actions` / `from next_actions import …` working for hard-co
 
 from __future__ import annotations
 
-from spine import next_actions as _impl
 import sys as _sys
+
+from spine import next_actions as _impl
 
 _sys.modules[__name__] = _impl

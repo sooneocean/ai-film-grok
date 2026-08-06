@@ -2,7 +2,8 @@
 
 Keeps `import burn_srt_pil` / `from burn_srt_pil import …` working for hard-compat.
 """
-from post import burn_srt_pil as _impl
 import sys as _sys
+
+from post import burn_srt_pil as _impl
 
 _sys.modules[__name__] = _impl

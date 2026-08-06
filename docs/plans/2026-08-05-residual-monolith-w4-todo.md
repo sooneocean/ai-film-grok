@@ -69,9 +69,9 @@
 
 | Priority | Module | ~LOC | Why residual (risk × touch) | Status |
 |----------|--------|-----:|-------------------------------|--------|
-| **P0** | `post/render_final.py` | **2985** | Ship path; orchestrator still thick after leaf peels | package SHIPPED · **internal leaf residual** |
-| **P1** | `narrative/edit_policy_heat.py` | **4024** | Adult/heat IRON; high blast radius | package SHIPPED · **bug-driven packs only** |
-| **P1** | `plan/film_spec.py` | **3147** | write-spec / validate / projectors; sex floor leaf exists | monolith · peel on touch |
+| **P0** | `post/render_final.py` | **~2979** | Ship path; orchestrator still thick; watchdog peeled (2.40.12) | package SHIPPED · **internal leaf residual** |
+| **P1** | `narrative/edit_policy_heat.py` | **~3788** | Adult/heat IRON; **phase pack peeled** → `heat_phase.py` | package SHIPPED · wardrobe/coitus residual |
+| **P1** | `plan/film_spec.py` facade | **~97** + validate **~3033** | M1 peel 2.40.12 constants/validate | **facade SHIPPED** · further projectors residual |
 | **P2** | `post/export_composition.py` | **2804** | HF/Remotion export; coverage-starved | harness first |
 | **P2** | `post/compose_render.py` | **1579** | Compose path; double-burn contracts exist | harness residual |
 | **P2** | `narrative/edit_policy.py` | **2584** | visual_fit / stretch / cut silk | peel if dual-owner pain |

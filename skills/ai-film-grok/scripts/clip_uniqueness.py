@@ -5,7 +5,8 @@ Keeps `import clip_uniqueness` / `from clip_uniqueness import …` working for h
 
 from __future__ import annotations
 
-from assets import clip_uniqueness as _impl
 import sys as _sys
+
+from assets import clip_uniqueness as _impl
 
 _sys.modules[__name__] = _impl

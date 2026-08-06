@@ -2,7 +2,8 @@
 
 Keeps `import dramatic_meaning` / `from dramatic_meaning import …` working for hard-compat.
 """
-from narrative import dramatic_meaning as _impl
 import sys as _sys
+
+from narrative import dramatic_meaning as _impl
 
 _sys.modules[__name__] = _impl

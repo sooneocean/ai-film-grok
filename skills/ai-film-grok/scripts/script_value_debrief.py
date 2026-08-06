@@ -5,7 +5,8 @@ Keeps `import script_value_debrief` / `from script_value_debrief import …` wor
 
 from __future__ import annotations
 
-from plan import script_value_debrief as _impl
 import sys as _sys
+
+from plan import script_value_debrief as _impl
 
 _sys.modules[__name__] = _impl

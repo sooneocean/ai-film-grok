@@ -5,7 +5,8 @@ Keeps `import performance_state` / `from performance_state import …` working f
 
 from __future__ import annotations
 
-from assets import performance_state as _impl
 import sys as _sys
+
+from assets import performance_state as _impl
 
 _sys.modules[__name__] = _impl

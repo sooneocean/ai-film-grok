@@ -5,7 +5,8 @@ Keeps `import visual_bible` / `from visual_bible import …` working for hard-co
 
 from __future__ import annotations
 
-from assets import visual_bible as _impl
 import sys as _sys
+
+from assets import visual_bible as _impl
 
 _sys.modules[__name__] = _impl

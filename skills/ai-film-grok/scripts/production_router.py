@@ -5,7 +5,8 @@ Keeps `import production_router` / `from production_router import …` working f
 
 from __future__ import annotations
 
-from plan import production_router as _impl
 import sys as _sys
+
+from plan import production_router as _impl
 
 _sys.modules[__name__] = _impl

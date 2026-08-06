@@ -2,7 +2,8 @@
 
 Keeps `import tts_ab` / `from tts_ab import …` working for hard-compat.
 """
-from audio import tts_ab as _impl
 import sys as _sys
+
+from audio import tts_ab as _impl
 
 _sys.modules[__name__] = _impl

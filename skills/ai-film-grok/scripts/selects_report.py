@@ -5,7 +5,8 @@ Keeps `import selects_report` / `from selects_report import …` working for har
 
 from __future__ import annotations
 
-from spine import selects_report as _impl
 import sys as _sys
+
+from spine import selects_report as _impl
 
 _sys.modules[__name__] = _impl

@@ -5,7 +5,8 @@ Keeps `import production_book` / `from production_book import …` working for h
 
 from __future__ import annotations
 
-from plan import production_book as _impl
 import sys as _sys
+
+from plan import production_book as _impl
 
 _sys.modules[__name__] = _impl

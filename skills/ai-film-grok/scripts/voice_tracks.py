@@ -2,7 +2,8 @@
 
 Keeps `import voice_tracks` / `from voice_tracks import …` working for hard-compat.
 """
-from audio import voice_tracks as _impl
 import sys as _sys
+
+from audio import voice_tracks as _impl
 
 _sys.modules[__name__] = _impl

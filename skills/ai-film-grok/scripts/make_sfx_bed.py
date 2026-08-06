@@ -2,7 +2,8 @@
 
 Keeps `import make_sfx_bed` / `from make_sfx_bed import …` working for hard-compat.
 """
-from audio import make_sfx_bed as _impl
 import sys as _sys
+
+from audio import make_sfx_bed as _impl
 
 _sys.modules[__name__] = _impl

@@ -2,7 +2,8 @@
 
 Keeps `import story_contract` / `from story_contract import …` working for hard-compat.
 """
-from plan import story_contract as _impl
 import sys as _sys
+
+from plan import story_contract as _impl
 
 _sys.modules[__name__] = _impl

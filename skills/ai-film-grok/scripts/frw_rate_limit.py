@@ -2,7 +2,8 @@
 
 Keeps `import frw_rate_limit` / `from frw_rate_limit import …` working for hard-compat.
 """
-from media import frw_rate_limit as _impl
 import sys as _sys
+
+from media import frw_rate_limit as _impl
 
 _sys.modules[__name__] = _impl

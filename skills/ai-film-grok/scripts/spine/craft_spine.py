@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from util import read_json
-from util.spine_helpers import present, pilot_user_ok
+from util.spine_helpers import pilot_user_ok, present
 
 CRAFT_STAGES: tuple[str, ...] = (
     "idea",

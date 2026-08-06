@@ -9,14 +9,15 @@ import re
 from pathlib import Path
 from typing import Any
 
-from final.errors import RenderError
+from edit_policy import film_segment_timeline
 from film_spec import FilmSpecError, validate_film_spec
+from final.errors import RenderError
 from narrative_timeline import (
     NarrativeTimelineError,
+)
+from narrative_timeline import (
     validate_linear_narration as _validate_linear_narration,
 )
-from edit_policy import film_segment_timeline
-
 
 # Voice / caption defaults (peeled from render_final W4)
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"  # edge 显式后端默认女声

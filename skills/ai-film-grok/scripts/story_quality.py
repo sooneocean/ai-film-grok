@@ -2,7 +2,8 @@
 
 Keeps `import story_quality` / `from story_quality import …` working for hard-compat.
 """
-from plan import story_quality as _impl
 import sys as _sys
+
+from plan import story_quality as _impl
 
 _sys.modules[__name__] = _impl

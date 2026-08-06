@@ -2,7 +2,8 @@
 
 Keeps `import longform` / `from longform import …` working for hard-compat.
 """
-from plan import longform as _impl
 import sys as _sys
+
+from plan import longform as _impl
 
 _sys.modules[__name__] = _impl

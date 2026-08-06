@@ -2,7 +2,8 @@
 
 Keeps `import frw_canary` / `from frw_canary import …` working for hard-compat.
 """
-from media import frw_canary as _impl
 import sys as _sys
+
+from media import frw_canary as _impl
 
 _sys.modules[__name__] = _impl

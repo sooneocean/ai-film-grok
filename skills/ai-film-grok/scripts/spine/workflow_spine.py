@@ -14,7 +14,7 @@ from typing import Any
 from director_stage_gates import STAGE_ORDER
 from production_book import RIGOR_LEVELS
 from util import read_json
-from util.spine_helpers import post_audit_current, present, pilot_user_ok
+from util.spine_helpers import pilot_user_ok, post_audit_current, present
 
 STAGE_LABELS_ZH: dict[str, str] = {
     "concept_lock": "概念锁",

@@ -18,11 +18,15 @@ from typing import Any
 from security_policy import atomic_write_text
 from spine.stage_model import (
     INTERNAL_PIPELINE as PIPELINE_STAGES,
+)
+from spine.stage_model import (
     PIPELINE_LABELS_ZH as _STAGE_LABELS_ZH,
+)
+from spine.stage_model import (
     responsibility_for_stage,
 )
 from util import read_json, write_json
-from util.spine_helpers import post_audit_current, pilot_user_ok
+from util.spine_helpers import pilot_user_ok, post_audit_current
 
 # action id → primary stage (for status.next_actions[].stage)
 _ACTION_STAGE: dict[str, str] = {

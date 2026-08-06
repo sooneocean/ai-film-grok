@@ -5,7 +5,8 @@ Keeps `import style_lock` / `from style_lock import …` working for hard-compat
 
 from __future__ import annotations
 
-from assets import style_lock as _impl
 import sys as _sys
+
+from assets import style_lock as _impl
 
 _sys.modules[__name__] = _impl

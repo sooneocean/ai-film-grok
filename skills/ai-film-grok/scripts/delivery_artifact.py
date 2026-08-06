@@ -5,7 +5,8 @@ Keeps `import delivery_artifact` / `from delivery_artifact import …` working f
 
 from __future__ import annotations
 
-from gates import delivery_artifact as _impl
 import sys as _sys
+
+from gates import delivery_artifact as _impl
 
 _sys.modules[__name__] = _impl

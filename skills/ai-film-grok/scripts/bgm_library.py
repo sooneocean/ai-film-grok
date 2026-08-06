@@ -2,7 +2,8 @@
 
 Keeps `import bgm_library` / `from bgm_library import …` working for hard-compat.
 """
-from audio import bgm_library as _impl
 import sys as _sys
+
+from audio import bgm_library as _impl
 
 _sys.modules[__name__] = _impl

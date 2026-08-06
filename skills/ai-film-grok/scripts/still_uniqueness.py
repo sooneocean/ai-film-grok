@@ -5,7 +5,8 @@ Keeps `import still_uniqueness` / `from still_uniqueness import …` working for
 
 from __future__ import annotations
 
-from assets import still_uniqueness as _impl
 import sys as _sys
+
+from assets import still_uniqueness as _impl
 
 _sys.modules[__name__] = _impl

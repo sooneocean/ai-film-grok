@@ -2,7 +2,8 @@
 
 Keeps `import vibevoice_asr_review` / `from vibevoice_asr_review import …` working for hard-compat.
 """
-from audio import vibevoice_asr_review as _impl
 import sys as _sys
+
+from audio import vibevoice_asr_review as _impl
 
 _sys.modules[__name__] = _impl

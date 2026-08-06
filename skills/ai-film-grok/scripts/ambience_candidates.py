@@ -2,7 +2,8 @@
 
 Keeps `import ambience_candidates` / `from ambience_candidates import …` working for hard-compat.
 """
-from audio import ambience_candidates as _impl
 import sys as _sys
+
+from audio import ambience_candidates as _impl
 
 _sys.modules[__name__] = _impl

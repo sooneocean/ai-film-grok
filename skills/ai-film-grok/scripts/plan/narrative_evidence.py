@@ -8,9 +8,9 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from util import canonical_json_sha256, read_json, sha256_file, utc_now, write_json
-from plan.story_plan import normalize_story_graph
 from plan.narrative_control import validate_narrative_graph
+from plan.story_plan import normalize_story_graph
+from util import canonical_json_sha256, read_json, sha256_file, utc_now, write_json
 
 EVIDENCE_NAME = "narrative-evidence.json"
 VALID_STATUSES = frozenset({"verified", "missing", "uncertain"})

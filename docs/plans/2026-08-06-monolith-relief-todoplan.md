@@ -1,7 +1,7 @@
 # 巨石舒缓 Todo Plan（2026-08-06 · 诊断 + 执行队列）
 
-**Status:** ACTIVE · **M0 SHIPPED**（hub≤2500 · package boundary · `test_w3_package_shims` 9 passed）  
-**Plugin:** **2.40.10** · checkout `plugins/ai-film-grok`  
+**Status:** ACTIVE · **M0–M4 SHIPPED (2.40.12)** · M5 deferred  
+**Plugin:** **2.40.12** · checkout `plugins/ai-film-grok`  
 **结构主档（历史 wave）：** [residual-monolith-w4-todo](2026-08-05-residual-monolith-w4-todo.md)  
 **综合执行板：** [next-optimization-todoplan](2026-08-06-next-optimization-todoplan.md) Wave 3  
 **Tracker：** [project-module-refactor](2026-08-05-project-module-refactor.md)
@@ -98,39 +98,34 @@
 - [x] `pytest tests/test_w3_package_shims.py` → **9 passed**  
 - [x] `git rev-parse` = plugins checkout  
 
-### M1 · `film_spec` 触达式 peel（最高 ROI 预防边界）
+### M1 · `film_spec` peel — **SHIPPED 2.40.12**
 
-**触发：** sex floor / validate / write-spec / 槽长投影。  
+- [x] M1.1 `plan/film_spec_validate.py` + `film_spec_constants.py` + thin facade  
+- [x] M1.2 constants vs validate 分文件 · 无 cycle（profile 仍 root）  
+- [x] M1.3 structure-only（IRON 默认未改）  
 
-- [ ] M1.1 `validate_*` / director lint → `plan/film_spec_validate.py` + re-export  
-- [ ] M1.2 projectors 与 validate 分文件 · 无 cycle  
-- [ ] M1.3 move 与行为分 commit  
+**LOC：** facade ~80 · constants ~130 · validate ~3020（was 3147 monolith）。
 
-**测：** `test_cli_write_spec_extract` · sex floor / story contract · 路径动则 `make check-all`。
+### M2 · `render_final` stages — **SHIPPED partial 2.40.12**
 
-### M2 · `render_final` stages（出片挡路）
+- [x] M2.1 `_run_with_watchdog` → `final/watchdog.py`  
+- [ ] M2.2 更多 stage（plate/mix/subs）— residual  
+- [x] M2.3 shim `main()` 仍调实现（hotpath 测绿）  
 
-**触发：** VO/mix/字幕/timeout/plate。  
+**LOC：** render_final 2985→~2958 · watchdog ~67。
 
-- [ ] M2.1 每 PR 抽 **一段** stage → `final/` 或 `post/stages_*.py`  
-- [ ] M2.2 删 orchestrator 重复拷贝  
-- [ ] M2.3 shim `main()` 必调实现（防 1s 假绿）  
+### M3 · export/compose harness — **SHIPPED partial 2.40.12**
 
-**测：** `test_final_hotpath_contracts` · `test_render_core_helpers` · `test_w3_package_shims`。
+- [x] M3.1 `tests/test_export_hotpath_contracts.py`（preset garbage + missing root）  
+- [ ] M3.2 export builder peel — residual  
 
-### M3 · export/compose harness-first
+### M4 · heat phase pack — **SHIPPED 2.40.12**（用户 go 全开）
 
-**触发：** 双烧 / HF export / compose 翻车。  
+- [x] `narrative/heat_phase.py`：scale/phase normalize + escalation  
+- [ ] wardrobe / coitus / spice packs — residual  
+- 行为未 retune；`test_adult_heat_upgrade` 一条 sex ratio 0.495 vs floor 0.50 边界预存（未改 floor）  
 
-- [ ] M3.1 加强 export/compose hotpath 失败 fixture  
-- [ ] M3.2 harness 绿且 thrash 后再 peel builder  
-
-### M4 · heat packs — **bug-driven only · 默认不排期**
-
-- [ ] 一次 1 pack：`phase` / `wardrobe` / `coitus_arc` / `spice_vo` / `impact` + facade  
-- **禁** 无 bug 预防性全拆  
-
-**测：** `test_heat_check` · `test_heat_arc_multi` · `test_adult_heat_upgrade`。
+**LOC：** heat 4024→~3788 · heat_phase ~264。
 
 ### M5 · 次级（默认不排）
 

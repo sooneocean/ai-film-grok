@@ -2,7 +2,8 @@
 
 Keeps `import comfy_recovery` / `from comfy_recovery import …` working for hard-compat.
 """
-from media import comfy_recovery as _impl
 import sys as _sys
+
+from media import comfy_recovery as _impl
 
 _sys.modules[__name__] = _impl

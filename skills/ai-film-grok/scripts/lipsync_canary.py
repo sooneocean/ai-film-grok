@@ -2,7 +2,8 @@
 
 Keeps `import lipsync_canary` / `from lipsync_canary import …` working for hard-compat.
 """
-from audio import lipsync_canary as _impl
 import sys as _sys
+
+from audio import lipsync_canary as _impl
 
 _sys.modules[__name__] = _impl

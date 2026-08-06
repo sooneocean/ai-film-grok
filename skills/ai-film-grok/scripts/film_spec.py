@@ -2,7 +2,8 @@
 
 Keeps `import film_spec` / `from film_spec import …` working for hard-compat.
 """
-from plan import film_spec as _impl
 import sys as _sys
+
+from plan import film_spec as _impl
 
 _sys.modules[__name__] = _impl

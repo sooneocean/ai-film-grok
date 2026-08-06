@@ -2,7 +2,8 @@
 
 Keeps `import generation_ready` / `from generation_ready import …` working for hard-compat.
 """
-from media import generation_ready as _impl
 import sys as _sys
+
+from media import generation_ready as _impl
 
 _sys.modules[__name__] = _impl

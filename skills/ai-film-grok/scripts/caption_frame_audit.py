@@ -2,7 +2,8 @@
 
 Keeps `import caption_frame_audit` / `from caption_frame_audit import …` working for hard-compat.
 """
-from post import caption_frame_audit as _impl
 import sys as _sys
+
+from post import caption_frame_audit as _impl
 
 _sys.modules[__name__] = _impl

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Final mix PARTIAL receipt helpers (P1-B · 2026-08-05)."""
 from __future__ import annotations
+
 from pathlib import Path
+
 from util import utc_now, write_json
+
 
 def write_final_mix_partial_receipt(
     root: Path | str,

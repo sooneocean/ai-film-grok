@@ -2,7 +2,8 @@
 
 Keeps `import comfy_armory` / `from comfy_armory import …` working for hard-compat.
 """
-from media import comfy_armory as _impl
 import sys as _sys
+
+from media import comfy_armory as _impl
 
 _sys.modules[__name__] = _impl

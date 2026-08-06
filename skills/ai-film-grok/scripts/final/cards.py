@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
-
 from final.errors import RenderError
 from final.media_ops import run
+from PIL import Image, ImageDraw, ImageFont
 
 FONT_CANDIDATES = [
     "/System/Library/Fonts/STHeiti Medium.ttc",

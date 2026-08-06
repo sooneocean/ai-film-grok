@@ -13,7 +13,6 @@ import hashlib
 import json
 import os
 import shutil
-import signal
 import subprocess
 import sys
 import wave
@@ -146,6 +145,7 @@ from final.enhance import (  # noqa: E402, F401
     resolve_subtitle_mode,
 )
 from final.errors import RenderError, RenderTimeoutError  # noqa: E402
+from final.watchdog import _run_with_watchdog  # noqa: E402, F401
 from final.media_ops import (  # noqa: E402, F401
     apply_dialogue_broll_visual,
     concat_audio_segments,
@@ -238,6 +238,34 @@ from render_final_music import (  # noqa: E402, F401
 
 # Hard-compat: tests monkeypatch render_final.tts_synthesize
 tts_synthesize = _tts_synthesize_default
+
+
+def build_final_film_manifest_entry(
+    *,
+    final_path: Path,
+    output_sha256: str,
+    duration_sec: float,
+    report_path: Path,
+    technical_qa: dict[str, Any],
+    official_final: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Build the manifest final_film descriptor.
+
+    This function is intentionally side-effect free and shared by render and tests,
+    so final-fidelity can evolve without touching scheduling code.
+    """
+    from final.delivery_class import delivery_fields_from_official_final
+
+    entry = {
+        "path": str(final_path.name),  # store relative name when under out/
+        "sha256": output_sha256,
+        "duration_sec": duration_sec,
+        "report": str(report_path.name),
+        "assembled_at": utc_now(),
+        "technical_qa": technical_qa,
+    }
+    entry.update(delivery_fields_from_official_final(official_final))
+    return entry
 
 
 def tts_to_wav(*args, **kwargs):
@@ -2572,15 +2600,15 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     except Exception as tl_exc:  # noqa: BLE001
         report["film_timeline_receipt_error"] = str(tl_exc)[:160]
 
-    # Update manifest gates
-    manifest.setdefault("outputs", {})["final_film"] = {
-        "path": str(final_path.name),  # store relative name when under out/
-        "sha256": report["output_sha256"],
-        "duration_sec": report["duration_sec"],
-        "report": str(report_path.name),
-        "assembled_at": utc_now(),
-        "technical_qa": technical_qa,
-    }
+    # Update manifest gates (default technical final truth, overwritten after official final check).
+    manifest.setdefault("outputs", {})["final_film"] = build_final_film_manifest_entry(
+        final_path=final_path,
+        output_sha256=report["output_sha256"],
+        duration_sec=report["duration_sec"],
+        report_path=report_path,
+        technical_qa=technical_qa,
+        official_final={"delivery_visibility": "technical_final_visible", "status": "TECHNICAL_FINAL"},
+    )
     # Technical success is not human/agent end-to-end approval.
     manifest.setdefault("gates", {})["final_complete"] = False
     manifest["updated_at"] = utc_now()
@@ -2644,6 +2672,21 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         report["official_final"] = official_final
         report["scale_fallback"] = scale_fallback_receipt
         write_json(report_path, report)
+
+        final_film = manifest.setdefault("outputs", {}).setdefault("final_film", {})
+        if isinstance(final_film, dict) and isinstance(official_final, dict):
+            final_film.update(
+                build_final_film_manifest_entry(
+                    final_path=final_path,
+                    output_sha256=report["output_sha256"],
+                    duration_sec=report["duration_sec"],
+                    report_path=report_path,
+                    technical_qa=technical_qa,
+                    official_final=official_final,
+                )
+            )
+            manifest["updated_at"] = utc_now()
+            write_json(root / "manifest.json", manifest)
     except Exception as of_exc:  # noqa: BLE001
         log(f"official-final-report skip: {of_exc}")
 
@@ -2660,55 +2703,6 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "bgm_source": bgm_source_receipt,
     }
 
-
-def _run_with_watchdog(func, *, timeout: float):
-    """Run ``func`` under a total wall-clock watchdog.
-
-    Individual ffmpeg / TTS subprocesses already carry their own per-call timeouts
-    (AIFILM_FFMPEG_TIMEOUT, util.subprocess.run default). This guard caps the *total*
-    render so a stalled pipeline surfaces a clean error instead of hanging forever
-    (假死). On Unix we use SIGALRM (fires in the main thread, where render runs);
-    on other platforms with no SIGALRM we fall back to a daemon thread that raises on
-    breach. ``timeout <= 0`` disables the guard.
-    """
-    if timeout is None or timeout <= 0:
-        return func()
-
-    if hasattr(signal, "SIGALRM"):
-
-        def _alarm_handler(signum, frame):  # pragma: no cover - signal path
-            raise RenderTimeoutError(timeout)
-
-        prev = signal.signal(signal.SIGALRM, _alarm_handler)
-        try:
-            signal.alarm(max(1, int(timeout)))
-            return func()
-        finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, prev)
-    else:  # pragma: no cover - non-Unix fallback
-        import threading
-
-        # Thread-based watchdog for platforms without SIGALRM.
-        holder: list[tuple[str, object] | None] = [None]
-
-        def _target() -> None:
-            try:
-                holder[0] = ("result", func())
-            except BaseException as exc:  # noqa: BLE001
-                holder[0] = ("error", exc)
-
-        t = threading.Thread(target=_target, daemon=True)
-        t.start()
-        t.join(timeout)
-        if t.is_alive():
-            raise RenderTimeoutError(timeout)
-        item = holder[0]
-        if item is None:
-            raise RenderTimeoutError(timeout)
-        if item[0] == "error":
-            raise item[1]
-        return item[1]
 
 
 def main(argv: list[str] | None = None) -> int:

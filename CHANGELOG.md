@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.40.12] - 2026-08-06
+
+### Structure (monolith relief M1–M4 parallel)
+- **M1 film_spec:** `plan/film_spec_constants.py` + `plan/film_spec_validate.py` + thin facade; root shims; public `import film_spec` unchanged.
+- **M2 render_final:** `_run_with_watchdog` → `final/watchdog.py` (re-export hard-compat).
+- **M3 export harness:** `tests/test_export_hotpath_contracts.py` (bad preset + missing root fail-closed).
+- **M4 heat phase pack:** `narrative/heat_phase.py` re-exported by `edit_policy_heat` (no IRON retune).
+- **Docs:** `docs/plans/2026-08-06-monolith-relief-todoplan.md` M0–M4 status.
+- Verify: 144 passed on peel suite (shims/final/heat/write-spec/director/export/compose/suse iron).
+
+## [2.40.11] - 2026-08-06
+
+### Added (AD process optimization · 副导演三轴)
+- **Duration density A1/A2**: `plan.duration_target.finalize_duration_density` binds heat-lifted target to actual shot count; plan writes `receipts/duration-density.json` + `adult-target-shot-lift.json` when lift/delta present.
+- **Pilot A3/C1**: `pilot-go` schema v3 — `debrief_gate`, `three_look` (composition/wardrobe/poison), strict debrief blockers via env/design-go.
+- **Closeout A4/B**: advisory `duration_honesty` + `official_final_readback` steps; `receipts/duration-honesty-closeout.json`.
+- **Shortlist C2**: select-shortlist v2 — `mean_only_forbidden`, anti-hijack codes when multi-take without composition gate.
+- **Register C3**: approved clips blocked when `scale-fallback` `promote_ban` unless review-note accepts soft-max (escape `AIFILM_SKIP_SCALE_PROMOTE_GATE=1`).
+- **Stages B/C**: agent/visual/voice/post/deliver AD discipline cards.
+- **Ops D canary**: `artifacts/2026-08-06-ad-wave-d-ops-canary.json` honest OPEN_OPS (no fake until-empty).
+- Plan: `docs/plans/2026-08-06-ad-process-optimization-todoplan.md`.
+- Tests: `tests/test_ad_process_optimization.py`.
+
 ## [2.40.10] - 2026-08-06
 
 ### Docs / honesty (next-optimization board closeout W0–W6)

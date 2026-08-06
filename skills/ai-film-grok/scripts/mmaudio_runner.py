@@ -2,7 +2,8 @@
 
 Keeps `import mmaudio_runner` / `from mmaudio_runner import …` working for hard-compat.
 """
-from audio import mmaudio_runner as _impl
 import sys as _sys
+
+from audio import mmaudio_runner as _impl
 
 _sys.modules[__name__] = _impl

@@ -5,7 +5,8 @@ Keeps `import production_gates` / `from production_gates import …` working for
 
 from __future__ import annotations
 
-from gates import production_gates as _impl
 import sys as _sys
+
+from gates import production_gates as _impl
 
 _sys.modules[__name__] = _impl

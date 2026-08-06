@@ -2,7 +2,8 @@
 
 Keeps `import dialogue_screenplay` / `from dialogue_screenplay import …` working for hard-compat.
 """
-from narrative import dialogue_screenplay as _impl
 import sys as _sys
+
+from narrative import dialogue_screenplay as _impl
 
 _sys.modules[__name__] = _impl

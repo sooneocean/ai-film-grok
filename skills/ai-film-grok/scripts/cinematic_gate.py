@@ -5,7 +5,8 @@ Keeps `import cinematic_gate` / `from cinematic_gate import …` working for har
 
 from __future__ import annotations
 
-from gates import cinematic_gate as _impl
 import sys as _sys
+
+from gates import cinematic_gate as _impl
 
 _sys.modules[__name__] = _impl

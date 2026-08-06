@@ -5,7 +5,8 @@ Keeps `import identity_refs` / `from identity_refs import …` working for hard-
 
 from __future__ import annotations
 
-from assets import identity_refs as _impl
 import sys as _sys
+
+from assets import identity_refs as _impl
 
 _sys.modules[__name__] = _impl

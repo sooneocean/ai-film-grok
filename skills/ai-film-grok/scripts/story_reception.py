@@ -2,7 +2,8 @@
 
 Keeps `import story_reception` / `from story_reception import …` working for hard-compat.
 """
-from plan import story_reception as _impl
 import sys as _sys
+
+from plan import story_reception as _impl
 
 _sys.modules[__name__] = _impl

@@ -2,7 +2,8 @@
 
 Keeps `import subtitle_srt` / `from subtitle_srt import …` working for hard-compat.
 """
-from post import subtitle_srt as _impl
 import sys as _sys
+
+from post import subtitle_srt as _impl
 
 _sys.modules[__name__] = _impl
