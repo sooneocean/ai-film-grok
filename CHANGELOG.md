@@ -1,6 +1,12 @@
 # Changelog
 
-## [2.40.20] - 2026-08-06
+## [2.40.21] - 2026-08-06
+
+### Changed (quality P2 · H3 Fill-Idle 完整派单 · primary 分类纯函数化)
+- **Primary-H3 shot classification extracted to a pure, unit-tested function** (`media/h3_fill_idle.py::classify_primary_h3_shot`): the `elif primary:` block of `classify_fill_idle_shot` — P0a/P0b/P0c tier selection plus the dual I2V+R2V leg logic (including the γ3 skip-blind-R2V when the identity leg is already strong) — was previously inline and untested as a unit. It is now an explicit, behavior-preserving function returning `(priority, lane, status, reasons)`; `classify_fill_idle_shot` calls it and extends its reasons — identical output. This closes the loop on the Fill-Idle auto-dispatch decomposition started in v2.40.15–17.
+- Tests: `tests/test_fill_idle_primary_classify.py` (11 cases — P0a/P0b/P0c tiers / H3 above-floor done / H3 below-floor P1 retry + cap exhaustion / dual complete / dual-need-i2v with last-still / γ3 strong-skip vs weak-need-r2v / explicit-dual overrides γ3 skip). Zero external deps.
+
+
 
 ### Added (quality P2 · 介质自动路由 · 按角色稳定性选写实/漫剧)
 - **Media auto-routing by cast-state stability** (`media/media_routing.py`): unblocks the long-stalled P2 "介质自动路由（按 cast_state 稳定性选写实/漫剧）". The film has a global `medium_key` (photoreal / anime / manhua …) locked for the whole movie; an unstable cast member drifts in photoreal, so routing them to anime/漫剧 at *planning time* keeps identity coherent.
