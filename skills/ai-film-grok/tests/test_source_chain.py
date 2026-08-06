@@ -9,7 +9,7 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from source_chain import (  # noqa: E402
+from assets.source_chain import (  # noqa: E402
     SourceChainError,
     append_source,
     new_source_chain,

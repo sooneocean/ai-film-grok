@@ -9,7 +9,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from color_grade import (  # noqa: E402
+from post.color_grade import (  # noqa: E402
     PRESETS,
     ColorGradeError,
     build_ffmpeg_filter,

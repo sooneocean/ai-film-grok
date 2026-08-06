@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.34] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 续)
+- **P3-1 再迁 3 个业务模块**（累计 9/109+）到既有 package：`color_grade.py`→`post/`、`dailies_selects.py`→`post/`、`source_chain.py`→`assets/`（均 0 importer、无 `__file__` 相对资源路径、无 shell/跨脚本路径引用、`git mv` 保留历史）。
+- **既有 1:1 测试随迁移更新**：3 个模块**已有** `tests/test_*.py`（共 17 用例），迁移时把 import 从顶层 `from X import (...)` 改为 `from post.X import (...)` / `from assets.X import (...)`；无 `@patch` 指向模块名，无测试体内 `X.` 前缀引用，改动面最小。
+- **`runtime-lock.json` 指纹重生（关键修复）**：上一轮（v2.40.33）迁 4 个探针时只同步了 `registry/comfy-weapons.json`，**漏更 `runtime-lock.json`**——本次 `make lock-runtime` 一次性修掉这 4 个探针的路径漂移，并顺带消掉并发 `h3 8s cap` 合并带来的存量内容漂移（`adapters/`、`audio/`、`gates/`、`final/`、`media/h3_workflow.py`、`spine/advance.py` 等）。重生后 `make doctor` 的 `runtime_lock.ok` 由 `false`→`true`、`core_readiness.failed_checks` 由 `["runtime_lock"]`→`[]`，门禁恢复全绿。
+- 全仓 grep 确认无 dangling 顶层引用；3 测试 17 passed；ruff 干净；`make doctor` 全绿。
+
 ## [2.40.33] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 续)
