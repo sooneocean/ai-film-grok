@@ -48,19 +48,52 @@ def media_duration(path: Path) -> float:
         raise FilmError(str(exc)) from exc
 
 
-def probe_native_audio_mean_volume(path: Path) -> float | None:
-    """Return native I2V stem mean volume, or None when ffmpeg cannot measure it."""
-    try:
-        result = run(
-            ["ffmpeg", "-hide_banner", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    match = re.search(
-        r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB", (result.stderr or "") + (result.stdout or "")
-    )
+_MEAN_VOLUME_RE = re.compile(r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB")
+
+
+def parse_mean_volume_db(text: str) -> float | None:
+    """Parse ffmpeg volumedetect mean_volume from combined stdout/stderr text."""
+    match = _MEAN_VOLUME_RE.search(text or "")
     return float(match.group(1)) if match else None
+
+
+def probe_native_audio_mean_volume(
+    path: Path,
+    *,
+    sample_sec: float | None = None,
+    start_sec: float | None = None,
+    strip_video: bool = False,
+    timeout: float | None = 60.0,
+    run_fn: Any | None = None,
+) -> float | None:
+    """Return media mean volume (dB), or None when ffmpeg cannot measure it.
+
+    Single implementation for native-audio honesty and loudness probes.
+    Pass ``run_fn`` (e.g. hub ``run``) so tests can patch the caller module.
+    Optional ``sample_sec`` / ``start_sec`` limit decode window (compose path).
+    """
+    runner = run_fn or run
+    cmd: list[str] = ["ffmpeg", "-hide_banner"]
+    if start_sec is not None and float(start_sec) > 0:
+        cmd.extend(["-ss", f"{float(start_sec):.3f}"])
+    cmd.extend(["-i", str(path)])
+    if sample_sec is not None and float(sample_sec) > 0:
+        cmd.extend(["-t", f"{float(sample_sec):.3f}"])
+    if strip_video:
+        cmd.append("-vn")
+    cmd.extend(["-af", "volumedetect", "-f", "null", "-"])
+    try:
+        if timeout is not None:
+            try:
+                result = runner(cmd, check=False, timeout=timeout)
+            except TypeError:
+                result = runner(cmd, check=False)
+        else:
+            result = runner(cmd, check=False)
+    except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired, TimeoutError):
+        return None
+    text = f"{getattr(result, 'stderr', '') or ''}{getattr(result, 'stdout', '') or ''}"
+    return parse_mean_volume_db(text)
 
 
 def _register_media(

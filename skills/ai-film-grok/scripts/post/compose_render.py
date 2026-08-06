@@ -498,39 +498,15 @@ def copy_remotion_media(root: Path) -> dict[str, Any]:
 
 
 def probe_mean_volume_db(path: Path, *, sample_sec: float = 12.0) -> float | None:
-    """Rough loudness probe via ffmpeg volumedetect. None if unavailable."""
-    try:
-        proc = run(
-            [
-                "ffmpeg",
-                "-hide_banner",
-                "-ss",
-                "1",
-                "-t",
-                str(max(2.0, float(sample_sec))),
-                "-i",
-                str(path),
-                "-af",
-                "volumedetect",
-                "-f",
-                "null",
-                "-",
-            ],
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    text = (proc.stderr or "") + (proc.stdout or "")
-    mean = None
-    for line in text.splitlines():
-        if "mean_volume:" in line:
-            # e.g. [Parsed_volumedetect_0 @ …] mean_volume: -22.9 dB
-            try:
-                part = line.split("mean_volume:", 1)[1].strip().split()[0]
-                mean = float(part)
-            except (IndexError, ValueError):
-                continue
-    return mean
+    """Rough loudness probe via core.media_ops volumedetect. None if unavailable."""
+    from core.media_ops import probe_native_audio_mean_volume
+
+    return probe_native_audio_mean_volume(
+        path,
+        start_sec=1.0,
+        sample_sec=max(2.0, float(sample_sec)),
+        run_fn=run,
+    )
 
 
 def _preferred_mix_audio_sources(root: Path) -> list[Path]:

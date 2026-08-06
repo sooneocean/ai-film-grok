@@ -83,6 +83,87 @@ class PreferredModeTests(unittest.TestCase):
         mode = preferred_mode_for_lane("hero_identity_lock")
         self.assertTrue(mode is None or isinstance(mode, str))
 
+
+class FamilyApplyTests(unittest.TestCase):
+    def test_fill_empty_dsl_from_family(self) -> None:
+        from h3_combo_eval import apply_combo_family_to_shot
+
+        thin = {"id": "s1", "shot_role": "hero", "dsl": {}}
+        out = apply_combo_family_to_shot(thin, "soft_portrait_alive")
+        self.assertEqual(out.get("_combo_prompt_family_applied"), "soft_portrait_alive")
+        dsl = out.get("dsl") or {}
+        self.assertTrue(str(dsl.get("action") or "").strip())
+        self.assertIn("eyes", str(dsl.get("action") or "").lower())
+
+    def test_does_not_overwrite_author_action(self) -> None:
+        from h3_combo_eval import apply_combo_family_to_shot
+
+        author = {
+            "id": "s1",
+            "dsl": {"action": "CUSTOM_AUTHOR_ACTION_ONLY"},
+        }
+        out = apply_combo_family_to_shot(author, "high_motion_max")
+        self.assertEqual(out["dsl"]["action"], "CUSTOM_AUTHOR_ACTION_ONLY")
+        # other empty keys still fill
+        self.assertTrue(str(out["dsl"].get("motion") or "").strip())
+
+    def test_force_overwrites(self) -> None:
+        from h3_combo_eval import apply_combo_family_to_shot
+
+        author = {"id": "s1", "dsl": {"action": "KEEP_ME"}}
+        out = apply_combo_family_to_shot(author, "high_motion_max", force=True)
+        self.assertNotEqual(out["dsl"]["action"], "KEEP_ME")
+
+    def test_production_prompt_gets_family_micro_life(self) -> None:
+        """Empty-DSL hero shot should pick soft_portrait_alive and inject micro-life."""
+        from pathlib import Path
+        from h3_workflow import _prompt_for_shot
+
+        thin = {
+            "id": "s_soft_prod",
+            "shot_role": "hero",
+            "heat_phase": "setup",
+            "dramatic_function": "reaction",
+            "duration_sec": 5,
+            "dsl": {},
+        }
+        film = {"_i2v_profile": "h3_primary", "i2v_profile": "h3_primary"}
+        prompt = _prompt_for_shot(Path("/tmp"), thin, mode="i2v", spec=film)
+        low = prompt.lower()
+        self.assertTrue(
+            "eyes" in low or "breath" in low or "micro" in low,
+            msg=f"expected micro-life from soft_portrait_alive, got: {prompt[:400]}",
+        )
+        self.assertNotIn("HIGH MOTION priority: large visible pose/body change across the timeline", prompt)
+
+    def test_high_motion_family_header(self) -> None:
+        from pathlib import Path
+        from h3_workflow import _prompt_for_shot
+
+        shot = {
+            "id": "s_hi_prod",
+            "shot_role": "hero",
+            "heat_phase": "act",
+            "dramatic_function": "action",
+            "duration_sec": 5,
+            "prompt_tier": "high",
+            "dsl": {"prompt_tier": "high"},
+        }
+        film = {"_i2v_profile": "h3_primary"}
+        prompt = _prompt_for_shot(Path("/tmp"), shot, mode="r2v", spec=film)
+        self.assertIn("HIGH MOTION", prompt.upper())
+
+    def test_winners_dialogue_family_aligned(self) -> None:
+        from h3_combo_eval import load_combo_winners
+
+        data = load_combo_winners() or {}
+        lane = (data.get("lanes") or {}).get("dialogue_mouth_energy") or {}
+        self.assertEqual(lane.get("prompt_family"), "dialogue_mouth_max")
+        winner = lane.get("winner") or {}
+        if winner.get("family"):
+            self.assertEqual(winner.get("family"), lane.get("prompt_family"))
+
+
 if __name__ == "__main__":
     unittest.main()
 

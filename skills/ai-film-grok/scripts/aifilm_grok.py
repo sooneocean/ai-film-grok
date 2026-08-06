@@ -51,7 +51,7 @@ from core import (  # noqa: E402, F401
     which_npx_safe,
 )
 
-# probe_native_audio_mean_volume stays on hub below for test patchability of ``run``.
+# probe_native_audio_mean_volume stays on hub for test patchability of ``run``.
 from security_policy import (
     SecurityPolicyError,
     safe_existing_file,
@@ -65,22 +65,10 @@ from util.validators import aspect_dims
 
 
 def probe_native_audio_mean_volume(path: Path) -> float | None:
-    """Hard-compat volume probe: uses module-level ``run`` so tests can patch aifilm_grok.run."""
-    import re as _re
-    import subprocess as _subprocess
+    """Hard-compat: delegates to core.media_ops with hub ``run`` for test patches."""
+    from core.media_ops import probe_native_audio_mean_volume as _probe
 
-    try:
-        result = run(
-            ["ffmpeg", "-hide_banner", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
-            check=False,
-        )
-    except (OSError, _subprocess.SubprocessError):
-        return None
-    match = _re.search(
-        r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB",
-        (result.stderr or "") + (result.stdout or ""),
-    )
-    return float(match.group(1)) if match else None
+    return _probe(path, run_fn=run)
 
 
 

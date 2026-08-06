@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.39.90] - 2026-08-06
+
+### Added (engineering quality + team uplift)
+- **CONTRIBUTING** + **REVIEW_CHECKLIST**: `docs/CONTRIBUTING.md`, `docs/REVIEW_CHECKLIST.md` (linked from README/AGENTS).
+- **CI secret scan**: `scripts/secret_scan.py` on every push/PR (honest gate when local pre-push skips gitea-publish).
+- **CI hotpath job**: `pytest -m "hotpath and not slow"` fail-closed contracts.
+- **IRON coverage table**: `docs/reports/2026-08-06-iron-gate-coverage.md`.
+- **`util.read_json_source`**: secure nofollow JSON read; `semantic_index` delegates.
+- **`util.retry.retry_call`**: shared backoff helper for new call sites.
+- **Volume probe single path**: `core.media_ops.probe_native_audio_mean_volume` (+ `parse_mean_volume_db`); hub/compose/h3_ship_native/h3_workflow converge.
+- Tests: `tests/test_util_retry_json_source.py`.
+- Quality plan status refresh: `docs/plans/2026-08-06-codebase-quality-todoplan.md`.
+
+## [2.39.89] - 2026-08-06
+
+### Added (H3 prompt system · family → production)
+- **Production family apply**: registry `prompt_family` now hole-fills empty shot DSL on `h3_primary`/`hybrid_h3` via `apply_combo_family_to_shot` (escape `AIFILM_H3_FAMILY_APPLY=0`). Plan annotate-only gap closed.
+- **`registry/h3-prompt-system.json`**: versioned system clauses; `motion_prompt_spine.system_clause` for HIGH/SOFT/MOUTH/style-lock.
+- **Winners**: `dialogue_mouth_energy.winner.family` aligned to `dialogue_mouth_max`.
+- Audit: `docs/plans/2026-08-06-h3-prompt-system-audit.md`.
+- Tests: `FamilyApplyTests` in `test_h3_combo_eval.py`.
+
 ## [2.39.88] - 2026-08-06
 
 ### Fixed (C1 floor-retry residual)

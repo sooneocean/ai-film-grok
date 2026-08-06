@@ -14,12 +14,44 @@ that match the H3 DiT temporal decomposition format.
 
 from __future__ import annotations
 
+import json
 import os
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 
 class MotionCoreError(ValueError):
     """Raised when a motion prompt is missing film-core payload."""
+
+
+@lru_cache(maxsize=1)
+def load_h3_prompt_system() -> dict[str, Any]:
+    """Load versioned H3 system clauses (registry/h3-prompt-system.json)."""
+    here = Path(__file__).resolve().parent
+    candidates = [
+        here.parent / "registry" / "h3-prompt-system.json",
+        here / "registry" / "h3-prompt-system.json",
+    ]
+    for p in candidates:
+        if p.is_file():
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(data, dict):
+                return data
+    return {"schema_version": 1, "kind": "h3-prompt-system", "clauses": {}}
+
+
+def system_clause(key: str, *, fallback: str = "") -> str:
+    """Fetch one system clause by key; empty registry falls back to caller string."""
+    data = load_h3_prompt_system()
+    clauses = data.get("clauses") if isinstance(data.get("clauses"), dict) else {}
+    val = clauses.get(key)
+    if isinstance(val, str) and val.strip():
+        return val.strip()
+    return (fallback or "").strip()
 
 
 # Shared DF / heat sets — single source for spine prompts + optical gate.
@@ -394,12 +426,23 @@ def motion_core_clauses(
     tier = motion_tier_for(shot)
     if tier == "high":
         clauses.append(
-            "HIGH MOTION priority: large visible pose/body change; "
-            "avoid frozen portrait or micro-breath-only."
+            system_clause(
+                "high_motion",
+                fallback=(
+                    "HIGH MOTION priority: large visible pose/body change; "
+                    "avoid frozen portrait or micro-breath-only."
+                ),
+            )
         )
     elif tier == "soft":
         clauses.append(
-            "SOFT MOTION: micro-performance only (eyes, breath, jaw); locked camera preferred."
+            system_clause(
+                "soft_motion",
+                fallback=(
+                    "SOFT MOTION: micro-performance only (eyes, breath, jaw); "
+                    "locked camera preferred."
+                ),
+            )
         )
     actions = dsl_action_parts(shot)
     if actions:
@@ -415,22 +458,37 @@ def motion_core_clauses(
 def provider_prefix(mode: str) -> str:
     m = (mode or "i2v").strip().lower()
     if m == "r2v":
-        return (
-            "Vertical 9:16. Use <Picture 1> as identity and style reference. "
-            "Keep identity and wardrobe fixed."
+        body = system_clause(
+            "style_lock_r2v",
+            fallback=(
+                "Use <Picture 1> as identity and style reference. "
+                "Keep identity and wardrobe fixed."
+            ),
         )
+        return f"Vertical 9:16. {body}"
     if m == "t2v":
-        return "Vertical 9:16 text-to-video plate."
-    if m in {"flf", "first_last", "first_last_frame", "i2v_flf"}:
-        return (
-            "Vertical 9:16. First-last-frame image-to-video with medium cel-anime style lock. "
-            "Animate from the first keyframe toward the last keyframe; land on the last pose "
-            "and wardrobe; keep identity fixed."
+        return system_clause(
+            "style_lock_t2v",
+            fallback="Vertical 9:16 text-to-video plate.",
         )
-    return (
-        "Vertical 9:16. Animate the start frame with medium cel-anime style lock. "
-        "Keep identity and wardrobe fixed."
+    if m in {"flf", "first_last", "first_last_frame", "i2v_flf"}:
+        body = system_clause(
+            "style_lock_flf",
+            fallback=(
+                "First-last-frame image-to-video with medium cel-anime style lock. "
+                "Animate from the first keyframe toward the last keyframe; land on the last pose "
+                "and wardrobe; keep identity fixed."
+            ),
+        )
+        return f"Vertical 9:16. {body}"
+    body = system_clause(
+        "style_lock_i2v",
+        fallback=(
+            "Animate the start frame with medium cel-anime style lock. "
+            "Keep identity and wardrobe fixed."
+        ),
     )
+    return f"Vertical 9:16. {body}"
 
 
 def build_motion_prompt(
@@ -561,15 +619,30 @@ def build_h3_temporal_prompt(
             lead.append(want.rstrip("."))
         if has_dlg:
             lead.append(
-                "MOUTH ENERGY priority: clear jaw open-close each Mandarin syllable; "
-                "visible lip sync; keep face identity fixed; never freeze the mouth"
+                system_clause(
+                    "mouth_energy",
+                    fallback=(
+                        "MOUTH ENERGY priority: clear jaw open-close each Mandarin syllable; "
+                        "visible lip sync; keep face identity fixed; never freeze the mouth"
+                    ),
+                )
             )
         elif tier == "high":
             lead.append(
-                "HIGH MOTION priority: large visible pose/body change across the timeline"
+                system_clause(
+                    "high_motion_timeline",
+                    fallback=(
+                        "HIGH MOTION priority: large visible pose/body change across the timeline"
+                    ),
+                )
             )
         elif tier == "soft":
-            lead.append("SOFT MOTION: micro-performance only; locked camera preferred")
+            lead.append(
+                system_clause(
+                    "soft_motion",
+                    fallback="SOFT MOTION: micro-performance only; locked camera preferred.",
+                )
+            )
         if lead:
             tc, _, rest = segs[0].partition("] ")
             segs[0] = f"{tc}] {'; '.join(lead)}. {rest}".strip()

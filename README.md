@@ -14,6 +14,7 @@
 | **斜杠命令** | `/ai-film-grok` · `/aifilm` |
 | **CLI** | `skills/ai-film-grok/scripts/aifilm` |
 | **Agent 入口** | [`AGENTS.md`](./AGENTS.md) · skill 主脊 [`skills/ai-film-grok/SKILL.md`](./skills/ai-film-grok/SKILL.md) |
+| **贡献 / 评审** | [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) · [`docs/REVIEW_CHECKLIST.md`](./docs/REVIEW_CHECKLIST.md) |
 
 ---
 
@@ -625,11 +626,11 @@ MIT © [dex](https://github.com/sooneocean)
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.39.79`
+- 插件版本：`2.39.90`
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
-- Python 脚本：`622` 个
-- pytest 文件：`401` 个
+- Python 脚本：`629` 个
+- pytest 文件：`403` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

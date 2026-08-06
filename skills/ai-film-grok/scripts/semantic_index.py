@@ -11,13 +11,13 @@ import json
 import math
 import os
 import re
-import stat
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from local_llm import LocalLLMError, _request_json, normalize_base_url
 from security_policy import atomic_write_text
+from util import read_json_source
 
 DEFAULT_MODEL = "text-embedding-nomic-embed-text-v1.5"
 ALLOWED_MODELS = frozenset({DEFAULT_MODEL})
@@ -125,25 +125,12 @@ def _has_sensitive_assignment(text: str) -> bool:
 
 
 def _read_json_source(path: Path) -> tuple[bytes, dict[str, Any] | list[Any]]:
-    """Read only a regular file without following a final-component symlink."""
-    try:
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(path, flags)
-        with os.fdopen(descriptor, "rb") as handle:
-            if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
-                raise SemanticIndexError("index source must be a regular file")
-            raw = handle.read(_MAX_SOURCE_BYTES + 1)
-    except OSError as exc:
-        raise SemanticIndexError("index source became unsafe or unreadable") from exc
-    if len(raw) > _MAX_SOURCE_BYTES:
-        raise SemanticIndexError("index source exceeds 2 MB")
-    try:
-        value = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise SemanticIndexError("index source must contain valid JSON") from exc
-    if not isinstance(value, (dict, list)):
-        raise SemanticIndexError("index source must contain a JSON object or array")
-    return raw, value
+    """Security-sensitive JSON read — delegates to util.read_json_source."""
+    return read_json_source(
+        path,
+        max_bytes=_MAX_SOURCE_BYTES,
+        error_cls=SemanticIndexError,
+    )
 
 
 def _source_paths(root: Path) -> list[Path]:

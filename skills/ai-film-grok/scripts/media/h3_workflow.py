@@ -170,6 +170,10 @@ def _prompt_for_shot(
 
     When 2V + reference images are available, the prompt includes a
     Grok reference-composition stage before the timeline segments.
+
+    Combo-eval ``prompt_family`` (from registry winners) is hole-filled onto
+    the shot before compile so production matches canary recipes
+    (escape: ``AIFILM_H3_FAMILY_APPLY=0``).
     """
     from motion_prompt_spine import (
         MotionCoreError,
@@ -189,6 +193,8 @@ def _prompt_for_shot(
             # Unit tests / prompt-only calls may lack film-spec; spine still works.
             film = {}
 
+    work_shot = shot if isinstance(shot, dict) else {}
+
     i2v_profile = str(
         (film or {}).get("_i2v_profile")
         or (film or {}).get("i2v_profile")
@@ -197,10 +203,27 @@ def _prompt_for_shot(
         or ""
     ).strip().lower()
     is_5090_h3 = i2v_profile in {"h3_primary", "hybrid_h3"}
+
+    # Apply registry prompt_family DSL defaults only on 5090 H3 production profiles
+    # (fill empty motion fields only; escape AIFILM_H3_FAMILY_APPLY=0).
+    if is_5090_h3:
+        try:
+            from h3_combo_eval import (
+                apply_combo_family_to_shot,
+                family_apply_enabled,
+                resolve_prompt_family_for_shot,
+            )
+
+            if family_apply_enabled():
+                fam_id = resolve_prompt_family_for_shot(work_shot)
+                if fam_id:
+                    work_shot = apply_combo_family_to_shot(work_shot, fam_id)
+        except Exception:
+            work_shot = shot if isinstance(shot, dict) else {}
     # Per-shot override for A/B: dsl.prompt_format = flat | timeline
-    dsl0 = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    dsl0 = work_shot.get("dsl") if isinstance(work_shot.get("dsl"), dict) else {}
     fmt = str(
-        dsl0.get("prompt_format") or shot.get("prompt_format") or ""
+        dsl0.get("prompt_format") or work_shot.get("prompt_format") or ""
     ).strip().lower()
     if fmt in {"flat", "spine", "paragraph"}:
         use_timeline = False
@@ -209,7 +232,7 @@ def _prompt_for_shot(
     else:
         use_timeline = is_5090_h3
 
-    sid = str(shot.get("id") or "shot")
+    sid = str(work_shot.get("id") or "shot")
     prompt_paths = [
         root / "receipts" / "prompts" / f"{sid}.i2v.txt",
         root / "receipts" / "prompts" / f"{sid}.txt",
@@ -226,8 +249,8 @@ def _prompt_for_shot(
     duration = None
     try:
         duration = float(
-            shot.get("duration_sec")
-            or shot.get("max_duration_sec")
+            work_shot.get("duration_sec")
+            or work_shot.get("max_duration_sec")
             or h3_cfg.get("max_duration_sec")
             or 8
         )
@@ -236,10 +259,11 @@ def _prompt_for_shot(
 
     if author:
         # Keep author geometry/style; merge DF/want/dialogue; timeline when enabled.
+        # Family-filled work_shot still supplies missing motion core clauses.
         body = ensure_motion_core_in_prompt(
             author,
             film,
-            shot,
+            work_shot,
             timeline=bool(use_timeline),
             duration_sec=duration,
         )
@@ -255,17 +279,17 @@ def _prompt_for_shot(
     elif use_timeline:
         # Layer-4 timed action script ([0s-2s] …) for 5090 H3 (or explicit timeline).
         prompt = build_h3_temporal_prompt(
-            film, shot, mode=mode, duration_sec=duration,
+            film, work_shot, mode=mode, duration_sec=duration,
             ref_image_paths=ref_image_paths,
         )
     else:
-        prompt = build_motion_prompt(film, shot, mode=mode, include_provider_prefix=True)
+        prompt = build_motion_prompt(film, work_shot, mode=mode, include_provider_prefix=True)
     try:
         assert_motion_prompt_core(
             prompt,
-            shot,
+            work_shot,
             mode=mode,
-            role=str(shot.get("shot_role") or "hero"),
+            role=str(work_shot.get("shot_role") or "hero"),
         )
     except MotionCoreError as exc:
         raise H3WorkflowError(str(exc)) from exc
@@ -503,41 +527,20 @@ def _native_audio_usable(path: Path, *, min_db: float = -42.0) -> tuple[bool, di
         meta["probe_error"] = str(exc)[:200]
         return False, meta
 
-    # volumedetect on the embedded audio stream (no full re-encode; bounded hang)
+    # volumedetect via single core.media_ops probe (bounded hang)
     try:
-        proc = subprocess.run(
-            [
-                "ffmpeg",
-                "-hide_banner",
-                "-i",
-                str(path),
-                "-vn",
-                "-af",
-                "volumedetect",
-                "-f",
-                "null",
-                "-",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=60,
-        )
-    except subprocess.TimeoutExpired:
-        # Soft: volume unknown → keep native if stream exists (same as probe fail).
+        from core.media_ops import probe_native_audio_mean_volume
+
+        mean_db = probe_native_audio_mean_volume(path, strip_video=True, timeout=60.0)
+    except TimeoutError:
         meta["volume_probe_timeout"] = True
         meta["usable_reason"] = "volumedetect_timeout"
         usable = bool(has_audio)
         meta["usable"] = usable
         return usable, meta
-    mean_db: float | None = None
-    for line in (proc.stderr or "").splitlines():
-        if "mean_volume:" in line:
-            try:
-                mean_db = float(line.split("mean_volume:")[1].split("dB")[0].strip())
-            except (IndexError, ValueError):
-                mean_db = None
-            break
+    except Exception as exc:  # noqa: BLE001
+        meta["volume_probe_error"] = str(exc)[:200]
+        mean_db = None
     meta["mean_volume_db"] = mean_db
     usable = mean_db is not None and mean_db > min_db
     # If volumedetect failed but a stream exists, keep native (H3 usually has real audio).

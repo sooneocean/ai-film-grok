@@ -3,9 +3,25 @@
 > **作者角色**：Senior Developer（高级开发工程师）— 资深全栈 / 代码质量把控
 > **结论先行**：本仓库**功能与产线规则已成熟**（见既有 `2026-08-06-optimization-todoplan.md`，那是「产品/出片」迭代板）。本档是**互补的另一面**——聚焦**代码库工程质量、技术债、测试纪律与团队能力 uplift**。一句话：规则不缺，缺的是「把规则变成机器门禁 + 把质量把控变成团队习惯」。
 
-**仓库**：`/Users/dex/.grok/ai-film-grok`（git 根；git 根 ≠ AGENTS.md 写的 `~/.grok/plugins/...`，详见 T5.5）
-**规模基线**：1091 个 `.py` / 约 25 万行；测试 **3342 个** `def test_`（398 文件）；CI `ci.yml` 真实接 push/PR。
-**plugin**：2.39.87
+**Status（2026-08-06 晚）:** Q0 团队底座 + Q1 部分 + Q2.1/Q2.2 **SHIPPED** 于本轮（见 v2.39.90 CHANGELOG）  
+**仓库真相：** `/Users/dex/.grok/plugins/ai-film-grok`  
+**plugin：** 见 `plugin.json`（本轮 bump 2.39.90）
+
+### 账实快照（勿按旧段落重做）
+
+| 项 | 状态 |
+|----|------|
+| `docs/CONTRIBUTING.md` / `REVIEW_CHECKLIST.md` | **DONE** |
+| CI secret scan (`scripts/secret_scan.py`) | **DONE** |
+| CI hotpath job | **DONE** |
+| IRON coverage table | **DONE** `docs/reports/2026-08-06-iron-gate-coverage.md` |
+| hotpath markers | **DONE**（≥6 test files；旧文「0 处」过时） |
+| `core.hooksPath=.githooks` | **DONE**（`make install-hooks`） |
+| `util.read_json_source` + semantic_index | **DONE** |
+| volume probe → `core.media_ops` | **DONE** 主路径；canary/quality_check 可 residual |
+| `util.retry` | **DONE** 工具落地；全仓替换 OPEN |
+| heat↔policy sys.modules | **OPEN** bug-driven |
+| 虚荣 peel | **NON-GOAL** |
 
 ---
 

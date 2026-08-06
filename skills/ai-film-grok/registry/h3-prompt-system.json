@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "kind": "h3-prompt-system",
+  "policy": "h3_prompt_system_v1",
+  "notes": "Versioned system clauses for H3 motion compile. Source of truth for shared headers; PROMPT_FAMILIES hold lane DSL recipes.",
+  "clauses": {
+    "high_motion": "HIGH MOTION priority: large visible pose/body change; avoid frozen portrait or micro-breath-only.",
+    "high_motion_timeline": "HIGH MOTION priority: large visible pose/body change across the timeline",
+    "soft_motion": "SOFT MOTION: micro-performance only (eyes, breath, jaw); locked camera preferred.",
+    "mouth_energy": "MOUTH ENERGY priority: clear jaw open-close each Mandarin syllable; visible lip sync; keep face identity fixed; never freeze the mouth",
+    "soft_micro_life": "continuous micro-life: never freeze; every half-second a small natural micro-change",
+    "identity_lock": "Keep identity and wardrobe fixed; no morphing, no face swap, no extra people.",
+    "style_lock_i2v": "Animate the start frame with medium cel-anime style lock. Keep identity and wardrobe fixed.",
+    "style_lock_r2v": "Use <Picture 1> as identity and style reference. Keep identity and wardrobe fixed.",
+    "style_lock_flf": "First-last-frame image-to-video with medium cel-anime style lock. Animate from the first keyframe toward the last keyframe; land on the last pose and wardrobe; keep identity fixed.",
+    "style_lock_t2v": "Vertical 9:16 text-to-video plate.",
+    "no_redress": "Keep first-frame clothing; never re-dress after undress.",
+    "continue_frame": "CONTINUE from this exact end frame; preserve pose, wardrobe, and face identity."
+  },
+  "defaults": {
+    "family_apply": true,
+    "timeline": true,
+    "weapon_steps": 20,
+    "duration_sec_pilot": 5.0
+  }
+}

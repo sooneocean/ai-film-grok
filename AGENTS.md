@@ -1,6 +1,8 @@
 # AGENTS · ai-film-grok
 
 > Coding agent 入口。人读 README；agent 先读本档再改代码。
+>
+> 人读入职 / 评审：[`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) · [`docs/REVIEW_CHECKLIST.md`](docs/REVIEW_CHECKLIST.md)
 
 ## Source checkout（本机开发真相）
 
@@ -79,7 +81,9 @@ grok plugin update ai-film-grok
 git push origin main
 ```
 
-JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmError）；新代码勿再复制 `_read_json`。
+JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmError）；安全 nofollow 读 `util.read_json_source`；新代码勿再复制 `_read_json`。
+音量探针：`core.media_ops.probe_native_audio_mean_volume`（禁粘贴 volumedetect）；重试优先 `util.retry`。
+门禁真相：CI 为最终门禁（含 secret scan + hotpath）；本地 pre-push 无 gitea-publish 时 secret 会 skip。
 
 ## 硬规则（指针 · 正文在 hard-defaults / stages）
 

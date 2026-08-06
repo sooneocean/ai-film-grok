@@ -495,6 +495,137 @@ def compile_family_author_prompt(
     ).strip()
 
 
+def family_apply_enabled() -> bool:
+    """Production path applies combo family DSL fill. Escape: AIFILM_H3_FAMILY_APPLY=0."""
+    import os
+
+    raw = os.environ.get("AIFILM_H3_FAMILY_APPLY", "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+_DSL_FILL_KEYS = (
+    "action",
+    "motion",
+    "visible_change",
+    "camera_prompt",
+    "environment",
+    "timeline_events",
+    "prompt_tier",
+    "prompt_format",
+)
+
+
+def apply_combo_family_to_shot(
+    shot: dict[str, Any],
+    family_id: str | None,
+    *,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Merge winning prompt-family defaults into a production shot (fill holes only).
+
+    Does **not** overwrite non-empty author/DSL fields unless ``force=True``.
+    Used so registry ``prompt_family`` actually changes compiled H3 prompts
+    (plan.combo_prompt_family was annotate-only before this).
+    """
+    if not family_id or not isinstance(shot, dict):
+        return shot if isinstance(shot, dict) else {}
+    fam = PROMPT_FAMILIES.get(str(family_id).strip())
+    if not isinstance(fam, dict):
+        return dict(shot)
+
+    out = dict(shot)
+    # Only motion-tier / framing helpers at top level — never steal story beat (nar/DF).
+    for key, fam_key in (
+        ("prompt_tier", "prompt_tier"),
+        ("screen_mode", "screen_mode"),
+        ("shot_size", "shot_size"),
+    ):
+        if fam_key not in fam:
+            continue
+        cur = out.get(key)
+        empty = cur is None or (isinstance(cur, str) and not str(cur).strip())
+        if force or empty:
+            out[key] = fam[fam_key]
+    # prompt_format only when force (production 5090 already defaults timeline)
+    if force and fam.get("prompt_format"):
+        out["prompt_format"] = fam["prompt_format"]
+
+    # Do not inject eval-only audio_cues into live dialogue shots (would overwrite lines).
+    if force and fam.get("audio_cues") and not out.get("audio_cues"):
+        out["audio_cues"] = list(fam["audio_cues"])
+
+    dsl_in = out.get("dsl") if isinstance(out.get("dsl"), dict) else {}
+    dsl = dict(dsl_in)
+    fam_dsl = fam.get("dsl") if isinstance(fam.get("dsl"), dict) else {}
+    for key in _DSL_FILL_KEYS:
+        if key not in fam_dsl and key not in fam:
+            continue
+        src = fam_dsl.get(key) if key in fam_dsl else fam.get(key)
+        if src is None or src == "":
+            continue
+        cur = dsl.get(key)
+        empty = (
+            cur is None
+            or cur == ""
+            or (isinstance(cur, str) and not cur.strip())
+            or (isinstance(cur, list) and len(cur) == 0)
+        )
+        if force or empty:
+            dsl[key] = list(src) if isinstance(src, list) else src
+    if fam.get("prompt_tier") and (force or not dsl.get("prompt_tier")):
+        dsl["prompt_tier"] = fam["prompt_tier"]
+    if force and fam.get("prompt_format") and not dsl.get("prompt_format"):
+        dsl["prompt_format"] = fam["prompt_format"]
+    out["dsl"] = dsl
+    out["_combo_prompt_family_applied"] = str(family_id).strip()
+    return out
+
+
+def resolve_prompt_family_for_shot(
+    shot: dict[str, Any],
+    *,
+    intent: dict[str, Any] | None = None,
+    has_still: bool | None = None,
+    family_override: str | None = None,
+) -> str | None:
+    """Pick registry prompt_family for a live shot (lane → winners)."""
+    if family_override and str(family_override).strip():
+        fid = str(family_override).strip()
+        return fid if fid in PROMPT_FAMILIES else fid
+    try:
+        from h3_mode import infer_combo_lane
+
+        still_flag = bool(has_still) if has_still is not None else bool(
+            shot.get("still_path") or shot.get("has_still")
+        )
+        role = str(
+            (intent or {}).get("shot_role") if intent else None
+            or shot.get("shot_role")
+            or "hero"
+        ).strip().lower()
+        if not still_flag and role in {"hero", "insert", ""}:
+            still_flag = True
+        lane = infer_combo_lane(shot, intent=intent, has_still=still_flag)
+    except Exception:
+        lane = None
+    if not lane:
+        raw = (
+            (shot.get("dsl") or {}).get("prompt_family")
+            if isinstance(shot.get("dsl"), dict)
+            else None
+        ) or shot.get("prompt_family") or shot.get("combo_prompt_family")
+        if raw and str(raw).strip() in PROMPT_FAMILIES:
+            return str(raw).strip()
+        return None
+    data = load_combo_winners() or {}
+    lanes = data.get("lanes") if isinstance(data.get("lanes"), dict) else {}
+    entry = lanes.get(lane) if isinstance(lanes.get(lane), dict) else {}
+    family = (entry or {}).get("prompt_family")
+    if family and str(family).strip():
+        return str(family).strip()
+    return None
+
+
 def build_eval_film_spec(combos: list[ComboSpec] | None = None) -> dict[str, Any]:
     combos = combos or build_combo_matrix()
     shots_by_id: dict[str, dict[str, Any]] = {}

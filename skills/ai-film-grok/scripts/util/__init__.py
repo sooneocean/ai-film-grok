@@ -66,6 +66,39 @@ def require_json(path: Path) -> dict[str, Any]:
     return data
 
 
+def read_json_source(
+    path: Path,
+    *,
+    max_bytes: int = 2_000_000,
+    error_cls: type[BaseException] = FilmError,
+) -> tuple[bytes, dict[str, Any] | list[Any]]:
+    """Read a regular file without following a final-component symlink.
+
+    Used by security-sensitive index paths (semantic index). Prefer
+    ``read_json`` / ``require_json`` for ordinary film JSON.
+    """
+    import stat as _stat
+
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            if not _stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                raise error_cls("index source must be a regular file")
+            raw = handle.read(max_bytes + 1)
+    except OSError as exc:
+        raise error_cls("index source became unsafe or unreadable") from exc
+    if len(raw) > max_bytes:
+        raise error_cls(f"index source exceeds {max_bytes} bytes")
+    try:
+        value = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise error_cls("index source must contain valid JSON") from exc
+    if not isinstance(value, (dict, list)):
+        raise error_cls("index source must contain a JSON object or array")
+    return raw, value
+
+
 def soft_json(path: Path) -> dict[str, Any]:
     """Soft read always returning a dict (missing / invalid / non-object → ``{}``)."""
     return read_json(path) or {}

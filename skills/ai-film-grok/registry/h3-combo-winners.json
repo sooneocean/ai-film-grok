@@ -60,7 +60,7 @@
       "winner": {
         "combo_id": "r4_dlg_flat_i2v",
         "mode": "i2v",
-        "family": "dialogue_mouth_flat",
+        "family": "dialogue_mouth_max",
         "score": 92.02932,
         "scores": {
           "identity_score": 51.5424,

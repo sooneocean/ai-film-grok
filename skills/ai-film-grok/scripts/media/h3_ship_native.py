@@ -111,39 +111,12 @@ def _ffprobe_has_audio(path: Path) -> bool:
 
 
 def _mean_volume_db(path: Path) -> float | None:
-    """Best-effort volumedetect; None if ffmpeg missing or silent fail."""
+    """Best-effort volumedetect via core.media_ops (single implementation)."""
     try:
         from core.media_ops import probe_native_audio_mean_volume
 
-        return probe_native_audio_mean_volume(path)
+        return probe_native_audio_mean_volume(path, timeout=60.0)
     except Exception:
-        pass
-    try:
-        r = subprocess.run(
-            [
-                "ffmpeg",
-                "-hide_banner",
-                "-i",
-                str(path),
-                "-af",
-                "volumedetect",
-                "-f",
-                "null",
-                "-",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
-        )
-        import re
-
-        m = re.search(
-            r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB",
-            (r.stderr or "") + (r.stdout or ""),
-        )
-        return float(m.group(1)) if m else None
-    except (OSError, subprocess.TimeoutExpired, ValueError):
         return None
 
 
