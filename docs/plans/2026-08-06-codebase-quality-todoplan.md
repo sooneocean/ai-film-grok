@@ -17,6 +17,7 @@
 | IRON coverage table | **DONE** `docs/reports/2026-08-06-iron-gate-coverage.md` |
 | hotpath markers | **DONE**（≥6 test files；旧文「0 处」过时） |
 | `core.hooksPath=.githooks` | **DONE**（`make install-hooks`） |
+| 本地 `check-all` 镜像 CI（secret-scan + hotpath） | **DONE**（`scripts/check-all.sh` 2.39.92：本地绿线 ≡ CI = validate+ruff+doctor+pytest not-slow+secret-scan+hotpath） |
 | `util.read_json_source` + semantic_index | **DONE** |
 | volume probe → `core.media_ops` | **DONE** 主路径；canary/quality_check 可 residual |
 | `util.retry` | **DONE** 工具落地；全仓替换 OPEN |
@@ -191,3 +192,12 @@ T0.1 门禁真相（最高优先，1 小时内可决）
 两者共享 `5379ca9`（本 plan 首提）后分叉；`plugins/ai-film-grok` 还被并行 agent 推到了 github/main（`ce06076`）。本会话的 quality uplift 先落在 `ai-film-grok`，后被并行 commit `922caf5`（2.39.90，含 `scripts/secret_scan.py`、`parse_mean_volume_db`、`util/retry.py`、CONTRIBUTING/REVIEW_CHECKLIST、CI hotpath job）覆盖为 **superset**。
 
 **结论 / 行动项**：选定唯一 canonical 仓库（建议 `plugins/ai-film-grok`，契合 AGENTS 原意），统一远端与同步流程；将 `ai-film-grok` 的独有修正（AGENTS 路径纠错、3 个 gate 套件 hotpath 打标）以 follow-up commit（2.39.91）落到 canonical，解决 plugins 侧未提交 h3 工作后再 `grok plugin update`。
+
+### 10.1 门禁信任缺口收尾（2026-08-06 · 2.39.92）
+
+T0.1 的「唯一门禁」已闭环为两端：
+
+- **CI 端（2.39.90）**：`ci.yml` 每个 push/PR 真实跑 `secret_scan.py` + `hotpath` job（fail-closed）。
+- **本地端（2.39.92）**：`scripts/check-all.sh` 由 4 步扩到 6 步，新增 **secret-scan（step 1）** 与 **hotpath 契约（step 6）**，本地 `make check-all` ≡ CI 绿线。工程师本地即可复现远端门禁，不再有「以为在扫其实没扫」的盲区。
+
+残留项（非阻塞，已文档化）：本地 `check-all` 未跑 coverage 58% 阈值（CI 独有）；`core.hooksPath` 仍需 `make install-hooks` 手动启用一次。对称缺口仅剩 canonical 仓库统一（§10 主项）。
