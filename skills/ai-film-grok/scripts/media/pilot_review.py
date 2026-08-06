@@ -411,6 +411,10 @@ def user_phrase_is_approval(phrase: str) -> bool:
         "pilot approve",
         "pilot approved",
         "pilot passed",
+        "pilot 批准",
+        "pilot批准",
+        "polot 批准",  # common typo for pilot
+        "polot批准",
         "user approved pilot",
         "定妆过了",
         "三镜过了",
@@ -436,6 +440,9 @@ def user_phrase_is_approval(phrase: str) -> bool:
         "approved",
     )
     if any(m in p or m in low for m in markers):
+        return True
+    # 「…批准」with pilot/polot (e.g. user: polot 批准)
+    if ("批准" in p or "核准" in p) and ("pilot" in low or "polot" in low):
         return True
     # Exact short affirmations only (avoid matching random long text)
     return low in {"ok", "okay", "yes", "y", "好", "好的", "行", "过", "通过"}
