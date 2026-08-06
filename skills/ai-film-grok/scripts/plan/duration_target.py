@@ -188,6 +188,53 @@ def check_duration_target(
             if severity == "ok":
                 severity = "soft"
 
+    # S0.2 · H3-reachable shot density: even if duration_sec is padded so planned
+    # sum hits target, too few plates cannot deliver target under ~5.2s/clip.
+    h3_ceiling = n * float(nominal_clip_sec)
+    report["h3_reachable_sec"] = round(h3_ceiling, 3)
+    if min_shots > 0 and n < min_shots:
+        reach_gap = target - h3_ceiling
+        reach_ratio = reach_gap / target if target else 0.0
+        if reach_ratio > hard_gap_ratio:
+            codes.append("DURATION_SHOT_COUNT_SHORT_HARD")
+            severity = "hard"
+            nexts.extend(
+                [
+                    f"shot_count={n} < H3 min {min_shots} for target {target:.0f}s "
+                    f"(~{nominal_clip_sec}s/clip → max ~{h3_ceiling:.0f}s)",
+                    "next: (1) add shots until count≥suggested_min_shots_h3, or "
+                    f"(2) lower target_duration to ~{h3_ceiling:.0f}s and re-lock promise",
+                    "do not pad duration_sec above H3 nominal to fake planned sum",
+                ]
+            )
+        elif reach_ratio > soft_gap_ratio:
+            codes.append("DURATION_SHOT_COUNT_SHORT_SOFT")
+            if severity == "ok":
+                severity = "soft"
+            nexts.append(
+                f"shot_count={n} soft-under H3 density (need ≥{min_shots} for "
+                f"{target:.0f}s at ~{nominal_clip_sec}s)"
+            )
+
+    # Cap honesty: any planned plate well above nominal is a paper lie under h3_primary
+    overlong = 0
+    for sh in shots:
+        try:
+            d = float(sh.get("duration_sec") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if d > float(nominal_clip_sec) + 0.35:
+            overlong += 1
+    report["overlong_planned_shots"] = overlong
+    if overlong > 0 and n > 0 and overlong / n >= 0.25:
+        codes.append("DURATION_PLAN_OVERLONG_SOFT")
+        if severity == "ok":
+            severity = "soft"
+        nexts.append(
+            f"{overlong}/{n} shots have duration_sec > H3 nominal "
+            f"{nominal_clip_sec}s — clamp plan or re-I2V longer takes"
+        )
+
     # strict override from spec
     if strict is None and isinstance(spec, dict):
         raw = spec.get("duration_target_strict")

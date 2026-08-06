@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -351,7 +352,7 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
         "shots": [
             {
                 "id": shot["id"],
-                "duration_sec": float(shot.get("duration_sec") or 6),
+                "duration_sec": float(shot.get("duration_sec") or 5.2),
                 "title": shot.get("title") or shot["id"],
             }
             for shot in shots
@@ -395,6 +396,40 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
             "cinematic audit failed after projection: "
             + ",".join(cinematic_receipt.get("blocking_codes") or [])
         )
+
+    # S0.2 · plan-time duration honesty (fail-closed hard codes; receipt always)
+    duration_target_rep: dict[str, Any] | None = None
+    try:
+        from plan.duration_target import (
+            check_duration_target,
+            write_duration_target_receipt,
+        )
+
+        duration_target_rep = check_duration_target(spec)
+        write_duration_target_receipt(root, duration_target_rep)
+        skip_dt = os.environ.get("AIFILM_SKIP_DURATION_TARGET", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if (
+            not skip_dt
+            and duration_target_rep.get("severity") == "hard"
+            and not duration_target_rep.get("ok")
+        ):
+            raise FilmError(
+                "duration target honesty failed at write-spec: "
+                + str(duration_target_rep.get("message") or duration_target_rep.get("codes"))
+                + " — next: "
+                + "; ".join(str(x) for x in (duration_target_rep.get("next") or [])[:3])
+                + " (escape AIFILM_SKIP_DURATION_TARGET=1)"
+            )
+    except FilmError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — never block write-spec on probe crash
+        duration_target_rep = {"ok": False, "error": str(exc)[:200]}
+
     _emit(
         {
             "ok": True,
@@ -416,6 +451,7 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
             "sound_plan": spec.get("sound_plan"),
             "scene_sound": scene_sound,
             "cinematic_audit": cinematic_receipt,
+            "duration_target": duration_target_rep,
         }
     )
     return 0

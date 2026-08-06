@@ -201,8 +201,10 @@ MAX_NAR_CHARS = 55
 RECOMMENDED_NAR_CHARS = 28  # snappy: fits ~6s I2V with loops=0 after pad
 # Rough est: seconds ≈ chars / 4 for zh storyteller (floor 1.0)
 NAR_CHARS_PER_SEC = 4.0
-# Default I2V plate when duration_sec omitted
-DEFAULT_DURATION_SEC = 6.0
+# Default I2V plate when duration_sec omitted.
+# S0.1 · 2026-08-06: H3 single-clip nominal ~5.2s (not 6.0). Plan must not
+# systematically invent slots longer than local H3 stretchability (~5.9s).
+DEFAULT_DURATION_SEC = 5.2
 # Soft report threshold (legacy); hard gate is est_vo_sec <= duration_sec + slack.
 LOOP_RISK_VO_SEC = 5.5
 # TTS estimate slack vs plate (actual edge-tts may drift slightly under estimate).

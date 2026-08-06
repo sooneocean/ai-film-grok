@@ -2755,6 +2755,36 @@ def run_plan(
         write_json(root / "film-spec.json", latest_spec)
     st = graph_status(root, auto_derive=False)
 
+    # S0.2 · duration honesty at plan time (receipt; soft warn in next; hard on write-spec)
+    duration_target_rep: dict[str, Any] | None = None
+    if (root / "film-spec.json").is_file():
+        try:
+            from plan.duration_target import (
+                check_duration_target,
+                resolve_target_duration_sec,
+                write_duration_target_receipt,
+            )
+
+            plan_spec = read_json(root / "film-spec.json") or {}
+            if not resolve_target_duration_sec(plan_spec):
+                # bind CLI target so honesty can run before write-spec
+                plan_spec = dict(plan_spec)
+                plan_spec.setdefault("target_duration", float(target_duration))
+            duration_target_rep = check_duration_target(plan_spec)
+            write_duration_target_receipt(root, duration_target_rep)
+        except Exception as exc:  # noqa: BLE001
+            duration_target_rep = {"ok": False, "error": str(exc)[:200]}
+
+    plan_next = [
+        f'aifilm write-spec --root "{root}"',
+        f'aifilm assets check --root "{root}"',
+        f'aifilm graph status --root "{root}" --with-jobs',
+        f'aifilm dispatch --root "{root}"',
+    ]
+    if duration_target_rep and not duration_target_rep.get("ok"):
+        for item in (duration_target_rep.get("next") or [])[:3]:
+            plan_next.insert(0, str(item))
+
     write_json(
         root / "receipts" / "plan.json",
         {
@@ -2768,6 +2798,7 @@ def run_plan(
             "bible": bible_report,
             "assets": assets_report,
             "graph_line": st.get("line"),
+            "duration_target": duration_target_rep,
         },
     )
 
@@ -2792,13 +2823,9 @@ def run_plan(
         "film_spec": spec_report,
         "bible": bible_report,
         "assets": assets_report,
+        "duration_target": duration_target_rep,
         "warnings": (normalized.get("warnings") or []) + (v.get("warnings") or []),
-        "next": [
-            f'aifilm write-spec --root "{root}"',
-            f'aifilm assets check --root "{root}"',
-            f'aifilm graph status --root "{root}" --with-jobs',
-            f'aifilm dispatch --root "{root}"',
-        ],
+        "next": plan_next,
     }
 
 

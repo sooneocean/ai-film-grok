@@ -79,6 +79,59 @@ class TestDurationTarget(unittest.TestCase):
         )
         self.assertFalse(r["ok"])
         self.assertIn("DURATION_MEDIA_SHORT_HARD", r["codes"])
+        # S0.2: also fail on H3-reachable shot density (41 < 58)
+        self.assertIn("DURATION_SHOT_COUNT_SHORT_HARD", r["codes"])
+
+    def test_shot_count_short_hard_even_if_planned_padded(self) -> None:
+        """S0.2: paper duration_sec cannot hide too few H3 plates."""
+        from plan.duration_target import check_duration_target, suggest_min_shots
+
+        # 41 shots × 7.32s planned = 300, but H3 ceiling 41×5.2≈213
+        r = check_duration_target(_spec(41, 300.0 / 41, 300.0))
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["severity"], "hard")
+        self.assertIn("DURATION_SHOT_COUNT_SHORT_HARD", r["codes"])
+        self.assertEqual(r["suggested_min_shots_h3"], suggest_min_shots(300.0))
+        self.assertLess(r["h3_reachable_sec"], 300.0 * 0.8)
+
+    def test_default_duration_sec_is_h3_nominal(self) -> None:
+        """S0.1: film_spec default plate matches H3 nominal."""
+        from plan.duration_target import H3_NOMINAL_CLIP_SEC
+        from plan.film_spec import DEFAULT_DURATION_SEC
+
+        self.assertAlmostEqual(float(DEFAULT_DURATION_SEC), float(H3_NOMINAL_CLIP_SEC), places=2)
+        self.assertLessEqual(float(DEFAULT_DURATION_SEC), 5.2 + 1e-6)
+
+    def test_shot_plan_act_climax_capped_at_h3_nominal(self) -> None:
+        """S0.1: act/climax no longer invent 8s paper plates."""
+        from plan.shot_planning import H3_PLAN_DURATION_CAP_SEC, plan_shots
+
+        beat = {
+            "id": "bt01",
+            "order": 1,
+            "shots_n": 1,
+            "targetDuration": 20,
+            "dramatic_function": "action",
+            "source_text": "沉腰再办。",
+            "heat_phase": "act",
+            "coitus_beat": "rhythm",
+            "wardrobe_state": "bare",
+            "objective": "meat",
+        }
+        scene = {"order": 1, "genre": "adult"}
+        shots = plan_shots(
+            beat,
+            scene=scene,
+            shot_counter_start=1,
+            character_ids=["heroine"],
+            location_id="room",
+            chain_continue=False,
+        )
+        self.assertTrue(shots)
+        for sh in shots:
+            film = sh.get("_film") or {}
+            d = float(film.get("duration_sec") or 0)
+            self.assertLessEqual(d, float(H3_PLAN_DURATION_CAP_SEC) + 1e-6, film)
 
 
 class TestCropMasterStill(unittest.TestCase):

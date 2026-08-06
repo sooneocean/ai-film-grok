@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.39.97] - 2026-08-06
+
+### Fixed (shortform S0.1–S0.2 · plan H3 duration honesty)
+- **S0.1** `DEFAULT_DURATION_SEC=5.2` (was 6.0); shot planner caps act/climax plates at H3 nominal — removes 8s paper floor that invented unstretchable slots.
+- **S0.2** `check_duration_target` adds `DURATION_SHOT_COUNT_SHORT_HARD` when `shot_count < ceil(target/5.2)` even if `duration_sec` is padded; `overlong_planned_shots` soft code.
+- **write-spec** always writes `receipts/duration-target.json`; **fail-closed** on hard codes (escape `AIFILM_SKIP_DURATION_TARGET=1`).
+- **plan run** attaches duration-target receipt + next hints (non-blocking draft).
+- Strategy default: fail-closed + clear next (add shots / lower target); no silent pad.
+- Tests: `test_duration_target_ship_native` · `test_vo_budget` default 5.2.
+- Plan: `docs/plans/2026-08-06-shortform-optimization-todoplan.md`.
+
 ## [2.39.96] - 2026-08-06
 
 ### Validated (H3 prompt R5 · 5090)

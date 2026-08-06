@@ -30,10 +30,23 @@ def _est_vo_sec(nar: str) -> float:
     return max(1.0, round(len(t) / 4.0, 2))
 
 
-def _duration_for_nar(nar: str, floor: float = 3.0) -> float:
-    """Ensure write-spec vo_pacing: est_vo ≤ duration + 0.5."""
+# H3 nominal clip length (S0.1 · plan-time cap). Matches plan.duration_target.
+H3_NOMINAL_CLIP_SEC = 5.2
+# Soft upper for planned slot under shortform forbid_loop stretch (~5.9).
+H3_PLAN_DURATION_CAP_SEC = 5.2
+
+
+def _duration_for_nar(
+    nar: str, floor: float = 3.0, *, cap: float = H3_PLAN_DURATION_CAP_SEC
+) -> float:
+    """Ensure write-spec vo_pacing: est_vo ≤ duration + 0.5, capped to H3-reachable.
+
+    Prefer shorter spoken / more shots over inventing unstretchable plates.
+    """
     need = _est_vo_sec(nar) + 0.5 + 0.05
-    return max(float(floor), round(need, 1))
+    raw = max(float(floor), round(need, 1))
+    cap_f = float(cap) if cap and cap > 0 else raw
+    return min(raw, cap_f)
 
 
 # film-spec dramatic_function enum (kept here for shot-level decisions)
@@ -108,8 +121,10 @@ def plan_shots(
 ) -> list[dict[str, Any]]:
     """shot.plan — expand beat into 1–N vertical shots."""
     n = max(1, min(3, int(beat.get("shots_n") or 1)))
-    budget = float(beat.get("targetDuration") or 6)
-    per_floor = max(3.0, round(budget / n, 1))
+    budget = float(beat.get("targetDuration") or H3_NOMINAL_CLIP_SEC)
+    # Split budget across shots but never plan a single plate above H3 nominal
+    # (S0.1). More meat time → more shots at plan rebalance, not 8s paper slots.
+    per_floor = max(3.0, min(H3_PLAN_DURATION_CAP_SEC, round(budget / n, 1)))
     df = str(beat.get("dramatic_function") or "action")
     if df not in DRAMATIC_FUNCS:
         df = "action"
@@ -260,13 +275,14 @@ def plan_shots(
             "hook": "side_entry",
         }
         sex_pose = pose_cycle.get(coitus_beat) or ""
-        # Act/climax plates: longer floor so sex duration ratio hits ≥20%/40%
+        # Act/climax: prefer more plates at H3 nominal, not 8s paper duration
+        # (S0.1 · 2026-08-06 — 8s floor caused DURATION_MEDIA_SHORT vs ~5.2s H3).
         floor = per_floor
         if heat_phase in {"act", "climax"}:
-            floor = max(per_floor, 8.0)
+            floor = max(per_floor, min(H3_PLAN_DURATION_CAP_SEC, 5.0))
         elif heat_phase == "foreplay":
-            floor = max(per_floor, 5.0)
-        per = _duration_for_nar(nar, floor=floor)
+            floor = max(per_floor, min(H3_PLAN_DURATION_CAP_SEC, 5.0))
+        per = _duration_for_nar(nar, floor=floor, cap=H3_PLAN_DURATION_CAP_SEC)
         # Size ladder: setup wide → act medium → climax CU → lock insert
         # Size ladder pressure: avoid 3× same rank in a row (SIZE_STACK_FLAT)
         if coitus_beat == "entry" and heat_phase == "setup":

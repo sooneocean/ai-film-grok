@@ -105,10 +105,10 @@ class VoBudgetTests(unittest.TestCase):
         self.assertLessEqual(float(shots[0]["est_vo_sec"]), 10.5)
 
     def test_default_duration_applied_and_short_nar_ok(self) -> None:
-        nar = "话说夜里，她把门拉开。"  # short enough for 6s
+        nar = "话说夜里，她把门拉开。"  # short enough for H3 nominal 5.2s
         shots = validate_film_spec(_minimal(nar), assign_missing_ids=False)
-        self.assertEqual(float(shots[0]["duration_sec"]), 6.0)
-        self.assertLessEqual(float(shots[0]["est_vo_sec"]), 6.5)
+        self.assertEqual(float(shots[0]["duration_sec"]), 5.2)
+        self.assertLessEqual(float(shots[0]["est_vo_sec"]), 5.7)
 
 
 if __name__ == "__main__":
