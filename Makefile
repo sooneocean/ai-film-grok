@@ -1,10 +1,14 @@
-# Local / agent shortcuts. Absolute root on this machine:
-#   /Users/dex/.grok/plugins/ai-film-grok
+# Local / agent shortcuts.
+#   Git root (edit + commit here):   /Users/dex/.grok/ai-film-grok
+#   Runtime mirror (read by plugin): /Users/dex/.grok/plugins/ai-film-grok
+#                                     -> refresh after push via `grok plugin update`
+#   NOTE: the two checkouts share history but can fork — always commit in the
+#   git root above, then `grok plugin update` to sync the runtime mirror.
 #
 # Optimization loop (default agent path):
-#   make check-all          # validate + ruff + doctor + pytest not slow
-#   make release-light      # pre-push equivalent (docs + doctor core)
-#   git push                # pre-push uses light gate by default
+#   make check-all          # secret-scan + validate + ruff + doctor + pytest not slow + hotpath
+#   make release-light      # docs + doctor core (light gate; CI is the real gate)
+#   git push                # CI gates run on the server and are the final authority
 # Full suite before a heavy release:
 #   make release-check      # or AIFILM_RELEASE_GATE=full git push
 
@@ -17,12 +21,12 @@ RUNTIME_PYTHON := $(SKILL)/scripts/runtime-python
 
 help:
 	@echo "ai-film-grok make targets"
-	@echo "  check-all       validate + ruff + doctor + pytest -m 'not slow'"
+	@echo "  check-all       secret-scan + validate + ruff + doctor + pytest not slow + hotpath"
 	@echo "  test-fast       same fast pytest as agents (not slow)"
 	@echo "  test-hotpath    final/compose/gates fail-mode contracts only"
 	@echo "  test            full pytest (includes slow)"
 	@echo "  doctor          aifilm doctor"
-	@echo "  release-light   docs + doctor core (pre-push default)"
+	@echo "  release-light   docs + doctor core (CI is the real gate)"
 	@echo "  release-check   package + full test suite"
 	@echo "  lock-runtime    refresh runtime-lock.json fingerprints"
 	@echo "  sync-docs       regenerate README/GRAPH version pointers"
