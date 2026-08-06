@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.12] - 2026-08-06
+
+### Added (quality P2 · transition export read-back 全量)
+- **Transition export read-back gate** (`gates/production_gates.py::assert_transition_export_readback` + `transition_export_readback_report`): closes the loop on the v2.40.11 controlled transition-policy gate. The policy gate validates the *plan* (`transition_intents`/`transition_styles`); this read-back validates the *built operations* (`spec["transition_ops"]`) actually materialise every declared seam and obey the policy — catching seams dropped or styles silently drifted during export/build.
+- Coverage + consistency checks: `EXPORT_READBACK_NO_OPS` (declared seams but no built ops), `EXPORT_READBACK_OP_COUNT_MISMATCH` (a seam dropped/duplicated), `EXPORT_READBACK_CONTINUE_NOT_HARD` (continue seam not hard_cut/0.0s/no-overlay), `EXPORT_READBACK_PARAGRAPH_BAD` (chapter seam not soft xfade+fade/dissolve), `EXPORT_READBACK_SOFT_NOT_XFADE` / `EXPORT_READBACK_HARD_NOT_CUT`, `EXPORT_READBACK_STYLE_DRIFT` (built style != declared), `EXPORT_READBACK_FLASHY_STYLE` (whip/grid on scene cut), `EXPORT_READBACK_OP_INVALID` / `EXPORT_READBACK_OP_BASE_INVALID`.
+- intro/outro / pure-MG roles relax (HF catalog open), mirroring the policy gate.
+- Wired into `preflight` as soft advisory; hard under `transition_policy_strict` or adult `heat_scale` max/hot/extreme (same strictness as the policy gate, incremental rollout).
+- Emergency escape: `AIFILM_SKIP_TRANSITION_READBACK_GATE=1`.
+- Tests: `tests/test_transition_export_readback.py` (19 cases — no-ops / op-missing / count-mismatch / continue-softened / chapter-bad / style-drift / flashy / relax / strict-raise / env-escape / root-spec).
+
 ## [2.40.11] - 2026-08-06
 
 ### Added (quality P2 · controlled transition-policy gate / HF 转场受控策略全量)

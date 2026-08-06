@@ -22,6 +22,7 @@ from production_gates import (
     loop_risk_shots_from_spec,
     pilot_is_user_approved,
     transition_policy_report,
+    transition_export_readback_report,
 )
 from util import read_json, utc_now
 
@@ -948,6 +949,43 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "transition_policy_probe_error",
                     f"transition-policy probe failed: {exc}"[:200],
                     fix="check production_gates.transition_policy_report",
+                )
+            )
+
+        # --- Controlled transition export read-back (P2 · HF 转场 export read-back 全量) ---
+        # Read back built transition_ops and verify full seam coverage + policy
+        # consistency (continue→hard_cut/0.0s/no overlay; soft→xfade w/ declared
+        # style; chapter→soft fade/dissolve; scene cut→no whip/grid). Soft advisory
+        # by default; hard on transition_policy_strict or adult max heat.
+        try:
+            rb = transition_export_readback_report(spec)
+            rb_codes = list(rb.get("codes") or [])
+            if rb_codes:
+                rb_strict = spec.get("transition_policy_strict") is True or str(
+                    spec.get("heat_scale") or ""
+                ).lower() in {"max", "hot", "extreme"}
+                rb_issue = _issue(
+                    "hard" if rb_strict else "soft",
+                    "transition_readback",
+                    f"transition export read-back {'hard' if rb_strict else 'soft'}: "
+                    f"{rb_codes} — {((rb.get('issues') or [{}])[0].get('message', '') or '')[:120]}",
+                    fix=(
+                        "build one operation per declared seam (continue→hard_cut/0.0s/no "
+                        "overlay; soft→xfade with declared style; chapter→soft fade/dissolve; "
+                        "scene cut→no whip/grid).lessons/hf-transition-policy"
+                    ),
+                )
+                if rb_strict:
+                    hard.append(rb_issue)
+                else:
+                    soft.append(rb_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "transition_readback_probe_error",
+                    f"transition export read-back probe failed: {exc}"[:200],
+                    fix="check production_gates.transition_export_readback_report",
                 )
             )
 
