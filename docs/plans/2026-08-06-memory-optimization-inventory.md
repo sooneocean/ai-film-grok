@@ -9,10 +9,11 @@
 | **B 已 ship 工程** | 代码/CLI 已落地的优化 | 当基础，禁绿野重开 |
 | **C 仍 OPEN / PARTIAL** | 记忆或 canary 写明未闭合 | **真迭代队列** |
 
-**单一执行板（下一轮）：** [2026-08-06-next-optimization-todoplan.md](2026-08-06-next-optimization-todoplan.md)  
+**单一执行板（下一轮）：** [2026-08-06-next-optimization-todoplan.md](2026-08-06-next-optimization-todoplan.md)（含 **Wave N 养分内化**）  
+**养分对账：** [2026-08-06-nutrient-matrix.md](2026-08-06-nutrient-matrix.md)（L3/L4/L5 · 已吞吐可废文）  
 **历史出片板（A1–A5 SHIPPED）：** [2026-08-06-optimization-todoplan.md](2026-08-06-optimization-todoplan.md)  
-**结构残余：** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md)（LOC 已刷 2.40.9）  
-**反脆弱：** [2026-08-05-antifragility-todoplan.md](2026-08-05-antifragility-todoplan.md)（主项多已 ship）
+**结构残余：** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md) · [monolith-relief](2026-08-06-monolith-relief-todoplan.md)  
+**反脆弱：** [archive/2026-08-05-antifragility-todoplan.md](archive/2026-08-05-antifragility-todoplan.md)（主项多已 ship）
 
 ---
 

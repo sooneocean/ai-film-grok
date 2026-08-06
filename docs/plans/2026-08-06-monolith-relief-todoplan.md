@@ -15,18 +15,17 @@
 **舒缓 = 挡路才拆 + 先 harness 再 peel + 禁止虚荣 LOC 冲刺。**  
 日常出片优先诚实回归；结构债不是默认主业。
 
-| 探针（2026-08-06） | 值 |
+| 探针（2026-08-06 N0 刷新） | 值 |
 |--------------------|-----|
-| scripts `.py` / LOC | ~637 / ~163k |
-| tests | ~407 |
-| ≥2k 文件 | **10** |
-| ≥1k 文件 | **34** |
-| 最大石 | heat **4024** · film_spec **3147** · render_final **2985** · story_plan **2948** · export **2804** |
-| hub | **994** ≤2500 |
-| render_final 形态 | **7 def**，载荷在 `render_final()` |
-| heat 形态 | **53 def**（phase/wardrobe/coitus/spice…） |
+| plugin.json | **以文件为准**（文案 2.40.12 可能领先 bump） |
+| 最大石 | heat **3788** · validate **3033** · story_plan **2992** · final **2979** · export **2804** |
+| film_spec | facade **97** + validate **3033** + constants **133**（**禁**再写单文件 3147） |
+| hub | **999** ≤2500 |
+| heat peel | `heat_phase.py` ~291 · residual wardrobe/coitus |
+| final peel | `final/watchdog.py` ~66 · residual plate/mix/subs |
 
-**诚实语言：** 搬进包 ≠ 内部 peel DONE。residual = orchestrator / heat packs / film_spec validate / export harness。
+**诚实语言：** 搬进包 ≠ 内部 peel DONE。residual = final stages · heat packs · validate body · export harness。  
+**养分对账：** [nutrient-matrix](2026-08-06-nutrient-matrix.md)
 
 ---
 
@@ -57,11 +56,11 @@
 
 | Pri | 模块 | ~LOC | 策略 |
 |-----|------|-----:|------|
-| P0 | `post/render_final.py` | 2985 | 挡路 peel stages → `final/*` |
-| P1 雷区 | `narrative/edit_policy_heat.py` | 4024 | **仅 bug-driven** pack peel |
-| P1 | `plan/film_spec.py` | 3147 | 触达拆 validate vs projectors |
-| P2 | `export_composition` / `story_plan` / `edit_policy` / `h3_fill_idle` / cli_* | 2.1k–2.9k | harness 先 / 双路径 / growth guard |
-| 健康 | hub · `core/*` | ≤1k | 守住 |
+| P0 | `post/render_final.py` | **2979** | M2 residual：plate/mix/subs stages → `final/*` |
+| P1 雷区 | `narrative/edit_policy_heat.py` | **3788** | phase **SHIPPED**；wardrobe/coitus **bug-driven only** |
+| P1 | `plan/film_spec_validate.py` | **3033** | M1 facade SHIPPED；validate body 触达再 peel |
+| P2 | export **2804** / story **2992** / edit_policy **2584** / h3_fill **2455** / cli_* | — | harness 先 / thrash 才 peel |
+| 健康 | hub **999** · `core/*` | ≤1k | 守住 |
 
 **附加税：** root shim 海 · 双 checkout · plan 文档发散 · 407 测+refs 上下文。
 
@@ -139,7 +138,8 @@
 ### M6 · 上下文税
 
 - [x] 本档落库 + residual / next-opt 互指  
-- [ ] memory 长文 archive（可选）  
+- [x] memory L5 消除（N0.2）：shortform-s5 / effect-board / h3-family-apply / ad-process → `memory/archive/`  
+- [x] nutrient-matrix 对账表  
 - [ ] pytest slow/hotpath 再分层（可选）  
 
 ### S0 护栏（触达时）
@@ -158,7 +158,7 @@
 默认 go（结构）：无触达 → PARTIAL(无触发)，禁止硬拆 heat
 ```
 
-**Top-5 ROI：** final hotpath 守住 · 下次 film_spec→M1.1 · 下次 final→M2.1 · export bug→M3.1 · 双 checkout 纪律。
+**Top-5 ROI：** final hotpath 守住 · final 下一触达→M2.2 · export bug→M3.2 · heat 仅码 bug→wardrobe pack · 双 checkout 纪律。
 
 ---
 

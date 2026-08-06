@@ -75,10 +75,10 @@
 | **P2** | `post/export_composition.py` | **2804** | HF/Remotion export; coverage-starved | harness first |
 | **P2** | `post/compose_render.py` | **1579** | Compose path; double-burn contracts exist | harness residual |
 | **P2** | `narrative/edit_policy.py` | **2584** | visual_fit / stretch / cut silk | peel if dual-owner pain |
-| **P2** | `media/h3_fill_idle.py` | **2300** | capacity / until-empty | peel if logic thrash |
-| **P3** | `plan/story_plan.py` | **2948** | High coverage; peel only if dual-path residue | watch |
-| **CLI** | `cli/cli_post` / `cli_media` | 2476 / 2135 | Hub-extracted; further only if growing | optional |
-| **SHIPPED** | hub `aifilm_grok.py` | **993** | ≤2500 | W2 DONE |
+| **P2** | `media/h3_fill_idle.py` | **2455** | capacity / until-empty | peel if logic thrash |
+| **P3** | `plan/story_plan.py` | **2992** | High coverage; peel only if dual-path residue | watch |
+| **CLI** | `cli/cli_post` / `cli_media` | 2477 / 2172 | Hub-extracted; further only if growing | optional |
+| **SHIPPED** | hub `aifilm_grok.py` | **999** | ≤2500 | W2 DONE |
 | **SHIPPED** | `scripts/core/*` | **~901** | shared I/O | W1 DONE |
 | **SHIPPED** | top-level shims `render_final.py` / `edit_policy_heat.py` | thin + main guard | hard-compat | W4 boundary DONE |
 

@@ -14,7 +14,7 @@
 | 3 **本目录** | `memory/*.md` | 原话 · 三句 · checklist · 链 |
 | 4 长课 | `references/lessons-*` | 片例矩阵与复盘，按需打开 |
 
-## Active P0（≤40 · 2026-08-06 刷新）
+## Active P0（~37 · 2026-08-06 N0 刷新）
 
 | 主题 | 卡 |
 |------|-----|
@@ -23,14 +23,17 @@
 | 卸装不回穿 + 尺度兜底 | [wardrobe-no-redress](2026-08-06-wardrobe-no-redress-fullnude-fallback.md) |
 | 正牌 final IRON | [suse-ep01-final](2026-08-06-suse-ep01-official-final-iron.md) |
 | H3 原声季审片 | [h3-native-ship](2026-08-06-h3-native-ship-review-lessons.md) |
+| C1 capacity-wait | [c1-capacity](2026-08-06-c1-capacity-wait-iron.md) |
+| Comfy 隧道 auto | [tunnel-ensure](2026-08-06-comfy-tunnel-auto-ensure.md) |
 | 构图防抢走 | [anti-hijack](2026-08-05-composition-anti-hijack.md) |
 | 毒镜 / 抗无聊 / closeout | 07-29 对应卡 |
 | 成人 MAX / 高动 / 性爱时长底 | 07-27 · sex-hard-floors |
 | gate-auto / fill-idle / h3_primary | 08-04 · 08-05 |
 | 圣旨协议 | [user-command-is-edict](2026-08-04-user-command-is-edict.md) |
 | **本周索引** | [session-index](2026-08-06-session-index.md) |
+| **养分对账（工程）** | [nutrient-matrix](../../../docs/plans/2026-08-06-nutrient-matrix.md) |
 
-完整文件名见目录列表；旧卡在 `archive/`。
+完整文件名见目录列表；旧卡 / canary / session-wrap 在 `archive/`。
 
 ## 模板（新卡必循）
 

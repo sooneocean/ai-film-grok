@@ -7,15 +7,14 @@ W0–W1.5 · W4 诚实 except · W5 纪律卡 · W6 archive **SHIPPED** · W2 tu
 
 **结论先行：** 这不是「缺功能」的仓库，而是 **片厂已建完、规章已上墙、车间仍塞着几个 3k–4k 行总控台** 的成熟产线。下一轮优化应以 **诚实出片 + 可维护热路径 + 运维吞吐** 为主，**禁止**再开「全员压到 1500 行」或「再写一套 IRON 散文」。
 
-| 项 | 现状（本机探针） |
+| 项 | 现状（本机探针 · **N0 刷新**） |
 |----|------------------|
-| 版本 | `plugin.json` **2.40.12** |
-| 脚本 | ~**637** `.py` · scripts 树合计 ~**163k** LOC（含 shim） |
-| 测试 | ~**406** `test_*.py` · 体量很大，绿线靠 `make check-all` |
-| 文档税 | references ~**172** · memory active ~**42** · `docs/plans/*` 优化板 **20+** |
-| 最大石 | `edit_policy_heat` **4024** · `film_spec` **3147** · `render_final` **2985** · `story_plan` **2948** · `export_composition` **2804** |
-| 包边界 | W0–W7 **已 ship**（`core/post/narrative/audio/media/plan/cli…` + hard-compat shim） |
-| 今日已 ship | 内容质量 P0 五门 · final 诚实/watchdog · shortform · GPU no-hog 机读 · 字幕 CJK · motion mean · BGM fatigue… |
+| 版本 | `plugin.json` **2.40.4**（plan 文案曾写 2.40.12；以 json 为准，发版再 bump） |
+| 文档税 | memory active **~37** · nutrient-matrix 已落 · plans/archive 已收旧板 |
+| 最大石 | heat **3788** · validate **3033** · story **2992** · final **2979** · export **2804** |
+| film_spec | facade **97** + validate **3033**（M1 SHIPPED · **禁**写 3147 单文件） |
+| 包边界 / peel | W0–W7 + heat_phase + watchdog + export harness partial |
+| 养分 | [nutrient-matrix](2026-08-06-nutrient-matrix.md) · **Wave N** 见下 |
 
 ## 0.1 A/B/C 执行映射（本轮快照）
 
@@ -33,6 +32,8 @@ W0–W1.5 · W4 诚实 except · W5 纪律卡 · W6 archive **SHIPPED** · W2 tu
 | `docs/plans/2026-08-06-monolith-relief-todoplan.md` | **巨石诊断 + M0–M6 执行队列**（M0 SHIPPED 2.40.10） |
 | `docs/optimization-plan-2026-08-06.md` | 内容五域 P0 **已落地 2.40.7+** |
 | `docs/plans/2026-08-06-memory-optimization-inventory.md` | 记忆反查 · 类 C 真 OPEN |
+| `docs/plans/2026-08-06-nutrient-matrix.md` | **L3/L4/L5 对账** · 已吞吐可废文 |
+| `docs/plans/2026-08-06-monolith-relief-todoplan.md` | 巨石 M* · LOC 已 N0 刷新 |
 
 ---
 
@@ -148,17 +149,17 @@ W0–W1.5 · W4 诚实 except · W5 纪律卡 · W6 archive **SHIPPED** · W2 tu
 
 ### Wave 3 · 巨石「挡路才拆」（P1 structure）
 
-**完整诊断 + 可勾选 M 队列：** [2026-08-06-monolith-relief-todoplan.md](2026-08-06-monolith-relief-todoplan.md)（**M0 SHIPPED**）。  
+**M 队列 owner：** [monolith-relief](2026-08-06-monolith-relief-todoplan.md)（M0–M1 + M2.1 + M3.1 + M4 phase **SHIPPED**）。  
 排序 = **风险 × 近期触达**，不是行数虚荣。
 
 | 序 | 模块 | ~LOC | 触发条件 | 拆法 | M-id |
 |----|------|-----:|----------|------|------|
-| **W3.1** | `plan/film_spec.py` | 3147 | 再动 sex floor / validate / write-spec | validate 叶 + projectors；sex_floor 已存在 | M1 |
-| **W3.2** | `post/render_final.py` | 2985 | 再动 VO/mix/subtitle/timeout | 加深 `final/*` stages；orchestrator 只编排 | M2 |
-| **W3.3** | `post/export_composition.py` | 2804 | 字幕双烧 / HF export bug | harness 测优先，再 peel | M3 |
-| **W3.4** | `media/h3_fill_idle.py` | 2300 | capacity / until-empty 逻辑再变 | cycle vs plan 分离 | M5.1 |
-| **W3.5** | `narrative/edit_policy_heat.py` | 4024 | **仅** heat 码 bug | pack 级 peel；禁预防性全拆 | M4 |
-| **W3.6** | `cli/cli_post.py` / `cli_media.py` | 2.4k/2.1k | 子命令继续膨胀 | 按 verb 再抽，保持 public 字符串 | M5.4 |
+| **W3.1** | `film_spec_validate` | **3033** | 再动 validate/write-spec | 纯叶 projector；**facade 已 97** | M1 residual |
+| **W3.2** | `post/render_final` | **2979** | VO/mix/subtitle/timeout | stages → `final/*`（watchdog 已 peel） | M2 residual |
+| **W3.3** | `export_composition` | **2804** | 双烧 / HF export bug | harness 已有 → builder peel | M3 residual |
+| **W3.4** | `h3_fill_idle` | **2455** | capacity/until-empty thrash | cycle vs plan | M5.1 |
+| **W3.5** | `edit_policy_heat` | **3788** | **仅** heat 码 bug | wardrobe/coitus pack；phase 已 peel | M4 residual |
+| **W3.6** | cli_post / cli_media | 2.5k/2.2k | 子命令膨胀 | 按 verb | M5.4 |
 
 Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变更分 commit。
 
@@ -171,7 +172,7 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 | **W4.1** | `media_queue` 等热路径 `except Exception` 审计 → warning/partial，禁 silent pass | ✅ validate fallback + pilot load → `note_queue_partial` |
 | **W4.2** | 再触达的 bare subprocess 补 timeout（**不**全仓 150 处冲刺） | deferred（未触达新 subprocess 点） |
 | **W4.3** | provider 质量拒 vs 429 签名再审计（inventory C12） | deferred |
-| **W4.4** | doctor：假 plate 当 master 的 soft advisory | deferred（deliver 清单已覆盖人读） |
+| **W4.4** | doctor：假 plate 当 master 的 soft advisory | **→ Wave N1.4**（半吞吐） |
 
 ---
 
@@ -179,10 +180,10 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 
 | ID | Todo | 说明 |
 |----|------|------|
-| **W5.1** | multi-seed **强制** anti-hijack 纪律 | ✅ stages/agent.md 快卡 |
+| **W5.1** | multi-seed **强制** anti-hijack 纪律 | ✅ stages 快卡；**→ N1.3 机读默认** |
 | **W5.2** | design-go / script-value-debrief 出片前存在 | ✅ agent 快卡 |
 | **W5.3** | 对白主链：原音优先，禁后期对嘴复活 | ✅ agent 快卡 |
-| **W5.4** | 内容质量 P1 深化（按 ROI 选 1–2） | deferred（2.40.7–9 已 ship 多门；本轮不新开产品） |
+| **W5.4** | 内容质量 P1 深化（按 ROI 选 1–2） | deferred |
 
 ---
 
@@ -190,7 +191,7 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 
 | ID | Todo | 验收 |
 |----|------|------|
-| **W6.1** | memory：active 只留指针卡；长文 archive | deferred（已 ~42；未再砍） |
+| **W6.1** | memory：active 只留指针卡；长文 archive | ✅ N0.2 active **~37**；4 卡 → archive |
 | **W6.2** | `docs/plans` 归档目录 `plans/archive/` 移 7 月 CLOSED 板 | ✅ 18 板入 archive + README |
 | **W6.3** | process-slim 残余（inventory C13） | deferred |
 | **W6.4** | artifacts 日志/canary 是否进 git 审计 | canary JSON 入仓；大 .log 勿 add |
@@ -198,20 +199,41 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 
 ---
 
+### Wave N · 养分内化（记忆→代码 · **本轮主轴**）
+
+> 全文诊断见 session plan；对账见 [nutrient-matrix](2026-08-06-nutrient-matrix.md)。  
+> **优化 = L1→L3/L4 + 已 L4 则 L5 废文**；禁软化 IRON。
+
+| ID | Todo | 状态 |
+|----|------|------|
+| **N0.1** | 巨石 LOC 账实（facade vs validate） | ✅ 本提交 |
+| **N0.2** | memory L5 消除 canary/session-wrap | ✅ 4 卡 archive |
+| **N0.3** | nutrient-matrix 落库 | ✅ |
+| **N0.4** | 单一执行板互指 + Wave 表刷新 | ✅ |
+| **N0.5** | Agents 影音 Combo 再砍 | skip（已 ~103 行指针体） |
+| **N1.1** | closeout：plate 语义禁假 final_complete | pending |
+| **N1.2** | promote/register：SCALE_* fail-closed | pending |
+| **N1.3** | multi-seed 无 anti-hijack → demote/next_cmd | pending |
+| **N1.4** | doctor plate≠master soft advisory | pending |
+| **N2** | C1 until-empty OPEN_OPS 真烧 | 等人+GPU |
+| **N3** | 挡路 peel only（=W3 residual） | 触达 |
+
+---
+
 ## 5. 建议执行序
 
 ```text
 缺 GPU / 纯工程日：
-  W0 账实 → W1 final 回归 → W3 仅当 W1 碰文件顺手 peel → W4 尾巴 → W6 卫生
+  N0（已绿）→ N1 半吞吐机读 → 触达则 W3 residual peel → W4 尾巴
 
 有独占 5090：
-  W2.1 health → W2.2 until-empty → 回写 memory 短卡
+  N2 / W2.2 until-empty → 回写 C1
 
-内容/导演日：
-  W5 纪律 + 最多 1 条 P1 产品深化（勿与 W3 大 peel 同 PR）
+出片日：
+  deliver 回执清单优先；final 大改才 M2.2
 
 默认 `go` 最小链：
-  W0.1–W0.2 → W1.1–W1.2 测绿 → commit →（有卡）W2
+  N1.1 或 N1.2 一块 + 相关测绿 → commit
 ```
 
 ---
