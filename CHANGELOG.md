@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.44] - 2026-08-06
+
+### Changed (code metabolism residual closeout · P3-1×29 + inventory)
+- **Safe residual queue emptied:** 29 low-importer domain modules relocated with hard-compat top-level shims: `semantic_index`, `transaction_receipt`, `creative_pipeline`/`quality`/`workshop`, `department_cli`/`contracts`, `external_review`, `master_delivery`, `real_footage`, `serial_quality`, `promotion_report`, `transition_frame_audit`/`transition_ops`, `shortform_director`, `optimization_program`, `plan_feedback`, `h3_timeline_prompt`, `speech_performance_timing`, `composition_anti_hijack`, quality/performance/evidence leaves, etc.
+- **Inventory:** `docs/reports/2026-08-06-code-metabolism-inventory.md` (non-shim residual ~35 after star-reexport classification).
+- **Verify:** targeted suite 320 passed / 1 skipped; shim identity probe 18/18.
+- Iron: public `import name` preserved; no heat/i2v/pilot retune; giants left on-touch.
+
 ## [2.40.43] - 2026-08-06
 
 ### Changed (code metabolism round 4 · P3-1×10 + spine_helpers/render_defaults tests)

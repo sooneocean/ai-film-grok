@@ -3,6 +3,7 @@
 **Metabolism batch 2.40.39:** 8 more P3-1 moves + plate-slot sites + `core.emit` tests · **2.40.38:** [inventory](../reports/2026-08-06-code-metabolism-inventory.md) · migrate+shim 5 modules + golden_suite/color_grade shims · peel `resolve_plate_slot_sec`
 **Metabolism batch 2.40.41:** P3-1×10 + coerce_optional_float + core.constants tests
 **Metabolism batch 2.40.43:** P3-1×10 media/post/plan + spine_helpers/render_defaults tests
+**Metabolism batch 2.40.44:** safe residual closeout P3-1×29 · inventory
 **Status:** ACTIVE · **W0–W7 packages SHIPPED** · pure-helper peels SHIPPED · residual = orchestrator/heat/export only
 **Evidence:** `scripts/{core,assets,spine,gates,plan,post,narrative,final,audio,media}/` · hub ≤2500 · shims · `tests/test_w3_package_shims.py`  
 **Residual internal-peel todo:** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md) · **diagnosis M-queue:** [2026-08-06-monolith-relief-todoplan.md](2026-08-06-monolith-relief-todoplan.md)
