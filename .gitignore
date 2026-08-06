@@ -18,3 +18,6 @@ melo-cache/
 # Python
 __pycache__/
 *.pyc
+
+# Generator runtime scratch (job tickets); the ledger is generation-jobs.jsonl
+bgm-library/.gen-tickets/
