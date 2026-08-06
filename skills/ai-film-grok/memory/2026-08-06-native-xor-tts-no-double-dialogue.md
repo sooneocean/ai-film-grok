@@ -9,7 +9,9 @@
 3. 闸门：`DUPLICATE_DIALOGUE_AUDIO` + mix XOR fail-closed。
 
 ## 检查清单
-- [ ] final 后 `audio/mix_report.json` → `native_audio.shot_lanes` 无 `native`+`tts_mix_gain>0`
+- [x] 管线：`resolve_dialogue_audio_lane` + `render_final` silent VO on native（v2.40.18）
+- [x] 闸门：`DUPLICATE_DIALOGUE_AUDIO` + mix XOR fail-closed
+- [ ] final 后 `audio/mix_report.json` → `native_audio.shot_lanes` 无 `native`+`tts_mix_gain>0`（**片级重跑才验**）
 - [ ] 人耳：对白镜只听一路声
 - [ ] ADR 逃生：`audio_origin=post_vo` 或 `strip_native_use_tts_bgm`
 

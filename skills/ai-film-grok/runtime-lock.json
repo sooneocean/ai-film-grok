@@ -1682,7 +1682,7 @@
     },
     {
       "path": "scripts/media_queue.py",
-      "sha256": "1cffa742c6721faa6ed8e756173ca5ca0f5124de07b6903e7a00221a578607e0"
+      "sha256": "13eb0696b302c9f9d3d881a7c40d7c3ad159dcd586ea555cbfcfd4646d912dec"
     },
     {
       "path": "scripts/mix_partial.py",

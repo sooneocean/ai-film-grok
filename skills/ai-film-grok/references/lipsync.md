@@ -5,7 +5,8 @@
 1. **对白有声镜 = Grok Imagine Video 或 5090 MiniMax H3 原音**（`prefer_native` / `use_clip_audio`）。
 2. **后期对嘴工具已从生产路径移除**（非仅文档冻结）：`final --lipsync` **仅允许 `off`**；`lipsync-*` CLI / shortform enable-render / 节点适配器均为墓碑。
 3. Edge TTS 只做字幕时钟与可选 ADR，**不**驱动嘴型重渲染。
-4. **不做** lipsync canary 自动晋级（专家团旧建议已作废）。
+4. **原声 XOR TTS（P0 · 2026-08-06）**：同一句对白 **禁止**「片内原声 + Edge 再念一遍」。`final` 每镜 `dialogue_audio_lane` ∈ `native` \| `post_tts` \| `silence`；`native` 时 VO mix gain=0（字幕仍烧中文）。ADR 逃生：`audio_origin=post_vo` / `strip_native_use_tts_bgm`。闸门 `DUPLICATE_DIALOGUE_AUDIO`。见 [hard-defaults](hard-defaults.md) · [memory](../memory/2026-08-06-native-xor-tts-no-double-dialogue.md)。
+5. **不做** lipsync canary 自动晋级（专家团旧建议已作废）。
 
 详见 [dialogue-first-workflow](dialogue-first-workflow.md) · [hard-defaults 对白原音 IRON](hard-defaults.md) · `dialogue_competition` policy `native_audio_grok_h3_v1`。
 
@@ -35,7 +36,8 @@
   → 软/安全对白：Grok Video（台词进 prompt）
   → restricted / h3_primary：aifilm h3 run --register（台词注入）
   → register clip use_clip_audio=true（原声可用时）
-  → final --lipsync off + Edge 字幕硬烧
+  → final --lipsync off + Edge 字幕硬烧（原声 lane：Edge 仅字幕时钟，不进听感）
+  → 抽听 + mix_report.native_audio.shot_lanes（禁 native+tts 双开）
 ```
 
 人审只听：**原声是否可懂、台词是否对、有无供应商烧字、身份是否漂**——不再验收「LatentSync 对齐分数」。

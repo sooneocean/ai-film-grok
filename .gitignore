@@ -104,3 +104,6 @@ coverage.json
 # ---- local dev artifacts ----
 .kilo/
 backups-skills/
+
+# local launchd noise
+artifacts/comfy-tunnel-launchd.*

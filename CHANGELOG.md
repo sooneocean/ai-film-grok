@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.19] - 2026-08-06
+
+### Fixed (ops hygiene · media_queue shim + XOR docs)
+- **`media_queue.py` shim:** when run as a script, dispatch to `media.media_queue.main()` (same footgun as bare `render_final` shim exiting 0 with no work).
+- **Docs:** `lipsync.md` records native XOR TTS + mix_report `shot_lanes` check; memory checklist partially checked for pipeline/gate.
+- **Worktree:** incomplete concurrent peel (broke `COITUS_BEATS` import) stashed — do not blind-pop.
+
 ## [2.40.18] - 2026-08-06
 
 ### Fixed (P0 · native XOR TTS · no double dialogue)
