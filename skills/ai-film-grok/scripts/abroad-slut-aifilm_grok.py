@@ -1,1 +1,0 @@
-/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/scripts/aifilm_grok.py
