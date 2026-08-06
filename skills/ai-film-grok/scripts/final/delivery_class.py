@@ -108,6 +108,32 @@ def write_official_final_report(root: Path | str, payload: dict[str, Any]) -> Pa
     return out
 
 
+def delivery_fields_from_official_final(payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Normalize manifest fields for final report/manifest reconciliation.
+
+    Always materialize source + visibility so downstream consumers can treat
+    manifest records without separate schema branches.
+    """
+    payload = payload or {}
+    status = str(payload.get("status") or payload.get("delivery_class") or "").strip()
+    if not status:
+        status = "TECHNICAL_FINAL"
+    visibility = payload.get("delivery_visibility")
+    if visibility is None:
+        if status == "OFFICIAL_FINAL_PLATE":
+            visibility = "visible_plate"
+        elif status == "TECHNICAL_FINAL":
+            visibility = "technical_final_visible"
+        else:
+            visibility = str(payload.get("delivery_class") or status or "TECHNICAL_FINAL")
+    return {
+        "delivery_class": status,
+        "delivery_source": "official_final_report",
+        "delivery_visibility": str(visibility),
+        "master_lock": bool(payload.get("master_lock", False)),
+    }
+
+
 def plate_blocks_final_complete(
     root: Path | str,
     *,

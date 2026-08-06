@@ -245,6 +245,16 @@ class OfficialFinalPlateTests(unittest.TestCase):
         self.assertEqual(fields["delivery_visibility"], "technical_final_visible")
         self.assertTrue(fields["master_lock"])
 
+    def test_delivery_fields_default_visibility_for_known_status(self) -> None:
+        from final.delivery_class import delivery_fields_from_official_final
+
+        plate = delivery_fields_from_official_final({"status": "OFFICIAL_FINAL_PLATE"})
+        technical = delivery_fields_from_official_final({"status": "TECHNICAL_FINAL"})
+        self.assertEqual(plate["delivery_class"], "OFFICIAL_FINAL_PLATE")
+        self.assertEqual(plate["delivery_visibility"], "visible_plate")
+        self.assertEqual(technical["delivery_class"], "TECHNICAL_FINAL")
+        self.assertEqual(technical["delivery_visibility"], "technical_final_visible")
+
     def test_write_official_final_report(self) -> None:
         from final.delivery_class import (
             classify_official_final,
