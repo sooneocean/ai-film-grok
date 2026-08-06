@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.3] - 2026-08-06
+
+### Added (shortform residual close · S1.3 / S2.3 / S3.1)
+- **S2.3** `aifilm shortform export-spec` → draft `film-spec.json` + `timeline-draft.json` + receipt (force to overwrite).
+- **S1.3** ship-native `mandarin_intelligibility` soft checklist (aac≠可懂中文); sparse audio soft codes.
+- **S3.1** plan graph `project.wardrobe_honesty` (ambition vs honest_cap soft-max ladder).
+- S5 still OPEN_OPS (Comfy :18188 unreachable this session — no until-empty).
+
 ## [2.40.2] - 2026-08-06
 
 ### Docs (shortform board CODE CLOSED + S5 probe)

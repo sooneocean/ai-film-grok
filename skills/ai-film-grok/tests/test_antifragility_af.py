@@ -318,13 +318,15 @@ class Wave3H3WorkflowTimeoutTests(unittest.TestCase):
         self.assertIn("timeout=120", src)  # strip stream-copy
         self.assertIn("timeout=300", src)  # strip re-encode + register-clip
         self.assertIn("timeout=600", src)  # geometry upscale
-        self.assertIn("timeout=60", src)  # volumedetect
+        # volumedetect moved to core.media_ops (timeout=60) — still soft-fail path
+        self.assertIn("timeout=60", src)
+        self.assertIn("volumedetect_timeout", src)
         runs = src.split("subprocess.run(")[1:]
-        self.assertGreaterEqual(len(runs), 6)
+        # 5 direct runs remain after volume probe extraction to media_ops
+        self.assertGreaterEqual(len(runs), 5)
         for chunk in runs:
             self.assertIn("timeout=", chunk[:1600], msg=chunk[:200])
         self.assertIn("timed out", src)
-        self.assertIn("volumedetect_timeout", src)
 
     def test_continue_handoff_endframe_has_timeout(self) -> None:
         src = _impl_source("continue_handoff.py").read_text(encoding="utf-8")
@@ -341,21 +343,20 @@ class Wave3H3WorkflowTimeoutTests(unittest.TestCase):
             clip = Path(tmp) / "t.mp4"
             clip.write_bytes(b"\x00" * 64)
 
-            def _boom(*_a, **_k):
-                raise subprocess.TimeoutExpired(cmd=["ffmpeg"], timeout=60)
-
             with (
                 mock.patch(
                     "media_qa.analyze_media",
                     return_value={"has_audio": True, "ok": True},
                 ),
-                mock.patch("h3_workflow.subprocess.run", side_effect=_boom),
+                mock.patch(
+                    "core.media_ops.probe_native_audio_mean_volume",
+                    side_effect=TimeoutError("volumedetect timed out after 60s"),
+                ),
             ):
                 usable, meta = _native_audio_usable(clip)
             self.assertTrue(usable)
             self.assertTrue(meta.get("volume_probe_timeout"))
             self.assertEqual(meta.get("usable_reason"), "volumedetect_timeout")
-
 
 class Wave3AudioPipelineTimeoutTests(unittest.TestCase):
     """R-af1 residual · TTS render / event voice stem / delivery gate must bound hangs."""

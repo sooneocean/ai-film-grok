@@ -1461,6 +1461,7 @@ def cmd_shortform(args: argparse.Namespace) -> int:
         assemble_aroll,
         create_package,
         enable_lipsync,
+        export_spec,
         render_lipsync,
         review,
         validate_package,
@@ -1512,6 +1513,12 @@ def cmd_shortform(args: argparse.Namespace) -> int:
                 args.root,
                 visual_dir=Path(args.visual_dir),
                 out=Path(args.out) if args.out else None,
+            )
+        elif action == "export-spec":
+            report = export_spec(
+                args.root,
+                force=bool(getattr(args, "force", False)),
+                title=str(getattr(args, "title", "") or "") or None,
             )
         elif action == "motion-plan":
             layers = read_json(Path(args.layers))
@@ -1970,6 +1977,17 @@ def add_media_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
     sf_assemble.add_argument("--root", required=True)
     sf_assemble.add_argument("--visual-dir", required=True)
     sf_assemble.add_argument("--out", default="")
+    sf_export = shortform_sub.add_parser(
+        "export-spec",
+        help="S2.3 handoff: shortform package → draft film-spec + timeline (main spine)",
+    )
+    sf_export.add_argument("--root", required=True)
+    sf_export.add_argument("--title", default="")
+    sf_export.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing film-spec.json draft",
+    )
     sf_motion = shortform_sub.add_parser(
         "motion-plan", help="Write deterministic local layer-motion plan"
     )

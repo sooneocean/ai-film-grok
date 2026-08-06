@@ -527,7 +527,7 @@ def _native_audio_usable(path: Path, *, min_db: float = -42.0) -> tuple[bool, di
         meta["probe_error"] = str(exc)[:200]
         return False, meta
 
-    # volumedetect via single core.media_ops probe (bounded hang)
+    # volumedetect via single core.media_ops probe (bounded hang → TimeoutError)
     try:
         from core.media_ops import probe_native_audio_mean_volume
 

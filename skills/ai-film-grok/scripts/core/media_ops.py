@@ -101,7 +101,12 @@ def _volumedetect_text(
                 result = runner(cmd, check=False)
         else:
             result = runner(cmd, check=False)
-    except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired, TimeoutError):
+    except subprocess.TimeoutExpired as exc:
+        # Surface hang so H3 / final can soft-degrade instead of silent None.
+        raise TimeoutError(f"volumedetect timed out after {exc.timeout}s") from exc
+    except TimeoutError:
+        raise
+    except (OSError, subprocess.SubprocessError):
         return None
     return f"{getattr(result, 'stderr', '') or ''}{getattr(result, 'stdout', '') or ''}"
 

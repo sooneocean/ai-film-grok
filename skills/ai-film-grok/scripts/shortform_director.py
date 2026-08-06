@@ -420,6 +420,134 @@ def review(
     return _save(root, package)
 
 
+def export_spec(
+    root: Path | str,
+    *,
+    force: bool = False,
+    title: str | None = None,
+) -> dict[str, Any]:
+    """S2.3 · handoff package → minimal film-spec + timeline draft for main spine.
+
+    Does not invent media. Writes draft artifacts; existing film-spec requires --force.
+    """
+    root_p, package = _load_package(root)
+    mode = str(package.get("mode") or "topic")
+    beats = package.get("beats") if isinstance(package.get("beats"), list) else []
+    shots_out: list[dict[str, Any]] = []
+    timeline: list[dict[str, Any]] = []
+    t = 0.0
+    for beat in beats:
+        if not isinstance(beat, dict):
+            continue
+        for sh in beat.get("shots") or []:
+            if not isinstance(sh, dict):
+                continue
+            sid = str(sh.get("id") or f"{beat.get('id')}_sh")
+            dur = float(sh.get("duration_sec") or 5.2)
+            row = {
+                "id": sid,
+                "duration_sec": round(dur, 2),
+                "shot_role": "hero",
+                "screen_mode": sh.get("screen_mode") or "on_camera",
+                "spoken_text": str(beat.get("text") or sh.get("text") or "")[:200],
+                "dramatic_function": "bridge",
+                "wardrobe_state": "clothed",
+                "dsl": {
+                    "camera": {"shot_size": sh.get("shot_size") or "medium"},
+                    "motion": "subtle hold",
+                },
+                "source_shortform": {
+                    "package_mode": mode,
+                    "beat_id": beat.get("id"),
+                    "role": sh.get("role"),
+                },
+            }
+            if mode == "aroll":
+                row["prefer_native"] = True
+                row["use_clip_audio"] = True
+            shots_out.append(row)
+            timeline.append(
+                {
+                    "shot_id": sid,
+                    "start_sec": round(t, 2),
+                    "duration_sec": round(dur, 2),
+                    "end_sec": round(t + dur, 2),
+                }
+            )
+            t += dur
+    if not shots_out:
+        raise ShortformError("package has no shots to export")
+
+    film_title = (title or f"shortform-{mode}").strip() or "shortform-export"
+    spec = {
+        "schema_version": 1,
+        "title": film_title,
+        "production_mode": "shortform",
+        "target_duration": round(t, 1),
+        "heat_scale": "standard",
+        "genre": "drama",
+        "i2v_provider": "h3_primary",
+        "source": {
+            "kind": "shortform_export",
+            "package": PACKAGE_NAME,
+            "mode": mode,
+            "exported_at": utc_now(),
+        },
+        "scenes": [
+            {
+                "id": "sc01",
+                "title": "shortform-handoff",
+                "shots": shots_out,
+            }
+        ],
+        "notes": [
+            "draft from aifilm shortform export-spec — stills/I2V not generated",
+            "next: write-spec validate · design-go · pilot · visual on main spine",
+            "aroll rows prefer_native; do not re-enable post lipsync",
+        ],
+    }
+    spec_path = root_p / "film-spec.json"
+    if spec_path.is_file() and not force:
+        raise ShortformError(
+            f"{spec_path} exists; pass force=True / --force to overwrite draft export"
+        )
+    write_json(spec_path, spec)
+    tl_path = root_p / "timeline-draft.json"
+    write_json(
+        tl_path,
+        {
+            "schema_version": 1,
+            "kind": "shortform-timeline-draft",
+            "total_sec": round(t, 2),
+            "entries": timeline,
+        },
+    )
+    receipt = {
+        "schema_version": 1,
+        "kind": "shortform-export-spec",
+        "ok": True,
+        "at": utc_now(),
+        "root": str(root_p),
+        "mode": mode,
+        "shot_count": len(shots_out),
+        "target_duration_sec": round(t, 2),
+        "film_spec": str(spec_path),
+        "timeline_draft": str(tl_path),
+        "force": bool(force),
+        "next": [
+            f'aifilm dispatch --root "{root_p}"',
+            f'aifilm write-spec --root "{root_p}"  # if re-normalize needed',
+            f'aifilm design-go --root "{root_p}"',
+        ],
+        "note": "handoff draft only; not production-locked",
+    }
+    rec_path = root_p / "receipts" / "shortform-export-spec.json"
+    rec_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(rec_path, receipt)
+    receipt["receipt"] = str(rec_path)
+    return receipt
+
+
 def enable_lipsync(
     root: Path | str, *, shot_id: str, speaker: str, face_target: str, audio_sha256: str
 ) -> dict[str, Any]:

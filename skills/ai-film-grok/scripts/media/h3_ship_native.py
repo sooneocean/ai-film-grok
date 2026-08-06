@@ -362,6 +362,29 @@ def ship_native(
             "(not auto-run here — avoids false master)"
         ),
     }
+    # S1.3 · soft Mandarin intelligibility checklist (aac ≠ 可懂中文)
+    mandarin_soft = {
+        "schema_version": 1,
+        "kind": "mandarin_intelligibility_soft",
+        "severity": "soft",
+        "ok": True,
+        "codes": [],
+        "checklist": [
+            "sample ≥3 dialogue clips by ear (or spot-check mean_volume not silence)",
+            "confirm speech is Mandarin-intelligible (not FX / foreign noise only)",
+            "if unintelligible: re-I2V with dialogue energy or ADR Edge clock only",
+            "hard ASR gate deferred — set AIFILM_MANDARIN_HARD=1 later if product wants",
+        ],
+        "clips_with_audio_stream": with_audio,
+        "clip_count": len(parts),
+        "note": "soft only; does not fail ship-native",
+    }
+    if with_audio == 0 and parts:
+        mandarin_soft["codes"].append("NATIVE_AUDIO_STREAM_MISSING_SOFT")
+        mandarin_soft["ok"] = False
+    elif with_audio < max(1, len(parts) // 3):
+        mandarin_soft["codes"].append("NATIVE_AUDIO_SPARSE_SOFT")
+
     report: dict[str, Any] = {
         "schema_version": 1,
         "kind": "h3_ship_native",
@@ -375,6 +398,7 @@ def ship_native(
         "clips_with_audio_stream": with_audio,
         "audio_sample": audio_audit.get("rows"),
         "native_audio_audit": audio_audit,
+        "mandarin_intelligibility": mandarin_soft,
         "out": str(out),
         "duration_target": dur_rep,
         "stage2": stage2,
@@ -383,6 +407,7 @@ def ship_native(
             "OFFICIAL_FINAL_PLATE only — concat does not hardburn or mix rnb",
             "not master_lock; formal master = gate-auto green + review-final",
             f"stage-2 captions/BGM: {stage2_cmd}",
+            "S1.3 mandarin checklist soft in receipts (not ASR hard)",
         ],
         "next": list(
             dict.fromkeys(
@@ -391,6 +416,7 @@ def ship_native(
                 + [
                     stage2_cmd + "  # plate→hardburn/BGM stage-2",
                     f'aifilm gate-auto --root "{root_p}"',
+                    "spot-listen sample clips for Mandarin intelligibility (soft)",
                 ]
             )
         ),

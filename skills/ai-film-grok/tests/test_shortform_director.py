@@ -14,7 +14,8 @@ from PIL import Image
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from shortform_director import (  # noqa: E402
+from shortform_director import (
+    export_spec,  # noqa: E402
     ShortformError,
     aroll_broll,
     create_package,
@@ -225,3 +226,26 @@ def test_lipsync_render_rejects_a_symlinked_default_candidate_parent(
         audio = _write(root, "line.wav", b"audio")
         with pytest.raises(ShortformError, match="lipsync removed|prefer_native"):
             render_lipsync(root, shot_id="beat01_a", video=video, audio=audio)
+
+
+def test_export_spec_writes_draft_film_spec() -> None:
+    from shortform_director import create_package, export_spec, review
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        script = root / "approved.txt"
+        script.write_text("Hello world. Second beat here.", encoding="utf-8")
+        create_package(root, mode="topic", approved_script=script)
+        review(root, stage="plan", reviewer="dex", note="ok", approve=True)
+        rep = export_spec(root, title="export-demo")
+        assert rep.get("ok") is True
+        assert int(rep.get("shot_count") or 0) >= 2
+        spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
+        assert spec["source"]["kind"] == "shortform_export"
+        assert (root / "timeline-draft.json").is_file()
+        assert (root / "receipts" / "shortform-export-spec.json").is_file()
+        # second export without force fails
+        import pytest
+
+        with pytest.raises(ShortformError, match="force"):
+            export_spec(root)

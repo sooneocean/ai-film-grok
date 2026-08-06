@@ -6,7 +6,7 @@
 |----|-----|
 | Repo | `/Users/dex/.grok/plugins/ai-film-grok` |
 | 范围 | 默认 shortform 主产线 + `cli:shortform` 旁路 |
-| 状态 | **CODE CLOSED / SHIPPED** (plugin **2.40.2**) · **S5.1 OPEN_OPS** · **S5.2 PROBED** |
+| 状态 | **CODE CLOSED** · S0–S3 code SHIPPED (2.40.3) · **S5 OPEN_OPS** (GPU/tunnel) |
 | 拍板记录 | fail-closed + 明确 next；S2.3 export-spec **不做**；S5.1 等人+GPU |
 | S5 canary | `artifacts/2026-08-06-shortform-s5-open-ops-canary.json` · memory `2026-08-06-shortform-s5-open-ops` |
 | 与旧板关系 | 产品面 `2026-08-06-optimization-todoplan` A/B 已收；本档 = 短版收口真相 |

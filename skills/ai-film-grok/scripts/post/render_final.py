@@ -289,12 +289,25 @@ def write_final_mix_partial_receipt(
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
     bgm_source_receipt: dict[str, Any] | None = None
-    try:
-        from final.heartbeat import write_final_heartbeat
+    _hb_stage = "start"
 
-        write_final_heartbeat(root, stage="start", detail="render_final enter")
+    def _hb(stage: str, detail: str | None = None) -> None:
+        nonlocal _hb_stage
+        _hb_stage = stage
+        try:
+            from final.heartbeat import write_final_heartbeat
+
+            write_final_heartbeat(root, stage=stage, detail=detail)
+        except Exception:
+            pass
+
+    try:
+        from final.heartbeat import apply_final_ffmpeg_timeout_env
+
+        ff_to = apply_final_ffmpeg_timeout_env()
+        _hb("start", f"render_final enter ffmpeg_timeout={ff_to}s")
     except Exception:
-        pass
+        _hb("start", "render_final enter")
     try:
         paths = resolve_render_paths(root, args.out_name)
     except RenderWorkspaceError as exc:
@@ -907,6 +920,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
 
     # 2) Stretch each clip to VO length (post lipsync removed — native audio only)
+    _hb("stretch", f"shots={len(shot_audio)}")
     lipsync_report: list[dict[str, Any]] = []
     stretched: list[Path] = []
     shots_by_id = {shot.get("id"): shot for shot in shots}
@@ -1975,6 +1989,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         ]
     )
     # Wave D · sidechain can hang or fail mid-plate → simple amix PARTIAL (not silent)
+    _hb("audio_mix", "sidechain_or_amix")
     try:
         run(mix_cmd)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as mix_exc:
@@ -2758,6 +2773,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Clear shot checkpoints before rendering",
     )
     args = p.parse_args(argv)
+    root_for_timeout = Path(getattr(args, "root", ".")).expanduser().resolve()
     try:
         # Explicit --music still requires license text OR sidecar (checked inside resolve)
         if args.music and not (args.music_license and args.music_license.strip()):
@@ -2776,8 +2792,49 @@ def main(argv: list[str] | None = None) -> int:
                     f"{p.stem}.license.txt next to the file)"
                 )
         result = render_final(args)
+        try:
+            from final.heartbeat import write_final_heartbeat
+
+            write_final_heartbeat(root_for_timeout, stage="done", detail="ok")
+        except Exception:
+            pass
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
+    except subprocess.TimeoutExpired as exc:
+        stage = "unknown"
+        try:
+            from util import read_json
+
+            hb = read_json(root_for_timeout / "receipts" / "final-heartbeat.json") or {}
+            stage = str(hb.get("stage") or "unknown")
+        except Exception:
+            pass
+        try:
+            from final.heartbeat import write_final_timeout_receipt
+
+            rec = write_final_timeout_receipt(
+                root_for_timeout,
+                stage=stage,
+                timeout_sec=exc.timeout,
+                error=str(exc),
+            )
+            next_cmd = (read_json(rec) or {}).get("next_cmd") if "read_json" in dir() else None
+        except Exception:
+            next_cmd = None
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": f"final timed out at stage={stage}: {exc}",
+                    "stage": stage,
+                    "timeout_sec": exc.timeout,
+                    "next_cmd": next_cmd,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 2
     except (RenderError, subprocess.CalledProcessError, ValueError) as exc:
         err = str(exc)
         if isinstance(exc, subprocess.CalledProcessError):

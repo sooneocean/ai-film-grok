@@ -1087,6 +1087,34 @@ def build_planned_graph(
             "do not pad duration_sec above H3 nominal to fake planned sum",
         ],
     }
+    # S3.1 · wardrobe ambition vs honest model cap (metadata; scale_fallback enforces at promote)
+    heat_scale = str(heat.get("heat_scale") or "").strip().lower()
+    hardcore = bool(heat.get("hardcore") or heat.get("dual_climax"))
+    if heat_scale == "max" or hardcore:
+        wardrobe_ambition = "bare"
+        wardrobe_honest_cap = "soft-max"  # model limit: stop hard-on collapse → soft-max
+    elif heat_scale in {"high", "hot"}:
+        wardrobe_ambition = "undressed"
+        wardrobe_honest_cap = "undressed"
+    else:
+        wardrobe_ambition = "partial"
+        wardrobe_honest_cap = "partial"
+    wardrobe_honesty = {
+        "schema_version": 1,
+        "kind": "plan_wardrobe_honesty",
+        "wardrobe_ambition": wardrobe_ambition,
+        "wardrobe_honest_cap": wardrobe_honest_cap,
+        "heat_scale": heat_scale or None,
+        "hardcore": hardcore,
+        "note": (
+            "ambition is intent; honest_cap is promote stop ladder "
+            "(no-redress → bare-tease → soft-max; never fake hard-on collapse)"
+        ),
+        "next": [
+            "scale_fallback / promote: stop at wardrobe_honest_cap when anatomy fails",
+            "do not pad heat labels when stills cannot hold bare",
+        ],
+    }
     char_ids = [c["id"] for c in (normalized.get("character_candidates") or []) if c.get("id")]
     if not char_ids:
         char_ids = ["hero"]
@@ -1250,6 +1278,7 @@ def build_planned_graph(
             "root": root_s,
             "target_duration_sec": float(target_duration),
             "duration_density": duration_density,
+            "wardrobe_honesty": wardrobe_honesty,
         },
         "episodes": episode_outs
         or [structure_episode(normalized, target_duration=target_duration)],
