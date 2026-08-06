@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.30] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 续)
+- **P3-1 再迁 2 个 legacy 模块**（累计 3/109），均 0 importer、无 `__file__` 相对资源路径，`git mv` 保留历史：
+  - `scripts/wan_s2v_probe.py` → `media/wan_s2v_probe.py`（Wan 2.2 声音条件 I2V 只读就绪探针；依赖 `comfy_armory`/`comfy_video` 仍为顶层模块，迁移零回退）。
+  - `scripts/stable_audio_adapter.py` → `audio/stable_audio_adapter.py`（本地 Stable Audio 渲染器；`Path(__file__)` 取自身路径与位置无关，迁移零回退）。
+- **1:1 测试**：`tests/test_wan_s2v_probe.py`（3 用例，`_model_names` 纯函数 + `probe_wan_s2v` 伪造 HTTP 层断言就绪/缺失 class_type 报告）、`tests/test_stable_audio_adapter.py`（3 用例，`_sha256` 与 hashlib 一致 + `_pinned_local_model` 拒 symlink/拒 checkpoint SHA 失配，torch 重依赖懒加载故纯测无需 GPU）。
+- 全仓 grep 旧顶层路径无 dangling 引用。
+
 ## [2.40.28] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-1 起手)

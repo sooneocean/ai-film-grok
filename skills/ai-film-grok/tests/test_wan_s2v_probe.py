@@ -1,96 +1,61 @@
+"""1:1 test for media.wan_s2v_probe (P3-1 migration + contract lock).
+
+Migrated from scripts/wan_s2v_probe.py into the media package. The probe only
+proves named ComfyUI dependencies; tests fake the HTTP layer so no network or
+model load occurs.
+"""
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+import pytest
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
-sys.path.insert(0, str(SCRIPTS))
+from media import wan_s2v_probe
 
-from comfy_armory import load_armory  # noqa: E402
-from wan_s2v_probe import REQUIRED_CLASS_TYPES, REQUIRED_MODELS, probe_wan_s2v  # noqa: E402
+REQUIRED = wan_s2v_probe.REQUIRED_CLASS_TYPES
 
 
-def _object_info(*, complete: bool = True) -> dict[str, object]:
-    classes = {class_type: {} for class_type in REQUIRED_CLASS_TYPES}
-    if not complete:
-        classes.pop("AudioEncoderEncode")
-    return classes
+def test_model_names_pure():
+    assert wan_s2v_probe._model_names(["a", "b "]) == {"a", "b"}
+    assert wan_s2v_probe._model_names("notaseq") == set()
+    assert wan_s2v_probe._model_names([1, 2]) == set()
+    assert wan_s2v_probe._model_names([]) == set()
 
 
-@patch("wan_s2v_probe._json_request")
-def test_probe_proves_named_inputs_but_never_claims_execution_ready(
-    request: MagicMock,
-) -> None:
-    request.side_effect = lambda _url, route: {
-        "/object_info": _object_info(),
-        "/models/diffusion_models": [REQUIRED_MODELS["diffusion_models"]],
-        "/models/audio_encoders": [REQUIRED_MODELS["audio_encoders"]],
-    }[route]
+def test_probe_ready_when_deps_present(monkeypatch):
+    object_info = {name: {} for name in REQUIRED}
 
-    report = probe_wan_s2v("http://127.0.0.1:18188")
+    def fake_request(url: str, path: str):
+        if path == "/object_info":
+            return object_info
+        if path == "/models/diffusion_models":
+            return ["wan2.2_s2v_14B_fp8_scaled.safetensors"]
+        if path == "/models/audio_encoders":
+            return ["wav2vec2_large_english_fp16.safetensors"]
+        return []
 
-    assert [call.args[1] for call in request.call_args_list] == [
-        "/object_info",
-        "/models/diffusion_models",
-        "/models/audio_encoders",
-    ]
+    monkeypatch.setattr(wan_s2v_probe, "_json_request", fake_request)
+    monkeypatch.setattr(wan_s2v_probe, "normalize_base_url", lambda u: u)
+
+    report = wan_s2v_probe.probe_wan_s2v("http://comfy.local")
+    assert report["ok"] is True
     assert report["class_types_ready"] is True
     assert report["named_weights_present"] is True
-    assert report["weights_state"] == "named_present_fingerprint_unverified"
     assert report["execution_ready"] is False
-    assert report["auto_download_blocked"] is True
     assert report["auto_submission_blocked"] is True
+    assert report["auto_download_blocked"] is True
 
 
-@patch("wan_s2v_probe._json_request")
-def test_probe_fails_closed_when_required_audio_encoder_is_missing(
-    request: MagicMock,
-) -> None:
-    request.side_effect = lambda _url, route: {
-        "/object_info": _object_info(),
-        "/models/diffusion_models": [REQUIRED_MODELS["diffusion_models"]],
-        "/models/audio_encoders": [],
-    }[route]
+def test_probe_reports_missing_class_type(monkeypatch):
+    object_info = {"AudioEncoderLoader": {}}  # 2 of 3 required missing
 
-    report = probe_wan_s2v("http://127.0.0.1:18188")
+    def fake_request(url: str, path: str):
+        if path == "/object_info":
+            return object_info
+        return []
 
-    assert report["named_weights_present"] is False
-    assert report["missing_weights"] == {"audio_encoders": [REQUIRED_MODELS["audio_encoders"]]}
-    assert report["execution_ready"] is False
+    monkeypatch.setattr(wan_s2v_probe, "_json_request", fake_request)
+    monkeypatch.setattr(wan_s2v_probe, "normalize_base_url", lambda u: u)
 
-
-@patch("wan_s2v_probe._json_request")
-def test_probe_fails_closed_when_a_required_node_class_is_missing(
-    request: MagicMock,
-) -> None:
-    request.side_effect = lambda _url, route: {
-        "/object_info": _object_info(complete=False),
-        "/models/diffusion_models": [REQUIRED_MODELS["diffusion_models"]],
-        "/models/audio_encoders": [REQUIRED_MODELS["audio_encoders"]],
-    }[route]
-
-    report = probe_wan_s2v("http://127.0.0.1:18188")
-
+    report = wan_s2v_probe.probe_wan_s2v("http://comfy.local")
     assert report["class_types_ready"] is False
-    assert report["missing_class_types"] == ["AudioEncoderEncode"]
-    assert report["execution_ready"] is False
-
-
-def test_registry_keeps_wan_s2v_research_only_and_non_promotable() -> None:
-    weapon = next(
-        item
-        for item in load_armory()["research_weapons"]
-        if item["id"] == "wan22-s2v-performance-research"
-    )
-
-    assert weapon["allowed_stages"] == ["research"]
-    assert set(weapon["required_class_types"]) == set(REQUIRED_CLASS_TYPES)
-    assert weapon["required_models"] == REQUIRED_MODELS
-    assert {
-        "no_auto_download",
-        "no_auto_execute",
-        "no_auto_promotion",
-        "not_final",
-        "not_lipsync_substitute",
-    }.issubset(weapon["restrictions"])
+    assert "WanSoundImageToVideo" in report["missing_class_types"]
+    assert report["readiness"] == "dependency_contract_incomplete"

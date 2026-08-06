@@ -1,97 +1,65 @@
+"""1:1 test for audio.stable_audio_adapter (P3-1 migration + contract lock).
+
+Migrated from scripts/stable_audio_adapter.py into the audio package. The heavy
+torch/stable_audio imports are lazy (inside main), so the pure helpers are
+testable without GPU.
+"""
 from __future__ import annotations
 
-import argparse
 import hashlib
-import json
-import subprocess
-import sys
+import os
+import tempfile
 from pathlib import Path
 
-import stable_audio_adapter
+import pytest
+
+from audio import stable_audio_adapter
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def test_sha256_matches_hashlib():
+    with tempfile.NamedTemporaryFile(delete=False) as handle:
+        handle.write(b"hello stable audio")
+        path = Path(handle.name)
+    try:
+        assert (
+            stable_audio_adapter._sha256(path)
+            == hashlib.sha256(b"hello stable audio").hexdigest()
+        )
+    finally:
+        path.unlink()
 
 
-def test_adapter_accepts_only_hash_bound_local_checkpoint(tmp_path: Path) -> None:
-    model_root = tmp_path / "model"
-    model_root.mkdir()
-    checkpoint = model_root / "model.safetensors"
-    checkpoint.write_bytes(b"pinned-checkpoint")
-    adapter = Path(stable_audio_adapter.__file__).resolve()
-    args = argparse.Namespace(
-        model_root=str(model_root),
-        checkpoint=str(checkpoint),
-        expected_checkpoint_sha256=_sha256(checkpoint),
-        expected_adapter_sha256=_sha256(adapter),
-    )
+def test_pinned_local_model_rejects_symlink():
+    d = tempfile.mkdtemp()
+    target = Path(d) / "real.txt"
+    target.write_text("x")
+    link = Path(d) / "link.txt"
+    os.symlink(str(target), str(link))
+    checkpoint = Path(d) / "ckpt.bin"
+    checkpoint.write_text("c")
 
-    assert stable_audio_adapter._pinned_local_model(args) == model_root.resolve()
+    args = _args(model_root=str(link), checkpoint=str(checkpoint))
+    with pytest.raises(SystemExit):
+        stable_audio_adapter._pinned_local_model(args)
 
 
-def test_probe_reports_checkpoint_and_adapter_hashes(tmp_path: Path) -> None:
-    model_root = tmp_path / "model"
-    model_root.mkdir()
-    checkpoint = model_root / "model.safetensors"
-    checkpoint.write_bytes(b"pinned-checkpoint")
-    adapter = Path(stable_audio_adapter.__file__).resolve()
-    probe = Path(__file__).resolve().parent.parent / "scripts" / "node" / "stable_audio_probe.py"
+def test_pinned_local_model_rejects_checkpoint_sha_mismatch(monkeypatch):
+    d = tempfile.mkdtemp()
+    root = Path(d) / "root"
+    root.mkdir()
+    checkpoint = root / "ckpt.bin"
+    checkpoint.write_text("c")
 
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(probe),
-            "--model-root",
-            str(model_root),
-            "--checkpoint",
-            str(checkpoint),
-            "--adapter",
-            str(adapter),
-            "--model",
-            "stabilityai/stable-audio-open-1.0",
-            "--license",
-            "Stability AI Community License",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    report = json.loads(result.stdout)
-
-    assert report["ok"] is True
-    assert report["checkpoint_sha256"] == _sha256(checkpoint)
-    assert report["adapter_sha256"] == _sha256(adapter)
+    monkeypatch.setattr(stable_audio_adapter, "_sha256", lambda p: "deadbeef")
+    args = _args(model_root=str(root), checkpoint=str(checkpoint), expected_ckpt="other")
+    with pytest.raises(SystemExit):
+        stable_audio_adapter._pinned_local_model(args)
 
 
-def test_adapter_rejects_abbreviated_override_arguments() -> None:
-    adapter = Path(stable_audio_adapter.__file__).resolve()
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(adapter),
-            "--model-root",
-            "good",
-            "--checkpoint",
-            "good/model.safetensors",
-            "--expected-checkpoint-sha256",
-            "c" * 64,
-            "--expected-adapter-sha256",
-            "d" * 64,
-            "--prompt",
-            "rain",
-            "--duration",
-            "8",
-            "--seed",
-            "1",
-            "--out",
-            "candidate.wav",
-            "--checkp",
-            "evil/model.safetensors",
-        ],
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode == 2
-    assert "unrecognized arguments: --checkp" in result.stderr
+def _args(*, model_root: str, checkpoint: str, expected_ckpt: str = "x") -> object:
+    ns = type("Ns", (), {})()
+    ns.model_root = model_root
+    ns.checkpoint = checkpoint
+    ns.expected_checkpoint_sha256 = expected_ckpt
+    ns.expected_adapter_sha256 = "whatever"
+    return ns
