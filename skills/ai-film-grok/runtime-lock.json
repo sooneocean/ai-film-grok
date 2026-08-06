@@ -642,7 +642,7 @@
     },
     {
       "path": "scripts/cli/cli_post.py",
-      "sha256": "c4e76a0b235371fded2a83fdbf57121aa0d84cbcbd40ddb326f2e30e60d9d6f7"
+      "sha256": "5c8024361ee58fd576daf67b92ff441b185481b62ed2d44b25da8ad995b42a5c"
     },
     {
       "path": "scripts/cli/cli_quality.py",
@@ -1290,7 +1290,7 @@
     },
     {
       "path": "scripts/gates/production_gates.py",
-      "sha256": "37af476db98fb7931d652dd72fcffff4962c6f8533d8435575931ebdc7d7d155"
+      "sha256": "b18db7e25e757153c44bbcd7b22a24e839ddc00d09e904f685c1c5461bc6c75c"
     },
     {
       "path": "scripts/gates/quality_gates.py",
@@ -1514,7 +1514,7 @@
     },
     {
       "path": "scripts/media/h3_ship_native.py",
-      "sha256": "ff0eb329843e612e17c40c0787e725baecaf91abe3fe929b60eb49df94ad9cfa"
+      "sha256": "2cf37b74dc7f56bc85ad89f4cd98529a5e61fa512f1cc14ffc8eeaac4a161428"
     },
     {
       "path": "scripts/media/h3_workflow.py",
@@ -2022,7 +2022,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "6aa30565d35cac18b4452e71a8349a97f53f7c1145a0d981375781fb6066de33"
+      "sha256": "ab6f2c60ca057afc6326c2f6c587c6bf6e9a58e80b472ac3bd8015f3d79b4d91"
     },
     {
       "path": "scripts/post/render_final_music.py",

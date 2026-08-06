@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "kind": "shortform-tong-canary",
+  "at": "2026-08-06T06:48:53.704052+00:00",
+  "plugin": "2.40.3",
+  "film": "savani-ep01-5m",
+  "root": "/Users/dex/AI FILM SPACE/0805/savani-ep01-5m",
+  "gpu_tunnel": {
+    "status": "OPEN_OPS",
+    "18188": "connection_refused",
+    "lan_host": "192.168.88.52 ping_loss"
+  },
+  "delivery": {
+    "ship_native": "out/film_native_h3.mp4",
+    "film_final": "out/film_final.mp4",
+    "class": "OFFICIAL_FINAL_PLATE",
+    "master_lock": false,
+    "escapes": [
+      "skip-cinematic",
+      "allow-candidate-clips",
+      "AIFILM_SKIP_DIALOGUE_PACKAGE_GATE",
+      "AIFILM_FINAL_ALLOW_CANDIDATE_CLIPS"
+    ]
+  },
+  "next": [
+    "VPN+AIFILM_COMFY_SSH_TARGET then aifilm comfy recover --confirm",
+    "human review-final before master"
+  ]
+}
