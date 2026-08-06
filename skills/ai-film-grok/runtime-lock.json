@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "d0efd1c37575f76c24430ad305c3f16c752e45998340e80522c4cf24bbf1f54f"
+      "sha256": "44919394355c1d383a1ccdc795aa161a4efecc53445f70dfc8e9aeb2dee8242d"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -1153,6 +1153,14 @@
       "sha256": "c293fcf264357c25eddc817eb65f43d5726a8286220c201b12afc74dbc37f170"
     },
     {
+      "path": "scripts/export_cues.py",
+      "sha256": "ca84be3db1a87084351a25c5438670ba338d7b86d81b99ad9f0fd729ad80bb52"
+    },
+    {
+      "path": "scripts/export_helpers.py",
+      "sha256": "04fe5ab4e78e8eba4a0a9defd8f8a613268146e7f99469551d1263e66ed44bde"
+    },
+    {
       "path": "scripts/external_review.py",
       "sha256": "ea70bffb43cf1bd2c6a77e08a1a12d2d573f7ae0e74dd8e5ee923fadeff395ff"
     },
@@ -1173,6 +1181,10 @@
       "sha256": "82330105b74a5a630b614f766f0617469399ce40e080b034df73353be27fbaf8"
     },
     {
+      "path": "scripts/film_spec_lints.py",
+      "sha256": "4563611bcc6ca256820a3b2c3725683d567988062ab7c9903ccdcc2c32a4d518"
+    },
+    {
       "path": "scripts/film_spec_profile.py",
       "sha256": "8942a06f65d979f7918120cb9f4622a2e15b0347ece123e8c208b2f39c7e41f3"
     },
@@ -1189,6 +1201,10 @@
       "sha256": "662274affdc93afcb6bfaf802fbd0e4811f8a3a02ba4f4cdac01206a1ec3a842"
     },
     {
+      "path": "scripts/final/bgm_spotting.py",
+      "sha256": "6dc231f1f21220cea2be675cd022b726bf3a8bea1e024fb2c081f27030cd1f46"
+    },
+    {
       "path": "scripts/final/caption_text.py",
       "sha256": "e28b82c98ca5c116386209dacaf1649c1e795c48e95c25c4be44d014b24bd70c"
     },
@@ -1198,7 +1214,7 @@
     },
     {
       "path": "scripts/final/delivery_class.py",
-      "sha256": "3ee308aea33c95d819cdf884737289c1a3c15b4f48ce7e8d13f4706c0cb37fa0"
+      "sha256": "a70eb2113c3732db2023146fe4601de8042cf97d43a85662632bc29df57d614a"
     },
     {
       "path": "scripts/final/enhance.py",
@@ -1213,12 +1229,24 @@
       "sha256": "e2213d8fb7efb1afdfb4be5be4c6d5ba4470454624ee804c4c19a4fd728d7b5b"
     },
     {
+      "path": "scripts/final/io.py",
+      "sha256": "baf8fcfce26b7247bb140c1081bd0b162bee8031fa4a9ce3dbb803caf79f6ee7"
+    },
+    {
+      "path": "scripts/final/manifest.py",
+      "sha256": "8a9dba2487fb485b3aaba4600f89e678b4b2283bf846f14a5baee5550c6344d3"
+    },
+    {
       "path": "scripts/final/media_ops.py",
       "sha256": "c493053e7c67fb0f8d078cc78ee39b5c23d73fcc3c14e150f49657b499443923"
     },
     {
       "path": "scripts/final/native_audio.py",
-      "sha256": "88d3f8f4a5a5e6f87b5ea65d0956afba6b301bf25bbb4eb9a1a8a6534a44b10d"
+      "sha256": "8d2e24ea730b0e0767b27942bbeda64a1bf5f0b0873f4732f9002b9b62267a25"
+    },
+    {
+      "path": "scripts/final/render_defaults.py",
+      "sha256": "ebe57039b15e18215614cb33b7a6205e2106d7eb39541acfddf5170ae32c698c"
     },
     {
       "path": "scripts/final/tts_tracks.py",
@@ -1227,6 +1255,10 @@
     {
       "path": "scripts/final/voice.py",
       "sha256": "1537a8f2ba182c6fa52a73608e3b41453034383be41989450bb209c2d6f5bfcd"
+    },
+    {
+      "path": "scripts/final/voice_mix_config.py",
+      "sha256": "6817137a0a44178fc78a8a575de5b32fb975345733b9c075863d99ee32cc01aa"
     },
     {
       "path": "scripts/final/watchdog.py",
@@ -1385,12 +1417,36 @@
       "sha256": "55c1d1cf8a9993923231c579b6b78f49bdb56653f8e49e64456c677f0688fce0"
     },
     {
+      "path": "scripts/heat_arc_lint.py",
+      "sha256": "b306ec0e99aab354bccd7e5a722f62e569bb5fb3886d11e86edf02751027998a"
+    },
+    {
       "path": "scripts/heat_check.py",
       "sha256": "39b98a45276d375f29c2d84dba052c3af3134f1c97edff8ac7d64705bb6557fe"
     },
     {
+      "path": "scripts/heat_coitus.py",
+      "sha256": "dee3d3ac46bb3dedafc17b33f238e31b9d14967e706f758d65278fd5adb0fde6"
+    },
+    {
+      "path": "scripts/heat_impact.py",
+      "sha256": "371068d9b64f0aec254bfe4f9d2f595e9e398f528644a313f191f8579593d193"
+    },
+    {
+      "path": "scripts/heat_multi.py",
+      "sha256": "a05fe7a0fe412e0f1afc094fa0572bf815c0ee9afda900cd5caebfe520d00534"
+    },
+    {
       "path": "scripts/heat_phase.py",
       "sha256": "6ddb3fdd072dbd8a2e058e0193e6e6b9e18318041a98be5c00f62966a5555907"
+    },
+    {
+      "path": "scripts/heat_spice.py",
+      "sha256": "5fb27943db8e914e18eb414bdbb4b414ea7316a2838d2369d16c569909da34f5"
+    },
+    {
+      "path": "scripts/heat_wardrobe.py",
+      "sha256": "e89d20af5560c45a0ea80571e5ff4ee0f5be80b5017b6d3162530d3f29337647"
     },
     {
       "path": "scripts/i2v_motion_gate.py",
@@ -1738,7 +1794,7 @@
     },
     {
       "path": "scripts/narrative/edit_policy_heat.py",
-      "sha256": "b369a562a12a6a98bcf04dc03479705545ada171060861a5dbf6b0097975cd8e"
+      "sha256": "05727cf395cd5e74c148864ea92ee9dc3624ae04da95099bd8e3496278cef982"
     },
     {
       "path": "scripts/narrative/edit_policy_shared.py",
@@ -1753,12 +1809,36 @@
       "sha256": "65c3fd021b06d134cc994e003592104a398ab7af155795284b2d8e520a21a63a"
     },
     {
+      "path": "scripts/narrative/heat_arc_lint.py",
+      "sha256": "a93afeac5d540434472974820a0020db9aecf7adb4206c335e4443b71034a15e"
+    },
+    {
       "path": "scripts/narrative/heat_check.py",
       "sha256": "b620a112387a5ba9251b885336d32b6d80152afdaf70a723d60a46bc2ba548f3"
     },
     {
+      "path": "scripts/narrative/heat_coitus.py",
+      "sha256": "810dfad71353c0863bf82e3e9ca142301ce2dcaaac8c026baceeb335b84f9716"
+    },
+    {
+      "path": "scripts/narrative/heat_impact.py",
+      "sha256": "4b87cf54951bc904c572bd472b222f01566bc3f61429d2c896d7877b19e3b4e0"
+    },
+    {
+      "path": "scripts/narrative/heat_multi.py",
+      "sha256": "8f8530a8a5d491e2c56583647fb11974fb4eccd8e8015d072b445c04ccb68457"
+    },
+    {
       "path": "scripts/narrative/heat_phase.py",
       "sha256": "b09c9fcb0db92fb463a64495039c1aad7807f7087f2b8ad407abb03d1b7e7ddf"
+    },
+    {
+      "path": "scripts/narrative/heat_spice.py",
+      "sha256": "b3ffc12f0a10f1ba5a10e6dd5ffc9ec53307c459db75b443592d14a36c5bdfb9"
+    },
+    {
+      "path": "scripts/narrative/heat_wardrobe.py",
+      "sha256": "0be615974a95dc9bea1878c11f22497add987db3bfc051d13ec7a562edf246c3"
     },
     {
       "path": "scripts/narrative/scale_fallback.py",
@@ -1893,12 +1973,16 @@
       "sha256": "a416fcf1726ea89be001afde06b3205fdb89049b134828182a11629d3c03b9a4"
     },
     {
+      "path": "scripts/plan/film_spec_lints.py",
+      "sha256": "771ace852bf2c0c76f6b8f279c9211d094a7f695acbc1331d82990a47d7305a9"
+    },
+    {
       "path": "scripts/plan/film_spec_sex_floor.py",
       "sha256": "9d99de265ce055179385d9e7e66827524b518e9047cd478f415558c9f41d4c70"
     },
     {
       "path": "scripts/plan/film_spec_validate.py",
-      "sha256": "43c51272abbc947ccc811dd1920c72738c98ad78d501839cf09b5a11c4b20e60"
+      "sha256": "afad4614ae94b86f4f65ba59e98bf24e88fed5bd116ca39078c9df88fcdf5296"
     },
     {
       "path": "scripts/plan/intake.py",
@@ -2038,11 +2122,19 @@
     },
     {
       "path": "scripts/post/export_composition.py",
-      "sha256": "d4657a72a7d7598fb225ac11ef5aab823b42ec59583738df258fe754d4e6a9f4"
+      "sha256": "336bd32dd3ebb8a9a5b03583187e1a34bf6d09c6758cfecf4bc25cd3b7f56992"
+    },
+    {
+      "path": "scripts/post/export_cues.py",
+      "sha256": "e1e40a272e9ba26fb9ce6ced3ee4020ff26c985707b4adf264e9e841d7158442"
+    },
+    {
+      "path": "scripts/post/export_helpers.py",
+      "sha256": "af6956226533394bcfe43864bf29c3710ef727a451b04b624f6a3a48b63b60aa"
     },
     {
       "path": "scripts/post/final_editorial_review.py",
-      "sha256": "cc3be0b4fe81e362d78ebc8e6026edb5ac2f999905589e38b94c43509de9e56f"
+      "sha256": "0a6d30c9270fbb2863125535dc01941a33c682a25a84893bf0c1b2a2b43dbf6c"
     },
     {
       "path": "scripts/post/final_review_input.py",
@@ -2078,7 +2170,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "6586e15504178f38740cf37e65f8d087d51ec456f741130867934e92d83f7673"
+      "sha256": "de4371c5822f03db6d0704de23072c2ab46ce9093ebd632da1225dd60e841136"
     },
     {
       "path": "scripts/post/render_final_music.py",
