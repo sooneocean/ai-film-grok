@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.99] - 2026-08-06
+
+### Added / Fixed (shortform S0.3–S0.4 + S1.1 + lipsync freeze)
+- **S0.3** `rebalance_adult_beat_durations`: grow `shots_n` first; meat paper ≤ `shots_n × 5.2`; no unstretchable pad.
+- **S0.4** heat-lifted target → `project.duration_density` + min-shots H3 advice in graph.
+- **S1.1** `h3 ship-native --caption/--music-mood` → receipt `stage2.command` only (no silent hardburn).
+- **Post lipsync freeze (v2.40 path)**: tombstone LatentSync/MuseTalk/FRW/node clients; `--lipsync` must be `off`; prefer_native dialogue.
+- Tests: adult rebalance S0.3 · lipsync routing frozen · ship-native density suite still green.
+
 ## [2.39.98] - 2026-08-06
 
 ### Added / Fixed (multi-agent GPU gate + memory slim)

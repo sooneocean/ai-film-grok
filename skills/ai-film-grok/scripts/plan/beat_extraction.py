@@ -7,6 +7,7 @@ shot planning and graph construction.  This module is self-contained
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
@@ -436,14 +437,45 @@ def rebalance_adult_beat_durations(
     *,
     scene_budget_sec: float,
     sex_floor: float = 0.50,
+    nominal_clip_sec: float = 5.2,
+    max_shots_per_beat: int = 3,
 ) -> list[dict[str, Any]]:
     """Ensure act+climax share of beat duration ≥ sex_floor (adult max plan-time).
 
-    Extends meat beats first; does not invent new beats.
+    S0.3 · 2026-08-06: never invent paper seconds beyond H3-reachable media
+    (shots_n × nominal_clip_sec). Prefer raising shots_n (≤3), then duration
+    capped to that ceiling; if still short, cut non-meat (ratio honesty).
     """
     if not beats or scene_budget_sec <= 0:
         return beats
     meat_keys = {"act", "climax"}
+    non_meat_keys = {"setup", "afterglow", "bridge", "foreplay"}
+    nom = float(nominal_clip_sec) if nominal_clip_sec > 0 else 5.2
+    max_n = max(1, int(max_shots_per_beat))
+
+    def _shots_n(b: dict[str, Any]) -> int:
+        try:
+            n = int(b.get("shots_n") or 1)
+        except (TypeError, ValueError):
+            n = 1
+        return max(1, min(max_n, n))
+
+    def _cap_for(b: dict[str, Any]) -> float:
+        return round(_shots_n(b) * nom, 1)
+
+    def _clamp_meat_to_cap(b: dict[str, Any]) -> None:
+        cap = _cap_for(b)
+        cur = float(b.get("targetDuration") or 0)
+        if cur > cap + 1e-9:
+            b["targetDuration"] = cap
+            b["_duration_capped_h3"] = True
+            b["_h3_reachable_sec"] = cap
+
+    # Pre-clamp any meat already over H3 paper ceiling
+    for b in beats:
+        if str(b.get("heat_phase") or "").lower() in meat_keys:
+            _clamp_meat_to_cap(b)
+
     total = sum(float(b.get("targetDuration") or 0) for b in beats) or 0.0
     if total <= 0:
         return beats
@@ -466,10 +498,75 @@ def rebalance_adult_beat_durations(
             -float(b.get("targetDuration") or 0),
         ),
     )
-    each = need / len(meat_beats_sorted)
+
+    remaining = need
     for b in meat_beats_sorted:
-        b["targetDuration"] = round(float(b.get("targetDuration") or 0) + each, 1)
-        b["_duration_rebalanced"] = True
+        if remaining <= 1e-9:
+            break
+        # Grow shots_n first so reachable ceiling can absorb more meat time
+        cur = float(b.get("targetDuration") or 0)
+        headroom_if_max = max_n * nom - cur
+        add = min(remaining, max(0.0, headroom_if_max))
+        if add <= 1e-9:
+            continue
+        new_dur = cur + add
+        need_shots = max(1, min(max_n, int(math.ceil(new_dur / nom - 1e-9))))
+        if need_shots > _shots_n(b):
+            b["shots_n"] = need_shots
+            b["_shots_n_rebalanced"] = True
+        new_dur = min(new_dur, _cap_for(b))
+        gained = new_dur - cur
+        if gained > 1e-9:
+            b["targetDuration"] = round(new_dur, 1)
+            b["_duration_rebalanced"] = True
+            b["_h3_reachable_sec"] = _cap_for(b)
+            remaining -= gained
+
+    # Second pass: max-out meat beats still under cap
+    if remaining > 1e-9:
+        for b in meat_beats_sorted:
+            if remaining <= 1e-9:
+                break
+            if _shots_n(b) < max_n:
+                b["shots_n"] = max_n
+                b["_shots_n_rebalanced"] = True
+            cur = float(b.get("targetDuration") or 0)
+            cap = _cap_for(b)
+            if cur + 1e-9 < cap:
+                add = min(remaining, cap - cur)
+                b["targetDuration"] = round(cur + add, 1)
+                b["_duration_rebalanced"] = True
+                b["_h3_reachable_sec"] = cap
+                remaining -= add
+
+    total = sum(float(b.get("targetDuration") or 0) for b in beats) or 0.0
+    meat = sum(
+        float(b.get("targetDuration") or 0)
+        for b in beats
+        if str(b.get("heat_phase") or "").lower() in meat_keys
+    )
+    # If still under floor: cut non-meat to raise ratio (honest), never pad meat past H3
+    if total > 0 and meat / total + 1e-9 < sex_floor:
+        # target total so meat/total >= floor → total <= meat/floor
+        max_total = meat / sex_floor if sex_floor > 0 else total
+        overflow = total - max_total
+        non_meat = [
+            b
+            for b in beats
+            if str(b.get("heat_phase") or "").lower() in non_meat_keys
+        ]
+        for b in non_meat:
+            if overflow <= 1e-9:
+                break
+            cur = float(b.get("targetDuration") or 0)
+            cut = min(overflow, max(0.0, cur - 2.5))
+            if cut > 1e-9:
+                b["targetDuration"] = round(cur - cut, 1)
+                b["_duration_cut_for_sex_floor"] = True
+                overflow -= cut
+        for b in meat_beats:
+            b["_sex_floor_via_non_meat_cut"] = True
+
     new_total = sum(float(b.get("targetDuration") or 0) for b in beats)
     if new_total > scene_budget_sec * 1.15:
         setup_beats = [
@@ -485,6 +582,20 @@ def rebalance_adult_beat_durations(
             cut = min(overflow, max(0.0, cur - 2.5))
             b["targetDuration"] = round(cur - cut, 1)
             overflow -= cut
+
+    total = sum(float(b.get("targetDuration") or 0) for b in beats) or 0.0
+    meat = sum(
+        float(b.get("targetDuration") or 0)
+        for b in beats
+        if str(b.get("heat_phase") or "").lower() in meat_keys
+    )
+    if total > 0 and meat / total + 1e-9 < sex_floor:
+        for b in meat_beats:
+            b["_sex_floor_unreachable_h3"] = True
+            b["_honest_next"] = (
+                "add meat shots (shots_n) or lower sex_floor / scene promise; "
+                "do not pad duration_sec above H3 nominal"
+            )
     return beats
 
 

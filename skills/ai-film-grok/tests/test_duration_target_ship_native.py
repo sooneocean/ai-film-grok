@@ -246,6 +246,40 @@ class TestShipNativeDry(unittest.TestCase):
             self.assertIn("DURATION_TARGET_SHORT_HARD", dt.get("codes") or [])
             rec = root / "receipts" / "h3-ship-native.json"
             self.assertTrue(rec.is_file())
+            # S1.1: default still documents stage-2 final path
+            st2 = rep.get("stage2") or {}
+            self.assertFalse(st2.get("concat_includes_hardburn"))
+            self.assertIn("aifilm final", st2.get("command") or "")
+
+    def test_caption_music_flags_stage2_only(self) -> None:
+        """S1.1: caption/music-mood do not claim burned plate."""
+        import tempfile
+        from media.h3_ship_native import ship_native
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "clips").mkdir()
+            p = root / "clips" / "s01.mp4"
+            p.write_bytes(b"\x00" * 64)
+            spec = {
+                "target_duration": 5.0,
+                "scenes": [{"shots": [{"id": "s01", "duration_sec": 5.0}]}],
+            }
+            man = {"clips": {"s01": {"status": "approved", "path": "clips/s01.mp4"}}}
+            (root / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+            (root / "manifest.json").write_text(json.dumps(man), encoding="utf-8")
+            (root / "receipts").mkdir()
+            rep = ship_native(
+                root, dry_run=True, caption="hardburn", music_mood="rnb"
+            )
+            self.assertTrue(rep["ok"])
+            st2 = rep.get("stage2") or {}
+            self.assertTrue(st2.get("requested"))
+            self.assertFalse(st2.get("concat_includes_hardburn"))
+            self.assertFalse(st2.get("concat_includes_bgm"))
+            self.assertIn("ship_hardburn", st2.get("command") or "")
+            self.assertIn("--music-mood rnb", st2.get("command") or "")
+            self.assertEqual(rep["delivery_class"], "OFFICIAL_FINAL_PLATE")
 
 
 if __name__ == "__main__":

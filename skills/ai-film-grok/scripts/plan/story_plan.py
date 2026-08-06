@@ -1057,12 +1057,36 @@ def build_planned_graph(
     heat = (
         normalized.get("heat_signals") if isinstance(normalized.get("heat_signals"), dict) else {}
     )
+    from plan.duration_target import H3_NOMINAL_CLIP_SEC, suggest_min_shots
+
+    target_requested = float(target_duration)
+    heat_target_lift: str | None = None
     if heat.get("dual_climax") and target_duration < 90:
         target_duration = 100.0
+        heat_target_lift = "dual_climax"
     elif heat.get("hardcore") and target_duration < 60:
         target_duration = 60.0
+        heat_target_lift = "hardcore"
     elif heat.get("heat_scale") == "max" and target_duration < 50:
         target_duration = 55.0
+        heat_target_lift = "heat_scale_max"
+    # S0.4 · bind H3 shot density advice to heat-lifted target (metadata only)
+    min_shots_h3 = suggest_min_shots(float(target_duration), nominal_clip_sec=H3_NOMINAL_CLIP_SEC)
+    duration_density = {
+        "schema_version": 1,
+        "kind": "plan_duration_density",
+        "target_duration_requested": target_requested,
+        "target_duration_effective": float(target_duration),
+        "heat_target_lift": heat_target_lift,
+        "nominal_clip_sec": float(H3_NOMINAL_CLIP_SEC),
+        "suggested_min_shots_h3": int(min_shots_h3),
+        "h3_reachable_if_min_shots_sec": round(min_shots_h3 * float(H3_NOMINAL_CLIP_SEC), 2),
+        "next": [
+            f"plan ≥{min_shots_h3} shots at ~{H3_NOMINAL_CLIP_SEC}s "
+            f"or lower target_duration to n×{H3_NOMINAL_CLIP_SEC}",
+            "do not pad duration_sec above H3 nominal to fake planned sum",
+        ],
+    }
     char_ids = [c["id"] for c in (normalized.get("character_candidates") or []) if c.get("id")]
     if not char_ids:
         char_ids = ["hero"]
@@ -1224,6 +1248,8 @@ def build_planned_graph(
             "targetResolution": "1080x1920",
             "targetFps": 30,
             "root": root_s,
+            "target_duration_sec": float(target_duration),
+            "duration_density": duration_density,
         },
         "episodes": episode_outs
         or [structure_episode(normalized, target_duration=target_duration)],
@@ -1231,7 +1257,15 @@ def build_planned_graph(
         "characters": characters,
         "locations": locations,
         "props": [],
-        "warnings": list(normalized.get("warnings") or []),
+        "warnings": list(normalized.get("warnings") or [])
+        + (
+            [
+                f"H3 density: need ≥{min_shots_h3} shots for "
+                f"{float(target_duration):.0f}s target (~{H3_NOMINAL_CLIP_SEC}s/clip)"
+            ]
+            if heat_target_lift
+            else []
+        ),
     }
     screenplay = (
         normalized.get("dialogue_screenplay")

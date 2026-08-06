@@ -33,6 +33,26 @@ class DurationRebalanceTests(unittest.TestCase):
         total = sum(float(b["targetDuration"]) for b in out)
         meat = sum(float(b["targetDuration"]) for b in out if b["heat_phase"] in {"act", "climax"})
         self.assertGreaterEqual(meat / total, 0.50 - 1e-6)
+        # S0.3: meat paper duration never exceeds H3 reachable (shots_n × 5.2)
+        for b in out:
+            if b["heat_phase"] not in {"act", "climax"}:
+                continue
+            n = max(1, int(b.get("shots_n") or 1))
+            self.assertLessEqual(float(b["targetDuration"]), n * 5.2 + 1e-6)
+
+    def test_rebalance_raises_shots_n_not_8s_paper(self) -> None:
+        """S0.3: under-floor meat grows shots_n; no unstretchable 8s single plate."""
+        beats = [
+            {"heat_phase": "setup", "targetDuration": 30.0, "shots_n": 1},
+            {"heat_phase": "act", "coitus_beat": "rhythm", "targetDuration": 5.0, "shots_n": 1},
+            {"heat_phase": "climax", "coitus_beat": "finish", "targetDuration": 5.0, "shots_n": 1},
+        ]
+        out = rebalance_adult_beat_durations(beats, scene_budget_sec=40.0, sex_floor=0.50)
+        meat = [b for b in out if b["heat_phase"] in {"act", "climax"}]
+        self.assertTrue(any(int(b.get("shots_n") or 1) > 1 for b in meat))
+        for b in meat:
+            n = max(1, int(b.get("shots_n") or 1))
+            self.assertLessEqual(float(b["targetDuration"]), n * 5.2 + 1e-6)
 
     def test_compact_sex_scene_has_climax_bare(self) -> None:
         spine = _compact_adult_spine_for_scene("两人沉腰办事卸装缠绵")

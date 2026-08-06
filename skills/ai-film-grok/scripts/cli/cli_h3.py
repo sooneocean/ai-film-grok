@@ -324,6 +324,22 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
         help="Plan + duration honesty only; no ffmpeg",
     )
     ship.add_argument(
+        "--caption",
+        default=None,
+        help=(
+            "Stage-2 caption intent (e.g. hardburn/ship_hardburn). "
+            "Does NOT burn in ship-native; receipt.stage2.command runs aifilm final."
+        ),
+    )
+    ship.add_argument(
+        "--music-mood",
+        default=None,
+        help=(
+            "Stage-2 BGM mood (e.g. rnb). Does NOT mix in ship-native; "
+            "see receipts/h3-ship-native.json stage2.command"
+        ),
+    )
+    ship.add_argument(
         "--sample-audio",
         type=int,
         default=3,
@@ -473,6 +489,8 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                     allow_candidate=bool(getattr(args, "allow_candidate", False)),
                     dry_run=bool(getattr(args, "dry_run", False)),
                     sample_audio=int(getattr(args, "sample_audio", 3) or 3),
+                    caption=getattr(args, "caption", None),
+                    music_mood=getattr(args, "music_mood", None),
                 )
             except H3ShipNativeError as exc:
                 raise H3WorkflowError(str(exc)) from exc

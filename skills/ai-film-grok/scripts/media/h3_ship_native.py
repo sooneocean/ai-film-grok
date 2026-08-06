@@ -251,6 +251,24 @@ def check_duration_vs_target(
     return check_duration_target(spec, media_sum_sec=media_sum)
 
 
+def _stage2_final_cmd(
+    root: Path,
+    *,
+    caption: str | None,
+    music_mood: str | None,
+) -> str:
+    """Exact next command for hardburn/BGM after native concat (S1.1 honesty)."""
+    cap = (caption or "ship_hardburn").strip() or "ship_hardburn"
+    if cap in {"hardburn", "ship", "on", "true", "1"}:
+        cap = "ship_hardburn"
+    mood = (music_mood or "rnb").strip() or "rnb"
+    return (
+        f'aifilm final --root "{root}" --skip-canonical-truth '
+        f"--post-engine ffmpeg --tts-backend edge --music-mood {mood} "
+        f"--caption-path {cap}"
+    )
+
+
 def ship_native(
     root: Path | str,
     *,
@@ -258,8 +276,14 @@ def ship_native(
     allow_candidate: bool = False,
     dry_run: bool = False,
     sample_audio: int = 3,
+    caption: str | None = None,
+    music_mood: str | None = None,
 ) -> dict[str, Any]:
-    """Build H3-native plate from approved (or candidate) clips."""
+    """Build H3-native plate from approved (or candidate) clips.
+
+    S1.1: optional ``caption`` / ``music_mood`` only attach stage-2 final
+    command in the receipt — this path never silently claims hardburn/BGM.
+    """
     root_p = Path(root).expanduser().resolve()
     spec = read_json(root_p / "film-spec.json") or {}
     man = read_json(root_p / "manifest.json") or {}
@@ -280,6 +304,28 @@ def ship_native(
     out = Path(out_path).expanduser().resolve() if out_path else (
         root_p / "out" / "film_native_h3.mp4"
     )
+    wants_stage2 = bool(
+        (caption and str(caption).strip().lower() not in {"", "none", "off", "0"})
+        or (music_mood and str(music_mood).strip().lower() not in {"", "none", "off", "0"})
+    )
+    stage2_cmd = _stage2_final_cmd(
+        root_p,
+        caption=caption if wants_stage2 else "ship_hardburn",
+        music_mood=music_mood if wants_stage2 else "rnb",
+    )
+    stage2 = {
+        "required_for_captions_or_bgm": True,
+        "requested": wants_stage2,
+        "caption": caption,
+        "music_mood": music_mood,
+        "concat_includes_hardburn": False,
+        "concat_includes_bgm": False,
+        "command": stage2_cmd,
+        "note": (
+            "ship-native = concat plate only; hardburn/rnb is stage-2 via aifilm final "
+            "(not auto-run here — avoids false master)"
+        ),
+    }
     report: dict[str, Any] = {
         "schema_version": 1,
         "kind": "h3_ship_native",
@@ -295,26 +341,29 @@ def ship_native(
         "native_audio_audit": audio_audit,
         "out": str(out),
         "duration_target": dur_rep,
+        "stage2": stage2,
         "notes": [
             "native ship preserves clip aac when present; aac≠intelligible Mandarin",
-            "OFFICIAL_FINAL_PLATE only — no hardburn/rnb sidechain on this path",
+            "OFFICIAL_FINAL_PLATE only — concat does not hardburn or mix rnb",
             "not master_lock; formal master = gate-auto green + review-final",
-            "stage-2 captions/BGM: aifilm final --skip-canonical-truth "
-            "--post-engine ffmpeg --tts-backend edge --music-mood rnb --caption-path ship_hardburn",
+            f"stage-2 captions/BGM: {stage2_cmd}",
         ],
         "next": list(
             dict.fromkeys(
                 list(dur_rep.get("next") or [])
                 + list(audio_audit.get("next") or [])
                 + [
-                    f'aifilm final --root "{root_p}" --skip-canonical-truth '
-                    f"--post-engine ffmpeg --tts-backend edge --music-mood rnb "
-                    f"--caption-path ship_hardburn  # plate→hardburn/BGM stage-2",
+                    stage2_cmd + "  # plate→hardburn/BGM stage-2",
                     f'aifilm gate-auto --root "{root_p}"',
                 ]
             )
         ),
     }
+    if wants_stage2:
+        report["notes"].append(
+            "caption/music-mood flags recorded for stage-2 only — "
+            "this receipt is still OFFICIAL_FINAL_PLATE without burned subs/BGM"
+        )
 
     if dry_run:
         report["ok"] = True
