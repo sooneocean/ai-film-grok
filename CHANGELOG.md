@@ -1,11 +1,27 @@
 # Changelog
 
+## [2.40.1] - 2026-08-06
+
+### Added / Fixed (shortform closeout S1.2/S1.4 + S2.1 + freeze docs)
+- **S1.2** skip-canonical-truth contract tests (canonical graph raises; legacy soft).
+- **S1.4** closeout `plate_delivery_honesty`: OFFICIAL_FINAL_PLATE never counts as final_complete.
+- **S2.1** `references/shortform-director.md` + SKILL path picker; shortform lipsync stays hard-fail.
+- hard-defaults / lipsync.md v2.40 tombstone wording; variety precheck hard pointer.
+
 ## [2.40.0] - 2026-08-06
 
-### Added / Fixed (lipsync freeze cleanup + continuity MVP)
-- Delete obsolete lipsync node/canary/challenge/pilot tests; single `test_lipsync_frozen`.
-- Preflight wires `continuity_programmatic` + Chinese-only voice hard codes (no ja cast_voices).
-- Final heartbeat receipt helpers; programmatic continue-join checks.
+### Breaking (post lipsync removed)
+- **Production path**: `final --lipsync` **only `off`**; `enforce_dialogue_lipsync` hard-rejects auto/require/wav2lip/etc.
+- **Tombstones**: `audio/lipsync_*.py`, `frw_lipsync`, `node/{latentsync,musetalk}_adapter`, CLI `lipsync-*`, shortform enable/render-lipsync — all raise / FilmError.
+- **Doctor**: missing LatentSync no longer blocks core readiness.
+- Policy doc: `references/lipsync.md` marks **code removal** (not “optional frozen backends”).
+
+### Added (quality hard-gate MVP)
+- `gates/continuity_programmatic.py`: continue-join forbidden dissolve + optional frame hash + wedge insert.
+- Preflight: continuity programmatic issues + **ja cast_voices / dialogue_spoken_lang hard**.
+- Still register: face-identity **default hard** when cast enrolled (`AIFILM_SKIP_FACE_IDENTITY=1` escape).
+- `final/heartbeat.py` + render_final start heartbeat receipt.
+- Tests: `test_lipsync_frozen` · `test_continuity_programmatic` · `test_final_heartbeat`; drop legacy lipsync suite.
 
 ## [2.39.99] - 2026-08-06
 

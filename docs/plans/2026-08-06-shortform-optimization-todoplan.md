@@ -6,7 +6,7 @@
 |----|-----|
 | Repo | `/Users/dex/.grok/plugins/ai-film-grok` |
 | 范围 | 默认 shortform 主产线 + `cli:shortform` 旁路 |
-| 状态 | **ACTIVE** · **S0.1–S0.4 + S1.1 SHIPPED** (2.39.99) · lipsync freeze · S1.2–S5 待办 |
+| 状态 | **CODE CLOSED** · S0.1–S0.5 · S1.1–S1.2 · S1.4 · S2.1–S2.2 SHIPPED (2.40.1) · **S5 OPEN_OPS only** |
 | 拍板记录 | `go` 用推荐默认 **fail-closed + 明确 next**（非 auto 增镜/降 target） |
 | 与旧板关系 | 产品面 `docs/plans/2026-08-06-optimization-todoplan.md` Wave A/B 代码已多收；本档 = **短版残余专用板** |
 

@@ -417,7 +417,6 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     clips_dir = paths["clips_dir"]
     audio_dir = paths["audio_dir"]
     native_dir = paths["native_dir"]
-    keyframes_dir = paths["keyframes_dir"]
     work = paths["work"]
     overlays_dir = work / "overlays"
     checkpoint = CheckpointManager(root)

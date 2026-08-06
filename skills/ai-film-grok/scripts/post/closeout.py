@@ -67,10 +67,53 @@ def _final_record(root: Path) -> dict[str, Any] | None:
         "out/final.mp4",
         "out/plate.mp4",
         "out/final-plate.mp4",
+        "out/film_native_h3.mp4",
     ):
         if (root / rel).is_file():
             return {"path": str(root / rel), "source": "filesystem"}
     return None
+
+
+def plate_delivery_honesty(root: Path | str) -> dict[str, Any]:
+    """S1.4 · detect OFFICIAL_FINAL_PLATE (not master) so closeout never pretends complete."""
+    base = _root(root)
+    plate_markers: list[str] = []
+    for rel in (
+        "receipts/official-final-report.json",
+        "receipts/h3-ship-native.json",
+        "receipts/delivery-class.json",
+    ):
+        data = read_json(base / rel) or {}
+        if not isinstance(data, dict):
+            continue
+        status = str(
+            data.get("status")
+            or data.get("delivery_class")
+            or data.get("kind")
+            or ""
+        )
+        if "OFFICIAL_FINAL_PLATE" in status or status in {
+            "h3_ship_native",
+            "OFFICIAL_FINAL_PLATE",
+        }:
+            plate_markers.append(rel)
+        if data.get("master_lock") is False and (
+            data.get("delivery_class") == "OFFICIAL_FINAL_PLATE"
+            or data.get("status") == "OFFICIAL_FINAL_PLATE"
+        ):
+            if rel not in plate_markers:
+                plate_markers.append(rel)
+    is_plate = bool(plate_markers)
+    return {
+        "is_official_plate": is_plate,
+        "markers": plate_markers,
+        "master_eligible": not is_plate,
+        "note": (
+            "OFFICIAL_FINAL_PLATE is not final_complete; need gate-auto green + review-final"
+            if is_plate
+            else "no plate-only receipt"
+        ),
+    }
 
 
 def _post_audit_current(root: Path) -> dict[str, Any]:
@@ -96,6 +139,22 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         heat = {"active": False, "error": str(exc)[:160]}
 
     post = _post_audit_current(base)
+    plate = plate_delivery_honesty(base)
+    # S1.4: plate-only receipts can never satisfy final_complete
+    final_complete_ok = bool(gates.get("final_complete")) and not plate["is_official_plate"]
+    if plate["is_official_plate"] and gates.get("final_complete"):
+        final_complete_detail = (
+            "BLOCKED: gates.final_complete set but delivery is OFFICIAL_FINAL_PLATE "
+            f"({', '.join(plate['markers'][:3])}) — not master"
+        )
+    elif final_complete_ok:
+        final_complete_detail = "review-final scorecard approved"
+    elif plate["is_official_plate"]:
+        final_complete_detail = (
+            "plate only (OFFICIAL_FINAL_PLATE); gate-auto green + human review-final required"
+        )
+    else:
+        final_complete_detail = "needs human review-final"
     steps = [
         {
             "id": "heat",
@@ -119,20 +178,24 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         },
         {
             "id": "final_complete",
-            "ok": bool(gates.get("final_complete")),
-            "detail": "review-final scorecard approved"
-            if gates.get("final_complete")
-            else "needs human review-final",
+            "ok": final_complete_ok,
+            "detail": final_complete_detail,
+            "plate_honesty": plate,
             "next_cmd": (
                 None
-                if gates.get("final_complete")
-                # Draft if missing; apply path needs user phrase (shown in human_next)
-                else (f'aifilm agent-review-final --root "{base}"')
+                if final_complete_ok
+                else (
+                    f'aifilm gate-auto --root "{base}"  # then review-final'
+                    if plate["is_official_plate"]
+                    else f'aifilm agent-review-final --root "{base}"'
+                )
             ),
             "required_proof": None
-            if gates.get("final_complete")
+            if final_complete_ok
             else (
-                "agent-review-final → --apply --reviewer … --user-phrase 可以 "
+                "OFFICIAL_FINAL_PLATE ≠ master; gate-auto green + review-final phrase "
+                if plate["is_official_plate"]
+                else "agent-review-final → --apply --reviewer … --user-phrase 可以 "
                 "(never forge phrase; technical gates still apply)"
             ),
         },
@@ -219,6 +282,50 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
                 "advisory": False,
             }
     steps.append(caption_step)
+
+    # S1.4 · plate ≠ master: OFFICIAL_FINAL_PLATE must not pair with final_complete
+    plate_step: dict[str, Any] = {
+        "id": "plate_vs_master",
+        "ok": True,
+        "detail": "no plate/master conflict",
+        "next_cmd": None,
+        "advisory": True,
+    }
+    try:
+        from final.delivery_class import plate_blocks_final_complete
+
+        plate_adv = plate_blocks_final_complete(base, gates=gates)
+        plate_step = {
+            "id": "plate_vs_master",
+            "ok": bool(plate_adv.get("ok")),
+            "detail": plate_adv.get("note") or ("ok" if plate_adv.get("ok") else "plate conflict"),
+            "next_cmd": None
+            if plate_adv.get("ok")
+            else f'aifilm gate-auto --root "{base}"  # then review-final; plate≠master',
+            "advisory": True,
+            "codes": list(plate_adv.get("codes") or []),
+            "is_plate": bool(plate_adv.get("is_plate")),
+            "blocks_ship_complete": bool(plate_adv.get("blocks_ship_complete")),
+            "required_proof": (
+                None
+                if plate_adv.get("ok")
+                else "gate-auto green + human review-final; clear plate-only final_complete"
+            ),
+        }
+        # If plate claims final_complete, fail closed on this step (blocks overall ok)
+        if plate_adv.get("blocks_ship_complete"):
+            plate_step["advisory"] = False
+            plate_step["ok"] = False
+    except Exception as exc:  # noqa: BLE001
+        plate_step = {
+            "id": "plate_vs_master",
+            "ok": True,
+            "detail": f"plate advisory probe failed: {exc}"[:160],
+            "next_cmd": None,
+            "advisory": True,
+            "skipped": True,
+        }
+    steps.append(plate_step)
 
     # P0-C · evidence stale after final rewrite (quality-report / caption)
     evidence_step: dict[str, Any] = {
@@ -548,10 +655,11 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         "delivery_ready": delivery_ready,
         "film_core": core_audit,
         "gates": {
-            "final_complete": bool(gates.get("final_complete")),
+            "final_complete": final_complete_ok,
             "desktop_exported": bool(gates.get("desktop_exported")),
             "clips_complete": bool(gates.get("clips_complete")),
         },
+        "plate_honesty": plate,
         "final": final_rec,
         "heat": {
             "active": heat.get("active"),

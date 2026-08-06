@@ -165,10 +165,22 @@ def cmd_final(args: argparse.Namespace) -> int:
     import os as _os
 
     # H3 native / incomplete drama-graph ship: --skip-canonical-truth or AIFILM_SKIP_CANONICAL_TRUTH=1
-    skip_truth = bool(getattr(args, "skip_canonical_truth", False)) or (
-        str(_os.environ.get("AIFILM_SKIP_CANONICAL_TRUTH") or "").strip().lower()
-        in {"1", "true", "yes", "on"}
+    try:
+        from production_truth import (
+            resolve_skip_canonical_truth,
+            write_skip_canonical_truth_receipt,
+        )
+    except ImportError:  # pragma: no cover
+        from plan.production_truth import (  # type: ignore
+            resolve_skip_canonical_truth,
+            write_skip_canonical_truth_receipt,
+        )
+
+    skip_contract = resolve_skip_canonical_truth(
+        flag=bool(getattr(args, "skip_canonical_truth", False)),
+        env=dict(_os.environ),
     )
+    skip_truth = bool(skip_contract.get("skip"))
     if not skip_truth:
         try:
             require_current_canonical_truth(root)
@@ -182,6 +194,10 @@ def cmd_final(args: argparse.Namespace) -> int:
             "final: skipping require_current_canonical_truth "
             "(--skip-canonical-truth or AIFILM_SKIP_CANONICAL_TRUTH)"
         )
+        try:
+            write_skip_canonical_truth_receipt(root, skip_contract)
+        except Exception:  # noqa: BLE001
+            pass
     post_engine = str(getattr(args, "post_engine", "hyperframes") or "hyperframes").strip().lower()
     if post_engine not in {"ffmpeg", "hyperframes", "remotion"}:
         raise FilmError("--post-engine must be ffmpeg|hyperframes|remotion")

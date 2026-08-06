@@ -74,7 +74,7 @@ def test_aroll_segments_at_word_boundaries_and_never_allows_new_lipsync() -> Non
         with mock.patch("shortform_director._duration", return_value=8.0):
             package = create_package(root, mode="aroll", source_video=video, transcript=transcript)
         assert package["source"]["audio_policy"] == "source_audio_is_lipsync_truth"
-        with pytest.raises(ShortformError, match="cannot enable"):
+        with pytest.raises(ShortformError, match="lipsync removed|prefer_native|cannot enable"):
             enable_lipsync(
                 root, shot_id="beat01_a", speaker="x", face_target="x", audio_sha256="a" * 64
             )
@@ -89,10 +89,11 @@ def test_croll_anchor_hash_and_lipsync_shape_are_enforced() -> None:
         create_package(root, mode="croll", approved_script=script, anchor=anchor)
         review(root, stage="plan", reviewer="dex", note="plan", approve=True)
         review(root, stage="sample", reviewer="dex", note="sample", approve=True)
-        enable_lipsync(
-            root, shot_id="beat01_a", speaker="hero", face_target="hero", audio_sha256="b" * 64
-        )
-        assert not validate_package(root, require_approved=True)["ok"]
+        # v2.40: post lipsync removed — enable is hard-fail; anchor integrity still checked
+        with pytest.raises(ShortformError, match="lipsync removed|prefer_native"):
+            enable_lipsync(
+                root, shot_id="beat01_a", speaker="hero", face_target="hero", audio_sha256="b" * 64
+            )
         assert validate_package(root)["ok"]
         anchor.write_bytes(b"changed")
         report = validate_package(root)
@@ -205,76 +206,22 @@ def test_aroll_rejects_candidate_with_a_shorter_visual_clock(
 def test_explicit_lipsync_render_is_hash_bound_and_requires_new_sample_review(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    del monkeypatch
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        script = _write(root, "approved.txt", b"A character speaks to camera.")
-        anchor = _write(root, "anchor.png", b"approved-anchor")
         video = _write(root, "plate.mp4", b"video")
         audio = _write(root, "line.wav", b"audio")
-        create_package(root, mode="croll", approved_script=script, anchor=anchor)
-        review(root, stage="plan", reviewer="dex", note="plan", approve=True)
-        enable_lipsync(
-            root,
-            shot_id="beat01_a",
-            speaker="hero",
-            face_target="hero",
-            audio_sha256=hashlib.sha256(audio.read_bytes()).hexdigest(),
-        )
-
-        class FakeLipSyncError(RuntimeError):
-            pass
-
-        def fake_lipsync_one(**kwargs: object) -> dict[str, object]:
-            out = kwargs["out"]
-            assert isinstance(out, Path)
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(b"candidate")
-            return {"ok": True, "chosen_backend": "latentsync"}
-
-        fake_module = type(
-            "FakeModule",
-            (),
-            {"LipSyncError": FakeLipSyncError, "lipsync_one": fake_lipsync_one},
-        )
-        monkeypatch.setitem(sys.modules, "lipsync_backend", fake_module)
-        result = render_lipsync(root, shot_id="beat01_a", video=video, audio=audio)
-        assert result["candidate"]["backend"] == "latentsync"
-        assert result["candidate"]["status"] == "pending_human_review"
-        assert not validate_package(root, require_approved=True)["ok"]
+        with pytest.raises(ShortformError, match="lipsync removed|prefer_native"):
+            render_lipsync(root, shot_id="beat01_a", video=video, audio=audio)
 
 
 def test_lipsync_render_rejects_a_symlinked_default_candidate_parent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    del monkeypatch
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        script = _write(root, "approved.txt", b"A character speaks to camera.")
-        anchor = _write(root, "anchor.png", b"approved-anchor")
         video = _write(root, "plate.mp4", b"video")
         audio = _write(root, "line.wav", b"audio")
-        create_package(root, mode="croll", approved_script=script, anchor=anchor)
-        review(root, stage="plan", reviewer="dex", note="plan", approve=True)
-        enable_lipsync(
-            root,
-            shot_id="beat01_a",
-            speaker="hero",
-            face_target="hero",
-            audio_sha256=hashlib.sha256(audio.read_bytes()).hexdigest(),
-        )
-        outside = root.parent / "outside-candidates"
-        outside.mkdir(exist_ok=True)
-        (root / "candidates").symlink_to(outside, target_is_directory=True)
-        called = False
-
-        def fake_lipsync_one(**_kwargs: object) -> dict[str, object]:
-            nonlocal called
-            called = True
-            return {"ok": True}
-
-        fake_module = type(
-            "FakeModule", (), {"LipSyncError": RuntimeError, "lipsync_one": fake_lipsync_one}
-        )
-        monkeypatch.setitem(sys.modules, "lipsync_backend", fake_module)
-        with pytest.raises(ShortformError, match="parent must not be a symlink"):
+        with pytest.raises(ShortformError, match="lipsync removed|prefer_native"):
             render_lipsync(root, shot_id="beat01_a", video=video, audio=audio)
-        assert not called

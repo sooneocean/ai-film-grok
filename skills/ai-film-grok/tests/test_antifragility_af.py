@@ -439,12 +439,13 @@ class Wave3AdapterNodeTimeoutTests(unittest.TestCase):
         self.assertIn("timeout=1800", hg)
 
     def test_node_lipsync_adapters_have_timeout(self) -> None:
+        # v2.40: post lipsync adapters are tombstones (no live subprocess).
         ls = (SCRIPTS / "node" / "latentsync_adapter.py").read_text(encoding="utf-8")
         mt = (SCRIPTS / "node" / "musetalk_adapter.py").read_text(encoding="utf-8")
-        self.assertIn("timeout=", ls)
-        self.assertIn("timeout=600", mt)
-        self.assertIn("TimeoutExpired", ls)
-        self.assertIn("TimeoutExpired", mt)
+        self.assertIn("Tombstone", ls)
+        self.assertIn("Tombstone", mt)
+        self.assertIn("LipSyncError", ls)
+        self.assertIn("LipSyncError", mt)
 
     def test_mmaudio_run_checked_defaults_timeout(self) -> None:
         src = _impl_source("mmaudio_adapter.py").read_text(encoding="utf-8")

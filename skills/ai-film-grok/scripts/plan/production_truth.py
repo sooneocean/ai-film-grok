@@ -7,6 +7,7 @@ evidence it is meant to judge.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,71 @@ AUTHORITY = {
     "department_lifecycle": "production-book.json when present",
     "project_progress": "Professional 11-stage projection from project-state",
 }
+
+# Env tokens that enable final skip of require_current_canonical_truth
+_SKIP_TRUTH_ENV_ON = frozenset({"1", "true", "yes", "on"})
+
+
+def resolve_skip_canonical_truth(
+    *,
+    flag: bool = False,
+    env: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """S1.2 · contract: when final may skip require_current_canonical_truth.
+
+    Default off. Enable via CLI ``--skip-canonical-truth`` or env
+    ``AIFILM_SKIP_CANONICAL_TRUTH=1``. Escape is for H3 native / incomplete
+    graph bulk ship — **not** for locked canonical series by default.
+    """
+    environ = env if env is not None else os.environ
+    raw = str(environ.get("AIFILM_SKIP_CANONICAL_TRUTH") or "").strip().lower()
+    env_on = raw in _SKIP_TRUTH_ENV_ON
+    skip = bool(flag) or env_on
+    return {
+        "schema_version": 1,
+        "kind": "skip_canonical_truth_contract",
+        "skip": skip,
+        "via_flag": bool(flag),
+        "via_env": env_on,
+        "env_raw": raw or None,
+        "allowed_for": [
+            "h3_native_bulk_plate",
+            "incomplete_drama_graph_schema_v2_fields",
+            "explicit_operator_escape",
+        ],
+        "not_for": [
+            "locked_canonical_series_default",
+            "claiming_master_lock_without_truth",
+        ],
+        "default": "off",
+        "note": (
+            "skip does not repair graph; still OFFICIAL_FINAL_PLATE until gate-auto + review-final"
+        ),
+    }
+
+
+def write_skip_canonical_truth_receipt(
+    root: Path | str,
+    contract: dict[str, Any],
+    *,
+    name: str = "skip-canonical-truth.json",
+) -> Path:
+    """Write receipts/skip-canonical-truth.json when skip is active."""
+    root_p = Path(root).expanduser().resolve()
+    path = root_p / "receipts" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        from util import write_json, utc_now
+
+        payload = dict(contract)
+        payload["at"] = utc_now()
+        payload["root"] = str(root_p)
+        write_json(path, payload)
+    except Exception:  # noqa: BLE001
+        import json
+
+        path.write_text(json.dumps(contract, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def audit_production_truth(root: Path | str) -> dict[str, Any]:

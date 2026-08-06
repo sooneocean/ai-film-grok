@@ -245,6 +245,13 @@ def report_scale_fallback_for_shots(
         consecutive_anatomy_fail=consecutive_anatomy_fail,
         penetration_failed=penetration_failed,
     )
+    # S3 · ambition vs honest cap (model-limit delivery)
+    ambition = target
+    honest_cap = (
+        decision.get("recommended_tier")
+        or peak.get("peak_tier")
+        or ("soft-max" if decision.get("partial") else target)
+    )
     return {
         "kind": "scale-fallback",
         "schema_version": 1,
@@ -257,6 +264,9 @@ def report_scale_fallback_for_shots(
         "achieved_wardrobe_tier": peak.get("peak_tier"),
         "recommended_tier": decision.get("recommended_tier"),
         "promote_ban": bool(decision.get("promote_ban")),
+        "wardrobe_ambition": ambition,
+        "wardrobe_honest_cap": honest_cap,
+        "ambition_met": tier_rank(peak.get("peak_tier")) >= tier_rank(ambition),
     }
 
 

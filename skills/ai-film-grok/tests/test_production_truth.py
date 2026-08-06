@@ -160,3 +160,31 @@ def test_legacy_truth_remains_delivery_compatible(tmp_path: Path, monkeypatch) -
     )
 
     assert production_truth.require_current_canonical_truth(tmp_path)["ok"] is False
+
+
+def test_skip_canonical_truth_contract_default_off() -> None:
+    """S1.2: skip is opt-in; default off for locked series safety."""
+    import production_truth
+
+    c = production_truth.resolve_skip_canonical_truth(flag=False, env={})
+    assert c["skip"] is False
+    assert c["default"] == "off"
+    c2 = production_truth.resolve_skip_canonical_truth(
+        flag=False, env={"AIFILM_SKIP_CANONICAL_TRUTH": "1"}
+    )
+    assert c2["skip"] is True
+    assert c2["via_env"] is True
+    c3 = production_truth.resolve_skip_canonical_truth(flag=True, env={})
+    assert c3["skip"] is True
+    assert c3["via_flag"] is True
+    assert "locked_canonical_series_default" in c3["not_for"]
+
+
+def test_skip_canonical_truth_receipt_writes(tmp_path: Path) -> None:
+    import production_truth
+
+    c = production_truth.resolve_skip_canonical_truth(flag=True, env={})
+    path = production_truth.write_skip_canonical_truth_receipt(tmp_path, c)
+    assert path.is_file()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data.get("skip") is True

@@ -126,8 +126,13 @@ def sample_native_audio_audit(
     *,
     sample_n: int = 3,
     silence_db: float = -45.0,
+    mandarin_hard: bool | None = None,
 ) -> dict[str, Any]:
-    """Q5.2 soft native-audio honesty: stream + mean_volume on head samples."""
+    """Q5.2 + S1.3 soft native-audio honesty: stream + mean_volume on head samples.
+
+    Always notes aac≠可懂中文. Optional hard: env ``AIFILM_NATIVE_AUDIO_MANDARIN_HARD=1``
+    promotes stream/quiet failures to severity hard (still not ASR).
+    """
     n = max(0, min(int(sample_n), len(parts)))
     rows: list[dict[str, Any]] = []
     silentish = 0
@@ -153,21 +158,52 @@ def sample_native_audio_audit(
         codes.append("NATIVE_AUDIO_NO_STREAM_SAMPLE")
     if silentish >= max(1, n // 2) and n > 0:
         codes.append("NATIVE_AUDIO_QUIET_SAMPLE")
-    if codes:
-        next_hint = [
-            "aac stream ≠ intelligible Mandarin — spot-listen before claiming native dialogue",
-            "fallback: Edge TTS ADR clock + ship_hardburn captions via aifilm final",
-        ]
+    # S1.3 · always soft-remind Mandarin unverified when any sample has a stream
+    if n > 0 and no_stream < n:
+        codes.append("NATIVE_AUDIO_MANDARIN_UNVERIFIED")
+    if mandarin_hard is None:
+        mandarin_hard = os.environ.get("AIFILM_NATIVE_AUDIO_MANDARIN_HARD", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    stream_fail = {
+        c
+        for c in codes
+        if c in {"NATIVE_AUDIO_NO_STREAM_SAMPLE", "NATIVE_AUDIO_QUIET_SAMPLE"}
+    }
+    if mandarin_hard and stream_fail:
+        severity = "hard"
+        codes.append("NATIVE_AUDIO_MANDARIN_HARD")
+        ok = False
+    elif codes:
+        severity = "soft"
+        ok = True  # soft codes do not fail ship-native by default
     else:
-        next_hint = []
+        severity = "ok"
+        ok = True
+    next_hint = [
+        "aac stream ≠ intelligible Mandarin — spot-listen before claiming native dialogue",
+        "fallback: Edge TTS ADR clock + ship_hardburn captions via aifilm final",
+    ]
+    if mandarin_hard:
+        next_hint.append(
+            "AIFILM_NATIVE_AUDIO_MANDARIN_HARD=1: quiet/no-stream samples fail closed"
+        )
     return {
         "sample_n": n,
         "rows": rows,
         "codes": codes,
-        "ok": not codes,
-        "severity": "soft" if codes else "ok",
-        "next": next_hint,
-        "note": "volumedetect only; not ASR. aac≠中文对白清晰.",
+        "ok": ok,
+        "severity": severity,
+        "mandarin_hard": bool(mandarin_hard),
+        "next": next_hint if codes else [],
+        "note": "volumedetect only; not ASR. aac≠中文对白清晰. checklist: spot-listen sample rows.",
+        "listen_checklist": [
+            "抽听 sample rows 是否有可懂中文口白（非氛围/外语噪声）",
+            "无中文可懂 → Edge ADR + ship_hardburn，勿声称 native dialogue",
+        ],
     }
 
 

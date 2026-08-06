@@ -281,6 +281,59 @@ class TestShipNativeDry(unittest.TestCase):
             self.assertIn("--music-mood rnb", st2.get("command") or "")
             self.assertEqual(rep["delivery_class"], "OFFICIAL_FINAL_PLATE")
 
+    def test_mandarin_unverified_soft_and_hard_flag(self) -> None:
+        """S1.3: aac present → MANDARIN_UNVERIFIED soft; hard env promotes stream fail."""
+        from media.h3_ship_native import sample_native_audio_audit
+        from pathlib import Path
+        from unittest import mock
+
+        with mock.patch("media.h3_ship_native._ffprobe_has_audio", return_value=True), mock.patch(
+            "media.h3_ship_native._mean_volume_db", return_value=-20.0
+        ):
+            r = sample_native_audio_audit(
+                ["s01"], [Path("/tmp/x.mp4")], sample_n=1, mandarin_hard=False
+            )
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["severity"], "soft")
+        self.assertIn("NATIVE_AUDIO_MANDARIN_UNVERIFIED", r["codes"])
+        self.assertTrue(r.get("listen_checklist"))
+
+        with mock.patch("media.h3_ship_native._ffprobe_has_audio", return_value=False), mock.patch(
+            "media.h3_ship_native._mean_volume_db", return_value=None
+        ):
+            r2 = sample_native_audio_audit(
+                ["s01"], [Path("/tmp/x.mp4")], sample_n=1, mandarin_hard=True
+            )
+        self.assertFalse(r2["ok"])
+        self.assertEqual(r2["severity"], "hard")
+        self.assertIn("NATIVE_AUDIO_MANDARIN_HARD", r2["codes"])
+
+
+class TestPlateVsMaster(unittest.TestCase):
+    def test_plate_blocks_final_complete_claim(self) -> None:
+        """S1.4: OFFICIAL_FINAL_PLATE + final_complete → blocks ship complete."""
+        import json
+        import tempfile
+        from final.delivery_class import plate_blocks_final_complete
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "receipts").mkdir()
+            (root / "receipts" / "official-final-report.json").write_text(
+                json.dumps(
+                    {
+                        "status": "OFFICIAL_FINAL_PLATE",
+                        "partial": True,
+                        "master_lock": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            r = plate_blocks_final_complete(root, gates={"final_complete": True})
+            self.assertFalse(r["ok"])
+            self.assertTrue(r["blocks_ship_complete"])
+            self.assertIn("PLATE_CLAIMED_FINAL_COMPLETE", r["codes"])
+
 
 if __name__ == "__main__":
     unittest.main()

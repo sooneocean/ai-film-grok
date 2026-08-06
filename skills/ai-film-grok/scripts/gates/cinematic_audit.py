@@ -289,13 +289,15 @@ def current_audit(root: Path | str) -> dict[str, Any]:
     report = read_json(base / RECEIPT_RELATIVE_PATH)
     if not isinstance(report, dict):
         return {"ok": False, "blocking_codes": ["CINEMATIC_AUDIT_MISSING"]}
-    expected = sha256_file(base / "film-spec.json")
+    def _hash(name: Path) -> str | None:
+        return sha256_file(name) if name.is_file() else None
+
+    inputs = report.get("inputs", {})
     if (
         report.get("version") != AUDIT_VERSION
-        or report.get("inputs", {}).get("film_spec_sha256") != expected
-        or report.get("inputs", {}).get("manifest_sha256") != sha256_file(base / "manifest.json")
-        or report.get("inputs", {}).get("final_mp4_sha256")
-        != sha256_file(base / "out" / "film_final.mp4")
+        or inputs.get("film_spec_sha256") != _hash(base / "film-spec.json")
+        or inputs.get("manifest_sha256") != _hash(base / "manifest.json")
+        or inputs.get("final_mp4_sha256") != _hash(base / "out" / "film_final.mp4")
     ):
         return {"ok": False, "blocking_codes": ["CINEMATIC_AUDIT_STALE"]}
     return report

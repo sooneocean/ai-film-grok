@@ -379,7 +379,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     # Post lipsync removed (v2.40): never block doctor on missing LatentSync/MuseTalk.
     lipsync_required_ok = True
     ready_lipsync_backends: list[str] = []
-    requested_lipsync = "off"
     report = {
         "ok": True,
         "skill_dir": str(skill_dir),

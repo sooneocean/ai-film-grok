@@ -8,6 +8,7 @@
 - selected owner 未烧字 → `stage_caption` recovery；禁止清空 `final.srt` 过关。
 - title / end card / grade：正式链单引擎，避免双烧；ship 硬烧字幕可与 HF underlay 并存（字已在 plate 则 HF 勿再叠一层）。
 - `final` 技术成功 ≠ `final_complete`；仍需 post audit、caption attestation 与完整观看。
+- **H3 槽（S0.5）**：短源 ~5.2s → plan `duration_sec` 默认 ≤5.2；forbid_loop 可 stretch 上限约 **~5.9s**；禁空写 8–10s。`OFFICIAL_FINAL_PLATE` ≠ master。
 
 ## P0 · final 工程（2026-07-24 ep2 复盘 · 2026-08-03 Wave D）
 

@@ -35,7 +35,7 @@ ai-film-grok/                    ← plugin root / git root
 │   │   ├── assets/              ← continuity / style_lock / face
 │   │   ├── plan/                ← drama_graph / narrative_control
 │   │   ├── gates/               ← preflight / production_gates
-│   │   ├── audio/               ← TTS/BGM/lipsync/sound（W6）
+│   │   ├── audio/               ← TTS/BGM/sound（W6；post lipsync 已 v2.40 移除）
 │   │   ├── media/               ← I2V/Comfy/H3/FRW/queue（W6）
 │   │   ├── post/                ← render_final（W4）
 │   │   ├── narrative/           ← edit_policy_heat（W4）
@@ -60,7 +60,7 @@ Package layout tracker: `docs/plans/2026-08-05-project-module-refactor.md`
 | Plan | `scripts/plan/*` · story.normalize → shot plan | `test_story_plan` |
 | Assets | `scripts/assets/*` · character/location/prop/state | `test_asset_registry` |
 | Media | I2V / queue / register / OAuth 出图 | media / continuity 相关 |
-| Audio | TTS / BGM / recipe / lipsync | `test_audio_recipe` `test_capability` |
+| Audio | TTS / BGM / recipe（lipsync 墓碑） | `test_audio_recipe` `test_lipsync_frozen` |
 | Post | final / compose / review / export · `scripts/post/` | `test_delivery_gates` compose 相关 |
 | Narrative | 色气 / 性爱时长≥20% / 剪辑 / 景别 · `scripts/narrative/` | `test_heat_arc_multi` + soft gate |
 | Gates | hard-defaults / security / runtime-lock | doctor + delivery gates |

@@ -106,3 +106,66 @@ def write_official_final_report(root: Path | str, payload: dict[str, Any]) -> Pa
 
         out.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return out
+
+
+def plate_blocks_final_complete(
+    root: Path | str,
+    *,
+    gates: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """S1.4 · plate / red gate must not be treated as final_complete master.
+
+    Returns advisory when OFFICIAL_FINAL_PLATE or gate-auto red while someone
+    might claim ship-complete.
+    """
+    root_p = Path(root).expanduser().resolve()
+    try:
+        from util import read_json
+    except ImportError:  # pragma: no cover
+        read_json = None  # type: ignore
+    report = None
+    if read_json is not None:
+        report = read_json(root_p / "receipts" / "official-final-report.json")
+    if not isinstance(report, dict):
+        report = {}
+    status = str(report.get("status") or "")
+    master_claim = bool(report.get("master_lock"))
+    gate_ok = read_gate_auto_ok(root_p)
+    g = gates if isinstance(gates, dict) else {}
+    final_complete = bool(g.get("final_complete"))
+    is_plate = status == "OFFICIAL_FINAL_PLATE" or bool(report.get("partial"))
+    blocks = False
+    codes: list[str] = []
+    if is_plate and final_complete:
+        blocks = True
+        codes.append("PLATE_CLAIMED_FINAL_COMPLETE")
+    if master_claim:
+        blocks = True
+        codes.append("MASTER_LOCK_ON_PLATE_RECEIPT")
+    if gate_ok is False and final_complete:
+        blocks = True
+        codes.append("GATE_AUTO_RED_WITH_FINAL_COMPLETE")
+    return {
+        "kind": "plate_vs_master_advisory",
+        "ok": not blocks,
+        "advisory": True,
+        "is_plate": is_plate or status == "OFFICIAL_FINAL_PLATE",
+        "final_complete": final_complete,
+        "gate_auto_ok": gate_ok,
+        "master_lock_claimed": master_claim,
+        "codes": codes,
+        "blocks_ship_complete": blocks,
+        "note": (
+            "OFFICIAL_FINAL_PLATE ≠ master; clear final_complete until gate-auto green + review-final"
+            if blocks or is_plate
+            else "no plate/master conflict detected"
+        ),
+        "next": (
+            [
+                "do not export-desktop as ship-complete while plate/PARTIAL",
+                "aifilm gate-auto → review-final before final_complete",
+            ]
+            if blocks or is_plate
+            else []
+        ),
+    }

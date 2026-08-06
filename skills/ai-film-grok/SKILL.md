@@ -27,8 +27,11 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 映射：idea/story/beats→agent · shots/media→visual · rough/voice→voice+post · verified→deliver。  
 八环/11-stage=内部；规则 `hard-defaults`；context 只 stages。
 
+**路径选择：** AI 剧情/漫剧/H3 成片 → **主产线** `plan run`…`final`；真人 A-roll 15–60s 编排 → `aifilm shortform`（旁路，**不进** dispatch）；决策树 [shortform-director](references/shortform-director.md)。
+
 小说/剧本：[receive](references/story-reception.md)→[debrief](references/script-value-debrief.md)→`plan run`→`fidelity check`；lock 须确认。  
-会诊：[creative-workshop](references/creative-workshop.md)。长片：`plan run --production-mode longform`；[longform](references/longform-workflow.md)
+会诊：[creative-workshop](references/creative-workshop.md)。长片：`plan run --production-mode longform`；[longform](references/longform-workflow.md)  
+**短版选型**：默认主产线 `plan run`（shortform）；仅 15–60s topic/A-roll/C-roll 编排才用 `aifilm shortform`（[决策树](references/shortform-director.md)）；禁后期 lipsync。
 
 ## P0
 
@@ -50,7 +53,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 14. **高动**：mean≥18、肉戏≥20；桌面 final 仅 motion-gate ok。
 15. **I2V 画风**：源=style-locked still；首段 MEDIUM LOCK cel。
 16. **5090**：未锁视觉走 `weapon_route`；本机 1×`comfy_video`；禁 pgrep 自杀。
-17. **口型/原音**：生产 **冻结** 后期对嘴（LatentSync/MuseTalk/InfiniteTalk/FRW lipsync）；有声镜靠模型原音 `prefer_native`。[lipsync](references/lipsync.md)
+17. **口型/原音**：**v2.40 移除** 后期对嘴（仅 `--lipsync off`）；有声镜靠模型原音 `prefer_native`。[lipsync](references/lipsync.md)
 18. **零旁白 IRON**：`dialogue_drama` 默认 `zero_narration_strict`；`nar` 硬底 0%。
 19. **DP+5-Track**：焦段/三点光；DX/FX/BG/MX/SUB；-16 LUFS。[5track](references/5track-audio-master.md)
 20. **真片+gate-auto**：**运镜只在 Grok/H3 视频内**；still 不进 timeline。`aifilm gate-auto` 机写 mean→i2v-final→sex_sfx→five-track→true-video→variety→cinematic。仅 pilot / 多 take PK / review-final 须人。[memory](memory/2026-08-04-gate-auto.md)
