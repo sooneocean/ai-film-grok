@@ -158,7 +158,12 @@ class FamilyApplyTests(unittest.TestCase):
 
         data = load_combo_winners() or {}
         lane = (data.get("lanes") or {}).get("dialogue_mouth_energy") or {}
-        self.assertEqual(lane.get("prompt_family"), "dialogue_mouth_max")
+        # R5 mouth-metric winner may be dialogue_mouth_flat; policy requires
+        # prompt_family == winner.family (no stale mismatch).
+        self.assertIn(
+            lane.get("prompt_family"),
+            {"dialogue_mouth_max", "dialogue_mouth_flat", "dialogue_mandarin"},
+        )
         winner = lane.get("winner") or {}
         if winner.get("family"):
             self.assertEqual(winner.get("family"), lane.get("prompt_family"))

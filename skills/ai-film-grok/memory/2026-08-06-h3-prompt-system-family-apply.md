@@ -14,9 +14,12 @@
 ## 检查清单
 - [x] family apply + 单测
 - [x] 系统句表 + spine 读表
-- [x] dialogue winner.family 对齐 max
-- [ ] R5 GPU 矩阵（idle）
-- [ ] 真片 soft+meat canary
+- [x] R5 GPU 矩阵 7/7（`h3-combo-r5-family-20260806`）
+- [x] winners 回写 + free-memory 每镜
+- [x] 生产 prompt canary（空 DSL → family 内容）
+
+## R5 三数
+- soft mean≈**5.5** id≈74 · high r2v mean≈**25.4** · dlg flat mouth≈**48**（mid L1≈77 弱）
 
 ## 链
-- lesson h3-max · weapon-lane · combo-eval CLI
+- lesson h3-max · weapon-lane · combo-eval CLI · `artifacts/.../R5-SUMMARY.md`

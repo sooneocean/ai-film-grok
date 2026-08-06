@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.39.96] - 2026-08-06
+
+### Validated (H3 prompt R5 · 5090)
+- GPU revalidation of round-4 matrix under family-apply stack: 7/7 ok (`artifacts/.../h3-combo-r5-family-20260806`).
+- Winners written: soft `soft_portrait_alive` i2v · high `high_motion_max` r2v mean≈25.4 · dialogue mouth-metric `dialogue_mouth_flat` i2v (runner_up max for identity).
+- **combo-eval free-memory after every job** (VRAM residual floor stall fix).
+- Evidence: `registry/evidence/h3-combo-r5-summary-20260806.md`.
+
 ## [2.39.95] - 2026-08-06
 
 ### Added / Fixed (quality closeout)

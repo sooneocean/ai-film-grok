@@ -1130,11 +1130,18 @@ def run_combo_grid(
             write_json(compare / f"{c.combo_id}.json", row)
             continue
 
-        if free_memory_on_mode_switch and last_mode and last_mode != c.mode:
+        # Free after every prior job (not only mode switch): residual VRAM often
+        # stays below 24GiB floor even when queue is idle (R5 2026-08-06).
+        if free_memory_on_mode_switch and last_mode is not None:
             try:
                 from comfy_armory import default_base_url
                 from comfy_video import free_memory
-                _log(f"free-memory on mode switch {last_mode}→{c.mode}")
+                reason = (
+                    f"mode switch {last_mode}→{c.mode}"
+                    if last_mode != c.mode
+                    else f"post-job free after {last_mode}"
+                )
+                _log(f"free-memory ({reason})")
                 free_memory(base_url or default_base_url())
                 time.sleep(3)
             except Exception as exc:  # noqa: BLE001

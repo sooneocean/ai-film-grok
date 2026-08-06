@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "kind": "h3-combo-winners",
-  "policy": "h3_max_effect_combo_v1",
+  "policy": "h3_max_effect_combo_v1_r5",
   "source_verdict_kind": "h3-combo-verdict",
-  "ts": "2026-08-05T09:38:13.458195+00:00",
+  "ts": "2026-08-06T05:31:20.012365+00:00",
   "lanes": {
     "hero_identity_lock": {
       "preferred_mode": "i2v",
@@ -13,20 +13,20 @@
         "combo_id": "r4_soft_tl_i2v",
         "mode": "i2v",
         "family": "soft_portrait_alive",
-        "score": 74.0181,
+        "score": 74.0767,
         "scores": {
-          "identity_score": 74.0181,
-          "motion_score": 4.7533,
-          "mouth_score": 17.5622,
-          "hero_balanced": 53.2386
+          "identity_score": 74.0767,
+          "motion_score": 5.5448,
+          "mouth_score": 22.852,
+          "hero_balanced": 53.5171
         },
-        "motion_mean_absdiff": 4.7533,
+        "motion_mean_absdiff": 5.5448,
         "identity": {
-          "start_l1": 19.1773,
-          "mid_l1": 26.8479,
-          "end_l1": 41.6946
+          "start_l1": 19.4237,
+          "mid_l1": 24.4929,
+          "end_l1": 44.3179
         },
-        "mouth_region_std_change": 17.5622
+        "mouth_region_std_change": 22.852
       }
     },
     "high_motion_energy": {
@@ -37,44 +37,57 @@
         "combo_id": "r4_high_tl_r2v",
         "mode": "r2v",
         "family": "high_motion_max",
-        "score": 26.0017,
+        "score": 25.397,
         "scores": {
-          "identity_score": 71.455,
-          "motion_score": 26.0017,
-          "mouth_score": 50.7239,
-          "hero_balanced": 57.819
+          "identity_score": 70.1386,
+          "motion_score": 25.397,
+          "mouth_score": 46.1343,
+          "hero_balanced": 56.7161
         },
-        "motion_mean_absdiff": 26.0017,
+        "motion_mean_absdiff": 25.397,
         "identity": {
-          "start_l1": 20.405,
-          "mid_l1": 48.2332,
-          "end_l1": 19.3629
+          "start_l1": 20.6476,
+          "mid_l1": 52.1667,
+          "end_l1": 19.438
         },
-        "mouth_region_std_change": 50.7239
+        "mouth_region_std_change": 46.1343
       }
     },
     "dialogue_mouth_energy": {
       "preferred_mode": "i2v",
-      "prompt_family": "dialogue_mouth_max",
-      "notes": "Default I2V + Mandarin line inject; R2V only for extreme mouth CU when identity can float",
+      "prompt_family": "dialogue_mouth_flat",
+      "notes": "R5 2026-08-06: mouth metric winner is dialogue_mouth_flat i2v (mouth≈48) but mid identity L1≈77 is weak; dialogue_mouth_max keeps MOUTH ENERGY timeline with milder mouth≈30. Production uses flat as registry family; prefer max when identity lock is critical. R2V only for extreme mouth CU when identity can float.",
       "winner": {
         "combo_id": "r4_dlg_flat_i2v",
         "mode": "i2v",
-        "family": "dialogue_mouth_max",
-        "score": 92.02932,
+        "family": "dialogue_mouth_flat",
+        "score": 99.278765,
         "scores": {
-          "identity_score": 51.5424,
-          "motion_score": 19.0763,
-          "mouth_score": 44.7261,
-          "hero_balanced": 41.8026
+          "identity_score": 51.2913,
+          "motion_score": 18.2146,
+          "mouth_score": 48.3571,
+          "hero_balanced": 41.3683
         },
-        "motion_mean_absdiff": 19.0763,
+        "motion_mean_absdiff": 18.2146,
         "identity": {
-          "start_l1": 19.5491,
-          "mid_l1": 76.7604,
-          "end_l1": 78.2746
+          "start_l1": 19.3565,
+          "mid_l1": 77.5224,
+          "end_l1": 78.8685
         },
-        "mouth_region_std_change": 44.7261
+        "mouth_region_std_change": 48.3571
+      },
+      "runner_up": {
+        "combo_id": "r4_dlg_tl_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mouth_max",
+        "motion_mean_absdiff": 11.9222,
+        "mouth_region_std_change": 30.4837,
+        "identity": {
+          "start_l1": 19.503,
+          "mid_l1": 73.4605,
+          "end_l1": 73.2789
+        },
+        "note": "timeline mouth_max — better identity narrative, lower mouth metric"
       }
     },
     "faceless_env": {
@@ -100,5 +113,6 @@
     "duration_sec": 5.0,
     "fps": 24,
     "note": "registry tuning.steps.allowed is [20] only"
-  }
+  },
+  "source_eval_root": "artifacts/5090-evaluation/h3-combo-r5-family-20260806"
 }
