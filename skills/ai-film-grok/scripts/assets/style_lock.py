@@ -356,6 +356,44 @@ def validate_style_lock_bible(bible: dict[str, Any]) -> dict[str, Any]:
             continue
         if not cast_locks.get(cid):
             soft.append(f"CAST_LOCK_MISSING:{cid}")
+    # P1 · 2026-08-06: hair-color lock hard when cast_locks present (lesson→default)
+    for cid, cl in cast_locks.items():
+        if not isinstance(cl, dict):
+            continue
+        hair = str(cl.get("hair_lock") or "").strip()
+        if not hair:
+            hard.append(f"HAIR_LOCK_MISSING:{cid}")
+            continue
+        hair_l = hair.lower()
+        if not any(
+            tok in hair_l
+            for tok in (
+                "never",
+                "match",
+                "lock",
+                "recolor",
+                "cast master",
+                "发色",
+                "禁",
+            )
+        ):
+            soft.append(
+                f"HAIR_LOCK_WEAK:{cid} — prefer 'hair match cast master; NEVER random recolor'"
+            )
+    # Default hard NEG tokens for first-frame poison / compress lessons
+    neg = str(
+        (fp.get("negative") if isinstance(fp, dict) else None)
+        or bible.get("negative")
+        or ""
+    ).lower()
+    required_neg = ("watermark", "text", "logo")
+    missing_neg = [t for t in required_neg if t not in neg]
+    if missing_neg and medium_key:
+        soft.append(
+            "STYLE_NEG_DEFAULT_GAP: add --no tokens "
+            + ",".join(missing_neg)
+            + " (watermark/text/logo; see keyframe-first-frame-poison)"
+        )
     if medium_key == "photoreal":
         soft.append(
             "PHOTOREAL_LOW_STABILITY: multi-shot I2V face drift risk; "

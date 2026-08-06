@@ -512,6 +512,45 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     steps.append(cin_step)
 
+    # Narrative rebind + adult sex arc (P1 · 2026-08-06) — receipt always written
+    rebind_step: dict[str, Any] = {
+        "id": "narrative_rebind",
+        "ok": True,
+        "detail": "skipped",
+        "next_cmd": None,
+        "advisory": True,
+    }
+    try:
+        from narrative_rebind import check_narrative_rebind
+
+        rebind = check_narrative_rebind(base, write=True)
+        hard_issues = [
+            i for i in (rebind.get("issues") or []) if i.get("severity") == "hard"
+        ]
+        rebind_step = {
+            "id": "narrative_rebind",
+            "ok": bool(rebind.get("ok")),
+            "detail": (
+                "graph projection current + adult arc ok"
+                if rebind.get("ok")
+                else f"hard={len(hard_issues)} soft={rebind.get('soft_count')}"
+            ),
+            "next_cmd": rebind.get("next_cmd"),
+            "advisory": False if hard_issues else True,
+            "hard": bool(hard_issues),
+            "receipt": "receipts/narrative-rebind.json",
+        }
+    except Exception as exc:  # noqa: BLE001
+        rebind_step = {
+            "id": "narrative_rebind",
+            "ok": False,
+            "detail": str(exc)[:200],
+            "next_cmd": f'aifilm closeout status --root "{base}"',
+            "advisory": False,
+            "hard": True,
+        }
+    steps.append(rebind_step)
+
     # film-core audit: max/premium/strict → hard; else advisory
     core_audit: dict[str, Any] = {}
     film_core_hard = False

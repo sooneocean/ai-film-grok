@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.6] - 2026-08-06
+
+### Added (quality P1 · narrative rebind + hair + adult arc closeout)
+- **`narrative_rebind`**: closeout step + `receipts/narrative-rebind.json` — stale graph projection hard; max heat re-asserts SEX_ARC_*/coitus core (escape `AIFILM_SKIP_NARRATIVE_REBIND=1`).
+- **style_lock**: `HAIR_LOCK_MISSING` hard when cast_locks lack hair; weak lock soft; default NEG gap soft.
+- **compat**: re-export `COITUS_BEATS` / `_compatibility_vo_mode` (hotpath collection).
+- Tests: `test_narrative_rebind` · `test_style_lock_hair`.
+
 ## [2.40.5] - 2026-08-06
 
 ### Fixed / Ops
